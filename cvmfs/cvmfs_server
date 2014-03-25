@@ -1143,7 +1143,7 @@ remove_apache_config_file() {
 
   # disable configuration on newer apache versions
   if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    a2disconf $file_name > /dev/null || return 1
+    a2disconf $file_name > /dev/null 2>&1 || return 1
   fi
 
   # remove configuration file
