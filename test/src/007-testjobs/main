@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Experiment framwork test jobs"
+cvmfs_test_name="Experiment framework test jobs"
 
 cvmfs_run_test() {
   logfile=$1
