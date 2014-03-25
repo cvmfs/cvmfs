@@ -41,7 +41,7 @@ cvmfs_run_test() {
     echo "done"
   fi
   mkdir $symlink_destination || return 2
-  ln --symbolic $symlink_destination $backend_dir || return 3
+  sudo ln --symbolic $symlink_destination $backend_dir || return 3
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
