@@ -39,9 +39,7 @@ run_unittests --gtest_shuffle \
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
-./run.sh $TEST_LOGFILE -x src/004-davinci              \
-                          src/005-asetup               \
-                          src/007-testjobs             \
+./run.sh $TEST_LOGFILE -x src/005-asetup               \
                           src/024-reload-during-asetup \
                           src/518-hardlinkstresstest   \
                           src/523-corruptchunkfailover \
