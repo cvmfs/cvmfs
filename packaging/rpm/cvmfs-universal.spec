@@ -125,6 +125,9 @@ Requires: attr
 Requires: openssl
 Requires: httpd
 Requires: cvmfs-keys >= 1.2
+
+Conflicts: cvmfs-server < 2.1
+
 %description server
 CernVM-FS tools to maintain Stratum 0/1 repositories
 
