@@ -475,6 +475,27 @@ is_root() {
 }
 
 
+# checks if a given path is mounted
+# Note: this takes care of symlink resolving and should be
+#       used exclusively for mount checks
+#
+# @param mountpoint  the mountpoint to be checked
+# @param regexp      additional regexp to be validated on the mountpoint record
+#                    found in /proc/mounts
+is_mounted() {
+  local mountpoint="$1"
+  local regexp="$2"
+
+  local absolute_mnt="$(readlink --canonicalize $mountpoint)"
+  local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
+  if [ x"$mnt_record" = x"" ]; then
+    return 1
+  fi
+
+  [ x"$regexp" = x"" ] || echo "$mnt_record" | grep -q "$regexp"
+}
+
+
 # checks if a given repository is a stratum 0 repository
 #
 # @param name   the repository name to be checked
@@ -774,22 +795,22 @@ health_check() {
   fi
 
   # check mounted union file system
-  if ! cat /proc/mounts | grep -q " /cvmfs/$name "; then
+  if ! is_mounted "/cvmfs/$name"; then
     die "/cvmfs/$name is not mounted properly."
   fi
 
   # check mounted read-only cvmfs client
-  if ! cat /proc/mounts | grep -q " /var/spool/cvmfs/$name/rdonly "; then
+  if ! is_mounted "/var/spool/cvmfs/$name/rdonly"; then
     die "/var/spool/cvmfs/$name/rdonly is not mounted properly."
   fi
 
   # check transaction status
   if is_in_transaction $name; then
-    if ! cat /proc/mounts | grep -q " /cvmfs/$name .*rw"; then
+    if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
       die "$name is in a transaction but /cvmfs/$name is not mounted read/write"
     fi
   else
-    if ! cat /proc/mounts | grep -q " /cvmfs/$name .*ro"; then
+    if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
       die "$name is not in a transaction but /cvmfs/$name is mounted read-only"
     fi
   fi
@@ -1921,8 +1942,8 @@ rmfs() {
     if [ "$type" = "stratum0" ]; then
       echo -n "Unmounting CernVM-FS Area... "
       sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
-      mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
-      mount | grep -q " ${spool_dir}/rdonly " && umount ${spool_dir}/rdonly
+      is_mounted "/cvmfs/$name"        && umount /cvmfs/$name
+      is_mounted "${spool_dir}/rdonly" && umount ${spool_dir}/rdonly
       if [ -d /cvmfs/$name ]; then
         rmdir /cvmfs/$name
       fi
