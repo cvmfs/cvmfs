@@ -28,8 +28,6 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-const uint64_t WritableCatalogManager::kDefaultCatalogEntryWarnThreshold = 250000;
-
 WritableCatalogManager::WritableCatalogManager(
   const shash::Any          &base_hash,
   const std::string         &stratum0,
