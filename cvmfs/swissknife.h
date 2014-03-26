@@ -8,6 +8,9 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <cassert>
+
+#include "util.h"
 
 namespace download {
 class DownloadManager;
@@ -25,19 +28,35 @@ void Usage();
 
 class Parameter {
  public:
-  Parameter(const char key, const std::string &desc, const bool opt,
-            const bool switch_only)
-  {
-    key_ = key;
-    description_ = desc;
-    optional_ = opt;
-    switch_only_ = switch_only;
+  static Parameter Mandatory(const char key, const std::string &desc) {
+    return Parameter(key, desc, false, false);
+  }
+  static Parameter Optional(const char key, const std::string &desc) {
+    return Parameter(key, desc, true, false);
+  }
+  static Parameter Switch(const char key, const std::string &desc) {
+    return Parameter(key, desc, true, true);
   }
 
   char key() const { return key_; }
-  std::string description() const { return description_; }
+  const std::string& description() const { return description_; }
   bool optional() const { return optional_; }
+  bool mandatory() const { return !optional_; }
   bool switch_only() const { return switch_only_; }
+
+ protected:
+  Parameter(const char          key,
+            const std::string  &desc,
+            const bool          opt,
+            const bool          switch_only) :
+    key_(key),
+    description_(desc),
+    optional_(opt),
+    switch_only_(switch_only)
+  {
+    assert (! switch_only_ || optional_); // switches are optional by definition
+  }
+
  private:
   char key_;
   std::string description_;
@@ -48,16 +67,61 @@ class Parameter {
 typedef std::vector<Parameter> ParameterList;
 typedef std::map<char, std::string *> ArgumentList;
 
-class Command {
+struct CommandIntrospection {
+  CommandIntrospection(const std::string    &name,
+                       const std::string    &description,
+                       const ParameterList  &parameters) :
+    name(name), description(description), parameters(parameters) {}
+
+  std::string    name;
+  std::string    description;
+  ParameterList  parameters;
+};
+
+class AbstractCommand : public PolymorphicConstruction<AbstractCommand,
+                                                       std::string,
+                                                       CommandIntrospection> {
  public:
-  Command() { }
-  virtual ~Command() { }
-  virtual std::string GetName() = 0;
-  virtual std::string GetDescription() = 0;
-  virtual ParameterList GetParams() = 0;
-  virtual int Main(const ArgumentList &args) = 0;
+  static void RegisterPlugins();
+
+ public:
+  // this should be overridden and up-called for each Command implementation
+  AbstractCommand(const std::string &param) {}
+  virtual ~AbstractCommand() { }
+  virtual int Main(int argc, char** argv) = 0;
+  virtual int Run(const ArgumentList &args) = 0;
+
+ protected:
+  virtual ArgumentList ReadArguments(int argc, char **argv) const = 0;
+
+  ArgumentList ParseArguments(int argc, char **argv, ParameterList &params) const;
+};
+
+
+// CRTP - Curiously Recurring Template Pattern for static polymorphism
+template <class DerivedT>
+class Command : public AbstractCommand {
+ public:
+  Command(const std::string &param) : AbstractCommand(param) {}
+
+  static bool WillHandle(const std::string &param) {
+    return (param == DerivedT::GetName());
+  }
+
+  static CommandIntrospection GetInfo() {
+    return CommandIntrospection(DerivedT::GetName(),
+                                DerivedT::GetDescription(),
+                                DerivedT::GetParameters());
+  }
+
+  int Main(int argc, char **argv);
+
+ protected:
+  ArgumentList ReadArguments(int argc, char **argv) const;
 };
 
 }  // namespace swissknife
+
+#include "swissknife_impl.h"
 
 #endif  // CVMFS_SWISSKNIFE_H_

@@ -8,28 +8,19 @@
 
 using namespace swissknife;
 
-CommandListCatalogs::CommandListCatalogs() :
-  print_tree_(false),
-  print_hash_(false) {}
 
-
-ParameterList CommandListCatalogs::GetParams() {
-  ParameterList result;
-  result.push_back(Parameter('r', "repository URL (absolute local path or remote URL)",
-                             false, false));
-  result.push_back(Parameter('n', "fully qualified repository name",
-                             true, false));
-  result.push_back(Parameter('k', "repository master key(s)",
-                             true, false));
-  result.push_back(Parameter('t', "print tree structure of catalogs",
-                             true, true));
-  result.push_back(Parameter('d', "print digest for each catalog",
-                             true, true));
-  return result;
+ParameterList CommandListCatalogs::GetParameters() {
+  ParameterList r;
+  r.push_back(Parameter::Mandatory('r', "repository URL (absolute local path or remote URL)"));
+  r.push_back(Parameter::Optional ('n', "fully qualified repository name"));
+  r.push_back(Parameter::Optional ('k', "repository master key(s)"));
+  r.push_back(Parameter::Switch   ('t', "print tree structure of catalogs"));
+  r.push_back(Parameter::Switch   ('d', "print digest for each catalog"));
+  return r;
 }
 
 
-int CommandListCatalogs::Main(const ArgumentList &args) {
+int CommandListCatalogs::Run(const ArgumentList &args) {
   print_tree_ = (args.count('t') > 0);
   print_hash_ = (args.count('d') > 0);
 

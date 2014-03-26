@@ -9,29 +9,27 @@
 
 namespace swissknife {
 
-class CommandSign : public Command {
+class CommandSign : public Command<CommandSign> {
  public:
+  CommandSign(const std::string &param) : Command(param) {}
   ~CommandSign() { };
-  std::string GetName() { return "sign"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "sign"; };
+  static std::string GetDescription() {
     return "Adds a signature to the repository manifest.";
   };
-  ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('m', "manifest file", false, false));
-    result.push_back(Parameter('r', "spooler definition", false, false));
-    result.push_back(Parameter('t', "directory for temporary files",
-                               false, false));
-    result.push_back(Parameter('c', "x509 certificate", true, false));
-    result.push_back(Parameter('k', "private key of the certificate",
-                               true, false));
-    result.push_back(Parameter('s', "password for the private key",
-                               true, false));
-    result.push_back(Parameter('n', "repository name", true, false));
-    result.push_back(Parameter('h', "history path", true, false));
-    return result;
+  static ParameterList GetParameters() {
+    ParameterList r;
+    r.push_back(Parameter::Mandatory('m', "manifest file"));
+    r.push_back(Parameter::Mandatory('r', "spooler definition"));
+    r.push_back(Parameter::Mandatory('t', "directory for temporary files"));
+    r.push_back(Parameter::Optional ('c', "x509 certificate"));
+    r.push_back(Parameter::Optional ('k', "private key of the certificate"));
+    r.push_back(Parameter::Optional ('s', "password for the private key"));
+    r.push_back(Parameter::Optional ('n', "repository name"));
+    r.push_back(Parameter::Optional ('h', "history path"));
+    return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 }  // namespace swissknife

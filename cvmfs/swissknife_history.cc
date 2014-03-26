@@ -103,7 +103,7 @@ static bool FetchTagList(const string &repository_url,
 }
 
 
-int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandTag::Run(const swissknife::ArgumentList &args) {
   const string repository_url = MakeCanonicalPath(*args.find('r')->second);
   const string repository_name = *args.find('n')->second;
   const string repository_key_path = *args.find('k')->second;
@@ -252,7 +252,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
 }
 
 
-int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandRollback::Run(const swissknife::ArgumentList &args) {
   const string spooler_definition = *args.find('r')->second;
   const string repository_url = MakeCanonicalPath(*args.find('u')->second);
   const string repository_name = *args.find('n')->second;

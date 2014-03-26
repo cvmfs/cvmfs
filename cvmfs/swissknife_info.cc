@@ -42,22 +42,21 @@ static bool Exists(const string &repository, const string &file)
   }
 }
 
-swissknife::ParameterList swissknife::CommandInfo::GetParams() {
-  swissknife::ParameterList result;
-  result.push_back(Parameter('r', "repository directory / url",
-                             false, false));
-  result.push_back(Parameter('l', "log level (0-4, default: 2)", true, false));
-  result.push_back(Parameter('c', "show root catalog hash", true, true));
-  result.push_back(Parameter('n', "show fully qualified repository name", true, true));
-  result.push_back(Parameter('t', "show time stamp", true, true));
-  result.push_back(Parameter('m', "check if repository is marked as replication master copy", true, true));
-  result.push_back(Parameter('h', "print results in human readable form", true, true));
+swissknife::ParameterList swissknife::CommandInfo::GetParameters() {
+  swissknife::ParameterList r;
+  r.push_back(Parameter::Mandatory('r', "repository directory / url"));
+  r.push_back(Parameter::Optional ('l', "log level (0-4, default: 2)"));
+  r.push_back(Parameter::Switch   ('c', "show root catalog hash"));
+  r.push_back(Parameter::Switch   ('n', "show fully qualified repository name"));
+  r.push_back(Parameter::Switch   ('t', "show time stamp"));
+  r.push_back(Parameter::Switch   ('m', "check if repository is marked as replication master copy"));
+  r.push_back(Parameter::Switch   ('h', "print results in human readable form"));
   // to be extended...
-  return result;
+  return r;
 }
 
 
-int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandInfo::Run(const swissknife::ArgumentList &args) {
   if (args.find('l') != args.end()) {
     unsigned log_level =
       1 << (kLogLevel0 + String2Uint64(*args.find('l')->second));
@@ -154,7 +153,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 //
 
 
-int swissknife::CommandVersion::Main(const ArgumentList &args) {
+int swissknife::CommandVersion::Run(const ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "%s", PACKAGE_VERSION);
   return 0;
 }
