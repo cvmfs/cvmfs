@@ -645,8 +645,9 @@ void WritableCatalog::CopyToParent() {
 /**
  * Writes delta_counters_ to the database.
  */
-void WritableCatalog::UpdateCounters() const {
-  const bool retval = delta_counters_.WriteToDatabase(database());
+void WritableCatalog::UpdateCounters() {
+  const bool retval = delta_counters_.WriteToDatabase(database()) &&
+                      ReadCatalogCounters();
   assert (retval);
 }
 
