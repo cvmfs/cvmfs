@@ -23,8 +23,9 @@ run_unittests --gtest_shuffle || ut_retval=$?
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
-./run.sh $TEST_LOGFILE -x src/004-davinci \
+./run.sh $TEST_LOGFILE -x src/004-davinci  \
                           src/007-testjobs \
+                          src/045-oasis    \
                           src/518-hardlinkstresstest   \
                           src/523-corruptchunkfailover \
                           src/524-corruptmanifestfailover || it_retval=$?

@@ -19,6 +19,7 @@ cd ${SOURCE_DIRECTORY}/test
                           src/005-asetup                \
                           src/007-testjobs              \
                           src/024-reload-during-asetup  \
+                          src/045-oasis                 \
                           src/518-hardlinkstresstest    \
                           src/523-corruptchunkfailover  \
                           src/524-corruptmanifestfailover || it_retval=$?
