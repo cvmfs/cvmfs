@@ -49,6 +49,15 @@ enum LoadError {
   kLoadFail,
 };
 
+inline const char* ToString(const LoadError error) {
+  return (const char*[]){
+    "loaded new catalog",
+    "catalog was up to date",
+    "not enough space to load catalog",
+    "failed to load catalog"
+  }[error];
+}
+
 
 struct Statistics {
   atomic_int64 num_lookup_inode;

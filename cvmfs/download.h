@@ -56,6 +56,23 @@ enum Failures {
   kFailOther,
 };  // Failures
 
+inline const char* ToString(const Failures error) {
+  return (const char*[]){
+    "OK",
+    "local I/O failure",
+    "malformed URL",
+    "failed to resolve proxy",
+    "failed to resolve host",
+    "try fail-over host after proxy",
+    "proxy connection problem",
+    "host connection problem",
+    "HTTP related proxy failure",
+    "HTTP related host failure",
+    "malformed data received",
+    "unknown error"
+  }[error];
+}
+
 
 struct Statistics {
   double transferred_bytes;

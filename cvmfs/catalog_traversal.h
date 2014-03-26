@@ -247,20 +247,22 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
       signature_manager.Fini();
 
       // Check if manifest was loaded correctly
-      if (retval == manifest::kFailNameMismatch) {
+      if (retval == manifest::kFailOk) {
+        manifest = new manifest::Manifest(*manifest_ensemble.manifest);
+      } else if (retval == manifest::kFailNameMismatch) {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
                  "repository name mismatch. No name provided?");
-      }
-      if (retval == manifest::kFailBadSignature   ||
-          retval == manifest::kFailBadCertificate ||
-          retval == manifest::kFailBadWhitelist)
+      } else if (retval == manifest::kFailBadSignature   ||
+                 retval == manifest::kFailBadCertificate ||
+                 retval == manifest::kFailBadWhitelist)
       {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
                  "repository signature mismatch. No key(s) provided?");
+      } else {
+        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+                 "failed to load manifest (%d - %s)",
+                 retval, ToString(retval));
       }
-
-      if (retval == manifest::kFailOk)
-        manifest = new manifest::Manifest(*manifest_ensemble.manifest);
     }
 
     return manifest;
@@ -293,8 +295,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     download::Failures retval = download_manager_.Fetch(&download_catalog);
 
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s (%d)",
-             catalog_hash.ToString().c_str(), retval);
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s"
+                                                 " (%d - %s)",
+             catalog_hash.ToString().c_str(), retval, ToString(retval));
       return false;
     }
 
