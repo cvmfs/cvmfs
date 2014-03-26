@@ -78,7 +78,7 @@ bool swissknife::CommandSync::CheckParams(const SyncParameters &p) {
 }
 
 
-int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandCreate::Run(const swissknife::ArgumentList &args) {
   const string manifest_path = *args.find('o')->second;
   const string dir_temp = *args.find('t')->second;
   const string spooler_definition = *args.find('r')->second;
@@ -130,7 +130,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 }
 
 
-int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandUpload::Run(const swissknife::ArgumentList &args) {
   const string source = *args.find('i')->second;
   const string dest = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
@@ -160,7 +160,7 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
 }
 
 
-int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandPeek::Run(const swissknife::ArgumentList &args) {
   const string file_to_peek = *args.find('d')->second;
   const string spooler_definition = *args.find('r')->second;
 
@@ -187,7 +187,7 @@ int swissknife::CommandPeek::Main(const swissknife::ArgumentList &args) {
 }
 
 
-int swissknife::CommandRemove::Main(const ArgumentList &args) {
+int swissknife::CommandRemove::Run(const ArgumentList &args) {
   const string file_to_delete     = *args.find('o')->second;
   const string spooler_definition = *args.find('r')->second;
 
@@ -244,7 +244,7 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 }
 
 
-int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandSync::Run(const swissknife::ArgumentList &args) {
   SyncParameters params;
 
   // Initialization

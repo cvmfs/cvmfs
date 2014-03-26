@@ -178,7 +178,7 @@ void zerr(int ret)
 }
 
 /* compress or decompress from stdin to stdout */
-int swissknife::CommandZpipe::Main(const swissknife::ArgumentList &args) {
+int swissknife::CommandZpipe::Run(const swissknife::ArgumentList &args) {
     int ret;
 
     /* avoid end-of-line conversions */

@@ -60,15 +60,16 @@ tbb::task* CommandScrub::StoredFileScrubbingTask::execute() {
 
 
 
-swissknife::ParameterList CommandScrub::GetParams() {
-  swissknife::ParameterList result;
-  result.push_back(Parameter('r', "repository directory", false, false));
-  result.push_back(Parameter('m', "machine readable output", true, true));
-  return result;
+swissknife::ParameterList CommandScrub::GetParameters() {
+  swissknife::ParameterList r;
+  r.push_back(Parameter::Mandatory ('r', "repository directory"));
+  r.push_back(Parameter::Switch    ('m', "machine readable output"));
+  r.push_back(Parameter::HelpSwitch('h', "list possible alerts (and exit)"));
+  return r;
 }
 
 
- const char* CommandScrub::Alerts::ToString(const CommandScrub::Alerts::Type t) {
+const char* CommandScrub::Alerts::ToString(const CommandScrub::Alerts::Type t) {
   switch (t) {
     case Alerts::kUnexpectedFile:
       return "unexpected regular file";
@@ -86,6 +87,28 @@ swissknife::ParameterList CommandScrub::GetParams() {
       return "mismatch of file name and content hash";
     default:
       return "unknown alert";
+  }
+}
+
+
+const char* CommandScrub::Alerts::ToDocString(const Type t) {
+  switch (t) {
+    case Alerts::kUnexpectedFile:
+      return " -               <path> | an unexpected regular file was found";
+    case Alerts::kUnexpectedSymlink:
+      return " -               <path> | an unexpected symlink was found";
+    case Alerts::kUnexpectedSubdir:
+      return " -               <path> | an unexpected subdir was found in a backend subdir";
+    case Alerts::kUnexpectedModifier:
+      return " -               <path> | the modifier (capital letter) behind a data object is unknown";
+    case Alerts::kMalformedHash:
+      return "<malformed hash> <path> | content hash is not retrievable for file name";
+    case Alerts::kMalformedCasSubdir:
+      return " -               <path> | subdir name in backend is of unexpected length";
+    case Alerts::kContentHashMismatch:
+      return "<content hash>   <path> | content hash of file does not match object name";
+    default:
+      assert(false && "unexpected alert id");
   }
 }
 
@@ -188,7 +211,12 @@ std::string CommandScrub::CheckPathAndExtractHash(
 }
 
 
-int CommandScrub::Main(const swissknife::ArgumentList &args) {
+int CommandScrub::Run(const swissknife::ArgumentList &args) {
+  if (args.find('h') != args.end()) {
+    ShowAlertsHelpMessage();
+    return 0;
+  }
+
   repo_path_               = MakeCanonicalPath(*args.find('r')->second);
   machine_readable_output_ = (args.find('m') != args.end());
 
@@ -247,7 +275,13 @@ std::string CommandScrub::MakeFullPath(const std::string &relative_path,
 
 
 void CommandScrub::ShowAlertsHelpMessage() const {
-  LogCvmfs(kLogUtility, kLogStdout, "to come...");
+  static const char *headline = "[Code] [Hash Info]      [Path] | [Description]";
+  static const char *alert_ln = " %d     %s";
+  LogCvmfs(kLogUtility, kLogStdout, headline);
+  for (unsigned int i = 1; i < Alerts::kNumberOfErrorTypes; ++i) {
+    LogCvmfs(kLogUtility, kLogStdout, alert_ln,
+      i, Alerts::ToDocString(static_cast<Alerts::Type>(i)));
+  }
 }
 
 

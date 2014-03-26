@@ -9,20 +9,21 @@
 
 namespace swissknife {
 
-class CommandZpipe : public Command {
+class CommandZpipe : public Command<CommandZpipe> {
  public:
+  CommandZpipe(const std::string &param) : Command(param) {}
   ~CommandZpipe() { };
-  std::string GetName() { return "zpipe"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "zpipe"; };
+  static std::string GetDescription() {
     return "Compresses or decompresses a file using the DEFLATE algorithm.\n"
       "Input comes on stdin, output goes to stdout.";
   };
-  ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('d', "decompress file", true, true));
-    return result;
+  static ParameterList GetParameters() {
+    ParameterList r;
+    r.push_back(Parameter::Switch('d', "decompress file"));
+    return r;
   }
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 };
 
 }

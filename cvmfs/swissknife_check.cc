@@ -558,7 +558,7 @@ bool CommandCheck::InspectTree(const string &path,
 }
 
 
-int CommandCheck::Main(const swissknife::ArgumentList &args) {
+int CommandCheck::Run(const swissknife::ArgumentList &args) {
   string tag_name;
   check_chunks = false;
   if (args.find('t') != args.end())

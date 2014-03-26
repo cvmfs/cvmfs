@@ -16,7 +16,7 @@
 
 namespace swissknife {
 
-class CommandScrub : public Command {
+class CommandScrub : public Command<CommandScrub> {
  private:
   struct Alerts {
     enum Type {
@@ -31,6 +31,7 @@ class CommandScrub : public Command {
     };
 
     static const char* ToString(const Type t);
+    static const char* ToDocString(const Type t);
   };
 
  private:
@@ -72,18 +73,19 @@ class CommandScrub : public Command {
   typedef upload::Reader<StoredFileScrubbingTask, StoredFile> ScrubbingReader;
 
  public:
-  CommandScrub() : machine_readable_output_(false),
-                   reader_(NULL),
-                   alerts_(0) {}
+  CommandScrub(const std::string &param) : Command(param),
+                                           machine_readable_output_(false),
+                                           reader_(NULL),
+                                           alerts_(0) {}
   ~CommandScrub();
-  std::string GetName() { return "scrub"; }
-  std::string GetDescription() {
+  static std::string GetName() { return "scrub"; }
+  static std::string GetDescription() {
     return "CernVM File System repository file storage checker. Finds silent "
            "disk corruptions by recomputing all file content checksums in the "
            "backend file storage.";
   };
-  ParameterList GetParams();
-  int Main(const ArgumentList &args);
+  static ParameterList GetParameters();
+  int Run(const ArgumentList &args);
 
 
  protected:

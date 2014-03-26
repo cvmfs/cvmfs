@@ -16,19 +16,21 @@ namespace catalog {
 
 namespace swissknife {
 
-class CommandListCatalogs : public Command {
+class CommandListCatalogs : public Command<CommandListCatalogs> {
  public:
-  CommandListCatalogs();
+  CommandListCatalogs(const std::string &param) : Command(param),
+                                                  print_tree_(false),
+                                                  print_hash_(false) {}
   ~CommandListCatalogs() { };
-  std::string GetName() { return "lsrepo"; };
-  std::string GetDescription() {
+  static std::string GetName() { return "lsrepo"; };
+  static std::string GetDescription() {
     return "CernVM File System Repository Traversal\n"
       "This command lists the nested catalog tree that builds up a "
       "cvmfs repository structure.";
   };
-  ParameterList GetParams();
+  static ParameterList GetParameters();
 
-  int Main(const ArgumentList &args);
+  int Run(const ArgumentList &args);
 
   void CatalogCallback(const CatalogTraversalData &data);
 
