@@ -49,13 +49,18 @@ enum LoadError {
   kLoadFail,
 };
 
-inline const char* ToString(const LoadError error) {
-  return (const char*[]){
-    "loaded new catalog",
-    "catalog was up to date",
-    "not enough space to load catalog",
-    "failed to load catalog"
-  }[error];
+inline const char *Code2Ascii(const LoadError error) {
+  const int kNumElems = 4;
+  if (error >= kNumElems)
+    return "no text available (internal error)";
+
+  const char *texts[kNumElems];
+  texts[0] = "loaded new catalog";
+  texts[1] = "catalog was up to date";
+  texts[2] = "not enough space to load catalog";
+  texts[3] = "failed to load catalog";
+
+  return texts[error];
 }
 
 

@@ -177,8 +177,9 @@ static void *MainWorker(void *data) {
       do {
         retval = g_download_manager->Fetch(&download_chunk);
         if (retval != download::kFailOk) {
-          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s), abort",
-                   url_chunk.c_str(), retval, ToString(retval));
+          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s), "
+                   "abort", url_chunk.c_str(),
+                   retval, download::Code2Ascii(retval));
           abort();
         }
         attempts++;
@@ -238,7 +239,8 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d - %s)",
-             catalog_hash.ToString().c_str(), dl_retval, ToString(dl_retval));
+             catalog_hash.ToString().c_str(), dl_retval,
+             download::Code2Ascii(dl_retval));
     goto pull_cleanup;
   }
   retval = zlib::DecompressPath2Path(file_catalog_vanilla, file_catalog);
@@ -448,7 +450,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                            g_signature_manager, g_download_manager, &ensemble);
   if (m_retval != manifest::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d - %s)",
-             m_retval, ToString(m_retval));
+             m_retval, manifest::Code2Ascii(m_retval));
     goto fini;
   }
 
@@ -475,7 +477,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     dl_retval = g_download_manager->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
-               dl_retval, ToString(dl_retval));
+               dl_retval, download::Code2Ascii(dl_retval));
       goto fini;
     }
     retval = zlib::DecompressPath2Path(history_path,

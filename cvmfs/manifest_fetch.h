@@ -38,20 +38,25 @@ enum Failures {
   kFailUnknown,
 };
 
-inline const char* ToString(const Failures error) {
-  return (const char*[]){
-    "OK",
-    "failed to load",
-    "loading incomplete",
-    "repository name mismatch",
-    "root catalog mismatch",
-    "outdated manifest",
-    "bad certificate",
-    "bad signature",
-    "bad whitelist",
-    "invalid certificate",
-    "unknown error"
-  }[error];
+inline const char *Code2Ascii(const Failures error) {
+  const int kNumElems = 11;
+  if (error >= kNumElems)
+    return "no text available (internal error)";
+
+  const char *texts[kNumElems];
+  texts[0] = "OK";
+  texts[1] = "failed to download";
+  texts[2] = "incomplete manifest";
+  texts[3] = "repository name mismatch";
+  texts[4] = "catalog root path mismatch";
+  texts[5] = "outdated manifest";
+  texts[6] = "bad certificate, failed to verify repository manifest";
+  texts[7] = "bad signature, failed to verify repository manifest";
+  texts[8] = "bad whitelist";
+  texts[9] = "invalid certificate";
+  texts[10] = "unknown error";
+
+  return texts[error];
 }
 
 

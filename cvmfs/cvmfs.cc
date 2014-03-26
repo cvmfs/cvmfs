@@ -464,7 +464,7 @@ static void RemountCheck() {
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "reload failed (%s), "
                                      "applying short term TTL",
-               ToString(retval));
+               catalog::Code2Ascii(retval));
       alarm(kShortTermTTL);
       catalogs_valid_until_ = time(NULL) + kShortTermTTL;
     } else if (retval == catalog::kLoadUp2Date) {

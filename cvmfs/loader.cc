@@ -823,8 +823,8 @@ int main(int argc, char *argv[]) {
       return 0;
     }
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s (%d - %s)",
-             cvmfs_exports_->fnGetErrorMsg().c_str(), retval,
-             ToString((Failures)retval));
+             cvmfs_exports_->fnGetErrorMsg().c_str(),
+             retval, Code2Ascii((Failures)retval));
     cvmfs_exports_->fnFini();
     return retval;
   }

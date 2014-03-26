@@ -261,7 +261,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
       } else {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
                  "failed to load manifest (%d - %s)",
-                 retval, ToString(retval));
+                 retval, Code2Ascii(retval));
       }
     }
 
@@ -297,7 +297,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     if (retval != download::kFailOk) {
       LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s"
                                                  " (%d - %s)",
-             catalog_hash.ToString().c_str(), retval, ToString(retval));
+             catalog_hash.ToString().c_str(), retval, Code2Ascii(retval));
       return false;
     }
 

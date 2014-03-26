@@ -48,7 +48,7 @@ static bool GetHistoryDbHash(const string &repository_url,
     if (retval != manifest::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
                                       "(%d - %s)",
-               retval, ToString(retval));
+               retval, manifest::Code2Ascii(retval));
     }
     manifest = manifest_ensemble.manifest;
   } else {
@@ -94,7 +94,7 @@ static bool FetchTagList(const string &repository_url,
     dl_retval = g_download_manager->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
-               dl_retval, ToString(dl_retval));
+               dl_retval, download::Code2Ascii(dl_retval));
       return false;
     }
   }
@@ -344,7 +344,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
     dl_retval = g_download_manager->Fetch(&download_catalog);
     if (dl_retval != download::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog (%d - %s)",
-               dl_retval, ToString(dl_retval));
+               dl_retval, download::Code2Ascii(dl_retval));
       goto rollback_fini;
     }
   }

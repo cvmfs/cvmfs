@@ -47,33 +47,38 @@ enum Failures {
   kFailWpad,
 };
 
-inline const char* ToString(const Failures error) {
-  return (const char*[]){
-    "OK",
-    "unknown error",
-    "illegal options",
-    "permission denied",
-    "failed to mount",
-    "unable to init loader talk socket",
-    "cannot run FUSE event loop",
-    "failed to load shared library",
-    "incompatible library version",
-    "cache directory problem",
-    "peering problem",
-    "NFS maps init failure",
-    "quota init failure",
-    "watchdog spawning failure",
-    "talk socket init failure",
-    "signature verification failure",
-    "catalog init failure",
-    "maintenance mode",
-    "state saving failure",
-    "state restore failure",
-    "already mounted somewhere else",
-    "trying to double mount",
-    "history init failure",
-    "proxy auto-discovery failed"
-  }[error];
+inline const char *Code2Ascii(const Failures error) {
+  const int kNumElems = 24;
+  if (error >= kNumElems)
+    return "no text available (internal error)";
+
+  const char *texts[kNumElems];
+  texts[0] = "OK";
+  texts[1] = "unknown error";
+  texts[2] = "illegal options";
+  texts[3] = "permission denied";
+  texts[4] = "failed to mount";
+  texts[5] = "unable to init loader talk socket";
+  texts[6] = "cannot run FUSE event loop";
+  texts[7] = "failed to load shared library";
+  texts[8] = "incompatible library version";
+  texts[9] = "cache directory problem";
+  texts[10] = "peering problem";
+  texts[11] = "NFS maps init failure";
+  texts[12] = "quota init failure";
+  texts[13] = "watchdog failure";
+  texts[14] = "talk socket failure";
+  texts[15] = "signature verification failure";
+  texts[16] = "file catalog failure";
+  texts[17] = "maintenance mode";
+  texts[18] = "state saving failure";
+  texts[19] = "state restore failure";
+  texts[20] = "already mounted";
+  texts[21] = "double mount";
+  texts[22] = "history init failure";
+  texts[23] = "proxy auto-discovery failed";
+
+  return texts[error];
 }
 
 

@@ -69,13 +69,13 @@ static void *MainTalk(void *data __attribute__((unused))) {
 
       SetLogMicroSyslog(*usyslog_path_);
       LogCvmfs(kLogCvmfs, kLogSyslog, "reloading Fuse module");
-      Failures retval = Reload(con_fd, command == 'S');
+      int retval = Reload(con_fd, command == 'S');
       SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
       if (retval != kFailOk) {
         LogCvmfs(kLogCvmfs, kLogSyslogErr, "reloading Fuse module failed "
                                            "(%d - %s)",
-                 retval, ToString(retval));
+                 retval, Code2Ascii(static_cast<Failures>(retval)));
         abort();
       }
       SetLogMicroSyslog("");

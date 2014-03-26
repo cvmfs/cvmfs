@@ -90,8 +90,8 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
 
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "failed to load %s from Stratum 0 (%d - %s)", url.c_str(), retval,
-             ToString(retval));
+             "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
+             retval, download::Code2Ascii(retval));
     assert(false);
   }
 

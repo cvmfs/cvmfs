@@ -788,7 +788,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "unable to load catalog with key %s (%d - %s)",
              hash.ToString().c_str(), download_catalog.error_code,
-             ToString(download_catalog.error_code));
+             download::Code2Ascii(download_catalog.error_code));
     AbortTransaction(temp_path);
     backoff_throttle_.Throttle();
     return catalog::kLoadFail;
@@ -899,7 +899,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
                                      &ensemble);
   if (manifest_failure != manifest::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
-             manifest_failure, ToString(manifest_failure));
+             manifest_failure, manifest::Code2Ascii(manifest_failure));
     if (!cache_hash.IsNull()) {
       // TODO remove code duplication
       if (catalog_path) {
