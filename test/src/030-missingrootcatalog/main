@@ -37,6 +37,7 @@ cvmfs_run_test() {
       cd data/$(echo $cert | head -c2)       || return 6
       wget $stratum1/atlas/data/$(echo $cert | head -c2)/$(echo $cert | tail -c39)X || return 7
       cd ../.. || return 8
+      break
     fi
   done
   cd ..
