@@ -120,6 +120,17 @@ bool Catalog::InitStandalone(const std::string &database_file) {
 }
 
 
+bool Catalog::ReadCatalogCounters() {
+  assert (database_ != NULL && database_->ready());
+  const bool statistics_loaded =
+    (database().schema_version() < Database::kLatestSupportedSchema -
+                                   Database::kSchemaEpsilon)
+      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
+      : counters_.ReadFromDatabase(database());
+  return statistics_loaded;
+}
+
+
 /**
  * Establishes the database structures and opens the sqlite database file.
  * @param db_path the absolute path to the database file on local file system
@@ -170,15 +181,10 @@ bool Catalog::OpenDatabase(const string &db_path) {
     volatile_flag_ = sql_volatile_flag.RetrieveInt(0);
 
   // Read Catalog Counter Statistics
-  const bool statistics_loaded =
-    (database().schema_version() < Database::kLatestSupportedSchema -
-                                   Database::kSchemaEpsilon)
-      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
-      : counters_.ReadFromDatabase(database());
-  if (! statistics_loaded) {
+  if (! ReadCatalogCounters()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load statistics counters for catalog %s (file %s)",
-             root_prefix_.c_str(), db_path.c_str());
+             path_.c_str(), db_path.c_str());
     return false;
   }
 
