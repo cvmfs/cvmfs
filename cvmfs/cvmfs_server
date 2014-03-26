@@ -1148,6 +1148,36 @@ set_ro_root_hash() {
 }
 
 
+
+process_dirtab() {
+  local name=$1
+  local base_path="/cvmfs/${name}"
+  local dirtab_path="${base_path}/.cvmfsdirtab"
+
+  if [ ! -f $dirtab_path ]; then
+    return 0
+  fi
+
+  echo "Auto-creating nested catalogs (${dirtab_path})... "
+
+  for dirtab_entry in $(cat "$dirtab_path"); do
+    local dirtab_dir="${base_path}${dirtab_entry}"
+    if [ ! -d $dirtab_dir ]; then
+      echo "Error: didn't find $dirtab_dir" >&2
+      return 1
+    fi
+
+    for candidate in $(find "$dirtab_dir" -maxdepth 1 -mindepth 1 -type d); do
+      local clg_marker_path="${candidate}/.cvmfscatalog"
+      if [ ! -f $clg_marker_path ]; then
+        echo "Auto-creating nested catalog in $candidate"
+        touch $clg_marker_path
+      fi
+    done
+  done
+}
+
+
 # writes apache configuration file
 # This figures out where to put the apache configuration file depending
 # on the running apache version
@@ -2550,6 +2580,7 @@ publish() {
     local user_shell="sh -c"
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
+    process_dirtab $name || die "Synchronization Failed! Please repair your .cvmfsdirtab file!"
     publish_before_hook $name
     publishing_lock $name
     cvmfs_suid_helper lock $name
