@@ -74,6 +74,12 @@ bool swissknife::CommandSync::CheckParams(const SyncParameters &p) {
     return false;
   }
 
+  if (p.catalog_entry_warn_threshold <= 10000) {
+    PrintError("catalog entry warning threshold is too low "
+               "(should be at least 10000)");
+    return false;
+  }
+
   return true;
 }
 
@@ -290,6 +296,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
   }
 
+  if (args.find('j') != args.end()) {
+    params.catalog_entry_warn_threshold = String2Uint64(*args.find('j')->second);
+  }
+
   if (!CheckParams(params)) return 2;
 
   // Start spooler
@@ -309,7 +319,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   catalog::WritableCatalogManager
     catalog_manager(shash::MkFromHexPtr(shash::HexPtr(params.base_hash)),
                     params.stratum0, params.dir_temp, params.spooler,
-                    g_download_manager);
+                    g_download_manager, params.catalog_entry_warn_threshold);
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
   if (params.union_fs_type == "overlayfs") {

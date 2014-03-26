@@ -186,6 +186,7 @@ class Catalog : public SingleCopy {
   mutable HardlinkGroupMap hardlink_groups_;
 
   bool InitStandalone(const std::string &database_file);
+  bool ReadCatalogCounters();
 
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
