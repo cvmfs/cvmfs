@@ -168,6 +168,8 @@ class CommandSync : public Command {
     result.push_back(Parameter('f', "union filesystem type", true, false));
     result.push_back(Parameter('e', "hash algorithm (default: SHA-1)",
                                true, false));
+    result.push_back(Parameter('j', "catalog entry warning threshold",
+                               true, false));
     return result;
   }
   int Main(const ArgumentList &args);

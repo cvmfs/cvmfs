@@ -74,6 +74,12 @@ bool swissknife::CommandSync::CheckParams(const SyncParameters &p) {
     return false;
   }
 
+  if (p.catalog_entry_warn_threshold <= 10000) {
+    PrintError("catalog entry warning threshold is too low "
+               "(should be at least 10000)");
+    return false;
+  }
+
   return true;
 }
 
@@ -288,6 +294,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       PrintError("unknown hash algorithm");
       return 1;
     }
+  }
+
+  if (args.find('j') != args.end()) {
+    params.catalog_entry_warn_threshold = String2Uint64(*args.find('j')->second);
   }
 
   if (!CheckParams(params)) return 2;
