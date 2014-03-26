@@ -33,17 +33,17 @@ WritableCatalogManager::WritableCatalogManager(
   const std::string         &stratum0,
   const string              &dir_temp,
   upload::Spooler           *spooler,
-  download::DownloadManager *download_manager)
+  download::DownloadManager *download_manager) :
+    base_hash_(base_hash),
+    stratum0_(stratum0),
+    dir_temp_(dir_temp),
+    spooler_(spooler),
+    download_manager_(download_manager)
 {
   sync_lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(sync_lock_, NULL);
   assert(retval == 0);
-  base_hash_ = base_hash;
-  stratum0_ = stratum0;
-  dir_temp_ = dir_temp;
-  spooler_ = spooler;
-  download_manager_ = download_manager;
   Init();
 }
 
