@@ -28,17 +28,21 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+const uint64_t WritableCatalogManager::kDefaultCatalogEntryWarnThreshold = 250000;
+
 WritableCatalogManager::WritableCatalogManager(
   const shash::Any          &base_hash,
   const std::string         &stratum0,
   const string              &dir_temp,
   upload::Spooler           *spooler,
-  download::DownloadManager *download_manager) :
+  download::DownloadManager *download_manager,
+  const uint64_t             catalog_entry_warn_threshold) :
     base_hash_(base_hash),
     stratum0_(stratum0),
     dir_temp_(dir_temp),
     spooler_(spooler),
-    download_manager_(download_manager)
+    download_manager_(download_manager),
+    catalog_entry_warn_threshold_(catalog_entry_warn_threshold)
 {
   sync_lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -702,6 +706,16 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
       getchar();
     }
     shash::Any hash = SnapshotCatalog(*i);
+
+    if ((*i)->GetCounters().GetSelfEntries() > catalog_entry_warn_threshold_) {
+      LogCvmfs(kLogCatalog, kLogStdout, "WARNING: catalog at %s has more than "
+                                        "%d entries (%d). Please consider to "
+                                        "split it into nested catalogs.",
+                                        ((*i)->IsRoot()) ? "/" : (*i)->path().c_str(),
+                                        catalog_entry_warn_threshold_,
+                                        (*i)->GetCounters().GetSelfEntries());
+    }
+
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
