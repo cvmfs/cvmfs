@@ -79,6 +79,66 @@ class CatalogReference:
 
 
 
+class CatalogStatistics:
+    """ Provides a convenience data wrapper around catalog statistics """
+
+    def __init__(self, catalog):
+        self.catalog = catalog
+        if catalog.schema >= 2.1:
+            self._read_statistics(catalog)
+
+    def __str__(self):
+        return "<CatalogStatistics for " + self.catalog.root_prefix + ">"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+    def num_entries(self):
+        return self._get_stat('regular') + \
+               self._get_stat('dir')     + \
+               self._get_stat('symlink')
+
+    def num_subtree_entries(self):
+        return self._get_stat('all_regular') + \
+               self._get_stat('all_dir')     + \
+               self._get_stat('all_symlink')
+
+    def num_chunked_files(self):
+        return self._get_stat('chunked')
+
+    def num_subtree_chunked_files(self):
+        return self._get_stat('all_chunked')
+
+    def num_file_chunks(self):
+        return self._get_stat('chunks')
+
+    def num_subtree_file_chunks(self):
+        return self._get_stat('all_chunks')
+
+    def data_size(self):
+        return self._get_stat('file_size')
+
+    def subtree_data_size(self):
+        return self._get_stat('all_file_size')
+
+
+    def _read_statistics(self, catalog):
+        stats = catalog.run_sql("SELECT * FROM statistics ORDER BY counter;")
+        for stat, value in stats:
+            if stat.startswith('self_'):
+                setattr(self, stat[5:], value)
+            elif stat.startswith('subtree_'):
+                setattr(self, "all_" + stat[8:], value + getattr(self, stat[8:]))
+
+
+    def _get_stat(self, stat):
+        if not hasattr(self, stat):
+            raise Exception("Statistic '" + stat + "' not provided.")
+        return getattr(self, stat)
+
+
+
 class Catalog(DatabaseObject):
     """ Wraps the basic functionality of CernVM-FS Catalogs """
 
@@ -113,6 +173,11 @@ class Catalog(DatabaseObject):
             return [ CatalogReference(clg[0], clg[1], clg[2]) for clg in catalogs ]
         else:
             return [ CatalogReference(clg[0], clg[1]) for clg in catalogs ]
+
+
+    def get_statistics(self):
+        """ returns the embedded catalog statistics (if available) """
+        return CatalogStatistics(self)
 
 
     def find_nested_for_path(self, needle_path):
