@@ -178,7 +178,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
   if (! statistics_loaded) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load statistics counters for catalog %s (file %s)",
-             root_prefix_.c_str(), db_path.c_str());
+             path_.c_str(), db_path.c_str());
     return false;
   }
 
