@@ -19,7 +19,7 @@ struct SyncParameters {
     use_file_chunking(false),
     ignore_xdir_hardlinks(false),
     stop_for_catalog_tweaks(false),
-    catalog_entry_warn_threshold(250000),
+    catalog_entry_warn_threshold(500000),
     min_file_chunk_size(4*1024*1024),
     avg_file_chunk_size(8*1024*1024),
     max_file_chunk_size(16*1024*1024) {}
