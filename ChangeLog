@@ -1,5 +1,6 @@
 2.1.18:
   * Fix symlinked /var/spool/cvmfs/... (CVM-607)
+  * Add verbose texts to most error codes (CVM-594)
   * Fix abnormal termination of cvmfs_server on whitelist
     verification errors (CVM-602)
   * Reduce default verbosity of 'cvmfs_server publish' (CVM-269)

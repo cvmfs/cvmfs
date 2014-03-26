@@ -83,8 +83,8 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     download::JobInfo download_manifest(&url, false, false, NULL);
     download::Failures retval = g_download_manager->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d)",
-               retval);
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
+               retval, download::Code2Ascii(retval));
       return 1;
     }
     char *buffer = download_manifest.destination_mem.data;

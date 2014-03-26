@@ -57,6 +57,29 @@ enum Failures {
 };  // Failures
 
 
+inline const char *Code2Ascii(const Failures error) {
+  const int kNumElems = 12;
+  if (error >= kNumElems)
+    return "no text available (internal error)";
+
+  const char *texts[kNumElems];
+  texts[0] = "OK";
+  texts[1] = "local I/O failure";
+  texts[2] = "malformed URL";
+  texts[3] = "failed to resolve proxy address";
+  texts[4] = "failed to resolve host address";
+  texts[5] = "all proxies failed, trying host fail-over";
+  texts[6] = "proxy connection problem";
+  texts[7] = "host connection problem";
+  texts[8] = "proxy returned HTTP error";
+  texts[9] = "host returned HTTP error";
+  texts[10] = "corrupted data received";
+  texts[11] = "unknown network error";
+
+  return texts[error];
+}
+
+
 struct Statistics {
   double transferred_bytes;
   double transfer_time;

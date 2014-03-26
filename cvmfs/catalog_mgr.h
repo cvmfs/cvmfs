@@ -49,6 +49,20 @@ enum LoadError {
   kLoadFail,
 };
 
+inline const char *Code2Ascii(const LoadError error) {
+  const int kNumElems = 4;
+  if (error >= kNumElems)
+    return "no text available (internal error)";
+
+  const char *texts[kNumElems];
+  texts[0] = "loaded new catalog";
+  texts[1] = "catalog was up to date";
+  texts[2] = "not enough space to load catalog";
+  texts[3] = "failed to load catalog";
+
+  return texts[error];
+}
+
 
 struct Statistics {
   atomic_int64 num_lookup_inode;

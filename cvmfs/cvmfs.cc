@@ -462,7 +462,9 @@ static void RemountCheck() {
     LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, reload");
     catalog::LoadError retval = RemountStart();
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "reload failed, applying short term TTL");
+      LogCvmfs(kLogCvmfs, kLogDebug, "reload failed (%s), "
+                                     "applying short term TTL",
+               catalog::Code2Ascii(retval));
       alarm(kShortTermTTL);
       catalogs_valid_until_ = time(NULL) + kShortTermTTL;
     } else if (retval == catalog::kLoadUp2Date) {

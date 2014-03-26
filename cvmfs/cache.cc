@@ -786,8 +786,9 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
   fclose(catalog_file);
   if (download_catalog.error_code != download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-             "unable to load catalog with key %s (%d)",
-             hash.ToString().c_str(), download_catalog.error_code);
+             "unable to load catalog with key %s (%d - %s)",
+             hash.ToString().c_str(), download_catalog.error_code,
+             download::Code2Ascii(download_catalog.error_code));
     AbortTransaction(temp_path);
     backoff_throttle_.Throttle();
     return catalog::kLoadFail;
@@ -897,8 +898,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
                                      download_manager_,
                                      &ensemble);
   if (manifest_failure != manifest::kFailOk) {
-    LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d)",
-             manifest_failure);
+    LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
+             manifest_failure, manifest::Code2Ascii(manifest_failure));
     if (!cache_hash.IsNull()) {
       // TODO remove code duplication
       if (catalog_path) {
@@ -942,7 +943,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
         if (!retval) {
           LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                    "failed to pin cached root catalog (no space)");
-          return catalog::kLoadFail;
+          return catalog::kLoadNoSpace;
         }
       }
       loaded_catalogs_[mountpoint] = cache_hash;
