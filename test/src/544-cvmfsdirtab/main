@@ -187,7 +187,8 @@ cvmfs_run_test() {
   produce_files_in_2 $repo_dir || return 2
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log_1=publish_1.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -203,8 +204,15 @@ cvmfs_run_test() {
   echo "putting some stuff in the repository"
   produce_files_in_3 $repo_dir || return 3
 
-  echo "creating CVMFS snapshot (expecting a failure)"
-  publish_repo $CVMFS_TEST_REPO && return 4
+  echo "creating CVMFS snapshot (should produce a warning)"
+  local publish_log_2=publish_2.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2 2>&1 || return $?
+
+  echo "look for the warning"
+  cat $publish_log_2 | grep -q "^WARNING.*FrancoisHollande" || return 4
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "repair the .cvmfsdirtab file"
   produce_files_in_4 $repo_dir || return 5
