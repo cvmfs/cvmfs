@@ -72,6 +72,7 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
 	     config[1].c_str());
     return false;
   }
+  options::Fini();
 
   const std::string kStandardPort = "80";
   number_of_buckets_ = 1;
