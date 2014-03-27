@@ -1,4 +1,5 @@
 2.1.18:
+  * Use CVMFS_PAC_URLS instead of PAC_URLS
   * Fix symlinked /var/spool/cvmfs/... (CVM-607)
   * Add verbose texts to most error codes (CVM-594)
   * Fix abnormal termination of cvmfs_server on whitelist

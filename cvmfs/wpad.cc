@@ -154,11 +154,9 @@ string AutoProxy(DownloadManager *download_manager) {
   }
 
   vector<string> pac_paths;
-  char *pac_env = getenv("PAC_URLS");
+  char *pac_env = getenv("CVMFS_PAC_URLS");
   if (pac_env != NULL)
     pac_paths = SplitString(pac_env, ';');
-  pac_paths.push_back("http://wpad/wpad.dat");
-  pac_paths.push_back("http://wlcg-wpad.cern.ch/wpad.dat");
 
   // Try downloading from each of the PAC URLs
   for (unsigned i = 0; i < pac_paths.size(); ++i) {
