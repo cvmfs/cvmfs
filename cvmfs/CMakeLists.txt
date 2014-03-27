@@ -95,6 +95,7 @@ set (CVMFS_FSCK_SOURCES
   cvmfs_fsck.cc)
 
 set (CVMFS_SWISSKNIFE_SOURCES
+  options.cc options.h
   smalloc.h atomic.h
   platform.h platform_linux.h platform_osx.h
   duplex_zlib.h duplex_sqlite3.h

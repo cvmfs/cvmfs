@@ -8,6 +8,7 @@
 #include "compression.h"
 #include "util.h"
 #include "file_processing/char_buffer.h"
+#include "options.h"
 
 #include <sstream>
 
@@ -34,10 +35,10 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition) :
 
 bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition) {
   // Default Spooler Configuration Scheme:
-  // <host name>[:port]@<access key>@<secret key>@<bucket name>
+  // <host name>[:port]@<config_file>
 
   std::vector<std::string> config = SplitString(spooler_definition.spooler_configuration, '@');
-  if (config.size() != 4) {
+  if (config.size() != 2) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3 spooler definition "
 	     "string: %s",
              spooler_definition.spooler_configuration.c_str());
@@ -48,15 +49,35 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
   if (host.empty() || host.size() > 2) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3 host: %s",
              config[0].c_str());
-    return true;
+    return false;
+  }
+
+  // Parse S3 configuration
+  options::Init();
+  options::ParsePath(config[1]);
+  std::string s3_access_key;
+  if (!options::GetValue("S3_ACCESS_KEY", &s3_access_key)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_ACCESS_KEY from '%s'.", 
+	     config[1].c_str());
+    return false;
+  }
+  std::string s3_secret_key;
+  if (!options::GetValue("S3_SECRET_KEY", &s3_secret_key)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_SECRET_KEY from '%s'.", 
+	     config[1].c_str());
+    return false;
+  }
+  if (!options::GetValue("S3_BUCKET", &bucket_body_name_)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_BUCKET from '%s'.", 
+	     config[1].c_str());
+    return false;
   }
 
   const std::string kStandardPort = "80";
   number_of_buckets_ = 1;
   host_name_         = host[0];
   full_host_name_    = host[0] + ":" + ((host.size() == 2) ? host[1] : kStandardPort);
-  keys_.push_back(std::make_pair(config[1], config[2]));
-  bucket_body_name_  = config[3];
+  keys_.push_back(std::make_pair(s3_access_key, s3_secret_key));
 
   return true;
 }

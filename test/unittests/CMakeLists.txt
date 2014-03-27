@@ -71,6 +71,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/duplex_curl.h
   ${CVMFS_SOURCE_DIR}/download.h
   ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/options.h
+  ${CVMFS_SOURCE_DIR}/options.cc 
+
   ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
 
@@ -114,10 +117,6 @@ add_dependencies (${PROJECT_TEST_NAME} googletest)
 
 if (LIBCURL_BUILTIN)
   add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
-<<<<<<< HEAD
-=======
-  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
->>>>>>> CMake fixed to work with upload_s3 for unit tests.
 endif (LIBCURL_BUILTIN)
 
 if (SQLITE3_BUILTIN)
