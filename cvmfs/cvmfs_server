@@ -1149,6 +1149,15 @@ set_ro_root_hash() {
 }
 
 
+_process_dirtab_is_readable() {
+  local dirtab_entry="$1"
+  for candidate in $dirtab_entry; do
+    if [ ! -r "$candidate" ]; then
+      echo "WARNING: cannot read $candidate" >&2
+      return 1
+    fi
+  done
+}
 
 process_dirtab() {
   local name=$1
@@ -1160,20 +1169,16 @@ process_dirtab() {
   fi
 
   echo "Auto-creating nested catalogs (${dirtab_path})... "
-
   for dirtab_entry in $(cat "$dirtab_path"); do
-    local dirtab_dir="${base_path}${dirtab_entry}"
-    if [ ! -d $dirtab_dir ]; then
-      echo "Error: didn't find $dirtab_dir" >&2
-      return 1
-    fi
-
-    for candidate in $(find "$dirtab_dir" -maxdepth 1 -mindepth 1 -type d); do
-      local clg_marker_path="${candidate}/.cvmfscatalog"
-      if [ ! -f $clg_marker_path ]; then
-        echo "Auto-creating nested catalog in $candidate"
-        touch $clg_marker_path
-      fi
+    local dirtab_path="$base_path$dirtab_entry"
+    _process_dirtab_is_readable $dirtab_path || continue
+    for candidate in $base_path$dirtab_entry; do
+      for nested_path in $(find $candidate -maxdepth 1 -mindepth 1 -type d); do
+        if [ ! -f "$nested_path/.cvmfscatalog" ]; then
+          echo "Auto-creating nested catalog in $nested_path"
+          touch "$nested_path/.cvmfscatalog"
+        fi
+      done
     done
   done
 }
