@@ -12,6 +12,15 @@ using namespace std;  // NOLINT
 
 namespace publish {
 
+
+SyncItem::SyncItem() :
+  union_engine_(NULL),
+  whiteout_(false),
+  scratch_type_(static_cast<SyncItemType>(0)),
+  rdonly_type_(static_cast<SyncItemType>(0))
+{
+}
+
 SyncItem::SyncItem(const string &relative_parent_path,
                    const string &filename,
                    const SyncItemType entry_type,

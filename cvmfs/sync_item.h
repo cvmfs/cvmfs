@@ -6,6 +6,7 @@
 #define CVMFS_SYNC_ITEM_H_
 
 #include <string>
+#include <cstring>
 
 #include "platform.h"
 #include "hash.h"
@@ -43,7 +44,7 @@ class SyncItem {
    *  @param filename the name of the file ;-)
    *  @param entryType well...
    */
-  SyncItem() { };  // TODO: Remove
+  SyncItem();  // TODO: Remove
   SyncItem(const std::string &relative_parent_path,
            const std::string &filename,
            const SyncItemType entry_type,
@@ -105,7 +106,9 @@ class SyncItem {
    * Structure to cache stat calls to the different file locations.
    */
   struct EntryStat {
-    EntryStat() : obtained(false), error_code(0) { }
+    EntryStat() : obtained(false), error_code(0) {
+      memset(&stat, 0, sizeof(stat));
+    }
 
     bool obtained;   /**< false at the beginning, true after first stat call */
     int error_code;  /**< errno value of the stat call */

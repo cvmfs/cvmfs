@@ -7,6 +7,7 @@ set (CVMFS_LOADER_SOURCES
   smalloc.h atomic.h shortstring.h fs_traversal.h
   platform.h platform_linux.h platform_osx.h
   logging_internal.h logging.h logging.cc
+  prng.h
   hash.h hash.cc
   util.h util.cc
   sanitizer.h sanitizer.cc
@@ -87,6 +88,7 @@ set (CVMFS_FSCK_SOURCES
   smalloc.h
   atomic.h
   duplex_zlib.h compression.cc compression.h
+  prng.h
   hash.cc hash.h
   util.cc util.h
   cvmfs_fsck.cc)
@@ -99,6 +101,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   globals.cc globals.h
   manifest.h manifest.cc
   manifest_fetch.h manifest_fetch.cc
+  prng.h
   hash.h hash.cc
   compression.h compression.cc
   util.h util.cc

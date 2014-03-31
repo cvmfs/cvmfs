@@ -101,7 +101,11 @@ struct LruCommand {
   uint16_t path_length;  // Maximum 512-sizeof(LruCommand) in order to guarantee
                          // atomic pipe operations
 
-  LruCommand() : size(0), return_pipe(-1) { }
+  LruCommand() : command_type(static_cast<CommandType>(0)),
+                 size(0), return_pipe(-1), path_length(0)
+  {
+    memset(digest, 0, shash::kMaxDigestSize);
+  }
 
   void SetSize(const uint64_t new_size) {
     uint64_t mask = 7;

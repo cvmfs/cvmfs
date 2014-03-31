@@ -15,6 +15,7 @@ is exporting the proper set of symbols to be used by a C program.
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define TEST_LINE_MAX 1024
 
@@ -66,7 +67,8 @@ int cvmfs_test_cat( const char *path )
 	while(1) {
 		int length = read(fd,buffer,sizeof(buffer));
 		if(length<=0) break;
-		write(1,buffer,length);
+		int retval = write(1,buffer,length);
+    assert(retval == length);
 	}
 
 	cvmfs_close(fd);

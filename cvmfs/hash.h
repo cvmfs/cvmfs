@@ -21,6 +21,7 @@
 #include <string>
 #include "logging.h"
 #include "smalloc.h"
+#include "prng.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -122,10 +123,12 @@ struct Digest {
    * Generates a purely random hash
    * Only used for testing purposes
    */
-  void Randomize() {
+  void Randomize(const uint64_t seed) {
+    Prng prng;
+    prng.InitSeed(seed);
     const unsigned bytes = GetDigestSize();
     for (unsigned i = 0; i < bytes; ++i) {
-      digest[i] = rand() % 256;
+      digest[i] = prng.Next(256);
     }
   }
 

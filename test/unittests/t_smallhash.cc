@@ -86,7 +86,7 @@ TEST_F(T_Smallhash, InsertMd5) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
     shash::Md5 random_hash;
-    random_hash.Randomize();
+    random_hash.Randomize(i);
     smallhash_md5_.Insert(random_hash, i);
   }
 
@@ -98,7 +98,7 @@ TEST_F(T_Smallhash, InsertAndCopyMd5) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
     shash::Md5 random_hash;
-    random_hash.Randomize();
+    random_hash.Randomize(i);
     smallhash_md5_.Insert(random_hash, i);
   }
 

@@ -4,6 +4,7 @@
 #include <sstream>
 #include <tbb/atomic.h>
 
+#include "../../cvmfs/atomic.h"
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/upload_spooler_definition.h"
 #include "../../cvmfs/upload_local.h"
@@ -66,9 +67,10 @@ class T_LocalUploader : public FileSandbox {
   static const std::string tmp_dir;
 
  public:
+  static atomic_int64 gSeed;
   struct StreamHandle {
     StreamHandle() : handle(NULL), content_hash(shash::kMd5) {
-      content_hash.Randomize();
+      content_hash.Randomize(atomic_xadd64(&gSeed, 1));
     }
 
     UploadStreamHandle *handle;
@@ -275,6 +277,7 @@ class T_LocalUploader : public FileSandbox {
   AbstractUploader *uploader_;
   UploadCallbacks   delegate_;
 };
+atomic_int64 T_LocalUploader::gSeed = 0;
 
 const std::string T_LocalUploader::sandbox_path = "/tmp/cvmfs_ut_localuploader";
 const std::string T_LocalUploader::tmp_dir      = T_LocalUploader::sandbox_path + "/tmp";
@@ -499,7 +502,7 @@ TEST_F(T_LocalUploader, SingleStreamedUpload) {
   EXPECT_EQ (0u,                delegate_.streamed_upload_complete_invocations);
 
   shash::Any content_hash(shash::kSha1);
-  content_hash.Randomize();
+  content_hash.Randomize(42);
   const std::string hash_suffix = "A";
   uploader_->ScheduleCommit(handle, content_hash, hash_suffix);
   uploader_->WaitForUpload();

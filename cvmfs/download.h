@@ -120,27 +120,71 @@ struct JobInfo {
   const shash::Any *expected_hash;
   const std::string *extra_info;
 
+  // Default initialization of fields
+  void Init() {
+    url = NULL;
+    compressed = false;
+    probe_hosts = false;
+    head_request = false;
+    destination = kDestinationNone;
+    destination_mem.size = destination_mem.pos = 0;
+    destination_mem.data = NULL;
+    destination_file = NULL;
+    destination_path = NULL;
+    expected_hash = NULL;
+    extra_info = NULL;
+
+    curl_handle = NULL;
+    headers = NULL;
+    extra_header = NULL;
+    wait_at[0] = wait_at[1] = -1;
+    nocache = false;
+    error_code = kFailOther;
+    num_used_proxies = num_used_hosts = num_retries = 0;
+    backoff_ms = 0;
+  }
+
   // One constructor per destination + head request
-  JobInfo() { wait_at[0] = wait_at[1] = -1; head_request = false;
-              extra_info = NULL; }
+  JobInfo() { Init(); }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const std::string *p, const shash::Any *h) : url(u), compressed(c),
-          probe_hosts(ph), head_request(false),
-          destination(kDestinationPath), destination_path(p), expected_hash(h)
-          { wait_at[0] = wait_at[1] = -1; extra_info = NULL; }
+          const std::string *p, const shash::Any *h)
+  {
+    Init();
+    url = u;
+    compressed = c;
+    probe_hosts = ph;
+    destination = kDestinationPath;
+    destination_path = p;
+    expected_hash = h;
+  }
   JobInfo(const std::string *u, const bool c, const bool ph, FILE *f,
-          const shash::Any *h) : url(u), compressed(c), probe_hosts(ph),
-          head_request(false),
-          destination(kDestinationFile), destination_file(f), expected_hash(h)
-          { wait_at[0] = wait_at[1] = -1; extra_info = NULL; }
+          const shash::Any *h)
+  {
+    Init();
+    url = u;
+    compressed = c;
+    probe_hosts = ph;
+    destination = kDestinationFile;
+    destination_file = f;
+    expected_hash = h;
+  }
   JobInfo(const std::string *u, const bool c, const bool ph,
-          const shash::Any *h) : url(u), compressed(c), probe_hosts(ph),
-          head_request(false), destination(kDestinationMem), expected_hash(h)
-          { wait_at[0] = wait_at[1] = -1; extra_info = NULL; }
-  JobInfo(const std::string *u, const bool ph) :
-          url(u), compressed(false), probe_hosts(ph), head_request(true),
-          destination(kDestinationNone), expected_hash(NULL)
-          { wait_at[0] = wait_at[1] = -1; extra_info = NULL; }
+          const shash::Any *h)
+  {
+    Init();
+    url = u;
+    compressed = c;
+    probe_hosts = ph;
+    destination = kDestinationMem;
+    expected_hash = h;
+  }
+  JobInfo(const std::string *u, const bool ph) {
+    Init();
+    url = u;
+    probe_hosts = ph;
+    head_request = true;
+  }
+
   ~JobInfo() {
     if (wait_at[0] >= 0) {
       close(wait_at[0]);
