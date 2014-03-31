@@ -230,6 +230,11 @@ class DirectoryEntry : public DirectoryEntryBase {
     is_negative_(false) {}
 
   inline explicit DirectoryEntry(SpecialDirents special_type) :
+    cached_mtime_(0),
+    hardlink_group_(0),
+    is_nested_catalog_root_(false),
+    is_nested_catalog_mountpoint_(false),
+    is_chunked_file_(false),
     is_negative_(true) { assert(special_type == kDirentNegative); };
 
   inline SpecialDirents GetSpecial() const {

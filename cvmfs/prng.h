@@ -13,6 +13,10 @@
 #include <cassert>
 #include <cstdlib>
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 /**
  * Pseudo Random Number Generator.  See: TAoCP, volume 2
  */
@@ -49,5 +53,9 @@ class Prng {
   static const uint64_t c = 1442695040888963407LLU;
   uint64_t state_;
 };  // class Prng
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}
+#endif
 
 #endif  // CVMFS_PRNG_H_
