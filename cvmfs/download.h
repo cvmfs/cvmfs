@@ -136,6 +136,7 @@ struct JobInfo {
 
     curl_handle = NULL;
     headers = NULL;
+    memset(&zstream, 0, sizeof(zstream));
     extra_header = NULL;
     wait_at[0] = wait_at[1] = -1;
     nocache = false;
