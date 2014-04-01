@@ -476,7 +476,7 @@ void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
 Catalog* AbstractCatalogManager::FindCatalog(const PathString &path) const {
   assert (catalogs_.size() > 0);
 
-  // Start at the root catalog and successive go down the catalog tree
+  // Start at the root catalog and successively go down the catalog tree
   Catalog *best_fit = GetRootCatalog();
   Catalog *next_fit = NULL;
   while (best_fit->path() != path) {

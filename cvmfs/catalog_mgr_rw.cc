@@ -560,8 +560,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Get the DirectoryEntry for the given path, this will serve as root
   // entry for the nested catalog we are about to create
   DirectoryEntry new_root_entry;
-  bool retval = old_catalog->LookupPath(PathString(nested_root_path.data(),
-                                        nested_root_path.length()),
+  bool retval = old_catalog->LookupPath(PathString(nested_root_path),
                                         &new_root_entry);
   assert(retval);
 
@@ -577,9 +576,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
   // Attach the just created nested catalog
   Catalog *new_catalog =
-    CreateCatalog(PathString(nested_root_path.data(), nested_root_path.length()),
-                  shash::Any(),
-                  old_catalog);
+    CreateCatalog(PathString(nested_root_path), shash::Any(), old_catalog);
   retval = AttachCatalog(database_file_path, new_catalog);
   assert(retval);
 

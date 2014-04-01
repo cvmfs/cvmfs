@@ -370,8 +370,7 @@ void WritableCatalog::MoveToNestedRecursively(
   // After creating a new nested catalog we have to move all elements
   // now contained by the new one.  List and move them recursively.
   DirectoryEntryList listing;
-  bool retval = ListingPath(PathString(directory.data(), directory.length()),
-                            &listing);
+  bool retval = ListingPath(PathString(directory), &listing);
   assert(retval);
 
   // Go through the listing
@@ -409,8 +408,7 @@ void WritableCatalog::MoveCatalogsToNested(
   {
     shash::Any hash_nested;
     uint64_t size_nested;
-    bool retval = FindNested(PathString(i->data(), i->length()),
-                             &hash_nested, &size_nested);
+    bool retval = FindNested(PathString(*i), &hash_nested, &size_nested);
     assert(retval);
 
     Catalog *attached_reference = NULL;
@@ -501,8 +499,7 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
   // If the reference was successfully deleted, we also have to check whether
   // there is also an attached reference in our in-memory data.
   // In this case we remove the child and return it through **attached_reference
-  Catalog *child = FindChild(PathString(mountpoint.data(),
-                                        mountpoint.length()));
+  Catalog *child = FindChild(PathString(mountpoint));
   if (child != NULL)
     RemoveChild(child);
   if (attached_reference != NULL)
