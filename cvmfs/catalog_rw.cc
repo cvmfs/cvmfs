@@ -467,6 +467,8 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     AddChild(attached_reference);
 
+  ResetNestedCatalogCache();
+
   delta_counters_.self.nested_catalogs++;
 }
 
@@ -505,6 +507,8 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     *attached_reference = child;
 
+  ResetNestedCatalogCache();
+
   delta_counters_.self.nested_catalogs--;
 }
 
@@ -528,6 +532,8 @@ void WritableCatalog::UpdateNestedCatalog(const string &path,
     stmt.BindInt64(2, size) &&
     stmt.BindText(3, path) &&
     stmt.Execute();
+
+  ResetNestedCatalogCache();
 
   assert(retval);
 }
@@ -558,13 +564,13 @@ void WritableCatalog::CopyCatalogsToParent() {
   WritableCatalog *parent = GetWritableParent();
 
   // Obtain a list of all nested catalog references
-  NestedCatalogList *nested_catalog_references = ListNestedCatalogs();
+  const NestedCatalogList nested_catalog_references = ListNestedCatalogs();
 
   // Go through the list and update the databases
   // simultaneously we are checking if the referenced catalogs are currently
   // attached and update the in-memory data structures as well
-  for (NestedCatalogList::const_iterator i = nested_catalog_references->begin(),
-       iEnd = nested_catalog_references->end(); i != iEnd; ++i)
+  for (NestedCatalogList::const_iterator i = nested_catalog_references.begin(),
+       iEnd = nested_catalog_references.end(); i != iEnd; ++i)
   {
     Catalog *child = FindChild(i->path);
     parent->InsertNestedCatalog(i->path.ToString(), child, i->hash, i->size);

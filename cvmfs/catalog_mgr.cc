@@ -530,10 +530,10 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
   PathString path_slash(path);
   path_slash.Append("/", 1);
   atomic_inc64(&statistics_.num_nested_listing);
-  const Catalog::NestedCatalogList *nested_catalogs =
+  const Catalog::NestedCatalogList nested_catalogs =
     parent->ListNestedCatalogs();
-  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs->begin(),
-       iEnd = nested_catalogs->end(); i != iEnd; ++i)
+  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
+       iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
     PathString nested_path_slash(i->path);

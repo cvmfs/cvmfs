@@ -173,7 +173,7 @@ class Catalog : public SingleCopy {
     uint64_t size;
   } NestedCatalog;
   typedef std::vector<NestedCatalog> NestedCatalogList;
-  NestedCatalogList *ListNestedCatalogs() const;
+  NestedCatalogList ListNestedCatalogs() const;
   bool FindNested(const PathString &mountpoint,
                   shash::Any *hash, uint64_t *size) const;
 
@@ -208,6 +208,7 @@ class Catalog : public SingleCopy {
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
+  void ResetNestedCatalogCache();
 
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
@@ -232,7 +233,8 @@ class Catalog : public SingleCopy {
 
   Catalog *parent_;
   NestedCatalogMap children_;
-  mutable NestedCatalogList *nested_catalog_cache_;
+  mutable NestedCatalogList nested_catalog_cache_;
+  mutable bool              nested_catalog_cache_dirty_;
 
   bool initialized_;
   InodeRange inode_range_;

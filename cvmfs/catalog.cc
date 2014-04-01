@@ -47,6 +47,7 @@ Catalog::Catalog(const PathString &path,
   path_(path),
   volatile_flag_(false),
   parent_(parent),
+  nested_catalog_cache_dirty_(true),
   initialized_(false)
 {
   max_row_id_ = 0;
@@ -56,7 +57,6 @@ Catalog::Catalog(const PathString &path,
   assert(retval == 0);
 
   database_ = NULL;
-  nested_catalog_cache_ = NULL;
   uid_map_ = NULL;
   gid_map_ = NULL;
   sql_listing_ = NULL;
@@ -74,7 +74,6 @@ Catalog::~Catalog() {
   free(lock_);
   FinalizePreparedStatements();
   delete database_;
-  delete nested_catalog_cache_;
 }
 
 
@@ -478,37 +477,39 @@ uint64_t Catalog::GetRowIdFromInode(const inode_t inode) const {
 
 /**
  * Get a list of all registered nested catalogs in this catalog.
- * @return a list of all nested catalog references of this catalog.
- *         The potinter's ownership remains at the catalog object
+ * @return  a list of all nested catalog references of this catalog.
  */
-Catalog::NestedCatalogList *Catalog::ListNestedCatalogs() const {
-  NestedCatalogList *result;
-
+Catalog::NestedCatalogList Catalog::ListNestedCatalogs() const {
   pthread_mutex_lock(lock_);
-  // Ideally, the list of nested catalogs is already cached
-  if (read_only_) {
-    if (nested_catalog_cache_) {
-      pthread_mutex_unlock(lock_);
-      return nested_catalog_cache_;
+
+  if (nested_catalog_cache_dirty_) {
+    LogCvmfs(kLogCatalog, kLogDebug, "refreshing nested catalog cache of '%s'",
+             path().c_str());
+    while (sql_list_nested_->FetchRow()) {
+      NestedCatalog nested;
+      nested.path = sql_list_nested_->GetMountpoint();
+      nested.hash = sql_list_nested_->GetContentHash();
+      nested.size = sql_list_nested_->GetSize();
+      nested_catalog_cache_.push_back(nested);
     }
-    nested_catalog_cache_ = new NestedCatalogList();
-  } else {
-    delete nested_catalog_cache_;
-    nested_catalog_cache_ = new NestedCatalogList();
+    sql_list_nested_->Reset();
+    nested_catalog_cache_dirty_ = false;
   }
-  result = nested_catalog_cache_;
 
-  while (sql_list_nested_->FetchRow()) {
-    NestedCatalog nested;
-    nested.path = sql_list_nested_->GetMountpoint();
-    nested.hash = sql_list_nested_->GetContentHash();
-    nested.size = sql_list_nested_->GetSize();
-    result->push_back(nested);
-  }
-  sql_list_nested_->Reset();
   pthread_mutex_unlock(lock_);
+  return nested_catalog_cache_;
+}
 
-  return result;
+
+/**
+ * Drops the nested catalog cache. Usually this is only useful in subclasses
+ * that implement writable catalogs.
+ */
+void Catalog::ResetNestedCatalogCache() {
+  pthread_mutex_lock(lock_);
+  nested_catalog_cache_.clear();
+  nested_catalog_cache_dirty_ = true;
+  pthread_mutex_unlock(lock_);
 }
 
 

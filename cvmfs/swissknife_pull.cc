@@ -307,11 +307,10 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
 
   // Nested catalogs
   if (with_nested) {
-    catalog::Catalog::NestedCatalogList *nested_catalogs =
+    const catalog::Catalog::NestedCatalogList nested_catalogs =
       catalog->ListNestedCatalogs();
-    assert(nested_catalogs);
     for (catalog::Catalog::NestedCatalogList::const_iterator i =
-         nested_catalogs->begin(), iEnd = nested_catalogs->end();
+         nested_catalogs.begin(), iEnd = nested_catalogs.end();
          i != iEnd; ++i)
     {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
