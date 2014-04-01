@@ -479,7 +479,7 @@ uint64_t Catalog::GetRowIdFromInode(const inode_t inode) const {
  * Get a list of all registered nested catalogs in this catalog.
  * @return  a list of all nested catalog references of this catalog.
  */
-Catalog::NestedCatalogList Catalog::ListNestedCatalogs() const {
+const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
   pthread_mutex_lock(lock_);
 
   if (nested_catalog_cache_dirty_) {

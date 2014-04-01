@@ -515,7 +515,7 @@ bool CommandCheck::InspectTree(const string &path,
   }
 
   // Recurse into nested catalogs
-  const catalog::Catalog::NestedCatalogList nested_catalogs =
+  const catalog::Catalog::NestedCatalogList &nested_catalogs =
     catalog->ListNestedCatalogs();
   if (nested_catalogs.size() !=
       static_cast<uint64_t>(computed_counters->self.nested_catalogs))

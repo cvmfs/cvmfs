@@ -307,7 +307,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
 
   // Nested catalogs
   if (with_nested) {
-    const catalog::Catalog::NestedCatalogList nested_catalogs =
+    const catalog::Catalog::NestedCatalogList &nested_catalogs =
       catalog->ListNestedCatalogs();
     for (catalog::Catalog::NestedCatalogList::const_iterator i =
          nested_catalogs.begin(), iEnd = nested_catalogs.end();

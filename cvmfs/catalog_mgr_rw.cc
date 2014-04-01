@@ -596,7 +596,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Fix subtree counters in new nested catalogs: subtree is the sum of all
   // entries of all "grand-nested" catalogs
   // Note: taking a copy of the nested catalog list here
-  const Catalog::NestedCatalogList grand_nested =
+  const Catalog::NestedCatalogList &grand_nested =
     wr_new_catalog->ListNestedCatalogs();
   DeltaCounters fix_subtree_counters;
   for (Catalog::NestedCatalogList::const_iterator i = grand_nested.begin(),
