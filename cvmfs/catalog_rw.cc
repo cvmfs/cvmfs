@@ -134,7 +134,9 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
   shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
   shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
 
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry %s", entry_path.c_str());
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
+                                        entry_path.c_str(),
+                                        path().c_str());
 
   bool retval =
     sql_insert_->BindPathHash(path_hash) &&
