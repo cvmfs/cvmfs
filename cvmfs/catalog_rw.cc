@@ -32,10 +32,7 @@ WritableCatalog::WritableCatalog(const string      &path,
   sql_chunks_count_(NULL),
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
-  dirty_(false)
-{
-  read_only_ = false;
-}
+  dirty_(false) {}
 
 
 WritableCatalog *WritableCatalog::AttachFreely(const string      &root_path,
@@ -137,7 +134,9 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
   shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
   shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
 
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry %s", entry_path.c_str());
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
+                                        entry_path.c_str(),
+                                        path().c_str());
 
   bool retval =
     sql_insert_->BindPathHash(path_hash) &&
@@ -373,8 +372,7 @@ void WritableCatalog::MoveToNestedRecursively(
   // After creating a new nested catalog we have to move all elements
   // now contained by the new one.  List and move them recursively.
   DirectoryEntryList listing;
-  bool retval = ListingPath(PathString(directory.data(), directory.length()),
-                            &listing);
+  bool retval = ListingPath(PathString(directory), &listing);
   assert(retval);
 
   // Go through the listing
@@ -412,8 +410,7 @@ void WritableCatalog::MoveCatalogsToNested(
   {
     shash::Any hash_nested;
     uint64_t size_nested;
-    bool retval = FindNested(PathString(i->data(), i->length()),
-                             &hash_nested, &size_nested);
+    bool retval = FindNested(PathString(*i), &hash_nested, &size_nested);
     assert(retval);
 
     Catalog *attached_reference = NULL;
@@ -472,6 +469,8 @@ void WritableCatalog::InsertNestedCatalog(const string &mountpoint,
   if (attached_reference != NULL)
     AddChild(attached_reference);
 
+  ResetNestedCatalogCache();
+
   delta_counters_.self.nested_catalogs++;
 }
 
@@ -504,12 +503,13 @@ void WritableCatalog::RemoveNestedCatalog(const string &mountpoint,
   // If the reference was successfully deleted, we also have to check whether
   // there is also an attached reference in our in-memory data.
   // In this case we remove the child and return it through **attached_reference
-  Catalog *child = FindChild(PathString(mountpoint.data(),
-                                        mountpoint.length()));
+  Catalog *child = FindChild(PathString(mountpoint));
   if (child != NULL)
     RemoveChild(child);
   if (attached_reference != NULL)
     *attached_reference = child;
+
+  ResetNestedCatalogCache();
 
   delta_counters_.self.nested_catalogs--;
 }
@@ -534,6 +534,8 @@ void WritableCatalog::UpdateNestedCatalog(const string &path,
     stmt.BindInt64(2, size) &&
     stmt.BindText(3, path) &&
     stmt.Execute();
+
+  ResetNestedCatalogCache();
 
   assert(retval);
 }
@@ -564,13 +566,13 @@ void WritableCatalog::CopyCatalogsToParent() {
   WritableCatalog *parent = GetWritableParent();
 
   // Obtain a list of all nested catalog references
-  NestedCatalogList *nested_catalog_references = ListNestedCatalogs();
+  const NestedCatalogList &nested_catalog_references = ListNestedCatalogs();
 
   // Go through the list and update the databases
   // simultaneously we are checking if the referenced catalogs are currently
   // attached and update the in-memory data structures as well
-  for (NestedCatalogList::const_iterator i = nested_catalog_references->begin(),
-       iEnd = nested_catalog_references->end(); i != iEnd; ++i)
+  for (NestedCatalogList::const_iterator i = nested_catalog_references.begin(),
+       iEnd = nested_catalog_references.end(); i != iEnd; ++i)
   {
     Catalog *child = FindChild(i->path);
     parent->InsertNestedCatalog(i->path.ToString(), child, i->hash, i->size);

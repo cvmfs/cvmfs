@@ -407,6 +407,17 @@ make_huge_repo() {
 }
 
 
+# creates a big file at a given location with a given size
+# @param path  the location of the new file
+# @param size  the desired size in megabytes
+create_big_file() {
+  local path=$1
+  local size=$2
+
+  dd if=/dev/zero of=$path bs=1024k count=$size
+}
+
+
 # generate a custom style recursive listing with only the following infos:
 # - file name
 # - linkcount

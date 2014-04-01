@@ -193,10 +193,12 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     NotifyListeners(CatalogTraversalData(catalog, job.hash, job.tree_level));
 
     // Inception! Go to the next catalog level
-    catalog::Catalog::NestedCatalogList *nested_catalogs =
+    // Note: taking a copy of the result of ListNestedCatalogs() here for
+    //       data corruption prevention
+    const catalog::Catalog::NestedCatalogList nested_catalogs =
       catalog->ListNestedCatalogs();
     for (catalog::Catalog::NestedCatalogList::const_iterator i =
-         nested_catalogs->begin(), iEnd = nested_catalogs->end();
+         nested_catalogs.begin(), iEnd = nested_catalogs.end();
          i != iEnd; ++i)
     {
       catalog::Catalog* parent = (no_close_) ? catalog : NULL;
