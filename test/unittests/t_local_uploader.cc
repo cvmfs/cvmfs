@@ -82,7 +82,8 @@ class T_LocalUploader : public FileSandbox {
 
  public:
   T_LocalUploader() :
-    FileSandbox(T_LocalUploader::sandbox_path) {}
+    FileSandbox(T_LocalUploader::sandbox_path),
+    uploader_(NULL) {}
 
  protected:
   virtual void SetUp() {
