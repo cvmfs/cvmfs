@@ -186,6 +186,7 @@ class MockUploader : public upload::AbstractUploader {
               upload::CharBuffer          *buffer,
               const callback_t            *callback = NULL) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
+    assert (local_handle != NULL);
     local_handle->Append(buffer);
 
     Respond(callback, upload::UploaderResults(0, buffer));
@@ -195,6 +196,7 @@ class MockUploader : public upload::AbstractUploader {
                               const shash::Any            content_hash,
                               const std::string           hash_suffix) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
+    assert (local_handle != NULL);
 
     // summarize the results produced by the FileProcessor
     results_.push_back(Result(local_handle, content_hash, hash_suffix));

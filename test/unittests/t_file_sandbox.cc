@@ -64,7 +64,7 @@ TEST_F(T_FileSandbox, CreateRandomBufferMethod) {
   const uint64_t buffer_size = 10 * 1024 * 1024;
   char *buffer = (char*)malloc(buffer_size);
   ASSERT_NE (static_cast<char*>(NULL), buffer);
-  memset(buffer, buffer_size, 0);
+  memset(buffer, 0, buffer_size);
 
   // count number of zero-bytes in the random buffer as 'checksum'
   CreateRandomBuffer(buffer, buffer_size, rng);

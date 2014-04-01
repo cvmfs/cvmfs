@@ -56,10 +56,7 @@ class ChunkDetector {
 class StaticOffsetDetector : public ChunkDetector {
  public:
   StaticOffsetDetector(const size_t static_chunk_size) :
-    chunk_size_(static_chunk_size)
-  {
-    assert (chunk_size_ >= 0u);
-  }
+    chunk_size_(static_chunk_size) {}
 
   bool MightFindChunks(const size_t size) const { return size > chunk_size_; }
 
