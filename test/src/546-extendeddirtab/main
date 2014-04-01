@@ -161,7 +161,7 @@ produce_files_in_4() {
 check_catalog_presence_4() {
   local repo_name=$1
 
-  if [ $(get_catalog_count $repo_name) -ne 17 ]; then
+  if [ $(get_catalog_count $repo_name) -ne 20 ]; then
     return 101
   fi
 
