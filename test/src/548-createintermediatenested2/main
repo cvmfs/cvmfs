@@ -1,13 +1,13 @@
 
-cvmfs_test_name="Create Intermediate Nested Catalog"
+cvmfs_test_name="Create Intermediate Nested Catalog (2)"
 cvmfs_test_autofs_on_startup=false
 
-# this test is basically the same as 548-createintermediatenested2 which is a re-
-# gression test for CVM-608. It defines some directories inside the (future)
+# this test is basically the same as 547-createintermediatenested which is a re-
+# gression test for CVM-608. It defines all directories inside the (future)
 # nested catalog as nested catalogs. This lead to a different failure mode, thus
 # there are two regression tests.
 #
-# This test lead to corrupted catalog statistics that was detected by `check`
+# This test lead to an assertion during the repository publishing
 
 produce_files_in() {
   local working_dir=$1
@@ -75,7 +75,9 @@ produce_files_in() {
   # create nested catalog markers
   # touch dir5/ndir5/.cvmfscatalog
   touch dir5/ndir5/nndir3/nnndir1/.cvmfscatalog
+  touch dir5/ndir5/nndir3/nnndir2/.cvmfscatalog
   touch dir5/ndir5/nndir3/nnndir3/.cvmfscatalog
+  touch dir5/ndir5/nndir3/nnndir4/.cvmfscatalog
   touch dir5/ndir5/nndir3/nnndir5/.cvmfscatalog
 
   popdir
@@ -106,13 +108,15 @@ change_files_again_in() {
 check_initial_nested_catalog_presence() {
   local repo_name=$1
 
-  if [ $(get_catalog_count $repo_name) -ne 4 ]; then
+  if [ $(get_catalog_count $repo_name) -ne 6 ]; then
     return 101
   fi
 
   if check_catalog_presence /                          $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir1 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir2 $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir3 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir4 $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir5 $repo_name; then
     return 0
   else
@@ -123,14 +127,16 @@ check_initial_nested_catalog_presence() {
 check_intermediate_nested_catalog_presence() {
   local repo_name=$1
 
-  if [ $(get_catalog_count $repo_name) -ne 5 ]; then
+  if [ $(get_catalog_count $repo_name) -ne 7 ]; then
     return 101
   fi
 
   if check_catalog_presence /                          $repo_name && \
      check_catalog_presence /dir5/ndir5                $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir1 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir2 $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir3 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir4 $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir5 $repo_name; then
     return 0
   else
@@ -141,7 +147,7 @@ check_intermediate_nested_catalog_presence() {
 check_final_nested_catalog_presence() {
   local repo_name=$1
 
-  if [ $(get_catalog_count $repo_name) -ne 6 ]; then
+  if [ $(get_catalog_count $repo_name) -ne 8 ]; then
     return 101
   fi
 
@@ -149,7 +155,9 @@ check_final_nested_catalog_presence() {
      check_catalog_presence /dir5/ndir5                $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3         $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir1 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir2 $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir3 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir4 $repo_name && \
      check_catalog_presence /dir5/ndir5/nndir3/nnndir5 $repo_name; then
     return 0
   else
