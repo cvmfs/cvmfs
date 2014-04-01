@@ -43,7 +43,6 @@ Catalog* Catalog::AttachFreely(const string     &root_path,
 Catalog::Catalog(const PathString &path,
                  const shash::Any &catalog_hash,
                  Catalog *parent) :
-  read_only_(true),
   catalog_hash_(catalog_hash),
   path_(path),
   volatile_flag_(false),

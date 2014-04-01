@@ -150,7 +150,6 @@ class Catalog : public SingleCopy {
   shash::Any GetPreviousRevision() const;
   const Counters& GetCounters() const { return counters_; };
 
-  inline bool read_only() const { return read_only_; }
   inline float schema() const { return database().schema_version(); }
   inline PathString path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
@@ -209,7 +208,6 @@ class Catalog : public SingleCopy {
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
-  bool read_only_;
 
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;

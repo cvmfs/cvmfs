@@ -32,10 +32,7 @@ WritableCatalog::WritableCatalog(const string      &path,
   sql_chunks_count_(NULL),
   sql_max_link_id_(NULL),
   sql_inc_linkcount_(NULL),
-  dirty_(false)
-{
-  read_only_ = false;
-}
+  dirty_(false) {}
 
 
 WritableCatalog *WritableCatalog::AttachFreely(const string      &root_path,
