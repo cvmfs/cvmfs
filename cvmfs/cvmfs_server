@@ -1199,19 +1199,19 @@ process_dirtab() {
 '
   for dirtab_entry in $(cat "$dirtab_path"); do
     _process_dirtab_is_exclusion "$dirtab_entry" && continue
+
     local dirtab_entry_path="$base_path$dirtab_entry"
     _process_dirtab_is_readable $dirtab_entry_path || continue
     for candidate in $dirtab_entry_path; do
-      for nested_path in $(find $candidate -maxdepth 1 -mindepth 1 -type d); do
-        if [ ! -f "$nested_path/.cvmfscatalog" ]; then
-          if _process_dirtab_is_excluded $dirtab_path $nested_path; then
-            echo "Ignoring $nested_path"
-          else
-            echo "Auto-creating nested catalog in $nested_path"
-            touch "$nested_path/.cvmfscatalog"
-          fi
-        fi
-      done
+      [ -d $candidate ]                 || continue
+      [ ! -f $candidate/.cvmfscatalog ] || continue
+
+      if _process_dirtab_is_excluded $dirtab_path $candidate; then
+        echo "Ignoring $candidate"
+      else
+        echo "Auto-creating nested catalog in $candidate"
+        touch "$candidate/.cvmfscatalog"
+      fi
     done
   done
   IFS="$old_ifs"
