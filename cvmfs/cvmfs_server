@@ -1153,7 +1153,7 @@ _process_dirtab_is_readable() {
   local dirtab_entry="$1"
   for candidate in $dirtab_entry; do
     if [ ! -r "$candidate" ]; then
-      echo "WARNING: cannot read $candidate" >&2
+      echo "WARNING: cannot apply .cvmfsdirtab entry $candidate" >&2
       return 1
     fi
   done
