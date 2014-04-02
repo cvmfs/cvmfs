@@ -1173,12 +1173,13 @@ _process_dirtab_is_excluded() {
 '
   for dirtab_entry in $(cat "$dirtab_path"); do
     if _process_dirtab_is_exclusion "$dirtab_entry"; then
-      local exclusion="$(echo "$dirtab_entry" | sed -e 's/^!\s*\/\?\(.*\)$/\1/')"
-      exclusion="$(dirname $dirtab_path)/$exclusion"
-      local res=$(find $candidate_path -maxdepth 0 -wholename "$exclusion" -print)
-      if [ ! -z "$res" ] && echo "$res" | grep -q "^$candidate_path"; then
-        exclude=1
-      fi
+      local pattern="$(echo "$dirtab_entry" | sed -e 's/^!\s*\/\?\(.*\)$/\1/')"
+      pattern="$(dirname $dirtab_path)/$pattern"
+      for exclusion in $pattern; do
+        if echo $exclusion | grep -q "^$candidate_path$"; then
+          exclude=1; break;
+        fi
+      done
     fi
   done
   IFS="$old_ifs"
