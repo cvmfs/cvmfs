@@ -33,6 +33,7 @@ enum Failures {
   kFailHostResolve,
   kFailHostConnection,
   kFailNotFound,
+  kFailServiceUnavailable,
   kFailOther,
 };  // Failures
 
@@ -132,7 +133,7 @@ public:
 
 class S3FanoutManager {
  public:
-  static S3FanoutManager *Instance();
+  static S3FanoutManager *Instance(int concurrent_jobs);
 
   void Init(const unsigned max_pool_handles,
             AbstractUrlConstructor *url_constructor);

@@ -27,7 +27,7 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition) :
   assert (spooler_definition.IsValid() &&
           spooler_definition.driver_type == SpoolerDefinition::S3);
 
-  s3fanout_mgr = s3fanout::S3FanoutManager::Instance();
+  s3fanout_mgr = s3fanout::S3FanoutManager::Instance(maximum_number_of_parallell_uploads_);
 
   atomic_init32(&copy_errors_);
 }
@@ -72,6 +72,13 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
 	     config[1].c_str());
     return false;
   }
+  std::string parameter;   
+  if (!options::GetValue("MAX_NUMBER_OF_PARALLELL_CONNECTIONS", &parameter)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse MAX_NUMBER_OF_PARALLELL_CONNECTIONS from '%s'.", 
+	     config[1].c_str());
+    return false;
+  }
+  maximum_number_of_parallell_uploads_ = String2Uint64(parameter);
   options::Fini();
 
   const std::string kStandardPort = "80";
@@ -134,7 +141,11 @@ void S3Uploader::WorkerThread() {
     for(std::vector<s3fanout::JobInfo*>::iterator it = jobs.begin(); it != jobs.end(); ++it) {
       // Report and clean completed jobs
       s3fanout::JobInfo *info = *it;
-      Respond((callback_t*)info->callback, UploaderResults(0));
+      if(info->error_code == s3fanout::kFailOk) {
+	Respond((callback_t*)info->callback, UploaderResults(0));
+      } else {
+	Respond((callback_t*)info->callback, UploaderResults(99, info->mmf->file_path()));
+      }
       info->mmf->Unmap();
       delete info->mmf;
     }

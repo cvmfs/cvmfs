@@ -91,6 +91,7 @@ namespace upload
     std::string host_name_;
     std::string bucket_body_name_;
     int         number_of_buckets_;
+    int         maximum_number_of_parallell_uploads_;
     std::vector< std::pair<std::string, std::string> > keys_;
 
     const std::string    upstream_path_;

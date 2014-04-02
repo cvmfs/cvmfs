@@ -20,13 +20,14 @@ namespace s3fanout {
  * S3FanoutManager static variable for the compiler to find.
  */
 S3FanoutManager *S3FanoutManager::s3fm_ = NULL;
-static UrlConstructor url_constructor;
-
+static UrlConstructor url_constructor_static_;
+static int maximum_number_of_concurrent_jobs_ = 100;
 
 /**
  * Use this to get the S3FanoutManager instance.
  */
-S3FanoutManager *S3FanoutManager::Instance() {
+S3FanoutManager *S3FanoutManager::Instance(int concurrent_jobs) {
+  maximum_number_of_concurrent_jobs_ = concurrent_jobs;
   static pthread_once_t once_control = PTHREAD_ONCE_INIT;
   pthread_once(&once_control, &S3FanoutManager::Initialise);
   return s3fm_;
@@ -37,9 +38,8 @@ S3FanoutManager *S3FanoutManager::Instance() {
  * S3FanoutManager initialisation as a Singleton class.
  */
 void S3FanoutManager::Initialise() {
-  const int maximum_number_of_concurrent_jobs = 100;
   static S3FanoutManager s;
-  s.Init(maximum_number_of_concurrent_jobs, &url_constructor); // max connections
+  s.Init(maximum_number_of_concurrent_jobs_, &url_constructor_static_); // max connections
   s.SetRetryParameters(3, 100, 2000);
   s.Spawn();
 
@@ -76,6 +76,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       int http_error = String2Int64(string(&header_line[i], 3));
 
       switch (http_error) {
+        case 503:
+	  info->error_code = kFailServiceUnavailable;
+	  break;
         case 501:
         case 400:
           info->error_code = kFailBadRequest;
@@ -542,8 +545,10 @@ bool S3FanoutManager::CanRetry(const JobInfo *info) {
   unsigned max_retries = opt_max_retries_;
   pthread_mutex_unlock(lock_options_);
 
-  return (info->error_code == kFailHostConnection) &&
-         (info->num_retries < max_retries);
+  return (info->error_code == kFailHostConnection || 
+	  info->error_code == kFailServiceUnavailable ) &&
+    (info->num_retries < max_retries);
+
 }
 
 
