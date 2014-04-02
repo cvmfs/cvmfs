@@ -1163,12 +1163,15 @@ process_dirtab() {
   local name=$1
   local base_path="/cvmfs/${name}"
   local dirtab_path="${base_path}/.cvmfsdirtab"
+  local old_ifs="$IFS"
 
   if [ ! -f $dirtab_path ]; then
     return 0
   fi
 
   echo "Auto-creating nested catalogs (${dirtab_path})... "
+  IFS=$'
+'
   for dirtab_entry in $(cat "$dirtab_path"); do
     local dirtab_path="$base_path$dirtab_entry"
     _process_dirtab_is_readable $dirtab_path || continue
@@ -1181,6 +1184,7 @@ process_dirtab() {
       done
     done
   done
+  IFS="$old_ifs"
 }
 
 
