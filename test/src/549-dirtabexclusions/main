@@ -22,9 +22,9 @@ produce_files_in_1() {
 
 
   # create a .cvmfsdirtab for these directories
-  echo "/People/Germans/*" >  .cvmfsdirtab
-  echo "/Machines/Linux*"  >> .cvmfsdirtab
-  echo "! 2.*"             >> .cvmfsdirtab
+  echo "/People/Germans/*/*" >  .cvmfsdirtab
+  echo "/Machines/Linux*/*"  >> .cvmfsdirtab
+  echo "! 2.*"               >> .cvmfsdirtab
 
   popdir
 }
@@ -108,7 +108,7 @@ produce_files_in_3() {
 
   pushdir $working_dir
 
-  echo "/People/*/Musicians"  >> .cvmfsdirtab
+  echo "/People/*/Musicians/*" >> .cvmfsdirtab
 
   popdir
 }
@@ -141,7 +141,7 @@ produce_files_in_4() {
   pushdir $working_dir
 
   # add People/* to nested catalogs, but not Russians ;-)
-  echo "/People"    >> .cvmfsdirtab
+  echo "/People/*"  >> .cvmfsdirtab
   echo "! Russians" >> .cvmfsdirtab
 
   popdir

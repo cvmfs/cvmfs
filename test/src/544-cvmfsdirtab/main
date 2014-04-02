@@ -12,9 +12,9 @@ produce_files_in_1() {
   mkdir People/Germans People/Americans People/French People/Russians
 
   # create a .cvmfsdirtab for these directories
-  echo "/People/Germans"   >  .cvmfsdirtab
-  echo "/People/Americans" >> .cvmfsdirtab
-  echo "/People/Russians"  >> .cvmfsdirtab
+  echo "/People/Germans/*"   >  .cvmfsdirtab
+  echo "/People/Americans/*" >> .cvmfsdirtab
+  echo "/People/Russians/*"  >> .cvmfsdirtab
 
   popdir
 }
