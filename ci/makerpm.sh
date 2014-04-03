@@ -27,9 +27,9 @@ if [ $? -eq 0 ]; then
 fi
 
 enforce_target=
-if [ "$(uname -m)" = "i686" ]; then
-  enforce_target="--target=i686"
-fi
+#if [ "$(uname -m)" = "i686" ]; then
+#  enforce_target="--target=i686"
+#fi
 if [ "$(uname -m)" = "x86_64" -a $(getconf LONG_BIT) = 32 ]; then
   enforce_target="--target=i686"
 fi 

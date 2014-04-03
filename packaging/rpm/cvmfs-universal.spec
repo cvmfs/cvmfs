@@ -147,15 +147,23 @@ cp %{SOURCE1} SELinux
 %endif
 
 %build
+
+%ifarch i386
+export CXXFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
+export CFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
+%endif
+
 %if 0%{?el4}
 export CC=gcc4
 export CXX=g++4
 %endif
+
 %if 0%{?suse_version}
 cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr .
 %else
 %cmake -DCMAKE_INSTALL_LIBDIR:PATH=%{_lib} -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_LIBCVMFS=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes .
 %endif
+
 make %{?_smp_mflags}
 
 %if 0%{?selinux_cvmfs}
@@ -337,6 +345,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Thu Apr 3 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
+- Fix for EL6.5 32bit
 * Tue Feb 11 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
 - Fedora 20 compatibility fixes
 * Tue Jan 21 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.17
