@@ -1186,6 +1186,7 @@ _process_dirtab_is_excluded() {
 
 process_dirtab() {
   local name=$1
+  local verbose="$2"
   local base_path="/cvmfs/${name}"
   local dirtab_path="${base_path}/.cvmfsdirtab"
   local old_ifs="$IFS"
@@ -1207,7 +1208,7 @@ process_dirtab() {
       [ ! -f $candidate/.cvmfscatalog ] || continue
 
       if _process_dirtab_is_excluded $dirtab_path $candidate; then
-        echo "Ignoring $candidate"
+        [ x"$verbose" != x"" ] && echo "Ignoring $candidate"
       else
         echo "Auto-creating nested catalog in $candidate"
         touch "$candidate/.cvmfscatalog"
@@ -2500,7 +2501,7 @@ publish() {
   local add_tag=
   local remove_tag=
   local retcode=0
-  local verbosity=" "
+  local verbosity=""
 
   # optional parameter handling
   OPTIND=1
@@ -2621,7 +2622,7 @@ publish() {
     local user_shell="sh -c"
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
-    process_dirtab $name || die "Synchronization Failed! Please repair your .cvmfsdirtab file!"
+    process_dirtab $name $verbosity || die "Synchronization Failed! Please repair your .cvmfsdirtab file!"
     publish_before_hook $name
     publishing_lock $name
     cvmfs_suid_helper lock $name
