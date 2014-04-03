@@ -1175,11 +1175,9 @@ _process_dirtab_is_excluded() {
     if _process_dirtab_is_exclusion "$dirtab_entry"; then
       local pattern="$(echo "$dirtab_entry" | sed -e 's/^!\s*\/\?\(.*\)$/\1/')"
       pattern="$(dirname $dirtab_path)/$pattern"
-      for exclusion in $pattern; do
-        if echo $exclusion | grep -q "^$candidate_path$"; then
-          exclude=1; break;
-        fi
-      done
+      case "$candidate_path" in
+        $pattern) exclude=1; break;;
+      esac
     fi
   done
   IFS="$old_ifs"
