@@ -90,6 +90,8 @@ class FileObject(CompressedObject):
     def file(self):
         return self.file_
 
+def _binary_buffer_to_hex_string(binbuf):
+    return "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,binbuf)))
 
 def _split_md5(md5digest):
     hi = lo = 0
