@@ -83,6 +83,14 @@ class DatabaseObject(CompressedObject):
         subprocess.call(['sqlite3', self.file_.name])
 
 
+class FileObject(CompressedObject):
+    def __init__(self, compressed_file):
+        CompressedObject.__init__(self, compressed_file)
+
+    def file(self):
+        return self.file_
+
+
 def _split_md5(md5digest):
     hi = lo = 0
     for i in range(0, 8):
