@@ -5,6 +5,9 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+from _common import _binary_buffer_to_hex_string, FileObject
+
+
 class _Flags:
     """ Definition of used dirent flags (see cvmfs/catalog_sql.h) """
     Directory               = 1
@@ -14,6 +17,24 @@ class _Flags:
     Link                    = 8
     FileStat                = 16 # unused
     FileChunk               = 64
+    ContentHashType         = 256 + 512 + 1024
+
+
+class ContentHashTypes:
+    """ Enumeration of supported content hash types (see cvmfs/hash.h) """
+    Unknown    = -1
+    # Md5      =  0  # MD5 is not used as a content hash!
+    Sha1       =  1
+    Ripemd160  =  2
+    UpperBound =  3
+
+    @staticmethod
+    def to_suffix(content_hash_type):
+        """ figures out the hash suffix in CVMFS's CAS (see cvmfs/hash.cc) """
+        if content_hash_type == ContentHashTypes.Ripemd160:
+            return "-rmd160"
+        else:
+            return ""
 
 
 class DirectoryEntry:
@@ -26,6 +47,7 @@ class DirectoryEntry:
         self.md5path_1, self.md5path_2, self.parent_1, self.parent_2,    \
         self.content_hash, self.flags, self.size, self.mode, self.mtime, \
         self.name, self.symlink = result_set
+        self._read_content_hash_type()
 
     def __str__(self):
         return "<DirectoryEntry for '" + self.name + "'>"
@@ -61,6 +83,20 @@ class DirectoryEntry:
     def parent_hash(self):
         return self.parent_1, self.parent_2
 
+    def content_hash_string(self):
+        suffix = ContentHashTypes.to_suffix(self.content_hash_type)
+        return _binary_buffer_to_hex_string(self.content_hash) + suffix
+
+    def _read_content_hash_type(self):
+        bit_mask     = _Flags.ContentHashType
+        right_shifts = 0
+        while bit_mask & 1 == 0:
+            bit_mask = bit_mask >> 1
+            right_shifts += 1
+        hash_type = ((self.flags & _Flags.ContentHashType) >> right_shifts) + 1
+        self.content_hash_type = \
+            hash_type if hash_type > 0 and hash_type < ContentHashTypes.UpperBound \
+                      else ContentHashTypes.Unknown
 
     # def BacktracePath(self, containing_catalog, repo):
     #     """ Tries to reconstruct the full path of a DirectoryEntry """
