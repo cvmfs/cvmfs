@@ -62,6 +62,14 @@ class DirectoryEntry:
         return "md5path_1, md5path_2, parent_1, parent_2, hash, \
                 flags, size, mode, mtime, name, symlink"
 
+    def retrieve_from(self, repository):
+        if self.is_symlink():
+            raise Exception("Cannot retrieve symlink")
+        elif self.is_directory():
+            raise Exception("Cannot retrieve directory")
+        f = FileObject(repository.retrieve_object(self.content_hash_string()))
+        return f.file()
+
     def is_directory(self):
         return (self.flags & _Flags.Directory) > 0
 
