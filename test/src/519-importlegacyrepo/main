@@ -25,6 +25,7 @@ cvmfs_run_test() {
   echo "download Guinea Pig repository $guinea_pig"
   python ${script_location}/downloadCatalogs.py \
     --directory ${download_location}/data \
+    --get-dirtab                          \
     $guinea_pig || return 5
   wget \
     --directory-prefix $download_location \
@@ -59,9 +60,17 @@ cvmfs_run_test() {
     -s \
     $CVMFS_TEST_REPO || return 11
 
+  # check if the migrated dirtab is sane
+  echo "check if the migrated .cvmfsdirtab looks okay"
+  local dirtab_path="/cvmfs/${CVMFS_TEST_REPO}/.cvmfsdirtab"
+  cat $dirtab_path
+  for line in $(cat $dirtab_path); do
+    echo "$line" | grep -qe '^.*/\*$' || return 12
+  done
+
   # check if the migrated and imported catalogs are sane
   echo "check migrated catalogs without checking data chunks (we did not download them)"
-  check_repository $CVMFS_TEST_REPO -c || return 12
+  check_repository $CVMFS_TEST_REPO -c || return 13
 
   # cheate a new repository revision of the migrated catalogs
   echo "create a new repository revision"
@@ -78,16 +87,16 @@ cvmfs_run_test() {
 
   # check if still everything is fine
   echo "check catalogs again"
-  check_repository $CVMFS_TEST_REPO -c || return 13
+  check_repository $CVMFS_TEST_REPO -c || return 14
 
   # see if the files ended up in the catalog
   echo "check created files"
   local content=$(cat ${repo_dir}/foo/bar)
-  [ -f ${repo_dir}/foo/bar ] && grep -q "no meaningful stuff" ${repo_dir}/foo/bar || return 14
-  [ -f ${repo_dir}/bar/baz ] && grep -q "no meaningful stuff" ${repo_dir}/bar/baz || return 15
+  [ -f ${repo_dir}/foo/bar ] && grep -q "no meaningful stuff" ${repo_dir}/foo/bar || return 15
+  [ -f ${repo_dir}/bar/baz ] && grep -q "no meaningful stuff" ${repo_dir}/bar/baz || return 16
 
   # remove the test repository
-  destroy_repo $CVMFS_TEST_REPO || return 16
+  destroy_repo $CVMFS_TEST_REPO || return 17
 
   return 0
 }
