@@ -1218,6 +1218,18 @@ process_dirtab() {
   IFS="$old_ifs"
 }
 
+migrate_legacy_dirtab() {
+  local name=$1
+  local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
+  local tmp_dirtab=$(mktemp)
+
+  cp -f "$dirtab_path" "$tmp_dirtab"                           || return 1
+  transaction $name > /dev/null                                || return 2
+  cat "$tmp_dirtab" | sed -e 's/\(.*\)/\1\/\*/' > $dirtab_path || return 3
+  publish $name > /dev/null                                    || return 4
+  rm -f "$tmp_dirtab"                                          || return 5
+}
+
 
 # writes apache configuration file
 # This figures out where to put the apache configuration file depending
@@ -1980,6 +1992,13 @@ import() {
   echo -n "Mounting CernVM-FS Storage... "
   setup_and_mount_new_repository $name aufs || die "fail!"
   echo "done"
+
+  # the .cvmfsdirtab semantics might need an update
+  if [ $is_legacy -ne 0 ] && [ -f /cvmfs/${name}/.cvmfsdirtab ]; then
+    echo -n "Migrating .cvmfsdirtab... "
+    migrate_legacy_dirtab $name || die "fail!"
+    echo "done"
+  fi
 
   # make stratum0 repository replicable if requested
   if [ $replicable -eq 1 ]; then
