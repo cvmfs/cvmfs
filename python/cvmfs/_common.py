@@ -33,15 +33,17 @@ class CompressedObject:
     def __init__(self, compressed_file):
         self._decompress(compressed_file)
 
-    def __del__(self):
-        if self.file_:
-            self.file_.close()
-
     def _decompress(self, compressed_file):
         """ Unzip a file to a temporary referenced by self.file_ """
         self.file_ = tempfile.NamedTemporaryFile('w+b')
         self.file_.write(zlib.decompress(compressed_file.read()))
         self.file_.flush()
+        self.file_.seek(0)
+
+    def _close(self):
+        if self.file_:
+            self.file_.close()
+
 
 
 class DatabaseObject(CompressedObject):
@@ -54,6 +56,7 @@ class DatabaseObject(CompressedObject):
     def __del__(self):
         if self.db_handle_:
             self.db_handle_.close()
+        self._close()
 
     def _open_database(self):
         """ Create and configure a database handle to the Catalog """
@@ -79,6 +82,16 @@ class DatabaseObject(CompressedObject):
         """ Spawns a sqlite shell for interactive catalog database inspection """
         subprocess.call(['sqlite3', self.file_.name])
 
+
+class FileObject(CompressedObject):
+    def __init__(self, compressed_file):
+        CompressedObject.__init__(self, compressed_file)
+
+    def file(self):
+        return self.file_
+
+def _binary_buffer_to_hex_string(binbuf):
+    return "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,binbuf)))
 
 def _split_md5(md5digest):
     hi = lo = 0
