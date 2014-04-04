@@ -19,17 +19,13 @@ class _Flags:
 class DirectoryEntry:
     """ Thin wrapper around a DirectoryEntry as it is saved in the Catalogs """
 
-    def __init__(self):
-        self.md5path_1 = 0
-        self.md5path_2 = 0
-        self.parent_1  = 0
-        self.parent_2  = 0
-        self.flags     = 0
-        self.size      = 0
-        self.mode      = 0
-        self.mtime     = 0
-        self.name      = ""
-        self.symlink   = ""
+    def __init__(self, result_set):
+        # see DirectoryEntry._catalog_db_fields()
+        if len(result_set) != 11:
+            raise Exception("Result set doesn't match")
+        self.md5path_1, self.md5path_2, self.parent_1, self.parent_2,    \
+        self.content_hash, self.flags, self.size, self.mode, self.mtime, \
+        self.name, self.symlink = result_set
 
     def __str__(self):
         return "<DirectoryEntry for '" + self.name + "'>"
@@ -37,6 +33,12 @@ class DirectoryEntry:
     def __repr__(self):
         return "<DirectoryEntry '" + self.name + "' - " + \
                str(self.md5path_1) + "|" + str(self.md5path_2) + ">"
+
+    @staticmethod
+    def _catalog_db_fields():
+        # see DirectoryEntry.__init__()
+        return "md5path_1, md5path_2, parent_1, parent_2, hash, \
+                flags, size, mode, mtime, name, symlink"
 
     def is_directory(self):
         return (self.flags & _Flags.Directory) > 0

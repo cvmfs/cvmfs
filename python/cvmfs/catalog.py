@@ -203,19 +203,12 @@ class Catalog(DatabaseObject):
 
     def list_directory_split_md5(self, parent_1, parent_2):
         """ Create a directory listing of DirectoryEntry items based on MD5 path """
-        res = self.run_sql("SELECT md5path_1, md5path_2, parent_1, parent_2,     \
-                                    flags, size, mode, mtime, name, symlink       \
-                             FROM catalog                                         \
-                             WHERE parent_1 = " + str(parent_1) + " AND           \
-                                   parent_2 = " + str(parent_2) + "               \
-                             ORDER BY name ASC;")
-        listing = []
-        for result in res:
-            e = DirectoryEntry()
-            e.md5path_1, e.md5path_2,   e.parent_1, e.parent_2, e.flags, e.size,  \
-            e.mode, e.mtime, e.name, e.symlink = result
-            listing.append(e)
-        return listing
+        res = self.run_sql("SELECT " + DirectoryEntry._catalog_db_fields() + " \
+                            FROM catalog                                       \
+                            WHERE parent_1 = " + str(parent_1) + " AND         \
+                                  parent_2 = " + str(parent_2) + "             \
+                            ORDER BY name ASC;")
+        return [ DirectoryEntry(result) for result in res ]
 
 
     def find_directory_entry(self, path):
@@ -233,20 +226,12 @@ class Catalog(DatabaseObject):
 
     def find_directory_entry_split_md5(self, md5path_1, md5path_2):
         """ Finds the DirectoryEntry for the given split MD5 hashed path """
-        res = self.run_sql("SELECT parent_1, parent_2, flags, size, mode, mtime, \
-                                    name, symlink                                 \
-                             FROM catalog                                         \
-                             WHERE md5path_1 = " + str(md5path_1) + " AND         \
-                                   md5path_2 = " + str(md5path_2) + "             \
-                             LIMIT 1;")
-        if len(res) != 1:
-            return None
-        e = DirectoryEntry()
-        e.md5path_1 = md5path_1
-        e.md5path_2 = md5path_2
-        e.parent_1, e.parent_2, e.flags, e.size, e.mode, \
-        e.mtime, e.name, e.symlink = res[0]
-        return e
+        res = self.run_sql("SELECT " + DirectoryEntry._catalog_db_fields() + " \
+                            FROM catalog                                       \
+                            WHERE md5path_1 = " + str(md5path_1) + " AND       \
+                                  md5path_2 = " + str(md5path_2) + "           \
+                            LIMIT 1;")
+        return DirectoryEntry(res[0]) if len(res) == 1 else None
 
 
     def is_root(self):
