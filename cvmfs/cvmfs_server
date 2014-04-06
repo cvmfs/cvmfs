@@ -1274,13 +1274,6 @@ EOF
 
   create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
-<Directory "/cvmfs/$name">
-    Options -MultiViews
-    AllowOverride All
-    $(get_compatible_apache_allow_from_all_config)
-    EnableMMAP Off
-    EnableSendFile Off
-</Directory>
 EOF
 
   # ONLY FOR LOCAL UPSTREAM
