@@ -5,6 +5,9 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+from _common import _binary_buffer_to_hex_string, FileObject
+
+
 class _Flags:
     """ Definition of used dirent flags (see cvmfs/catalog_sql.h) """
     Directory               = 1
@@ -14,22 +17,37 @@ class _Flags:
     Link                    = 8
     FileStat                = 16 # unused
     FileChunk               = 64
+    ContentHashType         = 256 + 512 + 1024
+
+
+class ContentHashTypes:
+    """ Enumeration of supported content hash types (see cvmfs/hash.h) """
+    Unknown    = -1
+    # Md5      =  0  # MD5 is not used as a content hash!
+    Sha1       =  1
+    Ripemd160  =  2
+    UpperBound =  3
+
+    @staticmethod
+    def to_suffix(content_hash_type):
+        """ figures out the hash suffix in CVMFS's CAS (see cvmfs/hash.cc) """
+        if content_hash_type == ContentHashTypes.Ripemd160:
+            return "-rmd160"
+        else:
+            return ""
 
 
 class DirectoryEntry:
     """ Thin wrapper around a DirectoryEntry as it is saved in the Catalogs """
 
-    def __init__(self):
-        self.md5path_1 = 0
-        self.md5path_2 = 0
-        self.parent_1  = 0
-        self.parent_2  = 0
-        self.flags     = 0
-        self.size      = 0
-        self.mode      = 0
-        self.mtime     = 0
-        self.name      = ""
-        self.symlink   = ""
+    def __init__(self, result_set):
+        # see DirectoryEntry._catalog_db_fields()
+        if len(result_set) != 11:
+            raise Exception("Result set doesn't match")
+        self.md5path_1, self.md5path_2, self.parent_1, self.parent_2,    \
+        self.content_hash, self.flags, self.size, self.mode, self.mtime, \
+        self.name, self.symlink = result_set
+        self._read_content_hash_type()
 
     def __str__(self):
         return "<DirectoryEntry for '" + self.name + "'>"
@@ -37,6 +55,20 @@ class DirectoryEntry:
     def __repr__(self):
         return "<DirectoryEntry '" + self.name + "' - " + \
                str(self.md5path_1) + "|" + str(self.md5path_2) + ">"
+
+    @staticmethod
+    def _catalog_db_fields():
+        # see DirectoryEntry.__init__()
+        return "md5path_1, md5path_2, parent_1, parent_2, hash, \
+                flags, size, mode, mtime, name, symlink"
+
+    def retrieve_from(self, repository):
+        if self.is_symlink():
+            raise Exception("Cannot retrieve symlink")
+        elif self.is_directory():
+            raise Exception("Cannot retrieve directory")
+        f = FileObject(repository.retrieve_object(self.content_hash_string()))
+        return f.file()
 
     def is_directory(self):
         return (self.flags & _Flags.Directory) > 0
@@ -59,6 +91,20 @@ class DirectoryEntry:
     def parent_hash(self):
         return self.parent_1, self.parent_2
 
+    def content_hash_string(self):
+        suffix = ContentHashTypes.to_suffix(self.content_hash_type)
+        return _binary_buffer_to_hex_string(self.content_hash) + suffix
+
+    def _read_content_hash_type(self):
+        bit_mask     = _Flags.ContentHashType
+        right_shifts = 0
+        while bit_mask & 1 == 0:
+            bit_mask = bit_mask >> 1
+            right_shifts += 1
+        hash_type = ((self.flags & _Flags.ContentHashType) >> right_shifts) + 1
+        self.content_hash_type = \
+            hash_type if hash_type > 0 and hash_type < ContentHashTypes.UpperBound \
+                      else ContentHashTypes.Unknown
 
     # def BacktracePath(self, containing_catalog, repo):
     #     """ Tries to reconstruct the full path of a DirectoryEntry """

@@ -57,14 +57,12 @@ def getCatalogFilePath(catalogName, catalogDirectory):
 	return catalogDirectory + "/" + catalogName[0:2] + "/" + catalogName[2:] + "C"
 
 
-def downloadCatalog(repositoryUrl, catalogName, catalogDirectory, beVerbose):
-	# find out some pathes and init the zlib decompressor
-	subdir = catalogName[0:2]
-	filename = catalogName[2:] + "C"
-	url = repositoryUrl + "/data/" + subdir + "/" + filename
-	destDir = catalogDirectory + "/" + subdir + "/"
-	dest = destDir + filename
-	#decoder = zlib.decompressobj()
+def downloadObject(repositoryUrl, objectName, resultDirectory, beVerbose):
+	subdir   = objectName[0:2]
+	filename = objectName[2:]
+	url      = repositoryUrl + "/data/" + subdir + "/" + filename
+	destDir  = resultDirectory + "/" + subdir + "/"
+	dest     = destDir + filename
 
 	# create target directory if not existing and open output file
 	createDirectory(destDir)
@@ -77,7 +75,7 @@ def downloadCatalog(repositoryUrl, catalogName, catalogDirectory, beVerbose):
 		fileSize = int(meta.getheaders("Content-Length")[0])
 
 		if beVerbose:
-			print "retrieving " + catalogName + " - " + str(fileSize) + " bytes"
+			print "retrieving " + objectName + " - " + str(fileSize) + " bytes"
 
 		local_file = open(dest, "wb")
 		try:
@@ -90,6 +88,10 @@ def downloadCatalog(repositoryUrl, catalogName, catalogDirectory, beVerbose):
 		printError("URL:" + e.reason + url)
 
 
+def downloadCatalog(repositoryUrl, catalogName, catalogDirectory, beVerbose):
+	downloadObject(repositoryUrl, catalogName + "C", catalogDirectory, beVerbose)
+
+
 def decompressCatalog(filename, destination):
 	str_object1 = open(filename, 'rb').read()
 	str_object2 = zlib.decompress(str_object1)
@@ -98,7 +100,7 @@ def decompressCatalog(filename, destination):
 	f.close()
 
 
-def findNestedCatalogs(catalogName, catalogDirectory):
+def findNestedCatalogs(catalogName, catalogDirectory, repositoryUrl, beVerbose, getDirtab):
 	catalogFile = getCatalogFilePath(catalogName, catalogDirectory)
 	tempFile    = tempfile.NamedTemporaryFile('wb')
 	decompressCatalog(catalogFile, tempFile.name)
@@ -113,12 +115,22 @@ def findNestedCatalogs(catalogName, catalogDirectory):
 	for catalog in result:
 		catalogs.append(catalog[0])
 
+	# dirtab entry
+	if getDirtab:
+		cursor.execute("SELECT hash FROM catalog WHERE name = '.cvmfsdirtab'")
+		result = cursor.fetchall()
+		for dirtab in result:
+			print "--> found .cvmfsdirtab"
+			sha1 = "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,result[0][0])))
+			downloadObject(repositoryUrl, sha1, catalogDirectory, beVerbose)
+
+
 	dbHandle.close()
 	tempFile.close()
 	return catalogs
 
 
-def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, beVerbose):
+def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, beVerbose, getDirtab):
 	catalogs = [catalogName]
 	downloads = 0
 	while catalogs:
@@ -129,7 +141,7 @@ def retrieveCatalogsRecursively(repositoryUrl, catalogName, catalogDirectory, be
 			continue
 
 		downloadCatalog(repositoryUrl, catalog, catalogDirectory, beVerbose)
-		nestedCatalogs = findNestedCatalogs(catalog, catalogDirectory)
+		nestedCatalogs = findNestedCatalogs(catalog, catalogDirectory, repositoryUrl, beVerbose, getDirtab)
 		downloads += 1
 
 		if beVerbose:
@@ -144,6 +156,7 @@ def main():
 	parser = OptionParser(usage)
 	parser.add_option("-d", "--directory", dest="catalogDirectory", default="catalogs", help="the directory to download catalogs to")
 	parser.add_option("-q", "--quiet", action="store_false", dest="verbose", default=True, help="don't print status messages to stdout")
+	parser.add_option("-t", "--get-dirtab", dest="getDirtab", action="store_true", default=False, help="download the data chunk for .cvmfsdirtab")
 	(options, args) = parser.parse_args()
 
 	if len(args) != 1:
@@ -153,6 +166,7 @@ def main():
 	repositoryUrl = args[0]
 	catalogDirectory = options.catalogDirectory
 	verbose = options.verbose
+	getDirtab = options.getDirtab
 
 	# check option consistency
 	if os.path.exists(catalogDirectory) and os.listdir(catalogDirectory) != []:
@@ -160,7 +174,7 @@ def main():
 
 	# do the job
 	rootCatalog = getRootCatalogName(repositoryUrl)
-	numCatalogs = retrieveCatalogsRecursively(repositoryUrl, rootCatalog, catalogDirectory, verbose)
+	numCatalogs = retrieveCatalogsRecursively(repositoryUrl, rootCatalog, catalogDirectory, verbose, getDirtab)
 
 	print "downloaded" , numCatalogs , "catalogs"
 
