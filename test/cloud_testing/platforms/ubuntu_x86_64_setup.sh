@@ -60,3 +60,8 @@ install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
 echo -n "loading AUFS kernel module..."
 sudo modprobe aufs || die "fail"
 echo "done"
+
+# increase open file descriptor limits
+echo -n "increasing ulimit -n ... "
+set_nofile_limit 65536 || die "fail"
+echo "done"

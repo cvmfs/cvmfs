@@ -47,3 +47,8 @@ echo "OK"
 echo "installing test dependencies..."
 install_from_repo gcc     || die "fail (installing gcc)"
 install_from_repo gcc-c++ || die "fail (installing gcc-c++)"
+
+# increase open file descriptor limits
+echo -n "increasing ulimit -n ... "
+set_nofile_limit 65536 || die "fail"
+echo "done"
