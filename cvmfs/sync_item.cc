@@ -38,7 +38,8 @@ SyncItem::SyncItem(const string &relative_parent_path,
 
 SyncItemType SyncItem::GetRdOnlyFiletype() const {
   StatRdOnly();
-  if (rdonly_stat_.error_code == ENOENT)  return kItemNew;
+  if (rdonly_stat_.error_code == ENOENT ||
+      rdonly_stat_.error_code == ENOTDIR) return kItemNew;
   if (S_ISDIR(rdonly_stat_.stat.st_mode)) return kItemDir;
   if (S_ISREG(rdonly_stat_.stat.st_mode)) return kItemFile;
   if (S_ISLNK(rdonly_stat_.stat.st_mode)) return kItemSymlink;
