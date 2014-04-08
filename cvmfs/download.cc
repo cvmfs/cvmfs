@@ -637,8 +637,8 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   info->num_retries = 0;
   info->backoff_ms = 0;
   info->headers = header_lists_->DuplicateList(default_headers_);
-  if (info->extra_header) {
-    header_lists_->AppendHeader(info->headers, info->extra_header);
+  if (info->info_header) {
+    header_lists_->AppendHeader(info->headers, info->info_header);
   }
   if (info->compressed) {
     zlib::DecompressInit(&(info->zstream));
@@ -1095,7 +1095,7 @@ DownloadManager::DownloadManager() {
   opt_max_retries_ = 0;
   opt_backoff_init_ms_ = 0;
   opt_backoff_max_ms_ = 0;
-
+  enable_info_header_ = false;
   opt_ipv4_only_ = false;
 
   opt_timestamp_backup_proxies_ = 0;
@@ -1276,17 +1276,17 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   }
 
   // Prepare cvmfs-info: header, allocate string on the stack
-  info->extra_header = NULL;
-  if (info->extra_info) {
+  info->info_header = NULL;
+  if (enable_info_header_ && info->extra_info) {
     const char *header_name = "cvmfs-info: ";
     const size_t header_name_len = strlen(header_name);
     const unsigned header_size = 1 + header_name_len +
       EscapeHeader(*(info->extra_info), NULL, 0);
-    info->extra_header = static_cast<char *>(alloca(header_size));
-    memcpy(info->extra_header, header_name, header_name_len);
-    EscapeHeader(*(info->extra_info), info->extra_header + header_name_len,
+    info->info_header = static_cast<char *>(alloca(header_size));
+    memcpy(info->info_header, header_name, header_name_len);
+    EscapeHeader(*(info->extra_info), info->info_header + header_name_len,
                  header_size - header_name_len);
-    info->extra_header[header_size-1] = '\0';
+    info->info_header[header_size-1] = '\0';
   }
 
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
@@ -1810,7 +1810,12 @@ void DownloadManager::SetRetryParameters(const unsigned max_retries,
 }
 
 
-void DownloadManager::ActivatePipelining() {
+void DownloadManager::EnableInfoHeader() {
+  enable_info_header_ = true;
+}
+
+
+void DownloadManager::EnablePipelining() {
   curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 }
 

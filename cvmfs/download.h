@@ -128,7 +128,7 @@ struct JobInfo {
   // Internal state, don't touch
   CURL *curl_handle;
   curl_slist *headers;
-  char *extra_header;
+  char *info_header;
   z_stream zstream;
   shash::ContextPtr hash_context;
   int wait_at[2];  /**< Pipe used for the return value */
@@ -204,7 +204,8 @@ class DownloadManager {
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
-  void ActivatePipelining();
+  void EnableInfoHeader();
+  void EnablePipelining();
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -261,7 +262,7 @@ class DownloadManager {
   unsigned opt_max_retries_;
   unsigned opt_backoff_init_ms_;
   unsigned opt_backoff_max_ms_;
-
+  bool enable_info_header_;
   bool opt_ipv4_only_;
 
   /**
