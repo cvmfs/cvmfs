@@ -18,7 +18,7 @@ echo "done"
 
 # custom kernel packages (figures out the newest installed kernel, downloads and
 #                         installs the associated patched aufs version of it)
-knl_version=$(yum list installed | grep -e '^kernel\.x86_64' | awk '{ print $2 }' | sort -r | head -n1)
+knl_version=$(rpm -qa --last | grep -e '^kernel-[0-9]' | head -n 1 | sed -e 's/^kernel-\(.*\)\.x86_64.*$/\1/')
 aufs_util_version="2.1-2"
 knl_firmware="https://ecsft.cern.ch/dist/cvmfs/kernel/${knl_version}/kernel-firmware-${knl_version}.aufs21.x86_64.rpm"
 knl="https://ecsft.cern.ch/dist/cvmfs/kernel/${knl_version}/kernel-${knl_version}.aufs21.x86_64.rpm"
