@@ -1,4 +1,6 @@
 2.1.18:
+  * Fix overwriting regular file or symlink with non-empty
+    directory in cvmfs_server
   * Fix rpm build on EL6.5 32bit
   * Fix memory corruption during publish process (CVM-608)
   * Use CVMFS_PAC_URLS instead of PAC_URLS
