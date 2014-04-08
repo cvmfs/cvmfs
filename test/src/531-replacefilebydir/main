@@ -109,7 +109,7 @@ cvmfs_run_test() {
   echo "putting exactly the same stuff in the scratch space for comparison"
   produce_files_in $reference_dir || return 4
 
-  echo "creating CVMFS snapshot"
+  echo "creating CVMFS snapshot (initial)"
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "compare the results of cvmfs to our reference copy"
@@ -129,7 +129,7 @@ cvmfs_run_test() {
   echo "putting exactly the same stuff in the scratch space for comparison"
   replace_symlink_by_directory $reference_dir || return 4
 
-  echo "creating CVMFS snapshot"
+  echo "creating CVMFS snapshot (replace symlink by directory)"
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "check catalog and data integrity"
@@ -149,7 +149,7 @@ cvmfs_run_test() {
   echo "putting exactly the same stuff in the scratch space for comparison"
   replace_regular_file_by_directory $reference_dir || return 4
 
-  echo "creating CVMFS snapshot"
+  echo "creating CVMFS snapshot (replace regular file by directory)"
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "check catalog and data integrity"
