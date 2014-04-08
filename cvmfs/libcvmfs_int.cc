@@ -514,7 +514,7 @@ int cvmfs_int_init(
   cvmfs::download_manager_->SetProxyChain(
     download::ResolveProxyDescription(cvmfs_opts_proxies,
                                       cvmfs::download_manager_));
-  cvmfs::download_manager_->EnableInfoHeader();
+  //cvmfs::download_manager_->EnableInfoHeader();
   download_ready = true;
 
   cvmfs::signature_manager_ = new signature::SignatureManager();
