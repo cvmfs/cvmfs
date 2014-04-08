@@ -1,4 +1,6 @@
 2.1.18:
+  * Send requested file system path in cvmfs-info HTTP header (CVM-580);
+    behavior can be turned on and off through CVMFS_SEND_INFO_HEADER
   * Fix overwriting regular file or symlink with non-empty
     directory in cvmfs_server
   * Fix rpm build on EL6.5 32bit
