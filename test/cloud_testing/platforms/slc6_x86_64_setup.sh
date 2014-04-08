@@ -66,6 +66,11 @@ echo "installing additional RPM packages..."
 install_from_repo gcc
 install_from_repo gcc-c++
 
+# increase open file descriptor limits
+echo -n "increasing ulimit -n ... "
+set_nofile_limit 65536 || die "fail"
+echo "done"
+
 # rebooting the system (returning 0 value)
 echo "sleep 1 && reboot" > killme.sh
 sudo nohup sh < killme.sh &
