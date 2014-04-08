@@ -38,11 +38,21 @@ SyncItem::SyncItem(const string &relative_parent_path,
 
 SyncItemType SyncItem::GetRdOnlyFiletype() const {
   StatRdOnly();
-  if (rdonly_stat_.error_code == ENOENT)  return kItemNew;
+  // file could not exist in read-only branch, or a regular file could have
+  // been replaced by a directory in the read/write branch, like:
+  // rdonly:
+  //    /foo/bar/regular_file   <-- ENOTDIR when asking for (.../is_dir_now)
+  // r/w:
+  //    /foo/bar/regular_file/
+  //    /foo/bar/regular_file/is_dir_now
+  if (rdonly_stat_.error_code == ENOENT ||
+      rdonly_stat_.error_code == ENOTDIR) return kItemNew;
   if (S_ISDIR(rdonly_stat_.stat.st_mode)) return kItemDir;
   if (S_ISREG(rdonly_stat_.stat.st_mode)) return kItemFile;
   if (S_ISLNK(rdonly_stat_.stat.st_mode)) return kItemSymlink;
-  PrintWarning("'" + GetRelativePath() + "' has an unsupported file type!");
+  PrintWarning("'" + GetRelativePath() + "' has an unsupported file type "
+               "(st_mode: " + StringifyInt(rdonly_stat_.stat.st_mode) +
+               " errno: " + StringifyInt(rdonly_stat_.error_code) + ")");
   abort();
 }
 
