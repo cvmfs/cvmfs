@@ -1777,6 +1777,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   unsigned max_retries = 1;
   unsigned backoff_init = 2000;
   unsigned backoff_max = 10000;
+  bool send_info_header = true;
   string tracefile = "";
   string cachedir = string(cvmfs::kDefaultCachedir);
   unsigned max_ttl = 0;
@@ -1847,6 +1848,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
     backoff_init = String2Uint64(parameter)*1000;
   if (options::GetValue("CVMFS_BACKOFF_MAX", &parameter))
     backoff_max = String2Uint64(parameter)*1000;
+  if (options::GetValue("CVMFS_SEND_INFO_HEADER", &parameter) &&
+      !options::IsOn(parameter))
+  {
+    send_info_header = false;
+  }
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
   if (options::GetValue("CVMFS_MAX_TTL", &parameter))
@@ -2184,6 +2190,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->SetRetryParameters(max_retries,
                                                backoff_init,
                                                backoff_max);
+  if (send_info_header)
+    cvmfs::download_manager_->EnableInfoHeader();
   proxies = download::ResolveProxyDescription(proxies,
                                               cvmfs::download_manager_);
   if (proxies == "") {
