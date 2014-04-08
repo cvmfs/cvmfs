@@ -60,27 +60,40 @@ using namespace std;  // NOLINT
 
 namespace download {
 
+
+static inline bool EscapeUrlChar(char input, char output[3]) {
+  if (((input >= '0') && (input <= '9')) ||
+      ((input >= 'A') && (input <= 'Z')) ||
+      ((input >= 'a') && (input <= 'z')) ||
+      (input == '/') || (input == ':') || (input == '.') ||
+      (input == '+') || (input == '-') ||
+      (input == '[') || (input == ']'))
+  {
+    output[0] = input;
+    return false;
+  }
+
+  output[0] = '%';
+  output[1] = (input / 16) + ((input / 16 <= 9) ? '0' : 'A'-10);
+  output[2] = (input % 16) + ((input % 16 <= 9) ? '0' : 'A'-10);
+  return true;
+}
+
+
 /**
  * Escape special chars from the URL, except for ':' and '/',
  * which should keep their meaning.
  */
 static string EscapeUrl(const string &url) {
   string escaped;
+  escaped.reserve(url.length());
 
+  char escaped_char[3];
   for (unsigned i = 0, s = url.length(); i < s; ++i) {
-    if (((url[i] >= '0') && (url[i] <= '9')) ||
-        ((url[i] >= 'A') && (url[i] <= 'Z')) ||
-        ((url[i] >= 'a') && (url[i] <= 'z')) ||
-        (url[i] == '/') || (url[i] == ':') || (url[i] == '.') ||
-        (url[i] == '+') || (url[i] == '-') ||
-        (url[i] == '[') || (url[i] == ']'))
-    {
-      escaped += url[i];
-    } else {
-      escaped += '%';
-      escaped += (url[i] / 16) + ((url[i] / 16 <= 9) ? '0' : 'A'-10);
-      escaped += (url[i] % 16) + ((url[i] % 16 <= 9) ? '0' : 'A'-10);
-    }
+    if (EscapeUrlChar(url[i], escaped_char))
+      escaped.append(escaped_char, 3);
+    else
+      escaped.push_back(escaped_char[0]);
   }
   LogCvmfs(kLogDownload, kLogDebug, "escaped %s to %s",
            url.c_str(), escaped.c_str());
@@ -93,14 +106,30 @@ static string EscapeUrl(const string &url) {
  * escaped array needs to be sufficiently large.  It's size is calculated by
  * passing NULL to EscapeHeader.
  */
-static unsigned EscapeHeader(const string &header, char *escaped) {
+static unsigned EscapeHeader(const string &header,
+                             char *escaped_buf,
+                             size_t buf_size)
+{
   unsigned esc_pos = 0;
+  char escaped_char[3];
   for (unsigned i = 0, s = header.size(); i < s; ++i) {
-    if ((header[i] == 0) || (header[i] == 10) || (header[i] == 13))
-      continue;
-    if (escaped != NULL)
-      escaped[esc_pos] = header[i];
-    esc_pos++;
+    if (EscapeUrlChar(header[i], escaped_char)) {
+      for (unsigned j = 0; j < 3; ++j) {
+        if (escaped_buf) {
+          if (esc_pos >= buf_size)
+            return esc_pos;
+          escaped_buf[esc_pos] = escaped_char[j];
+        }
+        esc_pos++;
+      }
+    } else {
+      if (escaped_buf) {
+        if (esc_pos >= buf_size)
+          return esc_pos;
+        escaped_buf[esc_pos] = escaped_char[0];
+      }
+      esc_pos++;
+    }
   }
 
   return esc_pos;
@@ -1250,11 +1279,13 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   info->extra_header = NULL;
   if (info->extra_info) {
     const char *header_name = "cvmfs-info: ";
-    const unsigned header_size = 1 + strlen(header_name) +
-      EscapeHeader(*(info->extra_info), NULL);
+    const size_t header_name_len = strlen(header_name);
+    const unsigned header_size = 1 + header_name_len +
+      EscapeHeader(*(info->extra_info), NULL, 0);
     info->extra_header = static_cast<char *>(alloca(header_size));
-    memcpy(info->extra_header, header_name, strlen(header_name));
-    EscapeHeader(*(info->extra_info), info->extra_header + strlen(header_name));
+    memcpy(info->extra_header, header_name, header_name_len);
+    EscapeHeader(*(info->extra_info), info->extra_header + header_name_len,
+                 header_size - header_name_len);
     info->extra_header[header_size-1] = '\0';
   }
 
