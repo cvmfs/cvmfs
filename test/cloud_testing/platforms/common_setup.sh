@@ -173,4 +173,12 @@ attach_user_group() {
 }
 
 
+set_nofile_limit() {
+  local limit_value=$1
+  echo "*    hard nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
+  echo "*    soft nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
+  echo "root hard nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
+  echo "root soft nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
+}
+
 echo "Hostname is $(hostname)"
