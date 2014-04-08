@@ -36,6 +36,7 @@ cvmfs_run_test() {
   mkdir -p $spool_dir_destination || return 2
   chown $CVMFS_TEST_USER:$CVMFS_TEST_USER $spool_dir_destination || { desaster_cleanup; return 3; }
   sudo ln --symbolic $spool_dir_destination $spool_dir || { desaster_cleanup; return 4; }
+  sudo chown -h $CVMFS_TEST_USER:$CVMFS_TEST_USER $spool_dir || { desaster_cleanup; return 5; }
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
