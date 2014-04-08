@@ -42,7 +42,9 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
   if (S_ISDIR(rdonly_stat_.stat.st_mode)) return kItemDir;
   if (S_ISREG(rdonly_stat_.stat.st_mode)) return kItemFile;
   if (S_ISLNK(rdonly_stat_.stat.st_mode)) return kItemSymlink;
-  PrintWarning("'" + GetRelativePath() + "' has an unsupported file type!");
+  PrintWarning("'" + GetRelativePath() + "' has an unsupported file type "
+               "(st_mode: " + StringifyInt(rdonly_stat_.stat.st_mode) +
+               " errno: " + StringifyInt(rdonly_stat_.error_code) + ")");
   abort();
 }
 
