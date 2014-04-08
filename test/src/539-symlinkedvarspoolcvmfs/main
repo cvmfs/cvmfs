@@ -36,38 +36,39 @@ cvmfs_run_test() {
   mkdir -p $spool_dir_destination || return 2
   chown $CVMFS_TEST_USER:$CVMFS_TEST_USER $spool_dir_destination || { desaster_cleanup; return 3; }
   sudo ln --symbolic $spool_dir_destination $spool_dir || { desaster_cleanup; return 4; }
+  sudo chown -h $CVMFS_TEST_USER:$CVMFS_TEST_USER $spool_dir || { desaster_cleanup; return 5; }
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || { desaster_cleanup; return 5; }
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || { desaster_cleanup; return 6; }
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "check that repository spooler is redirected"
-  [ -f ${spool_dir_destination}/client.local ] || { desaster_cleanup; return 6; }
-  [ -d ${spool_dir_destination}/cache ]        || { desaster_cleanup; return 7; }
-  [ -d ${spool_dir_destination}/rdonly ]       || { desaster_cleanup; return 8; }
+  [ -f ${spool_dir_destination}/client.local ] || { desaster_cleanup; return 7; }
+  [ -d ${spool_dir_destination}/cache ]        || { desaster_cleanup; return 8; }
+  [ -d ${spool_dir_destination}/rdonly ]       || { desaster_cleanup; return 9; }
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "starting transaction to edit repository"
-  start_transaction $CVMFS_TEST_REPO || { desaster_cleanup; return 9; } 
+  start_transaction $CVMFS_TEST_REPO || { desaster_cleanup; return 10; } 
 
   echo "putting some stuff in the new repository"
-  produce_files_in $repo_dir || { desaster_cleanup; return 10; }
+  produce_files_in $repo_dir || { desaster_cleanup; return 11; }
 
   echo "putting exactly the same stuff in the scratch space for comparison"
-  produce_files_in $reference_dir || { desaster_cleanup; return 11; }
+  produce_files_in $reference_dir || { desaster_cleanup; return 12; }
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || { desaster_cleanup; return 12; }
+  publish_repo $CVMFS_TEST_REPO || { desaster_cleanup; return 13; }
 
   echo "compare the results of cvmfs to our reference copy"
-  compare_directories $repo_dir $reference_dir || { desaster_cleanup; return 13; }
+  compare_directories $repo_dir $reference_dir || { desaster_cleanup; return 14; }
 
   echo "check catalog and data integrity"
-  check_repository $CVMFS_TEST_REPO -i || { desaster_cleanup; return 14; }
+  check_repository $CVMFS_TEST_REPO -i || { desaster_cleanup; return 15; }
 
   echo "remove repository garbage"
   desaster_cleanup
