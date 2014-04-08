@@ -1777,7 +1777,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   unsigned max_retries = 1;
   unsigned backoff_init = 2000;
   unsigned backoff_max = 10000;
-  bool send_info_header = true;
+  bool send_info_header = false;
   string tracefile = "";
   string cachedir = string(cvmfs::kDefaultCachedir);
   unsigned max_ttl = 0;
