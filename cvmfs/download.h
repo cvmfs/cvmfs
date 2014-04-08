@@ -137,7 +137,6 @@ struct JobInfo {
     curl_handle = NULL;
     headers = NULL;
     memset(&zstream, 0, sizeof(zstream));
-    extra_header = NULL;
     wait_at[0] = wait_at[1] = -1;
     nocache = false;
     error_code = kFailOther;
@@ -211,7 +210,7 @@ struct JobInfo {
 
 
 /**
- * Manages blocks of arrays of curl_slist storing header strings.  In contrast 
+ * Manages blocks of arrays of curl_slist storing header strings.  In contrast
  * to curl's slists, these ones don't take ownership of the header strings.
  * Overall number of elements is limited as number of concurrent connections
  * is limited.
