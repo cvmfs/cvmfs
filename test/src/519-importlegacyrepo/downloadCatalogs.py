@@ -77,9 +77,9 @@ def downloadObject(repositoryUrl, objectName, resultDirectory, beVerbose):
 		finally:
 			local_file.close()
 	except HTTPError, e:
-		printError("HTTP: " + e.code + url)
+		printError("HTTP: " + str(e.code) + " " + url)
 	except URLError, e:
-		printError("URL:" + e.reason + url)
+		printError("URL: " + e.reason +  " " + url)
 
 
 def downloadCatalog(repositoryUrl, catalogName, catalogDirectory, beVerbose):
