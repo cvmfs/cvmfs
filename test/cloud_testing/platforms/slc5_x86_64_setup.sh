@@ -45,8 +45,9 @@ echo "OK"
 
 # install test dependencies
 echo "installing test dependencies..."
-install_from_repo gcc     || die "fail (installing gcc)"
-install_from_repo gcc-c++ || die "fail (installing gcc-c++)"
+install_from_repo gcc            || die "fail (installing gcc)"
+install_from_repo gcc-c++        || die "fail (installing gcc-c++)"
+install_from_repo python-sqlite2 || die "fail (installing python-sqlite2)"
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "
