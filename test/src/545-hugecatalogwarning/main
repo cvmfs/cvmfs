@@ -23,9 +23,9 @@ configure_catalog_size_warning() {
   local repo_conf_dir=/etc/cvmfs/repositories.d/$repo_name
   local server_conf=${repo_conf_dir}/server.conf
 
-  mv ${server_conf} ${server_conf}.old || return 101
+  sudo mv ${server_conf} ${server_conf}.old || return 101
   sed -e "s/^\(CVMFS_CATALOG_ENTRY_WARN_THRESHOLD\)=[0-9]*$/\1=$warning_threshold/" \
-    ${server_conf}.old > ${server_conf} || return 102
+    ${server_conf}.old | sudo tee ${server_conf} > /dev/null || return 102
   cat ${server_conf} | grep -q "^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$warning_threshold$" || return 103
 }
 
