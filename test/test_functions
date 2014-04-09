@@ -40,8 +40,26 @@ else
 fi
 
 # find the name of the httpd service
-apache="httpd"
-which apache2 >/dev/null 2>&1 && apache="apache2"
+
+
+# figure out the installed apache platform
+if which httpd2 >/dev/null 2>&1; then #SLES/OpenSuSE
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=$(which httpd2)
+elif which apache2 >/dev/null 2>&1; then # Debian based
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=$(which apache2)
+else
+  APACHE_SERVICE="httpd" # EL based
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN="/usr/sbin/httpd"
+fi
+
+version_major() { echo $1 | cut --delimiter=. --fields=1; }
+version_minor() { echo $1 | cut --delimiter=. --fields=2; }
+version_patch() { echo $1 | cut --delimiter=. --fields=3; }
 
 # ensures that a generic service is running
 # @param service  the name of the service
@@ -121,10 +139,10 @@ autofs_switch() {
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 apache_switch() {
-  sudo $service_binary $apache status > /dev/null 2>&1
+  sudo $service_binary $APACHE_SERVICE status > /dev/null 2>&1
   service_should_switch $1 $?
   if [ $? -eq 0 ]; then
-    service_switch $apache $1
+    service_switch $APACHE_SERVICE $1
     return $?
   else
     return 0 # already in correct state
@@ -705,4 +723,83 @@ popdir() {
     cd -
     return $?
   fi
+}
+
+
+# retrieves the apache version string "2.x.xx"
+get_apache_version() {
+  ${APACHE_BIN} -v | head -n1 | \
+    sed 's/^Server version: Apache\/\([0-9]\+\.[0-9]\+\.[0-9]\+\).*$/\1/'
+}
+
+
+# figure out apache config file mode
+#
+# @return   apache config mode (stdout) (see globals below)
+APACHE_CONF_MODE_OLD=1 # *.conf goes to ${APACHE_CONF}/conf.d
+APACHE_CONF_MODE_NEW=2 # *.conf goes to ${APACHE_CONF}/conf-available
+get_apache_conf_mode() {
+  local minor_apache_version=$(version_minor "$(get_apache_version)")
+  if [ $minor_apache_version -ge 4 ] || [ -d /etc/${APACHE_CONF}/conf-available ]; then
+    echo $APACHE_CONF_MODE_NEW
+  else
+    echo $APACHE_CONF_MODE_OLD
+  fi
+}
+
+
+# find location of apache configuration files
+#
+# @return   the location of apache configuration files (stdout)
+get_apache_conf_path() {
+  local res_path="/etc/${APACHE_CONF}"
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "${res_path}/conf-available"
+  else
+    echo "${res_path}/conf.d"
+  fi
+}
+
+
+# writes apache configuration file
+# This figures out where to put the apache configuration file depending
+# on the running apache version
+# Note: Configuration file content is expected to come through stdin
+#
+# @param   file_name  the name of the apache config file (no path!)
+# @return             0 on success
+create_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)"
+
+  # create (or append) the conf file
+  cat - | sudo tee ${conf_path}/${file_name} > /dev/null || return 1
+
+  # the new apache requires the enable the config afterwards
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    sudo a2enconf $file_name > /dev/null || return 2
+  fi
+
+  return 0
+}
+
+
+# removes apache config files dependent on the apache version in place
+# Note: As of apache 2.4.x `a2disconf` needs to be called before removal
+#
+# @param   file_name  the name of the conf file to be removed (no path!)
+# @return  0 on successful removal
+remove_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)/${file_name}"
+
+  # disable configuration on newer apache versions
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    sudo a2disconf $file_name > /dev/null 2>&1 || return 1
+  fi
+
+  # remove configuration file
+  sudo rm -f $conf_path
 }
