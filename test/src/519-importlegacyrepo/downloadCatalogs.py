@@ -17,6 +17,11 @@ except:
 	from pysqlite2 import dbapi2 as sqlite3
 
 
+def hash2hex(hash):
+	print len(hash)
+	return "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,hash)))
+
+
 def doHttpRequest(url):
 	response = urlopen(url)
 	return response.read()
@@ -110,7 +115,7 @@ def findNestedCatalogs(catalogName, catalogDirectory, repositoryUrl, beVerbose, 
 		result = cursor.fetchall()
 		for dirtab in result:
 			print "--> found .cvmfsdirtab"
-			sha1 = "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,result[0][0])))
+			sha1 = hash2hex(result[0][0])
 			downloadObject(repositoryUrl, sha1, catalogDirectory, beVerbose)
 
 
