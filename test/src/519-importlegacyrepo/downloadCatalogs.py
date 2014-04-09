@@ -8,24 +8,13 @@ import shutil
 import tempfile
 from optparse import OptionParser
 
-foundSqlite = False
-foundSqlite3 = False
-
 # figure out which sqlite module to use
-# in Python 2.4 an old version is present
-# which does not allow proper read out of
-# long int and therefore cannot merge catalogs
+# in Python 2.4 there is dbapi2 in pysqlite2 which will become sqlite3
+# in the standard library later on but was not at this time (software archeology)
 try:
-	import sqlite3 as sqlite
-	foundSqlite3 = True
+	import sqlite3
 except:
-	pass
-if not foundSqlite3:
-	try:
-		import sqlite
-		foundSqlite = True
-	except ImportError, e:
-		pass
+	from pysqlite2 import dbapi2 as sqlite3
 
 
 def doHttpRequest(url):
@@ -105,7 +94,7 @@ def findNestedCatalogs(catalogName, catalogDirectory, repositoryUrl, beVerbose, 
 	tempFile    = tempfile.NamedTemporaryFile('wb')
 	decompressCatalog(catalogFile, tempFile.name)
 
-	dbHandle = sqlite.connect(tempFile.name)
+	dbHandle = sqlite3.connect(tempFile.name)
 	cursor = dbHandle.cursor()
 	catalogs = []
 
