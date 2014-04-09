@@ -144,7 +144,7 @@ fi
 # create test user account if necessary
 id $test_username > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-  sudo /usr/sbin/useradd $test_username
+  sudo /usr/sbin/useradd --create-home -s /bin/bash $test_username
   if [ $? -ne 0 ]; then
     echo "cannot create user account $test_username"
     exit 4
