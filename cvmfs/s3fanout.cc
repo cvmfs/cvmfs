@@ -23,6 +23,7 @@ S3FanoutManager *S3FanoutManager::s3fm_ = NULL;
 static UrlConstructor url_constructor_static_;
 static int maximum_number_of_concurrent_jobs_ = 100;
 
+
 /**
  * Use this to get the S3FanoutManager instance.
  */
@@ -125,7 +126,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     if (read_bytes != num_bytes) {
       if (ferror(info->origin_file) != 0) {
         LogCvmfs(kLogS3Fanout, kLogDebug, "local I/O error reading %s",
-                 info->origin_path->c_str());
+                 info->origin_path.c_str());
         return CURL_READFUNC_ABORT;
       }
     }
@@ -436,10 +437,10 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) {
     timestamp = RfcTimestamp();
     info->http_headers =
       curl_slist_append(info->http_headers,
-                        MkAuthoritzation(*(info->access_key),
-                                         *(info->secret_key),
+                        MkAuthoritzation(info->access_key,
+                                         info->secret_key,
                                          timestamp, "", "HEAD", "",
-                                         *(info->bucket),
+                                         info->bucket,
                                          info->object_key).c_str());
     info->http_headers =
       curl_slist_append(info->http_headers, "Content-Length: 0");
@@ -451,10 +452,10 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) {
       curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, info->origin_mem.size);
       shash::HashMem(info->origin_mem.data, info->origin_mem.size, &content_md5);
     } else if (info->origin == kOriginPath) {
-      bool retval = shash::HashFile(*(info->origin_path), &content_md5);
+      bool retval = shash::HashFile(info->origin_path, &content_md5);
       if (!retval)
         return kFailLocalIO;
-      int64_t file_size = GetFileSize(*(info->origin_path));
+      int64_t file_size = GetFileSize(info->origin_path);
       if (file_size == -1)
         return kFailLocalIO;
       curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, file_size);
@@ -472,11 +473,11 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) {
     timestamp = RfcTimestamp();
     info->http_headers =
       curl_slist_append(info->http_headers,
-                        MkAuthoritzation(*(info->access_key),
-                                         *(info->secret_key),
+                        MkAuthoritzation(info->access_key,
+                                         info->secret_key,
                                          timestamp, "binary/octet-stream",
                                          "PUT", content_md5_base64,
-                                         *(info->bucket),
+                                         info->bucket,
                                          (info->object_key)).c_str());
 
     info->http_headers =
@@ -521,7 +522,7 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) {
   curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
   pthread_mutex_unlock(lock_options_);
 
-  string url = url_constructor_->MkUrl(info->hostname, *(info->bucket), (info->object_key));
+  string url = url_constructor_->MkUrl(info->hostname, info->bucket, (info->object_key));
   curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
 }
 

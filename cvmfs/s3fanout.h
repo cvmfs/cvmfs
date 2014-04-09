@@ -76,10 +76,10 @@ struct JobInfo {
     const unsigned char *data;
   } origin_mem; 
 
-  const std::string *origin_path;
-  const std::string *access_key;
-  const std::string *secret_key;
-  const std::string *bucket;
+  const std::string origin_path;
+  const std::string access_key;
+  const std::string secret_key;
+  const std::string bucket;
   const std::string object_key;
   const std::string hostname;
   bool test_and_set;
@@ -88,16 +88,14 @@ struct JobInfo {
 
   // One constructor per destination + head request
   JobInfo() { http_headers = NULL; }
-  JobInfo(const std::string *a, const std::string *s,
-	  std::string h,
-          const std::string *b, const std::string k, const std::string *p) :
+  JobInfo(const std::string a, const std::string s, const std::string h,
+          const std::string b, const std::string k, const std::string p) :
           origin(kOriginPath), 
 	  origin_path(p),
 	  access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
           { http_headers = NULL; test_and_set = false; }
-  JobInfo(const std::string *a, const std::string *s,
-	  std::string h,
-          const std::string *b, const std::string k,
+  JobInfo(const std::string a, const std::string s, const std::string h,
+          const std::string b, const std::string k,
           const unsigned char *buffer, size_t size) :
           origin(kOriginMem),
           access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)

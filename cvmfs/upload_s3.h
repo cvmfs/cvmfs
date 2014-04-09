@@ -86,6 +86,14 @@ namespace upload
 		   const callback_t  *callback,
 		   MemoryMappedFile  *mmf);
 
+    int getKeysAndBucket(const std::string filename,
+			 std::string &access_key,
+			 std::string &secret_key,
+			 std::string &bucket_name);
+    std::string getBucketName(unsigned int use_bucket);
+    int select_bucket(std::string rem_filename);
+    int getKeyIndex(unsigned int use_bucket);
+
     // state information
     std::string full_host_name_;
     std::string host_name_;
