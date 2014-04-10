@@ -45,7 +45,7 @@ resign_repository() {
     -n ${repo_name} \
     -m ${legacy_repo_storage}/.cvmfspublished_unsigned \
     -t $tmp_dir \
-    -r $upstream || return 3
+    -r $upstream > /dev/null || return 3
 }
 
 
@@ -85,10 +85,10 @@ create_apache_config_file $apache_config_file << EOF
 # Created by test case 550.  Don't touch.
 Alias /cvmfs/${legacy_repo_name} ${legacy_repo_storage}/pub/catalogs
 <Directory "${legacy_repo_storage}/pub/catalogs">
-  Options -MultiViews FollowSymLinks
+  Options -MultiViews +FollowSymLinks
   AllowOverride All
-  Order allow,deny
-  Allow from all
+  $(get_compatible_apache_allow_from_all_config)
+
   EnableMMAP Off
   EnableSendFile Off
   AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
