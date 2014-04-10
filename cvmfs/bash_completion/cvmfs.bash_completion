@@ -1,8 +1,8 @@
 # Bash completion script for cvmfs_config.
 #
-# Steve Traylen, <steve.traylen@cern.ch>, 13th January 2013 
+# Steve Traylen, <steve.traylen@cern.ch>, 13th January 2014 
 #  -> cvmfs_config
-# Rene Meusel, <rene.meusel@cern.ch>, 21st January 2013
+# Rene Meusel, <rene.meusel@cern.ch>, 21st January 2014
 #  -> cvmfs_server
 
 __local_repos()

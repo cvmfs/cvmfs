@@ -85,6 +85,10 @@ cvmfs_getorigin() {
    local domain; domain=`cvmfs_getdomain $fqrn`
 
    local dist_default="/etc/cvmfs/default.d/*.conf"
+   local dist_default_reverse=
+   for file in $dist_default; do
+     dist_default_reverse="$file $dist_default_reverse"
+   done
    source=`grep -H "^[ ]*\(readonly\)\{0,1\}[ ]*${key}=" \
       /etc/cvmfs/config.d/$fqrn.local \
       /etc/cvmfs/config.d/$fqrn.conf \
@@ -94,7 +98,7 @@ cvmfs_getorigin() {
       /etc/cernvm/site.conf \
       /etc/cvmfs/site.conf \
       /etc/cernvm/default.conf \
-      $dist_default /etc/cvmfs/default.conf \
+      $dist_default_reverse /etc/cvmfs/default.conf \
       2>/dev/null | head -n1 | cut -d":" -f1`
    if [ "x$source" != "x" ]; then
       echo $source
