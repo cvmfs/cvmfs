@@ -53,3 +53,8 @@ install_from_repo python-sqlite2 || die "fail (installing python-sqlite2)"
 echo -n "increasing ulimit -n ... "
 set_nofile_limit 65536 || die "fail"
 echo "done"
+
+# rebooting the system (returning 0 value)
+echo "sleep 1 && reboot" > killme.sh
+sudo nohup sh < killme.sh &
+exit 0
