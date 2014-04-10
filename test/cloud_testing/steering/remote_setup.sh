@@ -205,11 +205,11 @@ fi
 
 # run the platform specific script to perform platform specific test setups
 echo "running platform specific script $platform_script... "
-sudo -H -u $test_username sh $platform_script_abs -s $server_package           \
-                                                  -c $client_package           \
-                                                  -g $unittest_package         \
-                                                  -k $keys_package             \
-                                                  -t $cvmfs_source_directory   \
-                                                  -l $cvmfs_test_log           \
-                                                  -u $cvmfs_unittest_log       \
-                                                  -m $cvmfs_migrationtest_log
+sudo -H -E -u $test_username sh $platform_script_abs -s $server_package           \
+                                                     -c $client_package           \
+                                                     -g $unittest_package         \
+                                                     -k $keys_package             \
+                                                     -t $cvmfs_source_directory   \
+                                                     -l $cvmfs_test_log           \
+                                                     -u $cvmfs_unittest_log       \
+                                                     -m $cvmfs_migrationtest_log
