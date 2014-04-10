@@ -45,10 +45,16 @@ machine_readable_legacy_parted() {
 }
 
 
+is_legacy_parted() {
+  local major_version=$(sudo parted --version | head -n1 | sed -e 's/^.*\s\([0-9]\)\..*$/\1/')
+  [ $major_version -lt 2 ]
+}
+
+
 get_partition_table() {
   local device=$1
-  local major_version=$(parted --version | head -n1 | sed -e 's/^.*\s\([0-9]\)\..*$/\1/')
-  if [ $major_version -lt 2 ]; then
+
+  if is_legacy_parted; then
     machine_readable_legacy_parted $device
   else
     sudo parted --script --machine $device -- unit B print
@@ -102,8 +108,13 @@ create_partition_at() {
 
   local num_before
   num_before=$(get_last_partition_number $device)
-  sudo parted --script $device -- \
-    unit B mkpart $p_type $p_start $p_end
+  if is_legacy_parted; then
+    sudo parted --script $device -- \
+      unit B mkpart $p_type $p_start $p_end
+  else
+    sudo parted --script --machine --align optimal $device -- \
+      unit B mkpart $p_type $p_start $p_end
+  fi
   sudo partprobe
   [ $num_before -ne $(get_last_partition_number $device) ] # check if new partition appeared
 }
