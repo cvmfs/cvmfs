@@ -45,7 +45,7 @@ resign_repository() {
     -n ${repo_name} \
     -m ${legacy_repo_storage}/.cvmfspublished_unsigned \
     -t $tmp_dir \
-    -r $upstream || return 3
+    -r $upstream > /dev/null || return 3
 }
 
 
