@@ -376,6 +376,7 @@ cvmfs_chksetup() {
 
       # Check readability of config files
       for config_file in /etc/cvmfs/default.conf /etc/cvmfs/default.local \
+                         /etc/cvmfs/default.d/*.conf \
                          /etc/cvmfs/domain.d/*.conf /etc/cvmfs/domain.d/*.local \
                          /etc/cvmfs/config.d/*.conf /etc/cvmfs/config.d/*.local
       do
@@ -976,8 +977,13 @@ cvmfs_bugreport() {
   mkdir bugreport
   cd bugreport
 
-  [ -f /etc/cvmfs/default.conf ] && . /etc/cvmfs/default.conf
-  [ -f /etc/cvmfs/default.local ] && . /etc/cvmfs/default.local
+  dist_default="/etc/cvmfs/default.d/*.conf"
+  for file in /etc/cvmfs/default.conf $dist_default /etc/cvmfs/default.local
+  do
+    if [ -f $file ]; then
+      . $file
+    fi
+  done
 
   echo "Gathering /etc/cvmfs"
   mkdir etc
