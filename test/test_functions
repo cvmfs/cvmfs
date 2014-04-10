@@ -761,6 +761,21 @@ get_apache_conf_path() {
 }
 
 
+# returns the apache configuration string for 'allow from all'
+# Note: this is necessary, since apache 2.4.x formulates that different
+#
+# @return   a configuration snippet to allow s'th from all hosts (stdout)
+get_compatible_apache_allow_from_all_config() {
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "Require all granted"
+  else
+    local nl='
+'
+    echo "Order allow,deny${nl}    Allow from all"
+  fi
+}
+
+
 # writes apache configuration file
 # This figures out where to put the apache configuration file depending
 # on the running apache version
