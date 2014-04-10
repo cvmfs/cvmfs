@@ -1,4 +1,6 @@
 2.1.18:
+  * Parse /etc/cvmfs/default.d/*.conf after /etc/cvmfs/default.conf and
+    before /etc/cvmfs/default.local
   * Log pacparser errors to syslog
   * Resolve auto PAC location to http://wpad/wpad.dat
   * Send requested file system path in cvmfs-info HTTP header (CVM-580);
