@@ -34,8 +34,9 @@ cvmfs_readconfig() {
     return 1
   fi
 
+  local dist_default="/etc/cvmfs/default.d/*"
   local file
-  for file in /etc/cernvm/default.conf \
+  for file in /etc/cernvm/default.conf $dist_default \
               /etc/cvmfs/site.conf \
               /etc/cernvm/site.conf
   do
