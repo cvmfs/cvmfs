@@ -310,6 +310,7 @@ fi
 %dir %{_sysconfdir}/cvmfs/domain.d
 %dir /cvmfs
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
+%{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf
 %config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %dir %{_sysconfdir}/bash_completion.d
@@ -345,6 +346,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Thu Apr 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
+- Add /etc/cvmfs/default.d
 * Thu Apr 3 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
 - Fix for EL6.5 32bit
 * Tue Feb 11 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18

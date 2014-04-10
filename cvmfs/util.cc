@@ -36,6 +36,7 @@
 #include <cstring>
 #include <cassert>
 
+#include <algorithm>
 #include <string>
 #include <map>
 #include <set>
@@ -591,6 +592,7 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
     }
   }
   closedir(dirp);
+  sort(result.begin(), result.end());
   return result;
 }
 

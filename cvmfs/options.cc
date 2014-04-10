@@ -138,6 +138,10 @@ void ParsePath(const string &config_file) {
 
 void ParseDefault(const string &repository_name) {
   ParsePath("/etc/cvmfs/default.conf");
+  vector<string> dist_defaults = FindFiles("/etc/cvmfs/default.d", ".conf");
+  for (unsigned i = 0; i < dist_defaults.size(); ++i) {
+    ParsePath(dist_defaults[i]);
+  }
   ParsePath("/etc/cernvm/default.conf");
   ParsePath("/etc/cvmfs/site.conf");
   ParsePath("/etc/cernvm/site.conf");
