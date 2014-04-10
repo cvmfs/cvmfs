@@ -21,9 +21,38 @@ strip_unit() {
 }
 
 
+machine_readable_legacy_parted() {
+  local device=$1
+  local p="sudo parted --script $device -- unit B print"
+  local l1=$($p | head -n2 | tail -n1)
+  local l2=$($p | head -n3 | tail -n1)
+  local l3=$($p | head -n4 | tail -n1)
+  local l4=$($p | head -n5 | tail -n1)
+  local devtype=$(echo "$l1" | sed -e 's/^Model: \(.*\) (\(.*\)).*$/\1/')
+  local virtblk=$(echo "$l1" | sed -e 's/^Model: \(.*\) (\(.*\)).*$/\2/')
+  local devpath=$(echo "$l2" | sed -e 's/^Disk \(.*\): \([0-9]\+\).*$/\1/')
+  local devsize=$(echo "$l2" | sed -e 's/^Disk \(.*\): \([0-9]\+.\).*$/\2/')
+  local sector1=$(echo "$l3" | sed -e 's/^Sector .*: \([0-9]\+\).\/\([0-9]\+\).*$/\1/')
+  local sector2=$(echo "$l3" | sed -e 's/^Sector .*: \([0-9]\+\).\/\([0-9]\+\).*$/\2/')
+  local tablety=$(echo "$l4" | sed -e 's/^Partition Table: \(.*\)$/\1/')
+  local lines=$($p | wc -l)
+  local tailn=$(( $lines - 7 ))
+  local headn=$(( $tailn - 1 ))
+
+  echo "I don't know"
+  echo "$devpath:$devsize:$virtblk:$sector1:$sector2:$tablety:$devtype;"
+  $p | tail -n $tailn | head -n $headn  | sed -e 's/\s*\([0-9]\+\)\s\+\([0-9]\+.\)\s\+\([0-9]\+.\)\s\+\([0-9]\+.\)\s\+[a-z0-9]*\s\+\([a-z0-9]*\)\s\+\([a-z0-9]*\).*$/\1:\2:\3:\4:\5::\6/'
+}
+
+
 get_partition_table() {
   local device=$1
-  sudo parted --script --machine $device -- unit B print
+  local major_version=$(parted --version | head -n1 | sed -e 's/^.*\s\([0-9]\)\..*$/\1/')
+  if [ $major_version -lt 2 ]; then
+    machine_readable_legacy_parted $device
+  else
+    sudo parted --script --machine $device -- unit B print
+  fi
 }
 
 
@@ -73,7 +102,7 @@ create_partition_at() {
 
   local num_before
   num_before=$(get_last_partition_number $device)
-  sudo parted --script --machine --align optimal $device -- \
+  sudo parted --script $device -- \
     unit B mkpart $p_type $p_start $p_end
   sudo partprobe
   [ $num_before -ne $(get_last_partition_number $device) ] # check if new partition appeared
