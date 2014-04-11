@@ -1975,7 +1975,6 @@ import() {
 
     # sign new (migrated) repository revision
     echo -n "Signing newly imported Repository... "
-    create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
     sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
       -c ${global_key_dir}/${certificate} \
       -k ${global_key_dir}/${private_key} \
