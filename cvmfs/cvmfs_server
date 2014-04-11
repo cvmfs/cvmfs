@@ -2679,7 +2679,7 @@ publish() {
     check_repository_compatibility
     check_expiry $stratum0         || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
-    $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1; continue; }
+    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     if [ "x$add_tag" != "x" ] && \
        lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
@@ -2712,6 +2712,10 @@ publish() {
 
     local user_shell="sh -c"
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+
+    # check if we have open file descriptors on /cvmfs/<name>
+    local use_fd_fallback=0
+    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
     process_dirtab $name $verbosity || die "Synchronization Failed! Please repair your .cvmfsdirtab file!"
     publish_before_hook $name
@@ -2771,8 +2775,14 @@ publish() {
       $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
       $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
       echo "Remounting newly created repository revision"
-      cvmfs_suid_helper rw_umount $name
-      cvmfs_suid_helper rdonly_umount $name
+      if [ $use_fd_fallback -eq 1 ]; then
+        cvmfs_suid_helper rw_lazy_umount     $name
+        cvmfs_suid_helper kill_cvmfs         $name
+        cvmfs_suid_helper rdonly_lazy_umount $name
+      else
+        cvmfs_suid_helper rw_umount $name
+        cvmfs_suid_helper rdonly_umount $name
+      fi
       set_ro_root_hash $name $trunk_hash
       cvmfs_suid_helper clear_scratch $name
       rm -rf ${spool_dir}/tmp/*
