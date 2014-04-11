@@ -283,6 +283,7 @@ cvmfs_run_test() {
     -o $CVMFS_TEST_USER    \
     -l                     \
     -s                     \
+    -g                     \
     $legacy_repo_name || return 14
 
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
