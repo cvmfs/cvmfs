@@ -142,7 +142,6 @@ initiate_reload() {
   local mountpoint="$1"
   local repo_name="$2"
   local talk_pipe="$(get_talk_pipe $mountpoint $repo_name)"
-  ls -lisa $talk_pipe
   cvmfs_talk -p $talk_pipe remount
 }
 
@@ -284,6 +283,7 @@ cvmfs_run_test() {
     -o $CVMFS_TEST_USER    \
     -l                     \
     -s                     \
+    -g                     \
     $legacy_repo_name || return 14
 
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"

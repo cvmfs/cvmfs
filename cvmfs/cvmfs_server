@@ -177,7 +177,7 @@ Supported Commands:
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                [-c file ownership (UID:GID)] [-k path to keys]
+                [-c file ownership (UID:GID)] [-k path to keys] [-g chown backend]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
@@ -1827,10 +1827,11 @@ import() {
   local is_legacy=0
   local show_statistics=0
   local replicable=0
+  local chown_backend=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:l:sm" option; do
+  while getopts "w:o:c:u:k:l:smg" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1856,6 +1857,9 @@ import() {
       m)
         replicable=1
       ;;
+      g)
+        chown_backend=1
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command import: Unrecognized option: $1"
@@ -1873,11 +1877,10 @@ import() {
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
 
   # security key pathes
-  local masterkey="${name}.masterkey"
   local private_key="${name}.key"
   local certificate="${name}.crt"
   local public_key="${name}.pub"
-  local pki_keys="$masterkey $private_key $certificate $public_key"
+  local pki_keys="$private_key $certificate $public_key"
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
@@ -1901,6 +1904,7 @@ import() {
   [ -d $storage_location ] || die "Did not find repository storage to import at $storage_location"
   [ -f "${storage_location}/.cvmfspublished" ] && \
   [ -d "${storage_location}/data" ] || die "$storage_location does not seem to be a repository storage"
+  [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
 
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
@@ -1929,7 +1933,7 @@ import() {
   echo "done"
 
   # create storage
-  echo -n "Create CernVM-FS Storage... "
+  echo -n "Creating CernVM-FS Repository Infrastructure... "
   create_spool_area_for_new_repository $name
   reload_apache > /dev/null
   echo "done"
@@ -1939,12 +1943,14 @@ import() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
 
   # import storage location
-  echo -n "Importing CernVM-FS storage... "
-  chown -R $cvmfs_user $storage_location || die "fail!"
-  if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
+  if [ $chown_backend -ne 0 ]; then
+    echo -n "Importing CernVM-FS storage... "
+    chown -R $cvmfs_user $storage_location || die "fail!"
+    if has_selinux; then
+      chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
+    fi
+    echo "done"
   fi
-  echo "done"
 
   # migrate old catalogs
   if [ $is_legacy -ne 0 ]; then
@@ -1970,7 +1976,6 @@ import() {
 
     # sign new (migrated) repository revision
     echo -n "Signing newly imported Repository... "
-    create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
     sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
       -c ${global_key_dir}/${certificate} \
       -k ${global_key_dir}/${private_key} \
