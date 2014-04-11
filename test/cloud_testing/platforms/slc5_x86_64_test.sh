@@ -38,6 +38,17 @@ echo -n "starting apache... "
 sudo service httpd start > /dev/null 2>&1 || die "fail"
 echo "OK"
 
+# loading the aufs kernel module
+echo -n "activate aufs... "
+kobj=$(rpm -ql $(rpm -qa | grep kernel-module-aufs) | tail -n1)
+sudo /sbin/insmod $kobj || die "fail"
+echo "done"
+
+# allow httpd on backend storage
+echo -n "allowing httpd to access /srv/cvmfs..."
+sudo chcon --type httpd_sys_content_t /srv/cvmfs > /dev/null || die "fail"
+echo "done"
+
 # running unit test suite
 run_unittests --gtest_shuffle || ut_retval=$?
 
