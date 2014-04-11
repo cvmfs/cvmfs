@@ -71,8 +71,8 @@ void LocalUploader::FileUpload(const std::string &local_path,
   std::string tmp_path = CreateTempPath(temporary_path_ + "/upload", 0666);
   if (tmp_path.empty()) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to create temp path for "
-                                          "upload of file '%s'",
-             local_path.c_str());
+                                          "upload of file '%s' (errno: %d)",
+             local_path.c_str(), errno);
     atomic_inc32(&copy_errors_);
     Respond(callback, UploaderResults(1, local_path));
     return;

@@ -257,7 +257,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       unlink(hist_compressed_path.c_str());
     unlink(manifest_path.c_str());
     if (spooler->GetNumberOfErrors()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest");
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to commit manifest (errors: %d)",
+               spooler->GetNumberOfErrors());
       delete manifest;
       goto sign_fail;
     }
