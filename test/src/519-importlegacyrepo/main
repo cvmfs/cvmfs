@@ -15,10 +15,11 @@ cvmfs_run_test() {
   local upstream="local,${download_location}/data/txn,${download_location}"
 
   # create a test repository (to steal its keys)
-  echo "create dummy repository and steal its keys"
+  echo "create dummy repository and steal its keys and whitelist"
   create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
   mkdir $keys_location || return 2
   cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.* $keys_location || return 3
+  cp /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfswhitelist $keys_location || 3
   destroy_repo $CVMFS_TEST_REPO || return 4
 
   # download a 2.0 repository
@@ -30,6 +31,7 @@ cvmfs_run_test() {
   wget \
     --directory-prefix $download_location \
     ${guinea_pig}/.cvmfspublished || return 6
+  cp ${keys_location}/.cvmfswhitelist $download_location || return 6
   cvmfs_server skeleton -o $CVMFS_TEST_USER ${download_location} || return 7
 
   # set SELinux boolean to allow access by httpd
