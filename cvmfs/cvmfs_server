@@ -1877,11 +1877,10 @@ import() {
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
 
   # security key pathes
-  local masterkey="${name}.masterkey"
   local private_key="${name}.key"
   local certificate="${name}.crt"
   local public_key="${name}.pub"
-  local pki_keys="$masterkey $private_key $certificate $public_key"
+  local pki_keys="$private_key $certificate $public_key"
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
