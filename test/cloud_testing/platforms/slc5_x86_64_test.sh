@@ -18,6 +18,37 @@ extend_path() {
 extend_path "/usr/sbin"
 extend_path "/sbin"
 
+# format additional disks with ext4 and many inodes
+echo -n "formatting new disk partitions... "
+disk_to_partition=/dev/vda
+partition_2=$(get_last_partition_number $disk_to_partition)
+partition_1=$(( $partition_2 - 1 ))
+format_partition_ext4 $disk_to_partition$partition_1 || die "fail (formatting partition 1)"
+format_partition_ext4 $disk_to_partition$partition_2 || die "fail (formatting partition 2)"
+echo "done"
+
+# mount additional disk partitions on strategic cvmfs location
+echo -n "mounting new disk partitions into cvmfs specific locations... "
+mount_partition $disk_to_partition$partition_1 /srv/cvmfs       || die "fail (mounting /srv/cvmfs $?)"
+mount_partition $disk_to_partition$partition_2 /var/spool/cvmfs || die "fail (mounting /var/spool/cvmfs $?)"
+echo "done"
+
+# start apache
+echo -n "starting apache... "
+sudo service httpd start > /dev/null 2>&1 || die "fail"
+echo "OK"
+
+# loading the aufs kernel module
+echo -n "activate aufs... "
+kobj=$(rpm -ql $(rpm -qa | grep kernel-module-aufs) | tail -n1)
+sudo /sbin/insmod $kobj || die "fail"
+echo "done"
+
+# allow httpd on backend storage
+echo -n "allowing httpd to access /srv/cvmfs..."
+sudo chcon --type httpd_sys_content_t /srv/cvmfs > /dev/null || die "fail"
+echo "done"
+
 # running unit test suite
 run_unittests --gtest_shuffle || ut_retval=$?
 

@@ -177,8 +177,8 @@ Supported Commands:
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                [-c file ownership (UID:GID)]
-                < -k path to keys> <fully qualified repository name>
+                [-c file ownership (UID:GID)] [-k path to keys]
+                <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
                 [-a tag name] [-c tag channel] [ -t tag description] [ -h hash]
