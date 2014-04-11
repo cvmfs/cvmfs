@@ -8,6 +8,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <errno.h>
@@ -79,6 +80,22 @@ static void Mount(const string &path) {
 
 static void Umount(const string &path) {
   ExecAsRoot("/bin/umount", path.c_str(), NULL, NULL);
+}
+
+static void KillCvmfs(const string &fqrn) {
+  // prevent exploitation like:
+  // fqrn = ../../../../usr/home/file_with_xattr_user.pid
+  if (fqrn.find("/") != string::npos || fqrn.find("\\") != string::npos) {
+    fprintf(stderr, "go away!\n");
+    exit(1);
+  }
+  string pid;
+  const string mountpoint = string(kSpoolArea) + "/" + fqrn + "/rdonly";
+  const bool retval = platform_getxattr(mountpoint.c_str(), "user.pid", &pid);
+  if (!retval) {
+    exit(1);
+  }
+  ExecAsRoot("/bin/kill", "-9", pid.c_str(), NULL);
 }
 
 static bool ClearWorkingDir() {
@@ -182,6 +199,8 @@ int main(int argc, char *argv[]) {
     Remount("/cvmfs/" + fqrn, kRemountRdonly);
   } else if (command == "open") {
     Remount("/cvmfs/" + fqrn, kRemountRw);
+  } else if (command == "kill_cvmfs") {
+    KillCvmfs(fqrn);
   } else if (command == "rw_mount") {
     Mount("/cvmfs/" + fqrn);
   } else if (command == "rw_umount") {
