@@ -345,7 +345,7 @@ int S3Uploader::uploadFile(std::string       filename,
 
   s3fanout::JobInfo *info = new s3fanout::JobInfo(access_key,
 						  secret_key,
-						  host_name_,
+						  full_host_name_,
 						  bucket_name,
 						  filename,
 						  (unsigned char*)buff, 
@@ -359,7 +359,7 @@ int S3Uploader::uploadFile(std::string       filename,
 	   "Uploading file:\n"
 	   "--> File:        '%s'\n"
 	   "--> Hostname:    '%s'\n"
-	   "--> Bucket body: '%s'\n"
+	   "--> Bucket:      '%s'\n"
 	   "--> File size:   '%d'\n", 
 	   filename.c_str(),
 	   full_host_name_.c_str(),
