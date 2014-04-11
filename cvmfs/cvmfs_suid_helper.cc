@@ -82,6 +82,10 @@ static void Umount(const string &path) {
   ExecAsRoot("/bin/umount", path.c_str(), NULL, NULL);
 }
 
+static void LazyUmount(const string &path) {
+  ExecAsRoot("/bin/umount", "-l", path.c_str(), NULL);
+}
+
 static void KillCvmfs(const string &fqrn) {
   // prevent exploitation like:
   // fqrn = ../../../../usr/home/file_with_xattr_user.pid
@@ -205,10 +209,14 @@ int main(int argc, char *argv[]) {
     Mount("/cvmfs/" + fqrn);
   } else if (command == "rw_umount") {
     Umount("/cvmfs/" + fqrn);
+  } else if (command == "rw_lazy_umount") {
+    LazyUmount("/cvmfs/" + fqrn);
   } else if (command == "rdonly_mount") {
     Mount(string(kSpoolArea) + "/" + fqrn + "/rdonly");
   } else if (command == "rdonly_umount") {
     Umount(string(kSpoolArea) + "/" + fqrn + "/rdonly");
+  } else if (command == "rdonly_lazy_umount") {
+    LazyUmount(string(kSpoolArea) + "/" + fqrn + "/rdonly");
   } else if (command == "clear_scratch") {
     const string scratch_area = string(kSpoolArea) + "/" + fqrn + "/scratch";
     retval = chdir(scratch_area.c_str());
