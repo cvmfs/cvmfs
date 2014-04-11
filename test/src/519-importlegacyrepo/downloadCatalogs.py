@@ -18,7 +18,6 @@ except:
 
 
 def hash2hex(hash):
-	print len(hash)
 	return "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,hash)))
 
 

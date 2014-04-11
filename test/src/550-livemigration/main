@@ -142,7 +142,6 @@ initiate_reload() {
   local mountpoint="$1"
   local repo_name="$2"
   local talk_pipe="$(get_talk_pipe $mountpoint $repo_name)"
-  ls -lisa $talk_pipe
   cvmfs_talk -p $talk_pipe remount
 }
 
