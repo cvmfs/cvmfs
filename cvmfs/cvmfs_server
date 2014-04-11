@@ -177,7 +177,7 @@ Supported Commands:
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                [-c file ownership (UID:GID)] [-k path to keys]
+                [-c file ownership (UID:GID)] [-k path to keys] [-g chown backend]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
@@ -1827,10 +1827,11 @@ import() {
   local is_legacy=0
   local show_statistics=0
   local replicable=0
+  local chown_backend=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:l:sm" option; do
+  while getopts "w:o:c:u:k:l:smg" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1855,6 +1856,9 @@ import() {
       ;;
       m)
         replicable=1
+      ;;
+      g)
+        chown_backend=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1939,12 +1943,14 @@ import() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
 
   # import storage location
-  echo -n "Importing CernVM-FS storage... "
-  chown -R $cvmfs_user $storage_location || die "fail!"
-  if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
+  if [ $chown_backend -ne 0 ]; then
+    echo -n "Importing CernVM-FS storage... "
+    chown -R $cvmfs_user $storage_location || die "fail!"
+    if has_selinux; then
+      chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
+    fi
+    echo "done"
   fi
-  echo "done"
 
   # migrate old catalogs
   if [ $is_legacy -ne 0 ]; then
