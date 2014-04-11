@@ -2852,7 +2852,7 @@ rollback() {
   check_repository_compatibility
   check_expiry $stratum0  || die "Repository whitelist is expired!"
   is_in_transaction $name || die "Not in a transaction"
-  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
 
   if [ $force -ne 1 ]; then
     local reply
@@ -2861,6 +2861,10 @@ rollback() {
       return 1
     fi
   fi
+
+  # check if we have open file descriptors on /cvmfs/<name>
+  local use_fd_fallback=0
+  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
   # do it!
   local swissknife="cvmfs_swissknife"
@@ -2895,8 +2899,14 @@ rollback() {
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
-  cvmfs_suid_helper rw_umount $name
-  cvmfs_suid_helper rdonly_umount $name
+  if [ $use_fd_fallback -eq 1 ]; then
+    cvmfs_suid_helper rw_lazy_umount     $name
+    cvmfs_suid_helper kill_cvmfs         $name
+    cvmfs_suid_helper rdonly_lazy_umount $name
+  else
+    cvmfs_suid_helper rw_umount $name
+    cvmfs_suid_helper rdonly_umount $name
+  fi
   set_ro_root_hash $name $trunk_hash
   cvmfs_suid_helper clear_scratch $name
   rm -rf ${spool_dir}/tmp/*
