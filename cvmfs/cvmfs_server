@@ -2538,7 +2538,7 @@ abort() {
     # more sanity checks
     check_repository_compatibility
     is_in_transaction $name || { echo "Repository $name is not in a transaction"; continue; }
-    $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1 continue; }
+    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
 
     # better ask the user once again!
     if [ $force -ne 1 ]; then
@@ -2549,12 +2549,19 @@ abort() {
       fi
     fi
 
-    # do it!
-    local user_shell="sh -c"
-    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    # check if we have open file descriptors on /cvmfs/<name>
+    local use_fd_fallback=0
+    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
     abort_before_hook $name
-    cvmfs_suid_helper rw_umount $name
+    if [ $use_fd_fallback -eq 0 ]; then
+      cvmfs_suid_helper rw_umount $name
+    else
+      cvmfs_suid_helper rw_lazy_umount     $name
+      cvmfs_suid_helper kill_cvmfs         $name
+      cvmfs_suid_helper rdonly_lazy_umount $name
+      cvmfs_suid_helper rdonly_mount       $name > /dev/null
+    fi
     rm -rf ${spool_dir}/tmp/*
     cvmfs_suid_helper clear_scratch $name
     cvmfs_suid_helper rw_mount $name
