@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Blacklist certificate"
+cvmfs_test_name="Certificate blacklist"
 
 cleanup_blacklist() {
   sudo rm -f /etc/cvmfs/blacklist
@@ -19,7 +19,7 @@ cvmfs_run_test() {
   cvmfs_umount grid.cern.ch || retval=11
 
   sudo cvmfs_config wipecache
-  sudo cat << EOF > /etc/cvmfs/blacklist
+  sudo sh -c "cat > /etc/cvmfs/blacklist" <<EOF
 A7:D8:2A:0F:30:53:3C:60:4F:B0:3E:59:B6:D7:D1:97:9C:AA:EB:B4
 A0:1A:33:B5:C3:00:D5:D3:8F:C9:4A:4D:D4:A4:51:65:F4:20:A3:5B
 09:D9:09:04:9A:E2:1E:F3:9A:E2:EB:52:90:B6:17:9F:F3:F0:B3:57
