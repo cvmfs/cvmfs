@@ -417,6 +417,38 @@ get_apache_version() {
 }
 
 
+get_fd_modes() {
+  local path=$1
+  lsof -Fan | grep -B1 -e "^n$path" | grep -e '^a.*'
+}
+
+# gets the number of open read-only file descriptors beneath a given path
+#
+# @param path  the path to look at for open read-only fds
+# @return      the number of open read-only file descriptors
+count_rd_only_fds() {
+  local path=$1
+  local cnt=0
+  for line in $(get_fd_modes $path); do
+    if echo "$line" | grep -qe '^\ar\?$';  then cnt=$(( $cnt + 1 )); fi
+  done
+  echo $cnt
+}
+
+# gets the number of open writable file descriptors beneath a given path
+#
+# @param path  the path to look at for open writable fds
+# @return      the number of open writable file descriptors
+count_wr_fds() {
+  local path=$1
+  local cnt=0
+  for line in $(get_fd_modes $path); do
+    if echo "$line" | grep -qe '^\a[wu]$'; then cnt=$(( $cnt + 1 )); fi
+  done
+  echo $cnt
+}
+
+
 # figure out apache config file mode
 #
 # @return   apache config mode (stdout) (see globals below)
@@ -1453,6 +1485,41 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
+file_descriptor_warning_and_question() {
+  local name=$1
+  echo "\
+
+WARNING! You have open read-only file descriptors in /cvmfs/$name
+  --> This is potentially harmful and might cause problems later on.
+      We can anyway perform the requested operation, but please check the
+      open file descriptors on /cvmfs/$name next time!
+
+         Do you want to proceed anyway? (y/N)
+"
+
+  local reply="n"
+  read reply
+  if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+    echo "aborted... we appreciate your decision!"
+    exit 1
+  fi
+
+  return 0
+}
+
+
+handle_read_only_file_descriptors_on_mount_point() {
+  local name=$1
+
+  if [ $(count_rd_only_fds /cvmfs/$name) -eq 0 ]; then
+    return 0
+  else
+    file_descriptor_warning_and_question $name # might abort...
+    return 1
+  fi
+}
+
+
 ################################################################################
 #                                                                              #
 #                                Sub Commands                                  #
@@ -2471,7 +2538,7 @@ abort() {
     # more sanity checks
     check_repository_compatibility
     is_in_transaction $name || { echo "Repository $name is not in a transaction"; continue; }
-    $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1 continue; }
+    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
 
     # better ask the user once again!
     if [ $force -ne 1 ]; then
@@ -2482,12 +2549,19 @@ abort() {
       fi
     fi
 
-    # do it!
-    local user_shell="sh -c"
-    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    # check if we have open file descriptors on /cvmfs/<name>
+    local use_fd_fallback=0
+    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
     abort_before_hook $name
-    cvmfs_suid_helper rw_umount $name
+    if [ $use_fd_fallback -eq 0 ]; then
+      cvmfs_suid_helper rw_umount $name
+    else
+      cvmfs_suid_helper rw_lazy_umount     $name
+      cvmfs_suid_helper kill_cvmfs         $name
+      cvmfs_suid_helper rdonly_lazy_umount $name
+      cvmfs_suid_helper rdonly_mount       $name > /dev/null
+    fi
     rm -rf ${spool_dir}/tmp/*
     cvmfs_suid_helper clear_scratch $name
     cvmfs_suid_helper rw_mount $name
@@ -2605,7 +2679,7 @@ publish() {
     check_repository_compatibility
     check_expiry $stratum0         || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
-    $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1; continue; }
+    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     if [ "x$add_tag" != "x" ] && \
        lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
@@ -2638,6 +2712,10 @@ publish() {
 
     local user_shell="sh -c"
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+
+    # check if we have open file descriptors on /cvmfs/<name>
+    local use_fd_fallback=0
+    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
     process_dirtab $name $verbosity || die "Synchronization Failed! Please repair your .cvmfsdirtab file!"
     publish_before_hook $name
@@ -2697,8 +2775,14 @@ publish() {
       $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
       $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
       echo "Remounting newly created repository revision"
-      cvmfs_suid_helper rw_umount $name
-      cvmfs_suid_helper rdonly_umount $name
+      if [ $use_fd_fallback -eq 1 ]; then
+        cvmfs_suid_helper rw_lazy_umount     $name
+        cvmfs_suid_helper kill_cvmfs         $name
+        cvmfs_suid_helper rdonly_lazy_umount $name
+      else
+        cvmfs_suid_helper rw_umount $name
+        cvmfs_suid_helper rdonly_umount $name
+      fi
       set_ro_root_hash $name $trunk_hash
       cvmfs_suid_helper clear_scratch $name
       rm -rf ${spool_dir}/tmp/*
@@ -2768,7 +2852,7 @@ rollback() {
   check_repository_compatibility
   check_expiry $stratum0  || die "Repository whitelist is expired!"
   is_in_transaction $name || die "Not in a transaction"
-  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
 
   if [ $force -ne 1 ]; then
     local reply
@@ -2777,6 +2861,10 @@ rollback() {
       return 1
     fi
   fi
+
+  # check if we have open file descriptors on /cvmfs/<name>
+  local use_fd_fallback=0
+  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
   # do it!
   local swissknife="cvmfs_swissknife"
@@ -2811,8 +2899,14 @@ rollback() {
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
-  cvmfs_suid_helper rw_umount $name
-  cvmfs_suid_helper rdonly_umount $name
+  if [ $use_fd_fallback -eq 1 ]; then
+    cvmfs_suid_helper rw_lazy_umount     $name
+    cvmfs_suid_helper kill_cvmfs         $name
+    cvmfs_suid_helper rdonly_lazy_umount $name
+  else
+    cvmfs_suid_helper rw_umount $name
+    cvmfs_suid_helper rdonly_umount $name
+  fi
   set_ro_root_hash $name $trunk_hash
   cvmfs_suid_helper clear_scratch $name
   rm -rf ${spool_dir}/tmp/*
