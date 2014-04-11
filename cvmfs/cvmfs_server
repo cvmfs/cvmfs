@@ -417,6 +417,38 @@ get_apache_version() {
 }
 
 
+get_fd_modes() {
+  local path=$1
+  lsof -Fan | grep -B1 -e "^n$path" | grep -e '^a.*'
+}
+
+# gets the number of open read-only file descriptors beneath a given path
+#
+# @param path  the path to look at for open read-only fds
+# @return      the number of open read-only file descriptors
+count_rd_only_fds() {
+  local path=$1
+  local cnt=0
+  for line in $(get_fd_modes $path); do
+    if echo "$line" | grep -qe '^\ar\?$';  then cnt=$(( $cnt + 1 )); fi
+  done
+  echo $cnt
+}
+
+# gets the number of open writable file descriptors beneath a given path
+#
+# @param path  the path to look at for open writable fds
+# @return      the number of open writable file descriptors
+count_wr_fds() {
+  local path=$1
+  local cnt=0
+  for line in $(get_fd_modes $path); do
+    if echo "$line" | grep -qe '^\a[wu]$'; then cnt=$(( $cnt + 1 )); fi
+  done
+  echo $cnt
+}
+
+
 # figure out apache config file mode
 #
 # @return   apache config mode (stdout) (see globals below)
