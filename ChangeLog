@@ -1,4 +1,6 @@
 2.1.18:
+  * Repository sanitation: require a dot in the repository name in
+    autofs map
   * Parse /etc/cvmfs/default.d/*.conf after /etc/cvmfs/default.conf and
     before /etc/cvmfs/default.local
   * Log pacparser errors to syslog

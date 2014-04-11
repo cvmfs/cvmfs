@@ -31,9 +31,13 @@ int main(int argc, char **argv) {
     return 1;
   if (!IsAlphanum(hostname[0]))
     return 1;
+  bool has_dot = false;
   for (unsigned i = 1; i < hostname.length(); ++i) {
+    if (hostname[i] == '.') {
+      has_dot = true;
+      continue;
+    }
     if (IsAlphanum(hostname[i]) ||
-        (hostname[i] == '.') ||
         (hostname[i] == '-') ||
         (hostname[i] == '_'))
     {
@@ -41,6 +45,8 @@ int main(int argc, char **argv) {
     }
     return 1;
   }
+  if (!has_dot)
+    return 1;
   if (hostname[hostname.length()-1] == '.')
     return 1;
 
