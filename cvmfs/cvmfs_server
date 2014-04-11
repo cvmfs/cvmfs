@@ -1485,6 +1485,41 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
+file_descriptor_warning_and_question() {
+  local name=$1
+  echo "\
+
+WARNING! You have open read-only file descriptors in /cvmfs/$name
+  --> This is potentially harmful and might cause problems later on.
+      We can anyway perform the requested operation, but please check the
+      open file descriptors on /cvmfs/$name next time!
+
+         Do you want to proceed anyway? (y/N)
+"
+
+  local reply="n"
+  read reply
+  if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+    echo "aborted... we appreciate your decision!"
+    exit 1
+  fi
+
+  return 0
+}
+
+
+handle_read_only_file_descriptors_on_mount_point() {
+  local name=$1
+
+  if [ $(count_rd_only_fds /cvmfs/$name) -eq 0 ]; then
+    return 0
+  else
+    file_descriptor_warning_and_question $name # might abort...
+    return 1
+  fi
+}
+
+
 ################################################################################
 #                                                                              #
 #                                Sub Commands                                  #
