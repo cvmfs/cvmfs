@@ -1933,7 +1933,7 @@ import() {
   echo "done"
 
   # create storage
-  echo -n "Create CernVM-FS Storage... "
+  echo -n "Creating CernVM-FS Repository Infrastructure... "
   create_spool_area_for_new_repository $name
   reload_apache > /dev/null
   echo "done"
