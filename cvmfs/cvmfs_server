@@ -1491,16 +1491,15 @@ file_descriptor_warning_and_question() {
 
 WARNING! You have open read-only file descriptors in /cvmfs/$name
   --> This is potentially harmful and might cause problems later on.
-      We can anyway perform the requested operation, but please check the
-      open file descriptors on /cvmfs/$name next time!
+      We can anyway perform the requested operation, but this will most likely
+      break other processes with open file descriptors on /cvmfs/$name!
 
-         Do you want to proceed anyway? (y/N)
-"
+         Do you want to proceed anyway? (y/N) "
 
   local reply="n"
   read reply
   if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
-    echo "aborted... we appreciate your decision!"
+    echo "aborted."
     exit 1
   fi
 
