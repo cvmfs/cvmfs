@@ -435,6 +435,23 @@ count_rd_only_fds() {
   echo $cnt
 }
 
+# returns 0 if the current working dir is somewhere under $path
+#
+# @param path  the path to look at
+# @return      0 if cwd is on path or below, 1 otherwise
+is_cwd_on_path() {
+  local path=$1
+
+  if [ "x$(pwd)" = "x${path}" ]; then
+    return 0
+  fi
+  if echo "x$(pwd)" | grep -q "^x${path}/"; then
+    return 0
+  fi
+
+  return 1
+}
+
 # gets the number of open writable file descriptors beneath a given path
 #
 # @param path  the path to look at for open writable fds
@@ -2679,6 +2696,7 @@ publish() {
     check_expiry $stratum0         || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
+    is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     if [ "x$add_tag" != "x" ] && \
        lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
