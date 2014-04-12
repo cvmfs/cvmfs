@@ -20,6 +20,7 @@
 #include <string>
 
 #include "platform.h"
+#include "sanitizer.h"
 
 using namespace std;  // NOLINT
 
@@ -90,15 +91,16 @@ static void KillCvmfs(const string &fqrn) {
   // prevent exploitation like:
   // fqrn = ../../../../usr/home/file_with_xattr_user.pid
   if (fqrn.find("/") != string::npos || fqrn.find("\\") != string::npos) {
-    fprintf(stderr, "go away!\n");
     exit(1);
   }
   string pid;
   const string mountpoint = string(kSpoolArea) + "/" + fqrn + "/rdonly";
   const bool retval = platform_getxattr(mountpoint.c_str(), "user.pid", &pid);
-  if (!retval) {
+  if (!retval || pid.empty())
     exit(1);
-  }
+  sanitizer::IntegerSanitizer pid_sanitizer;
+  if (!pid_sanitizer.IsValid(pid))
+    exit(1);
   ExecAsRoot("/bin/kill", "-9", pid.c_str(), NULL);
 }
 
@@ -109,8 +111,11 @@ static bool ClearWorkingDir() {
     return false;
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp)) != NULL) {
-    if ((strcmp(dirent->d_name, ".") == 0) || (strcmp(dirent->d_name, "..") == 0))
+    if ((strcmp(dirent->d_name, ".") == 0) ||
+        (strcmp(dirent->d_name, "..") == 0))
+    {
       continue;
+    }
 
     platform_stat64 info;
     retval = platform_lstat(dirent->d_name, &info);
@@ -155,7 +160,7 @@ static bool ClearWorkingDir() {
 
 static void Usage(const string &exe, FILE *output) {
   fprintf(output,
-    "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|clear_scratch "
+    "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|clear_scratch|kill_cvmfs "
     "fqrn\n"
     "Example: %s rw_umount atlas.cern.ch\n"
     "This binary is typically called by cvmfs_server.\n",
