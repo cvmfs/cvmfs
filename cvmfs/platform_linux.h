@@ -227,8 +227,12 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
     free(buffer);
     return false;
   }
-  value->assign(static_cast<const char *>(buffer), size);
-  free(buffer);
+  if (retval > 0) {
+    value->assign(static_cast<const char *>(buffer), size);
+    free(buffer);
+  } else {
+    value->assign("");
+  }
   return true;
 }
 
