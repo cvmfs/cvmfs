@@ -1,0 +1,74 @@
+cvmfs_test_name="Publish with open file descriptors"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+	local working_dir=$1
+
+	pushdir $working_dir
+
+	echo "meaningless file content" > file
+	echo "more clever file content" > clever
+
+	mkdir foo
+	mkdir bar
+
+	mkdir foo/bar
+	mkdir bar/foo
+
+	ln file hardlinkToFile
+	ln -s clever symlinkToClever
+
+	popdir
+}
+
+block_repo() {
+  cd /cvmfs/$CVMFS_TEST_REPO
+  while true; do ls .; sleep 1; done
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "block repository"
+  block_repo &
+  local pid=$!
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "creating CVMFS snapshot"
+  echo y | publish_repo $CVMFS_TEST_REPO || return 4
+
+  start_transaction $CVMFS_TEST_REPO || return 5
+  publish_repo $CVMFS_TEST_REPO || return 6
+
+  kill $pid || return 7
+
+  cd /cvmfs/$CVMFS_TEST_REPO || return 8
+  start_transaction $CVMFS_TEST_REPO || return 9
+  echo y | publish_repo $CVMFS_TEST_REPO
+  if [ $? -eq 0 ]; then
+    return 10
+  fi
+  cd foo || return 11
+  echo y | publish_repo $CVMFS_TEST_REPO
+  if [ $? -eq 0 ]; then
+    return 12
+  fi
+  cd / || return 13
+  publish_repo $CVMFS_TEST_REPO || return 14
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}
+
