@@ -27,8 +27,10 @@ if [ $? -eq 0 ]; then
 fi
 
 enforce_target=
-if [ "$(uname -m)" = "i686" ]; then
-  enforce_target="--target=i686"
+if grep -q "6\." /etc/redhat-release 2>/dev/null; then 
+  if [ "$(uname -m)" = "i686" ]; then
+    enforce_target="--target=i686"
+  fi
 fi
 if [ "$(uname -m)" = "x86_64" -a $(getconf LONG_BIT) = 32 ]; then
   enforce_target="--target=i686"
