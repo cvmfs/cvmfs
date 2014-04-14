@@ -1052,7 +1052,7 @@ cvmfs_bugreport() {
    echo
    echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
    echo "Please attach this file to your problem description and send it as a"
-   echo "Savannah bug report to https://savannah.cern.ch/projects/cernvm"
+   echo "JIRA bug report to https://sft.its.cern.ch/jira/browse/CVM"
 }
 
 
