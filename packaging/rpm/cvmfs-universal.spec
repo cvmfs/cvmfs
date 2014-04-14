@@ -148,7 +148,7 @@ cp %{SOURCE1} SELinux
 
 %build
 
-%ifarch i386
+%ifarch i386 i686
 export CXXFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
 export CFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
 %endif
