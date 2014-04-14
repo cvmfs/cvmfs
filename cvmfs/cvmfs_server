@@ -838,7 +838,7 @@ get_or_guess_multiple_repository_names() {
 foreclose_legacy_cvmfs() {
   local found_something=0
 
-  # This can potentially precent 2.0 to 2.1 migration
+  # This can potentially prevent 2.0 to 2.1 migration
   #if [ $(ls /srv/cvmfs/ 2>/dev/null | wc -l) -eq 1 ]; then
   #  if [ -d /srv/cvmfs/*/pub ] || [ -d /srv/cvmfs/*/shadow ]; then
   #    echo "found legacy repo structure in /srv/cvmfs" 1>&2
