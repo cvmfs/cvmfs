@@ -1,3 +1,5 @@
+2.1.19:
+
 2.1.18:
   * Fix publishing when other shells are open on /cvmfs/$fqrn
   * Repository sanitation: require a dot in the repository name in
