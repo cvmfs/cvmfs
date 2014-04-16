@@ -21,6 +21,7 @@
 #include "swissknife_lsrepo.h"
 #include "swissknife_pull.h"
 #include "swissknife_sign.h"
+#include "swissknife_letter.h"
 #include "swissknife_sync.h"
 #include "swissknife_info.h"
 #include "swissknife_history.h"
@@ -81,6 +82,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandTag());
   command_list.push_back(new swissknife::CommandRollback());
   command_list.push_back(new swissknife::CommandSign());
+  command_list.push_back(new swissknife::CommandLetter());
   command_list.push_back(new swissknife::CommandCheck());
   command_list.push_back(new swissknife::CommandListCatalogs());
   command_list.push_back(new swissknife::CommandPull());
