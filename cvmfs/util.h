@@ -209,6 +209,7 @@ struct hash_murmur {
 #endif
   }
 };
+std::string Base64(const std::string &data);
 
 
 template <class T>

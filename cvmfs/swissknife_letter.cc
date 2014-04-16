@@ -137,6 +137,6 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   free(sig);
   signature_manager.Fini();
 
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s", text.c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s", Base64(text).c_str());
   return 0;
 }
