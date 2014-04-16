@@ -12,7 +12,7 @@
 #include "signature.h"
 #include "hash.h"
 #include "util.h"
-#include "compression.h"
+#include "letter.h"
 
 using namespace std;  // NOLINT
 
@@ -95,48 +95,11 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     // TODO: read from stdin
   }
 
-  // Calculate certificate hash
-  unsigned char *cert_buf = NULL;
-  unsigned cert_buf_size;
-  if (!signature_manager.WriteCertificateMem(&cert_buf, &cert_buf_size))
-    return 3;
-  void *compr_buf;
-  uint64_t compr_size;
-  if (!zlib::CompressMem2Mem(cert_buf, cert_buf_size,
-                             &compr_buf, &compr_size))
-  {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to compress certificate");
-    free(cert_buf);
-    return 3;
-  }
-  shash::Any certificate_hash(hash_algorithm);
-  shash::HashMem((unsigned char *)compr_buf, compr_size, &certificate_hash);
-  free(compr_buf);
-  free(cert_buf);
+  letter::Letter text_letter(text, &signature_manager);
 
-  // Add signature to text
-  text += string("\n##\n") +
-          "T" + StringifyInt(time(NULL)) + "\n" +
-          "X" + certificate_hash.ToString() + "\n";
-  shash::Any text_hash(hash_algorithm);
-  shash::HashMem(reinterpret_cast<const unsigned char *>(text.data()),
-                 text.length(), &text_hash);
-  text += "--\n" + text_hash.ToString() + "\n";
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s",
+           text_letter.Sign(hash_algorithm).c_str());
 
-  // Sign manifest
-  unsigned char *sig;
-  unsigned sig_size;
-  if (!signature_manager.Sign(
-    reinterpret_cast<const unsigned char *>(text_hash.ToString().data()),
-    text_hash.GetHexSize(), &sig, &sig_size))
-  {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to sign manifest");
-    return 4;
-  }
-  text.append(reinterpret_cast<char *>(sig), sig_size);
-  free(sig);
   signature_manager.Fini();
-
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s", Base64(text).c_str());
   return 0;
 }

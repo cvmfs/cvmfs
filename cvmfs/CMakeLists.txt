@@ -144,6 +144,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   history.h history.cc
+  letter.h letter.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc
