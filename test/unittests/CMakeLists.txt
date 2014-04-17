@@ -37,6 +37,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_blocking_counter.cc
   t_shash.cc
   t_header_lists.cc
+  t_base64.cc
 
   # test utility functions
   testutil.cc testutil.h
