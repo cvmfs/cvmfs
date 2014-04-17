@@ -93,6 +93,13 @@ TEST_F(T_Base64, Decode) {
     "other animals, which is a lust of the mind, that by a perseverance of delight "
     "in the continued and indefatigable generation of knowledge, exceeds the short "
     "vehemence of any carnal pleasure.", dec);
+    
+  std::string all_chars;
+  for (unsigned i = 0; i < 255; ++i)
+    all_chars.push_back(i);
+  retval = Debase64(Base64(all_chars), &dec);
+  EXPECT_EQ(retval, true);
+  EXPECT_EQ(all_chars, dec);  
 }
 
 TEST_F(T_Base64, Invalid) {
