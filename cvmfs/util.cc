@@ -847,6 +847,55 @@ string JoinStrings(const vector<string> &strings, const string &joint) {
 }
 
 
+void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
+                    map<char, string> *content)
+{
+  string line;
+  unsigned pos = 0;
+  while (pos < buffer_size) {
+    if (static_cast<char>(buffer[pos]) == '\n') {
+      if (line == "--")
+        return;
+
+      if (line != "") {
+        const string tail = (line.length() == 1) ? "" : line.substr(1);
+        // Special handling of 'Z' key because it can exist multiple times
+        if (line[0] != 'Z') {
+          (*content)[line[0]] = tail;
+        } else {
+          if (content->find(line[0]) == content->end()) {
+            (*content)[line[0]] = tail;
+          } else {
+            (*content)[line[0]] = (*content)[line[0]] + "|" + tail;
+          }
+        }
+      }
+      line = "";
+    } else {
+      line += static_cast<char>(buffer[pos]);
+    }
+    pos++;
+  }
+}
+
+
+bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
+  int fd = open(filename.c_str(), O_RDONLY);
+  if (fd < 0)
+    return false;
+
+  unsigned char buffer[4096];
+  int num_bytes = read(fd, buffer, sizeof(buffer));
+  close(fd);
+
+  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
+    return false;
+
+  ParseKeyvalMem(buffer, unsigned(num_bytes), content);
+  return true;
+}
+
+
 double DiffTimeSeconds(struct timeval start, struct timeval end) {
   // Time substraction, from GCC documentation
   if (end.tv_usec < start.tv_usec) {

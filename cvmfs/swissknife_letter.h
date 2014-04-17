@@ -26,6 +26,9 @@ class CommandLetter : public Command {
                                true, false));
     result.push_back(Parameter('s', "password for the private key",
                                true, false));
+    result.push_back(Parameter('v', "verify",
+                               true, true));
+                               
     return result;
   }
   int Main(const ArgumentList &args);

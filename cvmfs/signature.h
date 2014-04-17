@@ -59,10 +59,14 @@ class SignatureManager {
   bool VerifyPkcs7(const unsigned char *buffer, const unsigned buffer_size,
                    unsigned char **content, unsigned *content_size,
                    std::vector<std::string> *alt_uris);
+  static void CutLetter(const unsigned char *buffer, 
+                        const unsigned buffer_size,
+                        const char separator,
+                        unsigned *letter_length, 
+                        unsigned *pos_after_mark);
+
  private:
   void InitX509Store();
-  void CutLetter(const unsigned char *buffer, const unsigned buffer_size,
-                 unsigned *letter_length, unsigned *pos_after_mark);
 
   EVP_PKEY *private_key_;
   X509 *certificate_;

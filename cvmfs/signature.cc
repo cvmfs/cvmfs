@@ -559,6 +559,7 @@ bool SignatureManager::VerifyRsa(const unsigned char *buffer,
  */
 void SignatureManager::CutLetter(const unsigned char *buffer,
                                  const unsigned buffer_size,
+                                 const char separator,
                                  unsigned *letter_length,
                                  unsigned *pos_after_mark)
 {
@@ -572,7 +573,7 @@ void SignatureManager::CutLetter(const unsigned char *buffer,
     }
 
     if ((buffer[pos] == '\n') && (pos+4 <= buffer_size) &&
-        (buffer[pos+1] == '-') && (buffer[pos+2] == '-') &&
+        (buffer[pos+1] == separator) && (buffer[pos+2] == separator) &&
         (buffer[pos+3] == '\n'))
     {
       *letter_length = pos+1;
@@ -598,7 +599,7 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
 {
   unsigned pos = 0;
   unsigned letter_length = 0;
-  CutLetter(buffer, buffer_size, &letter_length, &pos);
+  CutLetter(buffer, buffer_size, '-', &letter_length, &pos);
   if (pos >= buffer_size)
     return false;
 

@@ -33,6 +33,9 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  bool verify = false;
+  if (args.find('v') != args.end())
+  verify = true;
 
   signature::SignatureManager signature_manager;
   signature_manager.Init();
@@ -92,10 +95,26 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     return 2;
   }
   if (text == "") {
+    char c;
+    while (read(0, &c, 1) == 1) {
+      if (c == '\n')
+        break;
+      text.push_back(c);
+    }
     // TODO: read from stdin
   }
 
   letter::Letter text_letter(text, &signature_manager);
+
+  if (verify) {
+    letter::Failures retval;
+    string msg;
+    string cert;
+    retval = text_letter.Verify(5, &msg, &cert);
+    LogCvmfs(kLogCvmfs, kLogStdout, "retval %d (%s), msg\n%s\ncert\n%s",
+             retval, letter::Code2Ascii(retval), msg.c_str(), cert.c_str());
+    return 0;
+  }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "%s",
            text_letter.Sign(hash_algorithm).c_str());
