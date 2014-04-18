@@ -169,7 +169,7 @@ std::string JoinStrings(const std::vector<std::string> &strings,
                         const std::string &joint);
 void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
                     std::map<char, std::string> *content);
-bool ParseKeyvalPath(const std::string &filename, 
+bool ParseKeyvalPath(const std::string &filename,
                      std::map<char, std::string> *content);
 
 double DiffTimeSeconds(struct timeval start, struct timeval end);

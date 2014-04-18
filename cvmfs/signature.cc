@@ -331,20 +331,39 @@ bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
  * OpenSSL does (01:AB:...).
  * Empty string on failure.
  */
-string SignatureManager::FingerprintCertificate(
+shash::Any SignatureManager::HashCertificate(
   const shash::Algorithms hash_algorithm)
 {
-  if (!certificate_) return "";
+  shash::Any result;
+  if (!certificate_)
+    return result;
 
   int buffer_size;
   unsigned char *buffer = NULL;
 
   buffer_size = i2d_X509(certificate_, &buffer);
-  if (buffer_size < 0) return "";
+  if (buffer_size < 0)
+    return result;
 
-  shash::Any hash(hash_algorithm);
-  shash::HashMem(buffer, buffer_size, &hash);
+  result.algorithm = hash_algorithm;
+  shash::HashMem(buffer, buffer_size, &result);
   free(buffer);
+
+  return result;
+}
+
+
+/**
+ * Returns cryptographic hash from DER encoded certificate, encoded the same way
+ * OpenSSL does (01:AB:...).
+ * Empty string on failure.
+ */
+string SignatureManager::FingerprintCertificate(
+  const shash::Algorithms hash_algorithm)
+{
+  shash::Any hash = HashCertificate(hash_algorithm);
+  if (hash.IsNull())
+    return "";
 
   const string hash_str = hash.ToString();
   string result;
@@ -355,6 +374,25 @@ string SignatureManager::FingerprintCertificate(
     result += toupper(hash_str[i]);
   }
   return result;
+}
+
+
+/**
+ * Parses a fingerprint from the whitelist
+ */
+shash::Any SignatureManager::MkFromFingerprint(const std::string &fingerprint) {
+  string convert;
+  for (unsigned i = 0; i < fingerprint.length(); ++i) {
+    if ((fingerprint[i] == ' ') || (fingerprint[i] == '\t') ||
+        (fingerprint[i] == '#'))
+    {
+      break;
+    }
+    if (fingerprint[i] != ':')
+      convert.push_back(tolower(fingerprint[i]));
+  }
+
+  return shash::MkFromHexPtr(shash::HexPtr(convert));
 }
 
 

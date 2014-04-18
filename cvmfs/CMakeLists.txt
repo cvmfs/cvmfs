@@ -35,6 +35,7 @@ set (CVMFS_CLIENT_SOURCES
   download.cc download.h
   wpad.cc wpad.h
   manifest.h manifest.cc
+  whitelist.h whitelist.cc
   manifest_fetch.h manifest_fetch.cc
   murmur.h smallhash.h
   bigvector.h
@@ -100,6 +101,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   logging.cc logging.h logging_internal.h
   globals.cc globals.h
   manifest.h manifest.cc
+  whitelist.h whitelist.cc
   manifest_fetch.h manifest_fetch.cc
   prng.h
   hash.h hash.cc
