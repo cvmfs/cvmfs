@@ -28,6 +28,7 @@ const int Whitelist::kFlagVerifyCaChain = 0x04;
 
 void Whitelist::CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
                             unsigned *pkcs7_size, unsigned char **pkcs7_buf)
+  const
 {
   *plain_size = plain_size_;
   *pkcs7_size = pkcs7_size_;
@@ -313,6 +314,37 @@ Whitelist::Whitelist(const string &fqrn,
   pkcs7_size_(0)
 {
   Reset();
+}
+
+
+Whitelist::Whitelist(const Whitelist &other) :
+  fqrn_(other.fqrn_),
+  download_manager_(other.download_manager_),
+  signature_manager_(other.signature_manager_),
+  status_(other.status_),
+  fingerprints_(other.fingerprints_),
+  expires_(other.expires_),
+  verification_flags_(other.verification_flags_)
+{
+  other.CopyBuffers(&plain_size_, &plain_buf_, &pkcs7_size_, &pkcs7_buf_);
+}
+
+
+Whitelist &Whitelist::operator= (const Whitelist &other) {
+  if (&other == this)
+    return *this;
+
+  Reset();
+  fqrn_ = other.fqrn_;
+  download_manager_ = other.download_manager_;
+  signature_manager_ = other.signature_manager_;
+  status_ = other.status_;
+  fingerprints_ = other.fingerprints_;
+  expires_ = other.expires_;
+  verification_flags_ = other.verification_flags_;
+  other.CopyBuffers(&plain_size_, &plain_buf_, &pkcs7_size_, &pkcs7_buf_);
+
+  return *this;
 }
 
 

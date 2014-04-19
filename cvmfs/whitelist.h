@@ -73,16 +73,17 @@ class Whitelist {
     kStNone,
     kStAvailable,
   };
-  
-  // TODO: copy, assignment
+
   Whitelist(const std::string &fqrn,
             download::DownloadManager *download_manager,
             signature::SignatureManager *signature_manager);
   ~Whitelist();
+  explicit Whitelist(const Whitelist &other);
+  Whitelist &operator= (const Whitelist &other);
   Failures Load(const std::string &base_url);
 
   void CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
-                   unsigned *pkcs7_size, unsigned char **pkcs7_buf);
+                   unsigned *pkcs7_size, unsigned char **pkcs7_buf) const;
   time_t expires();
   bool IsExpired() const;
   Failures VerifyLoadedCertificate() const;

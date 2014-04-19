@@ -100,6 +100,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       }
 
       if ((time(NULL) + 3600*24*3) > whitelist.expires()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "reloading whitelist");
         whitelist::Whitelist refresh(fqrn, &download_manager,
                                      &signature_manager);
         retval = refresh.Load(repository_url);
@@ -113,14 +114,21 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       retval = letter.Verify(max_age, &message, &cert);
       if (retval != letter::kFailOk) {
         exit_code = 3;
+        LogCvmfs(kLogCvmfs, kLogStderr, "%s",
+                 Code2Ascii((letter::Failures)retval));
       } else {
         if (whitelist.IsExpired()) {
           exit_code = 4;
+          LogCvmfs(kLogCvmfs, kLogStderr, "whitelist expired");
         } else {
-          exit_code = 5;
           retval = whitelist.VerifyLoadedCertificate();
-          if (retval == whitelist::kFailOk)
+          if (retval == whitelist::kFailOk) {
             exit_code = 0;
+          } else {
+            exit_code = 5;
+            LogCvmfs(kLogCvmfs, kLogStderr, "%s",
+                     Code2Ascii((whitelist::Failures)retval));
+          }
         }
       }
 
@@ -130,7 +138,8 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
           LogCvmfs(kLogCvmfs, kLogStdout, "%u", message.length());
       }
       if (exit_code == 0)
-        LogCvmfs(kLogCvmfs, kLogStdout, "%s", message.c_str());
+        LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s",
+                 message.c_str());
       text = "";
     } while (loop);
     download_manager.Fini();
