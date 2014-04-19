@@ -44,6 +44,12 @@ void Whitelist::CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
 }
 
 
+time_t Whitelist::expires() {
+  assert(status_ == kStAvailable);
+  return expires_;
+}
+
+
 bool Whitelist::IsExpired() const {
   assert(status_ == kStAvailable);
   return time(NULL) > expires_;

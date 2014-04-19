@@ -73,18 +73,19 @@ class Whitelist {
     kStNone,
     kStAvailable,
   };
-
+  
+  // TODO: copy, assignment
   Whitelist(const std::string &fqrn,
             download::DownloadManager *download_manager,
             signature::SignatureManager *signature_manager);
   ~Whitelist();
   Failures Load(const std::string &base_url);
 
-  bool IsExpired() const;
-  Failures VerifyLoadedCertificate() const;
-
   void CopyBuffers(unsigned *plain_size, unsigned char **plain_buf,
                    unsigned *pkcs7_size, unsigned char **pkcs7_buf);
+  time_t expires();
+  bool IsExpired() const;
+  Failures VerifyLoadedCertificate() const;
 
  private:
   static const int kFlagVerifyRsa;
