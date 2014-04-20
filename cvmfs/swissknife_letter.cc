@@ -10,6 +10,8 @@
 #include <inttypes.h>
 #include <termios.h>
 
+#include <cassert>
+
 #include "download.h"
 #include "hash.h"
 #include "letter.h"
@@ -18,6 +20,61 @@
 #include "whitelist.h"
 
 using namespace std;  // NOLINT
+
+
+static void ReadStdinBytes(unsigned char *buf, const uint16_t num_bytes) {
+  int read_chunk;
+  unsigned read_all = 0;
+
+  do {
+    if ((read_chunk = read(0, buf+read_all, num_bytes-read_all)) <= 0)
+      break;
+    read_all += read_chunk;
+  } while (read_all < num_bytes);
+
+  if (read_chunk == 0) exit(0);
+  assert(read_all == num_bytes);
+}
+
+
+static void WriteStdoutBytes(const unsigned char *buf,
+                             const uint16_t num_bytes)
+{
+  int wrote_chunk;
+  unsigned wrote_all = 0;
+
+  do {
+    if ((wrote_chunk = write(1, buf+wrote_all, num_bytes-wrote_all)) <= 0)
+      break;
+    wrote_all += wrote_chunk;
+  } while (wrote_all < num_bytes);
+
+  assert(wrote_all == num_bytes);
+}
+
+
+static uint16_t ReadErlang(unsigned char *buf) {
+  int len;
+
+  ReadStdinBytes(buf, 2);
+  len = (buf[0] << 8) | buf[1];
+  if (len > 0)
+    ReadStdinBytes(buf, len);
+  return len;
+}
+
+
+static void WriteErlang(const unsigned char *buf, int len) {
+  unsigned char li;
+
+  li = (len >> 8) & 0xff;
+  WriteStdoutBytes(&li, 1);
+  li = len & 0xff;
+  WriteStdoutBytes(&li, 1);
+
+  WriteStdoutBytes(buf, len);
+}
+
 
 int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   bool verify = false;
@@ -28,16 +85,16 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     return 1;
   }
 
-  bool loop = false;
+  bool erlang = false;
   string repository_url;
   string certificate_path;
   string certificate_password;
-  shash::Algorithms hash_algorithm;
+  shash::Algorithms hash_algorithm = shash::kSha1;
   uint64_t max_age;
   if (verify) {
     repository_url = *args.find('r')->second;
     max_age = String2Uint64(*args.find('m')->second);
-    if (args.find('l') != args.end()) loop = true;
+    if (args.find('e') != args.end()) erlang = true;
   } else {
     certificate_path = *args.find('c')->second;
     if (args.find('p') != args.end())
@@ -87,16 +144,27 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       return 2;
     }
 
-    int exit_code = 0;
+    if (erlang) {
+      const char *ready = "ready";
+      WriteErlang(reinterpret_cast<const unsigned char *>(ready), 5);
+    }
+
+    char exit_code = 0;
     do {
-      if (text == "") {
-        char c;
-        while ((retval = read(0, &c, 1)) == 1) {
-          if (c == '\n')
-            break;
-          text.push_back(c);
+      if (erlang) {
+        unsigned char buf[65000];
+        int length = ReadErlang(buf);
+        text = string(reinterpret_cast<char *>(buf), length);
+      } else {
+        if (text == "") {
+          char c;
+          while ((retval = read(0, &c, 1)) == 1) {
+            if (c == '\n')
+              break;
+            text.push_back(c);
+          }
+          if (retval != 1) return exit_code;
         }
-        if (retval != 1) return exit_code;
       }
 
       if ((time(NULL) + 3600*24*3) > whitelist.expires()) {
@@ -132,16 +200,20 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
         }
       }
 
-      if (loop) {
-        LogCvmfs(kLogCvmfs, kLogStdout, "%d", exit_code);
+      if (erlang) {
+        if ((exit_code == 0) && (message.length() > 60000))
+          exit_code = 6;
+        WriteErlang(reinterpret_cast<unsigned char *>(&exit_code), 1);
         if (exit_code == 0)
-          LogCvmfs(kLogCvmfs, kLogStdout, "%u", message.length());
+          WriteErlang(reinterpret_cast<const unsigned char *>(message.data()),
+                      message.length());
+      } else {
+        if (exit_code == 0)
+          LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s",
+                   message.c_str());
       }
-      if (exit_code == 0)
-        LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s",
-                 message.c_str());
       text = "";
-    } while (loop);
+    } while (erlang);
     download_manager.Fini();
     signature_manager.Fini();
     return exit_code;

@@ -29,7 +29,7 @@ class CommandLetter : public Command {
     result.push_back(Parameter('m', "max age (seconds)", true, false));
     result.push_back(Parameter('z', "trusted certificate dir(s)", true, false));
     result.push_back(Parameter('r', "repository url", true, false));
-    result.push_back(Parameter('l', "verify in a loop until EOF", true, true));
+    result.push_back(Parameter('e', "Erlang mode (stay active)", true, true));
     result.push_back(Parameter('t', "text to sign or verify", true, false));
     result.push_back(Parameter('f', "fully qualified repository name",
                      false, false));
