@@ -419,7 +419,7 @@ get_apache_version() {
 
 get_fd_modes() {
   local path=$1
-  lsof -Fan | grep -B1 -e "^n$path" | grep -e '^a.*'
+  lsof -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
 }
 
 # gets the number of open read-only file descriptors beneath a given path

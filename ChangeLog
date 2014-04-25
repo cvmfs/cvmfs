@@ -1,5 +1,6 @@
 2.1.19:
-  * Fix CVMFS_SEND_INFO_HEADER option handling
+  * Suppress confusing lsof output in cvmfs_server (CVM-624)
+  * Fix CVMFS_SEND_INFO_HEADER option handling (CVM-623)
 
 2.1.18:
   * Fix publishing when other shells are open on /cvmfs/$fqrn
