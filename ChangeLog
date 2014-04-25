@@ -1,4 +1,5 @@
 2.1.19:
+  * Fix CVMFS_SEND_INFO_HEADER option handling
 
 2.1.18:
   * Fix publishing when other shells are open on /cvmfs/$fqrn

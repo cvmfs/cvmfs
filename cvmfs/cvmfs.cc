@@ -1849,9 +1849,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (options::GetValue("CVMFS_BACKOFF_MAX", &parameter))
     backoff_max = String2Uint64(parameter)*1000;
   if (options::GetValue("CVMFS_SEND_INFO_HEADER", &parameter) &&
-      !options::IsOn(parameter))
+      options::IsOn(parameter))
   {
-    send_info_header = false;
+    send_info_header = true;
   }
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
