@@ -2652,7 +2652,7 @@ publish() {
         tag_description="$OPTARG"
       ;;
       r)
-        remove_tag="-d $OPTARG"
+        remove_tag="-d '$OPTARG'"
         if [ "x$OPTARG" = "xtrunk" -o "x$OPTARG" = "xtrunk-previous" ]; then
           echo "Warning: won't delete $OPTARG tag"
         fi
