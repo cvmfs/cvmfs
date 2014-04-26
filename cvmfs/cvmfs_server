@@ -1364,6 +1364,7 @@ CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
 CVMFS_UNION_FS_TYPE=$unionfs
 CVMFS_HASH_ALGORITHM=$hash_algo
+CVMFS_AUTO_TAG=true
 EOF
 
   # make sure that the config file does not exist, yet
@@ -2699,6 +2700,13 @@ publish() {
     hash_algo=$CVMFS_HASH_ALGORITHM
     if [ x"$hash_algo" != "x" ]; then
       hash_algo="-e $hash_algo"
+    fi
+
+    if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
+      local timestamp=$(date -u "+%Y-%m-%d~%H:%M:%S")
+      tag_name="generic-$timestamp-utc"
+      echo "Using auto tag '$tag_name'"
+      add_tag="-a $tag_name"
     fi
 
     # more sanity checks
