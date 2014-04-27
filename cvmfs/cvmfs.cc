@@ -1794,6 +1794,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string public_keys = "";
   string root_hash = "";
   string repository_tag = "";
+  string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
   string trusted_certs = "";
   map<uint64_t, uint64_t> uid_map;
@@ -1879,6 +1880,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     root_hash = parameter;
   if (options::GetValue("CVMFS_REPOSITORY_TAG", &parameter))
     repository_tag = parameter;
+  if (options::GetValue("CVMFS_REPOSITORY_DATE", &parameter))
+    repository_date = parameter;
   if (options::GetValue("CVMFS_NFS_SOURCE", &parameter) &&
       options::IsOn(parameter))
   {
@@ -2239,7 +2242,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::catalog_manager_->SetOwnerMaps(uid_map, gid_map);
 
   // Load specific tag (root hash has precedence)
-  if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {
+  if ((root_hash == "") && 
+      ((*cvmfs::repository_tag_ != "") || (repository_date != "")) 
+  {
     manifest::ManifestEnsemble ensemble;
     retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,
                              cvmfs::signature_manager_,
