@@ -1,3 +1,5 @@
+2.1.20:
+
 2.1.19:
   * Suppress confusing lsof output in cvmfs_server (CVM-624)
   * Fix CVMFS_SEND_INFO_HEADER option handling (CVM-623)
