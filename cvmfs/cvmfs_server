@@ -2703,8 +2703,8 @@ publish() {
     fi
 
     if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
-      local timestamp=$(date -u "+%Y-%m-%d~%H:%M:%S")
-      tag_name="generic-$timestamp-utc"
+      local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+      tag_name="generic-$timestamp"
       echo "Using auto tag '$tag_name'"
       add_tag="-a $tag_name"
     fi
