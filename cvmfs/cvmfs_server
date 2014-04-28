@@ -232,6 +232,11 @@ NOTE: $errormsg
 load_repo_config() {
   local name=$1
   . /etc/cvmfs/repositories.d/${name}/server.conf
+  if [ x"$CVMFS_REPOSITORY_TYPE" = x"stratum0" ]; then
+    . /etc/cvmfs/repositories.d/${name}/client.conf
+  else
+    . /etc/cvmfs/repositories.d/${name}/replica.conf
+  fi
 }
 
 # retrieves (or guesses) the version of CernVM-FS that was used to create the
