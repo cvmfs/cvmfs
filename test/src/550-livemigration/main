@@ -16,15 +16,19 @@ get_talk_pipe() {
   echo "${cache}/${repo_name}/cvmfs_io.${repo_name}"
 }
 
+get_apache_config_filename() {
+  local repo_name="$1"
+  echo "${repo_name}.conf"
+}
 
-mock_apache_access() {
+
+mock_apache_access_to_legacy_repo() {
   local legacy_repo_name="$1"
-  local apache_config_file="$2"
+  local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
   local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
   local legacy_repo_url="$(get_repo_url $legacy_repo_name)"
 
   echo -n "configuring apache to serve the legacy repository... "
-  TEST550_APACHE_CONF="$apache_config_file"
 create_apache_config_file $apache_config_file << EOF
 # Created by test case 550.  Don't touch.
 Alias /cvmfs/${legacy_repo_name} ${legacy_repo_storage}/pub/catalogs
@@ -36,11 +40,11 @@ Alias /cvmfs/${legacy_repo_name} ${legacy_repo_storage}/pub/catalogs
   EnableMMAP Off
   EnableSendFile Off
   AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
-  FileETag INode MTime Size 
+  FileETag INode MTime Size
   ExpiresActive On
   ExpiresDefault "access plus 3 days"
-  ExpiresByType text/html "access plus 5 minutes" 
-  ExpiresByType application/x-cvmfs "access plus 1 minutes" 
+  ExpiresByType text/html "access plus 5 minutes"
+  ExpiresByType application/x-cvmfs "access plus 1 minutes"
 </Directory>
 EOF
   apache_switch off > /dev/null
@@ -51,7 +55,9 @@ EOF
 
 
 stop_mocked_apache_access() {
-  local apache_config_file="$1"
+  local legacy_repo_name="$1"
+  local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
+  local legacy_repo_url="$(get_repo_url $legacy_repo_name)"
   echo -n "shutting down mocked legacy repository... "
   remove_apache_config_file "$apache_config_file"
   apache_switch off > /dev/null
@@ -137,14 +143,12 @@ cvmfs_run_test() {
   logfile=$1
   local script_location=$2
   local guinea_pig_location="${script_location}/../common/guinea_pig_repo_20"
-  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local legacy_repo_name="testmigration.cern.ch"
   local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
   local legacy_repo_url="$(get_repo_url $legacy_repo_name)"
   local replica_name="${legacy_repo_name}.stratum1"
   local replica_url="$(get_repo_url $replica_name)"
   local key_location="/etc/cvmfs/keys"
-  local apache_config_file="${legacy_repo_name}.conf"
   local s0_mnt="$(pwd)/s0"
   local s1_mnt="$(pwd)/s1"
 
@@ -161,7 +165,8 @@ cvmfs_run_test() {
   echo "done"
 
   echo "start apache to serve the legacy repository"
-  mock_apache_access "$legacy_repo_name" "$apache_config_file"
+  TEST550_APACHE_CONF=$(get_apache_config_filename $legacy_repo_name)
+  mock_apache_access_to_legacy_repo "$legacy_repo_name"
 
   echo "creating a stratum1 replication"
   TEST550_REPLICA_NAME="$replica_name"
@@ -201,7 +206,7 @@ cvmfs_run_test() {
   [ -d ${s1_mnt}/dir4 ] && [ -d ${s1_mnt}/dir5 ] && [ -d ${s1_mnt}/dir6 ] || return 12
 
   echo "stop serving the old repository - migration imminent"
-  stop_mocked_apache_access "$apache_config_file"
+  stop_mocked_apache_access "$legacy_repo_name"
 
   echo "fast forward to revision 6"
   plant_legacy_repository_revision "${guinea_pig_location}/revision-6.tar.gz" "$legacy_repo_name" || return $?
