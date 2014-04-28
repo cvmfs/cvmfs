@@ -2,103 +2,82 @@
 cvmfs_test_name="Import Legacy Repository"
 cvmfs_test_autofs_on_startup=false
 
+TEST519_LEGACY_STORAGE=""
+TEST519_NEW_REPO_NAME=""
+cleanup() {
+  [ -z "$TEST519_NEW_REPO_NAME" ]  || sudo cvmfs_server rmfs -f $TEST519_NEW_REPO_NAME
+  [ -z "$TEST519_LEGACY_STORAGE" ] || sudo rm -fR $TEST519_LEGACY_STORAGE
+}
+
 cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
-  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local scratch_dir=$(pwd)
 
-  local guinea_pig="http://cvmfs-stratum-zero.cern.ch/opt/boss"
-  local download_location="${scratch_dir}/guinea_pig_repo"
-  local keys_location="${scratch_dir}/keys"
-  local temp_dir="${scratch_dir}/tmp"
-  local upstream="local,${download_location}/data/txn,${download_location}"
+  local guinea_pig_location="${script_location}/../common/guinea_pig_repo_20"
+  local legacy_repo_name="testmigration.cern.ch"
+  local repo_dir="/cvmfs/${legacy_repo_name}"
+  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
 
-  # create a test repository (to steal its keys)
-  echo "create dummy repository and steal its keys and whitelist"
-  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 1
-  mkdir $keys_location || return 2
-  cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.* $keys_location || return 3
-  cp /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfswhitelist $keys_location || 3
-  destroy_repo $CVMFS_TEST_REPO || return 4
+  echo "make sure there are no legacy repo leftovers from previous tests"
+  cleanup_legacy_repo_leftovers "$legacy_repo_name"
 
-  # download a 2.0 repository
-  echo "download Guinea Pig repository $guinea_pig"
-  python ${script_location}/downloadCatalogs.py \
-    --directory ${download_location}/data \
-    --get-dirtab                          \
-    $guinea_pig || return 5
-  wget \
-    --directory-prefix $download_location \
-    ${guinea_pig}/.cvmfspublished || return 6
-  cp ${keys_location}/.cvmfswhitelist $download_location || return 6
-  cvmfs_server skeleton -o $CVMFS_TEST_USER ${download_location} || return 7
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
 
-  # set SELinux boolean to allow access by httpd
-  if [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]; then
-    echo "SELinux is present... better silence it for httpd >.<"
-    sudo setsebool httpd_enable_homedirs true
-  fi
+  echo -n "resurrect legacy repository... "
+  TEST519_LEGACY_STORAGE="$legacy_repo_storage"
+  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                              || return $?
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-6.tar.gz" "$legacy_repo_name" || return $?
+  echo "done"
 
-  # resign freshly downloaded repository (since we lack its private keys)
-  echo "remove original repository signature and resign it with the stolen keys"
-  cat ${download_location}/.cvmfspublished | head -n6 > ${download_location}/.cvmfspublished_unsigned || return 8
-  mkdir $temp_dir || return 9
-  cvmfs_swissknife sign \
-    -c ${keys_location}/${CVMFS_TEST_REPO}.crt \
-    -k ${keys_location}/${CVMFS_TEST_REPO}.key \
-    -n ${CVMFS_TEST_REPO} \
-    -m ${download_location}/.cvmfspublished_unsigned \
-    -t $temp_dir \
-    -r $upstream || return 10
-
-  # import the prepared guinea pig legacy repository into a fresh repository
-  echo "import legacy repository into fresh repository"
+  echo "run the repository migration"
+  TEST519_NEW_REPO_NAME="$legacy_repo_name"
+  sudo mv $legacy_repo_storage/pub/data $legacy_repo_storage         || return 1
+  sudo ln -s $legacy_repo_storage/data $legacy_repo_storage/pub/data || return 2
+  sudo cp $legacy_repo_storage/pub/catalogs/.cvmfspublished         \
+          $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
+          $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
+          $legacy_repo_storage || return 3
   sudo cvmfs_server import \
-    -o $CVMFS_TEST_USER \
-    -u $upstream \
-    -k $keys_location \
-    -l \
-    -s \
-    $CVMFS_TEST_REPO || return 11
+    -o $CVMFS_TEST_USER    \
+    -l                     \
+    -s                     \
+    -g                     \
+    $legacy_repo_name || return 4
 
-  # check if the migrated dirtab is sane
-  echo "check if the migrated .cvmfsdirtab looks okay"
-  local dirtab_path="/cvmfs/${CVMFS_TEST_REPO}/.cvmfsdirtab"
-  cat $dirtab_path
-  for line in $(cat $dirtab_path); do
-    echo "$line" | grep -qe '^.*/\*$' || return 12
-  done
+  echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
+  ls -lisa /cvmfs/${legacy_repo_name} || return 5
 
   # check if the migrated and imported catalogs are sane
-  echo "check migrated catalogs without checking data chunks (we did not download them)"
-  check_repository $CVMFS_TEST_REPO -c || return 13
+  echo "check migrated catalogs and data chunks"
+  check_repository $legacy_repo_name || return 6
 
   # cheate a new repository revision of the migrated catalogs
   echo "create a new repository revision"
-  start_transaction $CVMFS_TEST_REPO || return $?
+  local big_file="${repo_dir}/dir6/bigfile"
+  start_transaction $legacy_repo_name || return $?
   cd $repo_dir
-    rm -fR $(ls -d */ | head -n1)
+    rm -fR dir7
     mkdir -p foo bar
+    touch foo/.cvmfscatalog
     echo "no meaningful stuff" > foo/bar
     echo "even less meaning"   > bar/foo
     ln foo/bar foo/baz
     ln -s ../foo/baz bar/baz
+    touch $big_file
   cd $scratch_dir
-  publish_repo $CVMFS_TEST_REPO || return $?
+  publish_repo $legacy_repo_name || return $?
 
   # check if still everything is fine
   echo "check catalogs again"
-  check_repository $CVMFS_TEST_REPO -c || return 14
+  check_repository $legacy_repo_name || return 7
 
   # see if the files ended up in the catalog
   echo "check created files"
   local content=$(cat ${repo_dir}/foo/bar)
-  [ -f ${repo_dir}/foo/bar ] && grep -q "no meaningful stuff" ${repo_dir}/foo/bar || return 15
-  [ -f ${repo_dir}/bar/baz ] && grep -q "no meaningful stuff" ${repo_dir}/bar/baz || return 16
-
-  # remove the test repository
-  destroy_repo $CVMFS_TEST_REPO || return 17
+  [ -f ${repo_dir}/foo/bar ] && grep -q "no meaningful stuff" ${repo_dir}/foo/bar || return 8
+  [ -f ${repo_dir}/bar/baz ] && grep -q "no meaningful stuff" ${repo_dir}/bar/baz || return 9
 
   return 0
 }
