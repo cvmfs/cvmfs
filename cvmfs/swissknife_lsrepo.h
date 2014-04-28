@@ -35,6 +35,7 @@ class CommandListCatalogs : public Command {
  private:
   bool print_tree_;
   bool print_hash_;
+  bool print_size_;
 };
 
 }
