@@ -32,12 +32,15 @@ namespace swissknife {
 struct CatalogTraversalData {
   CatalogTraversalData(const catalog::Catalog* catalog,
                        const shash::Any&       catalog_hash,
-                       const unsigned          tree_level) :
-    catalog(catalog), catalog_hash(catalog_hash), tree_level(tree_level) {}
+                       const unsigned          tree_level,
+                       const size_t            file_size) :
+    catalog(catalog), catalog_hash(catalog_hash), tree_level(tree_level),
+    file_size(file_size) {}
 
   const catalog::Catalog*  catalog;
   const shash::Any         catalog_hash;
   const unsigned int       tree_level;
+  const size_t             file_size;
 };
 
 /**
@@ -175,6 +178,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
       return false;
     }
 
+    // Get the size of the decompressed catalog file
+    const size_t file_size = GetFileSize(tmp_file);
+
     // Open the catalog
     catalog::Catalog *catalog = CatalogT::AttachFreely(job.path,
                                                        tmp_file,
@@ -190,7 +196,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     }
 
     // Provide the user with the catalog
-    NotifyListeners(CatalogTraversalData(catalog, job.hash, job.tree_level));
+    NotifyListeners(CatalogTraversalData(catalog,
+                                         job.hash,
+                                         job.tree_level,
+                                         file_size));
 
     // Inception! Go to the next catalog level
     // Note: taking a copy of the result of ListNestedCatalogs() here for
