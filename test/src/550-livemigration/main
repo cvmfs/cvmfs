@@ -231,7 +231,7 @@ cvmfs_run_test() {
   initiate_reload "$s0_mnt" "$legacy_repo_name" || return 17
   initiate_reload "$s1_mnt" "$legacy_repo_name" || return 18
 
-  echo "wait for the clients to pick up revision 3"
+  echo "wait for the clients to pick up revision 7"
   wait_for_revision "$s0_mnt" "$legacy_repo_name" 7 || return 19
   wait_for_revision "$s1_mnt" "$legacy_repo_name" 7 || return 20
 
