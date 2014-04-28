@@ -9,12 +9,6 @@ get_repo_url() {
 }
 
 
-get_repo_storage() {
-  local repo_name="$1"
-  echo "/srv/cvmfs/${repo_name}"
-}
-
-
 get_cache_directory() {
   local mountpoint="$1"
   echo "${mountpoint}c"
@@ -26,50 +20,6 @@ get_talk_pipe() {
   local repo_name="$2"
   local cache="$(get_cache_directory $mountpoint)"
   echo "${cache}/${repo_name}/cvmfs_io.${repo_name}"
-}
-
-
-resign_repository() {
-  local repo_name="$1"
-  local repo_storage="$(get_repo_storage $repo_name)"
-  local legacy_repo_storage="${repo_storage}/pub/catalogs"
-  local tmp_dir="$(pwd)/tmp"
-  local upstream="local,${legacy_repo_storage}/data/txn,${legacy_repo_storage}"
-
-  cat ${legacy_repo_storage}/.cvmfspublished | head -n6 | \
-    sudo tee ${legacy_repo_storage}/.cvmfspublished_unsigned > /dev/null || return 1
-  mkdir -p $tmp_dir || return 2
-  sudo cvmfs_swissknife sign \
-    -c /etc/cvmfs/keys/${repo_name}.crt \
-    -k /etc/cvmfs/keys/${repo_name}.key \
-    -n ${repo_name} \
-    -m ${legacy_repo_storage}/.cvmfspublished_unsigned \
-    -t $tmp_dir \
-    -r $upstream > /dev/null || return 3
-}
-
-
-plant_tarball() {
-  local tarball="$1"
-  local olddir="$(pwd)"
-
-  cd /                  || return 101
-  sudo tar xzf $tarball || return 102
-  cd $olddir            || return 103
-}
-
-
-plant_legacy_revision() {
-  local tarball="$1"
-  local legacy_repo_name="$2"
-  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
-
-  plant_tarball "$tarball"                                             || return 104
-  [ -d ${legacy_repo_storage}/pub ]                                    || return 105
-  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
-  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
-  sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
-  resign_repository "$legacy_repo_name"                                || return 109
 }
 
 
@@ -223,8 +173,8 @@ cvmfs_run_test() {
 
   echo -n "resurrect legacy repository... "
   TEST550_LEGACY_STORAGE="$legacy_repo_storage"
-  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                   || return $?
-  plant_legacy_revision "${guinea_pig_location}/revision-2.tar.gz" "$legacy_repo_name" || return $?
+  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                              || return $?
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-2.tar.gz" "$legacy_repo_name" || return $?
   echo "done"
 
   echo "start apache to serve the legacy repository"
@@ -247,7 +197,7 @@ cvmfs_run_test() {
   ls -lisa $s0_mnt $s1_mnt || return 6
 
   echo "publish revision 3"
-  plant_legacy_revision "${guinea_pig_location}/revision-3.tar.gz" "$legacy_repo_name" || return $?
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-3.tar.gz" "$legacy_repo_name" || return $?
 
   echo "snapshot the new revision"
   sudo cvmfs_server snapshot $replica_name || return 7
@@ -271,7 +221,7 @@ cvmfs_run_test() {
   stop_mocked_apache_access "$apache_config_file"
 
   echo "fast forward to revision 6"
-  plant_legacy_revision "${guinea_pig_location}/revision-6.tar.gz" "$legacy_repo_name" || return $?
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-6.tar.gz" "$legacy_repo_name" || return $?
 
   echo "run the repository migration"
   TEST550_NEW_REPO_NAME="$legacy_repo_name"
