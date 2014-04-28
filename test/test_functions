@@ -331,7 +331,7 @@ destroy_repo() {
 
 has_repo() {
   local repo=$1
-  cvmfs_server list | grep -q "^$repo "
+  cvmfs_server list 2>/dev/null | grep -q "^$repo "
 }
 
 
