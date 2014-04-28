@@ -2243,7 +2243,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   // Load specific tag (root hash has precedence)
   if ((root_hash == "") && 
-      ((*cvmfs::repository_tag_ != "") || (repository_date != "")) 
+      ((*cvmfs::repository_tag_ != "") || (repository_date != ""))) 
   {
     manifest::ManifestEnsemble ensemble;
     retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,

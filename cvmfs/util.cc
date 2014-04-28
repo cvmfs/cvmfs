@@ -715,6 +715,38 @@ string StringifyIpv4(const uint32_t ip4_address) {
 }
 
 
+/**
+ * Parses a timstamp of the form YYYY-MM-DDTHH:MM:SSZ
+ * Return 0 on error
+ */
+time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
+  time_t utc_time = 0;
+  unsigned length = iso8601.length();
+
+  if (length != 20)
+    return utc_time;
+  if ((iso8601[5] != '-') || (iso8601[8] != '-') || (iso8601[11] != 'T') ||
+      (iso8601[14] != ':') || (iso8601[17] != ':') || (iso8601[20] != 'Z'))
+  {
+    return utc_time;
+  }
+
+  struct tm tm_wl;
+  memset(&tm_wl, 0, sizeof(struct tm));
+  tm_wl.tm_year = String2Int64(iso8601.substr(1, 4))-1900;
+  tm_wl.tm_mon = String2Int64(iso8601.substr(6, 2)) - 1;
+  tm_wl.tm_mday = String2Int64(iso8601.substr(9, 2));
+  tm_wl.tm_hour = String2Int64(iso8601.substr(12, 2));
+  tm_wl.tm_min = String2Int64(iso8601.substr(15, 2));
+  tm_wl.tm_sec = String2Int64(iso8601.substr(18, 2));
+  utc_time = timegm(&tm_wl);
+  if (utc_time < 0)
+    return 0;
+
+  return utc_time;
+}
+
+
 int64_t String2Int64(const string &value) {
   int64_t result;
   sscanf(value.c_str(), "%"PRId64, &result);
