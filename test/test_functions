@@ -825,6 +825,37 @@ get_repo_storage() {
   echo "/srv/cvmfs/${repo_name}"
 }
 
+get_repo_url() {
+  local repo_name="$1"
+  echo "http://localhost/cvmfs/${repo_name}"
+}
+
+get_apache_config_filename() {
+  local repo_name="$1"
+  echo "${repo_name}.conf"
+}
+
+
+cleanup_legacy_repo_leftovers() {
+  local legacy_repo_name="$1"
+  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
+  local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
+
+  echo -n "cleanup (if necessary)... "
+  has_repo $legacy_repo_name && die "fail"
+  if [ -d $legacy_repo_storage ]; then
+    sudo rm -fR $legacy_repo_storage
+  fi
+  if [ -f /etc/cvmfs/keys/${legacy_repo_name}.crt ] || \
+     [ -f /etc/cvmfs/keys/${legacy_repo_name}.pub ] || \
+     [ -f /etc/cvmfs/keys/${legacy_repo_name}.key ] || \
+     [ -f /etc/cvmfs/keys/${legacy_repo_name}.masterkey ]; then
+    sudo rm -f /etc/cvmfs/keys/${legacy_repo_name}.*
+  fi
+  remove_apache_config_file $apache_config_file
+  echo "done"
+}
+
 
 # resigns a freshly planted legacy repository (see plant_legacy_repo())
 # Note: This expects a matching keychain in /etc/keys/{$repo_name}

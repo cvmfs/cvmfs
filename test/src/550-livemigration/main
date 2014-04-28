@@ -3,12 +3,6 @@ cvmfs_test_name="Migrating CernVM-FS 2.0 Repository to 2.1.x"
 cvmfs_test_autofs_on_startup=false
 
 
-get_repo_url() {
-  local repo_name="$1"
-  echo "http://localhost/cvmfs/${repo_name}"
-}
-
-
 get_cache_directory() {
   local mountpoint="$1"
   echo "${mountpoint}c"
@@ -154,19 +148,8 @@ cvmfs_run_test() {
   local s0_mnt="$(pwd)/s0"
   local s1_mnt="$(pwd)/s1"
 
-  echo -n "cleanup (if necessary)... "
-  has_repo $legacy_repo_name && die "fail"
-  if [ -d $legacy_repo_storage ]; then
-    sudo rm -fR $legacy_repo_storage
-  fi
-  if [ -f ${key_location}/${legacy_repo_name}.crt ] || \
-     [ -f ${key_location}/${legacy_repo_name}.pub ] || \
-     [ -f ${key_location}/${legacy_repo_name}.key ] || \
-     [ -f ${key_location}/${legacy_repo_name}.masterkey ]; then
-    sudo rm -f ${key_location}/${legacy_repo_name}.*
-  fi
-  remove_apache_config_file $apache_config_file
-  echo "done"
+  echo "make sure there are no legacy repo leftovers from previous tests"
+  cleanup_legacy_repo_leftovers "$legacy_repo_name"
 
   echo "set a trap for desaster cleanup"
   trap cleanup EXIT HUP INT TERM
