@@ -27,14 +27,17 @@ ParameterList CommandListCatalogs::GetParams() {
                              true, true));
   result.push_back(Parameter('s', "print catalog file sizes",
                              true, true));
+  result.push_back(Parameter('e', "print number of catalog entries",
+                             true, true));
   return result;
 }
 
 
 int CommandListCatalogs::Main(const ArgumentList &args) {
-  print_tree_ = (args.count('t') > 0);
-  print_hash_ = (args.count('d') > 0);
+  print_tree_    = (args.count('t') > 0);
+  print_hash_    = (args.count('d') > 0);
   print_size_    = (args.count('s') > 0);
+  print_entries_ = (args.count('e') > 0);
 
   const std::string &repo_url = *args.find('r')->second;
   const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second : "";
@@ -51,6 +54,7 @@ void CommandListCatalogs::CatalogCallback(const CatalogTraversalData &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string clg_size;
+  std::string clg_entries;
   std::string path;
 
   if (print_tree_) {
@@ -70,11 +74,15 @@ void CommandListCatalogs::CatalogCallback(const CatalogTraversalData &data) {
     clg_size = StringifyInt(data.file_size) + "B ";
   }
 
+  if (print_entries_) {
+    clg_entries = StringifyInt(data.catalog->GetNumEntries()) + " ";
+  }
+
   path = data.catalog->path().ToString();
   if (path.empty())
     path = "/";
 
-  LogCvmfs(kLogCatalog, kLogStdout, "%s%s%s%s",
+  LogCvmfs(kLogCatalog, kLogStdout, "%s%s%s%s%s",
     tree_indent.c_str(), hash_string.c_str(), clg_size.c_str(),
-    path.c_str());
+    clg_entries.c_str(), path.c_str());
 }
