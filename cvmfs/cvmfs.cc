@@ -1480,6 +1480,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_manager_->GetRootHash().ToString();
+  } else if (attr == "user.tag") {
+    attribute_value = *repository_tag_;
   } else if (attr == "user.expires") {
     if (catalogs_valid_until_ == kIndefiniteDeadline) {
       attribute_value = "never (fixed root catalog)";
@@ -1584,7 +1586,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
     "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
-    "user.ndiropen\0user.inode_max\0";
+    "user.ndiropen\0user.inode_max\0user.tag\0";
   string attribute_list(base_list, sizeof(base_list)-1);
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
@@ -2296,6 +2298,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                "time stamp %s UTC resolved to tag '%s'",
                StringifyTime(repository_utctime, true).c_str(),
                tag.name.c_str());
+      *cvmfs::repository_tag_ = tag.name;
     } else {
       retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
       if (!retval) {
