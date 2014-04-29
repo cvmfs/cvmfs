@@ -2785,7 +2785,7 @@ publish() {
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     if [ "x$add_tag" != "x" ] && \
-       ls_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
+       list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
       echo "Tag name '$tag_name' is already in use for repository $name. Maybe you wanted to specify -h to move it?"
       retcode=1
