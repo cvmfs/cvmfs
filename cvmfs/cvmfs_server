@@ -103,7 +103,8 @@ cvmfs_mkfqrn() {
 is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
-    resign list info lstags check transaction abort snapshot skeleton migrate list-catalogs"
+    resign list info list-tags lstags check transaction abort snapshot skeleton \
+    migrate list-catalogs"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -204,7 +205,7 @@ Supported Commands:
                 Print a full list of all nested catalogs of a repository
   info          <fully qualified name>
                 Print summary about the repository
-  lstags        <fully qualified name>
+  list-tags     <fully qualified name>
                 Print named tags (snapshots) of the repository
   check         [-c disable data chunk existence check]
                 [-i check data integrity] (may take some time)]
@@ -2360,6 +2361,10 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 
 
 lstags() {
+  list_tags "$@" # backward compatibility alias
+}
+
+list_tags() {
   local name
 
   # get repository name
@@ -2741,7 +2746,7 @@ publish() {
   if [ "x$add_tag" != "x" ]; then
     [ "x$tag_name" != "x" ]               || die "Tag name missing"
     echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
-    if lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
+    if list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
       die "Tag name '$tag_name' is already in use. Maybe you wanted to specify -h to move it?"
     fi
@@ -2780,7 +2785,7 @@ publish() {
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     if [ "x$add_tag" != "x" ] && \
-       lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
+       list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
       echo "Tag name '$tag_name' is already in use for repository $name. Maybe you wanted to specify -h to move it?"
       retcode=1
