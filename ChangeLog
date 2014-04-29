@@ -1,4 +1,7 @@
 2.1.20:
+  * Add extended attribute user.tag
+  * Add CVMFS_REPOSITORY_DATE client parameter
+  * Enable default auto tagging (CVMFS_AUTO_TAG)
   * Add list-catalogs command to cvmfs_server
 
 2.1.19:
