@@ -103,7 +103,8 @@ cvmfs_mkfqrn() {
 is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
-    resign list info list-tags check transaction abort snapshot skeleton migrate list-catalogs"
+    resign list info list-tags lstags check transaction abort snapshot skeleton \
+    migrate list-catalogs"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -2358,6 +2359,10 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 
 ################################################################################
 
+
+lstags() {
+  list_tags "$@" # backward compatibility alias
+}
 
 list_tags() {
   local name
