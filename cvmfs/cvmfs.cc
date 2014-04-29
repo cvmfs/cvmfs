@@ -1480,6 +1480,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_manager_->GetRootHash().ToString();
+  } else if (attr == "user.tag") {
+    attribute_value = *repository_tag_;
   } else if (attr == "user.expires") {
     if (catalogs_valid_until_ == kIndefiniteDeadline) {
       attribute_value = "never (fixed root catalog)";
@@ -1584,7 +1586,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
     "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
-    "user.ndiropen\0user.inode_max\0";
+    "user.ndiropen\0user.inode_max\0user.tag\0";
   string attribute_list(base_list, sizeof(base_list)-1);
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
@@ -1794,6 +1796,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string public_keys = "";
   string root_hash = "";
   string repository_tag = "";
+  string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
   string trusted_certs = "";
   map<uint64_t, uint64_t> uid_map;
@@ -1879,6 +1882,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     root_hash = parameter;
   if (options::GetValue("CVMFS_REPOSITORY_TAG", &parameter))
     repository_tag = parameter;
+  if (options::GetValue("CVMFS_REPOSITORY_DATE", &parameter))
+    repository_date = parameter;
   if (options::GetValue("CVMFS_NFS_SOURCE", &parameter) &&
       options::IsOn(parameter))
   {
@@ -2238,8 +2243,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   cvmfs::catalog_manager_->SetOwnerMaps(uid_map, gid_map);
 
-  // Load specific tag (root hash has precedence)
-  if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {
+  // Load specific tag (root hash has precedence, then repository_tag)
+  if ((root_hash == "") &&
+      ((*cvmfs::repository_tag_ != "") || (repository_date != "")))
+  {
     manifest::ManifestEnsemble ensemble;
     retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,
                              cvmfs::signature_manager_,
@@ -2274,10 +2281,30 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailHistory;
     }
     history::Tag tag;
-    retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
-    if (!retval) {
-      *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
-      return loader::kFailHistory;
+    if (*cvmfs::repository_tag_ == "") {
+      time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
+      if (repository_utctime == 0) {
+        *g_boot_error = "invalid timestamp in CVMFS_REPOSITORY_DATE: " +
+                        repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
+        return loader::kFailHistory;
+      }
+      retval = tag_list.FindTagByDate(repository_utctime, &tag);
+      if (!retval) {
+        *g_boot_error = "no repository state as early as utc timestamp " +
+                        StringifyTime(repository_utctime, true);
+        return loader::kFailHistory;
+      }
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "time stamp %s UTC resolved to tag '%s'",
+               StringifyTime(repository_utctime, true).c_str(),
+               tag.name.c_str());
+      *cvmfs::repository_tag_ = tag.name;
+    } else {
+      retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
+      if (!retval) {
+        *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
+        return loader::kFailHistory;
+      }
     }
     root_hash = tag.root_hash.ToString();
   }

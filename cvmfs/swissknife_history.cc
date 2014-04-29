@@ -118,10 +118,10 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   const uint64_t trunk_catalog_size = String2Uint64(*args.find('s')->second);
   const unsigned trunk_revision = String2Uint64(*args.find('i')->second);
   shash::Any tag_hash = trunk_hash;
-  string delete_tag;
+  string delete_tag_list;
   string trusted_certs;
   if (args.find('d') != args.end()) {
-    delete_tag = *args.find('d')->second;
+    delete_tag_list = *args.find('d')->second;
   }
   if (args.find('h') != args.end()) {
     tag_hash = shash::MkFromHexPtr(shash::HexPtr(*args.find('h')->second));
@@ -201,9 +201,13 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   }
 
   // Add / Remove tag to history database
-  if (delete_tag != "") {
-    LogCvmfs(kLogHistory, kLogStdout, "Removing tag %s", delete_tag.c_str());
-    tag_list.Remove(delete_tag);
+  if (delete_tag_list != "") {
+    vector<string> delete_tags = SplitString(delete_tag_list, ' ');
+    for (unsigned i = 0; i < delete_tags.size(); ++i) {
+      string this_tag = delete_tags[i];
+      LogCvmfs(kLogHistory, kLogStdout, "Removing tag %s", this_tag.c_str());
+      tag_list.Remove(this_tag);
+    }
   }
   if (new_tag.name != "") {
     if (tag_hash != trunk_hash) {

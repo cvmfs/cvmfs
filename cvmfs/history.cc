@@ -323,6 +323,19 @@ bool TagList::FindTag(const string &name, Tag *tag) {
 }
 
 
+bool TagList::FindTagByDate(const time_t seconds_utc, Tag *tag) {
+  assert(tag);
+  bool result = false;
+  for (unsigned i = 0; i < list_.size(); ++i) {
+    if (list_[i].timestamp > seconds_utc)
+      break;
+    *tag = list_[i];
+    result = true;
+  }
+  return result;
+}
+
+
 bool TagList::FindRevision(const unsigned revision, Tag *tag) {
   assert(tag);
   for (unsigned i = 0; i < list_.size(); ++i) {
