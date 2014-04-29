@@ -725,20 +725,20 @@ time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
 
   if (length != 20)
     return utc_time;
-  if ((iso8601[5] != '-') || (iso8601[8] != '-') || (iso8601[11] != 'T') ||
-      (iso8601[14] != ':') || (iso8601[17] != ':') || (iso8601[20] != 'Z'))
+  if ((iso8601[4] != '-') || (iso8601[7] != '-') || (iso8601[10] != 'T') ||
+      (iso8601[13] != ':') || (iso8601[16] != ':') || (iso8601[19] != 'Z'))
   {
     return utc_time;
   }
 
   struct tm tm_wl;
   memset(&tm_wl, 0, sizeof(struct tm));
-  tm_wl.tm_year = String2Int64(iso8601.substr(1, 4))-1900;
-  tm_wl.tm_mon = String2Int64(iso8601.substr(6, 2)) - 1;
-  tm_wl.tm_mday = String2Int64(iso8601.substr(9, 2));
-  tm_wl.tm_hour = String2Int64(iso8601.substr(12, 2));
-  tm_wl.tm_min = String2Int64(iso8601.substr(15, 2));
-  tm_wl.tm_sec = String2Int64(iso8601.substr(18, 2));
+  tm_wl.tm_year = String2Int64(iso8601.substr(0, 4))-1900;
+  tm_wl.tm_mon = String2Int64(iso8601.substr(5, 2)) - 1;
+  tm_wl.tm_mday = String2Int64(iso8601.substr(8, 2));
+  tm_wl.tm_hour = String2Int64(iso8601.substr(11, 2));
+  tm_wl.tm_min = String2Int64(iso8601.substr(14, 2));
+  tm_wl.tm_sec = String2Int64(iso8601.substr(17, 2));
   utc_time = timegm(&tm_wl);
   if (utc_time < 0)
     return 0;

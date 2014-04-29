@@ -2241,9 +2241,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   cvmfs::catalog_manager_->SetOwnerMaps(uid_map, gid_map);
 
-  // Load specific tag (root hash has precedence)
-  if ((root_hash == "") && 
-      ((*cvmfs::repository_tag_ != "") || (repository_date != ""))) 
+  // Load specific tag (root hash has precedence, then repository_tag)
+  if ((root_hash == "") &&
+      ((*cvmfs::repository_tag_ != "") || (repository_date != "")))
   {
     manifest::ManifestEnsemble ensemble;
     retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,
@@ -2279,10 +2279,29 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailHistory;
     }
     history::Tag tag;
-    retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
-    if (!retval) {
-      *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
-      return loader::kFailHistory;
+    if (*cvmfs::repository_tag_ == "") {
+      time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
+      if (repository_utctime == 0) {
+        *g_boot_error = "invalid timestamp in CVMFS_REPOSITORY_DATE: " +
+                        repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
+        return loader::kFailHistory;
+      }
+      retval = tag_list.FindTagByDate(repository_utctime, &tag);
+      if (!retval) {
+        *g_boot_error = "no repository state as early as utc timestamp " +
+                        StringifyTime(repository_utctime, true);
+        return loader::kFailHistory;
+      }
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "time stamp %s UTC resolved to tag '%s'",
+               StringifyTime(repository_utctime, true).c_str(),
+               tag.name.c_str());
+    } else {
+      retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
+      if (!retval) {
+        *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
+        return loader::kFailHistory;
+      }
     }
     root_hash = tag.root_hash.ToString();
   }

@@ -6,6 +6,7 @@
 #define CVMFS_HISTORY_H_
 
 #include <stdint.h>
+#include <time.h>
 
 #include <string>
 #include <vector>
@@ -131,6 +132,7 @@ class TagList {
   };
 
   bool FindTag(const std::string &name, Tag *tag);
+  bool FindTagByDate(const time_t seconds_utc, Tag *tag);
   bool FindRevision(const unsigned revision, Tag *tag);
   bool FindHash(const shash::Any &hash, Tag *tag);
   Failures Insert(const Tag &tag);
