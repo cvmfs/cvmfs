@@ -31,7 +31,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
   start_transaction $CVMFS_TEST_REPO || return $?
   publish_repo $CVMFS_TEST_REPO || return $?
-  sudo cvmfs_server lstags $CVMFS_TEST_REPO || return $?
+  sudo cvmfs_server list-tags $CVMFS_TEST_REPO || return $?
 
   local conf="${scratch_dir}/test.conf"
   local cachedir="${scratch_dir}/cache"
