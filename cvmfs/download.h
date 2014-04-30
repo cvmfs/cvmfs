@@ -138,6 +138,7 @@ struct JobInfo {
     headers = NULL;
     memset(&zstream, 0, sizeof(zstream));
     info_header = NULL;
+    crc32 = 0;
     wait_at[0] = wait_at[1] = -1;
     nocache = false;
     error_code = kFailOther;
