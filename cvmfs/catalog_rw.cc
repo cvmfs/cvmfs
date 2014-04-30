@@ -668,10 +668,10 @@ void WritableCatalog::VacuumDatabaseIfNecessary() {
   double      ratio                 = 0.0;
   std::string reason;
 
-  if ((ratio = db.GetFreePageRatio()) > maximal_free_page_ratio) {
+  if ((ratio = db.GetFreePageRatio()) > kMaximalFreePageRatio) {
     needs_defragmentation = true;
     reason                = "free pages";
-  } else if ((ratio = db.GetRowIdWasteRatio()) > maximal_row_id_waste_ratio) {
+  } else if ((ratio = db.GetRowIdWasteRatio()) > kMaximalRowIdWasteRatio) {
     needs_defragmentation = true;
     reason                = "wasted row IDs";
   }
