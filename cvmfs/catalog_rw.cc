@@ -663,16 +663,26 @@ void WritableCatalog::UpdateCounters() {
  * if necessary
  */
 void WritableCatalog::VacuumDatabaseIfNecessary() {
-  double page_ratio = database().GetFreePageRatio();
+  const Database &db = database();
+  bool        needs_defragmentation = false;
+  double      ratio                 = 0.0;
+  std::string reason;
 
-  if (page_ratio > maximal_free_page_ratio) {
+  if ((ratio = db.GetFreePageRatio()) > maximal_free_page_ratio) {
+    needs_defragmentation = true;
+    reason                = "free pages";
+  } else if ((ratio = db.GetRowIdWasteRatio()) > maximal_row_id_waste_ratio) {
+    needs_defragmentation = true;
+    reason                = "wasted row IDs";
+  }
+
+  if (needs_defragmentation) {
     LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
-             "Note: catalog at %s gets defragmented (%.2f%% free pages)... ",
-             (IsRoot()) ? "/" : path().c_str(), page_ratio * 100.0);
-
-    if (! database().Vacuum()) {
+             "Note: Catalog at %s gets defragmented (%.2f%% %s)... ",
+             (IsRoot()) ? "/" : path().c_str(), ratio * 100.0, reason.c_str());
+    if (! db.Vacuum()) {
       LogCvmfs(kLogCatalog, kLogStderr, "failed (SQLite: %s)",
-               database().GetLastErrorMsg().c_str());
+               db.GetLastErrorMsg().c_str());
       assert (false);
     }
     LogCvmfs(kLogCatalog, kLogStdout, "done");

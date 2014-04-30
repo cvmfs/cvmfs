@@ -35,7 +35,8 @@ class WritableCatalog : public Catalog {
   friend class swissknife::CommandMigrate; // needed for catalog migrations
 
  protected:
-  const static double maximal_free_page_ratio = 0.20;
+  const static double maximal_free_page_ratio    = 0.20;
+  const static double maximal_row_id_waste_ratio = 0.25;
 
  public:
   WritableCatalog(const std::string &path,
