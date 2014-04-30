@@ -779,6 +779,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating snapshot of catalog '%s'",
            catalog->path().c_str());
 
+  catalog->Transaction();
   catalog->UpdateCounters();
   if (catalog->parent()) {
     catalog->delta_counters_.PopulateToParent(
@@ -801,6 +802,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
     assert (retval);
     catalog->SetPreviousRevision(hash_previous);
   }
+  catalog->Commit();
 
   uint64_t catalog_size = GetFileSize(catalog->database_path());
   assert(catalog_size > 0);

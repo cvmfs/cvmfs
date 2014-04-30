@@ -242,6 +242,13 @@ bool Database::Create(const string &filename,
     return false;
   }
 
+  // start initial filling transaction
+  retval = Sql(database, "BEGIN;").Execute();
+  if (!retval) {
+    SqlError("failed to enter initial filling transaction", database);
+    return false;
+  }
+
   // insert initial values to properties
   Sql insert_initial_properties(database,
     "INSERT INTO properties (key, value) "
@@ -306,6 +313,13 @@ bool Database::Create(const string &filename,
                database);
       return false;
     }
+  }
+
+  // commit initial filling transaction
+  retval = Sql(database, "COMMIT;").Execute();
+  if (!retval) {
+    SqlError("failed to commit initial filling transaction", database);
+    return false;
   }
 
   return true;
