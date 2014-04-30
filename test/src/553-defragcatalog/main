@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Defragment After Nested Catalog Extraction"
+cvmfs_test_name="Defragment due to Free Database Pages"
 cvmfs_test_autofs_on_startup=false
 
 get_catalog_file_size() {
@@ -63,7 +63,7 @@ cvmfs_run_test() {
   touch ${repo_dir}/foo/.cvmfscatalog
 
   echo "create next revision (again expecting defragmentations)"
-  [ $(publish_repo $CVMFS_TEST_REPO | grep 'gets defragmented' | wc -l) -eq 2 ] || return 14
+  [ $(publish_repo $CVMFS_TEST_REPO | grep 'gets defragmented.*free pages' | wc -l) -eq 2 ] || return 14
 
   echo "check sizes of catalogs (including safety margin)"
   local third_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
@@ -82,7 +82,7 @@ cvmfs_run_test() {
   cp /bin/* ${repo_dir}/foo
 
   echo "publish last revision (addition should not trigger defragmentation)"
-  [ $(publish_repo $CVMFS_TEST_REPO | grep 'gets defragmented' | wc -l) -eq 0 ] || return 18
+  [ $(publish_repo $CVMFS_TEST_REPO | grep -e 'gets defragmented.*free pages' | wc -l) -eq 0 ] || return 18
 
   return 0
 }
