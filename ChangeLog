@@ -1,5 +1,5 @@
 2.1.20:
-  * Compact deflated catalogs on publish
+  * Compact inflated catalogs on publish
   * Add 'letter' command to cvmfs_swissknife
   * Use sqlite 3.8.4.3
   * Use libcurl 7.36
