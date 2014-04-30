@@ -49,4 +49,5 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --without-libidn \
   --without-winidn \
   --without-librtmp \
+  --without-nghttp2 \
   --disable-verbose
