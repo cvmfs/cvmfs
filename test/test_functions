@@ -415,7 +415,7 @@ create_filled_repo() {
 # @param  repo_dir   where to put the dummy dirents
 make_huge_repo() {
   local repo_dir=$1
-  python ${TEST_ROOT}/mock_services/make_repo.py \
+  python ${TEST_ROOT}/common/mock_services/make_repo.py \
     --max-dir-depth        7                     \
     --num-subdirs          5                     \
     --num-files-per-dir    5                     \
@@ -583,7 +583,7 @@ open_silent_port() {
   local cmd
   local retcode
 
-  cmd="sudo python ${TEST_ROOT}/mock_services/silent_socket.py $protocol $port"
+  cmd="sudo python ${TEST_ROOT}/common/mock_services/silent_socket.py $protocol $port"
   pid=$(run_background_service $logfile "$cmd")
   retcode=$?
 
