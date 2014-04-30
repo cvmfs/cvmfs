@@ -1,12 +1,13 @@
 2.1.20:
-  * sqlite 3.8.4.3
-  * libcurl 7.36
-  * leveldb 1.15
+  * Add 'letter' command to cvmfs_swissknife
+  * Use sqlite 3.8.4.3
+  * Use libcurl 7.36
+  * Use leveldb 1.15
   * Rename cvmfs_server lstags command to list-tags
   * Add extended attribute user.tag
   * Add CVMFS_REPOSITORY_DATE client parameter
   * Enable default auto tagging (CVMFS_AUTO_TAG)
-  * Add list-catalogs command to cvmfs_server
+  * Add 'list-catalogs' command to cvmfs_server
 
 2.1.19:
   * Suppress confusing lsof output in cvmfs_server (CVM-624)
