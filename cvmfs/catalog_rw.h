@@ -34,6 +34,9 @@ class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
   friend class swissknife::CommandMigrate; // needed for catalog migrations
 
+ protected:
+  const static double maximal_free_page_ratio = 0.20;
+
  public:
   WritableCatalog(const std::string &path,
                   const shash::Any  &catalog_hash,
@@ -148,6 +151,7 @@ class WritableCatalog : public Catalog {
   void CopyCatalogsToParent();
 
   void UpdateCounters();
+  void VacuumDatabaseIfNecessary();
 };  // class WritableCatalog
 
 typedef std::vector<WritableCatalog *> WritableCatalogList;

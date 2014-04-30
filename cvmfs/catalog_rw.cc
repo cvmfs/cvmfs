@@ -657,4 +657,26 @@ void WritableCatalog::UpdateCounters() {
   assert (retval);
 }
 
+
+/**
+ * Checks if the database of this catalogs needs cleanup and defragments it
+ * if necessary
+ */
+void WritableCatalog::VacuumDatabaseIfNecessary() {
+  double page_ratio = database().GetFreePageRatio();
+
+  if (page_ratio > maximal_free_page_ratio) {
+    LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
+             "Note: catalog at %s gets defragmented (%.2f%% free pages)... ",
+             (IsRoot()) ? "/" : path().c_str(), page_ratio * 100.0);
+
+    if (! database().Vacuum()) {
+      LogCvmfs(kLogCatalog, kLogStderr, "failed (SQLite: %s)",
+               database().GetLastErrorMsg().c_str());
+      assert (false);
+    }
+    LogCvmfs(kLogCatalog, kLogStdout, "done");
+  }
+}
+
 }  // namespace catalog
