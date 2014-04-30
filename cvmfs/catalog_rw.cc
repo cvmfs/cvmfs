@@ -59,6 +59,8 @@ WritableCatalog::~WritableCatalog() {
 
 void WritableCatalog::Transaction() {
   Sql transaction(database(), "BEGIN;");
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "opening SQLite transaction for '%s'",
+                                        path().c_str());
   bool retval = transaction.Execute();
   assert(retval == true);
 }
@@ -66,6 +68,8 @@ void WritableCatalog::Transaction() {
 
 void WritableCatalog::Commit() {
   Sql commit(database(), "COMMIT;");
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "closing SQLite transaction for '%s'",
+                                        path().c_str());
   bool retval = commit.Execute();
   assert(retval == true);
   dirty_ = false;
