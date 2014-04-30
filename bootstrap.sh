@@ -94,6 +94,7 @@ do_extract  "googletest"  "gtest-${GOOGLETEST_VERSION}.tar.gz"
 do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 
 do_copy     "sqlite3"
+do_copy     "crc32"
 do_copy     "vjson"
 
 patch_external "leveldb"     "dont_search_snappy.patch"           \
