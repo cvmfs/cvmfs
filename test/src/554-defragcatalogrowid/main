@@ -1,0 +1,71 @@
+
+cvmfs_test_name="Defragment due to Wasted Row IDs"
+cvmfs_test_autofs_on_startup=false
+
+get_catalog_file_size() {
+  local repo_name="$1"
+  local catalog_path="$2"
+
+  cvmfs_server list-catalogs -ms $repo_name | grep -e "^.*\s$catalog_path$" | sed 's/^\([0-9]*\)B\s.*$/\1/'
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create test repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "start transactions to create huge root catalog (in steps)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "create a synthetically huge root catalog"
+  mkdir ${repo_dir}/foo || return 1
+  mkdir ${repo_dir}/bar || return 2
+  mkdir ${repo_dir}/baz || return 3
+  mkdir ${repo_dir}/mop || return 4
+  mkdir ${repo_dir}/pom || return 5
+
+  echo "publish directory structure first"
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 6
+
+  echo "second transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 7
+  cp /bin/* ${repo_dir}/foo                 || return 8
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 9
+
+  echo "third transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 10
+  cp /bin/* ${repo_dir}/bar                 || return 11
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 12
+
+  echo "fourth transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 13
+  cp /bin/* ${repo_dir}/baz                 || return 14
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 15
+
+  echo "find the file size of the root catalog"
+  local initial_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
+  echo "Catalog Size: $initial_root_size"
+
+  echo "start next transaction to edit root catalog"
+  start_transaction $CVMFS_TEST_REPO || return 16
+
+  echo "remove files from /bar and /foo and add files to /mop"
+  cp /bin/* ${repo_dir}/mop || return 17
+  cp /bin/* ${repo_dir}/pom || return 18
+  rm -fR ${repo_dir}/bar    || return 19
+  rm -fR ${repo_dir}/foo    || return 20
+
+  echo "publish repository (should trigger root catalog defragmatation)"
+  publish_repo $CVMFS_TEST_REPO | grep -e '/ gets defragmented.*wasted row' || return 21
+
+  echo "check if root catalog is approximately the same size than before"
+  local second_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
+  local absdiff=$(( $second_root_size - $initial_root_size ))
+  echo "Catalog Size: $second_root_size"
+  [ $absdiff -lt 10240 ] || [ $absdiff -gt -10240 ] || return 22
+
+  return 0
+}
