@@ -62,12 +62,12 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CERNVM_GRID_UI_VERSION CVMFS_SYSLOG_LEVEL CVMFS_SYSLOG_FACILITY CVMFS_TRACEFILE \
           CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_PUBLIC_KEY CVMFS_KEYS_DIR \
           CVMFS_MAX_TTL CVMFS_RELOAD_SOCKETS CVMFS_DEFAULT_DOMAIN \
-          CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORIES \
+          CVMFS_MEMCACHE_SIZE CVMFS_KCACHE_TIMEOUT CVMFS_ROOT_HASH CVMFS_REPOSITORY_TAG CVMFS_REPOSITORY_DATE CVMFS_REPOSITORIES \
           CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX \
           CVMFS_ALIEN_CACHE CVMFS_TRUSTED_CERTS CVMFS_INITIAL_GENERATION"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
-          CVMFS_MOUNT_RW"
+          CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER"
 required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_RELOAD_SOCKETS \
                CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
@@ -376,6 +376,7 @@ cvmfs_chksetup() {
 
       # Check readability of config files
       for config_file in /etc/cvmfs/default.conf /etc/cvmfs/default.local \
+                         /etc/cvmfs/default.d/*.conf \
                          /etc/cvmfs/domain.d/*.conf /etc/cvmfs/domain.d/*.local \
                          /etc/cvmfs/config.d/*.conf /etc/cvmfs/config.d/*.local
       do
@@ -976,8 +977,13 @@ cvmfs_bugreport() {
   mkdir bugreport
   cd bugreport
 
-  [ -f /etc/cvmfs/default.conf ] && . /etc/cvmfs/default.conf
-  [ -f /etc/cvmfs/default.local ] && . /etc/cvmfs/default.local
+  dist_default="/etc/cvmfs/default.d/*.conf"
+  for file in /etc/cvmfs/default.conf $dist_default /etc/cvmfs/default.local
+  do
+    if [ -f $file ]; then
+      . $file
+    fi
+  done
 
   echo "Gathering /etc/cvmfs"
   mkdir etc
@@ -1046,7 +1052,7 @@ cvmfs_bugreport() {
    echo
    echo "System information has been collected in ${tmpdir}/cvmfs-bugreport.tar.gz"
    echo "Please attach this file to your problem description and send it as a"
-   echo "Savannah bug report to https://savannah.cern.ch/projects/cernvm"
+   echo "JIRA bug report to https://sft.its.cern.ch/jira/browse/CVM"
 }
 
 

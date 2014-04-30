@@ -6,6 +6,7 @@
 #define CVMFS_UPLOAD_SPOOLER_DEFINITION_
 
 #include <string>
+#include "hash.h"
 
 namespace upload {
 
@@ -33,6 +34,7 @@ struct SpoolerDefinition {
    *                            preted by the constructor
    */
   explicit SpoolerDefinition(const std::string  &definition_string,
+                             const shash::Algorithms hash_algorithm,
                              const bool          use_file_chunking   = false,
                              const size_t        min_file_chunk_size = 0,
                              const size_t        avg_file_chunk_size = 0,
@@ -44,10 +46,11 @@ struct SpoolerDefinition {
   std::string spooler_configuration; //!< a driver specific spooler
                                      //!<  configuration string
                                      //!<  (interpreted by the concrete spooler)
-  bool        use_file_chunking;
-  size_t      min_file_chunk_size;
-  size_t      avg_file_chunk_size;
-  size_t      max_file_chunk_size;
+  shash::Algorithms  hash_algorithm;
+  bool               use_file_chunking;
+  size_t             min_file_chunk_size;
+  size_t             avg_file_chunk_size;
+  size_t             max_file_chunk_size;
 
   bool valid_;
 };

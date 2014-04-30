@@ -17,7 +17,7 @@ class AbstractFile {
     path_(path), size_(size) {}
 
   const std::string& path() const { return path_; }
-  const size_t       size() const { return size_; }
+        size_t       size() const { return size_; }
 
  private:
   const std::string  path_;
@@ -30,8 +30,9 @@ class AbstractFileScrubbingTask : public tbb::task {
  public:
   AbstractFileScrubbingTask(FileT           *file,
                             CharBuffer      *buffer,
-                            const bool       is_last_piece) :
-    file_(file), buffer_(buffer), reader_(NULL), is_last_(is_last_piece),
+                            const bool       is_last_piece,
+                            AbstractReader  *reader = NULL) :
+    file_(file), buffer_(buffer), reader_(reader), is_last_(is_last_piece),
     next_(NULL) {}
 
         FileT*      file()         { return file_;    }
@@ -44,10 +45,6 @@ class AbstractFileScrubbingTask : public tbb::task {
   void SetNext(tbb::task *next) {
     next->increment_ref_count();
     next_ = next;
-  }
-
-  void SetReader(AbstractReader *reader) {
-    reader_ = reader;
   }
 
  protected:

@@ -2,11 +2,41 @@
  * This file is part of the CernVM File System.
  */
 
+#include "../logging.h"
+#include <cerrno>
 
 namespace upload { // TODO: remove this... wrong namespace (for testing)
 
+
+template <class FileScrubbingTaskT, class FileT>
+bool Reader<FileScrubbingTaskT, FileT>::Initialize() {
+  // TODO: exactly the same Initialize()/TearDown() concept is implemented
+  //       in AbstractUploader. It might be worth to facter out that code into
+  //       an extra template that handles clean thread creation/destruction
+  //       and perhaps the connection of the thread using a tbb::[...]queue
+  tbb::tbb_thread thread(&ThreadProxy<Reader>,
+                          this,
+                         &Reader<FileScrubbingTaskT, FileT>::ReadThread);
+
+  assert (! read_thread_.joinable());
+  read_thread_ = thread;
+  assert (read_thread_.joinable());
+  assert (! thread.joinable());
+
+  // wait for the thread to call back...
+  const bool successful_startup = thread_started_executing_.Get();
+  if (successful_startup) {
+    running_ = true;
+  }
+
+  return successful_startup;
+}
+
+
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::ReadThread() {
+  thread_started_executing_.Set(true);
+
   while (HasData()) {
     // acquire a new job from the job queue:
     // -> if the queue is empty, just continue on the work currently in flight
@@ -62,6 +92,11 @@ bool Reader<FileScrubbingTaskT, FileT>::TryToAcquireNewJob(FileJob &next_job) {
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
   const int fd = open(file->path().c_str(), O_RDONLY, 0);
+  if (fd < 0 && errno == EMFILE) {
+    LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to a lack of file"
+                                      "descriptors! Please increase this limit. "
+                                      "(see ulimit -n)");
+  }
   assert (fd > 0);
 
   OpenFile open_file;
@@ -167,8 +202,8 @@ bool Reader<FileScrubbingTaskT, FileT>::
   FileScrubbingTaskT *new_task =
     new(tbb::task::allocate_root()) FileScrubbingTaskT(open_file.file,
                                                        buffer,
-                                                       finished_reading);
-  new_task->SetReader(this);
+                                                       finished_reading,
+                                                       this);
   new_task->increment_ref_count();
   tbb::task *sync_task = new(new_task->allocate_child()) tbb::empty_task();
 

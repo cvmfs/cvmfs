@@ -37,7 +37,7 @@ class Catalog;
 
 /**
  * Content-addressable chunks can be entire files, micro catalogs (ending L) or
- * pieces of large files
+ * pieces of large files (ending P)
  */
 enum ChunkTypes {
   kChunkFile = 0,
@@ -66,6 +66,7 @@ class Database {
   ~Database();
   static bool Create(const std::string &filename,
                      const std::string &root_path,
+                     const bool volatile_content,
                      const DirectoryEntry &root_entry
                                              = DirectoryEntry(kDirentNegative));
 
@@ -127,24 +128,26 @@ class Sql : public sqlite::Sql {
   }
 
   /**
-   * Wrapper for retrieving a SHA1 hash from a blob field.
+   * Wrapper for retrieving a cryptographic hash from a blob field.
    */
-  inline shash::Any RetrieveSha1Blob(const int idx_column) const {
+  inline shash::Any RetrieveHashBlob(const int idx_column,
+                                     const shash::Algorithms hash_algo) const
+  {
     if (RetrieveBytes(idx_column) > 0) {
-      return shash::Any(shash::kSha1,
+      return shash::Any(hash_algo,
         static_cast<const unsigned char *>(RetrieveBlob(idx_column)),
         RetrieveBytes(idx_column));
     }
-    return shash::Any(shash::kSha1);
+    return shash::Any(hash_algo);
   }
 
   /**
-   * Wrapper for retrieving a SHA1 hash from a text field.
+   * Wrapper for retrieving a cryptographic hash from a text field.
    */
-  inline shash::Any RetrieveSha1Hex(const int idx_column) const {
+  inline shash::Any RetrieveHashHex(const int idx_column) const {
     const std::string hash_string = std::string(
       reinterpret_cast<const char *>(RetrieveText(idx_column)));
-    return shash::Any(shash::kSha1, shash::HexPtr(hash_string));
+    return shash::MkFromHexPtr(shash::HexPtr(hash_string));
   }
 
   /**
@@ -164,12 +167,13 @@ class Sql : public sqlite::Sql {
   }
 
   /**
-   * Wrapper for binding a SHA1 hash.
+   * Wrapper for binding a cryptographic hash.  Algorithm of hash has to be
+   * elsewhere (in flags).
    * @param idx_column offset of the blob field in database query
    * @param hash the hash to bind in the query
    * @result true on success, false otherwise
    */
-  inline bool BindSha1Blob(const int idx_column, const shash::Any &hash) {
+  inline bool BindHashBlob(const int idx_column, const shash::Any &hash) {
     if (hash.IsNull()) {
       return BindNull(idx_column);
     } else {
@@ -202,14 +206,23 @@ class SqlDirent : public Sql {
   const static int kFlagFileStat            = 16;  // currently unused
   const static int kFlagFileChunk           = 64;
 
+  // as of 2^8: 3 bit for hashes
+  // 0: SHA-1
+  // 1: RIPEMD-160
+  // ... corresponds to shash::algorithms with offset in order to support
+  // future hashes
+  const static int kFlagPosHash             = 8;
+
  protected:
   /**
    *  take the meta data from the DirectoryEntry and transform it
-   *  into a valid flags field ready to be safed in the database
+   *  into a valid flags field ready to be saved in the database
    *  @param entry the DirectoryEntry to encode
    *  @return an integer containing the bitmap of the flags field
    */
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
+  void StoreHashAlgorithm(const shash::Algorithms algo, unsigned *flags) const;
+  shash::Algorithms RetrieveHashAlgorithm(const unsigned flags) const;
 
   /**
    * The hardlink information (hardlink group ID and linkcount) is saved in one
@@ -442,7 +455,7 @@ class SqlChunksListing : public Sql {
  public:
   SqlChunksListing(const Database &database);
   bool BindPathHash(const shash::Md5 &hash);
-  FileChunk GetFileChunk() const;
+  FileChunk GetFileChunk(const shash::Algorithms interpret_hash_as) const;
 };
 
 

@@ -34,6 +34,8 @@ bool Cleanup(const uint64_t leave_size);
 
 void Insert(const shash::Any &hash, const uint64_t size,
             const std::string &cmvfs_path);
+void InsertVolatile(const shash::Any &hash, const uint64_t size,
+                    const std::string &cmvfs_path);
 bool Pin(const shash::Any &hash, const uint64_t size,
          const std::string &path_on_cvmfs, const bool is_catalog);
 void Unpin(const shash::Any &hash);

@@ -107,6 +107,7 @@ class DirectoryEntryBase {
 
   inline shash::Any checksum() const            { return checksum_; }
   inline const shash::Any *checksum_ptr() const { return &checksum_; }
+  inline shash::Algorithms hash_algorithm() const { return checksum_.algorithm; }
 
   inline uint64_t size() const {
     return (IsLink()) ? symlink().GetLength() : size_;
@@ -213,26 +214,31 @@ class DirectoryEntry : public DirectoryEntryBase {
    */
   inline explicit DirectoryEntry(const DirectoryEntryBase& base) :
     DirectoryEntryBase(base),
-    catalog_(NULL),
     cached_mtime_(0),
     hardlink_group_(0),
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false),
-    is_chunked_file_(false) {}
+    is_chunked_file_(false),
+    is_negative_(false) {}
 
   inline DirectoryEntry() :
-    catalog_(NULL),
     cached_mtime_(0),
     hardlink_group_(0),
     is_nested_catalog_root_(false),
     is_nested_catalog_mountpoint_(false),
-    is_chunked_file_(false) {}
+    is_chunked_file_(false),
+    is_negative_(false) {}
 
   inline explicit DirectoryEntry(SpecialDirents special_type) :
-    catalog_((Catalog *)(-1)) { };
+    cached_mtime_(0),
+    hardlink_group_(0),
+    is_nested_catalog_root_(false),
+    is_nested_catalog_mountpoint_(false),
+    is_chunked_file_(false),
+    is_negative_(true) { assert(special_type == kDirentNegative); };
 
   inline SpecialDirents GetSpecial() const {
-    return (catalog_ == (Catalog *)(-1)) ? kDirentNegative : kDirentNormal;
+    return is_negative_ ? kDirentNegative : kDirentNormal;
   }
 
   Differences CompareTo(const DirectoryEntry &other) const;
@@ -243,7 +249,7 @@ class DirectoryEntry : public DirectoryEntryBase {
     return !(*this == other);
   }
 
-  inline bool IsNegative() const { return GetSpecial() == kDirentNegative; }
+  inline bool IsNegative() const { return is_negative_; }
 
   inline bool IsNestedCatalogRoot() const { return is_nested_catalog_root_; }
   inline bool IsNestedCatalogMountpoint() const {
@@ -251,7 +257,6 @@ class DirectoryEntry : public DirectoryEntryBase {
   }
   inline bool IsChunkedFile() const { return is_chunked_file_; }
 
-  inline const Catalog *catalog() const  { return catalog_; }
   inline uint32_t hardlink_group() const { return hardlink_group_; }
   inline time_t cached_mtime() const     { return cached_mtime_; }
 
@@ -269,10 +274,7 @@ class DirectoryEntry : public DirectoryEntryBase {
     is_chunked_file_ = val;
   }
 
-private:
-  // Associated cvmfs catalog
-  Catalog* catalog_;
-
+ private:
   time_t cached_mtime_;  /**< can be compared to mtime to figure out if caches
                               need to be invalidated (file has changed) */
 
@@ -284,6 +286,7 @@ private:
   bool is_nested_catalog_root_;
   bool is_nested_catalog_mountpoint_;
   bool is_chunked_file_;
+  bool is_negative_;
 };
 
 /**

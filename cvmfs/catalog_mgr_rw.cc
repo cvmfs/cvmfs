@@ -33,17 +33,19 @@ WritableCatalogManager::WritableCatalogManager(
   const std::string         &stratum0,
   const string              &dir_temp,
   upload::Spooler           *spooler,
-  download::DownloadManager *download_manager)
+  download::DownloadManager *download_manager,
+  const uint64_t             catalog_entry_warn_threshold) :
+    base_hash_(base_hash),
+    stratum0_(stratum0),
+    dir_temp_(dir_temp),
+    spooler_(spooler),
+    download_manager_(download_manager),
+    catalog_entry_warn_threshold_(catalog_entry_warn_threshold)
 {
   sync_lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(sync_lock_, NULL);
   assert(retval == 0);
-  base_hash_ = base_hash;
-  stratum0_ = stratum0;
-  dir_temp_ = dir_temp;
-  spooler_ = spooler;
-  download_manager_ = download_manager;
   Init();
 }
 
@@ -90,7 +92,8 @@ LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
 
   if (retval != download::kFailOk) {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "failed to load %s from Stratum 0 (%d)", url.c_str(), retval);
+             "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
+             retval, download::Code2Ascii(retval));
     assert(false);
   }
 
@@ -126,10 +129,13 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
  */
 manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string     &dir_temp,
+  const bool volatile_content,
   upload::Spooler  *spooler)
 {
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
+
+  shash::Algorithms hash_algorithm = spooler->GetHashAlgorithm();
 
   // A newly created catalog always needs a root entry
   // we create and configure this here
@@ -141,12 +147,12 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   root_entry.mtime_             = time(NULL);
   root_entry.uid_               = getuid();
   root_entry.gid_               = getgid();
-  root_entry.checksum_          = shash::Any(shash::kSha1);
+  root_entry.checksum_          = shash::Any(hash_algorithm);
   root_entry.linkcount_         = 2;
   string root_path = "";
 
   // Create the database schema and the inital root entry
-  if (!Database::Create(file_path, root_path, root_entry)) {
+  if (!Database::Create(file_path, root_path, volatile_content, root_entry)) {
     LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
              file_path.c_str());
     return NULL;
@@ -159,7 +165,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
     return NULL;
   }
   string file_path_compressed = file_path + ".compressed";
-  shash::Any hash_catalog(shash::kSha1);
+  shash::Any hash_catalog(hash_algorithm);
   bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
                                         &hash_catalog);
   if (!retval) {
@@ -179,7 +185,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   spooler->Upload(file_path_compressed,
                   "data" + hash_catalog.MakePath(1, 2) + "C");
   spooler->WaitForUpload();
-  spooler->WaitForTermination();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to commit catalog %s",
@@ -555,8 +560,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Get the DirectoryEntry for the given path, this will serve as root
   // entry for the nested catalog we are about to create
   DirectoryEntry new_root_entry;
-  bool retval = old_catalog->LookupPath(PathString(nested_root_path.data(),
-                                        nested_root_path.length()),
+  bool retval = old_catalog->LookupPath(PathString(nested_root_path),
                                         &new_root_entry);
   assert(retval);
 
@@ -564,15 +568,15 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // for the new nested catalog
   const string database_file_path = CreateTempPath(dir_temp_ + "/catalog",
                                                    0666);
+  const bool volatile_content = false;
   retval =
-    Database::Create(database_file_path, nested_root_path, new_root_entry);
+    Database::Create(database_file_path, nested_root_path, volatile_content,
+                     new_root_entry);
   assert(retval);
 
   // Attach the just created nested catalog
   Catalog *new_catalog =
-    CreateCatalog(PathString(nested_root_path.data(), nested_root_path.length()),
-                  shash::Any(),
-                  old_catalog);
+    CreateCatalog(PathString(nested_root_path), shash::Any(), old_catalog);
   retval = AttachCatalog(database_file_path, new_catalog);
   assert(retval);
 
@@ -587,15 +591,16 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Add the newly created nested catalog to the references of the containing
   // catalog
   old_catalog->InsertNestedCatalog(new_catalog->path().ToString(), NULL,
-                                   shash::Any(shash::kSha1), 0);
+                                   shash::Any(spooler_->GetHashAlgorithm()), 0);
 
   // Fix subtree counters in new nested catalogs: subtree is the sum of all
   // entries of all "grand-nested" catalogs
-  Catalog::NestedCatalogList *grand_nested =
+  // Note: taking a copy of the nested catalog list here
+  const Catalog::NestedCatalogList &grand_nested =
     wr_new_catalog->ListNestedCatalogs();
   DeltaCounters fix_subtree_counters;
-  for (Catalog::NestedCatalogList::const_iterator i = grand_nested->begin(),
-       iEnd = grand_nested->end(); i != iEnd; ++i)
+  for (Catalog::NestedCatalogList::const_iterator i = grand_nested.begin(),
+       iEnd = grand_nested.end(); i != iEnd; ++i)
   {
     WritableCatalog *grand_catalog;
     retval = FindCatalog(i->path.ToString(), &grand_catalog);
@@ -698,6 +703,16 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
       getchar();
     }
     shash::Any hash = SnapshotCatalog(*i);
+
+    if ((*i)->GetCounters().GetSelfEntries() > catalog_entry_warn_threshold_) {
+      LogCvmfs(kLogCatalog, kLogStdout, "WARNING: catalog at %s has more than "
+                                        "%d entries (%d). Please consider to "
+                                        "split it into nested catalogs.",
+                                        ((*i)->IsRoot()) ? "/" : (*i)->path().c_str(),
+                                        catalog_entry_warn_threshold_,
+                                        (*i)->GetCounters().GetSelfEntries());
+    }
+
     if ((*i)->IsRoot()) {
       base_hash_ = hash;
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
@@ -764,6 +779,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating snapshot of catalog '%s'",
            catalog->path().c_str());
 
+  catalog->Transaction();
   catalog->UpdateCounters();
   if (catalog->parent()) {
     catalog->delta_counters_.PopulateToParent(
@@ -786,12 +802,13 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
     assert (retval);
     catalog->SetPreviousRevision(hash_previous);
   }
+  catalog->Commit();
 
   uint64_t catalog_size = GetFileSize(catalog->database_path());
   assert(catalog_size > 0);
 
   // Compress catalog
-  shash::Any hash_catalog(shash::kSha1);
+  shash::Any hash_catalog(spooler_->GetHashAlgorithm());
   if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_catalog))
@@ -804,7 +821,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   spooler_->Upload(catalog->database_path() + ".compressed",
                    "data" + hash_catalog.MakePath(1, 2) + "C");
 
-  // Update registered catalog SHA1 in nested catalog
+  // Update registered catalog hash in nested catalog
   if (!catalog->IsRoot()) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
     WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());

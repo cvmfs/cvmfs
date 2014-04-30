@@ -28,7 +28,7 @@ guess_package_url() {
 
   # SLC 5 and 6
   elif [ x$(lsb_release --id --short 2>/dev/null) = x"ScientificCERNSLC" ]; then
-    local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9]\)\.[0-9] .*$/\1/')
+    local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9][0-9]* .*$/\1/')
     local architecture=$(uname -m)
     if [ x"$slc_major_version" = x"5" ] || [ x"$slc_major_version" = x"6" ]; then
       if [ x"$slc_major_version" = x"5" ] && [ x"$architecture" = x"i686" ]; then

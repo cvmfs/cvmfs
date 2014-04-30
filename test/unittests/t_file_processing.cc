@@ -123,6 +123,7 @@ class MockUploader : public upload::AbstractUploader {
       AbstractUploader::Construct(
         upload::SpoolerDefinition("mock," + sandbox_path + "," +
                                             sandbox_tmp_dir,
+                                  shash::kSha1,
                                   true,
                                   min_chunk_size,
                                   avg_chunk_size,
@@ -185,6 +186,7 @@ class MockUploader : public upload::AbstractUploader {
               upload::CharBuffer          *buffer,
               const callback_t            *callback = NULL) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
+    assert (local_handle != NULL);
     local_handle->Append(buffer);
 
     Respond(callback, upload::UploaderResults(0, buffer));
@@ -194,6 +196,7 @@ class MockUploader : public upload::AbstractUploader {
                               const shash::Any            content_hash,
                               const std::string           hash_suffix) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
+    assert (local_handle != NULL);
 
     // summarize the results produced by the FileProcessor
     results_.push_back(Result(local_handle, content_hash, hash_suffix));
@@ -252,6 +255,9 @@ class T_FileProcessing : public FileSandbox {
   void TearDown() {
     RemoveSandbox(MockUploader::sandbox_tmp_dir);
     PolymorphicConstructionUnittestAdapter::UnregisterAllPlugins<upload::AbstractUploader>();
+
+    uploader_->TearDown();
+    delete uploader_;
   }
 
   ExpectedHashString GetEmptyFileBulkHash(const std::string suffix = "") const {
@@ -417,7 +423,7 @@ class T_FileProcessing : public FileSandbox {
   void TestProcessFiles(const std::vector<std::string> &file_pathes,
                         const ExpectedHashStrings      &reference_hash_strings,
                         const bool                      use_chunking = true) {
-    upload::FileProcessor processor(uploader_, use_chunking,
+    upload::FileProcessor processor(uploader_, shash::kSha1, use_chunking,
                                     MockUploader::min_chunk_size,
                                     MockUploader::avg_chunk_size,
                                     MockUploader::max_chunk_size);
@@ -500,7 +506,7 @@ TEST_F(T_FileProcessing, UploaderInitialized) {
 
 
 TEST_F(T_FileProcessing, Initialize) {
-  upload::FileProcessor processor(uploader_, true,
+  upload::FileProcessor processor(uploader_, shash::kSha1, true,
                                   MockUploader::min_chunk_size,
                                   MockUploader::avg_chunk_size,
                                   MockUploader::max_chunk_size);
@@ -602,7 +608,7 @@ TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunking) {
 
 TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWaves) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(uploader_, use_chunking,
+  upload::FileProcessor processor(uploader_, shash::kSha1, use_chunking,
                                   MockUploader::min_chunk_size,
                                   MockUploader::avg_chunk_size,
                                   MockUploader::max_chunk_size);
@@ -658,7 +664,7 @@ FileChunkList CallbackTest::result_chunk_list;
 
 TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(uploader_, use_chunking,
+  upload::FileProcessor processor(uploader_, shash::kSha1, use_chunking,
                                   MockUploader::min_chunk_size,
                                   MockUploader::avg_chunk_size,
                                   MockUploader::max_chunk_size);
@@ -678,7 +684,7 @@ TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
 
 TEST_F(T_FileProcessing, ProcessingCallbackForBigFile) {
   const bool use_chunking = true;
-  upload::FileProcessor processor(uploader_, use_chunking,
+  upload::FileProcessor processor(uploader_, shash::kSha1, use_chunking,
                                   MockUploader::min_chunk_size,
                                   MockUploader::avg_chunk_size,
                                   MockUploader::max_chunk_size);

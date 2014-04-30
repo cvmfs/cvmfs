@@ -21,6 +21,7 @@
 #include <string>
 #include "logging.h"
 #include "smalloc.h"
+#include "prng.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -28,9 +29,14 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
+/**
+ * Don't change order!  The integer value of the enum constants is used
+ * as file catalog flags and as flags in communication with the cache manager.
+ */
 enum Algorithms {
   kMd5 = 0,
   kSha1,
+  kRmd160,
   kAny,
 };
 
@@ -39,8 +45,17 @@ enum Algorithms {
  * Corresponds to Algorithms.  "Any" is the maximum of all the other
  * digest sizes.
  */
-const unsigned kDigestSizes[] = {16, 20, 20};
+const unsigned kDigestSizes[] = {16, 20, 20, 20};
 const unsigned kMaxDigestSize = 20;
+/**
+ * Hex representations of hashes with the same length need a suffix
+ * to be distinguished from each other.  They should all have one but
+ * for backwards compatibility MD5 ans SHA-1 have none.
+ */
+extern const char *kSuffixes[];
+// in hash.cc: const char *kSuffixes[] = {"", "", "-rmd160", ""};
+const unsigned kSuffixLengths[] = {0, 0, 7, 0};
+const unsigned kMaxSuffixLength = 7;
 
 
 /**
@@ -50,6 +65,7 @@ const unsigned kMaxDigestSize = 20;
 struct HexPtr {
   const std::string *str;
   explicit HexPtr(const std::string &s) { str = &s; }
+  bool IsValid() const;
 };
 
 struct AsciiPtr {
@@ -70,6 +86,9 @@ struct Digest {
   Algorithms algorithm;
 
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
+  unsigned GetHexSize() const {
+    return 2*kDigestSizes[algorithm] + kSuffixLengths[algorithm];
+  }
 
   Digest() {
     algorithm = algorithm_;
@@ -83,7 +102,7 @@ struct Digest {
 
     const std::string *str = hex.str;
     const unsigned length = str->length();
-    assert(length >= char_size);
+    assert(length >= char_size);  // A suffix won't hurt
 
     for (unsigned i = 0; i < char_size; i += 2) {
       this->digest[i/2] =
@@ -104,30 +123,34 @@ struct Digest {
    * Generates a purely random hash
    * Only used for testing purposes
    */
-  void Randomize() {
+  void Randomize(const uint64_t seed) {
+    Prng prng;
+    prng.InitSeed(seed);
     const unsigned bytes = GetDigestSize();
     for (unsigned i = 0; i < bytes; ++i) {
-      digest[i] = rand() % 256;
+      digest[i] = prng.Next(256);
     }
   }
 
-  void ToCStr(char cstr[digest_size_+1]) const {
+  std::string ToString() const {
+    const unsigned string_length = GetHexSize();
+    std::string result(string_length, 0);
+
     unsigned i;
     for (i = 0; i < kDigestSizes[algorithm]; ++i) {
       char dgt1 = (unsigned)digest[i] / 16;
       char dgt2 = (unsigned)digest[i] % 16;
       dgt1 += (dgt1 <= 9) ? '0' : 'a' - 10;
       dgt2 += (dgt2 <= 9) ? '0' : 'a' - 10;
-      cstr[i*2] = dgt1;
-      cstr[i*2+1] = dgt2;
+      result[i*2] = dgt1;
+      result[i*2+1] = dgt2;
     }
-    cstr[i*2] = '\0';
-  }
-
-  std::string ToString() const {
-    char result[2*kDigestSizes[algorithm]+1];
-    ToCStr(result);
-    return std::string(result, 2*kDigestSizes[algorithm]);
+    unsigned pos = i*2;
+    for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
+      result[pos] = *s;
+      pos++;
+    }
+    return result;
   }
 
   /**
@@ -136,7 +159,7 @@ struct Digest {
   std::string MakePath(const unsigned dir_levels,
                        const unsigned digits_per_level) const
   {
-    const unsigned string_length = 2*kDigestSizes[algorithm] + dir_levels + 1;
+    const unsigned string_length = GetHexSize() + dir_levels + 1;
     std::string result(string_length, 0);
 
     unsigned i = 0, pos = 0;
@@ -152,6 +175,10 @@ struct Digest {
       result[pos] = digit;
       ++pos;
       ++i;
+    }
+    for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
+      result[pos] = *s;
+      pos++;
     }
 
     return result;
@@ -178,6 +205,8 @@ struct Digest {
   }
 
   bool operator <(const Digest<digest_size_, algorithm_> &other) const {
+    if (this->algorithm != other.algorithm)
+      return (this->algorithm < other.algorithm);
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
       if (this->digest[i] > other.digest[i])
         return false;
@@ -188,6 +217,8 @@ struct Digest {
   }
 
   bool operator >(const Digest<digest_size_, algorithm_> &other) const {
+    if (this->algorithm != other.algorithm)
+      return (this->algorithm > other.algorithm);
     for (int i = 0; i < kDigestSizes[algorithm]; ++i) {
       if (this->digest[i] < other.digest[i])
         return false;
@@ -213,6 +244,7 @@ struct Md5 : public Digest<16, kMd5> {
 };
 
 struct Sha1 : public Digest<20, kSha1> { };
+struct Rmd160 : public Digest<20, kRmd160> { };
 
 /**
  * Any as such must not be used except for digest storage.
@@ -240,29 +272,30 @@ unsigned GetContextSize(const Algorithms algorithm);
  * Holds an OpenSSL context, only required for hash operations.  Allows to
  * deferr the storage allocation for the context to alloca.
  */
-struct ContextPtr {
-  Algorithms algorithm;
-  void *buffer;
-  unsigned size;
+class ContextPtr {
+ public:
+  Algorithms  algorithm;
+  void       *buffer;
+  unsigned    size;
 
-  ContextPtr() {
-    algorithm = kAny;
-    size = 0;
-    buffer = NULL;
-  }
+  ContextPtr() : algorithm(kAny), buffer(NULL), size(0) {}
 
-  explicit ContextPtr(const Algorithms a) {
-    algorithm = a;
-    size = GetContextSize(a);
-    buffer = NULL;
-  }
+  explicit ContextPtr(const Algorithms a) :
+    algorithm(a), buffer(NULL), size(GetContextSize(a)) {}
 
+  /**
+   * Produces a duplicated ContextPtr
+   * Warning: Since the buffer handling is up to the user, the actual context
+   *          buffer is _not_ copied by this copy constructor and needs to be
+   *          dealt with by the caller! (i.e. memcpy'ed from old to new)
+   */
   explicit ContextPtr(const ContextPtr &other) :
-    algorithm(other.algorithm),
-    size(other.size)
-  {
-    buffer = smalloc(size);
-    memcpy(buffer, other.buffer, size);
+    algorithm(other.algorithm), buffer(NULL), size(other.size) {}
+
+ private:
+  ContextPtr& operator=(const ContextPtr &other) {
+    const bool not_implemented = false;
+    assert (not_implemented);
   }
 };
 
@@ -273,6 +306,9 @@ void Final(ContextPtr &context, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
 bool HashFile(const std::string filename, Any *any_digest);
+
+Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
+Any MkFromHexPtr(const HexPtr hex);
 
 }  // namespace hash
 

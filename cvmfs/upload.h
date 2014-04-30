@@ -118,8 +118,6 @@ namespace upload
    */
   class Spooler : public Observable<SpoolerResult> {
    public:
-
-   public:
     static Spooler* Construct(const SpoolerDefinition &spooler_definition);
     virtual ~Spooler();
 
@@ -198,20 +196,15 @@ namespace upload
     void WaitForUpload() const;
 
     /**
-     * Blocks until all jobs are processed and all worker threads terminated
-     * successfully. Afterwards the spooler will be out of service.
-     * Call this after you have called WaitForUpload() to wait until the
-     * Spooler terminates.
-     * Note: after calling this method NO JOBS should be scheduled anymore.
-     */
-    void WaitForTermination() const;
-
-    /**
      * Checks how many of the already processed jobs have failed.
      *
      * @return   the number of failed jobs at the time this method is invoked
      */
     unsigned int GetNumberOfErrors() const;
+
+    shash::Algorithms GetHashAlgorithm() const {
+      return spooler_definition_.hash_algorithm;
+    }
 
 
    protected:
@@ -221,16 +214,6 @@ namespace upload
      */
     bool Initialize();
 
-    /**
-     * This method is called right before the Spooler object will terminate.
-     * Implement this to do global clean up work. You should not finish jobs
-     * in this method, since it is meant to be called after the Spooler has
-     * stopped its actual work or was terminated prematurely.
-     */
-    void TearDown();
-
-
-   protected:
     /**
      * @param spooler_definition   the SpoolerDefinition structure that defines
      *                             some intrinsics of the concrete Spoolers.

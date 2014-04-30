@@ -4,7 +4,8 @@
  *
  * CernVM-FS shows a remote HTTP directory as local file system.  The client
  * sees all available files.  On first access, a file is downloaded and
- * cached locally.  All downloaded pieces are verified with SHA1.
+ * cached locally.  All downloaded pieces are verified by a cryptographic
+ * content hash.
  *
  * To do so, a directory hive has to be transformed into a CVMFS2
  * "repository".  This can be done by the CernVM-FS server tools.
@@ -182,6 +183,7 @@ glue::InodeTracker *inode_tracker_ = NULL;
 
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
+bool volatile_repository_ = false;
 
 /**
  * in maintenance mode, cache timeout is 0 and catalogs are not reloaded
@@ -420,6 +422,7 @@ static void RemountFinish() {
       inode_generation_info_.inode_generation =
         inode_annotation_->GetGeneration();
     }
+    volatile_repository_ = catalog_manager_->GetVolatileFlag();
     remount_fence_->Unblock();
 
     inode_cache_->Resume();
@@ -459,7 +462,9 @@ static void RemountCheck() {
     LogCvmfs(kLogCvmfs, kLogDebug, "catalog TTL expired, reload");
     catalog::LoadError retval = RemountStart();
     if ((retval == catalog::kLoadFail) || (retval == catalog::kLoadNoSpace)) {
-      LogCvmfs(kLogCvmfs, kLogDebug, "reload failed, applying short term TTL");
+      LogCvmfs(kLogCvmfs, kLogDebug, "reload failed (%s), "
+                                     "applying short term TTL",
+               catalog::Code2Ascii(retval));
       alarm(kShortTermTTL);
       catalogs_valid_until_ = time(NULL) + kShortTermTTL;
     } else if (retval == catalog::kLoadUp2Date) {
@@ -1023,7 +1028,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     ReplyNegative(dirent, req);
     return;
   }
-  remount_fence_->Leave();
 
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
@@ -1033,18 +1037,22 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   //}
 #ifdef __APPLE__
   if ((fi->flags & O_SHLOCK) || (fi->flags & O_EXLOCK)) {
+    remount_fence_->Leave();
     fuse_reply_err(req, EOPNOTSUPP);
     return;
   }
 #endif
   if (fi->flags & O_EXCL) {
+    remount_fence_->Leave();
     fuse_reply_err(req, EEXIST);
     return;
   }
 
   atomic_inc64(&num_fs_open_);  // Count actual open / fetch operations
 
-  if (dirent.IsChunkedFile()) {
+  if (!dirent.IsChunkedFile()) {
+    remount_fence_->Leave();
+  } else {
     LogCvmfs(kLogCvmfs, kLogDebug,
              "chunked file %s opened (download delayed to read() call)",
              path.c_str());
@@ -1053,6 +1061,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         (static_cast<int>(max_open_files_))-kNumReservedFd)
     {
       atomic_dec32(&open_files_);
+      remount_fence_->Leave();
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
       return;
@@ -1064,13 +1073,17 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
       // Retrieve File chunks from the catalog
       FileChunkList *chunks = new FileChunkList();
-      if (!dirent.catalog()->ListFileChunks(path, chunks) || chunks->IsEmpty()) {
-        LogCvmfs(kLogCvmfs, kLogSyslogErr, "file %s is marked as 'chunked', "
-                 "but no chunks found in the catalog %s.", path.c_str(),
-                 dirent.catalog()->path().c_str());
+      if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
+                                           chunks) ||
+          chunks->IsEmpty())
+      {
+        remount_fence_->Leave();
+        LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+                 "'chunked', but no chunks found.", path.c_str());
         fuse_reply_err(req, EIO);
         return;
       }
+      remount_fence_->Leave();
 
       chunk_tables_->Lock();
       // Check again to avoid race
@@ -1084,6 +1097,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
         chunk_tables_->inode2references.Insert(ino, refctr+1);
       }
     } else {
+      remount_fence_->Leave();
       uint32_t refctr;
       bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
       assert(retval);
@@ -1104,7 +1118,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()),
-                          download_manager_);
+                          volatile_repository_, download_manager_);
 
   if (fd >= 0) {
     if (atomic_xadd32(&open_files_, 1) <
@@ -1215,6 +1229,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         string verbose_path = "Part of " + chunks.path.ToString();
         chunk_fd.fd = cache::FetchChunk(*chunks.list->AtPtr(chunk_idx),
                                         verbose_path,
+                                        volatile_repository_,
                                         download_manager_);
         if (chunk_fd.fd < 0) {
           chunk_fd.fd = -1;
@@ -1423,7 +1438,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = string(VERSION) + "." + string(CVMFS_PATCH_LEVEL);
   } else if (attr == "user.hash") {
     if (!d.checksum().IsNull()) {
-      attribute_value = d.checksum().ToString() + " (SHA-1)";
+      attribute_value = d.checksum().ToString();
     } else {
       fuse_reply_err(req, ENOATTR);
       return;
@@ -1435,7 +1450,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       if (fd < 0) {
         attribute_value = "Not in cache";
       } else {
-        shash::Any hash(shash::kSha1);
+        shash::Any hash(d.checksum().algorithm);
         FILE *f = fdopen(fd, "r");
         if (!f) {
           fuse_reply_err(req, EIO);
@@ -1447,7 +1462,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
           return;
         }
         fclose(f);
-        attribute_value = hash.ToString() + " (SHA-1)";
+        attribute_value = hash.ToString();
       }
     } else {
       fuse_reply_err(req, ENOATTR);
@@ -1465,6 +1480,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_manager_->GetRootHash().ToString();
+  } else if (attr == "user.tag") {
+    attribute_value = *repository_tag_;
   } else if (attr == "user.expires") {
     if (catalogs_valid_until_ == kIndefiniteDeadline) {
       attribute_value = "never (fixed root catalog)";
@@ -1569,7 +1586,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
     "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
-    "user.ndiropen\0user.inode_max\0";
+    "user.ndiropen\0user.inode_max\0user.tag\0";
   string attribute_list(base_list, sizeof(base_list)-1);
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
@@ -1607,13 +1624,18 @@ bool Pin(const string &path) {
   catalog::DirectoryEntry dirent;
   remount_fence_->Enter();
   const bool found = GetDirentForPath(PathString(path), &dirent);
-  remount_fence_->Leave();
-
-  if (!found || !dirent.IsRegular())
+  if (!found || !dirent.IsRegular()) {
+    remount_fence_->Leave();
     return false;
-  if (dirent.IsChunkedFile()) {
+  }
+
+  if (!dirent.IsChunkedFile()) {
+    remount_fence_->Leave();
+  } else {
     FileChunkList chunks;
-    dirent.catalog()->ListFileChunks(PathString(path), &chunks);
+    catalog_manager_->ListFileChunks(PathString(path), dirent.hash_algorithm(),
+                                     &chunks);
+    remount_fence_->Leave();
     for (unsigned i = 0; i < chunks.size(); ++i) {
       bool retval =
         quota::Pin(chunks.AtPtr(i)->content_hash(), chunks.AtPtr(i)->size(),
@@ -1621,7 +1643,7 @@ bool Pin(const string &path) {
       if (!retval)
         return false;
       int fd = cache::FetchChunk(*chunks.AtPtr(i), "Part of " + path,
-                                 download_manager_);
+                                 volatile_repository_, download_manager_);
       if (fd < 0) {
         quota::Unpin(chunks.AtPtr(i)->content_hash());
         return false;
@@ -1639,7 +1661,8 @@ bool Pin(const string &path) {
   bool retval = quota::Pin(dirent.checksum(), dirent.size(), path, false);
   if (!retval)
     return false;
-  int fd = cache::FetchDirent(dirent, path, download_manager_);
+  int fd = cache::FetchDirent(dirent, path, volatile_repository_,
+                              download_manager_);
   if (fd < 0) {
     quota::Unpin(dirent.checksum());
     return false;
@@ -1756,6 +1779,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   unsigned max_retries = 1;
   unsigned backoff_init = 2000;
   unsigned backoff_max = 10000;
+  bool send_info_header = false;
   string tracefile = "";
   string cachedir = string(cvmfs::kDefaultCachedir);
   unsigned max_ttl = 0;
@@ -1772,8 +1796,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string public_keys = "";
   string root_hash = "";
   string repository_tag = "";
+  string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
-  string trusted_certs = "/etc/grid-security/certificates";
+  string trusted_certs = "";
   map<uint64_t, uint64_t> uid_map;
   map<uint64_t, uint64_t> gid_map;
   uint64_t initial_generation = 0;
@@ -1826,6 +1851,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
     backoff_init = String2Uint64(parameter)*1000;
   if (options::GetValue("CVMFS_BACKOFF_MAX", &parameter))
     backoff_max = String2Uint64(parameter)*1000;
+  if (options::GetValue("CVMFS_SEND_INFO_HEADER", &parameter) &&
+      options::IsOn(parameter))
+  {
+    send_info_header = true;
+  }
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
   if (options::GetValue("CVMFS_MAX_TTL", &parameter))
@@ -1852,6 +1882,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     root_hash = parameter;
   if (options::GetValue("CVMFS_REPOSITORY_TAG", &parameter))
     repository_tag = parameter;
+  if (options::GetValue("CVMFS_REPOSITORY_DATE", &parameter))
+    repository_date = parameter;
   if (options::GetValue("CVMFS_NFS_SOURCE", &parameter) &&
       options::IsOn(parameter))
   {
@@ -2163,6 +2195,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->SetRetryParameters(max_retries,
                                                backoff_init,
                                                backoff_max);
+  if (send_info_header)
+    cvmfs::download_manager_->EnableInfoHeader();
   proxies = download::ResolveProxyDescription(proxies,
                                               cvmfs::download_manager_);
   if (proxies == "") {
@@ -2209,8 +2243,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   cvmfs::catalog_manager_->SetOwnerMaps(uid_map, gid_map);
 
-  // Load specific tag (root hash has precedence)
-  if ((root_hash == "") && (*cvmfs::repository_tag_ != "")) {
+  // Load specific tag (root hash has precedence, then repository_tag)
+  if ((root_hash == "") &&
+      ((*cvmfs::repository_tag_ != "") || (repository_date != "")))
+  {
     manifest::ManifestEnsemble ensemble;
     retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,
                              cvmfs::signature_manager_,
@@ -2245,17 +2281,37 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailHistory;
     }
     history::Tag tag;
-    retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
-    if (!retval) {
-      *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
-      return loader::kFailHistory;
+    if (*cvmfs::repository_tag_ == "") {
+      time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
+      if (repository_utctime == 0) {
+        *g_boot_error = "invalid timestamp in CVMFS_REPOSITORY_DATE: " +
+                        repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
+        return loader::kFailHistory;
+      }
+      retval = tag_list.FindTagByDate(repository_utctime, &tag);
+      if (!retval) {
+        *g_boot_error = "no repository state as early as utc timestamp " +
+                        StringifyTime(repository_utctime, true);
+        return loader::kFailHistory;
+      }
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "time stamp %s UTC resolved to tag '%s'",
+               StringifyTime(repository_utctime, true).c_str(),
+               tag.name.c_str());
+      *cvmfs::repository_tag_ = tag.name;
+    } else {
+      retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
+      if (!retval) {
+        *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
+        return loader::kFailHistory;
+      }
     }
     root_hash = tag.root_hash.ToString();
   }
 
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
-    shash::Any hash(shash::kSha1, shash::HexPtr(string(root_hash)));
+    shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)));
     retval = cvmfs::catalog_manager_->InitFixed(hash);
   } else {
     retval = cvmfs::catalog_manager_->Init();
@@ -2270,6 +2326,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::inode_annotation_->GetGeneration();
   LogCvmfs(kLogCvmfs, kLogDebug, "root inode is %"PRIu64,
            uint64_t(cvmfs::catalog_manager_->GetRootInode()));
+
+  if (cvmfs::catalog_manager_->GetVolatileFlag()) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "content of repository flagged as VOLATILE");
+    cvmfs::volatile_repository_ = true;
+  }
 
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
   auto_umount::SetMountpoint(*cvmfs::mountpoint_);

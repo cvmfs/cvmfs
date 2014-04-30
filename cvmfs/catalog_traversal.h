@@ -2,11 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_CATALOG_TRAVERSAL_H_
+#define CVMFS_CATALOG_TRAVERSAL_H_
+
 #include <string>
 #include <stack>
 
 #include "catalog.h"
 #include "util.h"
+#include "util_concurrency.h"
 #include "download.h"
 #include "logging.h"
 #include "compression.h"
@@ -16,6 +20,28 @@
 #include "signature.h"
 
 namespace swissknife {
+
+/**
+ * Callback data which has to be implemented by the registered callback
+ * functions/methods (see Observable<> for further details)
+ * @param catalog             the catalog object which needs to be processed
+ * @param catalog_hash        the SHA-1 content hash of the catalog
+ * @param tree_level          the depth in the nested catalog tree
+ *                            (starting at zero)
+ */
+struct CatalogTraversalData {
+  CatalogTraversalData(const catalog::Catalog* catalog,
+                       const shash::Any&       catalog_hash,
+                       const unsigned          tree_level,
+                       const size_t            file_size) :
+    catalog(catalog), catalog_hash(catalog_hash), tree_level(tree_level),
+    file_size(file_size) {}
+
+  const catalog::Catalog*  catalog;
+  const shash::Any         catalog_hash;
+  const unsigned int       tree_level;
+  const size_t             file_size;
+};
 
 /**
  * This class traverses the complete catalog hierarchy of a CVMFS repository
@@ -30,25 +56,9 @@ namespace swissknife {
  * CAUTION: the Catalog* pointer passed into the callback becomes invalid
  *          directly after the callback method returns, unless you create the
  *          CatalogTraversal object with no_close = true.
- *
- * TODO: Use the Observable template buried in Pull Request 46 instead of imple-
- *       menting your own callback infrastructure here.
  */
-template<class T, class CatalogT = catalog::Catalog>
-class CatalogTraversal {
- public:
-  /**
-   * Callback signature which has to be implemented by the delegate object
-   * @param catalog             the catalog object which needs to be processed
-   * @param catalog_hash        the SHA-1 content hash of the catalog
-   * @param tree_level          the depth in the nested catalog tree
-   *                            (starting at zero)
-   */
-  typedef void (T::*Callback)(const catalog::Catalog* catalog,
-                              const shash::Any&       catalog_hash,
-                              const unsigned          tree_level);
-
-
+template<class CatalogT>
+class CatalogTraversal : public Observable<CatalogTraversalData> {
  protected:
   struct CatalogJob {
     CatalogJob(const std::string      &path,
@@ -77,10 +87,6 @@ class CatalogTraversal {
  public:
   /**
    * Constructs a new catalog traversal engine.
-   * @param delegate           the object to be notified when a catalog needs
-   *                           to be processed
-   * @param catalog_callback   a function pointer to the callback to be called
-   *                           on the delegate object
    * @param repo_url           the path to the repository to be traversed:
    *                           -> either absolute path to the local catalogs
    *                           -> or an URL to a remote repository
@@ -91,15 +97,11 @@ class CatalogTraversal {
    * @param no_close           do not close catalogs after they were attached
    *                           (catalogs retain their parent/child pointers)
    */
-	CatalogTraversal(T*                 delegate,
-                   Callback           catalog_callback,
-                   const std::string& repo_url,
+	CatalogTraversal(const std::string& repo_url,
                    const std::string& repo_name = "",
                    const std::string& repo_keys = "",
                    const bool         no_close = false,
                    const std::string& tmp_dir  = "/tmp") :
-    delegate_(delegate),
-    catalog_callback_(catalog_callback),
     repo_url_(MakeCanonicalPath(repo_url)),
     repo_name_(repo_name),
     repo_keys_(repo_keys),
@@ -120,15 +122,12 @@ class CatalogTraversal {
   /**
    * Starts the traversal process.
    * After calling this methods CatalogTraversal will go through all catalogs
-   * and call the given callback method on the provided delegate object for each
-   * found catalog.
+   * and call the registered callback methods for each found catalog.
    * If something goes wrong in the process, the traversal will be cancelled.
    * @return  true, when all catalogs were successfully processed. On failure
    *          the traversal is cancelled and false is returned
    */
   bool Traverse() {
-    assert(catalog_callback_ != NULL);
-
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
     manifest::Manifest *manifest = LoadManifest();
@@ -179,6 +178,9 @@ class CatalogTraversal {
       return false;
     }
 
+    // Get the size of the decompressed catalog file
+    const size_t file_size = GetFileSize(tmp_file);
+
     // Open the catalog
     catalog::Catalog *catalog = CatalogT::AttachFreely(job.path,
                                                        tmp_file,
@@ -194,13 +196,18 @@ class CatalogTraversal {
     }
 
     // Provide the user with the catalog
-    (delegate_->*catalog_callback_)(catalog, job.hash, job.tree_level);
+    NotifyListeners(CatalogTraversalData(catalog,
+                                         job.hash,
+                                         job.tree_level,
+                                         file_size));
 
     // Inception! Go to the next catalog level
-    catalog::Catalog::NestedCatalogList *nested_catalogs =
+    // Note: taking a copy of the result of ListNestedCatalogs() here for
+    //       data corruption prevention
+    const catalog::Catalog::NestedCatalogList nested_catalogs =
       catalog->ListNestedCatalogs();
     for (catalog::Catalog::NestedCatalogList::const_iterator i =
-         nested_catalogs->begin(), iEnd = nested_catalogs->end();
+         nested_catalogs.begin(), iEnd = nested_catalogs.end();
          i != iEnd; ++i)
     {
       catalog::Catalog* parent = (no_close_) ? catalog : NULL;
@@ -251,20 +258,22 @@ class CatalogTraversal {
       signature_manager.Fini();
 
       // Check if manifest was loaded correctly
-      if (retval == manifest::kFailNameMismatch) {
+      if (retval == manifest::kFailOk) {
+        manifest = new manifest::Manifest(*manifest_ensemble.manifest);
+      } else if (retval == manifest::kFailNameMismatch) {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
                  "repository name mismatch. No name provided?");
-      }
-      if (retval == manifest::kFailBadSignature   ||
-          retval == manifest::kFailBadCertificate ||
-          retval == manifest::kFailBadWhitelist)
+      } else if (retval == manifest::kFailBadSignature   ||
+                 retval == manifest::kFailBadCertificate ||
+                 retval == manifest::kFailBadWhitelist)
       {
         LogCvmfs(kLogCatalogTraversal, kLogStderr,
                  "repository signature mismatch. No key(s) provided?");
+      } else {
+        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+                 "failed to load manifest (%d - %s)",
+                 retval, Code2Ascii(retval));
       }
-
-      if (retval == manifest::kFailOk)
-        manifest = new manifest::Manifest(*manifest_ensemble.manifest);
     }
 
     return manifest;
@@ -297,8 +306,9 @@ class CatalogTraversal {
     download::Failures retval = download_manager_.Fetch(&download_catalog);
 
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s (%d)",
-             catalog_hash.ToString().c_str(), retval);
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s"
+                                                 " (%d - %s)",
+             catalog_hash.ToString().c_str(), retval, Code2Ascii(retval));
       return false;
     }
 
@@ -344,8 +354,6 @@ class CatalogTraversal {
   }
 
  private:
-  T                *delegate_;
-  Callback          catalog_callback_;
   const std::string repo_url_;
   const std::string repo_name_;
   const std::string repo_keys_;
@@ -356,4 +364,8 @@ class CatalogTraversal {
   download::DownloadManager download_manager_;
 };
 
+typedef CatalogTraversal<catalog::Catalog> SimpleCatalogTraversal;
+
 }
+
+#endif /* CVMFS_CATALOG_TRAVERSAL_H_*/

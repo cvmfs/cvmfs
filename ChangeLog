@@ -1,3 +1,61 @@
+2.1.20:
+  * Add 'letter' command to cvmfs_swissknife
+  * Use sqlite 3.8.4.3
+  * Use libcurl 7.36
+  * Use leveldb 1.15
+  * Rename cvmfs_server lstags command to list-tags
+  * Add extended attribute user.tag
+  * Add CVMFS_REPOSITORY_DATE client parameter
+  * Enable default auto tagging (CVMFS_AUTO_TAG)
+  * Add 'list-catalogs' command to cvmfs_server
+
+2.1.19:
+  * Suppress confusing lsof output in cvmfs_server (CVM-624)
+  * Fix CVMFS_SEND_INFO_HEADER option handling (CVM-623)
+
+2.1.18:
+  * Fix publishing when other shells are open on /cvmfs/$fqrn
+  * Repository sanitation: require a dot in the repository name in
+    autofs map
+  * Parse /etc/cvmfs/default.d/*.conf after /etc/cvmfs/default.conf and
+    before /etc/cvmfs/default.local
+  * Log pacparser errors to syslog
+  * Resolve auto PAC location to http://wpad/wpad.dat
+  * Send requested file system path in cvmfs-info HTTP header (CVM-580);
+    behavior can be turned on and off through CVMFS_SEND_INFO_HEADER
+  * Fix overwriting regular file or symlink with non-empty
+    directory in cvmfs_server
+  * Fix rpm build on EL6.5 32bit
+  * Fix memory corruption during publish process (CVM-608)
+  * Use CVMFS_PAC_URLS instead of PAC_URLS
+  * Fix symlinked /var/spool/cvmfs/... (CVM-607)
+  * Add verbose texts to most error codes (CVM-594)
+  * Fix abnormal termination of cvmfs_server on whitelist
+    verification errors (CVM-602)
+  * Reduce default verbosity of 'cvmfs_server publish' (CVM-269)
+  * Fix automounter map on EL6.2 (CVM-601)
+  * Log to syslog in addition to stderr when debug log cannot
+    be opened (CVM-273)
+  * Fix false parsing of /etc/cvmfs/domaind.d/cern.ch.* on mount
+    (CVM-600)
+  * Improve error logging when loading the cvmfs library (cf. CVM-595)
+  * Fix crash in exclusive cache mode if unpin listener is called
+    on mount (CVM-267) 
+  * Add "volatile" repository and volatile cache class (CVM-263)
+  * Fix TBB build system for 32bit on 64bit mock environments
+  * Fix RPM spec file for FC20
+  * Add cvmfs Python library
+  * Fix permissions of private keys on repository creation
+  * Fix race between cached chunked files and catalog updates
+  * Fix false caching of catalog object in dirent
+  * Support for RIPEMD-160 hash algorithm in lieu of SHA-1
+  * Switch to TBB 4.2 update 2 
+  * Bash completion for cvmfs_config and cvmfs_server
+  * Fix build system for SL4
+
+2.1.17:
+  * Fix proxy failover on HTTP 403 errors (introduced in 2.1.16)
+
 2.1.16:
   * Track uncompressed catalog sizes
   * Replace sudo magic in cvmfs_server by cvmfs_suid_helper

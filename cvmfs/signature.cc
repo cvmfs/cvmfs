@@ -76,18 +76,21 @@ void SignatureManager::InitX509Store() {
   x509_store_ = X509_STORE_new();
   assert(x509_store_ != NULL);
 
+  unsigned long verify_flags =
+    X509_V_FLAG_CRL_CHECK |
+    X509_V_FLAG_CRL_CHECK_ALL;
+#if OPENSSL_VERSION_NUMBER < 0x00908000L
+  X509_STORE_set_flags(x509_store_, verify_flags);
+#else
   int retval;
   X509_VERIFY_PARAM *param = X509_VERIFY_PARAM_new();
   assert(param != NULL);
-  unsigned long verify_flags =
-    X509_V_FLAG_CRL_CHECK |
-    X509_V_FLAG_CRL_CHECK_ALL |
-    X509_V_FLAG_POLICY_CHECK;
   retval = X509_VERIFY_PARAM_set_flags(param, verify_flags);
   assert(retval == 1);
   retval = X509_STORE_set1_param(x509_store_, param);
   assert(retval == 1);
   X509_VERIFY_PARAM_free(param);
+#endif
 
   x509_lookup_ = X509_STORE_add_lookup(x509_store_, X509_LOOKUP_hash_dir());
   assert(x509_lookup_ != NULL);
@@ -324,30 +327,72 @@ bool SignatureManager::LoadTrustedCaCrl(const string &path_list) {
 
 
 /**
- * Returns SHA-1 hash from DER encoded certificate, encoded the same way
+ * Returns cryptographic hash from DER encoded certificate, encoded the same way
  * OpenSSL does (01:AB:...).
  * Empty string on failure.
  */
-string SignatureManager::FingerprintCertificate() {
-  if (!certificate_) return "";
+shash::Any SignatureManager::HashCertificate(
+  const shash::Algorithms hash_algorithm)
+{
+  shash::Any result;
+  if (!certificate_)
+    return result;
 
   int buffer_size;
   unsigned char *buffer = NULL;
 
   buffer_size = i2d_X509(certificate_, &buffer);
-  if (buffer_size < 0) return "";
+  if (buffer_size < 0)
+    return result;
 
-  shash::Any hash(shash::kSha1);
-  shash::HashMem(buffer, buffer_size, &hash);
+  result.algorithm = hash_algorithm;
+  shash::HashMem(buffer, buffer_size, &result);
   free(buffer);
+
+  return result;
+}
+
+
+/**
+ * Returns cryptographic hash from DER encoded certificate, encoded the same way
+ * OpenSSL does (01:AB:...).
+ * Empty string on failure.
+ */
+string SignatureManager::FingerprintCertificate(
+  const shash::Algorithms hash_algorithm)
+{
+  shash::Any hash = HashCertificate(hash_algorithm);
+  if (hash.IsNull())
+    return "";
 
   const string hash_str = hash.ToString();
   string result;
   for (unsigned i = 0; i < hash_str.length(); ++i) {
-    if ((i > 0) && (i%2 == 0)) result += ":";
+    if (i < 2*shash::kDigestSizes[hash_algorithm]) {
+      if ((i > 0) && (i%2 == 0)) result += ":";
+    }
     result += toupper(hash_str[i]);
   }
   return result;
+}
+
+
+/**
+ * Parses a fingerprint from the whitelist
+ */
+shash::Any SignatureManager::MkFromFingerprint(const std::string &fingerprint) {
+  string convert;
+  for (unsigned i = 0; i < fingerprint.length(); ++i) {
+    if ((fingerprint[i] == ' ') || (fingerprint[i] == '\t') ||
+        (fingerprint[i] == '#'))
+    {
+      break;
+    }
+    if (fingerprint[i] != ':')
+      convert.push_back(tolower(fingerprint[i]));
+  }
+
+  return shash::MkFromHexPtr(shash::HexPtr(convert));
 }
 
 
@@ -494,8 +539,14 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   EVP_MD_CTX_init(&ctx);
   if (EVP_VerifyInit(&ctx, EVP_sha1()) &&
       EVP_VerifyUpdate(&ctx, buffer, buffer_size) &&
+#if OPENSSL_VERSION_NUMBER < 0x00908000L
+      EVP_VerifyFinal(&ctx, const_cast<unsigned char *>(signature), signature_size,
+                      X509_get_pubkey(certificate_))
+#else
       EVP_VerifyFinal(&ctx, signature, signature_size,
-                      X509_get_pubkey(certificate_)))
+                      X509_get_pubkey(certificate_))
+#endif
+    )
   {
     result = true;
   }
@@ -546,6 +597,7 @@ bool SignatureManager::VerifyRsa(const unsigned char *buffer,
  */
 void SignatureManager::CutLetter(const unsigned char *buffer,
                                  const unsigned buffer_size,
+                                 const char separator,
                                  unsigned *letter_length,
                                  unsigned *pos_after_mark)
 {
@@ -559,7 +611,7 @@ void SignatureManager::CutLetter(const unsigned char *buffer,
     }
 
     if ((buffer[pos] == '\n') && (pos+4 <= buffer_size) &&
-        (buffer[pos+1] == '-') && (buffer[pos+2] == '-') &&
+        (buffer[pos+1] == separator) && (buffer[pos+2] == separator) &&
         (buffer[pos+3] == '\n'))
     {
       *letter_length = pos+1;
@@ -585,7 +637,7 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
 {
   unsigned pos = 0;
   unsigned letter_length = 0;
-  CutLetter(buffer, buffer_size, &letter_length, &pos);
+  CutLetter(buffer, buffer_size, '-', &letter_length, &pos);
   if (pos >= buffer_size)
     return false;
 
@@ -600,10 +652,7 @@ bool SignatureManager::VerifyLetter(const unsigned char *buffer,
     }
     hash_str.push_back(buffer[pos++]);
   } while (true);
-  // TODO: more hashes
-  if (hash_str.length() != 2*shash::kDigestSizes[shash::kSha1])
-    return false;
-  shash::Any hash_printed(shash::kSha1, shash::HexPtr(hash_str));
+  shash::Any hash_printed = shash::MkFromHexPtr(shash::HexPtr(hash_str));
   shash::Any hash_computed(hash_printed.algorithm);
   shash::HashMem(buffer, letter_length, &hash_computed);
   if (hash_printed != hash_computed)

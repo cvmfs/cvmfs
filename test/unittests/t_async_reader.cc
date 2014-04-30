@@ -64,10 +64,14 @@ class TestFile : public upload::AbstractFile {
 class DummyFileScrubbingTask :
                             public upload::AbstractFileScrubbingTask<TestFile> {
  public:
-  DummyFileScrubbingTask(TestFile                *file,
-                         upload::CharBuffer      *buffer,
-                         const bool               is_last_piece) :
-    upload::AbstractFileScrubbingTask<TestFile>(file, buffer, is_last_piece) {}
+  DummyFileScrubbingTask(TestFile            *file,
+                         upload::CharBuffer  *buffer,
+                         const bool           is_last_piece,
+                         AbstractReader      *reader) :
+    upload::AbstractFileScrubbingTask<TestFile>(file,
+                                                buffer,
+                                                is_last_piece,
+                                                reader) {}
 
  protected:
   tbb::task* execute() {
@@ -151,7 +155,14 @@ TEST_F (T_AsyncReader, Initialize) {
   const unsigned int  max_buffers_in_flight = 10;
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
+  reader.Initialize();
+  reader.TearDown();
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 TEST_F (T_AsyncReader, ReadEmptyFile) {
@@ -159,13 +170,21 @@ TEST_F (T_AsyncReader, ReadEmptyFile) {
   const unsigned int  max_buffers_in_flight = 10;
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
+  reader.Initialize();
 
   TestFile *f = new TestFile(GetEmptyFile(), GetEmptyFileHash());
   reader.ScheduleRead(f);
   reader.Wait();
 
   f->CheckHash();
+
+  reader.TearDown();
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 TEST_F (T_AsyncReader, ReadSmallFile) {
@@ -175,11 +194,21 @@ TEST_F (T_AsyncReader, ReadSmallFile) {
   const unsigned int  max_buffers_in_flight = 10;
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
+  reader.Initialize();
+
   reader.ScheduleRead(f);
   reader.Wait();
 
   f->CheckHash();
+
+  reader.TearDown();
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
 
 unsigned int g_FileReadCallback_Callback_calls = 0;
 void FileReadCallback_Callback(TestFile* const& file) {
@@ -200,6 +229,7 @@ TEST_F (T_AsyncReader, FileReadCallback) {
   const size_t        max_buffer_size = 524288;
   const unsigned int  max_buffers_in_flight = 5;
   MyReader reader(max_buffer_size, max_buffers_in_flight);
+  reader.Initialize();
   reader.RegisterListener(FileReadCallback_Callback);
 
   std::vector<TestFile*>::const_iterator i    = files.begin();
@@ -212,7 +242,14 @@ TEST_F (T_AsyncReader, FileReadCallback) {
 
   EXPECT_EQ (file_count, g_FileReadCallback_Callback_calls)
     << "number of callback invocation does not match";
+
+  reader.TearDown();
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 TEST_F (T_AsyncReader, ReadHugeFile) {
@@ -222,14 +259,23 @@ TEST_F (T_AsyncReader, ReadHugeFile) {
   const unsigned int  max_buffers_in_flight = 10;
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
+  reader.Initialize();
+
   reader.ScheduleRead(f);
   reader.Wait();
 
   f->CheckHash();
+
+  reader.TearDown();
 }
 
 
-TEST_F (T_AsyncReader, ReadManyBigFile) {
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F (T_AsyncReader, ReadManyBigFiles) {
   const int file_count = 5000;
 
   std::vector<TestFile*> files;
@@ -241,6 +287,7 @@ TEST_F (T_AsyncReader, ReadManyBigFile) {
   const size_t        max_buffer_size = 524288;
   const unsigned int  max_buffers_in_flight = 5; // less buffers than files
   MyReader reader(max_buffer_size, max_buffers_in_flight);
+  reader.Initialize();
 
   std::vector<TestFile*>::const_iterator i    = files.begin();
   std::vector<TestFile*>::const_iterator iend = files.end();
@@ -255,7 +302,14 @@ TEST_F (T_AsyncReader, ReadManyBigFile) {
   for (; j < jend; ++j) {
     (*j)->CheckHash();
   }
+
+  reader.TearDown();
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 void *deadlock_test(void *v_files) {
@@ -264,6 +318,7 @@ void *deadlock_test(void *v_files) {
   const size_t        max_buffer_size = 524288;
   const unsigned int  max_buffers_in_flight = 5; // less buffers than files
   T_AsyncReader::MyReader reader(max_buffer_size, max_buffers_in_flight);
+  reader.Initialize();
 
   // do multiple waits (empty queue... should return immediately)
   reader.Wait();
@@ -292,6 +347,8 @@ void *deadlock_test(void *v_files) {
   for (; j < jend; ++j) {
     (*j)->CheckHash();
   }
+
+  reader.TearDown();
 
   return (void*)1337;
 }

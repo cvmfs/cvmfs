@@ -4,7 +4,7 @@
  *
  * CernVM-FS shows a remote HTTP directory as local file system.  The client
  * sees all available files.  On first access, a file is downloaded and
- * cached locally.  All downloaded pieces are verified with SHA1.
+ * cached locally.  All downloaded pieces are verified by a cryptographic hash.
  *
  * To do so, a directory hive has to be transformed into a CVMFS2
  * "repository".  This can be done by the CernVM-FS server tools.
@@ -514,6 +514,7 @@ int cvmfs_int_init(
   cvmfs::download_manager_->SetProxyChain(
     download::ResolveProxyDescription(cvmfs_opts_proxies,
                                       cvmfs::download_manager_));
+  //cvmfs::download_manager_->EnableInfoHeader();
   download_ready = true;
 
   cvmfs::signature_manager_ = new signature::SignatureManager();
@@ -542,7 +543,7 @@ int cvmfs_int_init(
                           cvmfs::download_manager_);
   if (!cvmfs_opts_root_hash.empty()) {
     retval = cvmfs::catalog_manager_->InitFixed(
-      shash::Any(shash::kSha1, shash::HexPtr(string(cvmfs_opts_root_hash))));
+      shash::MkFromHexPtr(shash::HexPtr(string(cvmfs_opts_root_hash))));
   } else {
     retval = cvmfs::catalog_manager_->Init();
   }
@@ -637,8 +638,9 @@ int cvmfs_open(const char *c_path)
     return -ENOENT;
   }
 
+  const bool volatile_content = false;
   fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()),
-                          cvmfs::download_manager_);
+                          volatile_content, cvmfs::download_manager_);
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {

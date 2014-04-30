@@ -15,11 +15,13 @@
 using namespace upload;
 
 FileProcessor::FileProcessor(AbstractUploader *uploader,
+                             const shash::Algorithms hash_algorithm,
                              const bool        enable_file_chunking,
                              const size_t      minimal_chunk_size,
                              const size_t      average_chunk_size,
                              const size_t      maximal_chunk_size) :
   io_dispatcher_(new IoDispatcher(uploader, this)),
+  hash_algorithm_(hash_algorithm),
   chunking_enabled_(enable_file_chunking),
   minimal_chunk_size_(minimal_chunk_size),
   average_chunk_size_(average_chunk_size),
@@ -51,6 +53,7 @@ void FileProcessor::Process(const std::string  &local_path,
   File *file = new File(local_path,
                         io_dispatcher_,
                         chunk_detector,
+                        hash_algorithm_,
                         hash_suffix);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Scheduling '%s' for processing ("

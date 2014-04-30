@@ -43,10 +43,11 @@ Catalog* Catalog::AttachFreely(const string     &root_path,
 Catalog::Catalog(const PathString &path,
                  const shash::Any &catalog_hash,
                  Catalog *parent) :
-  read_only_(true),
   catalog_hash_(catalog_hash),
   path_(path),
+  volatile_flag_(false),
   parent_(parent),
+  nested_catalog_cache_dirty_(true),
   initialized_(false)
 {
   max_row_id_ = 0;
@@ -56,7 +57,6 @@ Catalog::Catalog(const PathString &path,
   assert(retval == 0);
 
   database_ = NULL;
-  nested_catalog_cache_ = NULL;
   uid_map_ = NULL;
   gid_map_ = NULL;
   sql_listing_ = NULL;
@@ -74,7 +74,6 @@ Catalog::~Catalog() {
   free(lock_);
   FinalizePreparedStatements();
   delete database_;
-  delete nested_catalog_cache_;
 }
 
 
@@ -116,6 +115,17 @@ bool Catalog::InitStandalone(const std::string &database_file) {
   inode_range.MakeDummy();
   set_inode_range(inode_range);
   return true;
+}
+
+
+bool Catalog::ReadCatalogCounters() {
+  assert (database_ != NULL && database_->ready());
+  const bool statistics_loaded =
+    (database().schema_version() < Database::kLatestSupportedSchema -
+                                   Database::kSchemaEpsilon)
+      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
+      : counters_.ReadFromDatabase(database());
+  return statistics_loaded;
 }
 
 
@@ -162,16 +172,17 @@ bool Catalog::OpenDatabase(const string &db_path) {
     }
   }
 
+  // Get volatile content flag
+  Sql sql_volatile_flag(database(), "SELECT value FROM properties "
+                        "WHERE key='volatile';");
+  if (sql_volatile_flag.FetchRow())
+    volatile_flag_ = sql_volatile_flag.RetrieveInt(0);
+
   // Read Catalog Counter Statistics
-  const bool statistics_loaded =
-    (database().schema_version() < Database::kLatestSupportedSchema -
-                                   Database::kSchemaEpsilon)
-      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
-      : counters_.ReadFromDatabase(database());
-  if (! statistics_loaded) {
+  if (! ReadCatalogCounters()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load statistics counters for catalog %s (file %s)",
-             root_prefix_.c_str(), db_path.c_str());
+             path_.c_str(), db_path.c_str());
     return false;
   }
 
@@ -337,7 +348,13 @@ bool Catalog::AllChunksEnd() {
 }
 
 
+/**
+ * Hash algorithm is given by the unchunked file.
+ * Could be figured out by a join but it is faster if the user of this
+ * method tells us.
+ */
 bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
+                                const shash::Algorithms interpret_hashes_as,
                                 FileChunkList    *chunks) const
 {
   assert(IsInitialized() && chunks->IsEmpty());
@@ -345,7 +362,7 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
   pthread_mutex_lock(lock_);
   sql_chunks_listing_->BindPathHash(md5path);
   while (sql_chunks_listing_->FetchRow()) {
-    chunks->PushBack(sql_chunks_listing_->GetFileChunk());
+    chunks->PushBack(sql_chunks_listing_->GetFileChunk(interpret_hashes_as));
   }
   sql_chunks_listing_->Reset();
   pthread_mutex_unlock(lock_);
@@ -395,11 +412,11 @@ shash::Any Catalog::GetPreviousRevision() const {
   const string sql =
     "SELECT value FROM properties WHERE key='previous_revision';";
 
-  shash::Any result(shash::kSha1);
+  shash::Any result;
   pthread_mutex_lock(lock_);
   Sql stmt(database(), sql);
   if (stmt.FetchRow())
-    result = stmt.RetrieveSha1Hex(0);
+    result = stmt.RetrieveHashHex(0);
   pthread_mutex_unlock(lock_);
 
   return result;
@@ -460,37 +477,39 @@ uint64_t Catalog::GetRowIdFromInode(const inode_t inode) const {
 
 /**
  * Get a list of all registered nested catalogs in this catalog.
- * @return a list of all nested catalog references of this catalog.
- *         The potinter's ownership remains at the catalog object
+ * @return  a list of all nested catalog references of this catalog.
  */
-Catalog::NestedCatalogList *Catalog::ListNestedCatalogs() const {
-  NestedCatalogList *result;
-
+const Catalog::NestedCatalogList& Catalog::ListNestedCatalogs() const {
   pthread_mutex_lock(lock_);
-  // Ideally, the list of nested catalogs is already cached
-  if (read_only_) {
-    if (nested_catalog_cache_) {
-      pthread_mutex_unlock(lock_);
-      return nested_catalog_cache_;
+
+  if (nested_catalog_cache_dirty_) {
+    LogCvmfs(kLogCatalog, kLogDebug, "refreshing nested catalog cache of '%s'",
+             path().c_str());
+    while (sql_list_nested_->FetchRow()) {
+      NestedCatalog nested;
+      nested.path = sql_list_nested_->GetMountpoint();
+      nested.hash = sql_list_nested_->GetContentHash();
+      nested.size = sql_list_nested_->GetSize();
+      nested_catalog_cache_.push_back(nested);
     }
-    nested_catalog_cache_ = new NestedCatalogList();
-  } else {
-    delete nested_catalog_cache_;
-    nested_catalog_cache_ = new NestedCatalogList();
+    sql_list_nested_->Reset();
+    nested_catalog_cache_dirty_ = false;
   }
-  result = nested_catalog_cache_;
 
-  while (sql_list_nested_->FetchRow()) {
-    NestedCatalog nested;
-    nested.path = sql_list_nested_->GetMountpoint();
-    nested.hash = sql_list_nested_->GetContentHash();
-    nested.size = sql_list_nested_->GetSize();
-    result->push_back(nested);
-  }
-  sql_list_nested_->Reset();
   pthread_mutex_unlock(lock_);
+  return nested_catalog_cache_;
+}
 
-  return result;
+
+/**
+ * Drops the nested catalog cache. Usually this is only useful in subclasses
+ * that implement writable catalogs.
+ */
+void Catalog::ResetNestedCatalogCache() {
+  pthread_mutex_lock(lock_);
+  nested_catalog_cache_.clear();
+  nested_catalog_cache_dirty_ = true;
+  pthread_mutex_unlock(lock_);
 }
 
 

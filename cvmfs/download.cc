@@ -60,32 +60,79 @@ using namespace std;  // NOLINT
 
 namespace download {
 
+
+static inline bool EscapeUrlChar(char input, char output[3]) {
+  if (((input >= '0') && (input <= '9')) ||
+      ((input >= 'A') && (input <= 'Z')) ||
+      ((input >= 'a') && (input <= 'z')) ||
+      (input == '/') || (input == ':') || (input == '.') ||
+      (input == '+') || (input == '-') ||
+      (input == '[') || (input == ']'))
+  {
+    output[0] = input;
+    return false;
+  }
+
+  output[0] = '%';
+  output[1] = (input / 16) + ((input / 16 <= 9) ? '0' : 'A'-10);
+  output[2] = (input % 16) + ((input % 16 <= 9) ? '0' : 'A'-10);
+  return true;
+}
+
+
 /**
  * Escape special chars from the URL, except for ':' and '/',
  * which should keep their meaning.
  */
 static string EscapeUrl(const string &url) {
   string escaped;
+  escaped.reserve(url.length());
 
+  char escaped_char[3];
   for (unsigned i = 0, s = url.length(); i < s; ++i) {
-    if (((url[i] >= '0') && (url[i] <= '9')) ||
-        ((url[i] >= 'A') && (url[i] <= 'Z')) ||
-        ((url[i] >= 'a') && (url[i] <= 'z')) ||
-        (url[i] == '/') || (url[i] == ':') || (url[i] == '.') ||
-        (url[i] == '+') || (url[i] == '-') ||
-        (url[i] == '[') || (url[i] == ']'))
-    {
-      escaped += url[i];
-    } else {
-      escaped += '%';
-      escaped += (url[i] / 16) + ((url[i] / 16 <= 9) ? '0' : 'A'-10);
-      escaped += (url[i] % 16) + ((url[i] % 16 <= 9) ? '0' : 'A'-10);
-    }
+    if (EscapeUrlChar(url[i], escaped_char))
+      escaped.append(escaped_char, 3);
+    else
+      escaped.push_back(escaped_char[0]);
   }
   LogCvmfs(kLogDownload, kLogDebug, "escaped %s to %s",
            url.c_str(), escaped.c_str());
 
   return escaped;
+}
+
+
+/**
+ * escaped array needs to be sufficiently large.  It's size is calculated by
+ * passing NULL to EscapeHeader.
+ */
+static unsigned EscapeHeader(const string &header,
+                             char *escaped_buf,
+                             size_t buf_size)
+{
+  unsigned esc_pos = 0;
+  char escaped_char[3];
+  for (unsigned i = 0, s = header.size(); i < s; ++i) {
+    if (EscapeUrlChar(header[i], escaped_char)) {
+      for (unsigned j = 0; j < 3; ++j) {
+        if (escaped_buf) {
+          if (esc_pos >= buf_size)
+            return esc_pos;
+          escaped_buf[esc_pos] = escaped_char[j];
+        }
+        esc_pos++;
+      }
+    } else {
+      if (escaped_buf) {
+        if (esc_pos >= buf_size)
+          return esc_pos;
+        escaped_buf[esc_pos] = escaped_char[0];
+      }
+      esc_pos++;
+    }
+  }
+
+  return esc_pos;
 }
 
 
@@ -138,7 +185,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
         // 5XX returned by host
         info->error_code = kFailHostHttp;
       } else if ((header_line.length() > i+2) && (header_line[i] == '4') &&
-                 (header_line[i+1] == '0') && (header_line[i] == '4'))
+                 (header_line[i+1] == '0') && (header_line[i+2] == '4'))
       {
         // 404: the stratum 1 does not have the newest files
         info->error_code = kFailHostHttp;
@@ -187,8 +234,10 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   if (info->destination == kDestinationMem) {
     // Write to memory
-    if (info->destination_mem.pos + num_bytes > info->destination_mem.size)
+    if (info->destination_mem.pos + num_bytes > info->destination_mem.size) {
+      info->error_code = kFailBadData;
       return 0;
+    }
     memcpy(info->destination_mem.data + info->destination_mem.pos,
            ptr, num_bytes);
     info->destination_mem.pos += num_bytes;
@@ -227,8 +276,11 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 /**
  * Called when new curl sockets arrive or existing curl sockets depart.
  */
-int DownloadManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
-                                        void *userp, void *socketp)
+int DownloadManager::CallbackCurlSocket(CURL *easy,
+                                        curl_socket_t s,
+                                        int action,
+                                        void *userp,
+                                        void *socketp)
 {
   //LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
   //         "handle %p, socket %d, action %d", easy, s, action);
@@ -435,6 +487,101 @@ void *DownloadManager::MainDownload(void *data) {
 //------------------------------------------------------------------------------
 
 
+HeaderLists::~HeaderLists() {
+  for (unsigned i = 0; i < blocks_.size(); ++i) {
+    delete[] blocks_[i];
+  }
+  blocks_.clear();
+}
+
+
+curl_slist *HeaderLists::GetList(const char *header) {
+  return Get(header);
+}
+
+
+curl_slist *HeaderLists::DuplicateList(curl_slist *slist) {
+  assert(slist);
+  curl_slist *copy = GetList(slist->data);
+  copy->next = slist->next;
+  curl_slist *prev = copy;
+  slist = slist->next;
+  while (slist) {
+    curl_slist *new_link = Get(slist->data);
+    new_link->next = slist->next;
+    prev->next = new_link;
+    prev = new_link;
+    slist = slist->next;
+  }
+  return copy;
+}
+
+
+void HeaderLists::AppendHeader(curl_slist *slist, const char *header) {
+  assert(slist);
+  curl_slist *new_link = Get(header);
+  new_link->next = NULL;
+
+  while (slist->next)
+    slist = slist->next;
+  slist->next = new_link;
+}
+
+
+void HeaderLists::PutList(curl_slist *slist) {
+  while (slist) {
+    curl_slist *next = slist->next;
+    Put(slist);
+    slist = next;
+  }
+}
+
+
+string HeaderLists::Print(curl_slist *slist) {
+  string verbose;
+  while (slist) {
+    verbose += string(slist->data) + "\n";
+    slist = slist->next;
+  }
+  return verbose;
+}
+
+
+curl_slist *HeaderLists::Get(const char *header) {
+  for (unsigned i = 0; i < blocks_.size(); ++i) {
+    for (unsigned j = 0; j < kBlockSize; ++j) {
+      if (!IsUsed(&(blocks_[i][j]))) {
+        blocks_[i][j].data = const_cast<char *>(header);
+        return &(blocks_[i][j]);
+      }
+    }
+  }
+
+  // All used, new block
+  AddBlock();
+  blocks_[blocks_.size()-1][0].data = const_cast<char *>(header);
+  return &(blocks_[blocks_.size()-1][0]);
+}
+
+
+void HeaderLists::Put(curl_slist *slist) {
+  slist->data = NULL;
+  slist->next = NULL;
+}
+
+
+void HeaderLists::AddBlock(){
+  curl_slist *new_block = new curl_slist[kBlockSize];
+  for (unsigned i = 0; i < kBlockSize; ++i) {
+    Put(&new_block[i]);
+  }
+  blocks_.push_back(new_block);
+}
+
+
+//------------------------------------------------------------------------------
+
+
 /**
  * Gets an idle CURL handle from the pool. Creates a new one and adds it to
  * the pool if necessary.
@@ -489,6 +636,10 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   info->num_used_hosts = 1;
   info->num_retries = 0;
   info->backoff_ms = 0;
+  info->headers = header_lists_->DuplicateList(default_headers_);
+  if (info->info_header) {
+    header_lists_->AppendHeader(info->headers, info->info_header);
+  }
   if (info->compressed) {
     zlib::DecompressInit(&(info->zstream));
   }
@@ -509,7 +660,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   curl_easy_setopt(handle, CURLOPT_WRITEHEADER,
                    static_cast<void *>(info));
   curl_easy_setopt(handle, CURLOPT_WRITEDATA, static_cast<void *>(info));
-  curl_easy_setopt(handle, CURLOPT_HTTPHEADER, http_headers_);
+  curl_easy_setopt(handle, CURLOPT_HTTPHEADER, info->headers);
   if (info->head_request)
     curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
   else
@@ -838,8 +989,9 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     bool switch_host = false;
     switch (info->error_code) {
       case kFailBadData:
-        curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER,
-                         http_headers_nocache_);
+        header_lists_->AppendHeader(info->headers, "Pragma: no-cache");
+        header_lists_->AppendHeader(info->headers, "Cache-Control: no-cache");
+        curl_easy_setopt(info->curl_handle, CURLOPT_HTTPHEADER, info->headers);
         info->nocache = true;
         break;
       case kFailProxyResolve:
@@ -896,6 +1048,11 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   if (info->compressed)
     zlib::DecompressFini(&info->zstream);
 
+  if (info->headers) {
+    header_lists_->PutList(info->headers);
+    info->headers = NULL;
+  }
+
   return false;  // stop transfer and return to Fetch()
 }
 
@@ -905,8 +1062,7 @@ DownloadManager::DownloadManager() {
   pool_handles_inuse_ = NULL;
   pool_max_handles_ = 0;
   curl_multi_ = NULL;
-  http_headers_ = NULL;
-  http_headers_nocache_ = NULL;
+  default_headers_ = NULL;
 
   atomic_init32(&multi_threaded_);
   pipe_terminate_[0] = pipe_terminate_[1] = -1;
@@ -939,7 +1095,7 @@ DownloadManager::DownloadManager() {
   opt_max_retries_ = 0;
   opt_backoff_init_ms_ = 0;
   opt_backoff_max_ms_ = 0;
-
+  enable_info_header_ = false;
   opt_ipv4_only_ = false;
 
   opt_timestamp_backup_proxies_ = 0;
@@ -957,6 +1113,35 @@ DownloadManager::~DownloadManager() {
   pthread_mutex_destroy(lock_synchronous_mode_);
   free(lock_options_);
   free(lock_synchronous_mode_);
+}
+
+void DownloadManager::InitHeaders() {
+  // User-Agent
+  string cernvm_id = "User-Agent: cvmfs ";
+#ifdef CVMFS_LIBCVMFS
+  cernvm_id += "libcvmfs ";
+#else
+  cernvm_id += "Fuse ";
+#endif
+  cernvm_id += string(VERSION);
+  if (getenv("CERNVM_UUID") != NULL) {
+    cernvm_id += " " +
+    sanitizer::InputSanitizer("az AZ 09 -").Filter(getenv("CERNVM_UUID"));
+  }
+  user_agent_ = strdup(cernvm_id.c_str());
+
+  header_lists_ = new HeaderLists();
+
+  default_headers_ = header_lists_->GetList("Connection: Keep-Alive");
+  header_lists_->AppendHeader(default_headers_, "Pragma:");
+  header_lists_->AppendHeader(default_headers_, user_agent_);
+}
+
+
+void DownloadManager::FiniHeaders() {
+  delete header_lists_;
+  header_lists_ = NULL;
+  default_headers_ = NULL;
 }
 
 
@@ -980,28 +1165,8 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 
   statistics_ = new Statistics();
 
-  // Prepare HTTP headers
-  string cernvm_id = "User-Agent: cvmfs ";
-#ifdef CVMFS_LIBCVMFS
-  cernvm_id += "libcvmfs ";
-#else
-  cernvm_id += "Fuse ";
-#endif
-  cernvm_id += string(VERSION);
-  if (getenv("CERNVM_UUID") != NULL) {
-    cernvm_id += " " +
-      sanitizer::InputSanitizer("az AZ 09 -").Filter(getenv("CERNVM_UUID"));
-  }
-
-  http_headers_ = curl_slist_append(http_headers_, "Connection: Keep-Alive");
-  http_headers_ = curl_slist_append(http_headers_, "Pragma:");
-  http_headers_ = curl_slist_append(http_headers_, cernvm_id.c_str());
-  http_headers_nocache_ = curl_slist_append(http_headers_nocache_,
-                                            "Pragma: no-cache");
-  http_headers_nocache_ = curl_slist_append(http_headers_nocache_,
-                                            "Cache-Control: no-cache");
-  http_headers_nocache_ = curl_slist_append(http_headers_nocache_,
-                                            cernvm_id.c_str());
+  user_agent_ = NULL;
+  InitHeaders();
 
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
@@ -1051,14 +1216,15 @@ void DownloadManager::Fini() {
   }
   delete pool_handles_idle_;
   delete pool_handles_inuse_;
-  curl_slist_free_all(http_headers_);
-  curl_slist_free_all(http_headers_nocache_);
   curl_multi_cleanup(curl_multi_);
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
-  http_headers_ = NULL;
-  http_headers_nocache_ = NULL;
   curl_multi_ = NULL;
+
+  FiniHeaders();
+  if (user_agent_)
+    free(user_agent_);
+  user_agent_ = NULL;
 
   delete statistics_;
   statistics_ = NULL;
@@ -1109,6 +1275,20 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     info->hash_context.buffer = alloca(info->hash_context.size);
   }
 
+  // Prepare cvmfs-info: header, allocate string on the stack
+  info->info_header = NULL;
+  if (enable_info_header_ && info->extra_info) {
+    const char *header_name = "cvmfs-info: ";
+    const size_t header_name_len = strlen(header_name);
+    const unsigned header_size = 1 + header_name_len +
+      EscapeHeader(*(info->extra_info), NULL, 0);
+    info->info_header = static_cast<char *>(alloca(header_size));
+    memcpy(info->info_header, header_name, header_name_len);
+    EscapeHeader(*(info->extra_info), info->info_header + header_name_len,
+                 header_size - header_name_len);
+    info->info_header[header_size-1] = '\0';
+  }
+
   if (atomic_xadd32(&multi_threaded_, 0) == 1) {
     if (info->wait_at[0] == -1) {
       MakePipe(info->wait_at);
@@ -1139,7 +1319,8 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   }
 
   if (result != kFailOk) {
-    LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d)", result);
+    LogCvmfs(kLogDownload, kLogDebug, "download failed (error %d - %s)", result,
+             Code2Ascii(result));
 
     if (info->destination == kDestinationPath)
       unlink(info->destination_path->c_str());
@@ -1426,8 +1607,8 @@ void DownloadManager::ProbeHosts() {
         LogCvmfs(kLogDownload, kLogDebug, "probing host %s had %dms rtt",
                  url.c_str(), host_rtt[i]);
       } else {
-        LogCvmfs(kLogDownload, kLogDebug, "error while probing host %s: %d",
-                 url.c_str(), result);
+        LogCvmfs(kLogDownload, kLogDebug, "error while probing host %s: %d - %s",
+                 url.c_str(), result, Code2Ascii(result));
         host_rtt[i] = INT_MAX;
       }
     }
@@ -1630,7 +1811,12 @@ void DownloadManager::SetRetryParameters(const unsigned max_retries,
 }
 
 
-void DownloadManager::ActivatePipelining() {
+void DownloadManager::EnableInfoHeader() {
+  enable_info_header_ = true;
+}
+
+
+void DownloadManager::EnablePipelining() {
   curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 }
 

@@ -1,12 +1,14 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * Careful: any real schema migration as of now requires taking care of
+ * hash algorithm
  */
 
 #include "swissknife_migrate.h"
 
 #include <sys/resource.h>
 
-#include "catalog_traversal.h"
 #include "catalog_sql.h"
 #include "catalog_rw.h"
 #include "logging.h"
@@ -118,7 +120,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   // Create an upstream spooler
   temporary_directory_ = decompress_tmp_dir;
-  const upload::SpoolerDefinition spooler_definition(spooler);
+  const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_) {
     Error("Failed to create upstream Spooler.");
@@ -129,14 +131,13 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
-  CatalogTraversal<CommandMigrate, WritableCatalog> traversal(
-    this,
-    &CommandMigrate::CatalogCallback,
+  CatalogTraversal<WritableCatalog> traversal(
     repo_url,
     repo_name,
     repo_keys,
     generate_full_catalog_tree,
     decompress_tmp_dir);
+  traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
   catalog_loading_stopwatch_.Start();
   const bool loading_successful = traversal.Traverse();
   catalog_loading_stopwatch_.Stop();
@@ -248,12 +249,7 @@ bool CommandMigrate::DoMigrationAndCommit(
            "\nCommitting migrated repository revision...");
   const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash.Get();
   const std::string &root_catalog_path = root_catalog->root_path();
-  const int64_t root_catalog_size =
-    GetFileSize(root_catalog->new_catalog->database_path());
-  if (root_catalog_size <= 0) {
-    Error("Getting root catalog file size failed.\nAborting...");
-    return false;
-  }
+  const size_t root_catalog_size = root_catalog->new_catalog_size.Get();
   manifest::Manifest manifest(root_catalog_hash, root_catalog_size,
                               root_catalog_path);
   const Catalog* new_catalog = (root_catalog->HasNew())
@@ -273,28 +269,25 @@ bool CommandMigrate::DoMigrationAndCommit(
 }
 
 
-void CommandMigrate::CatalogCallback(const Catalog*    catalog,
-                                     const shash::Any& catalog_hash,
-                                     const unsigned    tree_level)
-{
+void CommandMigrate::CatalogCallback(const CatalogTraversalData &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string path;
 
-  for (unsigned int i = 1; i < tree_level; ++i) {
+  for (unsigned int i = 1; i < data.tree_level; ++i) {
     tree_indent += "\u2502  ";
   }
 
-  if (tree_level > 0) {
+  if (data.tree_level > 0) {
     tree_indent += "\u251C\u2500 ";
   }
 
-  hash_string = catalog_hash.ToString();
+  hash_string = data.catalog_hash.ToString();
 
-  path = catalog->path().ToString();
+  path = data.catalog->path().ToString();
   if (path.empty()) {
     path = "/";
-    root_catalog_ = catalog;
+    root_catalog_ = data.catalog;
   }
 
   LogCvmfs(kLogCatalog, kLogStdout, "%s%s %s",
@@ -324,6 +317,15 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
     pending_catalogs_[path] = data;
   }
   catalog_statistics_list_.Insert(data->statistics);
+
+  // check the size of the uncompressed catalog file
+  size_t new_catalog_size = GetFileSize(path);
+  if (new_catalog_size <= 0) {
+    Error("Failed to get uncompressed file size of catalog!", data);
+    exit(2);
+    return;
+  }
+  data->new_catalog_size.Set(new_catalog_size);
 
   // Schedule the compression and upload of the catalog
   spooler_->ProcessCatalog(path);
@@ -524,7 +526,8 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::UpdateNestedCatalogRefer
   const Database &writable = new_catalog->database();
 
   Sql add_nested_catalog(writable,
-    "INSERT OR REPLACE INTO nested_catalogs (path, sha1) VALUES (:path, :sha1);"
+    "INSERT OR REPLACE INTO nested_catalogs (path,   sha1,  size) "
+    "                VALUES                 (:path, :sha1, :size);"
   );
 
   // go through all nested catalogs and update their references (we are curently
@@ -533,14 +536,16 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::UpdateNestedCatalogRefer
   PendingCatalogList::const_iterator i    = data->nested_catalogs.begin();
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
-    PendingCatalog *nested_catalog = *i;
-    const std::string &root_path   = nested_catalog->root_path();
-    const shash::Any catalog_hash  = nested_catalog->new_catalog_hash.Get();
+    PendingCatalog    *nested_catalog  = *i;
+    const std::string &root_path       = nested_catalog->root_path();
+    const shash::Any   catalog_hash    = nested_catalog->new_catalog_hash.Get();
+    const size_t       catalog_size    = nested_catalog->new_catalog_size.Get();
 
     // insert the updated nested catalog reference into the new catalog
     const bool retval =
-      add_nested_catalog.BindText(1, root_path)               &&
-      add_nested_catalog.BindText(2, catalog_hash.ToString()) &&
+      add_nested_catalog.BindText (1, root_path)               &&
+      add_nested_catalog.BindText (2, catalog_hash.ToString()) &&
+      add_nested_catalog.BindInt64(3, catalog_size)            &&
       add_nested_catalog.Execute();
     if (! retval) {
       Error("Failed to add nested catalog link", add_nested_catalog, data);
@@ -639,7 +644,8 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
     Error("Failed to create temporary file for the new catalog database.");
     return false;
   }
-  retval = Database::Create(catalog_db, root_path);
+  const bool volatile_content = false;
+  retval = Database::Create(catalog_db, root_path, volatile_content);
   if (!retval) {
     Error("Failed to create database for new catalog");
     unlink(catalog_db.c_str());
@@ -1026,8 +1032,8 @@ bool CommandMigrate::MigrationWorker_20x::MigrateNestedCatalogMountPoints(
     const shash::Md5 mountpoint_hash = shash::Md5(root_path.data(),
                                                   root_path.size());
     retval =
-      update_mntpnt_linkcount.BindInt64(1, root_entry.linkcount());
-      update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash);
+      update_mntpnt_linkcount.BindInt64(1, root_entry.linkcount()) &&
+      update_mntpnt_linkcount.BindMd5(2, 3, mountpoint_hash)       &&
       update_mntpnt_linkcount.Execute();
     if (!retval) {
       Error("Failed to update linkcount of nested catalog mountpoint",

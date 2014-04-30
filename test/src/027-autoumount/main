@@ -10,13 +10,13 @@ cvmfs_run_test() {
   local pid=$(sudo cvmfs_talk -i atlas pid)
   sudo kill -11 $pid || return 3
 
-  sleep 10
+  sleep 20
   ls .
   if [ $? -eq 0 ]; then
     return 4
   fi
   cd $OLDPWD
-  ls /cvmfs/atlas.cern.ch || return 4
+  ls /cvmfs/atlas.cern.ch || return 5
 
   return 0
 }

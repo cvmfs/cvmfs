@@ -5,6 +5,7 @@
 #ifndef UPLOAD_FILE_PROCESSING_FILE_PROCESSOR_H_
 #define UPLOAD_FILE_PROCESSING_FILE_PROCESSOR_H_
 
+#include "../hash.h"
 #include "../util.h"
 #include "../util_concurrency.h"
 #include "../upload_spooler_result.h"
@@ -71,6 +72,7 @@ class File;
 class FileProcessor : public Observable<SpoolerResult> {
  public:
   FileProcessor(AbstractUploader  *uploader,
+                const shash::Algorithms hash_algorithm,
                 const bool         enable_file_chunking,
                 const size_t       minimal_chunk_size = 2 * 1024 * 1024,
                 const size_t       average_chunk_size = 4 * 1024 * 1024,
@@ -90,10 +92,11 @@ class FileProcessor : public Observable<SpoolerResult> {
  private:
   IoDispatcher  *io_dispatcher_;
 
-  const bool     chunking_enabled_;
-  const size_t   minimal_chunk_size_;
-  const size_t   average_chunk_size_;
-  const size_t   maximal_chunk_size_;
+  shash::Algorithms  hash_algorithm_;
+  const bool         chunking_enabled_;
+  const size_t       minimal_chunk_size_;
+  const size_t       average_chunk_size_;
+  const size_t       maximal_chunk_size_;
 };
 
 }

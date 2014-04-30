@@ -169,8 +169,8 @@ cvmfs_run_test() {
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "retrieving name of root catalog for later comparison"
   local old_root_catalog=$(cvmfs_swissknife info -r /srv/cvmfs/${CVMFS_TEST_REPO} -c)
@@ -192,8 +192,8 @@ cvmfs_run_test() {
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "retrieving name of new root catalog"
   local new_root_catalog=$(cvmfs_swissknife info -r /srv/cvmfs/${CVMFS_TEST_REPO} -c)

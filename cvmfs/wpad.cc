@@ -22,13 +22,15 @@ using namespace std;  // NOLINT
 
 namespace download {
 
+const char *kAutoPacLocation = "http://wpad/wpad.dat";
+
 static int PrintPacError(const char *fmt, va_list argp) {
   char *msg = NULL;
 
   int retval = vasprintf(&msg, fmt, argp);
   assert(retval != -1);  // else: out of memory
 
-  LogCvmfs(kLogDownload, kLogDebug, "(pacparser) %s", msg);
+  LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "(pacparser) %s", msg);
   free(msg);
   return retval;
 }
@@ -154,14 +156,17 @@ string AutoProxy(DownloadManager *download_manager) {
   }
 
   vector<string> pac_paths;
-  char *pac_env = getenv("PAC_URLS");
+  char *pac_env = getenv("CVMFS_PAC_URLS");
   if (pac_env != NULL)
     pac_paths = SplitString(pac_env, ';');
-  pac_paths.push_back("http://wpad/wpad.dat");
-  pac_paths.push_back("http://wlcg-wpad.cern.ch/wpad.dat");
 
   // Try downloading from each of the PAC URLs
   for (unsigned i = 0; i < pac_paths.size(); ++i) {
+    if (pac_paths[i] == "auto") {
+      LogCvmfs(kLogDownload, kLogDebug, "resolving auto proxy config to %s",
+               kAutoPacLocation);
+      pac_paths[i] = string(kAutoPacLocation);
+    }
     LogCvmfs(kLogDownload, kLogDebug, "looking for proxy config at %s",
              pac_paths[i].c_str());
     download::JobInfo download_pac(&pac_paths[i], false, false, NULL);

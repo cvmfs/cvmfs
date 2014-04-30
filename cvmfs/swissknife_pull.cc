@@ -41,6 +41,7 @@ namespace {
 
 struct ChunkJob {
   unsigned char type;
+  shash::Algorithms hash_algorithm;
   unsigned char digest[shash::kMaxDigestSize];
 };
 
@@ -129,7 +130,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   assert(ftmp);
   int retval;
   if (compress) {
-    shash::Any dummy(shash::kSha1);
+    shash::Any dummy(shash::kSha1);  // hardcoded hash no problem, unsused
     retval = zlib::CompressMem2File(buffer, size, ftmp, &dummy);
   } else {
     retval = CopyMem2File(buffer, size, ftmp);
@@ -154,8 +155,8 @@ static void *MainWorker(void *data) {
     if (next_chunk.type == 255)
       break;
 
-    shash::Any chunk_hash(shash::kSha1, next_chunk.digest,
-                          shash::kDigestSizes[shash::kSha1]);
+    shash::Any chunk_hash(next_chunk.hash_algorithm, next_chunk.digest,
+                          shash::kDigestSizes[next_chunk.hash_algorithm]);
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
     string chunk_path = "data" + chunk_hash.MakePath(1, 2);
@@ -176,8 +177,9 @@ static void *MainWorker(void *data) {
       do {
         retval = g_download_manager->Fetch(&download_chunk);
         if (retval != download::kFailOk) {
-          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d), abort",
-                   url_chunk.c_str(), retval);
+          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s), "
+                   "abort", url_chunk.c_str(),
+                   retval, download::Code2Ascii(retval));
           abort();
         }
         attempts++;
@@ -198,6 +200,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
                  const bool with_nested)
 {
   int retval;
+  download::Failures dl_retval;
 
   // Check if the catalog already exists
   if (Peek("data" + catalog_hash.MakePath(1, 2), 'C')) {
@@ -232,11 +235,12 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
                              catalog_hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url_catalog, false, false,
                                      fcatalog_vanilla, &catalog_hash);
-  retval = g_download_manager->Fetch(&download_catalog);
+  dl_retval = g_download_manager->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
-  if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d)",
-             catalog_hash.ToString().c_str(), retval);
+  if (dl_retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d - %s)",
+             catalog_hash.ToString().c_str(), dl_retval,
+             download::Code2Ascii(dl_retval));
     goto pull_cleanup;
   }
   retval = zlib::DecompressPath2Path(file_catalog_vanilla, file_catalog);
@@ -273,7 +277,8 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
       default:
         next_chunk.type = '\0';
     }
-    memcpy(next_chunk.digest, chunk_hash.digest, sizeof(chunk_hash.digest));
+    next_chunk.hash_algorithm = chunk_hash.algorithm;
+    memcpy(next_chunk.digest, chunk_hash.digest, chunk_hash.GetDigestSize());
     WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
     atomic_inc64(&chunk_queue);
   }
@@ -302,11 +307,10 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
 
   // Nested catalogs
   if (with_nested) {
-    catalog::Catalog::NestedCatalogList *nested_catalogs =
+    const catalog::Catalog::NestedCatalogList &nested_catalogs =
       catalog->ListNestedCatalogs();
-    assert(nested_catalogs);
     for (catalog::Catalog::NestedCatalogList::const_iterator i =
-         nested_catalogs->begin(), iEnd = nested_catalogs->end();
+         nested_catalogs.begin(), iEnd = nested_catalogs.end();
          i != iEnd; ++i)
     {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
@@ -333,8 +337,11 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
 
 int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int retval;
+  manifest::Failures m_retval;
+  download::Failures dl_retval;
   unsigned timeout = 10;
   int fd_lockfile = -1;
+  string spooler_definition_str;
   manifest::ManifestEnsemble ensemble;
 
   // Option parsing
@@ -354,10 +361,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (preload_cache) {
     preload_cachedir = new string(*args.find('r')->second);
   } else {
-    const upload::SpoolerDefinition spooler_definition(*args.find('r')->second);
-    spooler = upload::Spooler::Construct(spooler_definition);
-    assert(spooler);
-    spooler->RegisterListener(&SpoolerOnUpload);
+    spooler_definition_str = *args.find('r')->second;
   }
   const string master_keys = *args.find('k')->second;
   const string repository_name = *args.find('m')->second;
@@ -441,11 +445,23 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
   }
 
-  retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
+  m_retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
                            g_signature_manager, g_download_manager, &ensemble);
-  if (retval != manifest::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d)", retval);
+  if (m_retval != manifest::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch manifest (%d - %s)",
+             m_retval, manifest::Code2Ascii(m_retval));
     goto fini;
+  }
+
+  // Manifest available, now the spooler's hash algorithm can be determined
+  // That doesn't actually matter because the replication does no re-hashing
+  if (!preload_cache) {
+    const upload::SpoolerDefinition
+      spooler_definition(spooler_definition_str,
+                         ensemble.manifest->GetHashAlgorithm());
+    spooler = upload::Spooler::Construct(spooler_definition);
+    assert(spooler);
+    spooler->RegisterListener(&SpoolerOnUpload);
   }
 
   // Fetch tag list
@@ -457,10 +473,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     download::JobInfo download_history(&history_url, false, false,
                                        &history_path,
                                        &history_hash);
-    retval = g_download_manager->Fetch(&download_history);
-    if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d)",
-               retval);
+    dl_retval = g_download_manager->Fetch(&download_history);
+    if (dl_retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
+               dl_retval, download::Code2Ascii(dl_retval));
       goto fini;
     }
     retval = zlib::DecompressPath2Path(history_path,

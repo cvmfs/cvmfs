@@ -3,13 +3,13 @@
 set -e
 
 CARES_VERSION=1.10.0
-CURL_VERSION=7.32.0
+CURL_VERSION=7.36.0
 PACPARSER_VERSION=1.3.1
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
-LEVELDB_VERSION=1.12.0
+LEVELDB_VERSION=1.15.0
 GOOGLETEST_VERSION=1.7.0
-TBB_VERSION=4.1-4
+TBB_VERSION=4.2-2
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <decompress location>"
@@ -96,11 +96,13 @@ do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 do_copy     "sqlite3"
 do_copy     "vjson"
 
-patch_external "leveldb"  "dont_search_snappy.patch" \
-			  "dont_search_tcmalloc.patch"
-patch_external "tbb"      "custom_library_suffix.patch"        \
-                          "symlink_to_build_directories.patch"
-patch_external "vjson"    "missing_include.patch"
+patch_external "leveldb"     "dont_search_snappy.patch"           \
+                             "dont_search_tcmalloc.patch"
+patch_external "tbb"         "custom_library_suffix.patch"        \
+                             "symlink_to_build_directories.patch" \
+                             "32bit_mock.patch"
+patch_external "vjson"       "missing_include.patch"
+patch_external "sparsehash"  "fix_sl4_compilation.patch"
 
 # create a hint that bootstrapping is already done
 touch "$externals_build_dir/.decompressionDone"

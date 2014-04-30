@@ -133,12 +133,16 @@ class Catalog : public SingleCopy {
   bool AllChunksNext(shash::Any *hash, ChunkTypes *type);
   bool AllChunksEnd();
 
-  inline bool ListFileChunks(const PathString &path, FileChunkList *chunks) const
+  inline bool ListPathChunks(const PathString &path,
+                             const shash::Algorithms interpret_hashes_as,
+                             FileChunkList *chunks) const
   {
     return ListMd5PathChunks(shash::Md5(path.GetChars(), path.GetLength()),
-                             chunks);
+                             interpret_hashes_as, chunks);
   }
-  bool ListMd5PathChunks(const shash::Md5 &md5path, FileChunkList *chunks) const;
+  bool ListMd5PathChunks(const shash::Md5 &md5path,
+                         const shash::Algorithms interpret_hashes_as,
+                         FileChunkList *chunks) const;
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
@@ -146,7 +150,6 @@ class Catalog : public SingleCopy {
   shash::Any GetPreviousRevision() const;
   const Counters& GetCounters() const { return counters_; };
 
-  inline bool read_only() const { return read_only_; }
   inline float schema() const { return database().schema_version(); }
   inline PathString path() const { return path_; }
   inline Catalog* parent() const { return parent_; }
@@ -156,6 +159,7 @@ class Catalog : public SingleCopy {
   inline std::string database_path() const { return database_->filename(); }
   inline PathString root_prefix() const { return root_prefix_; }
   inline shash::Any hash() const { return catalog_hash_; }
+  inline bool volatile_flag() const { return volatile_flag_; }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && initialized_;
@@ -169,7 +173,7 @@ class Catalog : public SingleCopy {
     uint64_t size;
   } NestedCatalog;
   typedef std::vector<NestedCatalog> NestedCatalogList;
-  NestedCatalogList *ListNestedCatalogs() const;
+  const NestedCatalogList& ListNestedCatalogs() const;
   bool FindNested(const PathString &mountpoint,
                   shash::Any *hash, uint64_t *size) const;
 
@@ -181,6 +185,7 @@ class Catalog : public SingleCopy {
   mutable HardlinkGroupMap hardlink_groups_;
 
   bool InitStandalone(const std::string &database_file);
+  bool ReadCatalogCounters();
 
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
@@ -203,7 +208,7 @@ class Catalog : public SingleCopy {
   inline const Database &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
-  bool read_only_;
+  void ResetNestedCatalogCache();
 
  private:
   typedef std::map<PathString, Catalog*> NestedCatalogMap;
@@ -224,10 +229,12 @@ class Catalog : public SingleCopy {
   const shash::Any catalog_hash_;
   PathString root_prefix_;
   PathString path_;
+  bool volatile_flag_;
 
   Catalog *parent_;
   NestedCatalogMap children_;
-  mutable NestedCatalogList *nested_catalog_cache_;
+  mutable NestedCatalogList nested_catalog_cache_;
+  mutable bool              nested_catalog_cache_dirty_;
 
   bool initialized_;
   InodeRange inode_range_;

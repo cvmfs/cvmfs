@@ -7,11 +7,27 @@
 #include "io_dispatcher.h"
 #include "file.h"
 #include "../file_chunk.h"
+#include "../smalloc.h"
 
 using namespace upload;
 
+
+CharBuffer* Chunk::GetDeflateBuffer(const size_t bytes) {
+  if (current_deflate_buffer_              == NULL ||
+      current_deflate_buffer_->free_bytes() <  64) {
+    if (current_deflate_buffer_ != NULL) {
+      ScheduleWrite(current_deflate_buffer_);
+    }
+    current_deflate_buffer_ = new CharBuffer(bytes);
+  }
+
+  return current_deflate_buffer_;
+}
+
+
 void Chunk::ScheduleWrite(CharBuffer *buffer) {
-  assert (buffer->used_bytes() > 0);
+  buffer->SetBaseOffset(compressed_size_);
+  compressed_size_ += buffer->used_bytes();
 
   if (deferred_write_) {
     assert (! HasUploadStreamHandle());
@@ -39,7 +55,7 @@ void Chunk::Initialize() {
   done_            = false;
   compressed_size_ = 0;
 
-  content_hash_context_.buffer = malloc(content_hash_context_.size);
+  content_hash_context_.buffer = smalloc(content_hash_context_.size);
   shash::Init(content_hash_context_);
 
   zlib_context_.zalloc   = Z_NULL;
@@ -65,6 +81,11 @@ void Chunk::Finalize() {
   assert (zlib_context_.avail_in == 0);
   const int retcode = deflateEnd(&zlib_context_);
   assert (retcode == Z_OK);
+
+  if (current_deflate_buffer_ != NULL) {
+    ScheduleWrite(current_deflate_buffer_);
+    current_deflate_buffer_ = NULL;
+  }
 
   if (deferred_write_) {
     FlushDeferredWrites();
@@ -100,6 +121,13 @@ Chunk::Chunk(const Chunk &other) :
   assert (! other.HasUploadStreamHandle());
   assert (other.bytes_written_ == 0);
   assert (other.zlib_context_.avail_in == 0);
+
+  current_deflate_buffer_ = other.current_deflate_buffer_->Clone();
+
+  content_hash_context_.buffer = smalloc(content_hash_context_.size);
+  memcpy(      content_hash_context_.buffer,
+         other.content_hash_context_.buffer,
+               content_hash_context_.size);
 
   const int retval = deflateCopy(&zlib_context_,
                                  const_cast<z_streamp>(&other.zlib_context_));

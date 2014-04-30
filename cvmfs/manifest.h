@@ -51,6 +51,8 @@ class Manifest {
   bool Export(const std::string &path) const;
   bool ExportChecksum(const std::string &directory, const int mode) const;
 
+  shash::Algorithms GetHashAlgorithm() const { return catalog_hash_.algorithm; }
+
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }
   void set_certificate(const shash::Any &certificate) {

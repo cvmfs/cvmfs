@@ -7,6 +7,7 @@ set (CVMFS_LOADER_SOURCES
   smalloc.h atomic.h shortstring.h fs_traversal.h
   platform.h platform_linux.h platform_osx.h
   logging_internal.h logging.h logging.cc
+  prng.h
   hash.h hash.cc
   util.h util.cc
   sanitizer.h sanitizer.cc
@@ -34,6 +35,7 @@ set (CVMFS_CLIENT_SOURCES
   download.cc download.h
   wpad.cc wpad.h
   manifest.h manifest.cc
+  whitelist.h whitelist.cc
   manifest_fetch.h manifest_fetch.cc
   murmur.h smallhash.h
   bigvector.h
@@ -87,6 +89,7 @@ set (CVMFS_FSCK_SOURCES
   smalloc.h
   atomic.h
   duplex_zlib.h compression.cc compression.h
+  prng.h
   hash.cc hash.h
   util.cc util.h
   cvmfs_fsck.cc)
@@ -98,7 +101,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   logging.cc logging.h logging_internal.h
   globals.cc globals.h
   manifest.h manifest.cc
+  whitelist.h whitelist.cc
   manifest_fetch.h manifest_fetch.cc
+  prng.h
   hash.h hash.cc
   compression.h compression.cc
   util.h util.cc
@@ -141,12 +146,14 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   history.h history.cc
+  letter.h letter.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc
   swissknife_lsrepo.h swissknife_lsrepo.cc
   swissknife_pull.h swissknife_pull.cc
   swissknife_sign.h swissknife_sign.cc
+  swissknife_letter.h swissknife_letter.cc
   swissknife_sync.h swissknife_sync.cc
   swissknife_info.h swissknife_info.cc
   swissknife_history.h swissknife_history.cc
@@ -161,6 +168,7 @@ set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
 
 set (CVMFS_SUID_HELPER_SOURCES
   platform.h platform_osx.h platform_linux.h
+  sanitizer.h sanitizer.cc
   cvmfs_suid_helper.cc
 )
 
@@ -391,6 +399,13 @@ if (BUILD_CVMFS)
     FILES      cvmfs_talk cvmfs_config
     DESTINATION    bin
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+
+  install (
+    FILES         bash_completion/cvmfs.bash_completion
+    RENAME        cvmfs
+    DESTINATION   /etc/bash_completion.d
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
 endif (BUILD_CVMFS)

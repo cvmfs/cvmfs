@@ -26,7 +26,9 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
 {}
 
 
-Spooler::~Spooler() {}
+Spooler::~Spooler() {
+  uploader_->TearDown();
+}
 
 
 bool Spooler::Initialize() {
@@ -40,6 +42,7 @@ bool Spooler::Initialize() {
 
   // configure the file processor context
   file_processor_ = new FileProcessor(uploader_.weak_ref(),
+                                      spooler_definition_.hash_algorithm,
                                       spooler_definition_.use_file_chunking,
                                       spooler_definition_.min_file_chunk_size,
                                       spooler_definition_.avg_file_chunk_size,
@@ -48,11 +51,6 @@ bool Spooler::Initialize() {
 
   // all done...
   return true;
-}
-
-
-void Spooler::TearDown() {
-  WaitForTermination();
 }
 
 
@@ -98,12 +96,6 @@ void Spooler::UploadingCallback(const UploaderResults &data) {
 
 
 void Spooler::WaitForUpload() const {
-  uploader_->WaitForUpload();
-  file_processor_->WaitForProcessing();
-}
-
-
-void Spooler::WaitForTermination() const {
   uploader_->WaitForUpload();
   file_processor_->WaitForProcessing();
 }

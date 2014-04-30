@@ -127,7 +127,7 @@ CvmfsExports *cvmfs_exports_;
 LoaderExports *loader_exports_;
 
 
-static void Usage(const std::string &exename) {
+static void Usage(const string &exename) {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "The CernVM File System\n"
     "Version %s\n"
@@ -435,24 +435,30 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 {
   string library_name = string("cvmfs_fuse") + ((debug_mode) ? "_debug" : "");
   library_name = platform_libname(library_name);
+  string error_messages;
 
-  static std::vector<std::string> library_pathes;  // TODO: C++11 initializer
-  if (library_pathes.empty()) {
-    library_pathes.push_back(library_name);
-    library_pathes.push_back("/usr/lib/"   + library_name);
-    library_pathes.push_back("/usr/lib64/" + library_name);
+  static vector<string> library_paths;  // TODO: C++11 initializer
+  if (library_paths.empty()) {
+    library_paths.push_back(library_name);
+    library_paths.push_back("/usr/lib/"   + library_name);
+    library_paths.push_back("/usr/lib64/" + library_name);
   }
 
-  std::vector<std::string>::const_iterator i    = library_pathes.begin();
-  std::vector<std::string>::const_iterator iend = library_pathes.end();
+  vector<string>::const_iterator i    = library_paths.begin();
+  vector<string>::const_iterator iend = library_paths.end();
   for (; i != iend; ++i) {  // TODO: C++11 range based for
     library_handle_ = dlopen((*i).c_str(), RTLD_NOW | RTLD_LOCAL);
-    if (library_handle_) {
+    if (library_handle_ != NULL) {
       break;
     }
+
+    error_messages += string(dlerror()) + "\n";
   }
 
   if (! library_handle_) {
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+             "failed to load cvmfs library, tried: '%s'\n%s",
+             JoinStrings(library_paths, "' '").c_str(), error_messages.c_str());
     return NULL;
   }
 
@@ -805,8 +811,6 @@ int main(int argc, char *argv[]) {
            "CernVM-FS: loading Fuse module... ");
   cvmfs_exports_ = LoadLibrary(debug_mode_, loader_exports_);
   if (!cvmfs_exports_) {
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-             "failed to load cvmfs library: %s", dlerror());
     return kFailLoadLibrary;
   }
   retval = cvmfs_exports_->fnInit(loader_exports_);
@@ -818,8 +822,9 @@ int main(int argc, char *argv[]) {
                loader_exports_->mount_point.c_str());
       return 0;
     }
-    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s (%d)",
-             cvmfs_exports_->fnGetErrorMsg().c_str(), retval);
+    LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr, "%s (%d - %s)",
+             cvmfs_exports_->fnGetErrorMsg().c_str(),
+             retval, Code2Ascii((Failures)retval));
     cvmfs_exports_->fnFini();
     return retval;
   }

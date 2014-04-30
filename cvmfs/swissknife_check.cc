@@ -296,7 +296,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     // checking file chunk integrity
     if (entries[i].IsChunkedFile()) {
       FileChunkList chunks;
-      catalog->ListFileChunks(full_path, &chunks);
+      catalog->ListPathChunks(full_path, entries[i].hash_algorithm(), &chunks);
 
       computed_counters->self.chunked_files++;
       computed_counters->self.chunked_file_size += entries[i].size();
@@ -515,18 +515,18 @@ bool CommandCheck::InspectTree(const string &path,
   }
 
   // Recurse into nested catalogs
-  catalog::Catalog::NestedCatalogList *nested_catalogs =
+  const catalog::Catalog::NestedCatalogList &nested_catalogs =
     catalog->ListNestedCatalogs();
-  if (nested_catalogs->size() !=
+  if (nested_catalogs.size() !=
       static_cast<uint64_t>(computed_counters->self.nested_catalogs))
   {
     LogCvmfs(kLogCvmfs, kLogStderr, "number of nested catalogs does not match;"
              " expected %lu, got %lu", computed_counters->self.nested_catalogs,
-             nested_catalogs->size());
+             nested_catalogs.size());
     retval = false;
   }
   for (catalog::Catalog::NestedCatalogList::const_iterator i =
-       nested_catalogs->begin(), iEnd = nested_catalogs->end(); i != iEnd; ++i)
+       nested_catalogs.begin(), iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     catalog::DirectoryEntry nested_transition_point;
     if (!catalog->LookupPath(i->path, &nested_transition_point)) {
@@ -599,8 +599,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     download::JobInfo download_manifest(&url, false, false, NULL);
     download::Failures retval = g_download_manager->Fetch(&download_manifest);
     if (retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d)",
-               retval);
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download manifest (%d - %s)",
+               retval, download::Code2Ascii(retval));
       return 1;
     }
     char *buffer = download_manifest.destination_mem.data;
@@ -641,6 +641,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStdout, "failed to load history database %s",
                manifest->history().ToString().c_str());
+      delete manifest;
       return 1;
     }
     history::Database tag_db;
@@ -648,6 +649,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStdout, "failed to open history database");
       unlink(tmp_file.c_str());
+      delete manifest;
       return 1;
     }
     history::TagList tag_list;
@@ -659,6 +661,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStdout, "no such tag: %s", tag_name.c_str());
       unlink(tmp_file.c_str());
+      delete manifest;
       return 1;
     }
     root_hash = tag.root_hash;

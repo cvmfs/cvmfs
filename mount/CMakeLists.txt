@@ -38,6 +38,12 @@ if (MACOSX)
   )
 
   install (
+    FILES         default.d/README
+    DESTINATION   "/etc/cvmfs/default.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
     FILES         domain.d/cern.ch.conf
     DESTINATION   "/etc/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
@@ -95,6 +101,12 @@ else (MACOSX)
   install (
     FILES         domain.d/cern.ch.conf
     DESTINATION   "/etc/cvmfs/domain.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         default.d/README
+    DESTINATION   "/etc/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 

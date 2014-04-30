@@ -36,6 +36,7 @@
 #include <cstring>
 #include <cassert>
 
+#include <algorithm>
 #include <string>
 #include <map>
 #include <set>
@@ -51,6 +52,36 @@ using namespace std;  // NOLINT
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
+
+const char b64_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+  'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+  'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3',
+  '4', '5', '6', '7', '8', '9', '+', '/'};
+
+/**
+ * Decode Base64
+ */
+const signed char db64_table[] =
+  { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, -1, -1, 63,
+    52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1,  0, -1, -1,
+    -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
+    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1,
+    -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1,
+
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+  };
+
 
 /**
  * Removes a trailing "/" from a path.
@@ -123,6 +154,11 @@ NameString GetFileName(const PathString &path) {
   }
 
   return name;
+}
+
+
+bool IsAbsolutePath(const std::string &path) {
+  return (! path.empty() && path[0] == '/');
 }
 
 
@@ -402,6 +438,16 @@ bool DirectoryExists(const std::string &path) {
 
 
 /**
+ * Checks if the symlink file path exists.
+ */
+bool SymlinkExists(const string &path) {
+  platform_stat64 info;
+  return ((platform_lstat(path.c_str(), &info) == 0) &&
+          S_ISLNK(info.st_mode));
+}
+
+
+/**
  * The mkdir -p command.
  */
 bool MkdirDeep(const std::string &path, const mode_t mode) {
@@ -618,6 +664,7 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
     }
   }
   closedir(dirp);
+  sort(result.begin(), result.end());
   return result;
 }
 
@@ -740,6 +787,38 @@ string StringifyIpv4(const uint32_t ip4_address) {
 }
 
 
+/**
+ * Parses a timstamp of the form YYYY-MM-DDTHH:MM:SSZ
+ * Return 0 on error
+ */
+time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
+  time_t utc_time = 0;
+  unsigned length = iso8601.length();
+
+  if (length != 20)
+    return utc_time;
+  if ((iso8601[4] != '-') || (iso8601[7] != '-') || (iso8601[10] != 'T') ||
+      (iso8601[13] != ':') || (iso8601[16] != ':') || (iso8601[19] != 'Z'))
+  {
+    return utc_time;
+  }
+
+  struct tm tm_wl;
+  memset(&tm_wl, 0, sizeof(struct tm));
+  tm_wl.tm_year = String2Int64(iso8601.substr(0, 4))-1900;
+  tm_wl.tm_mon = String2Int64(iso8601.substr(5, 2)) - 1;
+  tm_wl.tm_mday = String2Int64(iso8601.substr(8, 2));
+  tm_wl.tm_hour = String2Int64(iso8601.substr(11, 2));
+  tm_wl.tm_min = String2Int64(iso8601.substr(14, 2));
+  tm_wl.tm_sec = String2Int64(iso8601.substr(17, 2));
+  utc_time = timegm(&tm_wl);
+  if (utc_time < 0)
+    return 0;
+
+  return utc_time;
+}
+
+
 int64_t String2Int64(const string &value) {
   int64_t result;
   sscanf(value.c_str(), "%"PRId64, &result);
@@ -839,6 +918,55 @@ string JoinStrings(const vector<string> &strings, const string &joint) {
   }
 
   return result;
+}
+
+
+void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
+                    map<char, string> *content)
+{
+  string line;
+  unsigned pos = 0;
+  while (pos < buffer_size) {
+    if (static_cast<char>(buffer[pos]) == '\n') {
+      if (line == "--")
+        return;
+
+      if (line != "") {
+        const string tail = (line.length() == 1) ? "" : line.substr(1);
+        // Special handling of 'Z' key because it can exist multiple times
+        if (line[0] != 'Z') {
+          (*content)[line[0]] = tail;
+        } else {
+          if (content->find(line[0]) == content->end()) {
+            (*content)[line[0]] = tail;
+          } else {
+            (*content)[line[0]] = (*content)[line[0]] + "|" + tail;
+          }
+        }
+      }
+      line = "";
+    } else {
+      line += static_cast<char>(buffer[pos]);
+    }
+    pos++;
+  }
+}
+
+
+bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
+  int fd = open(filename.c_str(), O_RDONLY);
+  if (fd < 0)
+    return false;
+
+  unsigned char buffer[4096];
+  int num_bytes = read(fd, buffer, sizeof(buffer));
+  close(fd);
+
+  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
+    return false;
+
+  ParseKeyvalMem(buffer, unsigned(num_bytes), content);
+  return true;
 }
 
 
@@ -1270,6 +1398,91 @@ void SafeSleepMs(const unsigned ms) {
   wait_for.tv_sec = ms / 1000;
   wait_for.tv_usec = (ms % 1000) * 1000;
   select(0, NULL, NULL, NULL, &wait_for);
+}
+
+
+static inline void Base64Block(const unsigned char input[3], const char *table,
+                               char output[4])
+{
+  output[0] = table[(input[0] & 0xFD) >> 2];
+  output[1] = table[((input[0] & 0x03) << 4) | ((input[1] & 0xF0) >> 4)];
+  output[2] = table[((input[1] & 0x0F) << 2) | ((input[2] & 0xD0) >> 6)];
+  output[3] = table[input[2] & 0x3F];
+}
+
+
+string Base64(const string &data) {
+  string result;
+  result.reserve((data.length()+3)*4/3);
+  unsigned pos = 0;
+  const unsigned char *data_ptr =
+    reinterpret_cast<const unsigned char *>(data.data());
+  const unsigned length = data.length();
+  while (pos+2 < length) {
+    char encoded_block[4];
+    Base64Block(data_ptr+pos, b64_table, encoded_block);
+    result.append(encoded_block, 4);
+    pos += 3;
+  }
+  if (length % 3 != 0) {
+    unsigned char input[3];
+    input[0] = data_ptr[pos];
+    input[1] = ((length % 3) == 2) ? data_ptr[pos+1] : 0;
+    input[2] = 0;
+    char encoded_block[4];
+    Base64Block(input, b64_table, encoded_block);
+    result.append(encoded_block, 2);
+    result.push_back(((length % 3) == 2) ? encoded_block[2] : '=');
+    result.push_back('=');
+  }
+
+  return result;
+}
+
+
+static bool Debase64Block(const unsigned char input[4],
+                          const signed char *d_table,
+                          unsigned char output[3])
+{
+  int32_t dec[4];
+  for (int i = 0; i < 4; ++i) {
+    dec[i] = db64_table[input[i]];
+    if (dec[i] < 0) return false;
+  }
+
+  output[0] = (dec[0] << 2) | (dec[1] >> 4);
+  output[1] = ((dec[1] & 0x0F) << 4) | (dec[2] >> 2);
+  output[2] = ((dec[2] & 0x03) << 6) | dec[3];
+  return true;
+}
+
+
+bool Debase64(const string &data, string *decoded) {
+  decoded->clear();
+  decoded->reserve((data.length()+4)*3/4);
+  unsigned pos = 0;
+  const unsigned char *data_ptr =
+    reinterpret_cast<const unsigned char *>(data.data());
+  const unsigned length = data.length();
+  if (length == 0) return true;
+  if ((length % 4) != 0)
+    return false;
+
+  while (pos < length) {
+    unsigned char decoded_block[3];
+    bool retval = Debase64Block(data_ptr+pos, db64_table, decoded_block);
+    if (!retval)
+      return false;
+    decoded->append(reinterpret_cast<char *>(decoded_block), 3);
+    pos += 4;
+  }
+
+  for (int i = 0; i < 2; ++i) {
+    pos--;
+    if (data[pos] == '=')
+      decoded->erase(decoded->length()-1);
+  }
+  return true;
 }
 
 

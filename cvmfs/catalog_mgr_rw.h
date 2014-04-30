@@ -56,9 +56,11 @@ class WritableCatalogManager : public AbstractCatalogManager {
                          const std::string &stratum0,
                          const std::string &dir_temp,
                          upload::Spooler   *spooler,
-                         download::DownloadManager *download_manager);
+                         download::DownloadManager *download_manager,
+                         uint64_t catalog_entry_warn_threshold);
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
+                                              const bool volatile_content,
                                               upload::Spooler   *spooler);
 
   bool Init();
@@ -152,6 +154,8 @@ class WritableCatalogManager : public AbstractCatalogManager {
   std::string                dir_temp_;
   upload::Spooler            *spooler_;
   download::DownloadManager  *download_manager_;
+
+  uint64_t                   catalog_entry_warn_threshold_;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

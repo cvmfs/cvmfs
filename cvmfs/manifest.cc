@@ -14,57 +14,6 @@ using namespace std;  // NOLINT
 
 namespace manifest {
 
-static void ParseKeyvalMem(const unsigned char *buffer,
-                           const unsigned buffer_size,
-                           map<char, string> *content)
-{
-  string line;
-  unsigned pos = 0;
-  while (pos < buffer_size) {
-    if (static_cast<char>(buffer[pos]) == '\n') {
-      if (line == "--")
-        return;
-
-      if (line != "") {
-        const string tail = (line.length() == 1) ? "" : line.substr(1);
-        // Special handling of 'Z' key because it can exist multiple times
-        if (line[0] != 'Z') {
-          (*content)[line[0]] = tail;
-        } else {
-          if (content->find(line[0]) == content->end()) {
-            (*content)[line[0]] = tail;
-          } else {
-            (*content)[line[0]] = (*content)[line[0]] + "|" + tail;
-          }
-        }
-      }
-      line = "";
-    } else {
-      line += static_cast<char>(buffer[pos]);
-    }
-    pos++;
-  }
-}
-
-
-static bool ParseKeyvalPath(const string &filename,
-                            map<char, string> *content)
-{
-  int fd = open(filename.c_str(), O_RDONLY);
-  if (fd < 0)
-    return false;
-
-  unsigned char buffer[4096];
-  int num_bytes = read(fd, buffer, sizeof(buffer));
-  close(fd);
-
-  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
-    return false;
-
-  ParseKeyvalMem(buffer, unsigned(num_bytes), content);
-  return true;
-}
-
 
 Manifest *Manifest::LoadMem(const unsigned char *buffer,
                             const unsigned length)
@@ -97,7 +46,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   iter = content.find('C');
   if ((iter = content.find('C')) == content.end())
     return NULL;
-  catalog_hash = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
+  catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second));
   if ((iter = content.find('R')) == content.end())
     return NULL;
   root_path = shash::Md5(shash::HexPtr(iter->second));
@@ -119,13 +68,13 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
   if ((iter = content.find('L')) != content.end())
-    micro_catalog_hash = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
+    micro_catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second));
   if ((iter = content.find('N')) != content.end())
     repository_name = iter->second;
   if ((iter = content.find('X')) != content.end())
-    certificate = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
+    certificate = MkFromHexPtr(shash::HexPtr(iter->second));
   if ((iter = content.find('H')) != content.end())
-    history = shash::Any(shash::kSha1, shash::HexPtr(iter->second));
+    history = MkFromHexPtr(shash::HexPtr(iter->second));
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
 
@@ -140,8 +89,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
       history::UpdateChannel channel =
         static_cast<history::UpdateChannel>(channel_int);
       channel_tops.push_back(history::TagList::ChannelTag(
-        channel, shash::Any(shash::kSha1,
-                            shash::HexPtr(elements[i].substr(2)))));
+        channel, MkFromHexPtr(shash::HexPtr(elements[i].substr(2)))));
     }
   }
 

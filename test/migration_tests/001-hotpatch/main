@@ -1,100 +1,121 @@
 
 cvmfs_test_name="Hotpatching During Linux Kernel TAR"
 
+
+skip_bytes() {
+    local num_of_bytes=$1
+    dd bs=512k 2>/dev/null | { dd bs=$num_of_bytes count=1 > /dev/null 2>&1; dd bs=512k 2>/dev/null; }
+}
+
+tar_gzip_and_hash() {
+    local dir_path=$1
+    local tar_log=$2
+    local result_file=$3
+
+    local md5_result
+    md5_result=$(tar czv $dir_path 2>$tar_log | skip_bytes 6 | md5sum | head -c32)
+
+    if [ x"$result_file" != x"" ]; then
+      echo -n "$md5_result" > $result_file
+    else
+      echo -n "$md5_result"
+    fi
+}
+
+
 cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
 
   . ${script_location}/../common.sh
 
+  local src_dir='/cvmfs/sft.cern.ch/lcg/external/experimental'
+  local tar_log1="tar_1.log"
+  local tar_log2="tar_2.log"
+  local tar_log3="tar_3.log"
+  local md5_1=""
+  local md5_2=""
+  local md5_3=""
+  local md5_output="async_md5.checksum"
+
   # download upstream package
   current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
-  echo "Version of testee:        $current_version" >> $logfile
+  echo "Version of testee:        $current_version"
   previous_version=$(decrement_version $current_version)
-  echo "Version to be downloaded: $previous_version" >> $logfile
+  echo "Version to be downloaded: $previous_version"
   upstream_package_url=$(guess_package_url "cvmfs" ${previous_version}-1)
-  echo "Download URL:             $upstream_package_url" >> $logfile
-  wget --no-check-certificate $upstream_package_url >> $logfile 2>&1 || return 2
+  echo "Download URL:             $upstream_package_url"
+  wget --no-check-certificate --quiet $upstream_package_url || return 2
   upstream_package=$(basename $upstream_package_url)
-  echo "Upstream Package:         $upstream_package"  >> $logfile
+  echo "Upstream Package:         $upstream_package"
 
   # make sure that there is no version of CernVM-FS installed
   if is_installed "cvmfs"; then
     installed_version=$(installed_package_version "cvmfs")
-    echo "uninstalling CernVM-FS $installed_version" >> $logfile
-    uninstall_package "cvmfs" >> $logfile 2>&1 || return 3
+    echo "uninstalling CernVM-FS $installed_version"
+    uninstall_package "cvmfs" || return 3
   fi
 
   # install the upstream CernVM-FS package
-  echo "installing CernVM-FS $previous_version" >> $logfile
-  install_package $upstream_package >> $logfile 2>&1 || return 4
+  echo "installing CernVM-FS $previous_version"
+  install_package $upstream_package || return 4
 
   # make sure that autofs is running
-  echo "switching on autofs" >> $logfile
-  autofs_switch on  >> $logfile 2>&1 || return 5
-  autofs_switch off >> $logfile 2>&1 || return 5
-  autofs_switch on  >> $logfile 2>&1 || return 5
+  echo "switching on autofs"
+  autofs_switch on  || return 5
+  autofs_switch off || return 5
+  autofs_switch on  || return 5
 
   # make CernVM-FS ready to go
-  echo "setting up CernVM-FS (cvmfs_config setup)" >> $logfile
-  sudo cvmfs_config setup    >> $logfile 2>&1 || return 6
-  sudo cvmfs_config chksetup >> $logfile 2>&1 || return 6
+  echo "setting up CernVM-FS (cvmfs_config setup)"
+  sudo cvmfs_config setup    || return 6
+  sudo cvmfs_config chksetup || return 6
 
   # mount a repository
-  echo "mounting sft.cern.ch" >> $logfile
-  cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=10" >> $logfile 2>&1 || return 7
+  echo "mounting sft.cern.ch"
+  cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=10" || return 7
 
   # do some hammering on the file system (without interruption)
-  echo "tar linux kernel (without interruption)" >> $logfile
-  local linux_source='/cvmfs/sft.cern.ch/lcg/external/experimental/linux'
-  local tar_log="tar.log"
-  touch $tar_log >> $logfile 2>&1 || return 8
-  tar_log=$(readlink --canonicalize $tar_log)
-  echo "TAR log: $tar_log" >> $logfile
-  tar cvf kernel_1.tar.gz $linux_source > $tar_log 2>&1 || return 9
-  local md5_1=$(md5sum kernel_1.tar.gz | cut --delimiter=' ' --field=1)
-  rm -f kernel_1.tar.gz >> $logfile 2>&1 || return 10
+  echo "tar $src_dir (without interruption)"
+  md5_1=$(tar_gzip_and_hash $src_dir $tar_log1)
 
   # do some hammering on the file system
-  sudo cvmfs_talk -i sft cleanup 0 >> $logfile
-  echo "starting to tar the linux kernel (log output in separate file)" >> $logfile
-  tar cvf kernel_2.tar.gz $linux_source >> $tar_log 2>&1 &
-  tar_pid=$!
-  echo "tar runs under PID $tar_pid" >> $logfile
+  sudo cvmfs_talk -i sft cleanup 0
+  echo "starting to tar $src_dir (log output in separate file)"
+  tar_gzip_and_hash $src_dir $tar_log2 $md5_output &
+  local tar_pid=$!
+  echo "tar runs under PID $tar_pid"
 
   # wait some time to bring tar up to speed
-  echo "giving tar some time to screw around" >> $logfile
-  sleep 5 >> $logfile 2>&1 || return 10
+  echo "giving tar some time to screw around"
+  sleep 5 || return 10
 
-  echo "==><><><><><><><><><><==" >> $logfile
-  echo "==> FUN STARTS HERE  <==" >> $logfile
-  echo "==><><><><><><><><><><==" >> $logfile
+  echo "==><><><><><><><><><><=="
+  echo "==> FUN STARTS HERE  <=="
+  echo "==><><><><><><><><><><=="
 
   # do the CernVM-FS package update
-  echo "updating CernVM-FS package to version $current_version" >> $logfile
+  echo "updating CernVM-FS package to version $current_version"
   kill -0 $tar_pid || return 11 # tar finished already >.<
-  install_package $CVMFS_CLIENT_PACKAGE >> $logfile 2>&1 || return 12
+  install_package $CVMFS_CLIENT_PACKAGE || return 12
   kill -0 $tar_pid || return 13 # tar finished already >.<
 
   # wait for the file system hammering to finish and collect the pieces
-  echo "waiting for tar to be finished... " >> $logfile
-  wait $tar_pid >> $logfile 2>&1 || return 14
+  echo "waiting for tar to be finished... "
+  wait $tar_pid || return 14
   tar_exit_code=$?
-  echo "tar is done (exit code: $tar_exit_code)" >> $logfile
-  local md5_2=$(md5sum kernel_2.tar.gz | cut --delimiter=' ' --field=1)
-  rm -f kernel_2.tar.gz || return 15
+  echo "tar is done (exit code: $tar_exit_code)"
+  md5_2=$(cat $md5_output)
 
   # do some hammering on the file system (after update)
-  echo "tar linux kernel (without interruption - after update)" >> $logfile
-  tar cvf kernel_3.tar.gz $linux_source > $tar_log 2>&1 || return 16
-  local md5_3=$(md5sum kernel_3.tar.gz | cut --delimiter=' ' --field=1)
-  rm -f kernel_3.tar.gz || return 17
+  echo "tar $src_dir (without interruption - after update)"
+  md5_3=$(tar_gzip_and_hash $src_dir $tar_log3)
 
   # check the outcome
-  echo "compare the output of all tar runs" >> $logfile
-  echo "MD5 (before update): $md5_1" >> $logfile
-  echo "MD5 (with reload):   $md5_2" >> $logfile
-  echo "MD5 (after update):  $md5_3" >> $logfile
+  echo "compare the output of all tar runs"
+  echo "MD5 (before update): $md5_1"
+  echo "MD5 (with reload):   $md5_2"
+  echo "MD5 (after update):  $md5_3"
   if [ x"$md5_1" != x"$md5_2" ] ||
      [ x"$md5_2" != x"$md5_3" ]; then
     return 18

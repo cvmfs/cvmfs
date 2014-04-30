@@ -19,6 +19,7 @@
 
 #include "catalog.h"
 #include "directory_entry.h"
+#include "file_chunk.h"
 #include "hash.h"
 #include "atomic.h"
 #include "util.h"
@@ -47,6 +48,20 @@ enum LoadError {
   kLoadNoSpace,
   kLoadFail,
 };
+
+inline const char *Code2Ascii(const LoadError error) {
+  const int kNumElems = 4;
+  if (error >= kNumElems)
+    return "no text available (internal error)";
+
+  const char *texts[kNumElems];
+  texts[0] = "loaded new catalog";
+  texts[1] = "catalog was up to date";
+  texts[2] = "not enough space to load catalog";
+  texts[3] = "failed to load catalog";
+
+  return texts[error];
+}
 
 
 struct Statistics {
@@ -162,6 +177,10 @@ class AbstractCatalogManager {
   }
   bool ListingStat(const PathString &path, StatEntryList *listing);
 
+  bool ListFileChunks(const PathString &path,
+                      const shash::Algorithms interpret_hashes_as,
+                      FileChunkList *chunks);
+
   void RegisterRemountListener(RemountListener *listener) {
     WriteLock();
     remount_listener_ = listener;
@@ -174,6 +193,7 @@ class AbstractCatalogManager {
     ReadLock(); uint64_t r = inode_gauge_; Unlock(); return r;
   }
   uint64_t GetRevision() const;
+  bool GetVolatileFlag() const;
   uint64_t GetTTL() const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;

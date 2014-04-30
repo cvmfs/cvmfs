@@ -9,6 +9,19 @@ echo -n "configure package manager for non-interactive usage... "
 export DEBIAN_FRONTEND=noninteractive
 echo "done"
 
+# sudo cannot resolve host name right after startup for some reason
+echo -n "wait for sudo to work properly... "
+timeout=1800
+while sudo echo "foo" 2>&1 | grep -q "unable to resolve host"; do
+  sleep 1
+  timeout=$(( $timeout - 1 ))
+  if [ $timeout -le 0 ]; then
+    echo "FAIL!"
+    exit 1
+  fi
+done
+echo "done"
+
 # update package manager cache
 echo -n "updating package manager cache... "
 sudo apt-get update > /dev/null || die "fail (apt-get update)"
@@ -46,4 +59,9 @@ install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"
 # setting up the AUFS kernel module
 echo -n "loading AUFS kernel module..."
 sudo modprobe aufs || die "fail"
+echo "done"
+
+# increase open file descriptor limits
+echo -n "increasing ulimit -n ... "
+set_nofile_limit 65536 || die "fail"
 echo "done"

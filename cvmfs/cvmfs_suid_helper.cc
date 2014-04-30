@@ -8,6 +8,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <errno.h>
@@ -19,6 +20,7 @@
 #include <string>
 
 #include "platform.h"
+#include "sanitizer.h"
 
 using namespace std;  // NOLINT
 
@@ -81,6 +83,27 @@ static void Umount(const string &path) {
   ExecAsRoot("/bin/umount", path.c_str(), NULL, NULL);
 }
 
+static void LazyUmount(const string &path) {
+  ExecAsRoot("/bin/umount", "-l", path.c_str(), NULL);
+}
+
+static void KillCvmfs(const string &fqrn) {
+  // prevent exploitation like:
+  // fqrn = ../../../../usr/home/file_with_xattr_user.pid
+  if (fqrn.find("/") != string::npos || fqrn.find("\\") != string::npos) {
+    exit(1);
+  }
+  string pid;
+  const string mountpoint = string(kSpoolArea) + "/" + fqrn + "/rdonly";
+  const bool retval = platform_getxattr(mountpoint.c_str(), "user.pid", &pid);
+  if (!retval || pid.empty())
+    exit(1);
+  sanitizer::IntegerSanitizer pid_sanitizer;
+  if (!pid_sanitizer.IsValid(pid))
+    exit(1);
+  ExecAsRoot("/bin/kill", "-9", pid.c_str(), NULL);
+}
+
 static bool ClearWorkingDir() {
   int retval;
   DIR *dirp = opendir(".");
@@ -88,8 +111,11 @@ static bool ClearWorkingDir() {
     return false;
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp)) != NULL) {
-    if ((strcmp(dirent->d_name, ".") == 0) || (strcmp(dirent->d_name, "..") == 0))
+    if ((strcmp(dirent->d_name, ".") == 0) ||
+        (strcmp(dirent->d_name, "..") == 0))
+    {
       continue;
+    }
 
     platform_stat64 info;
     retval = platform_lstat(dirent->d_name, &info);
@@ -134,7 +160,7 @@ static bool ClearWorkingDir() {
 
 static void Usage(const string &exe, FILE *output) {
   fprintf(output,
-    "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|clear_scratch "
+    "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|clear_scratch|kill_cvmfs "
     "fqrn\n"
     "Example: %s rw_umount atlas.cern.ch\n"
     "This binary is typically called by cvmfs_server.\n",
@@ -182,14 +208,20 @@ int main(int argc, char *argv[]) {
     Remount("/cvmfs/" + fqrn, kRemountRdonly);
   } else if (command == "open") {
     Remount("/cvmfs/" + fqrn, kRemountRw);
+  } else if (command == "kill_cvmfs") {
+    KillCvmfs(fqrn);
   } else if (command == "rw_mount") {
     Mount("/cvmfs/" + fqrn);
   } else if (command == "rw_umount") {
     Umount("/cvmfs/" + fqrn);
+  } else if (command == "rw_lazy_umount") {
+    LazyUmount("/cvmfs/" + fqrn);
   } else if (command == "rdonly_mount") {
     Mount(string(kSpoolArea) + "/" + fqrn + "/rdonly");
   } else if (command == "rdonly_umount") {
     Umount(string(kSpoolArea) + "/" + fqrn + "/rdonly");
+  } else if (command == "rdonly_lazy_umount") {
+    LazyUmount(string(kSpoolArea) + "/" + fqrn + "/rdonly");
   } else if (command == "clear_scratch") {
     const string scratch_area = string(kSpoolArea) + "/" + fqrn + "/scratch";
     retval = chdir(scratch_area.c_str());

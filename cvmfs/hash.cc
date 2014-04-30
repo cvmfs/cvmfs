@@ -8,6 +8,7 @@
 #include <alloca.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
+#include <openssl/ripemd.h>
 
 #include <cstdio>
 
@@ -19,6 +20,69 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
+const char *kSuffixes[] = {"", "", "-rmd160", ""};
+
+
+bool HexPtr::IsValid() const {
+  const unsigned l = str->length();
+  if (l == 0)
+    return false;
+  const char *c = str->data();  // Walks through the string
+  unsigned i = 0;  // String position of *c
+
+  for ( ; i < l; ++i, ++c) {
+    if (*c == '-')
+      break;
+    if ((*c < '0') || (*c > 'f') || ((*c > '9') && (*c < 'a')))
+      return false;
+  }
+
+  // Walk through all algorithms
+  for (unsigned j = 0; j < kAny; ++j) {
+    const unsigned hex_length = 2*kDigestSizes[j];
+    const unsigned suffix_length = kSuffixLengths[j];
+    if (i == hex_length) {
+      // Right suffix?
+      for ( ; (i < l) && (i-hex_length < suffix_length); ++i, ++c) {
+        if (*c != kSuffixes[j][i-hex_length])
+          break;
+      }
+      if (i == l)
+        return true;
+      i = hex_length;
+      c = str->data() + i;
+    }
+  }
+
+  return false;
+}
+
+
+Algorithms ParseHashAlgorithm(const string &algorithm_option) {
+  if (algorithm_option == "sha1")
+    return kSha1;
+  if (algorithm_option == "rmd160")
+    return kRmd160;
+  return kAny;
+}
+
+
+Any MkFromHexPtr(const HexPtr hex) {
+  Any result;
+
+  const unsigned length = hex.str->length();
+  if (length == 2*kDigestSizes[kMd5])
+    result = Any(kMd5, hex);
+  if (length == 2*kDigestSizes[kSha1])
+    result = Any(kSha1, hex);
+  // TODO compare -rmd160
+  if ((length == 2*kDigestSizes[kRmd160] + kSuffixLengths[kRmd160]))
+    result = Any(kRmd160, hex);
+
+  return result;
+}
+
+
 /**
  * Allows the caller to create the context on the stack.
  */
@@ -28,6 +92,8 @@ unsigned GetContextSize(const Algorithms algorithm) {
       return sizeof(MD5_CTX);
     case kSha1:
       return sizeof(SHA_CTX);
+    case kRmd160:
+      return sizeof(RIPEMD160_CTX);
     default:
       LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
                "context for unspecified hash. Aborting...");
@@ -44,6 +110,10 @@ void Init(ContextPtr &context) {
     case kSha1:
       assert(context.size == sizeof(SHA_CTX));
       SHA1_Init(reinterpret_cast<SHA_CTX *>(context.buffer));
+      break;
+    case kRmd160:
+      assert(context.size == sizeof(RIPEMD160_CTX));
+      RIPEMD160_Init(reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
     default:
       abort();  // Undefined hash
@@ -64,6 +134,11 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
       SHA1_Update(reinterpret_cast<SHA_CTX *>(context.buffer),
                   buffer, buffer_length);
       break;
+    case kRmd160:
+      assert(context.size == sizeof(RIPEMD160_CTX));
+      RIPEMD160_Update(reinterpret_cast<RIPEMD160_CTX *>(context.buffer),
+                       buffer, buffer_length);
+      break;
     default:
       abort();  // Undefined hash
   }
@@ -80,6 +155,11 @@ void Final(ContextPtr &context, Any *any_digest) {
       assert(context.size == sizeof(SHA_CTX));
       SHA1_Final(any_digest->digest,
                  reinterpret_cast<SHA_CTX *>(context.buffer));
+      break;
+    case kRmd160:
+      assert(context.size == sizeof(RIPEMD160_CTX));
+      RIPEMD160_Final(any_digest->digest,
+                      reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
     default:
       abort();  // Undefined hash
@@ -114,7 +194,7 @@ bool HashFile(const std::string filename, Any *any_digest) {
   unsigned char io_buffer[4096];
   int actual_bytes;
   while ((actual_bytes = fread(io_buffer, 1, 4096, file))) {
-    Update(io_buffer, 4096, context);
+    Update(io_buffer, actual_bytes, context);
   }
 
   if (ferror(file)) {

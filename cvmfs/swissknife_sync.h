@@ -19,6 +19,7 @@ struct SyncParameters {
     use_file_chunking(false),
     ignore_xdir_hardlinks(false),
     stop_for_catalog_tweaks(false),
+    catalog_entry_warn_threshold(500000),
     min_file_chunk_size(4*1024*1024),
     avg_file_chunk_size(8*1024*1024),
     max_file_chunk_size(16*1024*1024) {}
@@ -39,6 +40,7 @@ struct SyncParameters {
   bool             use_file_chunking;
   bool             ignore_xdir_hardlinks;
   bool             stop_for_catalog_tweaks;
+  uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
   size_t           avg_file_chunk_size;
   size_t           max_file_chunk_size;
@@ -62,6 +64,10 @@ class CommandCreate : public Command {
     result.push_back(Parameter('r', "spooler definition", false, false));
     result.push_back(Parameter('l', "log level (0-4, default: 2)",
                                true, false));
+    result.push_back(Parameter('a', "hash algorithm (default: SHA-1)",
+                               true, false));
+    result.push_back(Parameter('v', "repository containing volatile files",
+                               true, true));
     return result;
   }
   int Main(const ArgumentList &args);
@@ -80,11 +86,13 @@ class CommandUpload : public Command {
     result.push_back(Parameter('i', "local file", false, false));
     result.push_back(Parameter('o', "destination path", false, false));
     result.push_back(Parameter('r', "spooler definition", false, false));
+    result.push_back(Parameter('a', "hash algorithm (default: SHA-1)",
+                               true, false));
     return result;
   }
   int Main(const ArgumentList &args);
 };
-  
+
 
 class CommandPeek : public Command {
 public:
@@ -143,9 +151,9 @@ class CommandSync : public Command {
     result.push_back(Parameter('x', "print change set", true, true));
     result.push_back(Parameter('y', "dry run", true, true));
     result.push_back(Parameter('m', "create micro catalogs", true, true));
-    result.push_back(Parameter('i', "ignore x-directory hardlinks", 
+    result.push_back(Parameter('i', "ignore x-directory hardlinks",
                                true, true));
-    result.push_back(Parameter('d', "pause publishing to allow for catalog tweaks", 
+    result.push_back(Parameter('d', "pause publishing to allow for catalog tweaks",
                                true, true));
     result.push_back(Parameter('z', "log level (0-4, default: 2)",
                                true, false));
@@ -158,6 +166,10 @@ class CommandSync : public Command {
     result.push_back(Parameter('h', "maximal file chunk size in bytes", true,
                                false));
     result.push_back(Parameter('f', "union filesystem type", true, false));
+    result.push_back(Parameter('e', "hash algorithm (default: SHA-1)",
+                               true, false));
+    result.push_back(Parameter('j', "catalog entry warning threshold",
+                               true, false));
     return result;
   }
   int Main(const ArgumentList &args);

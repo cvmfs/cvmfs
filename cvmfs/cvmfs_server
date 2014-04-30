@@ -40,12 +40,15 @@ publish_after_hook() { :; }
 if which httpd2 >/dev/null 2>&1; then #SLES/OpenSuSE
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=$(which httpd2)
 elif which apache2 >/dev/null 2>&1; then # Debian based
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=$(which apache2)
 else
   APACHE_SERVICE="httpd" # EL based
   APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN="/usr/sbin/httpd"
 fi
 
 # Find the service binary
@@ -70,6 +73,7 @@ CVMFS_DEFAULT_USE_FILE_CHUNKING=true
 CVMFS_DEFAULT_MIN_CHUNK_SIZE=4194304
 CVMFS_DEFAULT_AVG_CHUNK_SIZE=8388608
 CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
+CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD=500000
 
 
 ################################################################################
@@ -97,9 +101,10 @@ cvmfs_mkfqrn() {
 # @param subcommand   the subcommand to be called
 # @return   0 if the command was recognized
 is_subcommand() {
-  subcommand=$1
-  supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
-    resign list info lstags check transaction abort snapshot skeleton migrate"
+  local subcommand="$1"
+  local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
+    resign list info list-tags lstags check transaction abort snapshot skeleton \
+    migrate list-catalogs"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -163,7 +168,8 @@ Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
   mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
-                [-m replicable] [-f union filesystem type]
+                [-m replicable] [-f union filesystem type] [-v volatile content]
+                [-a hash algorithm (default: SHA-1)]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
@@ -172,12 +178,12 @@ Supported Commands:
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                [-c file ownership (UID:GID)]
-                < -k path to keys> <fully qualified repository name>
+                [-c file ownership (UID:GID)] [-k path to keys] [-g chown backend]
+                <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
                 [-a tag name] [-c tag channel] [ -t tag description] [ -h hash]
-                [-r tag name]
+                [-r tag name] [-v be verbose]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -193,11 +199,16 @@ Supported Commands:
                 inaccessible.  Without a tag name, trunk-previous is used.
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
+  list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
+                [-m machine readable]
+                <fully qualified name>
+                Print a full list of all nested catalogs of a repository
   info          <fully qualified name>
                 Print summary about the repository
-  lstags        <fully qualified name>
+  list-tags     <fully qualified name>
                 Print named tags (snapshots) of the repository
   check         [-c disable data chunk existence check]
+                [-i check data integrity] (may take some time)]
                 [-t tag (check given tag instead of trunk)]
                 <fully qualified name>
                 Checks if the repository is sane
@@ -226,6 +237,11 @@ NOTE: $errormsg
 load_repo_config() {
   local name=$1
   . /etc/cvmfs/repositories.d/${name}/server.conf
+  if [ x"$CVMFS_REPOSITORY_TYPE" = x"stratum0" ]; then
+    . /etc/cvmfs/repositories.d/${name}/client.conf
+  else
+    . /etc/cvmfs/repositories.d/${name}/replica.conf
+  fi
 }
 
 # retrieves (or guesses) the version of CernVM-FS that was used to create the
@@ -406,8 +422,57 @@ check_apache() {
 
 # retrieves the apache version string "2.x.xx"
 get_apache_version() {
-  ${APACHE_SERVICE} -v | head -n1 | \
+  ${APACHE_BIN} -v | head -n1 | \
     sed 's/^Server version: Apache\/\([0-9]\.[0-9]\.[0-9][0-9]*\).*$/\1/'
+}
+
+
+get_fd_modes() {
+  local path=$1
+  lsof -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
+}
+
+# gets the number of open read-only file descriptors beneath a given path
+#
+# @param path  the path to look at for open read-only fds
+# @return      the number of open read-only file descriptors
+count_rd_only_fds() {
+  local path=$1
+  local cnt=0
+  for line in $(get_fd_modes $path); do
+    if echo "$line" | grep -qe '^\ar\?$';  then cnt=$(( $cnt + 1 )); fi
+  done
+  echo $cnt
+}
+
+# returns 0 if the current working dir is somewhere under $path
+#
+# @param path  the path to look at
+# @return      0 if cwd is on path or below, 1 otherwise
+is_cwd_on_path() {
+  local path=$1
+
+  if [ "x$(pwd)" = "x${path}" ]; then
+    return 0
+  fi
+  if echo "x$(pwd)" | grep -q "^x${path}/"; then
+    return 0
+  fi
+
+  return 1
+}
+
+# gets the number of open writable file descriptors beneath a given path
+#
+# @param path  the path to look at for open writable fds
+# @return      the number of open writable file descriptors
+count_wr_fds() {
+  local path=$1
+  local cnt=0
+  for line in $(get_fd_modes $path); do
+    if echo "$line" | grep -qe '^\a[wu]$'; then cnt=$(( $cnt + 1 )); fi
+  done
+  echo $cnt
 }
 
 
@@ -470,6 +535,27 @@ is_root() {
 }
 
 
+# checks if a given path is mounted
+# Note: this takes care of symlink resolving and should be
+#       used exclusively for mount checks
+#
+# @param mountpoint  the mountpoint to be checked
+# @param regexp      additional regexp to be validated on the mountpoint record
+#                    found in /proc/mounts
+is_mounted() {
+  local mountpoint="$1"
+  local regexp="$2"
+
+  local absolute_mnt="$(readlink --canonicalize $mountpoint)"
+  local mnt_record="$(cat /proc/mounts 2>/dev/null | grep " $absolute_mnt ")"
+  if [ x"$mnt_record" = x"" ]; then
+    return 1
+  fi
+
+  [ x"$regexp" = x"" ] || echo "$mnt_record" | grep -q "$regexp"
+}
+
+
 # checks if a given repository is a stratum 0 repository
 #
 # @param name   the repository name to be checked
@@ -508,6 +594,45 @@ is_master_replica() {
   [ "x$is_master_replica" = "xtrue" ]
 }
 
+# checks if a repository is currently in a transaction
+#
+# @param name  the repository name to be checked
+# @return      0 if in a transaction
+is_in_transaction() {
+  local name=$1
+  load_repo_config $name
+  [ -d ${CVMFS_SPOOL_DIR}/in_transaction ]
+}
+
+open_transaction() {
+  local name=$1
+  load_repo_config $name
+  mkdir ${CVMFS_SPOOL_DIR}/in_transaction > /dev/null 2>&1 || die "Failed to open transaction"
+}
+
+close_transaction() {
+  local name=$1
+  load_repo_config $name
+  rmdir ${CVMFS_SPOOL_DIR}/in_transaction
+}
+
+# checks if a repository is currently runing a publish procedure
+#
+# @param name  the repository name to be checked
+# @return      0 if a publishing procedure is running
+is_publishing() {
+  local name=$1
+  load_repo_config $name
+  [ -d ${CVMFS_SPOOL_DIR}/is_publishing ]
+}
+
+publishing_lock() {
+  local name=$1
+  load_repo_config $name
+  mkdir ${CVMFS_SPOOL_DIR}/is_publishing > /dev/null 2>&1 || die "Failed to acquire publishing lock"
+  trap "rmdir ${CVMFS_SPOOL_DIR}/is_publishing > /dev/null 2>&1" 0
+}
+
 
 # checks if a user exists in the system
 #
@@ -543,6 +668,12 @@ contains() {
 }
 
 
+_cleanup_tmrc() {
+  local tmpdir=$1
+  umount ${tmpdir}/c > /dev/null 2>&1 || umount -l > /dev/null 2>&1
+  rm -fR ${tmpdir}   > /dev/null 2>&1
+}
+
 # for some reason `mount -o remount,(ro|rw) /cvmfs/$name` does not work on older
 # platforms if we set the SELinux context=... parameter in /etc/fstab
 # this dry-runs the whole mount, remount, unmount cycle to find out if it works
@@ -555,10 +686,9 @@ try_mount_remount_cycle_aufs() {
   mount -t aufs \
     -o br=${tmpdir}/a=ro:${tmpdir}/b=rw,ro,context=system_u:object_r:default_t:s0 \
     try_remount_aufs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
-  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
-  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
-  rm -fR ${tmpdir}
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
+  _cleanup_tmrc $tmpdir
   return 0
 }
 
@@ -571,10 +701,9 @@ try_mount_remount_cycle_overlayfs() {
   mount -t overlayfs \
     -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
     try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || return 2
-  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || return 3
-  umount ${tmpdir}/c              > /dev/null 2>&1 || return 4
-  rm -fR ${tmpdir}
+  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
+  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
+  _cleanup_tmrc $tmpdir
   return 0
 }
 
@@ -714,6 +843,82 @@ get_or_guess_multiple_repository_names() {
 }
 
 
+# looks for traces of CernVM-FS 2.0.x which is incompatible with CernVM-FS 2.1.x
+# and interferes with each other
+foreclose_legacy_cvmfs() {
+  local found_something=0
+
+  # This can potentially prevent 2.0 to 2.1 migration
+  #if [ $(ls /srv/cvmfs/ 2>/dev/null | wc -l) -eq 1 ]; then
+  #  if [ -d /srv/cvmfs/*/pub ] || [ -d /srv/cvmfs/*/shadow ]; then
+  #    echo "found legacy repo structure in /srv/cvmfs" 1>&2
+  #    found_something=1
+  #  fi
+  #fi
+
+  if [ -f /etc/cvmfs/server.conf ] || [ -f /etc/cvmfs/replica.conf ]; then
+    echo "found legacy configuration files in /etc/cvmfs" 1>&2
+    found_something=1
+  fi
+
+  if which cvmfs-sync     > /dev/null 2>&1 || \
+     which cvmfs_scrub    > /dev/null 2>&1 || \
+     which cvmfs_snapshot > /dev/null 2>&1 || \
+     which cvmfs_zpipe    > /dev/null 2>&1 || \
+     which cvmfs_pull     > /dev/null 2>&1 || \
+     which cvmfs_unsign   > /dev/null 2>&1; then
+    echo "found legacy CernVM-FS executables" 1>&2
+    found_something=1
+  fi
+
+  if [ -f /lib/modules/*/extra/cvmfsflt/cvmfsflt.ko ]; then
+    echo "found CernVM-FS 2.0.x kernel module" 1>&2
+    found_something=1
+  fi
+
+  if [ $found_something -ne 0 ]; then
+    echo "found traces of CernVM-FS 2.0.x! You should remove them before proceeding!"
+    exit 1
+  fi
+
+  return $found_something
+}
+
+
+# checks and warns in inconsistent repository states.
+#
+# @param name  the FQRN of the repository to be checked
+health_check() {
+  local name=$1
+
+  # for stratum 1 repositories there are no health checks
+  if is_stratum1 $name; then
+    return 0
+  fi
+
+  # check mounted union file system
+  if ! is_mounted "/cvmfs/$name"; then
+    die "/cvmfs/$name is not mounted properly."
+  fi
+
+  # check mounted read-only cvmfs client
+  if ! is_mounted "/var/spool/cvmfs/$name/rdonly"; then
+    die "/var/spool/cvmfs/$name/rdonly is not mounted properly."
+  fi
+
+  # check transaction status
+  if is_in_transaction $name; then
+    if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
+      die "$name is in a transaction but /cvmfs/$name is not mounted read/write"
+    fi
+  else
+    if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
+      die "$name is not in a transaction but /cvmfs/$name is mounted read-only"
+    fi
+  fi
+}
+
+
 create_master_key() {
   local name=$1
   local user=$2
@@ -724,7 +929,8 @@ create_master_key() {
   echo -n "Creating CernVM-FS master key for $name in $master_pub... "
   openssl genrsa -out $master_key 2048 > /dev/null 2>&1
   openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
-  chmod 444 $master_key $master_pub
+  chmod 400 $master_key
+  chmod 444 $master_pub
   chown $user $master_key $master_pub
   echo "done"
 }
@@ -744,8 +950,9 @@ create_cert() {
   openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$name CernVM-FS Release Managers" -key $key -out $csr > /dev/null 2>&1
   openssl x509 -req -days 365 -in $csr -signkey $key -out $crt > /dev/null 2>&1
   rm -f $csr
-  chmod 444 $key $crt
-  chown $user $master_key $master_pub
+  chmod 444 $crt
+  chmod 400 $key
+  chown $user $crt $key
   echo "done"
 }
 
@@ -763,23 +970,37 @@ create_whitelist() {
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$name" >> ${whitelist}.unsigned
-  openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
+  if [ "x$CVMFS_HASH_ALGORITHM" = "xrmd160" ]; then
+    fingerprint="$(openssl x509 -fingerprint -rmd160 -in /etc/cvmfs/keys/${name}.crt | grep 'RIPEMD160 Fingerprint' | sed 's/RIPEMD160 Fingerprint=//')-RMD160"
+    echo "$fingerprint" >> ${whitelist}.unsigned
+  else
+    openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
+  fi
 
-  local sha1; sha1=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
+  local hash;
+  if [ "x$CVMFS_HASH_ALGORITHM" = "xrmd160" ]; then
+    hash="`openssl rmd160 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`-rmd160"
+  else
+    hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
+  fi
   echo "--" >> ${whitelist}.unsigned
-  echo $sha1 >> ${whitelist}.unsigned
-  echo -n $sha1 > ${whitelist}.sha1
-  openssl rsautl -inkey /etc/cvmfs/keys/${name}.masterkey -sign -in ${whitelist}.sha1 -out ${whitelist}.signature
+  echo $hash >> ${whitelist}.unsigned
+  echo -n $hash > ${whitelist}.hash
+  openssl rsautl -inkey /etc/cvmfs/keys/${name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
   cat ${whitelist}.unsigned ${whitelist}.signature > $whitelist
   chown $user $whitelist
 
-  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.sha1
+  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
   cvmfs_swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
   rm -f $whitelist
   echo "done"
 }
 
 
+# figures out the time to expiry of the repository's whitelist
+#
+# @param stratum0  path/URL to stratum0 storage
+# @return          number of seconds until expiry (negativ if already expired)
 get_expiry() {
   local stratum0=$1
 
@@ -803,13 +1024,18 @@ get_expiry() {
 }
 
 
+# checks if the repository's whitelist is valid
+#
+# @param stratum0  path/URL to stratum0 storage
+# @return          0 if whitelist is still valid
 check_expiry() {
   local stratum0=$1
   local expiry="-1"
 
   expiry=$(get_expiry $stratum0)
   if [ $? -ne 0 ]; then
-    die "Failed to retrieve repository expiry date"
+    echo "Failed to retrieve repository expiry date" >&2
+    return 1
   fi
 
   [ $expiry -ge 0 ]
@@ -877,6 +1103,10 @@ reload_apache() {
    echo "done"
 }
 
+restart_apache() {
+  ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null
+}
+
 
 # lowers restrictions of hardlink creation if needed
 # allows AUFS to properly whiteout files without root privileges
@@ -920,7 +1150,7 @@ ensure_enabled_apache_modules() {
 
   # restart apache if needed
   if [ $restart -ne 0 ]; then
-    ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null 2>&1 | { echo "Warning: Failed to restart apache after enabling necessary modules"; retcode=2; }
+    restart_apache 2>/dev/null | { echo "Warning: Failed to restart apache after enabling necessary modules"; retcode=2; }
   fi
 
   return $retcode
@@ -941,10 +1171,10 @@ create_repository_skeleton() {
   done
   mkdir -p ${directory}/data/txn
   if [ x$(id -un) != x$user ]; then
-    chown -R $user $directory
+    chown -R $user ${directory}/
   fi
   if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $directory > /dev/null
+    chcon -Rv --type=httpd_sys_content_t ${directory}/ > /dev/null
   fi
   echo "done"
 }
@@ -976,6 +1206,88 @@ set_ro_root_hash() {
   else
     echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
   fi
+}
+
+
+_process_dirtab_is_readable() {
+  local dirtab_entry="$1"
+  for candidate in $dirtab_entry; do
+    if [ ! -r "$candidate" ]; then
+      echo "WARNING: cannot apply .cvmfsdirtab entry $candidate" >&2
+      return 1
+    fi
+  done
+}
+
+_process_dirtab_is_exclusion() {
+  local dirtab_entry="$1"
+  echo "$dirtab_entry" | grep -q '^!.*'
+}
+
+_process_dirtab_is_excluded() {
+  local dirtab_path="$1"
+  local candidate_path="$2"
+  local old_ifs="$IFS"
+  local exclude=0
+  IFS=$'
+'
+  for dirtab_entry in $(cat "$dirtab_path"); do
+    if _process_dirtab_is_exclusion "$dirtab_entry"; then
+      local pattern="$(echo "$dirtab_entry" | sed -e 's/^!\s*\/\?\(.*\)$/\1/')"
+      pattern="$(dirname $dirtab_path)/$pattern"
+      case "$candidate_path" in
+        $pattern) exclude=1; break;;
+      esac
+    fi
+  done
+  IFS="$old_ifs"
+  [ $exclude -eq 1 ]
+}
+
+process_dirtab() {
+  local name=$1
+  local verbose="$2"
+  local base_path="/cvmfs/${name}"
+  local dirtab_path="${base_path}/.cvmfsdirtab"
+  local old_ifs="$IFS"
+
+  if [ ! -f $dirtab_path ]; then
+    return 0
+  fi
+
+  echo "Auto-creating nested catalogs (${dirtab_path})... "
+  IFS=$'
+'
+  for dirtab_entry in $(cat "$dirtab_path"); do
+    _process_dirtab_is_exclusion "$dirtab_entry" && continue
+
+    local dirtab_entry_path="$base_path$dirtab_entry"
+    _process_dirtab_is_readable $dirtab_entry_path || continue
+    for candidate in $dirtab_entry_path; do
+      [ -d $candidate ]                 || continue
+      [ ! -f $candidate/.cvmfscatalog ] || continue
+
+      if _process_dirtab_is_excluded $dirtab_path $candidate; then
+        [ x"$verbose" != x"" ] && echo "Ignoring $candidate"
+      else
+        echo "Auto-creating nested catalog in $candidate"
+        touch "$candidate/.cvmfscatalog"
+      fi
+    done
+  done
+  IFS="$old_ifs"
+}
+
+migrate_legacy_dirtab() {
+  local name=$1
+  local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
+  local tmp_dirtab=$(mktemp)
+
+  cp -f "$dirtab_path" "$tmp_dirtab"                           || return 1
+  transaction $name > /dev/null                                || return 2
+  cat "$tmp_dirtab" | sed -e 's/\(.*\)/\1\/\*/' > $dirtab_path || return 3
+  publish $name > /dev/null                                    || return 4
+  rm -f "$tmp_dirtab"                                          || return 5
 }
 
 
@@ -1015,7 +1327,7 @@ remove_apache_config_file() {
 
   # disable configuration on newer apache versions
   if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    a2disconf $file_name > /dev/null || return 1
+    a2disconf $file_name > /dev/null 2>&1 || return 1
   fi
 
   # remove configuration file
@@ -1035,6 +1347,7 @@ create_config_files_for_new_repository() {
   local stratum0=$3
   local cvmfs_user=$4
   local unionfs=$5
+  local hash_algo=$6
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -1058,7 +1371,10 @@ CVMFS_USE_FILE_CHUNKING=$CVMFS_DEFAULT_USE_FILE_CHUNKING
 CVMFS_MIN_CHUNK_SIZE=$CVMFS_DEFAULT_MIN_CHUNK_SIZE
 CVMFS_AVG_CHUNK_SIZE=$CVMFS_DEFAULT_AVG_CHUNK_SIZE
 CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
+CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
 CVMFS_UNION_FS_TYPE=$unionfs
+CVMFS_HASH_ALGORITHM=$hash_algo
+CVMFS_AUTO_TAG=true
 EOF
 
   # make sure that the config file does not exist, yet
@@ -1066,13 +1382,6 @@ EOF
 
   create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
-<Directory "/cvmfs/$name">
-    Options -MultiViews
-    AllowOverride All
-    $(get_compatible_apache_allow_from_all_config)
-    EnableMMAP Off
-    EnableSendFile Off
-</Directory>
 EOF
 
   # ONLY FOR LOCAL UPSTREAM
@@ -1144,11 +1453,11 @@ create_spool_area_for_new_repository() {
   local cache_dir="${spool_dir}/cache"
 
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
-  chown -R $CVMFS_USER /cvmfs/$name $spool_dir
+  chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
   if [ $create_skeleton -eq 1 ] && is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
     local repository_dir
     repository_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
-    create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
+    create_repository_skeleton $repository_dir $CVMFS_USER > /dev/null
   fi
 }
 
@@ -1202,6 +1511,47 @@ Once you're happy, publish using \`cvmfs_server publish\`
 For client configuration, have a look at 'cvmfs_server info'
 
 If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
+}
+
+
+file_descriptor_warning_and_question() {
+  local name=$1
+  echo "\
+
+WARNING! There are open read-only file descriptors in /cvmfs/$name
+  --> This is potentially harmful and might cause problems later on.
+      We can anyway perform the requested operation, but this will most likely
+      break other processes with open file descriptors on /cvmfs/$name!
+
+      The following fuser report might show the processes with open file handles
+      "
+
+  fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
+
+  echo -n "\
+
+         Do you want to proceed anyway? (y/N) "
+
+  local reply="n"
+  read reply
+  if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+    echo "aborted."
+    exit 1
+  fi
+
+  return 0
+}
+
+
+handle_read_only_file_descriptors_on_mount_point() {
+  local name=$1
+
+  if [ $(count_rd_only_fds /cvmfs/$name) -eq 0 ]; then
+    return 0
+  else
+    file_descriptor_warning_and_question $name # might abort...
+    return 1
+  fi
 }
 
 
@@ -1286,11 +1636,13 @@ mkfs() {
   local upstream
   local owner
   local replicable=1
+  local volatile_content=0
   local unionfs
+  local hash_algo
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:" option; do
+  while getopts "w:u:o:mf:a:v" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1306,6 +1658,12 @@ mkfs() {
       ;;
       f)
         unionfs=$OPTARG
+      ;;
+      a)
+        hash_algo=$OPTARG
+      ;;
+      v)
+        volatile_content=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1323,6 +1681,7 @@ mkfs() {
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
   [ x"$unionfs" = x ] && unionfs=aufs
+  [ x"$hash_algo" = x ] && hash_algo=sha1
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
@@ -1347,7 +1706,7 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo
   echo "done"
 
   # create security keys and certificates
@@ -1369,9 +1728,15 @@ mkfs() {
 
   echo -n "Create Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
+  local volatile_opt=
+  if [ $volatile_content -eq 1 ]; then
+    volatile_opt="-v"
+    echo -n "(repository flagged volatile)... "
+  fi
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
     -t $temp_dir \
     -r $upstream \
+    -a $hash_algo $volatile_opt \
     -o ${temp_dir}/new_manifest" > /dev/null || die "fail! (cannot init repo)"
   sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/${name}.crt \
@@ -1564,10 +1929,11 @@ import() {
   local is_legacy=0
   local show_statistics=0
   local replicable=0
+  local chown_backend=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:l:sm" option; do
+  while getopts "w:o:c:u:k:l:smg" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1593,6 +1959,9 @@ import() {
       m)
         replicable=1
       ;;
+      g)
+        chown_backend=1
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command import: Unrecognized option: $1"
@@ -1610,11 +1979,10 @@ import() {
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
 
   # security key pathes
-  local masterkey="${name}.masterkey"
   local private_key="${name}.key"
   local certificate="${name}.crt"
   local public_key="${name}.pub"
-  local pki_keys="$masterkey $private_key $certificate $public_key"
+  local pki_keys="$private_key $certificate $public_key"
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
@@ -1638,6 +2006,7 @@ import() {
   [ -d $storage_location ] || die "Did not find repository storage to import at $storage_location"
   [ -f "${storage_location}/.cvmfspublished" ] && \
   [ -d "${storage_location}/data" ] || die "$storage_location does not seem to be a repository storage"
+  [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
 
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
@@ -1666,7 +2035,7 @@ import() {
   echo "done"
 
   # create storage
-  echo -n "Create CernVM-FS Storage... "
+  echo -n "Creating CernVM-FS Repository Infrastructure... "
   create_spool_area_for_new_repository $name
   reload_apache > /dev/null
   echo "done"
@@ -1676,12 +2045,14 @@ import() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
 
   # import storage location
-  echo -n "Importing CernVM-FS storage... "
-  chown -R $cvmfs_user $storage_location || die "fail!"
-  if has_selinux; then
-    chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
+  if [ $chown_backend -ne 0 ]; then
+    echo -n "Importing CernVM-FS storage... "
+    chown -R $cvmfs_user $storage_location || die "fail!"
+    if has_selinux; then
+      chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
+    fi
+    echo "done"
   fi
-  echo "done"
 
   # migrate old catalogs
   if [ $is_legacy -ne 0 ]; then
@@ -1707,7 +2078,6 @@ import() {
 
     # sign new (migrated) repository revision
     echo -n "Signing newly imported Repository... "
-    create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
     sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
       -c ${global_key_dir}/${certificate} \
       -k ${global_key_dir}/${private_key} \
@@ -1722,6 +2092,13 @@ import() {
   echo -n "Mounting CernVM-FS Storage... "
   setup_and_mount_new_repository $name aufs || die "fail!"
   echo "done"
+
+  # the .cvmfsdirtab semantics might need an update
+  if [ $is_legacy -ne 0 ] && [ -f /cvmfs/${name}/.cvmfsdirtab ]; then
+    echo -n "Migrating .cvmfsdirtab... "
+    migrate_legacy_dirtab $name || die "fail!"
+    echo "done"
+  fi
 
   # make stratum0 repository replicable if requested
   if [ $replicable -eq 1 ]; then
@@ -1797,8 +2174,8 @@ rmfs() {
     if [ "$type" = "stratum0" ]; then
       echo -n "Unmounting CernVM-FS Area... "
       sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
-      mount | grep -q " /cvmfs/$name " && umount /cvmfs/$name
-      mount | grep -q " ${spool_dir}/rdonly " && umount ${spool_dir}/rdonly
+      is_mounted "/cvmfs/$name"        && umount /cvmfs/$name
+      is_mounted "${spool_dir}/rdonly" && umount ${spool_dir}/rdonly
       if [ -d /cvmfs/$name ]; then
         rmdir /cvmfs/$name
       fi
@@ -1862,6 +2239,7 @@ resign() {
 
     # sanity checks
     is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    health_check $name
 
     # get repository information
     load_repo_config $name
@@ -1877,6 +2255,61 @@ resign() {
   done
 
   return $retcode
+}
+
+
+################################################################################
+
+
+list_catalogs() {
+  local name
+  local param_list="-t"
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "sehm" option
+  do
+    case $option in
+      s)
+        param_list="$param_list -s"
+      ;;
+      e)
+        param_list="$param_list -e"
+      ;;
+      h)
+        param_list="$param_list -d"
+      ;;
+      m)
+        param_list=$(echo "$param_list" | sed 's/-t\s\?//')
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command list-catalogs: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  health_check $name
+
+  # get repository information
+  load_repo_config $name
+
+  # check if repository is compatible to the installed CernVM-FS version
+  check_repository_compatibility
+
+  # do it!
+  cvmfs_swissknife lsrepo     \
+    -r $CVMFS_STRATUM0        \
+    -n $CVMFS_REPOSITORY_NAME \
+    -k $CVMFS_PUBLIC_KEY      \
+    $param_list
 }
 
 
@@ -1928,6 +2361,10 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 
 
 lstags() {
+  list_tags "$@" # backward compatibility alias
+}
+
+list_tags() {
   local name
 
   # get repository name
@@ -1939,7 +2376,7 @@ lstags() {
   is_stratum0 $name || die "This is not a stratum 0 repository"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
   cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
     -i 0 -s 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
@@ -1957,15 +2394,19 @@ check() {
   local upstream
   local repository_dir
   local check_chunks=1
+  local check_integrity=0
   local tag=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ct:" option
+  while getopts "cit:" option
   do
     case $option in
       c)
         check_chunks=0
+      ;;
+      i)
+        check_integrity=1
       ;;
       t)
         tag="-t $OPTARG"
@@ -1984,6 +2425,7 @@ check() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
+  health_check $name
 
   # get repository information
   load_repo_config $name
@@ -2001,10 +2443,16 @@ check() {
   repository_dir=$(get_upstream_config $upstream)
 
   # do it!
+  if [ $check_integrity -ne 0 ]; then
+    echo
+    echo "Checking Storage Integrity of $name ... (may take a while)"
+    cvmfs_swissknife scrub -r ${repository_dir}/data || die "FAIL!"
+  fi
+
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
-  echo "Verifying $name"
+  echo "Verifying Catalog Integrity of $name ..."
   cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $repository_dir
 }
 
@@ -2021,8 +2469,8 @@ list() {
       echo "Warning: unexpected file '$repository' in directory /etc/cvmfs/repositories.d/"
       continue
     fi
-    . ${repository}/server.conf
     local name=$(basename $repository)
+    load_repo_config $name
 
     # figure out the schema version of the repository
     local version_info=""
@@ -2047,12 +2495,18 @@ list() {
 
     # find out if the repository is currently in a transaction
     local transaction_info=""
-    if is_stratum0 && [ -f ${CVMFS_SPOOL_DIR}/in_transaction ]; then
+    if is_stratum0 $name && is_in_transaction $name; then
       transaction_info=" - in transaction"
     fi
 
+    # check if the repository whitelist is expired
+    local whitelist_info=""
+    if is_stratum0 $name && ! check_expiry $CVMFS_STRATUM0; then
+      whitelist_info=" - whitelist expired"
+    fi
+
     # print out repository information list
-    echo "$name ($CVMFS_REPOSITORY_TYPE$transaction_info) $stratum1_info $version_info"
+    echo "$name ($CVMFS_REPOSITORY_TYPE$transaction_info$whitelist_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
@@ -2096,6 +2550,7 @@ transaction() {
 
     # sanity checks
     is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    health_check $name
 
     # get repository information
     load_repo_config $name
@@ -2106,10 +2561,11 @@ transaction() {
 
     # more sanity checks
     check_repository_compatibility
-    check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     if [ $force -eq 0 ]; then
-      [ -f ${spool_dir}/in_transaction ] && { echo "Repository $name in already in a transaction"; continue; }
+      is_in_transaction $name && { echo "Repository $name is already in a transaction"; continue; }
     fi
+    check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
+    [ $(get_expiry $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
 
     # do it!
     transaction_before_hook $name
@@ -2122,7 +2578,7 @@ transaction() {
       cvmfs_suid_helper rw_mount $name
     fi
     cvmfs_suid_helper open $name
-    touch ${spool_dir}/in_transaction
+    open_transaction       $name
     transaction_after_hook $name
 
   done
@@ -2165,7 +2621,8 @@ abort() {
   for name in $names; do
 
     # sanity checks
-    is_stratum0 $name || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    is_stratum0 $name   || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
+    is_publishing $name && { echo "Repository $name is currently published (aborting abort)"; retcode=1; continue; }
 
     # get repository information
     load_repo_config $name
@@ -2174,8 +2631,9 @@ abort() {
 
     # more sanity checks
     check_repository_compatibility
-    [ -f ${spool_dir}/in_transaction ] || { echo "Repository $name is not in a transaction"; continue; }
-    $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1 continue; }
+    is_in_transaction $name || { echo "Repository $name is not in a transaction"; continue; }
+    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
+    is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
 
     # better ask the user once again!
     if [ $force -ne 1 ]; then
@@ -2186,16 +2644,24 @@ abort() {
       fi
     fi
 
-    # do it!
-    local user_shell="sh -c"
-    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    # check if we have open file descriptors on /cvmfs/<name>
+    local use_fd_fallback=0
+    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
     abort_before_hook $name
-    cvmfs_suid_helper rw_umount $name
+    sync
+    if [ $use_fd_fallback -eq 0 ]; then
+      cvmfs_suid_helper rw_umount $name
+    else
+      cvmfs_suid_helper rw_lazy_umount     $name
+      cvmfs_suid_helper kill_cvmfs         $name
+      cvmfs_suid_helper rdonly_lazy_umount $name
+      cvmfs_suid_helper rdonly_mount       $name > /dev/null
+    fi
     rm -rf ${spool_dir}/tmp/*
     cvmfs_suid_helper clear_scratch $name
     cvmfs_suid_helper rw_mount $name
-    rm -f ${spool_dir}/in_transaction
+    close_transaction $name
     abort_after_hook $name
 
   done
@@ -2222,10 +2688,11 @@ publish() {
   local add_tag=
   local remove_tag=
   local retcode=0
+  local verbosity=""
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:h:c:t:r:" option
+  while getopts "dDpa:h:c:t:r:v" option
   do
     case $option in
       d)
@@ -2254,10 +2721,13 @@ publish() {
         tag_description="$OPTARG"
       ;;
       r)
-        remove_tag="-d $OPTARG"
+        remove_tag="-d '$OPTARG'"
         if [ "x$OPTARG" = "xtrunk" -o "x$OPTARG" = "xtrunk-previous" ]; then
           echo "Warning: won't delete $OPTARG tag"
         fi
+      ;;
+      v)
+        verbosity="-x"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2276,7 +2746,7 @@ publish() {
   if [ "x$add_tag" != "x" ]; then
     [ "x$tag_name" != "x" ]               || die "Tag name missing"
     echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
-    if lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
+    if list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
       die "Tag name '$tag_name' is already in use. Maybe you wanted to specify -h to move it?"
     fi
@@ -2286,7 +2756,9 @@ publish() {
   for name in $names; do
 
     # sanity checks
-    is_stratum0 $name || die "This is not a stratum 0 repository"
+    is_stratum0 $name   || die "This is not a stratum 0 repository"
+    health_check $name
+    is_publishing $name && die "Another publish process is active for $name"
 
     # get repository information
     load_repo_config $name
@@ -2294,14 +2766,26 @@ publish() {
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
+    hash_algo=$CVMFS_HASH_ALGORITHM
+    if [ x"$hash_algo" != "x" ]; then
+      hash_algo="-e $hash_algo"
+    fi
+
+    if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
+      local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+      tag_name="generic-$timestamp"
+      echo "Using auto tag '$tag_name'"
+      add_tag="-a $tag_name"
+    fi
 
     # more sanity checks
     check_repository_compatibility
-    check_expiry $stratum0                  || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
-    [ -f ${spool_dir}/in_transaction ]      || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
-    $fuser -m /cvmfs/$name > /dev/null 2>&1 && { echo "Open file descriptors on $name"; retcode=1; continue; }
+    check_expiry $stratum0         || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
+    is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
+    [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
+    is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     if [ "x$add_tag" != "x" ] && \
-       lstags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
+       list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
        [ x"$tag_hash" = "x" ]; then
       echo "Tag name '$tag_name' is already in use for repository $name. Maybe you wanted to specify -h to move it?"
       retcode=1
@@ -2333,13 +2817,19 @@ publish() {
     local user_shell="sh -c"
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
+    # check if we have open file descriptors on /cvmfs/<name>
+    local use_fd_fallback=0
+    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+
+    process_dirtab $name $verbosity || die "Synchronization Failed! Please repair your .cvmfsdirtab file!"
     publish_before_hook $name
+    publishing_lock $name
     cvmfs_suid_helper lock $name
     local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-    local sync_command="$swissknife sync -x -u /cvmfs/$name \
+    local sync_command="$swissknife sync $verbosity -u /cvmfs/$name \
       -s ${spool_dir}/scratch \
       -c ${spool_dir}/rdonly \
       -t ${spool_dir}/tmp \
@@ -2347,7 +2837,7 @@ publish() {
       -r ${upstream} \
       -w $stratum0 \
       -o ${spool_dir}/tmp/manifest \
-      $log_level $tweaks_option"
+      $hash_algo $log_level $tweaks_option"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi
@@ -2359,6 +2849,9 @@ publish() {
     fi
     if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
       sync_command="$sync_command -i"
+    fi
+    if [ "x$CVMFS_CATALOG_ENTRY_WARN_THRESHOLD" != "x" ]; then
+      sync_command="$sync_command -j $CVMFS_CATALOG_ENTRY_WARN_THRESHOLD"
     fi
     local tag_command="$swissknife tag -r $stratum0 \
       -b $base_hash \
@@ -2386,14 +2879,21 @@ publish() {
       $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
       $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
       echo "Remounting newly created repository revision"
-      cvmfs_suid_helper rw_umount $name
-      cvmfs_suid_helper rdonly_umount $name
+      sync
+      if [ $use_fd_fallback -eq 1 ]; then
+        cvmfs_suid_helper rw_lazy_umount     $name
+        cvmfs_suid_helper kill_cvmfs         $name
+        cvmfs_suid_helper rdonly_lazy_umount $name
+      else
+        cvmfs_suid_helper rw_umount $name
+        cvmfs_suid_helper rdonly_umount $name
+      fi
       set_ro_root_hash $name $trunk_hash
       cvmfs_suid_helper clear_scratch $name
       rm -rf ${spool_dir}/tmp/*
       cvmfs_suid_helper rdonly_mount $name > /dev/null
       cvmfs_suid_helper rw_mount $name
-      rm -f ${spool_dir}/in_transaction
+      close_transaction $name
       publish_after_hook $name
     else
       exit 1
@@ -2442,10 +2942,12 @@ rollback() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum0 $name || die "This is not a stratum 0 repository"
+  is_stratum0 $name                || die "This is not a stratum 0 repository"
+  health_check $name
+  is_publishing $name              && die "Repository $name is currently being published"
 
   # get repository information
-  . /etc/cvmfs/repositories.d/$name/server.conf
+  load_repo_config $name
   user=$CVMFS_USER
   spool_dir=$CVMFS_SPOOL_DIR
   stratum0=$CVMFS_STRATUM0
@@ -2453,9 +2955,10 @@ rollback() {
 
   # more sanity checks
   check_repository_compatibility
-  check_expiry $stratum0 || die "Repository whitelist is expired!"
-  [ -f ${spool_dir}/in_transaction ] || die "Not in a transaction"
-  $fuser -m /cvmfs/$name > /dev/null 2>&1 && die "Open file descriptors on $name"
+  check_expiry $stratum0  || die "Repository whitelist is expired!"
+  is_in_transaction $name || die "Not in a transaction"
+  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
+  is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
 
   if [ $force -ne 1 ]; then
     local reply
@@ -2465,6 +2968,10 @@ rollback() {
     fi
   fi
 
+  # check if we have open file descriptors on /cvmfs/<name>
+  local use_fd_fallback=0
+  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+
   # do it!
   local swissknife="cvmfs_swissknife"
 
@@ -2472,6 +2979,7 @@ rollback() {
   [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
   publish_before_hook
+  publishing_lock $name
   cvmfs_suid_helper lock $name
   local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
 
@@ -2497,14 +3005,21 @@ rollback() {
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
-  cvmfs_suid_helper rw_umount $name
-  cvmfs_suid_helper rdonly_umount $name
+  sync
+  if [ $use_fd_fallback -eq 1 ]; then
+    cvmfs_suid_helper rw_lazy_umount     $name
+    cvmfs_suid_helper kill_cvmfs         $name
+    cvmfs_suid_helper rdonly_lazy_umount $name
+  else
+    cvmfs_suid_helper rw_umount $name
+    cvmfs_suid_helper rdonly_umount $name
+  fi
   set_ro_root_hash $name $trunk_hash
   cvmfs_suid_helper clear_scratch $name
   rm -rf ${spool_dir}/tmp/*
   cvmfs_suid_helper rdonly_mount $name > /dev/null
   cvmfs_suid_helper rw_mount $name
-  rm -f ${spool_dir}/in_transaction
+  close_transaction $name
   publish_after_hook $name
 }
 
@@ -2767,6 +3282,7 @@ migrate() {
 
     # more sanity checks
     check_repository_compatibility "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
+    health_check $name
 
     # do the migrations...
     if [ $(repository_creator_version) = "2.1.6" ]; then
@@ -2846,6 +3362,8 @@ skeleton() {
 #                                                                              #
 ################################################################################
 
+# check that there are no traces of CernVM-FS 2.0.x which might interfere
+foreclose_legacy_cvmfs
 
 # check if there is at least a selected sub-command
 if [ $# -lt 1 ]; then

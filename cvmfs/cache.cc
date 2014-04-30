@@ -6,7 +6,7 @@
  * according to their content hash.
  *
  * The procedure is
- *   -# Look in the catalog for SHA1 hash
+ *   -# Look in the catalog for content hash
  *   -# If it is in local cache: return file descriptor
  *   -# Otherwise download, store in cache and return fd
  *
@@ -374,6 +374,7 @@ static int CommitTransaction(const string &final_path,
                              const string &temp_path,
                              const string &cvmfs_path,
                              const shash::Any &hash,
+                             const bool volatile_content,
                              const uint64_t size)
 {
   int result;
@@ -390,7 +391,11 @@ static int CommitTransaction(const string &final_path,
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(temp_path.c_str());
   } else {
-    quota::Insert(hash, size, cvmfs_path);
+    if (volatile_content) {
+      quota::InsertVolatile(hash, size, cvmfs_path);
+    } else {
+      quota::Insert(hash, size, cvmfs_path);
+    }
   }
 
   return result;
@@ -418,7 +423,9 @@ static bool CommitFromMem(const shash::Any &id, const unsigned char *buffer,
     return false;
   }
 
-  return CommitTransaction(final_path, temp_path, cvmfs_path, id, size) == 0;
+  const bool volatile_content = false;
+  return CommitTransaction(final_path, temp_path, cvmfs_path, id,
+                           volatile_content, size) == 0;
 }
 
 
@@ -442,6 +449,7 @@ static int Fetch(const shash::Any &checksum,
                  const string     &hash_suffix,
                  const uint64_t    size,
                  const string     &cvmfs_path,
+                 const bool        volatile_content,
                  download::DownloadManager *download_manager)
 {
   CallGuard call_guard;
@@ -545,6 +553,7 @@ static int Fetch(const shash::Any &checksum,
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
   tls->download_job.expected_hash = &checksum;
+  tls->download_job.extra_info = &cvmfs_path;
   download_manager->Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {
@@ -578,7 +587,7 @@ static int Fetch(const shash::Any &checksum,
       goto fetch_finalize;
     }
     result = cache::CommitTransaction(final_path, temp_path, cvmfs_path,
-                                      checksum, size);
+                                      checksum, volatile_content, size);
     if (result == 0) {
       platform_disable_kcache(fd_return);
       result = fd_return;
@@ -627,9 +636,11 @@ static int Fetch(const shash::Any &checksum,
  */
 int FetchDirent(const catalog::DirectoryEntry &d,
                 const string &cvmfs_path,
+                const bool volatile_content,
                 download::DownloadManager *download_manager)
 {
-  return Fetch(d.checksum(), "", d.size(), cvmfs_path, download_manager);
+  return Fetch(d.checksum(), "", d.size(), cvmfs_path, volatile_content,
+               download_manager);
 }
 
 
@@ -642,13 +653,16 @@ int FetchDirent(const catalog::DirectoryEntry &d,
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-int FetchChunk(const FileChunk &chunk, const string &cvmfs_path,
+int FetchChunk(const FileChunk &chunk,
+               const string &cvmfs_path,
+               const bool volatile_content,
                download::DownloadManager *download_manager)
 {
   return Fetch(chunk.content_hash(),
                FileChunk::kCasSuffix,
                chunk.size(),
                cvmfs_path,
+               volatile_content,
                download_manager);
 }
 
@@ -767,12 +781,14 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
 
   const string url = "/data" + hash.MakePath(1, 2) + "C";
   download::JobInfo download_catalog(&url, true, true, catalog_file, &hash);
+  download_catalog.extra_info = &cvmfs_path;
   download_manager_->Fetch(&download_catalog);
   fclose(catalog_file);
   if (download_catalog.error_code != download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-             "unable to load catalog with key %s (%d)",
-             hash.ToString().c_str(), download_catalog.error_code);
+             "unable to load catalog with key %s (%d - %s)",
+             hash.ToString().c_str(), download_catalog.error_code,
+             download::Code2Ascii(download_catalog.error_code));
     AbortTransaction(temp_path);
     backoff_throttle_.Throttle();
     return catalog::kLoadFail;
@@ -847,21 +863,23 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   // Load local checksum
   FILE *file_checksum = fopen(checksum_path.c_str(), "r");
-  char tmp[40];
-  if (file_checksum && (fread(tmp, 1, 40, file_checksum) == 40)) {
-    cache_hash = shash::Any(shash::kSha1, shash::HexPtr(string(tmp, 40)));
+  char tmp[128];
+  int read_bytes;
+  if (file_checksum && (read_bytes = fread(tmp, 1, 128, file_checksum)) > 0) {
+    // Separate hash from timestamp
+    int separator_pos = 0;
+    for (; (separator_pos < read_bytes) && (tmp[separator_pos] != 'T');
+         ++separator_pos) { }
+    cache_hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)));
     if (!FileExists(*cache_path_ + cache_hash.MakePath(1, 2))) {
       LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
       cache_hash = shash::Any();
     } else {
       // Get local last modified time
-      char buf_modified;
       string str_modified;
-      if ((fread(&buf_modified, 1, 1, file_checksum) == 1) &&
-          (buf_modified == 'T'))
-      {
-        while (fread(&buf_modified, 1, 1, file_checksum) == 1)
-          str_modified += string(&buf_modified, 1);
+      if ((tmp[separator_pos] == 'T') && (read_bytes > (separator_pos+1))) {
+        str_modified = string(tmp+separator_pos+1,
+                              read_bytes-(separator_pos+1));
         cache_last_modified = String2Uint64(str_modified);
         LogCvmfs(kLogCache, kLogDebug, "cached copy publish date %s",
                  StringifyTime(cache_last_modified, true).c_str());
@@ -880,8 +898,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
                                      download_manager_,
                                      &ensemble);
   if (manifest_failure != manifest::kFailOk) {
-    LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d)",
-             manifest_failure);
+    LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
+             manifest_failure, manifest::Code2Ascii(manifest_failure));
     if (!cache_hash.IsNull()) {
       // TODO remove code duplication
       if (catalog_path) {
@@ -925,7 +943,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
         if (!retval) {
           LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                    "failed to pin cached root catalog (no space)");
-          return catalog::kLoadFail;
+          return catalog::kLoadNoSpace;
         }
       }
       loaded_catalogs_[mountpoint] = cache_hash;

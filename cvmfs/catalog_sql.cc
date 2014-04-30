@@ -20,6 +20,7 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+// Changelog
 const float Database::kLatestSchema = 2.5;
 const float Database::kLatestSupportedSchema = 2.5;  // + 1.X catalogs (r/o)
 const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
@@ -183,6 +184,7 @@ Database::~Database() {
  */
 bool Database::Create(const string &filename,
                       const string &root_path,
+                      const bool volatile_content,
                       const DirectoryEntry &root_entry)
 {
   bool retval = false;
@@ -201,8 +203,9 @@ bool Database::Create(const string &filename,
   Database database(filename, kLatestSchema, kLatestSchemaRevision);
   if (!database.ready()) {
     LogCvmfs(kLogCatalog, kLogStderr,
-             "Cannot create and open catalog database file '%s'",
-             filename.c_str());
+             "Cannot create and open catalog database file '%s'\n"
+             "SQLite said: '%s'",
+             filename.c_str(), database.GetLastErrorMsg().c_str());
     return false;
   }
 
@@ -239,6 +242,13 @@ bool Database::Create(const string &filename,
     return false;
   }
 
+  // start initial filling transaction
+  retval = Sql(database, "BEGIN;").Execute();
+  if (!retval) {
+    SqlError("failed to enter initial filling transaction", database);
+    return false;
+  }
+
   // insert initial values to properties
   Sql insert_initial_properties(database,
     "INSERT INTO properties (key, value) "
@@ -252,6 +262,16 @@ bool Database::Create(const string &filename,
     SqlError("failed to insert default initial values into the newly created "
              "catalog tables.", database);
     return false;
+  }
+
+  if (volatile_content) {
+    Sql insert_volatile_flag(database,
+      "INSERT INTO properties (key, value) VALUES ('volatile', 1);");
+    if (!insert_volatile_flag.Execute()) {
+      SqlError("failed to insert volatil flag into the newly created "
+               "catalog tables.", database);
+      return false;
+    }
   }
 
   // create initial statistics counters
@@ -295,6 +315,13 @@ bool Database::Create(const string &filename,
     }
   }
 
+  // commit initial filling transaction
+  retval = Sql(database, "COMMIT;").Execute();
+  if (!retval) {
+    SqlError("failed to commit initial filling transaction", database);
+    return false;
+  }
+
   return true;
 }
 
@@ -325,7 +352,25 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   if (entry.IsChunkedFile())
     database_flags |= kFlagFileChunk;
 
+  if (!entry.checksum_ptr()->IsNull())
+    StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
+
   return database_flags;
+}
+
+void SqlDirent::StoreHashAlgorithm(const shash::Algorithms algo,
+                                   unsigned *flags) const
+{
+  // Md5 unusable for content hashes
+  *flags |= (algo - 1) << kFlagPosHash;
+}
+
+shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
+  unsigned in_flags = ((7 << kFlagPosHash) & flags) >> kFlagPosHash;
+  // Skip Md5
+  in_flags++;
+  assert(in_flags < shash::kAny);
+  return static_cast<shash::Algorithms>(in_flags);
 }
 
 uint32_t SqlDirent::Hardlinks2Linkcount(const uint64_t hardlinks) const {
@@ -424,7 +469,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
                   entry.linkcount_);
 
   return (
-    BindSha1Blob(hash_idx, entry.checksum_) &&
+    BindHashBlob(hash_idx, entry.checksum_) &&
     BindInt64(hardlinks_idx, hardlinks) &&
     BindInt64(size_idx, entry.size_) &&
     BindInt(mode_idx, entry.mode_) &&
@@ -475,7 +520,6 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   DirectoryEntry result;
 
   const unsigned database_flags = RetrieveInt(5);
-  result.catalog_ = const_cast<Catalog *>(catalog);
   //result.generation_ = catalog->GetGeneration();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
@@ -494,6 +538,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.uid_             = g_uid;
     result.gid_             = g_gid;
     result.is_chunked_file_ = false;
+    result.checksum_        = RetrieveHashBlob(0, shash::kSha1);
   } else {
     const uint64_t hardlinks = RetrieveInt64(1);
     result.linkcount_        = Hardlinks2Linkcount(hardlinks);
@@ -503,14 +548,16 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.uid_              = RetrieveInt64(13);
     result.gid_              = RetrieveInt64(14);
     result.is_chunked_file_  = (database_flags & kFlagFileChunk);
-    if (result.catalog_->uid_map_) {
-      OwnerMap::const_iterator i = result.catalog_->uid_map_->find(result.uid_);
-      if (i != result.catalog_->uid_map_->end())
+    result.checksum_         =
+      RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
+    if (catalog->uid_map_) {
+      OwnerMap::const_iterator i = catalog->uid_map_->find(result.uid_);
+      if (i != catalog->uid_map_->end())
         result.uid_ = i->second;
     }
-    if (result.catalog_->gid_map_) {
-      OwnerMap::const_iterator i = result.catalog_->gid_map_->find(result.gid_);
-      if (i != result.catalog_->gid_map_->end())
+    if (catalog->gid_map_) {
+      OwnerMap::const_iterator i = catalog->gid_map_->find(result.gid_);
+      if (i != catalog->gid_map_->end())
         result.gid_ = i->second;
     }
   }
@@ -518,7 +565,6 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   result.mode_     = RetrieveInt(3);
   result.size_     = RetrieveInt64(2);
   result.mtime_    = RetrieveInt64(4);
-  result.checksum_ = RetrieveSha1Blob(0);
   result.name_.Assign(name, strlen(name));
   result.symlink_.Assign(symlink, strlen(symlink));
   if (expand_symlink)
@@ -593,7 +639,7 @@ SqlDirentTouch::SqlDirentTouch(const Database &database) {
 
 bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
   return (
-    BindSha1Blob(1, entry.checksum_)                                       &&
+    BindHashBlob(1, entry.checksum_)                                       &&
     BindInt64   (2, entry.size_)                                           &&
     BindInt     (3, entry.mode_)                                           &&
     BindInt64   (4, entry.mtime_)                                          &&
@@ -633,9 +679,9 @@ bool SqlNestedCatalogLookup::BindSearchPath(const PathString &path) {
 
 
 shash::Any SqlNestedCatalogLookup::GetContentHash() const {
-  const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(0)));
-  return (sha1.empty()) ? shash::Any(shash::kSha1) :
-                          shash::Any(shash::kSha1, shash::HexPtr(sha1));
+  const string hash = string(reinterpret_cast<const char *>(RetrieveText(0)));
+  return (hash.empty()) ? shash::Any(shash::kAny) :
+                          shash::MkFromHexPtr(shash::HexPtr(hash));
 }
 
 
@@ -666,9 +712,9 @@ PathString SqlNestedCatalogListing::GetMountpoint() const {
 
 
 shash::Any SqlNestedCatalogListing::GetContentHash() const {
-  const string sha1 = string(reinterpret_cast<const char *>(RetrieveText(1)));
-  return (sha1.empty()) ? shash::Any(shash::kSha1) :
-                          shash::Any(shash::kSha1, shash::HexPtr(sha1));
+  const string hash = string(reinterpret_cast<const char *>(RetrieveText(1)));
+  return (hash.empty()) ? shash::Any(shash::kAny) :
+                          shash::MkFromHexPtr(shash::HexPtr(hash));
 }
 
 
@@ -799,7 +845,7 @@ bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
   return
     BindInt64(3,    chunk.offset())       &&
     BindInt64(4,    chunk.size())         &&
-    BindSha1Blob(5, chunk.content_hash());
+    BindHashBlob(5, chunk.content_hash());
 }
 
 
@@ -838,8 +884,10 @@ bool SqlChunksListing::BindPathHash(const shash::Md5 &hash) {
 }
 
 
-FileChunk SqlChunksListing::GetFileChunk() const {
-  return FileChunk(RetrieveSha1Blob(2),
+FileChunk SqlChunksListing::GetFileChunk(
+  const shash::Algorithms interpret_hash_as) const
+{
+  return FileChunk(RetrieveHashBlob(2, interpret_hash_as),
                    RetrieveInt64(0),
                    RetrieveInt64(1));
 }
@@ -951,15 +999,23 @@ bool SqlCreateCounter::BindInitialValue(const int64_t value) {
 
 
 SqlAllChunks::SqlAllChunks(const Database &database) {
+  int hash_mask = 7 << SqlDirent::kFlagPosHash;
+  string flags2hash =
+    " ((flags&" + StringifyInt(hash_mask) + ") >> " +
+    StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
+
   string sql = "SELECT DISTINCT hash, "
   "CASE WHEN flags & " + StringifyInt(SqlDirent::kFlagFile) + " THEN " +
     StringifyInt(kChunkFile) + " " +
   "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
     StringifyInt(kChunkMicroCatalog) + " END " +
-  "AS chunk_type FROM catalog WHERE hash IS NOT NULL";
+  "AS chunk_type, " + flags2hash +
+  "FROM catalog WHERE hash IS NOT NULL";
   if (database.schema_version() >= 2.4-Database::kSchemaEpsilon) {
-    sql += " UNION SELECT DISTINCT hash, " + StringifyInt(kChunkPiece) + " " +
-      "FROM chunks";
+    sql += " UNION SELECT DISTINCT chunks.hash, " + StringifyInt(kChunkPiece) +
+      ", " + flags2hash + "FROM chunks, catalog WHERE "
+      "chunks.md5path_1=catalog.md5path_1 AND "
+      "chunks.md5path_2=catalog.md5path_2";
   }
   sql += ";";
   Init(database.sqlite_db(), sql);
@@ -973,7 +1029,7 @@ bool SqlAllChunks::Open() {
 
 bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
   if (FetchRow()) {
-    *hash = RetrieveSha1Blob(0);
+    *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)));
     *type = static_cast<ChunkTypes>(RetrieveInt(1));
     return true;
   }

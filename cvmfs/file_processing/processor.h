@@ -45,7 +45,7 @@ class ChunkProcessingTask : public tbb::task {
    */
   void Crunch(const unsigned char  *data,
               const size_t          bytes,
-              const bool            finalize) const;
+              const bool            finalize);
 
  private:
   Chunk        *chunk_;   ///< the associated Chunk object (will be updated)
@@ -74,8 +74,9 @@ class FileScrubbingTask : public AbstractFileScrubbingTask<File> {
  public:
   FileScrubbingTask(File            *file,
                     CharBuffer      *buffer,
-                    const bool       is_last_piece) :
-    AbstractFileScrubbingTask<File>(file, buffer, is_last_piece) {}
+                    const bool       is_last_piece,
+                    AbstractReader  *reader) :
+    AbstractFileScrubbingTask<File>(file, buffer, is_last_piece, reader) {}
 
   tbb::task* execute();
 

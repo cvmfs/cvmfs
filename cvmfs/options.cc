@@ -138,23 +138,27 @@ void ParsePath(const string &config_file) {
 
 void ParseDefault(const string &repository_name) {
   ParsePath("/etc/cvmfs/default.conf");
+  vector<string> dist_defaults = FindFiles("/etc/cvmfs/default.d", ".conf");
+  for (unsigned i = 0; i < dist_defaults.size(); ++i) {
+    ParsePath(dist_defaults[i]);
+  }
   ParsePath("/etc/cernvm/default.conf");
   ParsePath("/etc/cvmfs/site.conf");
   ParsePath("/etc/cernvm/site.conf");
   ParsePath("/etc/cvmfs/default.local");
 
-  string domain;
-  vector<string> tokens = SplitString(repository_name, '.');
-  if (tokens.size() > 1) {
-    tokens.erase(tokens.begin());
-    domain = JoinStrings(tokens, ".");
-  } else {
-    GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
-  }
-  ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf");
-  ParsePath("/etc/cvmfs/domain.d/" + domain + ".local");
-
   if (repository_name != "") {
+    string domain;
+    vector<string> tokens = SplitString(repository_name, '.');
+    if (tokens.size() > 1) {
+      tokens.erase(tokens.begin());
+      domain = JoinStrings(tokens, ".");
+    } else {
+      GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+    }
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf");
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local");
+
     ParsePath("/etc/cvmfs/config.d/" + repository_name + ".conf");
     ParsePath("/etc/cvmfs/config.d/" + repository_name + ".local");
   }

@@ -17,11 +17,13 @@ CVMFS_TEST_SYSLOG_FACILITY=${CVMFS_TEST_SYSLOG_FACILITY:=5}
 CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
 
 CVMFS_TEST_REPO=${CVMFS_TEST_REPO:=test.cern.ch}
+CVMFS_TEST_REPO_MORE=${CVMFS_TEST_REPO_MORE:=test-more.cern.ch}
 CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
 CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing
 
 CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=aufs} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
+CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 
 die() {
   echo -e $1 >&2
@@ -38,8 +40,26 @@ else
 fi
 
 # find the name of the httpd service
-apache="httpd"
-which apache2 >/dev/null 2>&1 && apache="apache2"
+
+
+# figure out the installed apache platform
+if which httpd2 >/dev/null 2>&1; then #SLES/OpenSuSE
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=$(which httpd2)
+elif which apache2 >/dev/null 2>&1; then # Debian based
+  APACHE_SERVICE="apache2"
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN=$(which apache2)
+else
+  APACHE_SERVICE="httpd" # EL based
+  APACHE_CONF=${APACHE_SERVICE}
+  APACHE_BIN="/usr/sbin/httpd"
+fi
+
+version_major() { echo $1 | cut --delimiter=. --fields=1; }
+version_minor() { echo $1 | cut --delimiter=. --fields=2; }
+version_patch() { echo $1 | cut --delimiter=. --fields=3; }
 
 # ensures that a generic service is running
 # @param service  the name of the service
@@ -119,10 +139,10 @@ autofs_switch() {
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 apache_switch() {
-  sudo $service_binary $apache status > /dev/null 2>&1
+  sudo $service_binary $APACHE_SERVICE status > /dev/null 2>&1
   service_should_switch $1 $?
   if [ $? -eq 0 ]; then
-    service_switch $apache $1
+    service_switch $APACHE_SERVICE $1
     return $?
   else
     return 0 # already in correct state
@@ -309,23 +329,30 @@ destroy_repo() {
 }
 
 
+has_repo() {
+  local repo=$1
+  cvmfs_server list 2>/dev/null | grep -q "^$repo "
+}
+
+
 create_repo() {
   local repo=$1
   local uid=$2
   local debug_log=$3
+  local extra_options="$4"
 
   echo "Shutting down autofs for the cvmfs mounts"
   autofs_switch off || return 100
 
-  if cvmfs_server list | grep -q $repo; then
+  if has_repo $repo; then
     echo "Repository $repo is already present... removing it"
     destroy_repo $repo || return 101
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs -o $uid -m -f ${CVMFS_TEST_UNIONFS} $repo || return 102
+  sudo cvmfs_server mkfs -o $uid -m -f ${CVMFS_TEST_UNIONFS} -a ${CVMFS_TEST_HASHALGO} $extra_options $repo || return 102
 
-  if [ x$debug_log != x ]; then
+  if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a /etc/cvmfs/repositories.d/${repo}/client.conf
   fi
 }
@@ -335,8 +362,9 @@ create_empty_repo() {
   local repo=$1
   local uid=$2
   local debug_log=$3
+  local extra_options="$4"
 
-  create_repo $repo $uid $debug_log || return 101
+  create_repo $repo $uid $debug_log $extra_options || return 101
 
   sudo cvmfs_server transaction $repo || return 102
   rm -f /cvmfs/$repo/new_repository
@@ -394,6 +422,17 @@ make_huge_repo() {
     --min-file-size        0                     \
     --max-file-size     5120                     \
     $repo_dir
+}
+
+
+# creates a big file at a given location with a given size
+# @param path  the location of the new file
+# @param size  the desired size in megabytes
+create_big_file() {
+  local path=$1
+  local size=$2
+
+  dd if=/dev/zero of=$path bs=1024k count=$size
 }
 
 
@@ -579,8 +618,10 @@ get_catalog_count() {
 }
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure
+# additionally it might check the backend storage integrity as well when
+# provided with -i
 # @param repo    the repository to be checked
-check_catalogs() {
+check_repository() {
   local repo=$1
   shift 1
 
@@ -604,7 +645,7 @@ publish_repo() {
   shift 1
 
   # parse the command line arguments (keep quotation marks)
-  args=""
+  args="-v"
   while [ $# -gt 0 ]; do
     if echo $1 | grep -q "\s"; then
       args="$args \"$1\""
@@ -631,6 +672,15 @@ publish_repo() {
 
   return 0
 }
+
+
+# sources the repository server configuration file for the given repo name
+# @param name  the name of the repository to load the configs for
+load_repo_config() {
+  local name=$1
+  . /etc/cvmfs/repositories.d/${name}/server.conf
+}
+
 
 # runs the given command and measures the time it took to execute
 stop_watch() {
@@ -673,4 +723,190 @@ popdir() {
     cd -
     return $?
   fi
+}
+
+
+# retrieves the apache version string "2.x.xx"
+get_apache_version() {
+  ${APACHE_BIN} -v | head -n1 | \
+    sed 's/^Server version: Apache\/\([0-9]\+\.[0-9]\+\.[0-9]\+\).*$/\1/'
+}
+
+
+# figure out apache config file mode
+#
+# @return   apache config mode (stdout) (see globals below)
+APACHE_CONF_MODE_OLD=1 # *.conf goes to ${APACHE_CONF}/conf.d
+APACHE_CONF_MODE_NEW=2 # *.conf goes to ${APACHE_CONF}/conf-available
+get_apache_conf_mode() {
+  local minor_apache_version=$(version_minor "$(get_apache_version)")
+  if [ $minor_apache_version -ge 4 ] || [ -d /etc/${APACHE_CONF}/conf-available ]; then
+    echo $APACHE_CONF_MODE_NEW
+  else
+    echo $APACHE_CONF_MODE_OLD
+  fi
+}
+
+
+# find location of apache configuration files
+#
+# @return   the location of apache configuration files (stdout)
+get_apache_conf_path() {
+  local res_path="/etc/${APACHE_CONF}"
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "${res_path}/conf-available"
+  else
+    echo "${res_path}/conf.d"
+  fi
+}
+
+
+# returns the apache configuration string for 'allow from all'
+# Note: this is necessary, since apache 2.4.x formulates that different
+#
+# @return   a configuration snippet to allow s'th from all hosts (stdout)
+get_compatible_apache_allow_from_all_config() {
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "Require all granted"
+  else
+    local nl='
+'
+    echo "Order allow,deny${nl}    Allow from all"
+  fi
+}
+
+
+# writes apache configuration file
+# This figures out where to put the apache configuration file depending
+# on the running apache version
+# Note: Configuration file content is expected to come through stdin
+#
+# @param   file_name  the name of the apache config file (no path!)
+# @return             0 on success
+create_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)"
+
+  # create (or append) the conf file
+  cat - | sudo tee ${conf_path}/${file_name} > /dev/null || return 1
+
+  # the new apache requires the enable the config afterwards
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    sudo a2enconf $file_name > /dev/null || return 2
+  fi
+
+  return 0
+}
+
+
+# removes apache config files dependent on the apache version in place
+# Note: As of apache 2.4.x `a2disconf` needs to be called before removal
+#
+# @param   file_name  the name of the conf file to be removed (no path!)
+# @return  0 on successful removal
+remove_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)/${file_name}"
+
+  # disable configuration on newer apache versions
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    sudo a2disconf $file_name > /dev/null 2>&1 || return 1
+  fi
+
+  # remove configuration file
+  sudo rm -f $conf_path
+}
+
+
+get_repo_storage() {
+  local repo_name="$1"
+  echo "/srv/cvmfs/${repo_name}"
+}
+
+get_repo_url() {
+  local repo_name="$1"
+  echo "http://localhost/cvmfs/${repo_name}"
+}
+
+get_apache_config_filename() {
+  local repo_name="$1"
+  echo "${repo_name}.conf"
+}
+
+
+cleanup_legacy_repo_leftovers() {
+  local legacy_repo_name="$1"
+  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
+  local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
+
+  echo -n "cleanup (if necessary)... "
+  has_repo $legacy_repo_name && die "fail"
+  if [ -d $legacy_repo_storage ]; then
+    sudo rm -fR $legacy_repo_storage
+  fi
+  if [ -f /etc/cvmfs/keys/${legacy_repo_name}.crt ] || \
+     [ -f /etc/cvmfs/keys/${legacy_repo_name}.pub ] || \
+     [ -f /etc/cvmfs/keys/${legacy_repo_name}.key ] || \
+     [ -f /etc/cvmfs/keys/${legacy_repo_name}.masterkey ]; then
+    sudo rm -f /etc/cvmfs/keys/${legacy_repo_name}.*
+  fi
+  remove_apache_config_file $apache_config_file
+  echo "done"
+}
+
+
+# resigns a freshly planted legacy repository (see plant_legacy_repo())
+# Note: This expects a matching keychain in /etc/keys/{$repo_name}
+# @param repo_name  the FQRN of the legacy repository to be resigned
+_resign_legacy_repository() {
+  local repo_name="$1"
+  local repo_storage="$(get_repo_storage $repo_name)"
+  local legacy_repo_storage="${repo_storage}/pub/catalogs"
+  local tmp_dir="$(pwd)/tmp"
+  local upstream="local,${legacy_repo_storage}/data/txn,${legacy_repo_storage}"
+
+  cat ${legacy_repo_storage}/.cvmfspublished | head -n6 | \
+    sudo tee ${legacy_repo_storage}/.cvmfspublished_unsigned > /dev/null || return 1
+  mkdir -p $tmp_dir || return 2
+  sudo cvmfs_swissknife sign \
+    -c /etc/cvmfs/keys/${repo_name}.crt \
+    -k /etc/cvmfs/keys/${repo_name}.key \
+    -n ${repo_name} \
+    -m ${legacy_repo_storage}/.cvmfspublished_unsigned \
+    -t $tmp_dir \
+    -r $upstream > /dev/null || return 3
+}
+
+
+# extracts a tarball into the root directory!
+# Note: it expects the tarball to define the full destination path.
+# @param tarball  the path to the tarball to be planted
+plant_tarball() {
+  local tarball="$1"
+  local olddir="$(pwd)"
+
+  cd /                  || return 101
+  sudo tar xzf $tarball || return 102
+  cd $olddir            || return 103
+}
+
+
+# extracts a legacy repository contained in a tarball.
+# Note: This expects the tarball to define the full destination path. Furthermore
+#       it expects a repo keychain to be planted in /etc/keys/${legacy_repo_name}
+# @param tarball           path to the tarball containing the legacy repo
+# @param legacy_repo_name  FQRN of the repository to be planted
+plant_legacy_repository_revision() {
+  local tarball="$1"
+  local legacy_repo_name="$2"
+  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
+
+  plant_tarball "$tarball"                                             || return 104
+  [ -d ${legacy_repo_storage}/pub ]                                    || return 105
+  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
+  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
+  sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
+  _resign_legacy_repository "$legacy_repo_name"                         || return 109
 }

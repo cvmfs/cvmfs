@@ -156,94 +156,6 @@ void AbstractCatalogManager::DetachNested() {
 }
 
 
-/*Catalog *AbstractCatalogManager::Inode2Catalog(const inode_t inode) {
-  Catalog *result = NULL;
-  const inode_t raw_inode =
-    inode_annotation_ ? inode_annotation_->Strip(inode) : inode;
-  for (CatalogList::const_iterator i = catalogs_.begin(),
-       iEnd = catalogs_.end(); i != iEnd; ++i)
-  {
-    if ((*i)->inode_range().ContainsInode(raw_inode)) {
-      result = *i;
-      break;
-    }
-  }
-  if (result == NULL) {
-    LogCvmfs(kLogCatalog, kLogDebug, "cannot find catalog for inode %"PRIu64" "
-             "(raw inode: %"PRIu64")", inode, raw_inode);
-  }
-  return result;
-}*/
-
-
-/**
- * Perform a lookup for a specific DirectoryEntry in the catalogs.
- * @param inode the inode to find in the catalogs
- * @param options whether to perform another lookup to get the parent entry, too
- * @param dirent the resulting DirectoryEntry
- * @return true if lookup succeeded otherwise false
- */
-/*bool AbstractCatalogManager::LookupInode(const inode_t inode,
-                                         const LookupOptions options,
-                                         DirectoryEntry *dirent)
-{
-  EnforceSqliteMemLimit();
-  ReadLock();
-  bool found = false;
-
-  // Don't lookup ancient inodes
-  if (inode_annotation_ && !inode_annotation_->ValidInode(inode)) {
-    Unlock();
-    return false;
-  }
-
-  // Get corresponding catalog
-  Catalog *catalog = Inode2Catalog(inode);
-  if (catalog == NULL)
-    goto lookup_inode_fini;
-
-  if ((options == kLookupSole) || (inode == GetRootInode())) {
-    atomic_inc64(&statistics_.num_lookup_inode);
-    found = catalog->LookupInode(inode, dirent, NULL);
-    goto lookup_inode_fini;
-  } else {
-    atomic_inc64(&statistics_.num_lookup_inode);
-    // Lookup including parent entry
-    shash::Md5 parent_md5path;
-    DirectoryEntry parent;
-    bool found_parent = false;
-
-    found = catalog->LookupInode(inode, dirent, &parent_md5path);
-    if (!found)
-      goto lookup_inode_fini;
-
-    // Parent is possibly in the parent catalog
-    atomic_inc64(&statistics_.num_lookup_path);
-    if (dirent->IsNestedCatalogRoot() && !catalog->IsRoot()) {
-      Catalog *parent_catalog = catalog->parent();
-      found_parent = parent_catalog->LookupMd5Path(parent_md5path, &parent);
-    } else {
-      found_parent = catalog->LookupMd5Path(parent_md5path, &parent);
-    }
-
-    // If there is no parent entry, it might be data corruption
-    if (!found_parent) {
-      LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogErr,
-               "cannot find parent entry for inode %"PRIu64" --> data corrupt?",
-               inode);
-      found = false;
-    } else {
-      dirent->set_parent_inode(parent.inode());
-      found = true;
-    }
-  }
-
- lookup_inode_fini:
-  Unlock();
-  return found;
-}*/
-
-
 /**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
  * @param path      the path to find in the catalogs
@@ -287,9 +199,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
     atomic_inc64(&statistics_.num_lookup_path);
     found = best_fit->LookupPath(path, dirent);
 
-    if (found) {
-      // DowngradeLock(); TODO
-    } else {
+    if (!found) {
       LogCvmfs(kLogCatalog, kLogDebug,
                "entry not found, we may have to load nested catalogs");
 
@@ -448,11 +358,58 @@ bool AbstractCatalogManager::ListingStat(const PathString &path,
 }
 
 
+/**
+ * Collect file chunks (if exist)
+ * @param path the path of the directory to list
+ * @param interpret_hashes_as hash of the directory entry (by convention the
+ *        same than the chunk hashes)
+ * @return true if listing succeeded otherwise false
+ */
+bool AbstractCatalogManager::ListFileChunks(
+  const PathString &path,
+  const shash::Algorithms interpret_hashes_as,
+  FileChunkList *chunks)
+{
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Find catalog, possibly load nested
+  Catalog *best_fit = FindCatalog(path);
+  Catalog *catalog = best_fit;
+  if (MountSubtree(path, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(path);
+    result = MountSubtree(path, best_fit, &catalog);
+    if (!result) {
+      Unlock();
+      return false;
+    }
+  }
+
+  result = catalog->ListPathChunks(path, interpret_hashes_as, chunks);
+
+  Unlock();
+  return result;
+}
+
+
+
 uint64_t AbstractCatalogManager::GetRevision() const {
   ReadLock();
   const uint64_t revision = revision_cache_;
   Unlock();
   return revision;
+}
+
+
+bool AbstractCatalogManager::GetVolatileFlag() const {
+  ReadLock();
+  const bool volatile_flag = GetRootCatalog()->volatile_flag();
+  Unlock();
+  return volatile_flag;
 }
 
 
@@ -519,7 +476,7 @@ void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
 Catalog* AbstractCatalogManager::FindCatalog(const PathString &path) const {
   assert (catalogs_.size() > 0);
 
-  // Start at the root catalog and successive go down the catalog tree
+  // Start at the root catalog and successively go down the catalog tree
   Catalog *best_fit = GetRootCatalog();
   Catalog *next_fit = NULL;
   while (best_fit->path() != path) {
@@ -573,10 +530,10 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
   PathString path_slash(path);
   path_slash.Append("/", 1);
   atomic_inc64(&statistics_.num_nested_listing);
-  const Catalog::NestedCatalogList *nested_catalogs =
+  const Catalog::NestedCatalogList& nested_catalogs =
     parent->ListNestedCatalogs();
-  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs->begin(),
-       iEnd = nested_catalogs->end(); i != iEnd; ++i)
+  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
+       iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
     PathString nested_path_slash(i->path);
@@ -626,8 +583,8 @@ Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
                                        &catalog_path,
                                        &catalog_hash);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d)",
-             mountpoint.c_str(), retval);
+    LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
+             mountpoint.c_str(), retval, Code2Ascii(retval));
     return NULL;
   }
 

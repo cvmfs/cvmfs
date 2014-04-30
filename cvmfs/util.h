@@ -65,6 +65,7 @@ std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 NameString GetFileName(const PathString &path);
+bool IsAbsolutePath(const std::string &path);
 
 void CreateFile(const std::string &path, const int mode);
 int MakeSocket(const std::string &path, const int mode);
@@ -132,6 +133,7 @@ bool SwitchCredentials(const uid_t uid, const gid_t gid,
 bool FileExists(const std::string &path);
 int64_t GetFileSize(const std::string &path);
 bool DirectoryExists(const std::string &path);
+bool SymlinkExists(const std::string &path);
 bool MkdirDeep(const std::string &path, const mode_t mode);
 bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
@@ -154,6 +156,7 @@ std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);
 std::string StringifyTimeval(const timeval value);
 std::string StringifyIpv4(const uint32_t ip_address);
+time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
 int HexDigit2Int(const char digit);
@@ -167,6 +170,10 @@ std::vector<std::string> SplitString(const std::string &str,
                                      const unsigned max_chunks = 0);
 std::string JoinStrings(const std::vector<std::string> &strings,
                         const std::string &joint);
+void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
+                    std::map<char, std::string> *content);
+bool ParseKeyvalPath(const std::string &filename,
+                     std::map<char, std::string> *content);
 
 double DiffTimeSeconds(struct timeval start, struct timeval end);
 
@@ -209,6 +216,8 @@ struct hash_murmur {
 #endif
   }
 };
+std::string Base64(const std::string &data);
+bool Debase64(const std::string &data, std::string *decoded);
 
 
 template <class T>
@@ -296,8 +305,10 @@ class MemoryMappedFile : SingleCopy {
  *                          polymorphically constructed by this factory
  * @param ParameterT        the type of the parameter that is used to figure out
  *                          which class should be instanciated at runtime
+ * @param InfoT             wrapper type for introspection data of registered
+ *                          plugins
  */
-template <class AbstractProductT, typename ParameterT>
+template <class AbstractProductT, typename ParameterT, typename InfoT>
 class AbstractFactory {
  public:
   AbstractFactory() {}
@@ -305,12 +316,13 @@ class AbstractFactory {
 
   virtual bool WillHandle(const ParameterT &param) const = 0;
   virtual AbstractProductT* Construct(const ParameterT &param) const = 0;
+  virtual InfoT Introspect() const = 0;
 };
 
 
 /**
- * Concrete (but templated) implementation of the AbstractFactory template to
- * wrap the creation of a specific class instance. Namely ConcreteProductT.
+ * Implementation of the AbstractFactory template to wrap the creation of a
+ * specific class instance. Namely ConcreteProductT. (Note: still abstract)
  * See the description of PolymorphicCreation for more details
  *
  * @param ConcreteProductT  the class that will be instanciated by this factory
@@ -318,9 +330,17 @@ class AbstractFactory {
  * @param AbstractProductT  the base class of all used ConcreteProductT classes
  * @param ParameterT        the type of the parameter that is used to poly-
  *                          morphically create a specific ConcreteProductT
+ * @param InfoT             wrapper type for introspection data of registered
+ *                          plugins
  */
-template <class ConcreteProductT, class AbstractProductT, typename ParameterT>
-class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT> {
+template <class ConcreteProductT,
+          class AbstractProductT,
+          typename ParameterT,
+          typename InfoT>
+class AbstractFactoryImpl2 : public AbstractFactory<AbstractProductT,
+                                                    ParameterT,
+                                                    InfoT>
+{
  public:
   inline bool WillHandle(const ParameterT &param) const {
     return ConcreteProductT::WillHandle(param);
@@ -329,6 +349,47 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
     AbstractProductT* product = new ConcreteProductT(param);
     return product;
   }
+};
+
+
+/**
+ * Template to add an implementation of Introspect() based on the type of InfoT.
+ * Generally Introspect() will call ConcreteProductT::GetInfo() and return it's
+ * result. However if InfoT = void, this method still needs to be stubbed.
+ * (See also the template specialization for InfoT = void below)
+ */
+template <class ConcreteProductT,
+          class AbstractProductT,
+          typename ParameterT,
+          typename InfoT>
+class AbstractFactoryImpl :
+  public AbstractFactoryImpl2<ConcreteProductT,
+                              AbstractProductT,
+                              ParameterT,
+                              InfoT>
+{
+  inline InfoT Introspect() const {
+    return ConcreteProductT::GetInfo();
+  }
+};
+
+/**
+ * Template specialization for InfoT = void that only stubs the abstract method
+ * Introspect().
+ */
+template <class ConcreteProductT,
+          class AbstractProductT,
+          typename ParameterT>
+class AbstractFactoryImpl<ConcreteProductT,
+                          AbstractProductT,
+                          ParameterT,
+                          void> :
+  public AbstractFactoryImpl2<ConcreteProductT,
+                              AbstractProductT,
+                              ParameterT,
+                              void>
+{
+  inline void Introspect() const {}
 };
 
 /**
@@ -350,6 +411,9 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
  *     virtual method `bool Initialize()` which will be called directly after
  *     creation of a ConcreteProductT. If it returns false, the constructed in-
  *     stance is deleted and the list of plugins is traversed further.
+ *  5. (OPTIONAL) The ConcreteProductTs can implement a `static InfoT GetInfo()`
+ *     that can be used for run-time introspection of registered plugins using
+ *     PolymorphicConstruction<AbstractProductT, ParameterT, InfoT>::Introspect()
  *
  * A possible class hierarchy could look like this:
  *
@@ -387,15 +451,18 @@ class AbstractFactoryImpl : public AbstractFactory<AbstractProductT, ParameterT>
  * @param ParameterT        the type of the parameter that is used to poly-
  *                          morphically instantiate one of the subclasses of
  *                          AbstractProductT
+ * @param InfoT             (optional) wrapper type for introspection data of
+ *                          registered plugins. InfoT AbstractProductT::GetInfo()
+ *                          needs to be implemented for each plugin
  */
-template <class AbstractProductT, typename ParameterT>
-class PolymorphicConstruction {
- private:
-  typedef AbstractFactory<AbstractProductT, ParameterT> Factory;
+template <class AbstractProductT, typename ParameterT, typename InfoT>
+class PolymorphicConstructionImpl {
+ protected:
+  typedef AbstractFactory<AbstractProductT, ParameterT, InfoT> Factory;
   typedef std::vector<Factory*> RegisteredPlugins;
 
  public:
-  virtual ~PolymorphicConstruction() {};
+  virtual ~PolymorphicConstructionImpl() {};
 
   static AbstractProductT* Construct(const ParameterT &param) {
     LazilyRegisterPlugins();
@@ -462,7 +529,8 @@ class PolymorphicConstruction {
     registered_plugins_.push_back(
       new AbstractFactoryImpl<ConcreteProductT,
                               AbstractProductT,
-                              ParameterT>()
+                              ParameterT,
+                              InfoT>()
     );
   }
 
@@ -485,26 +553,72 @@ class PolymorphicConstruction {
     needs_init_ = 1;
   }
 
- private:
+ protected:
   static RegisteredPlugins registered_plugins_;
+
+ private:
   static atomic_int32      needs_init_;
   static pthread_mutex_t   init_mutex_;
 };
 
-template <class AbstractProductT, typename ParameterT>
-atomic_int32
-PolymorphicConstruction<AbstractProductT, ParameterT>::needs_init_ = 1;
 
+/**
+ * Interface template for PolymorphicConstruction.
+ * This adds the static method Introspect() to each PolymorphicConstruction type
+ * implementation if (and only if) InfoT is not void.
+ * Backward compatibility: if InfoT is not defined (i.e. is void), Introspect()
+ *                         is not defined at all! (see template specialization)
+ */
+template <class AbstractProductT, typename ParameterT, typename InfoT = void>
+class PolymorphicConstruction :
+       public PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT> {
+ private:
+  typedef PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT> T;
+  typedef typename T::RegisteredPlugins RegisteredPlugins;
+
+ public:
+  typedef std::vector<InfoT> IntrospectionData;
+
+  static IntrospectionData Introspect() {
+    IntrospectionData introspection_data;
+    introspection_data.reserve(T::registered_plugins_.size());
+    const RegisteredPlugins &plugins = T::registered_plugins_;
+
+    T::LazilyRegisterPlugins();
+    typename RegisteredPlugins::const_iterator i    = plugins.begin();
+    typename RegisteredPlugins::const_iterator iend = plugins.end();
+    for (; i != iend; ++i) {
+      introspection_data.push_back((*i)->Introspect());
+    }
+
+    return introspection_data;
+  }
+};
+
+/**
+ * Template specialization for backward compatibility that _does not_ implement
+ * a static Introspect() method when the InfoT parameter is not given or is void
+ */
 template <class AbstractProductT, typename ParameterT>
+class PolymorphicConstruction<AbstractProductT, ParameterT, void> :
+      public PolymorphicConstructionImpl<AbstractProductT, ParameterT, void> {};
+
+
+
+template <class AbstractProductT, typename ParameterT, typename InfoT>
+atomic_int32
+PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::needs_init_ = 1;
+
+template <class AbstractProductT, typename ParameterT, typename InfoT>
 pthread_mutex_t
-PolymorphicConstruction<AbstractProductT, ParameterT>::init_mutex_ =
+PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::init_mutex_ =
                                                       PTHREAD_MUTEX_INITIALIZER;
 
-// init the static member registered_plugins_ inside the PolymorphicConstruction
+// init the static member registered_plugins_ inside the PolymorphicConstructionImpl
 // template... whoa, what ugly code :o)
-template <class AbstractProductT, typename ParameterT>
-typename PolymorphicConstruction<AbstractProductT, ParameterT>::RegisteredPlugins
-PolymorphicConstruction<AbstractProductT, ParameterT>::registered_plugins_;
+template <class AbstractProductT, typename ParameterT, typename InfoT>
+typename PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::RegisteredPlugins
+PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::registered_plugins_;
 
 
 /**
@@ -523,6 +637,8 @@ void ThreadProxy(DelegateT        *delegate,
 template<typename T, class A = std::allocator<T> >
 class Buffer {
  public:
+  typedef typename A::pointer pointer_t;
+
   Buffer() : used_(0), size_(0), buffer_(NULL), initialized_(false) {}
 
   Buffer(const size_t size) : used_(0), size_(0), buffer_(NULL),
@@ -538,7 +654,7 @@ class Buffer {
   void Allocate(const size_t size) {
     assert (!IsInitialized());
     size_        = size;
-    buffer_      = A().allocate(size_bytes());
+    buffer_      = allocator_.allocate(size_bytes());
     initialized_ = true;
   }
 
@@ -553,6 +669,16 @@ class Buffer {
     return buffer_;
   }
 
+  typename A::pointer free_space_ptr() {
+    assert (IsInitialized());
+    return buffer_ + used();
+  }
+
+  const typename A::pointer free_space_ptr() const {
+    assert (IsInitialized());
+    return buffer_ + used();
+  }
+
   void SetUsed(const size_t items) {
     assert (items <= size());
     used_ = items;
@@ -564,10 +690,12 @@ class Buffer {
     used_ = bytes / sizeof(T);
   }
 
-  size_t size()        const { return size_;             }
-  size_t size_bytes()  const { return size_ * sizeof(T); }
-  size_t used()        const { return used_;             }
-  size_t used_bytes()  const { return used_ * sizeof(T); }
+  size_t size()        const { return size_;              }
+  size_t size_bytes()  const { return size_ * sizeof(T);  }
+  size_t used()        const { return used_;              }
+  size_t used_bytes()  const { return used_ * sizeof(T);  }
+  size_t free()        const { return size_ - used_;      }
+  size_t free_bytes()  const { return free() * sizeof(T); }
 
  private:
   Buffer(const Buffer &other) { assert (false); } // no copy!
@@ -577,7 +705,7 @@ class Buffer {
     if (size_ == 0) {
       return;
     }
-    A().deallocate(buffer_, size_bytes());
+    allocator_.deallocate(buffer_, size_bytes());
     buffer_      = NULL;
     size_        = 0;
     used_        = 0;
@@ -585,6 +713,7 @@ class Buffer {
   }
 
  private:
+  A                    allocator_;
   size_t               used_;
   size_t               size_;
   typename A::pointer  buffer_;

@@ -144,7 +144,7 @@ fi
 # create test user account if necessary
 id $test_username > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-  sudo /usr/sbin/useradd $test_username
+  sudo /usr/sbin/useradd --create-home -s /bin/bash $test_username
   if [ $? -ne 0 ]; then
     echo "cannot create user account $test_username"
     exit 4
@@ -205,11 +205,11 @@ fi
 
 # run the platform specific script to perform platform specific test setups
 echo "running platform specific script $platform_script... "
-sudo -H -u $test_username sh $platform_script_abs -s $server_package           \
-                                                  -c $client_package           \
-                                                  -g $unittest_package         \
-                                                  -k $keys_package             \
-                                                  -t $cvmfs_source_directory   \
-                                                  -l $cvmfs_test_log           \
-                                                  -u $cvmfs_unittest_log       \
-                                                  -m $cvmfs_migrationtest_log
+sudo -H -E -u $test_username sh $platform_script_abs -s $server_package           \
+                                                     -c $client_package           \
+                                                     -g $unittest_package         \
+                                                     -k $keys_package             \
+                                                     -t $cvmfs_source_directory   \
+                                                     -l $cvmfs_test_log           \
+                                                     -u $cvmfs_unittest_log       \
+                                                     -m $cvmfs_migrationtest_log

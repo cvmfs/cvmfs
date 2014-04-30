@@ -219,7 +219,7 @@ std::string Database::GetLastErrorMsg() const {
 bool SqlTag::BindTag(const Tag &tag) {
   return (
     BindText(1, tag.name) &&
-    BindText(2, tag.root_hash.ToString()) &&
+    BindTextTransient(2, tag.root_hash.ToString()) && // temporary from ToString
     BindInt64(3, tag.revision) &&
     BindInt64(4, tag.timestamp) &&
     BindInt64(5, tag.channel) &&
@@ -233,7 +233,7 @@ Tag SqlTag::RetrieveTag() {
   Tag result;
   result.name = string(reinterpret_cast<const char *>(RetrieveText(0)));
   const string hash_str(reinterpret_cast<const char *>(RetrieveText(1)));
-  result.root_hash = shash::Any(shash::kSha1, shash::HexPtr(hash_str));
+  result.root_hash = shash::MkFromHexPtr(shash::HexPtr(hash_str));
   result.revision = RetrieveInt64(2);
   result.timestamp = RetrieveInt64(3);
   result.channel = static_cast<UpdateChannel>(RetrieveInt64(4));
@@ -320,6 +320,19 @@ bool TagList::FindTag(const string &name, Tag *tag) {
     }
   }
   return false;
+}
+
+
+bool TagList::FindTagByDate(const time_t seconds_utc, Tag *tag) {
+  assert(tag);
+  bool result = false;
+  for (unsigned i = 0; i < list_.size(); ++i) {
+    if (list_[i].timestamp > seconds_utc)
+      break;
+    *tag = list_[i];
+    result = true;
+  }
+  return result;
 }
 
 

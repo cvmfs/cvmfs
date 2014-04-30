@@ -17,6 +17,8 @@
 #include <openssl/rsa.h>
 #include <openssl/engine.h>
 
+#include "hash.h"
+
 namespace signature {
 
 class SignatureManager {
@@ -38,7 +40,9 @@ class SignatureManager {
   bool KeysMatch();
   bool VerifyCaChain();
   std::string Whois();
-  std::string FingerprintCertificate();
+  shash::Any HashCertificate(const shash::Algorithms hash_algorithm);
+  std::string FingerprintCertificate(const shash::Algorithms hash_algorithm);
+  static shash::Any MkFromFingerprint(const std::string &fingerprint);
 
   bool LoadPublicRsaKeys(const std::string &path_list);
   bool LoadBlacklist(const std::string &path_blacklist);
@@ -57,10 +61,14 @@ class SignatureManager {
   bool VerifyPkcs7(const unsigned char *buffer, const unsigned buffer_size,
                    unsigned char **content, unsigned *content_size,
                    std::vector<std::string> *alt_uris);
+  static void CutLetter(const unsigned char *buffer,
+                        const unsigned buffer_size,
+                        const char separator,
+                        unsigned *letter_length,
+                        unsigned *pos_after_mark);
+
  private:
   void InitX509Store();
-  void CutLetter(const unsigned char *buffer, const unsigned buffer_size,
-                 unsigned *letter_length, unsigned *pos_after_mark);
 
   EVP_PKEY *private_key_;
   X509 *certificate_;
