@@ -35,6 +35,7 @@ set (CVMFS_CLIENT_SOURCES
   download.cc download.h
   wpad.cc wpad.h
   manifest.h manifest.cc
+  whitelist.h whitelist.cc
   manifest_fetch.h manifest_fetch.cc
   murmur.h smallhash.h
   bigvector.h
@@ -100,6 +101,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   logging.cc logging.h logging_internal.h
   globals.cc globals.h
   manifest.h manifest.cc
+  whitelist.h whitelist.cc
   manifest_fetch.h manifest_fetch.cc
   prng.h
   hash.h hash.cc
@@ -144,12 +146,14 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   history.h history.cc
+  letter.h letter.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc
   swissknife_lsrepo.h swissknife_lsrepo.cc
   swissknife_pull.h swissknife_pull.cc
   swissknife_sign.h swissknife_sign.cc
+  swissknife_letter.h swissknife_letter.cc
   swissknife_sync.h swissknife_sync.cc
   swissknife_info.h swissknife_info.cc
   swissknife_history.h swissknife_history.cc

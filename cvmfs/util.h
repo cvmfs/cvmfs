@@ -168,6 +168,10 @@ std::vector<std::string> SplitString(const std::string &str,
                                      const unsigned max_chunks = 0);
 std::string JoinStrings(const std::vector<std::string> &strings,
                         const std::string &joint);
+void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
+                    std::map<char, std::string> *content);
+bool ParseKeyvalPath(const std::string &filename,
+                     std::map<char, std::string> *content);
 
 double DiffTimeSeconds(struct timeval start, struct timeval end);
 
@@ -210,6 +214,8 @@ struct hash_murmur {
 #endif
   }
 };
+std::string Base64(const std::string &data);
+bool Debase64(const std::string &data, std::string *decoded);
 
 
 template <class T>
