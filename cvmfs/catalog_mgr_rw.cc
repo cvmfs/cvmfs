@@ -804,6 +804,8 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   }
   catalog->Commit();
 
+  catalog->VacuumDatabaseIfNecessary();
+
   uint64_t catalog_size = GetFileSize(catalog->database_path());
   assert(catalog_size > 0);
 

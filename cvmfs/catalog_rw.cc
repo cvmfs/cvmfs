@@ -657,4 +657,36 @@ void WritableCatalog::UpdateCounters() {
   assert (retval);
 }
 
+
+/**
+ * Checks if the database of this catalogs needs cleanup and defragments it
+ * if necessary
+ */
+void WritableCatalog::VacuumDatabaseIfNecessary() {
+  const Database &db = database();
+  bool        needs_defragmentation = false;
+  double      ratio                 = 0.0;
+  std::string reason;
+
+  if ((ratio = db.GetFreePageRatio()) > kMaximalFreePageRatio) {
+    needs_defragmentation = true;
+    reason                = "free pages";
+  } else if ((ratio = db.GetRowIdWasteRatio()) > kMaximalRowIdWasteRatio) {
+    needs_defragmentation = true;
+    reason                = "wasted row IDs";
+  }
+
+  if (needs_defragmentation) {
+    LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
+             "Note: Catalog at %s gets defragmented (%.2f%% %s)... ",
+             (IsRoot()) ? "/" : path().c_str(), ratio * 100.0, reason.c_str());
+    if (! db.Vacuum()) {
+      LogCvmfs(kLogCatalog, kLogStderr, "failed (SQLite: %s)",
+               db.GetLastErrorMsg().c_str());
+      assert (false);
+    }
+    LogCvmfs(kLogCatalog, kLogStdout, "done");
+  }
+}
+
 }  // namespace catalog
