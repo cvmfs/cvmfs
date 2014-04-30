@@ -77,6 +77,7 @@ class Database {
   bool ready() const { return ready_; }
 
   double GetFreePageRatio() const;
+  double GetRowIdWasteRatio() const;
   bool Vacuum() const;
 
   /**

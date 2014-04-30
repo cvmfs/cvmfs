@@ -350,6 +350,15 @@ double Database::GetFreePageRatio() const {
 }
 
 
+double Database::GetRowIdWasteRatio() const {
+  Sql rowid_waste_ratio_query(*this,
+   "SELECT 1.0 - CAST(COUNT(*) AS DOUBLE) / MAX(rowid) AS ratio FROM catalog;");
+  const bool retval = rowid_waste_ratio_query.FetchRow();
+  assert (retval);
+
+  return rowid_waste_ratio_query.RetrieveDouble(0);
+}
+
 /**
  * Cleanup unused database space
  * See: http://www.sqlite.org/lang_vacuum.html
