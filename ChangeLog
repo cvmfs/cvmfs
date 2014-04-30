@@ -1,4 +1,7 @@
 2.1.20:
+  * sqlite 3.8.4.3
+  * libcurl 7.36
+  * leveldb 1.15
   * Rename cvmfs_server lstags command to list-tags
   * Add extended attribute user.tag
   * Add CVMFS_REPOSITORY_DATE client parameter
