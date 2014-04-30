@@ -37,6 +37,9 @@
 #define INVALID_CHECKSUM_DETECTED -1
 #define INVALID_CHECKSUM_TYPE -2
 
+// Default initial value for the CRC32
+#define CRC_INITIAL_VAL 0xffffffff
+
 // Return type for bulk verification when verification fails
 typedef struct crc32_error {
   uint32_t got_crc;
@@ -54,7 +57,7 @@ typedef struct crc32_error {
  * @param dataLen               Length of the data buffer
  * @param sums                  (out param) buffer to write checksums into.
  *                              It must contain at least dataLen * 4 bytes.
- * @param checksum_type         One of the CRC32 algorithm constants defined 
+ * @param checksum_type         One of the CRC32 algorithm constants defined
  *                              above
  * @param bytes_per_checksum    How many bytes of data to process per checksum.
  * @param error_info            If non-NULL, will be filled in if an error
@@ -64,7 +67,7 @@ typedef struct crc32_error {
  *                              for which are defined above
  */
 #ifdef __cplusplus
-extern "C" { 
+extern "C" {
 #endif
 int bulk_verify_crc(const uint8_t *data, size_t data_len,
     const uint32_t *sums, int checksum_type,
@@ -84,7 +87,7 @@ int bulk_verify_crc(const uint8_t *data, size_t data_len,
  * @param dataLen               Length of the data buffer
  * @param sums                  (out param) buffer to write checksums into.
  *                              It must contain at least dataLen * 4 bytes.
- * @param checksum_type         One of the CRC32 algorithm constants defined 
+ * @param checksum_type         One of the CRC32 algorithm constants defined
  *                              above
  * @param bytesPerChecksum      How many bytes of data to process per checksum.
  *
@@ -93,6 +96,26 @@ int bulk_verify_crc(const uint8_t *data, size_t data_len,
 int bulk_calculate_crc(const uint8_t *data, size_t data_len,
                     uint32_t *sums, int checksum_type,
                     int bytes_per_checksum);
+
+/**
+ * Calculate a checksum for a single data buffer.
+ *
+ * This is a non-bulk variant of the checksum algorithm.
+ *
+ * @param data                  The data to checksum
+ * @param dataLen               Length of the data buffer
+ * @param crc                   The initial CRC32 value; this is useful if one
+ *                              intends to keep a running checksum.
+ *                              This is also an output parameter.
+ * @param checksum_type         One of the CRC32 algorithm constants.
+ * @return                      0 for success, non-zero for an error.
+ *                              On success, this updates the crc parameter with
+ *                              the latest checksum.  On failure, the value of crc
+ *                              is undefined.
+ */
+int calculate_crc(const uint8_t *data, size_t data_len,
+                  uint32_t *crc, int checksum_type);
+
 #ifdef __cplusplus
 }
 #endif
