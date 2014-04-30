@@ -331,6 +331,34 @@ std::string Database::GetLastErrorMsg() const {
 }
 
 
+/**
+ * Used to check if the database needs cleanup
+ */
+double Database::GetFreePageRatio() const {
+  Sql free_page_count_query(*this, "PRAGMA freelist_count;");
+  Sql page_count_query     (*this, "PRAGMA page_count;");
+
+  const bool retval = page_count_query.FetchRow() &&
+                      free_page_count_query.FetchRow();
+  assert (retval);
+
+  int64_t pages      = page_count_query.RetrieveInt64(0);
+  int64_t free_pages = free_page_count_query.RetrieveInt64(0);
+  assert (pages > 0);
+
+  return ((double)free_pages) / ((double)pages);
+}
+
+
+/**
+ * Cleanup unused database space
+ * See: http://www.sqlite.org/lang_vacuum.html
+ */
+bool Database::Vacuum() const {
+  return Sql(*this, "VACUUM;").Execute();
+}
+
+
 //------------------------------------------------------------------------------
 
 

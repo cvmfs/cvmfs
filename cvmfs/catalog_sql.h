@@ -76,6 +76,9 @@ class Database {
   unsigned schema_revision() const { return schema_revision_; }
   bool ready() const { return ready_; }
 
+  double GetFreePageRatio() const;
+  bool Vacuum() const;
+
   /**
    * Returns the english language error description of the last error
    * happened in the context of the encapsulated sqlite3 database object.
@@ -84,6 +87,7 @@ class Database {
    * @return   english language error description of last error
    */
   std::string GetLastErrorMsg() const;
+
  private:
   Database(const std::string &filename,
            const float schema, const unsigned revision);
