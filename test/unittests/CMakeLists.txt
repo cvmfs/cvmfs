@@ -38,6 +38,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_shash.cc
   t_header_lists.cc
   t_base64.cc
+  t_crc32.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -61,6 +62,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/prng.h
   ${CVMFS_SOURCE_DIR}/util.h
   ${CVMFS_SOURCE_DIR}/util.cc
+  ${CVMFS_SOURCE_DIR}/checksum.h
   ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/hash.cc
   ${CVMFS_SOURCE_DIR}/shortstring.h
@@ -108,6 +110,8 @@ if (SQLITE3_BUILTIN)
   add_dependencies (${PROJECT_TEST_NAME} sqlite3)
 endif (SQLITE3_BUILTIN)
 
+add_dependencies (${PROJECT_TEST_NAME} crc32)
+
 if (ZLIB_BUILTIN)
   add_dependencies (${PROJECT_TEST_NAME} zlib)
 endif (ZLIB_BUILTIN)
@@ -121,7 +125,7 @@ set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UN
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 target_link_libraries (${PROJECT_TEST_NAME} ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} 
                          ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
-                       ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread)
+                       ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${CRC32_ARCHIVE} ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread)
 
 #
 # Install the generated unit test binary
