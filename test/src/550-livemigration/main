@@ -142,7 +142,7 @@ cleanup() {
 cvmfs_run_test() {
   logfile=$1
   local script_location=$2
-  local guinea_pig_location="${script_location}/../common/guinea_pig_repo_20"
+  local guinea_pig_location="${script_location}/../../common/guinea_pig_repo_20"
   local legacy_repo_name="testmigration.cern.ch"
   local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
   local legacy_repo_url="$(get_repo_url $legacy_repo_name)"

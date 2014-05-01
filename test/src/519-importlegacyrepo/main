@@ -14,7 +14,7 @@ cvmfs_run_test() {
   local script_location=$2
   local scratch_dir=$(pwd)
 
-  local guinea_pig_location="${script_location}/../common/guinea_pig_repo_20"
+  local guinea_pig_location="${script_location}/../../common/guinea_pig_repo_20"
   local legacy_repo_name="testmigration.cern.ch"
   local repo_dir="/cvmfs/${legacy_repo_name}"
   local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
