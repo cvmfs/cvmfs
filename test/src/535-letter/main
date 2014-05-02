@@ -19,12 +19,12 @@ cvmfs_run_test() {
 
   echo "Signed letter is $signed"
 
-  local verified=$(cvmfs_swissknife letter -v \
+  local verified="$(cvmfs_swissknife letter -v \
     -m 3 \
     -k /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
     -r http://localhost/cvmfs/$CVMFS_TEST_REPO \
     -f $CVMFS_TEST_REPO \
-    -t "$signed") || return 3
+    -t $signed)" || return 3
 
   echo "Verified letter is $verified"
 
@@ -34,15 +34,15 @@ cvmfs_run_test() {
   fi
 
   sleep 4
-  verified=$(cvmfs_swissknife letter -v \
+  verified="$(cvmfs_swissknife letter -v \
       -m 3 \
       -k /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
       -r http://localhost/cvmfs/$CVMFS_TEST_REPO \
       -f $CVMFS_TEST_REPO \
-      -t "$signed")
+      -t $signed)"
  echo "Verified letter is $verified" 
   
-  if [ "x$letter" == "x$verified" ]; then
+  if [ x"$letter" = x"$verified" ]; then
     echo "Expected failure"
     return 5
   fi
