@@ -14,7 +14,7 @@ class CommandLetter : public Command {
   ~CommandLetter() { };
   std::string GetName() { return "letter"; };
   std::string GetDescription() {
-    return "Signs aribtrary text with the repository certificate.";
+    return "Signs arbitrary text with the repository certificate.";
   };
   ParameterList GetParams() {
     ParameterList result;
