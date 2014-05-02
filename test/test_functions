@@ -232,6 +232,10 @@ cvmfs_umount() {
 }
 
 
+has_selinux() {
+  [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]
+}
+
 
 get_cvmfs_cachedir() {
   repository=$1
