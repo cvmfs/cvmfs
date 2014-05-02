@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Send and receive letters"
+cvmfs_test_name="Send and Receive Letters"
 cvmfs_test_autofs_on_startup=false
 
 cvmfs_run_test() {
