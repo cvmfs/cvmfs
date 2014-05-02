@@ -38,6 +38,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_shash.cc
   t_header_lists.cc
   t_base64.cc
+  t_pathspec.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -85,6 +86,11 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
   ${CVMFS_SOURCE_DIR}/compression.cc
   ${CVMFS_SOURCE_DIR}/compression.h
+
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec.h
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.h
 )
 
 #
