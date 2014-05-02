@@ -92,10 +92,18 @@ bool Reader<FileScrubbingTaskT, FileT>::TryToAcquireNewJob(FileJob &next_job) {
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
   const int fd = open(file->path().c_str(), O_RDONLY, 0);
-  if (fd < 0 && errno == EMFILE) {
-    LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to a lack of file"
-                                      "descriptors! Please increase this limit. "
-                                      "(see ulimit -n)");
+  if (fd < 0) {
+    switch (errno) {
+      case EMFILE:
+        LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to a lack of "
+                                          "file descriptors! Please increase "
+                                          "this limit. (see ulimit -n)");
+      case EACCES:
+      case EPERM:
+        LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to permission "
+                                          "issues. Please check '%s' and retry",
+                                          file->path().c_str());
+    }
   }
   assert (fd > 0);
 
