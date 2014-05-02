@@ -25,6 +25,7 @@ produce_files_in() {
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local selinux_disabled=0
 
   local scratch_dir=$(pwd)
   mkdir reference_dir
@@ -42,6 +43,12 @@ cvmfs_run_test() {
   fi
   mkdir $symlink_destination || return 2
   sudo ln --symbolic $symlink_destination $backend_dir || return 3
+
+  if has_selinux; then
+    echo "make sure that SELinux does not interfere"
+    sudo setsebool httpd_enable_homedirs true || return 6
+    selinux_disabled=1
+  fi
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -76,6 +83,13 @@ cvmfs_run_test() {
 
   echo "remove 'unusual' repository before successful test result"
   destroy_repo $CVMFS_TEST_REPO || return 5
+
+  # ============================================================================
+
+  if [ $selinux_disabled -ne 0 ]; then
+    echo "reverting SELinux config"
+    sudo setsebool httpd_enable_homedirs false || return 7
+  fi
 
   return 0
 }

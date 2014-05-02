@@ -22,6 +22,7 @@ desaster_cleanup() {
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local selinux_disabled=0
 
   local scratch_dir=$(pwd)
   mkdir reference_dir
@@ -65,6 +66,12 @@ cvmfs_run_test() {
   mkdir $symlink_destination || return 6
   sudo ln --symbolic $symlink_destination $backend_dir || return 7
 
+  if has_selinux; then
+    echo "make sure that SELinux does not interfere"
+    sudo setsebool httpd_enable_homedirs true || return 16
+    selinux_disabled=1
+  fi
+
   echo "create Stratum1 repository on the same machine"
   sudo cvmfs_server add-replica -o $CVMFS_TEST_USER -n $replica_name http://127.0.0.1/cvmfs/$CVMFS_TEST_REPO /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || { desaster_cleanup $mnt_point $replica_name; return 8; }
 
@@ -97,6 +104,11 @@ EOF
 
   echo "clean up"
   sudo cvmfs_server rmfs -f $replica_name
+
+  if [ $selinux_disabled -ne 0 ]; then
+    echo "reverting SELinux config"
+    sudo setsebool httpd_enable_homedirs false || return 17
+  fi
 
   return 0
 }
