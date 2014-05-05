@@ -18,6 +18,8 @@ class Pathspec {
  public:
   Pathspec(const std::string &spec);
 
+  bool IsMatching(const std::string &path) const;
+
   bool IsValid()    const { return valid_;    }
   bool IsAbsolute() const { return absolute_; }
   bool IsNegation() const { return negation_; }
@@ -30,6 +32,9 @@ class Pathspec {
                         const std::string::const_iterator  &end);
   void SkipWhitespace(        std::string::const_iterator  &itr,
                         const std::string::const_iterator  &end) const;
+
+  bool IsPathspecMatching(      std::string::const_iterator  &itr,
+                          const std::string::const_iterator  &end) const;
 
  private:
   std::vector<PathspecElementPattern> patterns_;

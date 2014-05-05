@@ -87,3 +87,21 @@ TEST(T_Pathspec, ParseWildcards) {
   EXPECT_TRUE (p4.IsValid()); EXPECT_TRUE  (p4.IsAbsolute()); EXPECT_FALSE (p4.IsNegation());
   EXPECT_TRUE (p5.IsValid()); EXPECT_TRUE  (p5.IsAbsolute()); EXPECT_FALSE (p5.IsNegation());
 }
+
+
+TEST(T_Pathspec, MatchOnAbsolutePath) {
+  const Pathspec p1("!/hallo");
+  const Pathspec p2("/foo");
+  const Pathspec p3("bar");
+  const Pathspec p4("!baz");
+
+  EXPECT_TRUE (p1.IsValid());
+  EXPECT_TRUE (p2.IsValid());
+  EXPECT_TRUE (p3.IsValid());
+  EXPECT_TRUE (p4.IsValid());
+
+  EXPECT_TRUE  (p1.IsMatching("foo"));
+  EXPECT_FALSE (p2.IsMatching("foo"));
+  EXPECT_FALSE (p3.IsMatching("/bar"));
+  EXPECT_TRUE  (p4.IsMatching("/moep"));
+}
