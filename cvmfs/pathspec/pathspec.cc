@@ -57,3 +57,20 @@ void Pathspec::SkipWhitespace(      std::string::const_iterator  &itr,
     ++itr;
   }
 }
+
+bool Pathspec::IsMatching(const std::string &path) const {
+        std::string::const_iterator i    = path.begin();
+  const std::string::const_iterator iend = path.end();
+
+  const bool query_is_absolute = (*i == kSeparator);
+  const bool matches = (query_is_absolute || ! this->IsAbsolute()) &&
+                       IsPathspecMatching(i, iend);
+
+  return IsNegation() ^ matches;
+}
+
+bool Pathspec::IsPathspecMatching(
+                                      std::string::const_iterator  &itr,
+                                const std::string::const_iterator  &end) const {
+  return false;
+}
