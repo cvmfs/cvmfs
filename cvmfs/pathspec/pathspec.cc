@@ -30,17 +30,14 @@ void Pathspec::Parse(const std::string &spec) {
 void Pathspec::ParsePath(      std::string::const_iterator  &itr,
                          const std::string::const_iterator  &end) {
   SkipWhitespace(itr, end);
-  bool first_char = true;
+  absolute_ = (*itr == kSeparator);
 
   while (itr != end) {
     if (*itr == kSeparator) {
-      if (first_char) {
-        absolute_ = true;
-      }
       ++itr;
+      continue;
     }
     ParsePathElement(itr, end);
-    first_char = false;
   }
 }
 
