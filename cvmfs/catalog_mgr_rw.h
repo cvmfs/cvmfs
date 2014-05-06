@@ -36,7 +36,7 @@
 #include <string>
 
 #include "catalog_rw.h"
-#include "catalog_mgr.h"
+#include "catalog_mgr_ro.h"
 
 namespace upload {
 class Spooler;
@@ -50,7 +50,7 @@ class Manifest;
 
 namespace catalog {
 
-class WritableCatalogManager : public AbstractCatalogManager {
+class WritableCatalogManager : public SimpleCatalogManager {
  public:
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
@@ -62,8 +62,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
                                               upload::Spooler   *spooler);
-
-  bool Init();
 
   // DirectoryEntry handling
   void AddFile(const DirectoryEntryBase &entry,
@@ -101,10 +99,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
  protected:
   void EnforceSqliteMemLimit() { }
 
-  LoadError LoadCatalog(const PathString &mountpoint,
-                        const shash::Any &hash,
-                        std::string      *catalog_path,
-                        shash::Any       *catalog_hash);
   Catalog* CreateCatalog(const PathString &mountpoint,
                          const shash::Any &catalog_hash,
                          Catalog *parent_catalog);
@@ -114,16 +108,6 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
  private:
   bool FindCatalog(const std::string &path, WritableCatalog **result);
-
-  /**
-   * Makes the given path relative to the catalog structure
-   * Pathes coming out here can be used for lookups in catalogs
-   * @param relativePath the path to be mangled
-   * @return the mangled path
-   */
-	inline std::string MakeRelativePath(const std::string &relative_path) const {
-    return (relative_path == "") ? "" : "/" + relative_path;
-  }
 
   /**
    * Traverses all open catalogs and determines which catalogs need updated
@@ -149,11 +133,7 @@ class WritableCatalogManager : public AbstractCatalogManager {
 
   // private lock of WritableCatalogManager
   pthread_mutex_t            *sync_lock_;
-  shash::Any                 base_hash_;
-  std::string                stratum0_;
-  std::string                dir_temp_;
   upload::Spooler            *spooler_;
-  download::DownloadManager  *download_manager_;
 
   uint64_t                   catalog_entry_warn_threshold_;
 };  // class WritableCatalogManager

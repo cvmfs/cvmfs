@@ -15,11 +15,9 @@
 
 #include <string>
 
-#include "compression.h"
 #include "catalog_rw.h"
 #include "util.h"
 #include "logging.h"
-#include "download.h"
 #include "manifest.h"
 #include "upload.h"
 #include "smalloc.h"
@@ -35,70 +33,20 @@ WritableCatalogManager::WritableCatalogManager(
   upload::Spooler           *spooler,
   download::DownloadManager *download_manager,
   const uint64_t             catalog_entry_warn_threshold) :
-    base_hash_(base_hash),
-    stratum0_(stratum0),
-    dir_temp_(dir_temp),
+    SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager),
     spooler_(spooler),
-    download_manager_(download_manager),
     catalog_entry_warn_threshold_(catalog_entry_warn_threshold)
 {
   sync_lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   int retval = pthread_mutex_init(sync_lock_, NULL);
   assert(retval == 0);
-  Init();
 }
 
 
 WritableCatalogManager::~WritableCatalogManager() {
   pthread_mutex_destroy(sync_lock_);
   free(sync_lock_);
-}
-
-
-bool WritableCatalogManager::Init() {
-  return AbstractCatalogManager::Init();
-}
-
-
-/**
- * Loads a catalog via HTTP from Statum 0 into a temporary file.
- * @param url_path the url of the catalog to load
- * @param mount_point the file system path where the catalog should be mounted
- * @param catalog_file a pointer to the string containing the full qualified
- *                     name of the catalog afterwards
- * @return 0 on success, different otherwise
- */
-LoadError WritableCatalogManager::LoadCatalog(const PathString &mountpoint,
-                                              const shash::Any &hash,
-                                              std::string *catalog_path,
-                                              shash::Any  *catalog_hash)
-{
-  shash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
-  const string url = stratum0_ + "/data" + effective_hash.MakePath(1, 2) + "C";
-  FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
-                                  catalog_path);
-  if (!fcatalog) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "failed to create temp file when loading %s", url.c_str());
-    assert(false);
-  }
-
-  download::JobInfo download_catalog(&url, true, false, fcatalog,
-                                     &effective_hash);
-
-  download::Failures retval = download_manager_->Fetch(&download_catalog);
-  fclose(fcatalog);
-
-  if (retval != download::kFailOk) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
-             retval, download::Code2Ascii(retval));
-    assert(false);
-  }
-
-  *catalog_hash = effective_hash;
-  return kLoadNew;
 }
 
 
@@ -566,7 +514,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 
   // Create the database schema and the inital root entry
   // for the new nested catalog
-  const string database_file_path = CreateTempPath(dir_temp_ + "/catalog",
+  const string database_file_path = CreateTempPath(dir_temp() + "/catalog",
                                                    0666);
   const bool volatile_content = false;
   retval =
@@ -714,7 +662,7 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
     }
 
     if ((*i)->IsRoot()) {
-      base_hash_ = hash;
+      set_base_hash(hash);
       LogCvmfs(kLogCatalog, kLogVerboseMsg, "waiting for upload of catalogs");
       spooler_->WaitForUpload();
       if (spooler_->GetNumberOfErrors() > 0) {
@@ -791,7 +739,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 
   // Previous revision
   if (catalog->IsRoot()) {
-    catalog->SetPreviousRevision(base_hash_);
+    catalog->SetPreviousRevision(base_hash());
   } else {
     shash::Any hash_previous;
     uint64_t size_previous;

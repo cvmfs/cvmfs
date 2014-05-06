@@ -144,6 +144,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog.h catalog.cc
   catalog_rw.h catalog_rw.cc
   catalog_mgr.h catalog_mgr.cc
+  catalog_mgr_ro.h catalog_mgr_ro.cc
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   dirtab.h dirtab.cc

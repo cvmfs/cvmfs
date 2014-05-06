@@ -320,6 +320,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager(shash::MkFromHexPtr(shash::HexPtr(params.base_hash)),
                     params.stratum0, params.dir_temp, params.spooler,
                     g_download_manager, params.catalog_entry_warn_threshold);
+  catalog_manager.Init();
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
   if (params.union_fs_type == "overlayfs") {
