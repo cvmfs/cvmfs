@@ -12,7 +12,6 @@
 
 Pathspec::Pathspec(const std::string &spec) : regex_compiled_(false),
                                               valid_(true),
-                                              negation_(false),
                                               absolute_(false) {
   Parse(spec);
   if (patterns_.size() == 0) {
@@ -33,16 +32,6 @@ void Pathspec::Parse(const std::string &spec) {
         std::string::const_iterator itr = spec.begin();
   const std::string::const_iterator end = spec.end();
 
-  SkipWhitespace(itr, end);
-  if (*itr == kNegator) {
-    negation_ = true;
-    ++itr;
-  }
-  ParsePath(itr, end);
-}
-
-void Pathspec::ParsePath(      std::string::const_iterator  &itr,
-                         const std::string::const_iterator  &end) {
   SkipWhitespace(itr, end);
   absolute_ = (*itr == kSeparator);
 
@@ -80,10 +69,8 @@ bool Pathspec::IsMatching(const std::string &query_path) const {
   }
 
   const bool query_is_absolute = (query_path[0] == kSeparator);
-  const bool matches = (! query_is_absolute || this->IsAbsolute()) &&
-                       IsPathspecMatching(query_path);
-
-  return IsNegation() ^ matches;
+  return (! query_is_absolute || this->IsAbsolute()) &&
+         IsPathspecMatching(query_path);
 }
 
 bool Pathspec::IsPathspecMatching(const std::string &query_path) const {
