@@ -4,13 +4,27 @@
 
 #include "pathspec.h"
 
+#include <iostream> // TODO: remove
+#include <cassert>
 
-Pathspec::Pathspec(const std::string &spec) : valid_(true),
+#include "../smalloc.h"
+#include "../logging.h"
+
+Pathspec::Pathspec(const std::string &spec) : regex_compiled_(false),
+                                              valid_(true),
                                               negation_(false),
                                               absolute_(false) {
   Parse(spec);
   if (patterns_.size() == 0) {
     valid_ = false;
+  }
+
+        ElementPatterns::const_iterator i    = patterns_.begin();
+  const ElementPatterns::const_iterator iend = patterns_.end();
+  for (; i != iend; ++i) {
+    if (!i->IsValid()) {
+      valid_ = false;
+    }
   }
 }
 
@@ -58,19 +72,82 @@ void Pathspec::SkipWhitespace(      std::string::const_iterator  &itr,
   }
 }
 
-bool Pathspec::IsMatching(const std::string &path) const {
-        std::string::const_iterator i    = path.begin();
-  const std::string::const_iterator iend = path.end();
+bool Pathspec::IsMatching(const std::string &query_path) const {
+  assert (IsValid());
 
-  const bool query_is_absolute = (*i == kSeparator);
-  const bool matches = (query_is_absolute || ! this->IsAbsolute()) &&
-                       IsPathspecMatching(i, iend);
+  if (query_path.empty()) {
+    return false;
+  }
+
+  const bool query_is_absolute = (query_path[0] == kSeparator);
+  const bool matches = (! query_is_absolute || this->IsAbsolute()) &&
+                       IsPathspecMatching(query_path);
 
   return IsNegation() ^ matches;
 }
 
-bool Pathspec::IsPathspecMatching(
-                                      std::string::const_iterator  &itr,
-                                const std::string::const_iterator  &end) const {
-  return false;
+bool Pathspec::IsPathspecMatching(const std::string &query_path) const {
+  regex_t *regex = GetRegularExpression();
+  const char *path = query_path.c_str();
+  const int retval = regexec(regex, path, 0, NULL, 0);
+
+  if (retval != 0 && retval != REG_NOMATCH) {
+    PrintRegularExpressionError(retval);
+  }
+
+  return (retval == 0);
+}
+
+regex_t* Pathspec::GetRegularExpression() const {
+  if (! regex_compiled_) {
+    const std::string regex = GenerateRegularExpression();
+    LogCvmfs(kLogPathspec, kLogDebug, "compiled regex: %s", regex.c_str());
+
+    regex_ = (regex_t*)smalloc(sizeof(regex_t));
+    const int flags = REG_NOSUB | REG_NEWLINE | REG_EXTENDED;
+    const int retval = regcomp(regex_, regex.c_str(), flags);
+    regex_compiled_ = true;
+
+    if (retval != 0) {
+      PrintRegularExpressionError(retval);
+      assert (false && "failed to compile regex");
+    }
+  }
+
+  return regex_;
+}
+
+std::string Pathspec::GenerateRegularExpression() const {
+  // start matching at the first character
+  std::string regex = "^";
+
+  // absolute paths require a / in the beginning
+  if (IsAbsolute()) {
+    regex += kSeparator;
+  }
+
+  // concatenate the regular expressions of the compiled path elements
+        ElementPatterns::const_iterator i    = patterns_.begin();
+  const ElementPatterns::const_iterator iend = patterns_.end();
+  for (; i != iend; ++i) {
+    regex += i->GenerateRegularExpression();
+    if (i + 1 != iend) {
+      regex += kSeparator;
+    }
+  }
+
+  // a path might end with a trailing slash
+  // (pathspec does not distinguish files and directories)
+  regex += kSeparator;
+  regex += "?$";
+
+  return regex;
+}
+
+void Pathspec::PrintRegularExpressionError(const int error_code) const {
+  assert (regex_compiled_);
+  const size_t errbuf_size = 1024;
+  char error[errbuf_size];
+  regerror(error_code, regex_, error, errbuf_size);
+  LogCvmfs(kLogPathspec, kLogStderr, "RegEx Error: %d - %s", error_code, error);
 }

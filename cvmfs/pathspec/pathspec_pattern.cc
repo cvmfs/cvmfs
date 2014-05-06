@@ -4,7 +4,10 @@
 
 #include "pathspec_pattern.h"
 
+#include <iostream>
 #include <cassert>
+
+#include "pathspec.h"
 
 PathspecElementPattern::PathspecElementPattern(
                                   const std::string::const_iterator   begin,
@@ -41,7 +44,7 @@ void PathspecElementPattern::Parse(const std::string::const_iterator  &begin,
                                    const std::string::const_iterator  &end) {
   std::string::const_iterator i = begin;
   while (i != end) {
-    SubPattern* next = (IsSpecialChar(*i))
+    SubPattern* next = (Pathspec::IsSpecialChar(*i))
                        ? ParseSpecialChar(i, end)
                        : ParsePlaintext(i, end);
     if (next->IsEmpty()) {
@@ -61,20 +64,21 @@ PathspecElementPattern::SubPattern* PathspecElementPattern::ParsePlaintext(
   bool next_is_escaped = false;
 
   while (i < end) {
-    if (IsSpecialChar(*i) && !next_is_escaped) {
+    if (Pathspec::IsSpecialChar(*i) && !next_is_escaped) {
       break;
     }
 
-    if (*i == kEscaper && !next_is_escaped) {
+    if (*i == Pathspec::kEscaper && !next_is_escaped) {
       next_is_escaped = true;
     } else if (next_is_escaped) {
-      if (IsSpecialChar(*i) || *i == kEscaper) {
+      if (Pathspec::IsSpecialChar(*i) || *i == Pathspec::kEscaper) {
         pattern->AddChar(*i);
+        next_is_escaped = false;
       } else {
         valid_ = false;
       }
     } else {
-      assert (!IsSpecialChar(*i));
+      assert (!Pathspec::IsSpecialChar(*i));
       pattern->AddChar(*i);
     }
 
@@ -87,24 +91,28 @@ PathspecElementPattern::SubPattern* PathspecElementPattern::ParsePlaintext(
 PathspecElementPattern::SubPattern* PathspecElementPattern::ParseSpecialChar(
                                             std::string::const_iterator  &i,
                                       const std::string::const_iterator  &end) {
-  assert (IsSpecialChar(*i));
+  assert (Pathspec::IsSpecialChar(*i));
   const char chr = *i;
   ++i;
 
   switch (chr) {
-    case kWildcard:
+    case Pathspec::kWildcard:
       return new WildcardSubPattern();
-    case kPlaceholder:
+    case Pathspec::kPlaceholder:
       return new PlaceholderSubPattern();
     default:
       assert (false && "unrecognized special character");
   }
 }
 
-
-bool PathspecElementPattern::Matches(const std::string::const_iterator   begin,
-                                     const std::string::const_iterator  &end) const {
-  return false;
+std::string PathspecElementPattern::GenerateRegularExpression() const {
+  std::string result;
+        SubPatterns::const_iterator i    = subpatterns_.begin();
+  const SubPatterns::const_iterator iend = subpatterns_.end();
+  for (; i != iend; ++i) {
+    result += (*i)->GenerateRegularExpression();
+  }
+  return result;
 }
 
 
@@ -115,4 +123,43 @@ bool PathspecElementPattern::Matches(const std::string::const_iterator   begin,
 
 void PathspecElementPattern::PlaintextSubPattern::AddChar(const char chr) {
   chars_.push_back(chr);
+}
+
+std::string PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpression() const {
+        std::string::const_iterator i    = chars_.begin();
+  const std::string::const_iterator iend = chars_.end();
+  std::string regex;
+  for (; i != iend; ++i) {
+    if (IsSpecialRegexCharacter(*i)) {
+      regex += "\\";
+    }
+    regex += *i;
+  }
+  return regex;
+}
+
+bool PathspecElementPattern::PlaintextSubPattern::IsSpecialRegexCharacter(const char chr) const {
+  return (chr == '.'  ||
+          chr == '\\' ||
+          chr == '*'  ||
+          chr == '?'  ||
+          chr == '['  ||
+          chr == ']'  ||
+          chr == '('  ||
+          chr == ')'  ||
+          chr == '{'  ||
+          chr == '}'  ||
+          chr == '^'  ||
+          chr == '$'  ||
+          chr == '+');
+}
+
+
+std::string PathspecElementPattern::WildcardSubPattern::GenerateRegularExpression() const {
+  return std::string("[^") + Pathspec::kSeparator + "]*";
+}
+
+
+std::string PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression() const {
+  return std::string("[^") + Pathspec::kSeparator + "]";
 }
