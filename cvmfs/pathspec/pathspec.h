@@ -15,7 +15,6 @@ class PathspecMatchingContext;
 
 class Pathspec {
  public:
-  static const char kNegator     = '!';
   static const char kSeparator   = '/';
   static const char kEscaper     = '\\';
   static const char kWildcard    = '*';
@@ -29,10 +28,8 @@ class Pathspec {
   Pathspec(const std::string &spec);
 
   bool IsMatching(const std::string &query_path) const;
-
   bool IsValid()    const { return valid_;    }
   bool IsAbsolute() const { return absolute_; }
-  bool IsNegation() const { return negation_; }
 
   static bool IsSpecialChar(const char chr) {
     return (chr == kWildcard || chr == kPlaceholder);
@@ -40,8 +37,6 @@ class Pathspec {
 
  protected:
   void Parse(const std::string &spec);
-  void ParsePath(             std::string::const_iterator  &itr,
-                        const std::string::const_iterator  &end);
   void ParsePathElement(      std::string::const_iterator  &itr,
                         const std::string::const_iterator  &end);
   void SkipWhitespace(        std::string::const_iterator  &itr,
@@ -59,7 +54,6 @@ class Pathspec {
   mutable regex_t  *regex_;
 
   bool valid_;
-  bool negation_;
   bool absolute_;
 };
 
