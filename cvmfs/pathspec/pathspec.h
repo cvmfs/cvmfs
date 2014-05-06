@@ -39,8 +39,6 @@ class Pathspec {
   void Parse(const std::string &spec);
   void ParsePathElement(      std::string::const_iterator  &itr,
                         const std::string::const_iterator  &end);
-  void SkipWhitespace(        std::string::const_iterator  &itr,
-                        const std::string::const_iterator  &end) const;
 
   bool IsPathspecMatching(const std::string &query_path) const;
   regex_t* GetRegularExpression() const;

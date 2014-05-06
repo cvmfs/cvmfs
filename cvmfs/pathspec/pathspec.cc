@@ -32,9 +32,7 @@ void Pathspec::Parse(const std::string &spec) {
         std::string::const_iterator itr = spec.begin();
   const std::string::const_iterator end = spec.end();
 
-  SkipWhitespace(itr, end);
   absolute_ = (*itr == kSeparator);
-
   while (itr != end) {
     if (*itr == kSeparator) {
       ++itr;
@@ -52,13 +50,6 @@ void Pathspec::ParsePathElement(      std::string::const_iterator  &itr,
   }
   const std::string::const_iterator end_element = itr;
   patterns_.push_back(PathspecElementPattern(begin_element, end_element));
-}
-
-void Pathspec::SkipWhitespace(      std::string::const_iterator  &itr,
-                              const std::string::const_iterator  &end) const {
-  while (itr != end && *itr == ' ') {
-    ++itr;
-  }
 }
 
 bool Pathspec::IsMatching(const std::string &query_path) const {
