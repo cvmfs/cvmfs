@@ -284,7 +284,21 @@ TEST(T_Pathspec, MatchWithWildcard) {
   EXPECT_FALSE (p4.IsMatching("/bar/txt.meop"));
   EXPECT_FALSE (p4.IsMatching("bar/txt"));
 
+  EXPECT_TRUE  (p5.IsMatching("/hallo/welt"));
+  EXPECT_TRUE  (p5.IsMatching("/hallo/welt/"));
+  EXPECT_TRUE  (p5.IsMatching("/foo/bar"));
+  EXPECT_TRUE  (p5.IsMatching("/foo/"));
   EXPECT_FALSE (p5.IsMatching("/foo/bar/baz"));
+  EXPECT_FALSE (p5.IsMatching("foo/bar"));
+
+  EXPECT_TRUE  (p6.IsMatching("hallo.test"));
+  EXPECT_TRUE  (p6.IsMatching(".test"));
+  EXPECT_TRUE  (p6.IsMatching("1.test"));
+  EXPECT_TRUE  (p6.IsMatching("..test"));
+  EXPECT_FALSE (p6.IsMatching("/hallo.test"));
+  EXPECT_FALSE (p6.IsMatching("/.test"));
+  EXPECT_FALSE (p6.IsMatching("/test"));
+  EXPECT_FALSE (p6.IsMatching("test"));
 }
 
 
