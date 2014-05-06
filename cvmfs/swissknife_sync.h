@@ -128,6 +128,29 @@ class CommandRemove : public Command {
 };
 
 
+class CommandApplyDirtab : public Command {
+ public:
+  ~CommandApplyDirtab() {};
+  std::string GetName() { return "dirtab"; }
+  std::string GetDescription() {
+    return "Parses the dirtab file and produces nested catalog markers.";
+  }
+  ParameterList GetParams() {
+    ParameterList result;
+    result.push_back(Parameter('k', "repository master key(s)", false, false));
+    result.push_back(Parameter('y', "trusted certificate directories",
+                               true, false));
+    result.push_back(Parameter('d', "path to dirtab file", false, false));
+    result.push_back(Parameter('b', "base hash", false, false));
+    result.push_back(Parameter('w', "stratum 0 base url", false, false));
+    result.push_back(Parameter('t', "directory for temporary storage",
+                               false, false));
+    return result;
+  }
+  int Main(const ArgumentList &args);
+};
+
+
 class CommandSync : public Command {
  public:
   ~CommandSync() { };
