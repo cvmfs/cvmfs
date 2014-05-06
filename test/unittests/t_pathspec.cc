@@ -141,6 +141,45 @@ TEST(T_Pathspec, MatchSimple) {
 }
 
 
+TEST(T_Pathspec, MatchEscapeSequences) {
+  const Pathspec p1("/hallo\\*/welt");
+  const Pathspec p2("/hallo\\\\/welt");
+  const Pathspec p3("/hallo\\?/welt");
+  const Pathspec p4("/foo\\?bar/welt");
+
+  EXPECT_TRUE (p1.IsValid());
+  EXPECT_TRUE (p2.IsValid());
+  EXPECT_TRUE (p3.IsValid());
+  EXPECT_TRUE (p4.IsValid());
+
+  EXPECT_TRUE  (p1.IsMatching("/hallo*/welt"));
+  EXPECT_TRUE  (p1.IsMatching("/hallo*/welt/"));
+  EXPECT_FALSE (p1.IsMatching("hallo*/welt"));
+  EXPECT_FALSE (p1.IsMatching("/halloo/welt"));
+  EXPECT_FALSE (p1.IsMatching("/hallooo/welt"));
+
+  EXPECT_TRUE  (p2.IsMatching("/hallo\\/welt"));
+  EXPECT_TRUE  (p2.IsMatching("/hallo\\/welt/"));
+  EXPECT_FALSE (p2.IsMatching("hallo\\/welt/"));
+  EXPECT_FALSE (p2.IsMatching("hallo\\\\/welt/"));
+
+  EXPECT_TRUE  (p3.IsMatching("/hallo?/welt"));
+  EXPECT_TRUE  (p3.IsMatching("/hallo?/welt/"));
+  EXPECT_FALSE (p3.IsMatching("/hallo/welt"));
+  EXPECT_FALSE (p3.IsMatching("/hall/welt"));
+  EXPECT_FALSE (p3.IsMatching("hallo?/welt"));
+  EXPECT_FALSE (p3.IsMatching("hallo?/welt/"));
+
+  EXPECT_TRUE  (p4.IsMatching("/foo?bar/welt"));
+  EXPECT_TRUE  (p4.IsMatching("/foo?bar/welt/"));
+  EXPECT_FALSE (p4.IsMatching("/foobar/welt"));
+  EXPECT_FALSE (p4.IsMatching("/fobar/welt"));
+  EXPECT_FALSE (p4.IsMatching("foobar/welt"));
+  EXPECT_FALSE (p4.IsMatching("foo?bar/welt"));
+  EXPECT_FALSE (p4.IsMatching("fobar/welt"));
+}
+
+
 TEST(T_Pathspec, MatchRegexEdgeCases) {
   const Pathspec p1("/hallo.welt");
   const Pathspec p2("foo.bar\\?");
