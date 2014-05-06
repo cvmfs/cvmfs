@@ -215,6 +215,19 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
 }
 
 
+int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
+  const string master_keys   = *args.find('k')->second;
+  const string trusted_certs = (args.find('y') != args.end()) ?
+                                  *args.find('y')->second : "";
+  const string dirtab_file   = *args.find('d')->second;
+  const string base_hash     = *args.find('b')->second;
+  const string stratum0      = *args.find('w')->second;
+  const string dir_temp      = *args.find('t')->second;
+
+  return 0;
+}
+
+
 struct chunk_arg {
   chunk_arg(char param, size_t *save_to) : param(param), save_to(save_to) {}
   char    param;
