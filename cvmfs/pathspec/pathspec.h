@@ -25,11 +25,16 @@ class Pathspec {
   typedef std::vector<PathspecElementPattern> ElementPatterns;
 
  public:
+  typedef std::vector<std::string>            GlobStringSequence;
+
+ public:
   Pathspec(const std::string &spec);
 
   bool IsMatching(const std::string &query_path) const;
   bool IsValid()    const { return valid_;    }
   bool IsAbsolute() const { return absolute_; }
+
+  const GlobStringSequence& GetGlobStringSequence() const;
 
   bool operator==(const Pathspec &other) const;
   bool operator!=(const Pathspec &other) const { return ! (*this == other); }
@@ -48,11 +53,16 @@ class Pathspec {
   std::string GenerateRegularExpression() const;
   void PrintRegularExpressionError(const int error_code) const;
 
- private:
-  ElementPatterns patterns_;
+  void GenerateGlobStringSequence() const;
 
-  mutable bool      regex_compiled_;
-  mutable regex_t  *regex_;
+ private:
+  ElementPatterns             patterns_;
+
+  mutable bool                regex_compiled_;
+  mutable regex_t            *regex_;
+
+  mutable bool                glob_string_compiled_;
+  mutable GlobStringSequence  glob_string_sequence_;
 
   bool valid_;
   bool absolute_;

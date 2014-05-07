@@ -115,6 +115,16 @@ std::string PathspecElementPattern::GenerateRegularExpression() const {
   return result;
 }
 
+std::string PathspecElementPattern::GenerateGlobString() const {
+  std::string result;
+        SubPatterns::const_iterator i    = subpatterns_.begin();
+  const SubPatterns::const_iterator iend = subpatterns_.end();
+  for (; i != iend; ++i) {
+    result += (*i)->GenerateGlobString();
+  }
+  return result;
+}
+
 bool PathspecElementPattern::operator==(const PathspecElementPattern &other) const {
   if (subpatterns_.size() != other.subpatterns_.size() ||
       IsValid()           != other.IsValid()) {
@@ -158,6 +168,19 @@ std::string PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpressi
   return regex;
 }
 
+std::string PathspecElementPattern::PlaintextSubPattern::GenerateGlobString() const {
+        std::string::const_iterator i    = chars_.begin();
+  const std::string::const_iterator iend = chars_.end();
+  std::string glob_string;
+  for (; i != iend; ++i) {
+    if (Pathspec::IsSpecialChar(*i)) {
+      glob_string += "\\";
+    }
+    glob_string += *i;
+  }
+  return glob_string;
+}
+
 bool PathspecElementPattern::PlaintextSubPattern::IsSpecialRegexCharacter(const char chr) const {
   return (chr == '.'  ||
           chr == '\\' ||
@@ -189,6 +212,10 @@ std::string PathspecElementPattern::WildcardSubPattern::GenerateRegularExpressio
   return std::string("[^") + Pathspec::kSeparator + "]*";
 }
 
+std::string PathspecElementPattern::WildcardSubPattern::GenerateGlobString() const {
+  return "*";
+}
+
 bool PathspecElementPattern::WildcardSubPattern::Compare(const SubPattern *other) const {
   return other->IsWildcard();
 }
@@ -196,6 +223,10 @@ bool PathspecElementPattern::WildcardSubPattern::Compare(const SubPattern *other
 
 std::string PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression() const {
   return std::string("[^") + Pathspec::kSeparator + "]";
+}
+
+std::string PathspecElementPattern::PlaceholderSubPattern::GenerateGlobString() const {
+  return "?";
 }
 
 bool PathspecElementPattern::PlaceholderSubPattern::Compare(const SubPattern *other) const {

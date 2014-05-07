@@ -10,9 +10,12 @@
 #include "../smalloc.h"
 #include "../logging.h"
 
-Pathspec::Pathspec(const std::string &spec) : regex_compiled_(false),
-                                              valid_(true),
-                                              absolute_(false) {
+Pathspec::Pathspec(const std::string &spec) :
+  regex_compiled_(false),
+  glob_string_compiled_(false),
+  valid_(true),
+  absolute_(false)
+{
   Parse(spec);
   if (patterns_.size() == 0) {
     valid_ = false;
@@ -149,4 +152,23 @@ void Pathspec::PrintRegularExpressionError(const int error_code) const {
   char error[errbuf_size];
   regerror(error_code, regex_, error, errbuf_size);
   LogCvmfs(kLogPathspec, kLogStderr, "RegEx Error: %d - %s", error_code, error);
+}
+
+const Pathspec::GlobStringSequence& Pathspec::GetGlobStringSequence() const {
+  if (! glob_string_compiled_) {
+    GenerateGlobStringSequence();
+    glob_string_compiled_ = true;
+  }
+  return glob_string_sequence_;
+}
+
+
+void Pathspec::GenerateGlobStringSequence() const {
+  assert (glob_string_sequence_.empty());
+        ElementPatterns::const_iterator i    = patterns_.begin();
+  const ElementPatterns::const_iterator iend = patterns_.end();
+  for (; i != iend; ++i) {
+    const std::string glob_string = i->GenerateGlobString();
+    glob_string_sequence_.push_back(glob_string);
+  }
 }
