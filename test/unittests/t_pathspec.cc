@@ -369,3 +369,60 @@ TEST(T_Pathspec, MatchWithPlaceholders) {
   EXPECT_FALSE (p3.IsMatching("foo/bar"));
   EXPECT_FALSE (p3.IsMatching("/foo/bar"));
 }
+
+
+TEST(T_Pathspec, ComparePathspecs) {
+  const Pathspec p1("/hallo/welt");
+  const Pathspec p2("/hallo/welt");
+  const Pathspec p3("/hallo/welt/");
+  const Pathspec p4("/hallo/wel?");
+  const Pathspec p5("/hallo/wel*");
+  const Pathspec p6("/hallo/welt/moep");
+  const Pathspec p7("/hallo/*/moep");
+  const Pathspec p8("/hallo/*/moep");
+  const Pathspec p9("/hallo/tlew");
+  const Pathspec p10("hallo/welt");
+  const Pathspec p11("hallo/welt");
+  const Pathspec p12("hallo/*/welt");
+  const Pathspec p13("hallo/*/welt");
+  const Pathspec p14("hallo/?/welt");
+  const Pathspec p15("hallo/?/welt");
+  const Pathspec p16("ha??o/*/w??t");
+  const Pathspec p17("ha??o/*/w??t");
+
+  EXPECT_EQ (p1, p2);
+  EXPECT_EQ (p2, p1);
+  EXPECT_EQ (p2, p3);
+  EXPECT_EQ (p3, p1);
+  EXPECT_EQ (p3, p2);
+  EXPECT_EQ (p7, p8);
+  EXPECT_EQ (p8, p7);
+  EXPECT_NE (p1, p4);
+  EXPECT_NE (p4, p1);
+  EXPECT_NE (p4, p5);
+  EXPECT_NE (p5, p4);
+  EXPECT_NE (p6, p7);
+  EXPECT_NE (p7, p6);
+  EXPECT_NE (p5, p6);
+  EXPECT_NE (p6, p5);
+  EXPECT_NE (p9, p1);
+  EXPECT_NE (p1, p9);
+  EXPECT_NE (p9, p3);
+  EXPECT_NE (p3, p9);
+  EXPECT_NE (p1, p10);
+  EXPECT_NE (p3, p9);
+  EXPECT_EQ (p10, p11);
+  EXPECT_EQ (p11, p10);
+  EXPECT_EQ (p12, p13);
+  EXPECT_EQ (p13, p12);
+  EXPECT_NE (p13, p14);
+  EXPECT_NE (p14, p13);
+  EXPECT_EQ (p14, p15);
+  EXPECT_EQ (p15, p14);
+  EXPECT_EQ (p16, p17);
+  EXPECT_EQ (p17, p16);
+  EXPECT_NE (p16, p14);
+  EXPECT_NE (p14, p16);
+  EXPECT_NE (p12, p16);
+  EXPECT_NE (p16, p12);
+}
