@@ -76,7 +76,8 @@ bool Dirtab::ParseLine(const std::string &line) {
     return true;
   }
   Pathspec pathspec(pathspec_str);
-  if (!pathspec.IsValid()) {
+  if ( !pathspec.IsValid() ||
+      (!negation && !pathspec.IsAbsolute())) {
     return false;
   }
 
