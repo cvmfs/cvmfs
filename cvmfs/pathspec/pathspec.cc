@@ -122,6 +122,27 @@ std::string Pathspec::GenerateRegularExpression() const {
   return regex;
 }
 
+bool Pathspec::operator==(const Pathspec &other) const {
+  if (patterns_.size() != other.patterns_.size() ||
+      IsValid()        != other.IsValid()        ||
+      IsAbsolute()     != other.IsAbsolute()) {
+    return false;
+  }
+
+        ElementPatterns::const_iterator i    = patterns_.begin();
+  const ElementPatterns::const_iterator iend = patterns_.end();
+        ElementPatterns::const_iterator j    = other.patterns_.begin();
+  const ElementPatterns::const_iterator jend = other.patterns_.end();
+
+  for (; i != iend && j != jend; ++i, ++j) {
+    if (*i != *j) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void Pathspec::PrintRegularExpressionError(const int error_code) const {
   assert (regex_compiled_);
   const size_t errbuf_size = 1024;

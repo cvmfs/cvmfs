@@ -31,6 +31,9 @@ class Pathspec {
   bool IsValid()    const { return valid_;    }
   bool IsAbsolute() const { return absolute_; }
 
+  bool operator==(const Pathspec &other) const;
+  bool operator!=(const Pathspec &other) const { return ! (*this == other); }
+
   static bool IsSpecialChar(const char chr) {
     return (chr == kWildcard || chr == kPlaceholder);
   }
