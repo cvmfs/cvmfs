@@ -24,6 +24,7 @@ class PathspecElementPattern {
     virtual bool IsPlaceholder() const { return false; }
 
     virtual std::string GenerateRegularExpression() const = 0;
+    virtual std::string GenerateGlobString()        const = 0;
   };
 
   class PlaintextSubPattern : public SubPattern {
@@ -39,6 +40,7 @@ class PathspecElementPattern {
     bool IsPlaintext() const { return true; }
 
     std::string GenerateRegularExpression() const;
+    std::string GenerateGlobString()        const;
 
    protected:
     bool IsSpecialRegexCharacter(const char chr) const;
@@ -52,6 +54,7 @@ class PathspecElementPattern {
     SubPattern* Clone() const { return new WildcardSubPattern(); }
     bool Compare(const SubPattern *other) const;
     std::string GenerateRegularExpression() const;
+    std::string GenerateGlobString()        const;
     bool IsWildcard() const { return true; }
   };
 
@@ -60,6 +63,7 @@ class PathspecElementPattern {
     SubPattern* Clone() const { return new PlaceholderSubPattern(); }
     bool Compare(const SubPattern *other) const;
     std::string GenerateRegularExpression() const;
+    std::string GenerateGlobString()        const;
     bool IsPlaceholder() const { return true; }
   };
 
@@ -74,6 +78,7 @@ class PathspecElementPattern {
   ~PathspecElementPattern();
 
   std::string GenerateRegularExpression() const;
+  std::string GenerateGlobString()        const;
   bool IsValid() const { return valid_; }
 
   bool operator==(const PathspecElementPattern &other) const;
