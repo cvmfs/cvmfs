@@ -39,6 +39,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_header_lists.cc
   t_base64.cc
   t_pathspec.cc
+  t_dirtab.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -91,6 +92,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec.h
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.h
+
+  ${CVMFS_SOURCE_DIR}/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/dirtab.h
 )
 
 #
