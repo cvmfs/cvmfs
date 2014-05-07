@@ -115,6 +115,26 @@ std::string PathspecElementPattern::GenerateRegularExpression() const {
   return result;
 }
 
+bool PathspecElementPattern::operator==(const PathspecElementPattern &other) const {
+  if (subpatterns_.size() != other.subpatterns_.size() ||
+      IsValid()           != other.IsValid()) {
+    return false;
+  }
+
+        SubPatterns::const_iterator i    = subpatterns_.begin();
+  const SubPatterns::const_iterator iend = subpatterns_.end();
+        SubPatterns::const_iterator j    = other.subpatterns_.begin();
+  const SubPatterns::const_iterator jend = other.subpatterns_.end();
+
+  for (; i != iend && j != jend; ++i, ++j) {
+    if (!(*i)->Compare(*j)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -154,12 +174,30 @@ bool PathspecElementPattern::PlaintextSubPattern::IsSpecialRegexCharacter(const 
           chr == '+');
 }
 
+bool PathspecElementPattern::PlaintextSubPattern::Compare(const SubPattern *other) const {
+  if (! other->IsPlaintext()) {
+    return false;
+  }
+
+  const PlaintextSubPattern *pt_other =
+                                dynamic_cast<const PlaintextSubPattern*>(other);
+  return chars_ == pt_other->chars_;
+}
+
 
 std::string PathspecElementPattern::WildcardSubPattern::GenerateRegularExpression() const {
   return std::string("[^") + Pathspec::kSeparator + "]*";
 }
 
+bool PathspecElementPattern::WildcardSubPattern::Compare(const SubPattern *other) const {
+  return other->IsWildcard();
+}
+
 
 std::string PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression() const {
   return std::string("[^") + Pathspec::kSeparator + "]";
+}
+
+bool PathspecElementPattern::PlaceholderSubPattern::Compare(const SubPattern *other) const {
+  return other->IsPlaceholder();
 }
