@@ -168,6 +168,18 @@ TEST_F(T_Dirtab, InvalidEscapedRule) {
 }
 
 
+TEST_F(T_Dirtab, InvalidPositiveRule) {
+  dirtab.Parse("# positive rules must be absolute!\n"
+               "/usr/local\n"
+               "hallo/welt.txt\n");
+
+  EXPECT_FALSE (dirtab.IsValid());
+  EXPECT_EQ (1u, dirtab.RuleCount());
+  EXPECT_EQ (1u, dirtab.PositiveRuleCount());
+  EXPECT_EQ (0u, dirtab.NegativeRuleCount());
+}
+
+
 TEST_F(T_Dirtab, ContradictingPositiveAndNegativeRules) {
   dirtab.Parse("# positive:\n"
                "/usr/bin/*\n"
