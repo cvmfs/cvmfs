@@ -116,6 +116,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   file_processing/processor.h file_processing/processor.cc
   file_processing/file_processor.h file_processing/file_processor.cc
 
+  pathspec/pathspec.h pathspec/pathspec.cc
+  pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
+
   upload.h upload.cc
   upload_spooler_definition.h upload_spooler_definition.cc
   upload_facility.h upload_facility.cc
@@ -143,6 +146,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_mgr.h catalog_mgr.cc
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
+  dirtab.h dirtab.cc
   history.h history.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
