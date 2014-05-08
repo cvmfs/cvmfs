@@ -68,8 +68,9 @@ class ShortString {
     Assign(other.GetChars(), other.GetLength());
   }
 
-  void Append(const ShortString &other) {
-    Append(other.stack_, other.length_);
+  template <class ShortStringT>
+  void Append(const ShortStringT &other) {
+    Append(other.GetChars(), other.GetLength());
   }
 
   void Append(const char *chars, const unsigned length) {
