@@ -192,3 +192,39 @@ TEST_F(T_Dirtab, ContradictingPositiveAndNegativeRules) {
   EXPECT_EQ (1u, dirtab.PositiveRuleCount());
   EXPECT_EQ (1u, dirtab.NegativeRuleCount());
 }
+
+
+TEST_F(T_Dirtab, OpposingMatches) {
+  dirtab.Parse("# positive:\n"
+               "/usr/*\n"
+               "/usr/local/*\n"
+               "/foo/*\n"
+               "\n"
+               "# negative:\n"
+               "!/usr/bi?\n"
+               "!/foo/b*\n"
+               "!/foo/.svn\n");
+
+  EXPECT_TRUE (dirtab.IsValid());
+  EXPECT_EQ (6u, dirtab.RuleCount());
+  EXPECT_EQ (3u, dirtab.PositiveRuleCount());
+  EXPECT_EQ (3u, dirtab.NegativeRuleCount());
+
+  EXPECT_TRUE  (dirtab.IsOpposing("/usr/bin"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/usr/bit"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/usr/bip"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/foo/bin"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/foo/b"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/foo/bar"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/foo/ball"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/foo/.svn"));
+  EXPECT_FALSE (dirtab.IsOpposing("usr/bin"));
+  EXPECT_FALSE (dirtab.IsOpposing("usr/bit"));
+  EXPECT_FALSE (dirtab.IsOpposing("/usr/bi"));
+  EXPECT_FALSE (dirtab.IsOpposing("/usr/binary"));
+  EXPECT_FALSE (dirtab.IsOpposing("/usr/bi/"));
+  EXPECT_FALSE (dirtab.IsOpposing("/foo/hallo"));
+  EXPECT_FALSE (dirtab.IsOpposing("/foo/hallo/welt"));
+  EXPECT_FALSE (dirtab.IsOpposing("/foo/hallo.welt"));
+  EXPECT_FALSE (dirtab.IsOpposing("/foo/.git"));
+}
