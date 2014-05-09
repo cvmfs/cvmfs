@@ -35,6 +35,7 @@ class Pathspec {
   bool IsAbsolute() const { return absolute_; }
 
   const GlobStringSequence& GetGlobStringSequence() const;
+  const std::string&        GetGlobString() const;
 
   bool operator==(const Pathspec &other) const;
   bool operator!=(const Pathspec &other) const { return ! (*this == other); }
@@ -54,6 +55,7 @@ class Pathspec {
   void PrintRegularExpressionError(const int error_code) const;
 
   void GenerateGlobStringSequence() const;
+  void GenerateGlobString() const;
 
  private:
   ElementPatterns             patterns_;
@@ -62,6 +64,9 @@ class Pathspec {
   mutable regex_t            *regex_;
 
   mutable bool                glob_string_compiled_;
+  mutable std::string         glob_string_;
+
+  mutable bool                glob_string_sequence_compiled_;
   mutable GlobStringSequence  glob_string_sequence_;
 
   bool valid_;

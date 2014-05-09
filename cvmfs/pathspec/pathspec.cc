@@ -13,6 +13,7 @@
 Pathspec::Pathspec(const std::string &spec) :
   regex_compiled_(false),
   glob_string_compiled_(false),
+  glob_string_sequence_compiled_(false),
   valid_(true),
   absolute_(false)
 {
@@ -155,9 +156,9 @@ void Pathspec::PrintRegularExpressionError(const int error_code) const {
 }
 
 const Pathspec::GlobStringSequence& Pathspec::GetGlobStringSequence() const {
-  if (! glob_string_compiled_) {
+  if (! glob_string_sequence_compiled_) {
     GenerateGlobStringSequence();
-    glob_string_compiled_ = true;
+    glob_string_sequence_compiled_ = true;
   }
   return glob_string_sequence_;
 }
@@ -170,5 +171,31 @@ void Pathspec::GenerateGlobStringSequence() const {
   for (; i != iend; ++i) {
     const std::string glob_string = i->GenerateGlobString();
     glob_string_sequence_.push_back(glob_string);
+  }
+}
+
+
+const std::string& Pathspec::GetGlobString() const {
+  if (! glob_string_compiled_) {
+    GenerateGlobString();
+    glob_string_compiled_ = true;
+  }
+  return glob_string_;
+}
+
+
+void Pathspec::GenerateGlobString() const {
+  assert (glob_string_.empty());
+
+  bool is_first = true;
+  const GlobStringSequence &seq = GetGlobStringSequence();
+        GlobStringSequence::const_iterator i    = seq.begin();
+  const GlobStringSequence::const_iterator iend = seq.end();
+  for (; i != iend; ++i) {
+    if (! is_first || IsAbsolute()) {
+      glob_string_ += kSeparator;
+    }
+    glob_string_ += *i;
+    is_first = false;
   }
 }
