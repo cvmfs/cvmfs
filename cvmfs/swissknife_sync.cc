@@ -292,9 +292,8 @@ void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
                                      nested_catalog_candidates);
     }
     else if (glob_retval == GLOB_NOMATCH) {
-      LogCvmfs(kLogCatalog, kLogDebug, "Failed to locate any matching entry "
-                                       "for pathspec (%s).",
-                                       glob_string.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "WARNING: cannot apply pathspec %s",
+                                      glob_string.c_str());
     } else {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to run glob matching (%s)",
                                       glob_string.c_str());
