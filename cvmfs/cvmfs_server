@@ -1199,75 +1199,6 @@ set_ro_root_hash() {
 }
 
 
-_process_dirtab_is_readable() {
-  local dirtab_entry="$1"
-  for candidate in $dirtab_entry; do
-    if [ ! -r "$candidate" ]; then
-      echo "WARNING: cannot apply .cvmfsdirtab entry $candidate" >&2
-      return 1
-    fi
-  done
-}
-
-_process_dirtab_is_exclusion() {
-  local dirtab_entry="$1"
-  echo "$dirtab_entry" | grep -q '^!.*'
-}
-
-_process_dirtab_is_excluded() {
-  local dirtab_path="$1"
-  local candidate_path="$2"
-  local old_ifs="$IFS"
-  local exclude=0
-  IFS=$'
-'
-  for dirtab_entry in $(cat "$dirtab_path"); do
-    if _process_dirtab_is_exclusion "$dirtab_entry"; then
-      local pattern="$(echo "$dirtab_entry" | sed -e 's/^!\s*\/\?\(.*\)$/\1/')"
-      pattern="$(dirname $dirtab_path)/$pattern"
-      case "$candidate_path" in
-        $pattern) exclude=1; break;;
-      esac
-    fi
-  done
-  IFS="$old_ifs"
-  [ $exclude -eq 1 ]
-}
-
-process_dirtab() {
-  local name=$1
-  local verbose="$2"
-  local base_path="/cvmfs/${name}"
-  local dirtab_path="${base_path}/.cvmfsdirtab"
-  local old_ifs="$IFS"
-
-  if [ ! -f $dirtab_path ]; then
-    return 0
-  fi
-
-  echo "Auto-creating nested catalogs (${dirtab_path})... "
-  IFS=$'
-'
-  for dirtab_entry in $(cat "$dirtab_path"); do
-    _process_dirtab_is_exclusion "$dirtab_entry" && continue
-
-    local dirtab_entry_path="$base_path$dirtab_entry"
-    _process_dirtab_is_readable $dirtab_entry_path || continue
-    for candidate in $dirtab_entry_path; do
-      [ -d $candidate ]                 || continue
-      [ ! -f $candidate/.cvmfscatalog ] || continue
-
-      if _process_dirtab_is_excluded $dirtab_path $candidate; then
-        [ x"$verbose" != x"" ] && echo "Ignoring $candidate"
-      else
-        echo "Auto-creating nested catalog in $candidate"
-        touch "$candidate/.cvmfscatalog"
-      fi
-    done
-  done
-  IFS="$old_ifs"
-}
-
 migrate_legacy_dirtab() {
   local name=$1
   local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
@@ -2744,11 +2675,18 @@ publish() {
     local use_fd_fallback=0
     handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
-    process_dirtab $name $verbosity || die "Synchronization Failed! Please repair your .cvmfsdirtab file!"
+    local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+    local dirtab_command="$swissknife dirtab $verbosity \
+      -d /cvmfs/${name}/.cvmfsdirtab                    \
+      -b $base_hash                                     \
+      -w $stratum0                                      \
+      -t ${spool_dir}/tmp                               \
+      -u /cvmfs/${name}"
+    $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
+
     publish_before_hook $name
     publishing_lock $name
     cvmfs_suid_helper lock $name
-    local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
