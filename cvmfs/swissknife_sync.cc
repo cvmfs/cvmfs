@@ -221,6 +221,7 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
 int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   const string dirtab_file   = *args.find('d')->second;
   union_dir_                 = MakeCanonicalPath(*args.find('u')->second);
+  scratch_dir_               = MakeCanonicalPath(*args.find('s')->second);
   const string base_hash_str = *args.find('b')->second;
   const string stratum0      = *args.find('w')->second;
   const string dir_temp      = *args.find('t')->second;
@@ -356,9 +357,24 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
                                        candidate_rel.c_str());
       nested_catalog_candidates.push_back(candidate);
     } else {
-      LogCvmfs(kLogCatalog, kLogDebug, "Found '%s' in catalogs and it already "
-                                       "is a nested catalog.",
-                                       candidate_rel.c_str());
+      // check if the nested catalog marker is still there, we might need to
+      // recreate the catalog after manual marker removal
+      // Note: First we check if the parent directory shows up in the scratch
+      //       space to verify that it was touched (copy-on-write)
+      //       Otherwise we would force the cvmfs client behind the union file-
+      //       system to (potentially) unncessarily fetch catalogs
+      if (DirectoryExists(scratch_dir_ + candidate_rel) &&
+          ! FileExists(union_dir_ + candidate_rel)) {
+        LogCvmfs(kLogCatalog, kLogStderr, "WARNING: '%s' should be a nested "
+                                          "catalog according to the dirtab. "
+                                          "Recreating...",
+                                          candidate_rel.c_str());
+        nested_catalog_candidates.push_back(candidate);
+      } else {
+        LogCvmfs(kLogCatalog, kLogDebug, "Found '%s' in catalogs and it already "
+                                         "is a nested catalog.",
+                                         candidate_rel.c_str());
+      }
     }
   }
 }

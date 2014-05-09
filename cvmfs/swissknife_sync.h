@@ -145,6 +145,7 @@ class CommandApplyDirtab : public Command {
     ParameterList result;
     result.push_back(Parameter('d', "path to dirtab file", false, false));
     result.push_back(Parameter('u', "union volume", false, false));
+    result.push_back(Parameter('s', "scratch directory", false, false));
     result.push_back(Parameter('b', "base hash", false, false));
     result.push_back(Parameter('w', "stratum 0 base url", false, false));
     result.push_back(Parameter('t', "directory for temporary storage",
@@ -168,6 +169,7 @@ class CommandApplyDirtab : public Command {
 
  private:
   std::string union_dir_;
+  std::string scratch_dir_;
   bool        verbose_;
 };
 
