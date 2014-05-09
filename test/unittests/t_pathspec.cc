@@ -426,3 +426,55 @@ TEST(T_Pathspec, ComparePathspecs) {
   EXPECT_NE (p12, p16);
   EXPECT_NE (p16, p12);
 }
+
+
+TEST(T_Pathspec, GetGlobString) {
+  const std::string s1  = "/hallo.welt";
+  const std::string s2  = "foo.bar\\?";
+  const std::string s3  = "foo/bar/baz.\\*";
+  const std::string s4  = "/foo[bar]";
+  const std::string s5  = "foo(bar)";
+  const std::string s6  = "/foo/bar{baz}";
+  const std::string s7  = "foo/^bar";
+  const std::string s8  = "foo/bar$";
+  const std::string s9  = "/moep+test/foo";
+  const std::string s10 = "moep\\\\atest/foo";
+  const std::string s10a= "moep\\atest/foo"; // escaped escapes are not rebuilt!
+  const std::string s11 = "/moep+/foo\\?/bar\\*/t[e]st/hallo.welt";
+
+  const Pathspec p1 (s1 );
+  const Pathspec p2 (s2 );
+  const Pathspec p3 (s3 );
+  const Pathspec p4 (s4 );
+  const Pathspec p5 (s5 );
+  const Pathspec p6 (s6 );
+  const Pathspec p7 (s7 );
+  const Pathspec p8 (s8 );
+  const Pathspec p9 (s9 );
+  const Pathspec p10(s10);
+  const Pathspec p11(s11);
+
+  EXPECT_TRUE (p1.IsValid());
+  EXPECT_TRUE (p2.IsValid());
+  EXPECT_TRUE (p3.IsValid());
+  EXPECT_TRUE (p4.IsValid());
+  EXPECT_TRUE (p5.IsValid());
+  EXPECT_TRUE (p6.IsValid());
+  EXPECT_TRUE (p7.IsValid());
+  EXPECT_TRUE (p8.IsValid());
+  EXPECT_TRUE (p9.IsValid());
+  EXPECT_TRUE (p10.IsValid());
+  EXPECT_TRUE (p11.IsValid());
+
+  EXPECT_EQ (s1,   p1.GetGlobString());
+  EXPECT_EQ (s2,   p2.GetGlobString());
+  EXPECT_EQ (s3,   p3.GetGlobString());
+  EXPECT_EQ (s4,   p4.GetGlobString());
+  EXPECT_EQ (s5,   p5.GetGlobString());
+  EXPECT_EQ (s6,   p6.GetGlobString());
+  EXPECT_EQ (s7,   p7.GetGlobString());
+  EXPECT_EQ (s8,   p8.GetGlobString());
+  EXPECT_EQ (s9,   p9.GetGlobString());
+  EXPECT_EQ (s10a, p10.GetGlobString());
+  EXPECT_EQ (s11,  p11.GetGlobString());
+}
