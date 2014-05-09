@@ -2681,7 +2681,8 @@ publish() {
       -b $base_hash                                     \
       -w $stratum0                                      \
       -t ${spool_dir}/tmp                               \
-      -u /cvmfs/${name}"
+      -u /cvmfs/${name}                                 \
+      -s ${spool_dir}/scratch"
     $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
 
     publish_before_hook $name
