@@ -35,6 +35,9 @@ class Dirtab {
   bool IsMatching(const std::string &path) const;
   bool IsOpposing(const std::string &path) const;
 
+  const Rules& positive_rules() const { return positive_rules_; }
+  const Rules& negative_rules() const { return negative_rules_; }
+
   size_t RuleCount() const { return NegativeRuleCount() + PositiveRuleCount(); }
   size_t NegativeRuleCount() const { return negative_rules_.size(); }
   size_t PositiveRuleCount() const { return positive_rules_.size(); }
