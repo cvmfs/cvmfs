@@ -130,21 +130,19 @@ bool Dirtab::IsMatching(const std::string &path) const {
     }
   }
 
-  // no positive match, no match in general!
-  if (! has_positive_match) {
-    return false;
-  }
+  return has_positive_match && ! IsOpposing(path);
+}
 
-  // check for negative matches (meaning no match in general)
+
+bool Dirtab::IsOpposing(const std::string &path) const {
         Rules::const_iterator n    = negative_rules_.begin();
   const Rules::const_iterator nend = negative_rules_.end();
   for (; n != nend; ++n) {
     assert (n->is_negation);
     if (n->pathspec.IsMatching(path)) {
-      return false;
+      return true;
     }
   }
 
-  // all good, path is matching dirtab
-  return true;
+  return false;
 }

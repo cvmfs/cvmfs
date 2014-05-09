@@ -33,6 +33,7 @@ class Dirtab {
   bool Parse(const std::string &dirtab);
 
   bool IsMatching(const std::string &path) const;
+  bool IsOpposing(const std::string &path) const;
 
   size_t RuleCount() const { return NegativeRuleCount() + PositiveRuleCount(); }
   size_t NegativeRuleCount() const { return negative_rules_.size(); }
