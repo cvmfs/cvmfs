@@ -25,6 +25,7 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <glob.h>
 
 #include <string>
 #include <vector>
@@ -32,7 +33,9 @@
 #include "platform.h"
 #include "sync_union.h"
 #include "sync_mediator.h"
+#include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
+#include "dirtab.h"
 #include "util.h"
 #include "logging.h"
 #include "download.h"
@@ -216,15 +219,187 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
 
 
 int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
-  const string master_keys   = *args.find('k')->second;
-  const string trusted_certs = (args.find('y') != args.end()) ?
-                                  *args.find('y')->second : "";
   const string dirtab_file   = *args.find('d')->second;
-  const string base_hash     = *args.find('b')->second;
+  union_dir_                 = MakeCanonicalPath(*args.find('u')->second);
+  const string base_hash_str = *args.find('b')->second;
   const string stratum0      = *args.find('w')->second;
   const string dir_temp      = *args.find('t')->second;
+  verbose_                   = (args.find('x') != args.end());
 
-  return 0;
+  // check if there is a dirtab file
+  if (! FileExists(dirtab_file)) {
+    LogCvmfs(kLogCatalog, kLogVerboseMsg, "Didn't find a dirtab at '%s'. "
+                                          "Skipping...",
+             dirtab_file.c_str());
+    return 0;
+  }
+
+  // parse dirtab file
+  catalog::Dirtab dirtab(dirtab_file);
+  if (! dirtab.IsValid()) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Invalid or not readable dirtab '%s'",
+             dirtab_file.c_str());
+    return 1;
+  }
+  LogCvmfs(kLogCatalog, kLogVerboseMsg, "Found %d rules in dirtab '%s'",
+           dirtab.RuleCount(), dirtab_file.c_str());
+
+  // initialize catalog infrastructure
+  g_download_manager->Init(1, true);
+  const shash::Any base_hash = shash::MkFromHexPtr(shash::HexPtr(base_hash_str));
+  catalog::SimpleCatalogManager catalog_manager(base_hash,
+                                                stratum0,
+                                                dir_temp,
+                                                g_download_manager);
+  catalog_manager.Init();
+
+  std::vector<std::string> new_nested_catalogs;
+  DetermineNestedCatalogCandidates(dirtab, catalog_manager,
+                                   new_nested_catalogs);
+  const bool success = CreateCatalogMarkers(new_nested_catalogs);
+
+  return (success) ? 0 : 1;
+}
+
+
+
+void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
+                    const catalog::Dirtab          &dirtab,
+                    catalog::SimpleCatalogManager  &catalog_manager,
+                    std::vector<std::string>       &nested_catalog_candidates) {
+  // find possible new nested catalog locations
+  const catalog::Dirtab::Rules &lookup_rules = dirtab.positive_rules();
+        catalog::Dirtab::Rules::const_iterator i    = lookup_rules.begin();
+  const catalog::Dirtab::Rules::const_iterator iend = lookup_rules.end();
+  for (; i != iend; ++i) {
+    assert (! i->is_negation);
+
+    // run a glob using the current dirtab rule on the current repository state
+    const std::string &glob_string = i->pathspec.GetGlobString();
+    const std::string &glob_string_abs = union_dir_ + glob_string;
+    const int glob_flags  = GLOB_ONLYDIR | GLOB_NOSORT | GLOB_PERIOD;
+    glob_t    glob_res;
+    const int glob_retval = glob(glob_string_abs.c_str(), glob_flags,
+                                 NULL, &glob_res);
+
+    if (glob_retval == 0) {
+      // found some candidates... filtering by cvmfs catalog structure
+      LogCvmfs(kLogCatalog, kLogDebug, "Found %d entries for pathspec (%s)",
+                                       glob_res.gl_pathc, glob_string.c_str());
+      FilterCandidatesFromGlobResult(dirtab,
+                                     glob_res.gl_pathv, glob_res.gl_pathc,
+                                     catalog_manager,
+                                     nested_catalog_candidates);
+    }
+    else if (glob_retval == GLOB_NOMATCH) {
+      LogCvmfs(kLogCatalog, kLogDebug, "Failed to locate any matching entry "
+                                       "for pathspec (%s).",
+                                       glob_string.c_str());
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to run glob matching (%s)",
+                                      glob_string.c_str());
+    }
+
+    globfree(&glob_res);
+  }
+}
+
+
+void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
+                    const catalog::Dirtab &dirtab,
+                    char **paths, const size_t npaths,
+                    catalog::SimpleCatalogManager  &catalog_manager,
+                    std::vector<std::string>       &nested_catalog_candidates) {
+  // go through the paths produced by glob() and filter them
+  for (size_t i = 0; i < npaths; ++i) {
+    // process candidate paths
+    const std::string candidate(paths[i]);
+    const std::string candidate_rel = candidate.substr(union_dir_.size());
+
+    // check if path points to a directory
+    platform_stat64 candidate_info;
+    const int lstat_retval = platform_lstat(candidate.c_str(), &candidate_info);
+    assert (lstat_retval == 0);
+    if (! S_ISDIR(candidate_info.st_mode)) {
+      continue;
+    }
+
+    // check if the path is a meta-directory (. or ..)
+    if (candidate_rel.substr(candidate_rel.size() - 3) == "/.." ||
+        candidate_rel.substr(candidate_rel.size() - 2) == "/.") {
+      continue;
+    }
+
+    // check that the path isn't excluded in the dirtab
+    if (dirtab.IsOpposing(candidate_rel)) {
+      LogCvmfs(kLogCatalog, kLogDebug, "Candidate '%s' is excluded by dirtab",
+              candidate_rel.c_str());
+      continue;
+    }
+
+    // lookup the path in the catalog structure to find out if it already
+    // points to a nested catalog transition point. Furthermore it could be
+    // a new directory and thus not in any catalog yet.
+    catalog::DirectoryEntry dirent;
+    const bool lookup_success = catalog_manager.LookupPath(
+                                                      candidate_rel,
+                                                      catalog::kLookupSole,
+                                                      &dirent);
+    if (! lookup_success) {
+      LogCvmfs(kLogCatalog, kLogDebug, "Didn't find '%s' in catalogs, could "
+                                       "be a new directory and nested catalog.",
+                                       candidate_rel.c_str());
+      nested_catalog_candidates.push_back(candidate);
+    } else if (! dirent.IsNestedCatalogMountpoint() &&
+               ! dirent.IsNestedCatalogRoot()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "Found '%s' in catalogs but is not a "
+                                       "nested catalog yet.",
+                                       candidate_rel.c_str());
+      nested_catalog_candidates.push_back(candidate);
+    } else {
+      LogCvmfs(kLogCatalog, kLogDebug, "Found '%s' in catalogs and it already "
+                                       "is a nested catalog.",
+                                       candidate_rel.c_str());
+    }
+  }
+}
+
+
+bool swissknife::CommandApplyDirtab::CreateCatalogMarkers(
+                          const std::vector<std::string> &new_nested_catalogs) {
+  // go through the new nested catalog paths and create .cvmfscatalog markers
+  // where necessary
+  bool success = true;
+        std::vector<std::string>::const_iterator k    = new_nested_catalogs.begin();
+  const std::vector<std::string>::const_iterator kend = new_nested_catalogs.end();
+  for (; k != kend; ++k) {
+    assert (! k->empty() && k->size() > union_dir_.size());
+
+    // was the marker already created by hand?
+    const std::string marker_path = *k + "/.cvmfscatalog";
+    if (FileExists(marker_path)) {
+      continue;
+    }
+
+    // create a nested catalog marker
+    const int fd = open(marker_path.c_str(), O_CREAT, 644);
+    if (fd <= 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create nested catalog marker "
+                                      "at '%s' (errno: %d)",
+                                      marker_path.c_str(), errno);
+      success = false;
+      continue;
+    }
+    close(fd);
+
+    // inform the user if requested
+    if (verbose_) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Auto-creating nested catalog in %s",
+               k->c_str());
+    }
+  }
+
+  return success;
 }
 
 
