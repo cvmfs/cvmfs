@@ -55,6 +55,7 @@
 #include "compression.h"
 #include "smalloc.h"
 #include "sanitizer.h"
+#include "checksum.h"
 
 using namespace std;  // NOLINT
 
@@ -247,9 +248,10 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       //LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
       //         num_bytes, info->url->c_str());
       zlib::StreamStates retval =
-        zlib::DecompressZStream2File(&info->zstream,
-                                     info->destination_file,
-                                     ptr, num_bytes);
+        zlib::DecompressZStream2FileCrc32(&info->zstream,
+                                          info->destination_file,
+                                          &info->crc32,
+                                          ptr, num_bytes);
       if (retval == zlib::kStreamDataError) {
         LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
                  info->url->c_str());
@@ -266,6 +268,9 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         info->error_code = kFailLocalIO;
         return 0;
       }
+      checksum::UpdateCrc32C(&info->crc32,
+                             reinterpret_cast<const unsigned char *>(ptr),
+                             num_bytes);
     }
   }
 
@@ -647,6 +652,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     assert(info->hash_context.buffer != NULL);
     shash::Init(info->hash_context);
   }
+  checksum::InitCrc32C(&info->crc32);
 
   if ((info->destination == kDestinationMem) &&
       (HasPrefix(*(info->url), "file://", false)))
@@ -845,23 +851,29 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
 
       // Decompress memory in a single run
-      if ((info->destination == kDestinationMem) && info->compressed) {
-        void *buf;
-        uint64_t size;
-        bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,
-                                              info->destination_mem.size,
-                                              &buf, &size);
-        if (retval) {
-          free(info->destination_mem.data);
-          info->destination_mem.data = static_cast<char *>(buf);
-          info->destination_mem.size = size;
-        } else {
-          LogCvmfs(kLogDownload, kLogDebug,
-                   "decompression (memory) of url %s failed",
-                   info->url->c_str());
-          info->error_code = kFailBadData;
-          break;
+      if (info->destination == kDestinationMem) {
+        if (info->compressed) {
+          void *buf;
+          uint64_t size;
+          bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,
+                                                info->destination_mem.size,
+                                                &buf, &size);
+          if (retval) {
+            free(info->destination_mem.data);
+            info->destination_mem.data = static_cast<char *>(buf);
+            info->destination_mem.size = size;
+          } else {
+            LogCvmfs(kLogDownload, kLogDebug,
+                     "decompression (memory) of url %s failed",
+                     info->url->c_str());
+            info->error_code = kFailBadData;
+            break;
+          }
         }
+        checksum::UpdateCrc32C(
+          &info->crc32,
+          reinterpret_cast<const unsigned char *>(info->destination_mem.data),
+          info->destination_mem.size);
       }
 
       info->error_code = kFailOk;
@@ -983,6 +995,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       shash::Init(info->hash_context);
     if (info->compressed)
       zlib::DecompressInit(&info->zstream);
+    checksum::InitCrc32C(&info->crc32);
 
     // Failure handling
     bool switch_proxy = false;
@@ -1047,6 +1060,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
   if (info->compressed)
     zlib::DecompressFini(&info->zstream);
+  checksum::FinalCrc32C(&info->crc32);
 
   if (info->headers) {
     header_lists_->PutList(info->headers);

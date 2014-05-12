@@ -20,8 +20,9 @@
 #include <cassert>
 #include <algorithm>
 
-#include "logging.h"
+#include "checksum.h"
 #include "hash.h"
+#include "logging.h"
 #include "util.h"
 #include "smalloc.h"
 
@@ -158,8 +159,11 @@ void DecompressFini(z_stream *strm) {
 }
 
 
-StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
-                                    const int64_t size)
+StreamStates DecompressZStream2FileCrc32(z_stream *strm,
+                                         FILE *f,
+                                         uint32_t *running_crc32,
+                                         const void *buf,
+                                         const int64_t size)
 {
   unsigned char out[kZChunk];
   int z_ret;
@@ -186,6 +190,8 @@ StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
       size_t have = kZChunk - strm->avail_out;
       if (fwrite(out, 1, have, f) != have || ferror(f))
         return kStreamIOError;
+      if (running_crc32)
+        checksum::UpdateCrc32C(running_crc32, out, have);
     } while (strm->avail_out == 0);
 
     pos += kZChunk;
@@ -504,7 +510,7 @@ bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
   DecompressInit(&strm);
 
   while ((have = fread(buf, 1, kBufferSize, fsrc)) > 0) {
-    stream_state = DecompressZStream2File(&strm, fdest, buf, have);
+    stream_state = DecompressZStream2FileCrc32(&strm, fdest, NULL, buf, have);
     if ((stream_state == kStreamDataError) || (stream_state == kStreamIOError))
       goto decompress_file2file_final;
   }

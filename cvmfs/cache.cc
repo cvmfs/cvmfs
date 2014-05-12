@@ -586,6 +586,7 @@ static int Fetch(const shash::Any &checksum,
       result = -errno;
       goto fetch_finalize;
     }
+    StoreInMtime(temp_path, tls->download_job.crc32);
     result = cache::CommitTransaction(final_path, temp_path, cvmfs_path,
                                       checksum, volatile_content, size);
     if (result == 0) {
