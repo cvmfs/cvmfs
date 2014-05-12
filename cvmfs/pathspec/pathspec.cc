@@ -4,7 +4,6 @@
 
 #include "pathspec.h"
 
-#include <iostream> // TODO: remove
 #include <cassert>
 
 #include "../smalloc.h"
