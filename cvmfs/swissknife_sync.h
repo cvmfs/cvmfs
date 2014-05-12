@@ -46,6 +46,11 @@ struct SyncParameters {
   size_t           max_file_chunk_size;
 };
 
+namespace catalog {
+  class Dirtab;
+  class SimpleCatalogManager;
+}
+
 
 namespace swissknife {
 
@@ -125,6 +130,47 @@ class CommandRemove : public Command {
     return result;
   }
   int Main(const ArgumentList &args);
+};
+
+
+class CommandApplyDirtab : public Command {
+ public:
+  CommandApplyDirtab() : verbose_(false) {}
+  ~CommandApplyDirtab() {};
+  std::string GetName() { return "dirtab"; }
+  std::string GetDescription() {
+    return "Parses the dirtab file and produces nested catalog markers.";
+  }
+  ParameterList GetParams() {
+    ParameterList result;
+    result.push_back(Parameter('d', "path to dirtab file", false, false));
+    result.push_back(Parameter('u', "union volume", false, false));
+    result.push_back(Parameter('s', "scratch directory", false, false));
+    result.push_back(Parameter('b', "base hash", false, false));
+    result.push_back(Parameter('w', "stratum 0 base url", false, false));
+    result.push_back(Parameter('t', "directory for temporary storage",
+                               false, false));
+    result.push_back(Parameter('x', "verbose mode", true, true));
+    return result;
+  }
+  int Main(const ArgumentList &args);
+
+ protected:
+  void DetermineNestedCatalogCandidates(
+                     const catalog::Dirtab          &dirtab,
+                     catalog::SimpleCatalogManager  &catalog_manager,
+                     std::vector<std::string>       &nested_catalog_candidates);
+  void FilterCandidatesFromGlobResult(
+                     const catalog::Dirtab &dirtab,
+                     char **paths, const size_t npaths,
+                     catalog::SimpleCatalogManager  &catalog_manager,
+                     std::vector<std::string>       &nested_catalog_candidates);
+  bool CreateCatalogMarkers(const std::vector<std::string> &new_nested_catalogs);
+
+ private:
+  std::string union_dir_;
+  std::string scratch_dir_;
+  bool        verbose_;
 };
 
 
