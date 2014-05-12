@@ -59,13 +59,21 @@ cvmfs_run_test() {
   rm -fR ${repo_dir}/foo    || return 20
 
   echo "publish repository (should trigger root catalog defragmatation)"
-  publish_repo $CVMFS_TEST_REPO | grep -e '/ gets defragmented.*wasted row' || return 21
+  local publish_log_1=publish_1.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 || return 21
+  cat $publish_log_1 | grep -e '/ gets defragmented.*wasted row' || return 22
 
   echo "check if root catalog is approximately the same size than before"
   local second_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
   local absdiff=$(( $second_root_size - $initial_root_size ))
   echo "Catalog Size: $second_root_size"
-  [ $absdiff -lt 10240 ] || [ $absdiff -gt -10240 ] || return 22
+  [ $absdiff -lt 10240 ] || [ $absdiff -gt -10240 ] || return 23
+
+  echo "create a last transaction to check if defrag info is gone"
+  start_transaction $CVMFS_TEST_REPO || return 24
+  local publish_log_2=publish_2.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2 || return 25
+  cat $publish_log_2 | grep -e '/ gets defragmented.*wasted row' && return 26
 
   return 0
 }

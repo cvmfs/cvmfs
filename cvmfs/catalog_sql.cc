@@ -361,10 +361,31 @@ double Database::GetRowIdWasteRatio() const {
 
 /**
  * Cleanup unused database space
+ *
+ * This creates a temporary table 'mapping' filled with the current rowIDs from
+ * the catalog table. The new table will implicitly have an auto-increment rowID
+ * that is compactized. Thus, we create a 'mapping' from each catalog's rowID
+ * to a new rowID-space that does not have any gaps.
+ * Thereafter the catalog's rowIDs are mapped to their new (unique and compact)
+ * rowIDs and the temporary table is deleted.
+ *
+ * Note: VACUUM used to have a similar behaviour but it was dropped from SQLite
+ *       at some point. Since we compute client-inodes from the rowIDs, we are
+ *       probably one of the few use cases where a defragmented rowID is indeed
+ *       beneficial.
+ *
  * See: http://www.sqlite.org/lang_vacuum.html
  */
 bool Database::Vacuum() const {
-  return Sql(*this, "VACUUM;").Execute();
+  return Sql(*this, "BEGIN;").Execute()                                 &&
+         Sql(*this, "CREATE TEMPORARY TABLE mapping AS "
+                    "SELECT rowid AS cid FROM catalog;").Execute()      &&
+         Sql(*this, "UPDATE OR ROLLBACK catalog SET "
+                    "  rowid = (SELECT rowid FROM mapping "
+                    "           WHERE cid = catalog.rowid);").Execute() &&
+         Sql(*this, "DROP TABLE mapping;").Execute()                    &&
+         Sql(*this, "COMMIT;").Execute()                                &&
+         Sql(*this, "VACUUM;").Execute();
 }
 
 
