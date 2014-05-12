@@ -4,7 +4,6 @@
 
 #include "pathspec_pattern.h"
 
-#include <iostream>
 #include <cassert>
 
 #include "pathspec.h"
