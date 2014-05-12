@@ -4,8 +4,8 @@
 
 #include "dirtab.h"
 
-#include <fstream>
-#include <sstream>
+#include <cstdio>
+#include <cstdlib>
 
 #include "util.h"
 
@@ -22,36 +22,46 @@ Dirtab::Dirtab(const std::string &dirtab_path) {
     return;
   }
 
-  std::ifstream dirtab(dirtab_path.c_str());
-  if (!dirtab) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Cannot open dirtab for reading at '%s'",
-             dirtab_path.c_str());
+  FILE *dirtab_file = fopen(dirtab_path.c_str(), "r");
+  if (dirtab_file == NULL) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Cannot open dirtab for reading at '%s' "
+                                      "(errno: %d)",
+             dirtab_path.c_str(), errno);
     valid_ = false;
     return;
   }
 
-  valid_ = Parse(dirtab);
-  dirtab.close();
+  valid_ = Parse(dirtab_file);
+  fclose(dirtab_file);
 }
 
 
 bool Dirtab::Parse(const std::string &dirtab) {
-  std::istringstream iss(dirtab);
-  const bool parse_success = Parse(iss);
-  valid_ = parse_success;
-  return parse_success;
+  valid_ = true;
+  off_t line_offset = 0;
+  while (line_offset < static_cast<off_t>(dirtab.size())) {
+    std::string line = GetLineMem(dirtab.c_str() + line_offset,
+                                  dirtab.size() - line_offset);
+    line_offset += line.size() + 1; // +1 == skipped \n
+    if (! ParseLine(line)) {
+      valid_ = false;
+    }
+  }
+  valid_ = valid_ && CheckRuleValidity();
+  return valid_;
 }
 
 
-bool Dirtab::Parse(std::istream &dirtab) {
+bool Dirtab::Parse(FILE *dirtab_file) {
+  valid_ = true;
   std::string line;
-  bool all_valid = true;
-  while (std::getline(dirtab, line)) {
+  while (GetLineFile(dirtab_file, &line)) {
     if (! ParseLine(line)) {
-      all_valid = false;
+      valid_ = false;
     }
   }
-  return all_valid && CheckRuleValidity();
+  valid_ = valid_ && CheckRuleValidity();
+  return valid_;
 }
 
 
