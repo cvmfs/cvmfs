@@ -6,7 +6,6 @@
 #define CVMFS_DIRTAB_H_
 
 #include <string>
-#include <istream>
 
 #include "pathspec/pathspec.h"
 
@@ -44,7 +43,7 @@ class Dirtab {
   bool   IsValid() const { return valid_; }
 
  protected:
-  bool Parse(std::istream &dirtab);
+  bool Parse(FILE *dirtab_file);
   bool ParseLine(const std::string &line);
   void AddRule(const Rule &rule);
 
