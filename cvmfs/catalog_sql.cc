@@ -364,7 +364,15 @@ double Database::GetRowIdWasteRatio() const {
  * See: http://www.sqlite.org/lang_vacuum.html
  */
 bool Database::Vacuum() const {
-  return Sql(*this, "VACUUM;").Execute();
+  return Sql(*this, "BEGIN;").Execute()                                 &&
+         Sql(*this, "CREATE TEMPORARY TABLE mapping AS "
+                    "SELECT rowid AS cid FROM catalog;").Execute()      &&
+         Sql(*this, "UPDATE OR ROLLBACK catalog SET "
+                    "  rowid = (SELECT rowid FROM mapping "
+                    "           WHERE cid = catalog.rowid);").Execute() &&
+         Sql(*this, "DROP TABLE mapping;").Execute()                    &&
+         Sql(*this, "COMMIT;").Execute()                                &&
+         Sql(*this, "VACUUM;").Execute();
 }
 
 
