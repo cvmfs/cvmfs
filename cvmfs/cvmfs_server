@@ -1408,7 +1408,8 @@ create_spool_area_for_new_repository() {
 remove_spool_area() {
   local name=$1
   load_repo_config $name
-  rm -fR $CVMFS_SPOOL_DIR
+  [ x"$CVMFS_SPOOL_DIR" != x"" ] || return 0
+  rm -fR "$CVMFS_SPOOL_DIR"
 }
 
 
