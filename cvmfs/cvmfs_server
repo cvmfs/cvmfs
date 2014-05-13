@@ -1367,6 +1367,18 @@ EOF
 }
 
 
+remove_config_files() {
+  local name=$1
+  load_repo_config $name
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+    remove_apache_config_file "cvmfs.${name}.conf"
+    reload_apache > /dev/null
+  fi
+  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
+  rm -rf /etc/cvmfs/repositories.d/$name
+}
+
+
 create_spool_area_for_new_repository() {
   local name=$1
   local create_skeleton=0
@@ -1390,6 +1402,13 @@ create_spool_area_for_new_repository() {
     repository_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
     create_repository_skeleton $repository_dir $CVMFS_USER > /dev/null
   fi
+}
+
+
+remove_spool_area() {
+  local name=$1
+  load_repo_config $name
+  rm -fR $CVMFS_SPOOL_DIR
 }
 
 
@@ -1425,6 +1444,18 @@ EOF
   sudo -H -u $cvmfs_user sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
+}
+
+
+unmount_and_teardown_repository() {
+  local name=$1
+  load_repo_config $name
+  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
+  is_mounted "/cvmfs/$name"              && umount /cvmfs/$name
+  is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && umount ${CVMFS_SPOOL_DIR}/rdonly
+  if [ -d /cvmfs/$name ]; then
+    rmdir /cvmfs/$name
+  fi
 }
 
 
