@@ -1881,6 +1881,26 @@ You might have to add the key in /etc/cvmfs/repositories.d/${alias_name}/replica
 ################################################################################
 
 
+IMPORT_DESASTER_REPO_NAME=""
+IMPORT_DESASTER_MANIFEST_BACKUP=""
+IMPORT_DESASTER_MANIFEST_SIGNED=0
+_import_desaster_cleanup() {
+  local name="$IMPORT_DESASTER_REPO_NAME"
+  if [ x"$name" = x"" ]; then
+    return 0
+  fi
+
+  unmount_and_teardown_repository $name
+  remove_spool_area               $name
+  remove_config_files             $name
+
+  if [ $IMPORT_DESASTER_MANIFEST_SIGNED -ne 0 ] && \
+     [ x$IMPORT_DESASTER_MANIFEST_BACKUP != x"" ]; then
+    echo "Manifest was overwritten. If needed here is a backup: $IMPORT_DESASTER_MANIFEST_BACKUP"
+  fi
+}
+
+
 import() {
   local name
   local stratum0
@@ -1978,6 +1998,10 @@ import() {
   local cvmfs_uid=$(echo $file_ownership | cut -d: -f1)
   local cvmfs_gid=$(echo $file_ownership | cut -d: -f2)
 
+  # set up desaster cleanup
+  IMPORT_DESASTER_REPO_NAME="$name"
+  trap _import_desaster_cleanup EXIT HUP INT QUIT TERM
+
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
   create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs
@@ -2024,6 +2048,9 @@ import() {
     if [ $show_statistics -ne 0 ]; then
       statistics_flag="-s"
     fi
+    IMPORT_DESASTER_MANIFEST_BACKUP="${storage_location}/.cvmfspublished.bak"
+    cp ${storage_location}/.cvmfspublished \
+       $IMPORT_DESASTER_MANIFEST_BACKUP || die "fail! (cannot backup .cvmfspublished)"
     cvmfs_swissknife migrate \
       -v "2.0.x" \
       -r $storage_location \
@@ -2047,6 +2074,7 @@ import() {
       -m $new_manifest \
       -t $temp_dir \
       -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
+    IMPORT_DESASTER_MANIFEST_SIGNED=1
     echo "done"
   fi
 
@@ -2067,6 +2095,8 @@ import() {
     alterfs -m on $name
   fi
 
+  # reset trap and finish
+  trap - EXIT HUP INT QUIT TERM
   print_new_repository_notice $name $cvmfs_user
 }
 
