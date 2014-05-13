@@ -1078,12 +1078,6 @@ is_local_upstream() {
   return $?
 }
 
-is_riak_upstream() {
-  local upstream=$1
-  check_upstream_type $upstream "riak"
-  return $?
-}
-
 get_upstream_config() {
   local upstream=$1
   echo "$upstream" | cut -d, -f3-
@@ -1339,14 +1333,6 @@ Alias /cvmfs/$name ${repository_dir}
     ExpiresByType text/html "access plus 5 minutes"
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
 </Directory>
-EOF
-
-  # ONLY FOR RIAK UPSTREAM
-  elif is_riak_upstream $upstream; then
-    local riak_urls=$(get_upstream_config $upstream)
-    cat > /etc/cvmfs/repositories.d/${name}/riak.conf << EOF
-# Created by cvmfs_server.
-CVMFS_RIAK_URLS=$riak_urls
 EOF
   fi
 
@@ -2175,8 +2161,6 @@ rmfs() {
         rm -rf $repository_dir
         echo "done"
       fi
-    elif is_riak_upstream $upstream; then
-      echo "currently Riak Storage is not wiped! TBD."
     fi
 
     if [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
@@ -2412,12 +2396,6 @@ check() {
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
-
-  # more sanity checks
-  if is_riak_upstream $upstream; then
-    echo "checking of Riak storage is not supported. TBD"
-    return
-  fi
 
   upstream=$CVMFS_UPSTREAM_STORAGE
   repository_dir=$(get_upstream_config $upstream)
