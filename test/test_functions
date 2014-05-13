@@ -867,16 +867,22 @@ _resign_legacy_repository() {
   local tmp_dir="$(pwd)/tmp"
   local upstream="local,${legacy_repo_storage}/data/txn,${legacy_repo_storage}"
 
-  cat ${legacy_repo_storage}/.cvmfspublished | head -n6 | \
-    sudo tee ${legacy_repo_storage}/.cvmfspublished_unsigned > /dev/null || return 1
-  mkdir -p $tmp_dir || return 2
-  sudo cvmfs_swissknife sign \
-    -c /etc/cvmfs/keys/${repo_name}.crt \
-    -k /etc/cvmfs/keys/${repo_name}.key \
-    -n ${repo_name} \
-    -m ${legacy_repo_storage}/.cvmfspublished_unsigned \
-    -t $tmp_dir \
-    -r $upstream > /dev/null || return 3
+  mkdir -p $tmp_dir || return 1
+
+  # recreate whitelist
+  local whitelist=${tmp_dir}/whitelist.${repo_name}
+  echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
+  echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
+  echo "N$repo_name" >> ${whitelist}.unsigned
+  openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${repo_name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
+  local hash;
+  hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
+  echo "--" >> ${whitelist}.unsigned
+  echo $hash >> ${whitelist}.unsigned
+  echo -n $hash > ${whitelist}.hash
+  openssl rsautl -inkey /etc/cvmfs/keys/${repo_name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
+  cat ${whitelist}.unsigned ${whitelist}.signature > ${legacy_repo_storage}/.cvmfswhitelist
+  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
 }
 
 
@@ -908,5 +914,5 @@ plant_legacy_repository_revision() {
   [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
   [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
   sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
-  _resign_legacy_repository "$legacy_repo_name"                         || return 109
+  _resign_legacy_repository "$legacy_repo_name"                        || return 109
 }
