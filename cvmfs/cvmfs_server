@@ -1367,6 +1367,18 @@ EOF
 }
 
 
+remove_config_files() {
+  local name=$1
+  load_repo_config $name
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+    remove_apache_config_file "cvmfs.${name}.conf"
+    reload_apache > /dev/null
+  fi
+  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
+  rm -rf /etc/cvmfs/repositories.d/$name
+}
+
+
 create_spool_area_for_new_repository() {
   local name=$1
   local create_skeleton=0
@@ -1390,6 +1402,14 @@ create_spool_area_for_new_repository() {
     repository_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
     create_repository_skeleton $repository_dir $CVMFS_USER > /dev/null
   fi
+}
+
+
+remove_spool_area() {
+  local name=$1
+  load_repo_config $name
+  [ x"$CVMFS_SPOOL_DIR" != x"" ] || return 0
+  rm -fR "$CVMFS_SPOOL_DIR"
 }
 
 
@@ -1425,6 +1445,18 @@ EOF
   sudo -H -u $cvmfs_user sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
+}
+
+
+unmount_and_teardown_repository() {
+  local name=$1
+  load_repo_config $name
+  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
+  is_mounted "/cvmfs/$name"              && umount /cvmfs/$name
+  is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && umount ${CVMFS_SPOOL_DIR}/rdonly
+  if [ -d /cvmfs/$name ]; then
+    rmdir /cvmfs/$name
+  fi
 }
 
 
@@ -1850,6 +1882,26 @@ You might have to add the key in /etc/cvmfs/repositories.d/${alias_name}/replica
 ################################################################################
 
 
+IMPORT_DESASTER_REPO_NAME=""
+IMPORT_DESASTER_MANIFEST_BACKUP=""
+IMPORT_DESASTER_MANIFEST_SIGNED=0
+_import_desaster_cleanup() {
+  local name="$IMPORT_DESASTER_REPO_NAME"
+  if [ x"$name" = x"" ]; then
+    return 0
+  fi
+
+  unmount_and_teardown_repository $name
+  remove_spool_area               $name
+  remove_config_files             $name
+
+  if [ $IMPORT_DESASTER_MANIFEST_SIGNED -ne 0 ] && \
+     [ x$IMPORT_DESASTER_MANIFEST_BACKUP != x"" ]; then
+    echo "Manifest was overwritten. If needed here is a backup: $IMPORT_DESASTER_MANIFEST_BACKUP"
+  fi
+}
+
+
 import() {
   local name
   local stratum0
@@ -1947,6 +1999,10 @@ import() {
   local cvmfs_uid=$(echo $file_ownership | cut -d: -f1)
   local cvmfs_gid=$(echo $file_ownership | cut -d: -f2)
 
+  # set up desaster cleanup
+  IMPORT_DESASTER_REPO_NAME="$name"
+  trap _import_desaster_cleanup EXIT HUP INT QUIT TERM
+
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
   create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs
@@ -1993,6 +2049,9 @@ import() {
     if [ $show_statistics -ne 0 ]; then
       statistics_flag="-s"
     fi
+    IMPORT_DESASTER_MANIFEST_BACKUP="${storage_location}/.cvmfspublished.bak"
+    cp ${storage_location}/.cvmfspublished \
+       $IMPORT_DESASTER_MANIFEST_BACKUP || die "fail! (cannot backup .cvmfspublished)"
     cvmfs_swissknife migrate \
       -v "2.0.x" \
       -r $storage_location \
@@ -2016,6 +2075,7 @@ import() {
       -m $new_manifest \
       -t $temp_dir \
       -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
+    IMPORT_DESASTER_MANIFEST_SIGNED=1
     echo "done"
   fi
 
@@ -2036,6 +2096,8 @@ import() {
     alterfs -m on $name
   fi
 
+  # reset trap and finish
+  trap - EXIT HUP INT QUIT TERM
   print_new_repository_notice $name $cvmfs_user
 }
 
@@ -2045,9 +2107,6 @@ import() {
 
 rmfs() {
   local names
-  local spool_dir
-  local upstream
-  local type
   local force=0
   local retcode=0
 
@@ -2089,32 +2148,24 @@ rmfs() {
 
     # get information about repository
     load_repo_config $name
-    spool_dir=$CVMFS_SPOOL_DIR
-    upstream=$CVMFS_UPSTREAM_STORAGE
-    type=$CVMFS_REPOSITORY_TYPE
 
     # check if repository is compatible to the installed CernVM-FS version
     check_repository_compatibility
 
     # sanity checks
-    [ x"$spool_dir" = x ] && { echo "Spool directory for $name is undefined"; retcode=1; continue;  }
-    [ x"$upstream" = x ]  && { echo "Upstream storage for $name is undefined"; retcode=1; continue; }
-    [ x"$type" = x ]      && { echo "Repository type for $name is undefined"; retcode=1; continue;  }
+    [ x"$CVMFS_SPOOL_DIR"        = x ] && { echo "Spool directory for $name is undefined";  retcode=1; continue; }
+    [ x"$CVMFS_UPSTREAM_STORAGE" = x ] && { echo "Upstream storage for $name is undefined"; retcode=1; continue; }
+    [ x"$CVMFS_REPOSITORY_TYPE"  = x ] && { echo "Repository type for $name is undefined";  retcode=1; continue; }
 
     # do it!
-    if [ "$type" = "stratum0" ]; then
+    if [ "$CVMFS_REPOSITORY_TYPE" = "stratum0" ]; then
       echo -n "Unmounting CernVM-FS Area... "
-      sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
-      is_mounted "/cvmfs/$name"        && umount /cvmfs/$name
-      is_mounted "${spool_dir}/rdonly" && umount ${spool_dir}/rdonly
-      if [ -d /cvmfs/$name ]; then
-        rmdir /cvmfs/$name
-      fi
+      unmount_and_teardown_repository $name
       echo "done"
     fi
 
     echo -n "Removing spool area... "
-    rm -rf $spool_dir
+    remove_spool_area $name
     echo done
 
     if is_local_upstream $upstream; then
@@ -2128,19 +2179,17 @@ rmfs() {
       echo "currently Riak Storage is not wiped! TBD."
     fi
 
-    echo -n "Removing keys and configuration... "
-    if [ "$type" = stratum0 ]; then
+    if [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
+      echo -n "Removing keys... "
       rm -f /etc/cvmfs/keys/$name.masterkey \
           /etc/cvmfs/keys/$name.pub \
           /etc/cvmfs/keys/$name.key \
           /etc/cvmfs/keys/$name.crt
+      echo "done"
     fi
-    if is_local_upstream $upstream; then
-      remove_apache_config_file "cvmfs.${name}.conf"
-      reload_apache > /dev/null
-    fi
-    sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
-    rm -rf /etc/cvmfs/repositories.d/$name
+
+    echo -n "Removing configuration... "
+    remove_config_files $name
     echo "done"
 
     echo "CernVM-FS repository $name wiped out!"
