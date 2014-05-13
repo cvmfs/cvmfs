@@ -792,13 +792,12 @@ cvmfs_reload() {
     fi
     return 0
   fi
-  if [ -f "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" ]; then
+  mkdir "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" 2>/dev/null
+  if [ $? -ne 0 ]; then
     echo "Another reload process has not finished yet"
     return 1
   fi
-  # Race condition here, TODO
-  touch "$CVMFS_RELOAD_SOCKETS/cvmfs.pause"
-  trap "rm -f $CVMFS_RELOAD_SOCKETS/cvmfs.pause" EXIT
+  trap "rmdir $CVMFS_RELOAD_SOCKETS/cvmfs.pause" EXIT
   rm -f "${CVMFS_RELOAD_SOCKETS}/pid.*" "${CVMFS_RELOAD_SOCKETS}/guard_files*"
 
   RETVAL=0

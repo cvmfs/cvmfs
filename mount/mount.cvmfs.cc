@@ -162,9 +162,15 @@ static bool WaitForReload() {
     return false;
   }
   string reload_guard = param + "/cvmfs.pause";
+  // Deprecated, now a directory
   if (FileExists(reload_guard)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Waiting for CernVM-FS reload...");
     while (FileExists(reload_guard))
+      SafeSleepMs(250);
+  }
+  if (DirectoryExists(reload_guard)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Waiting for CernVM-FS reload...");
+    while (DirectoryExists(reload_guard))
       SafeSleepMs(250);
   }
   return true;
