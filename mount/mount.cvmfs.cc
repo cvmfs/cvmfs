@@ -154,7 +154,7 @@ static bool GetCacheDir(const string &fqrn, string *cachedir) {
 }
 
 
-static bool WaitForReload() {
+static bool WaitForReload(const std::string &mountpoint) {
   string param;
   int retval = options::GetValue("CVMFS_RELOAD_SOCKETS", &param);
   if (!retval) {
@@ -170,8 +170,14 @@ static bool WaitForReload() {
   }
   if (DirectoryExists(reload_guard)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Waiting for CernVM-FS reload...");
-    while (DirectoryExists(reload_guard))
+    const string mountpoint_base64 = Base64(mountpoint);
+    while (DirectoryExists(reload_guard)) {
+      // We are in paused state but automounter unmounted the repo.
+      // We need to allow to mount just to reload.
+      if (FileExists(reload_guard + "/" + mountpoint_base64))
+        break;
       SafeSleepMs(250);
+    }
   }
   return true;
 }
@@ -243,7 +249,7 @@ int main(int argc, char **argv) {
   string cvmfs_user;
   string cachedir;
   // Environment checks
-  retval = WaitForReload();
+  retval = WaitForReload(mountpoint);
   if (!retval) return 1;
   retval = GetCacheDir(fqrn, &cachedir);
   if (!retval) return 1;
