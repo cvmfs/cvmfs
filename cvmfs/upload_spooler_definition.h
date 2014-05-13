@@ -19,7 +19,6 @@ namespace upload {
  */
 struct SpoolerDefinition {
   enum DriverType {
-    Riak,
     Local,
     Unknown
   };
