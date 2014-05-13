@@ -63,6 +63,7 @@ produce_files_in() {
 
   # create a big binary file that will get chunked
   mkdir big_file
+  touch big_file/.cvmfscatalog
   inflate_file big_file/1megabyte /bin/ls 1000000
   inflate_file big_file/10megabyte big_file/1megabyte 1000000
   inflate_file big_file/50megabyte big_file/10megabyte 50000000
