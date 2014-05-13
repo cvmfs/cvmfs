@@ -379,7 +379,8 @@ double Database::GetRowIdWasteRatio() const {
 bool Database::Vacuum() const {
   return Sql(*this, "BEGIN;").Execute()                                 &&
          Sql(*this, "CREATE TEMPORARY TABLE mapping AS "
-                    "SELECT rowid AS cid FROM catalog;").Execute()      &&
+                    "  SELECT rowid AS cid FROM catalog "
+                    "  ORDER BY cid;").Execute()                        &&
          Sql(*this, "UPDATE OR ROLLBACK catalog SET "
                     "  rowid = (SELECT rowid FROM mapping "
                     "           WHERE cid = catalog.rowid);").Execute() &&
