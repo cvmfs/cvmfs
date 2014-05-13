@@ -2076,9 +2076,6 @@ import() {
 
 rmfs() {
   local names
-  local spool_dir
-  local upstream
-  local type
   local force=0
   local retcode=0
 
@@ -2120,32 +2117,24 @@ rmfs() {
 
     # get information about repository
     load_repo_config $name
-    spool_dir=$CVMFS_SPOOL_DIR
-    upstream=$CVMFS_UPSTREAM_STORAGE
-    type=$CVMFS_REPOSITORY_TYPE
 
     # check if repository is compatible to the installed CernVM-FS version
     check_repository_compatibility
 
     # sanity checks
-    [ x"$spool_dir" = x ] && { echo "Spool directory for $name is undefined"; retcode=1; continue;  }
-    [ x"$upstream" = x ]  && { echo "Upstream storage for $name is undefined"; retcode=1; continue; }
-    [ x"$type" = x ]      && { echo "Repository type for $name is undefined"; retcode=1; continue;  }
+    [ x"$CVMFS_SPOOL_DIR"        = x ] && { echo "Spool directory for $name is undefined";  retcode=1; continue; }
+    [ x"$CVMFS_UPSTREAM_STORAGE" = x ] && { echo "Upstream storage for $name is undefined"; retcode=1; continue; }
+    [ x"$CVMFS_REPOSITORY_TYPE"  = x ] && { echo "Repository type for $name is undefined";  retcode=1; continue; }
 
     # do it!
-    if [ "$type" = "stratum0" ]; then
+    if [ "$CVMFS_REPOSITORY_TYPE" = "stratum0" ]; then
       echo -n "Unmounting CernVM-FS Area... "
-      sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
-      is_mounted "/cvmfs/$name"        && umount /cvmfs/$name
-      is_mounted "${spool_dir}/rdonly" && umount ${spool_dir}/rdonly
-      if [ -d /cvmfs/$name ]; then
-        rmdir /cvmfs/$name
-      fi
+      unmount_and_teardown_repository $name
       echo "done"
     fi
 
     echo -n "Removing spool area... "
-    rm -rf $spool_dir
+    remove_spool_area $name
     echo done
 
     if is_local_upstream $upstream; then
@@ -2159,19 +2148,17 @@ rmfs() {
       echo "currently Riak Storage is not wiped! TBD."
     fi
 
-    echo -n "Removing keys and configuration... "
-    if [ "$type" = stratum0 ]; then
+    if [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
+      echo -n "Removing keys... "
       rm -f /etc/cvmfs/keys/$name.masterkey \
           /etc/cvmfs/keys/$name.pub \
           /etc/cvmfs/keys/$name.key \
           /etc/cvmfs/keys/$name.crt
+      echo "done"
     fi
-    if is_local_upstream $upstream; then
-      remove_apache_config_file "cvmfs.${name}.conf"
-      reload_apache > /dev/null
-    fi
-    sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
-    rm -rf /etc/cvmfs/repositories.d/$name
+
+    echo -n "Removing configuration... "
+    remove_config_files $name
     echo "done"
 
     echo "CernVM-FS repository $name wiped out!"
