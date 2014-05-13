@@ -881,7 +881,7 @@ _resign_legacy_repository() {
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
   openssl rsautl -inkey /etc/cvmfs/keys/${repo_name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
-  cat ${whitelist}.unsigned ${whitelist}.signature > ${legacy_repo_storage}/.cvmfswhitelist
+  cat ${whitelist}.unsigned ${whitelist}.signature | sudo tee ${legacy_repo_storage}/.cvmfswhitelist > /dev/null
   rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
 }
 
