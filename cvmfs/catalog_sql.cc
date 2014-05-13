@@ -382,7 +382,7 @@ bool Database::Vacuum() const {
                     "  SELECT rowid AS cid FROM catalog "
                     "  ORDER BY cid;").Execute()                        &&
          Sql(*this, "UPDATE OR ROLLBACK catalog SET "
-                    "  rowid = (SELECT rowid FROM mapping "
+                    "  rowid = (SELECT mapping.rowid FROM mapping "
                     "           WHERE cid = catalog.rowid);").Execute() &&
          Sql(*this, "DROP TABLE mapping;").Execute()                    &&
          Sql(*this, "COMMIT;").Execute()                                &&
