@@ -1641,7 +1641,6 @@ mkfs() {
   check_repository_existence $name  && die "The repository $name already exists"
   is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
-  is_local_upstream $upstream       || die "Import is only supported for local storage"
   if [ $unionfs = "overlayfs" ]; then
     check_overlayfs                 || die "overlayfs kernel module missing"
     echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
@@ -1650,9 +1649,11 @@ mkfs() {
   fi
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
-  check_apache                      || die "Apache must be installed and running"
   lower_hardlink_restrictions
-  ensure_enabled_apache_modules
+  if is_local_upstream $upstream; then
+    check_apache                    || die "Apache must be installed and running"
+    ensure_enabled_apache_modules
+  fi
 
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
@@ -1661,6 +1662,9 @@ mkfs() {
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
   create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo || die "fail"
+  if is_local_upstream $upstream; then
+    reload_apache > /dev/null
+  fi
   echo "done"
 
   # create security keys and certificates
@@ -1673,7 +1677,6 @@ mkfs() {
   # create spool area and mountpoints
   echo -n "Creating CernVM-FS Server Infrastructure... "
   create_spool_area_for_new_repository $name || die "fail"
-  reload_apache > /dev/null
   echo "done"
 
   # create storage area
