@@ -15,7 +15,7 @@
  *      -> generate a content hash of the compression result
  *
  *   2. Upload files
- *      -> pluggable to support different upload pathes (local, Riak, ...)
+ *      -> pluggable to support different upload pathes (local, S3, ...)
  *
  * There are a number of different entities involved in this process. Namely:
  *   -> Spooler            - general steering tasks ( + common interface )
