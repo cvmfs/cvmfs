@@ -397,7 +397,8 @@ bool swissknife::CommandApplyDirtab::CreateCatalogMarkers(
     }
 
     // create a nested catalog marker
-    const int fd = open(marker_path.c_str(), O_CREAT);
+    const mode_t mode = kDefaultFileMode;
+    const int fd = open(marker_path.c_str(), O_CREAT, mode);
     if (fd <= 0) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create nested catalog marker "
                                       "at '%s' (errno: %d)",
