@@ -1659,25 +1659,25 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo || die "fail"
   echo "done"
 
   # create security keys and certificates
   echo -n "Creating CernVM-FS Master Key and Self-Signed Certificate... "
   mkdir -p /etc/cvmfs/keys
-  create_master_key $name $cvmfs_user
-  create_cert $name $cvmfs_user
+  create_master_key $name $cvmfs_user || die "fail (master key)"
+  create_cert $name $cvmfs_user       || die "fail (certificate)"
   echo "done"
 
   # create spool area and mountpoints
   echo -n "Creating CernVM-FS Server Infrastructure... "
-  create_spool_area_for_new_repository $name
+  create_spool_area_for_new_repository $name || die "fail"
   reload_apache > /dev/null
   echo "done"
 
   # create storage area
   echo -n "Creating Backend Storage... "
-  create_repository_storage $name
+  create_repository_storage $name || die "fail"
   echo "done"
 
   # get information about new repository
@@ -1708,7 +1708,7 @@ mkfs() {
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name $unionfs || die "fail!"
+  setup_and_mount_new_repository $name $unionfs || die "fail"
   echo "done"
 
   if [ $replicable -eq 1 ]; then
@@ -1716,11 +1716,11 @@ mkfs() {
   fi
 
   echo -n "Initial commit... "
-  transaction $name > /dev/null
+  transaction $name > /dev/null  || die "fail (transaction)"
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   chown $cvmfs_user /cvmfs/${name}/new_repository
-  publish $name > /dev/null
-  cat $rdonly_dir/new_repository
+  publish $name > /dev/null      || die "fail (publish)"
+  cat $rdonly_dir/new_repository || die "fail (finish)"
 
   print_new_repository_notice $name $cvmfs_user
 }
@@ -2157,31 +2157,31 @@ rmfs() {
     # do it!
     if [ "$CVMFS_REPOSITORY_TYPE" = "stratum0" ]; then
       echo -n "Unmounting CernVM-FS Area... "
-      unmount_and_teardown_repository $name
+      unmount_and_teardown_repository $name || die "fail"
       echo "done"
     fi
 
-    echo -n "Removing spool area... "
+    echo -n "Removing Spool Area... "
     remove_spool_area $name
     echo done
 
     if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-      echo -n "Removing repository storage... "
-      remove_repository_storage $name
+      echo -n "Removing Repository Storage... "
+      remove_repository_storage $name || die "fail"
       echo "done"
     fi
 
     if [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
-      echo -n "Removing keys... "
+      echo -n "Removing Keys and Certificate... "
       rm -f /etc/cvmfs/keys/$name.masterkey \
           /etc/cvmfs/keys/$name.pub \
           /etc/cvmfs/keys/$name.key \
-          /etc/cvmfs/keys/$name.crt
+          /etc/cvmfs/keys/$name.crt || die "fail"
       echo "done"
     fi
 
-    echo -n "Removing configuration... "
-    remove_config_files $name
+    echo -n "Removing Configuration... "
+    remove_config_files $name || die "fail"
     echo "done"
 
     echo "CernVM-FS repository $name wiped out!"
