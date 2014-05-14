@@ -86,9 +86,9 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
 	     config_path.c_str());
     return false;
   }
-  if (!options::GetValue("MAX_NUMBER_OF_PARALLELL_CONNECTIONS", &parameter)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse MAX_NUMBER_OF_PARALLELL_CONNECTIONS from '%s'.", 
-	     config[1].c_str());
+  if (!options::GetValue("S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS", &parameter)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS from '%s'.",
+	     config_path.c_str());
     return false;
   }
   maximum_number_of_parallell_uploads_ = String2Uint64(parameter);
