@@ -34,28 +34,27 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition) :
 
 
 bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition) {
-  // Spooler Configuration Scheme:
-  // <host name>[:port]@<config_file>
+  const std::string &config_path = spooler_definition.spooler_configuration;
 
-  std::vector<std::string> config = SplitString(spooler_definition.spooler_configuration, '@');
-  if (config.size() != 2) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3 spooler definition "
-	     "string: %s",
-             spooler_definition.spooler_configuration.c_str());
-    return false;
-  }
-
-  std::vector<std::string> host = SplitString(config[0], ':');
-  if (host.empty() || host.size() > 2) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3 host: %s",
-             config[0].c_str());
+  if (! FileExists(config_path)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Cannot find S3 config file at '%s'",
+             config_path.c_str());
     return false;
   }
 
   // Parse S3 configuration
   options::Init();
-  options::ParsePath(config[1]);
-  std::string parameter;   
+  options::ParsePath(config_path);
+  std::string parameter;
+  std::string s3_host;
+  if (!options::GetValue("S3_HOST", &s3_host)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_HOST from '%s'",
+             config_path.c_str());
+    return false;
+  }
+  const std::string kStandardPort = "80";
+  std::string s3_port = kStandardPort;
+  options::GetValue("S3_PORT", &s3_port);
   int s3_accounts=1;
   if (options::GetValue("S3_ACCOUNTS", &parameter)) {
     s3_accounts = String2Uint64(parameter);    
@@ -72,19 +71,19 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
   }
   std::string s3_access_key;
   if (!options::GetValue("S3_ACCESS_KEY", &s3_access_key)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_ACCESS_KEY from '%s'.", 
-	     config[1].c_str());
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_ACCESS_KEY from '%s'.",
+	     config_path.c_str());
     return false;
   }
   std::string s3_secret_key;
   if (!options::GetValue("S3_SECRET_KEY", &s3_secret_key)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_SECRET_KEY from '%s'.", 
-	     config[1].c_str());
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_SECRET_KEY from '%s'.",
+	     config_path.c_str());
     return false;
   }
   if (!options::GetValue("S3_BUCKET", &bucket_body_name_)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_BUCKET from '%s'.", 
-	     config[1].c_str());
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_BUCKET from '%s'.",
+	     config_path.c_str());
     return false;
   }
   if (!options::GetValue("MAX_NUMBER_OF_PARALLELL_CONNECTIONS", &parameter)) {
@@ -95,13 +94,12 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
   maximum_number_of_parallell_uploads_ = String2Uint64(parameter);
   options::Fini();
 
-  const std::string kStandardPort = "80";
   number_of_buckets_ = s3_buckets_per_account*s3_accounts;
-  host_name_         = host[0];
-  full_host_name_    = host[0] + ":" + ((host.size() == 2) ? host[1] : kStandardPort);
-  if(s3_accounts==1) {
-    keys_.push_back(std::make_pair(s3_access_key, s3_secret_key)); 
-  }else if(s3_accounts>1) {
+  host_name_         = s3_host;
+  full_host_name_    = s3_host + ":" + s3_port;
+  if (s3_accounts==1) {
+    keys_.push_back(std::make_pair(s3_access_key, s3_secret_key));
+  } else if(s3_accounts>1) {
     std::vector<std::string> s3_access_keys = SplitString(s3_access_key, ':');
     std::vector<std::string> s3_secret_keys = SplitString(s3_secret_key, ':');
     if(s3_access_keys.size() != (unsigned int)s3_accounts ||
