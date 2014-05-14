@@ -1372,7 +1372,7 @@ create_spool_area_for_new_repository() {
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
 
-  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
+  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir || return 1
   chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
 }
 
@@ -1381,9 +1381,9 @@ remove_spool_area() {
   local name=$1
   load_repo_config $name
   [ x"$CVMFS_SPOOL_DIR" != x"" ] || return 0
-  rm -fR "$CVMFS_SPOOL_DIR"
+  rm -fR "$CVMFS_SPOOL_DIR"      || return 1
   if [ -d /cvmfs/$name ]; then
-    rmdir /cvmfs/$name
+    rmdir /cvmfs/$name           || return 2
   fi
 }
 
@@ -1447,6 +1447,7 @@ unmount_and_teardown_repository() {
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
   is_mounted "/cvmfs/$name"              && umount /cvmfs/$name
   is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && umount ${CVMFS_SPOOL_DIR}/rdonly
+  return 0
 }
 
 
