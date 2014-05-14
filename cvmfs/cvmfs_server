@@ -1382,6 +1382,9 @@ remove_spool_area() {
   load_repo_config $name
   [ x"$CVMFS_SPOOL_DIR" != x"" ] || return 0
   rm -fR "$CVMFS_SPOOL_DIR"
+  if [ -d /cvmfs/$name ]; then
+    rmdir /cvmfs/$name
+  fi
 }
 
 
@@ -1444,9 +1447,6 @@ unmount_and_teardown_repository() {
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
   is_mounted "/cvmfs/$name"              && umount /cvmfs/$name
   is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && umount ${CVMFS_SPOOL_DIR}/rdonly
-  if [ -d /cvmfs/$name ]; then
-    rmdir /cvmfs/$name
-  fi
 }
 
 
