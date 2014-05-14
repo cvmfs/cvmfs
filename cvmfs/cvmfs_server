@@ -2003,13 +2003,13 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs || die "fail!"
   echo "done"
 
   # import the old repository security keys
   echo -n "Importing the given key files... "
   local global_key_dir="/etc/cvmfs/keys"
-  mkdir -p $global_key_dir
+  mkdir -p $global_key_dir || die "fail! (cannot create $global_key_dir)"
   for pki_file in $pki_keys; do
     if [ ! -f "${global_key_dir}/$pki_file" ]; then
       cp "${keys_location}/$pki_file" $global_key_dir  || die "fail! (cannot copy $pki_file)"
@@ -2021,8 +2021,8 @@ import() {
 
   # create storage
   echo -n "Creating CernVM-FS Repository Infrastructure... "
-  create_spool_area_for_new_repository $name
-  reload_apache > /dev/null
+  create_spool_area_for_new_repository $name || die "fail!"
+  reload_apache > /dev/null                  || die "fail!"
   echo "done"
 
   # load repository configuration file
@@ -2061,8 +2061,8 @@ import() {
       -p $cvmfs_uid \
       -g $cvmfs_gid \
       -f \
-      $statistics_flag || die "fail!"
-    chown $cvmfs_user $new_manifest
+      $statistics_flag              || die "fail! (migration)"
+    chown $cvmfs_user $new_manifest || die "fail! (chown manifest)"
 
     # sign new (migrated) repository revision
     echo -n "Signing newly imported Repository... "
