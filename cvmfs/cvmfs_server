@@ -1680,9 +1680,11 @@ mkfs() {
   echo "done"
 
   # create storage area
-  echo -n "Creating Backend Storage... "
-  create_repository_storage $name || die "fail"
-  echo "done"
+  if is_local_upstream $upstream; then
+    echo -n "Creating Backend Storage... "
+    create_repository_storage $name || die "fail"
+    echo "done"
+  fi
 
   # get information about new repository
   load_repo_config $name
