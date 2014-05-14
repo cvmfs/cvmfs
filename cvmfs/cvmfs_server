@@ -926,13 +926,11 @@ create_master_key() {
   master_key="/etc/cvmfs/keys/$name.masterkey"
   master_pub="/etc/cvmfs/keys/$name.pub"
 
-  echo -n "Creating CernVM-FS master key for $name in $master_pub... "
   openssl genrsa -out $master_key 2048 > /dev/null 2>&1
   openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
   chmod 400 $master_key
   chmod 444 $master_pub
   chown $user $master_key $master_pub
-  echo "done"
 }
 
 
@@ -945,7 +943,6 @@ create_cert() {
   local crt; crt="/etc/cvmfs/keys/$name.crt"
 
   # Create self-signed certificate
-  echo -n "Creating self-signed certificate for $name in $crt... "
   openssl genrsa -out $key 2048 > /dev/null 2>&1
   openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$name CernVM-FS Release Managers" -key $key -out $csr > /dev/null 2>&1
   openssl x509 -req -days 365 -in $csr -signkey $key -out $crt > /dev/null 2>&1
@@ -953,7 +950,6 @@ create_cert() {
   chmod 444 $crt
   chmod 400 $key
   chown $user $crt $key
-  echo "done"
 }
 
 
@@ -1654,14 +1650,16 @@ mkfs() {
   check_user $cvmfs_user || die "No user $cvmfs_user"
 
   # create system-wide configuration
-  echo -n "Creating configuration files... "
+  echo -n "Creating Configuration Files... "
   create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo
   echo "done"
 
   # create security keys and certificates
+  echo -n "Creating CernVM-FS Master Key and Self-Signed Certificate... "
   mkdir -p /etc/cvmfs/keys
   create_master_key $name $cvmfs_user
   create_cert $name $cvmfs_user
+  echo "done"
 
   # create storage and mountpoints
   echo -n "Create CernVM-FS Storage... "
@@ -1675,7 +1673,7 @@ mkfs() {
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
 
-  echo -n "Create Initial Repository... "
+  echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
   local volatile_opt=
   if [ $volatile_content -eq 1 ]; then
