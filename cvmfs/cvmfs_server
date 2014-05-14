@@ -1363,11 +1363,6 @@ remove_config_files() {
 
 create_spool_area_for_new_repository() {
   local name=$1
-  local create_skeleton=0
-
-  if [ $# -gt 1 ]; then
-    create_skeleton=1
-  fi
 
   # gather repository information from configuration file
   load_repo_config $name
@@ -1379,11 +1374,6 @@ create_spool_area_for_new_repository() {
 
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
   chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
-  if [ $create_skeleton -eq 1 ] && is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-    local repository_dir
-    repository_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
-    create_repository_skeleton $repository_dir $CVMFS_USER > /dev/null
-  fi
 }
 
 
@@ -1392,6 +1382,24 @@ remove_spool_area() {
   load_repo_config $name
   [ x"$CVMFS_SPOOL_DIR" != x"" ] || return 0
   rm -fR "$CVMFS_SPOOL_DIR"
+}
+
+
+create_repository_storage() {
+  local name=$1
+  local storage_dir
+  load_repo_config $name
+  storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+  create_repository_skeleton $storage_dir $CVMFS_USER > /dev/null
+}
+
+
+remove_repository_storage() {
+  local name=$1
+  load_repo_config $name
+  local storage_dir="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)"
+  [ x"$storage_dir" != x"" ] || return 0
+  rm -fR "$storage_dir"
 }
 
 
@@ -1661,10 +1669,15 @@ mkfs() {
   create_cert $name $cvmfs_user
   echo "done"
 
-  # create storage and mountpoints
-  echo -n "Create CernVM-FS Storage... "
-  create_spool_area_for_new_repository $name "with storage skeleton"
+  # create spool area and mountpoints
+  echo -n "Creating CernVM-FS Server Infrastructure... "
+  create_spool_area_for_new_repository $name
   reload_apache > /dev/null
+  echo "done"
+
+  # create storage area
+  echo -n "Creating Backend Storage... "
+  create_repository_storage $name
   echo "done"
 
   # get information about new repository
@@ -2152,13 +2165,10 @@ rmfs() {
     remove_spool_area $name
     echo done
 
-    if is_local_upstream $upstream; then
-      local repository_dir=$(get_upstream_config $upstream)
-      if [ "x"$repository_dir != x ]; then
-        echo -n "Removing repository storage... "
-        rm -rf $repository_dir
-        echo "done"
-      fi
+    if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+      echo -n "Removing repository storage... "
+      remove_repository_storage $name
+      echo "done"
     fi
 
     if [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
