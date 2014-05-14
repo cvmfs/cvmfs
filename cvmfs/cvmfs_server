@@ -926,13 +926,11 @@ create_master_key() {
   master_key="/etc/cvmfs/keys/$name.masterkey"
   master_pub="/etc/cvmfs/keys/$name.pub"
 
-  echo -n "Creating CernVM-FS master key for $name in $master_pub... "
   openssl genrsa -out $master_key 2048 > /dev/null 2>&1
   openssl rsa -in $master_key -pubout -out $master_pub > /dev/null 2>&1
   chmod 400 $master_key
   chmod 444 $master_pub
   chown $user $master_key $master_pub
-  echo "done"
 }
 
 
@@ -945,7 +943,6 @@ create_cert() {
   local crt; crt="/etc/cvmfs/keys/$name.crt"
 
   # Create self-signed certificate
-  echo -n "Creating self-signed certificate for $name in $crt... "
   openssl genrsa -out $key 2048 > /dev/null 2>&1
   openssl req -new -subj "/C=/ST=/L=/O=/OU=/CN=$name CernVM-FS Release Managers" -key $key -out $csr > /dev/null 2>&1
   openssl x509 -req -days 365 -in $csr -signkey $key -out $crt > /dev/null 2>&1
@@ -953,7 +950,6 @@ create_cert() {
   chmod 444 $crt
   chmod 400 $key
   chown $user $crt $key
-  echo "done"
 }
 
 
@@ -1367,11 +1363,6 @@ remove_config_files() {
 
 create_spool_area_for_new_repository() {
   local name=$1
-  local create_skeleton=0
-
-  if [ $# -gt 1 ]; then
-    create_skeleton=1
-  fi
 
   # gather repository information from configuration file
   load_repo_config $name
@@ -1381,13 +1372,8 @@ create_spool_area_for_new_repository() {
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
 
-  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir
+  mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir || return 1
   chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
-  if [ $create_skeleton -eq 1 ] && is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-    local repository_dir
-    repository_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
-    create_repository_skeleton $repository_dir $CVMFS_USER > /dev/null
-  fi
 }
 
 
@@ -1395,7 +1381,28 @@ remove_spool_area() {
   local name=$1
   load_repo_config $name
   [ x"$CVMFS_SPOOL_DIR" != x"" ] || return 0
-  rm -fR "$CVMFS_SPOOL_DIR"
+  rm -fR "$CVMFS_SPOOL_DIR"      || return 1
+  if [ -d /cvmfs/$name ]; then
+    rmdir /cvmfs/$name           || return 2
+  fi
+}
+
+
+create_repository_storage() {
+  local name=$1
+  local storage_dir
+  load_repo_config $name
+  storage_dir=$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)
+  create_repository_skeleton $storage_dir $CVMFS_USER > /dev/null
+}
+
+
+remove_repository_storage() {
+  local name=$1
+  load_repo_config $name
+  local storage_dir="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)"
+  [ x"$storage_dir" != x"" ] || return 0
+  rm -fR "$storage_dir"
 }
 
 
@@ -1440,9 +1447,7 @@ unmount_and_teardown_repository() {
   sed -i -e "/added by CernVM-FS for ${name}/d" /etc/fstab
   is_mounted "/cvmfs/$name"              && umount /cvmfs/$name
   is_mounted "${CVMFS_SPOOL_DIR}/rdonly" && umount ${CVMFS_SPOOL_DIR}/rdonly
-  if [ -d /cvmfs/$name ]; then
-    rmdir /cvmfs/$name
-  fi
+  return 0
 }
 
 
@@ -1654,19 +1659,26 @@ mkfs() {
   check_user $cvmfs_user || die "No user $cvmfs_user"
 
   # create system-wide configuration
-  echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo
+  echo -n "Creating Configuration Files... "
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo || die "fail"
   echo "done"
 
   # create security keys and certificates
+  echo -n "Creating CernVM-FS Master Key and Self-Signed Certificate... "
   mkdir -p /etc/cvmfs/keys
-  create_master_key $name $cvmfs_user
-  create_cert $name $cvmfs_user
+  create_master_key $name $cvmfs_user || die "fail (master key)"
+  create_cert $name $cvmfs_user       || die "fail (certificate)"
+  echo "done"
 
-  # create storage and mountpoints
-  echo -n "Create CernVM-FS Storage... "
-  create_spool_area_for_new_repository $name "with storage skeleton"
+  # create spool area and mountpoints
+  echo -n "Creating CernVM-FS Server Infrastructure... "
+  create_spool_area_for_new_repository $name || die "fail"
   reload_apache > /dev/null
+  echo "done"
+
+  # create storage area
+  echo -n "Creating Backend Storage... "
+  create_repository_storage $name || die "fail"
   echo "done"
 
   # get information about new repository
@@ -1675,7 +1687,7 @@ mkfs() {
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
 
-  echo -n "Create Initial Repository... "
+  echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
   local volatile_opt=
   if [ $volatile_content -eq 1 ]; then
@@ -1697,7 +1709,7 @@ mkfs() {
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name $unionfs || die "fail!"
+  setup_and_mount_new_repository $name $unionfs || die "fail"
   echo "done"
 
   if [ $replicable -eq 1 ]; then
@@ -1705,11 +1717,11 @@ mkfs() {
   fi
 
   echo -n "Initial commit... "
-  transaction $name > /dev/null
+  transaction $name > /dev/null  || die "fail (transaction)"
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   chown $cvmfs_user /cvmfs/${name}/new_repository
-  publish $name > /dev/null
-  cat $rdonly_dir/new_repository
+  publish $name > /dev/null      || die "fail (publish)"
+  cat $rdonly_dir/new_repository || die "fail (finish)"
 
   print_new_repository_notice $name $cvmfs_user
 }
@@ -1991,13 +2003,13 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs || die "fail!"
   echo "done"
 
   # import the old repository security keys
   echo -n "Importing the given key files... "
   local global_key_dir="/etc/cvmfs/keys"
-  mkdir -p $global_key_dir
+  mkdir -p $global_key_dir || die "fail! (cannot create $global_key_dir)"
   for pki_file in $pki_keys; do
     if [ ! -f "${global_key_dir}/$pki_file" ]; then
       cp "${keys_location}/$pki_file" $global_key_dir  || die "fail! (cannot copy $pki_file)"
@@ -2009,8 +2021,8 @@ import() {
 
   # create storage
   echo -n "Creating CernVM-FS Repository Infrastructure... "
-  create_spool_area_for_new_repository $name
-  reload_apache > /dev/null
+  create_spool_area_for_new_repository $name || die "fail!"
+  reload_apache > /dev/null                  || die "fail!"
   echo "done"
 
   # load repository configuration file
@@ -2049,8 +2061,8 @@ import() {
       -p $cvmfs_uid \
       -g $cvmfs_gid \
       -f \
-      $statistics_flag || die "fail!"
-    chown $cvmfs_user $new_manifest
+      $statistics_flag              || die "fail! (migration)"
+    chown $cvmfs_user $new_manifest || die "fail! (chown manifest)"
 
     # sign new (migrated) repository revision
     echo -n "Signing newly imported Repository... "
@@ -2146,34 +2158,31 @@ rmfs() {
     # do it!
     if [ "$CVMFS_REPOSITORY_TYPE" = "stratum0" ]; then
       echo -n "Unmounting CernVM-FS Area... "
-      unmount_and_teardown_repository $name
+      unmount_and_teardown_repository $name || die "fail"
       echo "done"
     fi
 
-    echo -n "Removing spool area... "
+    echo -n "Removing Spool Area... "
     remove_spool_area $name
     echo done
 
-    if is_local_upstream $upstream; then
-      local repository_dir=$(get_upstream_config $upstream)
-      if [ "x"$repository_dir != x ]; then
-        echo -n "Removing repository storage... "
-        rm -rf $repository_dir
-        echo "done"
-      fi
-    fi
-
-    if [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
-      echo -n "Removing keys... "
-      rm -f /etc/cvmfs/keys/$name.masterkey \
-          /etc/cvmfs/keys/$name.pub \
-          /etc/cvmfs/keys/$name.key \
-          /etc/cvmfs/keys/$name.crt
+    if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+      echo -n "Removing Repository Storage... "
+      remove_repository_storage $name || die "fail"
       echo "done"
     fi
 
-    echo -n "Removing configuration... "
-    remove_config_files $name
+    if [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
+      echo -n "Removing Keys and Certificate... "
+      rm -f /etc/cvmfs/keys/$name.masterkey \
+          /etc/cvmfs/keys/$name.pub \
+          /etc/cvmfs/keys/$name.key \
+          /etc/cvmfs/keys/$name.crt || die "fail"
+      echo "done"
+    fi
+
+    echo -n "Removing Configuration... "
+    remove_config_files $name || die "fail"
     echo "done"
 
     echo "CernVM-FS repository $name wiped out!"
