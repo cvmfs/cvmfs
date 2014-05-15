@@ -1057,15 +1057,15 @@ check_upstream_validity() {
   return 1
 }
 
+get_upstream_type() {
+  local upstream=$1
+  echo "$upstream" | cut -d, -f1
+}
+
 check_upstream_type() {
   local upstream=$1
   local needle_type=$2
-
-  if [ x$(echo "$upstream" | cut -d, -f1) = x"$needle_type" ]; then
-    return 0
-  else
-    return 1
-  fi
+  [ x$(get_upstream_type $upstream) = x"$needle_type" ]
 }
 
 is_local_upstream() {
@@ -2493,8 +2493,12 @@ list() {
       fi
     fi
 
+    # get the storage type of the repository
+    local storage_type=""
+    storage_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
+
     # print out repository information list
-    echo "$name ($CVMFS_REPOSITORY_TYPE$transaction_info$whitelist_info) $stratum1_info $version_info"
+    echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
