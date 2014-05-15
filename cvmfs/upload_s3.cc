@@ -17,7 +17,6 @@ using namespace upload;
 
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition) :
   AbstractUploader(spooler_definition),
-  upstream_path_(spooler_definition.spooler_configuration),
   temporary_path_(spooler_definition.temporary_path)
 {
   if (! ParseSpoolerDefinition(spooler_definition)) {

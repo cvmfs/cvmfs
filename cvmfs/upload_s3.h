@@ -102,7 +102,6 @@ namespace upload
     int         maximum_number_of_parallell_uploads_;
     std::vector< std::pair<std::string, std::string> > keys_;
 
-    const std::string    upstream_path_;
     const std::string    temporary_path_;
     mutable atomic_int32 copy_errors_;   //!< counts the number of occured
                                          //!< errors in Upload()
