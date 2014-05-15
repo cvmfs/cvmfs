@@ -95,6 +95,7 @@ namespace upload
     int getKeyIndex(unsigned int use_bucket);
 
     // state information
+    std::string repository_alias_;
     std::string full_host_name_;
     std::string host_name_;
     std::string bucket_body_name_;

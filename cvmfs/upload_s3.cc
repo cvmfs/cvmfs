@@ -33,7 +33,18 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition) :
 
 
 bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition) {
-  const std::string &config_path = spooler_definition.spooler_configuration;
+  // parse spooler configuration
+  const std::vector<std::string> config =
+    SplitString(spooler_definition.spooler_configuration, '@');
+  if (config.size() != 2) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse spooler configuration "
+                                      "string '%s'.\n"
+                                      "Provide: <repo_alias>@/path/to/s3.conf",
+             spooler_definition.spooler_configuration.c_str());
+    return false;
+  }
+  repository_alias_              = config[0];
+  const std::string &config_path = config[1];
 
   if (! FileExists(config_path)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Cannot find S3 config file at '%s'",
@@ -338,13 +349,14 @@ int S3Uploader::uploadFile(std::string       filename,
 
   // Choose S3 account and bucket based on the filename
   std::string access_key, secret_key, bucket_name;
-  getKeysAndBucket(filename, access_key, secret_key, bucket_name);
+  const std::string mangled_filename = repository_alias_ + "/" + filename;
+  getKeysAndBucket(mangled_filename, access_key, secret_key, bucket_name);
 
   s3fanout::JobInfo *info = new s3fanout::JobInfo(access_key,
                                                   secret_key,
                                                   full_host_name_,
                                                   bucket_name,
-                                                  filename,
+                                                  mangled_filename,
                                                   (unsigned char*)buff,
                                                   size_of_file);
   info->request = s3fanout::JobInfo::kReqPut;
@@ -358,14 +370,14 @@ int S3Uploader::uploadFile(std::string       filename,
            "--> Hostname:    '%s'\n"
            "--> Bucket:      '%s'\n"
            "--> File size:   '%d'\n",
-           filename.c_str(),
+           mangled_filename.c_str(),
            full_host_name_.c_str(),
            bucket_name.c_str(),
            mmf->size());
 
   if(s3fanout_mgr->PushNewJob(info) != 0) {
     LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload file: %s" ,
-             filename.data());
+             mangled_filename.data());
     return -1;
   }
 
