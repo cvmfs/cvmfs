@@ -859,7 +859,7 @@ remove_apache_config_file() {
 }
 
 
-get_repo_storage() {
+get_local_repo_storage() {
   local repo_name="$1"
   echo "/srv/cvmfs/${repo_name}"
 }
@@ -877,7 +877,7 @@ get_apache_config_filename() {
 
 cleanup_legacy_repo_leftovers() {
   local legacy_repo_name="$1"
-  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
   local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
 
   echo -n "cleanup (if necessary)... "
@@ -901,7 +901,7 @@ cleanup_legacy_repo_leftovers() {
 # @param repo_name  the FQRN of the legacy repository to be resigned
 _resign_legacy_repository() {
   local repo_name="$1"
-  local repo_storage="$(get_repo_storage $repo_name)"
+  local repo_storage="$(get_local_repo_storage $repo_name)"
   local legacy_repo_storage="${repo_storage}/pub/catalogs"
   local tmp_dir="$(pwd)/tmp"
   local upstream="local,${legacy_repo_storage}/data/txn,${legacy_repo_storage}"
@@ -946,7 +946,7 @@ plant_tarball() {
 plant_legacy_repository_revision() {
   local tarball="$1"
   local legacy_repo_name="$2"
-  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
 
   plant_tarball "$tarball"                                             || return 104
   [ -d ${legacy_repo_storage}/pub ]                                    || return 105
