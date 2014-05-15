@@ -1071,7 +1071,11 @@ check_upstream_type() {
 is_local_upstream() {
   local upstream=$1
   check_upstream_type $upstream "local"
-  return $?
+}
+
+is_s3_upstream() {
+  local upstream=$1
+  check_upstream_type $upstream "s3"
 }
 
 get_upstream_config() {
