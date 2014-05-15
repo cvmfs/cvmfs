@@ -864,9 +864,26 @@ get_local_repo_storage() {
   echo "/srv/cvmfs/${repo_name}"
 }
 
-get_repo_url() {
+get_local_repo_url() {
   local repo_name="$1"
   echo "http://localhost/cvmfs/${repo_name}"
+}
+
+get_s3_repo_url() {
+  local repo_name="$1"
+  local s3_stratum0_url="$CVMFS_TEST_STRATUM0"
+  [ x"$s3_stratum0_url" != x"" ] || die "\$CVMFS_TEST_STRATUM0 needs to be set for S3 tests to work!"
+  [ $(echo -n "$s3_stratum0_url" | tail -c1) = "/" ] || s3_stratum0_url="${s3_stratum0_url}/"
+  echo "${s3_stratum0_url}${repo_name}"
+}
+
+get_repo_url() {
+  local repo_name="$1"
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    get_s3_repo_url "$repo_name"
+  else
+    get_local_repo_url "$repo_name"
+  fi
 }
 
 get_apache_config_filename() {

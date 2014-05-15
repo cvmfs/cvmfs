@@ -26,7 +26,7 @@ mock_apache_access_to_legacy_repo() {
   local legacy_repo_name="$1"
   local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
-  local legacy_repo_url="$(get_repo_url $legacy_repo_name)"
+  local legacy_repo_url="$(get_local_repo_url $legacy_repo_name)"
 
   echo -n "configuring apache to serve the legacy repository... "
 create_apache_config_file $apache_config_file << EOF
@@ -145,7 +145,7 @@ cvmfs_run_test() {
   local guinea_pig_location="${script_location}/../../common/guinea_pig_repo_20"
   local legacy_repo_name="testmigration.cern.ch"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
-  local legacy_repo_url="$(get_repo_url $legacy_repo_name)"
+  local legacy_repo_url="$(get_local_repo_url $legacy_repo_name)"
   local replica_name="${legacy_repo_name}.stratum1"
   local replica_url="$(get_repo_url $replica_name)"
   local key_location="/etc/cvmfs/keys"
