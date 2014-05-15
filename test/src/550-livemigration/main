@@ -170,7 +170,11 @@ cvmfs_run_test() {
 
   echo "creating a stratum1 replication"
   TEST550_REPLICA_NAME="$replica_name"
-  sudo cvmfs_server add-replica -o $CVMFS_TEST_USER -n $replica_name $legacy_repo_url $key_location/${legacy_repo_name}.pub || return 2
+  create_stratum1 $replica_name                           \
+                  $CVMFS_TEST_USER                        \
+                  $legacy_repo_url                        \
+                  ${key_location}/${legacy_repo_name}.pub \
+    || return 2
 
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
   sudo cvmfs_server snapshot $replica_name || return 3

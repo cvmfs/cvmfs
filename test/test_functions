@@ -446,6 +446,24 @@ make_huge_repo() {
 }
 
 
+create_stratum1() {
+  local replica_name=$1
+  local uid=$2
+  local stratum0_url=$3
+  local stratum0_pub=$4
+  local s3_config=""
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG"
+  fi
+  sudo cvmfs_server add-replica -o $CVMFS_TEST_USER \
+                                -n $replica_name    \
+                                -a                  \
+                                $s3_config          \
+                                $stratum0_url       \
+                                $stratum0_pub
+}
+
 # creates a big file at a given location with a given size
 # @param path  the location of the new file
 # @param size  the desired size in megabytes
