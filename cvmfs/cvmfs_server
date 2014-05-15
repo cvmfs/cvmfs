@@ -2374,7 +2374,8 @@ list_tags() {
 check() {
   local name
   local upstream
-  local repository_dir
+  local storage_dir
+  local stratum0
   local check_chunks=1
   local check_integrity=0
   local tag=
@@ -2416,20 +2417,25 @@ check() {
   check_repository_compatibility
 
   upstream=$CVMFS_UPSTREAM_STORAGE
-  repository_dir=$(get_upstream_config $upstream)
+  stratum0=$CVMFS_STRATUM0
 
   # do it!
   if [ $check_integrity -ne 0 ]; then
-    echo
-    echo "Checking Storage Integrity of $name ... (may take a while)"
-    cvmfs_swissknife scrub -r ${repository_dir}/data || die "FAIL!"
+    if ! is_local_upstream $upstream; then
+      echo "Storage Integrity Check only works locally. skipping."
+    else
+      echo
+      echo "Checking Storage Integrity of $name ... (may take a while)"
+      storage_dir=$(get_upstream_config $upstream)
+      cvmfs_swissknife scrub -r ${storage_dir}/data || die "FAIL!"
+    fi
   fi
 
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying Catalog Integrity of $name ..."
-  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $repository_dir
+  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $stratum0
 }
 
 
