@@ -98,34 +98,37 @@ change_files_in() {
   popdir
 }
 
-make_path() {
+make_clg_path() {
   local catalog_hash=$1
-  local base_path="/srv/cvmfs/${CVMFS_TEST_REPO}/data"
   local cas_path="$(echo $catalog_hash | cut --bytes=1,2)"
   local clg_path="$(echo $catalog_hash | cut --bytes=3-)C"
-  local path="${base_path}/${cas_path}/${clg_path}"
-  echo $path
+  echo "${cas_path}/${clg_path}"
 }
 
-decompress() {
-  local catalog_path=$1
-  local tmp_file_path=$2
-  cat $catalog_path | cvmfs_swissknife zpipe -d > $tmp_file_path  
+download_catalog() {
+  local base_url=$1
+  local catalog_hash=$2
+  local dest_path=$3
+  local catalog_url
+  catalog_url="${base_url}/data/$(make_clg_path $catalog_hash)"
+  echo "Downloading and Decompressing: $catalog_url into $dest_path"
+  curl --silent --show-error $catalog_url | cvmfs_swissknife zpipe -d > $dest_path
 }
 
 check_chunk_alignment() {
-  local old_clg_phat=$1
-  local new_clg_path=$2
-
-  old_clg_path=$(make_path $old_root_catalog)
-  new_clg_path=$(make_path $new_root_catalog)
+  local repo_name=$1
+  local old_clg_hash=$2
+  local new_clg_hash=$3
 
   local old_catalog="old.db"
   local new_catalog="new.db"
-  local big_file="50megabyte" # see change_files_in()
 
-  decompress $old_clg_path $old_catalog
-  decompress $new_clg_path $new_catalog
+  load_repo_config $repo_name
+
+  download_catalog $CVMFS_STRATUM0 $old_clg_hash $old_catalog || return 1
+  download_catalog $CVMFS_STRATUM0 $new_clg_hash $new_catalog || return 2
+
+  local big_file="50megabyte" # see change_files_in()
 
   # compare the chunk sizes of associated chunks in the old and the new version
   # of the updated file.
@@ -173,7 +176,8 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "retrieving name of root catalog for later comparison"
-  local old_root_catalog=$(cvmfs_swissknife info -r /srv/cvmfs/${CVMFS_TEST_REPO} -c)
+  load_repo_config $CVMFS_TEST_REPO
+  local old_root_catalog=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -196,12 +200,12 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "retrieving name of new root catalog"
-  local new_root_catalog=$(cvmfs_swissknife info -r /srv/cvmfs/${CVMFS_TEST_REPO} -c)
+  local new_root_catalog=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "check if most chunks are still aligned after the edit"
-  check_chunk_alignment $old_root_catalog $new_root_catalog || return 7
+  check_chunk_alignment $CVMFS_TEST_REPO $old_root_catalog $new_root_catalog || return 7
 
   return 0
 }
