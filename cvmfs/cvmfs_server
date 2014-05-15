@@ -173,7 +173,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
-                [-a silence apache warning]
+                [-a silence apache warning] [-s S3 config file]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -1777,11 +1777,12 @@ add_replica() {
   local public_key
   local upstream
   local owner
+  local s3_config
   local silence_httpd_warning=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:a" option
+  while getopts "o:u:n:as:" option
   do
     case $option in
       u)
@@ -1795,6 +1796,9 @@ add_replica() {
       ;;
       a)
         silence_httpd_warning=1
+      ;;
+      s)
+        s3_config=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1828,17 +1832,21 @@ add_replica() {
     fi
   fi
 
-  # default values
-  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$alias_name/data/txn" "/srv/cvmfs/$alias_name")
+  # upstream generation (defaults to local upstream)
+  if [ x"$upstream" = x"" ]; then
+    if [ x"$s3_config" != x"" ]; then
+      upstream=$(make_s3_upstream $alias_name $s3_config)
+    else
+      upstream=$(make_local_upstream $alias_name)
+    fi
+  fi
 
   # additional configuration
-  local cvmfs_user=`get_cvmfs_owner $alias_name $owner`
+  local cvmfs_user=$(get_cvmfs_owner $alias_name $owner)
   local spool_dir="/var/spool/cvmfs/${alias_name}"
   local temp_dir="${spool_dir}/tmp"
-  local repository_dir;
-  if is_local_upstream $upstream; then
-    repository_dir=$(get_upstream_config $upstream)
-  fi
+  local storage_dir=""
+  is_local_upstream $upstream && storage_dir=$(get_upstream_config $upstream)
 
   # additional sanity checks
   is_root || die "Only root can create a new repository"
@@ -1852,7 +1860,7 @@ add_replica() {
   fi
   check_upstream_validity $upstream
 
-  echo -n "Creating configuration files... "
+  echo -n "Creating Configuration Files... "
   mkdir -p /etc/cvmfs/repositories.d/${alias_name}
   cat > /etc/cvmfs/repositories.d/${alias_name}/server.conf << EOF
 # Created by cvmfs_server.
@@ -1871,11 +1879,12 @@ CVMFS_PUBLIC_KEY=$public_key
 CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
+
   if is_local_upstream $upstream; then
     create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
 # Translation URL to real pathname
-Alias /cvmfs/$alias_name ${repository_dir}
-<Directory "${repository_dir}">
+Alias /cvmfs/$alias_name ${storage_dir}
+<Directory "${storage_dir}">
     Options -MultiViews
     AllowOverride All
     $(get_compatible_apache_allow_from_all_config)
@@ -1894,19 +1903,25 @@ Alias /cvmfs/$alias_name ${repository_dir}
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
 </Directory>
 EOF
+    reload_apache > /dev/null
   fi
   echo "done"
 
-  echo -n "Create CernVM-FS Storage... "
-  mkdir -p $spool_dir
-  if [ x"$repository_dir" != x ]; then
-    create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
-    ln -s $repository_dir/data/txn $temp_dir
-  else
-    mkdir -p $temp_dir
+  if is_local_upstream $upstream; then
+    echo -n "Create CernVM-FS Storage... "
+    mkdir -p $storage_dir
+    create_repository_skeleton $storage_dir $cvmfs_user > /dev/null
+    echo "done"
   fi
-  chown -R $cvmfs_user $spool_dir
-  reload_apache > /dev/null
+
+  echo -n "Creating CernVM-FS Server Infrastructure... "
+  mkdir -p $spool_dir                     || die "fail (mkdir spool)"
+  if is_local_upstream $upstream; then
+    ln -s ${storage_dir}/data/txn $temp_dir || die "fail (ln -s)"
+  else
+    mkdir -p $temp_dir                    || die "fail (mkdir temp)"
+  fi
+  chown -R $cvmfs_user $spool_dir         || die "fail (chown)"
   echo "done"
 
   echo "\
