@@ -169,7 +169,7 @@ Usage: cvmfs_server COMMAND [options] <parameters>
 Supported Commands:
   mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
                 [-m replicable] [-f union filesystem type] [-v volatile content]
-                [-a hash algorithm (default: SHA-1)]
+                [-a hash algorithm (default: SHA-1)] [-s S3 config file]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
@@ -1090,6 +1090,23 @@ make_upstream() {
   echo "$type_name,$tmp_dir,$config_string"
 }
 
+make_local_upstream() {
+  local repo_name=$1
+  make_upstream "local" "/srv/cvmfs/${repo_name}/data/txn" "/srv/cvmfs/${repo_name}"
+}
+
+make_s3_upstream() {
+  local repo_name=$1
+  local s3_config=$2
+  make_upstream "S3" "/tmp" "${repo_name}@${s3_config}"
+}
+
+mangle_s3_stratum0_url() {
+  local repo_name=$1
+  local s3_stratum0_url="$2"
+  [ $(echo -n "$s3_stratum0_url" | tail -c1) = "/" ] || s3_stratum0_url="${s3_stratum0_url}/"
+  echo "${s3_stratum0_url}${repo_name}"
+}
 
 reload_apache() {
    echo -n "Reloading Apache... "
@@ -1597,10 +1614,11 @@ mkfs() {
   local volatile_content=0
   local unionfs
   local hash_algo
+  local s3_config=""
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:a:v" option; do
+  while getopts "w:u:o:mf:a:vs:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1623,6 +1641,9 @@ mkfs() {
       v)
         volatile_content=1
       ;;
+      s)
+        s3_config=$OPTARG
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command mkfs: Unrecognized option: $1"
@@ -1636,10 +1657,20 @@ mkfs() {
   name=$(get_repository_name $1)
 
   # default values
-  [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
-  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
-  [ x"$unionfs" = x ] && unionfs=aufs
-  [ x"$hash_algo" = x ] && hash_algo=sha1
+  [ x"$unionfs"   = x"" ] && unionfs=aufs
+  [ x"$hash_algo" = x"" ] && hash_algo=sha1
+
+  # upstream generation (defaults to local upstream)
+  if [ x"$upstream" = x"" ]; then
+    if [ x"$s3_config" != x"" ]; then
+      [ x"$stratum0" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
+      upstream=$(make_s3_upstream $name $s3_config)
+      stratum0=$(mangle_s3_stratum0_url $name "$stratum0")
+    else
+      upstream=$(make_local_upstream $name)
+      [ x"$stratum0" = x"" ] && stratum0="http://localhost/cvmfs/$name"
+    fi
+  fi
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
