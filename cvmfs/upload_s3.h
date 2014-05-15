@@ -48,8 +48,8 @@ namespace upload
      * registered listeners (see the Observable template for details).
      */
     void FileUpload(const std::string  &local_path,
-		    const std::string  &remote_path,
-		    const callback_t   *callback = NULL);
+                    const std::string  &remote_path,
+                    const callback_t   *callback = NULL);
 
     UploadStreamHandle* InitStreamedUpload(const callback_t *callback = NULL);
     void Upload(UploadStreamHandle  *handle,
@@ -81,15 +81,15 @@ namespace upload
     s3fanout::S3FanoutManager *s3fanout_mgr;
     bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
     int uploadFile(std::string       filename,
-		   char              *buff,
-		   unsigned long     size_of_file,
-		   const callback_t  *callback,
-		   MemoryMappedFile  *mmf);
+                   char              *buff,
+                   unsigned long     size_of_file,
+                   const callback_t  *callback,
+                   MemoryMappedFile  *mmf);
 
     int getKeysAndBucket(const std::string filename,
-			 std::string &access_key,
-			 std::string &secret_key,
-			 std::string &bucket_name);
+                         std::string &access_key,
+                         std::string &secret_key,
+                         std::string &bucket_name);
     std::string getBucketName(unsigned int use_bucket);
     int select_bucket(std::string rem_filename);
     int getKeyIndex(unsigned int use_bucket);

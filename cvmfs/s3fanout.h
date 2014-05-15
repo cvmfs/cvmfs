@@ -74,7 +74,7 @@ struct JobInfo {
     size_t size;
     size_t pos;
     const unsigned char *data;
-  } origin_mem; 
+  } origin_mem;
 
   const std::string origin_path;
   const std::string access_key;
@@ -90,9 +90,9 @@ struct JobInfo {
   JobInfo() { http_headers = NULL; }
   JobInfo(const std::string a, const std::string s, const std::string h,
           const std::string b, const std::string k, const std::string p) :
-          origin(kOriginPath), 
-	  origin_path(p),
-	  access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
+          origin(kOriginPath),
+          origin_path(p),
+          access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
           { http_headers = NULL; test_and_set = false; }
   JobInfo(const std::string a, const std::string s, const std::string h,
           const std::string b, const std::string k,
@@ -116,15 +116,15 @@ struct JobInfo {
 class AbstractUrlConstructor {
  public:
   virtual std::string MkUrl(const std::string &host,
-			    const std::string &bucket,
+                            const std::string &bucket,
                             const std::string &objkey) = 0;
 };
 
 class UrlConstructor : public s3fanout::AbstractUrlConstructor {
 public:
-  virtual std::string MkUrl(const std::string &host, 
-			    const std::string &bucket, 
-			    const std::string &objkey2) {
+  virtual std::string MkUrl(const std::string &host,
+                            const std::string &bucket,
+                            const std::string &objkey2) {
     return "http://" + host + "/" + bucket + "/" + objkey2;
   }
 };
