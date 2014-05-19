@@ -75,6 +75,7 @@ void ParsePath(const string &config_file) {
   FILE *fconfig = fopen(config_file.c_str(), "r");
   if (!fconfig)
     return;
+  const string config_path = GetParentPath(config_file);
 
   int retval;
 
@@ -87,6 +88,9 @@ void ParsePath(const string &config_file) {
   // Let the shell read the file
   string line;
   const string newline = "\n";
+  const string cd = "cd \"" + ((config_path == "") ? "/" : config_path) + "\"" +
+                    newline;
+  WritePipe(fd_stdin, cd.data(), cd.length());
   while (GetLineFile(fconfig, &line)) {
     WritePipe(fd_stdin, line.data(), line.length());
     WritePipe(fd_stdin, newline.data(), newline.length());
