@@ -21,7 +21,7 @@ void Init();
 void Fini();
 
 void ParsePath(const std::string &config_file);
-void ParseDefault(const std::string &repository_name);
+void ParseDefault(const std::string &fqrn);
 void ClearConfig();
 bool IsDefined(const std::string &key);
 bool GetValue(const std::string &key, std::string *value);

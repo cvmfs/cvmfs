@@ -116,7 +116,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
 
   // Verify manifest
   retval_b = signature_manager->VerifyLetter(ensemble->raw_manifest_buf,
-                                             ensemble->raw_manifest_size, 
+                                             ensemble->raw_manifest_size,
                                              false);
   if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
