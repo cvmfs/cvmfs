@@ -237,7 +237,7 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
 }
 
 inline void platform_disable_kcache(int filedes) {
-  posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
+  (void)posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
 
 inline int platform_readahead(int filedes) {
