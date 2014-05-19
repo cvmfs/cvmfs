@@ -87,7 +87,11 @@ static bool CheckStrictMount(const string &fqrn) {
       options::IsOn(param_strict_mount))
   {
     string repository_list;
-    options::GetValue("CVMFS_REPOSITORIES", &repository_list);
+    bool retval = options::GetValue("CVMFS_REPOSITORIES", &repository_list);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_REPOSITORIES missing");
+      return false;
+    }
     vector<string> repositories = SplitString(repository_list, ',');
     for (unsigned i = 0; i < repositories.size(); ++i) {
       if (MkFqrn(repositories[i]) == fqrn)
