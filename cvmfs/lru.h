@@ -126,7 +126,7 @@ struct Statistics {
  * @param Value type of the value values
  */
 template<class Key, class Value>
-class LruCache {
+class LruCache : SingleCopy {
  private:
   // Forward declarations of private internal data structures
   template<class T> class ListEntry;

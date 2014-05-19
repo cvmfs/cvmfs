@@ -120,8 +120,9 @@ inline bool platform_umount(const char* mountpoint, const bool lazy) {
     unlink(lockfile.c_str());
     if (retval != 0)
       return false;
-    chmod(_PATH_MOUNTED, mtab_info.st_mode);
-    chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
+    // Best effort
+    (void)chmod(_PATH_MOUNTED, mtab_info.st_mode);
+    (void)chown(_PATH_MOUNTED, mtab_info.st_uid, mtab_info.st_gid);
   }
 
   int flags = lazy ? MNT_DETACH : 0;
@@ -237,7 +238,7 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
 }
 
 inline void platform_disable_kcache(int filedes) {
-  posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
+  (void)posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
 
 inline int platform_readahead(int filedes) {

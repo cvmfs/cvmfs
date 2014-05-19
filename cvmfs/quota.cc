@@ -1317,7 +1317,9 @@ static void CleanupPipes(const string &cache_dir) {
     const string name = dent->d_name;
     const string path = cache_dir + "/" + name;
     platform_stat64 info;
-    platform_stat(path.c_str(), &info);
+    int retval = platform_stat(path.c_str(), &info);
+    if (retval != 0)
+      continue;
     if (S_ISFIFO(info.st_mode) && (name.substr(0, 4) == "pipe")) {
       if (!found_leftovers) {
         LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,

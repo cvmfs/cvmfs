@@ -147,7 +147,7 @@ class RemountListener {
  *   catalog_manager->Init();
  *   catalog_manager->Lookup(<inode>, &<result_entry>);
  */
-class AbstractCatalogManager {
+class AbstractCatalogManager : public SingleCopy {
  public:
   const static inode_t kInodeOffset = 255;
   AbstractCatalogManager();

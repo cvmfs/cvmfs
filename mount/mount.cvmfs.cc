@@ -51,7 +51,12 @@ static string MkFqrn(const string &repository) {
   const string::size_type idx = repository.find_last_of('.');
   if (idx == string::npos) {
     string domain;
-    options::GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+    bool retval = options::GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+               "CVMFS_DEFAULT_DOMAIN missing");
+      abort();
+    }
     return repository + "." + domain;
   }
   return repository;
@@ -87,7 +92,11 @@ static bool CheckStrictMount(const string &fqrn) {
       options::IsOn(param_strict_mount))
   {
     string repository_list;
-    options::GetValue("CVMFS_REPOSITORIES", &repository_list);
+    bool retval = options::GetValue("CVMFS_REPOSITORIES", &repository_list);
+    if (!retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_REPOSITORIES missing");
+      return false;
+    }
     vector<string> repositories = SplitString(repository_list, ',');
     for (unsigned i = 0; i < repositories.size(); ++i) {
       if (MkFqrn(repositories[i]) == fqrn)

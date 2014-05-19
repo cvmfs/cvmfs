@@ -648,7 +648,8 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
       LogCvmfs(kLogCatalog, kLogStdout, "Allowing for tweaks in %s at %s "
                "(hit return to continue)",
                (*i)->database_path().c_str(), (*i)->path().c_str());
-      getchar();
+      int read_char = getchar();
+      assert(read_char != EOF);
     }
     shash::Any hash = SnapshotCatalog(*i);
 
