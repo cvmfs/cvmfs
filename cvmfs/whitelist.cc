@@ -89,15 +89,17 @@ Failures Whitelist::VerifyLoadedCertificate() const {
 
 Failures Whitelist::Load(const std::string &base_url) {
   const bool probe_hosts = base_url == "";
-  int retval;
+  bool retval_b;
+  download::Failures retval_dl;
+  whitelist::Failures retval_wl;
 
   Reset();
 
   const string whitelist_url = base_url + string("/.cvmfswhitelist");
   download::JobInfo download_whitelist(&whitelist_url,
                                        false, probe_hosts, NULL);
-  retval = download_manager_->Fetch(&download_whitelist);
-  if (retval != download::kFailOk)
+  retval_dl = download_manager_->Fetch(&download_whitelist);
+  if (retval_dl != download::kFailOk)
     return kFailLoad;
   plain_size_ = download_whitelist.destination_mem.size;
   if (plain_size_ == 0)
@@ -105,13 +107,13 @@ Failures Whitelist::Load(const std::string &base_url) {
   plain_buf_ =
     reinterpret_cast<unsigned char *>(download_whitelist.destination_mem.data);
 
-  retval = ParseWhitelist(plain_buf_, plain_size_);
-  if (retval != kFailOk)
-    return static_cast<Failures>(retval);
+  retval_wl = ParseWhitelist(plain_buf_, plain_size_);
+  if (retval_wl != kFailOk)
+    return retval_wl;
 
   if (verification_flags_ & kFlagVerifyRsa) {
-    retval = signature_manager_->VerifyLetter(plain_buf_, plain_size_, true);
-    if (!retval) {
+    retval_b = signature_manager_->VerifyLetter(plain_buf_, plain_size_, true);
+    if (!retval_b) {
       LogCvmfs(kLogCvmfs, kLogDebug, "failed to verify repository whitelist");
       return kFailBadSignature;
     }
@@ -123,8 +125,8 @@ Failures Whitelist::Load(const std::string &base_url) {
       base_url + string("cvmfswhitelist.pkcs7");
     download::JobInfo download_whitelist_pkcs7(&whitelist_pkcs7_url, false,
                                                probe_hosts, NULL);
-    retval = download_manager_->Fetch(&download_whitelist_pkcs7);
-    if (retval != download::kFailOk)
+    retval_dl = download_manager_->Fetch(&download_whitelist_pkcs7);
+    if (retval_dl != download::kFailOk)
       return kFailLoadPkcs7;
     pkcs7_size_ = download_whitelist_pkcs7.destination_mem.size;
     if (pkcs7_size_ == 0)
@@ -135,12 +137,12 @@ Failures Whitelist::Load(const std::string &base_url) {
     unsigned char *extracted_whitelist;
     unsigned extracted_whitelist_size;
     vector<string> alt_uris;
-    retval =
+    retval_b =
       signature_manager_->VerifyPkcs7(pkcs7_buf_, pkcs7_size_,
                                       &extracted_whitelist,
                                       &extracted_whitelist_size,
                                       &alt_uris);
-    if (!retval) {
+    if (!retval_b) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "failed to verify repository whitelist (pkcs#7): %s",
                signature_manager_->GetCryptoError().c_str());
@@ -170,8 +172,8 @@ Failures Whitelist::Load(const std::string &base_url) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Extracted pkcs#7 whitelist:\n%s",
              string(reinterpret_cast<char *>(extracted_whitelist),
                     extracted_whitelist_size).c_str());
-    retval = ParseWhitelist(extracted_whitelist, extracted_whitelist_size);
-    if (retval != kFailOk) {
+    retval_wl = ParseWhitelist(extracted_whitelist, extracted_whitelist_size);
+    if (retval_wl != kFailOk) {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "failed to verify repository certificate against pkcs#7 "
                "whitelist");
