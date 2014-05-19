@@ -28,7 +28,7 @@ const int kWlVerifyCaChain = 0x04;
 
 /**
  * Downloads and verifies the manifest, the certificate, and the whitelist.
- * If base_url is empty, uses the probe_hosts feature from download module.
+ * If base_url is empty, uses the probe_hosts feature from download manager.
  */
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
                const uint64_t minimum_timestamp, const shash::Any *base_catalog,
@@ -39,8 +39,9 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   assert(ensemble);
   const bool probe_hosts = base_url == "";
   Failures result = kFailUnknown;
-  int retval;
-  download::Failures dl_retval;
+  bool retval_b;
+  download::Failures retval_dl;
+  whitelist::Failures retval_wl;
   whitelist::Whitelist whitelist(repository_name,
                                  download_manager,
                                  signature_manager);
@@ -52,11 +53,11 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
                                          &certificate_hash);
 
-  dl_retval = download_manager->Fetch(&download_manifest);
-  if (dl_retval != download::kFailOk) {
+  retval_dl = download_manager->Fetch(&download_manifest);
+  if (retval_dl != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
              "failed to download repository manifest (%d - %s)",
-             dl_retval, Code2Ascii(dl_retval));
+             retval_dl, download::Code2Ascii(retval_dl));
     return kFailLoad;
   }
 
@@ -97,8 +98,8 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {
     certificate_url += certificate_hash.MakePath(1, 2) + "X";
-    retval = download_manager->Fetch(&download_certificate);
-    if (retval != download::kFailOk) {
+    retval_dl = download_manager->Fetch(&download_certificate);
+    if (retval_dl != download::kFailOk) {
       result = kFailLoad;
         goto cleanup;
     }
@@ -106,17 +107,18 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
       reinterpret_cast<unsigned char *>(download_certificate.destination_mem.data);
     ensemble->cert_size = download_certificate.destination_mem.size;
   }
-  retval = signature_manager->LoadCertificateMem(ensemble->cert_buf,
-                                                 ensemble->cert_size);
-  if (!retval) {
+  retval_b = signature_manager->LoadCertificateMem(ensemble->cert_buf,
+                                                   ensemble->cert_size);
+  if (!retval_b) {
     result = kFailBadCertificate;
     goto cleanup;
   }
 
   // Verify manifest
-  retval = signature_manager->VerifyLetter(ensemble->raw_manifest_buf,
-                                           ensemble->raw_manifest_size, false);
-  if (!retval) {
+  retval_b = signature_manager->VerifyLetter(ensemble->raw_manifest_buf,
+                                             ensemble->raw_manifest_size, 
+                                             false);
+  if (!retval_b) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository manifest");
     result = kFailBadSignature;
@@ -124,20 +126,20 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   }
 
   // Load whitelist and verify
-  retval = whitelist.Load(base_url);
-  if (retval != whitelist::kFailOk) {
+  retval_wl = whitelist.Load(base_url);
+  if (retval_wl != whitelist::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "whitelist verification failed (%d): %s",
-             retval, whitelist::Code2Ascii((whitelist::Failures)retval));
+             retval_wl, whitelist::Code2Ascii(retval_wl));
     result = kFailBadWhitelist;
     goto cleanup;
   }
 
-  retval = whitelist.VerifyLoadedCertificate();
-  if (retval != whitelist::kFailOk) {
+  retval_wl = whitelist.VerifyLoadedCertificate();
+  if (retval_wl != whitelist::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to verify repository signature against whitelist (%d): %s",
-             retval, whitelist::Code2Ascii((whitelist::Failures)retval));
+             retval_wl, whitelist::Code2Ascii(retval_wl));
     result = kFailInvalidCertificate;
     goto cleanup;
   }

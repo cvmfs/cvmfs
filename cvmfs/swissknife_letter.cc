@@ -116,20 +116,22 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
   if (args.find('t') != args.end()) text = *args.find('t')->second;
   if (args.find('z') != args.end()) cacrl_path = *args.find('z')->second;
 
-  int retval;
+  bool retval_b;
+  whitelist::Failures retval_wl;
+  letter::Failures retval_ltr;
   signature::SignatureManager signature_manager;
   signature_manager.Init();
 
   if (verify) {
     if (cacrl_path != "") {
-      retval = signature_manager.LoadTrustedCaCrl(cacrl_path);
-      if (!retval) {
+      retval_b = signature_manager.LoadTrustedCaCrl(cacrl_path);
+      if (!retval_b) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to load CA/CRLs");
         return 2;
       }
     }
-    retval = signature_manager.LoadPublicRsaKeys(key_path);
-    if (!retval && (cacrl_path == "")) {
+    retval_b = signature_manager.LoadPublicRsaKeys(key_path);
+    if (!retval_b && (cacrl_path == "")) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public keys");
       return 2;
     }
@@ -137,10 +139,10 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     download::DownloadManager download_manager;
     download_manager.Init(2, false);
     whitelist::Whitelist whitelist(fqrn, &download_manager, &signature_manager);
-    retval = whitelist.Load(repository_url);
-    if (retval != whitelist::kFailOk) {
+    retval_wl = whitelist.Load(repository_url);
+    if (retval_wl != whitelist::kFailOk) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load whitelist (%d): %s",
-               retval, whitelist::Code2Ascii((whitelist::Failures)retval));
+               retval_wl, whitelist::Code2Ascii(retval_wl));
       return 2;
     }
 
@@ -158,12 +160,13 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       } else {
         if (text == "") {
           char c;
-          while ((retval = read(0, &c, 1)) == 1) {
+          int num_read;
+          while ((num_read = read(0, &c, 1)) == 1) {
             if (c == '\n')
               break;
             text.push_back(c);
           }
-          if (retval != 1) return exit_code;
+          if (num_read != 1) return exit_code;
         }
       }
 
@@ -171,31 +174,30 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
         LogCvmfs(kLogCvmfs, kLogStderr, "reloading whitelist");
         whitelist::Whitelist refresh(fqrn, &download_manager,
                                      &signature_manager);
-        retval = refresh.Load(repository_url);
-        if (retval == whitelist::kFailOk)
+        retval_wl = refresh.Load(repository_url);
+        if (retval_wl == whitelist::kFailOk)
           whitelist = refresh;
       }
 
       string message;
       string cert;
       letter::Letter letter(fqrn, text, &signature_manager);
-      retval = letter.Verify(max_age, &message, &cert);
-      if (retval != letter::kFailOk) {
+      retval_ltr = letter.Verify(max_age, &message, &cert);
+      if (retval_ltr != letter::kFailOk) {
         exit_code = 3;
-        LogCvmfs(kLogCvmfs, kLogStderr, "%s",
-                 Code2Ascii((letter::Failures)retval));
+        LogCvmfs(kLogCvmfs, kLogStderr, "%s", letter::Code2Ascii(retval_ltr));
       } else {
         if (whitelist.IsExpired()) {
           exit_code = 4;
           LogCvmfs(kLogCvmfs, kLogStderr, "whitelist expired");
         } else {
-          retval = whitelist.VerifyLoadedCertificate();
-          if (retval == whitelist::kFailOk) {
+          retval_wl = whitelist.VerifyLoadedCertificate();
+          if (retval_wl == whitelist::kFailOk) {
             exit_code = 0;
           } else {
             exit_code = 5;
             LogCvmfs(kLogCvmfs, kLogStderr, "%s",
-                     Code2Ascii((whitelist::Failures)retval));
+                     whitelist::Code2Ascii(retval_wl));
           }
         }
       }
