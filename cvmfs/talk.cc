@@ -83,7 +83,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
   socklen_t socket_size = sizeof(remote);
   int con_fd = -1;
   while (true) {
-    if (con_fd > 0) {
+    if (con_fd >= 0) {
       shutdown(con_fd, SHUT_RDWR);
       close(con_fd);
     }
