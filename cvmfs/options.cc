@@ -154,7 +154,8 @@ void ParseDefault(const string &repository_name) {
       tokens.erase(tokens.begin());
       domain = JoinStrings(tokens, ".");
     } else {
-      GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+      bool retval = GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+      assert(retval);
     }
     ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf");
     ParsePath("/etc/cvmfs/domain.d/" + domain + ".local");
