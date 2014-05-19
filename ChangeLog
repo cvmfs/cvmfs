@@ -1,4 +1,6 @@
 2.1.20:
+  * Export CVMFS_FQRN to shell callouts for option parsing
+    (CVM-619)
   * Fix race when autofs unmounts a repository during reload
   * Use file catalogs when processing .cvmfsdirtab (CVM-620)
   * Compact inflated catalogs on publish
