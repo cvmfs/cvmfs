@@ -2247,12 +2247,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if ((root_hash == "") &&
       ((*cvmfs::repository_tag_ != "") || (repository_date != "")))
   {
+    manifest::Failures retval_mf;
+    download::Failures retval_dl;
     manifest::ManifestEnsemble ensemble;
-    retval = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,
-                             cvmfs::signature_manager_,
-                             cvmfs::download_manager_,
-                             &ensemble);
-    if (retval != manifest::kFailOk) {
+    retval_mf = manifest::Fetch("", *cvmfs::repository_name_, 0, NULL,
+                                cvmfs::signature_manager_,
+                                cvmfs::download_manager_,
+                                &ensemble);
+    if (retval_mf != manifest::kFailOk) {
       *g_boot_error = "Failed to fetch manifest";
       return loader::kFailHistory;
     }
@@ -2266,9 +2268,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
     string history_url = "/data" + history_hash.MakePath(1, 2) + "H";
     download::JobInfo download_history(&history_url, true, true, &history_path,
                                        &history_hash);
-    retval = cvmfs::download_manager_->Fetch(&download_history);
-    if (retval != download::kFailOk) {
-      *g_boot_error = "failed to download history: " + StringifyInt(retval);
+    retval_dl = cvmfs::download_manager_->Fetch(&download_history);
+    if (retval_dl != download::kFailOk) {
+      *g_boot_error = "failed to download history: " + StringifyInt(retval_dl);
       return loader::kFailHistory;
     }
     history::Database tag_db;
