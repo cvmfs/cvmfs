@@ -156,6 +156,8 @@ export CFLAGS="`echo %{optflags}|sed 's/march=i386/march=i686/'`"
 %if 0%{?el4}
 export CC=gcc4
 export CXX=g++4
+export CFLAGS="$CFLAGS -O0"
+export CXXFLAGS="$CXXFLAGS -O0"
 %endif
 
 %if 0%{?suse_version}
