@@ -20,7 +20,7 @@ namespace options {
 void Init();
 void Fini();
 
-void ParsePath(const std::string &config_file);
+void ParsePath(const std::string &config_file, const bool external);
 void ParseDefault(const std::string &fqrn);
 void ClearConfig();
 bool IsDefined(const std::string &key);

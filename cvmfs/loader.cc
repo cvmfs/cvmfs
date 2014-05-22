@@ -673,7 +673,7 @@ int main(int argc, char *argv[]) {
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
-      options::ParsePath(tokens[i]);
+      options::ParsePath(tokens[i], false);
     }
   } else {
     options::ParseDefault(*repository_name_);

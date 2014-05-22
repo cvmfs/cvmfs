@@ -1811,7 +1811,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (loader_exports->config_files != "") {
     vector<string> tokens = SplitString(loader_exports->config_files, ':');
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
-      options::ParsePath(tokens[i]);
+      options::ParsePath(tokens[i], false);
     }
   } else {
     options::ParseDefault(loader_exports->repository_name);
