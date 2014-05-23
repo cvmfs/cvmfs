@@ -606,24 +606,22 @@ cvmfs_showconfig() {
   local var
   for var in $var_list
   do
-    local value
-    eval value=\$$var
-    if [ "x$org" != "x" ]; then
-      value=`echo $value | sed s/@org@/$org/g`
+    if [ "x$var" = "xCVMFS_CACHE_DIR" ]; then
+      echo "CVMFS_CACHE_DIR=$CVMFS_CACHE_DIR"
+      continue
     fi
-    if [ "x$fqrn" != "x" ]; then
-      value=`echo $value | sed s/@fqrn@/$fqrn/g`
-    fi
-
-    local origin
-    if [ ! -z "$value" ]; then
-      origin=`cvmfs_getorigin "$fqrn" "$var"`
-      origin="# from $origin"
+    line=$(echo "$CVMFS_PARMS" | grep "^${var}=")
+    if [ "x$line" != "x" ]; then
+      if [ "x$org" != "x" ]; then
+        line=`echo "$line" | sed s/@org@/$org/g`
+      fi
+      if [ "x$fqrn" != "x" ]; then
+        line=`echo "$line" | sed s/@fqrn@/$fqrn/g`
+      fi
+      echo "$line"
     else
-      origin=
+      echo "${var}="
     fi
-
-    echo "$var=$value $origin"
   done
 }
 
