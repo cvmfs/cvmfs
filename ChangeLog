@@ -1,5 +1,9 @@
 2.1.20:
   * Work around gcc4.1 compiler bugs
+  * Add support for CVMFS_CONFIG_REPOSITORY (CVM-616)
+  * Change directory to config file being parsed (CVM-618)
+  * Export CVMFS_FQRN to shell callouts for option parsing
+    (CVM-619)
   * Fix race when autofs unmounts a repository during reload
   * Use file catalogs when processing .cvmfsdirtab (CVM-620)
   * Compact inflated catalogs on publish

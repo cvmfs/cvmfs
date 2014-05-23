@@ -102,6 +102,10 @@ static bool CheckStrictMount(const string &fqrn) {
       if (MkFqrn(repositories[i]) == fqrn)
         return true;
     }
+    string config_repository;
+    retval = options::GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository);
+    if (retval && (config_repository == fqrn))
+      return true;
     LogCvmfs(kLogCvmfs, kLogStderr, "Not allowed to mount %s, "
              "add it to CVMFS_REPOSITORIES", fqrn.c_str());
     return false;

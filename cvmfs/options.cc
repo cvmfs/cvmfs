@@ -10,6 +10,8 @@
 #include "options.h"
 
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 
 #include <cstdio>
 #include <cassert>
@@ -18,6 +20,8 @@
 #include <map>
 
 #include "util.h"
+#include "sanitizer.h"
+#include "logging.h"
 
 using namespace std;  // NOLINT
 
@@ -71,12 +75,60 @@ static string EscapeShell(const std::string &raw) {
 }
 
 
-void ParsePath(const string &config_file) {
-  FILE *fconfig = fopen(config_file.c_str(), "r");
-  if (!fconfig)
-    return;
-
+void ParsePath(const string &config_file, const bool external) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
   int retval;
+
+  int pipe_open[2];
+  int pipe_quit[2];
+  pid_t pid_child = 0;
+  if (external) {
+    // cvmfs can run in the process group of automount in which case
+    // autofs won't mount an additional config repository.  We create a
+    // short-lived process that detaches from the process group and triggers
+    // autofs to mount the config repository, if necessary.  It holds a file
+    // handle to the config file until the main process opened the file, too.
+    MakePipe(pipe_open);
+    MakePipe(pipe_quit);
+    switch (pid_child = fork()) {
+      case -1:
+        abort();
+      case 0: {  // Child
+        close(pipe_open[0]);
+        close(pipe_quit[1]);
+        retval = setpgrp();
+        assert(retval == 0);
+        (void)open(config_file.c_str(), O_RDONLY);
+        char ready = 'R';
+        WritePipe(pipe_open[1], &ready, 1);
+        read(pipe_quit[0], &ready, 1);
+        _exit(0);  // Don't flush shared file descriptors
+      }
+    }
+    // Parent
+    close(pipe_open[1]);
+    close(pipe_quit[0]);
+    char ready = 0;
+    ReadPipe(pipe_open[0], &ready, 1);
+    assert(ready == 'R');
+    close(pipe_open[0]);
+  }
+  const string config_path = GetParentPath(config_file);
+  FILE *fconfig = fopen(config_file.c_str(), "r");
+  if (pid_child > 0) {
+    char c = 'C';
+    WritePipe(pipe_quit[1], &c, 1);
+    int statloc;
+    waitpid(pid_child, &statloc, 0);
+    close(pipe_quit[1]);
+  }
+  if (!fconfig) {
+    if (external && !DirectoryExists(config_path)) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+               "external location for configuration files does not exist: %s",                 config_path.c_str());
+    }
+    return;
+  }
 
   int fd_stdin;
   int fd_stdout;
@@ -87,6 +139,9 @@ void ParsePath(const string &config_file) {
   // Let the shell read the file
   string line;
   const string newline = "\n";
+  const string cd = "cd \"" + ((config_path == "") ? "/" : config_path) + "\"" +
+                    newline;
+  WritePipe(fd_stdin, cd.data(), cd.length());
   while (GetLineFile(fconfig, &line)) {
     WritePipe(fd_stdin, line.data(), line.length());
     WritePipe(fd_stdin, newline.data(), newline.length());
@@ -136,32 +191,62 @@ void ParsePath(const string &config_file) {
 }
 
 
-void ParseDefault(const string &repository_name) {
-  ParsePath("/etc/cvmfs/default.conf");
+static bool HasConfigRepository(const string &fqrn, string *config_path) {
+  string cvmfs_mount_dir;
+  if (!GetValue("CVMFS_MOUNT_DIR", &cvmfs_mount_dir)) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "CVMFS_MOUNT_DIR missing");
+    return false;
+  }
+
+  string config_repository;
+  if (GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository)) {
+    if (config_repository == fqrn)
+      return false;
+    sanitizer::RepositorySanitizer repository_sanitizer;
+    if (!repository_sanitizer.IsValid(config_repository)) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+               "invalid CVMFS_CONFIG_REPOSITORY: %s",
+               config_repository.c_str());
+      return false;
+    }
+    *config_path = cvmfs_mount_dir + "/" + config_repository + "/etc/cvmfs/";
+    return true;
+  }
+  return false;
+}
+
+
+void ParseDefault(const string &fqrn) {
+  int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
+  assert(retval == 0);
+
+  ParsePath("/etc/cvmfs/default.conf", false);
   vector<string> dist_defaults = FindFiles("/etc/cvmfs/default.d", ".conf");
   for (unsigned i = 0; i < dist_defaults.size(); ++i) {
-    ParsePath(dist_defaults[i]);
+    ParsePath(dist_defaults[i], false);
   }
-  ParsePath("/etc/cernvm/default.conf");
-  ParsePath("/etc/cvmfs/site.conf");
-  ParsePath("/etc/cernvm/site.conf");
-  ParsePath("/etc/cvmfs/default.local");
+  ParsePath("/etc/cernvm/default.conf", false);
+  ParsePath("/etc/cvmfs/site.conf", false);
+  ParsePath("/etc/cernvm/site.conf", false);
+  ParsePath("/etc/cvmfs/default.local", false);
 
-  if (repository_name != "") {
+  if (fqrn != "") {
     string domain;
-    vector<string> tokens = SplitString(repository_name, '.');
-    if (tokens.size() > 1) {
-      tokens.erase(tokens.begin());
-      domain = JoinStrings(tokens, ".");
-    } else {
-      bool retval = GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
-      assert(retval);
-    }
-    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf");
-    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local");
+    vector<string> tokens = SplitString(fqrn, '.');
+    assert(tokens.size() > 1);
+    tokens.erase(tokens.begin());
+    domain = JoinStrings(tokens, ".");
 
-    ParsePath("/etc/cvmfs/config.d/" + repository_name + ".conf");
-    ParsePath("/etc/cvmfs/config.d/" + repository_name + ".local");
+    string external_config_path;
+    if (HasConfigRepository(fqrn, &external_config_path))
+      ParsePath(external_config_path + "domain.d/" + domain + ".conf", true);
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".conf", false);
+    ParsePath("/etc/cvmfs/domain.d/" + domain + ".local", false);
+
+    if (HasConfigRepository(fqrn, &external_config_path))
+      ParsePath(external_config_path + "config.d/" + fqrn + ".conf", true);
+    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".conf", false);
+    ParsePath("/etc/cvmfs/config.d/" + fqrn + ".local", false);
   }
 }
 
