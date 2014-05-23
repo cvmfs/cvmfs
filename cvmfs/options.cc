@@ -225,9 +225,6 @@ void ParseDefault(const string &fqrn) {
   for (unsigned i = 0; i < dist_defaults.size(); ++i) {
     ParsePath(dist_defaults[i], false);
   }
-  ParsePath("/etc/cernvm/default.conf", false);
-  ParsePath("/etc/cvmfs/site.conf", false);
-  ParsePath("/etc/cernvm/site.conf", false);
   ParsePath("/etc/cvmfs/default.local", false);
 
   if (fqrn != "") {
