@@ -15,17 +15,24 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" || return 2
   mount | grep alice.cern.ch || return 5
 
-  cvmfs_umount grid.cern.ch alice.cern.ch || return 6
+  cvmfs_umount grid.cern.ch || return 6
+  cvmfs_umount alice.cern.ch || return 6
   [ -d /cvmfs/alice.cern.ch ] || return 7
   cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" || return 8
   mount | grep alice.cern.ch || return 9
 
-  cvmfs_umount grid.cern.ch alice.cern.ch || return 10
-  [ -d /cvmfs/alice.cern.ch ] || return 11
-  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=notavail.cern.ch" || return 12
-  mount | grep alice.cern.ch || return 13
+  cvmfs_umount grid.cern.ch || return 15
+  cvmfs_umount alice.cern.ch || return 16
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" \
+    "CVMFS_STRICT_MOUNT=yes" || return 17
+  mount | grep alice.cern.ch || return 18
 
-  cvmfs_umount grid.cern.ch alice.cern.ch || return 20
+  cvmfs_umount grid.cern.ch || return 10
+  cvmfs_umount alice.cern.ch || return 11
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=notavail.cern.ch" || return 12
+  mount | grep grid.cern.ch || return 13
+
+  cvmfs_umount grid.cern.ch || return 20
   mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d"
   mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d"
   echo "EXTERNAL_DOMAIN_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d/cern.ch.conf"
