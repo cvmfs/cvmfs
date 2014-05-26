@@ -11,6 +11,8 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #    SERVER_PACKAGE        location of the CernVM-FS server package to test
 #    CLIENT_PACKAGE        location of the CernVM-FS client package to test
 #    TEST_LOGFILE          location of the test logfile to be used
+#    TEST_S3_LOGFILE       location of the test logfile for S3 tests to be used
+#    FAKE_S3_LOGFILE       location of the FakeS3 server's output to be used
 #    UNITTEST_LOGFILE      location of the unit test logfile to be used
 #    MIGRATIONTEST_LOGFILE location of the migration test logfile to be used
 #
@@ -19,6 +21,8 @@ SOURCE_DIRECTORY=""
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
 TEST_LOGFILE=""
+TEST_S3_LOGFILE=""
+FAKE_S3_LOGFILE=""
 UNITTEST_LOGFILE=""
 MIGRATIONTEST_LOGFILE=""
 
@@ -32,6 +36,8 @@ usage() {
   echo " -s <cvmfs server package>  CernVM-FS server package to be tested"
   echo " -c <cvmfs client package>  CernVM-FS client package to be tested"
   echo " -l <test logfile>          logfile to write test results into"
+  echo " -i <S3 test logfile>       logfile to write S3 server test results into"
+  echo " -j <FakeS3 logfile>        logfile to write FakeS3 server output into"
   echo " -u <unittest logfile>      logfile to write unittest outputs into"
   echo " -m <migrationtest logfile> logfile to write migration test outputs"
 
@@ -40,7 +46,7 @@ usage() {
 
 
 # parse script parameters (same for all platforms)
-while getopts "t:s:c:l:u:m:" option; do
+while getopts "t:s:c:l:i:j:u:m:" option; do
   case $option in
     t)
       SOURCE_DIRECTORY=$OPTARG
@@ -53,6 +59,12 @@ while getopts "t:s:c:l:u:m:" option; do
       ;;
     l)
       TEST_LOGFILE=$OPTARG
+      ;;
+    i)
+      TEST_S3_LOGFILE=$OPTARG
+      ;;
+    j)
+      FAKE_S3_LOGFILE=$OPTARG
       ;;
     u)
       UNITTEST_LOGFILE=$OPTARG
@@ -70,6 +82,8 @@ done
 # check that all mandatory parameters are set
 if [ x$SOURCE_DIRECTORY      = "x" ] ||
    [ x$TEST_LOGFILE          = "x" ] ||
+   [ x$TEST_S3_LOGFILE       = "x" ] ||
+   [ x$FAKE_S3_LOGFILE       = "x" ] ||
    [ x$UNITTEST_LOGFILE      = "x" ] ||
    [ x$MIGRATIONTEST_LOGFILE = "x" ] ||
    [ x$SERVER_PACKAGE        = "x" ] ||
