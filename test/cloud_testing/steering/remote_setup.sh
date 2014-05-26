@@ -60,6 +60,8 @@ cvmfs_test_s3_log="${cvmfs_workspace}/test_s3.log"
 cvmfs_fake_s3_log="${cvmfs_workspace}/fake_s3.log"
 cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
 cvmfs_migrationtest_log="${cvmfs_workspace}/migrationtest.log"
+all_log_files="$cvmfs_setup_log $cvmfs_run_log $cvmfs_test_log \
+$cvmfs_test_s3_log $cvmfs_fake_s3_log $cvmfs_unittest_log $cvmfs_migrationtest_log"
 
 # parameterized information
 platform_script=""
@@ -88,11 +90,9 @@ fi
 cd $cvmfs_workspace
 
 # create log files
-touch $cvmfs_setup_log
-touch $cvmfs_run_log
-touch $cvmfs_test_log
-touch $cvmfs_unittest_log
-touch $cvmfs_migrationtest_log
+for log_file in $all_log_files; do
+  touch $log_file
+done
 
 # from now on everything is logged to the logfile
 # Note: the only output of this script is the absolute path to the generated
