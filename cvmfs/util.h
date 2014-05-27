@@ -153,6 +153,7 @@ std::string StringifyByteAsHex(const unsigned char value);
 std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);
 std::string StringifyTimeval(const timeval value);
+std::string RfcTimestamp();
 std::string StringifyIpv4(const uint32_t ip_address);
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
@@ -216,7 +217,6 @@ struct hash_murmur {
 };
 std::string Base64(const std::string &data);
 bool Debase64(const std::string &data, std::string *decoded);
-
 
 template <class T>
 class UniquePtr : SingleCopy {

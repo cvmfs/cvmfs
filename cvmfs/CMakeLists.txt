@@ -95,6 +95,7 @@ set (CVMFS_FSCK_SOURCES
   cvmfs_fsck.cc)
 
 set (CVMFS_SWISSKNIFE_SOURCES
+  options.cc options.h
   smalloc.h atomic.h
   platform.h platform_linux.h platform_osx.h
   duplex_zlib.h duplex_sqlite3.h
@@ -125,6 +126,8 @@ set (CVMFS_SWISSKNIFE_SOURCES
   upload_spooler_definition.h upload_spooler_definition.cc
   upload_facility.h upload_facility.cc
   upload_local.h upload_local.cc
+  s3fanout.h s3fanout.cc
+  upload_s3.h upload_s3.cc
   upload_spooler_result.h
   json_document.h json_document.cc
 

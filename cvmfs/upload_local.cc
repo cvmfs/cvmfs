@@ -39,6 +39,9 @@ unsigned int LocalUploader::GetNumberOfErrors() const {
 
 void LocalUploader::WorkerThread() {
   bool running = true;
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread started.");
+
   while (running) {
     UploadJob job = AcquireNewJob();
     switch (job.type) {
@@ -61,12 +64,18 @@ void LocalUploader::WorkerThread() {
         break;
     }
   }
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread exited.");
+
 }
 
 
 void LocalUploader::FileUpload(const std::string &local_path,
                                const std::string &remote_path,
                                const callback_t   *callback) {
+
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "FileUpload call started.");
+
   // create destination in backend storage temporary directory
   std::string tmp_path = CreateTempPath(temporary_path_ + "/upload", 0666);
   if (tmp_path.empty()) {

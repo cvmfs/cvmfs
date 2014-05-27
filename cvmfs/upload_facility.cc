@@ -5,12 +5,14 @@
 #include "upload_facility.h"
 
 #include "upload_local.h"
+#include "upload_s3.h"
 #include "util.h"
 
 using namespace upload;
 
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
+  RegisterPlugin<S3Uploader>();
 }
 
 

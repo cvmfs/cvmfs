@@ -57,6 +57,11 @@ extern const char *kSuffixes[];
 const unsigned kSuffixLengths[] = {0, 0, 7, 0};
 const unsigned kMaxSuffixLength = 7;
 
+/**
+ * Corresponds to Algorithms.  There is no block size for Any
+ */
+const unsigned kBlockSizes[] = {64, 64, 64};
+
 
 /**
  * Distinguishes between interpreting a string as hex hash and hashing over
@@ -305,6 +310,9 @@ void Update(const unsigned char *buffer, const unsigned buffer_size,
 void Final(ContextPtr &context, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
+ void Hmac(const std::string &key,
+	   const unsigned char *buffer, const unsigned buffer_size,
+	   Any *any_digest);
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
