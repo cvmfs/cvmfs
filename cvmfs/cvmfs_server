@@ -173,7 +173,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
-                [-a silence apache warning] [-s S3 config file]
+                [-a silence apache warning]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -1777,12 +1777,11 @@ add_replica() {
   local public_key
   local upstream
   local owner
-  local s3_config
   local silence_httpd_warning=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:as:" option
+  while getopts "o:u:n:a" option
   do
     case $option in
       u)
@@ -1796,9 +1795,6 @@ add_replica() {
       ;;
       a)
         silence_httpd_warning=1
-      ;;
-      s)
-        s3_config=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -1834,11 +1830,7 @@ add_replica() {
 
   # upstream generation (defaults to local upstream)
   if [ x"$upstream" = x"" ]; then
-    if [ x"$s3_config" != x"" ]; then
-      upstream=$(make_s3_upstream $alias_name $s3_config)
-    else
-      upstream=$(make_local_upstream $alias_name)
-    fi
+    upstream=$(make_local_upstream $alias_name)
   fi
 
   # additional configuration
@@ -1915,13 +1907,13 @@ EOF
   fi
 
   echo -n "Creating CernVM-FS Server Infrastructure... "
-  mkdir -p $spool_dir                     || die "fail (mkdir spool)"
+  mkdir -p $spool_dir                       || die "fail (mkdir spool)"
   if is_local_upstream $upstream; then
     ln -s ${storage_dir}/data/txn $temp_dir || die "fail (ln -s)"
   else
-    mkdir -p $temp_dir                    || die "fail (mkdir temp)"
+    mkdir -p $temp_dir                      || die "fail (mkdir temp)"
   fi
-  chown -R $cvmfs_user $spool_dir         || die "fail (chown)"
+  chown -R $cvmfs_user $spool_dir           || die "fail (chown)"
   echo "done"
 
   echo "\
