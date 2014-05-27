@@ -16,6 +16,13 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #    UNITTEST_LOGFILE      location of the unit test logfile to be used
 #    MIGRATIONTEST_LOGFILE location of the migration test logfile to be used
 #
+# Additionally the following configuration variables will be defined:
+#    FAKE_S3_PORT          network port to communicate with FakeS3
+#    FAKE_S3_STORAGE       storage location of FakeS3
+#    FAKE_S3_CONFIG        location of the S3 config file to be created/used
+#    FAKE_S3_BUCKET        name of the S3 bucket to be used
+#    FAKE_S3_URL           URL to the S3 server
+#
 
 SOURCE_DIRECTORY=""
 SERVER_PACKAGE=""
@@ -25,6 +32,12 @@ TEST_S3_LOGFILE=""
 FAKE_S3_LOGFILE=""
 UNITTEST_LOGFILE=""
 MIGRATIONTEST_LOGFILE=""
+
+FAKE_S3_PORT=13337
+FAKE_S3_STORAGE=/srv/fakes3
+FAKE_S3_CONFIG=/etc/cvmfs/fakes3.conf
+FAKE_S3_BUCKET=cvmfs_test
+FAKE_S3_URL=http://localhost:${FAKE_S3_PORT}/${FAKE_S3_BUCKET}-1-1
 
 usage() {
   local msg=$1
@@ -101,6 +114,31 @@ fi
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
+
+create_fakes3_config() {
+  [ -f $FAKE_S3_CONFIG ] && sudo rm -f $FAKE_S3_CONFIG
+  sudo cat > $FAKE_S3_CONFIG << EOF
+S3_HOST=localhost
+S3_PORT=$FAKE_S3_PORT
+S3_ACCOUNTS=1
+S3_ACCESS_KEY=not
+S3_SECRET_KEY=important
+S3_BUCKETS_PER_ACCOUNT=1
+S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS=10
+S3_BUCKET=$FAKE_S3_BUCKET
+EOF
+}
+
+
+start_fakes3() {
+  local logfile=$1
+  local pid
+
+  [ ! -d $FAKE_S3_STORAGE ] || sudo rm -fR $FAKE_S3_STORAGE > /dev/null 2>&1 || return 1
+  sudo mkdir -p $FAKE_S3_STORAGE                            > /dev/null 2>&1 || return 2
+  create_fakes3_config                                      > /dev/null 2>&1 || return 3
+  run_background_service $logfile "fakes3 --port $FAKE_S3_PORT --root $FAKE_S3_STORAGE"
+}
 
 
 check_result() {
