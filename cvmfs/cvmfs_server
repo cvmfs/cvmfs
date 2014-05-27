@@ -1031,7 +1031,7 @@ check_expiry() {
   expiry=$(get_expiry $stratum0)
   if [ $? -ne 0 ]; then
     echo "Failed to retrieve repository expiry date" >&2
-    return 1
+    return 100
   fi
 
   [ $expiry -ge 0 ]
