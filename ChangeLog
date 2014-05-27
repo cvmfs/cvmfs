@@ -1,4 +1,6 @@
 2.1.20:
+  * Allow for setting a revision number using 'cvmfs_publish -n' 
+    (CVM-633)
   * Work around gcc4.1 compiler bugs
   * Add support for CVMFS_CONFIG_REPOSITORY (CVM-616)
   * Change directory to config file being parsed (CVM-618)
