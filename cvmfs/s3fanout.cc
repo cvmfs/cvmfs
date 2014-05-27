@@ -4,49 +4,16 @@
  * Runs a thread using libcurls asynchronous I/O mode to push data to S3
  */
 
+#include <pthread.h>
+
 #include "cvmfs_config.h"
 #include "s3fanout.h"
 #include "upload_facility.h"
 #include "util_concurrency.h"
 
-#include <pthread.h>
-
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace s3fanout {
-
-
-/**
- * S3FanoutManager static variable for the compiler to find.
- */
-S3FanoutManager *S3FanoutManager::s3fm_ = NULL;
-static UrlConstructor url_constructor_static_;
-static int maximum_number_of_concurrent_jobs_ = 100;
-
-
-/**
- * Use this to get the S3FanoutManager instance.
- */
-S3FanoutManager *S3FanoutManager::Instance(int concurrent_jobs) {
-  maximum_number_of_concurrent_jobs_ = concurrent_jobs;
-  static pthread_once_t once_control = PTHREAD_ONCE_INIT;
-  pthread_once(&once_control, &S3FanoutManager::Initialise);
-  return s3fm_;
-}
-
-
-/**
- * S3FanoutManager initialisation as a Singleton class.
- */
-void S3FanoutManager::Initialise() {
-  static S3FanoutManager s;
-  s.Init(maximum_number_of_concurrent_jobs_, &url_constructor_static_); // max connections
-  s.SetRetryParameters(3, 100, 2000);
-  s.Spawn();
-
-  s3fm_ = &s;
-}
-
 
 /**
  * Called by curl for every HTTP header. Not called for file:// transfers.
@@ -520,7 +487,7 @@ void S3FanoutManager::SetUrlOptions(JobInfo *info) {
   curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
   pthread_mutex_unlock(lock_options_);
 
-  string url = url_constructor_->MkUrl(info->hostname, info->bucket, (info->object_key));
+  string url = MkUrl(info->hostname, info->bucket, (info->object_key));
   curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
 }
 
@@ -705,8 +672,7 @@ S3FanoutManager::~S3FanoutManager() {
 }
 
 
-void S3FanoutManager::Init(const unsigned max_pool_handles,
-                           AbstractUrlConstructor *url_constructor) {
+void S3FanoutManager::Init(const unsigned max_pool_handles) {
   atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
@@ -742,12 +708,12 @@ void S3FanoutManager::Init(const unsigned max_pool_handles,
     opt_ipv4_only_ = true;
   }
 
-  url_constructor_ = url_constructor;
-
   watch_fds_ =
     static_cast<struct pollfd *>(smalloc(2 * sizeof(struct pollfd)));
   watch_fds_size_ = 2;
   watch_fds_inuse_ = 0;
+
+  SetRetryParameters(3, 100, 2000);
 }
 
 

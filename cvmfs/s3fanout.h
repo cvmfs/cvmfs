@@ -37,11 +37,9 @@ enum Failures {
   kFailOther,
 };  // Failures
 
-struct FinalReport {
-  Failures f;
-  int s1;
-  int s2;
-};
+
+// TODO: Code2Ascii stuff resolving Failures into strings
+
 
 struct Statistics {
   double transferred_bytes;
@@ -87,6 +85,7 @@ struct JobInfo {
   MemoryMappedFile *mmf;
 
   // One constructor per destination + head request
+  // TODO: Beautify constructors
   JobInfo() { http_headers = NULL; }
   JobInfo(const std::string a, const std::string s, const std::string h,
           const std::string b, const std::string k, const std::string p) :
@@ -113,28 +112,13 @@ struct JobInfo {
   unsigned backoff_ms;
 };  // JobInfo
 
-class AbstractUrlConstructor {
+
+class S3FanoutManager : SingleCopy {
  public:
-  virtual std::string MkUrl(const std::string &host,
-                            const std::string &bucket,
-                            const std::string &objkey) = 0;
-};
+  S3FanoutManager();
+  ~S3FanoutManager();
 
-class UrlConstructor : public s3fanout::AbstractUrlConstructor {
-public:
-  virtual std::string MkUrl(const std::string &host,
-                            const std::string &bucket,
-                            const std::string &objkey2) {
-    return "http://" + host + "/" + bucket + "/" + objkey2;
-  }
-};
-
-class S3FanoutManager {
- public:
-  static S3FanoutManager *Instance(int concurrent_jobs);
-
-  void Init(const unsigned max_pool_handles,
-            AbstractUrlConstructor *url_constructor);
+  void Init(const unsigned max_pool_handles);
   void Fini();
   void Spawn();
 
@@ -149,13 +133,6 @@ class S3FanoutManager {
                           const unsigned backoff_max_ms);
 
  private:
-  S3FanoutManager();
-  ~S3FanoutManager();
-  S3FanoutManager(const S3FanoutManager&);
-  S3FanoutManager& operator= (const S3FanoutManager&);
-  static void Initialise();
-  static S3FanoutManager *s3fm_;
-
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
   static void *MainUpload(void *data);
@@ -180,6 +157,12 @@ class S3FanoutManager {
                                const std::string &content_md5_base64,
                                const std::string &bucket,
                                const std::string &object_key);
+  std::string MkUrl(const std::string &host,
+                    const std::string &bucket,
+                    const std::string &objkey2)
+  {
+    return "http://" + host + "/" + bucket + "/" + objkey2;
+  }
 
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
@@ -205,15 +188,12 @@ class S3FanoutManager {
   unsigned opt_backoff_max_ms_;
   bool opt_ipv4_only_;
 
-  AbstractUrlConstructor *url_constructor_;
-
   unsigned int max_available_jobs_;
   sem_t available_jobs_;
 
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
   Statistics *statistics_;
-
 };  // S3FanoutManager
 
 }  // namespace s3fanout

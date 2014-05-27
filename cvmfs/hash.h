@@ -57,10 +57,10 @@ extern const char *kSuffixes[];
 const unsigned kSuffixLengths[] = {0, 0, 7, 0};
 const unsigned kMaxSuffixLength = 7;
 
-/**                                                                                                                                                 
- * Corresponds to Algorithms.  There is no block size for Any                                                                                       
+/**
+ * Corresponds to Algorithms.  There is no block size for Any
  */
- const unsigned kBlockSizes[] = {64, 64};
+const unsigned kBlockSizes[] = {64, 64, 64};
 
 
 /**
