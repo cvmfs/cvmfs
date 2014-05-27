@@ -65,6 +65,10 @@ echo "done"
 echo "installing additional RPM packages..."
 install_from_repo gcc
 install_from_repo gcc-c++
+install_from_repo rubygems
+
+# install ruby gem for FakeS3
+install_ruby_gem fakes3
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

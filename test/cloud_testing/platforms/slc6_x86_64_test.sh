@@ -6,6 +6,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 
 ut_retval=0
 it_retval=0
+s3_retval=0
 mg_retval=0
 
 # format additional disks with ext4 and many inodes
@@ -45,7 +46,33 @@ cd ${SOURCE_DIRECTORY}/test
                           src/523-corruptchunkfailover \
                           src/524-corruptmanifestfailover || it_retval=$?
 
+echo -n "starting FakeS3 service..."
+fakes3_pid=$(start_fakes3 $TEST_FAKE_S3_LOGFILE) || { s3_retval=$?; die "fail"; }
+echo "done"
+
+if [ $s3_retval -eq 0 ]; then
+    echo "running CernVM-FS server test cases against FakeS3..."
+    export CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                    && \
+    export CVMFS_TEST_STRATUM0=$FAKE_S3_URL                        && \
+    ./run.sh $TEST_S3_LOGFILE -x src/0*                               \
+                                 src/518-hardlinkstresstest           \
+                                 src/519-importlegacyrepo             \
+                                 src/522-missingchunkfailover         \
+                                 src/523-corruptchunkfailover         \
+                                 src/524-corruptmanifestfailover      \
+                                 src/528-recreatespoolarea            \
+                                 src/530-recreatespoolarea_defaultkey \
+                                 src/537-symlinkedbackend             \
+                                 src/538-symlinkedstratum1backend     \
+                                 src/542-storagescrubbing             \
+                                 src/543-storagescrubbing_scriptable  \
+                                 src/550-livemigration || s3_retval=$?
+
+    echo -n "killing FakeS3..."
+    sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
+fi
+
 echo "running CernVM-FS migration test cases..."
 ./run.sh $MIGRATIONTEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
 
-[ $ut_retval -eq 0 ] && [ $it_retval -eq 0 ] && [ $mg_retval -eq 0 ]
+[ $ut_retval -eq 0 ] && [ $it_retval -eq 0 ] && [ $s3_retval -eq 0 ] && [ $mg_retval -eq 0 ]
