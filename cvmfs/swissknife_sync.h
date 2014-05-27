@@ -22,7 +22,8 @@ struct SyncParameters {
     catalog_entry_warn_threshold(500000),
     min_file_chunk_size(4*1024*1024),
     avg_file_chunk_size(8*1024*1024),
-    max_file_chunk_size(16*1024*1024) {}
+    max_file_chunk_size(16*1024*1024),
+    manual_revision(0) {}
 
   upload::Spooler *spooler;
   std::string      dir_union;
@@ -44,6 +45,7 @@ struct SyncParameters {
   size_t           min_file_chunk_size;
   size_t           avg_file_chunk_size;
   size_t           max_file_chunk_size;
+  uint64_t         manual_revision;
 };
 
 namespace catalog {
@@ -216,6 +218,7 @@ class CommandSync : public Command {
                                true, false));
     result.push_back(Parameter('j', "catalog entry warning threshold",
                                true, false));
+    result.push_back(Parameter('v', "manual revision number", true, false));
     return result;
   }
   int Main(const ArgumentList &args);

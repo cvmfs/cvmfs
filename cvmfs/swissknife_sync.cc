@@ -504,6 +504,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.catalog_entry_warn_threshold = String2Uint64(*args.find('j')->second);
   }
 
+  if (args.find('v') != args.end()) {
+    params.manual_revision = String2Uint64(*args.find('v')->second);
+  }
+
   if (!CheckParams(params)) return 2;
 
   // Start spooler

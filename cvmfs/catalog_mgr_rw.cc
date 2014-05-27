@@ -634,7 +634,8 @@ void WritableCatalogManager::PrecalculateListings() {
 }
 
 
-manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
+manifest::Manifest *WritableCatalogManager::Commit(const bool     stop_for_tweaks,
+                                                   const uint64_t manual_revision) {
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
   GetModifiedCatalogs(&catalogs_to_snapshot);
@@ -650,6 +651,19 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool stop_for_tweaks) {
                (*i)->database_path().c_str(), (*i)->path().c_str());
       int read_char = getchar();
       assert(read_char != EOF);
+    }
+
+    if ((*i)->IsRoot() && manual_revision > 0) {
+      const uint64_t revision = (*i)->GetRevision();
+      if (revision >= manual_revision) {
+        LogCvmfs(kLogCatalog, kLogStderr, "Manual revision (%d) must not be "
+                                          "smaller than the current root "
+                                          "catalog's (%d). Skipped!",
+                                          manual_revision, revision);
+      } else {
+        (*i)->SetRevision(manual_revision - 1); // gets incremented by
+                                                // SnapshotCatalog() afterwards!
+      }
     }
     shash::Any hash = SnapshotCatalog(*i);
 
