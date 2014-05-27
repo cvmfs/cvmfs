@@ -2748,13 +2748,6 @@ publish() {
       hash_algo="-e $hash_algo"
     fi
 
-    if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
-      local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
-      tag_name="generic-$timestamp"
-      echo "Using auto tag '$tag_name'"
-      add_tag="-a $tag_name"
-    fi
-
     local swissknife="cvmfs_swissknife"
 
     # more sanity checks
@@ -2778,6 +2771,13 @@ publish() {
     fi
 
     # do it!
+    if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
+      local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+      tag_name="generic-$timestamp"
+      echo "Using auto tag '$tag_name'"
+      add_tag="-a $tag_name"
+    fi
+
     # enable the debug mode?
     if [ $debug -ne 0 ]
     then
