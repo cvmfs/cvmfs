@@ -163,6 +163,17 @@ install_from_repo() {
 }
 
 
+install_ruby_gem() {
+  local gem_name=$1
+  local pkg_mgr_name="gem"
+  local pkg_mgr_output=""
+
+  echo -n "Installing Ruby gem '$gem_name' ... "
+  pkg_mgr_output=$(sudo gem install $gem_name 2>&1)
+  check_package_manager_response $? $pkg_mgr_name "$pkg_mgr_output"
+}
+
+
 attach_user_group() {
   local groupname=$1
   local username
