@@ -182,8 +182,8 @@ Supported Commands:
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
-                [-a tag name] [-c tag channel] [ -t tag description] [ -h hash]
-                [-r tag name] [-v be verbose]
+                [-a tag name] [-c tag channel] [-t tag description] [-h hash]
+                [-r tag name] [-n manual revision number] [-v be verbose]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -2662,10 +2662,11 @@ publish() {
   local remove_tag=
   local retcode=0
   local verbosity=""
+  local manual_revision=""
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:h:c:t:r:v" option
+  while getopts "dDpa:h:c:t:r:vn:" option
   do
     case $option in
       d)
@@ -2701,6 +2702,9 @@ publish() {
       ;;
       v)
         verbosity="-x"
+      ;;
+      n)
+        manual_revision="$OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2751,6 +2755,8 @@ publish() {
       add_tag="-a $tag_name"
     fi
 
+    local swissknife="cvmfs_swissknife"
+
     # more sanity checks
     check_repository_compatibility
     check_expiry $stratum0         || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
@@ -2764,10 +2770,14 @@ publish() {
       retcode=1
       continue
     fi
+    local revision_number=$($swissknife info -r $stratum0 -v)
+    if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
+      echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
+      retcode=1
+      continue
+    fi
 
     # do it!
-    local swissknife="cvmfs_swissknife"
-
     # enable the debug mode?
     if [ $debug -ne 0 ]
     then
