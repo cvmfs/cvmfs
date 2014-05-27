@@ -110,7 +110,12 @@ cvmfs_run_test() {
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   echo "create Stratum1 repository on the same machine"
-  sudo cvmfs_server add-replica -o $CVMFS_TEST_USER -n $replica_name http://127.0.0.1/cvmfs/$CVMFS_TEST_REPO /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || { desaster_cleanup $mnt_point $replica_name; return 7; }
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    || { desaster_cleanup $mnt_point $replica_name; return 7; }
 
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 9; }

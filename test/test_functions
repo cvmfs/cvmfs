@@ -24,6 +24,8 @@ CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for te
 CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=aufs} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
+CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
+CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}
 
 die() {
   echo -e $1 >&2
@@ -354,7 +356,22 @@ create_repo() {
   fi
 
   echo "Creating new repository $repo..."
-  sudo cvmfs_server mkfs -o $uid -m -f ${CVMFS_TEST_UNIONFS} -a ${CVMFS_TEST_HASHALGO} $extra_options $repo || return 102
+  local s3_config=""
+  local stratum0=""
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG"
+  fi
+  if [ x"$CVMFS_TEST_STRATUM0" != x"" ]; then
+    echo "  Stratum0: $CVMFS_TEST_STRATUM0"
+    stratum0=" -w $CVMFS_TEST_STRATUM0"
+  fi
+  sudo cvmfs_server mkfs -o $uid -m                \
+                         -f ${CVMFS_TEST_UNIONFS}  \
+                         -a ${CVMFS_TEST_HASHALGO} \
+                         $s3_config                \
+                         $stratum0                 \
+                         $extra_options $repo || return 102
 
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a /etc/cvmfs/repositories.d/${repo}/client.conf
@@ -428,6 +445,24 @@ make_huge_repo() {
     $repo_dir
 }
 
+
+create_stratum1() {
+  local replica_name=$1
+  local uid=$2
+  local stratum0_url=$3
+  local stratum0_pub=$4
+  local s3_config=""
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG"
+  fi
+  sudo cvmfs_server add-replica -o $CVMFS_TEST_USER \
+                                -n $replica_name    \
+                                -a                  \
+                                $s3_config          \
+                                $stratum0_url       \
+                                $stratum0_pub
+}
 
 # creates a big file at a given location with a given size
 # @param path  the location of the new file
@@ -608,7 +643,7 @@ check_catalog_presence() {
   local catalog_path=$1
   local repo_name=$2
 
-  cvmfs_swissknife lsrepo -r /srv/cvmfs/$repo_name | grep -x -q $catalog_path
+  cvmfs_server list-catalogs -m $repo_name | grep -x -q $catalog_path
   return $?
 }
 
@@ -618,7 +653,7 @@ check_catalog_presence() {
 get_catalog_count() {
   local repo_name=$1
 
-  echo $(cvmfs_swissknife lsrepo -r /srv/cvmfs/$repo_name | wc -l)
+  echo $(cvmfs_server list-catalogs -m $repo_name | wc -l)
 }
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure
@@ -824,14 +859,31 @@ remove_apache_config_file() {
 }
 
 
-get_repo_storage() {
+get_local_repo_storage() {
   local repo_name="$1"
   echo "/srv/cvmfs/${repo_name}"
 }
 
-get_repo_url() {
+get_local_repo_url() {
   local repo_name="$1"
   echo "http://localhost/cvmfs/${repo_name}"
+}
+
+get_s3_repo_url() {
+  local repo_name="$1"
+  local s3_stratum0_url="$CVMFS_TEST_STRATUM0"
+  [ x"$s3_stratum0_url" != x"" ] || die "\$CVMFS_TEST_STRATUM0 needs to be set for S3 tests to work!"
+  [ $(echo -n "$s3_stratum0_url" | tail -c1) = "/" ] || s3_stratum0_url="${s3_stratum0_url}/"
+  echo "${s3_stratum0_url}${repo_name}"
+}
+
+get_repo_url() {
+  local repo_name="$1"
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    get_s3_repo_url "$repo_name"
+  else
+    get_local_repo_url "$repo_name"
+  fi
 }
 
 get_apache_config_filename() {
@@ -842,7 +894,7 @@ get_apache_config_filename() {
 
 cleanup_legacy_repo_leftovers() {
   local legacy_repo_name="$1"
-  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
   local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
 
   echo -n "cleanup (if necessary)... "
@@ -866,7 +918,7 @@ cleanup_legacy_repo_leftovers() {
 # @param repo_name  the FQRN of the legacy repository to be resigned
 _resign_legacy_repository() {
   local repo_name="$1"
-  local repo_storage="$(get_repo_storage $repo_name)"
+  local repo_storage="$(get_local_repo_storage $repo_name)"
   local legacy_repo_storage="${repo_storage}/pub/catalogs"
   local tmp_dir="$(pwd)/tmp"
   local upstream="local,${legacy_repo_storage}/data/txn,${legacy_repo_storage}"
@@ -911,7 +963,7 @@ plant_tarball() {
 plant_legacy_repository_revision() {
   local tarball="$1"
   local legacy_repo_name="$2"
-  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
 
   plant_tarball "$tarball"                                             || return 104
   [ -d ${legacy_repo_storage}/pub ]                                    || return 105

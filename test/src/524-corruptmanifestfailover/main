@@ -19,11 +19,12 @@ cvmfs_run_test() {
   create_filled_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   echo "create a replica of the fresh repository"
-  sudo cvmfs_server add-replica             \
-    -o $CVMFS_TEST_USER                     \
-    -n $replica_name                        \
-    http://127.0.0.1/cvmfs/$CVMFS_TEST_REPO \
-    /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || { desaster_cleanup $mnt_point $replica_name; return 2; }
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    || { desaster_cleanup $mnt_point $replica_name; return 2; }
 
   echo "create a snapshot of the Stratum1 repository"
   cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 3; }
