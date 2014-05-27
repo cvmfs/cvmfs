@@ -2466,10 +2466,16 @@ list() {
       transaction_info=" - in transaction"
     fi
 
-    # check if the repository whitelist is expired
+    # check if the repository whitelist is accessible and expired
     local whitelist_info=""
-    if is_stratum0 $name && ! check_expiry $CVMFS_STRATUM0; then
-      whitelist_info=" - whitelist expired"
+    if is_stratum0 $name; then
+      local reval=0
+      check_expiry $CVMFS_STRATUM0 2>/dev/null || retval=$?
+      if [ $retval -eq 100 ]; then
+        whitelist_info=" - whitelist unreachable"
+      elif [ $retval -ne 0 ]; then
+        whitelist_info=" - whitelist expired"
+      fi
     fi
 
     # print out repository information list
