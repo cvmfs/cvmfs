@@ -51,6 +51,7 @@ swissknife::ParameterList swissknife::CommandInfo::GetParams() {
   result.push_back(Parameter('n', "show fully qualified repository name", true, true));
   result.push_back(Parameter('t', "show time stamp", true, true));
   result.push_back(Parameter('m', "check if repository is marked as replication master copy", true, true));
+  result.push_back(Parameter('v', "repository revision number", true, true));
   result.push_back(Parameter('h', "print results in human readable form", true, true));
   // to be extended...
   return result;
@@ -142,6 +143,12 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Replication Master Copy:         " : "",
              (Exists(repository, ".cvmfs_master_replica")) ? "true" : "false");
+  }
+
+  if (args.count('v') > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
+             (human_readable) ? "Revision:                        " : "",
+             (StringifyInt(manifest->revision())).c_str());
   }
 
   delete manifest;
