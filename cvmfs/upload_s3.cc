@@ -54,7 +54,7 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
 
   // Parse S3 configuration
   options::Init();
-  options::ParsePath(config_path);
+  options::ParsePath(config_path, false);
   std::string parameter;
   std::string s3_host;
   if (!options::GetValue("S3_HOST", &s3_host)) {
