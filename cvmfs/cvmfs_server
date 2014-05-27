@@ -169,7 +169,7 @@ Usage: cvmfs_server COMMAND [options] <parameters>
 Supported Commands:
   mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
                 [-m replicable] [-f union filesystem type] [-v volatile content]
-                [-a hash algorithm (default: SHA-1)]
+                [-a hash algorithm (default: SHA-1)] [-s S3 config file]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
@@ -1057,21 +1057,25 @@ check_upstream_validity() {
   return 1
 }
 
+get_upstream_type() {
+  local upstream=$1
+  echo "$upstream" | cut -d, -f1
+}
+
 check_upstream_type() {
   local upstream=$1
   local needle_type=$2
-
-  if [ x$(echo "$upstream" | cut -d, -f1) = x"$needle_type" ]; then
-    return 0
-  else
-    return 1
-  fi
+  [ x$(get_upstream_type $upstream) = x"$needle_type" ]
 }
 
 is_local_upstream() {
   local upstream=$1
   check_upstream_type $upstream "local"
-  return $?
+}
+
+is_s3_upstream() {
+  local upstream=$1
+  check_upstream_type $upstream "s3"
 }
 
 get_upstream_config() {
@@ -1086,6 +1090,23 @@ make_upstream() {
   echo "$type_name,$tmp_dir,$config_string"
 }
 
+make_local_upstream() {
+  local repo_name=$1
+  make_upstream "local" "/srv/cvmfs/${repo_name}/data/txn" "/srv/cvmfs/${repo_name}"
+}
+
+make_s3_upstream() {
+  local repo_name=$1
+  local s3_config=$2
+  make_upstream "S3" "/tmp" "${repo_name}@${s3_config}"
+}
+
+mangle_s3_stratum0_url() {
+  local repo_name=$1
+  local s3_stratum0_url="$2"
+  [ $(echo -n "$s3_stratum0_url" | tail -c1) = "/" ] || s3_stratum0_url="${s3_stratum0_url}/"
+  echo "${s3_stratum0_url}${repo_name}"
+}
 
 reload_apache() {
    echo -n "Reloading Apache... "
@@ -1593,10 +1614,11 @@ mkfs() {
   local volatile_content=0
   local unionfs
   local hash_algo
+  local s3_config=""
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:a:v" option; do
+  while getopts "w:u:o:mf:a:vs:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1619,6 +1641,9 @@ mkfs() {
       v)
         volatile_content=1
       ;;
+      s)
+        s3_config=$OPTARG
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command mkfs: Unrecognized option: $1"
@@ -1632,16 +1657,25 @@ mkfs() {
   name=$(get_repository_name $1)
 
   # default values
-  [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
-  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
-  [ x"$unionfs" = x ] && unionfs=aufs
-  [ x"$hash_algo" = x ] && hash_algo=sha1
+  [ x"$unionfs"   = x"" ] && unionfs=aufs
+  [ x"$hash_algo" = x"" ] && hash_algo=sha1
+
+  # upstream generation (defaults to local upstream)
+  if [ x"$upstream" = x"" ]; then
+    if [ x"$s3_config" != x"" ]; then
+      [ x"$stratum0" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
+      upstream=$(make_s3_upstream $name $s3_config)
+      stratum0=$(mangle_s3_stratum0_url $name "$stratum0")
+    else
+      upstream=$(make_local_upstream $name)
+      [ x"$stratum0" = x"" ] && stratum0="http://localhost/cvmfs/$name"
+    fi
+  fi
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
   is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
-  is_local_upstream $upstream       || die "Import is only supported for local storage"
   if [ $unionfs = "overlayfs" ]; then
     check_overlayfs                 || die "overlayfs kernel module missing"
     echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
@@ -1650,9 +1684,11 @@ mkfs() {
   fi
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
-  check_apache                      || die "Apache must be installed and running"
   lower_hardlink_restrictions
-  ensure_enabled_apache_modules
+  if is_local_upstream $upstream; then
+    check_apache                    || die "Apache must be installed and running"
+    ensure_enabled_apache_modules
+  fi
 
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
@@ -1661,6 +1697,9 @@ mkfs() {
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
   create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo || die "fail"
+  if is_local_upstream $upstream; then
+    reload_apache > /dev/null
+  fi
   echo "done"
 
   # create security keys and certificates
@@ -1673,13 +1712,14 @@ mkfs() {
   # create spool area and mountpoints
   echo -n "Creating CernVM-FS Server Infrastructure... "
   create_spool_area_for_new_repository $name || die "fail"
-  reload_apache > /dev/null
   echo "done"
 
   # create storage area
-  echo -n "Creating Backend Storage... "
-  create_repository_storage $name || die "fail"
-  echo "done"
+  if is_local_upstream $upstream; then
+    echo -n "Creating Backend Storage... "
+    create_repository_storage $name || die "fail"
+    echo "done"
+  fi
 
   # get information about new repository
   load_repo_config $name
@@ -1788,17 +1828,17 @@ add_replica() {
     fi
   fi
 
-  # default values
-  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$alias_name/data/txn" "/srv/cvmfs/$alias_name")
+  # upstream generation (defaults to local upstream)
+  if [ x"$upstream" = x"" ]; then
+    upstream=$(make_local_upstream $alias_name)
+  fi
 
   # additional configuration
-  local cvmfs_user=`get_cvmfs_owner $alias_name $owner`
+  local cvmfs_user=$(get_cvmfs_owner $alias_name $owner)
   local spool_dir="/var/spool/cvmfs/${alias_name}"
   local temp_dir="${spool_dir}/tmp"
-  local repository_dir;
-  if is_local_upstream $upstream; then
-    repository_dir=$(get_upstream_config $upstream)
-  fi
+  local storage_dir=""
+  is_local_upstream $upstream && storage_dir=$(get_upstream_config $upstream)
 
   # additional sanity checks
   is_root || die "Only root can create a new repository"
@@ -1812,7 +1852,7 @@ add_replica() {
   fi
   check_upstream_validity $upstream
 
-  echo -n "Creating configuration files... "
+  echo -n "Creating Configuration Files... "
   mkdir -p /etc/cvmfs/repositories.d/${alias_name}
   cat > /etc/cvmfs/repositories.d/${alias_name}/server.conf << EOF
 # Created by cvmfs_server.
@@ -1831,11 +1871,12 @@ CVMFS_PUBLIC_KEY=$public_key
 CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
+
   if is_local_upstream $upstream; then
     create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
 # Translation URL to real pathname
-Alias /cvmfs/$alias_name ${repository_dir}
-<Directory "${repository_dir}">
+Alias /cvmfs/$alias_name ${storage_dir}
+<Directory "${storage_dir}">
     Options -MultiViews
     AllowOverride All
     $(get_compatible_apache_allow_from_all_config)
@@ -1854,19 +1895,25 @@ Alias /cvmfs/$alias_name ${repository_dir}
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
 </Directory>
 EOF
+    reload_apache > /dev/null
   fi
   echo "done"
 
-  echo -n "Create CernVM-FS Storage... "
-  mkdir -p $spool_dir
-  if [ x"$repository_dir" != x ]; then
-    create_repository_skeleton $repository_dir $cvmfs_user > /dev/null
-    ln -s $repository_dir/data/txn $temp_dir
-  else
-    mkdir -p $temp_dir
+  if is_local_upstream $upstream; then
+    echo -n "Create CernVM-FS Storage... "
+    mkdir -p $storage_dir
+    create_repository_skeleton $storage_dir $cvmfs_user > /dev/null
+    echo "done"
   fi
-  chown -R $cvmfs_user $spool_dir
-  reload_apache > /dev/null
+
+  echo -n "Creating CernVM-FS Server Infrastructure... "
+  mkdir -p $spool_dir                       || die "fail (mkdir spool)"
+  if is_local_upstream $upstream; then
+    ln -s ${storage_dir}/data/txn $temp_dir || die "fail (ln -s)"
+  else
+    mkdir -p $temp_dir                      || die "fail (mkdir temp)"
+  fi
+  chown -R $cvmfs_user $spool_dir           || die "fail (chown)"
   echo "done"
 
   echo "\
@@ -2365,7 +2412,8 @@ list_tags() {
 check() {
   local name
   local upstream
-  local repository_dir
+  local storage_dir
+  local stratum0
   local check_chunks=1
   local check_integrity=0
   local tag=
@@ -2407,20 +2455,25 @@ check() {
   check_repository_compatibility
 
   upstream=$CVMFS_UPSTREAM_STORAGE
-  repository_dir=$(get_upstream_config $upstream)
+  stratum0=$CVMFS_STRATUM0
 
   # do it!
   if [ $check_integrity -ne 0 ]; then
-    echo
-    echo "Checking Storage Integrity of $name ... (may take a while)"
-    cvmfs_swissknife scrub -r ${repository_dir}/data || die "FAIL!"
+    if ! is_local_upstream $upstream; then
+      echo "Storage Integrity Check only works locally. skipping."
+    else
+      echo
+      echo "Checking Storage Integrity of $name ... (may take a while)"
+      storage_dir=$(get_upstream_config $upstream)
+      cvmfs_swissknife scrub -r ${storage_dir}/data || die "FAIL!"
+    fi
   fi
 
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying Catalog Integrity of $name ..."
-  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $repository_dir
+  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $stratum0
 }
 
 
@@ -2478,8 +2531,12 @@ list() {
       fi
     fi
 
+    # get the storage type of the repository
+    local storage_type=""
+    storage_type=$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)
+
     # print out repository information list
-    echo "$name ($CVMFS_REPOSITORY_TYPE$transaction_info$whitelist_info) $stratum1_info $version_info"
+    echo "$name ($CVMFS_REPOSITORY_TYPE / $storage_type$transaction_info$whitelist_info) $stratum1_info $version_info"
     CVMFS_CREATOR_VERSION=""
   done
 }
