@@ -71,6 +71,7 @@ class Manifest {
     channel_tops_ = v;
   }
 
+  uint64_t revision() const { return revision_; }
   std::string repository_name() const { return repository_name_; }
   shash::Md5 root_path() const { return root_path_; }
   shash::Any catalog_hash() const { return catalog_hash_; }
