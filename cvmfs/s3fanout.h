@@ -148,7 +148,7 @@ class S3FanoutManager {
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
 
-  private:
+ private:
   S3FanoutManager();
   ~S3FanoutManager();
   S3FanoutManager(const S3FanoutManager&);

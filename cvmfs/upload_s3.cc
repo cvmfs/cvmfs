@@ -26,13 +26,15 @@ S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition) :
   assert (spooler_definition.IsValid() &&
           spooler_definition.driver_type == SpoolerDefinition::S3);
 
-  s3fanout_mgr = s3fanout::S3FanoutManager::Instance(maximum_number_of_parallell_uploads_);
+  s3fanout_mgr_ =
+    s3fanout::S3FanoutManager::Instance(maximum_number_of_parallell_uploads_);
 
   atomic_init32(&copy_errors_);
 }
 
 
-bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition) {
+bool S3Uploader::ParseSpoolerDefinition(
+                                  const SpoolerDefinition &spooler_definition) {
   // parse spooler configuration
   const std::vector<std::string> config =
     SplitString(spooler_definition.spooler_configuration, '@');
@@ -72,10 +74,12 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
   int s3_buckets_per_account=1;
   if (options::GetValue("S3_BUCKETS_PER_ACCOUNT", &parameter)) {
     s3_buckets_per_account = String2Uint64(parameter);
-    if(s3_buckets_per_account < 1 || s3_buckets_per_account > 100) {
-      LogCvmfs(kLogSpooler, kLogStderr, "Fail, invalid S3_BUCKETS_PER_ACCOUNT given: '%d'.",
-               s3_buckets_per_account);
-      LogCvmfs(kLogSpooler, kLogStderr, "S3_BUCKETS_PER_ACCOUNT should be in range 1-100.");
+    if (s3_buckets_per_account < 1 || s3_buckets_per_account > 100) {
+      LogCvmfs(kLogSpooler, kLogStderr, "Fail, invalid S3_BUCKETS_PER_ACCOUNT "
+                                        "given: '%d'.",
+                                        s3_buckets_per_account);
+      LogCvmfs(kLogSpooler, kLogStderr, "S3_BUCKETS_PER_ACCOUNT should be in "
+                                        "range 1-100.");
       return false;
     }
   }
@@ -97,8 +101,10 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
     return false;
   }
   if (!options::GetValue("S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS", &parameter)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS from '%s'.",
-             config_path.c_str());
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse "
+                                      "S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS "
+                                      "from '%s'.",
+                                      config_path.c_str());
     return false;
   }
   maximum_number_of_parallell_uploads_ = String2Uint64(parameter);
@@ -107,24 +113,27 @@ bool S3Uploader::ParseSpoolerDefinition(const SpoolerDefinition &spooler_definit
   number_of_buckets_ = s3_buckets_per_account*s3_accounts;
   host_name_         = s3_host;
   full_host_name_    = s3_host + ":" + s3_port;
-  if (s3_accounts==1) {
+  if (s3_accounts == 1) {
     keys_.push_back(std::make_pair(s3_access_key, s3_secret_key));
-  } else if(s3_accounts>1) {
+  } else if (s3_accounts > 1) {
     std::vector<std::string> s3_access_keys = SplitString(s3_access_key, ':');
     std::vector<std::string> s3_secret_keys = SplitString(s3_secret_key, ':');
-    if(s3_access_keys.size() != (unsigned int)s3_accounts ||
-       s3_secret_keys.size() != (unsigned int)s3_accounts) {
-      LogCvmfs(kLogSpooler, kLogStderr, "Fail, number of accounts does not match with number of keys: '%d'.",
-               s3_accounts);
-      LogCvmfs(kLogSpooler, kLogStderr, "Specify keys like this: S3_ACCESS_KEY=key1:key2:key3:...");
+    if (s3_access_keys.size() != (unsigned int)s3_accounts ||
+        s3_secret_keys.size() != (unsigned int)s3_accounts) {
+      LogCvmfs(kLogSpooler, kLogStderr, "Fail, number of accounts does not match "
+                                        "with number of keys: '%d'.",
+                                        s3_accounts);
+      LogCvmfs(kLogSpooler, kLogStderr, "Specify keys like this: "
+                                        "S3_ACCESS_KEY=key1:key2:key3:...");
       return false;
     }
-    for (int i=0; s3_accounts>i; i++) {
+    for (int i = 0; s3_accounts > i; i++) {
       keys_.push_back(std::make_pair(s3_access_keys.at(i), s3_secret_keys.at(i)));
     }
   } else {
-    LogCvmfs(kLogSpooler, kLogStderr, "Fail, invalid number of accounts specified: '%d'.",
-             s3_accounts);
+    LogCvmfs(kLogSpooler, kLogStderr, "Fail, invalid number of accounts "
+                                      "specified: '%d'.",
+                                      s3_accounts);
     return false;
   }
 
@@ -147,7 +156,6 @@ unsigned int S3Uploader::GetNumberOfErrors() const {
  * ones.
  */
 void S3Uploader::WorkerThread() {
-
   LogCvmfs(kLogS3Fanout, kLogDebug, "Upload_S3 WorkerThread started.");
 
   bool running = true;
@@ -156,40 +164,44 @@ void S3Uploader::WorkerThread() {
 
     // Try to get new job
     bool newjob = TryToAcquireNewJob(job);
-    if(newjob) {
+    if (newjob) {
       switch (job.type) {
-      case UploadJob::Upload:
-        Upload(job.stream_handle,
-               job.buffer,
-               job.callback);
-        break;
-      case UploadJob::Commit:
-        // Note, this block until upload is possible
-        FinalizeStreamedUpload(job.stream_handle,
-                               job.content_hash,
-                               job.hash_suffix);
-        break;
-      case UploadJob::Terminate:
-        running = false;
-        break;
-      default:
-        const bool unknown_job_type = false;
-        assert (unknown_job_type);
-        break;
+        case UploadJob::Upload:
+          Upload(job.stream_handle,
+                 job.buffer,
+                 job.callback);
+          break;
+        case UploadJob::Commit:
+          // Note, this block until upload is possible
+          FinalizeStreamedUpload(job.stream_handle,
+                                 job.content_hash,
+                                 job.hash_suffix);
+          break;
+        case UploadJob::Terminate:
+          running = false;
+          break;
+        default:
+          const bool unknown_job_type = false;
+          assert (unknown_job_type);
+          break;
       }
     }
 
     // Get and clean completed jobs
     std::vector<s3fanout::JobInfo*> jobs;
     jobs.clear();
-    s3fanout_mgr->PopCompletedJobs(jobs);
-    for(std::vector<s3fanout::JobInfo*>::iterator it = jobs.begin(); it != jobs.end(); ++it) {
+    s3fanout_mgr_->PopCompletedJobs(jobs);
+          std::vector<s3fanout::JobInfo*>::iterator       it    = jobs.begin();
+    const std::vector<s3fanout::JobInfo*>::const_iterator itend = jobs.end();
+    for (; it != itend; ++it) {
       // Report and clean completed jobs
       s3fanout::JobInfo *info = *it;
-      if(info->error_code == s3fanout::kFailOk) {
-        Respond((callback_t*)info->callback, UploaderResults(0));
+      if (info->error_code == s3fanout::kFailOk) {
+        Respond((callback_t*)info->callback,
+                UploaderResults(0));
       } else {
-        Respond((callback_t*)info->callback, UploaderResults(99, info->mmf->file_path()));
+        Respond((callback_t*)info->callback,
+                UploaderResults(99, info->mmf->file_path()));
       }
       info->mmf->Unmap();
       delete info->mmf;
@@ -208,11 +220,11 @@ void S3Uploader::WorkerThread() {
  * @param use_bucket Bucket to use between 0-(number_of_buckets_-1)
  * @return Index to the key to be used
  */
-int S3Uploader::getKeyIndex(unsigned int use_bucket) {
-  if(use_bucket >= (unsigned int)number_of_buckets_) {
+int S3Uploader::GetKeyIndex(unsigned int use_bucket) {
+  if (use_bucket >= (unsigned int)number_of_buckets_) {
     return 0;
   }
-  return use_bucket%keys_.size();
+  return use_bucket % keys_.size();
 }
 
 
@@ -225,14 +237,14 @@ int S3Uploader::getKeyIndex(unsigned int use_bucket) {
  * @param bucket_name Name of the bucket to be used
  * @return 0 if all ok
  */
-int S3Uploader::getKeysAndBucket(const std::string filename,
+int S3Uploader::GetKeysAndBucket(const std::string filename,
                                  std::string &access_key,
                                  std::string &secret_key,
                                  std::string &bucket_name) {
-  unsigned int use_bucket = select_bucket(filename);
-  bucket_name = getBucketName(use_bucket);
+  unsigned int use_bucket = SelectBucket(filename);
+  bucket_name = GetBucketName(use_bucket);
 
-  int k = getKeyIndex(use_bucket);
+  int k = GetKeyIndex(use_bucket);
   access_key = keys_.at(k).first;
   secret_key = keys_.at(k).second;
 
@@ -246,16 +258,16 @@ int S3Uploader::getKeysAndBucket(const std::string filename,
  * @param use_bucket Bucket to use between 0-(number_of_buckets_-1)
  * @return bucket name
  */
-std::string S3Uploader::getBucketName(unsigned int use_bucket) {
+std::string S3Uploader::GetBucketName(unsigned int use_bucket) {
   std::stringstream ss;
-  if(use_bucket >= (unsigned int)number_of_buckets_) {
-    ss<<bucket_body_name_<<"-1-1";
+  if (use_bucket >= (unsigned int)number_of_buckets_) {
+    ss << bucket_body_name_ << "-1-1";
     return ss.str();
   }
 
   int i = use_bucket/keys_.size();
-  int k = getKeyIndex(use_bucket);
-  ss <<bucket_body_name_<<"-"<<k+1<<"-"<<i+1;
+  int k = GetKeyIndex(use_bucket);
+  ss << bucket_body_name_ << "-" << (k + 1) << "-" << (i + 1);
 
   return ss.str();
 }
@@ -266,26 +278,26 @@ std::string S3Uploader::getBucketName(unsigned int use_bucket) {
  * @param rem_filename Filename to map into bucket
  * @return bucket index, between 0 and (number_of_buckets_-1)
  */
-int S3Uploader::select_bucket(std::string rem_filename) {
+int S3Uploader::SelectBucket(std::string rem_filename) {
     unsigned int use_bucket = 0;
     unsigned int cutlength= 3;     // Process filename in parts of this length
     std::string hex_filename;      // Filename with only valid hex-symbols
 
     // Accept only hex chars
-    for(unsigned int i =0;rem_filename.length()>i;i++) {
+    for (unsigned int i = 0;rem_filename.length() > i;i++) {
       char w = rem_filename.at(i);
-      if((w >= 48 && w <= 57) ||
-         (w >=65  && w <= 70) ||
-         (w >=97  && w <= 102)) {
+      if ((w >= 48 && w <= 57) ||
+          (w >=65  && w <= 70) ||
+          (w >=97  && w <= 102)) {
         hex_filename.push_back(w);
-      }else{
+      } else {
         hex_filename.push_back('6');
       }
     }
 
     // Calculate number based on the filename
     unsigned long xt = 0, x = 0;
-    while(hex_filename.length() > cutlength) {
+    while (hex_filename.length() > cutlength) {
       std::stringstream ss;
       ss.clear();
       ss << std::hex << hex_filename.substr(0,cutlength);
@@ -293,7 +305,8 @@ int S3Uploader::select_bucket(std::string rem_filename) {
       x += xt;
       hex_filename = hex_filename.substr(cutlength);
     }
-    if(hex_filename.length() > 0) {
+
+    if (hex_filename.length() > 0) {
       std::stringstream ss;
       ss.clear();
       ss << std::hex << hex_filename;
@@ -302,7 +315,7 @@ int S3Uploader::select_bucket(std::string rem_filename) {
     }
 
     // Choose the bucket wih modulo
-    use_bucket = x%number_of_buckets_;
+    use_bucket = x % number_of_buckets_;
 
     return use_bucket;
 }
@@ -311,7 +324,6 @@ int S3Uploader::select_bucket(std::string rem_filename) {
 void S3Uploader::FileUpload(const std::string &local_path,
                             const std::string &remote_path,
                             const callback_t  *callback) {
-
   // Check that we can read the given file
   MemoryMappedFile *mmf = new MemoryMappedFile(local_path);
   if (! mmf->Map()) {
@@ -323,10 +335,11 @@ void S3Uploader::FileUpload(const std::string &local_path,
   }
 
   // Try to upload the file
-  assert(uploadFile(remote_path, (char*)mmf->buffer(),
+  assert(UploadFile(remote_path, (char*)mmf->buffer(),
                     mmf->size(), callback, mmf) == 0);
 
-  LogCvmfs(kLogS3Fanout, kLogDebug, "Uploading from file finished: %s", local_path.c_str());
+  LogCvmfs(kLogS3Fanout, kLogDebug, "Uploading from file finished: %s",
+                                    local_path.c_str());
 }
 
 
@@ -341,7 +354,7 @@ void S3Uploader::FileUpload(const std::string &local_path,
  * @param mmf Memory mapped file (if one is used)
  * @return 0 if all is ok
  */
-int S3Uploader::uploadFile(std::string       filename,
+int S3Uploader::UploadFile(std::string       filename,
                            char              *buff,
                            unsigned long     size_of_file,
                            const callback_t  *callback,
@@ -350,7 +363,7 @@ int S3Uploader::uploadFile(std::string       filename,
   // Choose S3 account and bucket based on the filename
   std::string access_key, secret_key, bucket_name;
   const std::string mangled_filename = repository_alias_ + "/" + filename;
-  getKeysAndBucket(mangled_filename, access_key, secret_key, bucket_name);
+  GetKeysAndBucket(mangled_filename, access_key, secret_key, bucket_name);
 
   s3fanout::JobInfo *info = new s3fanout::JobInfo(access_key,
                                                   secret_key,
@@ -359,10 +372,10 @@ int S3Uploader::uploadFile(std::string       filename,
                                                   mangled_filename,
                                                   (unsigned char*)buff,
                                                   size_of_file);
-  info->request = s3fanout::JobInfo::kReqPut;
+  info->request        = s3fanout::JobInfo::kReqPut;
   info->origin_mem.pos = 0;
-  info->callback = (void *)callback;
-  info->mmf = mmf;
+  info->callback       = (void *)callback;
+  info->mmf            = mmf;
 
   LogCvmfs(kLogS3Fanout, kLogDebug,
            "Uploading file:\n"
@@ -375,7 +388,7 @@ int S3Uploader::uploadFile(std::string       filename,
            bucket_name.c_str(),
            mmf->size());
 
-  if(s3fanout_mgr->PushNewJob(info) != 0) {
+  if (s3fanout_mgr_->PushNewJob(info) != 0) {
     LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload file: %s" ,
              mangled_filename.data());
     return -1;
@@ -424,7 +437,7 @@ UploadStreamHandle* S3Uploader::InitStreamedUpload(const callback_t *callback) {
 
   if (tmp_fd < 0) {
     LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to open file (%d), %s",
-             errno,strerror(errno));
+             errno, strerror(errno));
 
     return NULL;
   }
@@ -439,7 +452,8 @@ void S3Uploader::Upload(UploadStreamHandle  *handle,
   assert (buffer->IsInitialized());
   S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
 
-  LogCvmfs(kLogS3Fanout, kLogDebug, "Upload target = %s", local_handle->temporary_path.c_str());
+  LogCvmfs(kLogS3Fanout, kLogDebug, "Upload target = %s",
+                                    local_handle->temporary_path.c_str());
 
   const size_t bytes_written = write(local_handle->file_descriptor,
                                      buffer->ptr(),
@@ -483,7 +497,8 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload %s",
              local_handle->temporary_path.c_str());
     atomic_inc32(&copy_errors_);
-    Respond(handle->commit_callback, UploaderResults(100, local_handle->temporary_path));
+    Respond(handle->commit_callback,
+            UploaderResults(100, local_handle->temporary_path));
     return;
   }
 
@@ -494,12 +509,13 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
 
   // Request upload
   const callback_t *callback = handle->commit_callback;
-  assert(uploadFile(final_path,
+  assert(UploadFile(final_path,
                     (char*)mmf->buffer(),
                     (long unsigned int)mmf->size(),
                     callback, mmf) == 0);
 
-  LogCvmfs(kLogS3Fanout, kLogDebug, "Uploading from stream finished: %s", local_handle->temporary_path.c_str());
+  LogCvmfs(kLogS3Fanout, kLogDebug, "Uploading from stream finished: %s",
+                                    local_handle->temporary_path.c_str());
 
   // Remove the temporary file
   remove(local_handle->temporary_path.c_str());

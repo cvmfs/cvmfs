@@ -147,8 +147,8 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
   int ajobs = 0;
   sem_getvalue(&s3fanout_mgr->available_jobs_, &ajobs);
   LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
-           "handle %p, socket %d, action %d, up %d, sp %d, fds_inuse %d, jobs %d", easy, s, action, userp, socketp,
-           s3fanout_mgr->watch_fds_inuse_, ajobs);
+           "handle %p, socket %d, action %d, up %d, sp %d, fds_inuse %d, jobs %d",
+           easy, s, action, userp, socketp, s3fanout_mgr->watch_fds_inuse_, ajobs);
   if (action == CURL_POLL_NONE)
     return 0;
 
@@ -161,8 +161,7 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
   // Or create newly
   if (index == s3fanout_mgr->watch_fds_inuse_) {
     // Extend array if necessary
-    if (s3fanout_mgr->watch_fds_inuse_ == s3fanout_mgr->watch_fds_size_)
-    {
+    if (s3fanout_mgr->watch_fds_inuse_ == s3fanout_mgr->watch_fds_size_) {
       s3fanout_mgr->watch_fds_size_ *= 2;
       s3fanout_mgr->watch_fds_ = static_cast<struct pollfd *>(
         srealloc(s3fanout_mgr->watch_fds_,
@@ -216,23 +215,23 @@ void *S3FanoutManager::MainUpload(void *data) {
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(data);
 
   while (s3fanout_mgr->thread_upload_run_) {
-
     JobInfo *info = NULL;
     pthread_mutex_lock(s3fanout_mgr->jobs_todo_lock_);
-    if(!s3fanout_mgr->jobs_todo_.empty()) {
+    if (!s3fanout_mgr->jobs_todo_.empty()) {
       info = s3fanout_mgr->jobs_todo_.back();
       s3fanout_mgr->jobs_todo_.pop_back();
     }
     pthread_mutex_unlock(s3fanout_mgr->jobs_todo_lock_);
 
-    if(info != NULL) {
+    if (info != NULL) {
       CURL *handle = s3fanout_mgr->AcquireCurlHandle();
-      if(handle == NULL) {
+      if (handle == NULL) {
         LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
         assert(handle != NULL);
       }
 
-      s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info, handle);
+      s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info,
+                                                                        handle);
       assert(init_failure == s3fanout::kFailOk);
       s3fanout_mgr->SetUrlOptions(info);
 
@@ -243,7 +242,8 @@ void *S3FanoutManager::MainUpload(void *data) {
                                         0,
                                         &still_running);
 
-      LogCvmfs(kLogS3Fanout, kLogDebug, "curl_multi_socket_action: %d - %d", retval, still_running);
+      LogCvmfs(kLogS3Fanout, kLogDebug, "curl_multi_socket_action: %d - %d",
+                                        retval, still_running);
     }
 
     // Check events with 1ms timeout
@@ -257,11 +257,11 @@ void *S3FanoutManager::MainUpload(void *data) {
                                         CURL_SOCKET_TIMEOUT,
                                         0,
                                         &still_running);
-      if(retval != CURLM_OK) {
+      if (retval != CURLM_OK) {
         LogCvmfs(kLogS3Fanout, kLogDebug, "Error, timeout due to: %d", retval);
         assert(retval == CURLM_OK);
       }
-    }else if (retval < 0) {
+    } else if (retval < 0) {
       LogCvmfs(kLogS3Fanout, kLogDebug, "Error, event poll failed: %d", errno);
       assert(retval >= 0);
     }
@@ -290,8 +290,7 @@ void *S3FanoutManager::MainUpload(void *data) {
     CURLMsg *curl_msg;
     int msgs_in_queue;
     while ((curl_msg = curl_multi_info_read(s3fanout_mgr->curl_multi_,
-                                            &msgs_in_queue)))
-    {
+                                            &msgs_in_queue))) {
       if (curl_msg->msg == CURLMSG_DONE) {
         s3fanout_mgr->statistics_->num_requests++;
         JobInfo *info;
@@ -394,8 +393,7 @@ string S3FanoutManager::MkAuthoritzation(const string &access_key,
                                          const string &request,
                                          const string &content_md5_base64,
                                          const string &bucket,
-                                         const string &object_key)
-{
+                                         const string &object_key) {
   string to_sign = request + "\n" +
     content_md5_base64 + "\n" +
     content_type + "\n" +
@@ -548,8 +546,7 @@ bool S3FanoutManager::CanRetry(const JobInfo *info) {
 
   return (info->error_code == kFailHostConnection ||
           info->error_code == kFailServiceUnavailable ) &&
-    (info->num_retries < max_retries);
-
+          (info->num_retries < max_retries);
 }
 
 
@@ -623,8 +620,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 
   // Transform head to put
   if ((info->error_code == kFailNotFound) &&
-      (info->request == JobInfo::kReqHead))
-  {
+      (info->request == JobInfo::kReqHead)) {
     LogCvmfs(kLogS3Fanout, kLogDebug, "not found: %s, uploading",
              info->object_key.c_str());
     info->request = JobInfo::kReqPut;
@@ -842,7 +838,9 @@ void S3FanoutManager::SetRetryParameters(const unsigned max_retries,
 int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs) {
 
   pthread_mutex_lock(jobs_completed_lock_);
-  for(std::vector<s3fanout::JobInfo*>::iterator it = jobs_completed_.begin(); it != jobs_completed_.end(); ++it) {
+        std::vector<JobInfo*>::iterator       it    = jobs_completed_.begin();
+  const std::vector<JobInfo*>::const_iterator itend = jobs_completed_.end();
+  for (; it != itend; ++it) {
     jobs.push_back(*it);
   }
   jobs_completed_.clear();
@@ -871,10 +869,10 @@ int S3FanoutManager::PushNewJob(JobInfo *info) {
 
 string Statistics::Print() const {
   return
-  "Transferred Bytes: " + StringifyInt(uint64_t(transferred_bytes)) + "\n" +
-  "Transfer duration: " + StringifyInt(uint64_t(transfer_time)) + " s\n" +
+  "Transferred Bytes:  " + StringifyInt(uint64_t(transferred_bytes)) + "\n" +
+  "Transfer duration:  " + StringifyInt(uint64_t(transfer_time)) + " s\n" +
   "Number of requests: " + StringifyInt(num_requests) + "\n" +
-  "Number of retries: " + StringifyInt(num_retries) + "\n";
+  "Number of retries:  " + StringifyInt(num_retries) + "\n";
 }
 
 }  // namespace s3fanout
