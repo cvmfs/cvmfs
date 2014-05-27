@@ -2469,7 +2469,7 @@ list() {
     # check if the repository whitelist is accessible and expired
     local whitelist_info=""
     if is_stratum0 $name; then
-      local reval=0
+      local retval=0
       check_expiry $CVMFS_STRATUM0 2>/dev/null || retval=$?
       if [ $retval -eq 100 ]; then
         whitelist_info=" - whitelist unreachable"
