@@ -116,11 +116,10 @@ fi
 #
 
 create_fakes3_config() {
-  [ -f $FAKE_S3_CONFIG ] && sudo rm -f $FAKE_S3_CONFIG
-  sudo cat > $FAKE_S3_CONFIG << EOF
+  [ ! -f $FAKE_S3_CONFIG ] || sudo rm -f $FAKE_S3_CONFIG
+  sudo tee $FAKE_S3_CONFIG > /dev/null << EOF
 S3_HOST=localhost
 S3_PORT=$FAKE_S3_PORT
-S3_ACCOUNTS=1
 S3_ACCESS_KEY=not
 S3_SECRET_KEY=important
 S3_BUCKETS_PER_ACCOUNT=1
@@ -132,12 +131,11 @@ EOF
 
 start_fakes3() {
   local logfile=$1
-  local pid
 
   [ ! -d $FAKE_S3_STORAGE ] || sudo rm -fR $FAKE_S3_STORAGE > /dev/null 2>&1 || return 1
   sudo mkdir -p $FAKE_S3_STORAGE                            > /dev/null 2>&1 || return 2
   create_fakes3_config                                      > /dev/null 2>&1 || return 3
-  run_background_service $logfile "fakes3 --port $FAKE_S3_PORT --root $FAKE_S3_STORAGE"
+  run_background_service $logfile "sudo fakes3 --port $FAKE_S3_PORT --root $FAKE_S3_STORAGE"
 }
 
 

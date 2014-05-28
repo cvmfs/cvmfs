@@ -46,7 +46,7 @@ cd ${SOURCE_DIRECTORY}/test
                           src/523-corruptchunkfailover \
                           src/524-corruptmanifestfailover || it_retval=$?
 
-echo -n "starting FakeS3 service..."
+echo -n "starting FakeS3 service... "
 fakes3_pid=$(start_fakes3 $TEST_FAKE_S3_LOGFILE) || { s3_retval=$?; die "fail"; }
 echo "done"
 
@@ -68,7 +68,7 @@ if [ $s3_retval -eq 0 ]; then
                                  src/543-storagescrubbing_scriptable  \
                                  src/550-livemigration || s3_retval=$?
 
-    echo -n "killing FakeS3..."
+    echo -n "killing FakeS3... "
     sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
 fi
 
