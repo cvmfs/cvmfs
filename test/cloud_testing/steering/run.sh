@@ -24,8 +24,12 @@ cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"
 cvmfs_setup_log="${cvmfs_workspace}/setup.log"
 cvmfs_run_log="${cvmfs_workspace}/run.log"
 cvmfs_test_log="${cvmfs_workspace}/test.log"
+cvmfs_test_s3_log="${cvmfs_workspace}/test_s3.log"
+cvmfs_fake_s3_log="${cvmfs_workspace}/fake_s3.log"
 cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
 cvmfs_migrationtest_log="${cvmfs_workspace}/migrationtest.log"
+all_log_files="$cvmfs_setup_log $cvmfs_run_log $cvmfs_test_log \
+$cvmfs_test_s3_log $cvmfs_fake_s3_log $cvmfs_unittest_log $cvmfs_migrationtest_log"
 
 # global variables for external script parameters
 testee_url=""
@@ -319,50 +323,20 @@ handle_test_failure() {
 get_test_results() {
   local ip=$1
   local username=$2
-  local retval_run_log
-  local retval_test_log
-  local retval_setup_log
-  local retval_unittest_log
-  local retval_migrationtest_log
+  local retval=0
 
   echo -n "retrieving test results... "
-  retrieve_file_from_virtual_machine                  \
-      $ip                                             \
-      $username                                       \
-      $cvmfs_test_log                                 \
-      ${log_destination}/$(basename $cvmfs_test_log)
-  retval_test_log=$?
-  retrieve_file_from_virtual_machine                  \
-      $ip                                             \
-      $username                                       \
-      $cvmfs_run_log                                  \
-      ${log_destination}/$(basename $cvmfs_run_log)
-  retval_run_log=$?
-  retrieve_file_from_virtual_machine                  \
-      $ip                                             \
-      $username                                       \
-      $cvmfs_setup_log                                \
-      ${log_destination}/$(basename $cvmfs_setup_log)
-  retval_setup_log=$?
-  retrieve_file_from_virtual_machine                  \
-      $ip                                             \
-      $username                                       \
-      $cvmfs_unittest_log                             \
-      ${log_destination}/$(basename $cvmfs_unittest_log)
-  retval_unittest_log=$?
-  retrieve_file_from_virtual_machine                  \
-      $ip                                             \
-      $username                                       \
-      $cvmfs_migrationtest_log                        \
-      ${log_destination}/$(basename $cvmfs_migrationtest_log)
-  retval_migrationtest_log=$?
-
-  [ $retval_test_log          -eq 0 ] && \
-  [ $retval_run_log           -eq 0 ] && \
-  [ $retval_setup_log         -eq 0 ] && \
-  [ $retval_unittest_log      -eq 0 ] && \
-  [ $retval_migrationtest_log -eq 0 ]
-  check_retcode $?
+  for log_file in $all_log_files; do
+    retrieve_file_from_virtual_machine \
+        $ip                            \
+        $username                      \
+        $log_file                      \
+        ${log_destination}/$(basename $log_file)
+    if [ $? -ne 0 ]; then
+      retval=1
+    fi
+  done
+  check_retcode $retval
 }
 
 

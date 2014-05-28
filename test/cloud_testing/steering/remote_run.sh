@@ -31,6 +31,8 @@ cvmfs_source_directory="${cvmfs_workspace}/cvmfs-source"
 cvmfs_setup_log="${cvmfs_workspace}/setup.log"
 cvmfs_run_log="${cvmfs_workspace}/run.log"
 cvmfs_test_log="${cvmfs_workspace}/test.log"
+cvmfs_test_s3_log="${cvmfs_workspace}/test_s3.log"
+cvmfs_fake_s3_log="${cvmfs_workspace}/fake_s3.log"
 cvmfs_unittest_log="${cvmfs_workspace}/unittest.log"
 cvmfs_migrationtest_log="${cvmfs_workspace}/migrationtest.log"
 
@@ -110,6 +112,8 @@ fi
 echo "running platform specific script $platform_script ..."
 sudo -H -E -u $test_username sh $platform_script_abs -t $cvmfs_source_directory\
                                                      -l $cvmfs_test_log        \
+                                                     -i $cvmfs_test_s3_log     \
+                                                     -j $cvmfs_fake_s3_log     \
                                                      -s $server_package        \
                                                      -c $client_package        \
                                                      -u $cvmfs_unittest_log    \
