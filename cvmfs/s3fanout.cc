@@ -279,6 +279,7 @@ void *S3FanoutManager::MainUpload(void *data) {
         } else {
           // Return easy handle into pool and write result back
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
+	  sem_post(&s3fanout_mgr->available_jobs_);
 
           pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
           s3fanout_mgr->jobs_completed_.push_back(info);
@@ -305,7 +306,7 @@ void *S3FanoutManager::MainUpload(void *data) {
  * Gets an idle CURL handle from the pool. Creates a new one and adds it to
  * the pool if necessary.
  */
-CURL *S3FanoutManager::AcquireCurlHandle() {
+CURL *S3FanoutManager::AcquireCurlHandle() const {
   CURL *handle;
 
   if (pool_handles_idle_->empty()) {
@@ -329,7 +330,7 @@ CURL *S3FanoutManager::AcquireCurlHandle() {
 }
 
 
-void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) {
+void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
   if (info->http_headers) {
     curl_slist_free_all(info->http_headers);
     info->http_headers = NULL;
@@ -345,7 +346,6 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) {
 
   pool_handles_inuse_->erase(elem);
 
-  sem_post(&available_jobs_);
 }
 
 
@@ -360,7 +360,7 @@ string S3FanoutManager::MkAuthoritzation(const string &access_key,
                                          const string &request,
                                          const string &content_md5_base64,
                                          const string &bucket,
-                                         const string &object_key) {
+                                         const string &object_key) const {
   string to_sign = request + "\n" +
     content_md5_base64 + "\n" +
     content_type + "\n" +
@@ -384,7 +384,7 @@ string S3FanoutManager::MkAuthoritzation(const string &access_key,
  * Request parameters set the URL and other options such as timeout and
  * proxy.
  */
-Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) {
+Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   // Initialize internal download state
   info->curl_handle = handle;
   info->error_code = kFailOk;
@@ -396,7 +396,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) {
   shash::Any content_md5;
   content_md5.algorithm = shash::kMd5;
   string timestamp;
-  if (info->request == JobInfo::kReqHead) {
+  if (info->request == JobInfo::kReqHead || info->request == JobInfo::kReqDelete) {
     curl_easy_setopt(handle, CURLOPT_UPLOAD, 0);
     curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
     timestamp = RfcTimestamp();
@@ -404,11 +404,15 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) {
       curl_slist_append(info->http_headers,
                         MkAuthoritzation(info->access_key,
                                          info->secret_key,
-                                         timestamp, "", "HEAD", "",
+                                         timestamp, "", 
+					 info->request == JobInfo::kReqHead?"HEAD":"DELETE", 
+					 "",
                                          info->bucket,
                                          info->object_key).c_str());
     info->http_headers =
       curl_slist_append(info->http_headers, "Content-Length: 0");
+
+    curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, info->request == JobInfo::kReqHead?"HEAD":"DELETE");
   } else {
     curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
@@ -480,7 +484,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) {
 /**
  * Sets the URL specific options such as host to use and timeout.
  */
-void S3FanoutManager::SetUrlOptions(JobInfo *info) {
+void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   CURL *curl_handle = info->curl_handle;
 
   pthread_mutex_lock(lock_options_);
@@ -829,6 +833,33 @@ int S3FanoutManager::PushNewJob(JobInfo *info) {
   return 0;
 }
 
+
+/**
+ * Performs given job synchronously.
+ * 
+ * @return true if exists, otherwise false
+ */
+bool S3FanoutManager::DoSingleJob(JobInfo *info) const {
+  bool retme = false;
+
+  CURL *handle = AcquireCurlHandle();
+  if (handle == NULL) {
+    LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to acquire CURL handle.");
+    assert(handle != NULL);
+  }
+
+  InitializeRequest(info, handle);
+  SetUrlOptions(info);
+
+  CURLcode resl = curl_easy_perform(handle);
+  if(resl == CURLE_OK && info->error_code == kFailOk) {
+    retme = true;
+  }
+
+  ReleaseCurlHandle(info, handle);
+
+  return retme;
+}
 
 //------------------------------------------------------------------------------
 

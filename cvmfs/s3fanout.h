@@ -65,6 +65,7 @@ struct JobInfo {
   enum RequestType {
     kReqHead = 0,
     kReqPut,
+    kReqDelete,
   };
 
   Origin origin;
@@ -132,6 +133,8 @@ class S3FanoutManager : SingleCopy {
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
 
+  bool DoSingleJob(JobInfo *info) const;
+
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -141,10 +144,10 @@ class S3FanoutManager : SingleCopy {
   std::vector<s3fanout::JobInfo*> jobs_completed_;
   pthread_mutex_t *jobs_completed_lock_;
 
-  CURL *AcquireCurlHandle();
-  void ReleaseCurlHandle(JobInfo *info, CURL *handle);
-  Failures InitializeRequest(JobInfo *info, CURL *handle);
-  void SetUrlOptions(JobInfo *info);
+  CURL *AcquireCurlHandle() const;
+  void ReleaseCurlHandle(JobInfo *info, CURL *handle) const;
+  Failures InitializeRequest(JobInfo *info, CURL *handle) const;
+  void SetUrlOptions(JobInfo *info) const;
   void UpdateStatistics(CURL *handle);
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
@@ -156,10 +159,10 @@ class S3FanoutManager : SingleCopy {
                                const std::string &request,
                                const std::string &content_md5_base64,
                                const std::string &bucket,
-                               const std::string &object_key);
+                               const std::string &object_key) const;
   std::string MkUrl(const std::string &host,
                     const std::string &bucket,
-                    const std::string &objkey2)
+                    const std::string &objkey2) const
   {
     return "http://" + host + "/" + bucket + "/" + objkey2;
   }
