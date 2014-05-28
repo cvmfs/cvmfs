@@ -120,7 +120,6 @@ create_fakes3_config() {
   sudo tee $FAKE_S3_CONFIG > /dev/null << EOF
 S3_HOST=localhost
 S3_PORT=$FAKE_S3_PORT
-S3_ACCOUNTS=1
 S3_ACCESS_KEY=not
 S3_SECRET_KEY=important
 S3_BUCKETS_PER_ACCOUNT=1
