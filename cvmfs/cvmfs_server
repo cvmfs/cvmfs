@@ -1853,7 +1853,7 @@ import() {
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:l:smg" option; do
+  while getopts "w:o:c:u:k:lsmg" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1872,7 +1872,7 @@ import() {
       ;;
       l)
         is_legacy=1
-        ;;
+      ;;
       s)
         show_statistics=1
       ;;
