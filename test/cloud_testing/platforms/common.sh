@@ -2,6 +2,9 @@
 
 export LC_ALL=C
 
+script_location=$(dirname $(readlink --canonicalize $0))
+. ${script_location}/../../test_functions
+
 # splits onelined CSV strings and prints the desired field offset
 #
 # @param cvs     the CSV string to be cut
