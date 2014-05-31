@@ -326,9 +326,18 @@ if (BUILD_LIBCVMFS)
 endif (BUILD_LIBCVMFS)
 
 if (BUILD_SERVER)
-  # create targets with according sources and static link libraries
+  # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
+  add_custom_target (geoip ALL)
+
+  if (LIBGEOIP_BUILTIN)
+    add_dependencies (geoip libgeoip)
+  endif (LIBGEOIP_BUILTIN)
+
+  if (PYTHON_GEOIP_BUILTIN)
+    add_dependencies (geoip python-geoip)
+  endif (PYTHON_GEOIP_BUILTIN)
 
   include (${VJSON_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   add_dependencies (cvmfs_swissknife libvjson)
@@ -457,10 +466,28 @@ if (BUILD_SERVER)
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
-        install(
-                FILES           cvmfs_server_hooks.sh.demo
-                DESTINATION     "/etc/cvmfs"
-                PERMISSIONS     OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-        )
+  install(
+    FILES      cvmfs_server_hooks.sh.demo
+    DESTINATION    "/etc/cvmfs"
+    PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install(
+    FILES      webapi/cvmfs-api.wsgi
+    DESTINATION    "/var/www/wsgi-scripts"
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+
+  install(
+    FILES      ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.py
+    DESTINATION    "/usr/share/cvmfs-server/webapi"
+    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
+
+  install(
+    FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
+    DESTINATION    "/usr/share/cvmfs-server/webapi"
+    PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
 
 endif (BUILD_SERVER)

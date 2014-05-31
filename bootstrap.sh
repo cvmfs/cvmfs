@@ -10,6 +10,8 @@ SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.15.0
 GOOGLETEST_VERSION=1.7.0
 TBB_VERSION=4.2-2
+LIBGEOIP_VERSION=1.6.0
+PYTHON_GEOIP_VERSION=1.3.1
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <decompress location>"
@@ -91,6 +93,8 @@ do_extract  "zlib"        "zlib-${ZLIB_VERSION}.tar.gz"
 do_extract  "sparsehash"  "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
 do_extract  "leveldb"     "leveldb-${LEVELDB_VERSION}.tar.gz"
 do_extract  "googletest"  "gtest-${GOOGLETEST_VERSION}.tar.gz"
+do_extract  "libgeoip"    "GeoIP-${LIBGEOIP_VERSION}.tar.gz"
+do_extract  "python-geoip" "GeoIP-${PYTHON_GEOIP_VERSION}.tar.gz"
 do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 
 do_copy     "sqlite3"

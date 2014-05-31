@@ -89,6 +89,8 @@ option (ZLIB_BUILTIN          "Don't use system zlib"                           
 option (SPARSEHASH_BUILTIN    "Don't use system installation of google sparse hash"              ON)
 option (LEVELDB_BUILTIN       "Don't use system leveldb"                                         ON)
 option (GOOGLETEST_BUILTIN    "Don't use system installation of google test"                     ON)
+option (LIBGEOIP_BUILTIN      "Don't use system libgeoip"                                        ON)
+option (PYTHON_GEOIP_BUILTIN  "Don't use system python-geoip"                                    ON)
 option (TBB_PRIVATE_LIB       "Compile our own TBB shared libraries"                             ON)
 
 #
@@ -117,6 +119,8 @@ set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_sparsehash"
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_leveldb")
 set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
 set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
+set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
+set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
 set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
 
 # create the directory for controlled out of source building of external stuff
@@ -301,6 +305,19 @@ else (GOOGLETEST_BUILTIN)
   find_package (GTest REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 endif (GOOGLETEST_BUILTIN)
+
+if (LIBGEOIP_BUILTIN)
+  include (${LIBGEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+else (LIBGEOIP_BUILTIN)
+  find_package (libgeoip REQUIRED)
+endif (LIBGEOIP_BUILTIN)
+
+if (PYTHON_GEOIP_BUILTIN)
+  include (${PYTHON_GEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+else (PYTHON_GEOIP_BUILTIN)
+  find_package (python-geoip REQUIRED)
+endif (PYTHON_GEOIP_BUILTIN)
+
 
 # required libraries for client and libcvmfs
 if (BUILD_CVMFS OR BUILD_LIBCVMFS)
