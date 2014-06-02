@@ -30,8 +30,6 @@ class PathspecElementPattern {
   class PlaintextSubPattern : public SubPattern {
    public:
     PlaintextSubPattern() : SubPattern() {}
-    PlaintextSubPattern(const PlaintextSubPattern &other) :
-      chars_(other.chars_) {}
     SubPattern* Clone() const { return new PlaintextSubPattern(*this); }
     bool Compare(const SubPattern *other) const;
 
@@ -43,6 +41,9 @@ class PathspecElementPattern {
     std::string GenerateGlobString()        const;
 
    protected:
+    PlaintextSubPattern(const PlaintextSubPattern &other) :
+      chars_(other.chars_) {}
+    PlaintextSubPattern& operator=(const PlaintextSubPattern &other);
     bool IsSpecialRegexCharacter(const char chr) const;
 
    private:
