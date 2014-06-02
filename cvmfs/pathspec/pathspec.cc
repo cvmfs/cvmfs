@@ -11,6 +11,7 @@
 
 Pathspec::Pathspec(const std::string &spec) :
   regex_compiled_(false),
+  regex_(NULL),
   glob_string_compiled_(false),
   glob_string_sequence_compiled_(false),
   valid_(true),
