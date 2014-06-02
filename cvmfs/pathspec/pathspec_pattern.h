@@ -75,6 +75,7 @@ class PathspecElementPattern {
   PathspecElementPattern(const std::string::const_iterator   begin,
                          const std::string::const_iterator  &end);
   PathspecElementPattern(const PathspecElementPattern& other);
+  PathspecElementPattern& operator=(const PathspecElementPattern& other);
   // TODO: C++11 - move constructor!
   ~PathspecElementPattern();
 
