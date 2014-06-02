@@ -9,8 +9,8 @@
 using namespace swissknife;
 
 CommandListCatalogs::CommandListCatalogs() :
-  print_tree_(false),
-  print_hash_(false) {}
+  print_tree_(false), print_hash_(false), print_size_(false),
+  print_entries_(false) {}
 
 
 ParameterList CommandListCatalogs::GetParams() {
