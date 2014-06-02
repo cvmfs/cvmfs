@@ -439,6 +439,7 @@ void CommandMigrate::AnalyzeCatalogStatistics() const {
   }
 
   // Inode quantization
+  assert (aggregated_max_row_id > 0);
   const unsigned int unused_inodes =
                                  aggregated_max_row_id - aggregated_entry_count;
   const float        ratio = ((float)unused_inodes           /
