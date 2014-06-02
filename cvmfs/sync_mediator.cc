@@ -29,6 +29,7 @@ namespace publish {
 SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
   catalog_manager_(catalog_manager),
+  union_engine_(NULL),
   params_(params),
   changed_items_(0)
 {
