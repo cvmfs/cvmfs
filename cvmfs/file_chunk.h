@@ -55,10 +55,8 @@ struct FileChunkReflist {
   FileChunkReflist() {
     list = NULL;
   }
-  FileChunkReflist(FileChunkList *l, PathString p) {
-    list = l;
-    path = p;
-  }
+  FileChunkReflist(FileChunkList *l, const PathString &p) :
+    list(l), path(p) {}
   FileChunkList *list;
   PathString path;
 };
