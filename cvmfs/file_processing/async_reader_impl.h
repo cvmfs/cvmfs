@@ -98,6 +98,7 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
         LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to a lack of "
                                           "file descriptors! Please increase "
                                           "this limit. (see ulimit -n)");
+        break;
       case EACCES:
       case EPERM:
         LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to permission "
