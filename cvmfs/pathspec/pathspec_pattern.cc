@@ -217,6 +217,7 @@ bool PathspecElementPattern::PlaintextSubPattern::Compare(const SubPattern *othe
 
   const PlaintextSubPattern *pt_other =
                                 dynamic_cast<const PlaintextSubPattern*>(other);
+  assert (pt_other != NULL);
   return chars_ == pt_other->chars_;
 }
 
