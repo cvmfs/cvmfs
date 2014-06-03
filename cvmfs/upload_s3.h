@@ -56,8 +56,7 @@ class S3Uploader : public AbstractUploader {
                               const shash::Any   &content_hash,
                               const std::string  &hash_suffix);
 
-  bool Remove(const std::string &file_to_delete);
-
+  bool Remove(const std::string &path);
   bool Peek(const std::string& path) const;
 
   /**
@@ -86,7 +85,7 @@ class S3Uploader : public AbstractUploader {
   std::string GetBucketName(unsigned int use_bucket) const;
   int SelectBucket(const std::string &rem_filename) const;
   int GetKeyIndex(unsigned int use_bucket) const;
-  s3fanout::JobInfo *CreateJobInfo(const std::string& file_to_delete) const;
+  s3fanout::JobInfo *CreateJobInfo(const std::string& path) const;
 
   s3fanout::S3FanoutManager s3fanout_mgr_;
   // state information

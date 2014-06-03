@@ -279,7 +279,7 @@ void *S3FanoutManager::MainUpload(void *data) {
         } else {
           // Return easy handle into pool and write result back
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
-	  sem_post(&s3fanout_mgr->available_jobs_);
+          sem_post(&s3fanout_mgr->available_jobs_);
 
           pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
           s3fanout_mgr->jobs_completed_.push_back(info);
@@ -404,15 +404,15 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       curl_slist_append(info->http_headers,
                         MkAuthoritzation(info->access_key,
                                          info->secret_key,
-                                         timestamp, "", 
-					 info->request == JobInfo::kReqHead?"HEAD":"DELETE", 
-					 "",
+                                         timestamp, "",
+                                         info->request == JobInfo::kReqHead ? "HEAD" : "DELETE",
+                                         "",
                                          info->bucket,
                                          info->object_key).c_str());
     info->http_headers =
       curl_slist_append(info->http_headers, "Content-Length: 0");
 
-    curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, info->request == JobInfo::kReqHead?"HEAD":"DELETE");
+    curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, info->request == JobInfo::kReqHead ? "HEAD" : "DELETE");
   } else {
     curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
     curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
@@ -836,7 +836,7 @@ int S3FanoutManager::PushNewJob(JobInfo *info) {
 
 /**
  * Performs given job synchronously.
- * 
+ *
  * @return true if exists, otherwise false
  */
 bool S3FanoutManager::DoSingleJob(JobInfo *info) const {
@@ -852,7 +852,7 @@ bool S3FanoutManager::DoSingleJob(JobInfo *info) const {
   SetUrlOptions(info);
 
   CURLcode resl = curl_easy_perform(handle);
-  if(resl == CURLE_OK && info->error_code == kFailOk) {
+  if (resl == CURLE_OK && info->error_code == kFailOk) {
     retme = true;
   }
 
