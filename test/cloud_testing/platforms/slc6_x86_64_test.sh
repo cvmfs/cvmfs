@@ -47,8 +47,8 @@ cd ${SOURCE_DIRECTORY}/test
                           src/524-corruptmanifestfailover || it_retval=$?
 
 echo -n "starting FakeS3 service... "
-fakes3_pid=$(start_fakes3 $TEST_FAKE_S3_LOGFILE) || { s3_retval=$?; die "fail"; }
-echo "done"
+fakes3_pid=$(start_fakes3 $FAKE_S3_LOGFILE) || { s3_retval=$?; die "fail"; }
+echo "done ($fakes3_pid)"
 
 if [ $s3_retval -eq 0 ]; then
     echo "running CernVM-FS server test cases against FakeS3..."
