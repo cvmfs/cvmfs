@@ -5,6 +5,7 @@ cvmfs_test_autofs_on_startup=false
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_url=$(get_repo_url $CVMFS_TEST_REPO)
   local scratch_dir=$(pwd)
 
   local stamp_zero=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
@@ -41,7 +42,7 @@ cvmfs_run_test() {
   cat > $conf << EOF
 CVMFS_CACHE_BASE=$cachedir
 CVMFS_RELOAD_SOCKETS=$cachedir
-CVMFS_SERVER_URL=http://localhost/cvmfs/$CVMFS_TEST_REPO
+CVMFS_SERVER_URL=$repo_url
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
 CVMFS_REPOSITORY_DATE=$stamp_zero
