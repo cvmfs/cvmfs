@@ -5,8 +5,10 @@ check_revision() {
   local repository=$1
   local expected_revision=$2
   local repository_revision=
+  local repo_url=$(get_repo_url $repository)
 
-  repository_revision=$(cvmfs_swissknife info -r http://localhost/cvmfs/$repository -v)
+  repository_revision=$(cvmfs_swissknife info -r $repo_url -v)
+  [ ! -z $repository_revision ] || return 1
   if [ $expected_revision -ne $repository_revision ]; then
     echo "expected: $expected_revision but found: $repository_revision"
     return 1

@@ -28,6 +28,7 @@ produce_files_in() {
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_url=$(get_repo_url $CVMFS_TEST_REPO)
 
   local scratch_dir=$(pwd)
   mkdir reference_dir
@@ -57,13 +58,13 @@ cvmfs_run_test() {
   cvmfs2 __MK_ALIEN_CACHE__ $preload_dir $(id -u $CVMFS_TEST_USER) $(id -g $CVMFS_TEST_USER) || return 11
   mkdir $preload_dir/sync_temp || return 12
   cvmfs_swissknife pull -c \
-    -u http://localhost/cvmfs/$CVMFS_TEST_REPO \
+    -u $repo_url \
     -r $preload_dir \
     -k /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub \
     -m $CVMFS_TEST_REPO \
     -x $preload_dir/sync_temp || return 13
   cvmfs_swissknife pull -c \
-    -u http://localhost/cvmfs/$CVMFS_TEST_REPO \
+    -u $repo_url \
     -r $preload_dir \
     -k /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub \
     -m $CVMFS_TEST_REPO \
