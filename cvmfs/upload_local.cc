@@ -216,12 +216,8 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
 
 
 bool LocalUploader::Remove(const std::string& file_to_delete) {
-  if (! Peek(file_to_delete)) {
-    return false;
-  }
-
   const int retval = unlink((upstream_path_ + "/" + file_to_delete).c_str());
-  return retval == 0;
+  return retval == 0 || errno == ENOENT;
 }
 
 
