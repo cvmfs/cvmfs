@@ -203,11 +203,15 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
   /**
    * Removes a file from the backend storage. This might be done synchronously.
    *
+   * Note: If the file doesn't exist before calling this method it will report
+   *       a successful deletion anyways.
+   *
    * Note: This method is currently used very sparsely! If this changes in the
    *       future, one might think about doing deletion asynchronously!
    *
    * @param file_to_delete  path to the file to be removed
-   * @return                true if the file was successfully removed
+   * @return                true if the file does not exist (anymore), false if
+   *                        the removal failed
    */
   virtual bool Remove(const std::string &file_to_delete) = 0;
 
