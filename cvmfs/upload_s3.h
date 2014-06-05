@@ -56,7 +56,7 @@ class S3Uploader : public AbstractUploader {
                               const shash::Any   &content_hash,
                               const std::string  &hash_suffix);
 
-  bool Remove(const std::string &path);
+  bool Remove(const std::string &file_to_delete);
   bool Peek(const std::string& path) const;
 
   /**

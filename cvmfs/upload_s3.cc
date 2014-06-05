@@ -546,15 +546,11 @@ s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
 }
 
 
-bool S3Uploader::Remove(const std::string& path) {
-  s3fanout::JobInfo *info = CreateJobInfo(path);
+bool S3Uploader::Remove(const std::string& file_to_delete) {
+  s3fanout::JobInfo *info = CreateJobInfo(file_to_delete);
 
-  info->request = s3fanout::JobInfo::kReqHead;
+  info->request = s3fanout::JobInfo::kReqDelete;
   bool retme = s3fanout_mgr_.DoSingleJob(info);
-  if(retme) {
-    info->request = s3fanout::JobInfo::kReqDelete;
-    retme = s3fanout_mgr_.DoSingleJob(info);
-  }
 
   delete info;
   return retme;
