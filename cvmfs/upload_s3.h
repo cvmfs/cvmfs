@@ -5,6 +5,10 @@
 #ifndef CVMFS_UPLOAD_S3_H_
 #define CVMFS_UPLOAD_S3_H_
 
+#include <string>
+#include <vector>
+#include <utility>
+
 #include "upload_facility.h"
 #include "s3fanout.h"
 
@@ -31,7 +35,7 @@ struct S3StreamHandle : public UploadStreamHandle {
  */
 class S3Uploader : public AbstractUploader {
  public:
-  S3Uploader(const SpoolerDefinition &spooler_definition);
+  explicit S3Uploader(const SpoolerDefinition &spooler_definition);
   virtual ~S3Uploader();
   static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
@@ -98,8 +102,8 @@ class S3Uploader : public AbstractUploader {
   std::vector<std::pair<std::string, std::string> > keys_;
 
   const std::string    temporary_path_;
-  mutable atomic_int32 copy_errors_;   //!< counts the number of occured
-                                       //!< errors in Upload()
+  mutable atomic_int32 copy_errors_;   // counts the number of occured
+                                       // errors in Upload()
 };
 
 }  // namespace upload

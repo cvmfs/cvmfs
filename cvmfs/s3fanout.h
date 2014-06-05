@@ -8,6 +8,10 @@
 #include <semaphore.h>
 #include <poll.h>
 
+#include <vector>
+#include <set>
+#include <string>
+
 #include "duplex_curl.h"
 #include "prng.h"
 #include "util_concurrency.h"
@@ -82,7 +86,7 @@ struct JobInfo {
   const std::string object_key;
   const std::string hostname;
   bool test_and_set;
-  void *callback; // Callback to be called when job is finished
+  void *callback;  // Callback to be called when job is finished
   MemoryMappedFile *mmf;
 
   // One constructor per destination + head request
@@ -93,14 +97,17 @@ struct JobInfo {
           origin(kOriginPath),
           origin_path(p),
           access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
-          { http_headers = NULL; test_and_set = false; }
+          { http_headers = NULL;
+            test_and_set = false; }
   JobInfo(const std::string a, const std::string s, const std::string h,
           const std::string b, const std::string k,
           const unsigned char *buffer, size_t size) :
           origin(kOriginMem),
           access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
-          { http_headers = NULL; test_and_set = false;
-            origin_mem.size = size; origin_mem.data = buffer; }
+          { http_headers = NULL;
+            test_and_set = false;
+            origin_mem.size = size;
+            origin_mem.data = buffer; }
   ~JobInfo() {}
 
   // Internal state, don't touch
@@ -124,7 +131,7 @@ class S3FanoutManager : SingleCopy {
   void Spawn();
 
   int PushNewJob(JobInfo *info);
-  int PopCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs);
+  int PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs);
 
   const Statistics &GetStatistics();
   void SetTimeout(const unsigned seconds);
@@ -162,8 +169,7 @@ class S3FanoutManager : SingleCopy {
                                const std::string &object_key) const;
   std::string MkUrl(const std::string &host,
                     const std::string &bucket,
-                    const std::string &objkey2) const
-  {
+                    const std::string &objkey2) const {
     return "http://" + host + "/" + bucket + "/" + objkey2;
   }
 
@@ -184,7 +190,7 @@ class S3FanoutManager : SingleCopy {
   uint32_t watch_fds_max_;
 
   pthread_mutex_t *lock_options_;
-  unsigned opt_timeout_ ;
+  unsigned opt_timeout_;
 
   unsigned opt_max_retries_;
   unsigned opt_backoff_init_ms_;
