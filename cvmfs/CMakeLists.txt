@@ -479,7 +479,7 @@ if (BUILD_SERVER)
   )
 
   install(
-    FILES      ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.py
+    FILES      ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so
     DESTINATION    "/usr/share/cvmfs-server/webapi"
     PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
   )
