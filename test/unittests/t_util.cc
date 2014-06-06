@@ -47,3 +47,67 @@ TEST(T_Util, IsAbsolutePath) {
   const bool absolute = IsAbsolutePath("/tmp/foo.bar");
   EXPECT_TRUE (absolute) << "absolute path not recognized";
 }
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
+void CallbackFn(bool* const &param) { *param = true; }
+
+TEST(T_Util, SimpleCallback) {
+  bool callback_called = false;
+
+  Callback<bool*> callback(&CallbackFn);
+  callback(&callback_called);
+  EXPECT_TRUE (callback_called);
+}
+
+
+class DummyCallbackDelegate {
+ public:
+  DummyCallbackDelegate() : callback_result(-1) {}
+  void CallbackMd(const int &value) { callback_result = value; }
+
+ public:
+  int callback_result;
+};
+
+TEST(T_Util, BoundCallback) {
+  DummyCallbackDelegate delegate;
+  ASSERT_EQ (-1, delegate.callback_result);
+
+  BoundCallback<int, DummyCallbackDelegate> callback(
+                              &DummyCallbackDelegate::CallbackMd,
+                              &delegate);
+  callback(42);
+  EXPECT_EQ (42, delegate.callback_result);
+}
+
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
+class DummyCallbackable : public Callbackable<int> {
+ public:
+  DummyCallbackable() : callback_result(-1) {}
+  void CallbackMd(const int &value) { callback_result = value; }
+
+ public:
+  int callback_result;
+};
+
+TEST(T_Util, Callbackable) {
+  DummyCallbackable callbackable;
+  ASSERT_EQ (-1, callbackable.callback_result);
+
+  DummyCallbackable::callback_t *callback =
+    DummyCallbackable::MakeCallback(&DummyCallbackable::CallbackMd,
+                                    &callbackable);
+  (*callback)(1337);
+
+  EXPECT_EQ (1337, callbackable.callback_result);
+}
