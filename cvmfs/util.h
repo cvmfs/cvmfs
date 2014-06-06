@@ -411,13 +411,37 @@ class BoundClosure : public CallbackBase<ParamT> {
 };
 
 
+/**
+ * This template contains convenience functions to be inherited by classes pro-
+ * viding callback functionality. You can use this as a base class providing the
+ * callback parameter your class is going to process.
+ * Users of your class can profit from the static MakeCallback resp. MakeClosure
+ * methods to generated Callback objects. Later they can easily be passed back
+ * to your class.
+ *
+ * Note: the convenience methods return a pointer to a callback object. The user
+ *       is responsible to clean up those pointers in some way. If it is a one-
+ *       time callback, it makes sense to delete it inside the inheriting class
+ *       once it was invoked.
+ *
+ * TODO: C++11 - Replace this functionality by lambdas
+ *
+ * @param ParamT  the parameter type of the callbacks to be called
+ */
 template <class ParamT>
 class Callbackable {
  public:
   typedef CallbackBase<ParamT> callback_t;
 
  public:
-  // replace this stuff by C++11 lambdas!
+  /**
+   * Produces a BoundClosure object that captures a closure value passed along
+   * to the invoked method.
+   *
+   * @param method        Function pointer to the method to be called
+   * @param delegate      The delegate object on which <method> will be called
+   * @param closure_data  The closure data to be passed along to <method>
+   */
   template <class DelegateT, typename ClosureDataT>
   static callback_t* MakeClosure(
       typename BoundClosure<ParamT, DelegateT, ClosureDataT>::CallbackMethod method,
@@ -427,12 +451,26 @@ class Callbackable {
                                                              delegate,
                                                              closure_data);
   }
+
+  /**
+   * Produces a BoundCallback object that invokes a method on a delegate object.
+   *
+   * @param method    Function pointer to the method to be called
+   * @param delegate  The delegate object on which <method> will be called
+   */
   template <class DelegateT>
   static callback_t* MakeCallback(
         typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
         DelegateT *delegate) {
     return new BoundCallback<ParamT, DelegateT>(method, delegate);
   }
+
+  /**
+   * Produces a Callback object that invokes a static function or a globally de-
+   * fined C-like function.
+   *
+   * @param function  Function pointer to the function to be invoked
+   */
   static callback_t* MakeCallback(
         typename Callback<ParamT>::CallbackFunction function) {
     return new Callback<ParamT>(function);
