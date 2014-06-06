@@ -41,14 +41,20 @@ if which httpd2 >/dev/null 2>&1; then #SLES/OpenSuSE
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN=$(which httpd2)
+  APACHE_CTL=$APACHE_BIN
+  APACHE_WSGI_MODPKG="apache2-mod_wsgi"
 elif which apache2 >/dev/null 2>&1; then # Debian based
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN=$(which apache2)
+  APACHE_CTL=$(which apache2ctl)
+  APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
 else
   APACHE_SERVICE="httpd" # EL based
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN="/usr/sbin/httpd"
+  APACHE_CTL=$APACHE_BIN
+  APACHE_WSGI_MODPKG="mod_wsgi"
 fi
 
 # Find the service binary
@@ -320,8 +326,10 @@ least CernVM-FS $creator to manipulate this repository."
   #     -> adjustments in /etc/fstab
   #     -> additional statistics counters in file catalogs
   #
-  #   2.1.15+
-  #     < nothing changed yet >
+  #   2.1.15+ -> 2.1.20
+  #     -> replica (i.e. stratum 1) with local upstream storage has
+  #	   additional apache config for wsgi
+  #	   
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -336,6 +344,18 @@ least CernVM-FS $creator to manipulate this repository."
      [ "$creator" = "2.1.13" ] || [ "$creator" = "2.1.14" ];
   then
     if version_greater_or_equal "2.1.15"; then
+      repo_is_incompatible "$creator" $nokill
+      return $?
+    fi
+  fi
+
+  if [ "$creator" = "2.1.15"  ] || [ "$creator" = "2.1.16"  ] || \
+     [ "$creator" = "2.1.17"  ] || [ "$creator" = "2.1.18" ] || \
+     [ "$creator" = "2.1.19" ];
+  then
+    if version_greater_or_equal "2.1.20" && \
+       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] &&
+       is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
       repo_is_incompatible "$creator" $nokill
       return $?
     fi
@@ -417,6 +437,28 @@ check_autofs_on_cvmfs() {
 # @return  0 if apache is installed and running
 check_apache() {
   [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null
+}
+
+
+# checks if wsgi apache module is installed and enabled
+check_wsgi_module() {
+  if ${APACHE_CTL} -M 2>&1 | grep -q wsgi_module; then
+    return 0
+  fi
+  echo "The apache wsgi module must be installed and enabled.
+The required package is called ${APACHE_WSGI_MODPKG}."
+  if [ -f /etc/redhat-release ]; then
+    case "`cat /etc/redhat-release`" in
+      *"release 5."*)
+	if [ -f /etc/httpd/conf.d/wsgi.conf ]; then
+	  echo "To enable the module, see instructions in /etc/httpd/conf.d/wsgi.conf"
+	else
+	  echo "The package is in the epel yum repository."
+	fi
+	;;
+    esac
+  fi
+  exit 1
 }
 
 
@@ -1109,13 +1151,15 @@ mangle_s3_stratum0_url() {
 }
 
 reload_apache() {
-   echo -n "Reloading Apache... "
-   ${SERVICE_BIN} ${APACHE_SERVICE} reload > /dev/null
-   echo "done"
+  echo -n "Reloading Apache... "
+  ${SERVICE_BIN} ${APACHE_SERVICE} reload > /dev/null
+  echo "done"
 }
 
 restart_apache() {
+  echo -n "Restarting Apache... "
   ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null
+  echo "done"
 }
 
 
@@ -1276,6 +1320,23 @@ remove_apache_config_file() {
   rm -f $conf_path
 }
 
+# sends wsgi configuration to stdout
+#
+# @param name        the name of the repository
+cat_wsgi_config() {
+  local name=$1
+  echo "# Enable api functions
+WSGIPythonPath /usr/share/cvmfs-server/webapi
+Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
+
+<Directory /var/www/wsgi-scripts>
+    Options ExecCGI
+    SetHandler wsgi-script
+    Order allow,deny
+    Allow from all
+</Directory>
+"
+}
 
 # puts all configuration files in place that are need for a stratum0 repository
 #
@@ -1843,11 +1904,15 @@ add_replica() {
   # additional sanity checks
   is_root || die "Only root can create a new repository"
   check_user $cvmfs_user || die "No user $cvmfs_user"
-  if is_local_upstream $upstream && ! check_apache; then
-    if [ $silence_httpd_warning -eq 1 ]; then
-      echo "Warning: Apache is needed to access this CVMFS replication"
-    else
-      die "Apache must be installed and running"
+  if is_local_upstream $upstream; then
+    if ! check_apache; then
+      if [ $silence_httpd_warning -eq 1 ]; then
+	echo "Warning: Apache is needed to access this CVMFS replication"
+      else
+	die "Apache must be installed and running"
+      fi
+    elif [ $silence_httpd_warning -eq 0 ]; then
+      check_wsgi_module
     fi
   fi
   check_upstream_validity $upstream
@@ -1873,7 +1938,9 @@ CVMFS_HTTP_RETRIES=3
 EOF
 
   if is_local_upstream $upstream; then
-    create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
+    ((echo "# Created by cvmfs_server.  Don't touch."
+      cat_wsgi_config ${name}; cat) | \
+      create_apache_config_file "cvmfs.${name}.conf") << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$alias_name ${storage_dir}
 <Directory "${storage_dir}">
@@ -3116,6 +3183,12 @@ snapshot() {
 
     # more sanity checks
     check_repository_compatibility
+    if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
+	# this might have been missed if add-replica -a was used or 
+	#  if a migrate was done while apache wasn't running, but then
+	#  apache was enabled later
+	check_wsgi_module
+    fi
 
     # do it!
     local user_shell="sh -c"
@@ -3311,6 +3384,54 @@ migrate_2_1_7() {
   cvmfs_suid_helper rw_mount $name      > /dev/null 2>&1 || die "fail! (mounting /cvmfs/$name)"
 }
 
+# note that this is only run on stratum1s that have local upstream storage
+migrate_2_1_15() {
+  local name=$1
+  local destination_version="2.1.20"
+  local conf_file
+  conf_file="$(get_apache_conf_path)/cvmfs.${name}.conf"
+  
+  # get repository information
+  load_repo_config $name
+
+  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string $destination_version)"
+
+  if check_apache; then
+    check_wsgi_module
+  fi
+  # else apache is currently stopped, add-replica may have been run with -a
+
+  if [ -f "$conf_file" ]; then
+    echo "--> updating $conf_file"
+    (echo "# Created by cvmfs_server.  Don't touch."
+     cat_wsgi_config $name
+     sed '/^# Created by cvmfs_server/d' $conf_file) > $conf_file.NEW
+    cat $conf_file.NEW >$conf_file
+    rm -f $conf_file.NEW
+    if check_apache; then
+      # Need to restart, reload doesn't work at least for the first module;
+      #  that results in repeated segmentation faults on RHEL5 & 6
+      restart_apache
+    fi
+  else
+    if check_apache; then
+      echo "$conf_file does not exist."
+      echo "Make sure the equivalent of the following is in the apache configuration:"
+      echo ----------
+    else
+      echo "Apache is not enabled and $conf_file does not exist."
+      echo "  If you do enable Apache, make sure the equivalent of the following is"
+      echo "  in the apache configuration:"
+    fi
+    cat_wsgi_config $name
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=$destination_version/" /etc/cvmfs/repositories.d/$name/server.conf
+
+  # reload (updated) repository information
+  load_repo_config $name
+}
 
 migrate() {
   local names
@@ -3350,6 +3471,17 @@ migrate() {
          $(repository_creator_version) = "2.1.14" ];
     then
       migrate_2_1_7 $name
+    fi
+
+    if [ $(repository_creator_version) = "2.1.15" -o \
+         $(repository_creator_version) = "2.1.16" -o \
+         $(repository_creator_version) = "2.1.17" -o \
+         $(repository_creator_version) = "2.1.18" -o \
+         $(repository_creator_version) = "2.1.19" ] &&
+       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] &&
+       is_local_upstream $CVMFS_UPSTREAM_STORAGE;
+    then
+      migrate_2_1_15 $name
     fi
 
   done
