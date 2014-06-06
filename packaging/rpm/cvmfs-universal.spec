@@ -109,7 +109,7 @@ CernVM-FS static client library for pure user-space use
 %package server
 Summary: CernVM-FS server tools
 Group: Application/System
-BuildRequires: python
+BuildRequires: python-devel
 %if 0%{?suse_version}
 Requires: insserv
 %else
