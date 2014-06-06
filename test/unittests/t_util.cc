@@ -122,13 +122,34 @@ TEST(T_Util, BoundClosure) {
 class DummyCallbackable : public Callbackable<int> {
  public:
   DummyCallbackable() : callback_result(-1) {}
-  void CallbackMd(const int &value) { callback_result = value; }
+  static void CallbackFn(const int &value) { g_callback_result = value; }
+         void CallbackMd(const int &value) { callback_result = value; }
+         void CallbackClosureMd(const int &value, ClosureData data) {
+    callback_result = value + data.data;
+  }
+
 
  public:
-  int callback_result;
+         int   callback_result;
+  static int g_callback_result;
 };
+int DummyCallbackable::g_callback_result = -1;
 
-TEST(T_Util, Callbackable) {
+TEST(T_Util, CallbackableCallback) {
+  ASSERT_EQ (-1, DummyCallbackable::g_callback_result);
+
+  DummyCallbackable::callback_t *callback =
+    DummyCallbackable::MakeCallback(&DummyCallbackable::CallbackFn);
+  EXPECT_EQ (-1, DummyCallbackable::g_callback_result);
+
+  (*callback)(1337);
+
+  EXPECT_EQ (1337, DummyCallbackable::g_callback_result);
+  DummyCallbackable::g_callback_result = -1;
+  ASSERT_EQ (-1, DummyCallbackable::g_callback_result);
+}
+
+TEST(T_Util, CallbackableBoundCallback) {
   DummyCallbackable callbackable;
   ASSERT_EQ (-1, callbackable.callback_result);
 
@@ -138,4 +159,24 @@ TEST(T_Util, Callbackable) {
   (*callback)(1337);
 
   EXPECT_EQ (1337, callbackable.callback_result);
+}
+
+TEST(T_Util, CallbackableBoundClosure) {
+  DummyCallbackable callbackable;
+  ASSERT_EQ (-1, callbackable.callback_result);
+
+  ClosureData closure_data;
+  ASSERT_EQ (closure_data_item, closure_data.data);
+
+  DummyCallbackable::callback_t *callback =
+    DummyCallbackable::MakeClosure(&DummyCallbackable::CallbackClosureMd,
+                                   &callbackable,
+                                    closure_data);
+  EXPECT_EQ (closure_data_item, closure_data.data);
+  EXPECT_EQ (-1, callbackable.callback_result);
+
+  (*callback)(1337);
+
+  EXPECT_EQ (closure_data_item, closure_data.data); // didn't change (closure captured copy)
+  EXPECT_EQ (1337 + closure_data_item, callbackable.callback_result);
 }
