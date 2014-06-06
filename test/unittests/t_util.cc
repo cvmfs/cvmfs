@@ -64,11 +64,19 @@ TEST(T_Util, SimpleCallback) {
   EXPECT_TRUE (callback_called);
 }
 
+const int closure_data_item = 93142;
+struct ClosureData {
+  ClosureData() : data(closure_data_item) {}
+  int data;
+};
 
 class DummyCallbackDelegate {
  public:
   DummyCallbackDelegate() : callback_result(-1) {}
   void CallbackMd(const int &value) { callback_result = value; }
+  void CallbackClosureMd(const int &value, ClosureData data) {
+    callback_result = value + data.data;
+  }
 
  public:
   int callback_result;
@@ -83,6 +91,26 @@ TEST(T_Util, BoundCallback) {
                               &delegate);
   callback(42);
   EXPECT_EQ (42, delegate.callback_result);
+}
+
+TEST(T_Util, BoundClosure) {
+  DummyCallbackDelegate delegate;
+  ASSERT_EQ (-1, delegate.callback_result);
+
+  ClosureData closure_data;
+  ASSERT_EQ (closure_data_item, closure_data.data);
+  EXPECT_EQ (-1, delegate.callback_result);
+
+  BoundClosure<int, DummyCallbackDelegate, ClosureData> closure(
+                              &DummyCallbackDelegate::CallbackClosureMd,
+                              &delegate,
+                               closure_data);
+  EXPECT_EQ (closure_data_item, closure_data.data);
+  EXPECT_EQ (-1, delegate.callback_result);
+
+  closure(1337);
+  EXPECT_EQ (closure_data_item, closure_data.data); // didn't change (closure captured copy)
+  EXPECT_EQ (closure_data_item + 1337, delegate.callback_result);
 }
 
 
