@@ -8,6 +8,10 @@
 #include <semaphore.h>
 #include <poll.h>
 
+#include <vector>
+#include <set>
+#include <string>
+
 #include "duplex_curl.h"
 #include "prng.h"
 #include "util_concurrency.h"
@@ -65,6 +69,7 @@ struct JobInfo {
   enum RequestType {
     kReqHead = 0,
     kReqPut,
+    kReqDelete,
   };
 
   Origin origin;
@@ -81,7 +86,7 @@ struct JobInfo {
   const std::string object_key;
   const std::string hostname;
   bool test_and_set;
-  void *callback; // Callback to be called when job is finished
+  void *callback;  // Callback to be called when job is finished
   MemoryMappedFile *mmf;
 
   // One constructor per destination + head request
@@ -92,14 +97,17 @@ struct JobInfo {
           origin(kOriginPath),
           origin_path(p),
           access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
-          { http_headers = NULL; test_and_set = false; }
+          { http_headers = NULL;
+            test_and_set = false; }
   JobInfo(const std::string a, const std::string s, const std::string h,
           const std::string b, const std::string k,
           const unsigned char *buffer, size_t size) :
           origin(kOriginMem),
           access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
-          { http_headers = NULL; test_and_set = false;
-            origin_mem.size = size; origin_mem.data = buffer; }
+          { http_headers = NULL;
+            test_and_set = false;
+            origin_mem.size = size;
+            origin_mem.data = buffer; }
   ~JobInfo() {}
 
   // Internal state, don't touch
@@ -123,7 +131,7 @@ class S3FanoutManager : SingleCopy {
   void Spawn();
 
   int PushNewJob(JobInfo *info);
-  int PopCompletedJobs(std::vector<s3fanout::JobInfo*> &jobs);
+  int PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs);
 
   const Statistics &GetStatistics();
   void SetTimeout(const unsigned seconds);
@@ -131,6 +139,8 @@ class S3FanoutManager : SingleCopy {
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
+
+  bool DoSingleJob(JobInfo *info) const;
 
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
@@ -141,10 +151,10 @@ class S3FanoutManager : SingleCopy {
   std::vector<s3fanout::JobInfo*> jobs_completed_;
   pthread_mutex_t *jobs_completed_lock_;
 
-  CURL *AcquireCurlHandle();
-  void ReleaseCurlHandle(JobInfo *info, CURL *handle);
-  Failures InitializeRequest(JobInfo *info, CURL *handle);
-  void SetUrlOptions(JobInfo *info);
+  CURL *AcquireCurlHandle() const;
+  void ReleaseCurlHandle(JobInfo *info, CURL *handle) const;
+  Failures InitializeRequest(JobInfo *info, CURL *handle) const;
+  void SetUrlOptions(JobInfo *info) const;
   void UpdateStatistics(CURL *handle);
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
@@ -156,11 +166,10 @@ class S3FanoutManager : SingleCopy {
                                const std::string &request,
                                const std::string &content_md5_base64,
                                const std::string &bucket,
-                               const std::string &object_key);
+                               const std::string &object_key) const;
   std::string MkUrl(const std::string &host,
                     const std::string &bucket,
-                    const std::string &objkey2)
-  {
+                    const std::string &objkey2) const {
     return "http://" + host + "/" + bucket + "/" + objkey2;
   }
 
@@ -181,7 +190,7 @@ class S3FanoutManager : SingleCopy {
   uint32_t watch_fds_max_;
 
   pthread_mutex_t *lock_options_;
-  unsigned opt_timeout_ ;
+  unsigned opt_timeout_;
 
   unsigned opt_max_retries_;
   unsigned opt_backoff_init_ms_;

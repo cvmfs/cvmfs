@@ -5,6 +5,10 @@
 #ifndef CVMFS_UPLOAD_S3_H_
 #define CVMFS_UPLOAD_S3_H_
 
+#include <string>
+#include <vector>
+#include <utility>
+
 #include "upload_facility.h"
 #include "s3fanout.h"
 
@@ -31,7 +35,7 @@ struct S3StreamHandle : public UploadStreamHandle {
  */
 class S3Uploader : public AbstractUploader {
  public:
-  S3Uploader(const SpoolerDefinition &spooler_definition);
+  explicit S3Uploader(const SpoolerDefinition &spooler_definition);
   virtual ~S3Uploader();
   static bool WillHandle(const SpoolerDefinition &spooler_definition);
 
@@ -57,7 +61,6 @@ class S3Uploader : public AbstractUploader {
                               const std::string  &hash_suffix);
 
   bool Remove(const std::string &file_to_delete);
-
   bool Peek(const std::string& path) const;
 
   /**
@@ -68,9 +71,6 @@ class S3Uploader : public AbstractUploader {
 
  protected:
   void WorkerThread();
-
-  int Move(const std::string &local_path,
-           const std::string &remote_path) const;
 
   int CreateAndOpenTemporaryChunkFile(std::string *path) const;
 
@@ -85,10 +85,11 @@ class S3Uploader : public AbstractUploader {
   int GetKeysAndBucket(const std::string  &filename,
                        std::string        *access_key,
                        std::string        *secret_key,
-                       std::string        *bucket_name);
-  std::string GetBucketName(unsigned int use_bucket);
-  int SelectBucket(const std::string &rem_filename);
-  int GetKeyIndex(unsigned int use_bucket);
+                       std::string        *bucket_name) const;
+  std::string GetBucketName(unsigned int use_bucket) const;
+  int SelectBucket(const std::string &rem_filename) const;
+  int GetKeyIndex(unsigned int use_bucket) const;
+  s3fanout::JobInfo *CreateJobInfo(const std::string& path) const;
 
   s3fanout::S3FanoutManager s3fanout_mgr_;
   // state information
@@ -101,8 +102,8 @@ class S3Uploader : public AbstractUploader {
   std::vector<std::pair<std::string, std::string> > keys_;
 
   const std::string    temporary_path_;
-  mutable atomic_int32 copy_errors_;   //!< counts the number of occured
-                                       //!< errors in Upload()
+  mutable atomic_int32 copy_errors_;   // counts the number of occured
+                                       // errors in Upload()
 };
 
 }  // namespace upload
