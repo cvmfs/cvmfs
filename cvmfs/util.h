@@ -311,6 +311,13 @@ class CallbackBase {
   virtual void operator()(const ParamT &value) const = 0;
 };
 
+template <>
+class CallbackBase<void> {
+ public:
+  virtual ~CallbackBase() {}
+  virtual void operator()() const = 0;
+};
+
 /**
  * This callback function object can be used to call static members or global
  * functions with the following signature:
@@ -328,6 +335,18 @@ class Callback : public CallbackBase<ParamT> {
 
   Callback(CallbackFunction function) : function_(function) {}
   void operator()(const ParamT &value) const { function_(value); }
+
+ private:
+  CallbackFunction function_;
+};
+
+template <>
+class Callback<void> : public CallbackBase<void> {
+ public:
+  typedef void (*CallbackFunction)();
+
+  Callback(CallbackFunction function) : function_(function) {}
+  void operator()() const { function_(); }
 
  private:
   CallbackFunction function_;
@@ -360,6 +379,23 @@ class BoundCallback : public CallbackBase<ParamT> {
     method_(method) {}
 
   void operator()(const ParamT &value) const { (delegate_->*method_)(value); }
+
+ private:
+  DelegateT*     delegate_;
+  CallbackMethod method_;
+};
+
+template <class DelegateT>
+class BoundCallback<void, DelegateT> : public CallbackBase<void> {
+ public:
+  typedef void (DelegateT::*CallbackMethod)();
+
+  BoundCallback(CallbackMethod method, DelegateT *delegate) :
+    delegate_(delegate), method_(method) {}
+  BoundCallback(CallbackMethod method, DelegateT &delegate) :
+    delegate_(&delegate), method_(method) {}
+
+  void operator()() const { (delegate_->*method_)(); }
 
  private:
   DelegateT*     delegate_;
@@ -408,6 +444,29 @@ class BoundClosure : public CallbackBase<ParamT> {
   DelegateT*          delegate_;
   CallbackMethod      method_;
   const ClosureDataT  closure_data_;
+};
+
+template <class DelegateT, typename ClosureDataT>
+class BoundClosure<void, DelegateT, ClosureDataT> : public CallbackBase<void> {
+ public:
+  typedef void (DelegateT::*CallbackMethod)(const ClosureDataT closure_data);
+
+ public:
+  BoundClosure(CallbackMethod  method,
+               DelegateT      *delegate,
+               ClosureDataT    data) :
+    delegate_(delegate), method_(method), closure_data_(data) {}
+  BoundClosure(CallbackMethod  method,
+               DelegateT      &delegate,
+               ClosureDataT    data) :
+    delegate_(&delegate), method_(method), closure_data_(data) {}
+
+  void operator()() const { (delegate_->*method_)(closure_data_); }
+
+ private:
+  DelegateT*         delegate_;
+  CallbackMethod     method_;
+  const ClosureDataT closure_data_;
 };
 
 
