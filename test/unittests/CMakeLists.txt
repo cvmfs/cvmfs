@@ -40,6 +40,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_base64.cc
   t_pathspec.cc
   t_dirtab.cc
+  t_callbacks.cc
 
   # test utility functions
   testutil.cc testutil.h
