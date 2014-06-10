@@ -180,9 +180,8 @@ class DummyCallbackable : public Callbackable<int> {
     callback_result = value + data.data;
   }
 
-
  public:
-         int   callback_result;
+         int callback_result;
   static int g_callback_result;
 };
 int DummyCallbackable::g_callback_result = -1;
