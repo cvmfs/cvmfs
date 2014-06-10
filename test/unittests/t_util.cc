@@ -186,6 +186,22 @@ class DummyCallbackable : public Callbackable<int> {
 };
 int DummyCallbackable::g_callback_result = -1;
 
+class DummyCallbackableVoid : public Callbackable<void> {
+ public:
+  DummyCallbackableVoid() : callback_result(-1) {}
+
+  static void CallbackFn() { ++g_void_callback_calls; }
+         void CallbackMd() { ++callback_result; }
+         void CallbackClosureMd(ClosureData data) {
+    callback_result = data.data;
+  }
+
+ public:
+         int callback_result;
+  static int g_void_callback_calls;
+};
+int DummyCallbackableVoid::g_void_callback_calls = 0;
+
 TEST(T_Util, CallbackableCallback) {
   ASSERT_EQ (-1, DummyCallbackable::g_callback_result);
 
@@ -230,4 +246,57 @@ TEST(T_Util, CallbackableBoundClosure) {
 
   EXPECT_EQ (closure_data_item, closure_data.data); // didn't change (closure captured copy)
   EXPECT_EQ (1337 + closure_data_item, callbackable.callback_result);
+}
+
+TEST(T_Util, CallbackableVoidCallback) {
+  ASSERT_EQ (0, DummyCallbackableVoid::g_void_callback_calls);
+
+  DummyCallbackableVoid::callback_t *callback =
+    DummyCallbackableVoid::MakeCallback(&DummyCallbackableVoid::CallbackFn);
+  EXPECT_EQ (0, DummyCallbackableVoid::g_void_callback_calls);
+
+  (*callback)();
+  EXPECT_EQ (1, DummyCallbackableVoid::g_void_callback_calls);
+  (*callback)();
+  EXPECT_EQ (2, DummyCallbackableVoid::g_void_callback_calls);
+  (*callback)();
+  EXPECT_EQ (3, DummyCallbackableVoid::g_void_callback_calls);
+
+  DummyCallbackableVoid::g_void_callback_calls = 0;
+  ASSERT_EQ (0, DummyCallbackableVoid::g_void_callback_calls);
+}
+
+TEST(T_Util, CallbackableVoidBoundCallback) {
+  DummyCallbackableVoid callbackable;
+  ASSERT_EQ (-1, callbackable.callback_result);
+
+  DummyCallbackableVoid::callback_t *callback =
+    DummyCallbackableVoid::MakeCallback(&DummyCallbackableVoid::CallbackMd,
+                                        &callbackable);
+  EXPECT_EQ (-1, callbackable.callback_result);
+  (*callback)();
+  EXPECT_EQ (0, callbackable.callback_result);
+  (*callback)();
+  EXPECT_EQ (1, callbackable.callback_result);
+  (*callback)();
+}
+
+TEST(T_Util, CallbackableVoidBoundClosure) {
+  DummyCallbackableVoid callbackable;
+  ASSERT_EQ (-1, callbackable.callback_result);
+
+  ClosureData closure_data;
+  ASSERT_EQ (closure_data_item, closure_data.data);
+
+  DummyCallbackableVoid::callback_t *callback =
+    DummyCallbackableVoid::MakeClosure(&DummyCallbackableVoid::CallbackClosureMd,
+                                       &callbackable,
+                                        closure_data);
+  EXPECT_EQ (closure_data_item, closure_data.data);
+  EXPECT_EQ (-1, callbackable.callback_result);
+
+  (*callback)();
+
+  EXPECT_EQ (closure_data_item, closure_data.data); // didn't change (closure captured copy)
+  EXPECT_EQ (closure_data_item, callbackable.callback_result);
 }
