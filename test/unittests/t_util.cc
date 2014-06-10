@@ -56,6 +56,9 @@ TEST(T_Util, IsAbsolutePath) {
 
 void CallbackFn(bool* const &param) { *param = true; }
 
+static int callback_fn_void_calls = 0;
+void CallbackFnVoid() { ++callback_fn_void_calls; }
+
 TEST(T_Util, SimpleCallback) {
   bool callback_called = false;
 
@@ -74,8 +77,12 @@ class DummyCallbackDelegate {
  public:
   DummyCallbackDelegate() : callback_result(-1) {}
   void CallbackMd(const int &value) { callback_result = value; }
+  void CallbackMdVoid() { ++callback_result; }
   void CallbackClosureMd(const int &value, ClosureData data) {
     callback_result = value + data.data;
+  }
+  void CallbackClosureMdVoid(ClosureData data) {
+    callback_result = data.data;
   }
 
  public:
@@ -111,6 +118,51 @@ TEST(T_Util, BoundClosure) {
   closure(1337);
   EXPECT_EQ (closure_data_item, closure_data.data); // didn't change (closure captured copy)
   EXPECT_EQ (closure_data_item + 1337, delegate.callback_result);
+}
+
+TEST(T_Util, VoidCallback) {
+  Callback<void> callback(&CallbackFnVoid);
+  EXPECT_EQ (0, callback_fn_void_calls);
+  callback();
+  EXPECT_EQ (1, callback_fn_void_calls);
+  callback();
+  EXPECT_EQ (2, callback_fn_void_calls);
+}
+
+TEST(T_Util, VoidBoundCallback) {
+  DummyCallbackDelegate delegate;
+  ASSERT_EQ (-1, delegate.callback_result);
+
+  BoundCallback<void, DummyCallbackDelegate> callback(
+                              &DummyCallbackDelegate::CallbackMdVoid,
+                              &delegate);
+  EXPECT_EQ (-1, delegate.callback_result);
+  callback();
+  EXPECT_EQ (0, delegate.callback_result);
+  callback();
+  EXPECT_EQ (1, delegate.callback_result);
+  callback();
+  EXPECT_EQ (2, delegate.callback_result);
+}
+
+TEST(T_Util, VoidBoundClosure) {
+  DummyCallbackDelegate delegate;
+  ASSERT_EQ (-1, delegate.callback_result);
+
+  ClosureData closure_data;
+  ASSERT_EQ (closure_data_item, closure_data.data);
+  EXPECT_EQ (-1, delegate.callback_result);
+
+  BoundClosure<void, DummyCallbackDelegate, ClosureData> closure(
+                              &DummyCallbackDelegate::CallbackClosureMdVoid,
+                              &delegate,
+                               closure_data);
+  EXPECT_EQ (closure_data_item, closure_data.data);
+  EXPECT_EQ (-1, delegate.callback_result);
+
+  closure();
+  EXPECT_EQ (closure_data_item, closure_data.data); // didn't change (closure captured copy)
+  EXPECT_EQ (closure_data_item, delegate.callback_result);
 }
 
 
