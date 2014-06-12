@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 
+#include <cstdlib>
 #include <string>
 #include <map>
 #include <vector>
@@ -19,6 +20,7 @@
 #include "atomic.h"
 #include "manifest_fetch.h"
 #include "backoff.h"
+#include "kvstore.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -42,8 +44,11 @@ enum CacheModes {
 
 bool Init(const std::string &cache_path, const bool alien_cache);
 void Fini();
+void Spawn();
 
 int Open(const shash::Any &id);
+bool Close(int fd);
+ssize_t Read(int fd, void *buf, size_t nbyte, off_t offset);
 int FetchDirent(const catalog::DirectoryEntry &d,
                 const std::string &cvmfs_path,
                 const bool volatile_content,

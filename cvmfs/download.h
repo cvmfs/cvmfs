@@ -53,6 +53,7 @@ enum Failures {
   kFailProxyHttp,
   kFailHostHttp,
   kFailBadData,
+  kFailWriteHandler,
   kFailOther,
 };  // Failures
 
@@ -74,7 +75,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[8] = "proxy returned HTTP error";
   texts[9] = "host returned HTTP error";
   texts[10] = "corrupted data received";
-  texts[11] = "unknown network error";
+  texts[11] = "custom write handler failed";
+  texts[12] = "unknown network error";
 
   return texts[error];
 }
@@ -101,6 +103,16 @@ struct Statistics {
 };  // Statistics
 
 
+struct JobInfo;
+struct StreamHandler {
+  virtual bool Start(const JobInfo &info) = 0;
+  virtual bool Next(const JobInfo &info,
+                    const void *data, const uint64_t size) = 0;
+  virtual bool Commit(const JobInfo &info) = 0;
+  virtual void Abort(const JobInfo &info) = 0;
+};
+
+
 /**
  * Contains all the information to specify a download job.
  */
@@ -119,6 +131,7 @@ struct JobInfo {
   const std::string *destination_path;
   const shash::Any *expected_hash;
   const std::string *extra_info;
+  StreamHandler *stream_handler;
 
   // Default initialization of fields
   void Init() {
@@ -133,10 +146,12 @@ struct JobInfo {
     destination_path = NULL;
     expected_hash = NULL;
     extra_info = NULL;
+    stream_handler = NULL;
 
     curl_handle = NULL;
     headers = NULL;
     memset(&zstream, 0, sizeof(zstream));
+    memset(&zstream_custom, 0, sizeof(zstream_custom));
     info_header = NULL;
     wait_at[0] = wait_at[1] = -1;
     nocache = false;
@@ -198,6 +213,7 @@ struct JobInfo {
   curl_slist *headers;
   char *info_header;
   z_stream zstream;
+  z_stream zstream_custom;
   shash::ContextPtr hash_context;
   int wait_at[2];  /**< Pipe used for the return value */
   std::string proxy;

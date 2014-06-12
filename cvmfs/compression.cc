@@ -195,6 +195,56 @@ StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
 }
 
 
+StreamStates DecompressZStream2Mem(z_stream *strm,
+                                   void **outbuf, uint64_t *outsize,
+                                   const void *buf, const int64_t size)
+{
+  unsigned char out[kZChunk];
+  int z_ret;
+  int64_t pos = 0;
+
+  *outsize = 0;
+  uint64_t outcapacity = 2*size;
+  *outbuf = smalloc(outcapacity);
+
+  do {
+    strm->avail_in = (kZChunk > (size-pos)) ? size-pos : kZChunk;
+    strm->next_in = ((unsigned char *)buf)+pos;
+
+    // Run inflate() on input until output buffer not full
+    do {
+      strm->avail_out = kZChunk;
+      strm->next_out = out;
+      z_ret = inflate(strm, Z_NO_FLUSH);
+      switch (z_ret) {
+        case Z_NEED_DICT:
+          z_ret = Z_DATA_ERROR;  // and fall through
+        case Z_STREAM_ERROR:
+        case Z_DATA_ERROR:
+          free(*outbuf);
+          *outbuf = NULL;
+          return kStreamDataError;
+        case Z_MEM_ERROR:
+          free(*outbuf);
+          *outbuf = NULL;
+          return kStreamIOError;
+      }
+      size_t have = kZChunk - strm->avail_out;
+      while (have > outcapacity - *outsize) {
+        outcapacity *= 2;
+        *outbuf = srealloc(*outbuf, outcapacity);
+      }
+      memcpy(reinterpret_cast<char *>(*outbuf) + *outsize, out, have);
+      *outsize += have;
+    } while (strm->avail_out == 0);
+
+    pos += kZChunk;
+  } while (pos < size);
+
+  return (z_ret == Z_STREAM_END ? kStreamEnd : kStreamContinue);
+}
+
+
 bool CompressPath2Path(const string &src, const string &dest) {
   FILE *fsrc = fopen(src.c_str(), "r");
   if (!fsrc) {

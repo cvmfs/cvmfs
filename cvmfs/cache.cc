@@ -124,6 +124,8 @@ atomic_int64 num_download_;
 
 CacheModes cache_mode_;
 
+KvStore *dmemcache_;
+
 
 static void CleanupTLS(ThreadLocalStorage *tls) {
   close(tls->pipe_wait[0]);
@@ -184,7 +186,21 @@ bool Init(const string &cache_path, const bool alien_cache) {
   int retval = pthread_key_create(&thread_local_storage_, TLSDestructor);
   assert(retval == 0);
 
+  dmemcache_ = NULL;
+  //dmemcache_ = new RcStore();
+  //retval = dmemcache_->Init("zk:localhost:2181");
+  //if (!retval)
+  //    return false;
+
   return true;
+}
+
+
+void Spawn() {
+  delete dmemcache_;
+  dmemcache_ = new RcStore();
+  bool retval = dmemcache_->Init("zk:localhost:2181");
+  assert(retval);
 }
 
 
@@ -197,9 +213,11 @@ void Fini() {
   delete cache_path_;
   delete queues_download_;
   delete tls_blocks_;
+  delete dmemcache_;
   cache_path_ = NULL;
   queues_download_ = NULL;
   tls_blocks_ = NULL;
+  dmemcache_ = NULL;
 }
 
 
@@ -247,6 +265,13 @@ static inline string GetTempName()
  * \return A file descriptor if file is in cache.  Error code of open() else.
  */
 int Open(const shash::Any &id) {
+  if (dmemcache_) {
+    int result = dmemcache_->Open(id.ToString());
+    if (result >= 0)
+      return result+50000;
+    return result;
+  }
+
   const string path = GetPathInCache(id);
   int result = ::open(path.c_str(), O_RDONLY);
 
@@ -259,6 +284,23 @@ int Open(const shash::Any &id) {
   }
 
   return result;
+}
+
+bool Close(int fd) {
+  if ((fd >= 50000) && dmemcache_) {
+    dmemcache_->Close(fd-50000);
+    return true;
+  }
+
+  int retval = close(fd);
+  return retval == 0;
+}
+
+ssize_t Read(int fd, void *buf, size_t nbytes, off_t offset) {
+  if ((fd >= 50000) && dmemcache_) {
+    return dmemcache_->Read(fd-50000, nbytes, offset, buf);
+  }
+  return pread(fd, buf, nbytes, offset);
 }
 
 
@@ -283,7 +325,7 @@ static bool Open2Mem(const shash::Any &id,
 
   platform_stat64 info;
   if (platform_fstat(fd, &info) != 0) {
-    close(fd);
+    cache::Close(fd);
     return false;
   }
 
@@ -292,14 +334,14 @@ static bool Open2Mem(const shash::Any &id,
 
   int64_t retval = read(fd, *buffer, *size);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != *size)) {
-    close(fd);
+    cache::Close(fd);
     free(*buffer);
     *buffer = NULL;
     *size = 0;
     return false;
   }
 
-  close(fd);
+  cache::Close(fd);
   return true;
 }
 
@@ -554,7 +596,11 @@ static int Fetch(const shash::Any &checksum,
   tls->download_job.destination_file = f;
   tls->download_job.expected_hash = &checksum;
   tls->download_job.extra_info = &cvmfs_path;
-  download_manager->Fetch(&tls->download_job);
+  {
+    KvStreamHandler kv_stream_handler(dmemcache_, checksum.ToString());
+    tls->download_job.stream_handler = &kv_stream_handler;
+    download_manager->Fetch(&tls->download_job);
+  }
 
   if (tls->download_job.error_code == download::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "finished downloading of %s", url.c_str());

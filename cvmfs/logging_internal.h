@@ -66,6 +66,7 @@ enum LogSource {
   kLogUnionFs,
   kLogPathspec,
   kLogS3Fanout,
+  kLogRamcloud,
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;

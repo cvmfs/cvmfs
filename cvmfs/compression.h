@@ -41,6 +41,9 @@ void DecompressFini(z_stream *strm);
 
 StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
                                     const int64_t size);
+StreamStates DecompressZStream2Mem(z_stream *strm,
+                                   void **outbuf, uint64_t *outsize,
+                                   const void *buf, const int64_t size);
 
 bool CompressPath2Path(const std::string &src, const std::string &dest);
 bool CompressPath2Path(const std::string &src, const std::string &dest,

@@ -151,6 +151,12 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
       return kFailLocalIO;
   }
 
+  if (info->stream_handler) {
+    bool retval = info->stream_handler->Start(*info);
+    if (!retval)
+      return kFailWriteHandler;
+  }
+
   return kFailOk;
 }
 
@@ -266,6 +272,32 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         info->error_code = kFailLocalIO;
         return 0;
       }
+    }
+  }
+
+  if (info->stream_handler) {
+    bool retval;
+    if (info->compressed) {
+      void *out_buf;
+      uint64_t outsize;
+      zlib::StreamStates retval_zlib =
+        zlib::DecompressZStream2Mem(&info->zstream_custom,
+                                    &out_buf, &outsize,
+                                    ptr, num_bytes);
+      if (retval_zlib == zlib::kStreamDataError) {
+        LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
+                 info->url->c_str());
+        info->error_code = kFailBadData;
+        return 0;
+      }
+      retval = info->stream_handler->Next(*info, out_buf, outsize);
+      free(out_buf);
+    } else {
+      retval = info->stream_handler->Next(*info, ptr, num_bytes);
+    }
+    if (!retval) {
+      info->error_code = kFailWriteHandler;
+      return 0;
     }
   }
 
@@ -642,6 +674,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   }
   if (info->compressed) {
     zlib::DecompressInit(&(info->zstream));
+    zlib::DecompressInit(&(info->zstream_custom));
   }
   if (info->expected_hash) {
     assert(info->hash_context.buffer != NULL);
@@ -864,6 +897,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         }
       }
 
+      if (info->stream_handler) {
+        bool retval = info->stream_handler->Commit(*info);
+        if (!retval)
+          info->error_code = kFailWriteHandler;
+      }
+
       info->error_code = kFailOk;
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
@@ -981,8 +1020,19 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if (info->expected_hash)
       shash::Init(info->hash_context);
-    if (info->compressed)
+    if (info->compressed) {
       zlib::DecompressInit(&info->zstream);
+      zlib::DecompressInit(&info->zstream_custom);
+    }
+
+    if (info->stream_handler) {
+      info->stream_handler->Abort(*info);
+      bool retval = info->stream_handler->Start(*info);
+      if (!retval) {
+        info->error_code = kFailWriteHandler;
+        goto verify_and_finalize_stop;
+      }
+    }
 
     // Failure handling
     bool switch_proxy = false;
@@ -1045,8 +1095,10 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->destination_file = NULL;
   }
 
-  if (info->compressed)
+  if (info->compressed) {
     zlib::DecompressFini(&info->zstream);
+    zlib::DecompressFini(&info->zstream_custom);
+  }
 
   if (info->headers) {
     header_lists_->PutList(info->headers);

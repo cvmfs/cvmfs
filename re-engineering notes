@@ -1,5 +1,6 @@
 cache module --> cache manager
 download: proper abstraction of "network path"
+download: abstraction for streamed data (start, next, abort/commit)
 central statistcs service
 enforce code style dicipline
 namespaces: use anonymous namespaces more systematically, review use of namespace together with moving source files into subdirectories (name spaces reflect relative path)

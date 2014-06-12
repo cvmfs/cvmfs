@@ -1109,6 +1109,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              "linking chunk handle %d to inode: %"PRIu64,
              chunk_tables_->next_handle, uint64_t(ino));
     chunk_tables_->handle2fd.Insert(chunk_tables_->next_handle, ChunkFd());
+    //fi->keep_cache = !cvmfs::nfs_maps_;
+    fi->keep_cache = 0;
     fi->fh = static_cast<uint64_t>(-chunk_tables_->next_handle);
     ++chunk_tables_->next_handle;
     chunk_tables_->Unlock();
@@ -1282,7 +1284,8 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
              chunk_fd.fd);
   } else {
     const int64_t fd = fi->fh;
-    overall_bytes_fetched = pread(fd, data, size, off);
+    overall_bytes_fetched = cache::Read(fd, data, size, off);
+    //pread(fd, data, size, off);
   }
 
   // Push it to user
@@ -1340,7 +1343,7 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
       close(chunk_fd.fd);
     atomic_dec32(&open_files_);
   } else {
-    if (close(fd) == 0) {
+    if (cache::Close(fd)) {
       atomic_dec32(&open_files_);
     }
   }
@@ -2381,6 +2384,7 @@ static void Spawn() {
     quota::RegisterUnpinListener(cvmfs::catalog_manager_,
                                  *cvmfs::repository_name_ + "-unpin");
   talk::Spawn();
+  cache::Spawn();
   if (cvmfs::nfs_maps_)
     nfs_maps::Spawn();
 
