@@ -18,11 +18,11 @@
 extern "C" {
 #endif
 
+struct cvmfs_context;
+
 /**
- * Initialize the CVMFS library and attach the specified remote
- * repository.
- *
- * See libcvmfs usage() for possible options.
+ * Initialize global CVMFS library structures
+ * Note: this _must_ be called before anything else in the library.
  *
  * @param[in] options, option1,option2,...
  * \return 0 on success
@@ -32,12 +32,22 @@ int cvmfs_init(char const *options);
 /**
  * Shut down the CVMFS library and release all resources.
  */
-void cvmfs_fini();
+void cvmfs_fini(cvmfs_context *ctx);
+
+/**
+ * Initialize a CVMFS remote repository.
+ *
+ * See libcvmfs usage() for possible options.
+ *
+ * @param[in] options, option1,option2,...
+ * \return 0 on success
+ */
+cvmfs_context* cvmfs_attach_repo(char const *options);
 
 /* Load a new catalog if there is one
  * \return 0 on success
  */
-int cvmfs_remount();
+int cvmfs_remount(cvmfs_context *ctx);
 
 /* Send syslog and debug messages to log_fn instead.  This may (and
  * probably should) be called before cvmfs_init().  Setting this to
@@ -50,14 +60,14 @@ void cvmfs_set_log_fn( void (*log_fn)(const char *msg) );
  * @param[in] path, path to open (e.g. /dir/file, not /cvmfs/repo/dir/file)
  * \return read-only file descriptor, -1 on failure (sets errno)
  */
-int cvmfs_open(const char *path);
+int cvmfs_open(cvmfs_context *ctx, const char *path);
 
 /* Closes a file previously opened with cvmfs_open().
  *
  * @param[in] fd, file descriptor to close
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_close(int fd);
+int cvmfs_close(cvmfs_context *ctx, int fd);
 
 /*
  * Reads a symlink from the catalog.  Environment variables in the
@@ -70,7 +80,7 @@ int cvmfs_close(int fd);
  * @param[in] size, size of buffer
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_readlink(const char *path, char *buf, size_t size);
+int cvmfs_readlink(cvmfs_context *ctx, const char *path, char *buf, size_t size);
 
 /* Get information about a file.  If the file is a symlink,
  * return info about the file it points to, not the symlink itself.
@@ -79,7 +89,7 @@ int cvmfs_readlink(const char *path, char *buf, size_t size);
  * @param[out] st, stat buffer in which to write the result
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_stat(const char *path,struct stat *st);
+int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st);
 
 /* Get information about a file.  If the file is a symlink,
  * return info about the link, not the file it points to.
@@ -88,7 +98,7 @@ int cvmfs_stat(const char *path,struct stat *st);
  * @param[out] st, stat buffer in which to write the result
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_lstat(const char *path,struct stat *st);
+int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
 
 /* Get list of directory contents.  The directory contents
  * includes "." and "..".
@@ -102,7 +112,7 @@ int cvmfs_lstat(const char *path,struct stat *st);
  * @param[in] buflen, pointer to variable containing size of array
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_listdir(const char *path,char ***buf,size_t *buflen);
+int cvmfs_listdir(cvmfs_context *ctx, const char *path,char ***buf,size_t *buflen);
 
 #ifdef __cplusplus
 }
