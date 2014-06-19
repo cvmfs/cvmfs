@@ -10,69 +10,189 @@
 
 #include <time.h>
 #include <unistd.h>
+#include <syslog.h>
 
 #include <string>
 #include <vector>
 
 #include "catalog_mgr.h"
 #include "lru.h"
+#include "util.h"
+
+namespace cache {
+  class CatalogManager;
+}
+
+namespace signature {
+  class SignatureManager;
+}
+
+namespace download {
+  class DownloadManager;
+}
+
+class BackoffThrottle;
 
 namespace cvmfs {
 
-extern pid_t pid_;
-extern std::string *mountpoint_;
-extern std::string *repository_name_;
-extern int max_cache_timeout_;
-extern bool foreground_;
+  extern pid_t         pid_;
+  extern std::string  *repository_name_;
+  extern bool          foreground_;
 
-catalog::LoadError RemountStart();
-unsigned GetRevision();
-std::string GetOpenCatalogs();
-unsigned GetMaxTTL();  // in minutes
-void SetMaxTTL(const unsigned value);  // in minutes
-void ResetErrorCounters();
-void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
-                      lru::Statistics *md5path_stats);
-catalog::Statistics GetCatalogStatistics();
-std::string GetCertificateStats();
-std::string GetFsStats();
+}
 
-int cvmfs_readlink(const char *path, char *buf, size_t size);
-int cvmfs_open(const char *c_path);
-int cvmfs_close(int fd);
-int cvmfs_statfs(const char *path __attribute__((unused)), struct statvfs *info);
-int cvmfs_getattr(const char *c_path, struct stat *info);
-int cvmfs_listdir(const char *path,char ***buf,size_t *buflen);
+class cvmfs_globals : SingleCopy {
+ public:
+  struct options {
+    options() : change_to_cache_directory(false),
+                alien_cache(false),
+                log_syslog_level(LOG_ALERT),
+                max_open_files(0) {}
 
-int cvmfs_int_init(
-  const std::string &cvmfs_opts_hostname,  // url of repository
-  const std::string &cvmfs_opts_proxies,
-  const std::string &cvmfs_opts_repo_name,
-  const std::string &cvmfs_opts_mountpoint,
-  const std::string &cvmfs_opts_pubkey,
-  const std::string &cvmfs_opts_cachedir,
-  const std::string &cvmfs_opts_alien_cachedir,
-  bool cvmfs_opts_cd_to_cachedir,
-  int64_t cvmfs_opts_quota_limit,
-  int64_t cvmfs_opts_quota_threshold,
-  bool cvmfs_opts_rebuild_cachedb,
-  bool cvmfs_opts_ignore_signature,
-  const std::string &cvmfs_opts_root_hash,
-  unsigned cvmfs_opts_timeout,
-  unsigned cvmfs_opts_timeout_direct,
-  int cvmfs_opts_syslog_level,
-  const std::string &cvmfs_opts_logfile,
-  const std::string &cvmfs_opts_tracefile,
-  const std::string &cvmfs_opts_deep_mount,
-  const std::string &cvmfs_opts_blacklist,
-  int cvmfs_opts_nofiles,
-  bool cvmfs_opts_enable_monitor,
-  bool cvmfs_opts_enable_async_downloads
-);
+    std::string    cache_directory;
+    bool           change_to_cache_directory;
+    bool           alien_cache;
 
-void cvmfs_int_spawn();
-void cvmfs_int_fini();
+    int            log_syslog_level;
+    std::string    log_prefix;
+    std::string    log_file;
 
-}  // namespace cvmfs
+    int            max_open_files;
+  };
+
+ public:
+  static int            Initialize(const options &opts);
+  static cvmfs_globals* Instance();
+
+  pthread_mutex_t *libcrypto_locks() { return libcrypto_locks_; }
+
+ protected:
+  int Setup(const options &opts);
+
+  static void CallbackLibcryptoLock(int mode, int type,
+                                    const char *file, int line);
+  static unsigned long CallbackLibcryptoThreadId();
+
+ private:
+  cvmfs_globals();
+  ~cvmfs_globals();
+
+ private:
+  static cvmfs_globals *instance;
+
+ private:
+  std::string       cache_directory_;
+  uid_t             uid_;
+  gid_t             gid_;
+
+  int               fd_lockfile_;
+  pthread_mutex_t  *libcrypto_locks_;
+
+  void             *sqlite_scratch;
+  void             *sqlite_page_cache;
+
+ private:
+  bool options_ready_;
+  bool lock_created_;
+  bool cache_ready_;
+  bool quota_ready_;
+};
+
+class cvmfs_context : SingleCopy {
+ public:
+  struct options {
+    unsigned       timeout;
+    unsigned       timeout_direct;
+    std::string    url;
+    std::string    proxies;
+    std::string    tracefile;
+    std::string    pubkey;
+    std::string    deep_mount;
+    std::string    blacklist;
+    std::string    repo_name;
+    std::string    root_hash;
+    std::string    mountpoint;
+    bool           allow_unsigned;
+
+   public:
+    options() :
+      timeout(2),
+      timeout_direct(2),
+      pubkey("/etc/cvmfs/keys/cern.ch.pub"),
+      blacklist(""),
+      allow_unsigned(false) {}
+  };
+
+
+ public:
+  static cvmfs_context* Create(const options &options);
+
+  int GetAttr(const char *c_path, struct stat *info);
+  int Readlink(const char *path, char *buf, size_t size);
+  int ListDirectory(const char *path, char ***buf, size_t *buflen);
+
+  int Open(const char *c_path);
+  int Close(int fd);
+
+  catalog::LoadError RemountStart();
+
+ protected:
+  cvmfs_context(const options &options); // please use static method Create()
+                                         // for construction
+
+ private:
+  int Setup(const options &opts);
+
+  void InitRuntimeCounters();
+
+  void AppendStringToList(char const   *str,
+                          char       ***buf,
+                          size_t       *listlen,
+                          size_t       *buflen);
+
+  bool GetDirentForPath(const PathString         &path,
+                        catalog::DirectoryEntry  *dirent);
+
+ private:
+  const options cfg_;
+
+  std::string mountpoint_;
+  std::string cachedir_;
+  std::string relative_cachedir; /* path to cachedir, relative to current working dir */
+  std::string tracefile_;
+  std::string repository_name_;  /**< Expected repository name,
+                                         e.g. atlas.cern.ch */
+  pid_t pid_;  /**< will be set after deamon() */
+  time_t boot_time_;
+  cache::CatalogManager *catalog_manager_;
+  signature::SignatureManager *signature_manager_;
+  download::DownloadManager *download_manager_;
+  lru::Md5PathCache *md5path_cache_;
+
+  atomic_int64 num_fs_open_;
+  atomic_int64 num_fs_dir_open_;
+  atomic_int64 num_fs_lookup_;
+  atomic_int64 num_fs_lookup_negative_;
+  atomic_int64 num_fs_stat_;
+  atomic_int64 num_fs_read_;
+  atomic_int64 num_fs_readlink_;
+  atomic_int32 num_io_error_;
+  atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
+  atomic_int32 open_dirs_; /**< number of currently open directories */
+  unsigned max_open_files_; /**< maximum allowed number of open files */
+  static const int kNumReservedFd = 512;  /**< Number of reserved file
+                                               descriptors for internal use */
+  static const unsigned int kMd5pathCacheSize = 32000;
+
+  BackoffThrottle *backoff_throttle_;
+
+  int fd_lockfile;
+
+ private:
+  bool download_ready_;
+  bool signature_ready_;
+  bool catalog_ready_;
+  bool tracer_ready_;
+};
 
 #endif  // CVMFS_LIBCVMFS_INT_H_
