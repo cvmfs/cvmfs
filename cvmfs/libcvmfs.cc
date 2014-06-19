@@ -238,14 +238,17 @@ static string mountpoint;
  * ensure proper loading of nested catalogs before the child is
  * accessed.
  */
-static int expand_path(char const *path,string &expanded_path,int depth=0)
+static int expand_path(cvmfs_context *ctx,
+                       char const    *path,
+                       string        &expanded_path,
+                       int            depth = 0)
 {
   string p_path = GetParentPath(path);
   string fname = GetFileName(path);
   int rc;
 
   if( fname == ".." ) {
-    rc = expand_path(p_path.c_str(),expanded_path,depth);
+    rc = expand_path(ctx, p_path.c_str(), expanded_path, depth);
     if( rc != 0 ) {
       return -1;
     }
@@ -264,7 +267,7 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
 
   string buf;
   if( p_path != "" ) {
-    rc = expand_path(p_path.c_str(),buf,depth);
+    rc = expand_path(ctx, p_path.c_str(), buf, depth);
     if( rc != 0 ) {
       return -1;
     }
@@ -281,7 +284,7 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
   buf += fname;
 
   struct stat st;
-  rc = cvmfs::cvmfs_getattr(buf.c_str(),&st);
+  rc = ctx->GetAttr(buf.c_str(),&st);
   if( rc != 0 ) {
     errno = -rc;
     return -1;
@@ -306,7 +309,7 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
     errno = ENOMEM;
     return -1;
   }
-  rc = cvmfs::cvmfs_readlink(buf.c_str(),ln_buf,st.st_size+2);
+  rc = ctx->Readlink(buf.c_str(), ln_buf, st.st_size + 2);
   if( rc != 0 ) {
     free(ln_buf);
     errno = -rc;
@@ -343,11 +346,13 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
   // In case the symlink references other symlinks or contains ".."
   // or "."  we must now call expand_path on the result.
 
-  return expand_path(buf.c_str(),expanded_path,depth+1);
+  return expand_path(ctx, buf.c_str(), expanded_path, depth + 1);
 }
 
 /* Like expand_path(), but do not expand the final element of the path. */
-static int expand_ppath(char const *path,string &expanded_path)
+static int expand_ppath(cvmfs_context  *ctx,
+                        char const     *path,
+                        string         &expanded_path)
 {
   string p_path = GetParentPath(path);
   string fname = GetFileName(path);
@@ -357,7 +362,7 @@ static int expand_ppath(char const *path,string &expanded_path)
     return 0;
   }
 
-  int rc = expand_path(p_path.c_str(),expanded_path);
+  int rc = expand_path(ctx, p_path.c_str(), expanded_path);
   if( rc != 0 ) {
     return rc;
   }
@@ -368,17 +373,17 @@ static int expand_ppath(char const *path,string &expanded_path)
   return 0;
 }
 
-int cvmfs_open(const char *path)
+int cvmfs_open(cvmfs_context *ctx, const char *path)
 {
   string lpath;
   int rc;
-  rc = expand_path(path,lpath);
+  rc = expand_path(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_open(path);
+  rc = ctx->Open(path);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -386,9 +391,9 @@ int cvmfs_open(const char *path)
   return rc;
 }
 
-int cvmfs_close(int fd)
+int cvmfs_close(cvmfs_context *ctx, int fd)
 {
-  int rc = cvmfs::cvmfs_close(fd);
+  int rc = ctx->Close(fd);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -396,16 +401,16 @@ int cvmfs_close(int fd)
   return 0;
 }
 
-int cvmfs_readlink(const char *path, char *buf, size_t size) {
+int cvmfs_readlink(cvmfs_context *ctx, const char *path, char *buf, size_t size) {
   string lpath;
   int rc;
-  rc = expand_ppath(path,lpath);
+  rc = expand_ppath(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_readlink(path,buf,size);
+  rc = ctx->Readlink(path, buf, size);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -413,17 +418,17 @@ int cvmfs_readlink(const char *path, char *buf, size_t size) {
   return 0;
 }
 
-int cvmfs_stat(const char *path,struct stat *st)
+int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st)
 {
   string lpath;
   int rc;
-  rc = expand_path(path,lpath);
+  rc = expand_path(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_getattr(path,st);
+  rc = ctx->GetAttr(path,st);
   if( rc < 0 ) {
     errno = -rc;
     return -1;
@@ -431,17 +436,17 @@ int cvmfs_stat(const char *path,struct stat *st)
   return 0;
 }
 
-int cvmfs_lstat(const char *path,struct stat *st)
+int cvmfs_lstat(cvmfs_context *ctx, const char *path,struct stat *st)
 {
   string lpath;
   int rc;
-  rc = expand_ppath(path,lpath);
+  rc = expand_ppath(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_getattr(path,st);
+  rc = ctx->GetAttr(path, st);
   if( rc < 0 ) {
     errno = -rc;
     return -1;
@@ -449,17 +454,17 @@ int cvmfs_lstat(const char *path,struct stat *st)
   return 0;
 }
 
-int cvmfs_listdir(const char *path,char ***buf,size_t *buflen)
+int cvmfs_listdir(cvmfs_context *ctx, const char *path, char ***buf, size_t *buflen)
 {
   string lpath;
   int rc;
-  rc = expand_path(path,lpath);
+  rc = expand_path(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_listdir(path,buf,buflen);
+  rc = ctx->ListDirectory(path, buf, buflen);
   if( rc < 0 ) {
     errno = -rc;
     return -1;
@@ -467,60 +472,41 @@ int cvmfs_listdir(const char *path,char ***buf,size_t *buflen)
   return 0;
 }
 
-int cvmfs_init(char const *options)
+cvmfs_context* cvmfs_attach_repo(char const *options)
 {
   /* Parse options */
-  struct cvmfs_opts cvmfs_opts;
-  int parse_result = cvmfs_opts.parse_options(options);
+  repo_options opts;
+  int parse_result = opts.parse_options(options);
   if (parse_result != 0)
   {
     if (parse_result < 0) {
       fprintf(stderr,"Invalid CVMFS options: %s.\n",options);
-      cvmfs_opts.usage();
+      usage();
     }
-    return -1;
+    return NULL;
   }
-  if (cvmfs_opts.url.empty()) {
-    fprintf(stderr,"No url specified in CVMFS options: %s.\n",options);
-    return -1;
-  }
-
-  int rc = cvmfs::cvmfs_int_init(
-                          cvmfs_opts.url,
-                          cvmfs_opts.proxies,
-                          cvmfs_opts.repo_name,
-                          cvmfs_opts.mountpoint,
-                          cvmfs_opts.pubkey,
-                          cvmfs_opts.cachedir,
-                          cvmfs_opts.alien_cachedir,
-                          false, /* cd_to_cachedir */
-                          cvmfs_opts.quota_limit,
-                          cvmfs_opts.quota_threshold,
-                          cvmfs_opts.rebuild_cachedb,
-                          cvmfs_opts.allow_unsigned,
-                          "" /* root_hash */,
-                          cvmfs_opts.timeout,
-                          cvmfs_opts.timeout_direct,
-                          cvmfs_opts.syslog_level,
-                          cvmfs_opts.logfile,
-                          cvmfs_opts.tracefile,
-                          cvmfs_opts.deep_mount,
-                          cvmfs_opts.blacklist,
-                          cvmfs_opts.nofiles,
-                          false,   /* enable_monitor */
-                          false   /* enable async downloads */
-                          );
-  if( rc != 0 ) {
-    return -1;
+  if (opts.url.empty()) {
+    fprintf(stderr,"No url specified in CVMFS repository options: %s.\n",options);
+    return NULL;
   }
 
-  ::mountpoint = cvmfs_opts.mountpoint;
-
-  return 0;
+  return cvmfs_context::Create(opts);
 }
 
-void cvmfs_fini() {
-  cvmfs::cvmfs_int_fini();
+int cvmfs_init(char const *options) {
+  global_options opts;
+  int parse_result = opts.parse_options(options);
+  if (parse_result != 0) {
+    fprintf(stderr, "Invalid CVMFS global options: %s.\n",options);
+    usage();
+    return parse_result;
+  }
+
+  return cvmfs_globals::Initialize(opts);
+}
+
+void cvmfs_fini(cvmfs_context *ctx) {
+  delete ctx;
   ::mountpoint = "";
 }
 
@@ -543,9 +529,9 @@ void cvmfs_set_log_fn( void (*log_fn)(const char *msg) )
 	}
 }
 
-int cvmfs_remount()
+int cvmfs_remount(cvmfs_context *ctx)
 {
-	catalog::LoadError retval = cvmfs::RemountStart();
+	catalog::LoadError retval = ctx->RemountStart();
 	if( retval == catalog::kLoadNew || retval == catalog::kLoadUp2Date) {
 		return 0;
 	}
