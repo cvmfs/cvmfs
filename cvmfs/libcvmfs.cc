@@ -24,123 +24,119 @@
 
 using namespace std;  // NOLINT
 
-/**
- * Structure to parse the file system options.
- */
-struct cvmfs_opts {
-  unsigned timeout;
-  unsigned timeout_direct;
-  string   url;
-  string   cachedir;
-  string   alien_cachedir;
-  string   proxies;
-  string   tracefile;
-  string   pubkey;
-  string   logfile;
-  string   deep_mount;
-  string   blacklist;
-  string   repo_name;
-  string   mountpoint;
-  bool     allow_unsigned;
-  bool     rebuild_cachedb;
-  int      nofiles;
-  int      syslog_level;
-  unsigned long  quota_limit;
-  unsigned long  quota_threshold;
 
-  cvmfs_opts() :
-    timeout(2),
-    timeout_direct(2),
-    cachedir("/var/cache/cvmfs2/default"),
-    alien_cachedir(""),
-    pubkey("/etc/cvmfs/keys/cern.ch.pub"),
-    blacklist(""),
-    allow_unsigned(false),
-    rebuild_cachedb(false),
-    nofiles(0),
-    syslog_level(3),
-    quota_limit(0),
-    quota_threshold(0) {}
-
-  int set_option(char const *name, char const *value, bool *var) {
-    if( *value != '\0' ) {
-      fprintf(stderr,"Option %s=%s contains a value when none was expected.\n",name,value);
-      return -1;
-    }
-    *var = true;
-    return 0;
+int set_option(char const *name, char const *value, bool *var) {
+  if( *value != '\0' ) {
+    fprintf(stderr,"Option %s=%s contains a value when none was expected.\n",name,value);
+    return -1;
   }
+  *var = true;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value, unsigned *var) {
-    unsigned v = 0;
-    int end = 0;
-    int rc = sscanf(value,"%u%n",&v,&end);
-    if( rc != 1 || value[end] != '\0' ) {
-      fprintf(stderr,"Invalid unsigned integer value for %s=%s\n",name,value);
-      return -1;
-    }
-    *var = v;
-    return 0;
+int set_option(char const *name, char const *value, unsigned *var) {
+  unsigned v = 0;
+  int end = 0;
+  int rc = sscanf(value,"%u%n",&v,&end);
+  if( rc != 1 || value[end] != '\0' ) {
+    fprintf(stderr,"Invalid unsigned integer value for %s=%s\n",name,value);
+    return -1;
   }
+  *var = v;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value, unsigned long *var) {
-    unsigned long v = 0;
-    int end = 0;
-    int rc = sscanf(value,"%lu%n",&v,&end);
-    if( rc != 1 || value[end] != '\0' ) {
-      fprintf(stderr,"Invalid unsigned long integer value for %s=%s\n",name,value);
-      return -1;
-    }
-    *var = v;
-    return 0;
+int set_option(char const *name, char const *value, unsigned long *var) {
+  unsigned long v = 0;
+  int end = 0;
+  int rc = sscanf(value,"%lu%n",&v,&end);
+  if( rc != 1 || value[end] != '\0' ) {
+    fprintf(stderr,"Invalid unsigned long integer value for %s=%s\n",name,value);
+    return -1;
   }
+  *var = v;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value, int *var) {
-    int v = 0;
-    int end = 0;
-    int rc = sscanf(value,"%d%n",&v,&end);
-    if( rc != 1 || value[end] != '\0' ) {
-      fprintf(stderr,"Invalid integer value for %s=%s\n",name,value);
-      return -1;
-    }
-    *var = v;
-    return 0;
+int set_option(char const *name, char const *value, int *var) {
+  int v = 0;
+  int end = 0;
+  int rc = sscanf(value,"%d%n",&v,&end);
+  if( rc != 1 || value[end] != '\0' ) {
+    fprintf(stderr,"Invalid integer value for %s=%s\n",name,value);
+    return -1;
   }
+  *var = v;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value, string *var) {
-    *var = value;
-    return 0;
-  }
+int set_option(char const *name, char const *value, string *var) {
+  *var = value;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value)
-  {
-#define CVMFS_OPT(var) if( strcmp(name,#var)==0 ) return set_option(name,value,&var)
+
+#define CVMFS_OPT(var) if( strcmp(name,#var)==0 ) return ::set_option(name,value,&var)
+
+struct cvmfs_repo_options : public cvmfs_context::options {
+  int set_option(char const *name, char const *value) {
     CVMFS_OPT(url);
     CVMFS_OPT(timeout);
     CVMFS_OPT(timeout_direct);
-    CVMFS_OPT(cachedir);
-    CVMFS_OPT(alien_cachedir);
     CVMFS_OPT(proxies);
     CVMFS_OPT(tracefile);
     CVMFS_OPT(allow_unsigned);
     CVMFS_OPT(pubkey);
-    CVMFS_OPT(logfile);
-    CVMFS_OPT(rebuild_cachedb);
-    CVMFS_OPT(quota_limit);
-    CVMFS_OPT(quota_threshold);
-    CVMFS_OPT(nofiles);
     CVMFS_OPT(deep_mount);
     CVMFS_OPT(repo_name);
     CVMFS_OPT(mountpoint);
     CVMFS_OPT(blacklist);
-    CVMFS_OPT(syslog_level);
 
-    if( strcmp(name,"help")==0 ) {
-      usage();
-      return 1;
-    }
-    fprintf(stderr,"Unknown libcvmfs option: %s\n",name);
+    fprintf(stderr,"Unknown repo option: %s\n", name);
     return -1;
+  }
+
+  int verify_sanity() {
+    if( mountpoint.empty() && !repo_name.empty()) {
+      mountpoint = "/cvmfs/";
+      mountpoint += repo_name;
+    }
+    while( mountpoint.length()>0 && mountpoint[mountpoint.length()-1] == '/' ) {
+      mountpoint.resize(mountpoint.length()-1);
+    }
+
+    return 0;
+  }
+};
+
+struct cvmfs_global_options : public cvmfs_globals::options {
+  int set_option(char const *name, char const *value) {
+    CVMFS_OPT(cache_directory);
+    CVMFS_OPT(change_to_cache_directory);
+    CVMFS_OPT(log_syslog_level);
+    CVMFS_OPT(log_prefix);
+    CVMFS_OPT(log_file);
+    CVMFS_OPT(max_open_files);
+
+    fprintf(stderr,"Unknown global option: %s\n", name);
+    return -1;
+  }
+
+  int verify_sanity() {
+    return 0;
+  }
+};
+
+
+/**
+ * Structure to parse the file system options.
+ */
+template <class DerivedT>
+struct cvmfs_options : public DerivedT {
+
+  //#define CVMFS_OPT(var) if( strcmp(name,#var)==0 ) return cvmfs_options::set_option(name,value,&var)
+  int set_option(char const *name, char const *value) {
+    return DerivedT::set_option(name, value);
   }
 
   int parse_options(char const *options)
@@ -173,7 +169,7 @@ struct cvmfs_opts {
       }
 
       if( !name.empty() || !value.empty() ) {
-        int result = set_option(name.c_str(),value.c_str());
+        int result = set_option(name.c_str(), value.c_str());
         if (result != 0) {
           return result;
         }
@@ -183,15 +179,12 @@ struct cvmfs_opts {
       options = next;
     }
 
-    if( mountpoint.empty() && !repo_name.empty()) {
-      mountpoint = "/cvmfs/";
-      mountpoint += repo_name;
-    }
-    while( mountpoint.length()>0 && mountpoint[mountpoint.length()-1] == '/' ) {
-      mountpoint.resize(mountpoint.length()-1);
-    }
-    return 0;
+    return DerivedT::verify_sanity();
   }
+};
+
+typedef cvmfs_options<cvmfs_repo_options>   repo_options;
+typedef cvmfs_options<cvmfs_global_options> global_options;
 
   /**
    * Display the usage message.
