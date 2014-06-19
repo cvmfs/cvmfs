@@ -190,7 +190,7 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
    * Display the usage message.
    */
   static void usage() {
-    struct cvmfs_opts defaults;
+    struct cvmfs_repo_options defaults;
     fprintf(stderr,
             "CernVM-FS version %s\n"
             "Copyright (c) 2009- CERN\n"
@@ -227,7 +227,6 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
             PACKAGE_VERSION, defaults.timeout, defaults.timeout_direct
             );
   }
-};
 
 /* Path to root of repository.  Used to resolve absolute symlinks. */
 static string mountpoint;
