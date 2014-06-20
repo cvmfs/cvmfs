@@ -113,6 +113,7 @@ struct cvmfs_global_options : public cvmfs_globals::options {
   int set_option(char const *name, char const *value) {
     CVMFS_OPT(cache_directory);
     CVMFS_OPT(change_to_cache_directory);
+    CVMFS_OPT(alien_cache);
     CVMFS_OPT(log_syslog_level);
     CVMFS_OPT(log_prefix);
     CVMFS_OPT(log_file);
