@@ -235,7 +235,10 @@ int cvmfs_globals::Setup(const options &opts) {
     PrintError("Failed to initialize lru cache");
     return -6;
   }
+  quota::Spawn();
   quota_ready_ = true;
+
+  cvmfs::pid_ = getpid();
 
   return 0;
 }
@@ -332,7 +335,6 @@ int cvmfs_context::Setup(const options &opts) {
 
   md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize);
 
-  cvmfs::pid_ = getpid();
   if (! opts.tracefile.empty()) {
     tracer::Init(8192, 7000, opts.tracefile);
   } else {
