@@ -39,20 +39,20 @@ namespace swissknife {
  */
 template <class CatalogT>
 struct CatalogTraversalData {
-  CatalogTraversalData(const catalog::Catalog* catalog,
-                       const shash::Any&       catalog_hash,
-                       const unsigned          tree_level,
-                       const size_t            file_size,
-                       const unsigned int      history_depth) :
+  CatalogTraversalData(const CatalogT     *catalog,
+                       const shash::Any   &catalog_hash,
+                       const unsigned      tree_level,
+                       const size_t        file_size,
+                       const unsigned int  history_depth) :
     catalog(catalog), catalog_hash(catalog_hash), tree_level(tree_level),
     file_size(file_size),
     history_depth(history_depth) {}
 
-  const catalog::Catalog*  catalog;
-  const shash::Any         catalog_hash;
-  const unsigned int       tree_level;
-  const size_t             file_size;
-  const unsigned int       history_depth;
+  const CatalogT     *catalog;
+  const shash::Any    catalog_hash;
+  const unsigned int  tree_level;
+  const size_t        file_size;
+  const unsigned int  history_depth;
 };
 
 
@@ -225,11 +225,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // Provide the user with the catalog
-    NotifyListeners(CatalogTraversalData(catalog,
-                                         job.hash,
-                                         job.tree_level,
-                                         file_size));
-                                         job.history_depth));
+    NotifyListeners(CallbackData(catalog,
+                                 job.hash,
+                                 job.tree_level,
+                                 file_size,
+                                 job.history_depth));
 
     // Inception! Go deeper into the catalog tree
     PushReferencedCatalogs(catalog, job);
@@ -265,12 +265,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     // Inception! Go to the next catalog level
     // Note: taking a copy of the result of ListNestedCatalogs() here for
     //       data corruption prevention
-    const catalog::Catalog::NestedCatalogList nested_catalogs =
-      catalog->ListNestedCatalogs();
-    typename CatalogT::NestedCatalogList::const_iterator i =
-      nested_catalogs->begin();
-    typename CatalogT::NestedCatalogList::const_iterator iend =
-      nested_catalogs->end();
+    const typename CatalogT::NestedCatalogList &nested =
+                                                  catalog->ListNestedCatalogs();
+    typename CatalogT::NestedCatalogList::const_iterator i    = nested.begin();
+    typename CatalogT::NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
       CatalogT* parent = (no_close_) ? catalog : NULL;
       const bool pushed = MightPush(CatalogJob(i->path.ToString(),

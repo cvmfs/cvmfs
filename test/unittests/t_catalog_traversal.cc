@@ -122,22 +122,23 @@ class MockCatalog {
     return (parent_ == NULL);
   }
 
-  NestedCatalogList *ListNestedCatalogs() const {
-    return const_cast<NestedCatalogList*>(&children_);
-  }
+  const NestedCatalogList& ListNestedCatalogs() const { return children_; }
+
+  unsigned int GetRevision() const { return revision_; }
 
   shash::Any GetPreviousRevision() const {
     return (previous_ != NULL) ? previous_->catalog_hash() : shash::Any();
   }
 
  public:
-  const std::string& root_path()    const { return root_path_;    }
-  const shash::Any&  catalog_hash() const { return catalog_hash_; }
-  uint64_t           catalog_size() const { return catalog_size_; }
-  unsigned int       revision()     const { return revision_;     }
+  const PathString   path()         const { return PathString(root_path_);  }
+  const std::string& root_path()    const { return root_path_;              }
+  const shash::Any&  catalog_hash() const { return catalog_hash_;           }
+  uint64_t           catalog_size() const { return catalog_size_;           }
+  unsigned int       revision()     const { return revision_;               }
 
-  MockCatalog*       parent()       const { return parent_;       }
-  MockCatalog*       previous()     const { return previous_;     }
+  MockCatalog*       parent()       const { return parent_;                 }
+  MockCatalog*       previous()     const { return previous_;               }
 
  public:
   void RegisterChild(MockCatalog *child) {
@@ -405,7 +406,7 @@ class T_CatalogTraversal : public ::testing::Test {
     // produce a random hash if no catalog has was given
     shash::Any effective_clg_hash = catalog_hash;
     if (effective_clg_hash.IsNull()) {
-      effective_clg_hash.Randomize();
+      effective_clg_hash.Randomize((uint64_t)time(0));
     }
 
     // get catalog tree for current revision
@@ -461,7 +462,7 @@ TEST_F(T_CatalogTraversal, Initialize) {
 CatalogIdentifiers SimpleTraversal_visited_catalogs;
 void SimpleTraversalCallback(const MockedCatalogTraversal::CallbackData &data) {
   SimpleTraversal_visited_catalogs.push_back(
-    std::make_pair(data.catalog->revision(), data.catalog->root_path()));
+    std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
 
 TEST_F(T_CatalogTraversal, SimpleTraversal) {
