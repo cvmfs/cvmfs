@@ -65,7 +65,7 @@ struct CatalogTraversalData {
  * @param repo_keys   a comma separated list of public key file
  *                    locations to verify the repository manifest file
  * @param history     depth of the desired catalog history traversal
- *                    (default: 1 - only HEAD catalogs are traversed)
+ *                    (default: 0 - only HEAD catalogs are traversed)
  * @param no_close    do not close catalogs after they were attached
  *                    (catalogs retain their parent/child pointers)
  * @param tmp_dir     path to the temporary directory to be used
