@@ -406,7 +406,7 @@ class T_CatalogTraversal : public ::testing::Test {
     // produce a random hash if no catalog has was given
     shash::Any effective_clg_hash = catalog_hash;
     if (effective_clg_hash.IsNull()) {
-      effective_clg_hash.Randomize((uint64_t)time(0));
+      effective_clg_hash.Randomize(dice_);
     }
 
     // get catalog tree for current revision

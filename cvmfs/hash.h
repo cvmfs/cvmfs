@@ -128,9 +128,31 @@ struct Digest {
    * Generates a purely random hash
    * Only used for testing purposes
    */
+  void Randomize() {
+    Prng prng;
+    prng.InitLocaltime();
+    Randomize(prng);
+  }
+
+  /**
+   * Generates a purely random hash
+   * Only used for testing purposes
+   *
+   * @param seed  random number generator seed (for reproducability)
+   */
   void Randomize(const uint64_t seed) {
     Prng prng;
     prng.InitSeed(seed);
+    Randomize(prng);
+  }
+
+  /**
+   * Generates a purely random hash
+   * Only used for testing purposes
+   *
+   * @param prng  random number generator object (for external reproducability)
+   */
+  void Randomize(Prng prng) {
     const unsigned bytes = GetDigestSize();
     for (unsigned i = 0; i < bytes; ++i) {
       digest[i] = prng.Next(256);
