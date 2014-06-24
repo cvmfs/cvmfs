@@ -200,19 +200,19 @@ class T_CatalogTraversal : public ::testing::Test {
   typedef std::map<unsigned int, CatalogPathMap> RevisionMap;
 
   const unsigned int max_revision;
-  const unsigned int intial_catalog_instances;
+  const unsigned int initial_catalog_instances;
 
  public:
   T_CatalogTraversal() :
     max_revision(6),
-    intial_catalog_instances(42) /* depends on max_revision */ {}
+    initial_catalog_instances(42) /* depends on max_revision */ {}
 
  protected:
   void SetUp() {
     dice_.InitLocaltime();
     MockCatalog::Reset();
     SetupDummyCatalogs();
-    EXPECT_EQ (intial_catalog_instances, MockCatalog::instances);
+    EXPECT_EQ (initial_catalog_instances, MockCatalog::instances);
   }
 
   void TearDown() {
@@ -536,7 +536,7 @@ TEST_F(T_CatalogTraversal, SimpleTraversalNoClose) {
   traverse.RegisterListener(&SimpleTraversalNoCloseCallback);
   traverse.Traverse();
 
-  EXPECT_EQ (21u + intial_catalog_instances, MockCatalog::instances);
+  EXPECT_EQ (21u + initial_catalog_instances, MockCatalog::instances);
 
   std::vector<MockCatalog*>::const_iterator i, iend;
   for (i    = SimpleTraversalNoCloseCallback_visited_catalogs.begin(),
@@ -698,7 +698,7 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
   traverse.RegisterListener(&FirstLevelHistoryTraversalNoCloseCallback);
   traverse.Traverse();
 
-  EXPECT_EQ (49u + intial_catalog_instances, MockCatalog::instances);
+  EXPECT_EQ (49u + initial_catalog_instances, MockCatalog::instances);
 
   std::vector<MockCatalog*>::const_iterator i, iend;
   for (i    = FirstLevelHistoryTraversalNoClose_visited_catalogs.begin(),
@@ -1066,7 +1066,7 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(1, ""));
 
-  EXPECT_EQ (intial_catalog_instances, FullHistoryTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ (initial_catalog_instances, FullHistoryTraversalNoRepeat_visited_catalogs.size());
 
   CheckVisitedCatalogs(catalogs, FullHistoryTraversalNoRepeat_visited_catalogs);
 }

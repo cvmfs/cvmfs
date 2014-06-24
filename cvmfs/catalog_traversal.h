@@ -34,7 +34,7 @@ namespace swissknife {
  * @param catalog_hash        the SHA-1 content hash of the catalog
  * @param tree_level          the depth in the nested catalog tree
  *                            (starting at zero)
- * @param history_depty       the distance from the current HEAD revision
+ * @param history_depth       the distance from the current HEAD revision
  *                            (current HEAD has history_depth 0)
  */
 template <class CatalogT>
