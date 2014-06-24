@@ -42,6 +42,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_pathspec.cc
   t_dirtab.cc
   t_callbacks.cc
+  t_lru.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -112,7 +113,7 @@ set (CVMFS_UNITTEST_SOURCES
 #
 # Compiler and Linker Flags for unit tests
 #
-set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0")
+set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -D_FILE_OFFSET_BITS=64")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 #
