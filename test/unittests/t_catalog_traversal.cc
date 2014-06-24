@@ -100,6 +100,15 @@ class MockCatalog {
     ++MockCatalog::instances;
   }
 
+  MockCatalog(const MockCatalog &other) :
+    parent_(other.parent_), previous_(other.previous_),
+    root_path_(other.root_path_), catalog_hash_(other.catalog_hash_),
+    catalog_size_(other.catalog_size_), revision_(other.revision_),
+    is_root_(other.is_root_), children_(other.children_)
+  {
+    ++MockCatalog::instances;
+  }
+
   ~MockCatalog() {
     --MockCatalog::instances;
   }
@@ -115,7 +124,9 @@ class MockCatalog {
     if (catalog == NULL) {
       return NULL;
     } else {
-      return catalog->Clone();
+      MockCatalog *new_catalog = catalog->Clone();
+      new_catalog->set_parent(parent);
+      return new_catalog;
     }
   }
 
@@ -139,6 +150,8 @@ class MockCatalog {
   MockCatalog*       parent()       const { return parent_;                 }
   MockCatalog*       previous()     const { return previous_;               }
 
+  void set_parent(MockCatalog *parent) { parent_ = parent; }
+
  public:
   void RegisterChild(MockCatalog *child) {
     NestedCatalog nested;
@@ -151,11 +164,7 @@ class MockCatalog {
 
  protected:
   MockCatalog* Clone() const {
-    MockCatalog *new_catalog = new MockCatalog(root_path_, catalog_hash_,
-                                               catalog_size_, revision_,
-                                               parent_, previous_);
-    new_catalog->children_ = children_;
-    return new_catalog;
+    return new MockCatalog(*this);
   }
 
  private:
