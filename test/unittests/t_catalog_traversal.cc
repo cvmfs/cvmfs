@@ -300,12 +300,13 @@ class T_CatalogTraversal : public ::testing::Test {
      *
      * Parts of the hierarchy are created multiple times in order to get some
      * historic catalogs. To simplify the creation the history looks like so:
-     *    Revision 1:   - only the root catalog (0-0)
-     *    Revision 2:   - adds branch 1-0
-     *    Revision 3:   - adds branch 1-1
-     *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated
-     *    Revision 5:   - adds branch 1-3
-     *    Revision 6:   - removes branch 1-0
+     *                                                                # catalogs
+     *    Revision 1:   - only the root catalog (0-0)                       1
+     *    Revision 2:   - adds branch 1-0                                   8
+     *    Revision 3:   - adds branch 1-1                                  17
+     *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated      25
+     *    Revision 5:   - adds branch 1-3                                  28
+     *    Revision 6:   - removes branch 1-0                               21
      *
      */
 
