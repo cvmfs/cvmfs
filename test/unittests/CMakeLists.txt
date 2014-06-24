@@ -105,6 +105,8 @@ set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
+
+  ${CVMFS_SOURCE_DIR}/catalog_traversal.cc
 )
 
 #
