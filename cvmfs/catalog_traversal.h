@@ -175,7 +175,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
     // add the root catalog of the repository as the first element on the job
     // stack
-    Push(CatalogJob("", manifest->catalog_hash(), 0, 0));
+    const bool did = MightPush(CatalogJob("", manifest->catalog_hash(), 0, 0));
+    assert (did);
 
     delete manifest;
 
@@ -262,11 +263,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     if (job.history_depth < history_depth_ && catalog->IsRoot()) {
       shash::Any previous_revision = catalog->GetPreviousRevision();
       if (! previous_revision.IsNull()) {
-        const bool pushed = Push(CatalogJob("",
-                                            previous_revision,
-                                            0,
-                                            job.history_depth + 1,
-                                            NULL));
+        const bool pushed = MightPush(CatalogJob("",
+                                                 previous_revision,
+                                                 0,
+                                                 job.history_depth + 1,
+                                                 NULL));
         if (pushed) {
           ++pushed_catalogs;
         }
@@ -282,11 +283,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     typename CatalogT::NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
       CatalogT* parent = (no_close_) ? catalog : NULL;
-      const bool pushed = Push(CatalogJob(i->path.ToString(),
-                                          i->hash,
-                                          job.tree_level + 1,
-                                          job.history_depth,
-                                          parent));
+      const bool pushed = MightPush(CatalogJob(i->path.ToString(),
+                                               i->hash,
+                                               job.tree_level + 1,
+                                               job.history_depth,
+                                               parent));
       if (pushed) {
         ++pushed_catalogs;
       }
@@ -296,7 +297,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
 
-  bool Push(const CatalogJob &job) {
+  bool MightPush(const CatalogJob &job) {
     if (no_repeat_history_ && visited_catalogs_.count(job.hash) > 0) {
       return false;
     }
