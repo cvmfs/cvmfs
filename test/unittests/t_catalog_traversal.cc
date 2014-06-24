@@ -209,6 +209,7 @@ class T_CatalogTraversal : public ::testing::Test {
 
  protected:
   void SetUp() {
+    dice_.InitLocaltime();
     MockCatalog::Reset();
     SetupDummyCatalogs();
     EXPECT_EQ (intial_catalog_instances, MockCatalog::instances);
