@@ -527,6 +527,9 @@ void SimpleTraversalNoCloseCallback(
 }
 
 TEST_F(T_CatalogTraversal, SimpleTraversalNoClose) {
+  SimpleTraversalNoCloseCallback_visited_catalogs.clear();
+  EXPECT_EQ (0u, SimpleTraversalNoCloseCallback_visited_catalogs.size());
+
   CatalogTraversalParams params;
   params.no_close = true;
   MockedCatalogTraversal traverse(params);
@@ -559,6 +562,9 @@ void ZeroLevelHistoryTraversalCallback(
 }
 
 TEST_F(T_CatalogTraversal, ZeroLevelHistoryTraversal) {
+  ZeroLevelHistoryTraversal_visited_catalogs.clear();
+  EXPECT_EQ (0u, ZeroLevelHistoryTraversal_visited_catalogs.size());
+
   CatalogTraversalParams params;
   params.history = 0;
   MockedCatalogTraversal traverse(params);
