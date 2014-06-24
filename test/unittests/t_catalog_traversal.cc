@@ -87,11 +87,12 @@ class MockCatalog {
               const shash::Any  &catalog_hash,
               const uint64_t     catalog_size,
               const unsigned int revision,
+              const bool         is_root,
               MockCatalog *parent   = NULL,
               MockCatalog *previous = NULL) :
     parent_(parent), previous_(previous), root_path_(root_path),
     catalog_hash_(catalog_hash), catalog_size_(catalog_size),
-    revision_(revision)
+    revision_(revision), is_root_(is_root)
   {
     if (parent != NULL) {
       parent->RegisterChild(this);
@@ -118,9 +119,7 @@ class MockCatalog {
     }
   }
 
-  bool IsRoot() const {
-    return (parent_ == NULL);
-  }
+  bool IsRoot() const { return is_root_; }
 
   const NestedCatalogList& ListNestedCatalogs() const { return children_; }
 
@@ -166,6 +165,7 @@ class MockCatalog {
   const shash::Any    catalog_hash_;
   const uint64_t      catalog_size_;
   const unsigned int  revision_;
+  const bool          is_root_;
 
   NestedCatalogList   children_;
 };
@@ -425,10 +425,12 @@ class T_CatalogTraversal : public ::testing::Test {
     }
 
     // produce the new catalog with references to it's predecessor and parent
+    const bool is_root = (parent == NULL);
     MockCatalog *catalog = new MockCatalog(root_path,
                                            effective_clg_hash,
                                            dice_.Next(10000),
                                            revision,
+                                           is_root,
                                            parent,
                                            previous_catalog);
 
