@@ -74,6 +74,8 @@ struct CatalogTraversalData {
 struct CatalogTraversalParams {
   CatalogTraversalParams() : history(0), no_close(false), tmp_dir("/tmp") {}
 
+  static const unsigned int kFullHistory;
+
   std::string   repo_url;
   std::string   repo_name;
   std::string   repo_keys;

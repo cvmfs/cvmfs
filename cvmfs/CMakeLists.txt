@@ -143,7 +143,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   file_chunk.h file_chunk.cc
   directory_entry.h directory_entry.cc
   shortstring.h
-  catalog_traversal.h
+  catalog_traversal.h catalog_traversal.cc
   sql.h sql.cc
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
