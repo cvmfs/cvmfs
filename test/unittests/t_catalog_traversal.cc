@@ -2,7 +2,6 @@
 #include <string>
 #include <map>
 #include <cassert>
-#include <iostream> // TODO: remove me!
 #include "../../cvmfs/prng.h"
 
 #include "../../cvmfs/catalog_traversal.h"
