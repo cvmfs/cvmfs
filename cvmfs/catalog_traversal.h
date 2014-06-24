@@ -19,6 +19,12 @@
 #include "manifest_fetch.h"
 #include "signature.h"
 
+
+namespace catalog {
+  class Catalog;
+  class WritableCatalog;
+}
+
 namespace swissknife {
 
 /**
@@ -28,20 +34,62 @@ namespace swissknife {
  * @param catalog_hash        the SHA-1 content hash of the catalog
  * @param tree_level          the depth in the nested catalog tree
  *                            (starting at zero)
+ * @param history_depth       the distance from the current HEAD revision
+ *                            (current HEAD has history_depth 0)
  */
+template <class CatalogT>
 struct CatalogTraversalData {
-  CatalogTraversalData(const catalog::Catalog* catalog,
-                       const shash::Any&       catalog_hash,
-                       const unsigned          tree_level,
-                       const size_t            file_size) :
+  CatalogTraversalData(const CatalogT     *catalog,
+                       const shash::Any   &catalog_hash,
+                       const unsigned      tree_level,
+                       const size_t        file_size,
+                       const unsigned int  history_depth) :
     catalog(catalog), catalog_hash(catalog_hash), tree_level(tree_level),
-    file_size(file_size) {}
+    file_size(file_size),
+    history_depth(history_depth) {}
 
-  const catalog::Catalog*  catalog;
-  const shash::Any         catalog_hash;
-  const unsigned int       tree_level;
-  const size_t             file_size;
+  const CatalogT     *catalog;
+  const shash::Any    catalog_hash;
+  const unsigned int  tree_level;
+  const size_t        file_size;
+  const unsigned int  history_depth;
 };
+
+
+/**
+ * @param repo_url           the path to the repository to be traversed:
+ *                           -> either absolute path to the local catalogs
+ *                           -> or an URL to a remote repository
+ * @param repo_name          fully qualified repository name (used for remote
+ *                           repository signature check) (optional)
+ * @param repo_keys          a comma separated list of public key file
+ *                           locations to verify the repository manifest file
+ * @param history            depth of the desired catalog history traversal
+ *                           (default: 0 - only HEAD catalogs are traversed)
+ * @param no_repeat_history  keep track of visited catalogs and don't re-visit
+ *                           them in previous revisions
+ * @param no_close           do not close catalogs after they were attached
+ *                           (catalogs retain their parent/child pointers)
+ * @param tmp_dir            path to the temporary directory to be used
+ *                           (default: /tmp)
+ */
+struct CatalogTraversalParams {
+  CatalogTraversalParams() : history(0), no_repeat_history(false),
+  no_close(false), tmp_dir("/tmp") {}
+
+  static const unsigned int kFullHistory;
+
+  std::string   repo_url;
+  std::string   repo_name;
+  std::string   repo_keys;
+  unsigned int  history;
+  bool          no_repeat_history;
+  bool          no_close;
+  std::string   tmp_dir;
+};
+
+
+class ObjectFetcher;
 
 /**
  * This class traverses the complete catalog hierarchy of a CVMFS repository
@@ -53,70 +101,58 @@ struct CatalogTraversalData {
  *       file size, each catalog is loaded, processed and removed immediately
  *       afterwards.
  *
+ * @param CatalogT        the catalog class that should be used for traversal
+ *                        usually this will be either catalog::Catalog or
+ *                        catalog::WritableCatalog
+ *                        (please consider to use the typedef'ed versions of
+ *                        this template i.e. [Readable|Writable]CatalogTraversal)
+ * @param ObjectFetcherT  Strategy Pattern implementation that is supposed to be
+ *                        used mainly for unit-testability. Normal usage should
+ *                        not bring up the need to actually set this to anything
+ *                        different than the default value (see below)
+ *
  * CAUTION: the Catalog* pointer passed into the callback becomes invalid
  *          directly after the callback method returns, unless you create the
  *          CatalogTraversal object with no_close = true.
  */
-template<class CatalogT>
-class CatalogTraversal : public Observable<CatalogTraversalData> {
+template<class CatalogT, class ObjectFetcherT = ObjectFetcher>
+class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
+ public:
+  typedef CatalogTraversalData<CatalogT> CallbackData;
+
  protected:
   struct CatalogJob {
-    CatalogJob(const std::string      &path,
-               const shash::Any       &hash,
-               const unsigned          tree_level,
-                     catalog::Catalog *parent = NULL) :
+    CatalogJob(const std::string  &path,
+               const shash::Any   &hash,
+               const unsigned      tree_level,
+               const unsigned      history_depth,
+                     CatalogT     *parent = NULL) :
       path(path),
       hash(hash),
       tree_level(tree_level),
-      parent(parent) {}
-    CatalogJob(const catalog::Catalog::NestedCatalog &nested_catalog,
-               const unsigned                         tree_level,
-                     catalog::Catalog                *parent = NULL) :
-      path(nested_catalog.path.ToString()),
-      hash(nested_catalog.hash),
-      tree_level(tree_level),
+      history_depth(history_depth),
       parent(parent) {}
 
-    const std::string       path;
-    const shash::Any        hash;
-    const unsigned          tree_level;
-          catalog::Catalog *parent;
+    const std::string   path;
+    const shash::Any    hash;
+    const unsigned      tree_level;
+    const unsigned      history_depth;
+          CatalogT     *parent;
   };
   typedef std::stack<CatalogJob> CatalogJobStack;
 
  public:
   /**
-   * Constructs a new catalog traversal engine.
-   * @param repo_url           the path to the repository to be traversed:
-   *                           -> either absolute path to the local catalogs
-   *                           -> or an URL to a remote repository
-   * @param repo_name          fully qualified repository name (used for remote
-   *                           repository signature check) (optional)
-   * @param repo_keys          a comma separated list of public key file
-   *                           locations to verify the repository manifest file
-   * @param no_close           do not close catalogs after they were attached
-   *                           (catalogs retain their parent/child pointers)
+   * Constructs a new catalog traversal engine based on the construction
+   * parameters described in struct ConstructionParams.
    */
-	CatalogTraversal(const std::string& repo_url,
-                   const std::string& repo_name = "",
-                   const std::string& repo_keys = "",
-                   const bool         no_close = false,
-                   const std::string& tmp_dir  = "/tmp") :
-    repo_url_(MakeCanonicalPath(repo_url)),
-    repo_name_(repo_name),
-    repo_keys_(repo_keys),
-    is_remote_(repo_url.substr(0, 7) == "http://"),
-    no_close_(no_close),
-    temporary_directory_(tmp_dir)
-  {
-    if (is_remote_)
-      download_manager_.Init(1, true);
-  }
-
-  virtual ~CatalogTraversal() {
-    if (is_remote_)
-      download_manager_.Fini();
-  }
+	CatalogTraversal(const CatalogTraversalParams &params) :
+    object_fetcher_(params),
+    repo_name_(params.repo_name),
+    no_close_(params.no_close),
+    no_repeat_history_(params.no_repeat_history),
+    history_depth_(params.history)
+  {}
 
 
   /**
@@ -130,7 +166,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
   bool Traverse() {
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
-    manifest::Manifest *manifest = LoadManifest();
+    manifest::Manifest *manifest = object_fetcher_.FetchManifest();
     if (!manifest) {
       LogCvmfs(kLogCatalogTraversal, kLogStderr,
         "Failed to load manifest for repository %s", repo_name_.c_str());
@@ -139,8 +175,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
 
     // add the root catalog of the repository as the first element on the job
     // stack
-    CatalogJob job("", manifest->catalog_hash(), 0);
-    catalog_stack_.push(job);
+    const bool did = MightPush(CatalogJob("", manifest->catalog_hash(), 0, 0));
+    assert (did);
 
     delete manifest;
 
@@ -160,6 +196,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
       CatalogJob job = catalog_stack_.top();
       catalog_stack_.pop();
 
+      // if necessary, we keep track of visited catalogs
+      if (no_repeat_history_) {
+        visited_catalogs_.insert(job.hash);
+      }
+
       // Process it (potentially generating new catalog jobs on the stack)
       const bool success = ProcessCatalogJob(job);
       if (!success)
@@ -172,7 +213,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
   bool ProcessCatalogJob(const CatalogJob &job) {
     // Load a catalog
     std::string tmp_file;
-    if (!FetchCatalog(job.hash, &tmp_file)) {
+    if (!object_fetcher_.Fetch(job.hash, &tmp_file)) {
       LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load catalog %s",
                job.hash.ToString().c_str());
       return false;
@@ -182,10 +223,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     const size_t file_size = GetFileSize(tmp_file);
 
     // Open the catalog
-    catalog::Catalog *catalog = CatalogT::AttachFreely(job.path,
-                                                       tmp_file,
-                                                       job.hash,
-                                                       job.parent);
+    CatalogT *catalog = CatalogT::AttachFreely(job.path,
+                                               tmp_file,
+                                               job.hash,
+                                               job.parent);
     if (!no_close_) {
       unlink(tmp_file.c_str());
     }
@@ -196,33 +237,119 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     }
 
     // Provide the user with the catalog
-    NotifyListeners(CatalogTraversalData(catalog,
-                                         job.hash,
-                                         job.tree_level,
-                                         file_size));
+    NotifyListeners(CallbackData(catalog,
+                                 job.hash,
+                                 job.tree_level,
+                                 file_size,
+                                 job.history_depth));
 
-    // Inception! Go to the next catalog level
-    // Note: taking a copy of the result of ListNestedCatalogs() here for
-    //       data corruption prevention
-    const catalog::Catalog::NestedCatalogList nested_catalogs =
-      catalog->ListNestedCatalogs();
-    for (catalog::Catalog::NestedCatalogList::const_iterator i =
-         nested_catalogs.begin(), iEnd = nested_catalogs.end();
-         i != iEnd; ++i)
-    {
-      catalog::Catalog* parent = (no_close_) ? catalog : NULL;
-      catalog_stack_.push(CatalogJob(*i, job.tree_level + 1, parent));
-    }
+    // Inception! Go deeper into the catalog tree
+    PushReferencedCatalogs(catalog, job);
 
     // We are done with this catalog
     if (!no_close_) {
       delete catalog;
     }
+
     return true;
   }
 
 
-  manifest::Manifest* LoadManifest() {
+  unsigned int PushReferencedCatalogs(      CatalogT    *catalog,
+                                      const CatalogJob  &job) {
+    unsigned int pushed_catalogs = 0;
+
+    // Only Root catalogs may be used as entry points into previous revisions
+    if (job.history_depth < history_depth_ && catalog->IsRoot()) {
+      shash::Any previous_revision = catalog->GetPreviousRevision();
+      if (! previous_revision.IsNull()) {
+        const bool pushed = MightPush(CatalogJob("",
+                                                 previous_revision,
+                                                 0,
+                                                 job.history_depth + 1,
+                                                 NULL));
+        if (pushed) {
+          ++pushed_catalogs;
+        }
+      }
+    }
+
+    // Inception! Go to the next catalog level
+    // Note: taking a copy of the result of ListNestedCatalogs() here for
+    //       data corruption prevention
+    const typename CatalogT::NestedCatalogList &nested =
+                                                  catalog->ListNestedCatalogs();
+    typename CatalogT::NestedCatalogList::const_iterator i    = nested.begin();
+    typename CatalogT::NestedCatalogList::const_iterator iend = nested.end();
+    for (; i != iend; ++i) {
+      CatalogT* parent = (no_close_) ? catalog : NULL;
+      const bool pushed = MightPush(CatalogJob(i->path.ToString(),
+                                               i->hash,
+                                               job.tree_level + 1,
+                                               job.history_depth,
+                                               parent));
+      if (pushed) {
+        ++pushed_catalogs;
+      }
+    }
+
+    return pushed_catalogs;
+  }
+
+
+  bool MightPush(const CatalogJob &job) {
+    if (no_repeat_history_ && visited_catalogs_.count(job.hash) > 0) {
+      return false;
+    }
+
+    catalog_stack_.push(job);
+    return true;
+  }
+
+ private:
+  ObjectFetcherT        object_fetcher_;
+  const std::string     repo_name_;
+  const bool            no_close_;
+  const bool            no_repeat_history_;
+  const unsigned int    history_depth_;
+  CatalogJobStack       catalog_stack_;
+  std::set<shash::Any>  visited_catalogs_;
+};
+
+typedef CatalogTraversal<catalog::Catalog>         ReadonlyCatalogTraversal;
+typedef CatalogTraversal<catalog::WritableCatalog> WritableCatalogTraversal;
+
+
+
+/**
+ * This is the default class implementing the data object fetching strategy of
+ * the CatalogTraversal<> template. It abstracts all accesses to external file
+ * or HTTP resources. There is no need to change the default ObjectFetcher of
+ * CatalogTraversal<> except for unit-testing.
+ */
+class ObjectFetcher {
+ public:
+  ObjectFetcher(const CatalogTraversalParams &params) :
+    repo_url_(MakeCanonicalPath(params.repo_url)),
+    repo_name_(params.repo_name),
+    repo_keys_(params.repo_keys),
+    is_remote_(params.repo_url.substr(0, 7) == "http://"),
+    temporary_directory_(params.tmp_dir)
+  {
+    if (is_remote_) {
+      download_manager_.Init(1, true);
+    }
+  }
+
+  virtual ~ObjectFetcher() {
+    if (is_remote_) {
+      download_manager_.Fini();
+    }
+  }
+
+
+ public:
+  manifest::Manifest* FetchManifest() {
     manifest::Manifest *manifest = NULL;
     // Grab manifest file
     if (!is_remote_) {
@@ -279,15 +406,30 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     return manifest;
   }
 
-
-  inline bool FetchCatalog(const shash::Any& catalog_hash,
-                           std::string *catalog_file)
-  {
+  inline bool Fetch(const shash::Any  &catalog_hash,
+                    std::string       *catalog_file) {
     return (is_remote_) ? DownloadCatalog  (catalog_hash, catalog_file)
                         : DecompressCatalog(catalog_hash, catalog_file);
   }
 
 
+  /**
+   * Checks if a file exists, both remotely or locally, depending on the type
+   * of repository currently traversed
+   * @param file   the file to be checked for existence
+   * @return       true if the file exists, false otherwise
+   */
+  inline bool Exists(const std::string &file) {
+    if (is_remote_) {
+      download::JobInfo head(&file, false);
+      return download_manager_.Fetch(&head) == download::kFailOk;
+    } else {
+      return FileExists(file);
+    }
+  }
+
+
+ protected:
   /**
    * Downloads a catalog from a remote repository and extracts it in one shot
    * @param catalog_hash   the SHA-1 hash of the catalog to be downloaded
@@ -337,34 +479,14 @@ class CatalogTraversal : public Observable<CatalogTraversalData> {
     return true;
   }
 
-
-  /**
-   * Checks if a file exists, both remotely or locally, depending on the type
-   * of repository currently traversed
-   * @param file   the file to be checked for existence
-   * @return       true if the file exists, false otherwise
-   */
-  bool Exists(const std::string &file) {
-    if (is_remote_) {
-      download::JobInfo head(&file, false);
-      return download_manager_.Fetch(&head) == download::kFailOk;
-    } else {
-      return FileExists(file);
-    }
-  }
-
  private:
-  const std::string repo_url_;
-  const std::string repo_name_;
-  const std::string repo_keys_;
-  const bool        is_remote_;
-  const bool        no_close_;
-  const std::string temporary_directory_;
-  CatalogJobStack   catalog_stack_;
-  download::DownloadManager download_manager_;
+  const std::string          repo_url_;
+  const std::string          repo_name_;
+  const std::string          repo_keys_;
+  const bool                 is_remote_;
+  const std::string          temporary_directory_;
+  download::DownloadManager  download_manager_;
 };
-
-typedef CatalogTraversal<catalog::Catalog> SimpleCatalogTraversal;
 
 }
 

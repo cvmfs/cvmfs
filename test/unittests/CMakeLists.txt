@@ -20,6 +20,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_util_concurrency.cc
   t_polymorphic_construction.cc
   t_catalog_counters.cc
+  t_catalog_traversal.cc
   t_fs_traversal.cc
   t_pipe.cc
   t_managed_exec.cc
@@ -101,6 +102,11 @@ set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_SOURCE_DIR}/dirtab.cc
   ${CVMFS_SOURCE_DIR}/dirtab.h
+
+  ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/manifest.cc
+
+  ${CVMFS_SOURCE_DIR}/catalog_traversal.cc
 )
 
 #
@@ -131,6 +137,10 @@ endif (ZLIB_BUILTIN)
 if (TBB_PRIVATE_LIB)
   add_dependencies (${PROJECT_TEST_NAME} libtbb)
 endif (TBB_PRIVATE_LIB)
+
+if (LIBCURL_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
+endif (LIBCURL_BUILTIN)
 
 set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 

@@ -43,14 +43,19 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second : "";
   const std::string &repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
 
-  SimpleCatalogTraversal traversal(repo_url, repo_name, repo_keys);
+  CatalogTraversalParams params;
+  params.repo_url  = repo_url;
+  params.repo_name = repo_name;
+  params.repo_keys = repo_keys;
+  ReadonlyCatalogTraversal traversal(params);
   traversal.RegisterListener(&CommandListCatalogs::CatalogCallback, this);
 
   return traversal.Traverse() ? 0 : 1;
 }
 
 
-void CommandListCatalogs::CatalogCallback(const CatalogTraversalData &data) {
+void CommandListCatalogs::CatalogCallback(
+                           const ReadonlyCatalogTraversal::CallbackData &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string clg_size;

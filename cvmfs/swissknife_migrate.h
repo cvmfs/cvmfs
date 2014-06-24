@@ -206,7 +206,7 @@ class CommandMigrate : public Command {
   static const catalog::DirectoryEntry& GetNestedCatalogMarkerDirent();
 
  protected:
-  void CatalogCallback(const CatalogTraversalData &data);
+  void CatalogCallback(const WritableCatalogTraversal::CallbackData &data);
   void MigrationCallback(PendingCatalog *const &data);
   void UploadCallback(const upload::SpoolerResult &result);
 

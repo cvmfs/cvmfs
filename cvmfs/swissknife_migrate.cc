@@ -131,13 +131,15 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
-  CatalogTraversal<WritableCatalog> traversal(
-    repo_url,
-    repo_name,
-    repo_keys,
-    generate_full_catalog_tree,
-    decompress_tmp_dir);
+  CatalogTraversalParams params;
+  params.repo_url  = repo_url;
+  params.repo_name = repo_name;
+  params.repo_keys = repo_keys;
+  params.no_close  = generate_full_catalog_tree;
+  params.tmp_dir   = decompress_tmp_dir;
+  WritableCatalogTraversal traversal(params);
   traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
+
   catalog_loading_stopwatch_.Start();
   const bool loading_successful = traversal.Traverse();
   catalog_loading_stopwatch_.Stop();
@@ -269,7 +271,8 @@ bool CommandMigrate::DoMigrationAndCommit(
 }
 
 
-void CommandMigrate::CatalogCallback(const CatalogTraversalData &data) {
+void CommandMigrate::CatalogCallback(
+                           const WritableCatalogTraversal::CallbackData &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string path;
