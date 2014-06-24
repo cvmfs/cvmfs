@@ -493,6 +493,10 @@ cvmfs_context* cvmfs_attach_repo(char const *options)
   return cvmfs_context::Create(opts);
 }
 
+void cvmfs_detach_repo(cvmfs_context *ctx) {
+  cvmfs_context::Destroy(ctx);
+}
+
 int cvmfs_init(char const *options) {
   global_options opts;
   int parse_result = opts.parse_options(options);
@@ -505,9 +509,8 @@ int cvmfs_init(char const *options) {
   return cvmfs_globals::Initialize(opts);
 }
 
-void cvmfs_fini(cvmfs_context *ctx) {
-  delete ctx;
-  ::mountpoint = "";
+void cvmfs_fini() {
+  cvmfs_globals::Destroy();
 }
 
 static void (*ext_log_fn)(const char *msg) = NULL;

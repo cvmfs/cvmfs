@@ -62,6 +62,7 @@ class cvmfs_globals : SingleCopy {
 
  public:
   static int            Initialize(const options &opts);
+  static void           Destroy();
   static cvmfs_globals* Instance();
 
   pthread_mutex_t *libcrypto_locks() { return libcrypto_locks_; }
@@ -126,6 +127,7 @@ class cvmfs_context : SingleCopy {
 
  public:
   static cvmfs_context* Create(const options &options);
+  static void Destroy(cvmfs_context *ctx);
 
   int GetAttr(const char *c_path, struct stat *info);
   int Readlink(const char *path, char *buf, size_t size);
@@ -139,6 +141,7 @@ class cvmfs_context : SingleCopy {
  protected:
   cvmfs_context(const options &options); // please use static method Create()
                                          // for construction
+  ~cvmfs_context();
 
  private:
   int Setup(const options &opts);
@@ -192,6 +195,7 @@ class cvmfs_context : SingleCopy {
   bool download_ready_;
   bool signature_ready_;
   bool catalog_ready_;
+  bool pathcache_ready_;
   bool tracer_ready_;
 };
 

@@ -34,7 +34,7 @@ int cvmfs_init(char const *options);
 /**
  * Shut down the CVMFS library and release all resources.
  */
-void cvmfs_fini(cvmfs_context *ctx);
+void cvmfs_fini();
 
 /**
  * Initialize a CVMFS remote repository.
@@ -45,6 +45,12 @@ void cvmfs_fini(cvmfs_context *ctx);
  * \return 0 on success
  */
 cvmfs_context* cvmfs_attach_repo(char const *options);
+
+/**
+ * Uninitialize a CVMFS remote repository and release all in memory resources
+ * for it.
+ */
+void cvmfs_detach_repo(cvmfs_context *ctx);
 
 /* Load a new catalog if there is one
  * \return 0 on success

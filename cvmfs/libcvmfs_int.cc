@@ -115,6 +115,14 @@ int cvmfs_globals::Initialize(const options &opts) {
   return retval;
 }
 
+void cvmfs_globals::Destroy() {
+  if (cvmfs_globals::instance != NULL) {
+    delete cvmfs_globals::instance;
+    cvmfs_globals::instance = NULL;
+  }
+  assert (cvmfs_globals::instance == NULL);
+}
+
 cvmfs_globals::cvmfs_globals() :
   sqlite_scratch(NULL),
   sqlite_page_cache(NULL),
@@ -279,6 +287,10 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
   return ctx;
 }
 
+void cvmfs_context::Destroy(cvmfs_context *ctx) {
+  delete ctx;
+}
+
 int cvmfs_context::Setup(const options &opts) {
   // Network initialization
   download_manager_ = new download::DownloadManager();
@@ -334,6 +346,7 @@ int cvmfs_context::Setup(const options &opts) {
            opts.mountpoint.c_str(), repository_name_.c_str());
 
   md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize);
+  pathcache_ready_ = true;
 
   if (! opts.tracefile.empty()) {
     tracer::Init(8192, 7000, opts.tracefile);
@@ -355,9 +368,38 @@ cvmfs_context::cvmfs_context(const options &opts) :
   download_ready_(false),
   signature_ready_(false),
   catalog_ready_(false),
+  pathcache_ready_(false),
   tracer_ready_(false)
 {
   InitRuntimeCounters();
+}
+
+cvmfs_context::~cvmfs_context() {
+  if (download_ready_) {
+    download_manager_->Fini();
+    delete download_manager_;
+    download_manager_ = NULL;
+  }
+
+  if (signature_ready_) {
+    signature_manager_->Fini();
+    delete signature_manager_;
+    signature_manager_ = NULL;
+  }
+
+  if (catalog_ready_) {
+    delete catalog_manager_;
+    catalog_manager_ = NULL;
+  }
+
+  if (pathcache_ready_) {
+    delete md5path_cache_;
+    md5path_cache_ = NULL;
+  }
+
+  if (tracer_ready_) {
+    tracer::Fini();
+  }
 }
 
 bool cvmfs_context::GetDirentForPath(const PathString         &path,
