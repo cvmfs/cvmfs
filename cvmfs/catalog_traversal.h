@@ -72,7 +72,8 @@ struct CatalogTraversalData {
  *                    (default: /tmp)
  */
 struct CatalogTraversalParams {
-  CatalogTraversalParams() : history(0), no_close(false), tmp_dir("/tmp") {}
+  CatalogTraversalParams() : history(0), no_repeat_history(false),
+  no_close(false), tmp_dir("/tmp") {}
 
   static const unsigned int kFullHistory;
 
@@ -80,6 +81,7 @@ struct CatalogTraversalParams {
   std::string   repo_name;
   std::string   repo_keys;
   unsigned int  history;
+  bool          no_repeat_history;
   bool          no_close;
   std::string   tmp_dir;
 };
@@ -146,6 +148,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     object_fetcher_(params),
     repo_name_(params.repo_name),
     no_close_(params.no_close),
+    no_repeat_history_(params.no_repeat_history),
     history_depth_(params.history)
   {}
 
@@ -189,6 +192,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       // Get the top most catalog for the next processing step
       CatalogJob job = catalog_stack_.top();
       catalog_stack_.pop();
+
+      // if necessary, we keep track of visited catalogs
+      if (no_repeat_history_) {
+        visited_catalogs_.insert(job.hash);
+      }
 
       // Process it (potentially generating new catalog jobs on the stack)
       const bool success = ProcessCatalogJob(job);
@@ -287,16 +295,22 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
 
   bool Push(const CatalogJob &job) {
+    if (no_repeat_history_ && visited_catalogs_.count(job.hash) > 0) {
+      return false;
+    }
+
     catalog_stack_.push(job);
     return true;
   }
 
  private:
-  ObjectFetcherT      object_fetcher_;
-  const std::string   repo_name_;
-  const bool          no_close_;
-  const unsigned int  history_depth_;
-  CatalogJobStack     catalog_stack_;
+  ObjectFetcherT        object_fetcher_;
+  const std::string     repo_name_;
+  const bool            no_close_;
+  const bool            no_repeat_history_;
+  const unsigned int    history_depth_;
+  CatalogJobStack       catalog_stack_;
+  std::set<shash::Any>  visited_catalogs_;
 };
 
 typedef CatalogTraversal<catalog::Catalog>         ReadonlyCatalogTraversal;
