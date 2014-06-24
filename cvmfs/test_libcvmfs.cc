@@ -22,10 +22,14 @@ is exporting the proper set of symbols to be used by a C program.
 
 #define TEST_LINE_MAX 1024
 
+typedef std::map<std::string, cvmfs_context*> RepoMap;
+static RepoMap attached_repos;
+
 void cvmfs_test_help()
 {
 	printf("commands are:\n");
 	printf("   attach <repo name (without .cern.ch)>\n");
+	printf("   detach <repo name (without .cern.ch)>\n");
 	printf("   list <path>\n");
 	printf("   cat  <path>\n");
 	printf("   quit\n");
@@ -92,8 +96,6 @@ int cvmfs_test_cat(cvmfs_context *ctx, const char *path)
 
 cvmfs_context* cvmfs_test_attach(const char *repo_name)
 {
-	typedef std::map<std::string, cvmfs_context*> RepoMap;
-	static RepoMap attached_repos;
 	cvmfs_context *ctx = NULL;
 
 	RepoMap::const_iterator i = attached_repos.find(repo_name);
@@ -115,6 +117,23 @@ cvmfs_context* cvmfs_test_attach(const char *repo_name)
 	}
 
 	return ctx;
+}
+
+void cvmfs_test_detach(const char *repo_name, const cvmfs_context *active_ctx) {
+	RepoMap::iterator i = attached_repos.find(repo_name);
+	if (i == attached_repos.end()) {
+		printf("Did not find '%s' to detach\n", repo_name);
+		return;
+	}
+
+	cvmfs_context *ctx = i->second;
+	if (ctx == active_ctx) {
+		printf("'%s' is currently active and cannot be detached.\n", repo_name);
+		return;
+	}
+
+	attached_repos.erase(i);
+	cvmfs_detach_repo(ctx);
 }
 
 
@@ -150,6 +169,8 @@ int main( int argc, char *argv[] )
 			cvmfs_test_cat(ctx, path);
 		} else if(sscanf(line,"attach %s",repo_name)==1) {
 			ctx = cvmfs_test_attach(repo_name);
+		} else if(sscanf(line,"detach %s",repo_name)==1) {
+			cvmfs_test_detach(repo_name, ctx);
 		} else if(!strcmp(line,"quit")) {
 			break;
 		} else {
@@ -157,7 +178,7 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	cvmfs_fini(ctx);
+	cvmfs_fini();
 
 	return 0;
 }
