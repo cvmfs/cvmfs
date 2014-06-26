@@ -148,24 +148,6 @@ class LruCache : SingleCopy {
 
   //static uint64_t GetEntrySize() { return sizeof(Key) + sizeof(Value); }
 
-  // Internal data fields
-  unsigned int cache_gauge_;
-  unsigned int cache_size_;
-  static ConcreteMemoryAllocator *allocator_;
-
-  /**
-   * A doubly linked list to keep track of the least recently used data entries.
-   * New entries get pushed back to the list. If an entry is touched
-   * it is moved to the back of the list again.
-   * If the cache gets too long, the first element (the oldest) gets
-   * deleted to obtain some space.
-   */
-  ListEntryHead<Key> *lru_list_;
-  SmallHashFixed<Key, CacheEntry> cache_;
-#ifdef LRU_CACHE_THREAD_SAFE
-  pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
-#endif
-
   /**
    * A special purpose memory allocator for the cache entries.
    * It allocates enough memory for the maximal number of cache entries at
@@ -776,6 +758,24 @@ class LruCache : SingleCopy {
 template<class Key, class Value>
 typename LruCache<Key, Value>::ConcreteMemoryAllocator
   *LruCache<Key, Value>::allocator_ = NULL;
+  // Internal data fields
+  unsigned int            cache_gauge_;
+  const unsigned int      cache_size_;
+  ConcreteMemoryAllocator allocator_;
+
+  /**
+   * A doubly linked list to keep track of the least recently used data entries.
+   * New entries get pushed back to the list. If an entry is touched
+   * it is moved to the back of the list again.
+   * If the cache gets too long, the first element (the oldest) gets
+   * deleted to obtain some space.
+   */
+  ListEntryHead<Key>              lru_list_;
+  SmallHashFixed<Key, CacheEntry> cache_;
+#ifdef LRU_CACHE_THREAD_SAFE
+  pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
+#endif
+};  // class LruCache
 
 // Hash functions
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
