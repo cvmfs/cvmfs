@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <cassert>
 
 namespace download {
 class DownloadManager;
@@ -34,9 +35,20 @@ class Parameter {
     switch_only_ = switch_only;
   }
 
+  static Parameter Mandatory(const char key, const std::string &desc) {
+    return Parameter(key, desc, false, false);
+  }
+  static Parameter Optional(const char key, const std::string &desc) {
+    return Parameter(key, desc, true, false);
+  }
+  static Parameter Switch(const char key, const std::string &desc) {
+    return Parameter(key, desc, true, true);
+  }
+
   char key() const { return key_; }
-  std::string description() const { return description_; }
+  const std::string& description() const { return description_; }
   bool optional() const { return optional_; }
+  bool mandatory() const { return !optional_; }
   bool switch_only() const { return switch_only_; }
  private:
   char key_;
