@@ -33,6 +33,14 @@
             <mod>group</mod>
             <mod>owner</mod>
           </f>
+          <f n="egi.eu.conf" o="root" g="wheel" p="33188">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="opensciencegrid.org.conf" o="root" g="wheel" p="33188">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
           <mod>group</mod>
           <mod>owner</mod>
         </f>
@@ -41,27 +49,23 @@
             <mod>group</mod>
             <mod>owner</mod>
           </f>
-          <mod>group</mod>
-          <mod>owner</mod>
-        </f>
-	<f n="keys" o="root" g="wheel" p="16877">
           <f n="cern-it1.cern.ch.pub" o="root" g="wheel" p="33060">
             <mod>group</mod>
             <mod>owner</mod>
           </f>
-          <mod>group</mod>
-          <mod>owner</mod>
-        </f>
-	<f n="keys" o="root" g="wheel" p="16877">
           <f n="cern-it2.cern.ch.pub" o="root" g="wheel" p="33060">
             <mod>group</mod>
             <mod>owner</mod>
           </f>
-          <mod>group</mod>
-          <mod>owner</mod>
-        </f>
-	<f n="keys" o="root" g="wheel" p="16877">
           <f n="cern-it3.cern.ch.pub" o="root" g="wheel" p="33060">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="opensciencegrid.org.pub" o="root" g="wheel" p="33060">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="egi.eu.pub" o="root" g="wheel" p="33060">
             <mod>group</mod>
             <mod>owner</mod>
           </f>
@@ -70,6 +74,10 @@
         </f>
         <f n="replica.conf" o="root" g="wheel" p="33204">
           <mod>mode</mod>
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
+        <f n="serverorder.sh" o="root" g="wheel" p="33188">
           <mod>group</mod>
           <mod>owner</mod>
         </f>
