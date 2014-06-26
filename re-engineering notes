@@ -1,3 +1,7 @@
+LruCache<> uses custom allocator and custom linked list --> make it STL with pool allocator
+SmallHash<> has custom allocator --> use C++ STL conform allocator
+
+
 cache module --> cache manager
 download: proper abstraction of "network path"
 central statistcs service
