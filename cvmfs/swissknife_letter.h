@@ -17,23 +17,21 @@ class CommandLetter : public Command {
     return "Signs arbitrary text with the repository certificate.";
   };
   ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('s', "sign text", true, true));
-    result.push_back(Parameter('a', "hash algorithm", true, false));
-    result.push_back(Parameter('c', "x509 certificate", true, false));
-    result.push_back(Parameter('k', "private key of the certificate "
-                               "or public master key", true, false));
-    result.push_back(Parameter('p', "password for the private key",
-                               true, false));
-    result.push_back(Parameter('v', "verify text", true, true));
-    result.push_back(Parameter('m', "max age (seconds)", true, false));
-    result.push_back(Parameter('z', "trusted certificate dir(s)", true, false));
-    result.push_back(Parameter('r', "repository url", true, false));
-    result.push_back(Parameter('e', "Erlang mode (stay active)", true, true));
-    result.push_back(Parameter('t', "text to sign or verify", true, false));
-    result.push_back(Parameter('f', "fully qualified repository name",
-                     false, false));
-    return result;
+    ParameterList r;
+    r.push_back(Parameter::Switch   ('s', "sign text"));
+    r.push_back(Parameter::Optional ('a', "hash algorithm"));
+    r.push_back(Parameter::Optional ('c', "x509 certificate"));
+    r.push_back(Parameter::Optional ('k', "private key of the certificate "
+                                          "or public master key"));
+    r.push_back(Parameter::Optional ('p', "password for the private key"));
+    r.push_back(Parameter::Switch   ('v', "verify text"));
+    r.push_back(Parameter::Optional ('m', "max age (seconds)"));
+    r.push_back(Parameter::Optional ('z', "trusted certificate dir(s)"));
+    r.push_back(Parameter::Optional ('r', "repository url"));
+    r.push_back(Parameter::Switch   ('e', "Erlang mode (stay active)"));
+    r.push_back(Parameter::Optional ('t', "text to sign or verify"));
+    r.push_back(Parameter::Mandatory('f', "fully qualified repository name"));
+    return r;
   }
   int Main(const ArgumentList &args);
 };

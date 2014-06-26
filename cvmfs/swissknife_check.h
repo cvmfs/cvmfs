@@ -25,15 +25,12 @@ class CommandCheck : public Command {
         "cvmfs repository.";
   };
   ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('r', "repository directory / url",
-                               false, false));
-    result.push_back(Parameter('t', "check specific repository tag",
-                               true, false));
-    result.push_back(Parameter('l', "log level (0-4, default: 2)", true, false));
-    result.push_back(Parameter('c', "check availability of data chunks",
-                               true, true));
-    return result;
+    ParameterList r;
+    r.push_back(Parameter::Mandatory('r', "repository directory / url"));
+    r.push_back(Parameter::Optional ('t', "check specific repository tag"));
+    r.push_back(Parameter::Optional ('l', "log level (0-4, default: 2)"));
+    r.push_back(Parameter::Switch   ('c', "check availability of data chunks"));
+    return r;
   }
   int Main(const ArgumentList &args);
 
