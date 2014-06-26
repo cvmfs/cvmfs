@@ -41,6 +41,13 @@ cp -R ${workdir}/tmp/packaging/debian/keys/* ${workdir}/src/cvmfs/debian
 cp ${workdir}/tmp/packaging/debian/keys/Makefile ${workdir}/src/cvmfs
 echo "done"
 
+echo -n "figuring out version number from rpm packaging... "
+upstream_version="$(cat ${srctree}/packaging/rpm/cvmfs-keys.spec | grep '^Version:' | awk '{print $2}')-0"
+echo "done"
+
 echo "building..."
-cd ${workdir}/src/cvmfs/debian
+cd ${workdir}/src/cvmfs
+dch -v $upstream_version -M "bumped upstream version number"
+
+cd debian
 pdebuild --buildresult ${workdir}/result
