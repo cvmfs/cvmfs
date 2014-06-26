@@ -18,9 +18,9 @@ class CommandZpipe : public Command {
       "Input comes on stdin, output goes to stdout.";
   };
   ParameterList GetParams() {
-    ParameterList result;
-    result.push_back(Parameter('d', "decompress file", true, true));
-    return result;
+    ParameterList r;
+    r.push_back(Parameter::Switch('d', "decompress file"));
+    return r;
   }
   int Main(const ArgumentList &args);
 };
