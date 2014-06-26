@@ -205,6 +205,19 @@ class LruCache : SingleCopy {
      */
     inline bool IsFull() const { return num_free_slots_ == 0; }
 
+    T* Construct(const T object) {
+      T* mem = Allocate();
+      if (mem != NULL) {
+        new (static_cast<void*>(mem)) T(object);
+      }
+      return mem;
+    }
+
+    void Destruct(T *object) {
+      object->~T();
+      Deallocate(object);
+    }
+
     /**
      * Allocate a slot and returns a pointer to the memory.
      * @return a pointer to a chunk of the memory pool
@@ -309,6 +322,12 @@ class LruCache : SingleCopy {
       this->next = this;
       this->prev = this;
     }
+
+    ListEntry(const ListEntry<T> &other) {
+      next = (other.next == &other) ? this : other.next;
+      prev = (other.prev == &other) ? this : other.prev;
+    }
+
     virtual ~ListEntry() {}
 
     /**
@@ -377,28 +396,9 @@ class LruCache : SingleCopy {
    */
   template<class T> class ListEntryContent : public ListEntry<T> {
    public:
-    ListEntryContent(Key content) {
+    ListEntryContent(T content) {
       content_ = content;
     };
-
-    /**
-     * Overwritten the new operator of this class to redirect it to our own
-     * memory allocator.  This ensures that heap is not fragmented by loads of
-     * malloc and free calls.
-     */
-    static void* operator new(size_t size) {
-      assert(LruCache::allocator_ != NULL);
-      return (void *)LruCache::allocator_->Allocate();
-    }
-
-    /**
-     * Overwritten delete operator to redirect deallocation to our own memory
-     * allocator.
-     */
-    static void operator delete (void *p) {
-      assert(LruCache::allocator_ != NULL);
-      LruCache::allocator_->Deallocate(static_cast<ListEntryContent<T> *>(p));
-    }
 
     inline bool IsListHead() const { return false; }
     inline T content() const { return content_; }
@@ -428,6 +428,9 @@ class LruCache : SingleCopy {
    */
   template<class T> class ListEntryHead : public ListEntry<T> {
    public:
+    ListEntryHead(ConcreteMemoryAllocator &allocator) :
+      allocator_(allocator) {}
+
     virtual ~ListEntryHead() {
       this->clear();
     }
@@ -443,7 +446,7 @@ class LruCache : SingleCopy {
       while (!entry->IsListHead()) {
         delete_me = entry;
         entry = entry->next;
-        delete delete_me;
+        allocator_.Destruct(static_cast<ConcreteListEntryContent*>(delete_me));
       }
 
       // Reset the list to lonely
@@ -460,7 +463,8 @@ class LruCache : SingleCopy {
      * @return the ListEntryContent structure wrapped around the data object
      */
     inline ListEntryContent<T>* PushBack(T content) {
-      ListEntryContent<T> *new_entry = new ListEntryContent<T>(content);
+      ListEntryContent<T> *new_entry =
+                             allocator_.Construct(ListEntryContent<T>(content));
       this->InsertAsPredecessor(new_entry);
       return new_entry;
     }
@@ -505,9 +509,12 @@ class LruCache : SingleCopy {
       ListEntryContent<T> *popped = (ListEntryContent<T> *)popped_entry;
       popped->RemoveFromList();
       T result = popped->content();
-      delete popped_entry;
+      allocator_.Destruct(static_cast<ConcreteListEntryContent*>(popped_entry));
       return result;
     }
+
+   private:
+    ConcreteMemoryAllocator &allocator_;
   };
 
  public:  // LruCache
@@ -515,22 +522,22 @@ class LruCache : SingleCopy {
    * Create a new LRU cache object
    * @param cache_size the maximal size of the cache
    */
-  LruCache(const unsigned cache_size, const Key &empty_key,
-           uint32_t (*hasher)(const Key &key))
+  LruCache(const unsigned   cache_size,
+           const Key       &empty_key,
+           uint32_t (*hasher)(const Key &key)) :
+    pause_(false),
+    cache_gauge_(0),
+    cache_size_(cache_size),
+    allocator_(cache_size),
+    lru_list_(allocator_)
   {
     assert(cache_size > 0);
 
-    LruCache<Key, Value>::allocator_ = new ConcreteMemoryAllocator(cache_size);
-
-    cache_gauge_ = 0;
-    cache_size_ = cache_size;
     statistics_.size = cache_size_;
     //cache_ = Cache(cache_size_);
     cache_.Init(cache_size_, empty_key, hasher);
-    atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated() +
+    atomic_xadd64(&statistics_.allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
-    lru_list_ = new ListEntryHead<Key>();
-    pause_ = false;
 
 #ifdef LRU_CACHE_THREAD_SAFE
     int retval = pthread_mutex_init(&lock_, NULL);
@@ -544,8 +551,6 @@ class LruCache : SingleCopy {
   }
 
   virtual ~LruCache() {
-    delete lru_list_;
-    delete LruCache<Key, Value>::allocator_;
 #ifdef LRU_CACHE_THREAD_SAFE
     pthread_mutex_destroy(&lock_);
 #endif
@@ -585,7 +590,7 @@ class LruCache : SingleCopy {
     if (this->IsFull())
       this->DeleteOldest();
 
-    entry.list_entry = lru_list_->PushBack(key);
+    entry.list_entry = lru_list_.PushBack(key);
     entry.value = value;
 
     cache_.Insert(key, entry);
@@ -644,7 +649,7 @@ class LruCache : SingleCopy {
       atomic_inc64(&statistics_.num_forget);
 
       entry.list_entry->RemoveFromList();
-      delete entry.list_entry;
+      allocator_.Destruct(entry.list_entry);
       cache_.Erase(key);
       --cache_gauge_;
     }
@@ -662,11 +667,11 @@ class LruCache : SingleCopy {
     this->Lock();
 
     cache_gauge_ = 0;
-    lru_list_->clear();
+    lru_list_.clear();
     cache_.Clear();
     atomic_inc64(&statistics_.num_drop);
     atomic_init64(&statistics_.allocated);
-    atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated() +
+    atomic_xadd64(&statistics_.allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
 
     this->Unlock();
@@ -717,7 +722,7 @@ class LruCache : SingleCopy {
    * @param entry the CacheEntry to be touched (CacheEntry is the internal wrapper data structure)
    */
   inline void Touch(const CacheEntry &entry) {
-    lru_list_->MoveToBack(entry.list_entry);
+    lru_list_.MoveToBack(entry.list_entry);
   }
 
   /**
@@ -727,7 +732,7 @@ class LruCache : SingleCopy {
     assert(!this->IsEmpty());
 
     atomic_inc64(&statistics_.num_replace);
-    Key delete_me = lru_list_->PopFront();
+    Key delete_me = lru_list_.PopFront();
     cache_.Erase(delete_me);
 
     --cache_gauge_;
@@ -752,12 +757,7 @@ class LruCache : SingleCopy {
   }
 
   bool pause_;  /**< Temporarily stops the cache in order to avoid poisoning */
-};  // class LruCache
 
-// initialize the static allocator field
-template<class Key, class Value>
-typename LruCache<Key, Value>::ConcreteMemoryAllocator
-  *LruCache<Key, Value>::allocator_ = NULL;
   // Internal data fields
   unsigned int            cache_gauge_;
   const unsigned int      cache_size_;
