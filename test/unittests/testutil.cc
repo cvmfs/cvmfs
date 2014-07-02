@@ -3,6 +3,10 @@
 #include <fstream>
 #include <sstream>
 
+#include <gtest/gtest.h>
+
+#include "../../cvmfs/manifest.h"
+
 #ifdef __APPLE__
   #include <sys/sysctl.h>
 #endif
@@ -92,3 +96,78 @@ DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
 }
 
 } /* namespace catalog */
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+MockCatalog::AvailableCatalogs MockCatalog::available_catalogs;
+unsigned int                   MockCatalog::instances = 0;
+
+const std::string MockCatalog::rhs       = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
+const shash::Any  MockCatalog::root_hash = shash::Any(shash::kSha1,
+                                                      shash::HexPtr(MockCatalog::rhs),
+                                                      'C');
+
+
+void MockCatalog::Reset() {
+  MockCatalog::instances = 0;
+  MockCatalog::UnregisterCatalogs();
+}
+
+void MockCatalog::RegisterCatalog(MockCatalog *catalog) {
+  ASSERT_EQ (MockCatalog::available_catalogs.end(),
+             MockCatalog::available_catalogs.find(catalog->catalog_hash()));
+  MockCatalog::available_catalogs[catalog->catalog_hash()] = catalog;
+}
+
+void MockCatalog::UnregisterCatalogs() {
+  MockCatalog::AvailableCatalogs::const_iterator i, iend;
+  for (i    = MockCatalog::available_catalogs.begin(),
+       iend = MockCatalog::available_catalogs.end();
+       i != iend; ++i)
+  {
+    delete i->second;
+  }
+  MockCatalog::available_catalogs.clear();
+}
+
+MockCatalog* MockCatalog::GetCatalog(const shash::Any &catalog_hash) {
+  AvailableCatalogs::const_iterator clg_itr =
+    MockCatalog::available_catalogs.find(catalog_hash);
+  return (MockCatalog::available_catalogs.end() != clg_itr)
+    ? clg_itr->second
+    : NULL;
+}
+
+MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
+                                       const std::string  &file,
+                                       const shash::Any   &catalog_hash,
+                                             MockCatalog  *parent) {
+  const MockCatalog *catalog = MockCatalog::GetCatalog(catalog_hash);
+  if (catalog == NULL) {
+    return NULL;
+  } else {
+    MockCatalog *new_catalog = catalog->Clone();
+    new_catalog->set_parent(parent);
+    return new_catalog;
+  }
+}
+
+void MockCatalog::RegisterChild(MockCatalog *child) {
+  NestedCatalog nested;
+  nested.path  = PathString(child->root_path());
+  nested.hash  = child->catalog_hash();
+  nested.child = child;
+  nested.size  = child->catalog_size();
+  children_.push_back(nested);
+}
+
+
+UniquePtr<history::History>* MockObjectFetcher::s_history;
+
+manifest::Manifest* MockObjectFetcher::FetchManifest() {
+  return new manifest::Manifest(MockCatalog::root_hash, 0, "");
+}

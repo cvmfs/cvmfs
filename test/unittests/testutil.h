@@ -7,6 +7,7 @@
 
 #include "../../cvmfs/directory_entry.h"
 #include "../../cvmfs/util.h"
+#include "../../cvmfs/history.h"
 
 pid_t GetParentPid(const pid_t pid);
 
@@ -166,5 +167,154 @@ template <class DerivedT>
 const std::string AbstractMockUploader<DerivedT>::sandbox_path    = g_sandbox_path;
 template <class DerivedT>
 const std::string AbstractMockUploader<DerivedT>::sandbox_tmp_dir = g_sandbox_tmp_dir;
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+namespace manifest {
+  class Manifest;
+}
+
+namespace swissknife {
+  class CatalogTraversalParams;
+}
+
+
+/**
+ * This is a minimal mock of a Catalog class.
+ */
+class MockCatalog {
+ public:
+  typedef std::map<shash::Any, MockCatalog*> AvailableCatalogs;
+  static AvailableCatalogs available_catalogs;
+  static unsigned int      instances;
+
+  static const std::string rhs;
+  static const shash::Any  root_hash;
+
+  static void Reset();
+  static void RegisterCatalog(MockCatalog *catalog);
+  static void UnregisterCatalogs();
+  static MockCatalog* GetCatalog(const shash::Any &catalog_hash);
+
+ public:
+  struct NestedCatalog {
+    PathString   path;
+    shash::Any   hash;
+    MockCatalog *child;
+    uint64_t     size;
+  };
+  typedef std::vector<NestedCatalog> NestedCatalogList;
+
+ public:
+  MockCatalog(const std::string &root_path,
+              const shash::Any  &catalog_hash,
+              const uint64_t     catalog_size,
+              const unsigned int revision,
+              const bool         is_root,
+              MockCatalog *parent   = NULL,
+              MockCatalog *previous = NULL) :
+    parent_(parent), previous_(previous), root_path_(root_path),
+    catalog_hash_(catalog_hash), catalog_size_(catalog_size),
+    revision_(revision), is_root_(is_root)
+  {
+    if (parent != NULL) {
+      parent->RegisterChild(this);
+    }
+    ++MockCatalog::instances;
+  }
+
+  MockCatalog(const MockCatalog &other) :
+    parent_(other.parent_), previous_(other.previous_),
+    root_path_(other.root_path_), catalog_hash_(other.catalog_hash_),
+    catalog_size_(other.catalog_size_), revision_(other.revision_),
+    is_root_(other.is_root_), children_(other.children_)
+  {
+    ++MockCatalog::instances;
+  }
+
+  ~MockCatalog() {
+    --MockCatalog::instances;
+  }
+
+ public: /* API in this 'public block' is used by CatalogTraversal
+          * (see catalog.h - catalog::Catalog for details)
+          */
+  static MockCatalog* AttachFreely(const std::string  &root_path,
+                                   const std::string  &file,
+                                   const shash::Any   &catalog_hash,
+                                         MockCatalog  *parent = NULL);
+
+  bool IsRoot() const { return is_root_; }
+
+  const NestedCatalogList& ListNestedCatalogs() const { return children_; }
+
+  unsigned int GetRevision() const { return revision_; }
+
+  shash::Any GetPreviousRevision() const {
+    return (previous_ != NULL) ? previous_->catalog_hash() : shash::Any();
+  }
+
+ public:
+  const PathString   path()         const { return PathString(root_path_);  }
+  const std::string& root_path()    const { return root_path_;              }
+  const shash::Any&  catalog_hash() const { return catalog_hash_;           }
+  uint64_t           catalog_size() const { return catalog_size_;           }
+  unsigned int       revision()     const { return revision_;               }
+
+  MockCatalog*       parent()       const { return parent_;                 }
+  MockCatalog*       previous()     const { return previous_;               }
+
+  void set_parent(MockCatalog *parent) { parent_ = parent; }
+
+ public:
+  void RegisterChild(MockCatalog *child);
+
+ protected:
+  MockCatalog* Clone() const {
+    return new MockCatalog(*this);
+  }
+
+ private:
+  MockCatalog        *parent_;
+  MockCatalog        *previous_;
+  const std::string   root_path_;
+  const shash::Any    catalog_hash_;
+  const uint64_t      catalog_size_;
+  const unsigned int  revision_;
+  const bool          is_root_;
+
+  NestedCatalogList   children_;
+};
+
+
+
+/**
+ * This is a mock of an ObjectFetcher that does essentially nothing.
+ */
+class MockObjectFetcher {
+ public:
+  static UniquePtr<history::History> *s_history;
+
+ public:
+  MockObjectFetcher(const swissknife::CatalogTraversalParams &params) {}
+ public:
+  manifest::Manifest* FetchManifest();
+  history::History* FetchHistory() {
+    return (MockObjectFetcher::s_history != NULL)
+              ? s_history->Release()
+              : NULL;
+  }
+  inline bool Fetch(const shash::Any  &catalog_hash,
+                    std::string       *catalog_file) {
+    return true;
+  }
+  inline bool Exists(const std::string &file) {
+    return false;
+  }
+};
 
 #endif /* CVMFS_UNITTEST_TESTUTIL */
