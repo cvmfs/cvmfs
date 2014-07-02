@@ -165,6 +165,13 @@ void MockCatalog::RegisterChild(MockCatalog *child) {
   children_.push_back(nested);
 }
 
+void MockCatalog::AddFile(const shash::Any   &content_hash,
+                          const size_t        file_size) {
+  MockCatalog::File f;
+  f.hash = content_hash;
+  f.size = file_size;
+  files_.push_back(f);
+}
 
 UniquePtr<history::History>* MockObjectFetcher::s_history;
 

@@ -209,6 +209,12 @@ class MockCatalog {
   };
   typedef std::vector<NestedCatalog> NestedCatalogList;
 
+  struct File {
+    shash::Any  hash;
+    size_t      size;
+  };
+  typedef std::vector<File> FileList;
+
  public:
   MockCatalog(const std::string &root_path,
               const shash::Any  &catalog_hash,
@@ -231,7 +237,7 @@ class MockCatalog {
     parent_(other.parent_), previous_(other.previous_),
     root_path_(other.root_path_), catalog_hash_(other.catalog_hash_),
     catalog_size_(other.catalog_size_), revision_(other.revision_),
-    is_root_(other.is_root_), children_(other.children_)
+    is_root_(other.is_root_), children_(other.children_), files_(other.files_)
   {
     ++MockCatalog::instances;
   }
@@ -272,6 +278,7 @@ class MockCatalog {
 
  public:
   void RegisterChild(MockCatalog *child);
+  void AddFile(const shash::Any &content_hash, const size_t file_size);
 
  protected:
   MockCatalog* Clone() const {
@@ -288,6 +295,7 @@ class MockCatalog {
   const bool          is_root_;
 
   NestedCatalogList   children_;
+  FileList            files_;
 };
 
 
