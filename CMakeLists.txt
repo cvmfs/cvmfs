@@ -81,6 +81,7 @@ option (BUILD_SERVER_DEBUG    "Build writer's end programs with debug symbols an
 option (BUILD_UNITTESTS       "Build the CernVM-FS unit test set"                                OFF)
 option (INSTALL_UNITTESTS     "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_MOUNT_SCRIPTS "Install CernVM-FS mount tools in /etc and /sbin"                  ON)
+option (INSTALL_CERN_KEYS     "Install CERN specific public key chain"                           ON)
 option (SQLITE3_BUILTIN       "Don't use system SQLite3"                                         ON)
 option (LIBCURL_BUILTIN       "Don't use system libcurl"                                         ON)
 option (PACPARSER_BUILTIN     "Don't use system installation of pacparser"                       ON)
@@ -358,8 +359,6 @@ add_subdirectory (cvmfs)
 if (INSTALL_MOUNT_SCRIPTS)
   add_subdirectory (mount)
 endif (INSTALL_MOUNT_SCRIPTS)
-
-add_subdirectory (cvmfs-keys)
 
 #
 # compile the unit tests
