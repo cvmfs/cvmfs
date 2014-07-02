@@ -81,7 +81,7 @@ Requires: SysVinit
 Requires: sysvinit-tools
   %endif
 %endif
-Obsoletes: cvmfs-keys < 1.5
+Requires: cvmfs-keys >= 1.2
 
 # SELinux integration
 # These are needed to build the selinux policy module.
@@ -124,7 +124,7 @@ Requires: curl
 Requires: attr
 Requires: openssl
 Requires: httpd
-Obsoletes: cvmfs-keys < 1.5
+Requires: cvmfs-keys >= 1.2
 
 Conflicts: cvmfs-server < 2.1
 
@@ -216,9 +216,11 @@ make DESTDIR=$RPM_BUILD_ROOT install
 mkdir -p $RPM_BUILD_ROOT/var/lib/cvmfs
 mkdir -p $RPM_BUILD_ROOT/cvmfs
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
-mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/domain.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
 mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
+
+# Keys are in cvmfs-keys
+rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
 
 # Fix docdir on SuSE
 %if 0%{?suse_version}
@@ -312,6 +314,7 @@ fi
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf
+%config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README ChangeLog

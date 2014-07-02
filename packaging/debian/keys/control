@@ -8,5 +8,5 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs-keys
 Architecture: all 
-Depends: curl ${misc:Depends}
+Depends: ${misc:Depends}
 Description: CernVM File System Public Keys
