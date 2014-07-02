@@ -237,11 +237,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // Provide the user with the catalog
-    NotifyListeners(CallbackData(catalog,
-                                 job.hash,
-                                 job.tree_level,
-                                 file_size,
-                                 job.history_depth));
+    this->NotifyListeners(CallbackData(catalog,
+                                       job.hash,
+                                       job.tree_level,
+                                       file_size,
+                                       job.history_depth));
 
     // Inception! Go deeper into the catalog tree
     PushReferencedCatalogs(catalog, job);
