@@ -169,6 +169,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_history.h swissknife_history.cc
   swissknife_migrate.h swissknife_migrate.cc
   swissknife_scrub.h swissknife_scrub.cc
+  swissknife_gc.h swissknife_gc.cc
   swissknife.h swissknife.cc)
 
 
