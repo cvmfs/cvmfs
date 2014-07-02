@@ -173,7 +173,16 @@ void MockCatalog::AddFile(const shash::Any   &content_hash,
   files_.push_back(f);
 }
 
+
 UniquePtr<history::History>* MockObjectFetcher::s_history;
+
+void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
+                           const size_t       chunk_size) {
+  MockCatalog::Chunk c;
+  c.hash = chunk_content_hash;
+  c.size = chunk_size;
+  chunks_.push_back(c);
+}
 
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   return new manifest::Manifest(MockCatalog::root_hash, 0, "");
