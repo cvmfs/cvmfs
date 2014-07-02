@@ -48,6 +48,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_unique_ptr.cc
   t_unlink_guard.cc
   t_history.cc
+  t_garbage_collector.cc
 
   # test utility functions
   testutil.cc testutil.h
