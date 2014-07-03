@@ -10,5 +10,5 @@ install:
 	cp mount/keys/*.pub $(DESTDIR)/etc/cvmfs/keys
 	mkdir -p $(DESTDIR)/etc/cvmfs/domain.d
 	cp mount/domain.d/*.conf $(DESTDIR)/etc/cvmfs/domain.d
-	rm -f $(DESTDIR)/etc/cvmfs/cern.ch.conf 
+	rm -f $(DESTDIR)/etc/cvmfs/domain.d/cern.ch.conf 
 	cp mount/serverorder.sh $(DESTDIR)/etc/cvmfs
