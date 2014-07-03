@@ -18,6 +18,8 @@ TEST(T_HashFilters, SimpleHashFilter) {
   filter.Fill(h("b9ca3169cbeb32229097bdd8d42849b6144e2e92"));
   filter.Freeze();
 
+  EXPECT_EQ (8u, filter.Count());
+
   EXPECT_TRUE (filter.Contains(h("451afd372792933f4dbad535413346bfe7e7cc08")));
   EXPECT_TRUE (filter.Contains(h("2579075d95e9c7abfbedb78de5307a7f27aa7109")));
   EXPECT_TRUE (filter.Contains(h("40e938a032915acb48da226792d394905321fb9e")));

@@ -39,6 +39,12 @@ class AbstractHashFilter {
    * Note: After Freeze() has been called, Fill() should fail!
    */
   virtual void Freeze() {}
+
+  /**
+   * Returns the number of objects already inserted into the filter.
+   * @return number of objects in the filter
+   */
+  virtual size_t Count() const = 0;
 };
 
 
@@ -64,7 +70,8 @@ class SimpleHashFilter : public AbstractHashFilter {
     return hashes_.find(hash) != hashes_.end();
   }
 
-  void Freeze() { frozen_ = true; }
+  void   Freeze()      { frozen_ = true;        }
+  size_t Count() const { return hashes_.size(); }
 
  private:
   std::set<shash::Any>  hashes_;
