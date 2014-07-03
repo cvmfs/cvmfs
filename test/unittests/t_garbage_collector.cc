@@ -305,3 +305,58 @@ TEST_F(T_GarbageCollector, Initialize) {
   EXPECT_EQ (0u, filter.freeze_calls);
   EXPECT_EQ (0u, filter.count_calls);
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+TEST_F(T_GarbageCollector, PreserveLatestRevision) {
+  InstrumentedSimpleHashFilter filter;
+  GarbageCollector<MockCatalog, InstrumentedSimpleHashFilter> gc(filter);
+
+  gc.Preserve(GetCatalog(5, "00"));
+  gc.Preserve(GetCatalog(5, "10"));
+  gc.Preserve(GetCatalog(5, "11"));
+  gc.Preserve(GetCatalog(5, "20"));
+
+  EXPECT_EQ (19u, filter.fill_calls);    //  12 data objects
+                                         // + 3 nested catalogs
+                                         // + 3 catalog self references
+                                         // + 1 root catalog
+  EXPECT_EQ (0u, filter.contains_calls);
+  EXPECT_EQ (0u, filter.freeze_calls);
+
+  gc.FreezePreservation();
+
+  EXPECT_EQ (1u, filter.freeze_calls);
+  EXPECT_EQ (14u, filter.Count()); //  12 data objects
+                                   // - 2 duplicates
+                                   // + 3 nested catalogs
+                                   // + 1 root catalog
+
+  EXPECT_TRUE (gc.IsCondemned(h("59b63e8478fb7fc02c54a85767c7116573907364")));
+  EXPECT_TRUE (gc.IsCondemned(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
+  EXPECT_TRUE (gc.IsCondemned(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
+  EXPECT_TRUE (gc.IsCondemned(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb")));
+  EXPECT_TRUE (gc.IsCondemned(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7")));
+  EXPECT_TRUE (gc.IsCondemned(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4")));
+  EXPECT_TRUE (gc.IsCondemned(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e")));
+  EXPECT_TRUE (gc.IsCondemned(h("1a17be523120c7d3a7be745ada1658cc74e8507b")));
+
+  EXPECT_FALSE(gc.IsCondemned(h("b52945d780f8cc16711d4e670d82499dad99032d")));
+  EXPECT_FALSE(gc.IsCondemned(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
+  EXPECT_FALSE(gc.IsCondemned(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
+  EXPECT_FALSE(gc.IsCondemned(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
+  EXPECT_FALSE(gc.IsCondemned(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+  EXPECT_FALSE(gc.IsCondemned(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(gc.IsCondemned(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
+  EXPECT_FALSE(gc.IsCondemned(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
+  EXPECT_FALSE(gc.IsCondemned(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
+  EXPECT_FALSE(gc.IsCondemned(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
+
+  EXPECT_FALSE(gc.IsCondemned(MockCatalog::root_hash));
+
+  EXPECT_EQ (19u, filter.contains_calls);
+}
