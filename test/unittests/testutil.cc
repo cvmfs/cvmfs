@@ -184,6 +184,35 @@ void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
   chunks_.push_back(c);
 }
 
+const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
+  if (referenced_objects_.empty()) {
+    referenced_objects_.reserve(   children_.size()
+                                 + files_.size()
+                                 + chunks_.size());
+
+          NestedCatalogList::const_iterator i    = children_.begin();
+    const NestedCatalogList::const_iterator iend = children_.end();
+    for (; i != iend; ++i) {
+      referenced_objects_.push_back(i->hash);
+    }
+
+          FileList::const_iterator j    = files_.begin();
+    const FileList::const_iterator jend = files_.end();
+    for (; j != jend; ++j) {
+      referenced_objects_.push_back(j->hash);
+    }
+
+          ChunkList::const_iterator k    = chunks_.begin();
+    const ChunkList::const_iterator kend = chunks_.end();
+    for (; k != kend; ++k) {
+      referenced_objects_.push_back(k->hash);
+    }
+  }
+
+  return referenced_objects_;
+}
+
+
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   return new manifest::Manifest(MockCatalog::root_hash, 0, "");
 }

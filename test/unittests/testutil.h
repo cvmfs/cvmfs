@@ -66,7 +66,7 @@ static upload::SpoolerDefinition MockSpoolerDefinition() {
  */
 template <class DerivedT> // curiously recurring template pattern
 class AbstractMockUploader : public upload::AbstractUploader {
- private:
+ protected:
   static const bool not_implemented = false;
 
  public:
@@ -221,6 +221,8 @@ class MockCatalog {
   };
   typedef std::vector<Chunk> ChunkList;
 
+  typedef std::vector<shash::Any> HashVector;
+
  public:
   MockCatalog(const std::string &root_path,
               const shash::Any  &catalog_hash,
@@ -264,6 +266,7 @@ class MockCatalog {
   bool IsRoot() const { return is_root_; }
 
   const NestedCatalogList& ListNestedCatalogs() const { return children_; }
+  const HashVector&        GetReferencedObjects() const;
 
   unsigned int GetRevision() const { return revision_; }
 
@@ -305,6 +308,8 @@ class MockCatalog {
   NestedCatalogList   children_;
   FileList            files_;
   ChunkList           chunks_;
+
+  mutable HashVector  referenced_objects_;
 };
 
 
