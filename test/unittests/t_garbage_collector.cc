@@ -257,12 +257,51 @@ class T_GarbageCollector : public ::testing::Test {
 };
 
 
+class InstrumentedSimpleHashFilter : public SimpleHashFilter {
+ public:
+  InstrumentedSimpleHashFilter() :
+    SimpleHashFilter(),
+    fill_calls(0), contains_calls(0), freeze_calls(0), count_calls(0) {}
+
+  void Fill(const shash::Any &hash) {
+    ++fill_calls;
+    SimpleHashFilter::Fill(hash);
+  }
+
+  bool Contains(const shash::Any &hash) const {
+    ++contains_calls;
+    return SimpleHashFilter::Contains(hash);
+  }
+
+  void Freeze() {
+    ++freeze_calls;
+    SimpleHashFilter::Freeze();
+  }
+
+  size_t Count() const {
+    ++count_calls;
+    return SimpleHashFilter::Count();
+  }
+
+ public:
+  mutable unsigned int fill_calls;
+  mutable unsigned int contains_calls;
+  mutable unsigned int freeze_calls;
+  mutable unsigned int count_calls;
+};
+
+
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
 
 
 TEST_F(T_GarbageCollector, Initialize) {
-  SimpleHashFilter filter;
-  GarbageCollector<MockCatalog, SimpleHashFilter> gc(filter);
+  InstrumentedSimpleHashFilter filter;
+  GarbageCollector<MockCatalog, InstrumentedSimpleHashFilter> gc(filter);
+
+  EXPECT_EQ (0u, filter.fill_calls);
+  EXPECT_EQ (0u, filter.contains_calls);
+  EXPECT_EQ (0u, filter.freeze_calls);
+  EXPECT_EQ (0u, filter.count_calls);
 }
