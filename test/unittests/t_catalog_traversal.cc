@@ -246,6 +246,12 @@ class T_CatalogTraversal : public ::testing::Test {
     }
   }
 
+  shash::Any GetRootHash(const unsigned int revision) const {
+    RootCatalogMap::const_iterator i = root_catalogs_.find(revision);
+    assert (i != root_catalogs_.end());
+    return i->second;
+  }
+
  private:
   CatalogPathMap& GetCatalogTree(const unsigned int  revision,
                                  RevisionMap        &revisions) const {
@@ -299,15 +305,24 @@ class T_CatalogTraversal : public ::testing::Test {
      *
      * Parts of the hierarchy are created multiple times in order to get some
      * historic catalogs. To simplify the creation the history looks like so:
-     *                                                                # catalogs
-     *    Revision 1:   - only the root catalog (0-0)                       1
-     *    Revision 2:   - adds branch 1-0                                   8
-     *    Revision 3:   - adds branch 1-1                                  17
-     *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated      25
-     *    Revision 5:   - adds branch 1-3                                  28
-     *    Revision 6:   - removes branch 1-0                               21
+     *                                                                # catalogs   root catalog hash
+     *    Revision 1:   - only the root catalog (0-0)                       1      d01c7fa072d3957ea5dd323f79fa435b33375c06
+     *    Revision 2:   - adds branch 1-0                                   8      ffee2bf068f3c793efa6ca0fa3bddb066541903b
+     *    Revision 3:   - adds branch 1-1                                  17      c9e011bbf7529d25c958bc0f948eefef79e991cd
+     *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated      25      eec5694dfe5f2055a358acfb4fda7748c896df24
+     *    Revision 5:   - adds branch 1-3                                  28      3c726334c98537e92c8b92b76852f77e3a425be9
+     *    Revision 6:   - removes branch 1-0                               21      $root_hash
      *
      */
+
+    RootCatalogMap root_catalogs;
+    root_catalogs[1] = h("d01c7fa072d3957ea5dd323f79fa435b33375c06");
+    root_catalogs[2] = h("ffee2bf068f3c793efa6ca0fa3bddb066541903b");
+    root_catalogs[3] = h("c9e011bbf7529d25c958bc0f948eefef79e991cd");
+    root_catalogs[4] = h("eec5694dfe5f2055a358acfb4fda7748c896df24");
+    root_catalogs[5] = h("3c726334c98537e92c8b92b76852f77e3a425be9");
+    root_catalogs[6] = root_hash;
+    root_catalogs_ = root_catalogs;
 
     RevisionMap revisions;
     for (unsigned int r = 1; r <= max_revision; ++r) {
@@ -326,9 +341,11 @@ class T_CatalogTraversal : public ::testing::Test {
     revisions[revision] = CatalogPathMap();
 
     // create the root catalog
-    MockCatalog *root_catalog = (revision < max_revision)
-      ? CreateAndRegisterCatalog("", revision, revisions)
-      : CreateAndRegisterCatalog("", revision, revisions, NULL, root_hash);
+    MockCatalog *root_catalog = CreateAndRegisterCatalog("",
+                                                         revision,
+                                                         revisions,
+                                                         NULL,
+                                                         GetRootHash(revision));
 
     // create the catalog hierarchy depending on the revision
     switch (revision) {
@@ -450,8 +467,16 @@ class T_CatalogTraversal : public ::testing::Test {
     return catalog;
   }
 
+  shash::Any h(const std::string &hash) {
+    return shash::Any(shash::kSha1, shash::HexPtr(hash));
+  }
+
+ protected:
+  typedef std::map<unsigned int, shash::Any> RootCatalogMap;
+
  private:
-  Prng dice_;
+  Prng            dice_;
+  RootCatalogMap  root_catalogs_;
 };
 
 
