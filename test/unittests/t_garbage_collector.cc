@@ -19,8 +19,6 @@ class T_GarbageCollector : public ::testing::Test {
   MockCatalog *dummy_catalog_hierarchy;
 
  protected:
-  typedef std::map<std::string, MockCatalog*>    CatalogPathMap;
-  typedef std::map<unsigned int, CatalogPathMap> RevisionMap;
 
  protected:
   void SetUp() {
@@ -32,35 +30,6 @@ class T_GarbageCollector : public ::testing::Test {
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
-  }
-
- private:
-  CatalogPathMap& GetCatalogTree(const unsigned int  revision,
-                                 RevisionMap        &revisions) const {
-    RevisionMap::iterator rev_itr = revisions.find(revision);
-    assert (rev_itr != revisions.end());
-    return rev_itr->second;
-  }
-
-  MockCatalog* GetRevisionHead(const unsigned int revision,
-                               RevisionMap &revisions) const {
-    CatalogPathMap &catalogs = GetCatalogTree(revision, revisions);
-    CatalogPathMap::iterator catalogs_itr = catalogs.find("");
-    assert (catalogs_itr != catalogs.end());
-    assert (catalogs_itr->second->revision() == revision);
-    assert (catalogs_itr->second->IsRoot());
-    return catalogs_itr->second;
-  }
-
-  MockCatalog* GetBranchHead(const std::string   &root_path,
-                             const unsigned int   revision,
-                             RevisionMap         &revisions) const {
-    CatalogPathMap &catalogs = GetCatalogTree(revision, revisions);
-    CatalogPathMap::iterator catalogs_itr = catalogs.find(root_path);
-    assert (catalogs_itr != catalogs.end());
-    assert (catalogs_itr->second->revision()  == revision);
-    assert (catalogs_itr->second->root_path() == root_path);
-    return catalogs_itr->second;
   }
 
   void SetupDummyCatalogs() {
