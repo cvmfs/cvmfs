@@ -173,12 +173,17 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       return false;
     }
 
+    const shash::Any root_catalog_hash = manifest->catalog_hash();
+    delete manifest;
+
+    return Traverse(root_catalog_hash);
+  }
+
+  bool Traverse(const shash::Any &root_catalog_hash) {
     // add the root catalog of the repository as the first element on the job
     // stack
-    const bool did = MightPush(CatalogJob("", manifest->catalog_hash(), 0, 0));
+    const bool did = MightPush(CatalogJob("", root_catalog_hash, 0, 0));
     assert (did);
-
-    delete manifest;
 
     return DoTraverse();
   }
