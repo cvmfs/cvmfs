@@ -6,6 +6,9 @@
  * contained in the filter or not.
  */
 
+#ifndef CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H
+#define CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H
+
 #include "../hash.h"
 
 /**
@@ -78,4 +81,4 @@ class SimpleHashFilter : public AbstractHashFilter {
   bool                  frozen_;
 };
 
-
+#endif /* CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H */
