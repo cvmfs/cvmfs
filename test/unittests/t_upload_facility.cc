@@ -2,8 +2,6 @@
 #include <unistd.h>
 
 #include "../../cvmfs/util.h"
-#include "../../cvmfs/upload_spooler_definition.h"
-#include "../../cvmfs/upload_facility.h"
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
 
@@ -13,15 +11,15 @@
 using namespace upload;
 
 
-struct MockStreamHandle_UF : public upload::UploadStreamHandle {
-  MockStreamHandle_UF(const callback_t *commit_callback) :
+struct UF_MockStreamHandle : public upload::UploadStreamHandle {
+  UF_MockStreamHandle(const callback_t *commit_callback) :
     UploadStreamHandle(commit_callback),
     commits(0), uploads(0)
   {
     ++instances;
   }
 
-  ~MockStreamHandle_UF() {
+  ~UF_MockStreamHandle() {
     --instances;
   }
 
@@ -31,74 +29,22 @@ struct MockStreamHandle_UF : public upload::UploadStreamHandle {
   static int instances;
 };
 
-int MockStreamHandle_UF::instances = 0;
+int UF_MockStreamHandle::instances = 0;
 
 
 /**
  * Mocked uploader that just keeps the processing results in memory for later
  * inspection.
  */
-class MockUploader_UF : public AbstractUploader {
- private:
-  static const bool not_implemented = false;
-
+class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
  public:
-  static const SpoolerDefinition spooler_definition;
-  static const std::string       sandbox_path;
-  static const std::string       sandbox_tmp_dir;
-  static const size_t            min_chunk_size = 512000;
-  static const size_t            avg_chunk_size = min_chunk_size * 2;
-  static const size_t            max_chunk_size = min_chunk_size * 4;
-
- public:
-  MockUploader_UF(const SpoolerDefinition &spooler_definition) :
-    AbstractUploader(spooler_definition),
+  UF_MockUploader(const SpoolerDefinition &spooler_definition) :
+    AbstractMockUploader(spooler_definition),
     initialize_called(false) {}
-
-
-  static bool WillHandle(const SpoolerDefinition &spooler_definition) {
-    return spooler_definition.driver_type == SpoolerDefinition::Unknown;
-  }
-
-
-  void WorkerThread() {
-    bool running                = true;
-    worker_thread_running       = true;
-    const callback_t *callback  = NULL;
-    MockStreamHandle_UF* handle = NULL;
-
-    while (running) {
-      UploadJob job = AcquireNewJob();
-      switch (job.type) {
-        case UploadJob::Upload:
-          handle = static_cast<MockStreamHandle_UF*>(job.stream_handle);
-          handle->uploads++;
-          Respond(job.callback, UploaderResults(0, job.buffer));
-          break;
-        case UploadJob::Commit:
-          handle = static_cast<MockStreamHandle_UF*>(job.stream_handle);
-          handle->commits++;
-          callback = handle->commit_callback;
-          delete handle;
-          Respond(callback, UploaderResults(0));
-          break;
-        case UploadJob::Terminate:
-          running = false;
-          break;
-        default:
-          FAIL() << "Unrecognized UploadJob type";
-          break;
-      }
-    }
-
-    EXPECT_EQ (0, jobs_in_flight()) << "Unfinished Jobs in the pipeline";
-
-    worker_thread_running = false;
-  }
 
   upload::UploadStreamHandle* InitStreamedUpload(
                                             const callback_t *callback = NULL) {
-    return new MockStreamHandle_UF(callback);
+    return new UF_MockStreamHandle(callback);
   }
 
   bool Initialize() {
@@ -107,83 +53,49 @@ class MockUploader_UF : public AbstractUploader {
     return true;
   }
 
-  void FileUpload(const std::string  &local_path,
-                  const std::string  &remote_path,
-                  const callback_t   *callback = NULL) {
-    // untested, since fully implementation dependent!
-    assert (MockUploader_UF::not_implemented);
+  void Upload(upload::UploadStreamHandle  *abstract_handle,
+              upload::CharBuffer          *buffer,
+              const callback_t            *callback = NULL) {
+    UF_MockStreamHandle* handle =
+                             static_cast<UF_MockStreamHandle*>(abstract_handle);
+    handle->uploads++;
+    Respond(callback, UploaderResults(0, buffer));
   }
 
-  bool Remove(const std::string &file_to_delete) {
-    // untested, since fully implementation dependent!
-    assert (MockUploader_UF::not_implemented);
-  }
-
-  bool Peek(const std::string &path) const {
-    // untested, since fully implementation dependent!
-    assert (MockUploader_UF::not_implemented);
-  }
-
-  unsigned int GetNumberOfErrors() const {
-    // untested, since fully implementation dependent!
-    assert (MockUploader_UF::not_implemented);
+  void FinalizeStreamedUpload(upload::UploadStreamHandle *abstract_handle,
+                              const shash::Any            content_hash,
+                              const std::string           hash_suffix) {
+    UF_MockStreamHandle* handle =
+                             static_cast<UF_MockStreamHandle*>(abstract_handle);
+    handle->commits++;
+    const UF_MockStreamHandle::callback_t *callback = handle->commit_callback;
+    delete handle;
+    Respond(callback, UploaderResults(0));
   }
 
  public:
-  static volatile bool worker_thread_running;
   bool initialize_called;
 };
 
-volatile bool MockUploader_UF::worker_thread_running = false;
-const std::string MockUploader_UF::sandbox_path    = "/tmp/cvmfs_ut_upload_facility";
-const std::string MockUploader_UF::sandbox_tmp_dir = MockUploader_UF::sandbox_path + "/tmp";
-const SpoolerDefinition MockUploader_UF::spooler_definition =
-  SpoolerDefinition("mock," + sandbox_path + "," +
-                              sandbox_tmp_dir,
-                    shash::kSha1,
-                    true,
-                    min_chunk_size,
-                    avg_chunk_size,
-                    max_chunk_size);
-
 
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
 
 
-class T_UploadFacility : public ::testing::Test {
- protected:
-  virtual void SetUp() {
-    PolymorphicConstructionUnittestAdapter::RegisterPlugin<upload::AbstractUploader,
-                                                           MockUploader_UF>();
-  }
+TEST(T_UploadFacility, InitializeAndTearDown) {
+  UF_MockUploader *uploader = UF_MockUploader::MockConstruct();
 
-  virtual void TearDown() {
-    PolymorphicConstructionUnittestAdapter::UnregisterAllPlugins<upload::AbstractUploader>();
-  }
-};
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F(T_UploadFacility, InitializeAndTearDown) {
-  MockUploader_UF *uploader = dynamic_cast<MockUploader_UF*>(
-              AbstractUploader::Construct(MockUploader_UF::spooler_definition));
-
-  ASSERT_NE (static_cast<MockUploader_UF*>(NULL), uploader);
+  ASSERT_NE (static_cast<UF_MockUploader*>(NULL), uploader);
   EXPECT_TRUE (uploader->initialize_called);
 
   sleep(1);
-  EXPECT_TRUE (MockUploader_UF::worker_thread_running);
+  EXPECT_TRUE (uploader->worker_thread_running);
 
   uploader->TearDown();
   delete uploader;
 
-  EXPECT_FALSE (MockUploader_UF::worker_thread_running);
+  EXPECT_FALSE (uploader->worker_thread_running);
 }
 
 
@@ -213,24 +125,23 @@ void BufferUploadCompleteCallback_T_Callbacks(const UploaderResults &results) {
 }
 
 
-TEST_F(T_UploadFacility, Callbacks) {
-  MockUploader_UF *uploader = dynamic_cast<MockUploader_UF*>(
-              AbstractUploader::Construct(MockUploader_UF::spooler_definition));
+TEST(T_UploadFacility, Callbacks) {
+  UF_MockUploader *uploader = UF_MockUploader::MockConstruct();
 
-  ASSERT_NE (static_cast<MockUploader_UF*>(NULL), uploader);
+  ASSERT_NE (static_cast<UF_MockUploader*>(NULL), uploader);
   EXPECT_TRUE (uploader->initialize_called);
   EXPECT_EQ (0, chunk_upload_complete_callback_calls);
   EXPECT_EQ (0, buffer_upload_complete_callback_calls);
-  EXPECT_EQ (0, MockStreamHandle_UF::instances);
+  EXPECT_EQ (0, UF_MockStreamHandle::instances);
 
   sleep(1);
-  EXPECT_TRUE (MockUploader_UF::worker_thread_running);
+  EXPECT_TRUE (uploader->worker_thread_running);
 
   UploadStreamHandle *handle = uploader->InitStreamedUpload(
       AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback_T_Callbacks));
   ASSERT_NE (static_cast<void*>(NULL), handle);
 
-  EXPECT_EQ (1, MockStreamHandle_UF::instances);
+  EXPECT_EQ (1, UF_MockStreamHandle::instances);
 
   sleep(1);
 
@@ -268,7 +179,7 @@ TEST_F(T_UploadFacility, Callbacks) {
 
   EXPECT_EQ (1, chunk_upload_complete_callback_calls);
   EXPECT_EQ (2, buffer_upload_complete_callback_calls);
-  EXPECT_EQ (0, MockStreamHandle_UF::instances);
+  EXPECT_EQ (0, UF_MockStreamHandle::instances);
 
   delete uploader;
 }
@@ -305,15 +216,14 @@ CharBuffer* MakeBuffer(const size_t  buffer_size,
   return buffer;
 }
 
-TEST_F(T_UploadFacility, DataBlockBasicOrdering) {
-  MockUploader_UF *uploader = dynamic_cast<MockUploader_UF*>(
-              AbstractUploader::Construct(MockUploader_UF::spooler_definition));
+TEST(T_UploadFacility, DataBlockBasicOrdering) {
+  UF_MockUploader *uploader = UF_MockUploader::MockConstruct();
 
-  ASSERT_NE (static_cast<MockUploader_UF*>(NULL), uploader);
+  ASSERT_NE (static_cast<UF_MockUploader*>(NULL), uploader);
   EXPECT_TRUE (uploader->initialize_called);
 
   sleep(1);
-  EXPECT_TRUE (MockUploader_UF::worker_thread_running);
+  EXPECT_TRUE (uploader->worker_thread_running);
 
   UploadStreamHandle *handle = uploader->InitStreamedUpload(
       AbstractUploader::MakeCallback(&ChunkUploadCompleteCallback_T_Ordering));
@@ -350,11 +260,10 @@ TEST_F(T_UploadFacility, DataBlockBasicOrdering) {
   delete uploader;
 }
 
-TEST_F(T_UploadFacility, InitDtorRace) {
-  MockUploader_UF *uploader = dynamic_cast<MockUploader_UF*>(
-              AbstractUploader::Construct(MockUploader_UF::spooler_definition));
+TEST(T_UploadFacility, InitDtorRace) {
+  UF_MockUploader *uploader = UF_MockUploader::MockConstruct();
 
-  ASSERT_NE (static_cast<MockUploader_UF*>(NULL), uploader);
+  ASSERT_NE (static_cast<UF_MockUploader*>(NULL), uploader);
   EXPECT_TRUE (uploader->initialize_called);
 
   uploader->WaitForUpload();

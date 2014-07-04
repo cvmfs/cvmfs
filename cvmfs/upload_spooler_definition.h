@@ -21,6 +21,7 @@ struct SpoolerDefinition {
   enum DriverType {
     S3,
     Local,
+    Mock,
     Unknown
   };
 

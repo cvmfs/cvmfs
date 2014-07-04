@@ -8,8 +8,6 @@
 #include <iostream>
 
 #include "../../cvmfs/util.h"
-#include "../../cvmfs/upload_facility.h"
-#include "../../cvmfs/upload_spooler_definition.h"
 #include "../../cvmfs/upload_spooler_result.h"
 #include "../../cvmfs/file_processing/file_processor.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
@@ -63,17 +61,7 @@ struct MockStreamHandle : public upload::UploadStreamHandle {
  * Mocked uploader that just keeps the processing results in memory for later
  * inspection.
  */
-class MockUploader : public upload::AbstractUploader {
- private:
-  static const bool not_implemented = false;
-
- public:
-  static const std::string sandbox_path;
-  static const std::string sandbox_tmp_dir;
-  static const size_t      min_chunk_size = 512000;
-  static const size_t      avg_chunk_size = min_chunk_size * 2;
-  static const size_t      max_chunk_size = min_chunk_size * 4;
-
+class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
  public:
   struct Result {
     Result(MockStreamHandle  *handle,
@@ -114,67 +102,13 @@ class MockUploader : public upload::AbstractUploader {
   typedef std::vector<Result> Results;
 
  public:
-  MockUploader(const upload::SpoolerDefinition &spooler_definition) :
-    AbstractUploader(spooler_definition),
-    worker_thread_running(false) {}
-
-  static MockUploader* MockConstruct() {
-    return dynamic_cast<MockUploader*>(
-      AbstractUploader::Construct(
-        upload::SpoolerDefinition("mock," + sandbox_path + "," +
-                                            sandbox_tmp_dir,
-                                  shash::kSha1,
-                                  true,
-                                  min_chunk_size,
-                                  avg_chunk_size,
-                                  max_chunk_size)
-      )
-    );
-  }
-
-  static bool WillHandle(const upload::SpoolerDefinition &spooler_definition) {
-    return spooler_definition.driver_type == upload::SpoolerDefinition::Unknown;
-  }
+  FP_MockUploader(const upload::SpoolerDefinition &spooler_definition) :
+    AbstractMockUploader(spooler_definition) {}
 
   const Results& results() const { return results_; }
 
   void ClearResults() {
     results_.clear();
-  }
-
-  void WorkerThread() {
-    worker_thread_running = true;
-
-    bool running = true;
-    while (running) {
-      UploadJob job = AcquireNewJob();
-      switch (job.type) {
-        case UploadJob::Upload:
-          Upload(job.stream_handle,
-                 job.buffer,
-                 job.callback);
-          break;
-        case UploadJob::Commit:
-          FinalizeStreamedUpload(job.stream_handle,
-                                 job.content_hash,
-                                 job.hash_suffix);
-          break;
-        case UploadJob::Terminate:
-          running = false;
-          break;
-        default:
-          FAIL() << "Unrecognized UploadJob type";
-          break;
-      }
-    }
-
-    worker_thread_running = false;
-  }
-
-  void FileUpload(const std::string  &local_path,
-                  const std::string  &remote_path,
-                  const callback_t   *callback = NULL) {
-    assert (MockUploader::not_implemented);
   }
 
   upload::UploadStreamHandle* InitStreamedUpload(
@@ -207,27 +141,9 @@ class MockUploader : public upload::AbstractUploader {
     Respond(callback, upload::UploaderResults(0));
   }
 
-  bool Remove(const std::string &file_to_delete) {
-    assert (MockUploader::not_implemented);
-  }
-
-  bool Peek(const std::string &path) const {
-    assert (MockUploader::not_implemented);
-  }
-
-  unsigned int GetNumberOfErrors() const {
-    assert (MockUploader::not_implemented);
-  }
-
  protected:
   Results results_;
-
- public:
-  volatile bool worker_thread_running;
 };
-
-const std::string MockUploader::sandbox_path    = "/tmp/cvmfs_ut_fileprocessing";
-const std::string MockUploader::sandbox_tmp_dir = MockUploader::sandbox_path + "/tmp";
 
 
 //
@@ -240,22 +156,18 @@ class T_FileProcessing : public FileSandbox {
   typedef std::vector<ExpectedHashString>     ExpectedHashStrings;
 
   T_FileProcessing() :
-    FileSandbox(MockUploader::sandbox_path),
+    FileSandbox(FP_MockUploader::sandbox_path),
     uploader_(NULL) {}
 
  protected:
   void SetUp() {
-    CreateSandbox(MockUploader::sandbox_tmp_dir);
-    PolymorphicConstructionUnittestAdapter::RegisterPlugin<upload::AbstractUploader,
-                                                           MockUploader>();
-    uploader_ = MockUploader::MockConstruct();
-    ASSERT_NE (static_cast<MockUploader*>(NULL), uploader_);
+    CreateSandbox(FP_MockUploader::sandbox_tmp_dir);
+    uploader_ = FP_MockUploader::MockConstruct();
+    ASSERT_NE (static_cast<FP_MockUploader*>(NULL), uploader_);
   }
 
   void TearDown() {
-    RemoveSandbox(MockUploader::sandbox_tmp_dir);
-    PolymorphicConstructionUnittestAdapter::UnregisterAllPlugins<upload::AbstractUploader>();
-
+    RemoveSandbox(FP_MockUploader::sandbox_tmp_dir);
     uploader_->TearDown();
     delete uploader_;
   }
@@ -424,9 +336,9 @@ class T_FileProcessing : public FileSandbox {
                         const ExpectedHashStrings      &reference_hash_strings,
                         const bool                      use_chunking = true) {
     upload::FileProcessor processor(uploader_, shash::kSha1, use_chunking,
-                                    MockUploader::min_chunk_size,
-                                    MockUploader::avg_chunk_size,
-                                    MockUploader::max_chunk_size);
+                                    FP_MockUploader::min_chunk_size,
+                                    FP_MockUploader::avg_chunk_size,
+                                    FP_MockUploader::max_chunk_size);
 
     std::vector<std::string>::const_iterator i    = file_pathes.begin();
     std::vector<std::string>::const_iterator iend = file_pathes.end();
@@ -436,18 +348,18 @@ class T_FileProcessing : public FileSandbox {
 
     processor.WaitForProcessing();
 
-    const MockUploader::Results &results = uploader_->results();
+    const FP_MockUploader::Results &results = uploader_->results();
     CheckHashes(results, reference_hash_strings);
   }
 
-  void CheckHash(const MockUploader::Results &results,
+  void CheckHash(const FP_MockUploader::Results &results,
                  const ExpectedHashString    &expected_hash) const {
     ExpectedHashStrings expected_hashes;
     expected_hashes.push_back(expected_hash);
     CheckHashes(results, expected_hashes);
   }
 
-  void CheckHashes(const MockUploader::Results &results,
+  void CheckHashes(const FP_MockUploader::Results &results,
                    const ExpectedHashStrings   &reference_hash_strings) const {
     EXPECT_EQ (reference_hash_strings.size(), results.size())
       << "number of generated chunks did not match";
@@ -466,8 +378,8 @@ class T_FileProcessing : public FileSandbox {
 
     // check if we can find the computed hashes in the expected hashes
     // Note: I know that this is O(n^2)... ;-)
-    MockUploader::Results::const_iterator j    = results.begin();
-    MockUploader::Results::const_iterator jend = results.end();
+    FP_MockUploader::Results::const_iterator j    = results.begin();
+    FP_MockUploader::Results::const_iterator jend = results.end();
     for (; j != jend; ++j) {
       bool found = false;
       ExpectedHashes::const_iterator k    = reference_hashes.begin();
@@ -489,7 +401,7 @@ class T_FileProcessing : public FileSandbox {
   }
 
  protected:
-  MockUploader *uploader_;
+  FP_MockUploader *uploader_;
 };
 
 
@@ -500,16 +412,16 @@ class T_FileProcessing : public FileSandbox {
 
 TEST_F(T_FileProcessing, UploaderInitialized) {
   sleep(1);
-  ASSERT_NE (static_cast<MockUploader*>(NULL), uploader_);
+  ASSERT_NE (static_cast<FP_MockUploader*>(NULL), uploader_);
   ASSERT_TRUE (uploader_->worker_thread_running);
 }
 
 
 TEST_F(T_FileProcessing, Initialize) {
   upload::FileProcessor processor(uploader_, shash::kSha1, true,
-                                  MockUploader::min_chunk_size,
-                                  MockUploader::avg_chunk_size,
-                                  MockUploader::max_chunk_size);
+                                  FP_MockUploader::min_chunk_size,
+                                  FP_MockUploader::avg_chunk_size,
+                                  FP_MockUploader::max_chunk_size);
   processor.WaitForProcessing();
 }
 
@@ -609,9 +521,9 @@ TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunking) {
 TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWaves) {
   const bool use_chunking = true;
   upload::FileProcessor processor(uploader_, shash::kSha1, use_chunking,
-                                  MockUploader::min_chunk_size,
-                                  MockUploader::avg_chunk_size,
-                                  MockUploader::max_chunk_size);
+                                  FP_MockUploader::min_chunk_size,
+                                  FP_MockUploader::avg_chunk_size,
+                                  FP_MockUploader::max_chunk_size);
 
   // first wave...
   processor.Process(GetEmptyFile(), true);
@@ -665,9 +577,9 @@ FileChunkList CallbackTest::result_chunk_list;
 TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
   const bool use_chunking = true;
   upload::FileProcessor processor(uploader_, shash::kSha1, use_chunking,
-                                  MockUploader::min_chunk_size,
-                                  MockUploader::avg_chunk_size,
-                                  MockUploader::max_chunk_size);
+                                  FP_MockUploader::min_chunk_size,
+                                  FP_MockUploader::avg_chunk_size,
+                                  FP_MockUploader::max_chunk_size);
   processor.RegisterListener(&CallbackTest::CallbackFn);
 
   processor.Process(GetSmallFile(), true, "T");
@@ -685,9 +597,9 @@ TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
 TEST_F(T_FileProcessing, ProcessingCallbackForBigFile) {
   const bool use_chunking = true;
   upload::FileProcessor processor(uploader_, shash::kSha1, use_chunking,
-                                  MockUploader::min_chunk_size,
-                                  MockUploader::avg_chunk_size,
-                                  MockUploader::max_chunk_size);
+                                  FP_MockUploader::min_chunk_size,
+                                  FP_MockUploader::avg_chunk_size,
+                                  FP_MockUploader::max_chunk_size);
   processor.RegisterListener(&CallbackTest::CallbackFn);
 
   processor.Process(GetBigFile(), true, "T");

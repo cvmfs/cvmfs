@@ -46,8 +46,9 @@ SpoolerDefinition::SpoolerDefinition(
   } else if (upstream[0] == "S3") {
     driver_type = S3;
   } else if (upstream[0] == "mock") {
-    driver_type = Unknown; // for unit testing purpose only!
+    driver_type = Mock; // for unit testing purpose only!
   } else {
+    driver_type = Unknown;
     LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
       upstream[0].c_str());
     return;
