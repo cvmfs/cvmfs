@@ -8,7 +8,7 @@
 #include "../../cvmfs/manifest.h"
 #include "../../cvmfs/hash.h"
 
-#include "../../cvmfs/garbage_collection/gc.h"
+#include "../../cvmfs/garbage_collection/garbage_detector.h"
 #include "../../cvmfs/garbage_collection/hash_filter.h"
 
 #include "testutil.h"
@@ -300,7 +300,7 @@ class InstrumentedSimpleHashFilter : public SimpleHashFilter {
 
 TEST_F(T_GarbageCollector, Initialize) {
   InstrumentedSimpleHashFilter filter;
-  GarbageCollector<MockCatalog, InstrumentedSimpleHashFilter> gc(filter);
+  GarbageDetector<MockCatalog, InstrumentedSimpleHashFilter> gc(filter);
 
   EXPECT_EQ (0u, filter.fill_calls);
   EXPECT_EQ (0u, filter.contains_calls);
@@ -316,7 +316,7 @@ TEST_F(T_GarbageCollector, Initialize) {
 
 TEST_F(T_GarbageCollector, PreserveLatestRevision) {
   InstrumentedSimpleHashFilter filter;
-  GarbageCollector<MockCatalog, InstrumentedSimpleHashFilter> gc(filter);
+  GarbageDetector<MockCatalog, InstrumentedSimpleHashFilter> gc(filter);
 
   gc.Preserve(GetCatalog(5, "00"));
   gc.Preserve(GetCatalog(5, "10"));
@@ -371,7 +371,7 @@ TEST_F(T_GarbageCollector, PreserveLatestRevision) {
 
 TEST_F(T_GarbageCollector, PreserveLatestTwoRevisions) {
   InstrumentedSimpleHashFilter filter;
-  GarbageCollector<MockCatalog, InstrumentedSimpleHashFilter> gc(filter);
+  GarbageDetector<MockCatalog, InstrumentedSimpleHashFilter> gc(filter);
 
   gc.Preserve(GetCatalog(5, "00"));
   gc.Preserve(GetCatalog(5, "10"));

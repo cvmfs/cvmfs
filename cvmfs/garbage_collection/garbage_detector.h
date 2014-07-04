@@ -27,8 +27,8 @@
  * actual hash filtering method to be used.
  */
 
-#ifndef CVMFS_GARBAGE_COLLECTION_GC_H
-#define CVMFS_GARBAGE_COLLECTION_GC_H
+#ifndef CVMFS_GARBAGE_COLLECTION_GARBAGE_DETECTOR_H
+#define CVMFS_GARBAGE_COLLECTION_GARBAGE_DETECTOR_H
 
 template <class CatalogT, class HashFilterT>
 class GarbageDetector {
@@ -70,6 +70,6 @@ class GarbageDetector {
   bool          initializing_;
 };
 
-#include "gc_impl.h"
+#include "garbage_detector_impl.h"
 
-#endif /* CVMFS_GARBAGE_COLLECTION_GC_H */
+#endif /* CVMFS_GARBAGE_COLLECTION_GARBAGE_DETECTOR_H */
