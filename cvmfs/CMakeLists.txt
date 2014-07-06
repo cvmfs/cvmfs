@@ -475,18 +475,28 @@ if (BUILD_SERVER)
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
-  if (NOT GEOIP_BUILTIN)
+  if (GEOIP_BUILTIN)
     install(
       FILES      ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so
       DESTINATION    "/usr/share/cvmfs-server/webapi"
       PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
     )
-  endif (NOT GEOIP_BUILTIN)
+  endif (GEOIP_BUILTIN)
 
   install(
     FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
     DESTINATION    "/usr/share/cvmfs-server/webapi"
     PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
+  )
+
+  install(
+    # for some reason this is relative to the top
+    CODE  "FILE(MAKE_DIRECTORY cvmfs/geo)"
+  )
+
+  install(
+    DIRECTORY   "geo"
+    DESTINATION "/var/lib/cvmfs-server"
   )
 
 endif (BUILD_SERVER)
