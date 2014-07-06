@@ -6,7 +6,7 @@ import cvmfs_api
 
 import GeoIP
 
-gi = GeoIP.open("/etc/cvmfs/GeoLiteCity.dat", GeoIP.GEOIP_STANDARD)
+gi = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCity.dat", GeoIP.GEOIP_STANDARD)
 
 positive_expire_secs = 60*60*24*3  # 3 days
 
