@@ -103,7 +103,7 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
 
  public:
   FP_MockUploader(const upload::SpoolerDefinition &spooler_definition) :
-    AbstractMockUploader(spooler_definition) {}
+    AbstractMockUploader<FP_MockUploader>(spooler_definition) {}
 
   const Results& results() const { return results_; }
 

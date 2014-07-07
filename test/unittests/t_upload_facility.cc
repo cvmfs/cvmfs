@@ -39,7 +39,7 @@ int UF_MockStreamHandle::instances = 0;
 class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
  public:
   UF_MockUploader(const SpoolerDefinition &spooler_definition) :
-    AbstractMockUploader(spooler_definition),
+    AbstractMockUploader<UF_MockUploader>(spooler_definition),
     initialize_called(false) {}
 
   upload::UploadStreamHandle* InitStreamedUpload(
