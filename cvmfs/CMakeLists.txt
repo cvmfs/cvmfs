@@ -490,13 +490,7 @@ if (BUILD_SERVER)
   )
 
   install(
-    # for some reason this is relative to the top
-    CODE  "FILE(MAKE_DIRECTORY cvmfs/geo)"
-  )
-
-  install(
-    DIRECTORY   "geo"
-    DESTINATION "/var/lib/cvmfs-server"
+    CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
   )
 
 endif (BUILD_SERVER)
