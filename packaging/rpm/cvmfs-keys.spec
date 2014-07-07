@@ -1,7 +1,7 @@
 Summary: CernVM File System Public Keys and Configs
 Name: cvmfs-keys
 Version: 1.5
-Release: 1%{?dist}
+Release: 1
 Source0: %{name}-%{version}.tar.gz
 BuildArch: noarch
 Requires: curl
