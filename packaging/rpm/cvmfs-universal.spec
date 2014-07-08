@@ -109,6 +109,7 @@ CernVM-FS static client library for pure user-space use
 %package server
 Summary: CernVM-FS server tools
 Group: Application/System
+BuildRequires: python-devel
 %if 0%{?suse_version}
 Requires: insserv
 %else
@@ -121,6 +122,7 @@ Requires: sed
 Requires: sudo
 Requires: psmisc
 Requires: curl
+Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
@@ -273,6 +275,11 @@ if [ $1 = 0 ] ; then
 fi
 %endif
 
+%preun server
+if [ $1 = 0 ] ; then
+    rm -f /var/lib/cvmfs-server/geo/*
+fi
+
 %postun
 if [ $1 -eq 0 ]; then
    #sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master
@@ -341,6 +348,9 @@ fi
 %{_libdir}/libtbbmalloc_cvmfs_debug.so
 %{_libdir}/libtbbmalloc_cvmfs_debug.so.2
 %dir %{_sysconfdir}/cvmfs/repositories.d
+/var/www/wsgi-scripts/cvmfs-api.wsgi
+/usr/share/cvmfs-server/
+/var/lib/cvmfs-server/
 %doc COPYING AUTHORS README ChangeLog
 
 %files unittests

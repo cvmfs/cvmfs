@@ -25,6 +25,15 @@ export LANG=C
 #                                                                              #
 ################################################################################
 
+# Configuration variables for update-geodb -l.  May be overridden in
+#   /etc/cvmfs/cvmfs_server_hooks.sh or per-repo replica.conf.
+# Default settings will attempt to update from cvmfs_server snapshot 
+#   once every 4 weeks in the 10 o'clock hour of Tuesday.
+CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
+CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
+CVMFS_UPDATEGEO_MINDAYS=25 # Minimum days between update attempts
+CVMFS_UPDATEGEO_MAXDAYS=100 # Maximum days old before considering it an error
+
 
 # setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
@@ -41,14 +50,20 @@ if which httpd2 >/dev/null 2>&1; then #SLES/OpenSuSE
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN=$(which httpd2)
+  APACHE_CTL=$APACHE_BIN
+  APACHE_WSGI_MODPKG="apache2-mod_wsgi"
 elif which apache2 >/dev/null 2>&1; then # Debian based
   APACHE_SERVICE="apache2"
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN=$(which apache2)
+  APACHE_CTL=$(which apache2ctl)
+  APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
 else
   APACHE_SERVICE="httpd" # EL based
   APACHE_CONF=${APACHE_SERVICE}
   APACHE_BIN="/usr/sbin/httpd"
+  APACHE_CTL=$APACHE_BIN
+  APACHE_WSGI_MODPKG="mod_wsgi"
 fi
 
 # Find the service binary
@@ -74,7 +89,6 @@ CVMFS_DEFAULT_MIN_CHUNK_SIZE=4194304
 CVMFS_DEFAULT_AVG_CHUNK_SIZE=8388608
 CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD=500000
-
 
 ################################################################################
 #                                                                              #
@@ -104,7 +118,7 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info list-tags lstags check transaction abort snapshot skeleton \
-    migrate list-catalogs"
+    migrate list-catalogs update-geodb"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -219,6 +233,8 @@ Supported Commands:
   migrate       <fully qualified name>
                 Migrates a repository to the current version of CernVM-FS
   list          List available repositories
+  update-geodb  [-l update lazily based on CVMFS_UPDATEGEO* variables]
+                Updates the geo-IP database
 "
 
 
@@ -320,8 +336,10 @@ least CernVM-FS $creator to manipulate this repository."
   #     -> adjustments in /etc/fstab
   #     -> additional statistics counters in file catalogs
   #
-  #   2.1.15+
-  #     < nothing changed yet >
+  #   2.1.15+ -> 2.1.20
+  #     -> replica (i.e. stratum 1) with local upstream storage has
+  #        additional apache config for wsgi
+  #        
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -336,6 +354,18 @@ least CernVM-FS $creator to manipulate this repository."
      [ "$creator" = "2.1.13" ] || [ "$creator" = "2.1.14" ];
   then
     if version_greater_or_equal "2.1.15"; then
+      repo_is_incompatible "$creator" $nokill
+      return $?
+    fi
+  fi
+
+  if [ "$creator" = "2.1.15"  ] || [ "$creator" = "2.1.16"  ] || \
+     [ "$creator" = "2.1.17"  ] || [ "$creator" = "2.1.18" ] || \
+     [ "$creator" = "2.1.19" ];
+  then
+    if version_greater_or_equal "2.1.20" && \
+       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] &&
+       is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
       repo_is_incompatible "$creator" $nokill
       return $?
     fi
@@ -417,6 +447,29 @@ check_autofs_on_cvmfs() {
 # @return  0 if apache is installed and running
 check_apache() {
   [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null
+}
+
+
+# checks if wsgi apache module is installed and enabled
+check_wsgi_module() {
+  if ${APACHE_CTL} -M 2>&1 | grep -q wsgi_module; then
+    return 0
+  fi
+  echo "The apache wsgi module must be installed and enabled.
+The required package is called ${APACHE_WSGI_MODPKG}."
+  if [ -f /etc/redhat-release ]; then
+    case "`cat /etc/redhat-release`" in
+      *"release 5."*)
+        if [ -f /etc/httpd/conf.d/wsgi.conf ]; then
+          # older el5 epel versions didn't automatically enable it
+          echo "To enable the module, see instructions in /etc/httpd/conf.d/wsgi.conf"
+        else
+          echo "The package is in the epel yum repository."
+        fi
+        ;;
+    esac
+  fi
+  exit 1
 }
 
 
@@ -1109,13 +1162,15 @@ mangle_s3_stratum0_url() {
 }
 
 reload_apache() {
-   echo -n "Reloading Apache... "
-   ${SERVICE_BIN} ${APACHE_SERVICE} reload > /dev/null
-   echo "done"
+  echo -n "Reloading Apache... "
+  ${SERVICE_BIN} ${APACHE_SERVICE} reload > /dev/null
+  echo "done"
 }
 
 restart_apache() {
+  echo -n "Restarting Apache... "
   ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null
+  echo "done"
 }
 
 
@@ -1276,6 +1331,23 @@ remove_apache_config_file() {
   rm -f $conf_path
 }
 
+# sends wsgi configuration to stdout
+#
+# @param name        the name of the repository
+cat_wsgi_config() {
+  local name=$1
+  echo "# Enable api functions
+WSGIPythonPath /usr/share/cvmfs-server/webapi
+Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
+
+<Directory /var/www/wsgi-scripts>
+    Options ExecCGI
+    SetHandler wsgi-script
+    Order allow,deny
+    Allow from all
+</Directory>
+"
+}
 
 # puts all configuration files in place that are need for a stratum0 repository
 #
@@ -1534,6 +1606,104 @@ handle_read_only_file_descriptors_on_mount_point() {
 #                                                                              #
 #                                Sub Commands                                  #
 #                                                                              #
+################################################################################
+
+_check_old_dbfile() {
+  local dbfile=$1
+  local lazy=$2
+  # only to be used from update_geodb
+  if [ -n "`find $dbfile -mtime +"$CVMFS_UPDATEGEO_MAXDAYS"`" ]; then
+    if ! is_root; then
+      echo "Geoip database more than $CVMFS_UPDATEGEO_MAXDAYS days old, do update-geodb as root regularly"
+    elif $lazy; then
+      echo "Geoip database more than $CVMFS_UPDATEGEO_MAXDAYS days old, try update-geodb without -l"
+    else
+      echo "Geoip database more than $CVMFS_UPDATEGEO_MAXDAYS days old, but should never reach this point"
+    fi
+    return 1
+  fi
+}
+
+update_geodb() {
+  local dburl="http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz"
+  local dbdir="/var/lib/cvmfs-server/geo"
+  local dbfile=$dbdir/GeoLiteCity.dat
+  local outfile=$dbdir/update.out
+  local lazy=false
+  local retcode=0
+
+  # parameter handling
+  OPTIND=1
+  while getopts "l" option; do
+    case $option in
+      l)
+        lazy=true
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command update-geodb: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # sanity checks
+  is_root || $lazy || die "Only root can update the geo database"
+  [ -d $dbdir ] || die "$dbdir does not exist"
+
+  # check if this is a lazy update and it isn't time to try again yet
+  if $lazy && [ -f $dbfile ] && [ -f $outfile ]; then
+    if [ -z "`find $outfile -mtime +$CVMFS_UPDATEGEO_MINDAYS`" ] || \
+        [ "`date +%w`" -ne "$CVMFS_UPDATEGEO_DAY" ] ||
+        [ "`date +%k`" -lt "$CVMFS_UPDATEGEO_HOUR" ]; then
+      # not time to try again yet
+      # if dbfile is old, warn but don't treat it as an error
+      _check_old_dbfile $dbfile $lazy || true
+      return
+    fi
+  fi
+
+  if is_root; then
+    echo "Downloading geoip database"
+    if ! curl -sS --fail --connect-timeout 10 --max-time 60 "$dburl" >$dbfile.gz 2>$outfile; then
+      retcode=1
+    fi
+    cat $outfile
+    if [ $retcode = 0 ]; then
+      if [ -s $dbfile.gz ]; then
+        if zcat $dbfile.gz >$dbfile.new; then
+          rm -f $dbfile.gz
+          mv -f $dbfile.new $dbfile
+        else
+          rm -f $dbfile.gz $dbfile.new
+          echo "error unzipping geoip database"
+          $lazy || return 1
+        fi
+      else
+        rm -f $dbfile.gz
+        echo "downloaded geoip database empty"
+        $lazy || return 1
+      fi
+    else
+      rm -f $dbfile.gz
+      echo "error downloading $dburl"
+      $lazy || return 1
+    fi
+  # else not root, can't do the download
+  fi
+
+  if [ ! -f $dbfile ]; then
+    # database has never been downloaded, fatal error
+    is_root || die "Geoip database not downloaded, do update-geodb as root"
+    ! $lazy || die "Geoip database failed to download, do update-geodb without -l"
+    die "Geoip database not downloaded, should never reach this point"
+  fi
+
+  # treat an old dbfile as an error, but not fatal to other cvmfs_server functions
+  _check_old_dbfile $dbfile $lazy || return 1
+
+  return
+}
+
 ################################################################################
 
 
@@ -1843,11 +2013,19 @@ add_replica() {
   # additional sanity checks
   is_root || die "Only root can create a new repository"
   check_user $cvmfs_user || die "No user $cvmfs_user"
-  if is_local_upstream $upstream && ! check_apache; then
-    if [ $silence_httpd_warning -eq 1 ]; then
-      echo "Warning: Apache is needed to access this CVMFS replication"
-    else
-      die "Apache must be installed and running"
+  if is_local_upstream $upstream; then
+    if ! check_apache; then
+      if [ $silence_httpd_warning -eq 1 ]; then
+        echo "Warning: Apache is needed to access this CVMFS replication"
+      else
+        die "Apache must be installed and running"
+      fi
+    elif [ $silence_httpd_warning -eq 0 ]; then
+      check_wsgi_module
+      update_geodb -l
+      if [ "$cvmfs_user" != root ]; then
+        echo "NOTE: If snapshot is not run regularly as root, do update-geodb monthly from cron"
+      fi
     fi
   fi
   check_upstream_validity $upstream
@@ -1873,7 +2051,9 @@ CVMFS_HTTP_RETRIES=3
 EOF
 
   if is_local_upstream $upstream; then
-    create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
+    ((echo "# Created by cvmfs_server.  Don't touch."
+      cat_wsgi_config ${alias_name}; cat) | \
+      create_apache_config_file "cvmfs.${alias_name}.conf") << EOF
 # Translation URL to real pathname
 Alias /cvmfs/$alias_name ${storage_dir}
 <Directory "${storage_dir}">
@@ -3116,6 +3296,14 @@ snapshot() {
 
     # more sanity checks
     check_repository_compatibility
+    if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
+        # this might have been missed if add-replica -a was used or 
+        #  if a migrate was done while apache wasn't running, but then
+        #  apache was enabled later
+        check_wsgi_module
+        # try to update the geodb, but continue if it doesn't work
+        update_geodb -l || true
+    fi
 
     # do it!
     local user_shell="sh -c"
@@ -3311,6 +3499,55 @@ migrate_2_1_7() {
   cvmfs_suid_helper rw_mount $name      > /dev/null 2>&1 || die "fail! (mounting /cvmfs/$name)"
 }
 
+# note that this is only run on stratum1s that have local upstream storage
+migrate_2_1_15() {
+  local name=$1
+  local destination_version="2.1.20"
+  local conf_file
+  conf_file="$(get_apache_conf_path)/cvmfs.${name}.conf"
+  
+  # get repository information
+  load_repo_config $name
+
+  echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string $destination_version)"
+
+  if check_apache; then
+    check_wsgi_module
+    update_geodb -l
+  fi
+  # else apache is currently stopped, add-replica may have been run with -a
+
+  if [ -f "$conf_file" ]; then
+    echo "--> updating $conf_file"
+    (echo "# Created by cvmfs_server.  Don't touch."
+     cat_wsgi_config $name
+     sed '/^# Created by cvmfs_server/d' $conf_file) > $conf_file.NEW
+    cat $conf_file.NEW >$conf_file
+    rm -f $conf_file.NEW
+    if check_apache; then
+      # Need to restart, reload doesn't work at least for the first module;
+      #  that results in repeated segmentation faults on RHEL5 & 6
+      restart_apache
+    fi
+  else
+    if check_apache; then
+      echo "$conf_file does not exist."
+      echo "Make sure the equivalent of the following is in the apache configuration:"
+      echo ----------
+    else
+      echo "Apache is not enabled and $conf_file does not exist."
+      echo "  If you do enable Apache, make sure the equivalent of the following is"
+      echo "  in the apache configuration:"
+    fi
+    cat_wsgi_config $name
+  fi
+
+  echo "--> updating server.conf"
+  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=$destination_version/" /etc/cvmfs/repositories.d/$name/server.conf
+
+  # reload (updated) repository information
+  load_repo_config $name
+}
 
 migrate() {
   local names
@@ -3350,6 +3587,17 @@ migrate() {
          $(repository_creator_version) = "2.1.14" ];
     then
       migrate_2_1_7 $name
+    fi
+
+    if [ $(repository_creator_version) = "2.1.15" -o \
+         $(repository_creator_version) = "2.1.16" -o \
+         $(repository_creator_version) = "2.1.17" -o \
+         $(repository_creator_version) = "2.1.18" -o \
+         $(repository_creator_version) = "2.1.19" ] &&
+       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] &&
+       is_local_upstream $CVMFS_UPSTREAM_STORAGE;
+    then
+      migrate_2_1_15 $name
     fi
 
   done
