@@ -332,7 +332,7 @@ if (BUILD_SERVER)
   add_custom_target (geoip ALL)
 
   if (GEOIP_BUILTIN)
-    add_dependencies (geoip libgeoip)
+    add_dependencies (python-geoip libgeoip)
     add_dependencies (geoip python-geoip)
   endif (GEOIP_BUILTIN)
 
