@@ -124,6 +124,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   typedef std::set<shash::Any>           HashSet;
 
  protected:
+  /**
+   * This struct keeps information about a catalog that still needs to be
+   * traversed by a currently running catalog traversal process.
+   */
   struct CatalogJob {
     CatalogJob(const std::string  &path,
                const shash::Any   &hash,
@@ -144,6 +148,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   };
   typedef std::stack<CatalogJob> CatalogJobStack;
 
+  /**
+   * This struct represents a catalog traversal context. It needs to be re-
+   * created for each catalog traversal process and contains information to this
+   * specific catalog traversal run.
+   */
   struct TraversalContext {
     TraversalContext(const unsigned history_depth) :
       history_depth(history_depth) {}
@@ -185,6 +194,12 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return DoTraverse(ctx);
   }
 
+  /**
+   * Starts the traversal process at the catalog pointed to by the given hash
+   *
+   * @param root_catalog_hash  the entry point into the catalog traversal
+   * @return                   true when catalogs were successfully traversed
+   */
   bool Traverse(const shash::Any &root_catalog_hash) {
     // add the root catalog of the repository as the first element on the job
     // stack
@@ -194,6 +209,17 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return DoTraverse(ctx);
   }
 
+  /**
+   * This traverses all catalogs that were left out by previous traversal runs.
+   *
+   * Note: This method asserts that previous traversal runs left out certain
+   *       catalogs due to history_depth restrictions. CatalogTraversal keeps
+   *       track of the root catalog hashes of catalog revisions that have been
+   *       pruned before. TraversePruned() will use those as entry points.
+   *
+   * @return  true on successful traversal of all necessary catalogs or false
+   *          in case of failure or no_repeat_history == false
+   */
   bool TraversePruned() {
     TraversalContext ctx(CatalogTraversalParams::kFullHistory);
     if (pruned_revisions_.empty()) {
