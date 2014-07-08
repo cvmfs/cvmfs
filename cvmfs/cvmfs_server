@@ -1608,10 +1608,10 @@ handle_read_only_file_descriptors_on_mount_point() {
 #                                                                              #
 ################################################################################
 
-check_old_dbfile()
-{
-  # only to be used from update_geodb -- depends on some inherited
-  #  local variables
+_check_old_dbfile() {
+  local dbfile=$1
+  local lazy=$2
+  # only to be used from update_geodb
   if [ -n "`find $dbfile -mtime +"$CVMFS_UPDATEGEO_MAXDAYS"`" ]; then
     if ! is_root; then
       echo "Geoip database more than $CVMFS_UPDATEGEO_MAXDAYS days old, do update-geodb as root regularly"
@@ -1657,7 +1657,7 @@ update_geodb() {
 	[ "`date +%k`" -lt "$CVMFS_UPDATEGEO_HOUR" ]; then
       # not time to try again yet
       # if dbfile is old, warn but don't treat it as an error
-      check_old_dbfile || true
+      _check_old_dbfile $dbfile $lazy || true
       return
     fi
   fi
@@ -1699,7 +1699,7 @@ update_geodb() {
   fi
 
   # treat an old dbfile as an error, but not fatal to other cvmfs_server functions
-  check_old_dbfile || return 1
+  _check_old_dbfile $dbfile $lazy || return 1
 
   return
 }
