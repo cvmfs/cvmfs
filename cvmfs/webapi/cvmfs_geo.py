@@ -52,6 +52,19 @@ def distance_on_unit_sphere(lat1, long1, lat2, long2):
 # Include ':' for IPv6 addresses.
 addr_pattern = re.compile('^[0-9a-zA-Z.:-]*$')
 
+# expected geo api URL:  /cvmfs/<repo_name>/api/v<version>/geo/<path_info>
+#   <repo_name> is repository name
+#   <version> is the api version number, typically "1.0"
+#   <path_info> is <caching_string>/<serverlist>
+#     <caching_string> can be anything to assist in ensuring that those
+#       clients wanting the same answer get responses cached together;
+#       typically the name of their shared proxy
+#     <serverlist> is a comma-separated list of N server names
+# response: a comma-separated list of numbers specifying the order of the N
+#    given servers numbered 1 to N from geographically closest to furthest
+#    away from the requester that initiated the connection (the requester
+#    is typically the proxy)
+
 def api(path_info, repo_name, version, start_response, environ):
 
     start = string.find(path_info, '/') + 1
