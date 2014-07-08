@@ -21,7 +21,7 @@ set -e
 
 case "$1" in
     purge|remove)
-	rm -f /var/lib/cvmfs/geo/*
+	rm -f /var/lib/cvmfs-server/geo/*
     ;;
 esac
 
