@@ -121,6 +121,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   typedef CatalogTraversalData<CatalogT> CallbackData;
 
  protected:
+  typedef std::set<shash::Any>           HashSet;
+
+ protected:
+  /**
+   * This struct keeps information about a catalog that still needs to be
+   * traversed by a currently running catalog traversal process.
+   */
   struct CatalogJob {
     CatalogJob(const std::string  &path,
                const shash::Any   &hash,
@@ -141,6 +148,19 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   };
   typedef std::stack<CatalogJob> CatalogJobStack;
 
+  /**
+   * This struct represents a catalog traversal context. It needs to be re-
+   * created for each catalog traversal process and contains information to this
+   * specific catalog traversal run.
+   */
+  struct TraversalContext {
+    TraversalContext(const unsigned history_depth) :
+      history_depth(history_depth) {}
+
+    const unsigned   history_depth;
+    CatalogJobStack  catalog_stack;
+  };
+
  public:
   /**
    * Constructs a new catalog traversal engine based on the construction
@@ -151,7 +171,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     repo_name_(params.repo_name),
     no_close_(params.no_close),
     no_repeat_history_(params.no_repeat_history),
-    history_depth_(params.history)
+    default_history_depth_(params.history)
   {}
 
 
@@ -164,42 +184,69 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    *          the traversal is cancelled and false is returned
    */
   bool Traverse() {
-    // get the manifest of the repository to learn about the entry point or the
-    // root catalog of the repository to be traversed
-    manifest::Manifest *manifest = object_fetcher_.FetchManifest();
-    if (!manifest) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr,
-        "Failed to load manifest for repository %s", repo_name_.c_str());
+    TraversalContext ctx(default_history_depth_);
+    const shash::Any root_catalog_hash = GetRepositoryRootCatalogHash();
+    if (root_catalog_hash.IsNull()) {
       return false;
     }
-
-    const shash::Any root_catalog_hash = manifest->catalog_hash();
-    delete manifest;
-
-    return Traverse(root_catalog_hash);
+    const bool did = MightPush(ctx, root_catalog_hash);
+    assert (did);
+    return DoTraverse(ctx);
   }
 
+  /**
+   * Starts the traversal process at the catalog pointed to by the given hash
+   *
+   * @param root_catalog_hash  the entry point into the catalog traversal
+   * @return                   true when catalogs were successfully traversed
+   */
   bool Traverse(const shash::Any &root_catalog_hash) {
     // add the root catalog of the repository as the first element on the job
     // stack
-    const bool did = MightPush(CatalogJob("", root_catalog_hash, 0, 0));
+    TraversalContext ctx(default_history_depth_);
+    const bool did = MightPush(ctx, root_catalog_hash);
     assert (did);
-
-    return DoTraverse();
+    return DoTraverse(ctx);
   }
 
+  /**
+   * This traverses all catalogs that were left out by previous traversal runs.
+   *
+   * Note: This method asserts that previous traversal runs left out certain
+   *       catalogs due to history_depth restrictions. CatalogTraversal keeps
+   *       track of the root catalog hashes of catalog revisions that have been
+   *       pruned before. TraversePruned() will use those as entry points.
+   *
+   * @return  true on successful traversal of all necessary catalogs or false
+   *          in case of failure or no_repeat_history == false
+   */
+  bool TraversePruned() {
+    TraversalContext ctx(CatalogTraversalParams::kFullHistory);
+    if (pruned_revisions_.empty()) {
+      return false;
+    }
+
+          HashSet::const_iterator i    = pruned_revisions_.begin();
+    const HashSet::const_iterator iend = pruned_revisions_.end();
+    for (; i != iend; ++i) {
+      MightPush(ctx, *i);
+    }
+    pruned_revisions_.clear();
+    return DoTraverse(ctx);
+  }
+
+  size_t pruned_revision_count() const { return pruned_revisions_.size(); }
 
  protected:
-  bool DoTraverse() {
+  bool DoTraverse(TraversalContext &ctx) {
     // The CatalogTraversal works with a stack, where new nested catalogs are
     // pushed onto while processing their parent (breadth first traversal).
     // When all catalogs are processed, this stack will naturally be empty and
     // the traversal can terminate
-    while(!catalog_stack_.empty())
-    {
+    while (! ctx.catalog_stack.empty()) {
       // Get the top most catalog for the next processing step
-      CatalogJob job = catalog_stack_.top();
-      catalog_stack_.pop();
+      CatalogJob job = ctx.catalog_stack.top();
+      ctx.catalog_stack.pop();
 
       // if necessary, we keep track of visited catalogs
       if (no_repeat_history_) {
@@ -207,15 +254,16 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       }
 
       // Process it (potentially generating new catalog jobs on the stack)
-      const bool success = ProcessCatalogJob(job);
-      if (!success)
+      const bool success = ProcessCatalogJob(ctx, job);
+      if (! success) {
         return false;
+      }
     }
     return true;
   }
 
 
-  bool ProcessCatalogJob(const CatalogJob &job) {
+  bool ProcessCatalogJob(TraversalContext &ctx, const CatalogJob &job) {
     // Load a catalog
     std::string tmp_file;
     if (!object_fetcher_.Fetch(job.hash, &tmp_file)) {
@@ -249,7 +297,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                                        job.history_depth));
 
     // Inception! Go deeper into the catalog tree
-    PushReferencedCatalogs(catalog, job);
+    PushReferencedCatalogs(ctx, catalog, job);
 
     // We are done with this catalog
     if (!no_close_) {
@@ -260,22 +308,25 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
 
-  unsigned int PushReferencedCatalogs(      CatalogT    *catalog,
-                                      const CatalogJob  &job) {
+  unsigned int PushReferencedCatalogs(      TraversalContext  &ctx,
+                                            CatalogT          *catalog,
+                                      const CatalogJob        &job) {
     unsigned int pushed_catalogs = 0;
 
     // Only Root catalogs may be used as entry points into previous revisions
-    if (job.history_depth < history_depth_ && catalog->IsRoot()) {
-      shash::Any previous_revision = catalog->GetPreviousRevision();
-      if (! previous_revision.IsNull()) {
-        const bool pushed = MightPush(CatalogJob("",
-                                                 previous_revision,
-                                                 0,
-                                                 job.history_depth + 1,
-                                                 NULL));
-        if (pushed) {
+    const shash::Any previous_revision = catalog->GetPreviousRevision();
+    if (catalog->IsRoot() && ! previous_revision.IsNull()) {
+      if (job.history_depth < ctx.history_depth) {
+        const CatalogJob new_job("",
+                                 previous_revision,
+                                 0,
+                                 job.history_depth + 1,
+                                 NULL);
+        if (MightPush(ctx, new_job)) {
           ++pushed_catalogs;
         }
+      } else {
+        pruned_revisions_.insert(previous_revision);
       }
     }
 
@@ -288,12 +339,12 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     typename CatalogT::NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
       CatalogT* parent = (no_close_) ? catalog : NULL;
-      const bool pushed = MightPush(CatalogJob(i->path.ToString(),
-                                               i->hash,
-                                               job.tree_level + 1,
-                                               job.history_depth,
-                                               parent));
-      if (pushed) {
+      const CatalogJob new_job(i->path.ToString(),
+                               i->hash,
+                               job.tree_level + 1,
+                               job.history_depth,
+                               parent);
+      if (MightPush(ctx, new_job)) {
         ++pushed_catalogs;
       }
     }
@@ -301,14 +352,34 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return pushed_catalogs;
   }
 
-
-  bool MightPush(const CatalogJob &job) {
+  bool MightPush(TraversalContext &ctx, const CatalogJob &job) const {
     if (no_repeat_history_ && visited_catalogs_.count(job.hash) > 0) {
       return false;
     }
 
-    catalog_stack_.push(job);
+    ctx.catalog_stack.push(job);
     return true;
+  }
+
+  bool MightPush(      TraversalContext  &ctx,
+                 const shash::Any        &root_catalog_hash) const {
+    return MightPush(ctx, CatalogJob("", root_catalog_hash, 0, 0));
+  }
+
+  shash::Any GetRepositoryRootCatalogHash() {
+    // get the manifest of the repository to learn about the entry point or the
+    // root catalog of the repository to be traversed
+    manifest::Manifest *manifest = object_fetcher_.FetchManifest();
+    if (!manifest) {
+      LogCvmfs(kLogCatalogTraversal, kLogStderr,
+        "Failed to load manifest for repository %s", repo_name_.c_str());
+      return shash::Any();
+    }
+
+    const shash::Any root_catalog_hash = manifest->catalog_hash();
+    delete manifest;
+
+    return root_catalog_hash;
   }
 
  private:
@@ -316,9 +387,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   const std::string     repo_name_;
   const bool            no_close_;
   const bool            no_repeat_history_;
-  const unsigned int    history_depth_;
-  CatalogJobStack       catalog_stack_;
-  std::set<shash::Any>  visited_catalogs_;
+  const unsigned int    default_history_depth_;
+  HashSet               visited_catalogs_;
+  HashSet               pruned_revisions_;
 };
 
 typedef CatalogTraversal<catalog::Catalog>         ReadonlyCatalogTraversal;
