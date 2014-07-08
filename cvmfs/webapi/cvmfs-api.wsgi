@@ -6,10 +6,11 @@ import cvmfs_api
 pattern = re.compile('^/([^/]*)/(v[^/]*)/([^/]*)/(.*)$')
 
 def application(environ, start_response):
-    match_result = pattern.search(environ['PATH_INFO'])
+    request_url  = environ['PATH_INFO']
+    match_result = pattern.search(request_url)
 
     if not match_result:
-	return cvmfs_api.bad_request(start_response, 'malformed api URL')
+        return cvmfs_api.bad_request(start_response, 'malformed api URL: ' + request_url)
 
     repo_name, version, api_func, path_info = match_result.groups()
 
