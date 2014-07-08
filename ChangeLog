@@ -1,4 +1,6 @@
 2.1.20:
+  * Add OSG, EGI public keys and config (CVM-641)
+  * Add geo api to cvmfs-server (CVM-629)
   * Allow for setting a revision number using
     'cvmfs_server publish -n' (CVM-633)
   * Work around gcc4.1 compiler bugs
