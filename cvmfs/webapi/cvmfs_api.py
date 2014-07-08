@@ -4,7 +4,7 @@ import cvmfs_geo
 negative_expire_secs = 60*5;        # 5 minutes
 
 def bad_request(start_response, reason):
-    response_body = 'Bad Request: ' + reason
+    response_body = 'Bad Request: ' + reason + "\n"
     start_response('400 Bad Request',
 		  [('Cache-control', 'max-age=' + str(negative_expire_secs))])
     return [response_body]
