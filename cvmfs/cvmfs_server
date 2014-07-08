@@ -29,8 +29,8 @@ export LANG=C
 #   /etc/cvmfs/cvmfs_server_hooks.sh or per-repo replica.conf.
 # Default settings will attempt to update from cvmfs_server snapshot 
 #   once every 4 weeks in the 10 o'clock hour of Tuesday.
-CVMFS_UPDATEGEO_DAY=2	# Weekday of update, 0-6 where 0 is Sunday, default Tuesday
-CVMFS_UPDATEGEO_HOUR=10	# First hour of day for update, 0-23, default 10am
+CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
+CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
 CVMFS_UPDATEGEO_MINDAYS=25 # Minimum days between update attempts
 CVMFS_UPDATEGEO_MAXDAYS=100 # Maximum days old before considering it an error
 
@@ -233,8 +233,8 @@ Supported Commands:
   migrate       <fully qualified name>
                 Migrates a repository to the current version of CernVM-FS
   list          List available repositories
-  update-geodb	[-l update lazily based on CVMFS_UPDATEGEO* variables]
-  		Updates the geo-IP database
+  update-geodb  [-l update lazily based on CVMFS_UPDATEGEO* variables]
+                Updates the geo-IP database
 "
 
 
@@ -338,8 +338,8 @@ least CernVM-FS $creator to manipulate this repository."
   #
   #   2.1.15+ -> 2.1.20
   #     -> replica (i.e. stratum 1) with local upstream storage has
-  #	   additional apache config for wsgi
-  #	   
+  #        additional apache config for wsgi
+  #        
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -460,13 +460,13 @@ The required package is called ${APACHE_WSGI_MODPKG}."
   if [ -f /etc/redhat-release ]; then
     case "`cat /etc/redhat-release`" in
       *"release 5."*)
-	if [ -f /etc/httpd/conf.d/wsgi.conf ]; then
-	  # older el5 epel versions didn't automatically enable it
-	  echo "To enable the module, see instructions in /etc/httpd/conf.d/wsgi.conf"
-	else
-	  echo "The package is in the epel yum repository."
-	fi
-	;;
+        if [ -f /etc/httpd/conf.d/wsgi.conf ]; then
+          # older el5 epel versions didn't automatically enable it
+          echo "To enable the module, see instructions in /etc/httpd/conf.d/wsgi.conf"
+        else
+          echo "The package is in the epel yum repository."
+        fi
+        ;;
     esac
   fi
   exit 1
@@ -1653,8 +1653,8 @@ update_geodb() {
   # check if this is a lazy update and it isn't time to try again yet
   if $lazy && [ -f $dbfile ] && [ -f $outfile ]; then
     if [ -z "`find $outfile -mtime +$CVMFS_UPDATEGEO_MINDAYS`" ] || \
-	[ "`date +%w`" -ne "$CVMFS_UPDATEGEO_DAY" ] ||
-	[ "`date +%k`" -lt "$CVMFS_UPDATEGEO_HOUR" ]; then
+        [ "`date +%w`" -ne "$CVMFS_UPDATEGEO_DAY" ] ||
+        [ "`date +%k`" -lt "$CVMFS_UPDATEGEO_HOUR" ]; then
       # not time to try again yet
       # if dbfile is old, warn but don't treat it as an error
       _check_old_dbfile $dbfile $lazy || true
@@ -1670,18 +1670,18 @@ update_geodb() {
     cat $outfile
     if [ $retcode = 0 ]; then
       if [ -s $dbfile.gz ]; then
-	if zcat $dbfile.gz >$dbfile.new; then
-	  rm -f $dbfile.gz
-	  mv -f $dbfile.new $dbfile
-	else
-	  rm -f $dbfile.gz $dbfile.new
-	  echo "error unzipping geoip database"
-	  $lazy || return 1
+        if zcat $dbfile.gz >$dbfile.new; then
+          rm -f $dbfile.gz
+          mv -f $dbfile.new $dbfile
+        else
+          rm -f $dbfile.gz $dbfile.new
+          echo "error unzipping geoip database"
+          $lazy || return 1
         fi
       else
-	rm -f $dbfile.gz
+        rm -f $dbfile.gz
         echo "downloaded geoip database empty"
-	$lazy || return 1
+        $lazy || return 1
       fi
     else
       rm -f $dbfile.gz
@@ -2016,9 +2016,9 @@ add_replica() {
   if is_local_upstream $upstream; then
     if ! check_apache; then
       if [ $silence_httpd_warning -eq 1 ]; then
-	echo "Warning: Apache is needed to access this CVMFS replication"
+        echo "Warning: Apache is needed to access this CVMFS replication"
       else
-	die "Apache must be installed and running"
+        die "Apache must be installed and running"
       fi
     elif [ $silence_httpd_warning -eq 0 ]; then
       check_wsgi_module
@@ -3297,12 +3297,12 @@ snapshot() {
     # more sanity checks
     check_repository_compatibility
     if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
-	# this might have been missed if add-replica -a was used or 
-	#  if a migrate was done while apache wasn't running, but then
-	#  apache was enabled later
-	check_wsgi_module
-	# try to update the geodb, but continue if it doesn't work
-	update_geodb -l || true
+        # this might have been missed if add-replica -a was used or 
+        #  if a migrate was done while apache wasn't running, but then
+        #  apache was enabled later
+        check_wsgi_module
+        # try to update the geodb, but continue if it doesn't work
+        update_geodb -l || true
     fi
 
     # do it!
