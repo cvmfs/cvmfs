@@ -270,7 +270,7 @@ struct Digest {
   bool operator >(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return (this->algorithm > other.algorithm);
-    for (int i = 0; i < kDigestSizes[algorithm]; ++i) {
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
       if (this->digest[i] < other.digest[i])
         return false;
       if (this->digest[i] > other.digest[i])
