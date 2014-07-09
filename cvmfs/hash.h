@@ -88,20 +88,23 @@ struct AsciiPtr {
 template<unsigned digest_size_, Algorithms algorithm_>
 struct Digest {
   unsigned char digest[digest_size_];
-  Algorithms algorithm;
+  Algorithms    algorithm;
+  char          suffix;
 
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
   unsigned GetHexSize() const {
     return 2*kDigestSizes[algorithm] + kSuffixLengths[algorithm];
   }
 
-  Digest() {
-    algorithm = algorithm_;
+  Digest() :
+    algorithm(algorithm_), suffix(0)
+  {
     memset(digest, 0, digest_size_);
   }
 
-  explicit Digest(const Algorithms a, const HexPtr hex) {
-    algorithm = a;
+  explicit Digest(const Algorithms a, const HexPtr hex, const char s = 0) :
+    algorithm(a), suffix(s)
+  {
     assert((algorithm_ == kAny) || (a == algorithm_));
     const unsigned char_size = 2*kDigestSizes[a];
 
@@ -117,9 +120,10 @@ struct Digest {
   }
 
   Digest(const Algorithms a,
-         const unsigned char *digest_buffer, const unsigned buffer_size)
+         const unsigned char *digest_buffer, const unsigned buffer_size,
+         const char s = 0) :
+    algorithm(a), suffix(s)
   {
-    algorithm = a;
     assert(buffer_size <= digest_size_);
     memcpy(digest, digest_buffer, buffer_size);
   }
@@ -159,8 +163,10 @@ struct Digest {
     }
   }
 
+  bool HasSuffix() const { return suffix != 0; }
+
   std::string ToString() const {
-    const unsigned string_length = GetHexSize();
+    const unsigned string_length = GetHexSize() + HasSuffix();
     std::string result(string_length, 0);
 
     unsigned i;
@@ -176,6 +182,9 @@ struct Digest {
     for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
       result[pos] = *s;
       pos++;
+    }
+    if (HasSuffix()) {
+      result[pos] = suffix;
     }
     return result;
   }
@@ -194,7 +203,8 @@ struct Digest {
     const unsigned string_length =   prefix.length()
                                    + GetHexSize()
                                    + dir_levels
-                                   + 1; // slash between prefix and hash
+                                   + 1 // slash between prefix and hash
+                                   + HasSuffix();
     std::string result(prefix);
     result.resize(string_length);
 
@@ -216,6 +226,9 @@ struct Digest {
       result[pos] = *s;
       pos++;
     }
+    if (HasSuffix()) {
+      result[pos] = suffix;
+    }
 
     return result;
   }
@@ -229,6 +242,8 @@ struct Digest {
 
   bool operator ==(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
+      return false;
+    if (this->suffix != other.suffix)
       return false;
     for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
       if (this->digest[i] != other.digest[i])
@@ -249,7 +264,7 @@ struct Digest {
       if (this->digest[i] < other.digest[i])
         return true;
     }
-    return false;
+    return this->suffix < other.suffix;
   }
 
   bool operator >(const Digest<digest_size_, algorithm_> &other) const {
@@ -261,7 +276,7 @@ struct Digest {
       if (this->digest[i] > other.digest[i])
         return true;
     }
-    return false;
+    return this->suffix > other.suffix;
   }
 };
 
