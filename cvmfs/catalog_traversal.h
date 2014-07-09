@@ -120,6 +120,7 @@ template<class CatalogT, class ObjectFetcherT = ObjectFetcher>
 class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
  public:
   typedef CatalogTraversalData<CatalogT> CallbackData;
+  typedef CatalogT                       Catalog;
 
  protected:
   typedef std::set<shash::Any>           HashSet;
