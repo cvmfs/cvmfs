@@ -50,7 +50,7 @@ const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
   "fuse stub", "signature", "fs traversal", "catalog traversal",
   "nfs maps", "publish", "spooler", "concurrency", "utility", "glue buffer",
-  "history", "unionfs", "pathspec", "s3fanout" };
+  "history", "unionfs", "pathspec", "s3fanout", "gc" };
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
