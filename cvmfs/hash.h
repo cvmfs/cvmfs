@@ -152,7 +152,7 @@ struct Digest {
    *
    * @param prng  random number generator object (for external reproducability)
    */
-  void Randomize(Prng prng) {
+  void Randomize(Prng &prng) {
     const unsigned bytes = GetDigestSize();
     for (unsigned i = 0; i < bytes; ++i) {
       digest[i] = prng.Next(256);
