@@ -184,12 +184,17 @@ struct Digest {
    * Create a path string from the hex notation of the digest.
    */
   std::string MakePath(const unsigned dir_levels,
-                       const unsigned digits_per_level) const
+                       const unsigned digits_per_level,
+                       const std::string &prefix = "") const
   {
-    const unsigned string_length = GetHexSize() + dir_levels + 1;
-    std::string result(string_length, 0);
+    const unsigned string_length =   prefix.length()
+                                   + GetHexSize()
+                                   + dir_levels
+                                   + 1; // slash between prefix and hash
+    std::string result(prefix);
+    result.resize(string_length);
 
-    unsigned i = 0, pos = 0;
+    unsigned i = 0, pos = prefix.length();
     while (i < 2*kDigestSizes[algorithm]) {
       if (((i % digits_per_level) == 0) &&
           ((i / digits_per_level) <= dir_levels))
