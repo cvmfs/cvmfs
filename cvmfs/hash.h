@@ -180,6 +180,10 @@ struct Digest {
     return result;
   }
 
+  std::string MakePath(const std::string &prefix = "data") const {
+    return MakePath(1, 2, prefix);
+  }
+
   /**
    * Create a path string from the hex notation of the digest.
    */
