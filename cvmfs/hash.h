@@ -40,6 +40,12 @@ enum Algorithms {
   kAny,
 };
 
+const char kSuffixCatalog      = 'C';
+const char kSuffixHistory      = 'H';
+const char kSuffixMicroCatalog = 'L'; // currently unused
+const char kSuffixPartial      = 'P';
+const char kSuffixCertificate  = 'X';
+
 
 /**
  * Corresponds to Algorithms.  "Any" is the maximum of all the other
