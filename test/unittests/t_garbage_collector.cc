@@ -360,7 +360,8 @@ TEST_F(T_GarbageCollector, InitializeGarbageCollector) {
 
 TEST_F(T_GarbageCollector, KeepEverything) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth = 10; // more revisions than actually accessible
+  config.keep_history_depth   = 10; // more revisions than actually accessible
+  config.keep_named_snapshots = false;
 
   MyGarbageCollector gc(config);
   gc.Collect();
@@ -372,7 +373,8 @@ TEST_F(T_GarbageCollector, KeepEverything) {
 
 TEST_F(T_GarbageCollector, KeepLastRevision) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth = 0; // no history preservation
+  config.keep_history_depth   = 0; // no history preservation
+  config.keep_named_snapshots = false;
 
   MyGarbageCollector gc(config);
   gc.Collect();
@@ -443,7 +445,8 @@ TEST_F(T_GarbageCollector, KeepLastRevision) {
 
 TEST_F(T_GarbageCollector, KeepLastThreeRevisions) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth = 2; // preserve two historic revisions
+  config.keep_history_depth   = 2; // preserve two historic revisions
+  config.keep_named_snapshots = false;
 
   MyGarbageCollector gc(config);
   gc.Collect();
