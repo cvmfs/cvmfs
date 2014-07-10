@@ -18,6 +18,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "signature.h"
+#include "history.h"
 
 
 namespace catalog {
@@ -210,6 +211,32 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
   /**
+   * Figures out all named tags in a repository and uses all of them as entry
+   * points into the traversal process. Traversing is done as configured from
+   * each of the entry points.
+   *
+   * @return  true when catalog traversal successfully finished
+   */
+  bool TraverseNamedSnapshots() {
+    typedef std::vector<shash::Any> HashList;
+
+    TraversalContext ctx(default_history_depth_);
+    const history::TagList tags = GetRepositoryTagList();
+    const HashList root_hashes = tags.GetReferencedHashes();
+
+    // traversing referenced named root hashes in reverse chronological order
+    // to make sure that overlapping history traversals don't leave out catalog
+    // revisions accidentially
+          HashList::const_reverse_iterator i    = root_hashes.rbegin();
+    const HashList::const_reverse_iterator iend = root_hashes.rend();
+    for (; i != iend; ++i) {
+      MightPush(ctx, *i);
+    }
+
+    return DoTraverse(ctx);
+  }
+
+  /**
    * This traverses all catalogs that were left out by previous traversal runs.
    *
    * Note: This method asserts that previous traversal runs left out certain
@@ -380,6 +407,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     delete manifest;
 
     return root_catalog_hash;
+  }
+
+  history::TagList GetRepositoryTagList() {
+    return object_fetcher_.FetchTagList();
   }
 
  private:
