@@ -10,8 +10,11 @@
 
 using namespace swissknife;
 
-static const std::string rhs       = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
-static const shash::Any  root_hash = shash::Any(shash::kSha1, shash::HexPtr(rhs));
+static const std::string rhs        = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
+static const shash::Any  root_hash  = shash::Any(shash::kSha1, shash::HexPtr(rhs));
+static history::TagList *g_tag_list = NULL; // needs to be global to 'mimic' the
+                                            // real world, where the repo itself
+                                            // is 'global'
 
 /**
  * This is a mock of an ObjectFetcher that does essentially nothing.
@@ -22,6 +25,9 @@ class MockObjectFetcher {
  public:
   manifest::Manifest* FetchManifest() {
     return new manifest::Manifest(root_hash, 0, "");
+  }
+  history::TagList FetchTagList() {
+    return (g_tag_list != NULL) ? *g_tag_list : history::TagList();
   }
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {
@@ -212,11 +218,13 @@ class T_CatalogTraversal : public ::testing::Test {
     MockCatalog::Reset();
     SetupDummyCatalogs();
     EXPECT_EQ (initial_catalog_instances, MockCatalog::instances);
+    g_tag_list = &named_snapshots_;
   }
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
+    g_tag_list = NULL;
   }
 
   void CheckVisitedCatalogs(const CatalogIdentifiers expected,
@@ -328,6 +336,23 @@ class T_CatalogTraversal : public ::testing::Test {
     for (unsigned int r = 1; r <= max_revision; ++r) {
       MakeRevision(r, revisions);
     }
+
+    history::TagList::Failures f;
+    f = named_snapshots_.Insert(history::Tag(
+                                        "Revision2", root_catalogs[2], 1337,
+                                        2, t(27,11,1987), history::kChannelProd,
+                                        "this is revision 2"));
+    EXPECT_EQ (history::TagList::kFailOk, f);
+    f = named_snapshots_.Insert(history::Tag(
+                                        "Revision5", root_catalogs[5], 42,
+                                        5, t(11, 9,2001), history::kChannelProd,
+                                        "this is revision 5"));
+    EXPECT_EQ (history::TagList::kFailOk, f);
+    f = named_snapshots_.Insert(history::Tag(
+                                        "Revision6", root_catalogs[6], 7,
+                                        6, t(10, 7,2014), history::kChannelTrunk,
+                                        "this is revision 6 - the newest!"));
+    EXPECT_EQ (history::TagList::kFailOk, f);
   }
 
   void MakeRevision(const unsigned int revision, RevisionMap &revisions) {
@@ -471,12 +496,26 @@ class T_CatalogTraversal : public ::testing::Test {
     return shash::Any(shash::kSha1, shash::HexPtr(hash));
   }
 
+  time_t t(const int day, const int month, const int year) const {
+    struct tm time_descriptor;
+
+    time_descriptor.tm_hour = 0;
+    time_descriptor.tm_min  = 0;
+    time_descriptor.tm_sec  = 0;
+    time_descriptor.tm_mday = day;
+    time_descriptor.tm_mon  = month;
+    time_descriptor.tm_year = year;
+
+    return mktime(&time_descriptor);
+  }
+
  protected:
   typedef std::map<unsigned int, shash::Any> RootCatalogMap;
 
  private:
-  Prng            dice_;
-  RootCatalogMap  root_catalogs_;
+  Prng             dice_;
+  RootCatalogMap   root_catalogs_;
+  history::TagList named_snapshots_;
 };
 
 
