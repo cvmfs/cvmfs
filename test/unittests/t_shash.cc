@@ -77,6 +77,45 @@ TEST(T_Shash, ToString) {
 }
 
 
+TEST(T_Shash, ToStringWithSuffix) {
+  Prng prng;
+  prng.InitSeed(1337);
+
+  shash::Any hash_md5(shash::kMd5);
+  hash_md5.Randomize(prng);
+  hash_md5.suffix = 'C';
+  ASSERT_FALSE (hash_md5.IsNull());
+  EXPECT_EQ    ("583525ddfde0ebe0b3afff68cde4d983C", hash_md5.ToString());
+
+  shash::Any hash_sha1(shash::kSha1);
+  hash_sha1.Randomize(prng);
+  hash_sha1.suffix = 'A';
+  ASSERT_FALSE (hash_sha1.IsNull());
+  EXPECT_EQ    ("efc0075d82e876211b66b4b0b91ce2ec217ee60aA", hash_sha1.ToString());
+
+  shash::Any hash_rmd160(shash::kRmd160);
+  hash_rmd160.Randomize(prng);
+  hash_rmd160.suffix = 'Q';
+  ASSERT_FALSE (hash_rmd160.IsNull());
+  EXPECT_EQ    ("850b90946048b2760f4d50ce83249dad6317ef10-rmd160Q", hash_rmd160.ToString());
+}
+
+
+TEST(T_Shash, InitializeAnyWithSuffix) {
+  shash::Any hash_md5(shash::kMd5, shash::HexPtr("9fd52a9f04d1ac6735403d16d755c94a"), 'H');
+  ASSERT_FALSE (hash_md5.IsNull());
+  EXPECT_EQ    ("9fd52a9f04d1ac6735403d16d755c94aH", hash_md5.ToString());
+
+  shash::Any hash_sha1(shash::kSha1, shash::HexPtr("cf95c182bb9214bcb9a23fed6658c60d061b45b5"), 'F');
+  ASSERT_FALSE (hash_sha1.IsNull());
+  EXPECT_EQ    ("cf95c182bb9214bcb9a23fed6658c60d061b45b5F", hash_sha1.ToString());
+
+  shash::Any hash_rmd160(shash::kRmd160, shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0"), 'M');
+  ASSERT_FALSE (hash_rmd160.IsNull());
+  EXPECT_EQ    ("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-rmd160M", hash_rmd160.ToString());
+}
+
+
 TEST(T_Shash, MakePathExplicit) {
   Prng prng;
   prng.InitSeed(42);
