@@ -154,6 +154,9 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
+  if (configuration_.keep_named_snapshots) {
+    traversal_.TraverseNamedSnapshots();
+  }
   traversal_.Traverse();
   traversal_.UnregisterListener(callback);
 }
