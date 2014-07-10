@@ -67,11 +67,13 @@ class T_GarbageCollector : public ::testing::Test {
     dice_.InitLocaltime();
     MockCatalog::Reset();
     SetupDummyCatalogs();
+    MockObjectFetcher::s_tag_list = &named_snapshots_;
   }
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
+    MockObjectFetcher::s_tag_list = NULL;
   }
 
   GcConfiguration GetStandardGarbageCollectorConfiguration() const {
@@ -256,6 +258,30 @@ class T_GarbageCollector : public ::testing::Test {
     c[mp(5,"20")]->AddChunk(h("a727b47d99fba5fe196400a3c7bc1738172dff71", 'P'),  8811); // 5
     c[mp(5,"20")]->AddChunk(h("80b59550342b6f5141b42e5b2d58ce453f12d710", 'P'),  8812); // 5
     c[mp(5,"20")]->AddChunk(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943", 'P'),  8813); // 5*
+
+    //
+    // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    // # REGISTERING OF NAMED SNAPSHOTS
+    // # We register revision 2, 4 and 5 as named snapshots in a mocked history.
+    // # Furthermore revision 5 is marked as the current trunk (HEAD).
+    // #
+    //
+    history::TagList::Failures f;
+    f = named_snapshots_.Insert(history::Tag(
+                                     "Revision2", c[mp(2,"00")]->catalog_hash(),
+                                     1337, 2, t(27,11,1987),
+                                     history::kChannelProd, "this is rev 2"));
+    EXPECT_EQ (history::TagList::kFailOk, f);
+    f = named_snapshots_.Insert(history::Tag(
+                                     "Revision4", c[mp(4,"00")]->catalog_hash(),
+                                     42, 4, t(11, 9,2001), history::kChannelProd,
+                                     "this is revision 4"));
+    EXPECT_EQ (history::TagList::kFailOk, f);
+    f = named_snapshots_.Insert(history::Tag(
+                                     "Revision5", c[mp(5,"00")]->catalog_hash(),
+                                     7, 5, t(10, 7,2014), history::kChannelTrunk,
+                                     "this is revision 5 - the newest!"));
+    EXPECT_EQ (history::TagList::kFailOk, f);
   }
 
   MockCatalog* CreateAndRegisterCatalog(
@@ -302,11 +328,25 @@ class T_GarbageCollector : public ::testing::Test {
     return std::make_pair(revision, clg_index);
   }
 
+  time_t t(const int day, const int month, const int year) const {
+    struct tm time_descriptor;
+
+    time_descriptor.tm_hour = 0;
+    time_descriptor.tm_min  = 0;
+    time_descriptor.tm_sec  = 0;
+    time_descriptor.tm_mday = day;
+    time_descriptor.tm_mon  = month;
+    time_descriptor.tm_year = year;
+
+    return mktime(&time_descriptor);
+  }
+
  protected:
-  RevisionMap  catalogs_;
+  RevisionMap      catalogs_;
+  history::TagList named_snapshots_;
 
  private:
-  Prng         dice_;
+  Prng             dice_;
 };
 
 
