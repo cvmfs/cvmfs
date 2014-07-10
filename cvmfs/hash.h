@@ -305,11 +305,12 @@ struct Rmd160 : public Digest<20, kRmd160> { };
 struct Any : public Digest<20, kAny> {
   Any() : Digest<20, kAny>() { }
   explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
-  Any(const Algorithms a,
-      const unsigned char *digest_buffer, const unsigned buffer_size)
-    : Digest<20, kAny>(a, digest_buffer, buffer_size) { }
-  explicit Any(const Algorithms a, const HexPtr hex) :
-    Digest<20, kAny>(a, hex) { }
+  Any(const Algorithms     a,
+      const unsigned char *digest_buffer, const unsigned buffer_size,
+      const char           suffix = 0) :
+    Digest<20, kAny>(a, digest_buffer, buffer_size, suffix) { }
+  explicit Any(const Algorithms a, const HexPtr hex, const char suffix = 0) :
+    Digest<20, kAny>(a, hex, suffix) { }
 };
 
 
