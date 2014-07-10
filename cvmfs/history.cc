@@ -389,6 +389,30 @@ map<string, shash::Any> TagList::GetAllHashes() {
 }
 
 
+struct revision_comparator {
+  bool operator() (const Tag &tag1, const Tag &tag2) {
+    return tag1.revision < tag2.revision;
+  }
+};
+
+struct hash_extractor {
+  const shash::Any& operator() (const Tag &tag) {
+    return tag.root_hash;
+  }
+};
+
+std::vector<shash::Any> TagList::GetReferencedHashes() const {
+  // copy the internal tag list and sort it by decending revision
+  std::vector<Tag> tags = list_;
+  std::sort(tags.begin(), tags.end(), revision_comparator());
+
+  // extract the root catalog hashes from it
+  std::vector<shash::Any> hashes(tags.size());
+  std::transform(tags.begin(), tags.end(), hashes.begin(), hash_extractor());
+  return hashes;
+}
+
+
 // Ordered list, newest releases first
 vector<TagList::ChannelTag> TagList::GetChannelTops() {
   vector<ChannelTag> result;

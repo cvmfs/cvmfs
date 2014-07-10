@@ -143,6 +143,13 @@ class TagList {
   std::string List();
   std::map<std::string, shash::Any> GetAllHashes();
 
+  /**
+   * This returns a list of referenced catalog root hashes sorted by revision
+   * from HEAD to tail.
+   * @return  a sorted list of all referenced root catalog hashes.
+   */
+  std::vector<shash::Any> GetReferencedHashes() const;
+
   bool Load(Database *database);
   bool Store(Database *database);
  private:
