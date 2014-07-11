@@ -190,8 +190,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     if (root_catalog_hash.IsNull()) {
       return false;
     }
-    const bool did = MightPush(ctx, root_catalog_hash);
-    assert (did);
+    MightPush(ctx, root_catalog_hash);
     return DoTraverse(ctx);
   }
 
@@ -205,8 +204,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     // add the root catalog of the repository as the first element on the job
     // stack
     TraversalContext ctx(default_history_depth_);
-    const bool did = MightPush(ctx, root_catalog_hash);
-    assert (did);
+    MightPush(ctx, root_catalog_hash);
     return DoTraverse(ctx);
   }
 
