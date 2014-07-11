@@ -76,7 +76,7 @@ struct CatalogTraversalData {
  */
 struct CatalogTraversalParams {
   CatalogTraversalParams() : history(0), no_repeat_history(false),
-  no_close(false), tmp_dir("/tmp") {}
+  no_close(false), ignore_load_failure(false), tmp_dir("/tmp") {}
 
   static const unsigned int kFullHistory;
 
@@ -86,6 +86,7 @@ struct CatalogTraversalParams {
   unsigned int  history;
   bool          no_repeat_history;
   bool          no_close;
+  bool          ignore_load_failure;
   std::string   tmp_dir;
 };
 
@@ -142,6 +143,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       history_depth(history_depth),
       parent(parent) {}
 
+    bool IsRootCatalog() const { return tree_level == 0; }
+
     const std::string   path;
     const shash::Any    hash;
     const unsigned      tree_level;
@@ -172,6 +175,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     object_fetcher_(params),
     repo_name_(params.repo_name),
     no_close_(params.no_close),
+    ignore_load_failure_(params.ignore_load_failure),
     no_repeat_history_(params.no_repeat_history),
     default_history_depth_(params.history)
   {}
@@ -294,10 +298,19 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   bool ProcessCatalogJob(TraversalContext &ctx, const CatalogJob &job) {
     // Load a catalog
     std::string tmp_file;
-    if (!object_fetcher_.Fetch(job.hash, &tmp_file)) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load catalog %s",
-               job.hash.ToString().c_str());
-      return false;
+    const bool fetched_catalog = object_fetcher_.Fetch(job.hash, &tmp_file);
+
+    if (! fetched_catalog) {
+      if (ignore_load_failure_ && job.IsRootCatalog()) {
+        LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignore missing root catalog "
+                                                  "%s (possibly sweeped before)",
+                 job.hash.ToString().c_str());
+        return true;
+      } else {
+        LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load catalog %s",
+                 job.hash.ToString().c_str());
+        return false;
+      }
     }
 
     // Get the size of the decompressed catalog file
@@ -418,6 +431,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   ObjectFetcherT        object_fetcher_;
   const std::string     repo_name_;
   const bool            no_close_;
+  const bool            ignore_load_failure_;
   const bool            no_repeat_history_;
   const unsigned int    default_history_depth_;
   HashSet               visited_catalogs_;
@@ -442,6 +456,7 @@ class ObjectFetcher {
     repo_name_(params.repo_name),
     repo_keys_(params.repo_keys),
     is_remote_(params.repo_url.substr(0, 7) == "http://"),
+    ignore_load_failure_(params.ignore_load_failure),
     temporary_directory_(params.tmp_dir)
   {
     if (is_remote_) {
@@ -560,15 +575,14 @@ class ObjectFetcher {
     download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
     download::Failures retval = download_manager_.Fetch(&download_catalog);
 
-    if (retval != download::kFailOk) {
+    if (! ignore_load_failure_ && retval != download::kFailOk) {
       LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s"
                                                  " (%d - %s)",
-             catalog_hash.ToString().c_str(), retval, Code2Ascii(retval));
-      return false;
+               catalog_hash.ToString().c_str(), retval, Code2Ascii(retval));
     }
 
     *catalog_file = dest;
-    return true;
+    return retval == download::kFailOk;
   }
 
 
@@ -584,9 +598,17 @@ class ObjectFetcher {
     const std::string source =
       repo_url_ + "/data" + catalog_hash.MakePathExplicit(1, 2) + "C";
     const std::string dest = temporary_directory_ + "/" + catalog_hash.ToString();
+    const bool file_exists = FileExists(dest);
 
-    if (!zlib::DecompressPath2Path(source, dest))
+    if (! ignore_load_failure_ && ! file_exists) {
+      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to locate catalog %s"
+                                                 "at '%s'",
+               catalog_hash.ToString().c_str(), dest.c_str());
+    }
+
+    if (! file_exists || ! zlib::DecompressPath2Path(source, dest)) {
       return false;
+    }
 
     *catalog_file = dest;
     return true;
@@ -597,6 +619,7 @@ class ObjectFetcher {
   const std::string          repo_name_;
   const std::string          repo_keys_;
   const bool                 is_remote_;
+  const bool                 ignore_load_failure_;
   const std::string          temporary_directory_;
   download::DownloadManager  download_manager_;
 };
