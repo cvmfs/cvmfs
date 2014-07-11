@@ -58,21 +58,24 @@ struct CatalogTraversalData {
 
 
 /**
- * @param repo_url           the path to the repository to be traversed:
- *                           -> either absolute path to the local catalogs
- *                           -> or an URL to a remote repository
- * @param repo_name          fully qualified repository name (used for remote
- *                           repository signature check) (optional)
- * @param repo_keys          a comma separated list of public key file
- *                           locations to verify the repository manifest file
- * @param history            depth of the desired catalog history traversal
- *                           (default: 0 - only HEAD catalogs are traversed)
- * @param no_repeat_history  keep track of visited catalogs and don't re-visit
- *                           them in previous revisions
- * @param no_close           do not close catalogs after they were attached
- *                           (catalogs retain their parent/child pointers)
- * @param tmp_dir            path to the temporary directory to be used
- *                           (default: /tmp)
+ * @param repo_url             the path to the repository to be traversed:
+ *                             -> either absolute path to the local catalogs
+ *                             -> or an URL to a remote repository
+ * @param repo_name            fully qualified repository name (used for remote
+ *                             repository signature check) (optional)
+ * @param repo_keys            a comma separated list of public key file
+ *                             locations to verify the repository manifest file
+ * @param history              depth of the desired catalog history traversal
+ *                             (default: 0 - only HEAD catalogs are traversed)
+ * @param no_repeat_history    keep track of visited catalogs and don't re-visit
+ *                             them in previous revisions
+ * @param no_close             do not close catalogs after they were attached
+ *                             (catalogs retain their parent/child pointers)
+ * @param ignore_load_failure  suppressed an error message if a revision's root
+ *                             catalog could not be loaded (i.e. was sweeped
+ *                             before by a garbage collection run)
+ * @param tmp_dir              path to the temporary directory to be used
+ *                             (default: /tmp)
  */
 struct CatalogTraversalParams {
   CatalogTraversalParams() : history(0), no_repeat_history(false),
