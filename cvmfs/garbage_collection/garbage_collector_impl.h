@@ -15,6 +15,7 @@ swissknife::CatalogTraversalParams
   params.history             = config.keep_history_depth;
   params.no_repeat_history   = true;
   params.ignore_load_failure = true;
+  params.quiet               = ! config.verbose;
   params.repo_url            = config.repo_url;
   params.repo_name           = config.repo_name;
   params.repo_keys           = config.repo_keys;

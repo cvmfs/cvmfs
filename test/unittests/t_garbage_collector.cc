@@ -360,11 +360,13 @@ TEST_F(T_GarbageCollector, InitializeGarbageCollector) {
 
 TEST_F(T_GarbageCollector, KeepEverything) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth   = 10; // more revisions than actually accessible
+  config.keep_history_depth   = CatalogTraversalParams::kFullHistory;
   config.keep_named_snapshots = false;
 
   MyGarbageCollector gc(config);
-  gc.Collect();
+  const bool gc1 = gc.Collect();
+
+  EXPECT_TRUE (gc1);
   EXPECT_EQ (17u, gc.preserved_catalog_count());
   EXPECT_EQ ( 0u, gc.condemned_catalog_count());
   EXPECT_EQ ( 0u, gc.condemned_objects_count());
@@ -377,7 +379,8 @@ TEST_F(T_GarbageCollector, KeepLastRevision) {
   config.keep_named_snapshots = false;
 
   MyGarbageCollector gc(config);
-  gc.Collect();
+  const bool gc1 = gc.Collect();
+  EXPECT_TRUE (gc1);
   EXPECT_EQ ( 4u, gc.preserved_catalog_count());
   EXPECT_EQ (13u, gc.condemned_catalog_count());
 
@@ -449,7 +452,8 @@ TEST_F(T_GarbageCollector, KeepLastThreeRevisions) {
   config.keep_named_snapshots = false;
 
   MyGarbageCollector gc(config);
-  gc.Collect();
+  const bool gc1 = gc.Collect();
+  EXPECT_TRUE (gc1);
   EXPECT_EQ (11u, gc.preserved_catalog_count());
   EXPECT_EQ ( 6u, gc.condemned_catalog_count());
 
@@ -526,7 +530,8 @@ TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
   config.keep_history_depth = 0;
 
   MyGarbageCollector gc(config);
-  gc.Collect();
+  const bool gc1 = gc.Collect();
+  EXPECT_TRUE (gc1);
   EXPECT_EQ (11u, gc.preserved_catalog_count());
   EXPECT_EQ ( 6u, gc.condemned_catalog_count());
 
@@ -593,7 +598,8 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->catalog_hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->catalog_hash()));
 
-  gc.Collect();
+  const bool gc1 = gc.Collect();
+  EXPECT_TRUE (gc1);
   EXPECT_EQ (11u, gc.preserved_catalog_count());
   EXPECT_EQ ( 0u, gc.condemned_catalog_count());
 
@@ -607,14 +613,14 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
   config.keep_named_snapshots = false;
   MyGarbageCollector gc(config);
 
-  RevisionMap     &c   = catalogs_;
+  RevisionMap &c   = catalogs_;
 
   std::set<shash::Any> deleted_catalogs;
-  deleted_catalogs.insert(c[mp(3,"00")]->catalog_hash());
+  deleted_catalogs.insert(c[mp(3,"10")]->catalog_hash());
   MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
 
-  const bool successful = gc.Collect();
-  EXPECT_FALSE (successful);
+  const bool gc1 = gc.Collect();
+  EXPECT_FALSE (gc1);
 
   MockObjectFetcher::deleted_catalogs = NULL;
 }
