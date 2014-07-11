@@ -4,7 +4,7 @@
 #include <sys/types.h>
 
 #include "../../cvmfs/upload_facility.h"
-
+#include "../../cvmfs/hash.h"
 #include "../../cvmfs/directory_entry.h"
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/history.h"
@@ -319,7 +319,8 @@ class MockCatalog {
  */
 class MockObjectFetcher {
  public:
-  static UniquePtr<history::History> *s_history;
+  static UniquePtr<history::History>  *s_history;
+  static std::set<shash::Any>         *deleted_catalogs;
 
  public:
   MockObjectFetcher(const swissknife::CatalogTraversalParams &params) {}
@@ -332,7 +333,8 @@ class MockObjectFetcher {
   }
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {
-    return true;
+    return (deleted_catalogs == NULL ||
+            deleted_catalogs->find(catalog_hash) == deleted_catalogs->end());
   }
   inline bool Exists(const std::string &file) {
     return false;

@@ -175,6 +175,7 @@ void MockCatalog::AddFile(const shash::Any   &content_hash,
 
 
 UniquePtr<history::History>* MockObjectFetcher::s_history;
+std::set<shash::Any>* MockObjectFetcher::deleted_catalogs = NULL;
 
 void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
                            const size_t       chunk_size) {
@@ -211,7 +212,6 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
 
   return referenced_objects_;
 }
-
 
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   return new manifest::Manifest(MockCatalog::root_hash, 0, "");
