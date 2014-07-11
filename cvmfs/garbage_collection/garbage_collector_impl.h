@@ -144,8 +144,6 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTree() {
-  assert (state_ == kPreserve);
-
   if (configuration_.verbose) {
     LogCvmfs(kLogGC, kLogStdout, "Preserving data objects in catalog tree");
   }
@@ -164,8 +162,6 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree() {
-  state_ = kSweep;
-
   if (configuration_.verbose) {
     LogCvmfs(kLogGC, kLogStdout, "Sweeping unreferenced data objects in "
                                  "remaining catalogs");

@@ -55,12 +55,6 @@ class GarbageCollector {
     std::string                tmp_dir;
   };
 
- private:
-  enum CollectionState {
-    kPreserve,
-    kSweep
-  };
-
  protected:
   typedef typename CatalogTraversalT::Catalog          MyCatalog;
   typedef typename CatalogTraversalT::CallbackData     MyCallbackData;
@@ -73,7 +67,6 @@ class GarbageCollector {
       GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
                                                                 configuration)),
     hash_filter_(),
-    state_(kPreserve),
     preserved_catalogs_(0), condemned_catalogs_(0), condemned_objects_(0) {}
 
   void Collect();
@@ -103,8 +96,6 @@ class GarbageCollector {
   const Configuration   configuration_;
   CatalogTraversalT     traversal_;
   HashFilterT           hash_filter_;
-
-  CollectionState       state_;
 
   unsigned int          preserved_catalogs_;
   unsigned int          condemned_catalogs_;
