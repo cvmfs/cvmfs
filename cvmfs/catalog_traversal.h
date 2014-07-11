@@ -570,8 +570,8 @@ class ObjectFetcher {
    * @param catalog_file   output parameter for the loaded catalog file
    * @return               true, if catalog was successfully downloaded
    */
-  bool DownloadCatalog(const shash::Any& catalog_hash,
-                       std::string *catalog_file) {
+  bool DownloadCatalog(const shash::Any  &catalog_hash,
+                       std::string       *catalog_file) {
     catalog_file->clear();
 
     const std::string source = "data" +
@@ -598,8 +598,8 @@ class ObjectFetcher {
    * @param catalog_hash   the SHA-1 hash of the catalog to be extracted
    * @return               the path to the extracted catalog file
    */
-  bool DecompressCatalog(const shash::Any& catalog_hash,
-                         std::string *catalog_file) {
+  bool DecompressCatalog(const shash::Any  &catalog_hash,
+                         std::string       *catalog_file) {
     catalog_file->clear();
 
     const std::string source =
