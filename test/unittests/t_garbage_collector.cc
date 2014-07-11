@@ -562,3 +562,59 @@ TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
 
   EXPECT_EQ (14u, upl->deleted_hashes.size());
 }
+
+
+TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = CatalogTraversalParams::kFullHistory;
+  MyGarbageCollector gc(config);
+
+  GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
+  RevisionMap     &c   = catalogs_;
+
+  std::set<shash::Any> deleted_catalogs;
+  deleted_catalogs.insert(c[mp(1,"00")]->catalog_hash());
+  deleted_catalogs.insert(c[mp(1,"10")]->catalog_hash());
+  deleted_catalogs.insert(c[mp(1,"11")]->catalog_hash());
+  deleted_catalogs.insert(c[mp(3,"00")]->catalog_hash());
+  deleted_catalogs.insert(c[mp(3,"10")]->catalog_hash());
+  deleted_catalogs.insert(c[mp(3,"11")]->catalog_hash());
+  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->catalog_hash()));
+
+  gc.Collect();
+  EXPECT_EQ (11u, gc.preserved_catalog_count());
+  EXPECT_EQ ( 0u, gc.condemned_catalog_count());
+
+  MockObjectFetcher::deleted_catalogs = NULL;
+}
+
+
+TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth   = CatalogTraversalParams::kFullHistory;
+  config.keep_named_snapshots = false;
+  MyGarbageCollector gc(config);
+
+  RevisionMap     &c   = catalogs_;
+
+  std::set<shash::Any> deleted_catalogs;
+  deleted_catalogs.insert(c[mp(3,"00")]->catalog_hash());
+  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+
+  const bool successful = gc.Collect();
+  EXPECT_FALSE (successful);
+
+  MockObjectFetcher::deleted_catalogs = NULL;
+}
