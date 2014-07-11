@@ -69,7 +69,7 @@ class GarbageCollector {
     hash_filter_(),
     preserved_catalogs_(0), condemned_catalogs_(0), condemned_objects_(0) {}
 
-  void Collect();
+  bool Collect();
 
   unsigned int preserved_catalog_count() const { return preserved_catalogs_; }
   unsigned int condemned_catalog_count() const { return condemned_catalogs_; }
@@ -83,8 +83,8 @@ class GarbageCollector {
   void SweepDataObjects   (const MyCallbackData &data);
 
   bool VerifyConfiguration() const;
-  void AnalyzePreservedCatalogTree();
-  void SweepCondemnedCatalogTree();
+  bool AnalyzePreservedCatalogTree();
+  bool SweepCondemnedCatalogTree();
 
   void CheckAndSweep(const shash::Any &hash);
   void Sweep(const shash::Any &hash);

@@ -12,12 +12,13 @@ swissknife::CatalogTraversalParams
   const GarbageCollector<CatalogTraversalT, HashFilterT>::Configuration &config)
 {
   swissknife::CatalogTraversalParams params;
-  params.history           = config.keep_history_depth;
-  params.no_repeat_history = true;
-  params.repo_url          = config.repo_url;
-  params.repo_name         = config.repo_name;
-  params.repo_keys         = config.repo_keys;
-  params.tmp_dir           = config.tmp_dir;
+  params.history             = config.keep_history_depth;
+  params.no_repeat_history   = true;
+  params.ignore_load_failure = true;
+  params.repo_url            = config.repo_url;
+  params.repo_name           = config.repo_name;
+  params.repo_keys           = config.repo_keys;
+  params.tmp_dir             = config.tmp_dir;
   return params;
 }
 
@@ -130,38 +131,44 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::VerifyConfiguration() con
 
 
 template <class CatalogTraversalT, class HashFilterT>
-void GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
-  const bool config_okay = VerifyConfiguration();
-  if (! config_okay) {
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
+  bool success = true;
+
+  success = VerifyConfiguration();
+  if (! success) {
     LogCvmfs(kLogGC, kLogStderr, "Malformed GarbageCollector configuration.");
-    return;
   }
 
-  AnalyzePreservedCatalogTree();
-  SweepCondemnedCatalogTree();
+  success = (success && AnalyzePreservedCatalogTree());
+  success = (success && SweepCondemnedCatalogTree());
+
+  return success;
 }
 
 
 template <class CatalogTraversalT, class HashFilterT>
-void GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTree() {
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTree() {
   if (configuration_.verbose) {
     LogCvmfs(kLogGC, kLogStdout, "Preserving data objects in catalog tree");
   }
+  bool success = true;
 
   typename CatalogTraversalT::callback_t *callback =
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
   if (configuration_.keep_named_snapshots) {
-    traversal_.TraverseNamedSnapshots();
+    success = traversal_.TraverseNamedSnapshots();
   }
-  traversal_.Traverse();
+  success = (success && traversal_.Traverse());
   traversal_.UnregisterListener(callback);
+
+  return success;
 }
 
 
 template <class CatalogTraversalT, class HashFilterT>
-void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree() {
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree() {
   if (configuration_.verbose) {
     LogCvmfs(kLogGC, kLogStdout, "Sweeping unreferenced data objects in "
                                  "remaining catalogs");
@@ -171,8 +178,10 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
         this);
-  traversal_.TraversePruned();
+  const bool success = traversal_.TraversePruned();
   traversal_.UnregisterListener(callback);
+
+  return success;
 }
 
 
