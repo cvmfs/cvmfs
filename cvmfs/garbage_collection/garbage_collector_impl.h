@@ -170,9 +170,19 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree() {
+  const bool has_condemned_revisions = (traversal_.pruned_revision_count() > 0);
   if (configuration_.verbose) {
-    LogCvmfs(kLogGC, kLogStdout, "Sweeping unreferenced data objects in "
-                                 "remaining catalogs");
+    if (! has_condemned_revisions) {
+      LogCvmfs(kLogGC, kLogStdout, "Nothing to be sweeped.");
+
+    } else {
+      LogCvmfs(kLogGC, kLogStdout, "Sweeping unreferenced data objects in "
+                                   "remaining catalogs");
+    }
+  }
+
+  if (! has_condemned_revisions) {
+    return true;
   }
 
   typename CatalogTraversalT::callback_t *callback =
