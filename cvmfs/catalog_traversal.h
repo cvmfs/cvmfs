@@ -291,9 +291,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       // Process it (potentially generating new catalog jobs on the stack)
       const bool success = ProcessCatalogJob(ctx, job);
       if (! success) {
+        LogCvmfs(kLogCatalogTraversal, kLogStderr, "aborting catalog traversal "
+                                                   "(%d jobs left in the queue)",
+                 ctx.catalog_stack.size());
         return false;
       }
     }
+
     return true;
   }
 
