@@ -519,3 +519,46 @@ TEST_F(T_GarbageCollector, KeepLastThreeRevisions) {
 
   EXPECT_EQ (11u, upl->deleted_hashes.size());
 }
+
+
+TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = 0;
+
+  MyGarbageCollector gc(config);
+  gc.Collect();
+  EXPECT_EQ (11u, gc.preserved_catalog_count());
+  EXPECT_EQ ( 6u, gc.condemned_catalog_count());
+
+  GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
+  RevisionMap     &c   = catalogs_;
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->catalog_hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->catalog_hash()));
+
+  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
+  EXPECT_TRUE  (upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
+  EXPECT_TRUE  (upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
+  EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE  (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_TRUE  (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->catalog_hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->catalog_hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"11")]->catalog_hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->catalog_hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->catalog_hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->catalog_hash()));
+
+  EXPECT_EQ (14u, upl->deleted_hashes.size());
+}
