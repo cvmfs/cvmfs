@@ -74,12 +74,13 @@ struct CatalogTraversalData {
  * @param ignore_load_failure  suppressed an error message if a revision's root
  *                             catalog could not be loaded (i.e. was sweeped
  *                             before by a garbage collection run)
+ * @param quiet                silence messages that would go to stderr
  * @param tmp_dir              path to the temporary directory to be used
  *                             (default: /tmp)
  */
 struct CatalogTraversalParams {
   CatalogTraversalParams() : history(0), no_repeat_history(false),
-  no_close(false), ignore_load_failure(false), tmp_dir("/tmp") {}
+  no_close(false), ignore_load_failure(false), quiet(false), tmp_dir("/tmp") {}
 
   static const unsigned int kFullHistory;
 
@@ -90,6 +91,7 @@ struct CatalogTraversalParams {
   bool          no_repeat_history;
   bool          no_close;
   bool          ignore_load_failure;
+  bool          quiet;
   std::string   tmp_dir;
 };
 
@@ -180,7 +182,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     no_close_(params.no_close),
     ignore_load_failure_(params.ignore_load_failure),
     no_repeat_history_(params.no_repeat_history),
-    default_history_depth_(params.history)
+    default_history_depth_(params.history),
+    error_sink_((params.quiet) ? kLogDebug : kLogStderr)
   {}
 
 
@@ -291,8 +294,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       // Process it (potentially generating new catalog jobs on the stack)
       const bool success = ProcessCatalogJob(ctx, job);
       if (! success) {
-        LogCvmfs(kLogCatalogTraversal, kLogStderr, "aborting catalog traversal "
-                                                   "(%d jobs left in the queue)",
+        LogCvmfs(kLogCatalogTraversal, error_sink_, "aborting catalog traversal "
+                                                    "(%d jobs left in the queue)",
                  ctx.catalog_stack.size());
         return false;
       }
@@ -314,7 +317,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                  job.hash.ToString().c_str());
         return true;
       } else {
-        LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to load catalog %s",
+        LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s",
                  job.hash.ToString().c_str());
         return false;
       }
@@ -332,7 +335,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       unlink(tmp_file.c_str());
     }
     if (catalog == NULL) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to open catalog %s",
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to open catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
@@ -419,7 +422,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     // root catalog of the repository to be traversed
     manifest::Manifest *manifest = object_fetcher_.FetchManifest();
     if (!manifest) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr,
+      LogCvmfs(kLogCatalogTraversal, error_sink_,
         "Failed to load manifest for repository %s", repo_name_.c_str());
       return shash::Any();
     }
@@ -443,6 +446,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   const unsigned int    default_history_depth_;
   HashSet               visited_catalogs_;
   HashSet               pruned_revisions_;
+  LogFacilities         error_sink_;
 };
 
 typedef CatalogTraversal<catalog::Catalog>         ReadonlyCatalogTraversal;
@@ -464,7 +468,8 @@ class ObjectFetcher {
     repo_keys_(params.repo_keys),
     is_remote_(params.repo_url.substr(0, 7) == "http://"),
     ignore_load_failure_(params.ignore_load_failure),
-    temporary_directory_(params.tmp_dir)
+    temporary_directory_(params.tmp_dir),
+    error_sink_((params.quiet) ? kLogDebug : kLogStderr)
   {
     if (is_remote_) {
       download_manager_.Init(1, true);
@@ -494,7 +499,7 @@ class ObjectFetcher {
       signature_manager.Init();
       const bool success = signature_manager.LoadPublicRsaKeys(repo_keys_);
       if (!success) {
-        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+        LogCvmfs(kLogCatalogTraversal, error_sink_,
           "cvmfs public key(s) could not be loaded.");
         signature_manager.Fini();
         return NULL;
@@ -518,16 +523,16 @@ class ObjectFetcher {
       if (retval == manifest::kFailOk) {
         manifest = new manifest::Manifest(*manifest_ensemble.manifest);
       } else if (retval == manifest::kFailNameMismatch) {
-        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+        LogCvmfs(kLogCatalogTraversal, error_sink_,
                  "repository name mismatch. No name provided?");
       } else if (retval == manifest::kFailBadSignature   ||
                  retval == manifest::kFailBadCertificate ||
                  retval == manifest::kFailBadWhitelist)
       {
-        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+        LogCvmfs(kLogCatalogTraversal, error_sink_,
                  "repository signature mismatch. No key(s) provided?");
       } else {
-        LogCvmfs(kLogCatalogTraversal, kLogStderr,
+        LogCvmfs(kLogCatalogTraversal, error_sink_,
                  "failed to load manifest (%d - %s)",
                  retval, Code2Ascii(retval));
       }
@@ -583,8 +588,8 @@ class ObjectFetcher {
     download::Failures retval = download_manager_.Fetch(&download_catalog);
 
     if (! ignore_load_failure_ && retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to download catalog %s"
-                                                 " (%d - %s)",
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to download catalog "
+                                                  "%s (%d - %s)",
                catalog_hash.ToString().c_str(), retval, Code2Ascii(retval));
     }
 
@@ -608,8 +613,8 @@ class ObjectFetcher {
     const bool file_exists = FileExists(dest);
 
     if (! ignore_load_failure_ && ! file_exists) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr, "failed to locate catalog %s"
-                                                 "at '%s'",
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to locate catalog %s "
+                                                  "at '%s'",
                catalog_hash.ToString().c_str(), dest.c_str());
     }
 
@@ -629,6 +634,7 @@ class ObjectFetcher {
   const bool                 ignore_load_failure_;
   const std::string          temporary_directory_;
   download::DownloadManager  download_manager_;
+  LogFacilities              error_sink_;
 };
 
 }
