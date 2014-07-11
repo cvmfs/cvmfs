@@ -103,6 +103,21 @@ class T_CatalogTraversal : public ::testing::Test {
     }
   }
 
+  MockCatalog* GetCatalog(const unsigned int  revision,
+                          const std::string  &path) {
+    RevisionMap::const_iterator rev_itr = revisions_.find(revision);
+    if (rev_itr == revisions_.end()) {
+      return NULL;
+    }
+
+    CatalogPathMap::const_iterator catalog_itr = rev_itr->second.find(path);
+    if (catalog_itr == rev_itr->second.end()) {
+      return NULL;
+    }
+
+    return catalog_itr->second;
+  }
+
   shash::Any GetRootHash(const unsigned int revision) const {
     RootCatalogMap::const_iterator i = root_catalogs_.find(revision);
     assert (i != root_catalogs_.end());
