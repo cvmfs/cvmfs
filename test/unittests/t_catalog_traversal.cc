@@ -74,8 +74,11 @@ class T_CatalogTraversal : public ::testing::Test {
   }
 
   void CheckVisitedCatalogs(const CatalogIdentifiers expected,
-                            const CatalogIdentifiers observed) {
-    EXPECT_EQ (expected.size(), observed.size());
+                            const CatalogIdentifiers observed,
+                            const bool               check_counts = true) {
+    if (check_counts) {
+      EXPECT_EQ (expected.size(), observed.size());
+    }
     typedef CatalogIdentifiers::const_iterator itr;
 
     unsigned int _i = 0;
