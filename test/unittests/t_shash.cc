@@ -246,14 +246,14 @@ TEST(T_Shash, HashSuffix) {
 
 
 TEST(T_Shash, Equality) {
-  shash::Any hash_md5_1(shash::kMd5);
-  shash::Any hash_md5_2(shash::kMd5);
+  shash::Any hash_md5_1(shash::kMd5); ASSERT_TRUE (hash_md5_1.IsNull());
+  shash::Any hash_md5_2(shash::kMd5); ASSERT_TRUE (hash_md5_2.IsNull());
   shash::Any hash_md5_3(shash::kMd5); hash_md5_3.Randomize(1337);
   shash::Any hash_md5_4(shash::kMd5); hash_md5_4.Randomize(1337);
   shash::Any hash_md5_5(shash::kMd5); hash_md5_5.Randomize(42);
   shash::Any hash_md5_6(shash::kMd5); hash_md5_6.Randomize(42);
-  shash::Any hash_md5_7(shash::kMd5); hash_md5_7.suffix = 'A';
-  shash::Any hash_md5_8(shash::kMd5); hash_md5_8.suffix = 'A';
+  shash::Any hash_md5_7(shash::kMd5); ASSERT_TRUE (hash_md5_7.IsNull()); hash_md5_7.suffix = 'A';
+  shash::Any hash_md5_8(shash::kMd5); ASSERT_TRUE (hash_md5_8.IsNull()); hash_md5_8.suffix = 'A';
   shash::Any hash_md5_9(shash::kMd5); hash_md5_9.Randomize(7); hash_md5_9.suffix = 'A';
   shash::Any hash_md5_0(shash::kMd5); hash_md5_0.Randomize(7); hash_md5_0.suffix = 'A';
 
@@ -289,14 +289,14 @@ TEST(T_Shash, Equality) {
   EXPECT_NE (hash_md5_9, hash_md5_5); EXPECT_NE (hash_md5_9, hash_md5_6);
   EXPECT_NE (hash_md5_9, hash_md5_7); EXPECT_NE (hash_md5_9, hash_md5_8);
 
-  shash::Any hash_sha1_1(shash::kSha1);
-  shash::Any hash_sha1_2(shash::kSha1);
+  shash::Any hash_sha1_1(shash::kSha1); ASSERT_TRUE (hash_sha1_1.IsNull());
+  shash::Any hash_sha1_2(shash::kSha1); ASSERT_TRUE (hash_sha1_2.IsNull());
   shash::Any hash_sha1_3(shash::kSha1); hash_sha1_3.Randomize(153);
   shash::Any hash_sha1_4(shash::kSha1); hash_sha1_4.Randomize(153);
   shash::Any hash_sha1_5(shash::kSha1); hash_sha1_5.Randomize(8761);
   shash::Any hash_sha1_6(shash::kSha1); hash_sha1_6.Randomize(8761);
-  shash::Any hash_sha1_7(shash::kSha1); hash_sha1_7.suffix = 'B';
-  shash::Any hash_sha1_8(shash::kSha1); hash_sha1_8.suffix = 'B';
+  shash::Any hash_sha1_7(shash::kSha1); ASSERT_TRUE (hash_sha1_7.IsNull()); hash_sha1_7.suffix = 'B';
+  shash::Any hash_sha1_8(shash::kSha1); ASSERT_TRUE (hash_sha1_8.IsNull()); hash_sha1_8.suffix = 'B';
   shash::Any hash_sha1_9(shash::kSha1); hash_sha1_9.Randomize(1); hash_sha1_9.suffix = 'B';
   shash::Any hash_sha1_0(shash::kSha1); hash_sha1_0.Randomize(1); hash_sha1_0.suffix = 'B';
 
@@ -332,14 +332,14 @@ TEST(T_Shash, Equality) {
   EXPECT_NE (hash_sha1_9, hash_sha1_5); EXPECT_NE (hash_sha1_9, hash_sha1_6);
   EXPECT_NE (hash_sha1_9, hash_sha1_7); EXPECT_NE (hash_sha1_9, hash_sha1_8);
 
-  shash::Any hash_rmd_1(shash::kRmd160);
-  shash::Any hash_rmd_2(shash::kRmd160);
+  shash::Any hash_rmd_1(shash::kRmd160); ASSERT_TRUE (hash_rmd_1.IsNull());
+  shash::Any hash_rmd_2(shash::kRmd160); ASSERT_TRUE (hash_rmd_2.IsNull());
   shash::Any hash_rmd_3(shash::kRmd160); hash_rmd_3.Randomize(234);
   shash::Any hash_rmd_4(shash::kRmd160); hash_rmd_4.Randomize(234);
   shash::Any hash_rmd_5(shash::kRmd160); hash_rmd_5.Randomize(883);
   shash::Any hash_rmd_6(shash::kRmd160); hash_rmd_6.Randomize(883);
-  shash::Any hash_rmd_7(shash::kRmd160); hash_rmd_7.suffix = 'C';
-  shash::Any hash_rmd_8(shash::kRmd160); hash_rmd_8.suffix = 'C';
+  shash::Any hash_rmd_7(shash::kRmd160); ASSERT_TRUE (hash_rmd_7.IsNull()); hash_rmd_7.suffix = 'C';
+  shash::Any hash_rmd_8(shash::kRmd160); ASSERT_TRUE (hash_rmd_8.IsNull()); hash_rmd_8.suffix = 'C';
   shash::Any hash_rmd_9(shash::kRmd160); hash_rmd_9.Randomize(8); hash_rmd_9.suffix = 'C';
   shash::Any hash_rmd_0(shash::kRmd160); hash_rmd_0.Randomize(8); hash_rmd_0.suffix = 'C';
 
