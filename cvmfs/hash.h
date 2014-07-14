@@ -268,7 +268,7 @@ struct Digest {
       if (this->digest[i] < other.digest[i])
         return true;
     }
-    return this->suffix < other.suffix;
+    return false;
   }
 
   bool operator >(const Digest<digest_size_, algorithm_> &other) const {
@@ -280,7 +280,7 @@ struct Digest {
       if (this->digest[i] > other.digest[i])
         return true;
     }
-    return this->suffix > other.suffix;
+    return false;
   }
 };
 
