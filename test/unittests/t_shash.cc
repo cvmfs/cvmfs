@@ -402,10 +402,10 @@ TEST(T_Shash, LowerThan) {
   EXPECT_LT (md5("ae1332b41f2ec2e455eae5908fa8eca1"), md5("ffffffffffffffffffffffffffffffff"));
   EXPECT_LT (md5("00000000000000000000000000000000"), md5("ffffffffffffffffffffffffffffffff"));
 
-  EXPECT_LT (md5("9facbf452def2d7efc5b5c48cdb837fa", 'A'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'B'));
-  EXPECT_LT (md5("9facbf452def2d7efc5b5c48cdb837fa", 'B'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'C'));
-  EXPECT_LT (md5("9facbf452def2d7efc5b5c48cdb837fa", 'C'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'D'));
-  EXPECT_LT (md5("9facbf452def2d7efc5b5c48cdb837fa", 'A'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'D'));
+  EXPECT_EQ (md5("9facbf452def2d7efc5b5c48cdb837fa", 'A'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'B'));
+  EXPECT_EQ (md5("9facbf452def2d7efc5b5c48cdb837fa", 'B'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'C'));
+  EXPECT_EQ (md5("9facbf452def2d7efc5b5c48cdb837fa", 'C'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'D'));
+  EXPECT_EQ (md5("9facbf452def2d7efc5b5c48cdb837fa", 'A'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'D'));
 
 
   EXPECT_LT (sha1("0000000000000000000000000000000000000000"), sha1("3cc2a7bc3db3ce79ebcb75ca3f01680ec74e9fbd"));
@@ -414,10 +414,10 @@ TEST(T_Shash, LowerThan) {
   EXPECT_LT (sha1("da39a3ee5e6b4b0d3255bfef95601890afd80709"), sha1("ffffffffffffffffffffffffffffffffffffffff"));
   EXPECT_LT (sha1("0000000000000000000000000000000000000000"), sha1("ffffffffffffffffffffffffffffffffffffffff"));
 
-  EXPECT_LT (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'A'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'B'));
-  EXPECT_LT (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'B'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'C'));
-  EXPECT_LT (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'C'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'D'));
-  EXPECT_LT (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'A'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'D'));
+  EXPECT_EQ (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'A'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'B'));
+  EXPECT_EQ (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'B'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'C'));
+  EXPECT_EQ (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'C'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'D'));
+  EXPECT_EQ (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'A'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'D'));
 
 
   EXPECT_LT (rmd160("0000000000000000000000000000000000000000"), rmd160("7e1363cebb1e1f4584111343da5a2d84858a2349"));
@@ -426,10 +426,10 @@ TEST(T_Shash, LowerThan) {
   EXPECT_LT (rmd160("d61c9a94f632a51b5920a91f5ad6ff6f0b36e968"), rmd160("ffffffffffffffffffffffffffffffffffffffff"));
   EXPECT_LT (rmd160("0000000000000000000000000000000000000000"), rmd160("ffffffffffffffffffffffffffffffffffffffff"));
 
-  EXPECT_LT (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'B'));
-  EXPECT_LT (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'B'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'));
-  EXPECT_LT (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'));
-  EXPECT_LT (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'));
+  EXPECT_EQ (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'B'));
+  EXPECT_EQ (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'B'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'));
+  EXPECT_EQ (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'));
+  EXPECT_EQ (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'));
 }
 
 
@@ -440,10 +440,10 @@ TEST(T_Shash, GreaterThan) {
   EXPECT_GT (md5("ffffffffffffffffffffffffffffffff"), md5("ae1332b41f2ec2e455eae5908fa8eca1"));
   EXPECT_GT (md5("ffffffffffffffffffffffffffffffff"), md5("00000000000000000000000000000000"));
 
-  EXPECT_GT (md5("9facbf452def2d7efc5b5c48cdb837fa", 'B'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'A'));
-  EXPECT_GT (md5("9facbf452def2d7efc5b5c48cdb837fa", 'C'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'B'));
-  EXPECT_GT (md5("9facbf452def2d7efc5b5c48cdb837fa", 'D'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'C'));
-  EXPECT_GT (md5("9facbf452def2d7efc5b5c48cdb837fa", 'D'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'A'));
+  EXPECT_EQ (md5("9facbf452def2d7efc5b5c48cdb837fa", 'B'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'A'));
+  EXPECT_EQ (md5("9facbf452def2d7efc5b5c48cdb837fa", 'C'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'B'));
+  EXPECT_EQ (md5("9facbf452def2d7efc5b5c48cdb837fa", 'D'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'C'));
+  EXPECT_EQ (md5("9facbf452def2d7efc5b5c48cdb837fa", 'D'), md5("9facbf452def2d7efc5b5c48cdb837fa", 'A'));
 
 
   EXPECT_GT (sha1("3cc2a7bc3db3ce79ebcb75ca3f01680ec74e9fbd"), sha1("0000000000000000000000000000000000000000"));
@@ -452,10 +452,10 @@ TEST(T_Shash, GreaterThan) {
   EXPECT_GT (sha1("ffffffffffffffffffffffffffffffffffffffff"), sha1("da39a3ee5e6b4b0d3255bfef95601890afd80709"));
   EXPECT_GT (sha1("ffffffffffffffffffffffffffffffffffffffff"), sha1("0000000000000000000000000000000000000000"));
 
-  EXPECT_GT (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'B'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'A'));
-  EXPECT_GT (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'C'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'B'));
-  EXPECT_GT (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'D'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'C'));
-  EXPECT_GT (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'D'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'A'));
+  EXPECT_EQ (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'B'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'A'));
+  EXPECT_EQ (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'C'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'B'));
+  EXPECT_EQ (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'D'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'C'));
+  EXPECT_EQ (sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'D'), sha1("6c973e8803b3fbaabfb09dd916e295ed24da1d43", 'A'));
 
 
   EXPECT_GT (rmd160("7e1363cebb1e1f4584111343da5a2d84858a2349"), rmd160("0000000000000000000000000000000000000000"));
@@ -464,8 +464,8 @@ TEST(T_Shash, GreaterThan) {
   EXPECT_GT (rmd160("ffffffffffffffffffffffffffffffffffffffff"), rmd160("d61c9a94f632a51b5920a91f5ad6ff6f0b36e968"));
   EXPECT_GT (rmd160("ffffffffffffffffffffffffffffffffffffffff"), rmd160("0000000000000000000000000000000000000000"));
 
-  EXPECT_GT (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'B'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'));
-  EXPECT_GT (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'B'));
-  EXPECT_GT (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'));
-  EXPECT_GT (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'));
+  EXPECT_EQ (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'B'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'));
+  EXPECT_EQ (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'B'));
+  EXPECT_EQ (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'));
+  EXPECT_EQ (rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'), rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'));
 }
