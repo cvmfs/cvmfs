@@ -151,7 +151,7 @@ set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UN
 target_link_libraries (${PROJECT_TEST_NAME} ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} 
                        ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                        ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
-                       ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread)
+                       ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
 
 #
 # Install the generated unit test binary
