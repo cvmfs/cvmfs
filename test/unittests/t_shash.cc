@@ -263,9 +263,11 @@ TEST(T_Shash, Equality) {
   EXPECT_EQ (hash_md5_7, hash_md5_8); EXPECT_EQ (hash_md5_7, hash_md5_7);
   EXPECT_EQ (hash_md5_9, hash_md5_0); EXPECT_EQ (hash_md5_9, hash_md5_9);
 
+  EXPECT_EQ (hash_md5_1, hash_md5_7); EXPECT_EQ (hash_md5_1, hash_md5_8);
+  EXPECT_EQ (hash_md5_7, hash_md5_1); EXPECT_EQ (hash_md5_7, hash_md5_2);
+
   EXPECT_NE (hash_md5_1, hash_md5_3); EXPECT_NE (hash_md5_1, hash_md5_4);
   EXPECT_NE (hash_md5_1, hash_md5_5); EXPECT_NE (hash_md5_1, hash_md5_6);
-  EXPECT_NE (hash_md5_1, hash_md5_7); EXPECT_NE (hash_md5_1, hash_md5_8);
   EXPECT_NE (hash_md5_1, hash_md5_9); EXPECT_NE (hash_md5_1, hash_md5_0);
 
   EXPECT_NE (hash_md5_3, hash_md5_1); EXPECT_NE (hash_md5_3, hash_md5_2);
@@ -278,7 +280,6 @@ TEST(T_Shash, Equality) {
   EXPECT_NE (hash_md5_5, hash_md5_7); EXPECT_NE (hash_md5_5, hash_md5_8);
   EXPECT_NE (hash_md5_5, hash_md5_9); EXPECT_NE (hash_md5_5, hash_md5_0);
 
-  EXPECT_NE (hash_md5_7, hash_md5_1); EXPECT_NE (hash_md5_7, hash_md5_2);
   EXPECT_NE (hash_md5_7, hash_md5_3); EXPECT_NE (hash_md5_7, hash_md5_4);
   EXPECT_NE (hash_md5_7, hash_md5_5); EXPECT_NE (hash_md5_7, hash_md5_6);
   EXPECT_NE (hash_md5_7, hash_md5_9); EXPECT_NE (hash_md5_7, hash_md5_0);
@@ -305,9 +306,11 @@ TEST(T_Shash, Equality) {
   EXPECT_EQ (hash_sha1_7, hash_sha1_8); EXPECT_EQ (hash_sha1_7, hash_sha1_7);
   EXPECT_EQ (hash_sha1_9, hash_sha1_0); EXPECT_EQ (hash_sha1_9, hash_sha1_9);
 
+  EXPECT_EQ (hash_sha1_1, hash_sha1_7); EXPECT_EQ (hash_sha1_1, hash_sha1_8);
+  EXPECT_EQ (hash_sha1_7, hash_sha1_1); EXPECT_EQ (hash_sha1_7, hash_sha1_2);
+
   EXPECT_NE (hash_sha1_1, hash_sha1_3); EXPECT_NE (hash_sha1_1, hash_sha1_4);
   EXPECT_NE (hash_sha1_1, hash_sha1_5); EXPECT_NE (hash_sha1_1, hash_sha1_6);
-  EXPECT_NE (hash_sha1_1, hash_sha1_7); EXPECT_NE (hash_sha1_1, hash_sha1_8);
   EXPECT_NE (hash_sha1_1, hash_sha1_9); EXPECT_NE (hash_sha1_1, hash_sha1_0);
 
   EXPECT_NE (hash_sha1_3, hash_sha1_1); EXPECT_NE (hash_sha1_3, hash_sha1_2);
@@ -320,7 +323,6 @@ TEST(T_Shash, Equality) {
   EXPECT_NE (hash_sha1_5, hash_sha1_7); EXPECT_NE (hash_sha1_5, hash_sha1_8);
   EXPECT_NE (hash_sha1_5, hash_sha1_9); EXPECT_NE (hash_sha1_5, hash_sha1_0);
 
-  EXPECT_NE (hash_sha1_7, hash_sha1_1); EXPECT_NE (hash_sha1_7, hash_sha1_2);
   EXPECT_NE (hash_sha1_7, hash_sha1_3); EXPECT_NE (hash_sha1_7, hash_sha1_4);
   EXPECT_NE (hash_sha1_7, hash_sha1_5); EXPECT_NE (hash_sha1_7, hash_sha1_6);
   EXPECT_NE (hash_sha1_7, hash_sha1_9); EXPECT_NE (hash_sha1_7, hash_sha1_0);
@@ -347,9 +349,11 @@ TEST(T_Shash, Equality) {
   EXPECT_EQ (hash_rmd_7, hash_rmd_8); EXPECT_EQ (hash_rmd_7, hash_rmd_7);
   EXPECT_EQ (hash_rmd_9, hash_rmd_0); EXPECT_EQ (hash_rmd_9, hash_rmd_9);
 
+  EXPECT_EQ (hash_rmd_1, hash_rmd_7); EXPECT_EQ (hash_rmd_1, hash_rmd_8);
+  EXPECT_EQ (hash_rmd_7, hash_rmd_1); EXPECT_EQ (hash_rmd_7, hash_rmd_2);
+
   EXPECT_NE (hash_rmd_1, hash_rmd_3); EXPECT_NE (hash_rmd_1, hash_rmd_4);
   EXPECT_NE (hash_rmd_1, hash_rmd_5); EXPECT_NE (hash_rmd_1, hash_rmd_6);
-  EXPECT_NE (hash_rmd_1, hash_rmd_7); EXPECT_NE (hash_rmd_1, hash_rmd_8);
   EXPECT_NE (hash_rmd_1, hash_rmd_9); EXPECT_NE (hash_rmd_1, hash_rmd_0);
 
   EXPECT_NE (hash_rmd_3, hash_rmd_1); EXPECT_NE (hash_rmd_3, hash_rmd_2);
@@ -362,7 +366,6 @@ TEST(T_Shash, Equality) {
   EXPECT_NE (hash_rmd_5, hash_rmd_7); EXPECT_NE (hash_rmd_5, hash_rmd_8);
   EXPECT_NE (hash_rmd_5, hash_rmd_9); EXPECT_NE (hash_rmd_5, hash_rmd_0);
 
-  EXPECT_NE (hash_rmd_7, hash_rmd_1); EXPECT_NE (hash_rmd_7, hash_rmd_2);
   EXPECT_NE (hash_rmd_7, hash_rmd_3); EXPECT_NE (hash_rmd_7, hash_rmd_4);
   EXPECT_NE (hash_rmd_7, hash_rmd_5); EXPECT_NE (hash_rmd_7, hash_rmd_6);
   EXPECT_NE (hash_rmd_7, hash_rmd_9); EXPECT_NE (hash_rmd_7, hash_rmd_0);
