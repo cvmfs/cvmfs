@@ -41,6 +41,10 @@ install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 
+# installing WSGI apache module
+echo "installing python WSGI module..."
+install_from_repo mod_wsgi || die "fail (installing mod_wsgi)"
+
 # setup environment
 echo -n "setting up CernVM-FS environment... "
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"

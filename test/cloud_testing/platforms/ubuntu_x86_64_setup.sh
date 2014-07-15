@@ -39,6 +39,11 @@ install_deb $CLIENT_PACKAGE
 install_deb $SERVER_PACKAGE
 install_deb $UNITTEST_PACKAGE
 
+# installing WSGI apache module
+echo "installing python WSGI module..."
+install_from_repo libapache2-mod-wsgi    || die "fail (installing libapache2-mod-wsgi)"
+sudo service apache2 restart > /dev/null || die "fail (restarting apache)"
+
 # setup environment
 echo -n "setting up CernVM-FS environment... "
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
