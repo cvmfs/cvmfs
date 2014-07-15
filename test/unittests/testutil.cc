@@ -119,8 +119,8 @@ void MockCatalog::Reset() {
 
 void MockCatalog::RegisterCatalog(MockCatalog *catalog) {
   ASSERT_EQ (MockCatalog::available_catalogs.end(),
-             MockCatalog::available_catalogs.find(catalog->catalog_hash()));
-  MockCatalog::available_catalogs[catalog->catalog_hash()] = catalog;
+             MockCatalog::available_catalogs.find(catalog->hash()));
+  MockCatalog::available_catalogs[catalog->hash()] = catalog;
 }
 
 void MockCatalog::UnregisterCatalogs() {
@@ -159,7 +159,7 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
 void MockCatalog::RegisterChild(MockCatalog *child) {
   NestedCatalog nested;
   nested.path  = PathString(child->root_path());
-  nested.hash  = child->catalog_hash();
+  nested.hash  = child->hash();
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);

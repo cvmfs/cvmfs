@@ -38,7 +38,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
   }
 
   // the hash of the actual catalog needs to preserved
-  hash_filter_.Fill(data.catalog->catalog_hash());
+  hash_filter_.Fill(data.catalog->hash());
 
   // all the objects referenced from this catalog need to be preserved
   const HashVector &referenced_hashes = data.catalog->GetReferencedObjects();
@@ -73,7 +73,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
   }
 
   // the catalog itself is also condemned and needs to be removed
-  CheckAndSweep(data.catalog->catalog_hash());
+  CheckAndSweep(data.catalog->hash());
 }
 
 
@@ -207,7 +207,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
   }
   tree_indent += "\u251C\u2500 ";
 
-  const std::string hash_string = catalog->catalog_hash().ToString();
+  const std::string hash_string = catalog->hash().ToString();
   const std::string path        = (catalog->path().IsEmpty())
                                           ? "/"
                                           : catalog->path().ToString();

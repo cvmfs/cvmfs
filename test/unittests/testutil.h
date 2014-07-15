@@ -271,13 +271,13 @@ class MockCatalog {
   unsigned int GetRevision() const { return revision_; }
 
   shash::Any GetPreviousRevision() const {
-    return (previous_ != NULL) ? previous_->catalog_hash() : shash::Any();
+    return (previous_ != NULL) ? previous_->hash() : shash::Any();
   }
 
  public:
   const PathString   path()         const { return PathString(root_path_);  }
   const std::string& root_path()    const { return root_path_;              }
-  const shash::Any&  catalog_hash() const { return catalog_hash_;           }
+  const shash::Any&  hash()         const { return catalog_hash_;           }
   uint64_t           catalog_size() const { return catalog_size_;           }
   unsigned int       revision()     const { return revision_;               }
 
