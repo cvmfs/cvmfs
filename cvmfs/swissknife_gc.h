@@ -19,9 +19,6 @@ class CommandGC : public Command {
   };
   ParameterList GetParams();
   int Main(const ArgumentList &args);
-
- protected:
-  void CatalogCallback(const ReadonlyCatalogTraversal::CallbackData &data);
 };
 
 }
