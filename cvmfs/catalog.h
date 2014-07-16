@@ -89,6 +89,10 @@ class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
   friend class SqlLookup;                  // for mangled inode and uid/gid maps
   friend class swissknife::CommandMigrate; // for catalog version migration
+
+ public:
+  typedef std::vector<shash::Any> HashVector;
+
  public:
   static const uint64_t kDefaultTTL = 900;  /**< 15 minutes default TTL */
 
@@ -143,6 +147,8 @@ class Catalog : public SingleCopy {
   bool ListMd5PathChunks(const shash::Md5 &md5path,
                          const shash::Algorithms interpret_hashes_as,
                          FileChunkList *chunks) const;
+
+  const HashVector& GetReferencedObjects() const;
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
@@ -253,6 +259,8 @@ class Catalog : public SingleCopy {
   SqlNestedCatalogListing  *sql_list_nested_;
   SqlAllChunks             *sql_all_chunks_;
   SqlChunksListing         *sql_chunks_listing_;
+
+  mutable HashVector        referenced_hashes_;
 };  // class Catalog
 
 }  // namespace catalog

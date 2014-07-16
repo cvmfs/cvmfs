@@ -5,6 +5,7 @@
 #include "catalog.h"
 
 #include <cassert>
+#include <algorithm>
 #include <errno.h>
 
 #include "platform.h"
@@ -366,6 +367,40 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
   pthread_mutex_unlock(lock_);
 
   return true;
+}
+
+
+struct NestedCatalogHashExtractor {
+  shash::Any operator() (const Catalog::NestedCatalog& nested_catalog) {
+    shash::Any nested_catalog_hash(nested_catalog.hash);
+    nested_catalog_hash.suffix = shash::kSuffixCatalog;
+    return nested_catalog_hash;
+  }
+};
+
+const Catalog::HashVector& Catalog::GetReferencedObjects() const {
+  if (! referenced_hashes_.empty()) {
+    return referenced_hashes_;
+  }
+
+  // retrieve all referenced content hashes of both files and file chunks
+  {
+    SqlListContentHashes list_content_hashes(database());
+    while (list_content_hashes.FetchRow()) {
+      referenced_hashes_.push_back(list_content_hashes.GetHash());
+    }
+  }
+
+  // retrieve the content hashes of all referenced nested catalogs
+  const NestedCatalogList& nested_catalogs = ListNestedCatalogs();
+  const size_t occupied = referenced_hashes_.size();
+  referenced_hashes_.resize(occupied + nested_catalogs.size());
+  std::transform(nested_catalogs.begin(),
+                 nested_catalogs.end(),
+                 referenced_hashes_.begin() + occupied,
+                 NestedCatalogHashExtractor());
+
+  return referenced_hashes_;
 }
 
 
