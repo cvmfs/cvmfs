@@ -513,6 +513,10 @@ class ObjectFetcher {
     return manifest;
   }
 
+  inline history::TagList FetchTagList() {
+    return history::TagList();
+  }
+
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {
     return (is_remote_) ? DownloadCatalog  (catalog_hash, catalog_file)
