@@ -195,12 +195,10 @@ struct HashExtractor {
 
 const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
   if (referenced_objects_.empty()) {
-    const size_t num_objs = children_.size() + files_.size() + chunks_.size();
+    const size_t num_objs = files_.size() + chunks_.size();
     referenced_objects_.resize(num_objs);
     HashVector::iterator i = referenced_objects_.begin();
 
-    i = std::transform(children_.begin(), children_.end(),
-                       i, HashExtractor<NestedCatalog>());
     i = std::transform(files_.begin(), files_.end(),
                        i, HashExtractor<File>());
     i = std::transform(chunks_.begin(), chunks_.end(),
