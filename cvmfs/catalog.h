@@ -167,6 +167,7 @@ class Catalog : public SingleCopy {
   inline PathString root_prefix() const { return root_prefix_; }
   inline shash::Any hash() const { return catalog_hash_; }
   inline bool volatile_flag() const { return volatile_flag_; }
+  inline uint64_t revision() const { return GetRevision(); }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && initialized_;
