@@ -610,7 +610,7 @@ class ObjectFetcher {
     const std::string source =
       repo_url_ + "/data" + catalog_hash.MakePathExplicit(1, 2) + "C";
     const std::string dest = temporary_directory_ + "/" + catalog_hash.ToString();
-    const bool file_exists = FileExists(dest);
+    const bool file_exists = FileExists(source);
 
     if (! ignore_load_failure_ && ! file_exists) {
       LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to locate catalog %s "
