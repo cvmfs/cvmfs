@@ -130,22 +130,22 @@ class T_GarbageCollector : public ::testing::Test {
     c[mp(1,"10")]->AddFile (h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9"),       6374); // 1*
     c[mp(1,"10")]->AddFile (h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4"),      89765); // 1*
 
-    c[mp(1,"11")]->AddFile (h("915614a7871a0ffc50abde2885a35545023a6a64"),         99); // 1*
+    c[mp(1,"11")]->AddFile (h("915614a7871a0ffc50abde2885a35545023a6a64"),         99); // 1
     c[mp(1,"11")]->AddFile (h("59b63e8478fb7fc02c54a85767c7116573907364"),       1240); // 1
-    c[mp(1,"11")]->AddFile (h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02"),          0); // 1*
+    c[mp(1,"11")]->AddFile (h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02"),          0); // 1
 
     //
     // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     // # REVISION 2
     // # Some files from revision 1 will be removed (marked with an asterisk in
-    // # the listing for revision 1). Additionally there will be some more files
-    // # added to the listing.
+    // # the listing for revision 1). We will reuse one of the catalogs.
+    // # Additionally there will be some more files added to the listing.
     // #
     //
 
     c[mp(2,"00")] = CreateAndRegisterCatalog("",        2,  NULL,          c[mp(1,"00")]);
     c[mp(2,"10")] = CreateAndRegisterCatalog("/00/10",  2,  c[mp(2,"00")], c[mp(1,"10")]);
-    c[mp(2,"11")] = CreateAndRegisterCatalog("/00/11",  2,  c[mp(2,"00")], c[mp(1,"11")]);
+    c[mp(2,"11")] = ReuseCatalog(c[mp(1,"11")], c[mp(2,"00")]);
 
     c[mp(2,"00")]->AddFile (h("c05b6c2319608d2dd03c0d19dba586682772b953"),       1337); // 1
     c[mp(2,"00")]->AddFile (h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1"),         42); // 1
@@ -155,10 +155,9 @@ class T_GarbageCollector : public ::testing::Test {
     c[mp(2,"10")]->AddFile (h("213bec88ed6729219d94fc9281893ba93fca2a02"),      13424); // 1
     c[mp(2,"10")]->AddFile (h("09fd3486d370013d859651eb164ec71a3a09f5cb"),      87541); // 2
     c[mp(2,"10")]->AddFile (h("380fe86b4cc68164afd5578eb21a32ab397e6d13"),         96); // 2
-
-    c[mp(2,"11")]->AddFile (h("59b63e8478fb7fc02c54a85767c7116573907364"),       1240); // 1
-    c[mp(2,"11")]->AddFile (h("09fd3486d370013d859651eb164ec71a3a09f5cb"),      87541); // 2
-    c[mp(2,"11")]->AddFile (h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44"),       9865); // 2
+    c[mp(2,"10")]->AddFile (h("59b63e8478fb7fc02c54a85767c7116573907364"),       1240); // 1
+    c[mp(2,"10")]->AddFile (h("09fd3486d370013d859651eb164ec71a3a09f5cb"),      87541); // 2
+    c[mp(2,"10")]->AddFile (h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44"),       9865); // 2
 
     //
     // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -312,6 +311,12 @@ class T_GarbageCollector : public ::testing::Test {
     return catalog;
   }
 
+  MockCatalog* ReuseCatalog(MockCatalog *legacy_catalog,
+                            MockCatalog *additional_parent_catalog) {
+    additional_parent_catalog->RegisterChild(legacy_catalog);
+    return legacy_catalog;
+  }
+
   MockCatalog* GetCatalog(const unsigned int   revision,
                           const std::string   &clg_index) {
     RevisionMap::const_iterator i = catalogs_.find(mp(revision, clg_index));
@@ -367,7 +372,7 @@ TEST_F(T_GarbageCollector, KeepEverything) {
   const bool gc1 = gc.Collect();
 
   EXPECT_TRUE (gc1);
-  EXPECT_EQ (17u, gc.preserved_catalog_count());
+  EXPECT_EQ (16u, gc.preserved_catalog_count());
   EXPECT_EQ ( 0u, gc.condemned_catalog_count());
   EXPECT_EQ ( 0u, gc.condemned_objects_count());
 }
@@ -382,7 +387,7 @@ TEST_F(T_GarbageCollector, KeepLastRevision) {
   const bool gc1 = gc.Collect();
   EXPECT_TRUE (gc1);
   EXPECT_EQ ( 4u, gc.preserved_catalog_count());
-  EXPECT_EQ (13u, gc.condemned_catalog_count());
+  EXPECT_EQ (12u, gc.condemned_catalog_count());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
@@ -430,7 +435,7 @@ TEST_F(T_GarbageCollector, KeepLastRevision) {
   EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"11")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"20")]->hash()));
 
-  EXPECT_EQ (44u, upl->deleted_hashes.size());   //   19 objects  (rev 4)
+  EXPECT_EQ (43u, upl->deleted_hashes.size());   //   19 objects  (rev 4)
                                                  // - 12 objects  (prev)
                                                  // -  1 object   (duplicate)
                                                  // +  4 catalogs (rev 4)
@@ -441,6 +446,7 @@ TEST_F(T_GarbageCollector, KeepLastRevision) {
                                                  // + 10 objects  (rev 2)
                                                  // -  4 objects  (prev)
                                                  // +  3 catalogs (rev 2)
+                                                 // -  1 catalog  (prev)
                                                  // + 12 objects  (rev 1)
                                                  // +  3 catalogs (rev 1)
 }
@@ -455,7 +461,7 @@ TEST_F(T_GarbageCollector, KeepLastThreeRevisions) {
   const bool gc1 = gc.Collect();
   EXPECT_TRUE (gc1);
   EXPECT_EQ (11u, gc.preserved_catalog_count());
-  EXPECT_EQ ( 6u, gc.condemned_catalog_count());
+  EXPECT_EQ ( 5u, gc.condemned_catalog_count());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
@@ -521,7 +527,7 @@ TEST_F(T_GarbageCollector, KeepLastThreeRevisions) {
   EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"10")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"11")]->hash()));
 
-  EXPECT_EQ (11u, upl->deleted_hashes.size());
+  EXPECT_EQ (10u, upl->deleted_hashes.size());
 }
 
 
@@ -533,14 +539,15 @@ TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
   const bool gc1 = gc.Collect();
   EXPECT_TRUE (gc1);
   EXPECT_EQ (11u, gc.preserved_catalog_count());
-  EXPECT_EQ ( 6u, gc.condemned_catalog_count());
+  EXPECT_EQ ( 5u, gc.condemned_catalog_count());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
 
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash())); // 1,"11" == 2,"11"
   EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
@@ -549,23 +556,22 @@ TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
   EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
+  EXPECT_FALSE (upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
 
   EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
   EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
   EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
-  EXPECT_TRUE  (upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
-  EXPECT_TRUE  (upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
   EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
   EXPECT_TRUE  (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
   EXPECT_TRUE  (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"11")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
 
-  EXPECT_EQ (14u, upl->deleted_hashes.size());
+  EXPECT_EQ (11u, upl->deleted_hashes.size());
 }
 
 
@@ -580,7 +586,6 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(c[mp(1,"00")]->hash());
   deleted_catalogs.insert(c[mp(1,"10")]->hash());
-  deleted_catalogs.insert(c[mp(1,"11")]->hash());
   deleted_catalogs.insert(c[mp(3,"00")]->hash());
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
   deleted_catalogs.insert(c[mp(3,"11")]->hash());
