@@ -619,6 +619,10 @@ class ObjectFetcher {
     }
 
     if (! file_exists || ! zlib::DecompressPath2Path(source, dest)) {
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to extract catalog %s "
+                                                  "from '%s' to '%s' (errno: %d)",
+               catalog_hash.ToString().c_str(), source.c_str(), dest.c_str(),
+               errno);
       return false;
     }
 
