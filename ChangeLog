@@ -1,4 +1,5 @@
 2.1.20:
+  * Change libcvmfs to access /cvmfs instead of /cvmfs/<repo>
   * Add OSG, EGI public keys and config (CVM-641)
   * Add geo api to cvmfs-server (CVM-629)
   * Allow for setting a revision number using
