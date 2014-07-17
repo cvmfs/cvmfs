@@ -24,123 +24,120 @@
 
 using namespace std;  // NOLINT
 
-/**
- * Structure to parse the file system options.
- */
-struct cvmfs_opts {
-  unsigned timeout;
-  unsigned timeout_direct;
-  string   url;
-  string   cachedir;
-  string   alien_cachedir;
-  string   proxies;
-  string   tracefile;
-  string   pubkey;
-  string   logfile;
-  string   deep_mount;
-  string   blacklist;
-  string   repo_name;
-  string   mountpoint;
-  bool     allow_unsigned;
-  bool     rebuild_cachedb;
-  int      nofiles;
-  int      syslog_level;
-  unsigned long  quota_limit;
-  unsigned long  quota_threshold;
 
-  cvmfs_opts() :
-    timeout(2),
-    timeout_direct(2),
-    cachedir("/var/cache/cvmfs2/default"),
-    alien_cachedir(""),
-    pubkey("/etc/cvmfs/keys/cern.ch.pub"),
-    blacklist(""),
-    allow_unsigned(false),
-    rebuild_cachedb(false),
-    nofiles(0),
-    syslog_level(3),
-    quota_limit(0),
-    quota_threshold(0) {}
-
-  int set_option(char const *name, char const *value, bool *var) {
-    if( *value != '\0' ) {
-      fprintf(stderr,"Option %s=%s contains a value when none was expected.\n",name,value);
-      return -1;
-    }
-    *var = true;
-    return 0;
+int set_option(char const *name, char const *value, bool *var) {
+  if( *value != '\0' ) {
+    fprintf(stderr,"Option %s=%s contains a value when none was expected.\n",name,value);
+    return -1;
   }
+  *var = true;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value, unsigned *var) {
-    unsigned v = 0;
-    int end = 0;
-    int rc = sscanf(value,"%u%n",&v,&end);
-    if( rc != 1 || value[end] != '\0' ) {
-      fprintf(stderr,"Invalid unsigned integer value for %s=%s\n",name,value);
-      return -1;
-    }
-    *var = v;
-    return 0;
+int set_option(char const *name, char const *value, unsigned *var) {
+  unsigned v = 0;
+  int end = 0;
+  int rc = sscanf(value,"%u%n",&v,&end);
+  if( rc != 1 || value[end] != '\0' ) {
+    fprintf(stderr,"Invalid unsigned integer value for %s=%s\n",name,value);
+    return -1;
   }
+  *var = v;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value, unsigned long *var) {
-    unsigned long v = 0;
-    int end = 0;
-    int rc = sscanf(value,"%lu%n",&v,&end);
-    if( rc != 1 || value[end] != '\0' ) {
-      fprintf(stderr,"Invalid unsigned long integer value for %s=%s\n",name,value);
-      return -1;
-    }
-    *var = v;
-    return 0;
+int set_option(char const *name, char const *value, unsigned long *var) {
+  unsigned long v = 0;
+  int end = 0;
+  int rc = sscanf(value,"%lu%n",&v,&end);
+  if( rc != 1 || value[end] != '\0' ) {
+    fprintf(stderr,"Invalid unsigned long integer value for %s=%s\n",name,value);
+    return -1;
   }
+  *var = v;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value, int *var) {
-    int v = 0;
-    int end = 0;
-    int rc = sscanf(value,"%d%n",&v,&end);
-    if( rc != 1 || value[end] != '\0' ) {
-      fprintf(stderr,"Invalid integer value for %s=%s\n",name,value);
-      return -1;
-    }
-    *var = v;
-    return 0;
+int set_option(char const *name, char const *value, int *var) {
+  int v = 0;
+  int end = 0;
+  int rc = sscanf(value,"%d%n",&v,&end);
+  if( rc != 1 || value[end] != '\0' ) {
+    fprintf(stderr,"Invalid integer value for %s=%s\n",name,value);
+    return -1;
   }
+  *var = v;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value, string *var) {
-    *var = value;
-    return 0;
-  }
+int set_option(char const *name, char const *value, string *var) {
+  *var = value;
+  return 0;
+}
 
-  int set_option(char const *name, char const *value)
-  {
-#define CVMFS_OPT(var) if( strcmp(name,#var)==0 ) return set_option(name,value,&var)
+
+#define CVMFS_OPT(var) if( strcmp(name,#var)==0 ) return ::set_option(name,value,&var)
+
+struct cvmfs_repo_options : public cvmfs_context::options {
+  int set_option(char const *name, char const *value) {
     CVMFS_OPT(url);
     CVMFS_OPT(timeout);
     CVMFS_OPT(timeout_direct);
-    CVMFS_OPT(cachedir);
-    CVMFS_OPT(alien_cachedir);
     CVMFS_OPT(proxies);
     CVMFS_OPT(tracefile);
     CVMFS_OPT(allow_unsigned);
     CVMFS_OPT(pubkey);
-    CVMFS_OPT(logfile);
-    CVMFS_OPT(rebuild_cachedb);
-    CVMFS_OPT(quota_limit);
-    CVMFS_OPT(quota_threshold);
-    CVMFS_OPT(nofiles);
     CVMFS_OPT(deep_mount);
     CVMFS_OPT(repo_name);
     CVMFS_OPT(mountpoint);
     CVMFS_OPT(blacklist);
-    CVMFS_OPT(syslog_level);
 
-    if( strcmp(name,"help")==0 ) {
-      usage();
-      return 1;
-    }
-    fprintf(stderr,"Unknown libcvmfs option: %s\n",name);
+    fprintf(stderr,"Unknown repo option: %s\n", name);
     return -1;
+  }
+
+  int verify_sanity() {
+    if( mountpoint.empty() && !repo_name.empty()) {
+      mountpoint = "/cvmfs/";
+      mountpoint += repo_name;
+    }
+    while( mountpoint.length()>0 && mountpoint[mountpoint.length()-1] == '/' ) {
+      mountpoint.resize(mountpoint.length()-1);
+    }
+
+    return 0;
+  }
+};
+
+struct cvmfs_global_options : public cvmfs_globals::options {
+  int set_option(char const *name, char const *value) {
+    CVMFS_OPT(cache_directory);
+    CVMFS_OPT(change_to_cache_directory);
+    CVMFS_OPT(alien_cache);
+    CVMFS_OPT(log_syslog_level);
+    CVMFS_OPT(log_prefix);
+    CVMFS_OPT(log_file);
+    CVMFS_OPT(max_open_files);
+
+    fprintf(stderr,"Unknown global option: %s\n", name);
+    return -1;
+  }
+
+  int verify_sanity() {
+    return 0;
+  }
+};
+
+
+/**
+ * Structure to parse the file system options.
+ */
+template <class DerivedT>
+struct cvmfs_options : public DerivedT {
+
+  //#define CVMFS_OPT(var) if( strcmp(name,#var)==0 ) return cvmfs_options::set_option(name,value,&var)
+  int set_option(char const *name, char const *value) {
+    return DerivedT::set_option(name, value);
   }
 
   int parse_options(char const *options)
@@ -173,7 +170,7 @@ struct cvmfs_opts {
       }
 
       if( !name.empty() || !value.empty() ) {
-        int result = set_option(name.c_str(),value.c_str());
+        int result = set_option(name.c_str(), value.c_str());
         if (result != 0) {
           return result;
         }
@@ -183,21 +180,18 @@ struct cvmfs_opts {
       options = next;
     }
 
-    if( mountpoint.empty() && !repo_name.empty()) {
-      mountpoint = "/cvmfs/";
-      mountpoint += repo_name;
-    }
-    while( mountpoint.length()>0 && mountpoint[mountpoint.length()-1] == '/' ) {
-      mountpoint.resize(mountpoint.length()-1);
-    }
-    return 0;
+    return DerivedT::verify_sanity();
   }
+};
+
+typedef cvmfs_options<cvmfs_repo_options>   repo_options;
+typedef cvmfs_options<cvmfs_global_options> global_options;
 
   /**
    * Display the usage message.
    */
   static void usage() {
-    struct cvmfs_opts defaults;
+    struct cvmfs_repo_options defaults;
     fprintf(stderr,
             "CernVM-FS version %s\n"
             "Copyright (c) 2009- CERN\n"
@@ -207,34 +201,37 @@ struct cvmfs_opts {
             "libcvmfs options are expected in the form: option1,option2,option3,...\n"
             "Within an option, the characters , and \\ must be preceded by \\.\n\n"
 
-            "options are:\n"
+            "There are two types of options (global and repository specifics)\n"
+            "  cvmfs_init()        expects global options\n"
+            "  cvmfs_attach_repo() expects repository specific options\n"
+
+            "global options are:\n"
+            " cache_directory=DIR        Where to store disk cache\n"
+            " change_to_cache_directory  Performs a cd to the cache directory (performance tweak)\n"
+            " alien_cache                Treat cache directory as alien cache\n"
+            " log_syslog_level=LEVEL     Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"
+            "                            Default is NOTICE.\n"
+            " log_prefix                 String to use as a log prefix in syslog\n"
+            " log_file                   Logs all messages to FILE instead of stderr and daemonizes.\n"
+            "                            Makes only sense for the debug version\n"
+            " max_open_files             Set the maximum number of open files for CernVM-FS process (soft limit)\n\n"
+
+            "repository specific options are:"
+            " repo_name=REPO_NANE     Unique name of the mounted repository, e.g. atlas.cern.ch\n"
             " url=REPOSITORY_URL      The URL of the CernVM-FS server(s): 'url1;url2;...'\n"
             " timeout=SECONDS         Timeout for network operations (default is %d)\n"
             " timeout_direct=SECONDS  Timeout for network operations without proxy (default is %d)\n"
-            " cachedir=DIR            Where to store disk cache\n"
-            " alien_cachedir=DIR      Store data chunks separately\n"
             " proxies=HTTP_PROXIES    Set the HTTP proxy list, such as 'proxy1|proxy2;DIRECT'\n"
             " tracefile=FILE          Trace FUSE opaerations into FILE\n"
             " pubkey=PEMFILE          Public RSA key that is used to verify the whitelist signature.\n"
             " allow_unsigned          Accept unsigned catalogs (allows man-in-the-middle attacks)\n"
-            " rebuild_cachedb         Force rebuilding the quota cache db from cache directory\n"
-            " quota_limit=MB          Limit size of data chunks in cache. -1 Means unlimited.\n"
-            " quota_threshold=MB      Cleanup until size is <= threshold\n"
-            " nofiles=NUMBER          Set the maximum number of open files for CernVM-FS process (soft limit)\n"
-            " logfile=FILE            Logs all messages to FILE instead of stderr and daemonizes.\n"
-            "                         Makes only sense for the debug version\n"
-            " deep_mount=prefix       Path prefix if a repository is mounted on a nested catalog,\n"
+            " deep_mount=PREFIX       Path prefix if a repository is mounted on a nested catalog,\n"
             "                         i.e. deep_mount=/software/15.0.1\n"
-            " repo_name=<repository>  Unique name of the mounted repository, e.g. atlas.cern.ch\n"
-            " mountpoint=<path>       Path to root of repository, e.g. /cvmfs/atlas.cern.ch\n"
-            " blacklist=FILE          Local blacklist for invalid certificates.  Has precedence over the whitelist.\n"
-            " syslog_level=NUMBER     Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"
-            "                         Default is NOTICE.\n"
-            " Note: you cannot load files greater than quota_limit-quota_threshold\n",
+            " mountpoint=PATH         Path to root of repository, e.g. /cvmfs/atlas.cern.ch\n"
+            " blacklist=FILE          Local blacklist for invalid certificates.  Has precedence over the whitelist.\n",
             PACKAGE_VERSION, defaults.timeout, defaults.timeout_direct
             );
   }
-};
 
 /* Path to root of repository.  Used to resolve absolute symlinks. */
 static string mountpoint;
@@ -245,14 +242,17 @@ static string mountpoint;
  * ensure proper loading of nested catalogs before the child is
  * accessed.
  */
-static int expand_path(char const *path,string &expanded_path,int depth=0)
+static int expand_path(cvmfs_context *ctx,
+                       char const    *path,
+                       string        &expanded_path,
+                       int            depth = 0)
 {
   string p_path = GetParentPath(path);
   string fname = GetFileName(path);
   int rc;
 
   if( fname == ".." ) {
-    rc = expand_path(p_path.c_str(),expanded_path,depth);
+    rc = expand_path(ctx, p_path.c_str(), expanded_path, depth);
     if( rc != 0 ) {
       return -1;
     }
@@ -271,7 +271,7 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
 
   string buf;
   if( p_path != "" ) {
-    rc = expand_path(p_path.c_str(),buf,depth);
+    rc = expand_path(ctx, p_path.c_str(), buf, depth);
     if( rc != 0 ) {
       return -1;
     }
@@ -288,7 +288,7 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
   buf += fname;
 
   struct stat st;
-  rc = cvmfs::cvmfs_getattr(buf.c_str(),&st);
+  rc = ctx->GetAttr(buf.c_str(),&st);
   if( rc != 0 ) {
     errno = -rc;
     return -1;
@@ -313,7 +313,7 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
     errno = ENOMEM;
     return -1;
   }
-  rc = cvmfs::cvmfs_readlink(buf.c_str(),ln_buf,st.st_size+2);
+  rc = ctx->Readlink(buf.c_str(), ln_buf, st.st_size + 2);
   if( rc != 0 ) {
     free(ln_buf);
     errno = -rc;
@@ -350,11 +350,13 @@ static int expand_path(char const *path,string &expanded_path,int depth=0)
   // In case the symlink references other symlinks or contains ".."
   // or "."  we must now call expand_path on the result.
 
-  return expand_path(buf.c_str(),expanded_path,depth+1);
+  return expand_path(ctx, buf.c_str(), expanded_path, depth + 1);
 }
 
 /* Like expand_path(), but do not expand the final element of the path. */
-static int expand_ppath(char const *path,string &expanded_path)
+static int expand_ppath(cvmfs_context  *ctx,
+                        char const     *path,
+                        string         &expanded_path)
 {
   string p_path = GetParentPath(path);
   string fname = GetFileName(path);
@@ -364,7 +366,7 @@ static int expand_ppath(char const *path,string &expanded_path)
     return 0;
   }
 
-  int rc = expand_path(p_path.c_str(),expanded_path);
+  int rc = expand_path(ctx, p_path.c_str(), expanded_path);
   if( rc != 0 ) {
     return rc;
   }
@@ -375,17 +377,17 @@ static int expand_ppath(char const *path,string &expanded_path)
   return 0;
 }
 
-int cvmfs_open(const char *path)
+int cvmfs_open(cvmfs_context *ctx, const char *path)
 {
   string lpath;
   int rc;
-  rc = expand_path(path,lpath);
+  rc = expand_path(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_open(path);
+  rc = ctx->Open(path);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -393,9 +395,9 @@ int cvmfs_open(const char *path)
   return rc;
 }
 
-int cvmfs_close(int fd)
+int cvmfs_close(cvmfs_context *ctx, int fd)
 {
-  int rc = cvmfs::cvmfs_close(fd);
+  int rc = ctx->Close(fd);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -403,16 +405,16 @@ int cvmfs_close(int fd)
   return 0;
 }
 
-int cvmfs_readlink(const char *path, char *buf, size_t size) {
+int cvmfs_readlink(cvmfs_context *ctx, const char *path, char *buf, size_t size) {
   string lpath;
   int rc;
-  rc = expand_ppath(path,lpath);
+  rc = expand_ppath(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_readlink(path,buf,size);
+  rc = ctx->Readlink(path, buf, size);
   if (rc < 0) {
     errno = -rc;
     return -1;
@@ -420,17 +422,17 @@ int cvmfs_readlink(const char *path, char *buf, size_t size) {
   return 0;
 }
 
-int cvmfs_stat(const char *path,struct stat *st)
+int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st)
 {
   string lpath;
   int rc;
-  rc = expand_path(path,lpath);
+  rc = expand_path(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_getattr(path,st);
+  rc = ctx->GetAttr(path,st);
   if( rc < 0 ) {
     errno = -rc;
     return -1;
@@ -438,17 +440,17 @@ int cvmfs_stat(const char *path,struct stat *st)
   return 0;
 }
 
-int cvmfs_lstat(const char *path,struct stat *st)
+int cvmfs_lstat(cvmfs_context *ctx, const char *path,struct stat *st)
 {
   string lpath;
   int rc;
-  rc = expand_ppath(path,lpath);
+  rc = expand_ppath(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_getattr(path,st);
+  rc = ctx->GetAttr(path, st);
   if( rc < 0 ) {
     errno = -rc;
     return -1;
@@ -456,17 +458,17 @@ int cvmfs_lstat(const char *path,struct stat *st)
   return 0;
 }
 
-int cvmfs_listdir(const char *path,char ***buf,size_t *buflen)
+int cvmfs_listdir(cvmfs_context *ctx, const char *path, char ***buf, size_t *buflen)
 {
   string lpath;
   int rc;
-  rc = expand_path(path,lpath);
+  rc = expand_path(ctx, path, lpath);
   if( rc < 0 ) {
     return -1;
   }
   path = lpath.c_str();
 
-  rc = cvmfs::cvmfs_listdir(path,buf,buflen);
+  rc = ctx->ListDirectory(path, buf, buflen);
   if( rc < 0 ) {
     errno = -rc;
     return -1;
@@ -474,61 +476,45 @@ int cvmfs_listdir(const char *path,char ***buf,size_t *buflen)
   return 0;
 }
 
-int cvmfs_init(char const *options)
+cvmfs_context* cvmfs_attach_repo(char const *options)
 {
   /* Parse options */
-  struct cvmfs_opts cvmfs_opts;
-  int parse_result = cvmfs_opts.parse_options(options);
+  repo_options opts;
+  int parse_result = opts.parse_options(options);
   if (parse_result != 0)
   {
     if (parse_result < 0) {
       fprintf(stderr,"Invalid CVMFS options: %s.\n",options);
-      cvmfs_opts.usage();
+      usage();
     }
-    return -1;
+    return NULL;
   }
-  if (cvmfs_opts.url.empty()) {
-    fprintf(stderr,"No url specified in CVMFS options: %s.\n",options);
-    return -1;
-  }
-
-  int rc = cvmfs::cvmfs_int_init(
-                          cvmfs_opts.url,
-                          cvmfs_opts.proxies,
-                          cvmfs_opts.repo_name,
-                          cvmfs_opts.mountpoint,
-                          cvmfs_opts.pubkey,
-                          cvmfs_opts.cachedir,
-                          cvmfs_opts.alien_cachedir,
-                          false, /* cd_to_cachedir */
-                          cvmfs_opts.quota_limit,
-                          cvmfs_opts.quota_threshold,
-                          cvmfs_opts.rebuild_cachedb,
-                          cvmfs_opts.allow_unsigned,
-                          "" /* root_hash */,
-                          cvmfs_opts.timeout,
-                          cvmfs_opts.timeout_direct,
-                          cvmfs_opts.syslog_level,
-                          cvmfs_opts.logfile,
-                          cvmfs_opts.tracefile,
-                          cvmfs_opts.deep_mount,
-                          cvmfs_opts.blacklist,
-                          cvmfs_opts.nofiles,
-                          false,   /* enable_monitor */
-                          false   /* enable async downloads */
-                          );
-  if( rc != 0 ) {
-    return -1;
+  if (opts.url.empty()) {
+    fprintf(stderr,"No url specified in CVMFS repository options: %s.\n",options);
+    return NULL;
   }
 
-  ::mountpoint = cvmfs_opts.mountpoint;
+  return cvmfs_context::Create(opts);
+}
 
-  return 0;
+void cvmfs_detach_repo(cvmfs_context *ctx) {
+  cvmfs_context::Destroy(ctx);
+}
+
+int cvmfs_init(char const *options) {
+  global_options opts;
+  int parse_result = opts.parse_options(options);
+  if (parse_result != 0) {
+    fprintf(stderr, "Invalid CVMFS global options: %s.\n",options);
+    usage();
+    return parse_result;
+  }
+
+  return cvmfs_globals::Initialize(opts);
 }
 
 void cvmfs_fini() {
-  cvmfs::cvmfs_int_fini();
-  ::mountpoint = "";
+  cvmfs_globals::Destroy();
 }
 
 static void (*ext_log_fn)(const char *msg) = NULL;
@@ -550,9 +536,9 @@ void cvmfs_set_log_fn( void (*log_fn)(const char *msg) )
 	}
 }
 
-int cvmfs_remount()
+int cvmfs_remount(cvmfs_context *ctx)
 {
-	catalog::LoadError retval = cvmfs::RemountStart();
+	catalog::LoadError retval = ctx->RemountStart();
 	if( retval == catalog::kLoadNew || retval == catalog::kLoadUp2Date) {
 		return 0;
 	}
