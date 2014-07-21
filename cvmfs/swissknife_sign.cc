@@ -161,7 +161,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     }
     free(compr_buf);
 
-    const string cert_hash_path = "data" + certificate_hash.MakePath(1, 2)
+    const string cert_hash_path = "data" + certificate_hash.MakePathExplicit(1, 2)
                                   + "X";
     spooler->Upload(cert_path_tmp, cert_hash_path);
 
@@ -197,7 +197,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       }
       fclose(fcompressed_history);
 
-      const string history_url = "data" + history_hash.MakePath(1, 2) + "H";
+      const string history_url = "data" + history_hash.MakePathExplicit(1, 2) + "H";
       spooler->Upload(hist_compressed_path, history_url);
       manifest->set_history(history_hash);
     }

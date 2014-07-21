@@ -518,7 +518,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
 
   // New file name based on content hash
   std::string final_path("data" +
-                         content_hash.MakePath(1, 2) +
+                         content_hash.MakePathExplicit(1, 2) +
                          hash_suffix);
 
   // Request upload

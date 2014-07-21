@@ -545,7 +545,7 @@ class ObjectFetcher {
                        std::string *catalog_file) {
     catalog_file->clear();
 
-    const std::string source = "data" + catalog_hash.MakePath(1,2) + "C";
+    const std::string source = "data" + catalog_hash.MakePathExplicit(1,2) + "C";
     const std::string dest = temporary_directory_ + "/" + catalog_hash.ToString();
     const std::string url = repo_url_ + "/" + source;
 
@@ -574,7 +574,7 @@ class ObjectFetcher {
     catalog_file->clear();
 
     const std::string source =
-      repo_url_ + "/data" + catalog_hash.MakePath(1,2) + "C";
+      repo_url_ + "/data" + catalog_hash.MakePathExplicit(1,2) + "C";
     const std::string dest = temporary_directory_ + "/" + catalog_hash.ToString();
 
     if (!zlib::DecompressPath2Path(source, dest))

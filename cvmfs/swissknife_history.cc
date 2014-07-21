@@ -88,7 +88,7 @@ static bool FetchTagList(const string &repository_url,
 
   if (!history_hash.IsNull()) {
     const string url = repository_url + "/data" +
-      history_hash.MakePath(1, 2) + "H";
+      history_hash.MakePathExplicit(1, 2) + "H";
     download::JobInfo download_history(&url, true, false, &tmp_path,
                                        &history_hash);
     dl_retval = g_download_manager->Fetch(&download_history);
@@ -342,7 +342,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
     assert(f);
     fclose(f);
     const string catalog_url = repository_url + "/data" +
-      target_tag.root_hash.MakePath(1, 2) + "C";
+      target_tag.root_hash.MakePathExplicit(1, 2) + "C";
     download::JobInfo download_catalog(&catalog_url, true, false, &catalog_path,
                                        &target_tag.root_hash);
     dl_retval = g_download_manager->Fetch(&download_catalog);
@@ -380,7 +380,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
     goto rollback_fini;
   }
   spooler->Upload(catalog->database_path() + ".compressed",
-                  "data" + hash_republished_catalog.MakePath(1, 2) + "C");
+                  "data" + hash_republished_catalog.MakePathExplicit(1, 2) + "C");
   spooler->WaitForUpload();
   unlink((catalog->database_path() + ".compressed").c_str());
   manifest =
