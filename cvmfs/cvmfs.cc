@@ -1975,7 +1975,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   assert(retval == SQLITE_OK);
 
   // Disable SQlite3 locks
-  sqlite3_vfs_register(sqlite3_vfs_find("unix-none"), 1);
+  retval = sqlite3_vfs_register(sqlite3_vfs_find("unix-none"), 1);
+  assert(retval == SQLITE_OK);
 
   // Meta-data memory caches
   const double memcache_unit_size =
