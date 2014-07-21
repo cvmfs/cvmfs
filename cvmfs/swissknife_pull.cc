@@ -269,10 +269,10 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
     ChunkJob next_chunk;
     switch (chunk_type) {
       case catalog::kChunkMicroCatalog:
-        next_chunk.type = 'L';
+        next_chunk.type = shash::kSuffixMicroCatalog;
         break;
       case catalog::kChunkPiece:
-        next_chunk.type = FileChunk::kCasSuffix.c_str()[0];
+        next_chunk.type = shash::kSuffixPartial;
         break;
       default:
         next_chunk.type = '\0';

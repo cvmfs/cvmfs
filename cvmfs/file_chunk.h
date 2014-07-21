@@ -28,16 +28,13 @@
  */
 class FileChunk {
  public:
-  static const std::string kCasSuffix;
-
- public:
   FileChunk() : content_hash_(shash::Any(shash::kAny)), offset_(0), size_(0) { }
   FileChunk(const shash::Any &hash,
             const off_t       offset,
             const size_t      size) :
     content_hash_(hash),
     offset_(offset),
-    size_(size) { }
+    size_(size) {}
 
   inline const shash::Any& content_hash() const { return content_hash_; }
   inline off_t             offset()       const { return offset_; }

@@ -10,8 +10,6 @@
 
 using namespace std;  // NOLINT
 
-const std::string FileChunk::kCasSuffix = "P";
-
 
 static inline uint32_t hasher_uint64t(const uint64_t &value) {
   return MurmurHash2(&value, sizeof(value), 0x07387a4f);

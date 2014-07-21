@@ -184,7 +184,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 
   void Hmac(const string &key,
 	    const unsigned char *buffer, const unsigned buffer_size,
-	    Any *any_digest) 
+	    Any *any_digest)
 {
     Algorithms algorithm = any_digest->algorithm;
     assert(algorithm != kAny);
@@ -203,7 +203,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
     }
 
     unsigned char pad_block[block_size];
-    // Inner hash                                                                                                                                     
+    // Inner hash
     Any hash_inner(algorithm);
     ContextPtr context_inner(algorithm);
     context_inner.buffer = alloca(context_inner.size);
@@ -214,7 +214,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
     Update(buffer, buffer_size, context_inner);
     Final(context_inner, &hash_inner);
 
-    // Outer hash                                                                                                                                     
+    // Outer hash
     ContextPtr context_outer(algorithm);
     context_outer.buffer = alloca(context_outer.size);
     Init(context_outer);
