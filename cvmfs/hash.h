@@ -199,18 +199,24 @@ struct Digest {
     return MakePath(1, 2, prefix);
   }
 
+  std::string MakePathWithoutSuffix(const std::string &prefix = "data") const {
+    return MakePath(1, 2, prefix, false);
+  }
+
   /**
    * Create a path string from the hex notation of the digest.
    */
-  std::string MakePath(const unsigned dir_levels,
-                       const unsigned digits_per_level,
-                       const std::string &prefix = "") const
+  std::string MakePath(const unsigned      dir_levels,
+                       const unsigned      digits_per_level,
+                       const std::string  &prefix = "",
+                       const bool          with_suffix = true) const
   {
+    const bool use_suffix = with_suffix && HasSuffix();
     const unsigned string_length =   prefix.length()
                                    + GetHexSize()
                                    + dir_levels
                                    + 1 // slash between prefix and hash
-                                   + HasSuffix();
+                                   + use_suffix;
     std::string result(prefix);
     result.resize(string_length);
 
@@ -232,7 +238,7 @@ struct Digest {
       result[pos] = *s;
       pos++;
     }
-    if (HasSuffix()) {
+    if (use_suffix) {
       result[pos] = suffix;
     }
 
