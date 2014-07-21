@@ -222,9 +222,9 @@ struct Digest {
 
   bool HasSuffix() const { return suffix != 0; }
 
-  std::string ToString() const {
+  std::string ToString(const bool with_suffix = false) const {
     Hexifier hexifier(this);
-    const bool     use_suffix    = HasSuffix();
+    const bool     use_suffix    = with_suffix && HasSuffix();
     const unsigned string_length = hexifier.length() + use_suffix;
     std::string result(string_length, 0);
 
@@ -241,12 +241,16 @@ struct Digest {
     return result;
   }
 
+  std::string ToStringWithSuffix() const {
+    return ToString(true);
+  }
+
   std::string MakePath(const std::string &prefix = "data") const {
     return MakePath(1, 2, prefix);
   }
 
-  std::string MakePathWithoutSuffix(const std::string &prefix = "data") const {
-    return MakePath(1, 2, prefix, false);
+  std::string MakePathWithSuffix(const std::string &prefix = "data") const {
+    return MakePath(1, 2, prefix, true);
   }
 
   /**
@@ -255,7 +259,7 @@ struct Digest {
   std::string MakePath(const unsigned      dir_levels,
                        const unsigned      digits_per_level,
                        const std::string  &prefix = "",
-                       const bool          with_suffix = true) const
+                       const bool          with_suffix = false) const
   {
     Hexifier hexifier(this);
     const bool use_suffix = with_suffix && HasSuffix();
