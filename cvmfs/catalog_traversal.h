@@ -361,30 +361,47 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
   unsigned int PushReferencedCatalogs(      TraversalContext  &ctx,
                                             CatalogT          *catalog,
-                                      const CatalogJob        &job) {
-    unsigned int pushed_catalogs = 0;
+                                      const CatalogJob        &job)
+  {
+    return   MightPushPreviousRevision(ctx, catalog, job)
+           + MightPushNestedCatalogs  (ctx, catalog, job);
+  }
 
-    // Only Root catalogs may be used as entry points into previous revisions
-    const shash::Any previous_revision = catalog->GetPreviousRevision();
-    if (catalog->IsRoot() && ! previous_revision.IsNull()) {
-      if (job.history_depth < ctx.history_depth) {
-        const CatalogJob new_job("",
-                                 previous_revision,
-                                 0,
-                                 job.history_depth + 1,
-                                 NULL);
-        if (MightPush(ctx, new_job)) {
-          ++pushed_catalogs;
-        }
-      } else {
-        pruned_revisions_.insert(previous_revision);
-      }
+  unsigned int MightPushPreviousRevision(      TraversalContext  &ctx,
+                                               CatalogT          *catalog,
+                                         const CatalogJob        &job)
+  {
+    // only root catalogs are used for entering a previous revision (graph)
+    if (! catalog->IsRoot()) {
+      return 0;
     }
 
-    // Inception! Go to the next catalog level
-    // Note: taking a copy of the result of ListNestedCatalogs() here for
-    //       data corruption prevention
-    const typename CatalogT::NestedCatalogList &nested =
+    const shash::Any previous_revision = catalog->GetPreviousRevision();
+    if (previous_revision.IsNull()) {
+      return 0;
+    }
+
+    // check if the next deeper history level is actually requested
+    // Note: otherwise it is marked to be 'pruned' for possible later traversal
+    if (job.history_depth >= ctx.history_depth) {
+      pruned_revisions_.insert(previous_revision);
+      return 0;
+    }
+
+    const CatalogJob new_job("",
+                             previous_revision,
+                             0,
+                             job.history_depth + 1,
+                             NULL);
+    return MightPush(ctx, new_job) ? 1 : 0;
+  }
+
+  unsigned int MightPushNestedCatalogs(      TraversalContext  &ctx,
+                                             CatalogT          *catalog,
+                                       const CatalogJob        &job)
+  {
+    unsigned int pushed_catalogs = 0;
+    const typename CatalogT::NestedCatalogList &nested = // TODO: C++11 auto ;-)
                                                   catalog->ListNestedCatalogs();
     typename CatalogT::NestedCatalogList::const_iterator i    = nested.begin();
     typename CatalogT::NestedCatalogList::const_iterator iend = nested.end();
@@ -402,6 +419,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
     return pushed_catalogs;
   }
+
 
   bool MightPush(TraversalContext &ctx, const CatalogJob &job) const {
     if (no_repeat_history_ && visited_catalogs_.count(job.hash) > 0) {
