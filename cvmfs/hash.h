@@ -98,6 +98,56 @@ struct Digest {
   Algorithms    algorithm;
   char          suffix;
 
+  class Hexifier {
+   public:
+    Hexifier(const Digest<digest_size_, algorithm_> *digest) :
+      digest_(*digest),
+      hash_length_(2 * kDigestSizes[digest_.algorithm]),
+      suffix_length_(kSuffixLengths[digest_.algorithm]),
+      position_(0) {}
+
+    unsigned int operator++() {
+      return position_++;
+    }
+
+    unsigned int operator++(int) {
+      const unsigned int pos = position_;
+      ++position_;
+      return pos;
+    }
+
+    unsigned int length()   const { return hash_length_ + suffix_length_; }
+    unsigned int position() const { return position_;                     }
+    operator     bool()     const { return position_ < length();          }
+
+    char operator*() const {
+      return (position_ < hash_length_)
+        ? GetHashChar()
+        : GetSuffixChar();
+    }
+
+   protected:
+    char GetHashChar() const {
+      assert (position_ < hash_length_);
+      return ToHex(((position_ % 2) == 0)
+        ? digest_.digest[position_ / 2] / 16
+        : digest_.digest[position_ / 2] % 16);
+    }
+
+    char GetSuffixChar() const {
+      assert (position_ >= hash_length_);
+      return kSuffixes[digest_.algorithm][position_ - hash_length_];
+    }
+
+    char ToHex(const char c) const { return c + ((c <= 9) ? '0' : 'a' - 10); }
+
+   private:
+    const Digest<digest_size_, algorithm_>  &digest_;
+    const unsigned int                       hash_length_;
+    const unsigned int                       suffix_length_;
+    unsigned int                             position_;
+  };
+
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
   unsigned GetHexSize() const {
     return 2*kDigestSizes[algorithm] + kSuffixLengths[algorithm];
@@ -173,26 +223,21 @@ struct Digest {
   bool HasSuffix() const { return suffix != 0; }
 
   std::string ToString() const {
-    const unsigned string_length = GetHexSize() + HasSuffix();
+    Hexifier hexifier(this);
+    const bool     use_suffix    = HasSuffix();
+    const unsigned string_length = hexifier.length() + use_suffix;
     std::string result(string_length, 0);
 
-    unsigned i;
-    for (i = 0; i < kDigestSizes[algorithm]; ++i) {
-      char dgt1 = (unsigned)digest[i] / 16;
-      char dgt2 = (unsigned)digest[i] % 16;
-      dgt1 += (dgt1 <= 9) ? '0' : 'a' - 10;
-      dgt2 += (dgt2 <= 9) ? '0' : 'a' - 10;
-      result[i*2] = dgt1;
-      result[i*2+1] = dgt2;
+    for (; hexifier; ++hexifier) {
+      result[hexifier.position()] = *hexifier;
     }
-    unsigned pos = i*2;
-    for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
-      result[pos] = *s;
-      pos++;
+
+    if (use_suffix) {
+      result[string_length - 1] = suffix;
     }
-    if (HasSuffix()) {
-      result[pos] = suffix;
-    }
+
+    assert (result.length() == string_length);
+
     return result;
   }
 
@@ -212,37 +257,35 @@ struct Digest {
                        const std::string  &prefix = "",
                        const bool          with_suffix = true) const
   {
+    Hexifier hexifier(this);
     const bool use_suffix = with_suffix && HasSuffix();
+
     const unsigned string_length =   prefix.length()
-                                   + GetHexSize()
+                                   + hexifier.length()
                                    + dir_levels
                                    + 1 // slash between prefix and hash
                                    + use_suffix;
+    // prepend prefix string
     std::string result(prefix);
     result.resize(string_length);
 
-    unsigned i = 0, pos = prefix.length();
-    while (i < 2*kDigestSizes[algorithm]) {
-      if (((i % digits_per_level) == 0) &&
-          ((i / digits_per_level) <= dir_levels))
+    // build hexified hash and path delimiters
+    unsigned pos = prefix.length();
+    for (; hexifier; ++hexifier) {
+      if (((hexifier.position() % digits_per_level) == 0) &&
+          ((hexifier.position() / digits_per_level) <= dir_levels))
       {
-        result[pos] = '/';
-        ++pos;
+        result[pos++] = '/';
       }
-      char digit = ((i % 2) == 0) ? digest[i/2] / 16 : digest[i/2] % 16;
-      digit += (digit <= 9) ? '0' : 'a' - 10;
-      result[pos] = digit;
-      ++pos;
-      ++i;
-    }
-    for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
-      result[pos] = *s;
-      pos++;
-    }
-    if (use_suffix) {
-      result[pos] = suffix;
+      result[pos++] = *hexifier;
     }
 
+    // (optionally) add hash hint suffix
+    if (use_suffix) {
+      result[pos++] = suffix;
+    }
+
+    assert (pos == string_length);
     return result;
   }
 
