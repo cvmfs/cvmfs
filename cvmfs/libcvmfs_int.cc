@@ -324,13 +324,14 @@ int cvmfs_context::Setup(const options &opts) {
   }
 
   // Load initial file catalog
+  bool clg_mgr_init;
   catalog_manager_ = new cache::CatalogManager(repository_name_,
                                                signature_manager_,
                                                download_manager_);
-  bool clg_mgr_init;
   if (! opts.root_hash.empty()) {
     clg_mgr_init = catalog_manager_->InitFixed(
-      shash::MkFromHexPtr(shash::HexPtr(opts.root_hash)));
+      shash::MkFromHexPtr(shash::HexPtr(string(opts.root_hash)),
+                          shash::kSuffixCatalog));
   } else {
     clg_mgr_init = catalog_manager_->Init();
   }

@@ -741,8 +741,9 @@ bool SqlNestedCatalogLookup::BindSearchPath(const PathString &path) {
 
 shash::Any SqlNestedCatalogLookup::GetContentHash() const {
   const string hash = string(reinterpret_cast<const char *>(RetrieveText(0)));
-  return (hash.empty()) ? shash::Any(shash::kAny) :
-                          shash::MkFromHexPtr(shash::HexPtr(hash));
+  return (hash.empty())
+    ? shash::Any(shash::kAny)
+    : shash::MkFromHexPtr(shash::HexPtr(hash), shash::kSuffixCatalog);
 }
 
 
@@ -774,8 +775,9 @@ PathString SqlNestedCatalogListing::GetMountpoint() const {
 
 shash::Any SqlNestedCatalogListing::GetContentHash() const {
   const string hash = string(reinterpret_cast<const char *>(RetrieveText(1)));
-  return (hash.empty()) ? shash::Any(shash::kAny) :
-                          shash::MkFromHexPtr(shash::HexPtr(hash));
+  return (hash.empty())
+    ? shash::Any(shash::kAny)
+    : shash::MkFromHexPtr(shash::HexPtr(hash), shash::kSuffixCatalog);
 }
 
 
@@ -948,7 +950,9 @@ bool SqlChunksListing::BindPathHash(const shash::Md5 &hash) {
 FileChunk SqlChunksListing::GetFileChunk(
   const shash::Algorithms interpret_hash_as) const
 {
-  return FileChunk(RetrieveHashBlob(2, interpret_hash_as),
+  shash::Any content_hash = RetrieveHashBlob(2, interpret_hash_as);
+  content_hash.suffix     = shash::kSuffixPartial;
+  return FileChunk(content_hash,
                    RetrieveInt64(0),
                    RetrieveInt64(1));
 }

@@ -112,9 +112,11 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   const string repository_key_path = *args.find('k')->second;
   const string history_path = *args.find('o')->second;
   const shash::Any base_hash =
-    shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second));
+    shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second),
+                        shash::kSuffixCatalog);
   const shash::Any trunk_hash =
-    shash::MkFromHexPtr(shash::HexPtr(*args.find('t')->second));
+    shash::MkFromHexPtr(shash::HexPtr(*args.find('t')->second),
+                        shash::kSuffixCatalog);
   const uint64_t trunk_catalog_size = String2Uint64(*args.find('s')->second);
   const unsigned trunk_revision = String2Uint64(*args.find('i')->second);
   shash::Any tag_hash = trunk_hash;
@@ -124,7 +126,8 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
     delete_tag_list = *args.find('d')->second;
   }
   if (args.find('h') != args.end()) {
-    tag_hash = shash::MkFromHexPtr(shash::HexPtr(*args.find('h')->second));
+    tag_hash = shash::MkFromHexPtr(shash::HexPtr(*args.find('h')->second),
+                                   shash::kSuffixCatalog);
   }
   if (args.find('z') != args.end()) {
     trusted_certs = *args.find('z')->second;
@@ -266,7 +269,8 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
   const string repository_key_path = *args.find('k')->second;
   const string history_path = *args.find('o')->second;
   const shash::Any base_hash(
-    shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second)));
+    shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second),
+                        shash::kSuffixCatalog));
   const string target_tag_name = *args.find('t')->second;
   const string manifest_path = *args.find('m')->second;
   const string temp_dir = *args.find('d')->second;

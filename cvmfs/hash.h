@@ -40,6 +40,7 @@ enum Algorithms {
   kAny,
 };
 
+const char kSuffixNone         = 0;
 const char kSuffixCatalog      = 'C';
 const char kSuffixHistory      = 'H';
 const char kSuffixMicroCatalog = 'L'; // currently unused
@@ -220,7 +221,7 @@ struct Digest {
     }
   }
 
-  bool HasSuffix() const { return suffix != 0; }
+  bool HasSuffix() const { return suffix != kSuffixNone; }
 
   std::string ToString(const bool with_suffix = false) const {
     Hexifier hexifier(this);
@@ -365,7 +366,7 @@ struct Any : public Digest<20, kAny> {
   explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
   Any(const Algorithms     a,
       const unsigned char *digest_buffer, const unsigned buffer_size,
-      const char           suffix = 0) :
+      const char           suffix = kSuffixNone) :
     Digest<20, kAny>(a, digest_buffer, buffer_size, suffix) { }
   explicit Any(const Algorithms a, const HexPtr hex, const char suffix = 0) :
     Digest<20, kAny>(a, hex, suffix) { }
@@ -421,7 +422,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
-Any MkFromHexPtr(const HexPtr hex);
+Any MkFromHexPtr(const HexPtr hex, const char suffix = kSuffixNone);
 
 }  // namespace hash
 

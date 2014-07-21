@@ -2317,7 +2317,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
-    shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)));
+    shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)),
+                                   shash::kSuffixCatalog);
     retval = cvmfs::catalog_manager_->InitFixed(hash);
   } else {
     retval = cvmfs::catalog_manager_->Init();

@@ -869,7 +869,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
     int separator_pos = 0;
     for (; (separator_pos < read_bytes) && (tmp[separator_pos] != 'T');
          ++separator_pos) { }
-    cache_hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)));
+    cache_hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)),
+                                     shash::kSuffixCatalog);
     if (!FileExists(*cache_path_ + cache_hash.MakePathExplicit(1, 2))) {
       LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
       cache_hash = shash::Any();
