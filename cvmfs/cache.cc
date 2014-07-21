@@ -445,12 +445,12 @@ static bool CommitFromMem(const shash::Any &id, const unsigned char *buffer,
  * \return Read-only file descriptor for the file pointing into local cache.
  *         On failure a negative error code.
  */
-static int Fetch(const shash::Any &checksum,
-                 const string     &hash_suffix,
-                 const uint64_t    size,
-                 const string     &cvmfs_path,
-                 const bool        volatile_content,
-                 download::DownloadManager *download_manager)
+static int Fetch(const shash::Any           &checksum,
+                 const std::string          &hash_suffix, // TODO: replace by hash-interal suffix field
+                 const uint64_t              size,
+                 const string               &cvmfs_path,
+                 const bool                  volatile_content,
+                 download::DownloadManager  *download_manager)
 {
   CallGuard call_guard;
   int fd_return;  // Read-only file descriptor that is returned
