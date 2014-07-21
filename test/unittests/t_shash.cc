@@ -220,6 +220,9 @@ TEST(T_Shash, HashSuffix) {
   EXPECT_EQ ("dataX/2e/c5fe3c17045abdb136a5e6a913e32aA", hash_md5.MakePath("dataX"));
   EXPECT_EQ ("dataY/2e/c5fe3c17045abdb136a5e6a913e32aA", hash_md5.MakePath("dataY"));
   EXPECT_EQ ("dataZ/2e/c5fe3c17045abdb136a5e6a913e32aA", hash_md5.MakePath("dataZ"));
+  EXPECT_EQ ("dataX/2e/c5fe3c17045abdb136a5e6a913e32a",  hash_md5.MakePathWithoutSuffix("dataX"));
+  EXPECT_EQ ("dataY/2e/c5fe3c17045abdb136a5e6a913e32a",  hash_md5.MakePathWithoutSuffix("dataY"));
+  EXPECT_EQ ("dataZ/2e/c5fe3c17045abdb136a5e6a913e32a",  hash_md5.MakePathWithoutSuffix("dataZ"));
 
   shash::Any hash_sha1(shash::kSha1);
   hash_sha1.Randomize(prng);
@@ -231,6 +234,9 @@ TEST(T_Shash, HashSuffix) {
   EXPECT_EQ ("dataX/b7/5ae68b53d2fc149b77e504132d37569b7e766bB", hash_sha1.MakePath("dataX"));
   EXPECT_EQ ("dataY/b7/5ae68b53d2fc149b77e504132d37569b7e766bB", hash_sha1.MakePath("dataY"));
   EXPECT_EQ ("dataZ/b7/5ae68b53d2fc149b77e504132d37569b7e766bB", hash_sha1.MakePath("dataZ"));
+  EXPECT_EQ ("dataX/b7/5ae68b53d2fc149b77e504132d37569b7e766b",  hash_sha1.MakePathWithoutSuffix("dataX"));
+  EXPECT_EQ ("dataY/b7/5ae68b53d2fc149b77e504132d37569b7e766b",  hash_sha1.MakePathWithoutSuffix("dataY"));
+  EXPECT_EQ ("dataZ/b7/5ae68b53d2fc149b77e504132d37569b7e766b",  hash_sha1.MakePathWithoutSuffix("dataZ"));
 
   shash::Any hash_rmd160(shash::kRmd160);
   hash_rmd160.Randomize(prng);
@@ -242,6 +248,9 @@ TEST(T_Shash, HashSuffix) {
   EXPECT_EQ ("dataX/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160C", hash_rmd160.MakePath("dataX"));
   EXPECT_EQ ("dataY/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160C", hash_rmd160.MakePath("dataY"));
   EXPECT_EQ ("dataZ/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160C", hash_rmd160.MakePath("dataZ"));
+  EXPECT_EQ ("dataX/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160",  hash_rmd160.MakePathWithoutSuffix("dataX"));
+  EXPECT_EQ ("dataY/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160",  hash_rmd160.MakePathWithoutSuffix("dataY"));
+  EXPECT_EQ ("dataZ/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160",  hash_rmd160.MakePathWithoutSuffix("dataZ"));
 }
 
 
