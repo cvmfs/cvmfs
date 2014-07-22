@@ -1,4 +1,7 @@
 2.1.20:
+  * Disable SQlite locking on the client; improves performance
+    and allows to store cache directory on file systems with
+    dodgy file locking support such as Lustre
   * Change libcvmfs to access /cvmfs instead of /cvmfs/<repo>
   * Add OSG, EGI public keys and config (CVM-641)
   * Add geo api to cvmfs-server (CVM-629)
