@@ -146,7 +146,8 @@ MockCatalog* MockCatalog::GetCatalog(const shash::Any &catalog_hash) {
 MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
                                        const std::string  &file,
                                        const shash::Any   &catalog_hash,
-                                             MockCatalog  *parent) {
+                                             MockCatalog  *parent,
+                                       const bool          is_not_root) {
   const MockCatalog *catalog = MockCatalog::GetCatalog(catalog_hash);
   if (catalog == NULL) {
     return NULL;

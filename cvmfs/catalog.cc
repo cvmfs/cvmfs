@@ -27,11 +27,13 @@ const int kSqliteThreadMem = 4;  /**< TODO SQLite3 heap limit per thread */
 Catalog* Catalog::AttachFreely(const string     &root_path,
                                const string     &file,
                                const shash::Any &catalog_hash,
-                                     Catalog    *parent) {
+                                     Catalog    *parent,
+                               const bool        is_not_root) {
   Catalog *catalog =
     new Catalog(PathString(root_path.data(), root_path.length()),
                 catalog_hash,
-                parent);
+                parent,
+                is_not_root);
   const bool successful_init = catalog->InitStandalone(file);
   if (!successful_init) {
     delete catalog;
@@ -43,10 +45,12 @@ Catalog* Catalog::AttachFreely(const string     &root_path,
 
 Catalog::Catalog(const PathString &path,
                  const shash::Any &catalog_hash,
-                 Catalog *parent) :
+                       Catalog    *parent,
+                 const bool        is_not_root) :
   catalog_hash_(catalog_hash),
   path_(path),
   volatile_flag_(false),
+  is_root_(parent == NULL && ! is_not_root),
   parent_(parent),
   nested_catalog_cache_dirty_(true),
   initialized_(false)
@@ -185,7 +189,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
     return false;
   }
 
-  if (!IsRoot()) {
+  if (HasParent()) {
     parent_->AddChild(this);
   }
 
@@ -679,7 +683,7 @@ Catalog* Catalog::FindChild(const PathString &mountpoint) const {
 void Catalog::FixTransitionPoint(const shash::Md5 &md5path,
                                  DirectoryEntry *dirent) const
 {
-  if (dirent->IsNestedCatalogRoot() && !IsRoot()) {
+  if (dirent->IsNestedCatalogRoot() && HasParent()) {
     DirectoryEntry parent_dirent;
     const bool retval = parent_->LookupMd5Path(md5path, &parent_dirent);
     assert(retval);
