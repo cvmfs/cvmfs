@@ -2,6 +2,17 @@
 cvmfs_test_name="Basic Garbage Collection"
 cvmfs_test_autofs_on_startup=false
 
+inflate_file() {
+  local destination_file=$1
+  local source_file=$2
+  local desired_file_size=$3
+
+  touch $destination_file
+  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
+    cat $source_file >> $destination_file
+  done
+}
+
 produce_files_1_in() {
   local working_dir=$1  
   pushdir $working_dir
@@ -23,6 +34,13 @@ produce_files_1_in() {
   echo "To tie up envy, evermore enlarged,"                  >> dir1/shakespeare
   echo "   If some suspect of ill masked not thy show,"      >> dir1/shakespeare
   echo "   Then thou alone kingdoms of hearts shouldst owe." >> dir1/shakespeare
+
+  touch dir1/many_shakespeares
+  touch dir1/alotof_shakespeares
+  touch dir1/shakespeare_army
+  inflate_file dir1/many_shakespeares dir1/shakespeare         1000000
+  inflate_file dir1/alotof_shakespeares dir1/many_shakespeares 10000000
+  inflate_file dir1/shakespeare_army dir1/alotof_shakespeares  50000000
 
   popdir
 }
@@ -67,6 +85,13 @@ produce_files_3_in() {
   echo "Why are you watching?"                                       >> dir3/kafka
   echo ""                                                            >> dir3/kafka
   echo "Someone must watch, it is said. Someone must be there."      >> dir3/kafka
+
+  touch dir3/many_kafkas
+  touch dir3/alotof_kafkas
+  touch dir3/kafka_army
+  inflate_file dir3/many_kafkas dir3/kafka         1000000
+  inflate_file dir3/alotof_kafkas dir3/many_kafkas 10000000
+  inflate_file dir3/kafka_army dir3/alotof_kafkas  50000000
 
   rm -fR dir1
 
@@ -177,14 +202,30 @@ cvmfs_run_test() {
   # ============================================================================
 
   local shakespeare_object="5ccb03a6d732ff70310ba5db25756a6cd4675710"
+  local chopped_shakespeare_1="f58287c6c5a608d70491519d4f3dc3b3436b607aP"
+  local chopped_shakespeare_2="1e3618d857695eab0e30da35fcd9ea5e3f52f266P"
+  local chopped_shakespeare_3="c3cc8c92d5ea75da3207498fae45123b8a172d21P"
   local kafka_object="fd8370662e701313534bfc2d2b860a7bf0fbf5da"
+  local chopped_kafka_1="1d4964dc2146c16f2f351b153347890e2513a8eaP"
+  local chopped_kafka_2="78d66a3880097d4b4bcd5145fea11498c4306ed0P"
+  local chopped_kafka_3="ed021be42b51c299560b9617c6585a4c40607158P"
   echo "check if poem objects are there ($shakespeare_object)..."
   peek_backend $CVMFS_TEST_REPO $shakespeare_object || return 9
   peek_backend $CVMFS_TEST_REPO $kafka_object       || return 9
 
-  echo "check if first 4 catalog revisions are still there"
+  echo "check if the file chunks are there"
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_1 || return 9
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 || return 9
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 || return 9
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_1       || return 9
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_2       || return 9
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_3       || return 9
+
   local condemned_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep generic | head -n 4 | awk '{print $3}')"
-  for clg_hash in $condemned_clgs; do
+  local preserved_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep generic | tail -n 2 | awk '{print $3}')"
+
+  echo "check if all catalog revisions are still there"
+  for clg_hash in $condemned_clgs $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 10
   done
 
@@ -192,15 +233,34 @@ cvmfs_run_test() {
   cvmfs_server gc -r 1 -h -f $CVMFS_TEST_REPO || return 11
 
   echo "check if shakespeare is gone"
-  peek_backend $CVMFS_TEST_REPO $shakespeare_object && return 12
+  peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 12
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_1 && return 12
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 && return 12
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 && return 12
 
   echo "check if kafka is still there"
-  peek_backend $CVMFS_TEST_REPO $kafka_object || return 13
+  peek_backend $CVMFS_TEST_REPO $kafka_object    || return 13
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_1 || return 13
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 || return 13
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 13
 
   echo "check if the catalog revisions 1-4 are gone"
   for clg_hash in $condemned_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 14
   done
+
+  echo "check if the catalog revisions 5-6 are preserved"
+  for clg_hash in $preserved_clgs; do
+    peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 15
+  done
+
+  # ============================================================================
+
+  echo "check if the repository is still sane"
+  check_repository $CVMFS_TEST_REPO -i || return 16
+
+  echo "check if the repository's previous revision is still sane"
+  check_repository $CVMFS_TEST_REPO -i -t trunk-previous || return 17
 
   return 0
 }
