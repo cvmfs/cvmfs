@@ -28,6 +28,7 @@ ParameterList CommandGC::GetParams() {
   r.push_back(Parameter::Mandatory('h', "conserve <h> revisions"));
   r.push_back(Parameter::Mandatory('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional ('k', "repository master key(s)"));
+  r.push_back(Parameter::Optional ('t', "temporary directory"));
   r.push_back(Parameter::Switch   ('d', "dry run"));
   r.push_back(Parameter::Switch   ('l', "list objects to be removed"));
   // to be extended...
@@ -43,8 +44,9 @@ int CommandGC::Main(const ArgumentList &args) {
   const std::string &repo_keys              = (args.count('k') > 0) ? *args.find('k')->second : "";
   const bool         dry_run                = (args.count('d') > 0);
   const bool         list_condemned_objects = (args.count('l') > 0);
+  const std::string  temp_directory         = (args.count('t') > 0) ? *args.find('t')->second : "/tmp";
 
-  if (revisions <= 0) {
+  if (revisions < 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "at least one revision needs to be preserved");
     return 1;
   }
@@ -59,7 +61,7 @@ int CommandGC::Main(const ArgumentList &args) {
   config.repo_url             = repo_url;
   config.repo_name            = repo_name;
   config.repo_keys            = repo_keys;
-  config.tmp_dir              = "/tmp";
+  config.tmp_dir              = temp_directory;
 
   if (config.uploader == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",

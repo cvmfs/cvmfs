@@ -228,9 +228,9 @@ Supported Commands:
                 All snapshots between trunk and the target tag become
                 inaccessible.  Without a tag name, trunk-previous is used.
   gc            [-l list deleted objects] [-r conserve <r> revisions]
-                [-h clear historic tags] [-s collect statistics] [-f don't ask again]
+                [-s collect statistics] [-d dry run] [-f don't ask again]
                 <fully qualified name>
-                (Garbage Collection) removes unneeded repository revisions
+                (Garbage Collection) removes unreferenced repository revisions
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
   list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
@@ -3697,24 +3697,24 @@ rollback() {
 gc() {
   local names
   local list_deleted_objects=0
+  local dry_run=0
   local preserve_revisions=0
-  local clear_history=0
   local collect_statistics=0
   local force=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "lr:hsf" option
+  while getopts "ldr:sf" option
   do
     case $option in
       l)
         list_deleted_objects=1
       ;;
+      d)
+        dry_run=1
+      ;;
       r)
         preserve_revisions="$OPTARG"
-      ;;
-      h)
-        clear_history=1
       ;;
       s)
         collect_statistics=1
@@ -3736,12 +3736,11 @@ gc() {
   check_multiple_repository_existence "$names"
 
   # global sanity checks
-  [ $preserve_revisions -ge 1 ] || die "at least one revision needs to be preserved! (see -r)"
+  [ $preserve_revisions -ge 0 ] || die "at least one revision needs to be preserved! (see -r)"
   if [ $force -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
     echo "Affected Repositories:      $names"
     echo "Preserved Legacy Revisions: $preserve_revisions"
-    echo "Remove Named Snapshots:     $( [ $clear_history -ne 0 ] && echo 'yes!!' || echo 'no' )"
     echo ""
     read -p "Please confirm this action (y/N)? " reply
     if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
@@ -3762,7 +3761,8 @@ gc() {
     [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
 
     local additional_switches=""
-    [ $list_deleted_objects -ne 0 ] && additional_switches="-l"
+    [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
+    [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
     local gc_command="cvmfs_swissknife gc -r $CVMFS_STRATUM0         \
                                           -u $CVMFS_UPSTREAM_STORAGE \
                                           -h $preserve_revisions     \
