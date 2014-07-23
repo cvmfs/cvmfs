@@ -9,3 +9,5 @@ enforce code style dicipline
 namespaces: use anonymous namespaces more systematically, review use of namespace together with moving source files into subdirectories (name spaces reflect relative path)
 REWRITE the hash abstraction! (templates, no manual alloca for ContextPtr)  <--  OBSOLETE due to special requirements for hashes
 Replace cvmfschecksum.$fqrn special format by manifest
+history databases become dangling at each update (no pointer to previous history)
+remove micro catalog legacy from the code base
