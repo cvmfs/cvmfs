@@ -833,7 +833,31 @@ class ObjectFetcher {
   }
 
   inline history::History* FetchHistory() {
-    return NULL;
+    manifest::Manifest *manifest = FetchManifest();
+    assert (manifest != NULL);
+
+    const shash::Any history_hash = manifest->history();
+    delete manifest;
+
+    std::string history_db_path;
+    const bool fetched_successful = Fetch(history_hash, &history_db_path, 'H');
+    if (! fetched_successful) {
+      LogCvmfs(kLogCatalogTraversal, error_sink_,
+               "failed to fetch history database (%s)",
+               history_hash.ToString().c_str());
+      assert (false && "history db download failed");
+    }
+
+    // TODO: need to unlink history_db_path after usage
+    history::History *history = history::History::Open(history_db_path);
+    if (NULL != history) {
+      LogCvmfs(kLogCatalogTraversal, error_sink_,
+               "failed to open history database (%s)",
+               history_db_path.c_str());
+      assert (false && "history db open failed");
+    }
+
+    return history;
   }
 
   inline bool Fetch(const shash::Any  &object_hash,
