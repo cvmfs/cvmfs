@@ -168,8 +168,8 @@ cvmfs_run_test() {
   local reference_dir3=$scratch_dir/reference_dir3
   local reference_dir4=$scratch_dir/reference_dir4
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log || return $?
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log -g || return $?
 
   # ============================================================================
 
@@ -276,7 +276,7 @@ cvmfs_run_test() {
   done
 
   echo "perform basic garbage collection"
-  cvmfs_server gc -r 1 -h -f $CVMFS_TEST_REPO || return 11
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 11
 
   echo "check if shakespeare is gone"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 12
