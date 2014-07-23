@@ -183,7 +183,8 @@ Usage: cvmfs_server COMMAND [options] <parameters>
 Supported Commands:
   mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
                 [-m replicable] [-f union filesystem type] [-v volatile content]
-                [-a hash algorithm (default: SHA-1)] [-s S3 config file]
+                [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
+                [-s S3 config file]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
@@ -1362,6 +1363,7 @@ create_config_files_for_new_repository() {
   local cvmfs_user=$4
   local unionfs=$5
   local hash_algo=$6
+  local autotagging=$7
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -1388,7 +1390,7 @@ CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
 CVMFS_UNION_FS_TYPE=$unionfs
 CVMFS_HASH_ALGORITHM=$hash_algo
-CVMFS_AUTO_TAG=true
+CVMFS_AUTO_TAG=$autotagging
 EOF
 
   # make sure that the config file does not exist, yet
@@ -1782,13 +1784,14 @@ mkfs() {
   local owner
   local replicable=1
   local volatile_content=0
+  local autotagging=true
   local unionfs
   local hash_algo
   local s3_config=""
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:a:vs:" option; do
+  while getopts "w:u:o:mf:vga:s:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1805,11 +1808,14 @@ mkfs() {
       f)
         unionfs=$OPTARG
       ;;
-      a)
-        hash_algo=$OPTARG
-      ;;
       v)
         volatile_content=1
+      ;;
+      g)
+        autotagging=false
+      ;;
+      a)
+        hash_algo=$OPTARG
       ;;
       s)
         s3_config=$OPTARG
@@ -1866,7 +1872,7 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo || die "fail"
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo $autotagging || die "fail"
   if is_local_upstream $upstream; then
     reload_apache > /dev/null
   fi
@@ -2230,7 +2236,7 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs || die "fail!"
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs sha1 true || die "fail!"
   echo "done"
 
   # import the old repository security keys
