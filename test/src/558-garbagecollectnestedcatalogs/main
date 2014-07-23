@@ -169,7 +169,7 @@ cvmfs_run_test() {
   local reference_dir4=$scratch_dir/reference_dir4
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log -g || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return $?
 
   # ============================================================================
 
