@@ -1,0 +1,76 @@
+
+cvmfs_test_name="Rename Cross-Branch Directory in AUFS (exdev)"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_1_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir foo
+  mkdir bar
+
+  echo "this file will be copied up and potentially causes a "   >  foo/mallory
+  echo "kernel dead lock because the rename() system call will " >> foo/mallory
+  echo "be called twice in the same call stack "                 >> foo/mallory
+
+  popdir
+}
+
+produce_files_2_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # this `mv` will call rename() to move the directory 'foo' into 'bar'. It will
+  # cause AUFS to perform a recursive copy-up of 'foo' which is not possible in
+  # the kernel. Thus the initial rename() inside `mv` will return EXDEV telling
+  # `mv` to fall back to a "copy and unlink" strategy.
+  # However, `mv` will re-try doing a simple rename() on each recursively found
+  # directory entry inside 'foo'; thus also for the file 'foo/mallory'. The call
+  # rename('foo/mallory', 'bar/foo/mallory') will again cause AUFS to perform an
+  # internal copy-up of 'mallory'.
+  # Assuming that 'mallory' is not yet in the cvmfs cache, it is downloaded and
+  # committed into the cvmfs cache using a rename(tmp file, cache-entry) which
+  # deadlocks with the still blocking intial rename('foo/mallory', ...). Phew!
+  mv foo bar/
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_1_in $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "change stuff in the repository (might produce a kernel dead lock)"
+  produce_files_2_in $repo_dir || return 2
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  return 0
+}
