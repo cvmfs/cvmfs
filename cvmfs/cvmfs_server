@@ -977,7 +977,7 @@ find_hazardous_aufs_config() {
 }
 
 
-# checks and warns in inconsistent repository states.
+# checks and warns in inconsistent repository states or unfavorable configs.
 #
 # @param name  the FQRN of the repository to be checked
 health_check() {
@@ -986,6 +986,17 @@ health_check() {
   # for stratum 1 repositories there are no health checks
   if is_stratum1 $name; then
     return 0
+  fi
+
+  # check configuration for harzardous AUFS setup
+  if find_hazardous_aufs_config $name; then
+    load_repo_config $name
+    echo "WARNING: AUFS config is vulnerable to kernel deadlocks. Please store "
+    echo "         the scratch space and the cvmfs client cache on different "
+    echo "         partitions. (Silence this with CVMFS_AUFS_WARNING=false)"
+    echo " Scratch Space: ${CVMFS_SPOOL_DIR}/scratch"
+    echo " Client Cache:  ${CVMFS_CACHE_BASE}"
+    echo ""
   fi
 
   # check mounted union file system
