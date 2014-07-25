@@ -29,7 +29,7 @@ echo "done"
 
 # mount additional disk partitions on strategic cvmfs location
 echo -n "mounting new disk partitions into cvmfs specific locations... "
-mount_partition $disk_to_partition$partition_1 /srv/cvmfs       || die "fail (mounting /srv/cvmfs $?)"
+mount_partition $disk_to_partition$partition_1 /srv             || die "fail (mounting /srv $?)"
 mount_partition $disk_to_partition$partition_2 /var/spool/cvmfs || die "fail (mounting /var/spool/cvmfs $?)"
 echo "done"
 
@@ -45,8 +45,13 @@ sudo /sbin/insmod $kobj || die "fail"
 echo "done"
 
 # allow httpd on backend storage
-echo -n "allowing httpd to access /srv/cvmfs..."
+echo -n "allowing httpd to access /srv/cvmfs... "
 sudo chcon --type httpd_sys_content_t /srv/cvmfs > /dev/null || die "fail"
+echo "done"
+
+# create the server's client cache directory in /srv (AUFS kernel deadlock workaround)
+echo -n "creating client cache on extra partition... "
+sudo mkdir /srv/cache || die "fail"
 echo "done"
 
 # running unit test suite
@@ -54,9 +59,10 @@ run_unittests --gtest_shuffle || ut_retval=$?
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
-./run.sh $TEST_LOGFILE -x src/004-davinci  \
-                          src/007-testjobs \
-                          src/045-oasis    \
+export CVMFS_TEST_SERVER_CACHE='/srv/cache' &&         \
+./run.sh $TEST_LOGFILE -x src/004-davinci              \
+                          src/007-testjobs             \
+                          src/045-oasis                \
                           src/518-hardlinkstresstest   \
                           src/523-corruptchunkfailover \
                           src/524-corruptmanifestfailover || it_retval=$?
