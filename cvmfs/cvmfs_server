@@ -949,6 +949,34 @@ foreclose_legacy_cvmfs() {
 }
 
 
+# checks if the configuration of a given repository is vulnerable to a kernel
+# deadlock bug of AUFS.
+#
+# @param name  the name of the repository to check
+# @return      0 if config is vulnerable
+find_hazardous_aufs_config() {
+  local name=$1
+
+  load_repo_config $name
+  if [ x"$CVMFS_UNION_FS_TYPE" != x"aufs"  ] || \
+     [ x"$CVMFS_AUFS_WARNING" = x"false"   ]; then
+    return 1
+  fi
+
+  local krnl_version="$(uname -r | cut --delimiter='-' --fields=1)"
+  local krnl_major="$(version_major $krnl_version)"
+  local krnl_minor="$(version_minor $krnl_version)"
+  if [ $krnl_major -ge 3 ] && [ $krnl_minor -ge 10 ]; then
+    return 1
+  fi
+
+  local cache_dir="$CVMFS_CACHE_BASE"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  [ x"$(get_partition_for_path $cache_dir)" = \
+    x"$(get_partition_for_path $scratch_dir)" ]
+}
+
+
 # checks and warns in inconsistent repository states.
 #
 # @param name  the FQRN of the repository to be checked
