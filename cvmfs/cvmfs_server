@@ -573,6 +573,16 @@ get_compatible_apache_allow_from_all_config() {
 }
 
 
+# find the partition name for a given file path
+#
+# @param   path  the path to the file to be checked
+# @return  the name of the partition that path resides on
+get_partition_for_path() {
+  local path="$1"
+  df --portability "$path" | tail -n1 | awk '{print $1}'
+}
+
+
 # checks if cvmfs2 client is installed
 #
 # @return  0 if cvmfs2 client is installed
