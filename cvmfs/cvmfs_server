@@ -963,11 +963,21 @@ find_hazardous_aufs_config() {
     return 1
   fi
 
-  local krnl_version="$(uname -r | cut --delimiter='-' --fields=1)"
-  local krnl_major="$(version_major $krnl_version)"
-  local krnl_minor="$(version_minor $krnl_version)"
-  if [ $krnl_major -ge 3 ] && [ $krnl_minor -ge 10 ]; then
-    return 1
+  if modinfo aufs > /dev/null 2>&1; then
+    local aufs_release=$(modinfo -F version aufs 2>/dev/null)
+    local aufs_date=$(echo "$aufs_release" | sed -e 's/[^-]\+-\(.*\)$/\1/')
+    local aufs_year=$(echo -n "$aufs_date" | head -c4)
+    local aufs_month=$(echo -n "$aufs_date" | head -c6 | tail -c2)
+    if [ $aufs_year -gt 2013 ] || [ $aufs_year -eq 2013 -a $aufs_month -gt 3 ]; then
+      return 1
+    fi
+  else
+    local krnl_version="$(uname -r | cut --delimiter='-' --fields=1)"
+    local krnl_major="$(version_major $krnl_version)"
+    local krnl_minor="$(version_minor $krnl_version)"
+    if [ $krnl_major -gt 3 ] || [ $krnl_major -eq 3 -a $krnl_minor -ge 10 ]; then
+      return 1
+    fi
   fi
 
   local cache_dir="$CVMFS_CACHE_BASE"
