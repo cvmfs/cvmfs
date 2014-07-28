@@ -71,6 +71,7 @@ class DirectoryEntry:
         self.md5path_1, self.md5path_2, self.parent_1, self.parent_2,    \
         self.content_hash, self.flags, self.size, self.mode, self.mtime, \
         self.name, self.symlink = result_set
+        self.chunks = []
         self._read_content_hash_type()
 
     def __str__(self):
@@ -118,6 +119,13 @@ class DirectoryEntry:
     def content_hash_string(self):
         suffix = ContentHashTypes.to_suffix(self.content_hash_type)
         return _binary_buffer_to_hex_string(self.content_hash) + suffix
+
+    def has_chunks(self):
+        return bool(self.chunks)
+
+    def _add_chunks(self, result_set):
+        self.chunks = [ Chunk(chunk_data, self.content_hash_type)
+                        for chunk_data in result_set ]
 
     def _read_content_hash_type(self):
         bit_mask     = _Flags.ContentHashType
