@@ -691,6 +691,23 @@ get_catalog_count() {
   echo $(cvmfs_server list-catalogs -x $repo_name | wc -l)
 }
 
+# retrieves the hash of the current root catalog of the given
+# repository by investigating the manifest
+# @param repo_name  the name of the repository
+# @return           the current root catalog hash
+get_current_root_catalog() {
+  local repo_name=$1
+  local manifest_url="$(get_repo_url $repo_name)/.cvmfspublished"
+  local catalog_record=$(curl "$manifest_url" 2>/dev/null | grep --text '^C[a-f0-9]*\(-[a-z0-9]*\)\?$')
+                                                                        # ^^~~~~~~~^ ^~~~~~~~~~~~^
+                                                                        # ||       | |           |
+                                                                        # ||       | +-----------+-- (optional) Hash Suffix
+                                                                        # |+-------+---------------- Hash String
+                                                                        # +------------------------- Manifest Field Identifier
+  local characters=$(echo -n $catalog_record | wc -c)
+  echo -n $catalog_record | tail -c $(( $characters - 1 ))
+}
+
 # uses `cvmfs_server check` to check the integrity of the catalog structure
 # additionally it might check the backend storage integrity as well when
 # provided with -i
