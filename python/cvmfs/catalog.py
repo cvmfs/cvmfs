@@ -12,7 +12,7 @@ import os
 
 
 from _common import _split_md5, DatabaseObject
-from dirent  import DirectoryEntry
+from dirent  import DirectoryEntry, Chunk
 
 
 class CatalogIterator:
@@ -208,7 +208,7 @@ class Catalog(DatabaseObject):
                             WHERE parent_1 = " + str(parent_1) + " AND         \
                                   parent_2 = " + str(parent_2) + "             \
                             ORDER BY name ASC;")
-        return [ DirectoryEntry(result) for result in res ]
+        return [ self._make_directory_entry(result) for result in res ]
 
 
     def find_directory_entry(self, path):
@@ -231,7 +231,7 @@ class Catalog(DatabaseObject):
                             WHERE md5path_1 = " + str(md5path_1) + " AND       \
                                   md5path_2 = " + str(md5path_2) + "           \
                             LIMIT 1;")
-        return DirectoryEntry(res[0]) if len(res) == 1 else None
+        return self._make_directory_entry(res[0]) if len(res) == 1 else None
 
 
     def is_root(self):
@@ -259,6 +259,24 @@ class Catalog(DatabaseObject):
             self.previous_revision = prop_value
         if prop_key == "root_prefix":
             self.root_prefix       = prop_value
+
+
+    def _make_directory_entry(self, result_set):
+        dirent = DirectoryEntry(result_set)
+        self._read_chunks(dirent)
+        return dirent
+
+
+    def _read_chunks(self, dirent):
+        """ Finds and adds the file chunk of a DirectoryEntry """
+        if self.schema < 2.4:
+            return
+        res = self.run_sql("SELECT " + Chunk._catalog_db_fields() + "           \
+                            FROM chunks                                         \
+                            WHERE md5path_1 = " + str(dirent.md5path_1) + " AND \
+                                  md5path_2 = " + str(dirent.md5path_2) + "     \
+                            ORDER BY offset ASC;")
+        dirent._add_chunks(res)
 
 
     def _guess_root_prefix_if_needed(self):
