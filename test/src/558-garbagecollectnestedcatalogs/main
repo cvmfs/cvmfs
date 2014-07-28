@@ -168,8 +168,12 @@ cvmfs_run_test() {
   local reference_dir3=$scratch_dir/reference_dir3
   local reference_dir4=$scratch_dir/reference_dir4
 
+  local condemned_clgs=""
+  local preserved_clgs=""
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return $?
+  condemned_clgs="$condemned_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
 
   # ============================================================================
 
@@ -184,6 +188,7 @@ cvmfs_run_test() {
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_1.log 2>&1 || return $?
+  condemned_clgs="$condemned_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir1 || return $?
@@ -202,6 +207,7 @@ cvmfs_run_test() {
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_2.log 2>&1 || return $?
+  condemned_clgs="$condemned_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir2 || return $?
@@ -221,6 +227,7 @@ cvmfs_run_test() {
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_3.log 2>&1 || return $?
+  preserved_clgs="$preserved_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir3 || return $?
@@ -241,6 +248,7 @@ cvmfs_run_test() {
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO > publish_4.log 2>&1 || return $?
+  preserved_clgs="$preserved_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir4 || return $?
@@ -266,9 +274,6 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_1       || return 9
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2       || return 9
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3       || return 9
-
-  local condemned_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep generic | head -n 4 | awk '{print $3}')"
-  local preserved_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep generic | tail -n 2 | awk '{print $3}')"
 
   echo "check if all catalog revisions are still there"
   for clg_hash in $condemned_clgs $preserved_clgs; do
