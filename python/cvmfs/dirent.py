@@ -37,6 +37,30 @@ class ContentHashTypes:
             return ""
 
 
+class Chunk:
+    """ Wrapper around file chunks in the CVMFS catalogs """
+
+    def __init__(self, chunk_data, content_hash_type):
+        if len(chunk_data) != 5:
+            raise Exception("Result set doesn't match")
+        _, _, self.offset, self.size, self.content_hash = chunk_data
+        self.content_hash_type = content_hash_type
+
+    def __str__(self):
+        return "<Chunk " + str(self.offset) + ">"
+
+    def __repr__(self):
+        return "<Chunk " + str(self.offset) + " - " + str(self.size) + ">"
+
+    def content_hash_string(self):
+        suffix = ContentHashTypes.to_suffix(self.content_hash_type)
+        return _binary_buffer_to_hex_string(self.content_hash) + suffix
+
+    @staticmethod
+    def _catalog_db_fields():
+        return "md5path_1, md5path_2, offset, size, hash"
+
+
 class DirectoryEntry:
     """ Thin wrapper around a DirectoryEntry as it is saved in the Catalogs """
 
