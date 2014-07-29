@@ -313,5 +313,26 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i -t revision_15 || return 22
   check_repository $CVMFS_TEST_REPO -i                || return 22
 
+  # ============================================================================
+
+  echo "delete an intermediate tag"
+  start_transaction $CVMFS_TEST_REPO || return 23
+  publish_repo $CVMFS_TEST_REPO -r "revision_10" >> $publish_log || return 24
+
+  echo "run garbage collection (should remove probe file 10)"
+  cvmfs_server gc -f || return 25
+
+  echo "check if all expected files are still there"
+  i=0
+  for hash in $(get_file_hashes); do
+    local modo=$(echo "$i % 5" | bc)
+    if [ $(echo "$i % 5" | bc) -eq 0 -a $i -ne 10 ] || [ $i -ge 16 ]; then
+      peek_backend $CVMFS_TEST_REPO "$hash" || return 26
+    else
+      peek_backend $CVMFS_TEST_REPO "$hash" && return 27
+    fi
+    i=$(( $i + 1 ))
+  done
+
   return 0
 }
