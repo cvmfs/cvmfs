@@ -1,0 +1,158 @@
+
+cvmfs_test_name="Garbage Collection After Legacy Repository Import"
+cvmfs_test_autofs_on_startup=false
+
+
+TEST519_LEGACY_STORAGE=""
+TEST519_NEW_REPO_NAME=""
+cleanup() {
+  [ -z "$TEST519_NEW_REPO_NAME" ]  || sudo cvmfs_server rmfs -f $TEST519_NEW_REPO_NAME
+  [ -z "$TEST519_LEGACY_STORAGE" ] || sudo rm -fR $TEST519_LEGACY_STORAGE
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  local guinea_pig_location="${script_location}/../../common/guinea_pig_repo_20"
+  local legacy_repo_name="testmigration.cern.ch"
+  local repo_dir="/cvmfs/${legacy_repo_name}"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+
+  echo "make sure there are no legacy repo leftovers from previous tests"
+  cleanup_legacy_repo_leftovers "$legacy_repo_name"
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo -n "resurrect legacy repository... "
+  local resurrect_log="resurrect.log"
+  TEST519_LEGACY_STORAGE="$legacy_repo_storage"
+  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                                                              || return $?
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-6.tar.gz" \
+                                   "$legacy_repo_name"                        \
+                                   "verbose" > $resurrect_log 2>&1 || return $?
+  echo "done"
+
+  echo "run the repository migration"
+  local import_log="import.log"
+  TEST519_NEW_REPO_NAME="$legacy_repo_name"
+  sudo mv $legacy_repo_storage/pub/data $legacy_repo_storage         || return 1
+  sudo ln -s $legacy_repo_storage/data $legacy_repo_storage/pub/data || return 2
+  sudo cp $legacy_repo_storage/pub/catalogs/.cvmfspublished         \
+          $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
+          $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
+          $legacy_repo_storage || return 3
+  sudo cvmfs_server import \
+    -o $CVMFS_TEST_USER    \
+    -l                     \
+    -s                     \
+    -g                     \
+    $legacy_repo_name > $import_log 2>&1 || return 4
+
+  echo "get all data chunks in the legacy repository"
+  local data_chunks="$(cat $resurrect_log | grep -o '[0-9a-f]\{2\}\/[0-9a-f]\+$' | sed 's/\///g')"
+
+  echo "get all loaded catalogs during the migration (2.0 catalogs)"
+  local last_legacy_catalogs="$(cat $resurrect_log | grep -o '[0-9a-f]\{2\}\/[0-9a-f]\+C' | sed 's/[\/C]//g')"
+
+  echo "get all catalog hashes after the import (2.1 catalogs)"
+  local converted_catalogs="$(cvmfs_server list-catalogs -mh $legacy_repo_name | awk '{print $1}')"
+
+  echo "create an additional revision after the migration to create the history database"
+  start_transaction $legacy_repo_name || return 5
+
+  echo "empty the repository, in order to have some garbage"
+  rm -fR /cvmfs/${legacy_repo_name}/dir3 /cvmfs/${legacy_repo_name}/dir7 || return 6
+
+  echo "publish the new revision"
+  publish_repo $legacy_repo_name      || return 7
+
+  echo "check migrated catalogs and data chunks"
+  check_repository $legacy_repo_name || return 8
+
+  echo "check if all catalogs are there"
+  for hash in $last_legacy_catalogs $converted_catalogs; do
+    peek_backend $legacy_repo_name "${hash}C" || return 9
+  done
+
+  echo "check if all data chunks are there"
+  for hash in $data_chunks; do
+    peek_backend $legacy_repo_name $hash || return 10
+  done
+
+  echo "run a first garbage collection to delete all revision execept the last 4"
+  cvmfs_server gc -r 3 -f $legacy_repo_name || return 11
+
+  echo "check if some 2.0 catalogs are gone (5 expected)"
+  local not_available_catalogs=0
+  for hash in $last_legacy_catalogs; do
+    peek_backend $legacy_repo_name "${hash}C" || not_available_catalogs=$(( $not_available_catalogs + 1 ))
+  done
+  echo "$not_available_catalogs are not available"
+  [ $not_available_catalogs -eq 5 ] || return 12
+
+  echo "check if the right 2.0 catalogs are gone"
+  local condemned_catalogs="713ca8a74dd20682338da781e314ac2b8ce883e4
+1b027e59f09fa69514a29811bcc22427fac3cad3
+d75c0a16673229c02491660e05bdd214620943d5
+ba15ac77075a19738c361f3abb8b608383e8d072
+e1db87c42de2501a3999b6fbbfdf9674ad968e71"
+  for hash in $condemned_catalogs; do
+    peek_backend $legacy_repo_name "${hash}C" && return 13
+  done
+
+  echo "check if all 2.1 catalogs are still there"
+  for hash in $converted_catalogs; do
+    peek_backend $legacy_repo_name "${hash}C" || return 14
+  done
+
+  echo "run a second garbage collection that should wipe out all but the 2.1 catalogs"
+  cvmfs_server gc -r 0 -f $legacy_repo_name || return 15
+
+  echo "check if all 2.0 catalogs are gone"
+  for hash in $last_legacy_catalogs; do
+    peek_backend $legacy_repo_name "${hash}C" && return 16
+  done
+
+  echo "check if some data chunks are gone (4 expected)"
+  local not_available_chunks=0
+  for hash in $data_chunks; do
+    peek_backend $legacy_repo_name $hash || not_available_chunks=$(( $not_available_chunks + 1 ))
+  done
+  echo "$not_available_chunks are not available"
+  [ $not_available_chunks -eq 4 ] || return 17
+
+  local condemned_objects="652f9cf5141503b71894a697576be429af9d8185
+ae5e22592eb2346f79974ca79f9eabcdb6b6b259
+07bbaa62f48ff3ce57fd167879bd4ee32a606431
+c2ccd8ec97ab28c586be9c85dc46a7cadf5cbaa2"
+  echo "check that the right data chunks are gone"
+  for hash in $condemned_objects; do
+    peek_backend $legacy_repo_name $hash && return 18
+  done
+
+  echo "check if some initial 2.1 catalogs are gone (expected 7)"
+  not_available_catalogs=0
+  for hash in $converted_catalogs; do
+    peek_backend $legacy_repo_name "${hash}C" || not_available_catalogs=$(( $not_available_catalogs + 1 ))
+  done
+  echo "$not_available_catalogs are not available"
+  [ $not_available_catalogs -eq 7 ] || return 19
+
+  echo "check that the right catalogs exist"
+  if ! check_catalog_presence /            $legacy_repo_name || \
+     ! check_catalog_presence /dir1        $legacy_repo_name || \
+     ! check_catalog_presence /dir2        $legacy_repo_name || \
+     ! check_catalog_presence /dir4        $legacy_repo_name || \
+     ! check_catalog_presence /dir6        $legacy_repo_name || \
+     ! check_catalog_presence /dir5/ndir5  $legacy_repo_name; then
+    return 19
+  fi
+
+  echo "check the integrity of the remaining revision of the repository"
+  check_repository $legacy_repo_name || return 20
+
+  return 0
+}
