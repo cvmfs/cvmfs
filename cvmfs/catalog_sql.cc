@@ -373,17 +373,24 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 
 SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
   const string statement =
-    "SELECT hash, flags, 0  "
-    "  FROM catalog  "
-    "  WHERE length(catalog.hash) > 0 "
-    "UNION "
-    "SELECT chunks.hash, catalog.flags, 1 "
-    "  FROM catalog "
-    "  LEFT JOIN chunks "
-    "  ON catalog.md5path_1 = chunks.md5path_1 AND "
-    "     catalog.md5path_2 = chunks.md5path_2 "
-    "  WHERE length(catalog.hash) > 0;";
-  Init(database.sqlite_db(), statement);
+    (database.schema_version() < 2.4-CatalogDatabase::kSchemaEpsilon)
+    ? "SELECT hash, flags, 0 "
+      "  FROM catalog "
+      "  WHERE length(hash) > 0;"
+
+    : "SELECT hash, flags, 0 "
+      "  FROM catalog "
+      "  WHERE length(catalog.hash) > 0 "
+      "UNION "
+      "SELECT chunks.hash, catalog.flags, 1 "
+      "  FROM catalog "
+      "  LEFT JOIN chunks "
+      "  ON catalog.md5path_1 = chunks.md5path_1 AND "
+      "     catalog.md5path_2 = chunks.md5path_2 "
+      "  WHERE length(catalog.hash) > 0;";
+
+  const bool successful_init = Init(database.sqlite_db(), statement);
+  assert (successful_init);
 }
 
 
