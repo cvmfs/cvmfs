@@ -43,7 +43,9 @@ BuildRequires: fuse-devel
 BuildRequires: pkgconfig
 BuildRequires: openssl-devel
 BuildRequires: libattr-devel
-%{?el5:BuildRequires: buildsys-macros}
+%if 0%{?el5}
+BuildRequires: buildsys-macros
+%endif
 
 Requires: bash
 Requires: coreutils
@@ -86,9 +88,11 @@ Requires: cvmfs-keys >= 1.2
 # SELinux integration
 # These are needed to build the selinux policy module.
 %if 0%{?selinux_cvmfs}
-%global selinux_policyver %(%{__sed} -e 's,.*selinux-policy-\\([^/]*\\)/.*,\\1,' /usr/share/selinux/devel/policyhelp || echo 0.0.0)
+%{!?_selinux_policy_version: %global _selinux_policy_version %(sed -e 's,.*selinux-policy-\\([^/]*\\)/.*,\\1,' /usr/share/selinux/devel/policyhelp 2>/dev/null)}
+%if "%{_selinux_policy_version}" != ""
+Requires:      selinux-policy >= %{_selinux_policy_version}
+%endif
 BuildRequires:  checkpolicy selinux-policy-devel hardlink selinux-policy-targeted
-Requires:       selinux-policy >= %{selinux_policyver}
 Requires(post):         /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
 Requires(preun):        /sbin/service /usr/sbin/semodule /usr/sbin/semanage /sbin/fixfiles
 Requires(postun):       /usr/sbin/semodule
