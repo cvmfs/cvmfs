@@ -335,6 +335,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       return false;
     }
 
+    // Inception! Go deeper into the catalog tree
+    PushReferencedCatalogs(ctx, catalog, job);
+
     // Provide the user with the catalog
     this->NotifyListeners(CallbackData(catalog,
                                        job.hash,
@@ -342,8 +345,6 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                                        file_size,
                                        job.history_depth));
 
-    // Inception! Go deeper into the catalog tree
-    PushReferencedCatalogs(ctx, catalog, job);
 
     // We are done with this catalog
     if (!no_close_) {
