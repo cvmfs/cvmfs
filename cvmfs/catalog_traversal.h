@@ -286,11 +286,6 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       CatalogJob job = ctx.catalog_stack.top();
       ctx.catalog_stack.pop();
 
-      // if necessary, we keep track of visited catalogs
-      if (no_repeat_history_) {
-        visited_catalogs_.insert(job.hash);
-      }
-
       // Process it (potentially generating new catalog jobs on the stack)
       const bool success = ProcessCatalogJob(ctx, job);
       if (! success) {
@@ -420,9 +415,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return pushed_catalogs;
   }
 
-
-  bool MightPush(TraversalContext &ctx, const CatalogJob &job) const {
-    if (no_repeat_history_ && visited_catalogs_.count(job.hash) > 0) {
+  bool MightPush(TraversalContext &ctx, const CatalogJob &job) {
+    if (WasHitBefore(job)) {
       return false;
     }
 
@@ -431,8 +425,28 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
   bool MightPush(      TraversalContext  &ctx,
-                 const shash::Any        &root_catalog_hash) const {
+                 const shash::Any        &root_catalog_hash) {
     return MightPush(ctx, CatalogJob("", root_catalog_hash, 0, 0));
+  }
+
+  /**
+   * Checks the traversal history if the given catalog was traversed or at least
+   * seen before. If 'no_repeat_history' is not set this is always 'false'.
+   *
+   * @param job   the job to be checked against the traversal history
+   * @return      true if the specified catalog was hit before
+   */
+  bool WasHitBefore(const CatalogJob &job) {
+    if (! no_repeat_history_) {
+      return false;
+    }
+
+    if (visited_catalogs_.count(job.hash) > 0) {
+      return true;
+    }
+
+    visited_catalogs_.insert(job.hash);
+    return false;
   }
 
   shash::Any GetRepositoryRootCatalogHash() {
