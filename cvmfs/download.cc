@@ -67,6 +67,7 @@ static inline bool EscapeUrlChar(char input, char output[3]) {
       ((input >= 'a') && (input <= 'z')) ||
       (input == '/') || (input == ':') || (input == '.') ||
       (input == '+') || (input == '-') ||
+      (input == '_') || (input == '~') ||
       (input == '[') || (input == ']'))
   {
     output[0] = input;
