@@ -146,17 +146,33 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       hash(hash),
       tree_level(tree_level),
       history_depth(history_depth),
-      parent(parent) {}
+      parent(parent),
+      catalog_file_size(0),
+      ignore(false),
+      catalog(NULL) {}
 
     bool IsRootCatalog() const { return tree_level == 0; }
 
+    CallbackData GetCallbackData() const {
+      return CallbackData(catalog, hash, tree_level,
+                          catalog_file_size, history_depth);
+    }
+
+    // initial state description
     const std::string   path;
     const shash::Any    hash;
     const unsigned      tree_level;
     const unsigned      history_depth;
           CatalogT     *parent;
+
+    // dynamic processing state
+    std::string   catalog_file_path;
+    size_t        catalog_file_size;
+    bool          ignore;
+    CatalogT     *catalog;
   };
-  typedef std::stack<CatalogJob> CatalogJobStack;
+
+  typedef std::stack<CatalogJob>   CatalogJobStack;
 
   /**
    * This struct represents a catalog traversal context. It needs to be re-
@@ -283,96 +299,85 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     // the traversal can terminate
     while (! ctx.catalog_stack.empty()) {
       // Get the top most catalog for the next processing step
-      CatalogJob job = ctx.catalog_stack.top();
-      ctx.catalog_stack.pop();
+      CatalogJob job = ctx.catalog_stack.top(); ctx.catalog_stack.pop();
 
-      // Process it (potentially generating new catalog jobs on the stack)
-      const bool success = ProcessCatalogJob(ctx, job);
-      if (! success) {
-        LogCvmfs(kLogCatalogTraversal, error_sink_, "aborting catalog traversal "
-                                                    "(%d jobs left in the queue)",
-                 ctx.catalog_stack.size());
-        return false;
-      }
+      // download the catalog file
+      const bool successful_download = FetchCatalog(job);
+      if (job.ignore)            continue;
+      if (! successful_download) return false;
+
+      // open the catalog file
+      const bool successful_open = OpenCatalog(job);
+      if (! successful_open) return false;
+
+      // push catalogs referenced by the current catalog (stack)
+      const unsigned int pushed_catalogs = PushReferencedCatalogs(ctx, job);
+
+      // notify listeners
+      this->NotifyListeners(job.GetCallbackData());
+
+      // might need to close the catalog
+      CloseCatalog(job);
     }
 
     return true;
   }
 
+  bool FetchCatalog(CatalogJob &job) {
+    const bool successful_fetch = object_fetcher_.Fetch( job.hash,
+                                                        &job.catalog_file_path);
 
-  bool ProcessCatalogJob(TraversalContext &ctx, const CatalogJob &job) {
-    // Load a catalog
-    std::string tmp_file;
-    const bool fetched_catalog = object_fetcher_.Fetch(job.hash, &tmp_file);
-
-    if (! fetched_catalog) {
+    if (! successful_fetch) {
       if (ignore_load_failure_ && job.IsRootCatalog()) {
         LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignore missing root catalog "
                                                   "%s (possibly sweeped before)",
                  job.hash.ToString().c_str());
-        return true;
+        job.ignore = true;
       } else {
         LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s",
                  job.hash.ToString().c_str());
-        return false;
       }
+
+      return false;
     }
 
-    // Get the size of the decompressed catalog file
-    const size_t file_size = GetFileSize(tmp_file);
+    job.catalog_file_size = GetFileSize(job.catalog_file_path);
+    return true;
+  }
 
-    // Open the catalog
-    CatalogT *catalog = CatalogT::AttachFreely(job.path,
-                                               tmp_file,
-                                               job.hash,
-                                               job.parent);
-    if (!no_close_) {
-      unlink(tmp_file.c_str());
-    }
-    if (catalog == NULL) {
+  bool OpenCatalog(CatalogJob &job) {
+    assert (! job.ignore);
+
+    job.catalog = CatalogT::AttachFreely(job.path,
+                                         job.catalog_file_path,
+                                         job.hash,
+                                         job.parent);
+
+    if (job.catalog == NULL) {
       LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to open catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
 
-    // Inception! Go deeper into the catalog tree
-    PushReferencedCatalogs(ctx, catalog, job);
-
-    // Provide the user with the catalog
-    this->NotifyListeners(CallbackData(catalog,
-                                       job.hash,
-                                       job.tree_level,
-                                       file_size,
-                                       job.history_depth));
-
-
-    // We are done with this catalog
-    if (!no_close_) {
-      delete catalog;
-    }
-
     return true;
   }
 
-
   unsigned int PushReferencedCatalogs(      TraversalContext  &ctx,
-                                            CatalogT          *catalog,
                                       const CatalogJob        &job)
   {
-    return   MightPushPreviousRevision(ctx, catalog, job)
-           + MightPushNestedCatalogs  (ctx, catalog, job);
+    return   MightPushPreviousRevision(ctx, job)
+           + MightPushNestedCatalogs  (ctx, job);
   }
 
   unsigned int MightPushPreviousRevision(      TraversalContext  &ctx,
-                                               CatalogT          *catalog,
                                          const CatalogJob        &job)
   {
     // only root catalogs are used for entering a previous revision (graph)
-    if (! catalog->IsRoot()) {
+    if (! job.catalog->IsRoot()) {
       return 0;
     }
 
-    const shash::Any previous_revision = catalog->GetPreviousRevision();
+    const shash::Any previous_revision = job.catalog->GetPreviousRevision();
     if (previous_revision.IsNull()) {
       return 0;
     }
@@ -393,16 +398,15 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
   unsigned int MightPushNestedCatalogs(      TraversalContext  &ctx,
-                                             CatalogT          *catalog,
                                        const CatalogJob        &job)
   {
     unsigned int pushed_catalogs = 0;
     const typename CatalogT::NestedCatalogList &nested = // TODO: C++11 auto ;-)
-                                                  catalog->ListNestedCatalogs();
+                                              job.catalog->ListNestedCatalogs();
     typename CatalogT::NestedCatalogList::const_iterator i    = nested.begin();
     typename CatalogT::NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
-      CatalogT* parent = (no_close_) ? catalog : NULL;
+      CatalogT* parent = (no_close_) ? job.catalog : NULL;
       const CatalogJob new_job(i->path.ToString(),
                                i->hash,
                                job.tree_level + 1,
@@ -414,6 +418,14 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     return pushed_catalogs;
+  }
+
+  void CloseCatalog(CatalogJob &job) {
+    if (!no_close_) {
+      delete job.catalog;
+      job.catalog = NULL;
+      unlink(job.catalog_file_path.c_str());
+    }
   }
 
   bool MightPush(TraversalContext &ctx, const CatalogJob &job) {
@@ -449,6 +461,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     visited_catalogs_.insert(job.hash);
     return false;
   }
+
 
   shash::Any GetRepositoryRootCatalogHash() {
     // get the manifest of the repository to learn about the entry point or the
