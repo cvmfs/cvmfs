@@ -1013,6 +1013,8 @@ health_check() {
     echo " Scratch Space: ${CVMFS_SPOOL_DIR}/scratch"
     echo " Client Cache:  ${CVMFS_CACHE_BASE}"
     echo ""
+    echo " More info: http://cernvm.cern.ch/portal/cvmfs/workaround-krnl-deadlock"
+    echo ""
   fi
 
   # check mounted union file system
