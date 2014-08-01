@@ -209,7 +209,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     bool          postponed;
   };
 
-  typedef std::stack<CatalogJob>   CatalogJobStack;
+  typedef std::stack<CatalogJob> CatalogJobStack;
 
   /**
    * This struct represents a catalog traversal context. It needs to be re-
@@ -376,6 +376,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * @return      true on successful traversal and false on abort
    */
   bool DoTraverse(TraversalContext &ctx) {
+    assert (ctx.callback_stack.empty());
 
     while (! ctx.catalog_stack.empty()) {
       // Get the top most catalog for the next processing step
@@ -432,6 +433,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
   bool OpenCatalog(CatalogJob &job) {
     assert (! job.ignore);
+    assert (job.catalog == NULL);
 
     job.catalog = CatalogT::AttachFreely(job.path,
                                          job.catalog_file_path,
@@ -556,6 +558,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       clbs.pop();
       if (! clbs.empty()) {
         CatalogJob &parent_job = ctx.callback_stack.top();
+        assert (parent_job.postponed);
         assert (parent_job.referenced_catalogs > 0);
         parent_job.referenced_catalogs--;
       }
@@ -593,9 +596,12 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * Note: this is only used for the Depth First Traversal strategy!
    */
   void PostponeYield(TraversalContext &ctx, CatalogJob &job) {
-    if (! no_close_ && job.referenced_catalogs > 0) {
-      delete job.catalog; job.catalog = NULL;
+    if (job.referenced_catalogs > 0) {
       job.postponed = true;
+
+      if (! no_close_) {
+        delete job.catalog; job.catalog = NULL;
+      }
     }
 
     ctx.callback_stack.push(job);
