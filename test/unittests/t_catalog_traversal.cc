@@ -73,24 +73,47 @@ class T_CatalogTraversal : public ::testing::Test {
     return path;
   }
 
-  void CheckVisitedCatalogs(const CatalogIdentifiers expected,
-                            const CatalogIdentifiers observed,
-                            const bool               check_counts = true) {
+  void CheckVisitedCatalogs(const CatalogIdentifiers &expected,
+                            const CatalogIdentifiers &observed,
+                            const bool                check_counts = true) {
     if (check_counts) {
       EXPECT_EQ (expected.size(), observed.size());
     }
     typedef CatalogIdentifiers::const_iterator itr;
 
-    unsigned int _i = 0;
     itr i    = expected.begin();
     itr iend = expected.end();
     for (; i != iend; ++i) {
       bool found = false;
 
-      unsigned int _j = 0;
       itr j    = observed.begin();
       itr jend = observed.end();
       for (; j != jend; ++j) {
+        if (*i == *j) {
+          found = true;
+          break;
+        }
+      }
+
+      EXPECT_TRUE (found) << "didn't find catalog: " << i->second << " "
+                          << "(revision: " << i->first << ")";
+    }
+  }
+
+  void CheckCatalogSequence(const CatalogIdentifiers &expected,
+                            const CatalogIdentifiers &observed) {
+    typedef CatalogIdentifiers::const_iterator itr;
+
+    unsigned int _i = 0;
+    itr i    = expected.begin();
+    itr iend = expected.end();
+    for (; i != iend; ++i, ++_i) {
+      bool found = false;
+
+      unsigned int _j = 0;
+      itr j    = observed.begin();
+      itr jend = observed.end();
+      for (; j != jend; ++j, ++_j) {
         if (*i == *j) {
           found = true;
           EXPECT_EQ (_i, _j) << "traversing order changed";
@@ -2681,4 +2704,45 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat) 
   EXPECT_EQ (0u, traverse.pruned_revision_count());
   EXPECT_EQ (initial_catalog_instances, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
   CheckVisitedCatalogs(catalogs, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+CatalogIdentifiers DepthFirstTraversalSequence_visited_catalogs;
+void DepthFirstTraversalSequenceCallback(
+                             const MockedCatalogTraversal::CallbackData &data) {
+  DepthFirstTraversalSequence_visited_catalogs.push_back(
+    std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
+}
+
+TEST_F(T_CatalogTraversal, DepthFirstTraversalSequence) {
+  DepthFirstTraversalSequence_visited_catalogs.clear();
+  EXPECT_EQ (0u, DepthFirstTraversalSequence_visited_catalogs.size());
+
+  CatalogIdentifiers catalogs;
+
+  CatalogTraversalParams params;
+  params.history           = 0;
+  MockedCatalogTraversal traverse(params);
+  traverse.RegisterListener(&DepthFirstTraversalSequenceCallback);
+
+  const bool t1 = traverse.Traverse(GetRootHash(2), MockedCatalogTraversal::kDepthFirstTraversal);
+  EXPECT_TRUE (t1);
+
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, ""));
+
+  EXPECT_EQ (1u, traverse.pruned_revision_count());
+  CheckVisitedCatalogs(catalogs, DepthFirstTraversalSequence_visited_catalogs);
+  CheckCatalogSequence(catalogs, DepthFirstTraversalSequence_visited_catalogs);
 }
