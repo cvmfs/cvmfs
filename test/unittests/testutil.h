@@ -333,6 +333,7 @@ class MockObjectFetcher {
   }
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {
+    catalog_file->clear();
     return (deleted_catalogs == NULL ||
             deleted_catalogs->find(catalog_hash) == deleted_catalogs->end());
   }
