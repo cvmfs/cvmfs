@@ -128,6 +128,12 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   typedef CatalogTraversalData<CatalogT> CallbackData;
   typedef CatalogT                       Catalog;
 
+ public:
+  enum TraversalType {
+    kBreadthFirstTraversal,
+    kDepthFirstTraversal
+  };
+
  protected:
   typedef std::set<shash::Any>           HashSet;
 
@@ -180,11 +186,14 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * specific catalog traversal run.
    */
   struct TraversalContext {
-    TraversalContext(const unsigned history_depth) :
-      history_depth(history_depth) {}
+    TraversalContext(const unsigned       history_depth,
+                     const TraversalType  traversal_type) :
+      history_depth(history_depth),
+      traversal_type(traversal_type) {}
 
-    const unsigned   history_depth;
-    CatalogJobStack  catalog_stack;
+    const unsigned       history_depth;
+    const TraversalType  traversal_type;
+    CatalogJobStack      catalog_stack;
   };
 
  public:
@@ -208,11 +217,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * After calling this methods CatalogTraversal will go through all catalogs
    * and call the registered callback methods for each found catalog.
    * If something goes wrong in the process, the traversal will be cancelled.
-   * @return  true, when all catalogs were successfully processed. On failure
-   *          the traversal is cancelled and false is returned
+   *
+   * @param type   breadths or depth first traversal
+   * @return       true, when all catalogs were successfully processed. On
+   *               failure the traversal is cancelled and false is returned.
    */
-  bool Traverse() {
-    TraversalContext ctx(default_history_depth_);
+  bool Traverse(const TraversalType type = kBreadthFirstTraversal) {
+    TraversalContext ctx(default_history_depth_, type);
     const shash::Any root_catalog_hash = GetRepositoryRootCatalogHash();
     if (root_catalog_hash.IsNull()) {
       return false;
@@ -225,12 +236,14 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * Starts the traversal process at the catalog pointed to by the given hash
    *
    * @param root_catalog_hash  the entry point into the catalog traversal
+   * @param type               breadths or depth first traversal
    * @return                   true when catalogs were successfully traversed
    */
-  bool Traverse(const shash::Any &root_catalog_hash) {
+  bool Traverse(const shash::Any     &root_catalog_hash,
+                const TraversalType   type = kBreadthFirstTraversal) {
     // add the root catalog of the repository as the first element on the job
     // stack
-    TraversalContext ctx(default_history_depth_);
+    TraversalContext ctx(default_history_depth_, type);
     MightPush(ctx, root_catalog_hash);
     return DoTraverse(ctx);
   }
@@ -240,12 +253,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * points into the traversal process. Traversing is done as configured from
    * each of the entry points.
    *
-   * @return  true when catalog traversal successfully finished
+   * @param type  breadths or depth first traversal
+   * @return      true when catalog traversal successfully finished
    */
-  bool TraverseNamedSnapshots() {
+  bool TraverseNamedSnapshots(const TraversalType type = kBreadthFirstTraversal) {
     typedef std::vector<shash::Any> HashList;
 
-    TraversalContext ctx(default_history_depth_);
+    TraversalContext ctx(default_history_depth_, type);
     const UniquePtr<history::History> tag_db(GetHistory());
     HashList root_hashes;
     const bool success = tag_db->GetHashes(&root_hashes);
@@ -271,11 +285,12 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    *       track of the root catalog hashes of catalog revisions that have been
    *       pruned before. TraversePruned() will use those as entry points.
    *
-   * @return  true on successful traversal of all necessary catalogs or false
-   *          in case of failure or no_repeat_history == false
+   * @param type  breadths or depth first traversal
+   * @return      true on successful traversal of all necessary catalogs or
+   *              false in case of failure or no_repeat_history == false
    */
-  bool TraversePruned() {
-    TraversalContext ctx(CatalogTraversalParams::kFullHistory);
+  bool TraversePruned(const TraversalType type = kBreadthFirstTraversal) {
+    TraversalContext ctx(CatalogTraversalParams::kFullHistory, type);
     if (pruned_revisions_.empty()) {
       return false;
     }
@@ -293,6 +308,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
  protected:
   bool DoTraverse(TraversalContext &ctx) {
+
     // The CatalogTraversal works with a stack, where new nested catalogs are
     // pushed onto while processing their parent (breadth first traversal).
     // When all catalogs are processed, this stack will naturally be empty and
@@ -461,7 +477,6 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     visited_catalogs_.insert(job.hash);
     return false;
   }
-
 
   shash::Any GetRepositoryRootCatalogHash() {
     // get the manifest of the repository to learn about the entry point or the
