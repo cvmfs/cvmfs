@@ -32,7 +32,7 @@ namespace swissknife {
  * Callback data which has to be implemented by the registered callback
  * functions/methods (see Observable<> for further details)
  * @param catalog             the catalog object which needs to be processed
- * @param catalog_hash        the SHA-1 content hash of the catalog
+ * @param catalog_hash        the content hash of the catalog
  * @param tree_level          the depth in the nested catalog tree
  *                            (starting at zero)
  * @param history_depth       the distance from the current HEAD revision
@@ -99,20 +99,48 @@ struct CatalogTraversalParams {
 class ObjectFetcher;
 
 /**
- * This class traverses the complete catalog hierarchy of a CVMFS repository
- * recursively. The user can specify a callback which is called for each catalog
- * on the way.
- * We are doing a BFS, pre-order traversal here. (I.e. if you simply print
- * the catalogs in the provided order you obtain a nice catalog tree.)
+ * This class traverses the catalog hierarchy of a CVMFS repository recursively.
+ * Also historic catalog trees can be traversed. The user needs to specify a
+ * callback which is called for each catalog on the way.
+ *
+ * CatalogTraversal<> can be configured and used in various ways:
+ *   -> Historic catalog traversal
+ *   -> Never traverse a certain catalog twice
+ *   -> Breadth First Traversal or Depth First Traversal
+ *   -> Optional catalog memory management (no_close)
+ *   -> Use all Named Snapshots of a repository as traversal entry point
+ *   -> Traverse starting from a provided catalog
+ *   -> Traverse catalogs that were previously skipped
+ *
+ * Breadth First Traversal Strategy
+ *   Catalogs are handed out to the user identical as they are traversed.
+ *   Say: From top to buttom. When you would simply print each received catalog
+ *        the result would be a nice representation of the catalog tree.
+ *   This method is more efficient, because catalogs are opened, processed and
+ *   thrown away directly afterwards.
+ *
+ * Depth First Traversal Strategy
+ *   The user gets the catalog tree starting from the leaf nodes.
+ *   Say: From bottom to top. A user can assume that he got all children or
+ *        historical ancestors of a catalog before.
+ *   This method climbs down the full catalog tree and hands it out 'in reverse
+ *   order'. Thus, catalogs on the way are opened, checked for their descendants
+ *   and closed. Once all children and historical ancestors are processed, it is
+ *   re-opened and handed out to the user.
+ *   Note: This method needs more disk space to temporarily storage downloaded
+ *         but not yet processed catalogs.
+ *
  * Note: Since all CVMFS catalog files together can grow to several gigabytes in
  *       file size, each catalog is loaded, processed and removed immediately
- *       afterwards.
+ *       afterwards. Except if no_close is specified, which allows the user to
+ *       choose when a catalog should be closed.
  *
  * @param CatalogT        the catalog class that should be used for traversal
  *                        usually this will be either catalog::Catalog or
  *                        catalog::WritableCatalog
  *                        (please consider to use the typedef'ed versions of
  *                        this template i.e. [Readable|Writable]CatalogTraversal)
+ *
  * @param ObjectFetcherT  Strategy Pattern implementation that is supposed to be
  *                        used mainly for unit-testability. Normal usage should
  *                        not bring up the need to actually set this to anything
@@ -172,7 +200,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     const unsigned      history_depth;
           CatalogT     *parent;
 
-    // dynamic processing state
+    // dynamic processing state (used internally)
     std::string   catalog_file_path;
     size_t        catalog_file_size;
     bool          ignore;
@@ -187,6 +215,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * This struct represents a catalog traversal context. It needs to be re-
    * created for each catalog traversal process and contains information to this
    * specific catalog traversal run.
+   *
+   * @param history_depth   the history traversal threshold
+   * @param traversal_type  either breadth or depth first traversal strategy
+   * @param catalog_stack   the call stack for catalogs to be traversed
+   * @param callback_stack  used in depth first traversal for deferred yielding
    */
   struct TraversalContext {
     TraversalContext(const unsigned       history_depth,
@@ -311,12 +344,39 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   size_t pruned_revision_count() const { return pruned_revisions_.size(); }
 
  protected:
+  /**
+   * This controls the actual traversal. Using a stack to traverse down the
+   * catalog hierarchy. This method implements the traversal itself, but not
+   * in which way catalogs are handed out to the user code.
+   *
+   * Each catalog is processed in these steps:
+   *  1.) Pop the next catalog from the stack
+   *        Catalogs are always traversed from latest to oldest revision and
+   *        from root to leaf nested catalogs
+   *  2.) Fetch the catalog from the repository
+   *        Depending on where the catalog comes from, this might do different
+   *        things (see ObjectFetcherT).
+   *  3.) Open the fetched catalog
+   *        Depending on the catalog this implementation might differ
+   *        (see CatalogT::AttachFreely)
+   *  4.) Find and push referencing catalogs
+   *        This pushes all descendants of the current catalog onto the stack.
+   *        Note that this is dependant on the strategy (depth or breadth first)
+   *        and on the history threshold (see history_depth). Furthermore,
+   *        catalogs might not be pushed again, when seen before (see
+   *        no_repeat_history).
+   *  5.) Hand the catalog out to the user code
+   *        Depending on the traversal strategy (depth of breadths first) this
+   *        might immediately yield zero to N catalogs to the user code.
+   *
+   * Note: If anything unexpected goes wrong during the traversal process, it
+   *       is aborted immediately.
+   *
+   * @param ctx   the traversal context that steers the whole traversal process
+   * @return      true on successful traversal and false on abort
+   */
   bool DoTraverse(TraversalContext &ctx) {
 
-    // The CatalogTraversal works with a stack, where new nested catalogs are
-    // pushed onto while processing their parent (breadth first traversal).
-    // When all catalogs are processed, this stack will naturally be empty and
-    // the traversal can terminate
     while (! ctx.catalog_stack.empty()) {
       // Get the top most catalog for the next processing step
       CatalogJob job = ctx.catalog_stack.top(); ctx.catalog_stack.pop();
@@ -338,6 +398,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       if (! successful_yield) return false;
     }
 
+    // invariant: after the traversal finshed, there should be no more catalogs
+    //            to traverse or to yield!
     assert (ctx.catalog_stack.empty());
     assert (ctx.callback_stack.empty());
     return true;
@@ -347,6 +409,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     const bool successful_fetch = object_fetcher_.Fetch( job.hash,
                                                         &job.catalog_file_path);
 
+    // Due to garbage collection, it might be that catalogs are not fetchable
+    // anymore. However, this only counts for root catalogs, since the garbage
+    // collection works on repository revision granularity.
     if (! successful_fetch) {
       if (ignore_load_failure_ && job.IsRootCatalog()) {
         LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignore missing root catalog "
@@ -388,6 +453,16 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     assert (ctx.traversal_type == kBreadthFirstTraversal ||
             ctx.traversal_type == kDepthFirstTraversal);
 
+    // this differs, depending on the traversal strategy.
+    //
+    // Breadths First Traversal
+    //   Catalogs are traversed from top (root catalog) to bottom (leaf catalogs)
+    //   and from more recent (HEAD revision) to older (historic revisions)
+    //
+    // Depth First Traversal
+    //   Catalogs are traversed from oldest revision (depends on the configured
+    //   maximal history depth) to the HEAD revision and from bottom (leafs) to
+    //   top (root catalogs)
     job.referenced_catalogs = (ctx.traversal_type == kBreadthFirstTraversal)
       ?   MightPushPreviousRevision(ctx, job)
         + MightPushNestedCatalogs  (ctx, job)
@@ -411,6 +486,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
     // check if the next deeper history level is actually requested
     // Note: otherwise it is marked to be 'pruned' for possible later traversal
+    //       (see: TraversePruned())
     if (job.history_depth >= ctx.history_depth) {
       pruned_revisions_.insert(previous_revision);
       return 0;
@@ -470,10 +546,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     // next top of the stack (it's parent CatalogJob waiting for yielding)
     CatalogJobStack &clbs = ctx.callback_stack;
     while (! clbs.empty() && clbs.top().referenced_catalogs == 0) {
+      // yield top-most catalog (certain to have no more references)
       if (! Yield(clbs.top())) {
         return false;
       }
 
+      // pop the just yielded catalog and decrement new top of stack (if any)
+      // this will (possibly) yield a previously postponed catalog
       clbs.pop();
       if (! clbs.empty()) {
         CatalogJob &parent_job = ctx.callback_stack.top();
@@ -489,13 +568,18 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     assert (! job.ignore);
     assert (job.catalog != NULL || job.postponed);
 
-    if (job.postponed && ! OpenCatalog(job)) {
+    // catalog was pushed on ctx.callback_stack before, it might need to be re-
+    // opened. If CatalogTraversal<> is configured with no_close, it was not
+    // closed before, hence does not need a re-open.
+    if (job.postponed && ! no_close_ && ! OpenCatalog(job)) {
       return false;
     }
 
+    // hand the catalog out to the user code (see Observable<>)
     assert (job.catalog != NULL);
     this->NotifyListeners(job.GetCallbackData());
 
+    // close the catalog again after it was processed
     if (! no_close_) {
       delete job.catalog; job.catalog = NULL;
       unlink(job.catalog_file_path.c_str());
@@ -504,6 +588,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return true;
   }
 
+  /**
+   * Pushes a catalog to the callback_stack for later yielding
+   * Note: this is only used for the Depth First Traversal strategy!
+   */
   void PostponeYield(TraversalContext &ctx, CatalogJob &job) {
     if (! no_close_ && job.referenced_catalogs > 0) {
       delete job.catalog; job.catalog = NULL;
