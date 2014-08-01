@@ -155,7 +155,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       parent(parent),
       catalog_file_size(0),
       ignore(false),
-      catalog(NULL) {}
+      catalog(NULL),
+      postponed(false) {}
 
     bool IsRootCatalog() const { return tree_level == 0; }
 
@@ -176,6 +177,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     size_t        catalog_file_size;
     bool          ignore;
     CatalogT     *catalog;
+    unsigned int  referenced_catalogs;
+    bool          postponed;
   };
 
   typedef std::stack<CatalogJob>   CatalogJobStack;
@@ -194,6 +197,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     const unsigned       history_depth;
     const TraversalType  traversal_type;
     CatalogJobStack      catalog_stack;
+    CatalogJobStack      callback_stack;
   };
 
  public:
@@ -326,16 +330,16 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       const bool successful_open = OpenCatalog(job);
       if (! successful_open) return false;
 
-      // push catalogs referenced by the current catalog (stack)
-      const unsigned int pushed_catalogs = PushReferencedCatalogs(ctx, job);
+      // push catalogs referenced by the current catalog (onto stack)
+      PushReferencedCatalogs(ctx, job);
 
       // notify listeners
-      this->NotifyListeners(job.GetCallbackData());
-
-      // might need to close the catalog
-      CloseCatalog(job);
+      const bool successful_yield = YieldToListeners(ctx, job);
+      if (! successful_yield) return false;
     }
 
+    assert (ctx.catalog_stack.empty());
+    assert (ctx.callback_stack.empty());
     return true;
   }
 
@@ -378,11 +382,18 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return true;
   }
 
-  unsigned int PushReferencedCatalogs(      TraversalContext  &ctx,
-                                      const CatalogJob        &job)
-  {
-    return   MightPushPreviousRevision(ctx, job)
-           + MightPushNestedCatalogs  (ctx, job);
+  void PushReferencedCatalogs(TraversalContext &ctx, CatalogJob &job) {
+    assert (! job.ignore);
+    assert (job.catalog != NULL);
+    assert (ctx.traversal_type == kBreadthFirstTraversal ||
+            ctx.traversal_type == kDepthFirstTraversal);
+
+    job.referenced_catalogs = (ctx.traversal_type == kBreadthFirstTraversal)
+      ?   MightPushPreviousRevision(ctx, job)
+        + MightPushNestedCatalogs  (ctx, job)
+
+      :   MightPushNestedCatalogs  (ctx, job)
+        + MightPushPreviousRevision(ctx, job);
   }
 
   unsigned int MightPushPreviousRevision(      TraversalContext  &ctx,
@@ -436,12 +447,70 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return pushed_catalogs;
   }
 
-  void CloseCatalog(CatalogJob &job) {
-    if (!no_close_) {
-      delete job.catalog;
-      job.catalog = NULL;
+  bool YieldToListeners(TraversalContext &ctx, CatalogJob &job) {
+    assert (! job.ignore);
+    assert (job.catalog != NULL);
+    assert (ctx.traversal_type == kBreadthFirstTraversal ||
+            ctx.traversal_type == kDepthFirstTraversal);
+
+    // in breadth first search mode, every catalog is simply handed out once
+    // it is visited. No extra magic required...
+    if (ctx.traversal_type == kBreadthFirstTraversal) {
+      return Yield(job);
+    }
+
+    // in depth first search mode, catalogs might need to wait until all of
+    // their referenced catalogs are yielded (callback_stack)...
+    assert (ctx.traversal_type == kDepthFirstTraversal);
+    PostponeYield(ctx, job);
+
+    // walk through the callback_stack and yield all catalogs that have no un-
+    // yielded referenced_catalogs anymore. Every time a CatalogJob in the
+    // callback_stack gets yielded it decrements the referenced_catalogs of the
+    // next top of the stack (it's parent CatalogJob waiting for yielding)
+    CatalogJobStack &clbs = ctx.callback_stack;
+    while (! clbs.empty() && clbs.top().referenced_catalogs == 0) {
+      if (! Yield(clbs.top())) {
+        return false;
+      }
+
+      clbs.pop();
+      if (! clbs.empty()) {
+        CatalogJob &parent_job = ctx.callback_stack.top();
+        assert (parent_job.referenced_catalogs > 0);
+        parent_job.referenced_catalogs--;
+      }
+    }
+
+    return true;
+  }
+
+  bool Yield(CatalogJob &job) {
+    assert (! job.ignore);
+    assert (job.catalog != NULL || job.postponed);
+
+    if (job.postponed && ! OpenCatalog(job)) {
+      return false;
+    }
+
+    assert (job.catalog != NULL);
+    this->NotifyListeners(job.GetCallbackData());
+
+    if (! no_close_) {
+      delete job.catalog; job.catalog = NULL;
       unlink(job.catalog_file_path.c_str());
     }
+
+    return true;
+  }
+
+  void PostponeYield(TraversalContext &ctx, CatalogJob &job) {
+    if (! no_close_ && job.referenced_catalogs > 0) {
+      delete job.catalog; job.catalog = NULL;
+      job.postponed = true;
+    }
+
+    ctx.callback_stack.push(job);
   }
 
   bool MightPush(TraversalContext &ctx, const CatalogJob &job) {
