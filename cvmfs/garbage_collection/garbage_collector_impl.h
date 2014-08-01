@@ -4,8 +4,6 @@
 
 #include "../logging.h"
 
-#include <iostream> // TODO: remove me!
-
 template <class CatalogTraversalT, class HashFilterT>
 swissknife::CatalogTraversalParams
   GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
@@ -189,7 +187,8 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
         this);
-  const bool success = traversal_.TraversePruned();
+  const bool success =
+             traversal_.TraversePruned(CatalogTraversalT::kDepthFirstTraversal);
   traversal_.UnregisterListener(callback);
 
   return success;
