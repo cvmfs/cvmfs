@@ -26,6 +26,7 @@ CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
 CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}
+CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
 
 die() {
   echo -e $1 >&2
@@ -373,8 +374,17 @@ create_repo() {
                          $stratum0                 \
                          $extra_options $repo || return 102
 
+  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
+
+  if [ x"$CVMFS_TEST_SERVER_CACHE" != x"" ]; then
+    local cache_base=$(echo "$CVMFS_TEST_SERVER_CACHE" | sed 's/\//\\\//g')
+    # will take effect _after_ the first publish operation...
+    sudo sed -i "s/^CVMFS_CACHE_BASE=.*\$/CVMFS_CACHE_BASE=${cache_base}/"         $client_conf
+    sudo sed -i "s/^CVMFS_RELOAD_SOCKETS=.*\$/CVMFS_RELOAD_SOCKETS=${cache_base}/" $client_conf
+  fi
+
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
-    echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a /etc/cvmfs/repositories.d/${repo}/client.conf
+    echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a $client_conf
   fi
 }
 
