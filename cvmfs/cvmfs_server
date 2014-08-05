@@ -972,7 +972,7 @@ find_hazardous_aufs_config() {
     local aufs_release=$(modinfo -F version aufs 2>/dev/null)
     aufs_date=$(echo "$aufs_release" | sed -e 's/[^-]\+-\(.*\)$/\1/')
   elif [ -f $aufs_type_h ]; then
-    aufs_date=$(cat $aufs_type_h | grep AUFS_VERSION | sed 's/^#define\s\+AUFS_VERSION\s\+"[0-9\.]\+-\(.*\)"$/\1/')
+    aufs_date=$(cat $aufs_type_h | grep AUFS_VERSION | sed 's/^#define\s\+AUFS_VERSION\s\+".*-\([0-9]\{8\}\)"$/\1/')
   fi
 
   # check the AUFS release date or otherwise take the kernel
