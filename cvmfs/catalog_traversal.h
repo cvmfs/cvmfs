@@ -265,7 +265,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     if (root_catalog_hash.IsNull()) {
       return false;
     }
-    MightPush(ctx, root_catalog_hash);
+    Push(ctx, root_catalog_hash);
     return DoTraverse(ctx);
   }
 
@@ -281,7 +281,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     // add the root catalog of the repository as the first element on the job
     // stack
     TraversalContext ctx(default_history_depth_, type);
-    MightPush(ctx, root_catalog_hash);
+    Push(ctx, root_catalog_hash);
     return DoTraverse(ctx);
   }
 
@@ -308,7 +308,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
           HashList::const_reverse_iterator i    = root_hashes.rbegin();
     const HashList::const_reverse_iterator iend = root_hashes.rend();
     for (; i != iend; ++i) {
-      MightPush(ctx, *i);
+      Push(ctx, *i);
     }
 
     return DoTraverse(ctx);
@@ -335,7 +335,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
           HashSet::const_iterator i    = pruned_revisions_.begin();
     const HashSet::const_iterator iend = pruned_revisions_.end();
     for (; i != iend; ++i) {
-      MightPush(ctx, *i);
+      Push(ctx, *i);
     }
     pruned_revisions_.clear();
     return DoTraverse(ctx);
@@ -382,6 +382,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       // Get the top most catalog for the next processing step
       CatalogJob job = ctx.catalog_stack.top(); ctx.catalog_stack.pop();
 
+      // skipping duplicate catalogs might also yield postponed catalogs
+      if (WasHitBefore(job)) {
+        continue;
+      }
+
       // download the catalog file
       const bool successful_download = FetchCatalog(job);
       if (job.ignore)            continue;
@@ -405,6 +410,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     assert (ctx.callback_stack.empty());
     return true;
   }
+
 
   bool FetchCatalog(CatalogJob &job) {
     const bool successful_fetch = object_fetcher_.Fetch( job.hash,
@@ -431,6 +437,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return true;
   }
 
+
   bool OpenCatalog(CatalogJob &job) {
     assert (! job.ignore);
     assert (job.catalog == NULL);
@@ -449,6 +456,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return true;
   }
 
+
   void PushReferencedCatalogs(TraversalContext &ctx, CatalogJob &job) {
     assert (! job.ignore);
     assert (job.catalog != NULL);
@@ -466,15 +474,15 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     //   maximal history depth) to the HEAD revision and from bottom (leafs) to
     //   top (root catalogs)
     job.referenced_catalogs = (ctx.traversal_type == kBreadthFirstTraversal)
-      ?   MightPushPreviousRevision(ctx, job)
-        + MightPushNestedCatalogs  (ctx, job)
+      ?   PushPreviousRevision(ctx, job)
+        + PushNestedCatalogs  (ctx, job)
 
-      :   MightPushNestedCatalogs  (ctx, job)
-        + MightPushPreviousRevision(ctx, job);
+      :   PushNestedCatalogs  (ctx, job)
+        + PushPreviousRevision(ctx, job);
   }
 
-  unsigned int MightPushPreviousRevision(      TraversalContext  &ctx,
-                                         const CatalogJob        &job)
+  unsigned int PushPreviousRevision(      TraversalContext  &ctx,
+                                    const CatalogJob        &job)
   {
     // only root catalogs are used for entering a previous revision (graph)
     if (! job.catalog->IsRoot()) {
@@ -499,11 +507,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                              0,
                              job.history_depth + 1,
                              NULL);
-    return MightPush(ctx, new_job) ? 1 : 0;
+    return Push(ctx, new_job) ? 1 : 0;
   }
 
-  unsigned int MightPushNestedCatalogs(      TraversalContext  &ctx,
-                                       const CatalogJob        &job)
+  unsigned int PushNestedCatalogs(      TraversalContext  &ctx,
+                                  const CatalogJob        &job)
   {
     unsigned int pushed_catalogs = 0;
     const typename CatalogT::NestedCatalogList &nested = // TODO: C++11 auto ;-)
@@ -517,13 +525,18 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                                job.tree_level + 1,
                                job.history_depth,
                                parent);
-      if (MightPush(ctx, new_job)) {
+      if (Push(ctx, new_job)) {
         ++pushed_catalogs;
       }
     }
 
     return pushed_catalogs;
   }
+
+  bool Push(TraversalContext &ctx, const shash::Any &root_catalog_hash) {
+    return Push(ctx, CatalogJob("", root_catalog_hash, 0, 0));
+  }
+
 
   bool YieldToListeners(TraversalContext &ctx, CatalogJob &job) {
     assert (! job.ignore);
@@ -624,9 +637,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return true;
   }
 
-  bool MightPush(      TraversalContext  &ctx,
-                 const shash::Any        &root_catalog_hash) {
-    return MightPush(ctx, CatalogJob("", root_catalog_hash, 0, 0));
+  bool Push(TraversalContext &ctx, const CatalogJob &job) {
+    ctx.catalog_stack.push(job);
+    return true;
   }
 
   /**
