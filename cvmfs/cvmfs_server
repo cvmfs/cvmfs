@@ -965,11 +965,19 @@ find_hazardous_aufs_config() {
     return 1
   fi
 
-  # check the AUFS release date (if available), otherwise take the kernel
-  # version as a hint of the installed AUFS version
+  # find the AUFS release date (if available)
+  local aufs_type_h="/usr/include/linux/aufs_type.h"
+  local aufs_date=""
   if modinfo aufs > /dev/null 2>&1; then
     local aufs_release=$(modinfo -F version aufs 2>/dev/null)
-    local aufs_date=$(echo "$aufs_release" | sed -e 's/[^-]\+-\(.*\)$/\1/')
+    aufs_date=$(echo "$aufs_release" | sed -e 's/[^-]\+-\(.*\)$/\1/')
+  elif [ -f $aufs_type_h ]; then
+    aufs_date=$(cat $aufs_type_h | grep AUFS_VERSION | sed 's/^#define\s\+AUFS_VERSION\s\+"[0-9\.]\+-\(.*\)"$/\1/')
+  fi
+
+  # check the AUFS release date or otherwise take the kernel
+  # version as a hint of the installed AUFS version
+  if [ $(echo -n "$aufs_date" | wc -c) -eq 8 ]; then
     local aufs_year=$(echo -n "$aufs_date" | head -c4)
     local aufs_month=$(echo -n "$aufs_date" | head -c6 | tail -c2)
     if [ $aufs_year -gt 2013 ] || [ $aufs_year -eq 2013 -a $aufs_month -gt 3 ]; then
