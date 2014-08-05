@@ -102,27 +102,15 @@ class T_CatalogTraversal : public ::testing::Test {
 
   void CheckCatalogSequence(const CatalogIdentifiers &expected,
                             const CatalogIdentifiers &observed) {
-    typedef CatalogIdentifiers::const_iterator itr;
+    ASSERT_EQ (expected.size(), observed.size());
 
-    unsigned int _i = 0;
-    itr i    = expected.begin();
-    itr iend = expected.end();
-    for (; i != iend; ++i, ++_i) {
-      bool found = false;
-
-      unsigned int _j = 0;
-      itr j    = observed.begin();
-      itr jend = observed.end();
-      for (; j != jend; ++j, ++_j) {
-        if (*i == *j) {
-          found = true;
-          EXPECT_EQ (_i, _j) << "traversing order changed";
-          break;
-        }
-      }
-
-      EXPECT_TRUE (found) << "didn't find catalog: " << i->second << " "
-                          << "(revision: " << i->first << ")";
+    for (unsigned int _i = 0; _i < expected.size(); ++_i) {
+      EXPECT_EQ (expected[_i], observed[_i])
+        << "traversing order changed" << std::endl
+        << "found:    "
+        << observed[_i].first << " " << observed[_i].second << std::endl
+        << "expected: "
+        << expected[_i].first << " " << expected[_i].second << std::endl;
     }
   }
 
@@ -2436,52 +2424,54 @@ TEST_F(T_CatalogTraversal, DepthFirstSearchFullHistoryTraversalNoRepeat) {
   EXPECT_TRUE (t1);
 
   CatalogIdentifiers catalogs;
-  catalogs.push_back(std::make_pair(6, ""));
-  catalogs.push_back(std::make_pair(5, "/00/13"));
-  catalogs.push_back(std::make_pair(5, "/00/13/29"));
-  catalogs.push_back(std::make_pair(5, "/00/13/28"));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
+
+  catalogs.push_back(std::make_pair(1, ""));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, ""));
+  catalogs.push_back(std::make_pair(3, "/00/11/24"));
+  catalogs.push_back(std::make_pair(3, "/00/11/23"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22/34/43"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22/34"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22"));
+  catalogs.push_back(std::make_pair(3, "/00/11"));
+  catalogs.push_back(std::make_pair(3, ""));
+  catalogs.push_back(std::make_pair(4, "/00/11/24"));
+  catalogs.push_back(std::make_pair(4, "/00/11/23"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22"));
+  catalogs.push_back(std::make_pair(4, "/00/11"));
   catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
   catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
   catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
   catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
   catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
   catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/11/24"));
-  catalogs.push_back(std::make_pair(4, "/00/11/23"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(5, ""));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
   catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(3, ""));
-  catalogs.push_back(std::make_pair(3, "/00/11"));
-  catalogs.push_back(std::make_pair(3, "/00/11/24"));
-  catalogs.push_back(std::make_pair(3, "/00/11/23"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, ""));
-  catalogs.push_back(std::make_pair(1, ""));
+  catalogs.push_back(std::make_pair(5, "/00/13/29"));
+  catalogs.push_back(std::make_pair(5, "/00/13/28"));
+  catalogs.push_back(std::make_pair(5, "/00/13"));
+  catalogs.push_back(std::make_pair(5, ""));
+  catalogs.push_back(std::make_pair(6, ""));
 
   EXPECT_EQ (initial_catalog_instances, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.size());
 
   CheckVisitedCatalogs(catalogs, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs);
 }
 
 
@@ -2509,108 +2499,110 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversal) {
   EXPECT_TRUE (t1);
 
   CatalogIdentifiers catalogs;
-  catalogs.push_back(std::make_pair(6, ""));
-  catalogs.push_back(std::make_pair(5, "/00/13"));
-  catalogs.push_back(std::make_pair(5, "/00/13/29"));
-  catalogs.push_back(std::make_pair(5, "/00/13/28"));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/11/24"));
-  catalogs.push_back(std::make_pair(4, "/00/11/23"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(5, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/11/24"));
-  catalogs.push_back(std::make_pair(4, "/00/11/23"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
+
+  catalogs.push_back(std::make_pair(1, ""));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(5, "/00/13"));
-  catalogs.push_back(std::make_pair(5, "/00/13/29"));
-  catalogs.push_back(std::make_pair(5, "/00/13/28"));
-  catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/11/24"));
-  catalogs.push_back(std::make_pair(4, "/00/11/23"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, ""));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(3, ""));
-  catalogs.push_back(std::make_pair(3, "/00/11"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(3, "/00/11/24"));
   catalogs.push_back(std::make_pair(3, "/00/11/23"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/43"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22/34"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22"));
+  catalogs.push_back(std::make_pair(3, "/00/11"));
+  catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(2, ""));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(4, "/00/11/24"));
+  catalogs.push_back(std::make_pair(4, "/00/11/23"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22"));
+  catalogs.push_back(std::make_pair(4, "/00/11"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, ""));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/11/24"));
+  catalogs.push_back(std::make_pair(4, "/00/11/23"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22"));
+  catalogs.push_back(std::make_pair(4, "/00/11"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(1, ""));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(5, "/00/13/29"));
+  catalogs.push_back(std::make_pair(5, "/00/13/28"));
+  catalogs.push_back(std::make_pair(5, "/00/13"));
+  catalogs.push_back(std::make_pair(5, ""));
+  catalogs.push_back(std::make_pair(5, "/00/13/29"));
+  catalogs.push_back(std::make_pair(5, "/00/13/28"));
+  catalogs.push_back(std::make_pair(5, "/00/13"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/11/24"));
+  catalogs.push_back(std::make_pair(4, "/00/11/23"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22"));
+  catalogs.push_back(std::make_pair(4, "/00/11"));
+  catalogs.push_back(std::make_pair(6, ""));
 
   CheckVisitedCatalogs(catalogs, FullHistoryDepthFirstTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, FullHistoryDepthFirstTraversal_visited_catalogs);
 }
 
 
