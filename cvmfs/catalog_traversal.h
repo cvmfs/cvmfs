@@ -184,6 +184,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       catalog_file_size(0),
       ignore(false),
       catalog(NULL),
+      referenced_catalogs(0),
       postponed(false) {}
 
     bool IsRootCatalog() const { return tree_level == 0; }
@@ -384,6 +385,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
       // skipping duplicate catalogs might also yield postponed catalogs
       if (WasHitBefore(job)) {
+        if (! HandlePostponedYields(ctx, job)) return false;
         continue;
       }
 
@@ -553,31 +555,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     // in depth first search mode, catalogs might need to wait until all of
     // their referenced catalogs are yielded (callback_stack)...
     assert (ctx.traversal_type == kDepthFirstTraversal);
-    PostponeYield(ctx, job);
-
-    // walk through the callback_stack and yield all catalogs that have no un-
-    // yielded referenced_catalogs anymore. Every time a CatalogJob in the
-    // callback_stack gets yielded it decrements the referenced_catalogs of the
-    // next top of the stack (it's parent CatalogJob waiting for yielding)
-    CatalogJobStack &clbs = ctx.callback_stack;
-    while (! clbs.empty() && clbs.top().referenced_catalogs == 0) {
-      // yield top-most catalog (certain to have no more references)
-      if (! Yield(clbs.top())) {
-        return false;
-      }
-
-      // pop the just yielded catalog and decrement new top of stack (if any)
-      // this will (possibly) yield a previously postponed catalog
-      clbs.pop();
-      if (! clbs.empty()) {
-        CatalogJob &parent_job = ctx.callback_stack.top();
-        assert (parent_job.postponed);
-        assert (parent_job.referenced_catalogs > 0);
-        parent_job.referenced_catalogs--;
-      }
+    if (job.referenced_catalogs > 0) {
+      PostponeYield(ctx, job);
+      return true;
     }
 
-    return true;
+    // this catalog can be yielded
+    return Yield(job) && HandlePostponedYields(ctx, job);
   }
 
   bool Yield(CatalogJob &job) {
@@ -617,23 +601,40 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * Note: this is only used for the Depth First Traversal strategy!
    */
   void PostponeYield(TraversalContext &ctx, CatalogJob &job) {
-    if (job.referenced_catalogs > 0) {
-      job.postponed = true;
+    assert (job.referenced_catalogs > 0);
 
-      if (! no_close_) {
-        delete job.catalog; job.catalog = NULL;
-      }
+    job.postponed = true;
+    if (! no_close_) {
+      delete job.catalog; job.catalog = NULL;
     }
-
     ctx.callback_stack.push(job);
   }
 
-  bool MightPush(TraversalContext &ctx, const CatalogJob &job) {
-    if (WasHitBefore(job)) {
-      return false;
+  bool HandlePostponedYields(TraversalContext &ctx, CatalogJob &job) {
+    if (ctx.traversal_type == kBreadthFirstTraversal) {
+      return true;
     }
 
-    ctx.catalog_stack.push(job);
+    assert (ctx.traversal_type == kDepthFirstTraversal);
+    assert (job.referenced_catalogs == 0);
+
+    // walk through the callback_stack and yield all catalogs that have no un-
+    // yielded referenced_catalogs anymore. Every time a CatalogJob in the
+    // callback_stack gets yielded it decrements the referenced_catalogs of the
+    // next top of the stack (it's parent CatalogJob waiting for yielding)
+    CatalogJobStack &clbs = ctx.callback_stack;
+    while (! clbs.empty()) {
+      CatalogJob &postponed_job = clbs.top();
+      if (--postponed_job.referenced_catalogs > 0) {
+        break;
+      }
+
+      if (! Yield(postponed_job)) {
+        return false;
+      }
+      clbs.pop();
+    }
+
     return true;
   }
 
