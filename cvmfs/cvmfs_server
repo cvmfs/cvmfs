@@ -2007,6 +2007,8 @@ mkfs() {
     alterfs -m on $name
   fi
 
+  health_check $name
+
   echo -n "Initial commit... "
   transaction $name > /dev/null  || die "fail (transaction)"
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
