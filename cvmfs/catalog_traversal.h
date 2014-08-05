@@ -351,22 +351,25 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * in which way catalogs are handed out to the user code.
    *
    * Each catalog is processed in these steps:
-   *  1.) Pop the next catalog from the stack
+   *  1.) Check if the catalog was processed before
+   *        Duplicated traversal can (optionally) be avoided. Note: skipped jobs
+   *        can still trigger postponed yields
+   *  2.) Pop the next catalog from the stack
    *        Catalogs are always traversed from latest to oldest revision and
    *        from root to leaf nested catalogs
-   *  2.) Fetch the catalog from the repository
+   *  3.) Fetch the catalog from the repository
    *        Depending on where the catalog comes from, this might do different
    *        things (see ObjectFetcherT).
-   *  3.) Open the fetched catalog
+   *  4.) Open the fetched catalog
    *        Depending on the catalog this implementation might differ
    *        (see CatalogT::AttachFreely)
-   *  4.) Find and push referencing catalogs
+   *  5.) Find and push referencing catalogs
    *        This pushes all descendants of the current catalog onto the stack.
    *        Note that this is dependant on the strategy (depth or breadth first)
    *        and on the history threshold (see history_depth). Furthermore,
    *        catalogs might not be pushed again, when seen before (see
    *        no_repeat_history).
-   *  5.) Hand the catalog out to the user code
+   *  6.) Hand the catalog out to the user code
    *        Depending on the traversal strategy (depth of breadths first) this
    *        might immediately yield zero to N catalogs to the user code.
    *
@@ -553,7 +556,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // in depth first search mode, catalogs might need to wait until all of
-    // their referenced catalogs are yielded (callback_stack)...
+    // their referenced catalogs are yielded (ctx.callback_stack)...
     assert (ctx.traversal_type == kDepthFirstTraversal);
     if (job.referenced_catalogs > 0) {
       PostponeYield(ctx, job);
@@ -564,6 +567,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return Yield(job) && HandlePostponedYields(ctx, job);
   }
 
+
+ private:
+  /**
+   * This actually hands out a catalog to the user code
+   * It is not called by DoTraversa() directly but by wrapper functions in order
+   * to provide higher level yielding behaviour.
+   */
   bool Yield(CatalogJob &job) {
     assert (! job.ignore);
     assert (job.catalog != NULL || job.postponed);
@@ -593,6 +603,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       }
     }
 
+    // all went well...
     return true;
   }
 
@@ -610,6 +621,17 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     ctx.callback_stack.push(job);
   }
 
+  /**
+   * Determines if there are postponed yields that can be set free based on
+   * the catalog currently being yielded
+   *
+   * Note: the CatalogJob being handed into this method does not necessarily
+   *       have an open Catalog attached to it.
+   *
+   * @param ctx   the TraversalContext
+   * @param job   the catalog job that was just yielded
+   * @return      true on successful execution
+   */
   bool HandlePostponedYields(TraversalContext &ctx, CatalogJob &job) {
     if (ctx.traversal_type == kBreadthFirstTraversal) {
       return true;
