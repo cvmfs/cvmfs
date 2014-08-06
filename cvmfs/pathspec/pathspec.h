@@ -11,8 +11,6 @@
 
 #include "pathspec_pattern.h"
 
-class PathspecMatchingContext;
-
 class Pathspec {
  public:
   static const char kSeparator   = '/';
@@ -21,16 +19,16 @@ class Pathspec {
   static const char kPlaceholder = '?';
 
  protected:
-  friend class PathspecMatchingContext;
   typedef std::vector<PathspecElementPattern> ElementPatterns;
 
  public:
-  typedef std::vector<std::string>            GlobStringSequence;
+  typedef std::vector<std::string> GlobStringSequence;
 
  public:
   Pathspec(const std::string &spec);
 
   bool IsMatching(const std::string &query_path) const;
+  bool IsMatchingRelaxed(const std::string &query_path) const;
   bool IsValid()    const { return valid_;    }
   bool IsAbsolute() const { return absolute_; }
 
@@ -50,8 +48,17 @@ class Pathspec {
                         const std::string::const_iterator  &end);
 
   bool IsPathspecMatching(const std::string &query_path) const;
+  bool IsPathspecMatchingRelaxed(const std::string &query_path) const;
+
+  bool ApplyRegularExpression(const std::string  &query_path,
+                                    regex_t      *regex) const;
+
   regex_t* GetRegularExpression() const;
-  std::string GenerateRegularExpression() const;
+  regex_t* GetRelaxedRegularExpression() const;
+
+  std::string GenerateRegularExpression(const bool is_relaxed = false) const;
+  regex_t* CompileRegularExpression(const std::string &regex) const;
+
   void PrintRegularExpressionError(const int error_code) const;
 
   void GenerateGlobStringSequence() const;
@@ -62,6 +69,9 @@ class Pathspec {
 
   mutable bool                regex_compiled_;
   mutable regex_t            *regex_;
+
+  mutable bool                relaxed_regex_compiled_;
+  mutable regex_t            *relaxed_regex_;
 
   mutable bool                glob_string_compiled_;
   mutable std::string         glob_string_;
