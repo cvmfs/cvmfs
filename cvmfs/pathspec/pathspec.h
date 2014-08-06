@@ -11,8 +11,6 @@
 
 #include "pathspec_pattern.h"
 
-class PathspecMatchingContext;
-
 class Pathspec {
  public:
   static const char kSeparator   = '/';
@@ -21,11 +19,10 @@ class Pathspec {
   static const char kPlaceholder = '?';
 
  protected:
-  friend class PathspecMatchingContext;
   typedef std::vector<PathspecElementPattern> ElementPatterns;
 
  public:
-  typedef std::vector<std::string>            GlobStringSequence;
+  typedef std::vector<std::string> GlobStringSequence;
 
  public:
   Pathspec(const std::string &spec);
