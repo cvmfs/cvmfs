@@ -967,6 +967,8 @@ find_hazardous_aufs_config() {
 
   # find the AUFS release date (if available)
   local aufs_type_h="/usr/include/linux/aufs_type.h"
+  # 1. try using modinfo
+  # 2. try to find aufs_type.h in the kernel sources
   local aufs_date=""
   if modinfo aufs > /dev/null 2>&1; then
     local aufs_release=$(modinfo -F version aufs 2>/dev/null)
@@ -988,7 +990,7 @@ find_hazardous_aufs_config() {
     local krnl_major="$(version_major $krnl_version)"
     local krnl_minor="$(version_minor $krnl_version)"
     if [ $krnl_major -gt 3 ] || [ $krnl_major -eq 3 -a $krnl_minor -ge 10 ]; then
-      return 1 # no problem, Linux kernel is recent enough
+      return 1 # no problem, Linux kernel is recent enough (AUFS should be as well)
     fi
   fi
 
