@@ -128,6 +128,16 @@ std::string PathspecElementPattern::GenerateRegularExpression() const {
   return result;
 }
 
+std::string PathspecElementPattern::GenerateRelaxedRegularExpression() const {
+  std::string result;
+        SubPatterns::const_iterator i    = subpatterns_.begin();
+  const SubPatterns::const_iterator iend = subpatterns_.end();
+  for (; i != iend; ++i) {
+    result += (*i)->GenerateRelaxedRegularExpression();
+  }
+  return result;
+}
+
 std::string PathspecElementPattern::GenerateGlobString() const {
   std::string result;
         SubPatterns::const_iterator i    = subpatterns_.begin();
@@ -181,6 +191,10 @@ std::string PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpressi
   return regex;
 }
 
+std::string PathspecElementPattern::PlaintextSubPattern::GenerateRelaxedRegularExpression() const {
+  return GenerateRegularExpression();
+}
+
 std::string PathspecElementPattern::PlaintextSubPattern::GenerateGlobString() const {
         std::string::const_iterator i    = chars_.begin();
   const std::string::const_iterator iend = chars_.end();
@@ -226,6 +240,10 @@ std::string PathspecElementPattern::WildcardSubPattern::GenerateRegularExpressio
   return std::string("[^") + Pathspec::kSeparator + "]*";
 }
 
+std::string PathspecElementPattern::WildcardSubPattern::GenerateRelaxedRegularExpression() const {
+  return std::string(".*");
+}
+
 std::string PathspecElementPattern::WildcardSubPattern::GenerateGlobString() const {
   return "*";
 }
@@ -237,6 +255,10 @@ bool PathspecElementPattern::WildcardSubPattern::Compare(const SubPattern *other
 
 std::string PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression() const {
   return std::string("[^") + Pathspec::kSeparator + "]";
+}
+
+std::string PathspecElementPattern::PlaceholderSubPattern::GenerateRelaxedRegularExpression() const {
+  return GenerateRegularExpression();
 }
 
 std::string PathspecElementPattern::PlaceholderSubPattern::GenerateGlobString() const {
