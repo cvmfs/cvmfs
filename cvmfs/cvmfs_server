@@ -966,15 +966,21 @@ find_hazardous_aufs_config() {
   fi
 
   # find the AUFS release date (if available)
-  local aufs_type_h="/usr/include/linux/aufs_type.h"
   # 1. try using modinfo
   # 2. try to find aufs_type.h in the kernel sources
   local aufs_date=""
   if modinfo aufs > /dev/null 2>&1; then
     local aufs_release=$(modinfo -F version aufs 2>/dev/null)
     aufs_date=$(echo "$aufs_release" | sed -e 's/[^-]\+-\(.*\)$/\1/')
-  elif [ -f $aufs_type_h ]; then
-    aufs_date=$(cat $aufs_type_h | grep AUFS_VERSION | sed 's/^#define\s\+AUFS_VERSION\s\+".*-\([0-9]\{8\}\)"$/\1/')
+  else
+    local aufs_type_h="/usr/include/linux/aufs_type.h \
+                       /usr/src/kernels/$(uname -r)/include/linux/aufs_type.h"
+    for p in $aufs_type_h; do
+      if [ -f $p ]; then
+        aufs_date=$(cat $p | grep AUFS_VERSION | sed 's/^#define\s\+AUFS_VERSION\s\+".*-\([0-9]\{8\}\)"$/\1/')
+        break
+      fi
+    done
   fi
 
   # check the AUFS release date or otherwise take the kernel
