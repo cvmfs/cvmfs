@@ -3,6 +3,7 @@
 # global test configuration
 #
 set (PROJECT_TEST_NAME "cvmfs_unittests")
+set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 
 #
 # unit test source files
@@ -96,19 +97,33 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/dirtab.h
 )
 
+set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
+
 #
 # Compiler and Linker Flags for unit tests
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0")
+set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -D_FILE_OFFSET_BITS=64")
+set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 #
 # build CernVM-FS test cases
 #
 include_directories (${INCLUDE_DIRECTORIES})
+
 add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
 add_dependencies (${PROJECT_TEST_NAME} googletest)
 
+if (BUILD_UNITTESTS_DEBUG)
+  add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} googletest)
+endif (BUILD_UNITTESTS_DEBUG)
+
+#
+# add optional dependencies
+#
 if (LIBCURL_BUILTIN)
   add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
 endif (LIBCURL_BUILTIN)
@@ -125,12 +140,53 @@ if (TBB_PRIVATE_LIB)
   add_dependencies (${PROJECT_TEST_NAME} libtbb)
 endif (TBB_PRIVATE_LIB)
 
+if (LIBCURL_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
+endif (LIBCURL_BUILTIN)
+
+
+if (BUILD_UNITTESTS_DEBUG)
+  if (LIBCURL_BUILTIN)
+    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libcares libcurl)
+  endif (LIBCURL_BUILTIN)
+
+  if (SQLITE3_BUILTIN)
+    add_dependencies (${PROJECT_TEST_DEBUG_NAME} sqlite3)
+  endif (SQLITE3_BUILTIN)
+
+  if (ZLIB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_DEBUG_NAME} zlib)
+  endif (ZLIB_BUILTIN)
+
+  if (TBB_PRIVATE_LIB)
+    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
+  endif (TBB_PRIVATE_LIB)
+
+  if (LIBCURL_BUILTIN)
+    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libcares libcurl)
+  endif (LIBCURL_BUILTIN)
+endif (BUILD_UNITTESTS_DEBUG)
+
+#
+# set build flags
+#
 set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+
+if (BUILD_UNITTESTS_DEBUG)
+  set_target_properties (${PROJECT_TEST_DEBUG_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
+endif (BUILD_UNITTESTS_DEBUG)
 
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 target_link_libraries (${PROJECT_TEST_NAME} ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} 
                          ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                        ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES} ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread)
+
+if (BUILD_UNITTESTS_DEBUG)
+  target_link_libraries (${PROJECT_TEST_DEBUG_NAME} ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES}
+                         ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
+                         ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
+                         ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)
+endif (BUILD_UNITTESTS_DEBUG)
 
 #
 # Install the generated unit test binary
@@ -142,6 +198,14 @@ if (INSTALL_UNITTESTS)
     DESTINATION    bin
   )
 endif (INSTALL_UNITTESTS)
+
+if (INSTALL_UNITTESTS_DEBUG)
+  install (
+    TARGETS        ${PROJECT_TEST_DEBUG_NAME}
+    RUNTIME
+    DESTINATION    bin
+  )
+endif (INSTALL_UNITTESTS_DEBUG)
 
 #
 # Integrate the test running into CMake
