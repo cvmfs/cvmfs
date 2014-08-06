@@ -57,10 +57,10 @@ class Pathspec {
                                     regex_t      *regex) const;
 
   regex_t* GetRegularExpression() const;
-  std::string GenerateRegularExpression() const;
-
   regex_t* GetRelaxedRegularExpression() const;
-  std::string GenerateRelaxedRegularExpression() const;
+
+  std::string GenerateRegularExpression(const bool is_relaxed = false) const;
+  regex_t* CompileRegularExpression(const std::string &regex) const;
 
   void PrintRegularExpressionError(const int error_code) const;
 

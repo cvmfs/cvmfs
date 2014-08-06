@@ -102,71 +102,32 @@ bool Pathspec::ApplyRegularExpression(const std::string  &query_path,
 
 regex_t* Pathspec::GetRegularExpression() const {
   if (! regex_compiled_) {
-    const std::string regex = GenerateRegularExpression();
+    const bool is_relaxed = false;
+    const std::string regex = GenerateRegularExpression(is_relaxed);
     LogCvmfs(kLogPathspec, kLogDebug, "compiled regex: %s", regex.c_str());
 
-    regex_ = (regex_t*)smalloc(sizeof(regex_t));
-    const int flags = REG_NOSUB | REG_NEWLINE | REG_EXTENDED;
-    const int retval = regcomp(regex_, regex.c_str(), flags);
+    regex_ = CompileRegularExpression(regex);
     regex_compiled_ = true;
-
-    if (retval != 0) {
-      PrintRegularExpressionError(retval);
-      assert (false && "failed to compile regex");
-    }
   }
 
   return regex_;
 }
 
-std::string Pathspec::GenerateRegularExpression() const {
-  // start matching at the first character
-  std::string regex = "^";
-
-  // absolute paths require a / in the beginning
-  if (IsAbsolute()) {
-    regex += kSeparator;
-  }
-
-  // concatenate the regular expressions of the compiled path elements
-        ElementPatterns::const_iterator i    = patterns_.begin();
-  const ElementPatterns::const_iterator iend = patterns_.end();
-  for (; i != iend; ++i) {
-    regex += i->GenerateRegularExpression();
-    if (i + 1 != iend) {
-      regex += kSeparator;
-    }
-  }
-
-  // a path might end with a trailing slash
-  // (pathspec does not distinguish files and directories)
-  regex += kSeparator;
-  regex += "?$";
-
-  return regex;
-}
-
 regex_t* Pathspec::GetRelaxedRegularExpression() const {
   if (! relaxed_regex_compiled_) {
-    const std::string regex = GenerateRelaxedRegularExpression();
+    const bool is_relaxed = true;
+    const std::string regex = GenerateRegularExpression(is_relaxed);
     LogCvmfs(kLogPathspec, kLogDebug, "compiled relaxed regex: %s",
              regex.c_str());
 
-    relaxed_regex_ = (regex_t*)smalloc(sizeof(regex_t));
-    const int flags = REG_NOSUB | REG_NEWLINE | REG_EXTENDED;
-    const int retval = regcomp(relaxed_regex_, regex.c_str(), flags);
+    relaxed_regex_ = CompileRegularExpression(regex);
     relaxed_regex_compiled_ = true;
-
-    if (retval != 0) {
-      PrintRegularExpressionError(retval);
-      assert (false && "failed to compile relaxed regex");
-    }
   }
 
   return relaxed_regex_;
 }
 
-std::string Pathspec::GenerateRelaxedRegularExpression() const {
+std::string Pathspec::GenerateRegularExpression(const bool is_relaxed) const {
   // start matching at the first character
   std::string regex = "^";
 
@@ -179,7 +140,7 @@ std::string Pathspec::GenerateRelaxedRegularExpression() const {
         ElementPatterns::const_iterator i    = patterns_.begin();
   const ElementPatterns::const_iterator iend = patterns_.end();
   for (; i != iend; ++i) {
-    regex += i->GenerateRelaxedRegularExpression();
+    regex += i->GenerateRegularExpression(is_relaxed);
     if (i + 1 != iend) {
       regex += kSeparator;
     }
@@ -191,6 +152,19 @@ std::string Pathspec::GenerateRelaxedRegularExpression() const {
   regex += "?$";
 
   return regex;
+}
+
+regex_t* Pathspec::CompileRegularExpression(const std::string &regex) const {
+  regex_t *result = (regex_t*)smalloc(sizeof(regex_t));
+  const int flags = REG_NOSUB | REG_NEWLINE | REG_EXTENDED;
+  const int retval = regcomp(result, regex.c_str(), flags);
+
+  if (retval != 0) {
+    PrintRegularExpressionError(retval);
+    assert (false && "failed to compile regex");
+  }
+
+  return result;
 }
 
 bool Pathspec::operator==(const Pathspec &other) const {

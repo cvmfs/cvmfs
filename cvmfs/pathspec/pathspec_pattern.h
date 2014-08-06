@@ -23,9 +23,8 @@ class PathspecElementPattern {
     virtual bool IsWildcard()    const { return false; }
     virtual bool IsPlaceholder() const { return false; }
 
-    virtual std::string GenerateRegularExpression()        const = 0;
-    virtual std::string GenerateRelaxedRegularExpression() const = 0;
-    virtual std::string GenerateGlobString()               const = 0;
+    virtual std::string GenerateRegularExpression(const bool is_relaxed) const = 0;
+    virtual std::string GenerateGlobString()                             const = 0;
   };
 
   class PlaintextSubPattern : public SubPattern {
@@ -38,9 +37,8 @@ class PathspecElementPattern {
     bool IsEmpty() const { return chars_.empty(); }
     bool IsPlaintext() const { return true; }
 
-    std::string GenerateRegularExpression()        const;
-    std::string GenerateRelaxedRegularExpression() const;
-    std::string GenerateGlobString()               const;
+    std::string GenerateRegularExpression(const bool is_relaxed) const;
+    std::string GenerateGlobString()                             const;
 
    protected:
     PlaintextSubPattern(const PlaintextSubPattern &other) :
@@ -56,9 +54,8 @@ class PathspecElementPattern {
    public:
     SubPattern* Clone() const { return new WildcardSubPattern(); }
     bool Compare(const SubPattern *other) const;
-    std::string GenerateRegularExpression()        const;
-    std::string GenerateRelaxedRegularExpression() const;
-    std::string GenerateGlobString()               const;
+    std::string GenerateRegularExpression(const bool is_relaxed) const;
+    std::string GenerateGlobString()                             const;
     bool IsWildcard() const { return true; }
   };
 
@@ -66,9 +63,8 @@ class PathspecElementPattern {
    public:
     SubPattern* Clone() const { return new PlaceholderSubPattern(); }
     bool Compare(const SubPattern *other) const;
-    std::string GenerateRegularExpression()        const;
-    std::string GenerateRelaxedRegularExpression() const;
-    std::string GenerateGlobString()               const;
+    std::string GenerateRegularExpression(const bool is_relaxed) const;
+    std::string GenerateGlobString()                             const;
     bool IsPlaceholder() const { return true; }
   };
 
@@ -83,9 +79,9 @@ class PathspecElementPattern {
   // TODO: C++11 - move constructor!
   ~PathspecElementPattern();
 
-  std::string GenerateRegularExpression()        const;
-  std::string GenerateRelaxedRegularExpression() const;
-  std::string GenerateGlobString()               const;
+  std::string GenerateRegularExpression(const bool is_relaxed = false) const;
+  std::string GenerateGlobString()                                     const;
+
   bool IsValid() const { return valid_; }
 
   bool operator==(const PathspecElementPattern &other) const;
