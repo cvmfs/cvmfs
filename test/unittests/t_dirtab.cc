@@ -228,3 +228,39 @@ TEST_F(T_Dirtab, OpposingMatches) {
   EXPECT_FALSE (dirtab.IsOpposing("/foo/hallo.welt"));
   EXPECT_FALSE (dirtab.IsOpposing("/foo/.git"));
 }
+
+
+TEST_F(T_Dirtab, MultiDirectoryWildcardsInNegativeRules) {
+  dirtab.Parse("# positive:\n"
+               "/usr/bin/*\n"
+               "/usr/include/*\n"
+               "\n"
+               "# negative:\n"
+               "! *.exe\n"
+               "! */include/*.hpp\n");
+
+  EXPECT_TRUE (dirtab.IsValid());
+  EXPECT_EQ (4u, dirtab.RuleCount());
+  EXPECT_EQ (2u, dirtab.PositiveRuleCount());
+  EXPECT_EQ (2u, dirtab.NegativeRuleCount());
+
+  EXPECT_TRUE  (dirtab.IsMatching("/usr/bin/bash"));
+  EXPECT_TRUE  (dirtab.IsMatching("/usr/include/stdio.h"));
+  EXPECT_TRUE  (dirtab.IsMatching("/usr/include/"));
+  EXPECT_TRUE  (dirtab.IsMatching("/usr/bin/root.exe.bak"));
+  EXPECT_FALSE (dirtab.IsMatching("/usr/include/random.hpp"));
+  EXPECT_FALSE (dirtab.IsMatching("/usr/bin/root.exe"));
+
+  EXPECT_TRUE  (dirtab.IsOpposing("/usr/bin/bash.exe"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/usr/bin/foo.exe"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/usr/local/include/bar.exe"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/usr/include/foo/bar.exe"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/usr/include/foo/bar.exe"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/root/include/stdio.hpp"));
+  EXPECT_TRUE  (dirtab.IsOpposing("/root/include/tr1/stdio.hpp"));
+  EXPECT_FALSE (dirtab.IsOpposing("/usr/bin/sh"));
+  EXPECT_FALSE (dirtab.IsOpposing("/usr/include/stdio.h"));
+  EXPECT_FALSE (dirtab.IsOpposing("/var/log/messages"));
+  EXPECT_FALSE (dirtab.IsOpposing("/usr/local/src/test.h"));
+  EXPECT_FALSE (dirtab.IsOpposing("/usr/local/src/test.hpp"));
+}
