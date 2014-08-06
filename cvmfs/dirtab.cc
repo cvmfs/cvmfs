@@ -149,7 +149,7 @@ bool Dirtab::IsOpposing(const std::string &path) const {
   const Rules::const_iterator nend = negative_rules_.end();
   for (; n != nend; ++n) {
     assert (n->is_negation);
-    if (n->pathspec.IsMatching(path)) {
+    if (n->pathspec.IsMatchingRelaxed(path)) {
       return true;
     }
   }
