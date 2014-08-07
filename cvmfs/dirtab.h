@@ -18,10 +18,10 @@ namespace catalog {
  * ative rules to omit the automatic creation of nested catalogs in certain
  * directories.
  *
- * Example:
+ * Example (adding a space in front of * - silence compiler warning):
  *   # this is a .cvmfsdirtab comment
- *   /software/releases/*
- *   /conditions_data/runs/*
+ *   /software/releases/ *
+ *   /conditions_data/runs/ *
  *
  *   # ignore repository directories
  *   ! *.svn
