@@ -66,6 +66,8 @@ class Pathspec {
   void GenerateGlobStringSequence() const;
   void GenerateGlobString() const;
 
+  void DestroyRegularExpressions();
+
  private:
   ElementPatterns             patterns_;
 
