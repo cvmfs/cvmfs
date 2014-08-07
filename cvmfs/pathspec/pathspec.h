@@ -37,6 +37,7 @@ class Pathspec {
   const GlobStringSequence& GetGlobStringSequence() const;
   const std::string&        GetGlobString() const;
 
+  Pathspec& operator=(const Pathspec &other);
   bool operator==(const Pathspec &other) const;
   bool operator!=(const Pathspec &other) const { return ! (*this == other); }
 
