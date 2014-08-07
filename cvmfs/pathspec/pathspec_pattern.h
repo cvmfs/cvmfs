@@ -8,6 +8,31 @@
 #include <string>
 #include <vector>
 
+/**
+ * The PathspecElementPattern is used internally by the Pathspec class!
+ *
+ * It describes a part of a full Pathspec. Namely only one directory level.
+ * Each PathspecElementPattern is composed by potentially multiple SubPatterns.
+ *
+ *  +----------+          +------------------------+          +------------+
+ *  | Pathspec |----<>----| PathspecElementPattern |----<>----| SubPattern |
+ *  +----------+          +------------------------+          +------------+
+ +                                                                ^  ^  ^
+ *                                                                |  |  |
+ *             +--------------------------------------------------+  |  |
+ *             |                        +----------------------------+  |
+ *             |                        |                               |
+ *  +---------------------+  +--------------------+  +-----------------------+
+ *  | PlaintextSubPattern |  | WildcardSubPattern |  | PlaceholderSubPattern |
+ *  +---------------------+  +--------------------+  +-----------------------+
+ *
+ * SubPatterns are implemented as a flat class hierarchy where the different
+ * patterns are implementing the behaviour of one pattern symbol.
+ *
+ * The PathspecElementPattern is taking care of the parsing and creation of
+ * SubPatterns.
+ *
+ */
 class PathspecElementPattern {
  private:
   class SubPattern {

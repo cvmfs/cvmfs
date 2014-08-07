@@ -35,6 +35,9 @@ Pathspec::Pathspec(const std::string &spec) :
 
 
 void Pathspec::Parse(const std::string &spec) {
+  // parsing is done using std::string iterators to walk through th entire
+  // pathspec parameter. Thus, all parsing methods receive references to these
+  // iterators and increment itr as they pass along.
         std::string::const_iterator itr = spec.begin();
   const std::string::const_iterator end = spec.end();
 
@@ -50,11 +53,14 @@ void Pathspec::Parse(const std::string &spec) {
 
 void Pathspec::ParsePathElement(      std::string::const_iterator  &itr,
                                 const std::string::const_iterator  &end) {
+  // find the end of the current pattern element (next directory boundary)
   const std::string::const_iterator begin_element = itr;
   while (itr != end && *itr != kSeparator) {
     ++itr;
   }
   const std::string::const_iterator end_element = itr;
+
+  // create a PathspecElementPattern out of this directory description
   patterns_.push_back(PathspecElementPattern(begin_element, end_element));
 }
 
