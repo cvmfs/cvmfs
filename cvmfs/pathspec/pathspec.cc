@@ -50,6 +50,24 @@ Pathspec::~Pathspec() {
   DestroyRegularExpressions();
 }
 
+Pathspec& Pathspec::operator=(const Pathspec &other) {
+  if (this != &other) {
+    DestroyRegularExpressions(); // see: copy c'tor for details
+    patterns_ = other.patterns_;
+
+    glob_string_compiled_ = other.glob_string_compiled_;
+    glob_string_          = other.glob_string_;
+
+    glob_string_sequence_compiled_ = other.glob_string_sequence_compiled_;
+    glob_string_sequence_          = other.glob_string_sequence_;
+
+    valid_    = other.valid_;
+    absolute_ = other.absolute_;
+  }
+
+  return *this;
+}
+
 
 void Pathspec::Parse(const std::string &spec) {
         std::string::const_iterator itr = spec.begin();
