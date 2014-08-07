@@ -581,3 +581,53 @@ TEST(T_Pathspec, MultiDirectoryWildcards) {
   EXPECT_FALSE (p5.IsMatchingRelaxed("foo/bat"));
   EXPECT_FALSE (p5.IsMatchingRelaxed("/foo/banary"));
 }
+
+
+TEST(T_Pathspec, CopyConstructor) {
+  const std::string s1("/test/*.foo");
+  Pathspec p1(s1);
+
+  EXPECT_TRUE (p1.IsValid());
+  EXPECT_TRUE (p1.IsMatching("/test/bar.foo"));
+  EXPECT_EQ   (s1, p1.GetGlobString());
+
+  Pathspec p2(p1);
+  EXPECT_TRUE (p2.IsValid());
+  EXPECT_TRUE (p1.IsMatching("/test/baz.foo"));
+  EXPECT_EQ   (s1, p2.GetGlobString());
+
+  const std::string s3("/heap/path?spec");
+  Pathspec *p3 = new Pathspec(s3);
+  ASSERT_NE (static_cast<Pathspec*>(NULL), p3);
+  EXPECT_TRUE (p3->IsValid());
+  EXPECT_TRUE (p3->IsMatching("/heap/path.spec"));
+  EXPECT_EQ   (s3, p3->GetGlobString());
+
+  Pathspec p4(*p3);
+  EXPECT_TRUE  (p4.IsValid());
+  EXPECT_FALSE (p4.IsMatching("/heap/pathspec"));
+  EXPECT_EQ    (s3, p4.GetGlobString());
+
+  delete p3;
+  EXPECT_TRUE (p4.IsValid());
+  EXPECT_TRUE (p4.IsMatchingRelaxed("/heap/path!spec"));
+  EXPECT_TRUE (p4.IsMatching("/heap/path+spec"));
+  EXPECT_EQ   (s3, p4.GetGlobString());
+
+  Pathspec *p5 = new Pathspec("/another/heap/*.spec");
+  ASSERT_NE (static_cast<Pathspec*>(NULL), p5);
+  EXPECT_TRUE (p5->IsValid());
+  EXPECT_TRUE (p5->IsMatching("/another/heap/path.spec"));
+
+  Pathspec p6(*p5);
+  EXPECT_TRUE  (p6.IsValid());
+  EXPECT_FALSE (p6.IsMatchingRelaxed("/heap/path!spec"));
+  EXPECT_TRUE  (p6.IsMatchingRelaxed("/another/heap/funny/path.spec"));
+  EXPECT_TRUE  (p6.IsMatching("/another/heap/funny.spec"));
+
+  delete p5;
+  EXPECT_TRUE  (p6.IsValid());
+  EXPECT_FALSE (p6.IsMatchingRelaxed("/does/not/match"));
+  EXPECT_TRUE  (p6.IsMatchingRelaxed("/another/heap/path.spec"));
+  EXPECT_TRUE  (p6.IsMatching("/another/heap/funny.spec"));
+}
