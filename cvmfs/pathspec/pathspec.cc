@@ -47,19 +47,7 @@ Pathspec::Pathspec(const Pathspec &other) :
   absolute_(other.absolute_) {}
 
 Pathspec::~Pathspec() {
-  if (regex_compiled_) {
-    assert (regex_ != NULL);
-    regfree(regex_);
-    regex_ = NULL;
-    regex_compiled_ = false;
-  }
-
-  if (relaxed_regex_compiled_) {
-    assert (relaxed_regex_ != NULL);
-    regfree(relaxed_regex_);
-    relaxed_regex_ = NULL;
-    relaxed_regex_compiled_ = false;
-  }
+  DestroyRegularExpressions();
 }
 
 
@@ -194,6 +182,22 @@ regex_t* Pathspec::CompileRegularExpression(const std::string &regex) const {
   }
 
   return result;
+}
+
+void Pathspec::DestroyRegularExpressions() {
+  if (regex_compiled_) {
+    assert (regex_ != NULL);
+    regfree(regex_);
+    regex_          = NULL;
+    regex_compiled_ = false;
+  }
+
+  if (relaxed_regex_compiled_) {
+    assert (relaxed_regex_ != NULL);
+    regfree(relaxed_regex_);
+    relaxed_regex_          = NULL;
+    relaxed_regex_compiled_ = false;
+  }
 }
 
 bool Pathspec::operator==(const Pathspec &other) const {
