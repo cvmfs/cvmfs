@@ -33,6 +33,19 @@ Pathspec::Pathspec(const std::string &spec) :
   }
 }
 
+Pathspec::Pathspec(const Pathspec &other) :
+  patterns_(other.patterns_),
+  regex_compiled_(false),         // compiled regex structure cannot be
+  regex_(NULL),                   // duplicated and needs to be re-compiled
+  relaxed_regex_compiled_(false), // Note: the copy-constructed object will
+  relaxed_regex_(NULL),           //       perform a lazy evaluation again
+  glob_string_compiled_(other.glob_string_compiled_),
+  glob_string_(other.glob_string_),
+  glob_string_sequence_compiled_(other.glob_string_sequence_compiled_),
+  glob_string_sequence_(other.glob_string_sequence_),
+  valid_(other.valid_),
+  absolute_(other.absolute_) {}
+
 Pathspec::~Pathspec() {
   if (regex_compiled_) {
     assert (regex_ != NULL);

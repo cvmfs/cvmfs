@@ -26,6 +26,7 @@ class Pathspec {
 
  public:
   Pathspec(const std::string &spec);
+  Pathspec(const Pathspec &other);
   ~Pathspec();
 
   bool IsMatching(const std::string &query_path) const;
