@@ -13,10 +13,10 @@
 
 /**
  * A Pathspec is an abstract description of a file path pattern.
- * Examples:
- *    /foo/bar/*.txt  - matches .txt files in /foo/bar
+ * Examples (adding a space in front of * - silence compiler warning):
+ *    /foo/bar/ *.txt  - matches .txt files in /foo/bar
  *    /kernel/2.6.?   - matches directories like: /kernel/2.6.[0-9a-z]
- *    /test/*_debug/* - matches all files in /test/cvmfs_debug/ for example
+ *    /test/ *_debug/ * - matches all files in /test/cvmfs_debug/ for example
  *
  * We are supporting both the wildcard (i.e. *) and the placeholder (i.e. ?)
  * symbol. Furthermore Pathspecs can be absolute (starting with /) or relative.
