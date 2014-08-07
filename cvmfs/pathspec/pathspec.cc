@@ -33,6 +33,22 @@ Pathspec::Pathspec(const std::string &spec) :
   }
 }
 
+Pathspec::~Pathspec() {
+  if (regex_compiled_) {
+    assert (regex_ != NULL);
+    regfree(regex_);
+    regex_ = NULL;
+    regex_compiled_ = false;
+  }
+
+  if (relaxed_regex_compiled_) {
+    assert (relaxed_regex_ != NULL);
+    regfree(relaxed_regex_);
+    relaxed_regex_ = NULL;
+    relaxed_regex_compiled_ = false;
+  }
+}
+
 
 void Pathspec::Parse(const std::string &spec) {
         std::string::const_iterator itr = spec.begin();
