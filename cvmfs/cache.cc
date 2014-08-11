@@ -856,8 +856,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
   }
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
-  const string checksum_path = (*cache_path_) + "/" +
-                               quota::checksum_file_prefix + "." + repo_name_;
+  const string checksum_path = quota::checksum_file_prefix + "." + repo_name_;
   shash::Any cache_hash;
   uint64_t cache_last_modified = 0;
 
@@ -973,8 +972,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
   CommitFromMem(ensemble.manifest->certificate(),
                 ensemble.cert_buf, ensemble.cert_size,
                 "certificate for " + repo_name_);
-  retval = ensemble.manifest->ExportChecksum(*cache_path_,
-                                             alien_cache_ ? 0660 : 0600);
+  retval = ensemble.manifest->ExportChecksum(".", 0600);
   if (!retval) {
     unlink(checksum_path.c_str());
   }
