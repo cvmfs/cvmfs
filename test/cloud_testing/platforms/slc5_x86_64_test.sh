@@ -46,7 +46,8 @@ echo "done"
 
 # allow httpd on backend storage
 echo -n "allowing httpd to access /srv/cvmfs... "
-sudo chcon --type httpd_sys_content_t /srv/cvmfs > /dev/null || die "fail"
+sudo mkdir /srv/cvmfs                                        || die "fail (mkdir)"
+sudo chcon --type httpd_sys_content_t /srv/cvmfs > /dev/null || die "fail (chcon)"
 echo "done"
 
 # create the server's client cache directory in /srv (AUFS kernel deadlock workaround)
