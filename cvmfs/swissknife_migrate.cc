@@ -766,6 +766,28 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     }
   }
 
+  // Check if there will be fixes needed due to corrupted nested catalog mount-
+  // point entries. This situation was first encountered in cms.cern.ch
+  // See catalog with hash: 57eaf45543c0b82a319ca68605eecda11ed9799e
+  Sql sql_corrupted_root(writable,
+    "SELECT count(*) "
+    "FROM old.catalog as c "
+    "WHERE c.flags & :flag_nested_mountpoint AND "
+    "      c.flags & :flag_nested_root");
+  retval = sql_corrupted_root.BindInt64(1, SqlDirent::kFlagDirNestedMountpoint) &&
+           sql_corrupted_root.BindInt64(2, SqlDirent::kFlagDirNestedRoot)       &&
+           sql_corrupted_root.FetchRow();
+  if (!retval) {
+    Error("Failed to check for corrupted nested catalog root entries",
+          sql_corrupted_root, data);
+    return false;
+  }
+
+  if (sql_corrupted_root.RetrieveInt64(0) > 0) {
+    LogCvmfs(kLogCatalog, kLogStdout, "NOTE: fixing corrupted nested catalog "
+                                      "root: '%s' ", data->root_path().c_str());
+  }
+
   // Analyze the linkcounts of directories
   //   - each directory has a linkcount of at least 2 (empty directory)
   //     (link in parent directory and self reference (cd .) )
@@ -774,6 +796,9 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
   //
   // Note: we deliberately exclude nested catalog mountpoints here, since we
   //       cannot check the number of containing directories here
+  //       However, in cms.cern.ch we found a root entry that was flagged both
+  //       as a root-entry and as a mount-point. Hence, root-entries are
+  //       specifically added to the result list.
   Sql sql_dir_linkcounts(writable,
     "INSERT INTO dir_linkcounts "
     "  SELECT c1.inode as inode, "
@@ -784,12 +809,14 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     "       c2.parent_2 = c1.md5path_2 AND "
     "       c2.flags & :flag_dir_1 "
     "  WHERE c1.flags & :flag_dir_2 AND "
-    "        NOT c1.flags & :flag_nested_mountpoint "
+    "        (NOT c1.flags & :flag_nested_mountpoint OR "
+    "         c1.flags & :flag_nested_root) "
     "  GROUP BY c1.inode;");
   retval =
     sql_dir_linkcounts.BindInt64(1, SqlDirent::kFlagDir)                 &&
     sql_dir_linkcounts.BindInt64(2, SqlDirent::kFlagDir)                 &&
     sql_dir_linkcounts.BindInt64(3, SqlDirent::kFlagDirNestedMountpoint) &&
+    sql_dir_linkcounts.BindInt64(4, SqlDirent::kFlagDirNestedRoot)       &&
     sql_dir_linkcounts.Execute();
   if (!retval) {
     Error("Failed to analyze directory specific linkcounts",
