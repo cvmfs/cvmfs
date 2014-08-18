@@ -772,8 +772,9 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
   //   - for each child directory, the parent's link count is incremented by 1
   //     (parent reference in child (cd ..) )
   //
-  // Note: we deliberately exclude nested catalog mountpoints here, since we
-  //       cannot check the number of containing directories here
+  // Note: nested catalog mountpoints will be miscalculated here, since we can't
+  //       check the number of containing directories. They are defined in a the
+  //       linked nested catalog and need to be added later on.
   Sql sql_dir_linkcounts(writable,
     "INSERT INTO dir_linkcounts "
     "  SELECT c1.inode as inode, "
@@ -783,13 +784,11 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     "    ON c2.parent_1 = c1.md5path_1 AND "
     "       c2.parent_2 = c1.md5path_2 AND "
     "       c2.flags & :flag_dir_1 "
-    "  WHERE c1.flags & :flag_dir_2 AND "
-    "        NOT c1.flags & :flag_nested_mountpoint "
+    "  WHERE c1.flags & :flag_dir_2 "
     "  GROUP BY c1.inode;");
   retval =
-    sql_dir_linkcounts.BindInt64(1, SqlDirent::kFlagDir)                 &&
-    sql_dir_linkcounts.BindInt64(2, SqlDirent::kFlagDir)                 &&
-    sql_dir_linkcounts.BindInt64(3, SqlDirent::kFlagDirNestedMountpoint) &&
+    sql_dir_linkcounts.BindInt64(1, SqlDirent::kFlagDir) &&
+    sql_dir_linkcounts.BindInt64(2, SqlDirent::kFlagDir) &&
     sql_dir_linkcounts.Execute();
   if (!retval) {
     Error("Failed to analyze directory specific linkcounts",
