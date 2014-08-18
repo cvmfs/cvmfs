@@ -156,6 +156,7 @@ class CommandMigrate : public Command {
     bool StartDatabaseTransaction         (PendingCatalog *data) const;
     bool MigrateFileMetadata              (PendingCatalog *data) const;
     bool AnalyzeFileLinkcounts            (PendingCatalog *data) const;
+    bool RemoveDanglingNestedMountpoints  (PendingCatalog *data) const;
     bool MigrateNestedCatalogMountPoints  (PendingCatalog *data) const;
     bool FixNestedCatalogTransitionPoints (PendingCatalog *data) const;
     bool GenerateCatalogStatistics        (PendingCatalog *data) const;

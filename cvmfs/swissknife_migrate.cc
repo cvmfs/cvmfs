@@ -625,6 +625,7 @@ bool CommandMigrate::MigrationWorker_20x::RunMigration(PendingCatalog *data) con
          MigrateFileMetadata              (data) &&
          MigrateNestedCatalogMountPoints  (data) &&
          FixNestedCatalogTransitionPoints (data) &&
+         RemoveDanglingNestedMountpoints  (data) &&
          GenerateCatalogStatistics        (data) &&
          FindRootEntryInformation         (data) &&
          CommitDatabaseTransaction        (data) &&
@@ -1152,6 +1153,90 @@ void CommandMigrate::FixNestedCatalogTransitionPoint(
   mountpoint.gid_   = nested_root.gid_;
   mountpoint.size_  = nested_root.size_;
   mountpoint.mtime_ = nested_root.mtime_;
+}
+
+
+class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
+ public:
+  SqlLookupDanglingMountpoints(const Database &database) {
+    const std::string statement =
+      "SELECT DISTINCT " + GetFieldsToSelect(database.schema_version()) + " "
+      "FROM catalog "
+      "JOIN catalog AS c2 "
+      "ON catalog.md5path_1 = c2.parent_1 AND catalog.md5path_2 = c2.parent_2 "
+      "WHERE catalog.flags & "
+                      + StringifyInt(SqlDirent::kFlagDirNestedMountpoint) + ";";
+    const bool init_successful = Init(database.sqlite_db(), statement);
+    assert (init_successful);
+  }
+};
+
+bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
+  PendingCatalog *data) const
+{
+  assert(data->HasNew());
+  const Database &writable = data->new_catalog->database();
+  bool retval = false;
+
+  // build a set of registered nested catalog path hashes
+  typedef catalog::Catalog::NestedCatalogList NestedCatalogList;
+  typedef std::map<shash::Md5, catalog::Catalog::NestedCatalog> NestedCatalogMap;
+  const NestedCatalogList& nested_clgs = data->old_catalog->ListNestedCatalogs();
+        NestedCatalogList::const_iterator i    = nested_clgs.begin();
+  const NestedCatalogList::const_iterator iend = nested_clgs.end();
+  NestedCatalogMap nested_catalog_path_hashes;
+  for (; i != iend; ++i) {
+    const PathString &path = i->path;
+    const shash::Md5  hash(path.GetChars(), path.GetLength());
+    nested_catalog_path_hashes[hash] = *i;
+  }
+
+  // Retrieve nested catalog mountpoints that have child entries directly inside
+  // the current catalog (which is a malformed state)
+  SqlLookupDanglingMountpoints sql_dangling_mountpoints(writable);
+  SqlDirentUpdate              save_updated_mountpoint(writable);
+
+  // go through the list of dangling nested catalog mountpoints and fix them
+  // where needed (check if there is no nested catalog registered for them)
+  while (sql_dangling_mountpoints.FetchRow()) {
+    DirectoryEntry dangling_mountpoint =
+                          sql_dangling_mountpoints.GetDirent(data->new_catalog);
+    const shash::Md5 path_hash = sql_dangling_mountpoints.GetPathHash();
+    assert (dangling_mountpoint.IsNestedCatalogMountpoint());
+
+    // check if the nested catalog mountpoint is registered in the nested cata-
+    // log list of the currently migrated catalog
+    const NestedCatalogMap::const_iterator nested_catalog =
+                                     nested_catalog_path_hashes.find(path_hash);
+    if (nested_catalog != nested_catalog_path_hashes.end()) {
+      LogCvmfs(kLogCatalog, kLogStderr, "WARNING: found a non-empty nested "
+                                        "catalog mountpoint under '%s'",
+                                        nested_catalog->second.path.c_str());
+      continue;
+    }
+
+    // the mountpoint was confirmed to be dangling and needs to be removed
+    dangling_mountpoint.set_is_nested_catalog_mountpoint(false);
+
+    // save the updated nested catalog root entry into the catalog
+
+    retval = save_updated_mountpoint.BindPathHash(path_hash)         &&
+             save_updated_mountpoint.BindDirent(dangling_mountpoint) &&
+             save_updated_mountpoint.Execute()                       &&
+             save_updated_mountpoint.Reset();
+    if (!retval) {
+      Error("Failed to remove dangling nested catalog mountpoint entry in "
+            "catalog", save_updated_mountpoint, data);
+      return false;
+    }
+
+    // tell the user that this intervention has been taken place
+    LogCvmfs(kLogCatalog, kLogStdout, "NOTE: fixed dangling nested catalog "
+                                      "mountpoint entry called: '%s' ",
+                                      dangling_mountpoint.name().c_str());
+  }
+
+  return true;
 }
 
 
