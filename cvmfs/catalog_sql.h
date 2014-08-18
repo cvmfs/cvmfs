@@ -281,7 +281,7 @@ class SqlLookup : public SqlDirent {
    * elements to load
    * @return a list of sql fields to query for DirectoryEntry
    */
-  std::string GetFieldsToSelect(const Database &database) const;
+  std::string GetFieldsToSelect(const float schema_version) const;
 
  public:
   /**
