@@ -547,17 +547,25 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 //------------------------------------------------------------------------------
 
 
-string SqlLookup::GetFieldsToSelect(const Database &database) const {
-  if (database.schema_version() < 2.1-Database::kSchemaEpsilon) {
-    return "hash, inode, size, mode, mtime, flags, name, symlink, "
-        //    0     1      2     3     4      5      6      7
-           "md5path_1, md5path_2, parent_1, parent_2, rowid";
-        //    8          9           10        11       12
+string SqlLookup::GetFieldsToSelect(const float schema_version) const {
+  if (schema_version < 2.1-Database::kSchemaEpsilon) {
+    return "catalog.hash, catalog.inode, catalog.size, catalog.mode, "
+        //           0              1             2             3
+           "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
+        //            4              5             6               7
+           "catalog.md5path_1, catalog.md5path_2, catalog.parent_1, "
+        //              8                  9                 10
+           "catalog.parent_2, catalog.rowid";
+        //             11              12
   } else {
-    return "hash, hardlinks, size, mode, mtime, flags, name, symlink, "
-        //    0        1      2     3     4      5      6      7
-           "md5path_1, md5path_2, parent_1, parent_2, rowid, uid, gid";
-        //    8          9           10        11       12    13   14
+    return "catalog.hash, catalog.hardlinks, catalog.size, catalog.mode, "
+        //           0                1               2             3
+           "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
+        //            4              5             6               7
+           "catalog.md5path_1, catalog.md5path_2, catalog.parent_1, "
+        //              8                  9                 10
+           "catalog.parent_2, catalog.rowid, catalog.uid, catalog.gid";
+        //             11               12            13           14
   }
 }
 
@@ -640,7 +648,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
 
 SqlListing::SqlListing(const Database &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database) + " FROM catalog "
+    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
   Init(database.sqlite_db(), statement);
 }
@@ -656,7 +664,7 @@ bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
 
 SqlLookupPathHash::SqlLookupPathHash(const Database &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database) + " FROM catalog "
+    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statement);
 }
@@ -671,7 +679,7 @@ bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
 
 SqlLookupInode::SqlLookupInode(const Database &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database) + " FROM catalog "
+    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE rowid = :rowid;";
   Init(database.sqlite_db(), statement);
 }
