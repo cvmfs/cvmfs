@@ -776,6 +776,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
   // Note: nested catalog mountpoints will be miscalculated here, since we can't
   //       check the number of containing directories. They are defined in a the
   //       linked nested catalog and need to be added later on.
+  //       (see: MigrateNestedCatalogMountPoints() for details)
   Sql sql_dir_linkcounts(writable,
     "INSERT INTO dir_linkcounts "
     "  SELECT c1.inode as inode, "
@@ -1148,6 +1149,18 @@ void CommandMigrate::FixNestedCatalogTransitionPoint(
 }
 
 
+/**
+ * Queries a single catalog and looks for DirectoryEntrys that have direct
+ * children in the same catalog but are marked as 'nested catalog mountpoints'.
+ * This is an inconsistent situation, since a mountpoint is supposed to be empty
+ * and it's children are stored in the corresponding referenced nested catalog.
+ *
+ * Note: the user code needs to check if there is a corresponding nested catalog
+ *       reference for the found dangling mountpoints. If so, we also have a
+ *       bogus state, but it is not reliably fixable automatically. The child-
+ *       DirectoryEntrys would be masked by the mounting nested catalog but it
+ *       is not clear if we can simply delete them or if this would destroy data.
+ */
 class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
  public:
   SqlLookupDanglingMountpoints(const Database &database) {
