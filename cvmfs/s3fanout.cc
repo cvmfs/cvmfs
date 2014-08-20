@@ -7,6 +7,8 @@
 #include <pthread.h>
 #include <set>
 #include <vector>
+#include <map>
+#include <utility>
 #include <string>
 
 #include "cvmfs_config.h"
@@ -328,7 +330,7 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
     assert(sharehandle != NULL);
     curl_share_setopt(sharehandle, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
     curl_easy_setopt(handle, CURLOPT_SHARE, sharehandle);
-    pool_sharehandles_->insert(sharehandle);
+    pool_sharehandles_->insert(std::pair<CURL*, CURLSH*>(handle, sharehandle));
 
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     // curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
@@ -355,10 +357,14 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
   set<CURL *>::iterator elem = pool_handles_inuse_->find(handle);
   assert(elem != pool_handles_inuse_->end());
 
-  if (pool_handles_idle_->size() > pool_max_handles_)
+  if (pool_handles_idle_->size() > pool_max_handles_) {
+    CURL *handle = *elem;
     curl_easy_cleanup(*elem);
-  else
+    curl_share_cleanup(pool_sharehandles_->find(handle)->second);
+    pool_sharehandles_->erase(handle);
+  } else {
     pool_handles_idle_->insert(*elem);
+  }
 
   pool_handles_inuse_->erase(elem);
 
@@ -708,7 +714,7 @@ void S3FanoutManager::Init(const unsigned max_pool_handles) {
   assert(retval == CURLE_OK);
   pool_handles_idle_ = new set<CURL *>;
   pool_handles_inuse_ = new set<CURL *>;
-  pool_sharehandles_ = new set<CURLSH *>;
+  pool_sharehandles_ = new map<CURL *, CURLSH *>;
   pool_max_handles_ = max_pool_handles;
   watch_fds_max_ = 4*pool_max_handles_;
 
@@ -759,6 +765,15 @@ void S3FanoutManager::Fini() {
   for (; i != iEnd; ++i) {
     curl_easy_cleanup(*i);
   }
+  map<CURL *, CURLSH *>::iterator             it    =
+      pool_sharehandles_->begin();
+  const map<CURL *, CURLSH *>::const_iterator itEnd =
+      pool_sharehandles_->end();
+  for (; it != itEnd; ++it) {
+    curl_share_cleanup(it->second);
+  }
+  pool_handles_idle_->clear();
+  pool_sharehandles_->clear();
   delete pool_handles_idle_;
   delete pool_handles_inuse_;
   delete pool_sharehandles_;
