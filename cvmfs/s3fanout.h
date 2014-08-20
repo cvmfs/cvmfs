@@ -176,6 +176,7 @@ class S3FanoutManager : SingleCopy {
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
+  std::set<CURLSH *> *pool_sharehandles_;
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;

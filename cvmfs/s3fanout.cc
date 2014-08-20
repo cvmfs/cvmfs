@@ -323,6 +323,13 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
     handle = curl_easy_init();
     assert(handle != NULL);
 
+    // Set private DNS cache for load balancing to work
+    CURLSH *sharehandle = curl_share_init();
+    assert(sharehandle != NULL);
+    curl_share_setopt(sharehandle, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
+    curl_easy_setopt(handle, CURLOPT_SHARE, sharehandle);
+    pool_sharehandles_->insert(sharehandle);
+
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     // curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
@@ -651,6 +658,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 S3FanoutManager::S3FanoutManager() {
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
+  pool_sharehandles_ = NULL;
   pool_max_handles_ = 0;
   curl_multi_ = NULL;
   user_agent_ = new string();
@@ -700,6 +708,7 @@ void S3FanoutManager::Init(const unsigned max_pool_handles) {
   assert(retval == CURLE_OK);
   pool_handles_idle_ = new set<CURL *>;
   pool_handles_inuse_ = new set<CURL *>;
+  pool_sharehandles_ = new set<CURLSH *>;
   pool_max_handles_ = max_pool_handles;
   watch_fds_max_ = 4*pool_max_handles_;
 
@@ -752,6 +761,7 @@ void S3FanoutManager::Fini() {
   }
   delete pool_handles_idle_;
   delete pool_handles_inuse_;
+  delete pool_sharehandles_;
   delete user_agent_;
   curl_multi_cleanup(curl_multi_);
   pool_handles_idle_ = NULL;
