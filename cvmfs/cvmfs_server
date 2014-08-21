@@ -184,7 +184,7 @@ Supported Commands:
   mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
-                [-s S3 config file]
+                [-s S3 config file] [-k path to existing keychain]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
@@ -1812,10 +1812,11 @@ mkfs() {
   local unionfs
   local hash_algo
   local s3_config=""
+  local keys_import_location
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:vga:s:" option; do
+  while getopts "w:u:o:mf:vga:s:k:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -1843,6 +1844,9 @@ mkfs() {
       ;;
       s)
         s3_config=$OPTARG
+      ;;
+      k)
+        keys_import_location=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
