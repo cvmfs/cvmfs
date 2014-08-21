@@ -330,7 +330,7 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
     assert(sharehandle != NULL);
     curl_share_setopt(sharehandle, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
     curl_easy_setopt(handle, CURLOPT_SHARE, sharehandle);
-    pool_sharehandles_->insert(std::pair<CURL*, CURLSH*>(handle, sharehandle));
+    pool_sharehandles_->insert(std::make_pair(handle, sharehandle));
 
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     // curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
