@@ -1906,12 +1906,17 @@ mkfs() {
   fi
   echo "done"
 
-  # create security keys and certificates
-  echo -n "Creating CernVM-FS Master Key and Self-Signed Certificate... "
-  mkdir -p /etc/cvmfs/keys
-  create_master_key $name $cvmfs_user || die "fail (master key)"
-  create_cert $name $cvmfs_user       || die "fail (certificate)"
-  echo "done"
+  # create or import security keys and certificates
+  if [ x"$keys_import_location" = x"" ]; then
+    echo -n "Creating CernVM-FS Master Key and Self-Signed Certificate... "
+    create_master_key $name $cvmfs_user || die "fail (master key)"
+    create_cert $name $cvmfs_user       || die "fail (certificate)"
+    echo "done"
+  else
+    echo -n "Importing CernVM-FS Master Key and Certificate from '$keys_import_location'... "
+    import_keychain $name "$keys_import_location" $cvmfs_user "$keys" > /dev/null || die "fail!"
+    echo "done"
+  fi
 
   # create spool area and mountpoints
   echo -n "Creating CernVM-FS Server Infrastructure... "
