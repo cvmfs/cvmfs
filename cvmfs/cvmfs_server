@@ -1894,6 +1894,26 @@ mkfs() {
     ensure_enabled_apache_modules
   fi
 
+  # check if the keychain for the repository to create is already in place
+  local keys_location="/etc/cvmfs/keys"
+  mkdir -p $keys_location
+  local keys="${name}.masterkey ${name}.key ${name}.crt ${name}.pub"
+  local keys_are_there=1
+  for k in $keys; do
+    if [ ! -f "${keys_location}/${k}" ]; then
+      keys_are_there=0
+      break
+    fi
+  done
+  if [ $keys_are_there -eq 1 ]; then
+    # just import the keys that are already there if they do not overwrite existing keys
+    if [ x"$keys_import_location" != x""               ] && \
+       [ x"$keys_import_location" != x"$keys_location" ]; then
+      die "Importing keys from '$keys_import_location' would overwrite keys in '$keys_location'"
+    fi
+    keys_import_location=$keys_location
+  fi
+
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
   check_user $cvmfs_user || die "No user $cvmfs_user"
