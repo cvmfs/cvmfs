@@ -364,6 +364,10 @@ endif (BUILD_SERVER OR BUILD_UNITTESTS)
 
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   find_package(PythonLibs REQUIRED)
+  find_program(UNZIP_EXE NAMES unzip)
+  if (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
+    message(FATAL_ERROR "unzip utility missing. Please install unzip...")
+  endif (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
 endif (BUILD_SERVER OR BUILD_SERVER_DEBUG)
 
 include_directories (${INCLUDE_DIRECTORIES})
