@@ -2864,3 +2864,26 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
   CheckVisitedCatalogs(catalogs, FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs);
   CheckCatalogSequence(catalogs, FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs);
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+void FullTraversalRootCatalogDetectionCallback(
+                             const MockedCatalogTraversal::CallbackData &data) {
+  const bool should_be_root = (data.catalog->path().ToString() == "" ||
+                               data.tree_level                 == 0);
+  EXPECT_EQ (should_be_root, data.catalog->IsRoot());
+}
+
+TEST_F(T_CatalogTraversal, FullTraversalRootCatalogDetection) {
+  CatalogTraversalParams params;
+  params.history = CatalogTraversalParams::kFullHistory;
+  MockedCatalogTraversal traverse(params);
+  traverse.RegisterListener(&FullTraversalRootCatalogDetectionCallback);
+
+  const bool t1 = traverse.Traverse();
+  EXPECT_TRUE (t1);
+}
