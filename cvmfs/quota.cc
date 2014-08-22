@@ -1651,6 +1651,7 @@ bool Pin(const shash::Any &hash, const uint64_t size,
 {
   assert(initialized_);
   if (limit_ == 0) return true;
+  assert(size > 0);
 
   const string hash_str = hash.ToString();
   LogCvmfs(kLogQuota, kLogDebug, "pin into lru %s, path %s",

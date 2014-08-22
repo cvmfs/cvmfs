@@ -562,8 +562,11 @@ static int Fetch(const shash::Any &checksum,
     // Check decompressed size (a cross check just in case)
     platform_stat64 stat_info;
     stat_info.st_size = -1;
+    // allow size to be zero if alien cache, because hadoop-fuse-dfs
+    //   returns size zero for a while
     if ((platform_fstat(fileno(f), &stat_info) != 0) ||
-        (stat_info.st_size != (int64_t)size))
+          ((stat_info.st_size != (int64_t)size) &&
+	  	(!alien_cache_ || (stat_info.st_size != 0))))
     {
       LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                "size check failure for %s, expected %lu, got %ld",
@@ -747,7 +750,6 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
 
     if (cache_mode_ == kCacheReadWrite) {
       size = GetFileSize(catalog_path->c_str());
-      assert(size > 0);
       pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
       if (!pin_retval) {
         quota::Remove(hash);
@@ -795,7 +797,6 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
   }
 
   size = GetFileSize(temp_path.c_str());
-  assert(size > 0);
   if (uint64_t(size) > quota::GetMaxFileSize()) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "failed to load catalog %s (too big)",
@@ -905,7 +906,6 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
         if (cache_mode_ == kCacheReadWrite) {
           *catalog_path = *cache_path_ + cache_hash.MakePath(1, 2);
           int64_t size = GetFileSize(*catalog_path);
-          assert(size >= 0);
           retval = quota::Pin(cache_hash, uint64_t(size),
                               cvmfs_path, true);
           if (!retval) {
@@ -936,7 +936,6 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
       // quota::Pin is only effective on first load, afterwards it is a NOP
       if (cache_mode_ == kCacheReadWrite) {
         int64_t size = GetFileSize(*catalog_path);
-        assert(size >= 0);
         retval = quota::Pin(cache_hash, uint64_t(size),
                             cvmfs_path, true);
         if (!retval) {
