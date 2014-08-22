@@ -464,7 +464,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     job.catalog = CatalogT::AttachFreely(job.path,
                                          job.catalog_file_path,
                                          job.hash,
-                                         job.parent);
+                                         job.parent,
+                                         ! job.IsRootCatalog());
 
     if (job.catalog == NULL) {
       LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to open catalog %s",
