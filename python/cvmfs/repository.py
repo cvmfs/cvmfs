@@ -65,6 +65,13 @@ class CannotReplicate(Exception):
     def __str__(self):
         return repr(self.repo)
 
+class NestedCatalogNotFound(Exception):
+    def __init__(self, repo):
+        self.repo = repo
+
+    def __str__(self):
+        return repr(self.repo)
+
 
 class RepositoryIterator:
     """ Iterates through all directory entries in a whole Repository """
@@ -106,6 +113,8 @@ class RepositoryIterator:
     def _fetch_and_push_catalog(self, catalog_mountpoint):
         current_catalog = self._get_current_catalog().catalog
         nested_ref      = current_catalog.find_nested_for_path(catalog_mountpoint)
+        if not nested_ref:
+            raise NestedCatalogNotFound(self.repository)
         new_catalog     = nested_ref.retrieve_from(self.repository)
         self._push_catalog(new_catalog)
 
