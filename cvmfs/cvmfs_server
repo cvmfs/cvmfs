@@ -2286,9 +2286,13 @@ import() {
   # import the old repository security keys
   echo -n "Importing the given key files... "
   local private_key="${name}.key"
+  local master_key="${name}.masterkey"
   local certificate="${name}.crt"
   local public_key="${name}.pub"
   keys="$private_key $certificate $public_key"
+  if [ -f ${keys_location}/${master_key} ]; then
+    keys="$keys $master_key"
+  fi
   import_keychain $name "$keys_location" $cvmfs_user "$keys" > /dev/null || die "fail!"
   echo "done"
 
