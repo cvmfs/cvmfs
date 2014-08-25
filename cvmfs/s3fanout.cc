@@ -811,6 +811,7 @@ void S3FanoutManager::Fini() {
   curl_multi_cleanup(curl_multi_);
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
+  pool_sharehandles_ = NULL;
   user_agent_ = NULL;
   curl_multi_ = NULL;
 
