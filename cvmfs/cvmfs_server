@@ -1496,9 +1496,9 @@ import_keychain() {
     if [ ! -f "${global_key_dir}/${keyfile}" ]; then
       cp "${keys_location}/${keyfile}" $global_key_dir || return 2
     fi
-    local key_mode=444
-    if echo "$keyfile" | grep -q '.*key$'; then
-      key_mode=400
+    local key_mode=400
+    if echo "$keyfile" | grep -vq '.*key$'; then
+      key_mode=444
     fi
     chmod $key_mode "${global_key_dir}/${keyfile}"   || return 3
     chown $cvmfs_user "${global_key_dir}/${keyfile}" || return 4
