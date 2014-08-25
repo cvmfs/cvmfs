@@ -65,6 +65,9 @@ class Pathspec {
    * @param spec  the pathspec pattern to be parsed
    */
   Pathspec(const std::string &spec);
+  Pathspec(const Pathspec &other);
+  // TODO: C++11 move constructor
+  ~Pathspec();
 
   /**
    * Matches an exact path string. Directory boundaries are taken into accound
@@ -114,6 +117,7 @@ class Pathspec {
    */
   const std::string& GetGlobString() const;
 
+  Pathspec& operator=(const Pathspec &other);
   bool operator==(const Pathspec &other) const;
   bool operator!=(const Pathspec &other) const { return ! (*this == other); }
 
@@ -142,6 +146,8 @@ class Pathspec {
 
   void GenerateGlobStringSequence() const;
   void GenerateGlobString() const;
+
+  void DestroyRegularExpressions();
 
  private:
   ElementPatterns             patterns_;
