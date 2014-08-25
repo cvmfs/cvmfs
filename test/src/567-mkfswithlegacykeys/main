@@ -49,6 +49,40 @@ check_keys_validity() {
   [ $all_match -eq 1 ]
 }
 
+check_keys_access_rights() {
+  local keys_location="$1"
+  local keys="$2"
+
+  local all_rwx_okay=1
+  for _key in $keys; do
+    local key_path="${keys_location}/${_key}"
+    local key_mode="$(stat -c %a $key_path)"
+    echo -n "checking '$key_path' ($key_mode)... "
+    local needle_mode=0
+
+    case "$key_path" in
+      *key|*masterkey)
+        needle_mode=400
+        ;;
+      *crt|*pub)
+        needle_mode=444
+        ;;
+      default)
+        echo "unknown"
+        all_rwx_okay=0
+    esac
+
+    if [ x"$needle_mode" = x"$key_mode" ]; then
+      echo "matches."
+    else
+      echo "doesn't match ($needle_mode)!"
+      all_rwx_okay=0
+    fi
+  done
+
+  [ $all_rwx_okay -eq 1 ]
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -71,55 +105,60 @@ cvmfs_run_test() {
   mkdir $keys_stash                                         || return 1
   sudo cp ${keys_location}/${CVMFS_TEST_REPO}.* $keys_stash || return 2
 
+  echo "manipulate the access rights of the public keys"
+  sudo chmod 755 ${keys_stash}/* || return 3
+
   echo "remove repository again"
   destroy_repo $CVMFS_TEST_REPO || return $?
 
   echo "check that the keychain is gone from $keys_location"
-  check_keys_existence "$keys_location" "$keys" && return 3
+  check_keys_existence "$keys_location" "$keys" && return 4
 
   echo "plant a dummy keychain into $keys_location"
   for _key in $keys; do
-    sudo touch "${keys_location}/${_key}" || return 4
+    sudo touch "${keys_location}/${_key}" || return 5
   done
 
   echo "recreate the repository with keys being in place and provide an import location (should fail)"
-  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO "-k $keys_stash" && return 5
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO "-k $keys_stash" && return 6
 
   echo "check that the keys haven't been overwritten"
-  check_keys_existence "$keys_location" "$keys"              || return 6
-  check_keys_validity "$keys_location" "$keys_stash" "$keys" && return 7
+  check_keys_existence "$keys_location" "$keys"              || return 7
+  check_keys_validity "$keys_location" "$keys_stash" "$keys" && return 8
 
   echo "remove the dummy keys"
   for _key in $keys; do
-    sudo rm -f "${keys_location}/${_key}" || return 8
+    sudo rm -f "${keys_location}/${_key}" || return 9
   done
 
   echo "recreate the repository using the old keys"
   create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO "-k $keys_stash" || return $?
 
   echo "check that the old keys have been used"
-  check_keys_validity "$keys_location" "$keys_stash" "$keys" || return 9
+  check_keys_validity "$keys_location" "$keys_stash" "$keys" || return 10
+  check_keys_access_rights "$keys_location" "$keys"          || return 11
 
   echo "remove the repository again"
   destroy_repo $CVMFS_TEST_REPO || return $?
 
   echo "check that the keychain is gone from $keys_location"
-  check_keys_existence "$keys_location" "$keys" && return 10
+  check_keys_existence "$keys_location" "$keys" && return 12
 
   echo "plant the keychain into $keys_location again"
-  sudo cp ${keys_stash}/${CVMFS_TEST_REPO}.* $keys_location || return 11
+  sudo cp ${keys_stash}/${CVMFS_TEST_REPO}.* $keys_location || return 13
 
   echo "recreate the repository with keys already being in place"
   create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO || return $?
 
   echo "check that the planted keys have been used"
-  check_keys_validity "$keys_location" "$keys_stash" "$keys" || return 12
+  check_keys_validity "$keys_location" "$keys_stash" "$keys" || return 14
+  check_keys_access_rights "$keys_location" "$keys"          || return 15
 
   echo "remove the repository again"
   destroy_repo $CVMFS_TEST_REPO || return $?
 
   echo "try to import keys that do not exist"
-  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO "-k /tmp" && return 13
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO "-k /tmp" && return 16
 
   echo "remove defunct repository"
   destroy_repo $CVMFS_TEST_REPO || return $?
