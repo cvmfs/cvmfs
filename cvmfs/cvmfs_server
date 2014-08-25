@@ -573,6 +573,16 @@ get_compatible_apache_allow_from_all_config() {
 }
 
 
+# find the partition name for a given file path
+#
+# @param   path  the path to the file to be checked
+# @return  the name of the partition that path resides on
+get_partition_for_path() {
+  local path="$1"
+  df --portability "$path" | tail -n1 | awk '{print $1}'
+}
+
+
 # checks if cvmfs2 client is installed
 #
 # @return  0 if cvmfs2 client is installed
@@ -939,7 +949,67 @@ foreclose_legacy_cvmfs() {
 }
 
 
-# checks and warns in inconsistent repository states.
+# checks if the configuration of a given repository is vulnerable to a kernel
+# deadlock bug of AUFS.
+#
+# @param name  the name of the repository to check
+# @return      0 if config is vulnerable
+find_hazardous_aufs_config() {
+  local name=$1
+
+  # check if we are actually dealing with AUFS or if the warning message is
+  # silenced... in these cases no more checks are needed
+  load_repo_config $name
+  if [ x"$CVMFS_UNION_FS_TYPE" != x"aufs"  ] || \
+     [ x"$CVMFS_AUFS_WARNING" = x"false"   ]; then
+    return 1
+  fi
+
+  # find the AUFS release date (if available)
+  # 1. try using modinfo
+  # 2. try to find aufs_type.h in the kernel sources
+  local aufs_date=""
+  if modinfo aufs > /dev/null 2>&1; then
+    local aufs_release=$(modinfo -F version aufs 2>/dev/null)
+    aufs_date=$(echo "$aufs_release" | sed -e 's/[^-]\+-\(.*\)$/\1/')
+  else
+    local aufs_type_h="/usr/include/linux/aufs_type.h \
+                       /usr/src/kernels/$(uname -r)/include/linux/aufs_type.h"
+    for p in $aufs_type_h; do
+      if [ -f $p ]; then
+        aufs_date=$(cat $p | grep AUFS_VERSION | sed 's/^#define\s\+AUFS_VERSION\s\+".*-\([0-9]\{8\}\)"$/\1/')
+        break
+      fi
+    done
+  fi
+
+  # check the AUFS release date or otherwise take the kernel
+  # version as a hint of the installed AUFS version
+  if [ $(echo -n "$aufs_date" | wc -c) -eq 8 ]; then
+    local aufs_year=$(echo -n "$aufs_date" | head -c4)
+    local aufs_month=$(echo -n "$aufs_date" | head -c6 | tail -c2)
+    if [ $aufs_year -gt 2013 ] || [ $aufs_year -eq 2013 -a $aufs_month -gt 3 ]; then
+      return 1 # no problem, AUFS is recent enough
+    fi
+  else
+    local krnl_version="$(uname -r | cut --delimiter='-' --fields=1)"
+    local krnl_major="$(version_major $krnl_version)"
+    local krnl_minor="$(version_minor $krnl_version)"
+    if [ $krnl_major -gt 3 ] || [ $krnl_major -eq 3 -a $krnl_minor -ge 10 ]; then
+      return 1 # no problem, Linux kernel is recent enough (AUFS should be as well)
+    fi
+  fi
+
+  # at this point, we have a potential AUFS kernel deadlock vulnerability if
+  # cache and scratch directory are on the same partition
+  local cache_dir="$CVMFS_CACHE_BASE"
+  local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  [ x"$(get_partition_for_path $cache_dir)" = \
+    x"$(get_partition_for_path $scratch_dir)" ]
+}
+
+
+# checks and warns in inconsistent repository states or unfavorable configs.
 #
 # @param name  the FQRN of the repository to be checked
 health_check() {
@@ -948,6 +1018,19 @@ health_check() {
   # for stratum 1 repositories there are no health checks
   if is_stratum1 $name; then
     return 0
+  fi
+
+  # check configuration for harzardous AUFS setup
+  if find_hazardous_aufs_config $name; then
+    load_repo_config $name
+    echo "WARNING: AUFS config is vulnerable to kernel deadlocks. Please store "
+    echo "         the scratch space and the cvmfs client cache on different "
+    echo "         partitions. (Silence this with CVMFS_AUFS_WARNING=false)"
+    echo " Scratch Space: ${CVMFS_SPOOL_DIR}/scratch"
+    echo " Client Cache:  ${CVMFS_CACHE_BASE}"
+    echo ""
+    echo " More info: http://cernvm.cern.ch/portal/cvmfs/workaround-krnl-deadlock"
+    echo ""
   fi
 
   # check mounted union file system
@@ -1931,6 +2014,8 @@ mkfs() {
   if [ $replicable -eq 1 ]; then
     alterfs -m on $name
   fi
+
+  health_check $name
 
   echo -n "Initial commit... "
   transaction $name > /dev/null  || die "fail (transaction)"
