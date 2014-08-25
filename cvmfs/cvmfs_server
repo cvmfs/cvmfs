@@ -1898,10 +1898,10 @@ mkfs() {
   local keys_location="/etc/cvmfs/keys"
   mkdir -p $keys_location
   local keys="${name}.masterkey ${name}.key ${name}.crt ${name}.pub"
-  local keys_are_there=1
+  local keys_are_there=0
   for k in $keys; do
-    if [ ! -f "${keys_location}/${k}" ]; then
-      keys_are_there=0
+    if [ -f "${keys_location}/${k}" ]; then
+      keys_are_there=1
       break
     fi
   done
