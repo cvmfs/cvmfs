@@ -1,0 +1,108 @@
+
+cvmfs_test_name="Import Corrupt Legacy Repository"
+cvmfs_test_autofs_on_startup=false
+
+TEST568_LEGACY_STORAGE=""
+TEST568_NEW_REPO_NAME=""
+cleanup() {
+  [ -z "$TEST568_NEW_REPO_NAME" ]  || sudo cvmfs_server rmfs -f $TEST568_NEW_REPO_NAME
+  [ -z "$TEST568_LEGACY_STORAGE" ] || sudo rm -fR $TEST568_LEGACY_STORAGE
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  local guinea_pig_location="${script_location}/../../common/corrupt_repo_20"
+  local legacy_repo_name="migrationtest01.cern.ch"
+  local repo_dir="/cvmfs/${legacy_repo_name}"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+
+  echo "make sure there are no legacy repo leftovers from previous tests"
+  cleanup_legacy_repo_leftovers "$legacy_repo_name"
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo -n "resurrect legacy repository... "
+  TEST568_LEGACY_STORAGE="$legacy_repo_storage"
+  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                                || return $?
+  plant_legacy_repository_revision "${guinea_pig_location}/corrupt_repo.tar.gz" "$legacy_repo_name" || return $?
+  echo "done"
+
+  echo "run the repository migration"
+  local migration_log="migration.log"
+  TEST568_NEW_REPO_NAME="$legacy_repo_name"
+  sudo mv $legacy_repo_storage/pub/data $legacy_repo_storage         || return 1
+  sudo ln -s $legacy_repo_storage/data $legacy_repo_storage/pub/data || return 2
+  sudo cp $legacy_repo_storage/pub/catalogs/.cvmfspublished         \
+          $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
+          $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
+          $legacy_repo_storage || return 3
+  sudo cvmfs_server import \
+    -o $CVMFS_TEST_USER    \
+    -l                     \
+    -s                     \
+    -g                     \
+    $legacy_repo_name > $migration_log 2>&1 || return 4
+
+  echo "look for the expected notes and warnings in the output"
+  cat "$migration_log" | grep '^NOTE: fixed.*transition point.*nested_mountpoint_out_of_sync' || return 5
+  cat "$migration_log" | grep '^NOTE: fixed.*dangling.*mountpoint.*dangling_mountpoint'       || return 6
+  cat "$migration_log" | grep '^WARNING.*non-empty.*mountpoint.*non_empty_nested_mountpoint'  || return 7
+
+  echo "check that there are no unexpected warnings"
+  [ $(cat "$migration_log" | grep '^NOTE'    | wc -l) -eq 2 ] || return 8
+  [ $(cat "$migration_log" | grep '^WARNING' | wc -l) -eq 1 ] || return 9
+
+  echo "remove the (legacy) quarantaine directory"
+  sudo rm -fR ${legacy_repo_storage}/data/quarantaine || return 10
+
+  echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
+  ls -lisa /cvmfs/${legacy_repo_name} || return 11
+
+  echo "list non-empty mountpoint"
+  ls -lisa /cvmfs/${legacy_repo_name}/non_empty_nested_mountpoint || return 12
+
+  echo "check that the non-empty mountpoint is overwritten by the nested catalog's content"
+  cat /cvmfs/${legacy_repo_name}/non_empty_nested_mountpoint/non_hidden_content_1/foo || return 13
+
+  # this check should produce catalog statistics errors, because there
+  # are hidden entries in the non-empty nested catalog mountpoint
+  echo "check migrated catalogs and data chunks (should produce errors)"
+  local check_log_1="fsck_1.log"
+  check_repository $legacy_repo_name -i > $check_log_1 2>&1 && return 14
+
+  echo "check that it produces the expected catalog statistics errors"
+  [ $(cat $check_log_1 | grep '^catalog statistics mismatch' | wc -l) -eq 3 ] || return 15
+
+  # cheate a new repository revision of the migrated catalogs
+  echo "create a new repository revision"
+  start_transaction $legacy_repo_name || return $?
+  cd $repo_dir
+    mkdir -p foo bar
+    touch foo/.cvmfscatalog
+    echo "no meaningful stuff" > foo/bar
+    echo "even less meaning"   > bar/foo
+    ln foo/bar foo/baz
+    ln -s ../foo/baz bar/baz
+  cd $scratch_dir
+  publish_repo $legacy_repo_name || return $?
+
+  # check if still everything is fine
+  echo "check catalogs again"
+  local check_log_2="fsck_2.log"
+  check_repository $legacy_repo_name -i > $check_log_2 2>&1 && return 16
+
+  echo "check that it produces the expected catalog statistics errors"
+  [ $(cat $check_log_2 | grep '^catalog statistics mismatch' | wc -l) -eq 3 ] || return 17
+
+  # see if the files ended up in the catalog
+  echo "check created files"
+  local content=$(cat ${repo_dir}/foo/bar)
+  [ -f ${repo_dir}/foo/bar ] && grep -q "no meaningful stuff" ${repo_dir}/foo/bar || return 18
+  [ -f ${repo_dir}/bar/baz ] && grep -q "no meaningful stuff" ${repo_dir}/bar/baz || return 19
+
+  return 0
+}
