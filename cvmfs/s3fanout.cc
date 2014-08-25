@@ -5,11 +5,7 @@
  */
 
 #include <pthread.h>
-#include <set>
-#include <vector>
-#include <map>
 #include <utility>
-#include <string>
 
 #include "cvmfs_config.h"
 #include "s3fanout.h"
