@@ -323,7 +323,10 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
     handle = curl_easy_init();
     assert(handle != NULL);
 
-    // Set private DNS cache for load balancing to work
+    // Set dedicated share handle for each easy handle in order to make sure
+    // that the easy handles do not share resolved addresses. This approach was
+    // needed to access efficiently S3 servers that use DNS load balancing, i.e.
+    // use several ips for one hostname.
     CURLSH *sharehandle = curl_share_init();
     assert(sharehandle != NULL);
     CURLSHcode share_retval = curl_share_setopt(sharehandle, CURLSHOPT_SHARE,
