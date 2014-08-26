@@ -3367,7 +3367,8 @@ rollback() {
     -t ${spool_dir}/tmp \
     -r ${upstream}"
 
-  $user_shell "$rollback_command" || die "Rollback failed\n\nExecuted Command:\n$rollback_command"
+  $user_shell "$rollback_command" ||
+    { cvmfs_suid_helper open $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"
