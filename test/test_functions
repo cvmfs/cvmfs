@@ -689,6 +689,15 @@ start_transaction() {
   return 0
 }
 
+# wrapper function to abort a transaction
+# @param repo    the repository you want to abort a transaction on
+abort_transaction() {
+  local repo=$1
+
+  cvmfs_server abort -f $repo || return 100
+  return 0
+}
+
 # wrapper function to publish an repository after its contents were updated.
 # @param repo    the repository name to start the transaction in
 publish_repo() {

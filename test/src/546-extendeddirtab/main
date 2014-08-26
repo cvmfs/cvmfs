@@ -294,7 +294,7 @@ cvmfs_run_test() {
   $open_catalogs | grep '/People/Americans' || return 12
 
   echo "abort transaction"
-  cvmfs_server abort -f $CVMFS_TEST_REPO || return 13
+  abort_transaction $CVMFS_TEST_REPO || return 13
 
   return 0
 }
