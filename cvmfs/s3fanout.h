@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <set>
+#include <map>
 #include <string>
 
 #include "duplex_curl.h"
@@ -176,6 +177,7 @@ class S3FanoutManager : SingleCopy {
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
+  std::map<CURL *, CURLSH *> *pool_sharehandles_;
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;
