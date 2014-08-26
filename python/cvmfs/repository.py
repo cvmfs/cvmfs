@@ -125,6 +125,53 @@ class RepositoryIterator:
         return self.catalog_stack.pop()
 
 
+class CatalogTreeIterator:
+    class _CatalogWrapper:
+        def __init__(self, repository):
+            self.repository        = repository
+            self.catalog           = None
+            self.catalog_reference = None
+
+        def get_catalog(self):
+            if self.catalog == None:
+                self.catalog = self.catalog_reference.retrieve_from(self.repository)
+            return self.catalog
+
+    def __init__(self, repository):
+        self.repository    = repository
+        self.catalog_stack = collections.deque()
+        wrapper            = self._CatalogWrapper(self.repository)
+        wrapper.catalog    = repository.retrieve_root_catalog()
+        self._push_catalog_wrapper(wrapper)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if not self._has_more():
+            raise StopIteration()
+        catalog = self._pop_catalog()
+        self._push_nested_catalogs(catalog)
+        return catalog
+
+    def _has_more(self):
+        return len(self.catalog_stack) > 0
+
+    def _push_nested_catalogs(self, catalog):
+        for nested_reference in catalog.list_nested():
+            wrapper = self._CatalogWrapper(self.repository)
+            wrapper.catalog_reference = nested_reference
+            self._push_catalog_wrapper(wrapper)
+
+    def _push_catalog_wrapper(self, catalog):
+        self.catalog_stack.append(catalog)
+
+    def _pop_catalog(self):
+        wrapper = self.catalog_stack.pop()
+        return wrapper.get_catalog()
+
+
+
 class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
     def __init__(self):
@@ -171,6 +218,10 @@ class Repository:
                 self.replicating_since = self.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
+
+
+    def catalogs(self):
+        return CatalogTreeIterator(self)
 
 
     def has_repository_type(self):
