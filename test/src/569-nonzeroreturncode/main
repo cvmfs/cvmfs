@@ -1,0 +1,62 @@
+cvmfs_test_name="Non-Zero Return Code on Failing Repo-Management Commands"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "starting another transaction (should fail)"
+  start_transaction $CVMFS_TEST_REPO && return 1
+
+  echo "aborting transaction"
+  abort_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "aborting transaction again (should fail)"
+  abort_transaction $CVMFS_TEST_REPO && return 2
+
+  echo "starting a transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "publish repository"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "publish again (should fail)"
+  publish_repo $CVMFS_TEST_REPO && return 3
+
+  echo "rollback to trunk-previous (should fail - not in a transaction)"
+  rollback_repo $CVMFS_TEST_REPO "trunk-previous" && return 4
+
+  echo "open transaction for rollback"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "rollback to trunc-previous (should fail - unknown tag)"
+  rollback_repo $CVMFS_TEST_REPO "trunc-previous" && return 5
+
+  echo "rollback to trunk-previous"
+  rollback_repo $CVMFS_TEST_REPO "trunk-previous" || return $?
+
+  echo "resign repository"
+  sudo cvmfs_server resign $CVMFS_TEST_REPO || return $?
+
+  echo "resign with broken master key (should fail)"
+  local master_key="/etc/cvmfs/keys/${CVMFS_TEST_REPO}.masterkey"
+  sudo cp $master_key .
+  echo "this is not valid!" | sudo tee $master_key || return 6
+  sudo cvmfs_server resign $CVMFS_TEST_REPO && return 7
+
+  echo "remove repository"
+  destroy_repo $CVMFS_TEST_REPO || return $?
+
+  echo "remove again (should fail)"
+  destroy_repo $CVMFS_TEST_REPO && return 8
+
+  return 0
+}
+
