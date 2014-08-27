@@ -276,6 +276,15 @@ class Repository:
         return clg
 
 
+    def close_catalog(self, catalog):
+        try:
+            open_catalog = self._opened_catalogs[catalog.hash]
+            del self._opened_catalogs[catalog.hash]
+        except KeyError, e:
+            print "not found:" , catalog.hash
+            pass
+
+
     def retrieve_catalog(self, catalog_hash):
         """ Download and open a catalog from the repository """
         if catalog_hash in self._opened_catalogs:
