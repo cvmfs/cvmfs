@@ -251,6 +251,16 @@ class Catalog(DatabaseObject):
         return self.root_prefix == "/"
 
 
+    def has_predecessor(self):
+        return hasattr(self, "previous_revision")
+
+
+    def get_predecessor(self):
+        if not self.has_predecessor():
+            return None
+        return CatalogReference(self.root_prefix, self.previous_revision)
+
+
     def _read_properties(self):
         self.read_properties_table(lambda prop_key, prop_value:
             self._read_property(prop_key, prop_value))
