@@ -146,11 +146,13 @@ class CatalogTreeIterator:
                 self.catalog = self.catalog_reference.retrieve_from(self.repository)
             return self.catalog
 
-    def __init__(self, repository):
+    def __init__(self, repository, root_catalog):
+        if not root_catalog:
+            root_catalog = repository.retrieve_root_catalog()
         self.repository    = repository
         self.catalog_stack = collections.deque()
         wrapper            = self._CatalogWrapper(self.repository)
-        wrapper.catalog    = repository.retrieve_root_catalog()
+        wrapper.catalog    = root_catalog
         self._push_catalog_wrapper(wrapper)
 
     def __iter__(self):
@@ -229,8 +231,8 @@ class Repository:
             pass
 
 
-    def catalogs(self):
-        return CatalogTreeIterator(self)
+    def catalogs(self, root_catalog = None):
+        return CatalogTreeIterator(self, root_catalog)
 
 
     def has_repository_type(self):
