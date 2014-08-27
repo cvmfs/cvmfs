@@ -285,7 +285,7 @@ class Repository:
 
     def _retrieve_and_open_catalog(self, catalog_hash):
         catalog_file = self.retrieve_object(catalog_hash, 'C')
-        new_catalog = Catalog(catalog_file)
+        new_catalog = Catalog(catalog_file, catalog_hash)
         self._opened_catalogs[catalog_hash] = new_catalog
         return new_catalog
 

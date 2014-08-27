@@ -142,8 +142,9 @@ class CatalogStatistics:
 class Catalog(DatabaseObject):
     """ Wraps the basic functionality of CernVM-FS Catalogs """
 
-    def __init__(self, catalog_file):
+    def __init__(self, catalog_file, catalog_hash = ""):
         DatabaseObject.__init__(self, catalog_file)
+        self.hash = catalog_hash
         self._read_properties()
         self._guess_root_prefix_if_needed()
         self._check_validity()
