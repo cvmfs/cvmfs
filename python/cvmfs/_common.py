@@ -28,21 +28,27 @@ class CvmfsNotInstalled(Exception):
 
 
 class CompressedObject:
-    file_ = None
+    file_            = None
+    compressed_file_ = None
 
     def __init__(self, compressed_file):
-        self._decompress(compressed_file)
+        self.compressed_file_ = compressed_file
+        self._decompress()
 
-    def _decompress(self, compressed_file):
+    def _decompress(self):
         """ Unzip a file to a temporary referenced by self.file_ """
         self.file_ = tempfile.NamedTemporaryFile('w+b')
-        self.file_.write(zlib.decompress(compressed_file.read()))
+        self.compressed_file_.seek(0)
+        self.file_.write(zlib.decompress(self.compressed_file_.read()))
         self.file_.flush()
         self.file_.seek(0)
+        self.compressed_file_.seek(0)
 
     def _close(self):
         if self.file_:
             self.file_.close()
+        if self.compressed_file_:
+            self.compressed_file_.close()
 
 
 
