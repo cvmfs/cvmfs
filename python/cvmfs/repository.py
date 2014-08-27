@@ -429,3 +429,9 @@ def all_local():
 
 def all_local_stratum0():
     return [ repo for repo in all_local() if repo.type == 'stratum0' ]
+
+def open_repository(repository_path):
+    if repository_path.startswith("http://"):
+        return RemoteRepository(repository_path)
+    else:
+        return LocalRepository(repository_path)
