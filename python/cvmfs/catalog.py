@@ -147,6 +147,7 @@ class Catalog(DatabaseObject):
         self.hash = catalog_hash
         self._read_properties()
         self._guess_root_prefix_if_needed()
+        self._guess_last_modified_if_needed()
         self._check_validity()
 
 
@@ -286,6 +287,12 @@ class Catalog(DatabaseObject):
             self.root_prefix = "/"
 
 
+    def _guess_last_modified_if_needed(self):
+        """ Catalog w/o a last_modified field, we set it to 0 """
+        if not hasattr(self, 'last_modified'):
+            self.last_modified = datetime.datetime.min
+
+
     def _canonicalize_path(self, path):
         if not path:
             return ""
@@ -294,6 +301,8 @@ class Catalog(DatabaseObject):
 
     def _check_validity(self):
         """ Check that all crucial properties have been found in the database """
+        if not hasattr(self, 'revision'):
+          raise Exception("Catalog lacks a revision entry")
         if not hasattr(self, 'schema'):
           raise Exception("Catalog lacks a schema entry")
         if not hasattr(self, 'root_prefix'):
