@@ -163,6 +163,16 @@ class Catalog(DatabaseObject):
         return CatalogIterator(self)
 
 
+    def has_nested(self):
+        return self.nested_count() > 0
+
+
+    def nested_count(self):
+        """ Returns the number of nested catalogs in this catalog """
+        num_catalogs = self.run_sql("SELECT count(*) FROM nested_catalogs;")
+        return num_catalogs[0][0]
+
+
     def list_nested(self):
         """ List CatalogReferences to all contained nested catalogs """
         new_version = (self.schema <= 1.2 and self.schema_revision > 0)
