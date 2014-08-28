@@ -1,4 +1,6 @@
 2.1.20:
+  * Support alien cache on hadoop-dfs-fuse which doesn't report 
+    file size immediately (CVM-659)
   * Fix false zero return code of 'cvmfs_server transaction' (CVM-658)
   * Allow using externally created keys in cvmfs_server mkfs (CVM-646)
   * Warn when aufs version is known to potentially cause deadlocks
