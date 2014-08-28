@@ -2907,7 +2907,7 @@ transaction() {
     # more sanity checks
     check_repository_compatibility
     if [ $force -eq 0 ]; then
-      is_in_transaction $name && { echo "Repository $name is already in a transaction"; continue; }
+      is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
     fi
     check_expiry $stratum0 || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     [ $(get_expiry $stratum0) -le $(( 12 * 60 * 60 )) ] && { echo "Warning: Repository whitelist stays valid for less than 12 hours!"; }
@@ -2976,7 +2976,7 @@ abort() {
 
     # more sanity checks
     check_repository_compatibility
-    is_in_transaction $name || { echo "Repository $name is not in a transaction"; continue; }
+    is_in_transaction $name || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
 
@@ -3367,7 +3367,8 @@ rollback() {
     -t ${spool_dir}/tmp \
     -r ${upstream}"
 
-  $user_shell "$rollback_command" || die "Rollback failed\n\nExecuted Command:\n$rollback_command"
+  $user_shell "$rollback_command" ||
+    { cvmfs_suid_helper open $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
   echo "Remounting newly created repository revision"

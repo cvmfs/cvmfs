@@ -22,7 +22,7 @@ cvmfs_run_test() {
   fi
 
   echo "abort transaction"
-  sudo cvmfs_server abort -f $CVMFS_TEST_REPO || return 5
+  abort_transaction $CVMFS_TEST_REPO || return 5
 
   return 0
 }
