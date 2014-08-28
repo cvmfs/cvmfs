@@ -17,7 +17,7 @@ cvmfs_run_test() {
   local guinea_pig_location="${script_location}/../../common/corrupt_repo_20"
   local legacy_repo_name="migrationtest01.cern.ch"
   local repo_dir="/cvmfs/${legacy_repo_name}"
-  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+  local legacy_repo_storage="$(get_repo_storage $legacy_repo_name)"
 
   echo "make sure there are no legacy repo leftovers from previous tests"
   cleanup_legacy_repo_leftovers "$legacy_repo_name"
