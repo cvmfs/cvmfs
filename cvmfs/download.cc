@@ -169,7 +169,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   //LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: Header callback with line %s",
   //         header_line.c_str());
 
-  // Check for http status code errors
+  // Check http status codes
   if (HasPrefix(header_line, "HTTP/1.", false)) {
     if (header_line.length() < 10)
       return 0;
@@ -178,6 +178,15 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     for (i = 8; (i < header_line.length()) && (header_line[i] == ' '); ++i) {}
 
     if (header_line[i] == '2') {
+      return num_bytes;
+    } else if ((header_line.length() > i+2) && (header_line[i] == '3') &&
+	       (header_line[i+1] == '0') &&
+	       ((header_line[i+2] == '1') || (header_line[i+2] == '2') ||
+	        (header_line[i+2] == '3') || (header_line[i+2] == '7')))
+    {
+      LogCvmfs(kLogDownload, kLogDebug, "http redirect: %s",
+               header_line.c_str());
+      // libcurl will handle this because of CURLOPT_FOLLOWLOCATION
       return num_bytes;
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
@@ -210,6 +219,10 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     else
       info->destination_mem.data = NULL;
     info->destination_mem.size = length;
+  } else if (HasPrefix(header_line, "LOCATION:", true))
+  {
+    // this comes along with redirects
+    LogCvmfs(kLogDownload, kLogDebug, "%s", header_line.c_str());
   }
 
   return num_bytes;
@@ -597,6 +610,7 @@ CURL *DownloadManager::AcquireCurlHandle() {
 
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     //curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
+    curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
     curl_easy_setopt(handle, CURLOPT_LOW_SPEED_LIMIT, 100);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlData);
