@@ -1682,7 +1682,7 @@ WARNING! There are open read-only file descriptors in /cvmfs/$name
       The following fuser report might show the processes with open file handles
       "
 
-  fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
+  $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
 
   echo -n "\
 
