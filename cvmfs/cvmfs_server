@@ -2897,8 +2897,6 @@ transaction() {
   local names
   local spool_dir
   local stratum0
-  local base_hash
-  local remote_hash
   local force=0
   local retcode=0
 
@@ -2934,8 +2932,6 @@ transaction() {
     load_repo_config $name
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
-    base_hash=$(get_mounted_root_hash $name)
-    remote_hash=$(get_published_root_hash $name)
 
     # more sanity checks
     check_repository_compatibility
@@ -2947,17 +2943,9 @@ transaction() {
 
     # do it!
     transaction_before_hook $name
-    if [ "$base_hash" != "$remote_hash" ]; then
-      echo "Repository $name has changed!  Remounting remote hash $remote_hash"
-      cvmfs_suid_helper rw_umount $name
-      cvmfs_suid_helper rdonly_umount $name
-      set_ro_root_hash $name $remote_hash
-      cvmfs_suid_helper rdonly_mount $name
-      cvmfs_suid_helper rw_mount $name
-    fi
-    cvmfs_suid_helper open $name
-    open_transaction       $name
-    transaction_after_hook $name
+    cvmfs_suid_helper open  $name
+    open_transaction        $name
+    transaction_after_hook  $name
 
   done
 
