@@ -3264,7 +3264,20 @@ publish() {
       echo "Flushing file system buffers"
       sync
 
-      echo "Remounting newly created repository revision"
+      # check again for open file descriptors (potential race condition)
+      if has_file_descriptors_on_mount_point $name; then
+        echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
+        echo "         The following fuser report might show the culprit:"
+        echo
+        $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
+        echo
+        echo "Forcing remount of already committed repository revision"
+        use_fd_fallback=1
+      else
+        echo "Remounting newly created repository revision"
+      fi
+
+      # remount the repository
       if [ $use_fd_fallback -eq 1 ]; then
         cvmfs_suid_helper rw_lazy_umount     $name
         cvmfs_suid_helper kill_cvmfs         $name
