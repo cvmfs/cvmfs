@@ -1359,6 +1359,30 @@ set_ro_root_hash() {
 }
 
 
+# retrieves the currently mounted root catalog hash in the spool area
+#
+# @param repository_name    the name of the repository to be checked
+# @return                   echoes the currently mounted root catalog hash
+get_mounted_root_hash() {
+  local repository_name=$1
+
+  load_repo_config $repository_name
+  attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly
+}
+
+
+# retrieves the latest published root catalog hash in the backend storage
+#
+# @param repository_name   the name of the repository to be checked
+# @return                  echoes the last published (HEAD) root catalog hash
+get_published_root_hash() {
+  local repository_name=$1
+
+  load_repo_config $repository_name
+  cvmfs_swissknife info -r $CVMFS_STRATUM0 -c
+}
+
+
 migrate_legacy_dirtab() {
   local name=$1
   local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
