@@ -3265,7 +3265,8 @@ publish() {
       sync
 
       # check again for open file descriptors (potential race condition)
-      if has_file_descriptors_on_mount_point $name; then
+      if has_file_descriptors_on_mount_point $name && \
+         [ $use_fd_fallback -ne 1 ]; then
         echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
         echo "         The following fuser report might show the culprit:"
         echo
