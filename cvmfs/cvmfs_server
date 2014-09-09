@@ -3142,7 +3142,6 @@ publish() {
       continue
     fi
 
-    # do it!
     if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
       local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
       tag_name="generic-$timestamp"
@@ -3169,12 +3168,9 @@ publish() {
       fi
     fi
 
+    # prepare the commands to be used for the publishing later
     local user_shell="sh -c"
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
-
-    # check if we have open file descriptors on /cvmfs/<name>
-    local use_fd_fallback=0
-    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
     local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
     local dirtab_command="$swissknife dirtab $verbosity \
@@ -3184,11 +3180,7 @@ publish() {
       -t ${spool_dir}/tmp                               \
       -u /cvmfs/${name}                                 \
       -s ${spool_dir}/scratch"
-    $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
 
-    publish_before_hook $name
-    publishing_lock $name
-    cvmfs_suid_helper lock $name
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
@@ -3234,18 +3226,36 @@ publish() {
       -t ${spool_dir}/tmp \
       -r ${upstream}"
 
+    # ---> do it! (from here on we are changing things)
+    $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
+
+    # check if we have open file descriptors on /cvmfs/<name>
+    local use_fd_fallback=0
+    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+
+    # lock down the repository
+    publish_before_hook $name
+    publishing_lock $name
+    cvmfs_suid_helper lock $name
+
+    # synchronize the repository
     $user_shell "$sync_command" || \
       (cvmfs_suid_helper open $name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
     if [ -f ${spool_dir}/tmp/manifest ]; then
       local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
       local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
       local trunk_size=$(grep "^B" ${spool_dir}/tmp/manifest | tr -d B)
-      tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
+
       echo "Tagging $name"
+      tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
       $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
       $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
-      echo "Remounting newly created repository revision"
+      set_ro_root_hash $name $trunk_hash
+
+      echo "Flushing file system buffers"
       sync
+
+      echo "Remounting newly created repository revision"
       if [ $use_fd_fallback -eq 1 ]; then
         cvmfs_suid_helper rw_lazy_umount     $name
         cvmfs_suid_helper kill_cvmfs         $name
@@ -3254,7 +3264,6 @@ publish() {
         cvmfs_suid_helper rw_umount $name
         cvmfs_suid_helper rdonly_umount $name
       fi
-      set_ro_root_hash $name $trunk_hash
       cvmfs_suid_helper clear_scratch $name
       rm -rf ${spool_dir}/tmp/*
       cvmfs_suid_helper rdonly_mount $name > /dev/null
