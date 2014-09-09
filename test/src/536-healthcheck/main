@@ -21,6 +21,10 @@ cvmfs_run_test() {
   echo "creating CVMFS snapshot"
   cvmfs_server publish $CVMFS_TEST_REPO || return 2
 
+  echo "remember the root hash of this revision"
+  local old_root_hash
+  old_root_hash="$(attr -qg root_hash $rd_only)"
+
   echo "unmount union file system mountpoint"
   sudo umount $repo_dir || return 3
 
@@ -67,6 +71,26 @@ cvmfs_run_test() {
 
   echo "repair the state of the mountpoint"
   sudo mount -o remount,ro $repo_dir || return 17
+
+  echo "remount previous revision $old_root_hash"
+  local latest_root_hash
+  latest_root_hash="$(attr -qg root_hash $rd_only)"
+  local client_config="/var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
+  sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${old_root_hash}/" $client_config
+  sudo umount $repo_dir || return 18
+  sudo umount $rd_only  || return 19
+  sudo mount $rd_only   || return 20
+  sudo mount $repo_dir  || return 21
+
+  echo "create a transaction (should fail)"
+  start_transaction $CVMFS_TEST_REPO 2>&1 | grep -q "$CVMFS_TEST_REPO is not based on the newest" || return 22
+
+  echo "repair the root hash ($latest_root_hash)"
+  sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${latest_root_hash}/" $client_config
+  sudo umount $repo_dir || return 23
+  sudo umount $rd_only  || return 24
+  sudo mount $rd_only   || return 25
+  sudo mount $repo_dir  || return 26
 
   echo "create a fresh transaction"
   start_transaction $CVMFS_TEST_REPO || return $?
