@@ -1053,6 +1053,11 @@ health_check() {
       die "$name is not in a transaction but /cvmfs/$name is mounted read-only"
     fi
   fi
+
+  # check mounted CVMFS revision against published
+  if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
+    die "$name is not based on the newest published revision"
+  fi
 }
 
 
