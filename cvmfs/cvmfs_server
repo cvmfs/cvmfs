@@ -1711,6 +1711,15 @@ handle_read_only_file_descriptors_on_mount_point() {
 }
 
 
+has_file_descriptors_on_mount_point() {
+  local name=$1
+  local mountpoint="/cvmfs/${name}"
+
+  [ $(count_rd_only_fds $mountpoint) -gt 0 ] || \
+  [ $(count_wr_fds      $mountpoint) -gt 0 ]
+}
+
+
 ################################################################################
 #                                                                              #
 #                                Sub Commands                                  #
