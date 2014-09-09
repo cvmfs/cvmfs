@@ -2745,7 +2745,7 @@ list_tags() {
 
   # get repository information
   load_repo_config $name
-  local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
+  local base_hash=$(get_mounted_root_hash $name)
   cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
     -i 0 -s 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
     -k /etc/cvmfs/keys/${name}.pub \
@@ -2934,8 +2934,8 @@ transaction() {
     load_repo_config $name
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
-    base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
-    remote_hash=$(cvmfs_swissknife info -r $stratum0 -c)
+    base_hash=$(get_mounted_root_hash $name)
+    remote_hash=$(get_published_root_hash $name)
 
     # more sanity checks
     check_repository_compatibility
@@ -3205,7 +3205,7 @@ publish() {
     local user_shell="sh -c"
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
-    local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+    local base_hash=$(get_mounted_root_hash $name)
     local dirtab_command="$swissknife dirtab $verbosity \
       -d /cvmfs/${name}/.cvmfsdirtab                    \
       -b $base_hash                                     \
@@ -3403,7 +3403,7 @@ rollback() {
   publish_before_hook
   publishing_lock $name
   cvmfs_suid_helper lock $name
-  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+  local base_hash=$(get_mounted_root_hash $name)
 
   local rollback_command="$swissknife rollback -u $stratum0 \
     -r $upstream \
@@ -3682,7 +3682,7 @@ migrate_2_1_7() {
   # update repository information
   echo "--> remounting (migrated) repository"
   local remote_hash
-  remote_hash=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
+  remote_hash=$(get_published_root_hash $name)
 
   cvmfs_suid_helper rw_umount $name     > /dev/null 2>&1 || die "fail! (unmounting /cvmfs/$name)"
   cvmfs_suid_helper rdonly_umount $name > /dev/null 2>&1 || die "fail! (unmounting ${CVMFS_SPOOL_DIR}/rdonly)"
