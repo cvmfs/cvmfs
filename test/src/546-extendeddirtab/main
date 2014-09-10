@@ -284,7 +284,7 @@ cvmfs_run_test() {
       -s ${spool_dir}/scratch || return 6
 
   echo "check that 'cvmfs_swissknife dirtab' doesn't open all catalogs"
-  local pipe_path="${spool_dir}/cache/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
+  local pipe_path="${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
   local open_catalogs="sudo cvmfs_talk -p $pipe_path open catalogs"
   $open_catalogs > /dev/null                || return 7
   [ $($open_catalogs | wc -l) -eq 5 ]       || return 8
