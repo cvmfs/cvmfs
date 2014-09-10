@@ -257,38 +257,34 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
     // open public key file
     fp = fopen(pubkey_file, "r");
     if (fp == NULL) {
-      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to open public key '%s', "
-                                             "Skipping...",
+      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to open public key '%s'",
                pubkey_file);
-      continue;
+      return false;
     }
 
     // load the public key from the file (and close it)
     EVP_PKEY *this_key = PEM_read_PUBKEY(fp, NULL, NULL, nopwd);
     fclose(fp);
     if (this_key == NULL) {
-      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to load public key '%s', "
-                                             "Skipping...",
+      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to load public key '%s'",
                pubkey_file);
-      continue;
+      return false;
     }
 
     // read the RSA key from the loaded public key
     RSA *key = EVP_PKEY_get1_RSA(this_key);
     EVP_PKEY_free(this_key);
     if (key == NULL) {
-      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to read public key '%s', "
-                                             "Skipping...",
-               pem_files[i].c_str());
-      continue;
+      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to read public key '%s'",
+               pubkey_file);
+      return false;
     }
 
     // store the loaded public key
     public_keys_.push_back(key);
   }
 
-  // at least one should have been read successfully
-  return public_keys_.size() > 0;
+  return true;
 }
 
 
