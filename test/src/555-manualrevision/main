@@ -43,17 +43,11 @@ cvmfs_run_test() {
   echo "check the revision (should be 42)"
   check_revision $CVMFS_TEST_REPO 42 || return 4
 
-  echo "starting transaction to edit repository"
-  start_transaction $CVMFS_TEST_REPO || return $?
-
   echo "creating CVMFS snapshot (manually setting revision to 10) expecting failure"
   publish_repo $CVMFS_TEST_REPO -n 10 && return 5
 
   echo "check the revision (should be 42)"
   check_revision $CVMFS_TEST_REPO 42 || return 6
-
-  echo "starting transaction to edit repository"
-  start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "creating CVMFS snapshot (no manual revision)"
   publish_repo $CVMFS_TEST_REPO || return 7
