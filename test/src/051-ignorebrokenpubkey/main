@@ -1,10 +1,10 @@
 
-cvmfs_test_name="Ignore of Broken Public Key Files"
+cvmfs_test_name="Mount with Broken Public Key Files"
 
 CVMFS_TEST_051_KEYFILE="broken.key.051.pub"
 cleanup() {
   echo "deleting broken key file $CVMFS_TEST_051_KEYFILE"
-  sudo rm -f /etc/cvmfs/keys/$CVMFS_TEST_051_KEYFILE 
+  sudo rm -f /etc/cvmfs/keys/$CVMFS_TEST_051_KEYFILE
 }
 
 cvmfs_run_test() {
@@ -12,8 +12,8 @@ cvmfs_run_test() {
 
   echo "check that repositories are mounted nicely"
   cvmfs_mount atlas.cern.ch,lhcb.cern.ch || return 1
-  ls /cvmfs/atlas.cern.ch || return 2
-  ls /cvmfs/lhcb.cern.ch || return 3
+  ls /cvmfs/atlas.cern.ch                || return 2
+  ls /cvmfs/lhcb.cern.ch                 || return 3
 
   echo "umount all repositories"
   sudo cvmfs_config umount || return 4
@@ -33,11 +33,24 @@ EOF
   trap cleanup HUP INT TERM EXIT
   sudo cp broken.pub /etc/cvmfs/keys/$CVMFS_TEST_051_KEYFILE || return 5
 
-  echo "try to remount the repositories"
-  cvmfs_mount atlas.cern.ch,lhcb.cern.ch || return 6
-  ls /cvmfs/atlas.cern.ch || return 7
-  ls /cvmfs/lhcb.cern.ch || return 8
-  
+  echo "try to remount the repositories (should fail now)"
+  cvmfs_mount atlas.cern.ch,lhcb.cern.ch && return 6
+  ls /cvmfs/atlas.cern.ch                && return 7
+  ls /cvmfs/lhcb.cern.ch                 && return 8
+
+  echo "removing the broken public key"
+  cleanup || return 9
+  trap - HUP INT TERM EXIT
+
+  echo "restart autofs"
+  autofs_switch off || return 10
+  autofs_switch on  || return 11
+
+  echo "try to remount the repositories (should work again)"
+  cvmfs_mount atlas.cern.ch,lhcb.cern.ch || return 12
+  ls /cvmfs/atlas.cern.ch                || return 13
+  ls /cvmfs/lhcb.cern.ch                 || return 14
+
   return 0
 }
 
