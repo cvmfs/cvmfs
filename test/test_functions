@@ -222,7 +222,7 @@ cvmfs_umount() {
     sudo umount /cvmfs/$r || return 100
 
     timeout=5
-    while cat /proc/mounts | grep -q /cvmfs/$r; do
+    while cat /proc/mounts | grep -q " /cvmfs/$r "; do
       if [ $timeout -eq 0 ]; then
         return 101
       fi
