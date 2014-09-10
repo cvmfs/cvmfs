@@ -751,6 +751,7 @@ publish_repo() {
 load_repo_config() {
   local name=$1
   . /etc/cvmfs/repositories.d/${name}/server.conf
+  . /etc/cvmfs/repositories.d/${name}/client.conf
 }
 
 
