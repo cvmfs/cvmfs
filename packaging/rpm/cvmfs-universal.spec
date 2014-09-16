@@ -26,6 +26,7 @@ Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
 Source1: cvmfs.te
+Source2: cvmfs.fc
 %endif
 Group: Applications/System
 License: BSD
@@ -150,7 +151,7 @@ CernVM-FS unit tests binary.  This RPM is not required except for testing.
 
 %if 0%{?selinux_cvmfs}
 mkdir SELinux
-cp %{SOURCE1} SELinux
+cp %{SOURCE1} %{SOURCE2} SELinux
 %endif
 
 %build
