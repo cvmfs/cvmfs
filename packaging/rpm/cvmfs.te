@@ -1,6 +1,14 @@
 
 module cvmfs 1.1;
 
+# Change Log
+# 1.1
+#   * introduce cvmfs_cache_t for cache directory
+#
+# 1.0
+#   * initial version
+#
+
 type cvmfs_cache_t;
 files_type(cvmfs_cache_t)
 
