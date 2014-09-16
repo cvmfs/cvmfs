@@ -77,7 +77,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const std::string &repo_url           = *args.find('r')->second;
   const std::string &spooler            = *args.find('u')->second;
   const std::string &manifest_path      = *args.find('o')->second;
-  const std::string &decompress_tmp_dir = *args.find('t')->second;
+  const std::string &tmp_dir            = *args.find('t')->second;
   const std::string &uid                = (args.count('p') > 0)      ?
                                              *args.find('p')->second :
                                              "";
@@ -107,7 +107,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
 
   // Create an upstream spooler
-  temporary_directory_ = decompress_tmp_dir;
+  temporary_directory_ = tmp_dir;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_) {
@@ -124,7 +124,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   params.repo_name = repo_name;
   params.repo_keys = repo_keys;
   params.no_close  = generate_full_catalog_tree;
-  params.tmp_dir   = decompress_tmp_dir;
+  params.tmp_dir   = tmp_dir;
   WritableCatalogTraversal traversal(params);
   traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
 
