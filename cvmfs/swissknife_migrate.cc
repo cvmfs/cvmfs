@@ -163,7 +163,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
     spooler_->WaitForUpload();
 
     // Configure the concurrent catalog migration facility
-    MigrationWorker_20x::worker_context context(spooler_definition.temporary_path,
+    MigrationWorker_20x::worker_context context(temporary_directory_,
                                                 collect_catalog_statistics,
                                                 fix_transition_points,
                                                 analyze_file_linkcounts,
@@ -172,7 +172,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_20x>(context, manifest_path);
   } else if (migration_base == "2.1.7") {
-    MigrationWorker_217::worker_context context(spooler_definition.temporary_path,
+    MigrationWorker_217::worker_context context(temporary_directory_,
                                                 collect_catalog_statistics);
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_217>(context, manifest_path);
