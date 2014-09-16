@@ -14,7 +14,7 @@ prerelease=$4
 mkdir $packagedir/{BUILD,RPMS,SOURCES,SRPMS,TMP}
 
 cp ${rpmdir}/cvmfs-universal.spec $packagedir || exit 4
-cp ${rpmdir}/cvmfs.te $packagedir/SOURCES || exit 8
+cp ${rpmdir}/cvmfs.te ${rpmdir}/cvmfs.fc $packagedir/SOURCES || exit 8
 cp $tarball $packagedir/SOURCES || exit 5
 cd $packagedir || exit 6
 version=`basename $tarball | sed 's/^cvmfs-//' | sed 's/\.tar\.gz//'`
@@ -27,13 +27,13 @@ if [ $? -eq 0 ]; then
 fi
 
 enforce_target=
-if grep -q "6\." /etc/redhat-release 2>/dev/null; then 
+if grep -q "6\." /etc/redhat-release 2>/dev/null; then
   if [ "$(uname -m)" = "i686" ]; then
     enforce_target="--target=i686"
   fi
 fi
 if [ "$(uname -m)" = "x86_64" -a $(getconf LONG_BIT) = 32 ]; then
   enforce_target="--target=i686"
-fi 
+fi
 rpmbuild --define="_topdir $packagedir" --define="_tmppath ${packagedir}/TMP" $enforce_target -ba cvmfs-universal.spec
 
