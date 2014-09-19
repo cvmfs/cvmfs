@@ -1050,7 +1050,7 @@ health_check() {
     fi
   else
     if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
-      die "$name is not in a transaction but /cvmfs/$name is mounted read-only"
+      die "$name is not in a transaction but /cvmfs/$name is mounted read/write"
     fi
   fi
 }
