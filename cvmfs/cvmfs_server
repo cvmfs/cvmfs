@@ -671,13 +671,32 @@ is_in_transaction() {
 open_transaction() {
   local name=$1
   load_repo_config $name
-  mkdir ${CVMFS_SPOOL_DIR}/in_transaction > /dev/null 2>&1 || die "Failed to open transaction"
+  local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
+
+  cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
+  mkdir "$tx_lock" > /dev/null 2>&1 || die "Failed to create transaction lock"
 }
 
 close_transaction() {
   local name=$1
+  local use_fd_fallback=$2
   load_repo_config $name
-  rmdir ${CVMFS_SPOOL_DIR}/in_transaction
+  local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
+  local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+
+  if [ $use_fd_fallback -ne 0 ]; then
+    cvmfs_suid_helper rw_lazy_umount     $name
+    cvmfs_suid_helper kill_cvmfs         $name
+    cvmfs_suid_helper rdonly_lazy_umount $name
+  else
+    cvmfs_suid_helper rw_umount $name
+    cvmfs_suid_helper rdonly_umount $name
+  fi
+  cvmfs_suid_helper clear_scratch $name
+  rm -rf "${tmp_dir}/*"
+  cvmfs_suid_helper rdonly_mount $name > /dev/null
+  cvmfs_suid_helper rw_mount $name
+  rmdir "$tx_lock"
 }
 
 # checks if a repository is currently runing a publish procedure
@@ -2948,7 +2967,6 @@ transaction() {
 
     # do it!
     transaction_before_hook $name
-    cvmfs_suid_helper open  $name
     open_transaction        $name
     transaction_after_hook  $name
 
@@ -3018,21 +3036,10 @@ abort() {
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
     handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+    sync
 
     abort_before_hook $name
-    sync
-    if [ $use_fd_fallback -eq 0 ]; then
-      cvmfs_suid_helper rw_umount $name
-    else
-      cvmfs_suid_helper rw_lazy_umount     $name
-      cvmfs_suid_helper kill_cvmfs         $name
-      cvmfs_suid_helper rdonly_lazy_umount $name
-      cvmfs_suid_helper rdonly_mount       $name > /dev/null
-    fi
-    rm -rf ${spool_dir}/tmp/*
-    cvmfs_suid_helper clear_scratch $name
-    cvmfs_suid_helper rw_mount $name
-    close_transaction $name
+    close_transaction $name $use_fd_fallback
     abort_after_hook $name
 
   done
@@ -3296,19 +3303,7 @@ publish() {
       fi
 
       # remount the repository
-      if [ $use_fd_fallback -eq 1 ]; then
-        cvmfs_suid_helper rw_lazy_umount     $name
-        cvmfs_suid_helper kill_cvmfs         $name
-        cvmfs_suid_helper rdonly_lazy_umount $name
-      else
-        cvmfs_suid_helper rw_umount $name
-        cvmfs_suid_helper rdonly_umount $name
-      fi
-      cvmfs_suid_helper clear_scratch $name
-      rm -rf ${spool_dir}/tmp/*
-      cvmfs_suid_helper rdonly_mount $name > /dev/null
-      cvmfs_suid_helper rw_mount $name
-      close_transaction $name
+      close_transaction $name $use_fd_fallback
       publish_after_hook $name
     else
       exit 1
@@ -3420,22 +3415,11 @@ rollback() {
     { cvmfs_suid_helper open $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
   $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
+  set_ro_root_hash $name $trunk_hash
+
   echo "Remounting newly created repository revision"
   sync
-  if [ $use_fd_fallback -eq 1 ]; then
-    cvmfs_suid_helper rw_lazy_umount     $name
-    cvmfs_suid_helper kill_cvmfs         $name
-    cvmfs_suid_helper rdonly_lazy_umount $name
-  else
-    cvmfs_suid_helper rw_umount $name
-    cvmfs_suid_helper rdonly_umount $name
-  fi
-  set_ro_root_hash $name $trunk_hash
-  cvmfs_suid_helper clear_scratch $name
-  rm -rf ${spool_dir}/tmp/*
-  cvmfs_suid_helper rdonly_mount $name > /dev/null
-  cvmfs_suid_helper rw_mount $name
-  close_transaction $name
+  close_transaction $name $use_fd_fallback
   publish_after_hook $name
 }
 
