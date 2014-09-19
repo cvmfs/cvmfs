@@ -709,11 +709,30 @@ is_publishing() {
   [ -d ${CVMFS_SPOOL_DIR}/is_publishing ]
 }
 
-publishing_lock() {
+publish_starting() {
   local name=$1
   load_repo_config $name
-  mkdir ${CVMFS_SPOOL_DIR}/is_publishing > /dev/null 2>&1 || die "Failed to acquire publishing lock"
-  trap "rmdir ${CVMFS_SPOOL_DIR}/is_publishing > /dev/null 2>&1" 0
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  mkdir "$pub_lock" > /dev/null 2>&1 || die "Failed to acquire publishing lock"
+  trap "publish_failed $name" EXIT HUP INT TERM
+  cvmfs_suid_helper lock $name
+}
+
+publish_failed() {
+  local name=$1
+  load_repo_config $name
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  trap - EXIT HUP INT TERM
+  rmdir $pub_lock > /dev/null 2>&1
+  cvmfs_suid_helper open $name
+}
+
+publish_succeeded() {
+  local name=$1
+  load_repo_config $name
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  trap - EXIT HUP INT TERM
+  rmdir $pub_lock > /dev/null 2>&1
 }
 
 
@@ -3266,48 +3285,46 @@ publish() {
     local use_fd_fallback=0
     handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
-    # lock down the repository
-    publish_before_hook $name
-    publishing_lock $name
-    cvmfs_suid_helper lock $name
-
     # synchronize the repository
-    $user_shell "$sync_command" || \
-      (cvmfs_suid_helper open $name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
-    if [ -f ${spool_dir}/tmp/manifest ]; then
-      local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-      local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
-      local trunk_size=$(grep "^B" ${spool_dir}/tmp/manifest | tr -d B)
+    publish_before_hook $name
+    publish_starting $name
+    $user_shell "$sync_command"      || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
+    [ -f ${spool_dir}/tmp/manifest ] || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
 
-      echo "Tagging $name"
-      tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
-      $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
-      $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
-      set_ro_root_hash $name $trunk_hash
+    # gather information of new (uncommitted) revision
+    local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
+    local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
+    local trunk_size=$(grep "^B" ${spool_dir}/tmp/manifest | tr -d B)
+    tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
 
-      echo "Flushing file system buffers"
-      sync
+    # committing newly created revision
+    echo "Tagging $name"
+    $user_shell "$tag_command"  || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+    $user_shell "$sign_command" || { publish_failed $name; die "Signing failed\n\nExecuted Command:\n$sign_command"; }
+    set_ro_root_hash $name $trunk_hash
 
-      # check again for open file descriptors (potential race condition)
-      if has_file_descriptors_on_mount_point $name && \
-         [ $use_fd_fallback -ne 1 ]; then
-        echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
-        echo "         The following fuser report might show the culprit:"
-        echo
-        $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
-        echo
-        echo "Forcing remount of already committed repository revision"
-        use_fd_fallback=1
-      else
-        echo "Remounting newly created repository revision"
-      fi
+    # finalizing transaction
+    echo "Flushing file system buffers"
+    sync
 
-      # remount the repository
-      close_transaction $name $use_fd_fallback
-      publish_after_hook $name
+    # check again for open file descriptors (potential race condition)
+    if has_file_descriptors_on_mount_point $name && \
+       [ $use_fd_fallback -ne 1 ]; then
+      echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
+      echo "         The following fuser report might show the culprit:"
+      echo
+      $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
+      echo
+      echo "Forcing remount of already committed repository revision"
+      use_fd_fallback=1
     else
-      exit 1
+      echo "Remounting newly created repository revision"
     fi
+
+    # remount the repository
+    close_transaction  $name $use_fd_fallback
+    publish_after_hook $name
+    publish_succeeded  $name
 
   done
 
@@ -3378,19 +3395,12 @@ rollback() {
     fi
   fi
 
-  # check if we have open file descriptors on /cvmfs/<name>
-  local use_fd_fallback=0
-  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
-
-  # do it!
+  # prepare the shell commands
   local swissknife="cvmfs_swissknife"
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
-  publish_before_hook
-  publishing_lock $name
-  cvmfs_suid_helper lock $name
   local base_hash=$(get_mounted_root_hash $name)
 
   local rollback_command="$swissknife rollback -u $stratum0 \
@@ -3411,16 +3421,27 @@ rollback() {
     -t ${spool_dir}/tmp \
     -r ${upstream}"
 
-  $user_shell "$rollback_command" ||
-    { cvmfs_suid_helper open $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
+  # check if we have open file descriptors on /cvmfs/<name>
+  local use_fd_fallback=0
+  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+
+  # do it!
+  publish_before_hook
+  publish_starting $name
+  $user_shell "$rollback_command" || { publish_failed $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
+
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
+  $user_shell "$sign_command" || { publish_failed; die "Signing failed\n\nExecuted Command:\n$sign_command"; }
   set_ro_root_hash $name $trunk_hash
+
+  echo "Flushing file system buffers"
+  sync
 
   echo "Remounting newly created repository revision"
   sync
-  close_transaction $name $use_fd_fallback
+  close_transaction  $name $use_fd_fallback
   publish_after_hook $name
+  publish_succeeded  $name
 }
 
 
