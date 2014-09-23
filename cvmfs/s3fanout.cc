@@ -532,7 +532,19 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                                            "",
                                            info->bucket,
                                            info->object_key).c_str());
+    info->http_headers =
+        curl_slist_append(info->http_headers, "Content-Length: 0");
+
+    if (info->request == JobInfo::kReqDelete) {
+      retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, req.c_str());
+      assert(retval == CURLE_OK);
+    } else {
+      retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
+      assert(retval == CURLE_OK);
+    }
   } else {
+    retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, NULL);
+    assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
