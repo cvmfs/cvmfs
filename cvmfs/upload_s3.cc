@@ -203,7 +203,7 @@ void S3Uploader::WorkerThread() {
       s3fanout::JobInfo *info = *it;
       if (info->error_code == s3fanout::kFailOk) {
         Respond(static_cast<callback_t*>(info->callback),
-                UploaderResults(0));
+                UploaderResults(0, info->mmf->file_path()));
       } else {
         LogCvmfs(kLogS3Fanout, kLogStderr, "Upload job for '%s' failed. "
                                            "(error code: %d - %s)",
