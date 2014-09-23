@@ -388,6 +388,11 @@ bool S3Uploader::UploadFile(const std::string &filename,
                                                   (unsigned char*)buff,
                                                   size_of_file);
   info->request        = s3fanout::JobInfo::kReqPut;
+#ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
+  if (filename.substr(0, 1) != ".") {
+    info->request        = s3fanout::JobInfo::kReqHead;
+  }
+#endif
   info->origin_mem.pos = 0;
   info->callback       = const_cast<void*>(static_cast<void const*>(callback));
   info->mmf            = mmf;
