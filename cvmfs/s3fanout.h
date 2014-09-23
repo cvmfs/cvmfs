@@ -193,6 +193,7 @@ class S3FanoutManager : SingleCopy {
   }
 
   Prng prng_;
+  pthread_mutex_t  *lock_handle_pool_;
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
   std::map<CURL *, CURLSH *> *pool_sharehandles_;
