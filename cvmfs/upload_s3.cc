@@ -73,49 +73,49 @@ bool S3Uploader::ParseSpoolerDefinition(
   options::ParsePath(config_path, false);
   std::string parameter;
   std::string s3_host;
-  if (!options::GetValue("S3_HOST", &s3_host)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_HOST from '%s'",
+  if (!options::GetValue("CVMFS_S3_HOST", &s3_host)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse CVMFS_S3_HOST from '%s'",
              config_path.c_str());
     return false;
   }
   const std::string kStandardPort = "80";
   std::string s3_port = kStandardPort;
-  options::GetValue("S3_PORT", &s3_port);
+  options::GetValue("CVMFS_S3_PORT", &s3_port);
   int s3_buckets_per_account = 1;
-  if (options::GetValue("S3_BUCKETS_PER_ACCOUNT", &parameter)) {
+  if (options::GetValue("CVMFS_S3_BUCKETS_PER_ACCOUNT", &parameter)) {
     s3_buckets_per_account = String2Uint64(parameter);
     if (s3_buckets_per_account < 1 || s3_buckets_per_account > 100) {
-      LogCvmfs(kLogSpooler, kLogStderr, "Fail, invalid S3_BUCKETS_PER_ACCOUNT "
+      LogCvmfs(kLogSpooler, kLogStderr, "Fail, invalid CVMFS_S3_BUCKETS_PER_ACCOUNT "
                "given: '%d'.",
                s3_buckets_per_account);
       LogCvmfs(kLogSpooler, kLogStderr,
-               "S3_BUCKETS_PER_ACCOUNT should be in range 1-100.");
+               "CVMFS_S3_BUCKETS_PER_ACCOUNT should be in range 1-100.");
       return false;
     }
   }
   std::string s3_access_key;
-  if (!options::GetValue("S3_ACCESS_KEY", &s3_access_key)) {
+  if (!options::GetValue("CVMFS_S3_ACCESS_KEY", &s3_access_key)) {
     LogCvmfs(kLogSpooler, kLogStderr,
-             "Failed to parse S3_ACCESS_KEY from '%s'.",
+             "Failed to parse CVMFS_S3_ACCESS_KEY from '%s'.",
              config_path.c_str());
     return false;
   }
   std::string s3_secret_key;
-  if (!options::GetValue("S3_SECRET_KEY", &s3_secret_key)) {
+  if (!options::GetValue("CVMFS_S3_SECRET_KEY", &s3_secret_key)) {
     LogCvmfs(kLogSpooler, kLogStderr,
-             "Failed to parse S3_SECRET_KEY from '%s'.",
+             "Failed to parse CVMFS_S3_SECRET_KEY from '%s'.",
              config_path.c_str());
     return false;
   }
-  if (!options::GetValue("S3_BUCKET", &bucket_body_name_)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse S3_BUCKET from '%s'.",
+  if (!options::GetValue("CVMFS_S3_BUCKET", &bucket_body_name_)) {
+    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse CVMFS_S3_BUCKET from '%s'.",
              config_path.c_str());
     return false;
   }
-  if (!options::GetValue("S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS",
+  if (!options::GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS",
                          &parameter)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse "
-             "S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS "
+             "CVMFS_S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS "
              "from '%s'.",
              config_path.c_str());
     return false;
@@ -130,7 +130,7 @@ bool S3Uploader::ParseSpoolerDefinition(
              "Failure, number of accounts does not match");
     LogCvmfs(kLogSpooler, kLogStderr,
              "Specify keys like this: "
-             "S3_ACCESS_KEY=key1:key2:key3:...");
+             "CVMFS_S3_ACCESS_KEY=key1:key2:key3:...");
     return false;
   }
 
