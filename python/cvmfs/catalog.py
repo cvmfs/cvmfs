@@ -122,6 +122,12 @@ class CatalogStatistics:
     def subtree_data_size(self):
         return self._get_stat('all_file_size')
 
+    def get_all_fields(self):
+        return self._get_stat('all_regular') , self._get_stat('all_dir') ,          \
+               self._get_stat('all_symlink') , self._get_stat('all_file_size') ,    \
+               self._get_stat('all_chunked') , self._get_stat('all_chunked_size') , \
+               self._get_stat('all_chunks')  , self._get_stat('all_nested')
+
 
     def _read_statistics(self, catalog):
         stats = catalog.run_sql("SELECT * FROM statistics ORDER BY counter;")
