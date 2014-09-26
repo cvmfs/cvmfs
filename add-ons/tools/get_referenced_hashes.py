@@ -29,6 +29,8 @@ def get_hashes_for_catalog_tree(repo, root_catalog):
     hashes = { root_catalog.hash + "C" }
     for catalog in repo.catalogs(root_catalog):
         hashes = hashes | get_hashes_for_catalog(catalog)
+        if not catalog.has_nested():
+          repo.close_catalog(catalog)
     return hashes
 
 def get_hashes_for_revision(repo, root_hash = None):
