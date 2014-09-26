@@ -65,6 +65,13 @@ class CannotReplicate(Exception):
     def __str__(self):
         return repr(self.repo)
 
+class NestedCatalogNotFound(Exception):
+    def __init__(self, repo):
+        self.repo = repo
+
+    def __str__(self):
+        return repr(self.repo)
+
 
 class RepositoryIterator:
     """ Iterates through all directory entries in a whole Repository """
@@ -106,6 +113,8 @@ class RepositoryIterator:
     def _fetch_and_push_catalog(self, catalog_mountpoint):
         current_catalog = self._get_current_catalog().catalog
         nested_ref      = current_catalog.find_nested_for_path(catalog_mountpoint)
+        if not nested_ref:
+            raise NestedCatalogNotFound(self.repository)
         new_catalog     = nested_ref.retrieve_from(self.repository)
         self._push_catalog(new_catalog)
 
@@ -137,11 +146,13 @@ class CatalogTreeIterator:
                 self.catalog = self.catalog_reference.retrieve_from(self.repository)
             return self.catalog
 
-    def __init__(self, repository):
+    def __init__(self, repository, root_catalog):
+        if not root_catalog:
+            root_catalog = repository.retrieve_root_catalog()
         self.repository    = repository
         self.catalog_stack = collections.deque()
         wrapper            = self._CatalogWrapper(self.repository)
-        wrapper.catalog    = repository.retrieve_root_catalog()
+        wrapper.catalog    = root_catalog
         self._push_catalog_wrapper(wrapper)
 
     def __iter__(self):
@@ -220,8 +231,8 @@ class Repository:
             pass
 
 
-    def catalogs(self):
-        return CatalogTreeIterator(self)
+    def catalogs(self, root_catalog = None):
+        return CatalogTreeIterator(self, root_catalog)
 
 
     def has_repository_type(self):
@@ -267,6 +278,15 @@ class Repository:
         return clg
 
 
+    def close_catalog(self, catalog):
+        try:
+            open_catalog = self._opened_catalogs[catalog.hash]
+            del self._opened_catalogs[catalog.hash]
+        except KeyError, e:
+            print "not found:" , catalog.hash
+            pass
+
+
     def retrieve_catalog(self, catalog_hash):
         """ Download and open a catalog from the repository """
         if catalog_hash in self._opened_catalogs:
@@ -276,7 +296,7 @@ class Repository:
 
     def _retrieve_and_open_catalog(self, catalog_hash):
         catalog_file = self.retrieve_object(catalog_hash, 'C')
-        new_catalog = Catalog(catalog_file)
+        new_catalog = Catalog(catalog_file, catalog_hash)
         self._opened_catalogs[catalog_hash] = new_catalog
         return new_catalog
 
@@ -411,3 +431,9 @@ def all_local():
 
 def all_local_stratum0():
     return [ repo for repo in all_local() if repo.type == 'stratum0' ]
+
+def open_repository(repository_path):
+    if repository_path.startswith("http://"):
+        return RemoteRepository(repository_path)
+    else:
+        return LocalRepository(repository_path)
