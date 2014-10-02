@@ -357,6 +357,34 @@ static int AbortTransaction(const string &temp_path) {
 
 
 /**
+ * Renames a file.  If using alien_cache, it may be on NFS so need to avoid
+ * deleting an existing file that was created by more than one node, so use
+ * link()/unlink() to rename, and ignore if the file already exists.
+ *
+ * @param[in] oldpath Absolute path of the file to rename
+ * @param[in] newpath Absolute path to rename the file to
+ * \return Zero on success, non-zero else.
+ */
+
+static int Rename(const char *oldpath,
+	          const char *newpath)
+{
+  if (!alien_cache_) {
+    return rename(oldpath, newpath);
+  }
+
+  int result = link(oldpath, newpath);
+  if (result < 0) {
+    if (errno == EEXIST)
+      LogCvmfs(kLogCache, kLogDebug, "%s already existed, ignoring", newpath);
+    else
+      return(result);
+  }
+  return(unlink(oldpath));
+}
+
+
+/**
  * Commits a file download started with StartTransaction(), i.e. renames
  * the temporary file to its real content hash name.
  *
@@ -385,7 +413,7 @@ static int CommitTransaction(const string &final_path,
     int retval = chmod(temp_path.c_str(), 0660);
     assert(retval == 0);
   }
-  result = rename(temp_path.c_str(), final_path.c_str());
+  result = Rename(temp_path.c_str(), final_path.c_str());
   if (result < 0) {
     result = -errno;
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
@@ -743,7 +771,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
   // Try from cache
   const string cache_path = *cache_path_ + hash.MakePath(1, 2);
   *catalog_path = cache_path + "T";
-  retval = rename(cache_path.c_str(), catalog_path->c_str());
+  retval = Rename(cache_path.c_str(), catalog_path->c_str());
   if (retval == 0) {
     LogCvmfs(kLogCache, kLogDebug, "found catalog %s in cache",
              hash.ToString().c_str());
@@ -761,7 +789,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
       }
     }
     // Pinned, can be safely renamed
-    retval = rename(catalog_path->c_str(), cache_path.c_str());
+    retval = Rename(catalog_path->c_str(), cache_path.c_str());
     *catalog_path = cache_path;
     return catalog::kLoadNew;
   }
@@ -818,7 +846,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
 
   retval = chmod(temp_path.c_str(), 0660);
   assert(retval == 0);
-  retval = rename(temp_path.c_str(), catalog_path->c_str());
+  retval = Rename(temp_path.c_str(), catalog_path->c_str());
   if (retval != 0) {
     quota::Remove(hash);
     backoff_throttle_.Throttle();
