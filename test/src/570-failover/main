@@ -1,0 +1,83 @@
+cvmfs_test_name="Failover"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "meaningless file content" > file
+  echo "more clever file content" > clever
+
+  popdir
+}
+
+TEST570_HTTP_PORT=""
+TEST570_PROXY_BASE_PORT=9000
+TEST570_NUM_PROXIES=0
+cleanup() {
+  echo -n "cleaning up... "
+  [ -z "$TEST570_HTTP_PORT" ] || curl -X POST http://localhost:${TEST570_HTTP_PORT}/__admin/shutdown > /dev/null 2>&1
+  if [ ! -z $TEST570_NUM_PROXIES ]; then
+    local i=0
+    while [ $i -lt $TEST570_NUM_PROXIES ]; do
+      local proxy_port=$(( $TEST570_PROXY_BASE_PORT + $i ))
+      curl -X POST http://localhost:${proxy_port}/__admin/shutdown > /dev/null 2>&1
+      i=$(( $i + 1 ))
+    done
+  fi
+  echo "done"
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "check that wiremock is available"
+  which wiremock || return 1
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 2
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "prepare the mocked stratum 0 repository content"
+  local http_root="mocked_http_root"
+  local repo_root="${http_root}/__files/cvmfs"
+  mkdir -p $repo_root                            || return 3
+  cp -R /srv/cvmfs/${CVMFS_TEST_REPO} $repo_root || return 4
+
+  echo "start a mocked HTTP server for the repository"
+  local http_log="http.log"
+  TEST570_HTTP_PORT=8000
+  run_background_service $http_log "wiremock --root $http_root --verbose --port $TEST570_HTTP_PORT" || return 5
+  sleep 1
+
+  local num_proxies=6
+  echo "start $num_proxies proxies"
+  local i=0
+  while [ $i -lt $num_proxies ]; do
+    local proxy_root="mocked_proxy_root_${i}"
+    local proxy_log="proxy_log_${i}.log"
+    local proxy_port=$(( $TEST570_PROXY_BASE_PORT + $i ))
+    mkdir -p $proxy_root || return 6
+    run_background_service $proxy_log "wiremock --root $proxy_root --verbose --port $proxy_port --enable-browser-proxying" || return 7
+    TEST570_NUM_PROXIES=$(( $TEST570_NUM_PROXIES + 1 ))
+    i=$(( $i + 1 ))
+  done
+  sleep 1
+
+  return 0
+}
+
