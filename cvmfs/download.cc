@@ -1075,6 +1075,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_COULDNT_CONNECT:
     case CURLE_OPERATION_TIMEDOUT:
     case CURLE_PARTIAL_FILE:
+    case CURLE_GOT_NOTHING:
+    case CURLE_RECV_ERROR:
       if (info->proxy != "")
         // This is a guess.  Fail-over can still change to switching host
         info->error_code = kFailProxyConnection;
