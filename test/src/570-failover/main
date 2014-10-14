@@ -127,14 +127,17 @@ mount_private() {
 TEST570_HTTP_PORT=""
 TEST570_PROXY_BASE_PORT=9000
 TEST570_NUM_PROXIES=0
+TEST570_PROXIES=""
+TEST570_MOUNT_POINT=""
 cleanup() {
   echo -n "cleaning up... "
-  [ -z "$TEST570_HTTP_PORT" ] || curl -X POST http://localhost:${TEST570_HTTP_PORT}/__admin/shutdown > /dev/null 2>&1
+  [ -z "$TEST570_MOUNT_POINT" ] || sudo umount $TEST570_MOUNT_POINT > /dev/null 2>&1
+  [ -z "$TEST570_HTTP_PORT" ]   || shutdown_wiremock "http://localhost:${TEST570_HTTP_PORT}"
   if [ ! -z $TEST570_NUM_PROXIES ]; then
     local i=0
     while [ $i -lt $TEST570_NUM_PROXIES ]; do
       local proxy_port=$(( $TEST570_PROXY_BASE_PORT + $i ))
-      curl -X POST http://localhost:${proxy_port}/__admin/shutdown > /dev/null 2>&1
+      shutdown_wiremock "http://localhost:${proxy_port}"
       i=$(( $i + 1 ))
     done
   fi
