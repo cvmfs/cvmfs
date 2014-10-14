@@ -12,6 +12,118 @@ produce_files_in() {
   popdir
 }
 
+start_wiremock() {
+  local document_root="$1"
+  local port="$2"
+  local logfile="$3"
+  local is_proxy=""
+  [ -z $4 ] || is_proxy="--enable-browser-proxying"
+  run_background_service $logfile "wiremock              \
+                                   --root $document_root \
+                                   --port $port          \
+                                   $is_proxy             \
+                                   --verbose "
+}
+
+send_wiremock_admin_command() {
+  local url="$1"
+  local admin_command="$2"
+  cat | curl -X POST "${url}/__admin/${admin_command}" -d @- \
+            --header "Content-Type: application/json" > /dev/null 2>&1 || exit 1
+}
+
+shutdown_wiremock() {
+  local url="$1"
+  echo "" | send_wiremock_admin_command "$url" "shutdown"
+}
+
+alter_wiremock_settings() {
+  local url="$1"
+  cat | send_wiremock_admin_command "$url" "settings"
+}
+
+set_wiremock_response_delay() {
+  local url="$1"
+  local delay="$2"
+  echo "{\"milliseconds\": $delay}" | send_wiremock_admin_command "$url" "socket-delay"
+  # Workaround: the delay seems to take effect only after one request was posted
+  curl $url > /dev/null 2>&1
+}
+
+set_wiremock_response_fault() {
+  local url="$1"
+  local url_pattern="$2"
+  local fault_code="$3"
+
+  echo "{                                      \
+          \"request\": {                       \
+            \"method\": \"GET\",               \
+            \"urlPattern\": \"${url_pattern}\" \
+          },                                   \
+                                               \
+          \"response\": {                      \
+            \"fault\": \"${fault_code}\"       \
+          }                                    \
+        }" | send_wiremock_admin_command "$url" "mappings/new"
+}
+
+set_wiremock_empty_response_fault() {
+  local url="$1"
+  local url_pattern=".*"
+  [ -z "$2" ] || url_pattern="$2"
+  set_wiremock_response_fault "$url" "$url_pattern" "EMPTY_RESPONSE"
+}
+
+set_wiremock_garbage_response_fault() {
+  local url="$1"
+  local url_pattern=".*"
+  [ -z "$2" ] || url_pattern="$2"
+  set_wiremock_response_fault "$url" "$url_pattern" "MALFORMED_RESPONSE_CHUNK"
+}
+
+reset_wiremock() {
+  local url="$1"
+  echo "" | send_wiremock_admin_command "$url" "reset"
+}
+
+clear_cache() {
+  local cache_directory="$1"
+  rm -fR "$cache_directory"   || return 1
+  mkdir -p "$cache_directory" || return 2
+}
+
+get_active_proxy_group() {
+  local talk_pipe="$1"
+  cvmfs_talk -p $talk_pipe proxy info | grep "Active proxy:" | sed -e 's/^.*\[\([0-9]\+\)\].*$/\1/'
+}
+
+check_active_proxy_group() {
+  local talk_pipe="$1"
+  local expected="$2"
+  local active_proxy_group
+
+  active_proxy_group=$(get_active_proxy_group "$talk_pipe")
+  echo "active proxy group: $active_proxy_group"
+  [ $active_proxy_group -eq $expected ]
+}
+
+switch_proxy_group() {
+  local talk_pipe="$1"
+  cvmfs_talk -p $talk_pipe proxy group switch
+}
+
+set_proxy_chain() {
+  local talk_pipe="$1"
+  local proxy_chain="$2"
+  cvmfs_talk -p $talk_pipe proxy set "$proxy_chain"
+}
+
+mount_private() {
+  local mountpoint="$1"
+  local configuration="$2"
+  cvmfs2 -o config=$configuration $CVMFS_TEST_REPO "$mountpoint" 1>&2 || return 8
+}
+
 TEST570_HTTP_PORT=""
 TEST570_PROXY_BASE_PORT=9000
 TEST570_NUM_PROXIES=0
@@ -27,6 +139,30 @@ cleanup() {
     done
   fi
   echo "done"
+}
+
+get_proxy() {
+  local n=$1
+  for proxy in $TEST570_PROXIES; do
+    if [ $n -eq 0 ]; then
+      echo $proxy
+      return 0
+    fi
+    n=$(( $n - 1 ))
+  done
+  return 1
+}
+
+get_proxies() {
+  echo "$TEST570_PROXIES"
+}
+
+reset_proxies() {
+  for proxy in $(get_proxies); do
+    echo "resetting: $proxy"
+    reset_wiremock "$proxy"
+  done
+  sleep 2
 }
 
 cvmfs_run_test() {
