@@ -30,6 +30,7 @@
 #include "cache.h"
 
 #include <sys/stat.h>
+#include <sys/statfs.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -59,6 +60,10 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "cvmfs.h"
+
+#ifndef NFS_SUPER_MAGIC
+#define NFS_SUPER_MAGIC 0x6969
+#endif
 
 using namespace std;  // NOLINT
 
@@ -113,6 +118,7 @@ typedef map< shash::Any, vector<int> * > ThreadQueues;
 
 string *cache_path_ = NULL;
 bool alien_cache_ = false;
+bool alien_cache_on_nfs_ = false;
 ThreadQueues *queues_download_ = NULL;  /**< maps currently
   downloaded chunks to an array of writer's ends of a pipe to signal the waiting
   threads when the download has finished */
@@ -170,6 +176,14 @@ bool Init(const string &cache_path, const bool alien_cache) {
     }
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
+    struct statfs cache_buf;
+    if ((statfs(cache_path.c_str(), &cache_buf) == 0) &&
+	    (cache_buf.f_type == NFS_SUPER_MAGIC))
+    {
+      alien_cache_on_nfs_ = true;
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "Alien cache is on NFS.");
+    }
   } else {
     if (!MakeCacheDirectories(cache_path, 0700))
       return false;
@@ -357,8 +371,8 @@ static int AbortTransaction(const string &temp_path) {
 
 
 /**
- * Renames a file.  If using alien_cache, it may be on NFS so need to avoid
- * deleting an existing file that was created by more than one node, so use
+ * Renames a file.  If using alien_cache on NFS, need to avoid deleting
+ * an existing file that was created by more than one node, so use
  * link()/unlink() to rename, and ignore if the file already exists.
  *
  * @param[in] oldpath Absolute path of the file to rename
@@ -369,7 +383,7 @@ static int AbortTransaction(const string &temp_path) {
 static int Rename(const char *oldpath,
 	          const char *newpath)
 {
-  if (!alien_cache_) {
+  if (!alien_cache_on_nfs_) {
     return rename(oldpath, newpath);
   }
 
