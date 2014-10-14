@@ -458,7 +458,7 @@ static int Fetch(const shash::Any &checksum,
 
   // Try to open from local cache
   if ((fd_return = cache::Open(checksum)) >= 0) {
-    LogCvmfs(kLogCache, kLogNormal, "HIT: %s",cvmfs_path.c_str());
+    LogCvmfs(kLogCache, kLogDebug, "hit: %s",cvmfs_path.c_str());
 
     if (cache_mode_ == kCacheReadWrite)
       quota::Touch(checksum);
@@ -469,7 +469,7 @@ static int Fetch(const shash::Any &checksum,
     return -EROFS;
 
   if (size > quota::GetMaxFileSize()) {
-    LogCvmfs(kLogCache, kLogNormal, "file too big for lru cache (%"PRIu64" "
+    LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64" "
                                    "requested but only %"PRIu64" bytes free)",
              size, quota::GetMaxFileSize());
     return -ENOSPC;
@@ -552,7 +552,7 @@ static int Fetch(const shash::Any &checksum,
     goto fetch_finalize;
   }
 
-  LogCvmfs(kLogCache, kLogNormal, "MISS: %s %s",cvmfs_path.c_str(),url.c_str());
+  LogCvmfs(kLogCache, kLogDebug, "miss: %s %s",cvmfs_path.c_str(),url.c_str());
 
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
