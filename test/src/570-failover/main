@@ -1,4 +1,4 @@
-cvmfs_test_name="Failover"
+cvmfs_test_name="Proxy Failover Scenarios"
 cvmfs_test_autofs_on_startup=false
 
 produce_files_in() {
