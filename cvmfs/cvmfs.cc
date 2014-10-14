@@ -1870,7 +1870,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     dns_server = parameter;
   if (options::GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;
-  if (options::GetValue("CVMFS_KEYS_DIR", &parameter)) {
+  if (options::GetValue("CVMFS_KEYS_DIR", &parameter) && ! parameter.empty()) {
     // Collect .pub files from CVMFS_KEYS_DIR
     public_keys = JoinStrings(FindFiles(parameter, ".pub"), ":");
   } else if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
