@@ -3288,6 +3288,7 @@ publish() {
       -r ${upstream}"
 
     # ---> do it! (from here on we are changing things)
+    publish_before_hook $name
     $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
 
     # check if we have open file descriptors on /cvmfs/<name>
@@ -3295,7 +3296,6 @@ publish() {
     handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
 
     # synchronize the repository
-    publish_before_hook $name
     publish_starting $name
     $user_shell "$sync_command"      || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     [ -f ${spool_dir}/tmp/manifest ] || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
