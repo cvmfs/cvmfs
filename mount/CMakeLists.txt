@@ -111,11 +111,26 @@ else (MACOSX)
   )
   add_executable (auto.cvmfs ${CVMFS_AUTO_SOURCES})
 
+  SET( autofsmap_link    /etc/auto.cvmfs)
+  SET( autofsmap_dest    /usr/libexec/cvmfs)
+  SET( autofsmap_target  ${autofsmap_dest}/auto.cvmfs)
   install (
     TARGETS       auto.cvmfs
-    DESTINATION   "/etc"
+    DESTINATION   ${autofsmap_dest}
     PERMISSIONS   OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
+  # Symlink /etc/auto.cvmfs --> /sbin/auto.cvmfs
+  install(CODE "
+    if (\"\$ENV{DESTDIR}\" STREQUAL \"\")
+      execute_process(COMMAND ln -sf
+        ${autofsmap_target}
+        ${autofsmap_link})
+    else ()
+      execute_process(COMMAND ln -sf
+        ${autofsmap_target}
+        \$ENV{DESTDIR}/${autofsmap_link})
+    endif ()
+  ")
 
   install (
     TARGETS       ${MOUNT_TARGET_NAME}
