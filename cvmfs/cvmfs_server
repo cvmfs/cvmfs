@@ -964,6 +964,11 @@ foreclose_legacy_cvmfs() {
 find_hazardous_aufs_config() {
   local name=$1
 
+  # threshold definitions
+  local aufs_minimum_required="20130300"
+  local krnl_minimum_required="3.10.0"
+  local krnl_sl6_minimal_fixed="431.29.2"
+
   # check if we are actually dealing with AUFS or if the warning message is
   # silenced... in these cases no more checks are needed
   load_repo_config $name
