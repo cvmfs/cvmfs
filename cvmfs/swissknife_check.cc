@@ -264,6 +264,16 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                    full_path.c_str());
           retval = false;
         }
+
+        // check that the nested mountpoint is empty in the current catalog
+        catalog::DirectoryEntryList nested_entries;
+        if (catalog->ListingPath(full_path, &nested_entries) &&
+            ! nested_entries.empty()) {
+          LogCvmfs(kLogCvmfs, kLogStderr, "non-empty nested catalog mountpoint "
+                                          "at %s.",
+                   full_path.c_str());
+          retval = false;
+        }
       } else {
         // Recurse
         if (!Find(catalog, full_path, computed_counters))

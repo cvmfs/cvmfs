@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <set>
+#include <map>
 #include <string>
 
 #include "duplex_curl.h"
@@ -42,7 +43,25 @@ enum Failures {
 };  // Failures
 
 
-// TODO: Code2Ascii stuff resolving Failures into strings
+inline const char *Code2Ascii(const Failures error) {
+  const int kNumElems = 9;
+  if (error >= kNumElems)
+    return "no text available (internal error)";
+
+  const char *texts[kNumElems];
+  texts[0] = "S3: OK";
+  texts[1] = "S3: local I/O failure";
+  texts[2] = "S3: malformed URL (bad request)";
+  texts[3] = "S3: forbidden";
+  texts[4] = "S3: failed to resolve host address";
+  texts[5] = "S3: host connection problem";
+  texts[6] = "S3: not found";
+  texts[7] = "S3: service not available";
+  texts[8] = "S3: unknown network error";
+
+  return texts[error];
+}
+
 
 
 struct Statistics {
@@ -176,6 +195,7 @@ class S3FanoutManager : SingleCopy {
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
+  std::map<CURL *, CURLSH *> *pool_sharehandles_;
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;

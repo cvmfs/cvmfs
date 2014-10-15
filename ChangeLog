@@ -1,4 +1,12 @@
 2.1.20:
+  * Fix concurrent access to alien cache on NFS (link/unlink instead
+    of rename)
+  * Support alien cache on hadoop-dfs-fuse which doesn't report 
+    file size immediately (CVM-659)
+  * Fix false zero return code of 'cvmfs_server transaction' (CVM-658)
+  * Allow using externally created keys in cvmfs_server mkfs (CVM-646)
+  * Warn when aufs version is known to potentially cause deadlocks
+  * Fix alien cache catalog updates (CVM-653)
   * Add underscore and tilde to the set of unescaped URI characters
   * Fix SElinux packaging for RHEL7 and Fedora 20
   * Disable SQlite locking on the client; improves performance

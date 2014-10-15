@@ -266,6 +266,36 @@ cvmfs_run_test() {
   echo "check if eventually the right catalogs are present in the repository"
   check_catalog_presence_4 $CVMFS_TEST_REPO || return $?
 
+  # ============================================================================
+
+  echo "start a transaction to check dirtab efficiency"
+  start_transaction $CVMFS_TEST_REPO || return 5
+
+  echo "run 'cvmfs_swissknife dirtab'"
+  load_repo_config $CVMFS_TEST_REPO
+  local spool_dir="$CVMFS_SPOOL_DIR"
+  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+  cvmfs_swissknife dirtab -x                    \
+      -d /cvmfs/${CVMFS_TEST_REPO}/.cvmfsdirtab \
+      -b $base_hash                             \
+      -w $CVMFS_STRATUM0                        \
+      -t ${spool_dir}/tmp                       \
+      -u /cvmfs/${CVMFS_TEST_REPO}              \
+      -s ${spool_dir}/scratch || return 6
+
+  echo "check that 'cvmfs_swissknife dirtab' doesn't open all catalogs"
+  local pipe_path="${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
+  local open_catalogs="sudo cvmfs_talk -p $pipe_path open catalogs"
+  $open_catalogs > /dev/null                || return 7
+  [ $($open_catalogs | wc -l) -eq 5 ]       || return 8
+  $open_catalogs | grep '/People/French'    || return 9
+  $open_catalogs | grep '/People/Germans'   || return 10
+  $open_catalogs | grep '/People/Russians'  || return 11
+  $open_catalogs | grep '/People/Americans' || return 12
+
+  echo "abort transaction"
+  abort_transaction $CVMFS_TEST_REPO || return 13
+
   return 0
 }
 

@@ -1,6 +1,6 @@
 
 %{?suse_version:%define dist .suse%suse_version}
-%if 0%{?el6} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20}
+%if 0%{?el6} || 0%{?el7} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
@@ -114,6 +114,7 @@ CernVM-FS static client library for pure user-space use
 Summary: CernVM-FS server tools
 Group: Application/System
 BuildRequires: python-devel
+BuildRequires: unzip
 %if 0%{?suse_version}
 Requires: insserv
 %else

@@ -77,7 +77,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   const std::string &repo_url           = *args.find('r')->second;
   const std::string &spooler            = *args.find('u')->second;
   const std::string &manifest_path      = *args.find('o')->second;
-  const std::string &decompress_tmp_dir = *args.find('t')->second;
+  const std::string &tmp_dir            = *args.find('t')->second;
   const std::string &uid                = (args.count('p') > 0)      ?
                                              *args.find('p')->second :
                                              "";
@@ -107,7 +107,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
 
   // Create an upstream spooler
-  temporary_directory_ = decompress_tmp_dir;
+  temporary_directory_ = tmp_dir;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kSha1);
   spooler_ = upload::Spooler::Construct(spooler_definition);
   if (!spooler_) {
@@ -124,7 +124,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   params.repo_name = repo_name;
   params.repo_keys = repo_keys;
   params.no_close  = generate_full_catalog_tree;
-  params.tmp_dir   = decompress_tmp_dir;
+  params.tmp_dir   = tmp_dir;
   WritableCatalogTraversal traversal(params);
   traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
 
@@ -163,7 +163,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
     spooler_->WaitForUpload();
 
     // Configure the concurrent catalog migration facility
-    MigrationWorker_20x::worker_context context(spooler_definition.temporary_path,
+    MigrationWorker_20x::worker_context context(temporary_directory_,
                                                 collect_catalog_statistics,
                                                 fix_transition_points,
                                                 analyze_file_linkcounts,
@@ -172,7 +172,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_20x>(context, manifest_path);
   } else if (migration_base == "2.1.7") {
-    MigrationWorker_217::worker_context context(spooler_definition.temporary_path,
+    MigrationWorker_217::worker_context context(temporary_directory_,
                                                 collect_catalog_statistics);
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_217>(context, manifest_path);
@@ -617,6 +617,7 @@ bool CommandMigrate::MigrationWorker_20x::RunMigration(PendingCatalog *data) con
          MigrateFileMetadata              (data) &&
          MigrateNestedCatalogMountPoints  (data) &&
          FixNestedCatalogTransitionPoints (data) &&
+         RemoveDanglingNestedMountpoints  (data) &&
          GenerateCatalogStatistics        (data) &&
          FindRootEntryInformation         (data) &&
          CommitDatabaseTransaction        (data) &&
@@ -772,8 +773,10 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
   //   - for each child directory, the parent's link count is incremented by 1
   //     (parent reference in child (cd ..) )
   //
-  // Note: we deliberately exclude nested catalog mountpoints here, since we
-  //       cannot check the number of containing directories here
+  // Note: nested catalog mountpoints will be miscalculated here, since we can't
+  //       check the number of containing directories. They are defined in a the
+  //       linked nested catalog and need to be added later on.
+  //       (see: MigrateNestedCatalogMountPoints() for details)
   Sql sql_dir_linkcounts(writable,
     "INSERT INTO dir_linkcounts "
     "  SELECT c1.inode as inode, "
@@ -783,13 +786,11 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     "    ON c2.parent_1 = c1.md5path_1 AND "
     "       c2.parent_2 = c1.md5path_2 AND "
     "       c2.flags & :flag_dir_1 "
-    "  WHERE c1.flags & :flag_dir_2 AND "
-    "        NOT c1.flags & :flag_nested_mountpoint "
+    "  WHERE c1.flags & :flag_dir_2 "
     "  GROUP BY c1.inode;");
   retval =
-    sql_dir_linkcounts.BindInt64(1, SqlDirent::kFlagDir)                 &&
-    sql_dir_linkcounts.BindInt64(2, SqlDirent::kFlagDir)                 &&
-    sql_dir_linkcounts.BindInt64(3, SqlDirent::kFlagDirNestedMountpoint) &&
+    sql_dir_linkcounts.BindInt64(1, SqlDirent::kFlagDir) &&
+    sql_dir_linkcounts.BindInt64(2, SqlDirent::kFlagDir) &&
     sql_dir_linkcounts.Execute();
   if (!retval) {
     Error("Failed to analyze directory specific linkcounts",
@@ -1145,6 +1146,102 @@ void CommandMigrate::FixNestedCatalogTransitionPoint(
   mountpoint.gid_   = nested_root.gid_;
   mountpoint.size_  = nested_root.size_;
   mountpoint.mtime_ = nested_root.mtime_;
+}
+
+
+/**
+ * Queries a single catalog and looks for DirectoryEntrys that have direct
+ * children in the same catalog but are marked as 'nested catalog mountpoints'.
+ * This is an inconsistent situation, since a mountpoint is supposed to be empty
+ * and it's children are stored in the corresponding referenced nested catalog.
+ *
+ * Note: the user code needs to check if there is a corresponding nested catalog
+ *       reference for the found dangling mountpoints. If so, we also have a
+ *       bogus state, but it is not reliably fixable automatically. The child-
+ *       DirectoryEntrys would be masked by the mounting nested catalog but it
+ *       is not clear if we can simply delete them or if this would destroy data.
+ */
+class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
+ public:
+  SqlLookupDanglingMountpoints(const Database &database) {
+    const std::string statement =
+      "SELECT DISTINCT " + GetFieldsToSelect(database.schema_version()) + " "
+      "FROM catalog "
+      "JOIN catalog AS c2 "
+      "ON catalog.md5path_1 = c2.parent_1 AND catalog.md5path_2 = c2.parent_2 "
+      "WHERE catalog.flags & "
+                      + StringifyInt(SqlDirent::kFlagDirNestedMountpoint) + ";";
+    const bool init_successful = Init(database.sqlite_db(), statement);
+    assert (init_successful);
+  }
+};
+
+bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
+  PendingCatalog *data) const
+{
+  assert(data->HasNew());
+  const Database &writable = data->new_catalog->database();
+  bool retval = false;
+
+  // build a set of registered nested catalog path hashes
+  typedef catalog::Catalog::NestedCatalogList NestedCatalogList;
+  typedef std::map<shash::Md5, catalog::Catalog::NestedCatalog> NestedCatalogMap;
+  const NestedCatalogList& nested_clgs = data->old_catalog->ListNestedCatalogs();
+        NestedCatalogList::const_iterator i    = nested_clgs.begin();
+  const NestedCatalogList::const_iterator iend = nested_clgs.end();
+  NestedCatalogMap nested_catalog_path_hashes;
+  for (; i != iend; ++i) {
+    const PathString &path = i->path;
+    const shash::Md5  hash(path.GetChars(), path.GetLength());
+    nested_catalog_path_hashes[hash] = *i;
+  }
+
+  // Retrieve nested catalog mountpoints that have child entries directly inside
+  // the current catalog (which is a malformed state)
+  SqlLookupDanglingMountpoints sql_dangling_mountpoints(writable);
+  SqlDirentUpdate              save_updated_mountpoint(writable);
+
+  // go through the list of dangling nested catalog mountpoints and fix them
+  // where needed (check if there is no nested catalog registered for them)
+  while (sql_dangling_mountpoints.FetchRow()) {
+    DirectoryEntry dangling_mountpoint =
+                          sql_dangling_mountpoints.GetDirent(data->new_catalog);
+    const shash::Md5 path_hash = sql_dangling_mountpoints.GetPathHash();
+    assert (dangling_mountpoint.IsNestedCatalogMountpoint());
+
+    // check if the nested catalog mountpoint is registered in the nested cata-
+    // log list of the currently migrated catalog
+    const NestedCatalogMap::const_iterator nested_catalog =
+                                     nested_catalog_path_hashes.find(path_hash);
+    if (nested_catalog != nested_catalog_path_hashes.end()) {
+      LogCvmfs(kLogCatalog, kLogStderr, "WARNING: found a non-empty nested "
+                                        "catalog mountpoint under '%s'",
+                                        nested_catalog->second.path.c_str());
+      continue;
+    }
+
+    // the mountpoint was confirmed to be dangling and needs to be removed
+    dangling_mountpoint.set_is_nested_catalog_mountpoint(false);
+
+    // save the updated nested catalog root entry into the catalog
+
+    retval = save_updated_mountpoint.BindPathHash(path_hash)         &&
+             save_updated_mountpoint.BindDirent(dangling_mountpoint) &&
+             save_updated_mountpoint.Execute()                       &&
+             save_updated_mountpoint.Reset();
+    if (!retval) {
+      Error("Failed to remove dangling nested catalog mountpoint entry in "
+            "catalog", save_updated_mountpoint, data);
+      return false;
+    }
+
+    // tell the user that this intervention has been taken place
+    LogCvmfs(kLogCatalog, kLogStdout, "NOTE: fixed dangling nested catalog "
+                                      "mountpoint entry called: '%s' ",
+                                      dangling_mountpoint.name().c_str());
+  }
+
+  return true;
 }
 
 

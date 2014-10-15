@@ -118,12 +118,13 @@ PathspecElementPattern::SubPattern* PathspecElementPattern::ParseSpecialChar(
   }
 }
 
-std::string PathspecElementPattern::GenerateRegularExpression() const {
+std::string PathspecElementPattern::GenerateRegularExpression(
+                                                  const bool is_relaxed) const {
   std::string result;
         SubPatterns::const_iterator i    = subpatterns_.begin();
   const SubPatterns::const_iterator iend = subpatterns_.end();
   for (; i != iend; ++i) {
-    result += (*i)->GenerateRegularExpression();
+    result += (*i)->GenerateRegularExpression(is_relaxed);
   }
   return result;
 }
@@ -168,7 +169,10 @@ void PathspecElementPattern::PlaintextSubPattern::AddChar(const char chr) {
   chars_.push_back(chr);
 }
 
-std::string PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpression() const {
+std::string
+    PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpression(
+                                                  const bool is_relaxed) const {
+  // Note: strict and relaxed regex are the same!
         std::string::const_iterator i    = chars_.begin();
   const std::string::const_iterator iend = chars_.end();
   std::string regex;
@@ -180,6 +184,7 @@ std::string PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpressi
   }
   return regex;
 }
+
 
 std::string PathspecElementPattern::PlaintextSubPattern::GenerateGlobString() const {
         std::string::const_iterator i    = chars_.begin();
@@ -222,8 +227,12 @@ bool PathspecElementPattern::PlaintextSubPattern::Compare(const SubPattern *othe
 }
 
 
-std::string PathspecElementPattern::WildcardSubPattern::GenerateRegularExpression() const {
-  return std::string("[^") + Pathspec::kSeparator + "]*";
+std::string
+    PathspecElementPattern::WildcardSubPattern::GenerateRegularExpression(
+                                                  const bool is_relaxed) const {
+  return (is_relaxed)
+         ? std::string(".*")
+         : std::string("[^") + Pathspec::kSeparator + "]*";
 }
 
 std::string PathspecElementPattern::WildcardSubPattern::GenerateGlobString() const {
@@ -235,7 +244,10 @@ bool PathspecElementPattern::WildcardSubPattern::Compare(const SubPattern *other
 }
 
 
-std::string PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression() const {
+std::string
+    PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression(
+                                                  const bool is_relaxed) const {
+  // Note: strict and relaxed regex are the same!
   return std::string("[^") + Pathspec::kSeparator + "]";
 }
 

@@ -33,7 +33,11 @@ void IoDispatcher::ScheduleWrite(Chunk       *chunk,
       AbstractUploader::MakeClosure(&IoDispatcher::ChunkUploadCompleteCallback,
                                     this,
                                     chunk));
-    assert (handle != NULL);
+    if (handle == NULL) {
+      LogCvmfs(kLogSpooler, kLogStderr, "initiating streamed upload failed");
+      abort();
+    }
+
     chunk->set_upload_stream_handle(handle);
   }
 
@@ -65,7 +69,11 @@ void IoDispatcher::BufferUploadCompleteCallback(
   CharBuffer *buffer        = buffer_info.buffer;
   const bool  delete_buffer = buffer_info.delete_buffer;
 
-  assert (results.return_code == 0);
+  if (results.return_code != 0) {
+    LogCvmfs(kLogSpooler, kLogStderr, "buffer upload failed (code: %d)",
+      results.return_code);
+    abort();
+  }
 
   chunk->add_bytes_written(buffer->used_bytes());
   if (delete_buffer) {
@@ -80,7 +88,11 @@ void IoDispatcher::ChunkUploadCompleteCallback(const UploaderResults &results,
   assert (chunk->HasUploadStreamHandle());
   assert (chunk->bytes_written() == chunk->compressed_size());
 
-  assert (results.return_code == 0);
+  if (results.return_code != 0) {
+    LogCvmfs(kLogSpooler, kLogStderr, "chunk upload failed (code: %d)",
+      results.return_code);
+    abort();
+  }
 
   chunk->file()->ChunkCommitted(chunk);
 

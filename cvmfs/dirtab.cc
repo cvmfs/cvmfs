@@ -66,6 +66,9 @@ bool Dirtab::Parse(FILE *dirtab_file) {
 
 
 bool Dirtab::ParseLine(const std::string &line) {
+  // line parsing is done using std::string iterators. Each parsing method ex-
+  // pects an iterator and the end iterator. While parsing itr is constantly
+  // incremented to walk through the given .cvmfsdirtab line.
         std::string::const_iterator itr  = line.begin();
   const std::string::const_iterator iend = line.end();
   bool negation = false;
@@ -86,6 +89,9 @@ bool Dirtab::ParseLine(const std::string &line) {
     return true;
   }
   Pathspec pathspec(pathspec_str);
+
+  // all generated Pathspecs need to be valid and positive rules must be
+  // absolute. Otherwise the .cvmfsdirtab is not valid.
   if ( !pathspec.IsValid() ||
       (!negation && !pathspec.IsAbsolute())) {
     return false;
@@ -149,7 +155,7 @@ bool Dirtab::IsOpposing(const std::string &path) const {
   const Rules::const_iterator nend = negative_rules_.end();
   for (; n != nend; ++n) {
     assert (n->is_negation);
-    if (n->pathspec.IsMatching(path)) {
+    if (n->pathspec.IsMatchingRelaxed(path)) {
       return true;
     }
   }

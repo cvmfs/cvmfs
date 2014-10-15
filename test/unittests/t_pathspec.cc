@@ -478,3 +478,221 @@ TEST(T_Pathspec, GetGlobString) {
   EXPECT_EQ (s10a, p10.GetGlobString());
   EXPECT_EQ (s11,  p11.GetGlobString());
 }
+
+
+TEST(T_Pathspec, MultiDirectoryWildcards) {
+  const Pathspec p1("*.exe");
+  const Pathspec p2("/foo/*.h");
+  const Pathspec p3("/foo/??\?/*.h");
+  const Pathspec p4("/*.exe");
+  const Pathspec p5("/foo/ba?");
+
+  EXPECT_TRUE (p1.IsValid());
+  EXPECT_TRUE (p2.IsValid());
+  EXPECT_TRUE (p3.IsValid());
+  EXPECT_TRUE (p4.IsValid());
+  EXPECT_TRUE (p5.IsValid());
+
+  EXPECT_TRUE  (p1.IsMatching("hallo.welt.exe"));
+  EXPECT_TRUE  (p1.IsMatching("foo.exe"));
+  EXPECT_FALSE (p1.IsMatching("hallo/welt/foo.exe"));
+  EXPECT_FALSE (p1.IsMatching("/foo.exe"));
+  EXPECT_FALSE (p1.IsMatching("/usr/bin/foo.exe"));
+  EXPECT_FALSE (p1.IsMatching("/usr/share/include/foo.exe.bak"));
+
+  EXPECT_TRUE  (p1.IsMatchingRelaxed("hallo.welt.exe"));
+  EXPECT_TRUE  (p1.IsMatchingRelaxed("foo.exe"));
+  EXPECT_TRUE  (p1.IsMatchingRelaxed("hallo/welt/foo.exe"));
+  EXPECT_TRUE  (p1.IsMatchingRelaxed("/foo.exe"));
+  EXPECT_TRUE  (p1.IsMatchingRelaxed("/usr/bin/foo.exe"));
+  EXPECT_FALSE (p1.IsMatchingRelaxed("/usr/share/include/foo.exe.bak"));
+  EXPECT_FALSE (p1.IsMatchingRelaxed("foo.exe/hallo"));
+  EXPECT_FALSE (p1.IsMatchingRelaxed("foo.exe.bak"));
+
+  EXPECT_TRUE  (p2.IsMatching("/foo/hallo.h"));
+  EXPECT_TRUE  (p2.IsMatching("/foo/bar.h"));
+  EXPECT_TRUE  (p2.IsMatching("/foo/directory.h/"));
+  EXPECT_FALSE (p2.IsMatching("foo.h"));
+  EXPECT_FALSE (p2.IsMatching("foo.h.bak"));
+  EXPECT_FALSE (p2.IsMatching("/foo/bar.h.bak"));
+  EXPECT_FALSE (p2.IsMatching("/foo/baz/bar.h"));
+  EXPECT_FALSE (p2.IsMatching("/foo/baz/directory.h/"));
+
+  EXPECT_TRUE  (p2.IsMatchingRelaxed("/foo/hallo.h"));
+  EXPECT_TRUE  (p2.IsMatchingRelaxed("/foo/bar.h"));
+  EXPECT_TRUE  (p2.IsMatchingRelaxed("/foo/directory.h/"));
+  EXPECT_FALSE (p2.IsMatchingRelaxed("foo.h"));
+  EXPECT_FALSE (p2.IsMatchingRelaxed("foo.h.bak"));
+  EXPECT_FALSE (p2.IsMatchingRelaxed("/foo/bar.h.bak"));
+  EXPECT_TRUE  (p2.IsMatchingRelaxed("/foo/baz/bar.h"));
+  EXPECT_TRUE  (p2.IsMatchingRelaxed("/foo/baz/directory.h/"));
+
+  EXPECT_TRUE  (p3.IsMatching("/foo/bar/hallo.h"));
+  EXPECT_TRUE  (p3.IsMatching("/foo/rab/void.h"));
+  EXPECT_TRUE  (p3.IsMatching("/foo/baz/stdio.h"));
+  EXPECT_TRUE  (p3.IsMatching("/foo/baz/hallo.h"));
+  EXPECT_FALSE (p3.IsMatching("/foo/alice/hallo.h"));
+  EXPECT_FALSE (p3.IsMatching("foo/n/hallo.h"));
+  EXPECT_FALSE (p3.IsMatching("foo/bar/hallo.h"));
+  EXPECT_FALSE (p3.IsMatching("/foo/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatching("fo/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatching("foh/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatching("/fo/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatching("/foh/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatching("fo/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatching("foo/bar/foo/hallo.h.welt"));
+
+  EXPECT_TRUE  (p3.IsMatchingRelaxed("/foo/bar/hallo.h"));
+  EXPECT_TRUE  (p3.IsMatchingRelaxed("/foo/rab/void.h"));
+  EXPECT_TRUE  (p3.IsMatchingRelaxed("/foo/baz/stdio.h"));
+  EXPECT_TRUE  (p3.IsMatchingRelaxed("/foo/baz/hallo.h"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("/foo/alice/hallo.h"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("foo/n/hallo.h"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("foo/bar/hallo.h"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("/foo/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("fo/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("foh/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("/fo/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("/foh/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("fo/bar/hallo.h.welt"));
+  EXPECT_FALSE (p3.IsMatchingRelaxed("foo/bar/foo/hallo.h.welt"));
+
+  EXPECT_TRUE  (p4.IsMatching("/bar.exe"));
+  EXPECT_FALSE (p4.IsMatching("bar.exe"));
+  EXPECT_FALSE (p4.IsMatching("/foo/bar.exe"));
+
+  EXPECT_FALSE (p4.IsMatchingRelaxed("bar.exe"));
+  EXPECT_TRUE  (p4.IsMatchingRelaxed("/bar.exe"));
+  EXPECT_TRUE  (p4.IsMatchingRelaxed("/foo/bar.exe"));
+
+  EXPECT_TRUE  (p5.IsMatching("/foo/ban"));
+  EXPECT_TRUE  (p5.IsMatching("/foo/bat"));
+  EXPECT_FALSE (p5.IsMatching("/foo/ba/"));
+  EXPECT_FALSE (p5.IsMatching("/foo/ba"));
+  EXPECT_FALSE (p5.IsMatching("foo/ban"));
+  EXPECT_FALSE (p5.IsMatching("foo/bat"));
+  EXPECT_FALSE (p5.IsMatching("/foo/banary"));
+
+  EXPECT_TRUE  (p5.IsMatchingRelaxed("/foo/ban"));
+  EXPECT_TRUE  (p5.IsMatchingRelaxed("/foo/bat"));
+  EXPECT_FALSE (p5.IsMatchingRelaxed("/foo/ba/"));
+  EXPECT_FALSE (p5.IsMatchingRelaxed("/foo/ba"));
+  EXPECT_FALSE (p5.IsMatchingRelaxed("foo/ban"));
+  EXPECT_FALSE (p5.IsMatchingRelaxed("foo/bat"));
+  EXPECT_FALSE (p5.IsMatchingRelaxed("/foo/banary"));
+}
+
+
+TEST(T_Pathspec, CopyConstructor) {
+  const std::string s1("/test/*.foo");
+  Pathspec p1(s1);
+
+  EXPECT_TRUE (p1.IsValid());
+  EXPECT_TRUE (p1.IsMatching("/test/bar.foo"));
+  EXPECT_EQ   (s1, p1.GetGlobString());
+
+  Pathspec p2(p1);
+  EXPECT_TRUE (p2.IsValid());
+  EXPECT_TRUE (p1.IsMatching("/test/baz.foo"));
+  EXPECT_EQ   (s1, p2.GetGlobString());
+
+  const std::string s3("/heap/path?spec");
+  Pathspec *p3 = new Pathspec(s3);
+  ASSERT_NE (static_cast<Pathspec*>(NULL), p3);
+  EXPECT_TRUE (p3->IsValid());
+  EXPECT_TRUE (p3->IsMatching("/heap/path.spec"));
+  EXPECT_EQ   (s3, p3->GetGlobString());
+
+  Pathspec p4(*p3);
+  EXPECT_TRUE  (p4.IsValid());
+  EXPECT_FALSE (p4.IsMatching("/heap/pathspec"));
+  EXPECT_EQ    (s3, p4.GetGlobString());
+
+  delete p3;
+  EXPECT_TRUE (p4.IsValid());
+  EXPECT_TRUE (p4.IsMatchingRelaxed("/heap/path!spec"));
+  EXPECT_TRUE (p4.IsMatching("/heap/path+spec"));
+  EXPECT_EQ   (s3, p4.GetGlobString());
+
+  Pathspec *p5 = new Pathspec("/another/heap/*.spec");
+  ASSERT_NE (static_cast<Pathspec*>(NULL), p5);
+  EXPECT_TRUE (p5->IsValid());
+  EXPECT_TRUE (p5->IsMatching("/another/heap/path.spec"));
+
+  Pathspec p6(*p5);
+  EXPECT_TRUE  (p6.IsValid());
+  EXPECT_FALSE (p6.IsMatchingRelaxed("/heap/path!spec"));
+  EXPECT_TRUE  (p6.IsMatchingRelaxed("/another/heap/funny/path.spec"));
+  EXPECT_TRUE  (p6.IsMatching("/another/heap/funny.spec"));
+
+  delete p5;
+  EXPECT_TRUE  (p6.IsValid());
+  EXPECT_FALSE (p6.IsMatchingRelaxed("/does/not/match"));
+  EXPECT_TRUE  (p6.IsMatchingRelaxed("/another/heap/path.spec"));
+  EXPECT_TRUE  (p6.IsMatching("/another/heap/funny.spec"));
+}
+
+
+TEST(T_Pathspec, AssignmentOperator) {
+  const std::string s1("/test/*.foo");
+  Pathspec p1(s1);
+
+  EXPECT_TRUE (p1.IsValid());
+  EXPECT_TRUE (p1.IsMatching("/test/bar.foo"));
+  EXPECT_EQ   (s1, p1.GetGlobString());
+
+  const std::string s2("/test/garbage");
+  Pathspec p2(s2);
+  EXPECT_TRUE  (p2.IsValid());
+  EXPECT_FALSE (p2.IsMatching("foo/bar"));
+  EXPECT_EQ    (s2, p2.GetGlobString());
+
+  p2 = p1;
+  EXPECT_TRUE (p1.IsMatching("/test/baz.foo"));
+  EXPECT_EQ   (s1, p2.GetGlobString());
+
+  const std::string s3("/heap/path?spec");
+  Pathspec *p3 = new Pathspec(s3);
+  ASSERT_NE (static_cast<Pathspec*>(NULL), p3);
+  EXPECT_TRUE (p3->IsValid());
+  EXPECT_TRUE (p3->IsMatching("/heap/path.spec"));
+  EXPECT_EQ   (s3, p3->GetGlobString());
+
+  const std::string s4("/short/term");
+  Pathspec p4(s4);
+  EXPECT_TRUE  (p4.IsValid());
+  EXPECT_FALSE (p4.IsMatching("/heap/pathspec"));
+  EXPECT_EQ    (s4, p4.GetGlobString());
+
+  p4 = *p3;
+  EXPECT_TRUE  (p4.IsValid());
+  EXPECT_FALSE (p4.IsMatching("/heap/pathspec"));
+  EXPECT_EQ    (s3, p4.GetGlobString());
+
+  delete p3;
+  EXPECT_TRUE (p4.IsValid());
+  EXPECT_TRUE (p4.IsMatchingRelaxed("/heap/path!spec"));
+  EXPECT_TRUE (p4.IsMatching("/heap/path+spec"));
+  EXPECT_EQ   (s3, p4.GetGlobString());
+
+  Pathspec *p5 = new Pathspec("/another/heap/*.spec");
+  ASSERT_NE (static_cast<Pathspec*>(NULL), p5);
+  EXPECT_TRUE (p5->IsValid());
+  EXPECT_TRUE (p5->IsMatching("/another/heap/path.spec"));
+
+  Pathspec p6("will/be/overwritten");
+  EXPECT_TRUE  (p6.IsValid());
+  EXPECT_TRUE  (p6.IsMatching("will/be/overwritten"));
+  EXPECT_FALSE (p6.IsMatchingRelaxed("/will/be/overwritten"));
+
+  p6 = *p5;
+  EXPECT_FALSE (p6.IsMatchingRelaxed("/heap/path!spec"));
+  EXPECT_TRUE  (p6.IsMatchingRelaxed("/another/heap/funny/path.spec"));
+  EXPECT_TRUE  (p6.IsMatching("/another/heap/funny.spec"));
+
+  delete p5;
+  EXPECT_TRUE  (p6.IsValid());
+  EXPECT_FALSE (p6.IsMatchingRelaxed("/does/not/match"));
+  EXPECT_TRUE  (p6.IsMatchingRelaxed("/another/heap/path.spec"));
+  EXPECT_TRUE  (p6.IsMatching("/another/heap/funny.spec"));
+}

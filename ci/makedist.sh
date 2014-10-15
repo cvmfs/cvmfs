@@ -10,7 +10,7 @@ issnapshot=$3
 mkdir -p $distdir
 cd $gitdir
 treeish=`git show master | head -n1 | cut -d" " -f2 | head -c16`
-if [ $issnapshot -eq 1 ]; then
+if [ x"$issnapshot" = x"true" ] || [ x"$issnapshot" = x"1" ]; then
   version="git-$treeish"  
 else
   version=`grep CVMFS_VERSION CMakeLists.txt | cut -d" " -f3`

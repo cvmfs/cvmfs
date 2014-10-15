@@ -222,7 +222,7 @@ cvmfs_umount() {
     sudo umount /cvmfs/$r || return 100
 
     timeout=5
-    while cat /proc/mounts | grep -q /cvmfs/$r; do
+    while cat /proc/mounts | grep -q " /cvmfs/$r "; do
       if [ $timeout -eq 0 ]; then
         return 101
       fi
@@ -689,6 +689,27 @@ start_transaction() {
   return 0
 }
 
+# wrapper function to abort a transaction
+# @param repo    the repository you want to abort a transaction on
+abort_transaction() {
+  local repo=$1
+
+  cvmfs_server abort -f $repo || return 100
+  return 0
+}
+
+# wrapper function to rollback a repository to a specified tag
+#
+# @param repo   the repository you want to rollback
+# @param tag    the name of the tag to be rollbacked to
+rollback_repo() {
+  local repo=$1
+  local tag=$2
+
+  cvmfs_server rollback -t $tag -f $repo || return 100
+  return 0
+}
+
 # wrapper function to publish an repository after its contents were updated.
 # @param repo    the repository name to start the transaction in
 publish_repo() {
@@ -730,6 +751,7 @@ publish_repo() {
 load_repo_config() {
   local name=$1
   . /etc/cvmfs/repositories.d/${name}/server.conf
+  . /etc/cvmfs/repositories.d/${name}/client.conf
 }
 
 

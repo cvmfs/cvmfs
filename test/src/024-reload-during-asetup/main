@@ -59,7 +59,7 @@ cvmfs_run_test() {
   reload_pid=$!
 
   # always kill the detached processes
-  trap "kill -9 $(cat $pidsfile | tr '\n' " ") $reload_pid > /dev/null 2>&1; rm -f $pidsfile; exit" SIGHUP SIGINT SIGTERM
+  trap "kill -9 $(cat $pidsfile | tr '\n' " ") $reload_pid > /dev/null 2>&1; rm -f $pidsfile; exit" HUP INT TERM
 
   # wait for the find calls to succeed
   wait $(cat $pidsfile | tr '\n' " ")

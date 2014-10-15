@@ -5,9 +5,7 @@
  */
 
 #include <pthread.h>
-#include <set>
-#include <vector>
-#include <string>
+#include <utility>
 
 #include "cvmfs_config.h"
 #include "s3fanout.h"
@@ -319,15 +317,33 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
   CURL *handle;
 
   if (pool_handles_idle_->empty()) {
+    CURLcode retval;
+
     // Create a new handle
     handle = curl_easy_init();
     assert(handle != NULL);
 
-    curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
-    // curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
-    curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
-    curl_easy_setopt(handle, CURLOPT_READFUNCTION, CallbackCurlData);
-    // curl_easy_setopt(handle, CURLOPT_DNS_CACHE_TIMEOUT, 0);
+    // Set dedicated share handle for each easy handle in order to make sure
+    // that the easy handles do not share resolved addresses. This approach was
+    // needed to access efficiently S3 servers that use DNS load balancing, i.e.
+    // use several ips for one hostname.
+    CURLSH *sharehandle = curl_share_init();
+    assert(sharehandle != NULL);
+    CURLSHcode share_retval = curl_share_setopt(sharehandle, CURLSHOPT_SHARE,
+                                                CURL_LOCK_DATA_DNS);
+    assert(share_retval == CURLSHE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_SHARE, sharehandle);
+    assert(retval == CURLE_OK);
+    pool_sharehandles_->insert(std::make_pair(handle, sharehandle));
+
+    // Other settings
+    retval = curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION,
+                              CallbackCurlHeader);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_READFUNCTION, CallbackCurlData);
+    assert(retval == CURLE_OK);
   } else {
     handle = *(pool_handles_idle_->begin());
     pool_handles_idle_->erase(pool_handles_idle_->begin());
@@ -348,10 +364,14 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
   set<CURL *>::iterator elem = pool_handles_inuse_->find(handle);
   assert(elem != pool_handles_inuse_->end());
 
-  if (pool_handles_idle_->size() > pool_max_handles_)
+  if (pool_handles_idle_->size() > pool_max_handles_) {
+    CURL *handle = *elem;
     curl_easy_cleanup(*elem);
-  else
+    curl_share_cleanup(pool_sharehandles_->find(handle)->second);
+    pool_sharehandles_->erase(handle);
+  } else {
     pool_handles_idle_->insert(*elem);
+  }
 
   pool_handles_inuse_->erase(elem);
 
@@ -407,10 +427,14 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   shash::Any content_md5;
   content_md5.algorithm = shash::kMd5;
   string timestamp;
+  CURLcode retval;
   if (info->request == JobInfo::kReqHead ||
       info->request == JobInfo::kReqDelete) {
-    curl_easy_setopt(handle, CURLOPT_UPLOAD, 0);
-    curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
+
+    retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 0);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
+    assert(retval == CURLE_OK);
     timestamp = RfcTimestamp();
     std::string req = info->request == JobInfo::kReqHead ? "HEAD" : "DELETE";
     info->http_headers =
@@ -425,24 +449,30 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     info->http_headers =
         curl_slist_append(info->http_headers, "Content-Length: 0");
 
-    curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, req.c_str());
+    retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, req.c_str());
+    assert(retval == CURLE_OK);
   } else {
-    curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
-    curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
+    retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
+    assert(retval == CURLE_OK);
+    retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 0);
+    assert(retval == CURLE_OK);
     // MD5 content hash
     if (info->origin == kOriginMem) {
-      curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, info->origin_mem.size);
+      retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
+                                info->origin_mem.size);
+      assert(retval == CURLE_OK);
       shash::HashMem(info->origin_mem.data,
                      info->origin_mem.size,
                      &content_md5);
     } else if (info->origin == kOriginPath) {
-      bool retval = shash::HashFile(info->origin_path, &content_md5);
-      if (!retval)
+      bool hashretval = shash::HashFile(info->origin_path, &content_md5);
+      if (!hashretval)
         return kFailLocalIO;
       int64_t file_size = GetFileSize(info->origin_path);
       if (file_size == -1)
         return kFailLocalIO;
-      curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, file_size);
+      retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, file_size);
+      assert(retval == CURLE_OK);
     }
     LogCvmfs(kLogS3Fanout, kLogDebug, "content hash: %s",
              content_md5.ToString().c_str());
@@ -486,12 +516,20 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                                          user_agent_->c_str());
 
   // Set curl parameters
-  curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
-  curl_easy_setopt(handle, CURLOPT_WRITEHEADER, static_cast<void *>(info));
-  curl_easy_setopt(handle, CURLOPT_READDATA, static_cast<void *>(info));
-  curl_easy_setopt(handle, CURLOPT_HTTPHEADER, info->http_headers);
-  if (opt_ipv4_only_)
-    curl_easy_setopt(handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+  retval = curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
+  assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(handle, CURLOPT_WRITEHEADER,
+                            static_cast<void *>(info));
+  assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(handle, CURLOPT_READDATA,
+                            static_cast<void *>(info));
+  assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(handle, CURLOPT_HTTPHEADER, info->http_headers);
+  assert(retval == CURLE_OK);
+  if (opt_ipv4_only_) {
+    retval = curl_easy_setopt(handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+    assert(retval == CURLE_OK);
+  }
 
   return kFailOk;
 }
@@ -502,13 +540,16 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
  */
 void S3FanoutManager::SetUrlOptions(JobInfo *info) const {
   CURL *curl_handle = info->curl_handle;
+  CURLcode retval;
 
   pthread_mutex_lock(lock_options_);
-  curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
+  retval = curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_);
+  assert(retval == CURLE_OK);
   pthread_mutex_unlock(lock_options_);
 
   string url = MkUrl(info->hostname, info->bucket, (info->object_key));
-  curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
+  retval = curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
+  assert(retval == CURLE_OK);
 }
 
 
@@ -651,6 +692,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 S3FanoutManager::S3FanoutManager() {
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
+  pool_sharehandles_ = NULL;
   pool_max_handles_ = 0;
   curl_multi_ = NULL;
   user_agent_ = new string();
@@ -696,10 +738,11 @@ S3FanoutManager::~S3FanoutManager() {
 
 void S3FanoutManager::Init(const unsigned max_pool_handles) {
   atomic_init32(&multi_threaded_);
-  int retval = curl_global_init(CURL_GLOBAL_ALL);
+  CURLcode retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
   pool_handles_idle_ = new set<CURL *>;
   pool_handles_inuse_ = new set<CURL *>;
+  pool_sharehandles_ = new map<CURL *, CURLSH *>;
   pool_max_handles_ = max_pool_handles;
   watch_fds_max_ = 4*pool_max_handles_;
 
@@ -712,14 +755,16 @@ void S3FanoutManager::Init(const unsigned max_pool_handles) {
 
   curl_multi_ = curl_multi_init();
   assert(curl_multi_ != NULL);
-  curl_multi_setopt(curl_multi_, CURLMOPT_SOCKETFUNCTION, CallbackCurlSocket);
-  curl_multi_setopt(curl_multi_, CURLMOPT_SOCKETDATA,
-                    static_cast<void *>(this));
-  // curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
-  // curl_multi_setopt(curl_multi_, CURLMOPT_MAX_PIPELINE_LENGTH, 64);
-  // curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
-  curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
-                    pool_max_handles_);
+  CURLMcode mretval;
+  mretval = curl_multi_setopt(curl_multi_, CURLMOPT_SOCKETFUNCTION,
+                              CallbackCurlSocket);
+  assert(mretval == CURLM_OK);
+  mretval = curl_multi_setopt(curl_multi_, CURLMOPT_SOCKETDATA,
+                              static_cast<void *>(this));
+  assert(mretval == CURLM_OK);
+  mretval = curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
+                              pool_max_handles_);
+  assert(mretval == CURLM_OK);
 
   prng_.InitLocaltime();
 
@@ -750,12 +795,23 @@ void S3FanoutManager::Fini() {
   for (; i != iEnd; ++i) {
     curl_easy_cleanup(*i);
   }
+  map<CURL *, CURLSH *>::iterator             it    =
+      pool_sharehandles_->begin();
+  const map<CURL *, CURLSH *>::const_iterator itEnd =
+      pool_sharehandles_->end();
+  for (; it != itEnd; ++it) {
+    curl_share_cleanup(it->second);
+  }
+  pool_handles_idle_->clear();
+  pool_sharehandles_->clear();
   delete pool_handles_idle_;
   delete pool_handles_inuse_;
+  delete pool_sharehandles_;
   delete user_agent_;
   curl_multi_cleanup(curl_multi_);
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
+  pool_sharehandles_ = NULL;
   user_agent_ = NULL;
   curl_multi_ = NULL;
 

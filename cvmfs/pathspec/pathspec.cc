@@ -12,6 +12,8 @@
 Pathspec::Pathspec(const std::string &spec) :
   regex_compiled_(false),
   regex_(NULL),
+  relaxed_regex_compiled_(false),
+  relaxed_regex_(NULL),
   glob_string_compiled_(false),
   glob_string_sequence_compiled_(false),
   valid_(true),
@@ -31,8 +33,46 @@ Pathspec::Pathspec(const std::string &spec) :
   }
 }
 
+Pathspec::Pathspec(const Pathspec &other) :
+  patterns_(other.patterns_),
+  regex_compiled_(false),         // compiled regex structure cannot be
+  regex_(NULL),                   // duplicated and needs to be re-compiled
+  relaxed_regex_compiled_(false), // Note: the copy-constructed object will
+  relaxed_regex_(NULL),           //       perform a lazy evaluation again
+  glob_string_compiled_(other.glob_string_compiled_),
+  glob_string_(other.glob_string_),
+  glob_string_sequence_compiled_(other.glob_string_sequence_compiled_),
+  glob_string_sequence_(other.glob_string_sequence_),
+  valid_(other.valid_),
+  absolute_(other.absolute_) {}
+
+Pathspec::~Pathspec() {
+  DestroyRegularExpressions();
+}
+
+Pathspec& Pathspec::operator=(const Pathspec &other) {
+  if (this != &other) {
+    DestroyRegularExpressions(); // see: copy c'tor for details
+    patterns_ = other.patterns_;
+
+    glob_string_compiled_ = other.glob_string_compiled_;
+    glob_string_          = other.glob_string_;
+
+    glob_string_sequence_compiled_ = other.glob_string_sequence_compiled_;
+    glob_string_sequence_          = other.glob_string_sequence_;
+
+    valid_    = other.valid_;
+    absolute_ = other.absolute_;
+  }
+
+  return *this;
+}
+
 
 void Pathspec::Parse(const std::string &spec) {
+  // parsing is done using std::string iterators to walk through th entire
+  // pathspec parameter. Thus, all parsing methods receive references to these
+  // iterators and increment itr as they pass along.
         std::string::const_iterator itr = spec.begin();
   const std::string::const_iterator end = spec.end();
 
@@ -48,11 +88,14 @@ void Pathspec::Parse(const std::string &spec) {
 
 void Pathspec::ParsePathElement(      std::string::const_iterator  &itr,
                                 const std::string::const_iterator  &end) {
+  // find the end of the current pattern element (next directory boundary)
   const std::string::const_iterator begin_element = itr;
   while (itr != end && *itr != kSeparator) {
     ++itr;
   }
   const std::string::const_iterator end_element = itr;
+
+  // create a PathspecElementPattern out of this directory description
   patterns_.push_back(PathspecElementPattern(begin_element, end_element));
 }
 
@@ -68,8 +111,26 @@ bool Pathspec::IsMatching(const std::string &query_path) const {
          IsPathspecMatching(query_path);
 }
 
+bool Pathspec::IsMatchingRelaxed(const std::string &query_path) const {
+  assert (IsValid());
+
+  if (query_path.empty()) {
+    return false;
+  }
+
+  return IsPathspecMatchingRelaxed(query_path);
+}
+
 bool Pathspec::IsPathspecMatching(const std::string &query_path) const {
-  regex_t *regex = GetRegularExpression();
+  return ApplyRegularExpression(query_path, GetRegularExpression());
+}
+
+bool Pathspec::IsPathspecMatchingRelaxed(const std::string &query_path) const {
+  return ApplyRegularExpression(query_path, GetRelaxedRegularExpression());
+}
+
+bool Pathspec::ApplyRegularExpression(const std::string  &query_path,
+                                            regex_t      *regex) const {
   const char *path = query_path.c_str();
   const int retval = regexec(regex, path, 0, NULL, 0);
 
@@ -82,24 +143,32 @@ bool Pathspec::IsPathspecMatching(const std::string &query_path) const {
 
 regex_t* Pathspec::GetRegularExpression() const {
   if (! regex_compiled_) {
-    const std::string regex = GenerateRegularExpression();
+    const bool is_relaxed = false;
+    const std::string regex = GenerateRegularExpression(is_relaxed);
     LogCvmfs(kLogPathspec, kLogDebug, "compiled regex: %s", regex.c_str());
 
-    regex_ = (regex_t*)smalloc(sizeof(regex_t));
-    const int flags = REG_NOSUB | REG_NEWLINE | REG_EXTENDED;
-    const int retval = regcomp(regex_, regex.c_str(), flags);
+    regex_ = CompileRegularExpression(regex);
     regex_compiled_ = true;
-
-    if (retval != 0) {
-      PrintRegularExpressionError(retval);
-      assert (false && "failed to compile regex");
-    }
   }
 
   return regex_;
 }
 
-std::string Pathspec::GenerateRegularExpression() const {
+regex_t* Pathspec::GetRelaxedRegularExpression() const {
+  if (! relaxed_regex_compiled_) {
+    const bool is_relaxed = true;
+    const std::string regex = GenerateRegularExpression(is_relaxed);
+    LogCvmfs(kLogPathspec, kLogDebug, "compiled relaxed regex: %s",
+             regex.c_str());
+
+    relaxed_regex_ = CompileRegularExpression(regex);
+    relaxed_regex_compiled_ = true;
+  }
+
+  return relaxed_regex_;
+}
+
+std::string Pathspec::GenerateRegularExpression(const bool is_relaxed) const {
   // start matching at the first character
   std::string regex = "^";
 
@@ -112,7 +181,7 @@ std::string Pathspec::GenerateRegularExpression() const {
         ElementPatterns::const_iterator i    = patterns_.begin();
   const ElementPatterns::const_iterator iend = patterns_.end();
   for (; i != iend; ++i) {
-    regex += i->GenerateRegularExpression();
+    regex += i->GenerateRegularExpression(is_relaxed);
     if (i + 1 != iend) {
       regex += kSeparator;
     }
@@ -124,6 +193,35 @@ std::string Pathspec::GenerateRegularExpression() const {
   regex += "?$";
 
   return regex;
+}
+
+regex_t* Pathspec::CompileRegularExpression(const std::string &regex) const {
+  regex_t *result = (regex_t*)smalloc(sizeof(regex_t));
+  const int flags = REG_NOSUB | REG_NEWLINE | REG_EXTENDED;
+  const int retval = regcomp(result, regex.c_str(), flags);
+
+  if (retval != 0) {
+    PrintRegularExpressionError(retval);
+    assert (false && "failed to compile regex");
+  }
+
+  return result;
+}
+
+void Pathspec::DestroyRegularExpressions() {
+  if (regex_compiled_) {
+    assert (regex_ != NULL);
+    regfree(regex_);
+    regex_          = NULL;
+    regex_compiled_ = false;
+  }
+
+  if (relaxed_regex_compiled_) {
+    assert (relaxed_regex_ != NULL);
+    regfree(relaxed_regex_);
+    relaxed_regex_          = NULL;
+    relaxed_regex_compiled_ = false;
+  }
 }
 
 bool Pathspec::operator==(const Pathspec &other) const {

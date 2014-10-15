@@ -122,6 +122,12 @@ class CatalogStatistics:
     def subtree_data_size(self):
         return self._get_stat('all_file_size')
 
+    def get_all_fields(self):
+        return self._get_stat('all_regular') , self._get_stat('all_dir') ,          \
+               self._get_stat('all_symlink') , self._get_stat('all_file_size') ,    \
+               self._get_stat('all_chunked') , self._get_stat('all_chunked_size') , \
+               self._get_stat('all_chunks')  , self._get_stat('all_nested')
+
 
     def _read_statistics(self, catalog):
         stats = catalog.run_sql("SELECT * FROM statistics ORDER BY counter;")
@@ -142,10 +148,12 @@ class CatalogStatistics:
 class Catalog(DatabaseObject):
     """ Wraps the basic functionality of CernVM-FS Catalogs """
 
-    def __init__(self, catalog_file):
+    def __init__(self, catalog_file, catalog_hash = ""):
         DatabaseObject.__init__(self, catalog_file)
+        self.hash = catalog_hash
         self._read_properties()
         self._guess_root_prefix_if_needed()
+        self._guess_last_modified_if_needed()
         self._check_validity()
 
 
@@ -159,6 +167,16 @@ class Catalog(DatabaseObject):
 
     def __iter__(self):
         return CatalogIterator(self)
+
+
+    def has_nested(self):
+        return self.nested_count() > 0
+
+
+    def nested_count(self):
+        """ Returns the number of nested catalogs in this catalog """
+        num_catalogs = self.run_sql("SELECT count(*) FROM nested_catalogs;")
+        return num_catalogs[0][0]
 
 
     def list_nested(self):
@@ -239,6 +257,16 @@ class Catalog(DatabaseObject):
         return self.root_prefix == "/"
 
 
+    def has_predecessor(self):
+        return hasattr(self, "previous_revision")
+
+
+    def get_predecessor(self):
+        if not self.has_predecessor():
+            return None
+        return CatalogReference(self.root_prefix, self.previous_revision)
+
+
     def _read_properties(self):
         self.read_properties_table(lambda prop_key, prop_value:
             self._read_property(prop_key, prop_value))
@@ -285,6 +313,12 @@ class Catalog(DatabaseObject):
             self.root_prefix = "/"
 
 
+    def _guess_last_modified_if_needed(self):
+        """ Catalog w/o a last_modified field, we set it to 0 """
+        if not hasattr(self, 'last_modified'):
+            self.last_modified = datetime.datetime.min
+
+
     def _canonicalize_path(self, path):
         if not path:
             return ""
@@ -293,6 +327,8 @@ class Catalog(DatabaseObject):
 
     def _check_validity(self):
         """ Check that all crucial properties have been found in the database """
+        if not hasattr(self, 'revision'):
+          raise Exception("Catalog lacks a revision entry")
         if not hasattr(self, 'schema'):
           raise Exception("Catalog lacks a schema entry")
         if not hasattr(self, 'root_prefix'):
