@@ -1746,6 +1746,12 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
+generate_fuser_report_for_mountpoint() {
+  local mountpoint="$1"
+  $fuser -v -m "$mountpoint" 2>&1 | grep -v "^Cannot stat file" || true
+}
+
+
 file_descriptor_warning_and_question() {
   local name=$1
   echo "\
@@ -1758,7 +1764,7 @@ WARNING! There are open read-only file descriptors in /cvmfs/$name
       The following fuser report might show the processes with open file handles
       "
 
-  $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
+  generate_fuser_report_for_mountpoint "/cvmfs/${name}"
 
   echo -n "\
 
