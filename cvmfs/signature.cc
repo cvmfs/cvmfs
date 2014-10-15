@@ -257,7 +257,8 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
     // open public key file
     fp = fopen(pubkey_file, "r");
     if (fp == NULL) {
-      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to open public key '%s'",
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "failed to open "
+                                                         "public key '%s'",
                pubkey_file);
       return false;
     }
@@ -266,7 +267,8 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
     EVP_PKEY *this_key = PEM_read_PUBKEY(fp, NULL, NULL, nopwd);
     fclose(fp);
     if (this_key == NULL) {
-      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to load public key '%s'",
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "failed to load "
+                                                         "public key '%s'",
                pubkey_file);
       return false;
     }
@@ -275,7 +277,8 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
     RSA *key = EVP_PKEY_get1_RSA(this_key);
     EVP_PKEY_free(this_key);
     if (key == NULL) {
-      LogCvmfs(kLogSignature, kLogSyslogErr, "failed to read public key '%s'",
+      LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "failed to read "
+                                                         "public key '%s'",
                pubkey_file);
       return false;
     }
