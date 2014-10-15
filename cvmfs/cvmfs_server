@@ -3459,7 +3459,16 @@ rollback() {
   echo "Flushing file system buffers"
   sync
 
-  echo "Remounting newly created repository revision"
+  # check again for open file descriptors (potential race condition)
+  if has_file_descriptors_on_mount_point $name && \
+     [ $use_fd_fallback -ne 1 ]; then
+    file_descriptor_warning $name
+    echo "Forcing remount of already rolled back repository revision"
+    use_fd_fallback=1
+  else
+    echo "Remounting rolled back repository revision"
+  fi
+
   sync
   close_transaction  $name $use_fd_fallback
   publish_after_hook $name
