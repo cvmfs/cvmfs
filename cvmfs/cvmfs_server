@@ -998,16 +998,12 @@ find_hazardous_aufs_config() {
   # check the AUFS release date or otherwise take the kernel
   # version as a hint of the installed AUFS version
   if [ $(echo -n "$aufs_date" | wc -c) -eq 8 ]; then
-    local aufs_year=$(echo -n "$aufs_date" | head -c4)
-    local aufs_month=$(echo -n "$aufs_date" | head -c6 | tail -c2)
-    if [ $aufs_year -gt 2013 ] || [ $aufs_year -eq 2013 -a $aufs_month -gt 3 ]; then
+    if [ $aufs_date -ge $aufs_minimum_required ]; then
       return 1 # no problem, AUFS is recent enough
     fi
   else
     local krnl_version="$(uname -r | cut --delimiter='-' --fields=1)"
-    local krnl_major="$(version_major $krnl_version)"
-    local krnl_minor="$(version_minor $krnl_version)"
-    if [ $krnl_major -gt 3 ] || [ $krnl_major -eq 3 -a $krnl_minor -ge 10 ]; then
+    if compare_versions "$krnl_version" -ge "$krnl_minimum_required"; then
       return 1 # no problem, Linux kernel is recent enough (AUFS should be as well)
     fi
   fi
