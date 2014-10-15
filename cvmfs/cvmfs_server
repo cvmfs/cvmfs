@@ -673,8 +673,8 @@ open_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
-  cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
   mkdir "$tx_lock" > /dev/null 2>&1 || die "Failed to create transaction lock"
+  cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
 }
 
 close_transaction() {
