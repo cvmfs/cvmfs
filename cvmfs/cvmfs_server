@@ -973,7 +973,7 @@ find_hazardous_aufs_config() {
   # silenced... in these cases no more checks are needed
   load_repo_config $name
   if [ x"$CVMFS_UNION_FS_TYPE" != x"aufs"  ] || \
-     [ x"$CVMFS_AUFS_WARNING" = x"false"   ]; then
+     [ x"$CVMFS_AUFS_WARNING"  =  x"false" ]; then
     return 1
   fi
 
