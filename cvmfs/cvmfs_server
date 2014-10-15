@@ -1781,6 +1781,17 @@ WARNING! There are open read-only file descriptors in /cvmfs/$name
 }
 
 
+file_descriptor_warning() {
+  local name=$1
+
+  echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
+  echo "         The following fuser report might show the culprit:"
+  echo
+  generate_fuser_report_for_mountpoint "/cvmfs/${name}"
+  echo
+}
+
+
 handle_read_only_file_descriptors_on_mount_point() {
   local name=$1
 
@@ -3325,11 +3336,7 @@ publish() {
     # check again for open file descriptors (potential race condition)
     if has_file_descriptors_on_mount_point $name && \
        [ $use_fd_fallback -ne 1 ]; then
-      echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
-      echo "         The following fuser report might show the culprit:"
-      echo
-      $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
-      echo
+      file_descriptor_warning $name
       echo "Forcing remount of already committed repository revision"
       use_fd_fallback=1
     else
