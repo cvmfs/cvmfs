@@ -677,9 +677,18 @@ open_transaction() {
   cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
 }
 
+# closes a previously opened transaction
+# Note: This function will perform remounts on /cvmfs/${name} and the underlying
+#       read-only CVMFS branch. Hence, check for open file descriptors first!
+#
+# @param name             the repository whose transaction should be closed
+# @param use_fd_fallback  if set != 0 this will perform a violent remount of the
+#                         repository to handle potential open file descriptors
+#                         on /cvmfs/${name}
 close_transaction() {
   local name=$1
   local use_fd_fallback=$2
+
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
   local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
