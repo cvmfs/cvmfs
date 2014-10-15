@@ -27,7 +27,7 @@ export LANG=C
 
 # Configuration variables for update-geodb -l.  May be overridden in
 #   /etc/cvmfs/cvmfs_server_hooks.sh or per-repo replica.conf.
-# Default settings will attempt to update from cvmfs_server snapshot 
+# Default settings will attempt to update from cvmfs_server snapshot
 #   once every 4 weeks in the 10 o'clock hour of Tuesday.
 CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
 CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
@@ -340,7 +340,7 @@ least CernVM-FS $creator to manipulate this repository."
   #   2.1.15+ -> 2.1.20
   #     -> replica (i.e. stratum 1) with local upstream storage has
   #        additional apache config for wsgi
-  #        
+  #
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -3433,7 +3433,7 @@ snapshot() {
     # more sanity checks
     check_repository_compatibility
     if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
-        # this might have been missed if add-replica -a was used or 
+        # this might have been missed if add-replica -a was used or
         #  if a migrate was done while apache wasn't running, but then
         #  apache was enabled later
         check_wsgi_module
@@ -3641,7 +3641,7 @@ migrate_2_1_15() {
   local destination_version="2.1.20"
   local conf_file
   conf_file="$(get_apache_conf_path)/cvmfs.${name}.conf"
-  
+
   # get repository information
   load_repo_config $name
 
