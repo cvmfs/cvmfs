@@ -1,4 +1,6 @@
 2.1.20:
+  * Fix concurrent access to alien cache on NFS (link/unlink instead
+    of rename)
   * Support alien cache on hadoop-dfs-fuse which doesn't report 
     file size immediately (CVM-659)
   * Fix false zero return code of 'cvmfs_server transaction' (CVM-658)
