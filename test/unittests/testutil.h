@@ -71,9 +71,6 @@ class AbstractMockUploader : public upload::AbstractUploader {
  public:
   static const std::string sandbox_path;
   static const std::string sandbox_tmp_dir;
-  static const size_t      min_chunk_size = 512000;
-  static const size_t      avg_chunk_size = 2 * min_chunk_size;
-  static const size_t      max_chunk_size = 4 * min_chunk_size;
 
  public:
   AbstractMockUploader(const upload::SpoolerDefinition &spooler_definition) :

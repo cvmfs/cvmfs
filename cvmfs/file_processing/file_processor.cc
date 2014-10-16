@@ -14,18 +14,16 @@
 
 using namespace upload;
 
-FileProcessor::FileProcessor(AbstractUploader *uploader,
-                             const shash::Algorithms hash_algorithm,
-                             const bool        enable_file_chunking,
-                             const size_t      minimal_chunk_size,
-                             const size_t      average_chunk_size,
-                             const size_t      maximal_chunk_size) :
-  io_dispatcher_(new IoDispatcher(uploader, this)),
-  hash_algorithm_(hash_algorithm),
-  chunking_enabled_(enable_file_chunking),
-  minimal_chunk_size_(minimal_chunk_size),
-  average_chunk_size_(average_chunk_size),
-  maximal_chunk_size_(maximal_chunk_size)
+FileProcessor::FileProcessor(AbstractUploader         *uploader,
+                             const SpoolerDefinition  &spooler_definition) :
+  io_dispatcher_(new IoDispatcher(uploader,
+                                  this,
+                                  spooler_definition.number_of_threads)),
+  hash_algorithm_(spooler_definition.hash_algorithm),
+  chunking_enabled_(spooler_definition.use_file_chunking),
+  minimal_chunk_size_(spooler_definition.min_file_chunk_size),
+  average_chunk_size_(spooler_definition.avg_file_chunk_size),
+  maximal_chunk_size_(spooler_definition.max_file_chunk_size)
 {
   assert (io_dispatcher_ != NULL);
   assert (!chunking_enabled_ || minimal_chunk_size_ > 0);
