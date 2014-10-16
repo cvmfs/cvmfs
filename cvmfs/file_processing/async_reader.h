@@ -7,7 +7,6 @@
  */
 
 #include <tbb/concurrent_queue.h>
-#include <tbb/task_scheduler_init.h>
 #include <tbb/task.h>
 #include <tbb/tbb_thread.h>
 
@@ -100,14 +99,11 @@ class Reader : public AbstractReader,
 
  public:
   Reader(const size_t       max_buffer_size,
-         const unsigned int max_files_in_flight,
-         const unsigned int number_of_tbb_threads =
-                          tbb::task_scheduler_init::default_num_threads() + 1) :
+         const unsigned int max_files_in_flight) :
     AbstractReader(max_files_in_flight * 5),
     max_buffer_size_(max_buffer_size),
     draining_(false),
     files_in_flight_counter_(max_files_in_flight),
-    tbb_worker_count_(number_of_tbb_threads),
     running_(false) {}
 
   virtual ~Reader() {
@@ -168,7 +164,6 @@ class Reader : public AbstractReader,
 
   SynchronizingCounter<uint32_t>  files_in_flight_counter_;
 
-  const unsigned int              tbb_worker_count_;
   tbb::tbb_thread                 read_thread_;
   Future<bool>                    thread_started_executing_;
   bool                            running_;
