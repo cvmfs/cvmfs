@@ -1,4 +1,5 @@
 2.1.20:
+  * Use custom cvmfs_cache_t SELinux label for the cache directory (CVM-644)
   * Fail gracefully if one of the public RSA keys is unreadable (CVM-667)
   * Fix concurrent access to alien cache on NFS (link/unlink instead of rename)
   * Support alien cache on hadoop-dfs-fuse which doesn't report 
