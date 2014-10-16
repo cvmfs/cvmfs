@@ -315,6 +315,22 @@ cvmfs_chksetup() {
     fi
   fi
 
+  # Check SELinux label of cache directory
+  if [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]; then
+    local expected_label="cvmfs_cache_t"
+    local cache_ctx="$(stat --format='%C' $CVMFS_CACHE_BASE)"
+    if [ $? -ne 0 ]; then
+      echo "Warning: cannot retrieve SELinux context from cache directory"
+      num_warnings=$(($num_warnings+1))
+    else
+      local cache_label="$(echo \"$cache_ctx\" | cut --delimiter=':' --field=3)"
+      if [ x"$cache_label" != x"$expected_label" ]; then
+        echo "Warning: SELinux enabled, but cache directory ($CVMFS_CACHE_BASE) labeled '$cache_label' instead of '$expected_label'"
+        num_warnings=$(($num_warnings+1))
+      fi
+    fi
+  fi
+
   # Check repository specfic settings
   local repo_list
   repo_list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
