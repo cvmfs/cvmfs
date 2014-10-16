@@ -53,6 +53,8 @@ struct SpoolerDefinition {
   size_t             avg_file_chunk_size;
   size_t             max_file_chunk_size;
 
+  const unsigned int number_of_threads;
+
   bool valid_;
 };
 
