@@ -27,7 +27,7 @@ export LANG=C
 
 # Configuration variables for update-geodb -l.  May be overridden in
 #   /etc/cvmfs/cvmfs_server_hooks.sh or per-repo replica.conf.
-# Default settings will attempt to update from cvmfs_server snapshot 
+# Default settings will attempt to update from cvmfs_server snapshot
 #   once every 4 weeks in the 10 o'clock hour of Tuesday.
 CVMFS_UPDATEGEO_DAY=2   # Weekday of update, 0-6 where 0 is Sunday, default Tuesday
 CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
@@ -146,13 +146,20 @@ cvmfs_version_string() {
 version_major() { echo $1 | cut --delimiter=. --fields=1; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2; }
 version_patch() { echo $1 | cut --delimiter=. --fields=3; }
+prepend_zeros() { printf %05d "$1"; }
 compare_versions() {
-  local lv=$1
+  local lhs=$1
   local comparison_operator=$2
-  local rv=$3
-  [ $(version_major $lv) $comparison_operator $(version_major $rv) ] && \
-  [ $(version_minor $lv) $comparison_operator $(version_minor $rv) ] && \
-  [ $(version_patch $lv) $comparison_operator $(version_patch $rv) ]
+  local rhs=$3
+
+  local lhs1=$(prepend_zeros $(version_major $lhs))
+  local lhs2=$(prepend_zeros $(version_minor $lhs))
+  local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local rhs1=$(prepend_zeros $(version_major $rhs))
+  local rhs2=$(prepend_zeros $(version_minor $rhs))
+  local rhs3=$(prepend_zeros $(version_patch $rhs))
+
+  [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
 }
 version_greater_or_equal() {
   local needle=$1
@@ -340,7 +347,7 @@ least CernVM-FS $creator to manipulate this repository."
   #   2.1.15+ -> 2.1.20
   #     -> replica (i.e. stratum 1) with local upstream storage has
   #        additional apache config for wsgi
-  #        
+  #
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -957,11 +964,16 @@ foreclose_legacy_cvmfs() {
 find_hazardous_aufs_config() {
   local name=$1
 
+  # threshold definitions
+  local aufs_minimum_required="20130300"
+  local krnl_minimum_required="3.10.0"
+  local krnl_sl6_minimal_fixed="431.29.2"
+
   # check if we are actually dealing with AUFS or if the warning message is
   # silenced... in these cases no more checks are needed
   load_repo_config $name
   if [ x"$CVMFS_UNION_FS_TYPE" != x"aufs"  ] || \
-     [ x"$CVMFS_AUFS_WARNING" = x"false"   ]; then
+     [ x"$CVMFS_AUFS_WARNING"  =  x"false" ]; then
     return 1
   fi
 
@@ -986,17 +998,21 @@ find_hazardous_aufs_config() {
   # check the AUFS release date or otherwise take the kernel
   # version as a hint of the installed AUFS version
   if [ $(echo -n "$aufs_date" | wc -c) -eq 8 ]; then
-    local aufs_year=$(echo -n "$aufs_date" | head -c4)
-    local aufs_month=$(echo -n "$aufs_date" | head -c6 | tail -c2)
-    if [ $aufs_year -gt 2013 ] || [ $aufs_year -eq 2013 -a $aufs_month -gt 3 ]; then
+    if [ $aufs_date -ge $aufs_minimum_required ]; then
       return 1 # no problem, AUFS is recent enough
     fi
   else
     local krnl_version="$(uname -r | cut --delimiter='-' --fields=1)"
-    local krnl_major="$(version_major $krnl_version)"
-    local krnl_minor="$(version_minor $krnl_version)"
-    if [ $krnl_major -gt 3 ] || [ $krnl_major -eq 3 -a $krnl_minor -ge 10 ]; then
+    if compare_versions "$krnl_version" -ge "$krnl_minimum_required"; then
       return 1 # no problem, Linux kernel is recent enough (AUFS should be as well)
+    fi
+  fi
+
+  # check if we are running the custom SL6 kernel (and if it is recent enough)
+  if uname -r | grep -q "el6.aufs"; then
+    local krnl_revision="$(uname -r | sed 's/^.*-\([0-9]\+\.[0-9]\+\.[0-9]\+\)\..*/\1/')"
+    if compare_versions "$krnl_revision" -ge "$krnl_sl6_minimal_fixed"; then
+      return 1 # kernel contains the AUFS workaround fix
     fi
   fi
 
@@ -3433,7 +3449,7 @@ snapshot() {
     # more sanity checks
     check_repository_compatibility
     if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
-        # this might have been missed if add-replica -a was used or 
+        # this might have been missed if add-replica -a was used or
         #  if a migrate was done while apache wasn't running, but then
         #  apache was enabled later
         check_wsgi_module
@@ -3641,7 +3657,7 @@ migrate_2_1_15() {
   local destination_version="2.1.20"
   local conf_file
   conf_file="$(get_apache_conf_path)/cvmfs.${name}.conf"
-  
+
   # get repository information
   load_repo_config $name
 
