@@ -5,6 +5,7 @@
 #include "upload_spooler_definition.h"
 
 #include <vector>
+#include <tbb/task_scheduler_init.h>
 
 #include "logging.h"
 #include "util.h"
@@ -24,6 +25,7 @@ SpoolerDefinition::SpoolerDefinition(
   min_file_chunk_size(min_file_chunk_size),
   avg_file_chunk_size(avg_file_chunk_size),
   max_file_chunk_size(max_file_chunk_size),
+  number_of_threads(tbb::task_scheduler_init::default_num_threads()),
   valid_(false)
 {
   // check if given file chunking values are sane

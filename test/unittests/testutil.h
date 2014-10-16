@@ -41,6 +41,23 @@ class PolymorphicConstructionUnittestAdapter {
 //
 
 
+static const std::string g_sandbox_path    = "/tmp/cvmfs_mockuploader";
+static const std::string g_sandbox_tmp_dir = g_sandbox_path + "/tmp";
+static upload::SpoolerDefinition MockSpoolerDefinition() {
+  const size_t      min_chunk_size   = 512000;
+  const size_t      avg_chunk_size   = 2 * min_chunk_size;
+  const size_t      max_chunk_size   = 4 * min_chunk_size;
+
+  return upload::SpoolerDefinition("mock," + g_sandbox_path + "," +
+                                             g_sandbox_tmp_dir,
+                                   shash::kSha1,
+                                   true,
+                                   min_chunk_size,
+                                   avg_chunk_size,
+                                   max_chunk_size);
+}
+
+
 /**
  * This is a simple base class for a mocked uploader. It implements only the
  * very common parts and takes care of the internal instrumentation of
@@ -54,9 +71,6 @@ class AbstractMockUploader : public upload::AbstractUploader {
  public:
   static const std::string sandbox_path;
   static const std::string sandbox_tmp_dir;
-  static const size_t      min_chunk_size = 512000;
-  static const size_t      avg_chunk_size = 2 * min_chunk_size;
-  static const size_t      max_chunk_size = 4 * min_chunk_size;
 
  public:
   AbstractMockUploader(const upload::SpoolerDefinition &spooler_definition) :
@@ -68,15 +82,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
                                                       upload::AbstractUploader,
                                                       DerivedT>();
     DerivedT* result = dynamic_cast<DerivedT*>(
-      AbstractUploader::Construct(
-        upload::SpoolerDefinition("mock," + sandbox_path + "," +
-                                            sandbox_tmp_dir,
-                                  shash::kSha1,
-                                  true,
-                                  min_chunk_size,
-                                  avg_chunk_size,
-                                  max_chunk_size)
-      )
+      AbstractUploader::Construct(MockSpoolerDefinition())
     );
     PolymorphicConstructionUnittestAdapter::UnregisterAllPlugins<
                                                     upload::AbstractUploader>();
@@ -157,8 +163,8 @@ class AbstractMockUploader : public upload::AbstractUploader {
 };
 
 template <class DerivedT>
-const std::string AbstractMockUploader<DerivedT>::sandbox_path    = "/tmp/cvmfs_mockuploader";
+const std::string AbstractMockUploader<DerivedT>::sandbox_path    = g_sandbox_path;
 template <class DerivedT>
-const std::string AbstractMockUploader<DerivedT>::sandbox_tmp_dir = AbstractMockUploader::sandbox_path + "/tmp";
+const std::string AbstractMockUploader<DerivedT>::sandbox_tmp_dir = g_sandbox_tmp_dir;
 
 #endif /* CVMFS_UNITTEST_TESTUTIL */

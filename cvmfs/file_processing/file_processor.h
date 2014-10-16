@@ -61,6 +61,7 @@ namespace upload {
 class AbstractUploader;
 class IoDispatcher;
 class File;
+class SpoolerDefinition;
 
 /**
  * This is the outer most wrapper class that should be used by the Spooler.
@@ -71,12 +72,8 @@ class File;
  */
 class FileProcessor : public Observable<SpoolerResult> {
  public:
-  FileProcessor(AbstractUploader  *uploader,
-                const shash::Algorithms hash_algorithm,
-                const bool         enable_file_chunking,
-                const size_t       minimal_chunk_size = 2 * 1024 * 1024,
-                const size_t       average_chunk_size = 4 * 1024 * 1024,
-                const size_t       maximal_chunk_size = 8 * 1024 * 1024);
+  FileProcessor(AbstractUploader         *uploader,
+                const SpoolerDefinition  &spooler_definition);
   virtual ~FileProcessor();
 
   void Process(const std::string  &local_path,

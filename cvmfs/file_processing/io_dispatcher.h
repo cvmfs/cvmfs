@@ -120,12 +120,12 @@ class IoDispatcher {
   typedef tbb::concurrent_bounded_queue<WriteJob> WriteJobQueue;
 
  public:
-  IoDispatcher(AbstractUploader  *uploader,
-               FileProcessor     *file_processor,
-               const size_t       max_read_buffer_size = 512 * 1024) :
-    tbb_workers_(tbb::task_scheduler_init::default_num_threads()),
+  IoDispatcher(AbstractUploader    *uploader,
+               FileProcessor       *file_processor,
+               const unsigned int   number_of_threads,
+               const size_t         max_read_buffer_size = 512 * 1024) :
     max_read_buffer_size_(max_read_buffer_size),
-    reader_(max_read_buffer_size_, tbb_workers_ * 10),
+    reader_(max_read_buffer_size_, number_of_threads * 10),
     uploader_(uploader),
     file_processor_(file_processor)
   {
@@ -207,7 +207,6 @@ class IoDispatcher {
                                     BufferUploadCompleteParam   buffer_info);
 
  private:
-  const unsigned int               tbb_workers_;               ///< number of TBB worker threads to be used
   const size_t                     max_read_buffer_size_;      ///< maximal data block size for file read-in
 
   tbb::atomic<unsigned int>        chunks_in_flight_;          ///< number of Chunks currently in processing
