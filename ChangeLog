@@ -1,4 +1,6 @@
 2.1.20:
+  * Fix whitelist resign period from one month to 30 days to match the
+    documentation (CVM-628)
   * Use custom cvmfs_cache_t SELinux label for the cache directory (CVM-644)
   * Fail gracefully if one of the public RSA keys is unreadable (CVM-667)
   * Fix concurrent access to alien cache on NFS (link/unlink instead of rename)
