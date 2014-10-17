@@ -30,7 +30,9 @@
 #include "cache.h"
 
 #include <sys/stat.h>
+#ifndef __APPLE__
 #include <sys/statfs.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
