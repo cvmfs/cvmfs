@@ -35,12 +35,22 @@ download() {
   local url=$1
   local download_output=
 
+  local dl_bin=""
+  if which wget > /dev/null 2>&1; then
+    dl_bin="wget --no-check-certificate"
+  elif which curl > /dev/null 2>&1; then
+    dl_bin="curl --insecure --silent --remote-name"
+  else
+    echo "didn't find wget or curl."
+    exit 1
+  fi
+
   echo -n "downloading $url ... "
-  download_output=$(wget --no-check-certificate $url 2>&1)
+  download_output=$($dl_bin $url 2>&1)
 
   if [ $? -ne 0 ]; then
     echo "fail"
-    echo "wget said:"
+    echo "downloader said:"
     echo $download_output
     exit 2
   else
