@@ -143,6 +143,9 @@ while getopts "r:s:c:t:g:k:p:u:" option; do
   esac
 done
 
+# check that sudo works as expected
+sudo echo "testing sudo..." || exit 2
+
 # check if we have all bits and pieces
 if [ x$platform_script  = "x" ] ||
    [ x$server_package   = "x" ] ||
