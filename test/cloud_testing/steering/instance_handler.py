@@ -38,13 +38,17 @@ def connect_to_openstack(access_key, secret_key, endpoint):
   return connection
 
 
-def spawn_instance(connection, ami, key_name, flavor, max_retries = 5):
+def spawn_instance(connection, ami, key_name, flavor, userdata, max_retries = 5):
   instance     = None
   time_backoff = 20
   retries      = 0
 
   while not is_running(instance) and retries < max_retries:
-    instance = spawn_instance_on_openstack(connection, ami, key_name, flavor)
+    instance = spawn_instance_on_openstack(connection,
+                                           ami,
+                                           key_name,
+                                           flavor,
+                                           userdata)
     retries += 1
     if not is_running(instance):
       instance_id    = "unknown"
@@ -62,12 +66,12 @@ def spawn_instance(connection, ami, key_name, flavor, max_retries = 5):
   return instance
 
 
-def spawn_instance_on_openstack(connection, ami, key_name, flavor):
+def spawn_instance_on_openstack(connection, ami, key_name, flavor, userdata):
   try:
     reservation = connection.run_instances(ami,
                                            key_name=key_name,
                                            instance_type=flavor,
-                                           user_data="#cloud-config\nresize_rootfs: True")
+                                           user_data=userdata)
     if len(reservation.instances) != 1:
       print_error("Failed to start instance (#: " + reservation.instances + ")")
       return None
@@ -118,6 +122,13 @@ def create_instance(parent_parser, argv):
                          required = True,
                          dest     = "flavor",
                          help     = "VM flavor to use")
+  parser.add_argument("--userdata",
+                         nargs    = 1,
+                         metavar  = "<user_data>",
+                         required = False,
+                         dest     = "userdata",
+                         default  = "",
+                         help     = "Cloud-init user data string")
   arguments = parser.parse_args(argv)
 
   access_key = arguments.access_key[0]
@@ -126,9 +137,10 @@ def create_instance(parent_parser, argv):
   ami        = arguments.ami[0]
   key_name   = arguments.key[0]
   flavor     = arguments.flavor[0]
+  userdata   = arguments.userdata[0]
 
   connection = connect_to_openstack(access_key, secret_key, endpoint)
-  instance   = spawn_instance(connection, ami, key_name, flavor)
+  instance   = spawn_instance(connection, ami, key_name, flavor, userdata)
 
   if is_running(instance):
     print instance.id , instance.private_ip_address
