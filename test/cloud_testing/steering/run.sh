@@ -40,6 +40,7 @@ ec2_config="ec2_config.sh"
 ami_name=""
 log_destination="."
 username="root"
+userdata=""
 
 # package download locations
 server_package=""
@@ -66,7 +67,7 @@ die() {
 
 
 usage() {
-  local msg=$1
+  local msg="$1"
 
   echo "Error: $msg"
   echo
@@ -81,6 +82,7 @@ usage() {
   echo " -e <EC2 config file>       local location of the ec2_config.sh file"
   echo " -d <results destination>   Directory to store final test session logs"
   echo " -m <ssh user name>         User name to be used for VM login (default: root)"
+  echo " -c <cloud init userdata>   User data string to be passed to the new instance"
 
   exit 1
 }
@@ -171,6 +173,7 @@ read_package_map() {
 
 spawn_virtual_machine() {
   local ami=$1
+  local userdata="$2"
 
   local retcode
 
@@ -183,6 +186,7 @@ spawn_virtual_machine() {
                                          --cloud-endpoint   $EC2_ENDPOINT      \
                                          --key              $EC2_KEY           \
                                          --instance-type    $EC2_INSTANCE_TYPE \
+                                         --userdata         "$userdata"        \
                                          --ami              $ami)
   retcode=$?
   instance_id=$(echo $spawn_results | awk '{print $1}')
@@ -345,7 +349,7 @@ get_test_results() {
 #
 
 
-while getopts "r:b:u:p:e:a:d:m:" option; do
+while getopts "r:b:u:p:e:a:d:m:c:" option; do
   case $option in
     r)
       platform_run_script=$OPTARG
@@ -370,6 +374,9 @@ while getopts "r:b:u:p:e:a:d:m:" option; do
       ;;
     m)
       username=$OPTARG
+      ;;
+    c)
+      userdata="$OPTARG"
       ;;
     ?)
       shift $(($OPTIND-2))
@@ -414,7 +421,7 @@ source_tarball="${testee_url}/${source_tarball}"
 # spawn the virtual machine image, run the platform specific setup script
 # on it, wait for the spawning and setup to be complete and run the actual
 # test suite on the VM.
-spawn_virtual_machine     $ami_name              || die "Aborting..."
+spawn_virtual_machine     $ami_name "$userdata"  || die "Aborting..."
 wait_for_virtual_machine  $ip_address  $username || die "Aborting..."
 setup_virtual_machine     $ip_address  $username || die "Aborting..."
 wait_for_virtual_machine  $ip_address  $username || die "Aborting..."
