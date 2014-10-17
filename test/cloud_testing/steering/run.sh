@@ -67,7 +67,7 @@ die() {
 
 
 usage() {
-  local msg=$1
+  local msg="$1"
 
   echo "Error: $msg"
   echo
