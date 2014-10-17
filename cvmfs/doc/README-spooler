@@ -5,6 +5,8 @@
 This directory is used by the CernVM-FS Server tools for book keeping of repos-
 itories on the release manager machine or respectively the stratum 0.
 
+WE STRONGLY DISCOURAGE ANY MANUAL INTERVENTION IN THE DIRECTORIES BELOW!!
+
 The directory `/var/spool/cvmfs` contains a sub-directory for each repository
 managed on this release manager machine. These sub-directories are named with
 the fully qualified name of the correlated repository.
@@ -17,19 +19,20 @@ the fully qualified name of the correlated repository.
              |
              +--> ...
 
-In each of these repository-specific a number of administrative structures can
-be found. Usually a user does not need to interact with them, nevertheless we
-provide a quick overview over their purpose.
-Since CernVM-FS Server 2.1.x the server tools incorporates a CernVM-FS client 
+Each of these repository-specific directories house a number of administrative
+structures. A user should not need to interact with them, nevertheless we
+provide a quick overview over their purpose in this README.
+Since CernVM-FS Server 2.1.x the server tools incorporate a CernVM-FS client
 that reflects the current state of the maintained repository. Hence, everything 
 that has been published is stored solely in CernVM-FS's backend storage and be-
 comes visible through a CernVM-FS client only.
 Utilizing a union file system (AUFS) we allow for file system updates directly
 on top of the CernVM-FS client. Hence, a CernVM-FS Server does not directly
-mount the CernVM-FS client in /cvmfs/foo.cern.ch but a writable AUFS overlay.
+mount the CernVM-FS client in /cvmfs/foo.cern.ch but through a a writable AUFS
+overlay (copy-on-write semantics).
 
-
-# Contents of /var/spool/cvmfs/foo.cern.ch/<object>
+Below is an overview over the contents of the sub-directories found here:
+/var/spool/cvmfs/foo.cern.ch/<object>
 
 -> rdonly/         The mount point of the CernVM-FS client for foo.cern.ch. This
                    reflects the current content of the repository as it would be
