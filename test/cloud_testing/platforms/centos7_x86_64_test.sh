@@ -28,6 +28,7 @@ cd ${SOURCE_DIRECTORY}/test
 export CVMFS_TEST_SERVER_CACHE='/srv/cache' &&         \
 ./run.sh $TEST_LOGFILE -x src/005-asetup               \
                           src/004-davinci              \
+                          src/007-testjobs             \
                           src/024-reload-during-asetup \
                           src/5* || it_retval=$?
 
