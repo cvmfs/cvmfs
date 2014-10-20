@@ -17,6 +17,7 @@ using namespace upload;
 
 LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition) :
   AbstractUploader(spooler_definition),
+  backend_file_mode_(default_backend_file_mode_ ^ GetUmask()),
   upstream_path_(spooler_definition.spooler_configuration),
   temporary_path_(spooler_definition.temporary_path)
 {
@@ -231,7 +232,7 @@ int LocalUploader::Move(const std::string &local_path,
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
   // make sure the file has the right permissions
-  int retval  = chmod(local_path.c_str(), backend_file_mode);
+  int retval  = chmod(local_path.c_str(), backend_file_mode_);
   int retcode = (retval == 0) ? 0 : 101;
   if (retcode != 0) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to set file permission '%s' "

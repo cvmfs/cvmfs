@@ -34,7 +34,8 @@ namespace upload
    */
   class LocalUploader : public AbstractUploader {
    private:
-    const mode_t backend_file_mode = 0664;
+    static const mode_t default_backend_file_mode_ = 0666;
+           const mode_t backend_file_mode_;
 
    public:
     LocalUploader(const SpoolerDefinition &spooler_definition);
