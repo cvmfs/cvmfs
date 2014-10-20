@@ -653,6 +653,15 @@ bool GetGidOf(const std::string &groupname, gid_t *gid) {
   return true;
 }
 
+/**
+ * read the current umask of this process
+ */
+mode_t GetUmask() {
+  const mode_t my_umask = umask(0);
+  umask(my_umask);
+  return my_umask;
+}
+
 
 /**
  * Adds gid to the list of supplementary groups
