@@ -29,7 +29,7 @@ echo "done"
 
 # install package dependency resolve program
 echo -n "installing gdebi-core... "
-sudo apt-get install gdebi-core > /dev/null || die "fail (install gdebi-core)"
+install_from_repo gdebi-core || die "fail (install gdebi-core)"
 echo "done"
 
 # install deb packages
