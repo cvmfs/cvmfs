@@ -231,7 +231,7 @@ int LocalUploader::Move(const std::string &local_path,
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
   // make sure the file has the right permissions
-  int retval  = chmod(local_path.c_str(), 0666);
+  int retval  = chmod(local_path.c_str(), backend_file_mode);
   int retcode = (retval == 0) ? 0 : 101;
   if (retcode != 0) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to set file permission '%s' "
