@@ -656,6 +656,8 @@ bool GetGidOf(const std::string &groupname, gid_t *gid) {
 
 /**
  * read the current umask of this process
+ * Note: umask query is guarded by a global mutex. Hence, always use
+ *       this function and beware of scalability bottlenecks
  */
 mode_t GetUmask() {
   pthread_mutex_lock(&getumask_mutex);
