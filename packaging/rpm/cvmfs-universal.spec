@@ -265,6 +265,7 @@ do
   /usr/sbin/semodule -s ${selinuxvariant} -i \
     %{_datadir}/selinux/${selinuxvariant}/cvmfs.pp &> /dev/null || :
 done
+restorecon -R /var/lib/cvmfs
 %endif
 /sbin/ldconfig
 if [ -d /var/run/cvmfs ]; then
