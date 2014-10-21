@@ -57,7 +57,11 @@ if (NOT REG_EXT_LIB)
 			execute_process (
 				COMMAND				sh ${LOCATION}/configureHook.sh
 				WORKING_DIRECTORY	${LOCATION}
+				RESULT_VARIABLE     RETVAL
 			)
+			if (NOT ${RETVAL} EQUAL 0)
+				message (FATAL_ERROR "failed to configure ${NAME}. Aborting.")
+			endif (NOT ${RETVAL} EQUAL 0)
 			file (WRITE ${LOCATION}/.external_is_configured "no coffee break needed...")
 		endif (NOT EXISTS ${LOCATION}/.external_is_configured)
 
