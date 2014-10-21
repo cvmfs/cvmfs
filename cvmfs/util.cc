@@ -660,10 +660,10 @@ bool GetGidOf(const std::string &groupname, gid_t *gid) {
  *       this function and beware of scalability bottlenecks
  */
 mode_t GetUmask() {
-  pthread_mutex_lock(&getumask_mutex);
+  LockMutex(&getumask_mutex);
   const mode_t my_umask = umask(0);
   umask(my_umask);
-  pthread_mutex_unlock(&getumask_mutex);
+  UnlockMutex(&getumask_mutex);
   return my_umask;
 }
 
