@@ -63,6 +63,21 @@ fi
 version_major() { echo $1 | cut --delimiter=. --fields=1; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2; }
 version_patch() { echo $1 | cut --delimiter=. --fields=3; }
+prepend_zeros() { printf %05d "$1"; }
+compare_versions() {
+  local lhs=$1
+  local comparison_operator=$2
+  local rhs=$3
+
+  local lhs1=$(prepend_zeros $(version_major $lhs))
+  local lhs2=$(prepend_zeros $(version_minor $lhs))
+  local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local rhs1=$(prepend_zeros $(version_major $rhs))
+  local rhs2=$(prepend_zeros $(version_minor $rhs))
+  local rhs3=$(prepend_zeros $(version_patch $rhs))
+
+  [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
+}
 
 # ensures that a generic service is running
 # @param service  the name of the service
