@@ -1,4 +1,6 @@
 2.1.20:
+  * Install auto.cvmfs in /usr/libexec/cvmfs and make /etc/auto.cvmfs a
+    symlink (CVM-645)
   * Restrict the number of in-flight file processing jobs in the server in
     order to not exhaust file descriptor limit
   * Fix whitelist resign period from one month to 30 days to match the
