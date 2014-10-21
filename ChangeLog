@@ -1,4 +1,6 @@
 2.1.20:
+  * Make server transaction handling more robust against failures and
+    concurrent operations (CVM-665, CVM-666)
   * Install auto.cvmfs in /usr/libexec/cvmfs and make /etc/auto.cvmfs a
     symlink (CVM-645)
   * Restrict the number of in-flight file processing jobs in the server in
