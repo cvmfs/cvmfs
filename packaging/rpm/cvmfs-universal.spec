@@ -313,6 +313,7 @@ fi
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
+%{_libexecdir}/cvmfs/auto.cvmfs
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}
@@ -364,6 +365,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Tue Oct 21 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20
+- /etc/auto.cvmfs is now a link to /usr/libexec/cvmfs/auto.cvmfs
 * Thu Apr 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
 - Add /etc/cvmfs/default.d
 * Thu Apr 3 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
