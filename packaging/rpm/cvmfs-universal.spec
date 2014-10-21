@@ -314,7 +314,7 @@ fi
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
-%{_libexecdir}/cvmfs/auto.cvmfs
+/usr/libexec/cvmfs/auto.cvmfs
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh
 %if 0%{?selinux_cvmfs}
