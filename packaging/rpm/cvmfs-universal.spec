@@ -359,6 +359,7 @@ fi
 /var/www/wsgi-scripts/cvmfs-api.wsgi
 /usr/share/cvmfs-server/
 /var/lib/cvmfs-server/
+/var/spool/cvmfs/README
 %doc COPYING AUTHORS README ChangeLog
 
 %files unittests

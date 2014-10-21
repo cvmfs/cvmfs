@@ -490,6 +490,13 @@ if (BUILD_SERVER)
   )
 
   install(
+    FILES          doc/README-spooler
+    DESTINATION    "/var/spool/cvmfs"
+    PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    RENAME         README
+  )
+
+  install(
     CODE  "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}/var/lib/cvmfs-server/geo)"
   )
 

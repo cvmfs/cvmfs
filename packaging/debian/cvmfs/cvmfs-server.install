@@ -16,3 +16,4 @@ usr/share/cvmfs-server/webapi/cvmfs_api.py
 usr/share/cvmfs-server/webapi/cvmfs_geo.py
 usr/share/cvmfs-server/webapi/GeoIP.so
 var/lib/cvmfs-server/geo/
+var/spool/cvmfs/README
