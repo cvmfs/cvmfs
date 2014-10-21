@@ -1762,6 +1762,12 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
+generate_fuser_report_for_mountpoint() {
+  local mountpoint="$1"
+  $fuser -v -m "$mountpoint" 2>&1 | grep -v "^Cannot stat file" || true
+}
+
+
 file_descriptor_warning_and_question() {
   local name=$1
   echo "\
@@ -1774,7 +1780,7 @@ WARNING! There are open read-only file descriptors in /cvmfs/$name
       The following fuser report might show the processes with open file handles
       "
 
-  $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
+  generate_fuser_report_for_mountpoint "/cvmfs/${name}"
 
   echo -n "\
 
@@ -1788,6 +1794,17 @@ WARNING! There are open read-only file descriptors in /cvmfs/$name
   fi
 
   return 0
+}
+
+
+file_descriptor_warning() {
+  local name=$1
+
+  echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
+  echo "         The following fuser report might show the culprit:"
+  echo
+  generate_fuser_report_for_mountpoint "/cvmfs/${name}"
+  echo
 }
 
 
@@ -3335,11 +3352,7 @@ publish() {
     # check again for open file descriptors (potential race condition)
     if has_file_descriptors_on_mount_point $name && \
        [ $use_fd_fallback -ne 1 ]; then
-      echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
-      echo "         The following fuser report might show the culprit:"
-      echo
-      $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
-      echo
+      file_descriptor_warning $name
       echo "Forcing remount of already committed repository revision"
       use_fd_fallback=1
     else
@@ -3462,7 +3475,16 @@ rollback() {
   echo "Flushing file system buffers"
   sync
 
-  echo "Remounting newly created repository revision"
+  # check again for open file descriptors (potential race condition)
+  if has_file_descriptors_on_mount_point $name && \
+     [ $use_fd_fallback -ne 1 ]; then
+    file_descriptor_warning $name
+    echo "Forcing remount of already rolled back repository revision"
+    use_fd_fallback=1
+  else
+    echo "Remounting rolled back repository revision"
+  fi
+
   sync
   close_transaction  $name $use_fd_fallback
   publish_after_hook $name
