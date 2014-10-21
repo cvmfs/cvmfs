@@ -678,13 +678,41 @@ is_in_transaction() {
 open_transaction() {
   local name=$1
   load_repo_config $name
-  mkdir ${CVMFS_SPOOL_DIR}/in_transaction > /dev/null 2>&1 || die "Failed to open transaction"
+  local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
+
+  mkdir "$tx_lock" > /dev/null 2>&1 || die "Failed to create transaction lock"
+  cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
 }
 
+# closes a previously opened transaction
+# Note: This function will perform remounts on /cvmfs/${name} and the underlying
+#       read-only CVMFS branch. Hence, check for open file descriptors first!
+#
+# @param name             the repository whose transaction should be closed
+# @param use_fd_fallback  if set != 0 this will perform a violent remount of the
+#                         repository to handle potential open file descriptors
+#                         on /cvmfs/${name}
 close_transaction() {
   local name=$1
+  local use_fd_fallback=$2
+
   load_repo_config $name
-  rmdir ${CVMFS_SPOOL_DIR}/in_transaction
+  local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
+  local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+
+  if [ $use_fd_fallback -ne 0 ]; then
+    cvmfs_suid_helper rw_lazy_umount     $name
+    cvmfs_suid_helper kill_cvmfs         $name
+    cvmfs_suid_helper rdonly_lazy_umount $name
+  else
+    cvmfs_suid_helper rw_umount $name
+    cvmfs_suid_helper rdonly_umount $name
+  fi
+  cvmfs_suid_helper clear_scratch $name
+  rm -rf "${tmp_dir}/*"
+  cvmfs_suid_helper rdonly_mount $name > /dev/null
+  cvmfs_suid_helper rw_mount $name
+  rmdir "$tx_lock"
 }
 
 # checks if a repository is currently runing a publish procedure
@@ -697,11 +725,30 @@ is_publishing() {
   [ -d ${CVMFS_SPOOL_DIR}/is_publishing ]
 }
 
-publishing_lock() {
+publish_starting() {
   local name=$1
   load_repo_config $name
-  mkdir ${CVMFS_SPOOL_DIR}/is_publishing > /dev/null 2>&1 || die "Failed to acquire publishing lock"
-  trap "rmdir ${CVMFS_SPOOL_DIR}/is_publishing > /dev/null 2>&1" 0
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  mkdir "$pub_lock" > /dev/null 2>&1 || die "Failed to acquire publishing lock"
+  trap "publish_failed $name" EXIT HUP INT TERM
+  cvmfs_suid_helper lock $name
+}
+
+publish_failed() {
+  local name=$1
+  load_repo_config $name
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  trap - EXIT HUP INT TERM
+  rmdir $pub_lock > /dev/null 2>&1
+  cvmfs_suid_helper open $name
+}
+
+publish_succeeded() {
+  local name=$1
+  load_repo_config $name
+  local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
+  trap - EXIT HUP INT TERM
+  rmdir $pub_lock > /dev/null 2>&1
 }
 
 
@@ -1069,6 +1116,11 @@ health_check() {
       die "$name is not in a transaction but /cvmfs/$name is mounted read/write"
     fi
   fi
+
+  # check mounted CVMFS revision against published
+  if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
+    die "$name is not based on the newest published revision"
+  fi
 }
 
 
@@ -1372,6 +1424,30 @@ set_ro_root_hash() {
   else
     echo "CVMFS_ROOT_HASH=${root_hash}" >> $client_config
   fi
+}
+
+
+# retrieves the currently mounted root catalog hash in the spool area
+#
+# @param repository_name    the name of the repository to be checked
+# @return                   echoes the currently mounted root catalog hash
+get_mounted_root_hash() {
+  local repository_name=$1
+
+  load_repo_config $repository_name
+  attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly
+}
+
+
+# retrieves the latest published root catalog hash in the backend storage
+#
+# @param repository_name   the name of the repository to be checked
+# @return                  echoes the last published (HEAD) root catalog hash
+get_published_root_hash() {
+  local repository_name=$1
+
+  load_repo_config $repository_name
+  cvmfs_swissknife info -r $CVMFS_STRATUM0 -c
 }
 
 
@@ -1698,7 +1774,7 @@ WARNING! There are open read-only file descriptors in /cvmfs/$name
       The following fuser report might show the processes with open file handles
       "
 
-  fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
+  $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
 
   echo -n "\
 
@@ -1724,6 +1800,15 @@ handle_read_only_file_descriptors_on_mount_point() {
     file_descriptor_warning_and_question $name # might abort...
     return 1
   fi
+}
+
+
+has_file_descriptors_on_mount_point() {
+  local name=$1
+  local mountpoint="/cvmfs/${name}"
+
+  [ $(count_rd_only_fds $mountpoint) -gt 0 ] || \
+  [ $(count_wr_fds      $mountpoint) -gt 0 ]
 }
 
 
@@ -2728,7 +2813,7 @@ list_tags() {
 
   # get repository information
   load_repo_config $name
-  local base_hash=$(attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly)
+  local base_hash=$(get_mounted_root_hash $name)
   cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
     -i 0 -s 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
     -k /etc/cvmfs/keys/${name}.pub \
@@ -2880,8 +2965,6 @@ transaction() {
   local names
   local spool_dir
   local stratum0
-  local base_hash
-  local remote_hash
   local force=0
   local retcode=0
 
@@ -2917,8 +3000,6 @@ transaction() {
     load_repo_config $name
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
-    base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
-    remote_hash=$(cvmfs_swissknife info -r $stratum0 -c)
 
     # more sanity checks
     check_repository_compatibility
@@ -2930,17 +3011,8 @@ transaction() {
 
     # do it!
     transaction_before_hook $name
-    if [ "$base_hash" != "$remote_hash" ]; then
-      echo "Repository $name has changed!  Remounting remote hash $remote_hash"
-      cvmfs_suid_helper rw_umount $name
-      cvmfs_suid_helper rdonly_umount $name
-      set_ro_root_hash $name $remote_hash
-      cvmfs_suid_helper rdonly_mount $name
-      cvmfs_suid_helper rw_mount $name
-    fi
-    cvmfs_suid_helper open $name
-    open_transaction       $name
-    transaction_after_hook $name
+    open_transaction        $name
+    transaction_after_hook  $name
 
   done
 
@@ -3008,21 +3080,10 @@ abort() {
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
     handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+    sync
 
     abort_before_hook $name
-    sync
-    if [ $use_fd_fallback -eq 0 ]; then
-      cvmfs_suid_helper rw_umount $name
-    else
-      cvmfs_suid_helper rw_lazy_umount     $name
-      cvmfs_suid_helper kill_cvmfs         $name
-      cvmfs_suid_helper rdonly_lazy_umount $name
-      cvmfs_suid_helper rdonly_mount       $name > /dev/null
-    fi
-    rm -rf ${spool_dir}/tmp/*
-    cvmfs_suid_helper clear_scratch $name
-    cvmfs_suid_helper rw_mount $name
-    close_transaction $name
+    close_transaction $name $use_fd_fallback
     abort_after_hook $name
 
   done
@@ -3158,7 +3219,6 @@ publish() {
       continue
     fi
 
-    # do it!
     if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
       local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
       tag_name="generic-$timestamp"
@@ -3185,14 +3245,11 @@ publish() {
       fi
     fi
 
+    # prepare the commands to be used for the publishing later
     local user_shell="sh -c"
     [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
-    # check if we have open file descriptors on /cvmfs/<name>
-    local use_fd_fallback=0
-    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
-
-    local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+    local base_hash=$(get_mounted_root_hash $name)
     local dirtab_command="$swissknife dirtab $verbosity \
       -d /cvmfs/${name}/.cvmfsdirtab                    \
       -b $base_hash                                     \
@@ -3200,11 +3257,7 @@ publish() {
       -t ${spool_dir}/tmp                               \
       -u /cvmfs/${name}                                 \
       -s ${spool_dir}/scratch"
-    $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
 
-    publish_before_hook $name
-    publishing_lock $name
-    cvmfs_suid_helper lock $name
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
@@ -3250,36 +3303,53 @@ publish() {
       -t ${spool_dir}/tmp \
       -r ${upstream}"
 
-    $user_shell "$sync_command" || \
-      (cvmfs_suid_helper open $name && die "Synchronization failed (/cvmfs/$name remounted read/write so changes can be made to transaction) \n\nExecuted Command:\n$sync_command" || die "Synchronization failed\n\nExecuted Command:\n$sync_command")
-    if [ -f ${spool_dir}/tmp/manifest ]; then
-      local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-      local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
-      local trunk_size=$(grep "^B" ${spool_dir}/tmp/manifest | tr -d B)
-      tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
-      echo "Tagging $name"
-      $user_shell "$tag_command" || die "Tagging failed\n\nExecuted Command:\n$tag_command"
-      $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
-      echo "Remounting newly created repository revision"
-      sync
-      if [ $use_fd_fallback -eq 1 ]; then
-        cvmfs_suid_helper rw_lazy_umount     $name
-        cvmfs_suid_helper kill_cvmfs         $name
-        cvmfs_suid_helper rdonly_lazy_umount $name
-      else
-        cvmfs_suid_helper rw_umount $name
-        cvmfs_suid_helper rdonly_umount $name
-      fi
-      set_ro_root_hash $name $trunk_hash
-      cvmfs_suid_helper clear_scratch $name
-      rm -rf ${spool_dir}/tmp/*
-      cvmfs_suid_helper rdonly_mount $name > /dev/null
-      cvmfs_suid_helper rw_mount $name
-      close_transaction $name
-      publish_after_hook $name
+    # ---> do it! (from here on we are changing things)
+    publish_before_hook $name
+    $user_shell "$dirtab_command" || die "Failed to apply .cvmfsdirtab"
+
+    # check if we have open file descriptors on /cvmfs/<name>
+    local use_fd_fallback=0
+    handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+
+    # synchronize the repository
+    publish_starting $name
+    $user_shell "$sync_command"      || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
+    [ -f ${spool_dir}/tmp/manifest ] || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+
+    # gather information of new (uncommitted) revision
+    local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
+    local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
+    local trunk_size=$(grep "^B" ${spool_dir}/tmp/manifest | tr -d B)
+    tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
+
+    # committing newly created revision
+    echo "Tagging $name"
+    $user_shell "$tag_command"  || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+    $user_shell "$sign_command" || { publish_failed $name; die "Signing failed\n\nExecuted Command:\n$sign_command"; }
+    set_ro_root_hash $name $trunk_hash
+
+    # finalizing transaction
+    echo "Flushing file system buffers"
+    sync
+
+    # check again for open file descriptors (potential race condition)
+    if has_file_descriptors_on_mount_point $name && \
+       [ $use_fd_fallback -ne 1 ]; then
+      echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
+      echo "         The following fuser report might show the culprit:"
+      echo
+      $fuser -v -m /cvmfs/$name 2>&1 | grep -v "^Cannot stat file" || true
+      echo
+      echo "Forcing remount of already committed repository revision"
+      use_fd_fallback=1
     else
-      exit 1
+      echo "Remounting newly created repository revision"
     fi
+
+    # remount the repository
+    close_transaction  $name $use_fd_fallback
+    publish_after_hook $name
+    publish_succeeded  $name
 
   done
 
@@ -3350,20 +3420,13 @@ rollback() {
     fi
   fi
 
-  # check if we have open file descriptors on /cvmfs/<name>
-  local use_fd_fallback=0
-  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
-
-  # do it!
+  # prepare the shell commands
   local swissknife="cvmfs_swissknife"
 
   local user_shell="sh -c"
   [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
 
-  publish_before_hook
-  publishing_lock $name
-  cvmfs_suid_helper lock $name
-  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+  local base_hash=$(get_mounted_root_hash $name)
 
   local rollback_command="$swissknife rollback -u $stratum0 \
     -r $upstream \
@@ -3383,27 +3446,27 @@ rollback() {
     -t ${spool_dir}/tmp \
     -r ${upstream}"
 
-  $user_shell "$rollback_command" ||
-    { cvmfs_suid_helper open $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
+  # check if we have open file descriptors on /cvmfs/<name>
+  local use_fd_fallback=0
+  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+
+  # do it!
+  publish_before_hook
+  publish_starting $name
+  $user_shell "$rollback_command" || { publish_failed $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
+
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-  $user_shell "$sign_command" || die "Signing failed\n\nExecuted Command:\n$sign_command"
+  $user_shell "$sign_command" || { publish_failed; die "Signing failed\n\nExecuted Command:\n$sign_command"; }
+  set_ro_root_hash $name $trunk_hash
+
+  echo "Flushing file system buffers"
+  sync
+
   echo "Remounting newly created repository revision"
   sync
-  if [ $use_fd_fallback -eq 1 ]; then
-    cvmfs_suid_helper rw_lazy_umount     $name
-    cvmfs_suid_helper kill_cvmfs         $name
-    cvmfs_suid_helper rdonly_lazy_umount $name
-  else
-    cvmfs_suid_helper rw_umount $name
-    cvmfs_suid_helper rdonly_umount $name
-  fi
-  set_ro_root_hash $name $trunk_hash
-  cvmfs_suid_helper clear_scratch $name
-  rm -rf ${spool_dir}/tmp/*
-  cvmfs_suid_helper rdonly_mount $name > /dev/null
-  cvmfs_suid_helper rw_mount $name
-  close_transaction $name
+  close_transaction  $name $use_fd_fallback
   publish_after_hook $name
+  publish_succeeded  $name
 }
 
 
@@ -3642,7 +3705,7 @@ migrate_2_1_7() {
   # update repository information
   echo "--> remounting (migrated) repository"
   local remote_hash
-  remote_hash=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -c)
+  remote_hash=$(get_published_root_hash $name)
 
   cvmfs_suid_helper rw_umount $name     > /dev/null 2>&1 || die "fail! (unmounting /cvmfs/$name)"
   cvmfs_suid_helper rdonly_umount $name > /dev/null 2>&1 || die "fail! (unmounting ${CVMFS_SPOOL_DIR}/rdonly)"
