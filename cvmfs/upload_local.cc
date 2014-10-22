@@ -192,11 +192,11 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     return;
   }
 
-  const std::string final_path = upstream_path_ + "/data" +
+  const std::string final_path = "data" +
                                  content_hash.MakePath(1, 2) +
                                  hash_suffix;
 
-  retval = rename(local_handle->temporary_path.c_str(), final_path.c_str());
+  retval = Move(local_handle->temporary_path.c_str(), final_path.c_str());
   if (retval != 0) {
     const int cpy_errno = errno;
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move temp file '%s' to "
