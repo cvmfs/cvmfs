@@ -7,6 +7,8 @@
 
 #include "upload_facility.h"
 
+#include <sys/stat.h>
+
 #include "util_concurrency.h"
 #include "atomic.h"
 
@@ -31,6 +33,10 @@ namespace upload
    * the AbstractSpooler base class.
    */
   class LocalUploader : public AbstractUploader {
+   private:
+    static const mode_t default_backend_file_mode_ = 0666;
+           const mode_t backend_file_mode_;
+
    public:
     LocalUploader(const SpoolerDefinition &spooler_definition);
     static bool WillHandle(const SpoolerDefinition &spooler_definition);

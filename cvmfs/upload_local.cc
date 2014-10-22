@@ -17,6 +17,7 @@ using namespace upload;
 
 LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition) :
   AbstractUploader(spooler_definition),
+  backend_file_mode_(default_backend_file_mode_ ^ GetUmask()),
   upstream_path_(spooler_definition.spooler_configuration),
   temporary_path_(spooler_definition.temporary_path)
 {
@@ -191,11 +192,11 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     return;
   }
 
-  const std::string final_path = upstream_path_ + "/data" +
+  const std::string final_path = "data" +
                                  content_hash.MakePath(1, 2) +
                                  hash_suffix;
 
-  retval = rename(local_handle->temporary_path.c_str(), final_path.c_str());
+  retval = Move(local_handle->temporary_path.c_str(), final_path.c_str());
   if (retval != 0) {
     const int cpy_errno = errno;
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move temp file '%s' to "
@@ -231,7 +232,7 @@ int LocalUploader::Move(const std::string &local_path,
   const std::string destination_path = upstream_path_ + "/" + remote_path;
 
   // make sure the file has the right permissions
-  int retval  = chmod(local_path.c_str(), 0666);
+  int retval  = chmod(local_path.c_str(), backend_file_mode_);
   int retcode = (retval == 0) ? 0 : 101;
   if (retcode != 0) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to set file permission '%s' "

@@ -1,0 +1,138 @@
+cvmfs_test_name="Local Backend File Permissions with umask"
+cvmfs_test_autofs_on_startup=false
+
+get_upstream_type() {
+  local upstream=$1
+  echo "$upstream" | cut -d, -f1
+}
+
+get_upstream_config() {
+  local upstream=$1
+  echo "$upstream" | cut -d, -f3-
+}
+
+get_new_backend_files() {
+  local seen_before_log="seen_before.log"
+  touch $seen_before_log
+  load_repo_config $CVMFS_TEST_REPO
+  local backend_path="$(get_upstream_config $CVMFS_UPSTREAM_STORAGE)/data"
+  for f in $(find /srv/cvmfs/test.cern.ch/data -type f); do
+    cat $seen_before_log | grep -q $f && continue
+    echo "$f" >> $seen_before_log
+    stat -c "%n %a" $f;
+  done
+}
+
+mangle_umask() {
+  local umask_val="$1"
+  local base_permission="0666"
+  printf "%o\n" $(( $base_permission ^ $umask_val ))
+}
+
+check_permissions_of_new_files() {
+  local expected_permission="$1"
+  local num_error=0
+  local checked_files=0
+  echo "checking backend files, expecting '$expected_permission' as file mode"
+  local old_ifs="$IFS"
+  IFS='
+'
+  for l in $(get_new_backend_files); do
+    local permission="$(echo -n "$l" | tail -c3)"
+    if [ x"$permission" != x"$expected_permission" ]; then
+      local file_name="$(echo -n "$l" | cut -d' ' -f1)"
+      echo "$file_name:"
+      echo "  expected '$expected_permission' but found '$permission'"
+      num_error=$(( $num_error + 1 ))
+    fi
+    checked_files=$(( $checked_files + 1 ))
+  done
+  IFS="$old_ifs"
+  echo "Checked $checked_files new files ($num_error wrong permissions)"
+  [ $num_error -eq 0 ]
+}
+
+create_random_files() {
+  local filename_dummy="$1"
+  local bytes="$2"
+  local filecount="$3"
+
+  local i=0
+  while [ $i -lt $filecount ]; do
+    local filename=$(mktemp $filename_dummy)
+    openssl rand -out $filename -base64 $bytes 2>/dev/null || return 1
+    i=$(( $i + 1 ))
+  done
+}
+
+put_files_in() {
+  local repo_dir="$1"
+  create_random_files "${repo_dir}/largeXXXXXX" $(( 15 * 1024 * 1024 ))  2
+  create_random_files "${repo_dir}/smallXXXXXX" $(( 15 * 1024 ))        10
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  local sudo_umask="$(sudo sh -c umask)"
+
+  local usr_umask="$(umask)"
+  local f_mode="$(mangle_umask $usr_umask)"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "check that we created a local repository"
+  load_repo_config $CVMFS_TEST_REPO || return 1
+  if [ x"$(get_upstream_type $CVMFS_UPSTREAM_STORAGE)" != x"local" ]; then
+    echo "--> This test case only makes sense for local repositories"
+    return 2
+  fi
+
+  echo "get a list of new files and their permissions"
+  echo "(expecting that default sudo environment umask ($sudo_umask) took effect)"
+  check_permissions_of_new_files "$(mangle_umask $sudo_umask)" || return 3
+
+  echo "create some more files in $CVMFS_TEST_REPO"
+  local publish_log_1="${scratch_dir}/publish_1.log"
+  start_transaction $CVMFS_TEST_REPO                  || return 4
+  put_files_in $repo_dir                              || return 5
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return 6
+
+  echo "check the permissions of the new files"
+  echo "(expecting standard umask $usr_umask and file permissions $f_mode)"
+  check_permissions_of_new_files "$f_mode" || return 7
+
+  echo "create more files to check other umask settings"
+  local publish_log_2="${scratch_dir}/publish_2.log"
+  usr_umask=0000
+  f_mode=666
+  umask $usr_umask                                    || return  8
+  start_transaction $CVMFS_TEST_REPO                  || return  9
+  put_files_in $repo_dir                              || return 10
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2 2>&1 || return 11
+
+  echo "check the permissions of the new files"
+  echo "(expecting umask to be $usr_umask and file permissions $f_mode)"
+  check_permissions_of_new_files "$f_mode" || return 12
+
+  echo "create more files to check other umask settings"
+  local publish_log_3="${scratch_dir}/publish_3.log"
+  local subcatalog="${repo_dir}/subcatalog"
+  usr_umask=0020
+  f_mode=646
+  umask $usr_umask                                    || return 13
+  start_transaction $CVMFS_TEST_REPO                  || return 14
+  mkdir $subcatalog                                   || return 15
+  touch ${subcatalog}/.cvmfscatalog                   || return 16
+  put_files_in $subcatalog                            || return 17
+  publish_repo $CVMFS_TEST_REPO > $publish_log_3 2>&1 || return 18
+
+  echo "check the permissions of the new files"
+  echo "(expecting umask to be $usr_umask and file permissions $f_mode)"
+  check_permissions_of_new_files "$f_mode" || return 19
+
+  return 0
+}

@@ -74,7 +74,8 @@ if [ $s3_retval -eq 0 ]; then
                                  src/538-symlinkedstratum1backend     \
                                  src/542-storagescrubbing             \
                                  src/543-storagescrubbing_scriptable  \
-                                 src/550-livemigration || s3_retval=$?
+                                 src/550-livemigration                \
+                                 src/571-localbackendumask || s3_retval=$?
 
     echo -n "killing FakeS3... "
     sudo kill -2 $fakes3_pid && echo "done" || echo "fail"

@@ -82,6 +82,7 @@ const signed char db64_table[] =
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
   };
 
+static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * Removes a trailing "/" from a path.
@@ -651,6 +652,19 @@ bool GetGidOf(const std::string &groupname, gid_t *gid) {
     return false;
   *gid = result->gr_gid;
   return true;
+}
+
+/**
+ * read the current umask of this process
+ * Note: umask query is guarded by a global mutex. Hence, always use
+ *       this function and beware of scalability bottlenecks
+ */
+mode_t GetUmask() {
+  LockMutex(&getumask_mutex);
+  const mode_t my_umask = umask(0);
+  umask(my_umask);
+  UnlockMutex(&getumask_mutex);
+  return my_umask;
 }
 
 
