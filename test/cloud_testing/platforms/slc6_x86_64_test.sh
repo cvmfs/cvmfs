@@ -67,6 +67,7 @@ if [ $s3_retval -eq 0 ]; then
                                  src/522-missingchunkfailover         \
                                  src/523-corruptchunkfailover         \
                                  src/524-corruptmanifestfailover      \
+                                 src/525-bigrepo                      \
                                  src/528-recreatespoolarea            \
                                  src/530-recreatespoolarea_defaultkey \
                                  src/537-symlinkedbackend             \
