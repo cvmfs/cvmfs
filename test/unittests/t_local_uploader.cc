@@ -511,7 +511,7 @@ TEST_F(T_LocalUploader, SingleStreamedUpload) {
   EXPECT_EQ (number_of_buffers, delegate_.buffer_upload_complete_invocations);
   EXPECT_EQ (1u,                delegate_.streamed_upload_complete_invocations);
 
-  const std::string dest = "data/" + content_hash.MakePath(1, 2) + hash_suffix;
+  const std::string dest = "data/" + content_hash.MakePathExplicit(1, 2) + hash_suffix;
   EXPECT_TRUE (CheckFile(dest));
   CompareBuffersAndFileContents(buffers, AbsoluteDestinationPath(dest));
 
@@ -586,7 +586,7 @@ TEST_F(T_LocalUploader, MultipleStreamedUpload) {
   BufferStreams::const_iterator kend = streams.end();
   for (; k != kend; ++k) {
     const shash::Any &content_hash = k->second.content_hash;
-    const std::string dest = "data/" + content_hash.MakePath(1, 2) + hash_suffix;
+    const std::string dest = "data/" + content_hash.MakePathExplicit(1, 2) + hash_suffix;
     EXPECT_TRUE (CheckFile(dest));
     CompareBuffersAndFileContents(k->first, AbsoluteDestinationPath(dest));
   }

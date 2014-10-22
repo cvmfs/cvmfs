@@ -40,6 +40,14 @@ enum Algorithms {
   kAny,
 };
 
+const char kSuffixNone         = 0;
+const char kSuffixCatalog      = 'C';
+const char kSuffixHistory      = 'H';
+const char kSuffixMicroCatalog = 'L'; // currently unused
+const char kSuffixPartial      = 'P';
+const char kSuffixTemporary    = 'T';
+const char kSuffixCertificate  = 'X';
+
 
 /**
  * Corresponds to Algorithms.  "Any" is the maximum of all the other
@@ -88,20 +96,73 @@ struct AsciiPtr {
 template<unsigned digest_size_, Algorithms algorithm_>
 struct Digest {
   unsigned char digest[digest_size_];
-  Algorithms algorithm;
+  Algorithms    algorithm;
+  char          suffix;
+
+  class Hexifier {
+   public:
+    Hexifier(const Digest<digest_size_, algorithm_> *digest) :
+      digest_(*digest),
+      hash_length_(2 * kDigestSizes[digest_.algorithm]),
+      suffix_length_(kSuffixLengths[digest_.algorithm]),
+      position_(0) {}
+
+    unsigned int operator++() {
+      return position_++;
+    }
+
+    unsigned int operator++(int) {
+      const unsigned int pos = position_;
+      ++position_;
+      return pos;
+    }
+
+    unsigned int length()   const { return hash_length_ + suffix_length_; }
+    unsigned int position() const { return position_;                     }
+    operator     bool()     const { return position_ < length();          }
+
+    char operator*() const {
+      return (position_ < hash_length_)
+        ? GetHashChar()
+        : GetSuffixChar();
+    }
+
+   protected:
+    char GetHashChar() const {
+      assert (position_ < hash_length_);
+      return ToHex(((position_ % 2) == 0)
+        ? digest_.digest[position_ / 2] / 16
+        : digest_.digest[position_ / 2] % 16);
+    }
+
+    char GetSuffixChar() const {
+      assert (position_ >= hash_length_);
+      return kSuffixes[digest_.algorithm][position_ - hash_length_];
+    }
+
+    char ToHex(const char c) const { return c + ((c <= 9) ? '0' : 'a' - 10); }
+
+   private:
+    const Digest<digest_size_, algorithm_>  &digest_;
+    const unsigned int                       hash_length_;
+    const unsigned int                       suffix_length_;
+    unsigned int                             position_;
+  };
 
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
   unsigned GetHexSize() const {
     return 2*kDigestSizes[algorithm] + kSuffixLengths[algorithm];
   }
 
-  Digest() {
-    algorithm = algorithm_;
+  Digest() :
+    algorithm(algorithm_), suffix(0)
+  {
     memset(digest, 0, digest_size_);
   }
 
-  explicit Digest(const Algorithms a, const HexPtr hex) {
-    algorithm = a;
+  explicit Digest(const Algorithms a, const HexPtr hex, const char s = 0) :
+    algorithm(a), suffix(s)
+  {
     assert((algorithm_ == kAny) || (a == algorithm_));
     const unsigned char_size = 2*kDigestSizes[a];
 
@@ -117,9 +178,10 @@ struct Digest {
   }
 
   Digest(const Algorithms a,
-         const unsigned char *digest_buffer, const unsigned buffer_size)
+         const unsigned char *digest_buffer, const unsigned buffer_size,
+         const char s = 0) :
+    algorithm(a), suffix(s)
   {
-    algorithm = a;
     assert(buffer_size <= digest_size_);
     memcpy(digest, digest_buffer, buffer_size);
   }
@@ -152,62 +214,83 @@ struct Digest {
    *
    * @param prng  random number generator object (for external reproducability)
    */
-  void Randomize(Prng prng) {
+  void Randomize(Prng &prng) {
     const unsigned bytes = GetDigestSize();
     for (unsigned i = 0; i < bytes; ++i) {
       digest[i] = prng.Next(256);
     }
   }
 
-  std::string ToString() const {
-    const unsigned string_length = GetHexSize();
+  bool HasSuffix() const { return suffix != kSuffixNone; }
+
+  std::string ToString(const bool with_suffix = false) const {
+    Hexifier hexifier(this);
+    const bool     use_suffix    = with_suffix && HasSuffix();
+    const unsigned string_length = hexifier.length() + use_suffix;
     std::string result(string_length, 0);
 
-    unsigned i;
-    for (i = 0; i < kDigestSizes[algorithm]; ++i) {
-      char dgt1 = (unsigned)digest[i] / 16;
-      char dgt2 = (unsigned)digest[i] % 16;
-      dgt1 += (dgt1 <= 9) ? '0' : 'a' - 10;
-      dgt2 += (dgt2 <= 9) ? '0' : 'a' - 10;
-      result[i*2] = dgt1;
-      result[i*2+1] = dgt2;
+    for (; hexifier; ++hexifier) {
+      result[hexifier.position()] = *hexifier;
     }
-    unsigned pos = i*2;
-    for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
-      result[pos] = *s;
-      pos++;
+
+    if (use_suffix) {
+      result[string_length - 1] = suffix;
     }
+
+    assert (result.length() == string_length);
+
     return result;
+  }
+
+  std::string ToStringWithSuffix() const {
+    return ToString(true);
+  }
+
+  std::string MakePath(const std::string &prefix = "data") const {
+    return MakePathExplicit(1, 2, prefix);
+  }
+
+  std::string MakePathWithSuffix(const std::string &prefix = "data") const {
+    return MakePathExplicit(1, 2, prefix, true);
   }
 
   /**
    * Create a path string from the hex notation of the digest.
    */
-  std::string MakePath(const unsigned dir_levels,
-                       const unsigned digits_per_level) const
+  std::string MakePathExplicit(const unsigned      dir_levels,
+                               const unsigned      digits_per_level,
+                               const std::string  &prefix = "",
+                               const bool          with_suffix = false) const
   {
-    const unsigned string_length = GetHexSize() + dir_levels + 1;
-    std::string result(string_length, 0);
+    Hexifier hexifier(this);
+    const bool use_suffix = with_suffix && HasSuffix();
 
-    unsigned i = 0, pos = 0;
-    while (i < 2*kDigestSizes[algorithm]) {
-      if (((i % digits_per_level) == 0) &&
-          ((i / digits_per_level) <= dir_levels))
+    const unsigned string_length =   prefix.length()
+                                   + hexifier.length()
+                                   + dir_levels
+                                   + 1 // slash between prefix and hash
+                                   + use_suffix;
+    // prepend prefix string
+    std::string result(prefix);
+    result.resize(string_length);
+
+    // build hexified hash and path delimiters
+    unsigned pos = prefix.length();
+    for (; hexifier; ++hexifier) {
+      if (((hexifier.position() % digits_per_level) == 0) &&
+          ((hexifier.position() / digits_per_level) <= dir_levels))
       {
-        result[pos] = '/';
-        ++pos;
+        result[pos++] = '/';
       }
-      char digit = ((i % 2) == 0) ? digest[i/2] / 16 : digest[i/2] % 16;
-      digit += (digit <= 9) ? '0' : 'a' - 10;
-      result[pos] = digit;
-      ++pos;
-      ++i;
-    }
-    for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
-      result[pos] = *s;
-      pos++;
+      result[pos++] = *hexifier;
     }
 
+    // (optionally) add hash hint suffix
+    if (use_suffix) {
+      result[pos++] = suffix;
+    }
+
+    assert (pos == string_length);
     return result;
   }
 
@@ -246,7 +329,7 @@ struct Digest {
   bool operator >(const Digest<digest_size_, algorithm_> &other) const {
     if (this->algorithm != other.algorithm)
       return (this->algorithm > other.algorithm);
-    for (int i = 0; i < kDigestSizes[algorithm]; ++i) {
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
       if (this->digest[i] < other.digest[i])
         return false;
       if (this->digest[i] > other.digest[i])
@@ -281,11 +364,12 @@ struct Rmd160 : public Digest<20, kRmd160> { };
 struct Any : public Digest<20, kAny> {
   Any() : Digest<20, kAny>() { }
   explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
-  Any(const Algorithms a,
-      const unsigned char *digest_buffer, const unsigned buffer_size)
-    : Digest<20, kAny>(a, digest_buffer, buffer_size) { }
-  explicit Any(const Algorithms a, const HexPtr hex) :
-    Digest<20, kAny>(a, hex) { }
+  Any(const Algorithms     a,
+      const unsigned char *digest_buffer, const unsigned buffer_size,
+      const char           suffix = kSuffixNone) :
+    Digest<20, kAny>(a, digest_buffer, buffer_size, suffix) { }
+  explicit Any(const Algorithms a, const HexPtr hex, const char suffix = 0) :
+    Digest<20, kAny>(a, hex, suffix) { }
 };
 
 
@@ -338,7 +422,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
-Any MkFromHexPtr(const HexPtr hex);
+Any MkFromHexPtr(const HexPtr hex, const char suffix = kSuffixNone);
 
 }  // namespace hash
 

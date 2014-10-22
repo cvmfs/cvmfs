@@ -233,7 +233,8 @@ Tag SqlTag::RetrieveTag() {
   Tag result;
   result.name = string(reinterpret_cast<const char *>(RetrieveText(0)));
   const string hash_str(reinterpret_cast<const char *>(RetrieveText(1)));
-  result.root_hash = shash::MkFromHexPtr(shash::HexPtr(hash_str));
+  result.root_hash = shash::MkFromHexPtr(shash::HexPtr(hash_str),
+                                         shash::kSuffixCatalog);
   result.revision = RetrieveInt64(2);
   result.timestamp = RetrieveInt64(3);
   result.channel = static_cast<UpdateChannel>(RetrieveInt64(4));

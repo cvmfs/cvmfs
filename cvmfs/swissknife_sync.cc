@@ -247,7 +247,8 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
 
   // initialize catalog infrastructure
   g_download_manager->Init(1, true);
-  const shash::Any base_hash = shash::MkFromHexPtr(shash::HexPtr(base_hash_str));
+  const shash::Any base_hash = shash::MkFromHexPtr(shash::HexPtr(base_hash_str),
+                                                   shash::kSuffixCatalog);
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
@@ -525,7 +526,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   g_download_manager->Init(1, true);
 
   catalog::WritableCatalogManager
-    catalog_manager(shash::MkFromHexPtr(shash::HexPtr(params.base_hash)),
+    catalog_manager(shash::MkFromHexPtr(shash::HexPtr(params.base_hash),
+                                        shash::kSuffixCatalog),
                     params.stratum0, params.dir_temp, params.spooler,
                     g_download_manager, params.catalog_entry_warn_threshold);
   catalog_manager.Init();

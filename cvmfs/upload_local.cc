@@ -192,7 +192,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
   }
 
   const std::string final_path = upstream_path_ + "/data" +
-                                 content_hash.MakePath(1, 2) +
+                                 content_hash.MakePathExplicit(1, 2) +
                                  hash_suffix;
 
   retval = rename(local_handle->temporary_path.c_str(), final_path.c_str());

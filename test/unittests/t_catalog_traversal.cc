@@ -11,7 +11,7 @@
 using namespace swissknife;
 
 static const std::string rhs        = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
-static const shash::Any  root_hash  = shash::Any(shash::kSha1, shash::HexPtr(rhs));
+static const shash::Any  root_hash  = shash::Any(shash::kSha1, shash::HexPtr(rhs), 'C');
 static history::TagList *g_tag_list = NULL; // needs to be global to 'mimic' the
                                             // real world, where the repo itself
                                             // is 'global'
@@ -324,11 +324,11 @@ class T_CatalogTraversal : public ::testing::Test {
      */
 
     RootCatalogMap root_catalogs;
-    root_catalogs[1] = h("d01c7fa072d3957ea5dd323f79fa435b33375c06");
-    root_catalogs[2] = h("ffee2bf068f3c793efa6ca0fa3bddb066541903b");
-    root_catalogs[3] = h("c9e011bbf7529d25c958bc0f948eefef79e991cd");
-    root_catalogs[4] = h("eec5694dfe5f2055a358acfb4fda7748c896df24");
-    root_catalogs[5] = h("3c726334c98537e92c8b92b76852f77e3a425be9");
+    root_catalogs[1] = h("d01c7fa072d3957ea5dd323f79fa435b33375c06", 'C');
+    root_catalogs[2] = h("ffee2bf068f3c793efa6ca0fa3bddb066541903b", 'C');
+    root_catalogs[3] = h("c9e011bbf7529d25c958bc0f948eefef79e991cd", 'C');
+    root_catalogs[4] = h("eec5694dfe5f2055a358acfb4fda7748c896df24", 'C');
+    root_catalogs[5] = h("3c726334c98537e92c8b92b76852f77e3a425be9", 'C');
     root_catalogs[6] = root_hash;
     root_catalogs_ = root_catalogs;
 
@@ -457,6 +457,7 @@ class T_CatalogTraversal : public ::testing::Test {
                   const shash::Any   &catalog_hash = shash::Any(shash::kSha1)) {
     // produce a random hash if no catalog has was given
     shash::Any effective_clg_hash = catalog_hash;
+    effective_clg_hash.suffix = 'C';
     if (effective_clg_hash.IsNull()) {
       effective_clg_hash.Randomize(dice_);
     }
@@ -492,8 +493,8 @@ class T_CatalogTraversal : public ::testing::Test {
     return catalog;
   }
 
-  shash::Any h(const std::string &hash) {
-    return shash::Any(shash::kSha1, shash::HexPtr(hash));
+  shash::Any h(const std::string &hash, const char suffix = 0) {
+    return shash::Any(shash::kSha1, shash::HexPtr(hash), suffix);
   }
 
   time_t t(const int day, const int month, const int year) const {
