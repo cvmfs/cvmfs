@@ -605,6 +605,15 @@ is_root() {
   [ $(id -u) -eq 0 ]
 }
 
+# checks if the running user is either the owner of a repository or root
+#
+# @param name  the name of the repository
+is_owner_or_root() {
+  local name="$1"
+  is_root && return 0
+  load_repo_config $name
+  [ x"$(whoami)" = x"$CVMFS_USER" ]
+}
 
 # create a shell invocation to be used by commands to impersonate the owner of
 # a specific CVMFS repository.
@@ -3035,8 +3044,10 @@ transaction() {
     load_repo_config $name
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
+    user=$CVMFS_USER
 
     # more sanity checks
+    is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
     if [ $force -eq 0 ]; then
       is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
@@ -3098,6 +3109,7 @@ abort() {
     spool_dir=$CVMFS_SPOOL_DIR
 
     # more sanity checks
+    is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
     is_in_transaction $name || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
@@ -3235,6 +3247,7 @@ publish() {
     local swissknife="cvmfs_swissknife"
 
     # more sanity checks
+    is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
     check_expiry $stratum0         || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
@@ -3436,6 +3449,7 @@ rollback() {
   upstream=$CVMFS_UPSTREAM_STORAGE
 
   # more sanity checks
+  is_owner_or_root $name || die "Permission denied: Repository $name is owned by $user"
   check_repository_compatibility
   check_expiry $stratum0  || die "Repository whitelist is expired!"
   is_in_transaction $name || die "Not in a transaction"
@@ -3547,6 +3561,7 @@ snapshot() {
     retries=$CVMFS_HTTP_RETRIES
 
     # more sanity checks
+    is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
     if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
         # this might have been missed if add-replica -a was used or
@@ -3821,6 +3836,7 @@ migrate() {
     load_repo_config $name
 
     # more sanity checks
+    is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
     health_check $name
 
