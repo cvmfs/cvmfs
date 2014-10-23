@@ -606,6 +606,11 @@ is_root() {
 }
 
 
+# create a shell invocation to be used by commands to impersonate the owner of
+# a specific CVMFS repository.
+#
+# @param name   the name of the repository whose owner should be impersonated
+# @return       a shell invocation to impersonate $CVMFS_USER
 get_user_shell() {
   local name=$1
 
