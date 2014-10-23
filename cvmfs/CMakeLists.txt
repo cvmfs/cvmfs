@@ -418,7 +418,7 @@ if (BUILD_CVMFS)
   install (
     FILES         bash_completion/cvmfs.bash_completion
     RENAME        cvmfs
-    DESTINATION   /etc/bash_completion.d
+    DESTINATION   etc/bash_completion.d
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
