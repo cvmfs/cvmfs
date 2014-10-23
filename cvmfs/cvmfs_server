@@ -235,6 +235,11 @@ Supported Commands:
                 Print a full list of all nested catalogs of a repository
   info          <fully qualified name>
                 Print summary about the repository
+  tag           Create and manage named snapshots
+                [-a create tag <name>] [-c channel] [-t message] [-h root hash]
+                [-r remove tag <name>] [-f don't ask again]
+                [-l list tags (alias for list-tags)]
+                <fully qualified name>
   list-tags     <fully qualified name>
                 Print named tags (snapshots) of the repository
   check         [-c disable data chunk existence check]
