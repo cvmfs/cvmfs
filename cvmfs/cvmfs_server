@@ -1739,7 +1739,8 @@ cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${nam
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   fi
-  sudo -H -u $cvmfs_user sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
+  local user_shell="$(get_user_shell $name)"
+  $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
 }
@@ -2174,12 +2175,13 @@ mkfs() {
     volatile_opt="-v"
     echo -n "(repository flagged volatile)... "
   fi
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
+  local user_shell=$(get_user_shell $name)
+  $user_shell "cvmfs_swissknife create \
     -t $temp_dir \
     -r $upstream \
     -a $hash_algo $volatile_opt \
     -o ${temp_dir}/new_manifest" > /dev/null || die "fail! (cannot init repo)"
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
+  $user_shell "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
@@ -2556,7 +2558,8 @@ import() {
 
     # sign new (migrated) repository revision
     echo -n "Signing newly imported Repository... "
-    sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
+    local user_shell="$(get_user_shell $name)"
+    $user_shell "cvmfs_swissknife sign \
       -c /etc/cvmfs/keys/${certificate} \
       -k /etc/cvmfs/keys/${private_key} \
       -n $name \
@@ -3674,12 +3677,13 @@ migrate_2_1_7() {
 
   # get repository information
   load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
 
   echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string $destination_version)"
 
   if [ ! -f ${CVMFS_SPOOL_DIR}/client.local ]; then
     echo "--> creating client.local"
-    sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local" || die "fail!"
+    $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local" || die "fail!"
   fi
 
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
@@ -3715,7 +3719,7 @@ migrate_2_1_7() {
   # sign new (migrated) repository revision
   echo -n "Signing newly imported Repository... "
   create_whitelist $name ${CVMFS_USER} ${CVMFS_UPSTREAM_STORAGE} $temp_dir > /dev/null
-  sudo -H -u ${CVMFS_USER} sh -c "cvmfs_swissknife sign \
+  $user_shell "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/$name.crt \
     -k /etc/cvmfs/keys/$name.key \
     -n $name \
