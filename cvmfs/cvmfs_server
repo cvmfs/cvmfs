@@ -3371,6 +3371,7 @@ abort() {
     # sanity checks
     is_stratum0 $name   || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
     is_publishing $name && { echo "Repository $name is currently published (aborting abort)"; retcode=1; continue; }
+    health_check $name
 
     # get repository information
     load_repo_config $name
@@ -3478,8 +3479,8 @@ publish() {
 
     # sanity checks
     is_stratum0 $name   || die "This is not a stratum 0 repository"
-    health_check $name
     is_publishing $name && die "Another publish process is active for $name"
+    health_check $name
 
     # get repository information
     load_repo_config $name
@@ -3705,8 +3706,8 @@ rollback() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
-  health_check $name
   is_publishing $name              && die "Repository $name is currently being published"
+  health_check $name
 
   # get repository information
   load_repo_config $name
