@@ -3565,7 +3565,7 @@ snapshot() {
     fi
 
     # put a magic file in the repository root to signal a snapshot in progress
-    $user_shell "sh -c \"date > ${spool_dir}/tmp/snapshotting\""
+    $user_shell "date > ${spool_dir}/tmp/snapshotting"
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/snapshotting \
       -o .cvmfs_is_snapshotting"
@@ -3585,7 +3585,7 @@ snapshot() {
         -n $num_workers \
         -t $timeout \
         -a $retries $with_history $log_level"
-    $user_shell "sh -c \"date > ${spool_dir}/tmp/last_snapshot\""
+    $user_shell "date > ${spool_dir}/tmp/last_snapshot"
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot \
       -o .cvmfs_last_snapshot"
