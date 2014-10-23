@@ -117,8 +117,8 @@ cvmfs_mkfqrn() {
 is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
-    resign list info list-tags lstags check transaction abort snapshot skeleton \
-    migrate list-catalogs update-geodb"
+    resign list info tag list-tags lstags check transaction abort snapshot \
+    skeleton migrate list-catalogs update-geodb"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -2867,6 +2867,98 @@ Create /etc/cvmfs/config.d/${name}.conf and set
   CVMFS_SERVER_URL=$stratum0
   CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
 Copy /etc/cvmfs/keys/${name}.pub to the client"
+}
+
+
+################################################################################
+
+
+tag() {
+  local name
+  local tag_name=""
+  local action_add=0
+  local add_tag_channel
+  local add_tag_description
+  local add_tag_root_hash
+  local action_remove=0
+  local remove_tag_force=0
+  local action_list=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "a:c:t:h:r:f:l" option
+  do
+    case $option in
+      a)
+        tag_name="$OPTARG"
+        action_add=1
+      ;;
+      c)
+        add_tag_channel=$OPTARG
+        ;;
+      t)
+        add_tag_description="$OPTARG"
+        ;;
+      h)
+        add_tag_root_hash=$OPTARG
+        ;;
+      r)
+        tag_name="$OPTARG"
+        action_remove=1
+        ;;
+      f)
+        remove_tag_force=$OPTARG
+        ;;
+      l)
+        action_list=1
+        ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command tag: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # check for ambiguous action requests
+  local actions=$(( $action_remove + $action_list + $action_add ))
+  [ $actions -le 1 ] || die "Ambiguous parameters. Please either add, remove or list tags."
+
+  # check for the alias of `cvmfs_server list-tags`
+  if [ $action_list -eq 1 ] || [ $actions -eq 0 ]; then
+    list_tags $name
+    exit $?
+  fi
+
+  # sanity checks
+  load_repo_config $name
+  is_owner_or_root $name            || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  is_stratum0 $name                 || die "This is not a stratum 0 repository"
+  ! is_publishing $name             || die "Repository is currently publishing"
+  [ ! -z "$tag_name" ]              || die "Tag name missing"
+  echo "$tag_name" | grep -q -v " " || die "Spaces are not allowed in tag names"
+  health_check $name
+
+  local base_hash="$(get_mounted_root_hash $name)"
+  local base_tag_command="$swissknife tag -r $CVMFS_STRATUM0 \
+    -b $base_hash                                       \
+    -n $name                                            \
+    -o ${CVMFS_SPOOL_DIR}/tmp/history                   \
+    -k /etc/cvmfs/keys/${name}.pub                      \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
+
+
+  if [ $action_add -eq 1 ]; then
+    echo $base_tag_command
+  fi
+
+  if [ $action_remove -eq 1 ]; then
+    echo $base_tag_command
+  fi
 }
 
 
