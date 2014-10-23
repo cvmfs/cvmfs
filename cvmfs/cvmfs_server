@@ -606,6 +606,16 @@ is_root() {
 }
 
 
+get_user_shell() {
+  local name=$1
+
+  load_repo_config $name
+  local user_shell="sh -c"
+  [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
+  echo "$user_shell"
+}
+
+
 # checks if a given path is mounted
 # Note: this takes care of symlink resolving and should be
 #       used exclusively for mount checks
