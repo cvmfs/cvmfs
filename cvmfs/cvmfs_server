@@ -3273,8 +3273,7 @@ publish() {
     fi
 
     # prepare the commands to be used for the publishing later
-    local user_shell="sh -c"
-    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    local user_shell="$(get_user_shell $name)"
 
     local base_hash=$(get_mounted_root_hash $name)
     local dirtab_command="$swissknife dirtab $verbosity \
@@ -3446,9 +3445,7 @@ rollback() {
   # prepare the shell commands
   local swissknife="cvmfs_swissknife"
 
-  local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
-
+  local user_shell="$(get_user_shell $name)"
   local base_hash=$(get_mounted_root_hash $name)
 
   local rollback_command="$swissknife rollback -u $stratum0 \
@@ -3553,8 +3550,7 @@ snapshot() {
     fi
 
     # do it!
-    local user_shell="sh -c"
-    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    local user_shell="$(get_user_shell $name)"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
