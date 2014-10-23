@@ -606,6 +606,21 @@ is_root() {
 }
 
 
+# create a shell invocation to be used by commands to impersonate the owner of
+# a specific CVMFS repository.
+#
+# @param name   the name of the repository whose owner should be impersonated
+# @return       a shell invocation to impersonate $CVMFS_USER
+get_user_shell() {
+  local name=$1
+
+  load_repo_config $name
+  local user_shell="sh -c"
+  [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
+  echo "$user_shell"
+}
+
+
 # checks if a given path is mounted
 # Note: this takes care of symlink resolving and should be
 #       used exclusively for mount checks
@@ -1729,7 +1744,8 @@ cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${nam
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   fi
-  sudo -H -u $cvmfs_user sh -c "touch ${CVMFS_SPOOL_DIR}/client.local"
+  local user_shell="$(get_user_shell $name)"
+  $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local"
   mount $rdonly_dir > /dev/null || return 1
   mount /cvmfs/$name
 }
@@ -2164,12 +2180,13 @@ mkfs() {
     volatile_opt="-v"
     echo -n "(repository flagged volatile)... "
   fi
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife create \
+  local user_shell=$(get_user_shell $name)
+  $user_shell "cvmfs_swissknife create \
     -t $temp_dir \
     -r $upstream \
     -a $hash_algo $volatile_opt \
     -o ${temp_dir}/new_manifest" > /dev/null || die "fail! (cannot init repo)"
-  sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
+  $user_shell "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/${name}.crt \
     -k /etc/cvmfs/keys/${name}.key \
     -n $name \
@@ -2546,7 +2563,8 @@ import() {
 
     # sign new (migrated) repository revision
     echo -n "Signing newly imported Repository... "
-    sudo -H -u $cvmfs_user sh -c "cvmfs_swissknife sign \
+    local user_shell="$(get_user_shell $name)"
+    $user_shell "cvmfs_swissknife sign \
       -c /etc/cvmfs/keys/${certificate} \
       -k /etc/cvmfs/keys/${private_key} \
       -n $name \
@@ -3263,8 +3281,7 @@ publish() {
     fi
 
     # prepare the commands to be used for the publishing later
-    local user_shell="sh -c"
-    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    local user_shell="$(get_user_shell $name)"
 
     local base_hash=$(get_mounted_root_hash $name)
     local dirtab_command="$swissknife dirtab $verbosity \
@@ -3436,9 +3453,7 @@ rollback() {
   # prepare the shell commands
   local swissknife="cvmfs_swissknife"
 
-  local user_shell="sh -c"
-  [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
-
+  local user_shell="$(get_user_shell $name)"
   local base_hash=$(get_mounted_root_hash $name)
 
   local rollback_command="$swissknife rollback -u $stratum0 \
@@ -3543,8 +3558,7 @@ snapshot() {
     fi
 
     # do it!
-    local user_shell="sh -c"
-    [ $(whoami) != $user ] && user_shell="sudo -E -H -u $user sh -c"
+    local user_shell="$(get_user_shell $name)"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
@@ -3556,7 +3570,7 @@ snapshot() {
     fi
 
     # put a magic file in the repository root to signal a snapshot in progress
-    $user_shell "sh -c \"date > ${spool_dir}/tmp/snapshotting\""
+    $user_shell "date > ${spool_dir}/tmp/snapshotting"
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/snapshotting \
       -o .cvmfs_is_snapshotting"
@@ -3576,7 +3590,7 @@ snapshot() {
         -n $num_workers \
         -t $timeout \
         -a $retries $with_history $log_level"
-    $user_shell "sh -c \"date > ${spool_dir}/tmp/last_snapshot\""
+    $user_shell "date > ${spool_dir}/tmp/last_snapshot"
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot \
       -o .cvmfs_last_snapshot"
@@ -3668,12 +3682,13 @@ migrate_2_1_7() {
 
   # get repository information
   load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
 
   echo "Migrating repository '$name' from CernVM-FS $CVMFS_CREATOR_VERSION to $(mangle_version_string $destination_version)"
 
   if [ ! -f ${CVMFS_SPOOL_DIR}/client.local ]; then
     echo "--> creating client.local"
-    sudo -H -u $CVMFS_USER sh -c "touch ${CVMFS_SPOOL_DIR}/client.local" || die "fail!"
+    $user_shell "touch ${CVMFS_SPOOL_DIR}/client.local" || die "fail!"
   fi
 
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
@@ -3709,7 +3724,7 @@ migrate_2_1_7() {
   # sign new (migrated) repository revision
   echo -n "Signing newly imported Repository... "
   create_whitelist $name ${CVMFS_USER} ${CVMFS_UPSTREAM_STORAGE} $temp_dir > /dev/null
-  sudo -H -u ${CVMFS_USER} sh -c "cvmfs_swissknife sign \
+  $user_shell "cvmfs_swissknife sign \
     -c /etc/cvmfs/keys/$name.crt \
     -k /etc/cvmfs/keys/$name.key \
     -n $name \
