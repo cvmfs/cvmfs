@@ -1136,6 +1136,17 @@ health_check() {
     return 0
   fi
 
+  # health check cannot deal with repositories currently being published
+  if is_publishing $name; then
+    echo "WARNING: The repository $name is currently publishing and should not"
+    echo "be touched. If you are absolutely sure, that this is _not_ the case,"
+    echo "please run the following command and retry:"
+    echo
+    echo "   rm -fR ${CVMFS_SPOOL_DIR}/is_publishing"
+    echo
+    exit 1
+  fi
+
   # check configuration for harzardous AUFS setup
   if [ $quiet -eq 0 ] && find_hazardous_aufs_config $name; then
     load_repo_config $name
