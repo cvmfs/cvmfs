@@ -50,6 +50,11 @@ DerivedT* Database<DerivedT>::Create(const std::string &filename) {
     return NULL;
   }
 
+  if (! database->PreparePropertiesQueries()) {
+    database->PrintSqlError("Failed to initialize properties queries");
+    return NULL;
+  }
+
   if (! database->StoreSchemaRevision()) {
     database->PrintSqlError("Failed to store initial schema revision");
     return NULL;
@@ -77,15 +82,16 @@ bool Database<DerivedT>::Initialize() {
   const int flags = (read_write_) ? SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE
                                   : SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
-  const bool successful = OpenDatabase(flags) &&
-                          FileReadAhead()     &&
-                          ReadSchemaRevision();
+  const bool successful = OpenDatabase(flags)        &&
+                          FileReadAhead()            &&
+                          PreparePropertiesQueries();
   if (! successful) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open database file '%s'",
                                  filename_.c_str());
     return false;
   }
 
+  ReadSchemaRevision();
   LogCvmfs(kLogSql, kLogDebug, "opened database with schema version %f "
                                "and revision %u",
                                schema_version_, schema_revision_);
@@ -158,6 +164,18 @@ bool Database<DerivedT>::FileReadAhead() {
 
 
 template <class DerivedT>
+bool Database<DerivedT>::PreparePropertiesQueries() {
+  has_property_ = new Sql(sqlite_db_, "SELECT count(*) FROM properties "
+                                      "WHERE key = :key;");
+  get_property_ = new Sql(sqlite_db_, "SELECT value FROM properties "
+                                      "WHERE key = :key;");
+  set_property_ = new Sql(sqlite_db_, "INSERT OR REPLACE INTO properties "
+                                      "(key, value) VALUES (:key, :value);");
+  return (has_property_ && get_property_ && set_property_);
+}
+
+
+template <class DerivedT>
 bool Database<DerivedT>::ReadSchemaRevision() {
   Sql sql_schema(this->sqlite_db(),
                  "SELECT value FROM properties WHERE key='schema';");
@@ -195,35 +213,36 @@ bool Database<DerivedT>::CreatePropertiesTable() {
 
 template <class DerivedT>
 bool Database<DerivedT>::HasProperty(const std::string &key) const {
-  Sql has_property(sqlite_db_, "SELECT count(*) FROM properties "
-                               "WHERE key = :key;");
-  const bool retval = has_property.BindText(1, key) &&
-                      has_property.FetchRow();
+  assert (has_property_ && ! has_property_->IsBusy());
+  const bool retval = has_property_->BindText(1, key) &&
+                      has_property_->FetchRow();
   assert (retval);
-  return has_property.RetrieveInt64(0) > 0;
+  const bool result = has_property_->RetrieveInt64(0) > 0;
+  has_property_->Reset();
+  return result;
 }
 
-
 template <class DerivedT>
-std::string Database<DerivedT>::GetProperty(const std::string &key) const {
-  Sql get_property(sqlite_db_, "SELECT value FROM properties "
-                               "WHERE key = :key;");
-  const bool retval = get_property.BindText(1, key) &&
-                      get_property.FetchRow();
+template <typename T>
+T Database<DerivedT>::GetProperty(const std::string &key) const {
+  assert (get_property_ && ! get_property_->IsBusy());
+  const bool retval = get_property_->BindText(1, key);
+                      get_property_->FetchRow();
   assert (retval);
-  return get_property.RetrieveText(0);
+  const T result = get_property_->Retrieve<T>(0);
+  get_property_->Reset();
+  return result;
 }
 
-
 template <class DerivedT>
+template <typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key,
-                                     const std::string &value) {
-  assert (read_write_);
-  Sql set_property(sqlite_db_, "INSERT OR REPLACE INTO properties (key, value) "
-                               "VALUES (:key, :value);");
-  return set_property.BindText(1, key)   &&
-         set_property.BindText(2, value) &&
-         set_property.Execute();
+                                     const T            value) {
+  assert (set_property_ && ! set_property_->IsBusy());
+  return set_property_->BindText(1, key) &&
+         set_property_->Bind(2, value)   &&
+         set_property_->Execute()        &&
+         set_property_->Reset();
 }
 
 
@@ -270,6 +289,10 @@ void Database<DerivedT>::PrintSqlError(const std::string &error_msg) {
 
 template <class DerivedT>
 const float Database<DerivedT>::kSchemaEpsilon = 0.0005;
+template <class DerivedT>
+const std::string Database<DerivedT>::kSchemaVersionKey = "schema";
+template <class DerivedT>
+const std::string Database<DerivedT>::kSchemaRevisionKey = "schema_revision";
 
 
 //
@@ -277,15 +300,14 @@ const float Database<DerivedT>::kSchemaEpsilon = 0.0005;
 //
 
 
-template <typename T>
-inline bool Sql::Bind(const int index, const T value) {
-  const bool not_implemented = false;
-  assert (not_implemented && "your data type is not implemented!");
-}
-
 template <>
 inline bool Sql::Bind(const int index, const int value) {
   return this->BindInt64(index, value);
+}
+
+template <>
+inline bool Sql::Bind(const int index, const unsigned int value) {
+  return this->BindInt64(index, static_cast<int>(value));
 }
 
 template <>
@@ -304,20 +326,19 @@ inline bool Sql::Bind(const int index, const char *value) {
 }
 
 template <>
+inline bool Sql::Bind(const int index, const float value) {
+  return this->BindDouble(index, value);
+}
+
+template <>
 inline bool Sql::Bind(const int index, const double value) {
   return this->BindDouble(index, value);
 }
 
 
-template <typename T>
-T Sql::Retrieve(const int index) {
-  const bool not_implemented = false;
-  assert (not_implemented && "your data type is not implemented!");
-}
-
 template <>
 inline int Sql::Retrieve(const int index) {
-  return this->RetrieveInt(index);
+  return this->RetrieveInt64(index);
 }
 
 template <>
@@ -328,6 +349,11 @@ inline sqlite3_int64 Sql::Retrieve(const int index) {
 template <>
 inline std::string Sql::Retrieve(const int index) {
   return reinterpret_cast<const char *>(this->RetrieveText(index));
+}
+
+template <>
+inline float Sql::Retrieve(const int index) {
+  return this->RetrieveDouble(index);
 }
 
 template <>

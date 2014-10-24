@@ -11,6 +11,8 @@
 
 namespace sqlite {
 
+class Sql;
+
 /**
  * Encapsulates an SQlite connection.
  *
@@ -65,6 +67,10 @@ class Database : SingleCopy {
     kOpenReadWrite,
   };
 
+ private:
+  static const std::string kSchemaVersionKey;
+  static const std::string kSchemaRevisionKey;
+
  public:
   static const float kSchemaEpsilon;  // floats get imprecise in SQlite
 
@@ -103,9 +109,11 @@ class Database : SingleCopy {
             value < compare + kSchemaEpsilon);
   }
 
-  bool        HasProperty(const std::string &key) const;
-  std::string GetProperty(const std::string &key) const;
-  bool        SetProperty(const std::string &key, const std::string &value);
+  template <typename T>
+  T GetProperty(const std::string &key) const;
+  template <typename T>
+  bool SetProperty(const std::string &key, const T value);
+  bool HasProperty(const std::string &key) const;
 
   sqlite3     *sqlite_db()       const { return sqlite_db_;       }
   std::string  filename()        const { return filename_;        }
@@ -158,11 +166,13 @@ class Database : SingleCopy {
   bool Initialize();
 
   bool CreatePropertiesTable();
+  bool PreparePropertiesQueries();
 
   bool OpenDatabase(const int sqlite_open_flags);
   bool FileReadAhead();
-  bool ReadSchemaRevision();
-  bool StoreSchemaRevision() const;
+
+  void ReadSchemaRevision();
+  bool StoreSchemaRevision();
 
   void set_schema_version(const float ver)     { schema_version_  = ver; }
   void set_schema_revision(const unsigned rev) { schema_revision_ = rev; }
@@ -173,6 +183,10 @@ class Database : SingleCopy {
   const bool          read_write_;
   float               schema_version_;
   unsigned            schema_revision_;
+
+  UniquePtr<Sql>      has_property_;
+  UniquePtr<Sql>      set_property_;
+  UniquePtr<Sql>      get_property_;
 };
 
 
