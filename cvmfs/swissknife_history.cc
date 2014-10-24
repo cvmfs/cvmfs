@@ -77,31 +77,25 @@ static bool GetHistoryDbHash(const string &repository_url,
 }
 
 
-static bool FetchTagList(const string &repository_url,
-                         const shash::Any &history_hash,
-                         const std::string tmp_path,
-                         history::Database *history_db,
-                         history::TagList *tag_list)
-{
-  int retval;
-  download::Failures dl_retval;
+static bool FetchHistoryDatabase(const string              &repository_url,
+                                 const shash::Any          &history_hash,
+                                 const std::string          tmp_path) {
+  assert (! history_hash.IsNull());
 
-  if (!history_hash.IsNull()) {
-    const string url = repository_url + "/data" +
-      history_hash.MakePath(1, 2) + "H";
-    download::JobInfo download_history(&url, true, false, &tmp_path,
-                                       &history_hash);
-    dl_retval = g_download_manager->Fetch(&download_history);
-    if (dl_retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
-               dl_retval, download::Code2Ascii(dl_retval));
-      return false;
-    }
+  download::Failures dl_retval;
+  const string url = repository_url + "/data" +
+    history_hash.MakePath(1, 2) + "H";
+
+  download::JobInfo download_history(&url, true, false, &tmp_path,
+                                     &history_hash);
+  dl_retval = g_download_manager->Fetch(&download_history);
+
+  if (dl_retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
+             dl_retval, download::Code2Ascii(dl_retval));
+    return false;
   }
-  retval = history_db->Open(tmp_path, sqlite::kDbOpenReadWrite);
-  assert(retval);
-  retval = tag_list->Load(history_db);
-  assert(retval);
+
   return true;
 }
 
@@ -148,7 +142,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   if (args.find('l') != args.end())
     list_only = true;
   shash::Any history_hash;
-  history::Database tag_db;
+  history::HistoryDatabase *tag_db;
   history::TagList tag_list;
   int retval;
 
@@ -182,16 +176,36 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
       result = 0;
       goto tag_fini;
     }
-    retval = history::Database::Create(history_path, repository_name);
-    if (!retval) {
+    tag_db = history::HistoryDatabase::Create(history_path);
+    if (NULL == tag_db) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to create history database");
       goto tag_fini;
     }
+    if (! tag_db->InsertInitialValues(repository_name)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize history database");
+      delete tag_db;
+      goto tag_fini;
+    }
+  } else {
+    if (! FetchHistoryDatabase(repository_url, history_hash, history_path)) {
+      goto tag_fini;
+    }
+
+    tag_db =
+      history::HistoryDatabase::Open(history_path,
+                                     history::HistoryDatabase::kOpenReadWrite);
+    if (NULL == tag_db) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
+               history_path.c_str());
+      goto tag_fini;
+    }
   }
-  retval = FetchTagList(repository_url, history_hash, history_path,
-                        &tag_db, &tag_list);
-  if (!retval)
+
+  retval = tag_list.Load(tag_db);
+  if (! retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to read history database");
     goto tag_fini;
+  }
 
   if (list_only) {
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "%s",
@@ -248,7 +262,7 @@ int swissknife::CommandTag::Main(const swissknife::ArgumentList &args) {
   }
 
   //LogCvmfs(kLogCvmfs, kLogStdout, "%s", tag_list.List().c_str());
-  retval = tag_list.Store(&tag_db);
+  retval = tag_list.Store(tag_db);
   assert(retval);
   result = 0;
 
@@ -277,7 +291,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
 
   upload::Spooler *spooler = NULL;
   shash::Any history_hash;
-  history::Database tag_db;
+  history::HistoryDatabase *tag_db;
   history::TagList tag_list;
   history::Tag target_tag;
   history::Tag trunk_tag;
@@ -316,10 +330,25 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStderr, "no history");
     goto rollback_fini;
   }
-  retval = FetchTagList(repository_url, history_hash, history_path,
-                        &tag_db, &tag_list);
-  if (!retval)
+
+  if (! FetchHistoryDatabase(repository_url, history_hash, history_path)) {
     goto rollback_fini;
+  }
+
+  tag_db =
+    history::HistoryDatabase::Open(history_path,
+                                   history::HistoryDatabase::kOpenReadWrite);
+  if (NULL == tag_db) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
+             history_path.c_str());
+    goto rollback_fini;
+  }
+
+  retval = tag_list.Load(tag_db);
+  if (!retval) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to read history database");
+    goto rollback_fini;
+  }
 
   // Verify rollback tag
   retval = tag_list.FindTag(target_tag_name, &target_tag);
@@ -408,7 +437,7 @@ int swissknife::CommandRollback::Main(const swissknife::ArgumentList &args) {
     tag_list.Insert(target_tag);
   tag_list.Insert(trunk_tag);
 
-  retval = tag_list.Store(&tag_db);
+  retval = tag_list.Store(tag_db);
   assert(retval);
   LogCvmfs(kLogHistory, kLogStdout,
            "Previous trunk was %s, previous history database was %s",

@@ -90,7 +90,7 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
 
 class SqlTag : public sqlite::Sql {
  public:
-  SqlTag(const Database &database, const std::string &statement) {
+  SqlTag(const HistoryDatabase &database, const std::string &statement) {
     Init(database.sqlite_db(), statement);
   }
   virtual ~SqlTag() { /* Done by super class */ }
@@ -133,8 +133,8 @@ class TagList {
    */
   std::vector<shash::Any> GetReferencedHashes() const;
 
-  bool Load(Database *database);
-  bool Store(Database *database);
+  bool Load(HistoryDatabase *database);
+  bool Store(HistoryDatabase *database);
  private:
   std::vector<Tag> list_;
 };

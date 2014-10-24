@@ -104,7 +104,7 @@ Tag SqlTag::RetrieveTag() {
 //------------------------------------------------------------------------------
 
 
-bool TagList::Load(Database *database) {
+bool TagList::Load(HistoryDatabase *database) {
   assert(database);
   string size_field = "0";
   if (database->schema_revision() >= 1)
@@ -121,7 +121,7 @@ bool TagList::Load(Database *database) {
 }
 
 
-bool TagList::Store(Database *database) {
+bool TagList::Store(HistoryDatabase *database) {
   assert(database);
   SqlTag sql_erase(*database, "DELETE FROM tags;");
   bool retval = sql_erase.Execute();
