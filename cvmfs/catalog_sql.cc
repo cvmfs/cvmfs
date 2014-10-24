@@ -382,7 +382,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 
 
 string SqlLookup::GetFieldsToSelect(const float schema_version) const {
-  if (schema_version < 2.1-Database::kSchemaEpsilon) {
+  if (schema_version < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     return "catalog.hash, catalog.inode, catalog.size, catalog.mode, "
         //           0              1             2             3
            "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
@@ -434,7 +434,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
 
   // retrieve the hardlink information from the hardlinks database field
-  if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
+  if (catalog->schema() < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     result.linkcount_       = 1;
     result.hardlink_group_  = 0;
     result.inode_           = catalog->GetMangledInode(RetrieveInt64(12), 0);
@@ -480,7 +480,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
 //------------------------------------------------------------------------------
 
 
-SqlListing::SqlListing(const Database &database) {
+SqlListing::SqlListing(const CatalogDatabase &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
@@ -496,7 +496,7 @@ bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlLookupPathHash::SqlLookupPathHash(const Database &database) {
+SqlLookupPathHash::SqlLookupPathHash(const CatalogDatabase &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
@@ -511,7 +511,7 @@ bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlLookupInode::SqlLookupInode(const Database &database) {
+SqlLookupInode::SqlLookupInode(const CatalogDatabase &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE rowid = :rowid;";
@@ -527,7 +527,7 @@ bool SqlLookupInode::BindRowId(const uint64_t inode) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentTouch::SqlDirentTouch(const Database &database) {
+SqlDirentTouch::SqlDirentTouch(const CatalogDatabase &database) {
   const string statement =
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
@@ -562,7 +562,8 @@ bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlNestedCatalogLookup::SqlNestedCatalogLookup(const Database &database) {
+SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
+{
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
       (database.schema_revision() >= 1))
   {
@@ -596,7 +597,8 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
 //------------------------------------------------------------------------------
 
 
-SqlNestedCatalogListing::SqlNestedCatalogListing(const Database &database) {
+SqlNestedCatalogListing::SqlNestedCatalogListing(
+                                              const CatalogDatabase &database) {
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
       (database.schema_revision() >= 1))
   {
@@ -629,7 +631,7 @@ uint64_t SqlNestedCatalogListing::GetSize() const {
 //------------------------------------------------------------------------------
 
 
-SqlDirentInsert::SqlDirentInsert(const Database &database) {
+SqlDirentInsert::SqlDirentInsert(const CatalogDatabase &database) {
   const string statement = "INSERT INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
     //    1           2         3         4       5       6        7     8
@@ -659,7 +661,7 @@ bool SqlDirentInsert::BindDirent(const DirectoryEntry &entry) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentUpdate::SqlDirentUpdate(const Database &database) {
+SqlDirentUpdate::SqlDirentUpdate(const CatalogDatabase &database) {
   const string statement =
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
@@ -687,7 +689,7 @@ bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentUnlink::SqlDirentUnlink(const Database &database) {
+SqlDirentUnlink::SqlDirentUnlink(const CatalogDatabase &database) {
   Init(database.sqlite_db(),
        "DELETE FROM catalog "
        "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
@@ -701,7 +703,7 @@ bool SqlDirentUnlink::BindPathHash(const shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
+SqlIncLinkcount::SqlIncLinkcount(const CatalogDatabase &database) {
   // This command changes the linkcount of a whole hardlink group at once!
   // We can do this, since the 'hardlinks'-field contains the hardlink group ID
   // in the higher 32bit as well as the 'linkcount' in the lower 32bit.
@@ -730,7 +732,7 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 //------------------------------------------------------------------------------
 
 
-SqlChunkInsert::SqlChunkInsert(const Database &database) {
+SqlChunkInsert::SqlChunkInsert(const CatalogDatabase &database) {
   const string statememt =
     "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
     //                       1          2        3      4     5
@@ -755,7 +757,7 @@ bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
 //------------------------------------------------------------------------------
 
 
-SqlChunksRemove::SqlChunksRemove(const Database &database) {
+SqlChunksRemove::SqlChunksRemove(const CatalogDatabase &database) {
   const string statement =
     "DELETE FROM chunks "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
@@ -771,7 +773,7 @@ bool SqlChunksRemove::BindPathHash(const shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlChunksListing::SqlChunksListing(const Database &database) {
+SqlChunksListing::SqlChunksListing(const CatalogDatabase &database) {
   const string statement =
     "SELECT offset, size, hash FROM chunks "
     //         0      1     2
@@ -799,7 +801,7 @@ FileChunk SqlChunksListing::GetFileChunk(
 //------------------------------------------------------------------------------
 
 
-SqlChunksCount::SqlChunksCount(const Database &database) {
+SqlChunksCount::SqlChunksCount(const CatalogDatabase &database) {
   const string statement =
     "SELECT count(*) FROM chunks "
     //         0
@@ -822,7 +824,7 @@ int SqlChunksCount::GetChunkCount() const {
 //------------------------------------------------------------------------------
 
 
-SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
+SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const CatalogDatabase &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
 
@@ -835,8 +837,8 @@ uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
 //------------------------------------------------------------------------------
 
 
-SqlGetCounter::SqlGetCounter(const Database &database) {
-  if (database.schema_version() >= 2.4-Database::kSchemaEpsilon) {
+SqlGetCounter::SqlGetCounter(const CatalogDatabase &database) {
+  if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     compat_ = false;
     Init(database.sqlite_db(),
          "SELECT value from statistics WHERE counter = :counter;");
@@ -862,7 +864,7 @@ uint64_t SqlGetCounter::GetCounter() const {
 //------------------------------------------------------------------------------
 
 
-SqlUpdateCounter::SqlUpdateCounter(const Database &database) {
+SqlUpdateCounter::SqlUpdateCounter(const CatalogDatabase &database) {
   Init(database.sqlite_db(),
        "UPDATE statistics SET value=value+:val WHERE counter=:counter;");
 }
@@ -881,7 +883,7 @@ bool SqlUpdateCounter::BindDelta(const int64_t delta) {
 //------------------------------------------------------------------------------
 
 
-SqlCreateCounter::SqlCreateCounter(const Database &database) {
+SqlCreateCounter::SqlCreateCounter(const CatalogDatabase &database) {
   Init(database.sqlite_db(),
        "INSERT OR REPLACE INTO statistics (counter, value) "
        "VALUES (:counter, :value);");
@@ -901,7 +903,7 @@ bool SqlCreateCounter::BindInitialValue(const int64_t value) {
 //------------------------------------------------------------------------------
 
 
-SqlAllChunks::SqlAllChunks(const Database &database) {
+SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
   int hash_mask = 7 << SqlDirent::kFlagPosHash;
   string flags2hash =
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
@@ -914,7 +916,7 @@ SqlAllChunks::SqlAllChunks(const Database &database) {
     StringifyInt(kChunkMicroCatalog) + " END " +
   "AS chunk_type, " + flags2hash +
   "FROM catalog WHERE hash IS NOT NULL";
-  if (database.schema_version() >= 2.4-Database::kSchemaEpsilon) {
+  if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql += " UNION SELECT DISTINCT chunks.hash, " + StringifyInt(kChunkPiece) +
       ", " + flags2hash + "FROM chunks, catalog WHERE "
       "chunks.md5path_1=catalog.md5path_1 AND "

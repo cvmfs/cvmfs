@@ -17,7 +17,7 @@ namespace swissknife {
 namespace catalog {
 
 class DirectoryEntry;
-class Database;
+class CatalogDatabase;
 
 struct LegacyMode {
   enum Type { // TODO: C++11 typed enum
@@ -86,10 +86,10 @@ class TreeCountersBase {
   };
 
  public:
-  bool ReadFromDatabase(const Database         &database,
+  bool ReadFromDatabase(const CatalogDatabase  &database,
                         const LegacyMode::Type  legacy = LegacyMode::kNoLegacy);
-  bool WriteToDatabase(const Database     &database) const;
-  bool InsertIntoDatabase(const Database  &database) const;
+  bool WriteToDatabase(const CatalogDatabase     &database) const;
+  bool InsertIntoDatabase(const CatalogDatabase  &database) const;
 
   void SetZero();
 
