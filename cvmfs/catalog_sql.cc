@@ -115,15 +115,14 @@ bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
   }
 
   // insert initial values to properties
-
-  if (! this->SetProperty("revision", "0")) {
+  if (! this->SetProperty("revision", 0)) {
     PrintSqlError("failed to insert default initial values into the newly created "
                   "catalog tables.");
     return false;
   }
 
   if (volatile_content) {
-    if (! this->SetProperty("volatile", "1")) {
+    if (! this->SetProperty("volatile", 1)) {
       PrintSqlError("failed to insert volatile flag into the newly created "
                     "catalog tables.");
       return false;
@@ -140,7 +139,7 @@ bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
              sql_insert.BindParentPathHash(root_parent_hash) &&
              sql_insert.BindDirent(root_entry)               &&
              sql_insert.Execute();
-    if (!retval) {
+    if (! retval) {
       PrintSqlError("failed to insert root entry into newly created catalog.");
       return false;
     }
@@ -156,14 +155,8 @@ bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
   }
 
   // insert root path (when given)
-  if (!root_path.empty()) {
-    Sql insert_root_path(*this,
-      "INSERT INTO properties "
-      "(key, value) VALUES ('root_prefix', :root_path);");
-    retval = insert_root_path.BindText(1, root_path) &&
-             insert_root_path.Execute();
-
-    if (!retval) {
+  if (! root_path.empty()) {
+    if (! this->SetProperty("root_prefix", root_path)) {
       PrintSqlError("failed to store root prefix in the newly created catalog.");
       return false;
     }

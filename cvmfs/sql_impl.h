@@ -176,30 +176,20 @@ bool Database<DerivedT>::PreparePropertiesQueries() {
 
 
 template <class DerivedT>
-bool Database<DerivedT>::ReadSchemaRevision() {
-  Sql sql_schema(this->sqlite_db(),
-                 "SELECT value FROM properties WHERE key='schema';");
-  schema_version_ = (sql_schema.FetchRow()) ? sql_schema.RetrieveDouble(0)
-                                            : 1.0;
-  Sql sql_revision(this->sqlite_db(),
-                   "SELECT value FROM properties WHERE key='schema_revision';");
-  if (sql_revision.FetchRow()) {
-    schema_revision_ = sql_revision.RetrieveInt64(0);
-  }
-
-  return true;
+void Database<DerivedT>::ReadSchemaRevision() {
+  schema_version_  = (this->HasProperty(kSchemaVersionKey))
+                        ? this->GetProperty<double>(kSchemaVersionKey)
+                        : 1.0;
+  schema_revision_ = (this->HasProperty(kSchemaRevisionKey))
+                        ? this->GetProperty<int>(kSchemaRevisionKey)
+                        : 0;
 }
 
 
 template <class DerivedT>
-bool Database<DerivedT>::StoreSchemaRevision() const {
-  Sql store_schema_revision(this->sqlite_db(),
-    "INSERT OR REPLACE INTO properties (key, value) "
-    "  VALUES ('schema',          :schema), "
-    "         ('schema_revision', :schema_revision);");
-  return store_schema_revision.BindDouble(1, schema_version_)  &&
-         store_schema_revision.BindDouble(2, schema_revision_) &&
-         store_schema_revision.Execute();
+bool Database<DerivedT>::StoreSchemaRevision() {
+  return this->SetProperty(kSchemaVersionKey,  schema_version_)   &&
+         this->SetProperty(kSchemaRevisionKey, schema_revision_);
 }
 
 
