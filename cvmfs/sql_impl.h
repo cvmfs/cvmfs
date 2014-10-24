@@ -271,4 +271,68 @@ void Database<DerivedT>::PrintSqlError(const std::string &error_msg) {
 template <class DerivedT>
 const float Database<DerivedT>::kSchemaEpsilon = 0.0005;
 
+
+//
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+//
+
+
+template <typename T>
+inline bool Sql::Bind(const int index, const T value) {
+  const bool not_implemented = false;
+  assert (not_implemented && "your data type is not implemented!");
+}
+
+template <>
+inline bool Sql::Bind(const int index, const int value) {
+  return this->BindInt64(index, value);
+}
+
+template <>
+inline bool Sql::Bind(const int index, const sqlite3_int64 value) {
+  return this->BindInt64(index, value);
+}
+
+template <>
+inline bool Sql::Bind(const int index, const std::string value) {
+  return this->BindText(index, value);
+}
+
+template <>
+inline bool Sql::Bind(const int index, const char *value) {
+  return this->BindText(index, value);
+}
+
+template <>
+inline bool Sql::Bind(const int index, const double value) {
+  return this->BindDouble(index, value);
+}
+
+
+template <typename T>
+T Sql::Retrieve(const int index) {
+  const bool not_implemented = false;
+  assert (not_implemented && "your data type is not implemented!");
+}
+
+template <>
+inline int Sql::Retrieve(const int index) {
+  return this->RetrieveInt(index);
+}
+
+template <>
+inline sqlite3_int64 Sql::Retrieve(const int index) {
+  return this->RetrieveInt64(index);
+}
+
+template <>
+inline std::string Sql::Retrieve(const int index) {
+  return reinterpret_cast<const char *>(this->RetrieveText(index));
+}
+
+template <>
+inline double Sql::Retrieve(const int index) {
+  return this->RetrieveDouble(index);
+}
+
 }

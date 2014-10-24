@@ -245,6 +245,8 @@ class Sql {
     last_error_code_ = sqlite3_bind_text(statement_, index, value, size, dtor);
     return Successful();
   }
+  template <typename T>
+  inline bool Bind(const int index, const T value);
 
 
   int RetrieveType(const int idx_column) const {
@@ -268,6 +270,8 @@ class Sql {
   const unsigned char *RetrieveText(const int idx_column) const {
     return sqlite3_column_text(statement_, idx_column);
   }
+  template <typename T>
+  inline T Retrieve(const int index);
 
   /**
    * Checks if a statement is currently busy with a transaction
