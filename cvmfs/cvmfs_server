@@ -3573,7 +3573,7 @@ snapshot() {
     fi
 
     # do it!
-    local user_shell="$(get_user_shell $name)"
+    local user_shell="$(get_user_shell $alias_name)"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
