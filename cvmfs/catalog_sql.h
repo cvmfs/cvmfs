@@ -46,59 +46,31 @@ enum ChunkTypes {
 };
 
 
-/**
- * Encapsulates an SQlite connection.  Abstracts the schema.
- */
-class Database {
+class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
  public:
   static const float kLatestSchema;
   static const float kLatestSupportedSchema;  // + 1.X catalogs (r/o)
-  static const float kSchemaEpsilon;  // floats get imprecise in SQlite
   // backwards-compatible schema changes
   static const unsigned kLatestSchemaRevision;
 
-  static bool IsEqualSchema(const float value, const float compare) {
-    return (value > compare - kSchemaEpsilon &&
-            value < compare + kSchemaEpsilon);
-  }
-
-  Database(const std::string filename, const sqlite::DbOpenMode open_mode);
-  ~Database();
-  static bool Create(const std::string &filename,
-                     const std::string &root_path,
-                     const bool volatile_content,
-                     const DirectoryEntry &root_entry
+  bool CreateEmptyDatabase();
+  bool InsertInitialValues(const std::string     &root_path,
+                           const bool             volatile_content,
+                           const DirectoryEntry  &root_entry
                                              = DirectoryEntry(kDirentNegative));
 
-  sqlite3 *sqlite_db() const { return sqlite_db_; }
-  std::string filename() const { return filename_; }
-  float schema_version() const { return schema_version_; }
-  unsigned schema_revision() const { return schema_revision_; }
-  bool ready() const { return ready_; }
+  bool CheckSchemaCompatibility();
+  bool LiveSchemaUpgradeIfNecessary();
+  bool CompactizeDatabase() const;
 
-  double GetFreePageRatio() const;
   double GetRowIdWasteRatio() const;
-  bool Vacuum() const;
 
-  /**
-   * Returns the english language error description of the last error
-   * happened in the context of the encapsulated sqlite3 database object.
-   * Note: In a multithreaded context it might be unpredictable which
-   *       the actual last error is.
-   * @return   english language error description of last error
-   */
-  std::string GetLastErrorMsg() const;
-
- private:
-  Database(const std::string &filename,
-           const float schema, const unsigned revision);
-
-  sqlite3 *sqlite_db_;
-  std::string filename_;
-  float schema_version_;
-  unsigned schema_revision_;
-  bool read_write_;
-  bool ready_;
+ protected:
+  // TODO: C++11 - constructor inheritance
+  friend class sqlite::Database<CatalogDatabase>;
+  CatalogDatabase(const std::string  &filename,
+                  const OpenMode      open_mode) :
+    sqlite::Database<CatalogDatabase>(filename, open_mode) {}
 };
 
 

@@ -7,12 +7,80 @@
 
 #include <string>
 #include "duplex_sqlite3.h"
+#include "util.h"
 
 namespace sqlite {
 
-enum DbOpenMode {
-  kDbOpenReadOnly,
-  kDbOpenReadWrite,
+/**
+ * Encapsulates an SQlite connection.
+ * Note: This implements a Curiously Recurring Template Pattern in order to
+ *       implement Database::Create and Database::Open as a static polymorphism
+ * TODO: C++11 Move Constructors to allow for stack allocated database
+ */
+template <class DerivedT>
+class Database : SingleCopy {
+ public:
+  enum OpenMode {
+    kOpenReadOnly,
+    kOpenReadWrite,
+  };
+
+ public:
+  static const float kSchemaEpsilon;  // floats get imprecise in SQlite
+
+  static DerivedT* Create(const std::string  &filename);
+  static DerivedT*   Open(const std::string  &filename,
+                          const OpenMode      open_mode);
+
+  ~Database();
+
+  bool IsEqualSchema(const float value, const float compare) const {
+    return (value > compare - kSchemaEpsilon &&
+            value < compare + kSchemaEpsilon);
+  }
+
+  sqlite3     *sqlite_db()       const { return sqlite_db_;       }
+  std::string  filename()        const { return filename_;        }
+  float        schema_version()  const { return schema_version_;  }
+  unsigned     schema_revision() const { return schema_revision_; }
+  bool         read_write()      const { return read_write_;      }
+
+  double GetFreePageRatio() const;
+  bool Vacuum() const;
+
+  void PrintSqlError(const std::string &error_msg);
+
+  /**
+   * Returns the english language error description of the last error
+   * happened in the context of the encapsulated sqlite3 database object.
+   * Note: In a multithreaded context it might be unpredictable which
+   *       the actual last error is.
+   * @return   english language error description of last error
+   */
+  std::string GetLastErrorMsg() const;
+
+ protected:
+  Database(const std::string  &filename,
+           const OpenMode      open_mode);
+
+  bool Initialize();
+
+  bool CreatePropertiesTable();
+
+  bool OpenDatabase(const int sqlite_open_flags);
+  bool FileReadAhead();
+  bool ReadSchemaRevision();
+  bool StoreSchemaRevision() const;
+
+  void set_schema_version(const float ver)     { schema_version_  = ver; }
+  void set_schema_revision(const unsigned rev) { schema_revision_ = rev; }
+
+ private:
+  sqlite3            *sqlite_db_;
+  const std::string   filename_;
+  const bool          read_write_;
+  float               schema_version_;
+  unsigned            schema_revision_;
 };
 
 /**
@@ -130,5 +198,7 @@ class Sql {
 };
 
 }  // namespace sqlite
+
+#include "sql_impl.h"
 
 #endif  // CVMFS_SQL_H_
