@@ -103,6 +103,10 @@ class Database : SingleCopy {
             value < compare + kSchemaEpsilon);
   }
 
+  bool        HasProperty(const std::string &key) const;
+  std::string GetProperty(const std::string &key) const;
+  bool        SetProperty(const std::string &key, const std::string &value);
+
   sqlite3     *sqlite_db()       const { return sqlite_db_;       }
   std::string  filename()        const { return filename_;        }
   float        schema_version()  const { return schema_version_;  }

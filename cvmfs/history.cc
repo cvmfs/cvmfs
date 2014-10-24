@@ -35,10 +35,7 @@ bool HistoryDatabase::CreateEmptyDatabase() {
 
 bool HistoryDatabase::InsertInitialValues(const std::string &repository_name) {
   assert (read_write());
-  sqlite::Sql add_fqrn(sqlite_db(), "INSERT INTO properties "
-                                    "(key, value) VALUES ('fqrn', :name);");
-  return add_fqrn.BindText(1, repository_name) &&
-         add_fqrn.Execute();
+  return this->SetProperty("fqrn", repository_name);
 }
 
 

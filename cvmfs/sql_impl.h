@@ -194,6 +194,40 @@ bool Database<DerivedT>::CreatePropertiesTable() {
 
 
 template <class DerivedT>
+bool Database<DerivedT>::HasProperty(const std::string &key) const {
+  Sql has_property(sqlite_db_, "SELECT count(*) FROM properties "
+                               "WHERE key = :key;");
+  const bool retval = has_property.BindText(1, key) &&
+                      has_property.FetchRow();
+  assert (retval);
+  return has_property.RetrieveInt64(0) > 0;
+}
+
+
+template <class DerivedT>
+std::string Database<DerivedT>::GetProperty(const std::string &key) const {
+  Sql get_property(sqlite_db_, "SELECT value FROM properties "
+                               "WHERE key = :key;");
+  const bool retval = get_property.BindText(1, key) &&
+                      get_property.FetchRow();
+  assert (retval);
+  return get_property.RetrieveText(0);
+}
+
+
+template <class DerivedT>
+bool Database<DerivedT>::SetProperty(const std::string &key,
+                                     const std::string &value) {
+  assert (read_write_);
+  Sql set_property(sqlite_db_, "INSERT OR REPLACE INTO properties (key, value) "
+                               "VALUES (:key, :value);");
+  return set_property.BindText(1, key)   &&
+         set_property.BindText(2, value) &&
+         set_property.Execute();
+}
+
+
+template <class DerivedT>
 std::string Database<DerivedT>::GetLastErrorMsg() const {
   const std::string msg = sqlite3_errmsg(sqlite_db_);
   return msg;

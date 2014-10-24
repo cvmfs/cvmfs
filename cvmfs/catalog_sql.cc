@@ -115,18 +115,15 @@ bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
   }
 
   // insert initial values to properties
-  Sql insert_initial_properties(*this,
-    "INSERT INTO properties (key, value) VALUES ('revision', 0)");
-  if (!insert_initial_properties.Execute()) {
+
+  if (! this->SetProperty("revision", "0")) {
     PrintSqlError("failed to insert default initial values into the newly created "
                   "catalog tables.");
     return false;
   }
 
   if (volatile_content) {
-    Sql insert_volatile_flag(*this,
-      "INSERT INTO properties (key, value) VALUES ('volatile', 1);");
-    if (!insert_volatile_flag.Execute()) {
+    if (! this->SetProperty("volatile", "1")) {
       PrintSqlError("failed to insert volatile flag into the newly created "
                     "catalog tables.");
       return false;
