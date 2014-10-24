@@ -20,7 +20,9 @@ class Sql;
  * throughout CernVM-FS. It provides a general interface for creating, opening,
  * compacting and migrating an SQLite database.
  * Furthermore it manages a `properties` table in each database, to store simple
- * key-value style information in a common fashion.
+ * key-value style information in a common fashion. For that, it offers the
+ * templated methods SetProperty(), GetProperty<>() and HasProperty() that take
+ * all common data types and persist it in the database.
  *
  * Note: This implements a Curiously Recurring Template Pattern in order to
  *       implement Database::Create and Database::Open as a static polymorphism
