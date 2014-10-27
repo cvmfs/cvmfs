@@ -50,7 +50,7 @@ DerivedT* Database<DerivedT>::Create(const std::string &filename) {
     return NULL;
   }
 
-  if (! database->PreparePropertiesQueries()) {
+  if (! database->PrepareCommonQueries()) {
     database->PrintSqlError("Failed to initialize properties queries");
     return NULL;
   }
@@ -84,7 +84,7 @@ bool Database<DerivedT>::Initialize() {
 
   const bool successful = OpenDatabase(flags)        &&
                           FileReadAhead()            &&
-                          PreparePropertiesQueries();
+                          PrepareCommonQueries();
   if (! successful) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open database file '%s'",
                                  filename_.c_str());
@@ -164,13 +164,14 @@ bool Database<DerivedT>::FileReadAhead() {
 
 
 template <class DerivedT>
-bool Database<DerivedT>::PreparePropertiesQueries() {
-  has_property_ = new Sql(sqlite_db_, "SELECT count(*) FROM properties "
-                                      "WHERE key = :key;");
-  get_property_ = new Sql(sqlite_db_, "SELECT value FROM properties "
-                                      "WHERE key = :key;");
-  set_property_ = new Sql(sqlite_db_, "INSERT OR REPLACE INTO properties "
-                                      "(key, value) VALUES (:key, :value);");
+bool Database<DerivedT>::PrepareCommonQueries() {
+  sqlite3 *db = sqlite_db_;
+  has_property_       = new Sql(db, "SELECT count(*) FROM properties "
+                                    "WHERE key = :key;");
+  get_property_       = new Sql(db, "SELECT value FROM properties "
+                                    "WHERE key = :key;");
+  set_property_       = new Sql(db, "INSERT OR REPLACE INTO properties "
+                                    "(key, value) VALUES (:key, :value);");
   return (has_property_ && get_property_ && set_property_);
 }
 

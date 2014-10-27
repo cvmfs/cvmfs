@@ -168,7 +168,7 @@ class Database : SingleCopy {
   bool Initialize();
 
   bool CreatePropertiesTable();
-  bool PreparePropertiesQueries();
+  bool PrepareCommonQueries();
 
   bool OpenDatabase(const int sqlite_open_flags);
   bool FileReadAhead();
