@@ -226,12 +226,14 @@ class UniquePtr : SingleCopy {
   inline UniquePtr(T *ref) : ref_(ref) {}
   inline ~UniquePtr()                 { delete ref_; }
 
-  inline operator bool() const        { return (ref_ != NULL); }
+  inline operator bool() const        { return IsValid(); }
   inline operator T*() const          { return *ref_; }
   inline UniquePtr& operator=(T* ref) { ref_ = ref; return *this; }
   inline T* operator->() const        { return ref_; }
 
   inline T* weak_ref() const          { return ref_; }
+  inline bool IsValid() const         { return (ref_ != NULL); }
+  inline T*   Release()               { T* r = ref_; ref_ = NULL; return r; }
 
  private:
   T *ref_;
