@@ -13,8 +13,8 @@
 #include <set>
 #include <map>
 
-#include "sql.h"
 #include "hash.h"
+#include "util.h"
 
 namespace history {
 
@@ -62,41 +62,6 @@ struct Tag {
   time_t timestamp;
   UpdateChannel channel;
   std::string description;
-};
-
-
-class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
- public:
-  static const float kLatestSchema;
-  static const float kLatestSupportedSchema;
-  // backwards-compatible schema changes
-  static const unsigned kLatestSchemaRevision;
-
-  bool CreateEmptyDatabase();
-  bool InsertInitialValues(const std::string &repository_name);
-
-  bool CheckSchemaCompatibility();
-  bool LiveSchemaUpgradeIfNecessary();
-  bool CompactDatabase() const { return true; /* NOOP */ };
-
- protected:
-  // TODO: C++11 - constructor inheritance
-  friend class sqlite::Database<HistoryDatabase>;
-  HistoryDatabase(const std::string  &filename,
-                  const OpenMode      open_mode) :
-    sqlite::Database<HistoryDatabase>(filename, open_mode) {}
-};
-
-
-class SqlTag : public sqlite::Sql {
- public:
-  SqlTag(const HistoryDatabase &database, const std::string &statement) {
-    Init(database.sqlite_db(), statement);
-  }
-  virtual ~SqlTag() { /* Done by super class */ }
-
-  bool BindTag(const Tag &tag);
-  Tag RetrieveTag();
 };
 
 
