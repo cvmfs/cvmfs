@@ -24,6 +24,7 @@ Database<DerivedT>::Database(const std::string  &filename,
 
 template <class DerivedT>
 DerivedT* Database<DerivedT>::Create(const std::string &filename) {
+  // TODO: SharedPointer to avoid 'delete' in error conditions
   DerivedT *database = new DerivedT(filename, kOpenReadWrite);
   database->set_schema_version(DerivedT::kLatestSchema);
   database->set_schema_revision(DerivedT::kLatestSchemaRevision);
@@ -37,26 +38,31 @@ DerivedT* Database<DerivedT>::Create(const std::string &filename) {
                          SQLITE_OPEN_CREATE;
   if (! database->OpenDatabase(open_flags)) {
     LogCvmfs(kLogSql, kLogDebug, "Failed to create new database file");
+    delete database;
     return NULL;
   }
 
   if (! database->CreatePropertiesTable()) {
     database->PrintSqlError("Failed to create common properties table");
+    delete database;
     return NULL;
   }
 
   if (! database->CreateEmptyDatabase()) {
     database->PrintSqlError("Failed to create empty database");
+    delete database;
     return NULL;
   }
 
   if (! database->PrepareCommonQueries()) {
     database->PrintSqlError("Failed to initialize properties queries");
+    delete database;
     return NULL;
   }
 
   if (! database->StoreSchemaRevision()) {
     database->PrintSqlError("Failed to store initial schema revision");
+    delete database;
     return NULL;
   }
 
