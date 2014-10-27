@@ -509,23 +509,18 @@ TEST_F(T_SQLite_Wrapper, DataAccess) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
   {
-    sqlite::Sql transaction(db1->sqlite_db(), "BEGIN;");
-    sqlite::Sql commit     (db1->sqlite_db(), "COMMIT;");
-    sqlite::Sql insert     (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
-                                              "VALUES (:f, :b);");
-
-    ASSERT_FALSE (transaction.IsBusy());
-    ASSERT_FALSE (commit.IsBusy());
+    sqlite::Sql insert (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
+                                          "VALUES (:f, :b);");
     ASSERT_FALSE (insert.IsBusy());
 
-    EXPECT_TRUE (transaction.Execute());
+    EXPECT_TRUE (db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
       EXPECT_TRUE(insert.Bind(1, "foobar!" + StringifyInt(i)));
       EXPECT_TRUE(insert.Bind(2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }
-    EXPECT_TRUE (commit.Execute());
+    EXPECT_TRUE (db1->CommitTransaction());
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
@@ -559,23 +554,18 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
   {
-    sqlite::Sql transaction(db1->sqlite_db(), "BEGIN;");
-    sqlite::Sql commit     (db1->sqlite_db(), "COMMIT;");
-    sqlite::Sql insert     (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
-                                              "VALUES (:f, :b);");
-
-    ASSERT_FALSE (transaction.IsBusy());
-    ASSERT_FALSE (commit.IsBusy());
+    sqlite::Sql insert (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
+                                          "VALUES (:f, :b);");
     ASSERT_FALSE (insert.IsBusy());
 
-    EXPECT_TRUE (transaction.Execute());
+    EXPECT_TRUE (db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
       EXPECT_TRUE(insert.Bind(1, "foobar!" + StringifyInt(i)));
       EXPECT_TRUE(insert.Bind(2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }
-    EXPECT_TRUE (commit.Execute());
+    EXPECT_TRUE (db1->CommitTransaction());
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
@@ -643,23 +633,18 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
   {
-    sqlite::Sql transaction(db1->sqlite_db(), "BEGIN;");
-    sqlite::Sql commit     (db1->sqlite_db(), "COMMIT;");
-    sqlite::Sql insert     (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
-                                              "VALUES (:f, :b);");
-
-    ASSERT_FALSE (transaction.IsBusy());
-    ASSERT_FALSE (commit.IsBusy());
+    sqlite::Sql insert (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
+                                          "VALUES (:f, :b);");
     ASSERT_FALSE (insert.IsBusy());
 
-    EXPECT_TRUE (transaction.Execute());
+    EXPECT_TRUE (db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
       EXPECT_TRUE(insert.Bind(1, "foobar!" + StringifyInt(i)));
       EXPECT_TRUE(insert.Bind(2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }
-    EXPECT_TRUE (commit.Execute());
+    EXPECT_TRUE (db1->CommitTransaction());
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
