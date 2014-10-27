@@ -415,12 +415,14 @@ if (BUILD_CVMFS)
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
-  install (
-    FILES         bash_completion/cvmfs.bash_completion
-    RENAME        cvmfs
-    DESTINATION   /etc/bash_completion.d
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
+  if(INSTALL_BASH_COMPLETION)
+    install (
+        FILES         bash_completion/cvmfs.bash_completion
+        RENAME        cvmfs
+        DESTINATION   /etc/bash_completion.d
+        PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+   endif (INSTALL_BASH_COMPLETION)
 
 endif (BUILD_CVMFS)
 
