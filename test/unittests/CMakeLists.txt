@@ -47,6 +47,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_sqlite_database.cc
   t_unique_ptr.cc
   t_unlink_guard.cc
+  t_history.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -113,6 +114,7 @@ set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_SOURCE_DIR}/catalog_traversal.cc
   ${CVMFS_SOURCE_DIR}/history.cc
+  ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
 )
 
