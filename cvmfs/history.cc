@@ -18,6 +18,148 @@ using namespace std;  // NOLINT
 namespace history {
 
 
+History::~History() {}
+
+
+History* History::Open(const std::string &file_name) {
+  History *history = new History();
+  if (NULL == history || ! history->OpenDatabase(file_name)) {
+    delete history;
+    return NULL;
+  }
+
+  LogCvmfs(kLogHistory, kLogDebug, "opened history database '%s' for "
+                                   "repository '%s'",
+           file_name.c_str(), history->fqrn().c_str());
+  return history;
+}
+
+
+History* History::Create(const std::string &file_name,
+                         const std::string &fqrn) {
+  History *history = new History();
+  if (NULL == history || ! history->CreateDatabase(file_name, fqrn)) {
+    delete history;
+    return NULL;
+  }
+
+  LogCvmfs(kLogHistory, kLogDebug, "created empty history database '%s' for"
+                                   "repository '%s'",
+           file_name.c_str(), fqrn.c_str());
+  return history;
+}
+
+
+bool History::OpenDatabase(const std::string &file_name) {
+  assert (! database_);
+  database_ = HistoryDatabase::Open(file_name, HistoryDatabase::kOpenReadOnly);
+  if (! database_.IsValid()) {
+    return false;
+  }
+
+  if (! database_->HasProperty(HistoryDatabase::kFqrnKey)) {
+    LogCvmfs(kLogHistory, kLogDebug, "opened history database does not provide "
+                                     "an FQRN under '%s'",
+             HistoryDatabase::kFqrnKey.c_str());
+    return false;
+  }
+
+  fqrn_ = database_->GetProperty<std::string>(HistoryDatabase::kFqrnKey);
+  return Initialize();
+}
+
+
+bool History::CreateDatabase(const std::string &file_name,
+                             const std::string &fqrn) {
+  assert (! database_);
+  assert (fqrn_.empty());
+  fqrn_     = fqrn;
+  database_ = HistoryDatabase::Create(file_name);
+  if (! database_ || ! database_->InsertInitialValues(fqrn)) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to initialize empty database '%s',"
+                                     "for repository '%s'",
+             file_name.c_str(), fqrn.c_str());
+    return false;
+  }
+
+  return Initialize();
+}
+
+
+bool History::Initialize() {
+  if (! PrepareQueries()) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to prepare statements of history");
+    return false;
+  }
+
+  return true;
+}
+
+
+bool History::PrepareQueries() {
+  assert (database_);
+  insert_tag_ = new SqlInsertTag(database_.weak_ref());
+  find_tag_   = new SqlFindTag(database_.weak_ref());
+  count_tags_ = new SqlCountTags(database_.weak_ref());
+  list_tags_  = new SqlListTags(database_.weak_ref());
+  return (insert_tag_ && find_tag_ && count_tags_ && list_tags_);
+}
+
+
+bool History::BeginTransaction()  const { return database_->BeginTransaction();  }
+bool History::CommitTransaction() const { return database_->CommitTransaction(); }
+
+
+int History::GetNumberOfTags() const {
+  assert (database_);
+  assert (count_tags_.IsValid() && ! count_tags_->IsBusy());
+  bool retval = count_tags_->FetchRow();
+  assert (retval);
+  const int count = count_tags_->RetrieveCount();
+  retval = count_tags_->Reset();
+  assert (retval);
+  return count;
+}
+
+
+bool History::Insert(const History::Tag &tag) {
+  assert (database_);
+  assert (insert_tag_.IsValid() && ! insert_tag_->IsBusy());
+
+  return insert_tag_->BindTag(tag) &&
+         insert_tag_->Execute()    &&
+         insert_tag_->Reset();
+}
+
+
+bool History::Find(const std::string &name, Tag *tag) const {
+  assert (database_);
+  assert (find_tag_.IsValid() && ! find_tag_->IsBusy());
+  assert (NULL != tag);
+
+  if (! find_tag_->BindName(name) ||
+      ! find_tag_->FetchRow()) {
+    find_tag_->Reset();
+    return false;
+  }
+
+  *tag = find_tag_->RetrieveTag();
+  return find_tag_->Reset();
+}
+
+
+bool History::List(std::vector<Tag> *tags) const {
+  assert (database_);
+  assert (list_tags_.IsValid() && ! list_tags_->IsBusy());
+  assert (NULL != tags);
+
+  while (list_tags_->FetchRow()) {
+    tags->push_back(list_tags_->RetrieveTag());
+  }
+
+  return list_tags_->Reset();
+}
+
 
 
 //------------------------------------------------------------------------------

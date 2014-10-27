@@ -18,50 +18,80 @@
 
 namespace history {
 
-enum UpdateChannel {
-  kChannelTrunk = 0,
-  kChannelDevel = 4,
-  kChannelTest = 16,
-  kChannelProd = 64,
-};
+class HistoryDatabase;
+class SqlInsertTag;
+class SqlFindTag;
+class SqlCountTags;
+class SqlListTags;
+
+class History {
+ public:
+  enum UpdateChannel {
+    kChannelTrunk = 0,
+    kChannelDevel = 4,
+    kChannelTest = 16,
+    kChannelProd = 64,
+  };
+
+  struct Tag {
+    Tag() :
+      size(0), revision(0), timestamp(0), channel(kChannelTrunk) {}
+
+    Tag(const std::string &n, const shash::Any &h, const uint64_t s,
+        const unsigned r, const time_t t, const UpdateChannel c,
+        const std::string &d) :
+      name(n), root_hash(h), size(s), revision(r), timestamp(t), channel(c),
+      description(d) {}
+
+    bool operator ==(const Tag &other) const {
+      return this->revision == other.revision;
+    }
+
+    bool operator <(const Tag &other) const {
+      return this->revision < other.revision;
+    }
+
+    std::string    name;
+    shash::Any     root_hash;
+    uint64_t       size;
+    unsigned       revision;
+    time_t         timestamp;
+    UpdateChannel  channel;
+    std::string    description;
+  };
+
+ public:
+  ~History();
+
+  static History* Open(const std::string &file_name);
+  static History* Create(const std::string &file_name, const std::string &fqrn);
+
+  int GetNumberOfTags() const;
+  bool BeginTransaction()  const;
+  bool CommitTransaction() const;
+
+  bool Insert(const Tag &tag);
+  bool Find(const std::string &name, Tag *tag) const;
+  bool List(std::vector<Tag> *tags) const;
+
+  const std::string& fqrn() const { return fqrn_; }
 
 
-struct Tag {
-  Tag() {
-    size = 0;
-    revision = 0;
-    timestamp = 0;
-    channel = kChannelTrunk;
-  }
+ protected:
+  bool OpenDatabase(const std::string &file_name);
+  bool CreateDatabase(const std::string &file_name, const std::string &fqrn);
 
-  Tag(const std::string &n, const shash::Any &h, const uint64_t s,
-      const unsigned r, const time_t t, const UpdateChannel c,
-      const std::string &d)
-  {
-    name = n;
-    root_hash = h;
-    size = s;
-    revision = r;
-    timestamp = t;
-    channel = c;
-    description = d;
-  }
+  bool Initialize();
+  bool PrepareQueries();
 
-  bool operator ==(const Tag &other) const {
-    return this->revision == other.revision;
-  }
+ private:
+  UniquePtr<HistoryDatabase>   database_;
+  std::string                  fqrn_;
 
-  bool operator <(const Tag &other) const {
-    return this->revision < other.revision;
-  }
-
-  std::string name;
-  shash::Any root_hash;
-  uint64_t size;
-  unsigned revision;
-  time_t timestamp;
-  UpdateChannel channel;
-  std::string description;
+  UniquePtr<SqlInsertTag>      insert_tag_;
+  UniquePtr<SqlFindTag>        find_tag_;
+  UniquePtr<SqlCountTags>      count_tags_;
+  UniquePtr<SqlListTags>       list_tags_;
 };
 
 
