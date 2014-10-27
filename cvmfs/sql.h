@@ -111,6 +111,9 @@ class Database : SingleCopy {
             value < compare + kSchemaEpsilon);
   }
 
+  bool BeginTransaction() const;
+  bool CommitTransaction() const;
+
   template <typename T>
   T GetProperty(const std::string &key) const;
   template <typename T>
@@ -185,6 +188,9 @@ class Database : SingleCopy {
   const bool          read_write_;
   float               schema_version_;
   unsigned            schema_revision_;
+
+  UniquePtr<Sql>      begin_transaction_;
+  UniquePtr<Sql>      commit_transaction_;
 
   UniquePtr<Sql>      has_property_;
   UniquePtr<Sql>      set_property_;

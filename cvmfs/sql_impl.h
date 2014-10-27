@@ -166,13 +166,16 @@ bool Database<DerivedT>::FileReadAhead() {
 template <class DerivedT>
 bool Database<DerivedT>::PrepareCommonQueries() {
   sqlite3 *db = sqlite_db_;
+  begin_transaction_  = new Sql(db, "BEGIN;");
+  commit_transaction_ = new Sql(db, "COMMIT;");
   has_property_       = new Sql(db, "SELECT count(*) FROM properties "
                                     "WHERE key = :key;");
   get_property_       = new Sql(db, "SELECT value FROM properties "
                                     "WHERE key = :key;");
   set_property_       = new Sql(db, "INSERT OR REPLACE INTO properties "
                                     "(key, value) VALUES (:key, :value);");
-  return (has_property_ && get_property_ && set_property_);
+  return (begin_transaction_ && commit_transaction_ &&
+          has_property_ && get_property_ && set_property_);
 }
 
 
@@ -191,6 +194,20 @@ template <class DerivedT>
 bool Database<DerivedT>::StoreSchemaRevision() {
   return this->SetProperty(kSchemaVersionKey,  schema_version_)   &&
          this->SetProperty(kSchemaRevisionKey, schema_revision_);
+}
+
+
+template <class DerivedT>
+bool Database<DerivedT>::BeginTransaction() const {
+  return begin_transaction_->Execute() &&
+         begin_transaction_->Reset();
+}
+
+
+template <class DerivedT>
+bool Database<DerivedT>::CommitTransaction() const {
+  return commit_transaction_->Execute() &&
+         commit_transaction_->Reset();
 }
 
 
