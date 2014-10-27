@@ -356,7 +356,7 @@ inline sqlite3_int64 Sql::Retrieve(const int index) {
 
 template <>
 inline std::string Sql::Retrieve(const int index) {
-  return reinterpret_cast<const char *>(this->RetrieveText(index));
+  return RetrieveString(index);
 }
 
 template <>

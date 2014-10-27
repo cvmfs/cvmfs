@@ -292,6 +292,9 @@ class Sql {
   const unsigned char *RetrieveText(const int idx_column) const {
     return sqlite3_column_text(statement_, idx_column);
   }
+  std::string RetrieveString(const int idx_column) const {
+    return reinterpret_cast<const char*>(RetrieveText(idx_column));
+  }
   template <typename T>
   inline T Retrieve(const int index);
 
