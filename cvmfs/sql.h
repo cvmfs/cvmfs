@@ -298,14 +298,6 @@ class Sql {
   template <typename T>
   inline T Retrieve(const int index);
 
-  /**
-   * Checks if a statement is currently busy with a transaction
-   * i.e. Reset() was not yet called on it.
-   */
-  inline bool IsReady() const {
-    return (bool)sqlite3_stmt_busy(statement_);
-  }
-
  protected:
   Sql() : statement_(NULL), last_error_code_(0) { }
   bool Init(const sqlite3 *database, const std::string &statement);
