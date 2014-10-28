@@ -64,8 +64,10 @@ class History {
   ~History();
 
   static History* Open(const std::string &file_name);
+  static History* OpenWritable(const std::string &file_name);
   static History* Create(const std::string &file_name, const std::string &fqrn);
 
+  bool IsWritable() const;
   int GetNumberOfTags() const;
   bool BeginTransaction()  const;
   bool CommitTransaction() const;
@@ -78,7 +80,8 @@ class History {
 
 
  protected:
-  bool OpenDatabase(const std::string &file_name);
+  static History* Open(const std::string &file_name, const bool read_write);
+  bool OpenDatabase(const std::string &file_name, const bool read_write);
   bool CreateDatabase(const std::string &file_name, const std::string &fqrn);
 
   bool Initialize();

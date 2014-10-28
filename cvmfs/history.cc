@@ -22,15 +22,29 @@ History::~History() {}
 
 
 History* History::Open(const std::string &file_name) {
+  const bool read_write = false;
+  return Open(file_name, read_write);
+}
+
+
+History* History::OpenWritable(const std::string &file_name) {
+  const bool read_write = true;
+  return Open(file_name, read_write);
+}
+
+
+History* History::Open(const std::string &file_name, const bool read_write) {
   History *history = new History();
-  if (NULL == history || ! history->OpenDatabase(file_name)) {
+  if (NULL == history || ! history->OpenDatabase(file_name, read_write)) {
     delete history;
     return NULL;
   }
 
   LogCvmfs(kLogHistory, kLogDebug, "opened history database '%s' for "
-                                   "repository '%s'",
-           file_name.c_str(), history->fqrn().c_str());
+                                   "repository '%s' %s",
+           file_name.c_str(), history->fqrn().c_str(),
+           ((history->IsWritable()) ? "(writable)" : ""));
+
   return history;
 }
 
@@ -50,9 +64,13 @@ History* History::Create(const std::string &file_name,
 }
 
 
-bool History::OpenDatabase(const std::string &file_name) {
+bool History::OpenDatabase(const std::string &file_name, const bool read_write)
+{
   assert (! database_);
-  database_ = HistoryDatabase::Open(file_name, HistoryDatabase::kOpenReadOnly);
+  const HistoryDatabase::OpenMode mode = (read_write)
+                                           ? HistoryDatabase::kOpenReadWrite
+                                           : HistoryDatabase::kOpenReadOnly;
+  database_ = HistoryDatabase::Open(file_name, mode);
   if (! database_.IsValid()) {
     return false;
   }
@@ -109,6 +127,11 @@ bool History::PrepareQueries() {
 bool History::BeginTransaction()  const { return database_->BeginTransaction();  }
 bool History::CommitTransaction() const { return database_->CommitTransaction(); }
 
+
+bool History::IsWritable() const {
+  assert (database_);
+  return database_->read_write();
+}
 
 int History::GetNumberOfTags() const {
   assert (database_);
