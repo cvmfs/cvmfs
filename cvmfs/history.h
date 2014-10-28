@@ -77,7 +77,7 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
 
   bool CheckSchemaCompatibility();
   bool LiveSchemaUpgradeIfNecessary();
-  bool CompactizeDatabase() const;
+  bool CompactDatabase() const { return true; /* NOOP */ };
 
  protected:
   // TODO: C++11 - constructor inheritance

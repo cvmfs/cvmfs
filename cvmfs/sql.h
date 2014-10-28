@@ -42,7 +42,7 @@ class Sql;
  *              this allows for on-the-fly schema updates and is always called
  *              when a database is opened read/write. It assumes 'true' both on
  *              successful migration and if no migration was necessary
- *  -> bool CompactizeDatabase()
+ *  -> bool CompactDatabase()
  *              here implementation specific cleanup actions can take place on
  *              databases opened as read/write. It is invoked by the `Vacuum()`
  *              method, that can be used by higher level user code
@@ -136,10 +136,10 @@ class Database : SingleCopy {
   double GetFreePageRatio() const;
 
   /**
-   * Performs a VACUUM call on the opened database file to compactize the data-
-   * base. As a first step it runs DerivedT::CompactizeDatabase() to allow for
-   * implementation dependent cleanup actions. Vacuum() assumes that the SQLite
-   * database was opened in read/write mode.
+   * Performs a VACUUM call on the opened database file to compacts the database.
+   * As a first step it runs DerivedT::CompactDatabase() to allow for implement-
+   * ation dependent cleanup actions. Vacuum() assumes that the SQLite database
+   * was opened in read/write mode.
    * @return  true on success
    */
   bool Vacuum() const;

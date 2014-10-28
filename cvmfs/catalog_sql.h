@@ -61,7 +61,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
 
   bool CheckSchemaCompatibility();
   bool LiveSchemaUpgradeIfNecessary();
-  bool CompactizeDatabase() const;
+  bool CompactDatabase() const;
 
   double GetRowIdWasteRatio() const;
 

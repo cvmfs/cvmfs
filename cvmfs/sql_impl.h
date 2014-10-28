@@ -290,7 +290,7 @@ double Database<DerivedT>::GetFreePageRatio() const {
 template <class DerivedT>
 bool Database<DerivedT>::Vacuum() const {
   assert (read_write_);
-  return static_cast<const DerivedT*>(this)->CompactizeDatabase() &&
+  return static_cast<const DerivedT*>(this)->CompactDatabase() &&
          Sql(this->sqlite_db(), "VACUUM;").Execute();
 }
 

@@ -187,9 +187,9 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
  *
  * This creates a temporary table 'mapping' filled with the current rowIDs from
  * the catalog table. The new table will implicitly have an auto-increment rowID
- * that is compactized. Thus, we create a 'mapping' from each catalog's rowID
- * to a new rowID-space that does not have any gaps. Notice, that the order of
- * old and new rowIDs will stay the same to fulfill the PRIMARY KEY constraints
+ * that is compact. Thus, we create a 'mapping' from each catalog's rowID to a
+ * new rowID-space that does not have any gaps. Notice, that the order of old
+ * and new rowIDs will stay the same to fulfill the PRIMARY KEY constraints
  * during update.
  * Thereafter the catalog's rowIDs are mapped to their new (unique and compact)
  * rowIDs and the temporary table is deleted.
@@ -201,7 +201,7 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
  *
  * See: http://www.sqlite.org/lang_vacuum.html
  */
-bool CatalogDatabase::CompactizeDatabase() const {
+bool CatalogDatabase::CompactDatabase() const {
   assert (read_write());
 
   return Sql(*this, "BEGIN;").Execute()                                 &&

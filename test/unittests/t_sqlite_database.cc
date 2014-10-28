@@ -56,8 +56,8 @@ class DummyDatabase : public sqlite::Database<DummyDatabase> {
     return false;
   }
 
-  bool CompactizeDatabase() const {
-    ++compactize_calls;
+  bool CompactDatabase() const {
+    ++compact_calls;
     return ! compacting_fails;
   }
 
@@ -72,7 +72,7 @@ class DummyDatabase : public sqlite::Database<DummyDatabase> {
                 const OpenMode      open_mode) :
     sqlite::Database<DummyDatabase>(filename, open_mode),
     create_empty_db_calls(0),  check_compatibility_calls(0),
-    live_upgrade_calls(0), compactize_calls(0)
+    live_upgrade_calls(0), compact_calls(0)
   {
     ++DummyDatabase::instances;
   }
@@ -83,7 +83,7 @@ class DummyDatabase : public sqlite::Database<DummyDatabase> {
   unsigned int         create_empty_db_calls;
   unsigned int         check_compatibility_calls;
   unsigned int         live_upgrade_calls;
-  mutable unsigned int compactize_calls;
+  mutable unsigned int compact_calls;
 };
 
 const float    DummyDatabase::kLatestCompatibleSchema = 1.0f;
@@ -138,7 +138,7 @@ TEST_F(T_SQLite_Wrapper, CreateEmptyDatabase) {
   EXPECT_EQ (1, db->create_empty_db_calls    );
   EXPECT_EQ (0, db->check_compatibility_calls);
   EXPECT_EQ (0, db->live_upgrade_calls       );
-  EXPECT_EQ (0, db->compactize_calls         );
+  EXPECT_EQ (0, db->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db->schema_revision());
   EXPECT_TRUE (db->IsEqualSchema(db->schema_version(),
                                  DummyDatabase::kLatestSchema));
@@ -157,7 +157,7 @@ TEST_F(T_SQLite_Wrapper, CloseDatabase) {
   EXPECT_EQ (1, db->create_empty_db_calls    );
   EXPECT_EQ (0, db->check_compatibility_calls);
   EXPECT_EQ (0, db->live_upgrade_calls       );
-  EXPECT_EQ (0, db->compactize_calls         );
+  EXPECT_EQ (0, db->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db->schema_revision());
   EXPECT_TRUE (db->IsEqualSchema(db->schema_version(),
                                  DummyDatabase::kLatestSchema));
@@ -178,7 +178,7 @@ TEST_F(T_SQLite_Wrapper, OpenDatabase) {
   EXPECT_EQ (1, db1->create_empty_db_calls    );
   EXPECT_EQ (0, db1->check_compatibility_calls);
   EXPECT_EQ (0, db1->live_upgrade_calls       );
-  EXPECT_EQ (0, db1->compactize_calls         );
+  EXPECT_EQ (0, db1->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db1->schema_revision());
   EXPECT_EQ (dbp, db1->filename());
   EXPECT_TRUE (db1->IsEqualSchema(db1->schema_version(),
@@ -195,7 +195,7 @@ TEST_F(T_SQLite_Wrapper, OpenDatabase) {
   EXPECT_EQ (0, db2->create_empty_db_calls    );
   EXPECT_EQ (1, db2->check_compatibility_calls);
   EXPECT_EQ (0, db2->live_upgrade_calls       );
-  EXPECT_EQ (0, db2->compactize_calls         );
+  EXPECT_EQ (0, db2->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db2->schema_revision());
   EXPECT_EQ (dbp, db2->filename());
   EXPECT_TRUE (db2->IsEqualSchema(db2->schema_version(),
@@ -218,7 +218,7 @@ TEST_F(T_SQLite_Wrapper, ReadWriteOpenDatabase) {
   EXPECT_EQ (1, db1->create_empty_db_calls    );
   EXPECT_EQ (0, db1->check_compatibility_calls);
   EXPECT_EQ (0, db1->live_upgrade_calls       );
-  EXPECT_EQ (0, db1->compactize_calls         );
+  EXPECT_EQ (0, db1->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db1->schema_revision());
   EXPECT_EQ (dbp, db1->filename());
   EXPECT_TRUE (db1->IsEqualSchema(db1->schema_version(),
@@ -235,7 +235,7 @@ TEST_F(T_SQLite_Wrapper, ReadWriteOpenDatabase) {
   EXPECT_EQ (0, db2->create_empty_db_calls    );
   EXPECT_EQ (1, db2->check_compatibility_calls);
   EXPECT_EQ (1, db2->live_upgrade_calls       );
-  EXPECT_EQ (0, db2->compactize_calls         );
+  EXPECT_EQ (0, db2->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db2->schema_revision());
   EXPECT_EQ (dbp, db2->filename());
   EXPECT_TRUE (db2->IsEqualSchema(db2->schema_version(),
@@ -248,7 +248,7 @@ TEST_F(T_SQLite_Wrapper, ReadWriteOpenDatabase) {
 }
 
 
-TEST_F(T_SQLite_Wrapper, CompactizeDatabase) {
+TEST_F(T_SQLite_Wrapper, CompactDatabase) {
   const std::string dbp = GetDatabaseFilename();
 
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
@@ -257,7 +257,7 @@ TEST_F(T_SQLite_Wrapper, CompactizeDatabase) {
   EXPECT_EQ (1, db1->create_empty_db_calls    );
   EXPECT_EQ (0, db1->check_compatibility_calls);
   EXPECT_EQ (0, db1->live_upgrade_calls       );
-  EXPECT_EQ (0, db1->compactize_calls         );
+  EXPECT_EQ (0, db1->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db1->schema_revision());
   EXPECT_EQ (dbp, db1->filename());
   EXPECT_TRUE (db1->IsEqualSchema(db1->schema_version(),
@@ -274,7 +274,7 @@ TEST_F(T_SQLite_Wrapper, CompactizeDatabase) {
   EXPECT_EQ (0, db2->create_empty_db_calls    );
   EXPECT_EQ (1, db2->check_compatibility_calls);
   EXPECT_EQ (1, db2->live_upgrade_calls       );
-  EXPECT_EQ (0, db2->compactize_calls         );
+  EXPECT_EQ (0, db2->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db2->schema_revision());
   EXPECT_EQ (dbp, db2->filename());
   EXPECT_TRUE (db2->IsEqualSchema(db2->schema_version(),
@@ -287,7 +287,7 @@ TEST_F(T_SQLite_Wrapper, CompactizeDatabase) {
   EXPECT_EQ (0, db2->create_empty_db_calls    );
   EXPECT_EQ (1, db2->check_compatibility_calls);
   EXPECT_EQ (1, db2->live_upgrade_calls       );
-  EXPECT_EQ (1, db2->compactize_calls         );
+  EXPECT_EQ (1, db2->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db2->schema_revision());
   EXPECT_EQ (dbp, db2->filename());
   EXPECT_TRUE (db2->IsEqualSchema(db2->schema_version(),
@@ -524,7 +524,7 @@ TEST_F(T_SQLite_Wrapper, DataAccess) {
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
-  EXPECT_EQ (0,   db1->compactize_calls);
+  EXPECT_EQ (0,   db1->compact_calls);
 
   delete db1;
   EXPECT_EQ (0, DummyDatabase::instances);
@@ -569,7 +569,7 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
-  EXPECT_EQ (0, db1->compactize_calls);
+  EXPECT_EQ (0, db1->compact_calls);
 
   delete db1;
   EXPECT_EQ (0, DummyDatabase::instances);
@@ -585,7 +585,7 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   }
 
   EXPECT_LT (0.9, db2->GetFreePageRatio());
-  EXPECT_EQ (0, db2->compactize_calls);
+  EXPECT_EQ (0, db2->compact_calls);
 
   delete db2;
   EXPECT_EQ (0, DummyDatabase::instances);
@@ -594,12 +594,12 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   DummyDatabase *db3 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db3);
   EXPECT_LT (0.9, db3->GetFreePageRatio());
-  EXPECT_EQ (0, db3->compactize_calls);
+  EXPECT_EQ (0, db3->compact_calls);
 
   EXPECT_TRUE (db3->Vacuum());
 
   EXPECT_GT (0.1, db3->GetFreePageRatio());
-  EXPECT_EQ (1, db3->compactize_calls);
+  EXPECT_EQ (1, db3->compact_calls);
 
   delete db3;
   EXPECT_EQ (0, DummyDatabase::instances);
@@ -608,15 +608,15 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   DummyDatabase *db4 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db4);
   EXPECT_GT (0.1, db4->GetFreePageRatio());
-  EXPECT_EQ (0, db4->compactize_calls);
+  EXPECT_EQ (0, db4->compact_calls);
 
   EXPECT_TRUE (db4->Vacuum());
   EXPECT_GT (0.1, db4->GetFreePageRatio());
-  EXPECT_EQ (1, db4->compactize_calls);
+  EXPECT_EQ (1, db4->compact_calls);
 
   EXPECT_TRUE (db4->Vacuum());
   EXPECT_GT (0.1, db4->GetFreePageRatio());
-  EXPECT_EQ (2, db4->compactize_calls);
+  EXPECT_EQ (2, db4->compact_calls);
 
   delete db4;
   EXPECT_EQ (0, DummyDatabase::instances);
@@ -648,7 +648,7 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
-  EXPECT_EQ (0, db1->compactize_calls);
+  EXPECT_EQ (0, db1->compact_calls);
 
   delete db1;
   EXPECT_EQ (0, DummyDatabase::instances);
@@ -664,17 +664,17 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
   }
 
   EXPECT_LT (0.9, db2->GetFreePageRatio());
-  EXPECT_EQ (0,   db2->compactize_calls);
+  EXPECT_EQ (0,   db2->compact_calls);
 
   DummyDatabase::compacting_fails = true;
   EXPECT_FALSE (db2->Vacuum());
   EXPECT_LT (0.9, db2->GetFreePageRatio());
-  EXPECT_EQ (1,   db2->compactize_calls);
+  EXPECT_EQ (1,   db2->compact_calls);
 
   DummyDatabase::compacting_fails = false;
   EXPECT_TRUE (db2->Vacuum());
   EXPECT_GT (0.1, db2->GetFreePageRatio());
-  EXPECT_EQ (2,   db2->compactize_calls);
+  EXPECT_EQ (2,   db2->compact_calls);
 
   delete db2;
   EXPECT_EQ (0, DummyDatabase::instances);
