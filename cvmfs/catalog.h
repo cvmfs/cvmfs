@@ -146,6 +146,7 @@ class Catalog : public SingleCopy {
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
+  uint64_t GetLastModified() const;
   uint64_t GetNumEntries() const;
   shash::Any GetPreviousRevision() const;
   const Counters& GetCounters() const { return counters_; };
