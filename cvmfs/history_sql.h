@@ -64,6 +64,13 @@ class SqlInsertTag : public SqlRetrieveTag {
 };
 
 
+class SqlRemoveTag : public sqlite::Sql {
+ public:
+  SqlRemoveTag(const HistoryDatabase *database);
+  bool BindName(const std::string &name);
+};
+
+
 class SqlFindTag : public SqlRetrieveTag {
  public:
   SqlFindTag(const HistoryDatabase *database);

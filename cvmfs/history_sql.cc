@@ -114,6 +114,17 @@ bool SqlInsertTag::BindTag(const History::Tag &tag) {
 }
 
 
+SqlRemoveTag::SqlRemoveTag(const HistoryDatabase *database) {
+  const std::string stmt = "DELETE FROM tags WHERE name = :name;";
+  const bool success = Init(database->sqlite_db(), stmt);
+  assert (success);
+}
+
+bool SqlRemoveTag::BindName(const std::string &name) {
+  return BindText(1, name);
+}
+
+
 SqlFindTag::SqlFindTag(const HistoryDatabase *database) {
   const std::string stmt =
     "SELECT " + GetDatabaseFields() + " FROM tags "

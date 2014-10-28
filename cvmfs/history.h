@@ -20,6 +20,7 @@ namespace history {
 
 class HistoryDatabase;
 class SqlInsertTag;
+class SqlRemoveTag;
 class SqlFindTag;
 class SqlCountTags;
 class SqlListTags;
@@ -73,6 +74,7 @@ class History {
   bool CommitTransaction() const;
 
   bool Insert(const Tag &tag);
+  bool Remove(const std::string &name);
   bool Find(const std::string &name, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
 
@@ -92,6 +94,7 @@ class History {
   std::string                  fqrn_;
 
   UniquePtr<SqlInsertTag>      insert_tag_;
+  UniquePtr<SqlRemoveTag>      remove_tag_;
   UniquePtr<SqlFindTag>        find_tag_;
   UniquePtr<SqlCountTags>      count_tags_;
   UniquePtr<SqlListTags>       list_tags_;
