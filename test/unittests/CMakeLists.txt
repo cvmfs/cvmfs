@@ -44,6 +44,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_dirtab.cc
   t_callbacks.cc
   t_lru.cc
+  t_sqlite_database.cc
 
   # test utility functions
   testutil.cc testutil.h

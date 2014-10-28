@@ -46,59 +46,31 @@ enum ChunkTypes {
 };
 
 
-/**
- * Encapsulates an SQlite connection.  Abstracts the schema.
- */
-class Database {
+class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
  public:
   static const float kLatestSchema;
   static const float kLatestSupportedSchema;  // + 1.X catalogs (r/o)
-  static const float kSchemaEpsilon;  // floats get imprecise in SQlite
   // backwards-compatible schema changes
   static const unsigned kLatestSchemaRevision;
 
-  static bool IsEqualSchema(const float value, const float compare) {
-    return (value > compare - kSchemaEpsilon &&
-            value < compare + kSchemaEpsilon);
-  }
-
-  Database(const std::string filename, const sqlite::DbOpenMode open_mode);
-  ~Database();
-  static bool Create(const std::string &filename,
-                     const std::string &root_path,
-                     const bool volatile_content,
-                     const DirectoryEntry &root_entry
+  bool CreateEmptyDatabase();
+  bool InsertInitialValues(const std::string     &root_path,
+                           const bool             volatile_content,
+                           const DirectoryEntry  &root_entry
                                              = DirectoryEntry(kDirentNegative));
 
-  sqlite3 *sqlite_db() const { return sqlite_db_; }
-  std::string filename() const { return filename_; }
-  float schema_version() const { return schema_version_; }
-  unsigned schema_revision() const { return schema_revision_; }
-  bool ready() const { return ready_; }
+  bool CheckSchemaCompatibility();
+  bool LiveSchemaUpgradeIfNecessary();
+  bool CompactDatabase() const;
 
-  double GetFreePageRatio() const;
   double GetRowIdWasteRatio() const;
-  bool Vacuum() const;
 
-  /**
-   * Returns the english language error description of the last error
-   * happened in the context of the encapsulated sqlite3 database object.
-   * Note: In a multithreaded context it might be unpredictable which
-   *       the actual last error is.
-   * @return   english language error description of last error
-   */
-  std::string GetLastErrorMsg() const;
-
- private:
-  Database(const std::string &filename,
-           const float schema, const unsigned revision);
-
-  sqlite3 *sqlite_db_;
-  std::string filename_;
-  float schema_version_;
-  unsigned schema_revision_;
-  bool read_write_;
-  bool ready_;
+ protected:
+  // TODO: C++11 - constructor inheritance
+  friend class sqlite::Database<CatalogDatabase>;
+  CatalogDatabase(const std::string  &filename,
+                  const OpenMode      open_mode) :
+    sqlite::Database<CatalogDatabase>(filename, open_mode) {}
 };
 
 
@@ -116,7 +88,7 @@ class Sql : public sqlite::Sql {
    * @param database the database to use the query on
    * @param statement the statement to prepare
    */
-  Sql(const Database &database, const std::string &statement) {
+  Sql(const CatalogDatabase &database, const std::string &statement) {
     Init(database.sqlite_db(), statement);
   }
   virtual ~Sql() { /* Done by super class */ }
@@ -318,7 +290,7 @@ class SqlLookup : public SqlDirent {
 
 class SqlListing : public SqlLookup {
  public:
-  SqlListing(const Database &database);
+  SqlListing(const CatalogDatabase &database);
   bool BindPathHash(const struct shash::Md5 &hash);
 };
 
@@ -328,7 +300,7 @@ class SqlListing : public SqlLookup {
 
 class SqlLookupPathHash : public SqlLookup {
  public:
-  SqlLookupPathHash(const Database &database);
+  SqlLookupPathHash(const CatalogDatabase &database);
   bool BindPathHash(const struct shash::Md5 &hash);
 };
 
@@ -338,7 +310,7 @@ class SqlLookupPathHash : public SqlLookup {
 
 class SqlLookupInode : public SqlLookup {
  public:
-  SqlLookupInode(const Database &database);
+  SqlLookupInode(const CatalogDatabase &database);
   bool BindRowId(const uint64_t inode);
 };
 
@@ -354,7 +326,7 @@ class SqlLookupInode : public SqlLookup {
  */
 class SqlDirentTouch : public Sql {
  public:
-  SqlDirentTouch(const Database &database);
+  SqlDirentTouch(const CatalogDatabase &database);
 
   bool BindDirentBase(const DirectoryEntryBase &entry);
   bool BindPathHash(const shash::Md5 &hash);
@@ -366,7 +338,7 @@ class SqlDirentTouch : public Sql {
 
 class SqlNestedCatalogLookup : public Sql {
  public:
-  SqlNestedCatalogLookup(const Database &database);
+  SqlNestedCatalogLookup(const CatalogDatabase &database);
   bool BindSearchPath(const PathString &path);
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
@@ -378,7 +350,7 @@ class SqlNestedCatalogLookup : public Sql {
 
 class SqlNestedCatalogListing : public Sql {
  public:
-  SqlNestedCatalogListing(const Database &database);
+  SqlNestedCatalogListing(const CatalogDatabase &database);
   PathString GetMountpoint() const;
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
@@ -390,7 +362,7 @@ class SqlNestedCatalogListing : public Sql {
 
 class SqlDirentInsert : public SqlDirentWrite {
  public:
-  SqlDirentInsert(const Database &database);
+  SqlDirentInsert(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   bool BindParentPathHash(const shash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
@@ -402,7 +374,7 @@ class SqlDirentInsert : public SqlDirentWrite {
 
 class SqlDirentUpdate : public SqlDirentWrite {
  public:
-  SqlDirentUpdate(const Database &database);
+  SqlDirentUpdate(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
 };
@@ -413,7 +385,7 @@ class SqlDirentUpdate : public SqlDirentWrite {
 
 class SqlDirentUnlink : public Sql {
  public:
-  SqlDirentUnlink(const Database &database);
+  SqlDirentUnlink(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
 };
 
@@ -426,7 +398,7 @@ class SqlDirentUnlink : public Sql {
  */
 class SqlIncLinkcount : public Sql {
  public:
-  SqlIncLinkcount(const Database &database);
+  SqlIncLinkcount(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   bool BindDelta(const int delta);
 };
@@ -437,7 +409,7 @@ class SqlIncLinkcount : public Sql {
 
 class SqlChunkInsert : public Sql {
  public:
-  SqlChunkInsert(const Database &database);
+  SqlChunkInsert(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   bool BindFileChunk(const FileChunk &chunk);
 };
@@ -448,7 +420,7 @@ class SqlChunkInsert : public Sql {
 
 class SqlChunksRemove : public Sql {
  public:
-  SqlChunksRemove(const Database &database);
+  SqlChunksRemove(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
 };
 
@@ -458,7 +430,7 @@ class SqlChunksRemove : public Sql {
 
 class SqlChunksListing : public Sql {
  public:
-  SqlChunksListing(const Database &database);
+  SqlChunksListing(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   FileChunk GetFileChunk(const shash::Algorithms interpret_hash_as) const;
 };
@@ -469,7 +441,7 @@ class SqlChunksListing : public Sql {
 
 class SqlChunksCount : public Sql {
  public:
-  SqlChunksCount(const Database &database);
+  SqlChunksCount(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   int GetChunkCount() const;
 };
@@ -480,7 +452,7 @@ class SqlChunksCount : public Sql {
 
 class SqlMaxHardlinkGroup : public Sql {
  public:
-  SqlMaxHardlinkGroup(const Database &database);
+  SqlMaxHardlinkGroup(const CatalogDatabase &database);
   uint32_t GetMaxGroupId() const;
 };
 
@@ -490,7 +462,7 @@ class SqlMaxHardlinkGroup : public Sql {
 
 class SqlGetCounter : public Sql {
  public:
-  SqlGetCounter(const Database &database);
+  SqlGetCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
   uint64_t GetCounter() const;
  private:
@@ -503,7 +475,7 @@ class SqlGetCounter : public Sql {
 
 class SqlUpdateCounter : public Sql {
  public:
-  SqlUpdateCounter(const Database &database);
+  SqlUpdateCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
   bool BindDelta(const int64_t delta);
 };
@@ -514,7 +486,7 @@ class SqlUpdateCounter : public Sql {
 
 class SqlCreateCounter : public Sql {
  public:
-  SqlCreateCounter(const Database &database);
+  SqlCreateCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
   bool BindInitialValue(const int64_t value);
 };
@@ -525,7 +497,7 @@ class SqlCreateCounter : public Sql {
 
 class SqlAllChunks : public Sql {
  public:
-  SqlAllChunks(const Database &database);
+  SqlAllChunks(const CatalogDatabase &database);
   bool Open();
   bool Next(shash::Any *hash, ChunkTypes *type);
   bool Close();

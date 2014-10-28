@@ -100,11 +100,19 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   string root_path = "";
 
   // Create the database schema and the inital root entry
-  if (!Database::Create(file_path, root_path, volatile_content, root_entry)) {
+  CatalogDatabase *new_catalog_db = CatalogDatabase::Create(file_path);
+  if (NULL == new_catalog_db ||
+      ! new_catalog_db->InsertInitialValues(root_path,
+                                            volatile_content,
+                                            root_entry))
+  {
     LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
              file_path.c_str());
     return NULL;
   }
+
+  // closing the newly created catalog again
+  delete new_catalog_db;
 
   // Compress root catalog;
   int64_t catalog_size = GetFileSize(file_path);
@@ -517,10 +525,15 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   const string database_file_path = CreateTempPath(dir_temp() + "/catalog",
                                                    0666);
   const bool volatile_content = false;
-  retval =
-    Database::Create(database_file_path, nested_root_path, volatile_content,
-                     new_root_entry);
-  assert(retval);
+  CatalogDatabase *new_catalog_db = CatalogDatabase::Create(database_file_path);
+  assert (NULL != new_catalog_db);
+  retval = new_catalog_db->InsertInitialValues(nested_root_path,
+                                               volatile_content,
+                                               new_root_entry);
+  assert (retval);
+  delete new_catalog_db; // TODO: we need a way to attach a catalog directy from
+                         //       an open database to remove this indirection
+  new_catalog_db = NULL;
 
   // Attach the just created nested catalog
   Catalog *new_catalog =

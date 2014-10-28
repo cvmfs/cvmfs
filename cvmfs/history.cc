@@ -16,200 +16,55 @@ using namespace std;  // NOLINT
 
 namespace history {
 
-const float Database::kLatestSchema = 1.0;
-const float Database::kLatestSupportedSchema = 1.0;
-const float Database::kSchemaEpsilon = 0.0005;
-const unsigned Database::kLatestSchemaRevision = 1;
-
-bool Database::Open(const std::string filename,
-                    const sqlite::DbOpenMode open_mode)
-{
-  filename_ = filename;
-  ready_ = false;
-  schema_version_ = 0.0;
-  schema_revision_ = 0;
-  sqlite_db_ = NULL;
-
-  int flags = SQLITE_OPEN_NOMUTEX;
-  switch (open_mode) {
-    case sqlite::kDbOpenReadOnly:
-      flags |= SQLITE_OPEN_READONLY;
-      read_write_ = false;
-      break;
-    case sqlite::kDbOpenReadWrite:
-      flags |= SQLITE_OPEN_READWRITE;
-      read_write_ = true;
-      break;
-    default:
-      abort();
-  }
-
-  // Open database file (depending on the flags read-only or read-write)
-  LogCvmfs(kLogHistory, kLogDebug, "opening database file %s",
-           filename_.c_str());
-  if (SQLITE_OK != sqlite3_open_v2(filename_.c_str(), &sqlite_db_, flags, NULL))
-  {
-    LogCvmfs(kLogHistory, kLogDebug, "cannot open catalog database file %s",
-             filename_.c_str());
-    return false;
-  }
-  sqlite3_extended_result_codes(sqlite_db_, 1);
-
-  {  // Get schema version and revision
-    sqlite::Sql sql_schema(sqlite_db_,
-                           "SELECT value FROM properties WHERE key='schema';");
-    if (sql_schema.FetchRow()) {
-      schema_version_ = sql_schema.RetrieveDouble(0);
-    } else {
-      LogCvmfs(kLogHistory, kLogDebug, "failed to retrieve schema in %s",
-               filename_.c_str());
-      goto database_failure;
-    }
-    sqlite::Sql sql_schema_revision(sqlite_db_,
-      "SELECT value FROM properties WHERE key='schema_revision';");
-    if (sql_schema_revision.FetchRow()) {
-      schema_revision_ = sql_schema_revision.RetrieveInt(0);
-    }
-  }
-  LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f revision %d",
-           schema_version_, schema_revision_);
-  if ((schema_version_ < kLatestSupportedSchema-kSchemaEpsilon) ||
-      (schema_version_ > kLatestSchema+kSchemaEpsilon))
-  {
-    LogCvmfs(kLogCatalog, kLogDebug, "schema version %f not supported (%s)",
-             schema_version_, filename.c_str());
-    goto database_failure;
-  }
-  // Live schema upgrade
-  if (open_mode == sqlite::kDbOpenReadWrite) {
-    if (schema_revision_ == 0) {
-      LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
-      sqlite::Sql sql_upgrade(sqlite_db_, "ALTER TABLE tags ADD size INTEGER;");
-      if (!sql_upgrade.Execute()) {
-        LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
-        goto database_failure;
-      }
-      sqlite::Sql sql_revision(sqlite_db_,
-                               "INSERT INTO properties (key, value) VALUES "
-                               "('schema_revision', 1);");
-      if (!sql_revision.Execute()) {
-        LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
-        goto database_failure;
-      }
-
-      schema_revision_ = 1;
-    }
-  }
-
-  ready_ = true;
-  return true;
-
- database_failure:
-  sqlite3_close(sqlite_db_);
-  sqlite_db_ = NULL;
-  return false;
-}
-
-
-/**
- * Private constructor.  Used to create a new sqlite database.
- */
-Database::Database(sqlite3 *sqlite_db, const float schema,
-                   const unsigned schema_revision, const bool rw)
-{
-  sqlite_db_ = sqlite_db;
-  filename_ = "TMP";
-  schema_version_ = schema;
-  schema_revision_ = schema_revision;
-  read_write_ = rw;
-  ready_ = false;  // Don't close on delete
-}
-
-
-Database::~Database() {
-  if (ready_)
-    sqlite3_close(sqlite_db_);
-}
+const float HistoryDatabase::kLatestSchema = 1.0;
+const float HistoryDatabase::kLatestSupportedSchema = 1.0;
+const unsigned HistoryDatabase::kLatestSchemaRevision = 1;
 
 
 /**
  * This method creates a new database file and initializes the database schema.
  */
-bool Database::Create(const string &filename, const string &repository_name)
-{
-  sqlite3 *sqlite_db;
-  sqlite::Sql *sql_schema;
-  sqlite::Sql *sql_schema_revision;
-  sqlite::Sql *sql_fqrn;
-  int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
-                   SQLITE_OPEN_CREATE;
-
-  // Create the new catalog file and open it
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating new history db at '%s'",
-           filename.c_str());
-  if (sqlite3_open_v2(filename.c_str(), &sqlite_db, open_flags, NULL) !=
-      SQLITE_OK)
-  {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "Cannot create and open history database file '%s'",
-             filename.c_str());
-    return false;
-  }
-  sqlite3_extended_result_codes(sqlite_db, 1);
-  Database database(sqlite_db, kLatestSchema, kLatestSchemaRevision, true);
-
-  bool retval;
-  string sql_create =
+bool HistoryDatabase::CreateEmptyDatabase() {
+  assert (read_write());
+  return sqlite::Sql(sqlite_db(),
     "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
     "  timestamp INTEGER, channel INTEGER, description TEXT, size INTEGER, "
-    "  CONSTRAINT pk_tags PRIMARY KEY (name))";
-  retval = sqlite::Sql(sqlite_db, sql_create).Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  sql_create = "CREATE TABLE properties (key TEXT, value TEXT, "
-               "CONSTRAINT pk_properties PRIMARY KEY (key));";
-  retval = sqlite::Sql(sqlite_db, sql_create).Execute();
-  if (!retval)
-    goto create_schema_fail;
-
-  sql_schema = new sqlite::Sql(sqlite_db, "INSERT INTO properties "
-                               "(key, value) VALUES ('schema', :schema);");
-  retval = sql_schema->BindDouble(1, kLatestSchema) && sql_schema->Execute();
-  delete sql_schema;
-  if (!retval)
-    goto create_schema_fail;
-
-  sql_schema_revision =
-    new sqlite::Sql(sqlite_db, "INSERT INTO properties "
-                               "(key, value) VALUES ('schema_revision', :r);");
-  retval = sql_schema_revision->BindInt(1, kLatestSchemaRevision) &&
-           sql_schema_revision->Execute();
-  delete sql_schema_revision;
-  if (!retval)
-    goto create_schema_fail;
-
-  sql_fqrn = new sqlite::Sql(sqlite_db, "INSERT INTO properties "
-                             "(key, value) VALUES ('fqrn', :name);");
-  retval = sql_fqrn->BindText(1, repository_name) && sql_fqrn->Execute();
-  delete sql_fqrn;
-  if (!retval)
-    goto create_schema_fail;
-
-  sqlite3_close(sqlite_db);
-  return true;
-
- create_schema_fail:
-  LogCvmfs(kLogSql, kLogVerboseMsg, "sql failure %s",
-           sqlite3_errmsg(sqlite_db));
-  sqlite3_close(sqlite_db);
-  return false;
+    "  CONSTRAINT pk_tags PRIMARY KEY (name))").Execute();
 }
 
 
-std::string Database::GetLastErrorMsg() const {
-  std::string msg = sqlite3_errmsg(sqlite_db_);
-  return msg;
+bool HistoryDatabase::InsertInitialValues(const std::string &repository_name) {
+  assert (read_write());
+  return this->SetProperty("fqrn", repository_name);
+}
+
+
+bool HistoryDatabase::CheckSchemaCompatibility() {
+  return ! ((schema_version() < kLatestSupportedSchema - kSchemaEpsilon) ||
+            (schema_version() > kLatestSchema          + kSchemaEpsilon));
+}
+
+
+bool HistoryDatabase::LiveSchemaUpgradeIfNecessary() {
+  assert (read_write());
+
+  if (schema_revision() == 0) {
+    LogCvmfs(kLogHistory, kLogDebug, "upgrading schema revision");
+
+    sqlite::Sql sql_upgrade(sqlite_db(), "ALTER TABLE tags ADD size INTEGER;");
+    if (!sql_upgrade.Execute()) {
+      LogCvmfs(kLogHistory, kLogDebug, "failed to upgrade tags table");
+      return false;
+    }
+
+    set_schema_revision(1);
+    if (! StoreSchemaRevision()) {
+      LogCvmfs(kLogHistory, kLogDebug, "failed tp upgrade schema revision");
+      return false;
+    }
+  }
+
+  return true;
 }
 
 
@@ -246,7 +101,7 @@ Tag SqlTag::RetrieveTag() {
 //------------------------------------------------------------------------------
 
 
-bool TagList::Load(Database *database) {
+bool TagList::Load(HistoryDatabase *database) {
   assert(database);
   string size_field = "0";
   if (database->schema_revision() >= 1)
@@ -263,7 +118,7 @@ bool TagList::Load(Database *database) {
 }
 
 
-bool TagList::Store(Database *database) {
+bool TagList::Store(HistoryDatabase *database) {
   assert(database);
   SqlTag sql_erase(*database, "DELETE FROM tags;");
   bool retval = sql_erase.Execute();

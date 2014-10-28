@@ -41,7 +41,7 @@ set (CVMFS_CLIENT_SOURCES
   bigvector.h
   lru.h
   globals.h globals.cc
-  sql.h sql.cc
+  sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr.cc
@@ -144,7 +144,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   directory_entry.h directory_entry.cc
   shortstring.h
   catalog_traversal.h catalog_traversal.cc
-  sql.h sql.cc
+  sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_rw.h catalog_rw.cc

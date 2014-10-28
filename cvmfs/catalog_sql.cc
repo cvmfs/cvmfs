@@ -4,14 +4,10 @@
 
 #include "catalog_sql.h"
 
-#include <fcntl.h>
-#include <errno.h>
-
 #include <cstdlib>
 #include <cstring>
 #include <cstdlib>
 
-#include "platform.h"
 #include "catalog.h"
 #include "logging.h"
 #include "util.h"
@@ -21,255 +17,114 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 // Changelog
-const float Database::kLatestSchema = 2.5;
-const float Database::kLatestSupportedSchema = 2.5;  // + 1.X catalogs (r/o)
-const float Database::kSchemaEpsilon = 0.0005;  // floats get imprecise in SQlite
+const float CatalogDatabase::kLatestSchema = 2.5;
+const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X catalogs (r/o)
 // ChangeLog
 //   0 --> 1: add size column to nested catalog table,
 //            add schema_revision property
-const unsigned Database::kLatestSchemaRevision = 1;
+const unsigned CatalogDatabase::kLatestSchemaRevision = 1;
 
 
-static void SqlError(const std::string &error_msg, const Database &database) {
-  LogCvmfs(kLogCatalog, kLogStderr, "%s\nSQLite said: '%s'",
-           error_msg.c_str(), database.GetLastErrorMsg().c_str());
+bool CatalogDatabase::CheckSchemaCompatibility() {
+  return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
+            (!IsEqualSchema(schema_version(), kLatestSupportedSchema)) &&
+            (!IsEqualSchema(schema_version(), 2.4)           ||
+             !IsEqualSchema(kLatestSupportedSchema, 2.5)) );
 }
 
 
-Database::Database(const std::string filename,
-                   const sqlite::DbOpenMode open_mode)
-{
-  int retval;
+bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
+  assert (read_write());
 
-  filename_ = filename;
-  ready_ = false;
-  schema_version_ = 0.0;
-  schema_revision_ = 0;
-  sqlite_db_ = NULL;
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
 
-  int flags = SQLITE_OPEN_NOMUTEX;
-  switch (open_mode) {
-    case sqlite::kDbOpenReadOnly:
-      flags |= SQLITE_OPEN_READONLY;
-      read_write_ = false;
-      break;
-    case sqlite::kDbOpenReadWrite:
-      flags |= SQLITE_OPEN_READWRITE;
-      read_write_ = true;
-      break;
-    default:
-      abort();
-  }
-
-  // Open database file (depending on the flags read-only or read-write)
-  LogCvmfs(kLogCatalog, kLogDebug, "opening database file %s",
-           filename_.c_str());
-  if (SQLITE_OK != sqlite3_open_v2(filename_.c_str(), &sqlite_db_, flags, NULL))
-  {
-    LogCvmfs(kLogCatalog, kLogDebug, "cannot open catalog database file %s",
-             filename_.c_str());
-    return;
-  }
-  sqlite3_extended_result_codes(sqlite_db_, 1);
-
-  // Read-ahead into file system buffers
-  // TODO: mmap, re-readahead
-  int fd_readahead = open(filename_.c_str(), O_RDONLY);
-  if (fd_readahead < 0) {
-    LogCvmfs(kLogCatalog, kLogDebug, "failed to open %s for read-ahead (%d)",
-             filename_.c_str(), errno);
-    goto database_failure;
-    return;
-  }
-  retval = platform_readahead(fd_readahead);
-  if (retval != 0) {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogWarn,
-             "failed to read-ahead %s (%d)", filename_.c_str(), errno);
-    //close(fd_readahead);
-    //goto database_failure;
-  }
-  close(fd_readahead);
-
-  {  // Get schema version and revision
-    Sql sql_schema(*this, "SELECT value FROM properties WHERE key='schema';");
-    if (sql_schema.FetchRow()) {
-      schema_version_ = sql_schema.RetrieveDouble(0);
-    } else {
-      schema_version_ = 1.0;
+    Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
+    if (! sql_upgrade.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
+      return false;
     }
 
-    Sql sql_revision(*this,
-                     "SELECT value FROM properties WHERE key='schema_revision';");
-    if (sql_revision.FetchRow()) {
-      schema_revision_ = sql_revision.RetrieveInt64(0);
+    set_schema_revision(1);
+    if (! StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+      return false;
     }
-  }
-  LogCvmfs(kLogCatalog, kLogDebug, "open db with schema version %f revision %u",
-           schema_version_, schema_revision_);
-  if ( (schema_version_ >= 2.0-kSchemaEpsilon)                   &&
-       (!IsEqualSchema(schema_version_, kLatestSupportedSchema)) &&
-       (!IsEqualSchema(schema_version_, 2.4)           ||
-        !IsEqualSchema(kLatestSupportedSchema, 2.5)) )
-  {
-    LogCvmfs(kLogCatalog, kLogDebug, "schema version %f not supported (%s)",
-             schema_version_, filename.c_str());
-    goto database_failure;
+  } else {
+    LogCvmfs(kLogCatalog, kLogDebug, "schema revision is up to date.");
   }
 
-  // Live schema upgrade
-  if (open_mode == sqlite::kDbOpenReadWrite) {
-    if (IsEqualSchema(schema_version_, 2.5) && (schema_revision_ == 0)) {
-      LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
-      Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
-      if (!sql_upgrade.Execute()) {
-        LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
-        goto database_failure;
-      }
-      Sql sql_revision(*this, "INSERT INTO properties (key, value) VALUES "
-                       "('schema_revision', 1);");
-      if (!sql_revision.Execute()) {
-        LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
-        goto database_failure;
-      }
-
-      schema_revision_ = 1;
-    }
-  }
-
-  ready_ = true;
-  return;
-
- database_failure:
-  sqlite3_close(sqlite_db_);
-  sqlite_db_ = NULL;
+  return true;
 }
 
 
-/**
- * Private constructor.  Used to create a new sqlite database.
- */
-Database::Database(const std::string &filename,
-                   const float schema, const unsigned revision) :
-  sqlite_db_(NULL),
-  filename_(filename),
-  schema_version_(schema),
-  schema_revision_(revision),
-  read_write_(true),
-  ready_(false)
-{
-  const int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
-                         SQLITE_OPEN_CREATE;
-
-  // Create and open new database file
-  if (sqlite3_open_v2(filename_.c_str(), &sqlite_db_, open_flags, NULL)
-      != SQLITE_OK)
-  {
-    return;
-  }
-
-  sqlite3_extended_result_codes(sqlite_db_, 1);
-  ready_ = true;
-}
-
-
-Database::~Database() {
-  if (ready_) {
-    sqlite3_close(sqlite_db_);
-  }
-}
-
-
-/**
- * This method creates a new database file and initializes the database schema.
- */
-bool Database::Create(const string &filename,
-                      const string &root_path,
-                      const bool volatile_content,
-                      const DirectoryEntry &root_entry)
-{
-  bool retval = false;
-
-  // Path hashes
-  shash::Md5 root_path_hash = shash::Md5(shash::AsciiPtr(root_path));
-  shash::Md5 root_parent_hash;
-  if (root_path == "")
-    root_parent_hash = shash::Md5();
-  else
-    root_parent_hash = shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
-
-  // Create the new catalog file and open it
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating new catalog at '%s'",
-           filename.c_str());
-  Database database(filename, kLatestSchema, kLatestSchemaRevision);
-  if (!database.ready()) {
-    LogCvmfs(kLogCatalog, kLogStderr,
-             "Cannot create and open catalog database file '%s'\n"
-             "SQLite said: '%s'",
-             filename.c_str(), database.GetLastErrorMsg().c_str());
-    return false;
-  }
+bool CatalogDatabase::CreateEmptyDatabase() {
+  assert (read_write());
 
   // generate the catalog table and index structure
-  retval =
-  Sql(database,
+  const bool retval =
+  Sql(*this,
     "CREATE TABLE catalog "
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
-  Sql(database,
+  Sql(*this,
     "CREATE INDEX idx_catalog_parent "
     "ON catalog (parent_1, parent_2);")                           .Execute()  &&
-  Sql(database,
+  Sql(*this,
     "CREATE TABLE chunks "
     "(md5path_1 INTEGER, md5path_2 INTEGER, offset INTEGER, size INTEGER, "
     " hash BLOB, "
     " CONSTRAINT pk_chunks PRIMARY KEY (md5path_1, md5path_2, offset, size), "
     " FOREIGN KEY (md5path_1, md5path_2) REFERENCES "
     "   catalog(md5path_1, md5path_2));")                         .Execute()  &&
-  Sql(database,
-    "CREATE TABLE properties (key TEXT, value TEXT, "
-    "CONSTRAINT pk_properties PRIMARY KEY (key));")               .Execute()  &&
-  Sql(database,
+  Sql(*this,
     "CREATE TABLE nested_catalogs (path TEXT, sha1 TEXT, size INTEGER, "
     "CONSTRAINT pk_nested_catalogs PRIMARY KEY (path));")         .Execute()  &&
-  Sql(database,
+  Sql(*this,
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
 
-  if (!retval) {
-    SqlError("failed to create catalog database tables.", database);
-    return false;
+  if (! retval) {
+    PrintSqlError("failed to create catalog database tables.");
   }
 
+  return retval;
+}
+
+
+bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
+                                          const bool            volatile_content,
+                                          const DirectoryEntry &root_entry) {
+  assert (read_write());
+  bool retval = false;
+
+  // Path hashes
+  shash::Md5 root_path_hash = shash::Md5(shash::AsciiPtr(root_path));
+  shash::Md5 root_parent_hash =
+                    (root_path == "")
+                      ? shash::Md5()
+                      : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
+
   // start initial filling transaction
-  retval = Sql(database, "BEGIN;").Execute();
+  retval = Sql(*this, "BEGIN;").Execute();
   if (!retval) {
-    SqlError("failed to enter initial filling transaction", database);
+    PrintSqlError("failed to enter initial filling transaction");
     return false;
   }
 
   // insert initial values to properties
-  Sql insert_initial_properties(database,
-    "INSERT INTO properties (key, value) "
-    "VALUES ('revision', 0), "
-    "       ('schema',   :schema), "
-    "       ('schema_revision', :schema_revision);");
-  insert_initial_properties.BindDouble(1, kLatestSchema);
-  insert_initial_properties.BindDouble(2, kLatestSchemaRevision);
-
-  if (!insert_initial_properties.Execute()) {
-    SqlError("failed to insert default initial values into the newly created "
-             "catalog tables.", database);
+  if (! this->SetProperty("revision", 0)) {
+    PrintSqlError("failed to insert default initial values into the newly created "
+                  "catalog tables.");
     return false;
   }
 
   if (volatile_content) {
-    Sql insert_volatile_flag(database,
-      "INSERT INTO properties (key, value) VALUES ('volatile', 1);");
-    if (!insert_volatile_flag.Execute()) {
-      SqlError("failed to insert volatil flag into the newly created "
-               "catalog tables.", database);
+    if (! this->SetProperty("volatile", 1)) {
+      PrintSqlError("failed to insert volatile flag into the newly created "
+                    "catalog tables.");
       return false;
     }
   }
@@ -279,14 +134,13 @@ bool Database::Create(const string &filename,
 
   // insert root entry (when given)
   if (!root_entry.IsNegative()) {
-    SqlDirentInsert sql_insert(database);
+    SqlDirentInsert sql_insert(*this);
     retval = sql_insert.BindPathHash(root_path_hash)         &&
              sql_insert.BindParentPathHash(root_parent_hash) &&
              sql_insert.BindDirent(root_entry)               &&
              sql_insert.Execute();
-    if (!retval) {
-      SqlError("failed to insert root entry into newly created catalog.",
-               database);
+    if (! retval) {
+      PrintSqlError("failed to insert root entry into newly created catalog.");
       return false;
     }
 
@@ -295,62 +149,31 @@ bool Database::Create(const string &filename,
   }
 
   // save initial statistics counters
-  if (!counters.InsertIntoDatabase(database)) {
-    SqlError("failed to insert initial catalog statistics counters.", database);
+  if (!counters.InsertIntoDatabase(*this)) {
+    PrintSqlError("failed to insert initial catalog statistics counters.");
     return false;
   }
 
   // insert root path (when given)
-  if (!root_path.empty()) {
-    Sql insert_root_path(database,
-      "INSERT INTO properties "
-      "(key, value) VALUES ('root_prefix', :root_path);");
-    retval = insert_root_path.BindText(1, root_path) &&
-             insert_root_path.Execute();
-
-    if (!retval) {
-      SqlError("failed to store root prefix in the newly created catalog.",
-               database);
+  if (! root_path.empty()) {
+    if (! this->SetProperty("root_prefix", root_path)) {
+      PrintSqlError("failed to store root prefix in the newly created catalog.");
       return false;
     }
   }
 
   // commit initial filling transaction
-  retval = Sql(database, "COMMIT;").Execute();
+  retval = Sql(*this, "COMMIT;").Execute();
   if (!retval) {
-    SqlError("failed to commit initial filling transaction", database);
+    PrintSqlError("failed to commit initial filling transaction");
     return false;
   }
 
   return true;
 }
 
-std::string Database::GetLastErrorMsg() const {
-  std::string msg = sqlite3_errmsg(sqlite_db_);
-  return msg;
-}
 
-
-/**
- * Used to check if the database needs cleanup
- */
-double Database::GetFreePageRatio() const {
-  Sql free_page_count_query(*this, "PRAGMA freelist_count;");
-  Sql page_count_query     (*this, "PRAGMA page_count;");
-
-  const bool retval = page_count_query.FetchRow() &&
-                      free_page_count_query.FetchRow();
-  assert (retval);
-
-  int64_t pages      = page_count_query.RetrieveInt64(0);
-  int64_t free_pages = free_page_count_query.RetrieveInt64(0);
-  assert (pages > 0);
-
-  return ((double)free_pages) / ((double)pages);
-}
-
-
-double Database::GetRowIdWasteRatio() const {
+double CatalogDatabase::GetRowIdWasteRatio() const {
   Sql rowid_waste_ratio_query(*this,
    "SELECT 1.0 - CAST(COUNT(*) AS DOUBLE) / MAX(rowid) AS ratio FROM catalog;");
   const bool retval = rowid_waste_ratio_query.FetchRow();
@@ -364,9 +187,9 @@ double Database::GetRowIdWasteRatio() const {
  *
  * This creates a temporary table 'mapping' filled with the current rowIDs from
  * the catalog table. The new table will implicitly have an auto-increment rowID
- * that is compactized. Thus, we create a 'mapping' from each catalog's rowID
- * to a new rowID-space that does not have any gaps. Notice, that the order of
- * old and new rowIDs will stay the same to fulfill the PRIMARY KEY constraints
+ * that is compact. Thus, we create a 'mapping' from each catalog's rowID to a
+ * new rowID-space that does not have any gaps. Notice, that the order of old
+ * and new rowIDs will stay the same to fulfill the PRIMARY KEY constraints
  * during update.
  * Thereafter the catalog's rowIDs are mapped to their new (unique and compact)
  * rowIDs and the temporary table is deleted.
@@ -378,7 +201,9 @@ double Database::GetRowIdWasteRatio() const {
  *
  * See: http://www.sqlite.org/lang_vacuum.html
  */
-bool Database::Vacuum() const {
+bool CatalogDatabase::CompactDatabase() const {
+  assert (read_write());
+
   return Sql(*this, "BEGIN;").Execute()                                 &&
          Sql(*this, "CREATE TEMPORARY TABLE mapping AS "
                     "  SELECT rowid AS cid FROM catalog "
@@ -387,8 +212,7 @@ bool Database::Vacuum() const {
                     "  rowid = (SELECT mapping.rowid FROM mapping "
                     "           WHERE cid = catalog.rowid);").Execute() &&
          Sql(*this, "DROP TABLE mapping;").Execute()                    &&
-         Sql(*this, "COMMIT;").Execute()                                &&
-         Sql(*this, "VACUUM;").Execute();
+         Sql(*this, "COMMIT;").Execute();
 }
 
 
@@ -548,7 +372,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 
 
 string SqlLookup::GetFieldsToSelect(const float schema_version) const {
-  if (schema_version < 2.1-Database::kSchemaEpsilon) {
+  if (schema_version < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     return "catalog.hash, catalog.inode, catalog.size, catalog.mode, "
         //           0              1             2             3
            "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
@@ -600,7 +424,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
 
   // retrieve the hardlink information from the hardlinks database field
-  if (catalog->schema() < 2.1-Database::kSchemaEpsilon) {
+  if (catalog->schema() < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     result.linkcount_       = 1;
     result.hardlink_group_  = 0;
     result.inode_           = catalog->GetMangledInode(RetrieveInt64(12), 0);
@@ -646,7 +470,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
 //------------------------------------------------------------------------------
 
 
-SqlListing::SqlListing(const Database &database) {
+SqlListing::SqlListing(const CatalogDatabase &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
@@ -662,7 +486,7 @@ bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlLookupPathHash::SqlLookupPathHash(const Database &database) {
+SqlLookupPathHash::SqlLookupPathHash(const CatalogDatabase &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
@@ -677,7 +501,7 @@ bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlLookupInode::SqlLookupInode(const Database &database) {
+SqlLookupInode::SqlLookupInode(const CatalogDatabase &database) {
   const string statement =
     "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
     "WHERE rowid = :rowid;";
@@ -693,7 +517,7 @@ bool SqlLookupInode::BindRowId(const uint64_t inode) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentTouch::SqlDirentTouch(const Database &database) {
+SqlDirentTouch::SqlDirentTouch(const CatalogDatabase &database) {
   const string statement =
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
@@ -728,7 +552,8 @@ bool SqlDirentTouch::BindPathHash(const shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlNestedCatalogLookup::SqlNestedCatalogLookup(const Database &database) {
+SqlNestedCatalogLookup::SqlNestedCatalogLookup(const CatalogDatabase &database)
+{
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
       (database.schema_revision() >= 1))
   {
@@ -762,7 +587,8 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
 //------------------------------------------------------------------------------
 
 
-SqlNestedCatalogListing::SqlNestedCatalogListing(const Database &database) {
+SqlNestedCatalogListing::SqlNestedCatalogListing(
+                                              const CatalogDatabase &database) {
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
       (database.schema_revision() >= 1))
   {
@@ -795,7 +621,7 @@ uint64_t SqlNestedCatalogListing::GetSize() const {
 //------------------------------------------------------------------------------
 
 
-SqlDirentInsert::SqlDirentInsert(const Database &database) {
+SqlDirentInsert::SqlDirentInsert(const CatalogDatabase &database) {
   const string statement = "INSERT INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
     //    1           2         3         4       5       6        7     8
@@ -825,7 +651,7 @@ bool SqlDirentInsert::BindDirent(const DirectoryEntry &entry) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentUpdate::SqlDirentUpdate(const Database &database) {
+SqlDirentUpdate::SqlDirentUpdate(const CatalogDatabase &database) {
   const string statement =
     "UPDATE catalog "
     "SET hash = :hash, size = :size, mode = :mode, mtime = :mtime, "
@@ -853,7 +679,7 @@ bool SqlDirentUpdate::BindDirent(const DirectoryEntry &entry) {
 //------------------------------------------------------------------------------
 
 
-SqlDirentUnlink::SqlDirentUnlink(const Database &database) {
+SqlDirentUnlink::SqlDirentUnlink(const CatalogDatabase &database) {
   Init(database.sqlite_db(),
        "DELETE FROM catalog "
        "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);");
@@ -867,7 +693,7 @@ bool SqlDirentUnlink::BindPathHash(const shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlIncLinkcount::SqlIncLinkcount(const Database &database) {
+SqlIncLinkcount::SqlIncLinkcount(const CatalogDatabase &database) {
   // This command changes the linkcount of a whole hardlink group at once!
   // We can do this, since the 'hardlinks'-field contains the hardlink group ID
   // in the higher 32bit as well as the 'linkcount' in the lower 32bit.
@@ -896,7 +722,7 @@ bool SqlIncLinkcount::BindDelta(const int delta) {
 //------------------------------------------------------------------------------
 
 
-SqlChunkInsert::SqlChunkInsert(const Database &database) {
+SqlChunkInsert::SqlChunkInsert(const CatalogDatabase &database) {
   const string statememt =
     "INSERT INTO chunks (md5path_1, md5path_2, offset, size, hash) "
     //                       1          2        3      4     5
@@ -921,7 +747,7 @@ bool SqlChunkInsert::BindFileChunk(const FileChunk &chunk) {
 //------------------------------------------------------------------------------
 
 
-SqlChunksRemove::SqlChunksRemove(const Database &database) {
+SqlChunksRemove::SqlChunksRemove(const CatalogDatabase &database) {
   const string statement =
     "DELETE FROM chunks "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
@@ -937,7 +763,7 @@ bool SqlChunksRemove::BindPathHash(const shash::Md5 &hash) {
 //------------------------------------------------------------------------------
 
 
-SqlChunksListing::SqlChunksListing(const Database &database) {
+SqlChunksListing::SqlChunksListing(const CatalogDatabase &database) {
   const string statement =
     "SELECT offset, size, hash FROM chunks "
     //         0      1     2
@@ -965,7 +791,7 @@ FileChunk SqlChunksListing::GetFileChunk(
 //------------------------------------------------------------------------------
 
 
-SqlChunksCount::SqlChunksCount(const Database &database) {
+SqlChunksCount::SqlChunksCount(const CatalogDatabase &database) {
   const string statement =
     "SELECT count(*) FROM chunks "
     //         0
@@ -988,7 +814,7 @@ int SqlChunksCount::GetChunkCount() const {
 //------------------------------------------------------------------------------
 
 
-SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const Database &database) {
+SqlMaxHardlinkGroup::SqlMaxHardlinkGroup(const CatalogDatabase &database) {
   Init(database.sqlite_db(), "SELECT max(hardlinks) FROM catalog;");
 }
 
@@ -1001,8 +827,8 @@ uint32_t SqlMaxHardlinkGroup::GetMaxGroupId() const {
 //------------------------------------------------------------------------------
 
 
-SqlGetCounter::SqlGetCounter(const Database &database) {
-  if (database.schema_version() >= 2.4-Database::kSchemaEpsilon) {
+SqlGetCounter::SqlGetCounter(const CatalogDatabase &database) {
+  if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     compat_ = false;
     Init(database.sqlite_db(),
          "SELECT value from statistics WHERE counter = :counter;");
@@ -1028,7 +854,7 @@ uint64_t SqlGetCounter::GetCounter() const {
 //------------------------------------------------------------------------------
 
 
-SqlUpdateCounter::SqlUpdateCounter(const Database &database) {
+SqlUpdateCounter::SqlUpdateCounter(const CatalogDatabase &database) {
   Init(database.sqlite_db(),
        "UPDATE statistics SET value=value+:val WHERE counter=:counter;");
 }
@@ -1047,7 +873,7 @@ bool SqlUpdateCounter::BindDelta(const int64_t delta) {
 //------------------------------------------------------------------------------
 
 
-SqlCreateCounter::SqlCreateCounter(const Database &database) {
+SqlCreateCounter::SqlCreateCounter(const CatalogDatabase &database) {
   Init(database.sqlite_db(),
        "INSERT OR REPLACE INTO statistics (counter, value) "
        "VALUES (:counter, :value);");
@@ -1067,7 +893,7 @@ bool SqlCreateCounter::BindInitialValue(const int64_t value) {
 //------------------------------------------------------------------------------
 
 
-SqlAllChunks::SqlAllChunks(const Database &database) {
+SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
   int hash_mask = 7 << SqlDirent::kFlagPosHash;
   string flags2hash =
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
@@ -1080,7 +906,7 @@ SqlAllChunks::SqlAllChunks(const Database &database) {
     StringifyInt(kChunkMicroCatalog) + " END " +
   "AS chunk_type, " + flags2hash +
   "FROM catalog WHERE hash IS NOT NULL";
-  if (database.schema_version() >= 2.4-Database::kSchemaEpsilon) {
+  if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql += " UNION SELECT DISTINCT chunks.hash, " + StringifyInt(kChunkPiece) +
       ", " + flags2hash + "FROM chunks, catalog WHERE "
       "chunks.md5path_1=catalog.md5path_1 AND "

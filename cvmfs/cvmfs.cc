@@ -2277,13 +2277,21 @@ static int Init(const loader::LoaderExports *loader_exports) {
       *g_boot_error = "failed to download history: " + StringifyInt(retval_dl);
       return loader::kFailHistory;
     }
-    history::Database tag_db;
     history::TagList tag_list;
-    retval = tag_db.Open(history_path, sqlite::kDbOpenReadOnly) &&
-             tag_list.Load(&tag_db);
+    history::HistoryDatabase *tag_db =
+      history::HistoryDatabase::Open(history_path,
+                                     history::HistoryDatabase::kOpenReadOnly);
+    if (NULL == tag_db) {
+      LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
+               "failed to open history database (%s)", history_path.c_str());
+      unlink(history_path.c_str());
+      return loader::kFailHistory;
+    }
+    retval = tag_list.Load(tag_db);
+    delete tag_db;
     unlink(history_path.c_str());
     if (!retval) {
-      *g_boot_error = "failed to open history";
+      *g_boot_error = "failed to read history database";
       return loader::kFailHistory;
     }
     history::Tag tag;

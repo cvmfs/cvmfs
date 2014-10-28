@@ -663,7 +663,7 @@ void WritableCatalog::UpdateCounters() {
  * if necessary
  */
 void WritableCatalog::VacuumDatabaseIfNecessary() {
-  const Database &db = database();
+  const CatalogDatabase &db = database();
   bool        needs_defragmentation = false;
   double      ratio                 = 0.0;
   std::string reason;

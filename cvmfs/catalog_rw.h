@@ -87,8 +87,8 @@ class WritableCatalog : public Catalog {
   void SetPreviousRevision(const shash::Any &hash);
 
  protected:
-  sqlite::DbOpenMode DatabaseOpenMode() const {
-    return sqlite::kDbOpenReadWrite;
+  CatalogDatabase::OpenMode DatabaseOpenMode() const {
+    return CatalogDatabase::kOpenReadWrite;
   }
 
   void UpdateEntry(const DirectoryEntry &entry, const shash::Md5 &path_hash);

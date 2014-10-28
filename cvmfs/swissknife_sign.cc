@@ -168,13 +168,17 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     // Safe history database
     shash::Any history_hash(manifest->GetHashAlgorithm());
     if (history_path != "") {
-      history::Database tag_db;
-      if (!tag_db.Open(history_path, sqlite::kDbOpenReadOnly)) {
+      history::HistoryDatabase *tag_db =
+        history::HistoryDatabase::Open(history_path,
+                                       history::HistoryDatabase::kOpenReadOnly);
+      if (NULL == tag_db) {
         delete manifest;
         goto sign_fail;
       }
       history::TagList tag_list;
-      if (!tag_list.Load(&tag_db)) {
+      const int retval = tag_list.Load(tag_db);
+      delete tag_db;
+      if (!retval) {
         delete manifest;
         goto sign_fail;
       }

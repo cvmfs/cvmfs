@@ -515,7 +515,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::UpdateNestedCatalogRefer
 {
   const Catalog *new_catalog = (data->HasNew()) ? data->new_catalog
                                                 : data->old_catalog;
-  const Database &writable = new_catalog->database();
+  const CatalogDatabase &writable = new_catalog->database();
 
   Sql add_nested_catalog(writable,
     "INSERT OR REPLACE INTO nested_catalogs (path,   sha1,  size) "
@@ -560,7 +560,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CollectAndAggregateStati
 
   const Catalog *new_catalog = (data->HasNew()) ? data->new_catalog
                                                 : data->old_catalog;
-  const Database &writable = new_catalog->database();
+  const CatalogDatabase &writable = new_catalog->database();
   bool retval;
 
   // Find out the discrepancy between MAX(rowid) and COUNT(*)
@@ -630,27 +630,30 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
   const string root_path = data->root_path();
 
   // create a new catalog database schema
-  bool retval;
-  const string catalog_db =
+  const string clg_db_path =
     CreateTempPath(temporary_directory_ + "/catalog", 0666);
-  if (catalog_db.empty()) {
+  if (clg_db_path.empty()) {
     Error("Failed to create temporary file for the new catalog database.");
     return false;
   }
   const bool volatile_content = false;
-  retval = Database::Create(catalog_db, root_path, volatile_content);
-  if (!retval) {
+  CatalogDatabase *new_catalog_db = CatalogDatabase::Create(clg_db_path);
+  if (NULL == new_catalog_db ||
+      ! new_catalog_db->InsertInitialValues(root_path, volatile_content)) {
     Error("Failed to create database for new catalog");
-    unlink(catalog_db.c_str());
+    unlink(clg_db_path.c_str());
     return false;
   }
+  delete new_catalog_db; // TODO: Attach catalog should work with an open
+                         //       catalog database as well, to remove this
+                         //       inefficiency
 
   // Attach the just created nested catalog database
   WritableCatalog *writable_catalog =
-    WritableCatalog::AttachFreely(root_path, catalog_db, shash::Any(shash::kSha1));
+    WritableCatalog::AttachFreely(root_path, clg_db_path, shash::Any(shash::kSha1));
   if (writable_catalog == NULL) {
     Error("Failed to open database for new catalog");
-    unlink(catalog_db.c_str());
+    unlink(clg_db_path.c_str());
     return false;
   }
 
@@ -662,15 +665,14 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
 bool CommandMigrate::MigrationWorker_20x::CheckDatabaseSchemaCompatibility(
   PendingCatalog *data) const
 {
-  const catalog::Database &old_catalog = data->old_catalog->database();
-  const catalog::Database &new_catalog = data->new_catalog->database();
+  const CatalogDatabase &old_catalog = data->old_catalog->database();
+  const CatalogDatabase &new_catalog = data->new_catalog->database();
 
-  if (!new_catalog.ready()                                                  ||
-      (new_catalog.schema_version() < Database::kLatestSupportedSchema -
-                                      Database::kSchemaEpsilon         ||
-       new_catalog.schema_version() > Database::kLatestSupportedSchema +
-                                      Database::kSchemaEpsilon)             ||
-      (old_catalog.schema_version() > 2.1 + Database::kSchemaEpsilon))
+  if ((new_catalog.schema_version() < CatalogDatabase::kLatestSupportedSchema -
+                                      CatalogDatabase::kSchemaEpsilon         ||
+       new_catalog.schema_version() > CatalogDatabase::kLatestSupportedSchema +
+                                      CatalogDatabase::kSchemaEpsilon)        ||
+      (old_catalog.schema_version() > 2.1 + CatalogDatabase::kSchemaEpsilon))
   {
     Error("Failed to meet database requirements for migration.", data);
     return false;
@@ -682,8 +684,8 @@ bool CommandMigrate::MigrationWorker_20x::CheckDatabaseSchemaCompatibility(
 bool CommandMigrate::MigrationWorker_20x::AttachOldCatalogDatabase(
   PendingCatalog *data) const
 {
-  const catalog::Database &old_catalog = data->old_catalog->database();
-  const catalog::Database &new_catalog = data->new_catalog->database();
+  const CatalogDatabase &old_catalog = data->old_catalog->database();
+  const CatalogDatabase &new_catalog = data->new_catalog->database();
 
   Sql sql_attach_new(new_catalog,
     "ATTACH '" + old_catalog.filename() + "' AS old;"
@@ -717,7 +719,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
   assert (!data->new_catalog->IsDirty());
   assert(data->HasNew());
   bool retval;
-  const Database &writable = data->new_catalog->database();
+  const CatalogDatabase &writable = data->new_catalog->database();
 
   // Hardlinks scratch space.
   // This temporary table is used for the hardlink analysis results.
@@ -890,7 +892,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
 bool CommandMigrate::MigrationWorker_20x::AnalyzeFileLinkcounts(
                                                    PendingCatalog *data) const {
   assert(data->HasNew());
-  const Database &writable = data->new_catalog->database();
+  const CatalogDatabase &writable = data->new_catalog->database();
   bool retval;
 
   // Analyze the hardlink relationships in the old catalog
@@ -1000,7 +1002,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateNestedCatalogMountPoints(
   PendingCatalog *data) const
 {
   assert(data->HasNew());
-  const Database &writable = data->new_catalog->database();
+  const CatalogDatabase &writable = data->new_catalog->database();
   bool retval;
 
   // preparing the SQL statement for nested catalog mountpoint update
@@ -1051,7 +1053,7 @@ bool CommandMigrate::MigrationWorker_20x::FixNestedCatalogTransitionPoints(
 
   typedef DirectoryEntry::Difference Difference;
 
-  const Database &writable = data->new_catalog->database();
+  const CatalogDatabase &writable = data->new_catalog->database();
   bool retval;
 
   SqlLookupPathHash lookup_mountpoint(writable);
@@ -1163,7 +1165,7 @@ void CommandMigrate::FixNestedCatalogTransitionPoint(
  */
 class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
  public:
-  SqlLookupDanglingMountpoints(const Database &database) {
+  SqlLookupDanglingMountpoints(const CatalogDatabase &database) {
     const std::string statement =
       "SELECT DISTINCT " + GetFieldsToSelect(database.schema_version()) + " "
       "FROM catalog "
@@ -1180,7 +1182,7 @@ bool CommandMigrate::MigrationWorker_20x::RemoveDanglingNestedMountpoints(
   PendingCatalog *data) const
 {
   assert(data->HasNew());
-  const Database &writable = data->new_catalog->database();
+  const CatalogDatabase &writable = data->new_catalog->database();
   bool retval = false;
 
   // build a set of registered nested catalog path hashes
@@ -1290,7 +1292,7 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
 {
   assert(data->HasNew());
   bool retval = false;
-  const Database &writable = data->new_catalog->database();
+  const CatalogDatabase &writable = data->new_catalog->database();
 
   // Aggregated the statistics counters of all nested catalogs
   // Note: we might need to wait until nested catalogs are sucessfully processed
@@ -1369,7 +1371,7 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
 bool CommandMigrate::MigrationWorker_20x::FindRootEntryInformation(
   PendingCatalog *data) const
 {
-  const Database &writable = data->new_catalog->database();
+  const CatalogDatabase &writable = data->new_catalog->database();
   bool retval;
 
   std::string root_path = data->root_path();
@@ -1408,7 +1410,7 @@ bool CommandMigrate::MigrationWorker_20x::DetachOldCatalogDatabase(
   PendingCatalog *data) const
 {
   assert(data->HasNew());
-  const Database &writable = data->new_catalog->database();
+  const CatalogDatabase &writable = data->new_catalog->database();
   Sql detach_old_catalog(writable, "DETACH old;");
   const bool retval = detach_old_catalog.Execute();
   if (! retval) {
@@ -1443,10 +1445,10 @@ bool CommandMigrate::MigrationWorker_217::RunMigration(PendingCatalog *data) con
 bool CommandMigrate::MigrationWorker_217::CheckDatabaseSchemaCompatibility
                                                   (PendingCatalog *data) const {
   assert(!data->HasNew());
-  const catalog::Database &old_catalog = data->old_catalog->database();
+  const CatalogDatabase &old_catalog = data->old_catalog->database();
 
-  if ((old_catalog.schema_version() < 2.4 - Database::kSchemaEpsilon) ||
-      (old_catalog.schema_version() > 2.4 + Database::kSchemaEpsilon))
+  if ((old_catalog.schema_version() < 2.4 - CatalogDatabase::kSchemaEpsilon) ||
+      (old_catalog.schema_version() > 2.4 + CatalogDatabase::kSchemaEpsilon))
   {
     Error("Given Catalog is not Schema 2.4.", data);
     return false;
@@ -1468,7 +1470,7 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
                                                   (PendingCatalog *data) const {
   assert(!data->HasNew());
   bool retval = false;
-  const Database &writable = GetWritable(data->old_catalog)->database();
+  const CatalogDatabase &writable = GetWritable(data->old_catalog)->database();
 
   // Aggregated the statistics counters of all nested catalogs
   // Note: we might need to wait until nested catalogs are sucessfully processed
@@ -1544,7 +1546,7 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
 bool CommandMigrate::MigrationWorker_217::UpdateCatalogSchema
                                                   (PendingCatalog *data) const {
   assert(!data->HasNew());
-  const Database &writable = GetWritable(data->old_catalog)->database();
+  const CatalogDatabase &writable = GetWritable(data->old_catalog)->database();
   Sql update_schema_version(writable,
     "UPDATE properties SET value = :schema_version WHERE key = 'schema';");
 

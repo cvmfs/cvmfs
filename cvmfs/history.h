@@ -65,49 +65,32 @@ struct Tag {
 };
 
 
-class Database {
+class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
  public:
   static const float kLatestSchema;
   static const float kLatestSupportedSchema;
-  static const float kSchemaEpsilon;  // floats get imprecise in SQlite
   // backwards-compatible schema changes
   static const unsigned kLatestSchemaRevision;
 
-  Database() {
-    sqlite_db_ = NULL;
-    schema_version_ = 0.0;
-    schema_revision_ = 0;
-    read_write_ = false;
-    ready_ = false;
-  }
-  ~Database();
-  static bool Create(const std::string &filename,
-                     const std::string &repository_name);
-  bool Open(const std::string filename, const sqlite::DbOpenMode open_mode);
+  bool CreateEmptyDatabase();
+  bool InsertInitialValues(const std::string &repository_name);
 
-  sqlite3 *sqlite_db() const { return sqlite_db_; }
-  std::string filename() const { return filename_; }
-  float schema_version() const { return schema_version_; }
-  unsigned schema_revision() const { return schema_revision_; }
-  bool ready() const { return ready_; }
+  bool CheckSchemaCompatibility();
+  bool LiveSchemaUpgradeIfNecessary();
+  bool CompactDatabase() const { return true; /* NOOP */ };
 
-  std::string GetLastErrorMsg() const;
- private:
-  Database(sqlite3 *sqlite_db, const float schema,
-           const unsigned schema_revision, const bool rw);
-
-  sqlite3 *sqlite_db_;
-  std::string filename_;
-  float schema_version_;
-  unsigned schema_revision_;
-  bool read_write_;
-  bool ready_;
+ protected:
+  // TODO: C++11 - constructor inheritance
+  friend class sqlite::Database<HistoryDatabase>;
+  HistoryDatabase(const std::string  &filename,
+                  const OpenMode      open_mode) :
+    sqlite::Database<HistoryDatabase>(filename, open_mode) {}
 };
 
 
 class SqlTag : public sqlite::Sql {
  public:
-  SqlTag(const Database &database, const std::string &statement) {
+  SqlTag(const HistoryDatabase &database, const std::string &statement) {
     Init(database.sqlite_db(), statement);
   }
   virtual ~SqlTag() { /* Done by super class */ }
@@ -150,8 +133,8 @@ class TagList {
    */
   std::vector<shash::Any> GetReferencedHashes() const;
 
-  bool Load(Database *database);
-  bool Store(Database *database);
+  bool Load(HistoryDatabase *database);
+  bool Store(HistoryDatabase *database);
  private:
   std::vector<Tag> list_;
 };

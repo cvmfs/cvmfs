@@ -190,8 +190,8 @@ class Catalog : public SingleCopy {
   /**
    * Specifies the SQLite open flags.  Overwritten by r/w catalog.
    */
-  virtual sqlite::DbOpenMode DatabaseOpenMode() const {
-    return sqlite::kDbOpenReadOnly;
+  virtual CatalogDatabase::OpenMode DatabaseOpenMode() const {
+    return CatalogDatabase::kOpenReadOnly;
   }
 
   virtual void InitPreparedStatements();
@@ -205,7 +205,7 @@ class Catalog : public SingleCopy {
 
   Counters& GetCounters() { return counters_; };
 
-  inline const Database &database() const { return *database_; }
+  inline const CatalogDatabase &database() const { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
   void ResetNestedCatalogCache();
@@ -223,7 +223,7 @@ class Catalog : public SingleCopy {
  private:
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                    DirectoryEntry *dirent) const;
-  Database *database_;
+  CatalogDatabase *database_;
   pthread_mutex_t *lock_;
 
   const shash::Any catalog_hash_;

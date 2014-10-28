@@ -654,16 +654,18 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       delete manifest;
       return 1;
     }
-    history::Database tag_db;
-    int retval = tag_db.Open(tmp_file, sqlite::kDbOpenReadOnly);
-    if (!retval) {
+    history::HistoryDatabase *tag_db =
+      history::HistoryDatabase::Open(tmp_file,
+                                     history::HistoryDatabase::kOpenReadOnly);
+    if (NULL == tag_db) {
       LogCvmfs(kLogCvmfs, kLogStdout, "failed to open history database");
       unlink(tmp_file.c_str());
       delete manifest;
       return 1;
     }
     history::TagList tag_list;
-    retval = tag_list.Load(&tag_db);
+    int retval = tag_list.Load(tag_db);
+    delete tag_db;
     assert(retval);
     unlink(tmp_file.c_str());
     history::Tag tag;

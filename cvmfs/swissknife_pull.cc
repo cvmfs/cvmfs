@@ -479,17 +479,24 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                dl_retval, download::Code2Ascii(dl_retval));
       goto fini;
     }
-    retval = zlib::DecompressPath2Path(history_path,
-                                       history_path + ".uncompressed");
+    const std::string history_db_path = history_path + ".uncompressed";
+    retval = zlib::DecompressPath2Path(history_path, history_db_path);
     assert(retval);
-    history::Database history_db;
+    history::HistoryDatabase *history_db =
+      history::HistoryDatabase::Open(history_db_path,
+                                     history::HistoryDatabase::kOpenReadWrite);
+    if (NULL == history_db) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
+               history_db_path.c_str());
+      unlink(history_db_path.c_str());
+      goto fini;
+    }
     history::TagList tag_list;
-    retval = history_db.Open(history_path + ".uncompressed",
-                             sqlite::kDbOpenReadWrite);
     assert(retval);
-    retval = tag_list.Load(&history_db);
+    retval = tag_list.Load(history_db);
+    delete history_db;
     assert(retval);
-    unlink((history_path + ".uncompressed").c_str());
+    unlink((history_db_path).c_str());
     historic_tags = tag_list.GetAllHashes();
 
     LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",

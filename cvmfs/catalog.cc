@@ -119,10 +119,10 @@ bool Catalog::InitStandalone(const std::string &database_file) {
 
 
 bool Catalog::ReadCatalogCounters() {
-  assert (database_ != NULL && database_->ready());
+  assert (database_ != NULL);
   const bool statistics_loaded =
-    (database().schema_version() < Database::kLatestSupportedSchema -
-                                   Database::kSchemaEpsilon)
+    (database().schema_version() < CatalogDatabase::kLatestSupportedSchema -
+                                   CatalogDatabase::kSchemaEpsilon)
       ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
       : counters_.ReadFromDatabase(database());
   return statistics_loaded;
@@ -135,10 +135,8 @@ bool Catalog::ReadCatalogCounters() {
  * @return true on successful initialization otherwise false
  */
 bool Catalog::OpenDatabase(const string &db_path) {
-  database_ = new Database(db_path, DatabaseOpenMode());
-  if (!database_->ready()) {
-    delete database_;
-    database_ = NULL;
+  database_ = CatalogDatabase::Open(db_path, DatabaseOpenMode());
+  if (NULL == database_) {
     return false;
   }
 
