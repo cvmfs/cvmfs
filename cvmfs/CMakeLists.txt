@@ -21,7 +21,7 @@ set (CVMFS_CLIENT_SOURCES
   smalloc.h
   logging.cc logging.h logging_internal.h
   tracer.h tracer.cc atomic.h
-  duplex_sqlite3.h duplex_curl.h
+  duplex_sqlite3.h duplex_curl.h duplex_cares.h
   signature.h signature.cc
   quota.h quota.cc
   hash.h hash.cc
@@ -32,6 +32,7 @@ set (CVMFS_CLIENT_SOURCES
   backoff.h backoff.cc
   duplex_zlib.h compression.h compression.cc
   sanitizer.cc sanitizer.h
+  dns.h dns.cc
   download.cc download.h
   wpad.cc wpad.h
   manifest.h manifest.cc
@@ -132,7 +133,8 @@ set (CVMFS_SWISSKNIFE_SOURCES
   json_document.h json_document.cc
 
   sanitizer.cc sanitizer.h
-  duplex_curl.h download.h download.cc
+  dns.h dns.cc
+  duplex_curl.h duplex_cares.h download.h download.cc
   signature.cc signature.h
 
   fs_traversal.h
