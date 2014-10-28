@@ -7,8 +7,87 @@
 
 #include <string>
 #include "swissknife.h"
+#include "hash.h"
+
+namespace manifest {
+  class Manifest;
+}
+
+namespace history {
+  class History;
+}
+
+namespace catalog {
+  class Catalog;
+  class WritableCatalog;
+}
 
 namespace swissknife {
+
+
+class CommandTag_ : public Command {
+ protected:
+  bool InitializeSignatureAndDownload(const std::string pubkey_path,
+                                      const std::string trusted_certs);
+  manifest::Manifest* FetchManifest(
+                                const std::string &repository_url,
+                                const std::string &repository_name,
+                                const shash::Any  &expected_root_catalog) const;
+  bool FetchObject(const std::string  &repository_url,
+                   const shash::Any   &object_hash,
+                   const std::string  &hash_suffix,
+                   const std::string   destination_path) const;
+  history::History* GetHistory(const manifest::Manifest  *manifest,
+                               const std::string         &repository_url,
+                               const std::string         &history_path,
+                               const bool                 read_write) const;
+
+  catalog::Catalog* GetCatalog(const std::string  &repository_url,
+                               const shash::Any   &catalog_hash,
+                               const std::string   catalog_path,
+                               const bool          read_write) const;
+};
+
+
+class CommandCreateTag : public CommandTag_ {
+ public:
+  std::string GetName() { return "tag_create"; }
+  std::string GetDescription() {
+    return "Create a tag for a specific snapshot.";
+  }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
+};
+
+
+class CommandRemoveTag : public Command {
+ public:
+  std::string GetName() { return "tag_remove"; }
+  std::string GetDescription() {
+    return "Remove a specific tag.";
+  }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
+};
+
+
+class CommandListTags : public Command {
+ public:
+  std::string GetName() { return "tags_list"; }
+  std::string GetDescription() {
+    return "Remove a specific tag.";
+  }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
+};
+
+
+
+
+
 
 class CommandTag : public Command {
  public:

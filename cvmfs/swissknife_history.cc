@@ -29,6 +29,316 @@ static bool IsRemote(const string &repository)
 }
 
 
+
+bool CommandTag_::InitializeSignatureAndDownload(
+                                            const std::string pubkey_path,
+                                            const std::string trusted_certs) {
+  g_signature_manager->Init();
+  if (! g_signature_manager->LoadPublicRsaKeys(pubkey_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key %s",
+             pubkey_path.c_str());
+    return false;
+  }
+
+  if (! trusted_certs.empty()) {
+    if (! g_signature_manager->LoadTrustedCaCrl(trusted_certs)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load trusted certificates");
+      return false;
+    }
+  }
+
+  g_download_manager->Init(1, true);
+  return true;
+}
+
+
+manifest::Manifest* CommandTag_::FetchManifest(
+                               const std::string &repository_url,
+                               const std::string &repository_name,
+                               const shash::Any  &expected_root_catalog) const {
+  manifest::ManifestEnsemble *manifest_ensemble = new manifest::ManifestEnsemble;
+  manifest::Manifest         *manifest          = NULL;
+
+  if (IsRemote(repository_url)) {
+    manifest::Failures retval;
+    retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
+                             g_signature_manager, g_download_manager,
+                             manifest_ensemble);
+
+    if (retval != manifest::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
+                                      "(%d - %s)",
+               retval, manifest::Code2Ascii(retval));
+      delete manifest_ensemble;
+      manifest = NULL;
+    } else {
+      // ManifestEnsemble stays around! This is a memory leak, but otherwise
+      // the destructor of ManifestEnsemble would free the wrapped manifest
+      // object, but I want to return it.
+      // Sorry for that...
+      //
+      // TODO: Revise the manifest fetching.
+      manifest = manifest_ensemble->manifest;
+    }
+  } else {
+    manifest = manifest::Manifest::LoadFile(repository_url + "/.cvmfspublished");
+  }
+
+  // check if manifest fetching was successful
+  if (! manifest) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
+    return NULL;
+  }
+
+    // Compare base hash with hash in manifest
+  // (make sure we operate on the right history file)
+  if (expected_root_catalog != manifest->catalog_hash()) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "wrong manifest, expected catalog %s, found catalog %s",
+             expected_root_catalog.ToString().c_str(),
+             manifest->catalog_hash().ToString().c_str());
+    delete manifest;
+    return NULL;
+  }
+
+  return manifest;
+}
+
+
+bool CommandTag_::FetchObject(const std::string  &repository_url,
+                              const shash::Any   &object_hash,
+                              const std::string  &hash_suffix,
+                              const std::string   destination_path) const {
+  assert (! object_hash.IsNull());
+
+  download::Failures dl_retval;
+  const std::string url =
+    repository_url + "/data" + object_hash.MakePath(1, 2) + hash_suffix;
+
+  download::JobInfo download_object(&url, true, false, &destination_path,
+                                    &object_hash);
+  dl_retval = g_download_manager->Fetch(&download_object);
+
+  if (dl_retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object '%s' with "
+                                    "suffix '%s' (%d - %s)",
+             object_hash.ToString().c_str(), hash_suffix.c_str(),
+             dl_retval, download::Code2Ascii(dl_retval));
+    return false;
+  }
+
+  return true;
+}
+
+
+history::History* CommandTag_::GetHistory(
+                                const manifest::Manifest  *manifest,
+                                const std::string         &repository_url,
+                                const std::string         &history_path,
+                                const bool                 read_write) const {
+  const shash::Any history_hash = manifest->history();
+  history::History *history;
+
+  if (history_hash.IsNull()) {
+    history = history::History::Create(history_path,
+                                       manifest->repository_name());
+    if (NULL == history) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to create history database");
+      return NULL;
+    }
+  } else {
+    if (! FetchObject(repository_url, history_hash, "H", history_path)) {
+      return NULL;
+    }
+
+    history = (read_write) ? history::History::OpenWritable(history_path)
+                           : history::History::Open(history_path);
+    if (NULL == history) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
+               history_path.c_str());
+      unlink(history_path.c_str());
+      return NULL;
+    }
+
+    if (history->fqrn() != manifest->repository_name()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "history database does not belong to "
+                                      "this repository ('%s' vs '%s')",
+               history->fqrn().c_str(), manifest->repository_name().c_str());
+      delete history;
+      unlink(history_path.c_str());
+      return NULL;
+    }
+  }
+
+  return history;
+}
+
+
+catalog::Catalog* CommandTag_::GetCatalog(
+                                       const std::string  &repository_url,
+                                       const shash::Any   &catalog_hash,
+                                       const std::string   catalog_path,
+                                       const bool          read_write) const {
+  if (! FetchObject(repository_url, catalog_hash, "C", catalog_path)) {
+    return NULL;
+  }
+
+  const std::string catalog_root_path = "";
+  return (read_write)
+    ? catalog::WritableCatalog::AttachFreely(catalog_root_path,
+                                             catalog_path,
+                                             catalog_hash)
+    : catalog::Catalog::AttachFreely(catalog_root_path,
+                                     catalog_path,
+                                     catalog_hash);
+}
+
+
+
+ParameterList CommandCreateTag::GetParams() {
+  ParameterList r;
+  r.push_back(Parameter::Mandatory('r', "repository directory / url"));
+  r.push_back(Parameter::Mandatory('b', "base hash"));
+  r.push_back(Parameter::Mandatory('n', "repository name"));
+  r.push_back(Parameter::Mandatory('k', "repository public key"));
+  r.push_back(Parameter::Mandatory('t', "temporary scratch directory"));
+  r.push_back(Parameter::Mandatory('a', "name of the new tag"));
+  r.push_back(Parameter::Mandatory('d', "description of the tag"));
+  r.push_back(Parameter::Optional ('h', "root hash of the new tag"));
+  r.push_back(Parameter::Optional ('c', "channel of the new tag"));
+  r.push_back(Parameter::Optional ('z', "trusted certificate dir(s)"));
+  return r;
+}
+
+
+int CommandCreateTag::Main(const ArgumentList &args) {
+  typedef history::History::UpdateChannel TagChannel;
+
+  const std::string repository_url      = MakeCanonicalPath(
+                                                       *args.find('r')->second);
+  const shash::Any  base_hash           = shash::MkFromHexPtr(
+                                            shash::HexPtr(
+                                              *args.find('b')->second));
+  const std::string repository_name     = *args.find('n')->second;
+  const std::string repository_key_path = *args.find('k')->second;
+  const std::string tmp_path            = *args.find('t')->second;
+  const std::string tag_name            = *args.find('a')->second;
+  const std::string tag_description     = *args.find('d')->second;
+        shash::Any  root_hash           = (args.find('h') != args.end())
+                                            ? shash::MkFromHexPtr(
+                                                shash::HexPtr(
+                                                  *args.find('h')->second))
+                                            : shash::Any();
+  const TagChannel  tag_channel         = (args.find('c') != args.end())
+                                            ? static_cast<TagChannel>(
+                                                String2Uint64(
+                                                  *args.find('c')->second))
+                                            : history::History::kChannelTrunk;
+  const std::string trusted_certs       = (args.find('z')->second)
+                                            ? *args.find('z')->second
+                                            : "";
+
+  const std::string history_path = CreateTempPath(tmp_path + "/history", 0600);
+  const std::string catalog_path = CreateTempPath(tmp_path + "/catalog", 0600);
+
+  if (! InitializeSignatureAndDownload(repository_key_path, trusted_certs)) {
+    return 1;
+  }
+
+  const UniquePtr<manifest::Manifest> manifest(FetchManifest(repository_url,
+                                                             repository_name,
+                                                             base_hash));
+  if (! manifest) {
+    return 1;
+  }
+
+  const bool history_read_write = true;
+  UniquePtr<history::History> history(GetHistory(manifest.weak_ref(),
+                                                 repository_url,
+                                                 history_path,
+                                                 history_read_write));
+  if (! history) {
+    return 1;
+  }
+  UnlinkGuard history_deleter(history_path);
+
+  if (root_hash.IsNull()) {
+    root_hash = manifest->catalog_hash();
+  }
+
+  history::History::Tag existing_tag;
+  const bool tag_exists = history->Find(tag_name, &existing_tag);
+  if (tag_exists) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "a tag with the name '%s' already exists.",
+             tag_name.c_str());
+    return 1;
+  }
+
+  const bool catalog_read_write = false;
+  const UniquePtr<catalog::Catalog> catalog(GetCatalog(repository_url,
+                                                       root_hash,
+                                                       catalog_path,
+                                                       catalog_read_write));
+  if (! catalog) {
+    return 1;
+  }
+  UnlinkGuard catalog_deleter(catalog_path);
+
+  history::History::Tag new_tag;
+  new_tag.name        = tag_name;
+  new_tag.root_hash   = root_hash;
+  new_tag.size        = GetFileSize(catalog_path);
+  new_tag.revision    = catalog->GetRevision();
+  new_tag.timestamp   = catalog->GetLastModified();
+  new_tag.channel     = tag_channel;
+  new_tag.description = tag_description;
+
+  history->Insert(new_tag);
+
+  return 0;
+}
+
+
+ParameterList CommandRemoveTag::GetParams() {
+  return ParameterList();
+}
+
+
+int CommandRemoveTag::Main(const ArgumentList &args) {
+  return 1;
+}
+
+
+ParameterList CommandListTags::GetParams() {
+  return ParameterList();
+}
+
+
+int CommandListTags::Main(const ArgumentList &args) {
+  return 1;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * Retrieves a history db hash from manifest.
  */
