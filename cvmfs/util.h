@@ -239,6 +239,29 @@ class UniquePtr : SingleCopy {
   T *ref_;
 };
 
+
+/**
+ * RAII object to call `unlink()` on a containing file when it gets out of scope
+ */
+class UnlinkGuard : SingleCopy {
+ public:
+  inline UnlinkGuard() : enabled_(false) {}
+  inline UnlinkGuard(const std::string &path) : path_(path), enabled_(true) {}
+  inline ~UnlinkGuard() { if (IsEnabled()) unlink(path_.c_str()); }
+
+  inline void Set(const std::string &path) { path_ = path; Enable(); }
+
+  inline bool IsEnabled() const { return enabled_;  }
+  inline void Enable()          { enabled_ = true;  }
+  inline void Disable()         { enabled_ = false; }
+
+  const std::string& path() const { return path_; }
+
+ private:
+  std::string  path_;
+  bool         enabled_;
+};
+
 /**
  * Very simple StopWatch implementation.
  * Currently the implementation does not allow a restart of a stopped
