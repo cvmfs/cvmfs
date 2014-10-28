@@ -136,7 +136,7 @@ bool History::IsWritable() const {
 
 int History::GetNumberOfTags() const {
   assert (database_);
-  assert (count_tags_.IsValid() && ! count_tags_->IsBusy());
+  assert (count_tags_.IsValid());
   bool retval = count_tags_->FetchRow();
   assert (retval);
   const int count = count_tags_->RetrieveCount();
@@ -148,7 +148,7 @@ int History::GetNumberOfTags() const {
 
 bool History::Insert(const History::Tag &tag) {
   assert (database_);
-  assert (insert_tag_.IsValid() && ! insert_tag_->IsBusy());
+  assert (insert_tag_.IsValid());
 
   return insert_tag_->BindTag(tag) &&
          insert_tag_->Execute()    &&
@@ -168,7 +168,7 @@ bool History::Remove(const std::string &name) {
 
 bool History::Find(const std::string &name, Tag *tag) const {
   assert (database_);
-  assert (find_tag_.IsValid() && ! find_tag_->IsBusy());
+  assert (find_tag_.IsValid());
   assert (NULL != tag);
 
   if (! find_tag_->BindName(name) ||
@@ -184,7 +184,7 @@ bool History::Find(const std::string &name, Tag *tag) const {
 
 bool History::List(std::vector<Tag> *tags) const {
   assert (database_);
-  assert (list_tags_.IsValid() && ! list_tags_->IsBusy());
+  assert (list_tags_.IsValid());
   assert (NULL != tags);
 
   while (list_tags_->FetchRow()) {
