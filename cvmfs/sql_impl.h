@@ -227,7 +227,7 @@ bool Database<DerivedT>::CreatePropertiesTable() {
 
 template <class DerivedT>
 bool Database<DerivedT>::HasProperty(const std::string &key) const {
-  assert (has_property_ && ! has_property_->IsBusy());
+  assert (has_property_ && ! has_property_->IsReady());
   const bool retval = has_property_->BindText(1, key) &&
                       has_property_->FetchRow();
   assert (retval);
@@ -239,7 +239,7 @@ bool Database<DerivedT>::HasProperty(const std::string &key) const {
 template <class DerivedT>
 template <typename T>
 T Database<DerivedT>::GetProperty(const std::string &key) const {
-  assert (get_property_ && ! get_property_->IsBusy());
+  assert (get_property_ && ! get_property_->IsReady());
   const bool retval = get_property_->BindText(1, key);
                       get_property_->FetchRow();
   assert (retval);
@@ -252,7 +252,7 @@ template <class DerivedT>
 template <typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key,
                                      const T            value) {
-  assert (set_property_ && ! set_property_->IsBusy());
+  assert (set_property_ && ! set_property_->IsReady());
   return set_property_->BindText(1, key) &&
          set_property_->Bind(2, value)   &&
          set_property_->Execute()        &&

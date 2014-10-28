@@ -302,7 +302,7 @@ class Sql {
    * Checks if a statement is currently busy with a transaction
    * i.e. Reset() was not yet called on it.
    */
-  inline bool IsBusy() const {
+  inline bool IsReady() const {
     return (bool)sqlite3_stmt_busy(statement_);
   }
 

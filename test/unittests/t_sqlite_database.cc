@@ -511,7 +511,7 @@ TEST_F(T_SQLite_Wrapper, DataAccess) {
   {
     sqlite::Sql insert (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
                                           "VALUES (:f, :b);");
-    ASSERT_FALSE (insert.IsBusy());
+    ASSERT_FALSE (insert.IsReady());
 
     EXPECT_TRUE (db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
@@ -534,7 +534,7 @@ TEST_F(T_SQLite_Wrapper, DataAccess) {
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
   {
     sqlite::Sql count(db2->sqlite_db(), "SELECT count(*) FROM foobar;");
-    ASSERT_FALSE (count.IsBusy());
+    ASSERT_FALSE (count.IsReady());
 
     EXPECT_TRUE (count.FetchRow());
     EXPECT_EQ   (entry_count, count.Retrieve<int>(0));
@@ -556,7 +556,7 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   {
     sqlite::Sql insert (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
                                           "VALUES (:f, :b);");
-    ASSERT_FALSE (insert.IsBusy());
+    ASSERT_FALSE (insert.IsReady());
 
     EXPECT_TRUE (db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
@@ -579,7 +579,7 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
   {
     sqlite::Sql wipe(db2->sqlite_db(), "DELETE FROM foobar;");
-    ASSERT_FALSE (wipe.IsBusy());
+    ASSERT_FALSE (wipe.IsReady());
 
     EXPECT_TRUE (wipe.Execute());
   }
@@ -635,7 +635,7 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
   {
     sqlite::Sql insert (db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
                                           "VALUES (:f, :b);");
-    ASSERT_FALSE (insert.IsBusy());
+    ASSERT_FALSE (insert.IsReady());
 
     EXPECT_TRUE (db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
@@ -658,7 +658,7 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
   {
     sqlite::Sql wipe(db2->sqlite_db(), "DELETE FROM foobar;");
-    ASSERT_FALSE (wipe.IsBusy());
+    ASSERT_FALSE (wipe.IsReady());
 
     EXPECT_TRUE (wipe.Execute());
   }
