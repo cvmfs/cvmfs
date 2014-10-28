@@ -91,7 +91,8 @@ SqlInsertTag::SqlInsertTag(const HistoryDatabase *database) {
   const std::string stmt =
     "INSERT INTO tags (" + GetDatabaseFields() + ")"
     "VALUES (" + GetDatabasePlaceholders() + ");";
-  Init(database->sqlite_db(), stmt);
+  const bool success = Init(database->sqlite_db(), stmt);
+  assert (success);
 }
 
 const std::string SqlInsertTag::tag_database_placeholders =
@@ -129,7 +130,8 @@ SqlFindTag::SqlFindTag(const HistoryDatabase *database) {
   const std::string stmt =
     "SELECT " + GetDatabaseFields() + " FROM tags "
     "WHERE name = :name LIMIT 1;";
-  Init(database->sqlite_db(), stmt);
+  const bool success = Init(database->sqlite_db(), stmt);
+  assert (success);
 }
 
 bool SqlFindTag::BindName(const std::string &name) {
@@ -138,7 +140,9 @@ bool SqlFindTag::BindName(const std::string &name) {
 
 
 SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
-  Init(database->sqlite_db(), "SELECT count(*) FROM tags;");
+  const bool success = Init(database->sqlite_db(),
+                            "SELECT count(*) FROM tags;");
+  assert (success);
 }
 
 int SqlCountTags::RetrieveCount() const {
@@ -147,8 +151,10 @@ int SqlCountTags::RetrieveCount() const {
 
 
 SqlListTags::SqlListTags(const HistoryDatabase *database) {
-  Init(database->sqlite_db(), "SELECT " + GetDatabaseFields() + " FROM tags "
-                              "ORDER BY revision DESC;");
+  const bool success = Init(database->sqlite_db(),
+                            "SELECT " + GetDatabaseFields() + " FROM tags "
+                            "ORDER BY revision DESC;");
+  assert (success);
 }
 
 
