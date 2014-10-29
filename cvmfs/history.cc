@@ -175,7 +175,13 @@ bool History::Remove(const std::string &name) {
 }
 
 
-bool History::Find(const std::string &name, Tag *tag) const {
+bool History::Exists(const std::string &name) const {
+  Tag existing_tag;
+  return Get(name, &existing_tag);
+}
+
+
+bool History::Get(const std::string &name, Tag *tag) const {
   assert (database_);
   assert (find_tag_.IsValid());
   assert (NULL != tag);

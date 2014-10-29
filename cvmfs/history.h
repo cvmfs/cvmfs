@@ -80,7 +80,8 @@ class History {
 
   bool Insert(const Tag &tag);
   bool Remove(const std::string &name);
-  bool Find(const std::string &name, Tag *tag) const;
+  bool Exists(const std::string &name) const;
+  bool Get(const std::string &name, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
 
   const std::string& fqrn() const { return fqrn_; }
