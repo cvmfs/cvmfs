@@ -826,6 +826,13 @@ uint64_t String2Uint64(const string &value) {
 }
 
 
+uint64_t HexString2Uint64(const string &value) {
+  uint64_t result;
+  sscanf(value.c_str(), "%"PRIx64, &result);
+  return result;
+}
+
+
 int HexDigit2Int(const char digit) {
   if ((digit >= '0') && (digit <= '9')) return digit - '0';
   if ((digit >= 'A') && (digit <= 'F')) return 10 + digit - 'A';

@@ -60,6 +60,8 @@ class Host {
   FRIEND_TEST(T_Dns, Host);
   FRIEND_TEST(T_Dns, HostEquivalent);
   FRIEND_TEST(T_Dns, HostValid);
+  friend class Resolver;
+
  public:
   bool IsEquivalent(const Host &other) const;
   bool IsValid() const;
@@ -71,7 +73,9 @@ class Host {
   bool hasIpv6() const { return !ipv6_addresses_.empty(); }
   std::set<std::string> ipv4_addresses() const { return ipv4_addresses_; }
   std::set<std::string> ipv6_addresses() const { return ipv6_addresses_; }
-  std::string name() const { return name_; };
+  std::string name() const { return name_; }
+  Failures status() const { return status_; }
+
  private:
   void CopyFrom(const Host &other);
 
@@ -130,15 +134,26 @@ class Host {
 class Resolver : SingleCopy {
  public:
   Resolver(const bool ipv4_only, const unsigned timeout);
-  virtual ~Resolver() = 0;
+  virtual ~Resolver() { };
 
   virtual void SetResolvers(const std::vector<std::string> &new_resolvers) = 0;
   virtual void SetSystemResolvers() = 0;
-  virtual Host Resolve(const std::string &name) = 0;
+  Host Resolve(const std::string &name);
 
   bool ipv4_only() const { return ipv4_only_; }
   unsigned timeout() const { return timeout_; }
- private:
+
+ protected:
+   /**
+    * Takes a host name and returns the resolved lists of A and AAAA records.
+    * To keep it simple, returns only a single TTL, the lower value of both
+    * records.
+    */
+  virtual Failures DoResolve(const std::string &name,
+                             std::vector<std::string> *ipv4_addresses,
+                             std::vector<std::string> *ipv6_addresses,
+                             unsigned *ttl) = 0;
+
   /**
    * Do not try to get AAAA records if true.
    */
@@ -148,6 +163,10 @@ class Resolver : SingleCopy {
    * Timeout in seconds for DNS queries.  Zero means no timeout.
    */
   unsigned timeout_;
+
+ private:
+  bool IsIpv4Address(const std::string &address);
+  bool IsIpv6Address(const std::string &address);
 };
 
 
@@ -161,7 +180,12 @@ class CaresResolver : public Resolver {
 
   void SetResolvers(const std::vector<std::string> &new_resolvers);
   void SetSystemResolvers();
-  Host Resolve(const std::string &name);
+
+ protected:
+  virtual Failures DoResolve(const std::string &name,
+                             std::vector<std::string> *ipv4_addresses,
+                             std::vector<std::string> *ipv6_addresses,
+                             unsigned *ttl);
 };
 
 }  // namespace dns

@@ -159,6 +159,7 @@ std::string StringifyIpv4(const uint32_t ip_address);
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
+uint64_t HexString2Uint64(const std::string &value);
 int HexDigit2Int(const char digit);
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
