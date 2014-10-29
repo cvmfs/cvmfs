@@ -175,7 +175,7 @@ TEST_F(T_History, InsertAndFindTag) {
   EXPECT_EQ (1, history->GetNumberOfTags());
 
   History::Tag tag;
-  ASSERT_TRUE (history->Find(dummy.name, &tag));
+  ASSERT_TRUE (history->Get(dummy.name, &tag));
   CompareTags (dummy, tag);
 
   delete history;
@@ -192,7 +192,7 @@ TEST_F(T_History, InsertReopenAndFindTag) {
   EXPECT_EQ (1, history1->GetNumberOfTags());
 
   History::Tag tag1;
-  ASSERT_TRUE (history1->Find(dummy.name, &tag1));
+  ASSERT_TRUE (history1->Get(dummy.name, &tag1));
   CompareTags (dummy, tag1);
   delete history1;
 
@@ -201,7 +201,7 @@ TEST_F(T_History, InsertReopenAndFindTag) {
   EXPECT_EQ (fqrn, history2->fqrn());
 
   History::Tag tag2;
-  ASSERT_TRUE (history2->Find(dummy.name, &tag2));
+  ASSERT_TRUE (history2->Get(dummy.name, &tag2));
   CompareTags (dummy, tag2);
   delete history2;
 }
@@ -258,11 +258,10 @@ TEST_F(T_History, InsertAndRemoveTag) {
   EXPECT_EQ (dummy_count, history->GetNumberOfTags());
 
   const std::string to_be_deleted = dummy_tags[5].name;
-  History::Tag deleted_tag;
-  EXPECT_TRUE (history->Find(to_be_deleted, &deleted_tag));
+  EXPECT_TRUE (history->Exists(to_be_deleted));
   ASSERT_TRUE (history->Remove(dummy_tags[5].name));
   EXPECT_EQ (dummy_count - 1, history->GetNumberOfTags());
-  EXPECT_FALSE (history->Find(to_be_deleted, &deleted_tag));
+  EXPECT_FALSE (history->Exists(to_be_deleted));
 
   TagVector tags;
   ASSERT_TRUE (history->List(&tags));
