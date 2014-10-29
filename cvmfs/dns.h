@@ -26,13 +26,14 @@ enum Failures {
   kFailTimeout,
   kFailInvalidHost,
   kFailUnknownHost,
+  kFailNoAddress,
   kFailNotYetResolved,
   kFailOther,
 };
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 7;
+  const int kNumElems = 8;
   if (error >= kNumElems)
     return "no text available (internal error)";
 
@@ -41,9 +42,10 @@ inline const char *Code2Ascii(const Failures error) {
   texts[1] = "invalid resolver addresses";
   texts[2] = "DNS query timeout";
   texts[3] = "invalid host name to resolve";
-  texts[4] = "no IP address for host";
-  texts[5] = "internal error, not yet resolved";
-  texts[6] = "unknown name resolving error";
+  texts[4] = "unknown host name";
+  texts[5] = "no IP address for host";
+  texts[6] = "internal error, not yet resolved";
+  texts[7] = "unknown name resolving error";
 
   return texts[error];
 }
@@ -55,11 +57,14 @@ inline const char *Code2Ascii(const Failures error) {
  * a resolver.
  */
 class Host {
+  FRIEND_TEST(T_Dns, Host);
+  FRIEND_TEST(T_Dns, HostEquivalent);
+  FRIEND_TEST(T_Dns, HostValid);
  public:
   bool IsEquivalent(const Host &other) const;
   bool IsValid() const;
 
-  explicit Host(const Host &other);
+  Host(const Host &other);
   Host &operator= (const Host &other);
 
   int64_t id() const { return id_; };

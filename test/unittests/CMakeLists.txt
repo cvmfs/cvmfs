@@ -44,6 +44,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_dirtab.cc
   t_callbacks.cc
   t_lru.cc
+  t_dns.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -76,7 +77,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/download.h
   ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/options.h
-  ${CVMFS_SOURCE_DIR}/options.cc 
+  ${CVMFS_SOURCE_DIR}/options.cc
 
   ${CVMFS_SOURCE_DIR}/catalog_counters.h
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
@@ -105,12 +106,14 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/dirtab.cc
   ${CVMFS_SOURCE_DIR}/dirtab.h
 
-  ${CVMFS_SOURCE_DIR}/download.cc
   ${CVMFS_SOURCE_DIR}/manifest.cc
 
   ${CVMFS_SOURCE_DIR}/catalog_traversal.cc
   ${CVMFS_SOURCE_DIR}/history.cc
   ${CVMFS_SOURCE_DIR}/sql.cc
+  ${CVMFS_SOURCE_DIR}/duplex_cares.h
+  ${CVMFS_SOURCE_DIR}/dns.h
+  ${CVMFS_SOURCE_DIR}/dns.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
@@ -192,7 +195,7 @@ if (BUILD_UNITTESTS_DEBUG)
 endif (BUILD_UNITTESTS_DEBUG)
 
 # link the stuff (*_LIBRARIES are dynamic link libraries)
-target_link_libraries (${PROJECT_TEST_NAME} ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} 
+target_link_libraries (${PROJECT_TEST_NAME} ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES}
                        ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                        ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                        ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} pthread dl)

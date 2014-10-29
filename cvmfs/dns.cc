@@ -26,9 +26,11 @@ void Host::CopyFrom(const Host &other) {
  * All fields except the unique id_ are set by the resolver.  Host objects
  * can be copied around but only the resolve can create them.
  */
-Host::Host() {
-  id_ = atomic_xadd64(&global_id_, 1);
-  status_ = kFailNotYetResolved;
+Host::Host()
+  : deadline_(0)
+  , id_(atomic_xadd64(&global_id_, 1))
+  , status_(kFailNotYetResolved)
+{
 }
 
 
@@ -60,11 +62,14 @@ bool Host::IsEquivalent(const Host &other) const {
 
 /**
  * A host object is valid after it has been successfully resolved and until the
- * DNS ttl expires.
+ * DNS ttl expires.  Successful name resolution means that there is at least
+ * one IP address.
  */
 bool Host::IsValid() const {
   if (status_ != kFailOk)
     return false;
+
+  assert(!ipv4_addresses_.empty() || !ipv6_addresses_.empty());
 
   time_t now = time(NULL);
   assert(now != static_cast<time_t>(-1));
@@ -81,5 +86,10 @@ Resolver::Resolver(const bool ipv4_only, const unsigned timeout)
 {
 
 }
+
+
+//------------------------------------------------------------------------------
+
+
 
 }  // namespace dns
