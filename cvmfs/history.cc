@@ -18,6 +18,8 @@ using namespace std;  // NOLINT
 namespace history {
 
 
+const std::string History::kPreviousRevisionKey = "previous_revision";
+
 History::~History() {}
 
 
@@ -127,6 +129,13 @@ bool History::PrepareQueries() {
 
 bool History::BeginTransaction()  const { return database_->BeginTransaction();  }
 bool History::CommitTransaction() const { return database_->CommitTransaction(); }
+
+
+bool History::SetPreviousRevision(const shash::Any &history_hash) {
+  assert (database_);
+  assert (IsWritable());
+  return database_->SetProperty(kPreviousRevisionKey, history_hash.ToString());
+}
 
 
 bool History::IsWritable() const {

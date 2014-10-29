@@ -61,6 +61,9 @@ class History {
     std::string    description;
   };
 
+ protected:
+  static const std::string kPreviousRevisionKey;
+
  public:
   ~History();
 
@@ -70,8 +73,10 @@ class History {
 
   bool IsWritable() const;
   int GetNumberOfTags() const;
+
   bool BeginTransaction()  const;
   bool CommitTransaction() const;
+  bool SetPreviousRevision(const shash::Any &history_hash);
 
   bool Insert(const Tag &tag);
   bool Remove(const std::string &name);
