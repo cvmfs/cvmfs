@@ -29,24 +29,7 @@ static bool IsRemote(const string &repository)
 }
 
 
-
-bool CommandTag_::InitializeSignatureAndDownload(
-                                            const std::string pubkey_path,
-                                            const std::string trusted_certs) {
-  g_signature_manager->Init();
-  if (! g_signature_manager->LoadPublicRsaKeys(pubkey_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key %s",
-             pubkey_path.c_str());
-    return false;
-  }
-
-  if (! trusted_certs.empty()) {
-    if (! g_signature_manager->LoadTrustedCaCrl(trusted_certs)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load trusted certificates");
-      return false;
-    }
-  }
-
+bool CommandTag_::InitializeDownload() {
   g_download_manager->Init(1, true);
   return true;
 }
@@ -193,20 +176,49 @@ catalog::Catalog* CommandTag_::GetCatalog(
                                      catalog_hash);
 }
 
+shash::Any CommandTag_::PushHistory(const  upload::SpoolerDefinition &spl_def,
+                                    const std::string &history_path) {
+  assert (! push_happened_);
+  push_happened_ = true;
+
+  UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(spl_def));
+  if (! spooler) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler upload");
+    return shash::Any();
+  }
+  spooler->RegisterListener(&CommandTag_::PushHistoryCallback, this);
+
+  spooler->ProcessHistory(history_path);
+  spooler->WaitForUpload();
+
+  return pushed_history_hash_.Get();
+}
+
+void CommandTag_::PushHistoryCallback(const upload::SpoolerResult &result) {
+  assert (! result.IsChunked());
+  if (result.return_code != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload history database (%d)",
+             result.return_code);
+    pushed_history_hash_.Set(shash::Any());
+  } else {
+    pushed_history_hash_.Set(result.content_hash);
+  }
+}
+
 
 
 ParameterList CommandCreateTag::GetParams() {
   ParameterList r;
-  r.push_back(Parameter::Mandatory('r', "repository directory / url"));
-  r.push_back(Parameter::Mandatory('b', "base hash"));
-  r.push_back(Parameter::Mandatory('n', "repository name"));
-  r.push_back(Parameter::Mandatory('k', "repository public key"));
+  r.push_back(Parameter::Mandatory('w', "repository directory / url"));
+  r.push_back(Parameter::Mandatory('r', "spooler definition string"));
+  r.push_back(Parameter::Mandatory('m', "(unsigned) manifest file to edit"));
   r.push_back(Parameter::Mandatory('t', "temporary scratch directory"));
+  r.push_back(Parameter::Optional ('e', "hash algorithm to use (default SHA1)"));
+
   r.push_back(Parameter::Mandatory('a', "name of the new tag"));
   r.push_back(Parameter::Mandatory('d', "description of the tag"));
   r.push_back(Parameter::Optional ('h', "root hash of the new tag"));
   r.push_back(Parameter::Optional ('c', "channel of the new tag"));
-  r.push_back(Parameter::Optional ('z', "trusted certificate dir(s)"));
   return r;
 }
 
@@ -214,42 +226,52 @@ ParameterList CommandCreateTag::GetParams() {
 int CommandCreateTag::Main(const ArgumentList &args) {
   typedef history::History::UpdateChannel TagChannel;
 
-  const std::string repository_url      = MakeCanonicalPath(
-                                                       *args.find('r')->second);
-  const shash::Any  base_hash           = shash::MkFromHexPtr(
-                                            shash::HexPtr(
-                                              *args.find('b')->second));
-  const std::string repository_name     = *args.find('n')->second;
-  const std::string repository_key_path = *args.find('k')->second;
-  const std::string tmp_path            = *args.find('t')->second;
-  const std::string tag_name            = *args.find('a')->second;
-  const std::string tag_description     = *args.find('d')->second;
-        shash::Any  root_hash           = (args.find('h') != args.end())
-                                            ? shash::MkFromHexPtr(
-                                                shash::HexPtr(
-                                                  *args.find('h')->second))
-                                            : shash::Any();
-  const TagChannel  tag_channel         = (args.find('c') != args.end())
-                                            ? static_cast<TagChannel>(
-                                                String2Uint64(
-                                                  *args.find('c')->second))
-                                            : history::History::kChannelTrunk;
-  const std::string trusted_certs       = (args.find('z')->second)
-                                            ? *args.find('z')->second
-                                            : "";
-
-  const std::string history_path = CreateTempPath(tmp_path + "/history", 0600);
-  const std::string catalog_path = CreateTempPath(tmp_path + "/catalog", 0600);
-
-  if (! InitializeSignatureAndDownload(repository_key_path, trusted_certs)) {
+  const std::string repository_url  = MakeCanonicalPath(*args.find('w')->second);
+  const std::string spl_definition  = MakeCanonicalPath(*args.find('r')->second);
+  const std::string manifest_path   = MakeCanonicalPath(*args.find('m')->second);
+  const std::string tmp_path        = MakeCanonicalPath(*args.find('t')->second);
+  const shash::Algorithms hash_algo = (args.find('e') == args.end())
+                                        ? shash::kSha1
+                                        : shash::ParseHashAlgorithm(
+                                                       *args.find('e')->second);
+  if (hash_algo == shash::kAny) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to parse hash algorith to use");
     return 1;
   }
 
-  const UniquePtr<manifest::Manifest> manifest(FetchManifest(repository_url,
-                                                             repository_name,
-                                                             base_hash));
-  if (! manifest) {
+  const std::string tag_name        = *args.find('a')->second;
+  const std::string tag_description = *args.find('d')->second;
+        shash::Any  root_hash       = (args.find('h') != args.end())
+                                        ? shash::MkFromHexPtr(
+                                            shash::HexPtr(
+                                              *args.find('h')->second))
+                                        : shash::Any();
+  const TagChannel  tag_channel     = (args.find('c') != args.end())
+                                        ? static_cast<TagChannel>(
+                                            String2Uint64(
+                                              *args.find('c')->second))
+                                        : history::History::kChannelTrunk;
+
+  const std::string catalog_path = CreateTempPath(tmp_path + "/catalog", 0600);
+  const std::string history_path = CreateTempPath(tmp_path + "/history", 0600);
+  UnlinkGuard catalog_deleter(catalog_path);
+  UnlinkGuard history_deleter(history_path);
+
+  if (! InitializeDownload()) {
     return 1;
+  }
+
+  const UniquePtr<manifest::Manifest> manifest(
+                                        manifest::Manifest::LoadFile(
+                                          manifest_path));
+  if (! manifest) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file '%s'",
+             manifest_path.c_str());
+    return 1;
+  }
+
+  if (root_hash.IsNull()) {
+    root_hash = manifest->catalog_hash();
   }
 
   const bool history_read_write = true;
@@ -260,15 +282,8 @@ int CommandCreateTag::Main(const ArgumentList &args) {
   if (! history) {
     return 1;
   }
-  UnlinkGuard history_deleter(history_path);
 
-  if (root_hash.IsNull()) {
-    root_hash = manifest->catalog_hash();
-  }
-
-  history::History::Tag existing_tag;
-  const bool tag_exists = history->Find(tag_name, &existing_tag);
-  if (tag_exists) {
+  if (history->Exists(tag_name)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "a tag with the name '%s' already exists.",
              tag_name.c_str());
     return 1;
@@ -282,7 +297,6 @@ int CommandCreateTag::Main(const ArgumentList &args) {
   if (! catalog) {
     return 1;
   }
-  UnlinkGuard catalog_deleter(catalog_path);
 
   history::History::Tag new_tag;
   new_tag.name        = tag_name;
@@ -293,7 +307,33 @@ int CommandCreateTag::Main(const ArgumentList &args) {
   new_tag.channel     = tag_channel;
   new_tag.description = tag_description;
 
-  history->Insert(new_tag);
+  const bool  success = history->BeginTransaction()                       &&
+                        history->Insert(new_tag)                          &&
+                        history->SetPreviousRevision(manifest->history()) &&
+                        history->CommitTransaction();
+  if (! success) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to insert new tag");
+    return 1;
+  }
+
+  // close the history database
+  history::History *weak_history = history.Release();
+  delete weak_history;
+
+  const bool use_file_chunking = false;
+  const upload::SpoolerDefinition sd(spl_definition,
+                                     hash_algo,
+                                     use_file_chunking);
+  const shash::Any new_history_hash = PushHistory(sd, history_path);
+  if (new_history_hash.IsNull()) {
+    return 1;
+  }
+
+  manifest->set_history(new_history_hash);
+  if (! manifest->Export(manifest_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to export the new manifest file");
+    return 1;
+  }
 
   return 0;
 }

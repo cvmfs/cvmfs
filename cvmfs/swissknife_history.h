@@ -8,6 +8,7 @@
 #include <string>
 #include "swissknife.h"
 #include "hash.h"
+#include "util_concurrency.h"
 
 namespace manifest {
   class Manifest;
@@ -22,13 +23,20 @@ namespace catalog {
   class WritableCatalog;
 }
 
+namespace upload {
+  class SpoolerDefinition;
+  class SpoolerResult;
+}
+
 namespace swissknife {
 
 
 class CommandTag_ : public Command {
+ public:
+  CommandTag_() : push_happened_(false) {};
+
  protected:
-  bool InitializeSignatureAndDownload(const std::string pubkey_path,
-                                      const std::string trusted_certs);
+  bool InitializeDownload();
   manifest::Manifest* FetchManifest(
                                 const std::string &repository_url,
                                 const std::string &repository_name,
@@ -46,6 +54,16 @@ class CommandTag_ : public Command {
                                const shash::Any   &catalog_hash,
                                const std::string   catalog_path,
                                const bool          read_write) const;
+
+  shash::Any PushHistory(const upload::SpoolerDefinition &spooler_definition,
+                         const std::string &history_path);
+
+ private:
+  void PushHistoryCallback(const upload::SpoolerResult &result);
+
+ private:
+  Future<shash::Any> pushed_history_hash_;
+  bool               push_happened_;
 };
 
 
