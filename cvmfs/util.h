@@ -227,7 +227,7 @@ class UniquePtr : SingleCopy {
   inline ~UniquePtr()                 { delete ref_; }
 
   inline operator bool() const        { return IsValid(); }
-  inline operator T*() const          { return *ref_; }
+  inline T& operator*() const         { return *ref_; }
   inline UniquePtr& operator=(T* ref) { ref_ = ref; return *this; }
   inline T* operator->() const        { return ref_; }
 
