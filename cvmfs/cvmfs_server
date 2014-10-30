@@ -2872,11 +2872,13 @@ list_tags() {
   # get repository information
   load_repo_config $name
   local base_hash=$(get_mounted_root_hash $name)
-  cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
-    -i 0 -s 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
-    -k /etc/cvmfs/keys/${name}.pub \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs -l
-  rm -f ${CVMFS_SPOOL_DIR}/show_history
+  cvmfs_swissknife tag_list                            \
+    -w $CVMFS_STRATUM0                                 \
+    -t ${CVMFS_SPOOL_DIR}/tmp                          \
+    -p /etc/cvmfs/keys/${name}.pub                     \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
+    -f $name                                           \
+    -b $base_hash
 }
 
 
