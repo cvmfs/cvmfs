@@ -111,6 +111,7 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
 
 bool CommandTag_::CloseAndPublishHistory(Environment *env) {
   assert (! env->push_happened_);
+  assert (env->spooler.IsValid());
   env->push_happened_ = true;
 
   // set the previous revision pointer of the history database
