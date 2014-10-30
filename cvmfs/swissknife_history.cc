@@ -30,9 +30,12 @@ static bool IsRemote(const string &repository)
 
 void CommandTag_::InsertCommonParameters(ParameterList &r) {
   r.push_back(Parameter::Mandatory('w', "repository directory / url"));
-  r.push_back(Parameter::Mandatory('r', "spooler definition string"));
-  r.push_back(Parameter::Mandatory('m', "(unsigned) manifest file to edit"));
   r.push_back(Parameter::Mandatory('t', "temporary scratch directory"));
+  r.push_back(Parameter::Optional ('p', "public key of the repository"));
+  r.push_back(Parameter::Optional ('z', "trusted certificates"));
+  r.push_back(Parameter::Optional ('f', "fully qualified repository name"));
+  r.push_back(Parameter::Optional ('r', "spooler definition string"));
+  r.push_back(Parameter::Optional ('m', "(unsigned) manifest file to edit"));
   r.push_back(Parameter::Optional ('e', "hash algorithm to use (default SHA1)"));
 }
 
@@ -42,19 +45,55 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
                                               const bool           read_write) {
   const std::string       repository_url  = MakeCanonicalPath(
                                                        *args.find('w')->second);
-  const std::string       spl_definition  = MakeCanonicalPath(
-                                                       *args.find('r')->second);
-  const std::string       manifest_path   = MakeCanonicalPath(
-                                                       *args.find('m')->second);
   const std::string       tmp_path        = MakeCanonicalPath(
                                                        *args.find('t')->second);
+  const std::string       spl_definition  = (args.find('r') == args.end())
+                                              ? ""
+                                              : MakeCanonicalPath(
+                                                       *args.find('r')->second);
+  const std::string       manifest_path   = (args.find('m') == args.end())
+                                              ? ""
+                                              : MakeCanonicalPath(
+                                                       *args.find('m')->second);
   const shash::Algorithms hash_algo       = (args.find('e') == args.end())
                                               ? shash::kSha1
                                               : shash::ParseHashAlgorithm(
                                                        *args.find('e')->second);
+  const std::string       pubkey_path     = (args.find('p') == args.end())
+                                              ? ""
+                                              : MakeCanonicalPath(
+                                                       *args.find('p')->second);
+  const std::string       trusted_certs   = (args.find('z') == args.end())
+                                              ? ""
+                                              : MakeCanonicalPath(
+                                                       *args.find('z')->second);
+  const std::string       repo_name       = (args.find('f') == args.end())
+                                              ? ""
+                                              : *args.find('f')->second;
 
+  // do some sanity checks
   if (hash_algo == shash::kAny) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to parse hash algorith to use");
+    return NULL;
+  }
+
+  if (read_write && spl_definition.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "no upstream storage provided (-r)");
+    return NULL;
+  }
+
+  if (read_write && manifest_path.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "no (unsigned) manifest provided (-m)");
+    return NULL;
+  }
+
+  if (! read_write && pubkey_path.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "no public key provided (-p)");
+    return NULL;
+  }
+
+  if (! read_write && repo_name.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "no repository name provided (-f)");
     return NULL;
   }
 
@@ -71,10 +110,14 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
   g_download_manager->Init(1, true);
 
   // open the (yet unsigned) manifest file
-  env->manifest = manifest::Manifest::LoadFile(env->manifest_path);
+  env->manifest = (read_write)
+                    ? manifest::Manifest::LoadFile(env->manifest_path)
+                    : FetchManifest(env->repository_url,
+                                    repo_name,
+                                    pubkey_path,
+                                    trusted_certs);
   if (! env->manifest) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file '%s'",
-             manifest_path.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file");
     return NULL;
   }
 
@@ -156,51 +199,53 @@ void CommandTag_::Environment::PushHistoryCallback(
 
 
 manifest::Manifest* CommandTag_::FetchManifest(
-                               const std::string &repository_url,
-                               const std::string &repository_name,
-                               const shash::Any  &expected_root_catalog) const {
+                                       const std::string &repository_url,
+                                       const std::string &repository_name,
+                                       const std::string &pubkey_path,
+                                       const std::string &trusted_certs) const {
   manifest::ManifestEnsemble *manifest_ensemble = new manifest::ManifestEnsemble;
   manifest::Manifest         *manifest          = NULL;
 
-  if (IsRemote(repository_url)) {
-    manifest::Failures retval;
-    retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
-                             g_signature_manager, g_download_manager,
-                             manifest_ensemble);
+  // initialize the (global) signature manager
+  g_signature_manager->Init();
+  if (! g_signature_manager->LoadPublicRsaKeys(pubkey_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key '%s'",
+             pubkey_path.c_str());
+    return NULL;
+  }
 
-    if (retval != manifest::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
-                                      "(%d - %s)",
-               retval, manifest::Code2Ascii(retval));
-      delete manifest_ensemble;
-      manifest = NULL;
-    } else {
-      // ManifestEnsemble stays around! This is a memory leak, but otherwise
-      // the destructor of ManifestEnsemble would free the wrapped manifest
-      // object, but I want to return it.
-      // Sorry for that...
-      //
-      // TODO: Revise the manifest fetching.
-      manifest = manifest_ensemble->manifest;
+  if (! trusted_certs.empty()) {
+    if (! g_signature_manager->LoadTrustedCaCrl(trusted_certs)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load trusted certificates");
+      return NULL;
     }
+  }
+
+  // fetch (and verify) the manifest
+  manifest::Failures retval;
+  retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
+                           g_signature_manager, g_download_manager,
+                           manifest_ensemble);
+
+  if (retval != manifest::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
+                                    "(%d - %s)",
+             retval, manifest::Code2Ascii(retval));
+    delete manifest_ensemble;
+    manifest = NULL;
   } else {
-    manifest = manifest::Manifest::LoadFile(repository_url + "/.cvmfspublished");
+    // ManifestEnsemble stays around! This is a memory leak, but otherwise
+    // the destructor of ManifestEnsemble would free the wrapped manifest
+    // object, but I want to return it.
+    // Sorry for that...
+    //
+    // TODO: Revise the manifest fetching.
+    manifest = manifest_ensemble->manifest;
   }
 
   // check if manifest fetching was successful
   if (! manifest) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
-    return NULL;
-  }
-
-    // Compare base hash with hash in manifest
-  // (make sure we operate on the right history file)
-  if (expected_root_catalog != manifest->catalog_hash()) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "wrong manifest, expected catalog %s, found catalog %s",
-             expected_root_catalog.ToString().c_str(),
-             manifest->catalog_hash().ToString().c_str());
-    delete manifest;
     return NULL;
   }
 

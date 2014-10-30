@@ -65,10 +65,10 @@ class CommandTag_ : public Command {
                                      const bool read_write);
   bool CloseAndPublishHistory(Environment *environment);
 
-  manifest::Manifest* FetchManifest(
-                                const std::string &repository_url,
-                                const std::string &repository_name,
-                                const shash::Any  &expected_root_catalog) const;
+  manifest::Manifest* FetchManifest(const std::string &repository_url,
+                                    const std::string &repository_name,
+                                    const std::string &pubkey_path,
+                                    const std::string &trusted_certs) const;
   bool FetchObject(const std::string  &repository_url,
                    const shash::Any   &object_hash,
                    const std::string  &hash_suffix,
