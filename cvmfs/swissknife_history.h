@@ -26,17 +26,45 @@ namespace catalog {
 namespace upload {
   class SpoolerDefinition;
   class SpoolerResult;
+  class Spooler;
 }
 
 namespace swissknife {
 
 
 class CommandTag_ : public Command {
+ protected:
+  struct Environment {
+    Environment(const std::string &manifest_path,
+                const std::string &repository_url,
+                const std::string &tmp_path) :
+      manifest_path(manifest_path), repository_url(repository_url),
+      tmp_path(tmp_path), push_happened_(false) {}
+    void PushHistoryCallback(const upload::SpoolerResult &result);
+
+    const std::string              manifest_path;
+    const std::string              repository_url;
+    const std::string              tmp_path;
+
+    UniquePtr<manifest::Manifest>  manifest;
+    UniquePtr<history::History>    history;
+    UniquePtr<upload::Spooler>     spooler;
+    UnlinkGuard                    history_path;
+
+    Future<shash::Any>             pushed_history_hash_;
+    bool                           push_happened_;
+  };
+
  public:
-  CommandTag_() : push_happened_(false) {};
+  CommandTag_() {};
 
  protected:
-  bool InitializeDownload();
+  void InsertCommonParameters(ParameterList &parameters);
+
+  Environment* InitializeEnvironment(const ArgumentList &args,
+                                     const bool read_write);
+  bool CloseAndPublishHistory(Environment *environment);
+
   manifest::Manifest* FetchManifest(
                                 const std::string &repository_url,
                                 const std::string &repository_name,
@@ -57,13 +85,6 @@ class CommandTag_ : public Command {
 
   shash::Any PushHistory(const upload::SpoolerDefinition &spooler_definition,
                          const std::string &history_path);
-
- private:
-  void PushHistoryCallback(const upload::SpoolerResult &result);
-
- private:
-  Future<shash::Any> pushed_history_hash_;
-  bool               push_happened_;
 };
 
 

@@ -29,9 +29,129 @@ static bool IsRemote(const string &repository)
 }
 
 
-bool CommandTag_::InitializeDownload() {
+void CommandTag_::InsertCommonParameters(ParameterList &r) {
+  r.push_back(Parameter::Mandatory('w', "repository directory / url"));
+  r.push_back(Parameter::Mandatory('r', "spooler definition string"));
+  r.push_back(Parameter::Mandatory('m', "(unsigned) manifest file to edit"));
+  r.push_back(Parameter::Mandatory('t', "temporary scratch directory"));
+  r.push_back(Parameter::Optional ('e', "hash algorithm to use (default SHA1)"));
+}
+
+
+CommandTag_::Environment* CommandTag_::InitializeEnvironment(
+                                              const ArgumentList  &args,
+                                              const bool           read_write) {
+  const std::string       repository_url  = MakeCanonicalPath(
+                                                       *args.find('w')->second);
+  const std::string       spl_definition  = MakeCanonicalPath(
+                                                       *args.find('r')->second);
+  const std::string       manifest_path   = MakeCanonicalPath(
+                                                       *args.find('m')->second);
+  const std::string       tmp_path        = MakeCanonicalPath(
+                                                       *args.find('t')->second);
+  const shash::Algorithms hash_algo       = (args.find('e') == args.end())
+                                              ? shash::kSha1
+                                              : shash::ParseHashAlgorithm(
+                                                       *args.find('e')->second);
+
+  if (hash_algo == shash::kAny) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to parse hash algorith to use");
+    return NULL;
+  }
+
+  // create new environment
+  // Note: We use this encapsulation because we cannot be sure that the Command
+  //       object gets deleted properly. With the Environment object at hand
+  //       we have full control and can make heavy and safe use of RAII
+  UniquePtr<Environment> env(new Environment(manifest_path,
+                                             repository_url,
+                                             tmp_path));
+  env->history_path.Set(CreateTempPath(tmp_path + "/history", 0600));
+
+  // initialize the (swissknife global) download manager
   g_download_manager->Init(1, true);
+
+  // open the (yet unsigned) manifest file
+  env->manifest = manifest::Manifest::LoadFile(env->manifest_path);
+  if (! env->manifest) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file '%s'",
+             manifest_path.c_str());
+    return NULL;
+  }
+
+  // download the history database referenced in the manifest
+  env->history = GetHistory(env->manifest.weak_ref(),
+                            env->repository_url,
+                            env->history_path.path(),
+                            read_write);
+  if (! env->history) {
+    return NULL;
+  }
+
+  // if the using Command is expected to change the history database, we need
+  // to initialize the upload spooler for potential later history upload
+  if (read_write) {
+    const bool use_file_chunking = false;
+    const upload::SpoolerDefinition sd(spl_definition,
+                                       hash_algo,
+                                       use_file_chunking);
+    env->spooler = upload::Spooler::Construct(sd);
+    if (! env->spooler) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize upload spooler");
+      return NULL;
+    }
+    env->spooler->RegisterListener(&CommandTag_::Environment::PushHistoryCallback,
+                                    env.weak_ref());
+  }
+
+  // return the pointer of the Environment (passing the ownership along)
+  return env.Release();
+}
+
+
+bool CommandTag_::CloseAndPublishHistory(Environment *env) {
+  assert (! env->push_happened_);
+  env->push_happened_ = true;
+
+  // set the previous revision pointer of the history database
+  env->history->SetPreviousRevision(env->manifest->history());
+
+  // close the history database
+  history::History *weak_history = env->history.Release();
+  delete weak_history;
+
+  // compress and upload the new history database
+  env->spooler->ProcessHistory(env->history_path.path());
+  env->spooler->WaitForUpload();
+
+  // retrieve the (async) uploader result
+  const shash::Any new_history_hash = env->pushed_history_hash_.Get();
+  if (new_history_hash.IsNull()) {
+    return false;
+  }
+
+  // update the (yet unsigned) manifest file
+  env->manifest->set_history(new_history_hash);
+  if (! env->manifest->Export(env->manifest_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to export the new manifest '%s'",
+             env->manifest_path.c_str());
+    return false;
+  }
+
+  // all done
   return true;
+}
+
+void CommandTag_::Environment::PushHistoryCallback(
+                                          const upload::SpoolerResult &result) {
+  assert (! result.IsChunked());
+  if (result.return_code != 0) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload history database (%d)",
+             result.return_code);
+    pushed_history_hash_.Set(shash::Any());
+  } else {
+    pushed_history_hash_.Set(result.content_hash);
+  }
 }
 
 
@@ -176,44 +296,11 @@ catalog::Catalog* CommandTag_::GetCatalog(
                                      catalog_hash);
 }
 
-shash::Any CommandTag_::PushHistory(const  upload::SpoolerDefinition &spl_def,
-                                    const std::string &history_path) {
-  assert (! push_happened_);
-  push_happened_ = true;
-
-  UniquePtr<upload::Spooler> spooler(upload::Spooler::Construct(spl_def));
-  if (! spooler) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler upload");
-    return shash::Any();
-  }
-  spooler->RegisterListener(&CommandTag_::PushHistoryCallback, this);
-
-  spooler->ProcessHistory(history_path);
-  spooler->WaitForUpload();
-
-  return pushed_history_hash_.Get();
-}
-
-void CommandTag_::PushHistoryCallback(const upload::SpoolerResult &result) {
-  assert (! result.IsChunked());
-  if (result.return_code != 0) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload history database (%d)",
-             result.return_code);
-    pushed_history_hash_.Set(shash::Any());
-  } else {
-    pushed_history_hash_.Set(result.content_hash);
-  }
-}
-
 
 
 ParameterList CommandCreateTag::GetParams() {
   ParameterList r;
-  r.push_back(Parameter::Mandatory('w', "repository directory / url"));
-  r.push_back(Parameter::Mandatory('r', "spooler definition string"));
-  r.push_back(Parameter::Mandatory('m', "(unsigned) manifest file to edit"));
-  r.push_back(Parameter::Mandatory('t', "temporary scratch directory"));
-  r.push_back(Parameter::Optional ('e', "hash algorithm to use (default SHA1)"));
+  InsertCommonParameters(r);
 
   r.push_back(Parameter::Mandatory('a', "name of the new tag"));
   r.push_back(Parameter::Mandatory('d', "description of the tag"));
@@ -225,20 +312,6 @@ ParameterList CommandCreateTag::GetParams() {
 
 int CommandCreateTag::Main(const ArgumentList &args) {
   typedef history::History::UpdateChannel TagChannel;
-
-  const std::string repository_url  = MakeCanonicalPath(*args.find('w')->second);
-  const std::string spl_definition  = MakeCanonicalPath(*args.find('r')->second);
-  const std::string manifest_path   = MakeCanonicalPath(*args.find('m')->second);
-  const std::string tmp_path        = MakeCanonicalPath(*args.find('t')->second);
-  const shash::Algorithms hash_algo = (args.find('e') == args.end())
-                                        ? shash::kSha1
-                                        : shash::ParseHashAlgorithm(
-                                                       *args.find('e')->second);
-  if (hash_algo == shash::kAny) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to parse hash algorith to use");
-    return 1;
-  }
-
   const std::string tag_name        = *args.find('a')->second;
   const std::string tag_description = *args.find('d')->second;
         shash::Any  root_hash       = (args.find('h') != args.end())
@@ -252,86 +325,59 @@ int CommandCreateTag::Main(const ArgumentList &args) {
                                               *args.find('c')->second))
                                         : history::History::kChannelTrunk;
 
-  const std::string catalog_path = CreateTempPath(tmp_path + "/catalog", 0600);
-  const std::string history_path = CreateTempPath(tmp_path + "/history", 0600);
-  UnlinkGuard catalog_deleter(catalog_path);
-  UnlinkGuard history_deleter(history_path);
-
-  if (! InitializeDownload()) {
-    return 1;
-  }
-
-  const UniquePtr<manifest::Manifest> manifest(
-                                        manifest::Manifest::LoadFile(
-                                          manifest_path));
-  if (! manifest) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file '%s'",
-             manifest_path.c_str());
-    return 1;
-  }
-
-  if (root_hash.IsNull()) {
-    root_hash = manifest->catalog_hash();
-  }
-
+  // initialize the Environment (taking ownership)
   const bool history_read_write = true;
-  UniquePtr<history::History> history(GetHistory(manifest.weak_ref(),
-                                                 repository_url,
-                                                 history_path,
-                                                 history_read_write));
-  if (! history) {
+  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  if (! env) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
     return 1;
   }
 
-  if (history->Exists(tag_name)) {
+  // check if the tag to be created exists
+  if (env->history->Exists(tag_name)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "a tag with the name '%s' already exists.",
              tag_name.c_str());
     return 1;
   }
 
+  // set the root hash to be tagged to the current HEAD if no other hash was
+  // given by the user
+  if (root_hash.IsNull()) {
+    root_hash = env->manifest->catalog_hash();
+  }
+
+  // open the catalog to be tagged (to check for existance and for meta info)
+  const UnlinkGuard catalog_path(CreateTempPath(env->tmp_path + "/catalog",
+                                                0600));
   const bool catalog_read_write = false;
-  const UniquePtr<catalog::Catalog> catalog(GetCatalog(repository_url,
+  const UniquePtr<catalog::Catalog> catalog(GetCatalog(env->repository_url,
                                                        root_hash,
-                                                       catalog_path,
+                                                       catalog_path.path(),
                                                        catalog_read_write));
   if (! catalog) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "catalog with hash '%s' does not exist",
+             root_hash.ToString().c_str());
     return 1;
   }
 
+  // build up the new tag information
   history::History::Tag new_tag;
   new_tag.name        = tag_name;
   new_tag.root_hash   = root_hash;
-  new_tag.size        = GetFileSize(catalog_path);
+  new_tag.size        = GetFileSize(catalog_path.path());
   new_tag.revision    = catalog->GetRevision();
   new_tag.timestamp   = catalog->GetLastModified();
   new_tag.channel     = tag_channel;
   new_tag.description = tag_description;
 
-  const bool  success = history->BeginTransaction()                       &&
-                        history->Insert(new_tag)                          &&
-                        history->SetPreviousRevision(manifest->history()) &&
-                        history->CommitTransaction();
-  if (! success) {
+  // insert the new tag into the history database
+  if (! env->history->Insert(new_tag)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to insert new tag");
     return 1;
   }
 
-  // close the history database
-  history::History *weak_history = history.Release();
-  delete weak_history;
-
-  const bool use_file_chunking = false;
-  const upload::SpoolerDefinition sd(spl_definition,
-                                     hash_algo,
-                                     use_file_chunking);
-  const shash::Any new_history_hash = PushHistory(sd, history_path);
-  if (new_history_hash.IsNull()) {
-    return 1;
-  }
-
-  manifest->set_history(new_history_hash);
-  if (! manifest->Export(manifest_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to export the new manifest file");
+  // finalize processing and upload new history database
+  if (! CloseAndPublishHistory(env.weak_ref())) {
     return 1;
   }
 
