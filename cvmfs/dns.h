@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "atomic.h"
+#include "duplex_cares.h"
 #include "util.h"
 
 namespace dns {
@@ -26,6 +27,7 @@ enum Failures {
   kFailTimeout,
   kFailInvalidHost,
   kFailUnknownHost,
+  kFailMalformed,
   kFailNoAddress,
   kFailNotYetResolved,
   kFailOther,
@@ -33,7 +35,7 @@ enum Failures {
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 8;
+  const int kNumElems = 9;
   if (error >= kNumElems)
     return "no text available (internal error)";
 
@@ -43,9 +45,10 @@ inline const char *Code2Ascii(const Failures error) {
   texts[2] = "DNS query timeout";
   texts[3] = "invalid host name to resolve";
   texts[4] = "unknown host name";
-  texts[5] = "no IP address for host";
-  texts[6] = "internal error, not yet resolved";
-  texts[7] = "unknown name resolving error";
+  texts[5] = "malformed DNS request";
+  texts[6] = "no IP address for host";
+  texts[7] = "internal error, not yet resolved";
+  texts[8] = "unknown name resolving error";
 
   return texts[error];
 }
@@ -69,6 +72,7 @@ class Host {
   Host(const Host &other);
   Host &operator= (const Host &other);
 
+  time_t deadline() const { return deadline_; }
   int64_t id() const { return id_; };
   bool hasIpv6() const { return !ipv6_addresses_.empty(); }
   std::set<std::string> ipv4_addresses() const { return ipv4_addresses_; }
@@ -133,7 +137,7 @@ class Host {
  */
 class Resolver : SingleCopy {
  public:
-  Resolver(const bool ipv4_only, const unsigned timeout);
+  Resolver(const bool ipv4_only, const unsigned timeout_ms);
   virtual ~Resolver() { };
 
   virtual void SetResolvers(const std::vector<std::string> &new_resolvers) = 0;
@@ -141,7 +145,7 @@ class Resolver : SingleCopy {
   Host Resolve(const std::string &name);
 
   bool ipv4_only() const { return ipv4_only_; }
-  unsigned timeout() const { return timeout_; }
+  unsigned timeout_ms() const { return timeout_ms_; }
 
  protected:
    /**
@@ -160,9 +164,9 @@ class Resolver : SingleCopy {
   bool ipv4_only_;
 
   /**
-   * Timeout in seconds for DNS queries.  Zero means no timeout.
+   * Timeout in milliseconds for DNS queries.  Zero means no timeout.
    */
-  unsigned timeout_;
+  unsigned timeout_ms_;
 
  private:
   bool IsIpv4Address(const std::string &address);
@@ -175,17 +179,24 @@ class Resolver : SingleCopy {
  */
 class CaresResolver : public Resolver {
  public:
-  CaresResolver(const bool ipv4_only, const unsigned timeout);
+  static const unsigned kMaxAddresses = 16;
+
+  static CaresResolver *Create(const bool ipv4_only, const unsigned timeout_ms);
   ~CaresResolver();
 
   void SetResolvers(const std::vector<std::string> &new_resolvers);
   void SetSystemResolvers();
 
  protected:
+  CaresResolver(const bool ipv4_only, const unsigned timeout_ms);
   virtual Failures DoResolve(const std::string &name,
                              std::vector<std::string> *ipv4_addresses,
                              std::vector<std::string> *ipv6_addresses,
                              unsigned *ttl);
+
+ private:
+  void WaitOnCares();
+  ares_channel *channel;
 };
 
 }  // namespace dns

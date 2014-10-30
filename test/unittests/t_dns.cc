@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
 #include "../../cvmfs/dns.h"
+#include "../../cvmfs/util.h"
 
 #include <ctime>
 
@@ -195,11 +196,30 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "timeout");
   EXPECT_EQ(host.status(), kFailTimeout);
   EXPECT_FALSE(host.IsValid());
-  
+
   host = resolver.Resolve("empty");
   EXPECT_EQ(host.name(), "empty");
   EXPECT_EQ(host.status(), kFailNoAddress);
   EXPECT_FALSE(host.IsValid());
+}
+
+TEST_F(T_Dns, CaresResolver) {
+  CaresResolver *resolver = CaresResolver::Create(false, 2000);
+  Host host = resolver->Resolve("donaldduck.ch");
+  set<string> ipv4_addresses = host.ipv4_addresses();
+  set<string> ipv6_addresses = host.ipv6_addresses();
+  printf("Status is %s, deadline is %s\n",
+    Code2Ascii(host.status()), StringifyTime(host.deadline(), true).c_str());
+  for (set<string>::const_iterator i = ipv4_addresses.begin(),
+       iEnd = ipv4_addresses.end(); i != iEnd; ++i)
+  {
+    printf("Resolves to %s\n", i->c_str());
+  }
+  for (set<string>::const_iterator i = ipv6_addresses.begin(),
+       iEnd = ipv6_addresses.end(); i != iEnd; ++i)
+  {
+    printf("Resolves(6) to %s\n", i->c_str());
+  }
 }
 
 }  // namespace dns
