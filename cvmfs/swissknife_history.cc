@@ -386,12 +386,63 @@ int CommandCreateTag::Main(const ArgumentList &args) {
 
 
 ParameterList CommandRemoveTag::GetParams() {
-  return ParameterList();
+  ParameterList r;
+  InsertCommonParameters(r);
+
+  r.push_back(Parameter::Mandatory('d', "space separated tags to be deleted"));
+  return r;
 }
 
 
 int CommandRemoveTag::Main(const ArgumentList &args) {
-  return 1;
+  typedef std::vector<std::string> TagNames;
+  const std::string tags_to_delete = *args.find('d')->second;
+
+  const TagNames condemned_tags = SplitString(tags_to_delete, ' ');
+  LogCvmfs(kLogCvmfs, kLogDebug, "proceeding to delete %d tags",
+           condemned_tags.size());
+
+  // initialize the Environment (taking ownership)
+  const bool history_read_write = true;
+  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  if (! env) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
+    return 1;
+  }
+
+  // check if the tags to be deleted exist
+        TagNames::const_iterator i    = condemned_tags.begin();
+  const TagNames::const_iterator iend = condemned_tags.end();
+  bool all_exist = true;
+  for (; i != iend; ++i) {
+    if (! env->history->Exists(*i)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' does not exist",
+               i->c_str());
+      all_exist = false;
+    }
+  }
+  if (! all_exist) {
+    return 1;
+  }
+
+  // delete the tags from the tag database
+  i = condemned_tags.begin();
+  env->history->BeginTransaction();
+  for (; i != iend; ++i) {
+    if (! env->history->Remove(*i)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to remove tag '%s' from history",
+               i->c_str());
+      return 1;
+    }
+  }
+  env->history->CommitTransaction();
+
+  // finalize processing and upload new history database
+  if (! CloseAndPublishHistory(env.weak_ref())) {
+    return 1;
+  }
+
+  return 0;
 }
 
 

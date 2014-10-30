@@ -100,11 +100,11 @@ class CommandCreateTag : public CommandTag_ {
 };
 
 
-class CommandRemoveTag : public Command {
+class CommandRemoveTag : public CommandTag_ {
  public:
   std::string GetName() { return "tag_remove"; }
   std::string GetDescription() {
-    return "Remove a specific tag.";
+    return "Remove one or more tags.";
   }
 
   ParameterList GetParams();
