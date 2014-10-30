@@ -25,7 +25,6 @@ class CommandSign : public Command {
     r.push_back(Parameter::Optional ('k', "private key of the certificate"));
     r.push_back(Parameter::Optional ('s', "password for the private key"));
     r.push_back(Parameter::Optional ('n', "repository name"));
-    r.push_back(Parameter::Optional ('h', "history path"));
     return r;
   }
   int Main(const ArgumentList &args);
