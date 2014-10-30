@@ -1500,6 +1500,25 @@ get_published_root_hash() {
 }
 
 
+# checks if a given tag already exists in the repository's history database
+#
+# @param repository_name   the name of the repository to be checked
+# @param tag               the tag name to be checked
+# @return                  0 if tag already exists
+check_tag_existence() {
+  local repository_name="$1"
+  local tag="$2"
+
+  load_repo_config $repository_name
+  cvmfs_swissknife tag_info                   \
+    -w $CVMFS_STRATUM0                        \
+    -t ${CVMFS_SPOOL_DIR}/tmp                 \
+    -p /etc/cvmfs/keys/${repository_name}.pub \
+    -f $repository_name                       \
+    -n "$tag" 2>&1 | grep -qv "does not exist" > /dev/null
+}
+
+
 migrate_legacy_dirtab() {
   local name=$1
   local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
