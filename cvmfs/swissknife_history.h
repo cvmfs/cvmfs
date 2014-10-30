@@ -47,6 +47,7 @@ class CommandTag_ : public Command {
     const std::string              tmp_path;
 
     UniquePtr<manifest::Manifest>  manifest;
+    UniquePtr<manifest::Manifest>  previous_manifest;
     UniquePtr<history::History>    history;
     UniquePtr<upload::Spooler>     spooler;
     UnlinkGuard                    history_path;
@@ -65,10 +66,11 @@ class CommandTag_ : public Command {
                                      const bool read_write);
   bool CloseAndPublishHistory(Environment *environment);
 
-  manifest::Manifest* FetchManifest(const std::string &repository_url,
-                                    const std::string &repository_name,
-                                    const std::string &pubkey_path,
-                                    const std::string &trusted_certs) const;
+  manifest::Manifest* FetchManifest(const std::string  &repository_url,
+                                    const std::string  &repository_name,
+                                    const std::string  &pubkey_path,
+                                    const std::string  &trusted_certs,
+                                    const shash::Any   &base_hash) const;
   bool FetchObject(const std::string  &repository_url,
                    const shash::Any   &object_hash,
                    const std::string  &hash_suffix,

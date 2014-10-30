@@ -36,6 +36,7 @@ void CommandTag_::InsertCommonParameters(ParameterList &r) {
   r.push_back(Parameter::Optional ('f', "fully qualified repository name"));
   r.push_back(Parameter::Optional ('r', "spooler definition string"));
   r.push_back(Parameter::Optional ('m', "(unsigned) manifest file to edit"));
+  r.push_back(Parameter::Optional ('b', "mounted repository base hash"));
   r.push_back(Parameter::Optional ('e', "hash algorithm to use (default SHA1)"));
 }
 
@@ -67,6 +68,11 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
                                               ? ""
                                               : MakeCanonicalPath(
                                                        *args.find('z')->second);
+  const shash::Any        base_hash       = (args.find('b') == args.end())
+                                              ? shash::Any()
+                                              : shash::MkFromHexPtr(
+                                                    shash::HexPtr(
+                                                      *args.find('b')->second));
   const std::string       repo_name       = (args.find('f') == args.end())
                                               ? ""
                                               : *args.find('f')->second;
@@ -115,10 +121,32 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
                     : FetchManifest(env->repository_url,
                                     repo_name,
                                     pubkey_path,
-                                    trusted_certs);
+                                    trusted_certs,
+                                    base_hash);
+
   if (! env->manifest) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to load manifest file");
     return NULL;
+  }
+
+  // figure out the hash of the history from the previous revision if needed
+  if (read_write && env->manifest->history().IsNull() && ! base_hash.IsNull()) {
+    env->previous_manifest = FetchManifest(env->repository_url,
+                                           repo_name,
+                                           pubkey_path,
+                                           trusted_certs,
+                                           base_hash);
+    if (! env->previous_manifest) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load previous manifest");
+      return NULL;
+    }
+
+    LogCvmfs(kLogCvmfs, kLogDebug, "using history database '%s' from previous "
+                                   "manifest (%s) as basis",
+             env->previous_manifest->history().ToString().c_str(),
+             env->previous_manifest->repository_name().c_str());
+    env->manifest->set_history(env->previous_manifest->history());
+    env->manifest->set_repository_name(env->previous_manifest->repository_name());
   }
 
   // download the history database referenced in the manifest
@@ -199,12 +227,13 @@ void CommandTag_::Environment::PushHistoryCallback(
 
 
 manifest::Manifest* CommandTag_::FetchManifest(
-                                       const std::string &repository_url,
-                                       const std::string &repository_name,
-                                       const std::string &pubkey_path,
-                                       const std::string &trusted_certs) const {
+                                           const std::string &repository_url,
+                                           const std::string &repository_name,
+                                           const std::string &pubkey_path,
+                                           const std::string &trusted_certs,
+                                           const shash::Any  &base_hash) const {
   manifest::ManifestEnsemble *manifest_ensemble = new manifest::ManifestEnsemble;
-  manifest::Manifest         *manifest          = NULL;
+  UniquePtr<manifest::Manifest> manifest;
 
   // initialize the (global) signature manager
   g_signature_manager->Init();
@@ -232,7 +261,7 @@ manifest::Manifest* CommandTag_::FetchManifest(
                                     "(%d - %s)",
              retval, manifest::Code2Ascii(retval));
     delete manifest_ensemble;
-    manifest = NULL;
+    return NULL;
   } else {
     // ManifestEnsemble stays around! This is a memory leak, but otherwise
     // the destructor of ManifestEnsemble would free the wrapped manifest
@@ -249,7 +278,17 @@ manifest::Manifest* CommandTag_::FetchManifest(
     return NULL;
   }
 
-  return manifest;
+  // check the provided base hash of the repository if provided
+  if (! base_hash.IsNull() && manifest->catalog_hash() != base_hash) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "base hash does not match manifest "
+                                    "(found: %s expected: %s)",
+             manifest->catalog_hash().ToString().c_str(),
+             base_hash.ToString().c_str());
+    return NULL;
+  }
+
+  // return the fetched manifest (releasing pointer ownership)
+  return manifest.Release();
 }
 
 
