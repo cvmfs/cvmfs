@@ -44,6 +44,16 @@ class History {
       name(n), root_hash(h), size(s), revision(r), timestamp(t), channel(c),
       description(d) {}
 
+    inline const char* GetChannelName() const {
+      switch(channel) {
+        case kChannelTrunk: return "trunk";
+        case kChannelDevel: return "development";
+        case kChannelTest:  return "testing";
+        case kChannelProd:  return "production";
+        default: assert (false && "unknown channel id");
+      }
+    }
+
     bool operator ==(const Tag &other) const {
       return this->revision == other.revision;
     }
