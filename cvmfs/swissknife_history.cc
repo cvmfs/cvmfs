@@ -79,7 +79,7 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
 
   // do some sanity checks
   if (hash_algo == shash::kAny) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to parse hash algorith to use");
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to parse hash algorithm to use");
     return NULL;
   }
 
