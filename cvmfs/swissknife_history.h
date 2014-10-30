@@ -9,13 +9,10 @@
 #include "swissknife.h"
 #include "hash.h"
 #include "util_concurrency.h"
+#include "history.h"
 
 namespace manifest {
   class Manifest;
-}
-
-namespace history {
-  class History;
 }
 
 namespace catalog {
@@ -33,6 +30,9 @@ namespace swissknife {
 
 
 class CommandTag_ : public Command {
+ protected:
+  typedef std::vector<history::History::Tag> TagList;
+
  protected:
   struct Environment {
     Environment(const std::string &manifest_path,
@@ -112,15 +112,23 @@ class CommandRemoveTag : public CommandTag_ {
 };
 
 
-class CommandListTags : public Command {
+class CommandListTags : public CommandTag_ {
  public:
-  std::string GetName() { return "tags_list"; }
+  std::string GetName() { return "tag_list"; }
   std::string GetDescription() {
-    return "Remove a specific tag.";
+    return "List tags in the tag database.";
   }
 
   ParameterList GetParams();
   int Main(const ArgumentList &args);
+
+ protected:
+  std::string AddPadding(const std::string  &str,
+                         const size_t        padding,
+                         const bool          align_right = false,
+                         const std::string  &fill_char = " ") const;
+
+  void PrintHumanReadableList(const TagList &tags) const;
 };
 
 

@@ -13,7 +13,6 @@
 #include "manifest_fetch.h"
 #include "download.h"
 #include "signature.h"
-#include "history.h"
 #include "catalog_rw.h"
 #include "upload.h"
 
@@ -448,12 +447,107 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
 
 
 ParameterList CommandListTags::GetParams() {
-  return ParameterList();
+  ParameterList r;
+  InsertCommonParameters(r);
+  return r;
+}
+
+std::string CommandListTags::AddPadding(const std::string  &str,
+                                        const size_t        padding,
+                                        const bool          align_right,
+                                        const std::string  &fill_char) const {
+  assert (str.size() <= padding);
+  std::string result(str);
+  result.reserve(padding);
+  const size_t pos = (align_right) ? 0 : str.size();
+  const size_t padding_width = padding - str.size();
+  for (size_t i = 0; i < padding_width; ++i) result.insert(pos, fill_char);
+  return result;
+}
+
+
+void CommandListTags::PrintHumanReadableList(
+                                   const CommandListTags::TagList &tags) const {
+  // go through the list of tags and figure out the column widths
+  const std::string name_label = "Name";
+  const std::string rev_label  = "Revision";
+  const std::string chan_label = "Channel";
+  const std::string time_label = "Timestamp";
+  const std::string desc_label = "Description";
+
+  // figure out the maximal lengths of the fields in the lists
+        TagList::const_iterator i    = tags.begin();
+  const TagList::const_iterator iend = tags.end();
+  size_t max_name_len = name_label.size();
+  size_t max_rev_len  = rev_label.size();
+  size_t max_chan_len = chan_label.size();
+  size_t max_time_len = desc_label.size();
+  for (; i != iend; ++i) {
+    max_name_len = std::max(max_name_len, i->name.size());
+    max_rev_len  = std::max(max_rev_len,  StringifyInt(i->revision).size());
+    max_chan_len = std::max(max_chan_len, strlen(i->GetChannelName()));
+    max_time_len = std::max(max_time_len, StringifyTime(i->timestamp, true).size());
+  }
+
+  // print the list header
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
+           AddPadding(name_label, max_name_len).c_str(),
+           AddPadding(rev_label,  max_rev_len).c_str(),
+           AddPadding(chan_label, max_chan_len).c_str(),
+           AddPadding(time_label, max_time_len).c_str(),
+           desc_label.c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s\u2500\u253C\u2500%s\u2500\u253C\u2500%s"
+                                  "\u2500\u253C\u2500%s\u2500\u253C\u2500%s",
+           AddPadding("", max_name_len,          false, "\u2500").c_str(),
+           AddPadding("", max_rev_len,           false, "\u2500").c_str(),
+           AddPadding("", max_chan_len,          false, "\u2500").c_str(),
+           AddPadding("", max_time_len,          false, "\u2500").c_str(),
+           AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
+
+  // print the rows of the list
+  i = tags.begin();
+  for (; i != iend; ++i) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
+             AddPadding(i->name,                           max_name_len).c_str(),
+             AddPadding(StringifyInt(i->revision),         max_rev_len, true).c_str(),
+             AddPadding(i->GetChannelName(),               max_chan_len).c_str(),
+             AddPadding(StringifyTime(i->timestamp, true), max_time_len).c_str(),
+             i->description.c_str());
+  }
+
+  // print the list footer
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s\u2500\u2534\u2500%s\u2500\u2534\u2500%s"
+                                  "\u2500\u2534\u2500%s\u2500\u2534\u2500%s",
+           AddPadding("", max_name_len,          false, "\u2500").c_str(),
+           AddPadding("", max_rev_len,           false, "\u2500").c_str(),
+           AddPadding("", max_chan_len,          false, "\u2500").c_str(),
+           AddPadding("", max_time_len,          false, "\u2500").c_str(),
+           AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
+
+  // print the number of tags listed
+  LogCvmfs(kLogCvmfs, kLogStdout, "listing contains %d tags", tags.size());
 }
 
 
 int CommandListTags::Main(const ArgumentList &args) {
-  return 1;
+  // initialize the Environment (taking ownership)
+  const bool history_read_write = false;
+  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  if (! env) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
+    return 1;
+  }
+
+  // obtain a full list of all tags
+  TagList tags;
+  if (! env->history->List(&tags)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to list tags in history database");
+    return 1;
+  }
+
+  PrintHumanReadableList(tags);
+
+  return 0;
 }
 
 
