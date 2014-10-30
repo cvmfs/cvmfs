@@ -212,8 +212,8 @@ Supported Commands:
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
-                [-a tag name] [-c tag channel] [-t tag description] [-h hash]
-                [-r tag name] [-n manual revision number] [-v be verbose]
+                [-a tag name] [-c tag channel] [-t tag description]
+                [-n manual revision number] [-v be verbose]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -3188,16 +3188,13 @@ publish() {
   local tag_name=
   local tag_channel=00
   local tag_description=
-  local tag_hash=
-  local add_tag=
-  local remove_tag=
   local retcode=0
   local verbosity=""
   local manual_revision=""
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:h:c:t:r:vn:" option
+  while getopts "dDpa:c:t:vn:" option
   do
     case $option in
       d)
@@ -3210,26 +3207,13 @@ publish() {
         tweaks_option="-d"
       ;;
       a)
-        add_tag="-a"
         tag_name="$OPTARG"
       ;;
-      h)
-        add_tag="-a"
-        tag_hash="-h $OPTARG"
-      ;;
       c)
-        add_tag="-a"
         tag_channel="$OPTARG"
       ;;
       t)
-        add_tag="-a"
         tag_description="$OPTARG"
-      ;;
-      r)
-        remove_tag="-d '$OPTARG'"
-        if [ "x$OPTARG" = "xtrunk" -o "x$OPTARG" = "xtrunk-previous" ]; then
-          echo "Warning: won't delete $OPTARG tag"
-        fi
       ;;
       v)
         verbosity="-x"
@@ -3251,14 +3235,9 @@ publish() {
   check_multiple_repository_existence "$names"
 
   # sanity checks
-  if [ "x$add_tag" != "x" ]; then
-    [ "x$tag_name" != "x" ]               || die "Tag name missing"
+  if [ ! -z "$tag_name" ]; then
     echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
-    if list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
-       [ x"$tag_hash" = "x" ]; then
-      die "Tag name '$tag_name' is already in use. Maybe you wanted to specify -h to move it?"
-    fi
-    add_tag="-a \"${tag_name}@${tag_channel}@${tag_description}\""
+    check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
   fi
 
   for name in $names; do
@@ -3288,13 +3267,6 @@ publish() {
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
-    if [ "x$add_tag" != "x" ] && \
-       list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
-       [ x"$tag_hash" = "x" ]; then
-      echo "Tag name '$tag_name' is already in use for repository $name. Maybe you wanted to specify -h to move it?"
-      retcode=1
-      continue
-    fi
     local revision_number=$($swissknife info -r $stratum0 -v)
     if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
       echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
@@ -3302,11 +3274,10 @@ publish() {
       continue
     fi
 
-    if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
+    if [ -z "$tag_name" ] && [ x"$CVMFS_AUTO_TAG" = x"true" ]; then
       local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
       tag_name="generic-$timestamp"
       echo "Using auto tag '$tag_name'"
-      add_tag="-a $tag_name"
     fi
 
     # enable the debug mode?
@@ -3370,13 +3341,22 @@ publish() {
     if [ "x$manual_revision" != "x" ]; then
       sync_command="$sync_command -v $manual_revision"
     fi
-    local tag_command="$swissknife tag -r $stratum0 \
+    local tag_command="$swissknife tag_create \
+      -r $upstream \
+      -w $stratum0 \
+      -t ${spool_dir}/tmp \
+      -m ${spool_dir}/tmp/manifest \
+      -p /etc/cvmfs/keys/${name}.pub \
+      -f $name \
       -b $base_hash \
-      -n $name \
-      -o ${spool_dir}/tmp/history \
-      -k /etc/cvmfs/keys/${name}.pub \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
-      $add_tag $remove_tag"
+      $hash_algo \
+      -a $tag_name"
+    if [ ! -z "$tag_channel" ]; then
+      tag_command="$tag_command -c $tag_channel"
+    fi
+    if [ ! -z "$tag_description" ]; then
+      tag_command="$tag_command -d '$tag_description'"
+    fi
 
     # ---> do it! (from here on we are changing things)
     publish_before_hook $name
@@ -3390,12 +3370,6 @@ publish() {
     publish_starting $name
     $user_shell "$sync_command"      || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     [ -f ${spool_dir}/tmp/manifest ] || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
-
-    # gather information of new (uncommitted) revision
-    local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-    local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
-    local trunk_size=$(grep "^B" ${spool_dir}/tmp/manifest | tr -d B)
-    tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
 
     # committing newly created revision
     echo "Tagging $name"
