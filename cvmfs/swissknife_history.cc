@@ -560,6 +560,75 @@ int CommandListTags::Main(const ArgumentList &args) {
 
 
 
+ParameterList CommandInfoTag::GetParams() {
+  ParameterList r;
+  InsertCommonParameters(r);
+
+  r.push_back(Parameter::Mandatory('n', "name of the tag to be inspected"));
+  return r;
+}
+
+
+std::string CommandInfoTag::HumanReadableFilesize(const size_t filesize) const {
+  const size_t kiB = 1024;
+  const size_t MiB = kiB * 1024;
+  const size_t GiB = MiB * 1024;
+
+  if (filesize > GiB) {
+    return StringifyDouble((double)filesize / GiB) + " GiB";
+  } else if (filesize > MiB) {
+    return StringifyDouble((double)filesize / MiB) + " MiB";
+  } else if (filesize > kiB) {
+    return StringifyDouble((double)filesize / kiB) + " kiB";
+  } else {
+    return StringifyInt(filesize) + " Byte";
+  }
+}
+
+
+void CommandInfoTag::PrintHumanReadableInfo(
+                                       const history::History::Tag &tag) const {
+  LogCvmfs(kLogCvmfs, kLogStdout, "Name:         %s\n"
+                                  "Revision:     %s\n"
+                                  "Channel:      %s\n"
+                                  "Timestamp:    %s\n"
+                                  "Root Hash:    %s\n"
+                                  "Catalog Size: %s\n"
+                                  "%s",
+           tag.name.c_str(),
+           StringifyInt(tag.revision).c_str(),
+           tag.GetChannelName(),
+           StringifyTime(tag.timestamp, true /* utc */).c_str(),
+           tag.root_hash.ToString().c_str(),
+           HumanReadableFilesize(tag.size).c_str(),
+           tag.description.c_str());
+}
+
+
+int CommandInfoTag::Main(const ArgumentList &args) {
+  const std::string tag_name = *args.find('n')->second;
+
+  // initialize the Environment (taking ownership)
+  const bool history_read_write = false;
+  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  if (! env) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
+    return 1;
+  }
+
+  history::History::Tag tag;
+  const bool found = env->history->Get(tag_name, &tag);
+  if (! found) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' does not exist", tag_name.c_str());
+    return 1;
+  }
+
+  PrintHumanReadableInfo(tag);
+
+  return 0;
+
+}
+
 
 
 

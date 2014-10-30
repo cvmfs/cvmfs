@@ -132,6 +132,22 @@ class CommandListTags : public CommandTag_ {
 };
 
 
+class CommandInfoTag : public CommandTag_ {
+ public:
+  std::string GetName() { return "tag_info"; }
+  std::string GetDescription() {
+    return "Obtain detailed information about a tag.";
+  }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
+
+ protected:
+  std::string HumanReadableFilesize(const size_t filesize) const;
+  void PrintHumanReadableInfo(const history::History::Tag &tag) const;
+};
+
+
 
 
 
