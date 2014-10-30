@@ -387,7 +387,7 @@ ParameterList CommandCreateTag::GetParams() {
   InsertCommonParameters(r);
 
   r.push_back(Parameter::Mandatory('a', "name of the new tag"));
-  r.push_back(Parameter::Mandatory('d', "description of the tag"));
+  r.push_back(Parameter::Optional ('d', "description of the tag"));
   r.push_back(Parameter::Optional ('h', "root hash of the new tag"));
   r.push_back(Parameter::Optional ('c', "channel of the new tag"));
   return r;
@@ -397,7 +397,9 @@ ParameterList CommandCreateTag::GetParams() {
 int CommandCreateTag::Main(const ArgumentList &args) {
   typedef history::History::UpdateChannel TagChannel;
   const std::string tag_name        = *args.find('a')->second;
-  const std::string tag_description = *args.find('d')->second;
+  const std::string tag_description = (args.find('d') != args.end())
+                                        ? *args.find('d')->second
+                                        : "";
         shash::Any  root_hash       = (args.find('h') != args.end())
                                         ? shash::MkFromHexPtr(
                                             shash::HexPtr(
