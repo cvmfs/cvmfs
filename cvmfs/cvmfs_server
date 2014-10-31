@@ -3621,28 +3621,27 @@ rollback() {
 
   if [ $force -ne 1 ]; then
     local reply
-    read -p "You are about to IRREVERSIBLY ROLLBACK AND REPUBLISH TAG $target_tag AS THE LATEST REVISION!  Are you sure (y/N)? " reply
+    read -p "You are about to ROLLBACK to $target_tag AS THE LATEST REVISION!  Are you sure (y/N)? " reply
     if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
       return 1
     fi
   fi
 
   # prepare the shell commands
-  local swissknife="cvmfs_swissknife"
-
   local user_shell="$(get_user_shell $name)"
   local base_hash=$(get_mounted_root_hash $name)
 
-  local rollback_command="$swissknife rollback -u $stratum0 \
-    -r $upstream \
-    -b $base_hash \
-    -n $name \
-    -k /etc/cvmfs/keys/${name}.pub \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
-    -o ${spool_dir}/tmp/history \
-    -m ${spool_dir}/tmp/manifest \
-    -d ${spool_dir}/tmp \
-    -t $target_tag"
+  local rollback_command="cvmfs_swissknife tag_rollback \
+    -w $stratum0                                        \
+    -t ${spool_dir}/tmp                                 \
+    -p /etc/cvmfs/keys/${name}.pub                      \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs  \
+    -f $name                                            \
+    -r $upstream                                        \
+    -m ${spool_dir}/tmp/manifest                        \
+    -b $base_hash                                       \
+    -e $CVMFS_HASH_ALGORITHM                            \
+    -n $target_tag"
 
   # check if we have open file descriptors on /cvmfs/<name>
   local use_fd_fallback=0
