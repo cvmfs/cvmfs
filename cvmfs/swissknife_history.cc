@@ -107,17 +107,18 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
   // Note: We use this encapsulation because we cannot be sure that the Command
   //       object gets deleted properly. With the Environment object at hand
   //       we have full control and can make heavy and safe use of RAII
-  UniquePtr<Environment> env(new Environment(manifest_path,
-                                             repository_url,
+  UniquePtr<Environment> env(new Environment(repository_url,
                                              tmp_path));
+  env->manifest_path.Set(manifest_path);
   env->history_path.Set(CreateTempPath(tmp_path + "/history", 0600));
 
   // initialize the (swissknife global) download manager
   g_download_manager->Init(1, true);
 
-  // open the (yet unsigned) manifest file
-  env->manifest = (read_write)
-                    ? manifest::Manifest::LoadFile(env->manifest_path)
+  // open the (yet unsigned) manifest file if it is there, otherwise load the
+  // latest manifest from the server
+  env->manifest = (FileExists(env->manifest_path.path()))
+                    ? manifest::Manifest::LoadFile(env->manifest_path.path())
                     : FetchManifest(env->repository_url,
                                     repo_name,
                                     pubkey_path,
@@ -203,11 +204,14 @@ bool CommandTag_::CloseAndPublishHistory(Environment *env) {
 
   // update the (yet unsigned) manifest file
   env->manifest->set_history(new_history_hash);
-  if (! env->manifest->Export(env->manifest_path)) {
+  if (! env->manifest->Export(env->manifest_path.path())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to export the new manifest '%s'",
-             env->manifest_path.c_str());
+             env->manifest_path.path().c_str());
     return false;
   }
+
+  // disable the unlink guard in order to keep the newly exported manifest file
+  env->manifest_path.Disable();
 
   // all done
   return true;

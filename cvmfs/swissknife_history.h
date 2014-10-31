@@ -35,17 +35,16 @@ class CommandTag_ : public Command {
 
  protected:
   struct Environment {
-    Environment(const std::string &manifest_path,
-                const std::string &repository_url,
+    Environment(const std::string &repository_url,
                 const std::string &tmp_path) :
-      manifest_path(manifest_path), repository_url(repository_url),
-      tmp_path(tmp_path), push_happened_(false) {}
+      repository_url(repository_url), tmp_path(tmp_path),
+      push_happened_(false) {}
     void PushHistoryCallback(const upload::SpoolerResult &result);
 
-    const std::string              manifest_path;
     const std::string              repository_url;
     const std::string              tmp_path;
 
+    UnlinkGuard                    manifest_path;
     UniquePtr<manifest::Manifest>  manifest;
     UniquePtr<manifest::Manifest>  previous_manifest;
     UniquePtr<history::History>    history;
