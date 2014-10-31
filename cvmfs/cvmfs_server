@@ -1267,6 +1267,23 @@ check_expiry() {
 }
 
 
+sign_manifest() {
+  local name=$1
+  local unsigned_manifest=$2
+
+  load_repo_config $name
+  local user_shell="$(get_user_shell $name)"
+
+  $user_shell "cvmfs_swissknife sign \
+    -c /etc/cvmfs/keys/${name}.crt \
+    -k /etc/cvmfs/keys/${name}.key \
+    -n $name \
+    -m $unsigned_manifest \
+    -t ${CVMFS_SPOOL_DIR}/tmp \
+    -r $CVMFS_UPSTREAM_STORAGE" > /dev/null
+}
+
+
 check_upstream_validity() {
   local upstream=$1
   local silent=0
@@ -2194,14 +2211,8 @@ mkfs() {
     -t $temp_dir \
     -r $upstream \
     -a $hash_algo $volatile_opt \
-    -o ${temp_dir}/new_manifest" > /dev/null || die "fail! (cannot init repo)"
-  $user_shell "cvmfs_swissknife sign \
-    -c /etc/cvmfs/keys/${name}.crt \
-    -k /etc/cvmfs/keys/${name}.key \
-    -n $name \
-    -m ${temp_dir}/new_manifest \
-    -t $temp_dir \
-    -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
+    -o ${temp_dir}/new_manifest" > /dev/null   || die "fail! (cannot init repo)"
+  sign_manifest $name ${temp_dir}/new_manifest || die "fail! (cannot sign repo)"
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
@@ -2573,13 +2584,7 @@ import() {
     # sign new (migrated) repository revision
     echo -n "Signing newly imported Repository... "
     local user_shell="$(get_user_shell $name)"
-    $user_shell "cvmfs_swissknife sign \
-      -c /etc/cvmfs/keys/${certificate} \
-      -k /etc/cvmfs/keys/${private_key} \
-      -n $name \
-      -m $new_manifest \
-      -t $temp_dir \
-      -r $upstream" > /dev/null || die "fail! (cannot sign repo)"
+    sign_manifest $name $new_manifest || die "fail! (cannot sign repo)"
     IMPORT_DESASTER_MANIFEST_SIGNED=1
     echo "done"
   fi
@@ -3342,13 +3347,6 @@ publish() {
       -k /etc/cvmfs/keys/${name}.pub \
       -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
       $add_tag $remove_tag"
-    local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
-      -k /etc/cvmfs/keys/${name}.key \
-      -n $name \
-      -m ${spool_dir}/tmp/manifest \
-      -h ${spool_dir}/tmp/history \
-      -t ${spool_dir}/tmp \
-      -r ${upstream}"
 
     # ---> do it! (from here on we are changing things)
     publish_before_hook $name
@@ -3371,8 +3369,8 @@ publish() {
 
     # committing newly created revision
     echo "Tagging $name"
-    $user_shell "$tag_command"  || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
-    $user_shell "$sign_command" || { publish_failed $name; die "Signing failed\n\nExecuted Command:\n$sign_command"; }
+    $user_shell "$tag_command"                    || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+    sign_manifest $name ${spool_dir}/tmp/manifest || { publish_failed $name; die "Signing failed"; }
     set_ro_root_hash $name $trunk_hash
 
     # finalizing transaction
@@ -3480,13 +3478,6 @@ rollback() {
     -m ${spool_dir}/tmp/manifest \
     -d ${spool_dir}/tmp \
     -t $target_tag"
-  local sign_command="$swissknife sign -c /etc/cvmfs/keys/${name}.crt \
-    -k /etc/cvmfs/keys/${name}.key \
-    -n $name \
-    -m ${spool_dir}/tmp/manifest \
-    -h ${spool_dir}/tmp/history \
-    -t ${spool_dir}/tmp \
-    -r ${upstream}"
 
   # check if we have open file descriptors on /cvmfs/<name>
   local use_fd_fallback=0
@@ -3498,7 +3489,7 @@ rollback() {
   $user_shell "$rollback_command" || { publish_failed $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
 
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-  $user_shell "$sign_command" || { publish_failed; die "Signing failed\n\nExecuted Command:\n$sign_command"; }
+  sign_manifest $name ${spool_dir}/tmp/manifest || { publish_failed; die "Signing failed"; }
   set_ro_root_hash $name $trunk_hash
 
   echo "Flushing file system buffers"
@@ -3739,13 +3730,7 @@ migrate_2_1_7() {
   # sign new (migrated) repository revision
   echo -n "Signing newly imported Repository... "
   create_whitelist $name ${CVMFS_USER} ${CVMFS_UPSTREAM_STORAGE} $temp_dir > /dev/null
-  $user_shell "cvmfs_swissknife sign \
-    -c /etc/cvmfs/keys/$name.crt \
-    -k /etc/cvmfs/keys/$name.key \
-    -n $name \
-    -m $new_manifest \
-    -t $temp_dir \
-    -r ${CVMFS_UPSTREAM_STORAGE}" > /dev/null || die "fail! (cannot sign repo)"
+  sign_manifest $name $new_manifest || die "fail! (cannot sign repo)"
   echo "done"
 
   echo "--> updating server.conf"
