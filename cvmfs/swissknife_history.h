@@ -159,35 +159,6 @@ class CommandRollbackTag : public CommandTag {
   int Main(const ArgumentList &args);
 };
 
-
-
-
-
-class CommandRollback : public Command {
- public:
-  ~CommandRollback() { };
-  std::string GetName() { return "rollback"; };
-  std::string GetDescription() {
-    return "Re-publishes a previous tagged snapshot.  All intermediate "
-           "snapshots become inaccessible.";
-  };
-  ParameterList GetParams() {
-    ParameterList r;
-    r.push_back(Parameter::Mandatory('r', "spooler definition"));
-    r.push_back(Parameter::Mandatory('u', "repository directory / url"));
-    r.push_back(Parameter::Mandatory('b', "base hash"));
-    r.push_back(Parameter::Mandatory('n', "repository name"));
-    r.push_back(Parameter::Mandatory('k', "repository public key"));
-    r.push_back(Parameter::Mandatory('o', "history db output file"));
-    r.push_back(Parameter::Mandatory('m', "manifest output file"));
-    r.push_back(Parameter::Mandatory('t', "revert to this tag"));
-    r.push_back(Parameter::Mandatory('d', "temp directory"));
-    r.push_back(Parameter::Optional ('z', "trusted certificate dir(s)"));
-    return r;
-  }
-  int Main(const ArgumentList &args);
-};
-
 }  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_HISTORY_H_
