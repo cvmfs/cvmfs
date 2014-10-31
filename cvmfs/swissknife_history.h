@@ -91,9 +91,6 @@ class CommandTag : public Command {
                                const shash::Any   &catalog_hash,
                                const std::string   catalog_path,
                                const bool          read_write) const;
-
-  shash::Any PushHistory(const upload::SpoolerDefinition &spooler_definition,
-                         const std::string &history_path);
 };
 
 
