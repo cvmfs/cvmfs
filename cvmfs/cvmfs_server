@@ -2887,6 +2887,7 @@ tag() {
   local add_tag_description
   local add_tag_root_hash
   local action_remove=0
+  local tag_names=""
   local remove_tag_force=0
   local action_inspect=0
   local action_list=0
@@ -2910,7 +2911,9 @@ tag() {
         add_tag_root_hash=$OPTARG
         ;;
       r)
-        tag_name="$OPTARG"
+        [ -z "$tag_names" ]      \
+          && tag_names="$OPTARG" \
+          || tag_names="$tag_names $OPTARG"
         action_remove=1
         ;;
       f)
@@ -2947,22 +2950,73 @@ tag() {
 
   # sanity checks
   load_repo_config $name
-  is_owner_or_root $name            || die "Permission denied: Repository $name is owned by $CVMFS_USER"
-  is_stratum0 $name                 || die "This is not a stratum 0 repository"
-  ! is_publishing $name             || die "Repository is currently publishing"
-  [ ! -z "$tag_name" ]              || die "Tag name missing"
-  echo "$tag_name" | grep -q -v " " || die "Spaces are not allowed in tag names"
+  is_owner_or_root $name                    || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  is_stratum0 $name                         || die "This is not a stratum 0 repository"
+  ! is_publishing $name                     || die "Repository is currently publishing"
+  [ ! -z "$tag_name" -o ! -z "$tag_names" ] || die "Tag name missing"
+  echo "$tag_name" | grep -q -v " "         || die "Spaces are not allowed in tag names"
   health_check $name
 
   local base_hash="$(get_mounted_root_hash $name)"
   local user_shell="$(get_user_shell $name)"
 
   if [ $action_add -eq 1 ]; then
-    echo $base_tag_command
+    is_in_transaction $name || die "Open a transaction before adding tags!"
+
+    local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    local tag_create_command="cvmfs_swissknife tag_create \
+      -w $CVMFS_STRATUM0                                  \
+      -t ${CVMFS_SPOOL_DIR}/tmp                           \
+      -p /etc/cvmfs/keys/${name}.pub                      \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs  \
+      -f $name                                            \
+      -r $CVMFS_UPSTREAM_STORAGE                          \
+      -m $new_manifest                                    \
+      -b $base_hash                                       \
+      -e $CVMFS_HASH_ALGORITHM                            \
+      -a $tag_name"
+    if [ ! -z "$add_tag_channel" ]; then
+      tag_create_command="$tag_create_command -c $add_tag_channel"
+    fi
+    if [ ! -z "$add_tag_description" ]; then
+      tag_create_command="$tag_create_command -d '$add_tag_description'"
+    fi
+    if [ ! -z "$add_tag_root_hash" ]; then
+      tag_create_command="$tag_create_command -h $add_tag_root_hash"
+    fi
+    $user_shell "$tag_create_command" || exit 1
+    sign_manifest $name $new_manifest || die "Failed to sign repo"
+    close_transaction $name 0
   fi
 
   if [ $action_remove -eq 1 ]; then
-    echo $base_tag_command
+    is_in_transaction $name || die "Open a transaction before removing tags!"
+
+    if [ $remove_tag_force -eq 0 ]; then
+      echo "You are about to remove these tags from $name:"
+      for t in $tag_names; do echo "* $t"; done
+      echo
+      local reply
+      read -p "Are you sure (y/N)? " reply
+      if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+        return 1
+      fi
+    fi
+
+    local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    $user_shell "cvmfs_swissknife tag_remove             \
+      -w $CVMFS_STRATUM0                                 \
+      -t ${CVMFS_SPOOL_DIR}/tmp                          \
+      -p /etc/cvmfs/keys/${name}.pub                     \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
+      -f $name                                           \
+      -r $CVMFS_UPSTREAM_STORAGE                         \
+      -m $new_manifest                                   \
+      -b $base_hash                                      \
+      -e $CVMFS_HASH_ALGORITHM                           \
+      -d '$tag_names'" || exit 1
+    sign_manifest $name $new_manifest || die "Failed to sign repo"
+    close_transaction $name 0
   fi
 
   if [ $action_inspect -eq 1 ]; then
