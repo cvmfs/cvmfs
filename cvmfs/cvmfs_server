@@ -238,6 +238,7 @@ Supported Commands:
   tag           Create and manage named snapshots
                 [-a create tag <name>] [-c channel] [-t message] [-h root hash]
                 [-r remove tag <name>] [-f don't ask again]
+                [-i inspect tag <name>]
                 [-l list tags (alias for list-tags)]
                 <fully qualified name>
   list-tags     <fully qualified name>
@@ -2887,11 +2888,12 @@ tag() {
   local add_tag_root_hash
   local action_remove=0
   local remove_tag_force=0
+  local action_inspect=0
   local action_list=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "a:c:t:h:r:f:l" option
+  while getopts "a:c:d:h:r:f:li:" option
   do
     case $option in
       a)
@@ -2917,6 +2919,10 @@ tag() {
       l)
         action_list=1
         ;;
+      i)
+        tag_name="$OPTARG"
+        action_inspect=1
+        ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command tag: Unrecognized option: $1"
@@ -2930,7 +2936,7 @@ tag() {
   name=$(get_or_guess_repository_name $1)
 
   # check for ambiguous action requests
-  local actions=$(( $action_remove + $action_list + $action_add ))
+  local actions=$(( $action_remove+$action_list+$action_add+$action_inspect ))
   [ $actions -le 1 ] || die "Ambiguous parameters. Please either add, remove or list tags."
 
   # check for the alias of `cvmfs_server list-tags`
@@ -2949,13 +2955,7 @@ tag() {
   health_check $name
 
   local base_hash="$(get_mounted_root_hash $name)"
-  local base_tag_command="$swissknife tag -r $CVMFS_STRATUM0 \
-    -b $base_hash                                       \
-    -n $name                                            \
-    -o ${CVMFS_SPOOL_DIR}/tmp/history                   \
-    -k /etc/cvmfs/keys/${name}.pub                      \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs"
-
+  local user_shell="$(get_user_shell $name)"
 
   if [ $action_add -eq 1 ]; then
     echo $base_tag_command
@@ -2963,6 +2963,16 @@ tag() {
 
   if [ $action_remove -eq 1 ]; then
     echo $base_tag_command
+  fi
+
+  if [ $action_inspect -eq 1 ]; then
+    $user_shell "cvmfs_swissknife tag_info               \
+      -w $CVMFS_STRATUM0                                 \
+      -t ${CVMFS_SPOOL_DIR}/tmp                          \
+      -p /etc/cvmfs/keys/${name}.pub                     \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
+      -f $name                                           \
+      -n $tag_name"
   fi
 }
 
