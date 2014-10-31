@@ -191,11 +191,18 @@ class DummyObservable : public Observable<int> {
 
 class DummyObserver {
  public:
-  DummyObserver() : observation_result(-1) {}
+  DummyObserver() : observation_result(-1), observation_result_closure(-1),
+                    closure_value(-1) {}
   void CallbackMd(const int &value) { observation_result = value; }
+  void ClosureMd(const int &value, int closure) {
+    observation_result_closure = value;
+    closure_value              = closure;
+  }
 
  public:
   int observation_result;
+  int observation_result_closure;
+  int closure_value;
 };
 
 int g_fn_observation_result = -1;
@@ -210,26 +217,42 @@ TEST(T_UtilConcurrency, Observable) {
 
   DummyObservable::callback_t *bound_callback =
     observee.RegisterListener(&DummyObserver::CallbackMd, &observer);
+  DummyObservable::callback_t *closure_callback =
+    observee.RegisterListener(&DummyObserver::ClosureMd, &observer, 123);
   DummyObservable::callback_t *static_callback =
     observee.RegisterListener(&ObserverFn);
 
   static const DummyObservable::callback_t *null_clb = NULL;
 
   ASSERT_NE (null_clb, bound_callback);
+  ASSERT_NE (null_clb, closure_callback);
   ASSERT_NE (null_clb, static_callback);
 
   observee.DoNotification(314);
   EXPECT_EQ (314, observer.observation_result) << "observing class not notified";
+  EXPECT_EQ (314, observer.observation_result_closure) << "observing class not notified through closure";
+  EXPECT_EQ (123, observer.closure_value) << "closure value is wrong";
   EXPECT_EQ (314, g_fn_observation_result) << "observing static function not notified";
 
   observee.UnregisterListener(static_callback);
   observee.DoNotification(1);
   EXPECT_EQ (1,   observer.observation_result);
+  EXPECT_EQ (1,   observer.observation_result_closure);
+  EXPECT_EQ (123, observer.closure_value);
   EXPECT_EQ (314, g_fn_observation_result);
 
   observee.UnregisterListener(bound_callback);
-  observee.DoNotification(-100);
+  observee.DoNotification(100);
   EXPECT_EQ (1,   observer.observation_result);
+  EXPECT_EQ (100, observer.observation_result_closure);
+  EXPECT_EQ (123, observer.closure_value);
+  EXPECT_EQ (314, g_fn_observation_result);
+
+  observee.UnregisterListener(closure_callback);
+  observee.DoNotification(7);
+  EXPECT_EQ (1,   observer.observation_result);
+  EXPECT_EQ (100, observer.observation_result_closure);
+  EXPECT_EQ (123, observer.closure_value);
   EXPECT_EQ (314, g_fn_observation_result);
 
   bound_callback =
@@ -237,17 +260,32 @@ TEST(T_UtilConcurrency, Observable) {
   ASSERT_NE (null_clb, bound_callback);
   observee.DoNotification(4);
   EXPECT_EQ (4,   observer.observation_result);
+  EXPECT_EQ (100, observer.observation_result_closure);
+  EXPECT_EQ (123, observer.closure_value);
   EXPECT_EQ (314, g_fn_observation_result);
 
   static_callback = observee.RegisterListener(&ObserverFn);
   ASSERT_NE (null_clb, static_callback);
   observee.DoNotification(123457);
   EXPECT_EQ (123457, observer.observation_result);
+  EXPECT_EQ (100,    observer.observation_result_closure);
+  EXPECT_EQ (123,    observer.closure_value);
+  EXPECT_EQ (123457, g_fn_observation_result);
+
+  closure_callback = observee.RegisterListener(&DummyObserver::ClosureMd,
+                                               &observer, 1337);
+  ASSERT_NE (null_clb, closure_callback);
+  observee.DoNotification(123457);
+  EXPECT_EQ (123457, observer.observation_result);
+  EXPECT_EQ (123457, observer.observation_result_closure);
+  EXPECT_EQ (1337,   observer.closure_value);
   EXPECT_EQ (123457, g_fn_observation_result);
 
   observee.UnregisterListeners();
   observee.DoNotification(0);
   EXPECT_EQ (123457, observer.observation_result);
+  EXPECT_EQ (123457, observer.observation_result_closure);
+  EXPECT_EQ (1337,   observer.closure_value);
   EXPECT_EQ (123457, g_fn_observation_result);
 }
 
