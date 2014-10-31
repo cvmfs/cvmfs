@@ -19,6 +19,13 @@
 using namespace swissknife;  // NOLINT
 
 
+const std::string CommandTag::kHeadTag         = "trunk";
+const std::string CommandTag::kPreviousHeadTag = "trunk-previous";
+
+const std::string CommandTag::kHeadTagDescription         = "current HEAD";
+const std::string CommandTag::kPreviousHeadTagDescription = "default undo target";
+
+
 void CommandTag::InsertCommonParameters(ParameterList &r) {
   r.push_back(Parameter::Mandatory('w', "repository directory / url"));
   r.push_back(Parameter::Mandatory('t', "temporary scratch directory"));
@@ -273,6 +280,52 @@ void CommandTag::UploadClosure(const upload::SpoolerResult  &result,
 }
 
 
+bool CommandTag::UpdateUndoTags(
+                          Environment                  *env,
+                          const history::History::Tag  &current_head_template) {
+  assert (env->history.IsValid());
+
+  history::History::Tag current_head;
+  history::History::Tag current_old_head;
+
+  // remove previous HEAD tag
+  if (! env->history->Remove(CommandTag::kPreviousHeadTag)) {
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "didn't find a previous HEAD tag");
+  }
+
+  // check if we have a current HEAD tag that needs to renamed to previous HEAD
+  if (env->history->Get(CommandTag::kHeadTag, &current_head)) {
+    // remove current HEAD tag
+    if (! env->history->Remove(CommandTag::kHeadTag)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to remove current HEAD tag");
+      return false;
+    }
+
+    // set previous HEAD tag where current HEAD used to be
+    current_old_head             = current_head;
+    current_old_head.name        = CommandTag::kPreviousHeadTag;
+    current_old_head.channel     = history::History::kChannelTrunk;
+    current_old_head.description = CommandTag::kPreviousHeadTagDescription;
+    if (! env->history->Insert(current_old_head)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to set previous HEAD tag");
+      return false;
+    }
+  }
+
+  // set the current HEAD to the catalog provided by the template HEAD
+  current_head             = current_head_template;
+  current_head.name        = CommandTag::kHeadTag;
+  current_head.channel     = history::History::kChannelTrunk;
+  current_head.description = CommandTag::kHeadTagDescription;
+  if (! env->history->Insert(current_head)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to set new current HEAD");
+    return false;
+  }
+
+  return true;
+}
+
+
 manifest::Manifest* CommandTag::FetchManifest(
                                            const std::string &repository_url,
                                            const std::string &repository_name,
@@ -441,6 +494,7 @@ ParameterList CommandCreateTag::GetParams() {
   r.push_back(Parameter::Optional ('d', "description of the tag"));
   r.push_back(Parameter::Optional ('h', "root hash of the new tag"));
   r.push_back(Parameter::Optional ('c', "channel of the new tag"));
+  r.push_back(Parameter::Switch   ('x', "maintain undo tags"));
   return r;
 }
 
@@ -461,6 +515,7 @@ int CommandCreateTag::Main(const ArgumentList &args) {
                                             String2Uint64(
                                               *args.find('c')->second))
                                         : history::History::kChannelTrunk;
+  const bool        undo_tags       = (args.find('x') != args.end());
 
   if (tag_name.find(" ") != std::string::npos) {
     LogCvmfs(kLogCvmfs, kLogStderr, "tag names must not contain spaces");
@@ -515,6 +570,12 @@ int CommandCreateTag::Main(const ArgumentList &args) {
   // insert the new tag into the history database
   if (! env->history->Insert(new_tag)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to insert new tag");
+    return 1;
+  }
+
+  // handle undo tags ('trunk' and 'trunk-previous') if necessary
+  if (undo_tags && ! UpdateUndoTags(env.weak_ref(), new_tag)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to update magic undo tags");
     return 1;
   }
 
@@ -846,10 +907,23 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // set the magic undo tags
+  history::History::Tag new_head("TEMPLATE",
+                                 env->manifest->catalog_hash(),
+                                 env->manifest->catalog_size(),
+                                 env->manifest->revision(),
+                                 env->manifest->publish_timestamp(),
+                                 history::History::kChannelTrunk,
+                                 "TEMPLATE");
+  if (! UpdateUndoTags(env.weak_ref(), new_head)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to update magic undo tags");
+    return false;
+  }
+
+  // finalize the history and upload it
   if (! CloseAndPublishHistory(env.weak_ref())) {
     return 1;
   }
-
 
   return 0;
 }

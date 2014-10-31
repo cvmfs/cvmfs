@@ -30,6 +30,12 @@ namespace swissknife {
 
 
 class CommandTag : public Command {
+ public:
+  static const std::string kHeadTag;
+  static const std::string kHeadTagDescription;
+  static const std::string kPreviousHeadTag;
+  static const std::string kPreviousHeadTagDescription;
+
  protected:
   typedef std::vector<history::History::Tag> TagList;
 
@@ -63,6 +69,9 @@ class CommandTag : public Command {
                                       catalog::WritableCatalog  *catalog);
   void UploadClosure(const upload::SpoolerResult  &result,
                            Future<shash::Any>     *hash);
+
+  bool UpdateUndoTags(Environment                  *env,
+                      const history::History::Tag  &current_head_template);
 
   manifest::Manifest* FetchManifest(const std::string  &repository_url,
                                     const std::string  &repository_name,
