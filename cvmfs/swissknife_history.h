@@ -88,6 +88,11 @@ class CommandTag : public Command {
 };
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 class CommandCreateTag : public CommandTag {
  public:
   std::string GetName() { return "tag_create"; }
@@ -100,6 +105,11 @@ class CommandCreateTag : public CommandTag {
 };
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 class CommandRemoveTag : public CommandTag {
  public:
   std::string GetName() { return "tag_remove"; }
@@ -110,6 +120,11 @@ class CommandRemoveTag : public CommandTag {
   ParameterList GetParams();
   int Main(const ArgumentList &args);
 };
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 class CommandListTags : public CommandTag {
@@ -132,6 +147,11 @@ class CommandListTags : public CommandTag {
 };
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 class CommandInfoTag : public CommandTag {
  public:
   std::string GetName() { return "tag_info"; }
@@ -146,6 +166,11 @@ class CommandInfoTag : public CommandTag {
   std::string HumanReadableFilesize(const size_t filesize) const;
   void PrintHumanReadableInfo(const history::History::Tag &tag) const;
 };
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 class CommandRollbackTag : public CommandTag {

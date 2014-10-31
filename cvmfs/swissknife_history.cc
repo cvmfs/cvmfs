@@ -213,6 +213,7 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
   return true;
 }
 
+
 bool CommandTag::UploadCatalogAndUpdateManifest(
                                            CommandTag::Environment   *env,
                                            catalog::WritableCatalog  *catalog) {
@@ -257,6 +258,7 @@ bool CommandTag::UploadCatalogAndUpdateManifest(
 
   return true;
 }
+
 
 void CommandTag::UploadClosure(const upload::SpoolerResult  &result,
                                      Future<shash::Any>     *hash) {
@@ -426,6 +428,10 @@ catalog::Catalog* CommandTag::GetCatalog(
 }
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
 
 ParameterList CommandCreateTag::GetParams() {
   ParameterList r;
@@ -521,6 +527,11 @@ int CommandCreateTag::Main(const ArgumentList &args) {
 }
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 ParameterList CommandRemoveTag::GetParams() {
   ParameterList r;
   InsertCommonParameters(r);
@@ -580,6 +591,11 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
 
   return 0;
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 ParameterList CommandListTags::GetParams() {
@@ -687,13 +703,9 @@ int CommandListTags::Main(const ArgumentList &args) {
 }
 
 
-
-
-
-
-
-
-
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 ParameterList CommandInfoTag::GetParams() {
@@ -766,6 +778,9 @@ int CommandInfoTag::Main(const ArgumentList &args) {
 }
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
 
 
 ParameterList CommandRollbackTag::GetParams() {
