@@ -236,7 +236,7 @@ Supported Commands:
   info          <fully qualified name>
                 Print summary about the repository
   tag           Create and manage named snapshots
-                [-a create tag <name>] [-c channel] [-t message] [-h root hash]
+                [-a create tag <name>] [-c channel] [-d message] [-h root hash]
                 [-r remove tag <name>] [-f don't ask again]
                 [-i inspect tag <name>]
                 [-l list tags (alias for list-tags)]
@@ -2903,7 +2903,7 @@ tag() {
       c)
         add_tag_channel=$OPTARG
         ;;
-      t)
+      d)
         add_tag_description="$OPTARG"
         ;;
       h)
