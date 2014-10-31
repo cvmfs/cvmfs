@@ -505,11 +505,6 @@ int CommandCreateTag::Main(const ArgumentList &args) {
   const std::string tag_description = (args.find('d') != args.end())
                                         ? *args.find('d')->second
                                         : "";
-        shash::Any  root_hash       = (args.find('h') != args.end())
-                                        ? shash::MkFromHexPtr(
-                                            shash::HexPtr(
-                                              *args.find('h')->second))
-                                        : shash::Any();
   const TagChannel  tag_channel     = (args.find('c') != args.end())
                                         ? static_cast<TagChannel>(
                                             String2Uint64(
@@ -539,7 +534,20 @@ int CommandCreateTag::Main(const ArgumentList &args) {
 
   // set the root hash to be tagged to the current HEAD if no other hash was
   // given by the user
-  if (root_hash.IsNull()) {
+  shash::Any root_hash;
+  if (args.find('h') != args.end()) {
+    const std::string root_hash_string = *args.find('h')->second;
+    root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_string));
+    if (root_hash.IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read provided catalog "
+                                      "hash '%s'",
+               root_hash_string.c_str());
+      return 1;
+    }
+  } else {
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no catalog hash provided, using hash"
+                                        "of current HEAD catalog (%s)",
+             env->manifest->catalog_hash().ToString().c_str());
     root_hash = env->manifest->catalog_hash();
   }
 
