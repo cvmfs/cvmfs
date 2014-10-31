@@ -70,6 +70,12 @@ class Manifest {
   void set_channel_tops(const std::vector<history::TagList::ChannelTag> &v) {
     channel_tops_ = v;
   }
+  void set_catalog_size(const uint64_t catalog_size) {
+    catalog_size_ = catalog_size;
+  }
+  void set_catalog_hash(const shash::Any &catalog_hash) {
+    catalog_hash_ = catalog_hash;
+  }
 
   uint64_t revision() const { return revision_; }
   std::string repository_name() const { return repository_name_; }
