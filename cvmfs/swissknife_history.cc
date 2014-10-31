@@ -415,6 +415,11 @@ int CommandCreateTag::Main(const ArgumentList &args) {
                                               *args.find('c')->second))
                                         : history::History::kChannelTrunk;
 
+  if (tag_name.find(" ") != std::string::npos) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "tag names must not contain spaces");
+    return 1;
+  }
+
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
   UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
