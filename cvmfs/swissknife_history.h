@@ -59,6 +59,8 @@ class CommandTag : public Command {
   Environment* InitializeEnvironment(const ArgumentList &args,
                                      const bool read_write);
   bool CloseAndPublishHistory(Environment *environment);
+  bool UploadCatalogAndUpdateManifest(Environment               *env,
+                                      catalog::WritableCatalog  *catalog);
   void UploadClosure(const upload::SpoolerResult  &result,
                            Future<shash::Any>     *hash);
 
@@ -143,6 +145,18 @@ class CommandInfoTag : public CommandTag {
  protected:
   std::string HumanReadableFilesize(const size_t filesize) const;
   void PrintHumanReadableInfo(const history::History::Tag &tag) const;
+};
+
+
+class CommandRollbackTag : public CommandTag {
+ public:
+  std::string GetName() { return "tag_rollback"; }
+  std::string GetDescription() {
+    return "Rollback repository to a given tag.";
+  }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
 };
 
 

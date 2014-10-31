@@ -222,6 +222,51 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
   return true;
 }
 
+bool CommandTag::UploadCatalogAndUpdateManifest(
+                                           CommandTag::Environment   *env,
+                                           catalog::WritableCatalog  *catalog) {
+  assert (env->spooler.IsValid());
+
+  // gather information about catalog to be uploaded and update manifest
+  UniquePtr<catalog::WritableCatalog> wr_catalog(catalog);
+  const std::string catalog_path  = wr_catalog->database_path();
+  env->manifest->set_ttl              (wr_catalog->GetTTL());
+  env->manifest->set_revision         (wr_catalog->GetRevision());
+  env->manifest->set_publish_timestamp(wr_catalog->GetLastModified());
+
+  // close the catalog
+  catalog::WritableCatalog *weak_catalog = wr_catalog.Release();
+  delete weak_catalog;
+
+  // upload the catalog
+  Future<shash::Any> catalog_hash;
+  upload::Spooler::callback_t* callback =
+    env->spooler->RegisterListener(&CommandTag::UploadClosure,
+                                    this,
+                                   &catalog_hash);
+  env->spooler->ProcessCatalog(catalog_path);
+  env->spooler->WaitForUpload();
+  const shash::Any new_catalog_hash = catalog_hash.Get();
+  env->spooler->UnregisterListener(callback);
+
+  // check if the upload succeeded
+  if (new_catalog_hash.IsNull()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload catalog '%s'",
+             catalog_path.c_str());
+    return false;
+  }
+
+  // update the catalog size and hash in the manifest
+  const size_t catalog_size = GetFileSize(catalog_path);
+  env->manifest->set_catalog_size(catalog_size);
+  env->manifest->set_catalog_hash(new_catalog_hash);
+
+  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "uploaded new catalog (%d bytes) '%s'",
+           catalog_size, new_catalog_hash.ToString().c_str());
+
+  return true;
+}
+
 void CommandTag::UploadClosure(const upload::SpoolerResult  &result,
                                      Future<shash::Any>     *hash) {
   assert (! result.IsChunked());
@@ -732,7 +777,76 @@ int CommandInfoTag::Main(const ArgumentList &args) {
 
 
 
+ParameterList CommandRollbackTag::GetParams() {
+  ParameterList r;
+  InsertCommonParameters(r);
 
+  r.push_back(Parameter::Mandatory('n', "name of the tag to be republished"));
+  return r;
+}
+
+
+int CommandRollbackTag::Main(const ArgumentList &args) {
+  const std::string tag_name = *args.find('n')->second;
+
+  // initialize the Environment (taking ownership)
+  const bool history_read_write = true;
+  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  if (! env) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
+    return 1;
+  }
+
+  // fand tag to be rolled back to
+  history::History::Tag target_tag;
+  const bool found = env->history->Get(tag_name, &target_tag);
+  if (! found) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' does not exist", tag_name.c_str());
+    return 1;
+  }
+
+  // check if tag is valid to be rolled back to
+  const uint64_t current_revision = env->manifest->revision();
+  assert (target_tag.revision <= current_revision);
+  if (target_tag.revision == current_revision) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "not rolling back to current head (%u)",
+             current_revision);
+    return 1;
+  }
+
+  // open the catalog to be rolled back to
+  const UnlinkGuard catalog_path(CreateTempPath(env->tmp_path + "/catalog",
+                                                0600));
+  const bool catalog_read_write = true;
+  UniquePtr<catalog::WritableCatalog> catalog(
+       dynamic_cast<catalog::WritableCatalog*>(GetCatalog(env->repository_url,
+                                                          target_tag.root_hash,
+                                                          catalog_path.path(),
+                                                          catalog_read_write)));
+  if (! catalog) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to open catalog with hash '%s'",
+             target_tag.root_hash.ToString().c_str());
+    return 1;
+  }
+
+  // update the catalog to be republished
+  catalog->UpdateLastModified();
+  catalog->SetRevision(current_revision + 1);
+  catalog->SetPreviousRevision(env->manifest->catalog_hash());
+
+  // Upload catalog (handing over ownership of catalog pointer)
+  if (! UploadCatalogAndUpdateManifest(env.weak_ref(), catalog.Release())) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "catalog upload failed");
+    return 1;
+  }
+
+  if (! CloseAndPublishHistory(env.weak_ref())) {
+    return 1;
+  }
+
+
+  return 0;
+}
 
 
 

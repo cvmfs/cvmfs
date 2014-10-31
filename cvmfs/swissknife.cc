@@ -85,6 +85,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandListTags());
   command_list.push_back(new swissknife::CommandInfoTag());
   command_list.push_back(new swissknife::CommandRollback());
+  command_list.push_back(new swissknife::CommandRollbackTag());
   command_list.push_back(new swissknife::CommandSign());
   command_list.push_back(new swissknife::CommandLetter());
   command_list.push_back(new swissknife::CommandCheck());
