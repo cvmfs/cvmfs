@@ -37,9 +37,7 @@ class CommandTag : public Command {
   struct Environment {
     Environment(const std::string &repository_url,
                 const std::string &tmp_path) :
-      repository_url(repository_url), tmp_path(tmp_path),
-      push_happened_(false) {}
-    void PushHistoryCallback(const upload::SpoolerResult &result);
+      repository_url(repository_url), tmp_path(tmp_path) {}
 
     const std::string              repository_url;
     const std::string              tmp_path;
@@ -50,9 +48,6 @@ class CommandTag : public Command {
     UniquePtr<history::History>    history;
     UniquePtr<upload::Spooler>     spooler;
     UnlinkGuard                    history_path;
-
-    Future<shash::Any>             pushed_history_hash_;
-    bool                           push_happened_;
   };
 
  public:
@@ -64,6 +59,8 @@ class CommandTag : public Command {
   Environment* InitializeEnvironment(const ArgumentList &args,
                                      const bool read_write);
   bool CloseAndPublishHistory(Environment *environment);
+  void UploadClosure(const upload::SpoolerResult  &result,
+                           Future<shash::Any>     *hash);
 
   manifest::Manifest* FetchManifest(const std::string  &repository_url,
                                     const std::string  &repository_name,

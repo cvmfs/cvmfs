@@ -171,8 +171,6 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize upload spooler");
       return NULL;
     }
-    env->spooler->RegisterListener(&CommandTag::Environment::PushHistoryCallback,
-                                    env.weak_ref());
   }
 
   // return the pointer of the Environment (passing the ownership along)
@@ -181,9 +179,7 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
 
 
 bool CommandTag::CloseAndPublishHistory(Environment *env) {
-  assert (! env->push_happened_);
   assert (env->spooler.IsValid());
-  env->push_happened_ = true;
 
   // set the previous revision pointer of the history database
   env->history->SetPreviousRevision(env->manifest->history());
@@ -193,11 +189,17 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
   delete weak_history;
 
   // compress and upload the new history database
+  Future<shash::Any> history_hash;
+  upload::Spooler::callback_t* callback =
+    env->spooler->RegisterListener(&CommandTag::UploadClosure,
+                                    this,
+                                   &history_hash);
   env->spooler->ProcessHistory(env->history_path.path());
   env->spooler->WaitForUpload();
+  const shash::Any new_history_hash = history_hash.Get();
+  env->spooler->UnregisterListener(callback);
 
   // retrieve the (async) uploader result
-  const shash::Any new_history_hash = env->pushed_history_hash_.Get();
   if (new_history_hash.IsNull()) {
     return false;
   }
@@ -212,20 +214,23 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
 
   // disable the unlink guard in order to keep the newly exported manifest file
   env->manifest_path.Disable();
+  LogCvmfs(kLogCvmfs, kLogVerboseMsg, "exported manifest (%d) with new "
+                                      "history '%s'",
+           env->manifest->revision(), new_history_hash.ToString().c_str());
 
   // all done
   return true;
 }
 
-void CommandTag::Environment::PushHistoryCallback(
-                                          const upload::SpoolerResult &result) {
+void CommandTag::UploadClosure(const upload::SpoolerResult  &result,
+                                     Future<shash::Any>     *hash) {
   assert (! result.IsChunked());
   if (result.return_code != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to upload history database (%d)",
              result.return_code);
-    pushed_history_hash_.Set(shash::Any());
+    hash->Set(shash::Any());
   } else {
-    pushed_history_hash_.Set(result.content_hash);
+    hash->Set(result.content_hash);
   }
 }
 
