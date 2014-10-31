@@ -29,7 +29,7 @@ namespace upload {
 namespace swissknife {
 
 
-class CommandTag_ : public Command {
+class CommandTag : public Command {
  protected:
   typedef std::vector<history::History::Tag> TagList;
 
@@ -56,7 +56,7 @@ class CommandTag_ : public Command {
   };
 
  public:
-  CommandTag_() {};
+  CommandTag() {};
 
  protected:
   void InsertCommonParameters(ParameterList &parameters);
@@ -89,7 +89,7 @@ class CommandTag_ : public Command {
 };
 
 
-class CommandCreateTag : public CommandTag_ {
+class CommandCreateTag : public CommandTag {
  public:
   std::string GetName() { return "tag_create"; }
   std::string GetDescription() {
@@ -101,7 +101,7 @@ class CommandCreateTag : public CommandTag_ {
 };
 
 
-class CommandRemoveTag : public CommandTag_ {
+class CommandRemoveTag : public CommandTag {
  public:
   std::string GetName() { return "tag_remove"; }
   std::string GetDescription() {
@@ -113,7 +113,7 @@ class CommandRemoveTag : public CommandTag_ {
 };
 
 
-class CommandListTags : public CommandTag_ {
+class CommandListTags : public CommandTag {
  public:
   std::string GetName() { return "tag_list"; }
   std::string GetDescription() {
@@ -133,7 +133,7 @@ class CommandListTags : public CommandTag_ {
 };
 
 
-class CommandInfoTag : public CommandTag_ {
+class CommandInfoTag : public CommandTag {
  public:
   std::string GetName() { return "tag_info"; }
   std::string GetDescription() {

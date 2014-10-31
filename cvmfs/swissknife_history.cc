@@ -28,7 +28,7 @@ static bool IsRemote(const string &repository)
 }
 
 
-void CommandTag_::InsertCommonParameters(ParameterList &r) {
+void CommandTag::InsertCommonParameters(ParameterList &r) {
   r.push_back(Parameter::Mandatory('w', "repository directory / url"));
   r.push_back(Parameter::Mandatory('t', "temporary scratch directory"));
   r.push_back(Parameter::Optional ('p', "public key of the repository"));
@@ -41,7 +41,7 @@ void CommandTag_::InsertCommonParameters(ParameterList &r) {
 }
 
 
-CommandTag_::Environment* CommandTag_::InitializeEnvironment(
+CommandTag::Environment* CommandTag::InitializeEnvironment(
                                               const ArgumentList  &args,
                                               const bool           read_write) {
   const std::string       repository_url  = MakeCanonicalPath(
@@ -171,7 +171,7 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize upload spooler");
       return NULL;
     }
-    env->spooler->RegisterListener(&CommandTag_::Environment::PushHistoryCallback,
+    env->spooler->RegisterListener(&CommandTag::Environment::PushHistoryCallback,
                                     env.weak_ref());
   }
 
@@ -180,7 +180,7 @@ CommandTag_::Environment* CommandTag_::InitializeEnvironment(
 }
 
 
-bool CommandTag_::CloseAndPublishHistory(Environment *env) {
+bool CommandTag::CloseAndPublishHistory(Environment *env) {
   assert (! env->push_happened_);
   assert (env->spooler.IsValid());
   env->push_happened_ = true;
@@ -217,7 +217,7 @@ bool CommandTag_::CloseAndPublishHistory(Environment *env) {
   return true;
 }
 
-void CommandTag_::Environment::PushHistoryCallback(
+void CommandTag::Environment::PushHistoryCallback(
                                           const upload::SpoolerResult &result) {
   assert (! result.IsChunked());
   if (result.return_code != 0) {
@@ -230,7 +230,7 @@ void CommandTag_::Environment::PushHistoryCallback(
 }
 
 
-manifest::Manifest* CommandTag_::FetchManifest(
+manifest::Manifest* CommandTag::FetchManifest(
                                            const std::string &repository_url,
                                            const std::string &repository_name,
                                            const std::string &pubkey_path,
@@ -296,7 +296,7 @@ manifest::Manifest* CommandTag_::FetchManifest(
 }
 
 
-bool CommandTag_::FetchObject(const std::string  &repository_url,
+bool CommandTag::FetchObject(const std::string  &repository_url,
                               const shash::Any   &object_hash,
                               const std::string  &hash_suffix,
                               const std::string   destination_path) const {
@@ -322,7 +322,7 @@ bool CommandTag_::FetchObject(const std::string  &repository_url,
 }
 
 
-history::History* CommandTag_::GetHistory(
+history::History* CommandTag::GetHistory(
                                 const manifest::Manifest  *manifest,
                                 const std::string         &repository_url,
                                 const std::string         &history_path,
@@ -365,7 +365,7 @@ history::History* CommandTag_::GetHistory(
 }
 
 
-catalog::Catalog* CommandTag_::GetCatalog(
+catalog::Catalog* CommandTag::GetCatalog(
                                        const std::string  &repository_url,
                                        const shash::Any   &catalog_hash,
                                        const std::string   catalog_path,
