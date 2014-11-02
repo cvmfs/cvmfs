@@ -73,7 +73,7 @@ class Host {
   Host &operator= (const Host &other);
 
   time_t deadline() const { return deadline_; }
-  int64_t id() const { return id_; };
+  int64_t id() const { return id_; }
   bool HasIpv6() const { return !ipv6_addresses_.empty(); }
   std::set<std::string> ipv4_addresses() const { return ipv4_addresses_; }
   std::set<std::string> ipv6_addresses() const { return ipv6_addresses_; }
@@ -141,12 +141,12 @@ class Resolver : SingleCopy {
   Resolver(const bool ipv4_only,
            const unsigned retries,
            const unsigned timeout_ms);
-  virtual ~Resolver() { };
+  virtual ~Resolver() { }
 
   virtual void SetResolvers(const std::vector<std::string> &new_resolvers) = 0;
   virtual void SetSystemResolvers() = 0;
   Host Resolve(const std::string &name);
-  void ResolveMany(std::vector<std::string> &names,
+  void ResolveMany(const std::vector<std::string> &names,
                    std::vector<Host> *hosts);
 
   bool ipv4_only() const { return ipv4_only_; }
