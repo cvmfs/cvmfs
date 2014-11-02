@@ -55,22 +55,28 @@ inline const char *Code2Ascii(const Failures error) {
 
 /**
  * Stores the resolved IPv4 and IPv6 addresses of a host name including their
- * time to live.  Data in these objects are immutable.  Once the TTL has
- * expired, they become invalid and a new Host object should be fetched from
- * a resolver.
+ * time to live.  Data in these objects are immutable.  They are created by a
+ * a Resolver.  Once the TTL has expired, they become invalid and a new Host
+ * object should be fetched from a resolver.
+ *
+ * A host object can be copied into a new object with an extended deadline.
+ * This is useful if an attempt to resolve a name fails where it previously
+ * succeeded.  In this case, the extended deadline can be used to retry the
+ * name resolution only after some grace period.
  */
 class Host {
-  FRIEND_TEST(T_Dns, Host);
   FRIEND_TEST(T_Dns, HostEquivalent);
   FRIEND_TEST(T_Dns, HostValid);
+  FRIEND_TEST(T_Dns, HostExtendDeadline);
   friend class Resolver;
 
  public:
-  bool IsEquivalent(const Host &other) const;
-  bool IsValid() const;
-
+  static Host ExtendDeadline(const Host &original, unsigned by_seconds);
+  Host();
   Host(const Host &other);
   Host &operator= (const Host &other);
+  bool IsEquivalent(const Host &other) const;
+  bool IsValid() const;
 
   time_t deadline() const { return deadline_; }
   int64_t id() const { return id_; }
@@ -82,11 +88,6 @@ class Host {
 
  private:
   void CopyFrom(const Host &other);
-
-  /**
-   * Only the Resolver constructs Host objects.
-   */
-  Host();
 
    /**
     * Counter that is increased with every creation of a host object.  Allows to

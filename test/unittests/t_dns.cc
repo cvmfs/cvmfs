@@ -117,7 +117,7 @@ TEST_F(T_Dns, Host) {
 
   EXPECT_EQ(host.id(), host3.id());
   EXPECT_NE(host.id(), host2.id());
-  EXPECT_EQ(host.status_, kFailNotYetResolved);
+  EXPECT_EQ(host.status(), kFailNotYetResolved);
   EXPECT_FALSE(host.IsValid());
   EXPECT_FALSE(host.IsEquivalent(host2));
   EXPECT_FALSE(host.IsEquivalent(host3));
@@ -190,6 +190,21 @@ TEST_F(T_Dns, HostValid) {
 
   host.deadline_ = time(NULL) + 10;
   EXPECT_TRUE(host.IsValid());
+}
+
+
+TEST_F(T_Dns, HostExtendDeadline) {
+  Host host;
+  host.name_ = "name";
+  host.deadline_ = 1;
+  host.ipv4_addresses_.insert("10.0.0.1");
+  host.ipv6_addresses_.insert("[::2]");
+  host.status_ = kFailOk;
+
+  Host host2 = Host::ExtendDeadline(host, 1);
+  EXPECT_TRUE(host.IsEquivalent(host2));
+  EXPECT_TRUE(host2.IsEquivalent(host));
+  EXPECT_EQ(host2.deadline(), 2U);
 }
 
 

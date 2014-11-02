@@ -36,8 +36,20 @@ void Host::CopyFrom(const Host &other) {
 
 
 /**
+ * Creates a copy of the original host with a new ID and adds by_seconds to the
+ * deadline.
+ */
+Host Host::ExtendDeadline(const Host &original, unsigned by_seconds) {
+  Host new_host(original);
+  new_host.id_ = atomic_xadd64(&global_id_, 1);
+  new_host.deadline_ += by_seconds;
+  return new_host;
+}
+
+
+/**
  * All fields except the unique id_ are set by the resolver.  Host objects
- * can be copied around but only the resolve can create them.
+ * can be copied around but only the resolve can create valid, new objects.
  */
 Host::Host()
   : deadline_(0)
