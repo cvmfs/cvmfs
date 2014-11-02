@@ -73,6 +73,12 @@ class DummyResolver : public Resolver {
           "0000:0000:0000:0000:0000:0000:0000:000G");
         (*ipv6_addresses)[i].push_back(
           "0000:0000:0000:0000:0000:0000:0000:0001");
+      } else if (names[i] == "large-ttl") {
+        (*ipv4_addresses)[i].push_back("127.0.0.1");
+        (*ttls)[i] = unsigned(-1);
+      } else if (names[i] == "small-ttl") {
+        (*ipv4_addresses)[i].push_back("127.0.0.1");
+        (*ttls)[i] = 1;
       } else if (names[i] == "timeout") {
         (*failures)[i] = kFailTimeout;
         continue;
@@ -243,7 +249,15 @@ TEST_F(T_Dns, Resolver) {
 
 
 TEST_F(T_Dns, ResolverTtlRange) {
-  // TODO
+  DummyResolver resolver;
+
+  time_t now = time(NULL);
+  Host host = resolver.Resolve("small-ttl");
+  EXPECT_GE(host.deadline(), now + Resolver::kMinTtl);
+
+  host = resolver.Resolve("large-ttl");
+  now = time(NULL);
+  EXPECT_LE(host.deadline(), now + Resolver::kMaxTtl);
 }
 
 

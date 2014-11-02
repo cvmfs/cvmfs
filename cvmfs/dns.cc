@@ -175,7 +175,13 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       continue;
     }
 
-    host.deadline_ = time(NULL) + ttls[i];
+    unsigned effective_ttl = ttls[i];
+    if (effective_ttl < kMinTtl) {
+      effective_ttl = kMinTtl;
+    } else if (effective_ttl > kMaxTtl) {
+      effective_ttl = kMaxTtl;
+    }
+    host.deadline_ = time(NULL) + effective_ttl;
 
     // Verify addresses and make them readily available for curl
     for (unsigned j = 0; j < ipv4_addresses[i].size(); ++j) {

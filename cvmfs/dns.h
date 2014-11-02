@@ -138,6 +138,16 @@ class Host {
  */
 class Resolver : SingleCopy {
  public:
+  /**
+   * Enlarge very small TTLs to 5 minutes.
+   */
+  static const unsigned kMinTtl = 300;
+
+  /**
+   * Cut off very large TTLs to 1 day.
+   */
+  static const unsigned kMaxTtl = 84600;
+
   Resolver(const bool ipv4_only,
            const unsigned retries,
            const unsigned timeout_ms);
