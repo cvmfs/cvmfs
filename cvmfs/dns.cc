@@ -176,16 +176,48 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
   vector<vector<string> > ipv6_addresses(num);
   vector<Failures> failures(num);
   vector<unsigned> ttls(num);
-  DoResolve(names, &ipv4_addresses, &ipv6_addresses, &failures, &ttls);
+  vector<bool> skip(num);
 
+  // Deal with special names: empty, IPv4, IPv6
   for (unsigned i = 0; i < num; ++i) {
+    if (names[i].empty()) {
+      Host invalid_host;
+      invalid_host.name_ = "";
+      invalid_host.status_ = kFailInvalidHost;
+      hosts->push_back(invalid_host);
+      skip[i] = true;
+    } else if (IsIpv4Address(names[i])) {
+      Host ipv4_host;
+      ipv4_host.name_ = names[i];
+      ipv4_host.status_ = kFailOk;
+      ipv4_host.ipv4_addresses_.insert(names[i]);
+      ipv4_host.deadline_ = time(NULL) + kMaxTtl;
+      hosts->push_back(ipv4_host);
+      skip[i] = true;
+    } else if ((names[i][0] == '[') && (names[i][names[i].length()-1] == ']')) {
+      Host ipv6_host;
+      ipv6_host.name_ = names[i];
+      ipv6_host.status_ = kFailOk;
+      ipv6_host.ipv6_addresses_.insert(names[i]);
+      ipv6_host.deadline_ = time(NULL) + kMaxTtl;
+      hosts->push_back(ipv6_host);
+      skip[i] = true;
+    } else {
+      hosts->push_back(Host());
+      skip[i] = false;
+    }
+  }
+
+  DoResolve(names, skip, &ipv4_addresses, &ipv6_addresses, &failures, &ttls);
+
+  // Construct host objects
+  for (unsigned i = 0; i < num; ++i) {
+    if (skip[i])
+      continue;
+
     Host host;
     host.name_ = names[i];
     host.status_ = failures[i];
-    if (host.status_ != kFailOk) {
-      hosts->push_back(host);
-      continue;
-    }
 
     unsigned effective_ttl = ttls[i];
     if (effective_ttl < kMinTtl) {
@@ -194,6 +226,11 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       effective_ttl = kMaxTtl;
     }
     host.deadline_ = time(NULL) + effective_ttl;
+
+    if (host.status_ != kFailOk) {
+      (*hosts)[i] = host;
+      continue;
+    }
 
     // Verify addresses and make them readily available for curl
     for (unsigned j = 0; j < ipv4_addresses[i].size(); ++j) {
@@ -224,7 +261,7 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
     if (host.ipv4_addresses_.empty() && host.ipv6_addresses_.empty())
       host.status_ = kFailNoAddress;
 
-    hosts->push_back(host);
+    (*hosts)[i] = host;
   }
 }
 
@@ -407,15 +444,15 @@ CaresResolver::CaresResolver(
   const unsigned retries,
   const unsigned timeout_ms)
   : Resolver(ipv4_only, retries, timeout_ms)
-  , channel(NULL)
+  , channel_(NULL)
 {
 }
 
 
 CaresResolver::~CaresResolver() {
-  if (channel) {
-    ares_destroy(*channel);
-    free(channel);
+  if (channel_) {
+    ares_destroy(*channel_);
+    free(channel_);
   }
 }
 
@@ -429,28 +466,73 @@ CaresResolver *CaresResolver::Create(
   const unsigned timeout_ms)
 {
   CaresResolver *resolver = new CaresResolver(ipv4_only, retries, timeout_ms);
-  resolver->channel = reinterpret_cast<ares_channel *>(
+  resolver->channel_ = reinterpret_cast<ares_channel *>(
     smalloc(sizeof(ares_channel)));
-  memset(resolver->channel, 0, sizeof(ares_channel));
+  memset(resolver->channel_, 0, sizeof(ares_channel));
 
+  int retval;
+  struct ares_addr_node *addresses;
+  struct ares_addr_node *iter;
   struct ares_options options;
   memset(&options, 0, sizeof(options));
   options.timeout = timeout_ms;
   options.tries = 1 + retries;
-  int retval = ares_init_options(resolver->channel, &options,
-                                 ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES);
-  if (retval != ARES_SUCCESS) {
-    LogCvmfs(kLogDns, kLogDebug | kLogSyslogErr,
-             "failed to initialize c-ares resolver (%d - %s)",
-             retval, ares_strerror(retval));
-    free(resolver->channel);
-    resolver->channel = NULL;
-    delete resolver;
-    return NULL;
-  }
+  retval = ares_init_options(resolver->channel_, &options,
+                             ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES);
+  if (retval != ARES_SUCCESS)
+    goto create_fail;
 
-  resolver->SetSystemResolvers();
+  // Save the system default resolvers
+  addresses = NULL;
+  retval = ares_get_servers(*resolver->channel_, &addresses);
+  if (retval != ARES_SUCCESS)
+    goto create_fail;
+  iter = addresses;
+  while (iter) {
+    switch (iter->family) {
+      case AF_INET: {
+        char addrstr[INET_ADDRSTRLEN];
+        const void *retval_p =
+          inet_ntop(AF_INET, &(iter->addr), addrstr, INET_ADDRSTRLEN);
+        if (!retval_p) {
+          LogCvmfs(kLogDns, kLogDebug | kLogSyslogErr,
+                   "invalid system name resolver");
+        } else {
+          resolver->resolvers_.push_back(string(addrstr) + ":53");
+        }
+        break;
+      }
+      case AF_INET6: {
+        char addrstr[INET6_ADDRSTRLEN];
+        const void *retval_p =
+          inet_ntop(AF_INET6, &(iter->addr), addrstr, INET6_ADDRSTRLEN);
+        if (!retval_p) {
+          LogCvmfs(kLogDns, kLogDebug | kLogSyslogErr,
+                   "invalid system name resolver");
+        } else {
+          resolver->resolvers_.push_back("[" + string(addrstr) + "]:53");
+        }
+        break;
+      }
+      default:
+        // Never here.
+        abort();
+    }
+    iter = iter->next;
+  };
+  ares_free_data(addresses);
+  resolver->system_resolvers_ = resolver->resolvers_;
+
   return resolver;
+
+ create_fail:
+  LogCvmfs(kLogDns, kLogDebug | kLogSyslogErr,
+           "failed to initialize c-ares resolver (%d - %s)",
+           retval, ares_strerror(retval));
+  free(resolver->channel_);
+  resolver->channel_ = NULL;
+  delete resolver;
+  return NULL;
 }
 
 
@@ -460,6 +542,7 @@ CaresResolver *CaresResolver::Create(
  */
 void CaresResolver::DoResolve(
   const vector<string> &names,
+  const vector<bool> &skip,
   vector<vector<string> > *ipv4_addresses,
   vector<vector<string> > *ipv6_addresses,
   vector<Failures> *failures,
@@ -473,13 +556,16 @@ void CaresResolver::DoResolve(
   vector<QueryInfo *> infos_ipv6(num, NULL);
 
   for (unsigned i = 0; i < num; ++i) {
+    if (skip[i])
+      continue;
+
     if (!ipv4_only()) {
       infos_ipv6[i] = new QueryInfo(&(*ipv6_addresses)[i], names[i], kRrAaaa);
-      ares_search(*channel, names[i].c_str(), ns_c_in, ns_t_aaaa,
+      ares_search(*channel_, names[i].c_str(), ns_c_in, ns_t_aaaa,
                   CallbackCares, infos_ipv6[i]);
     }
     infos_ipv4[i] = new QueryInfo(&(*ipv4_addresses)[i], names[i], kRrA);
-    ares_search(*channel, names[i].c_str(), ns_c_in, ns_t_a,
+    ares_search(*channel_, names[i].c_str(), ns_c_in, ns_t_a,
                 CallbackCares, infos_ipv4[i]);
   }
 
@@ -500,6 +586,9 @@ void CaresResolver::DoResolve(
   // Silently ignore errors with IPv4/6 if there are at least some usable IP
   // addresses.
   for (unsigned i = 0; i < num; ++i) {
+    if (skip[i])
+      continue;
+
     Failures status = kFailOther;
     (*ttls)[i] = unsigned(-1);
     if (infos_ipv6[i]) {
@@ -521,11 +610,28 @@ void CaresResolver::DoResolve(
 }
 
 
-void CaresResolver::SetResolvers(const vector<string> &new_resolvers) {
+bool CaresResolver::SetResolvers(const vector<string> &resolvers) {
+  string address_list = JoinStrings(resolvers, ",");
+  int retval = ares_set_servers_csv(*channel_, address_list.c_str());
+  if (retval != ARES_SUCCESS)
+    return false;
+
+  resolvers_ = resolvers;
+  return true;
+}
+
+
+bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
+  return false;
 }
 
 
 void CaresResolver::SetSystemResolvers() {
+  resolvers_ = system_resolvers_;
+}
+
+
+void CaresResolver::SetSystemSearchDomains() {
 }
 
 
@@ -537,7 +643,7 @@ void CaresResolver::WaitOnCares() {
   // Adapted from libcurl
   ares_socket_t socks[ARES_GETSOCK_MAXNUM];
   struct pollfd pfd[ARES_GETSOCK_MAXNUM];
-  int bitmask = ares_getsock(*channel, socks, ARES_GETSOCK_MAXNUM);
+  int bitmask = ares_getsock(*channel_, socks, ARES_GETSOCK_MAXNUM);
   unsigned num = 0;
   for (unsigned i = 0; i < ARES_GETSOCK_MAXNUM; ++i) {
     pfd[i].events = 0;
@@ -571,11 +677,11 @@ void CaresResolver::WaitOnCares() {
   if (nfds == 0) {
     // Call ares_process() unconditonally here, even if we simply timed out
     // above, as otherwise the ares name resolve won't timeout.
-    ares_process_fd(*channel, ARES_SOCKET_BAD, ARES_SOCKET_BAD);
+    ares_process_fd(*channel_, ARES_SOCKET_BAD, ARES_SOCKET_BAD);
   } else {
     // Go through the descriptors and ask for executing the callbacks.
     for (unsigned i = 0; i < num; ++i) {
-      ares_process_fd(*channel,
+      ares_process_fd(*channel_,
                       pfd[i].revents & (POLLRDNORM|POLLIN) ?
                         pfd[i].fd : ARES_SOCKET_BAD,
                       pfd[i].revents & (POLLWRNORM|POLLOUT) ?

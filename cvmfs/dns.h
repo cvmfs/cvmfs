@@ -154,13 +154,19 @@ class Resolver : SingleCopy {
            const unsigned timeout_ms);
   virtual ~Resolver() { }
 
-  virtual void SetResolvers(const std::vector<std::string> &new_resolvers) = 0;
+  /**
+   * A list of new resolvers in the form <IP address>[:port].
+   */
+  virtual bool SetResolvers(const std::vector<std::string> &resolvers) = 0;
+  virtual bool SetSearchDomains(const std::vector<std::string> &domains) = 0;
   virtual void SetSystemResolvers() = 0;
+  virtual void SetSystemSearchDomains() = 0;
   Host Resolve(const std::string &name);
   void ResolveMany(const std::vector<std::string> &names,
                    std::vector<Host> *hosts);
 
   bool ipv4_only() const { return ipv4_only_; }
+  std::vector<std::string> resolvers() const { return resolvers_; }
   unsigned retries() const { return retries_; }
   unsigned timeout_ms() const { return timeout_ms_; }
 
@@ -169,9 +175,11 @@ class Resolver : SingleCopy {
    * Takes host names and returns the resolved lists of A and AAAA records in
    * the same order.  To keep it simple, returns only a single TTL per host,
    * the lower value of both record types A/AAAA.  The output vectors have
-   * the same size as the input vector names.
+   * the same size as the input vector names.  Names that are handled by the
+   * base class are marked with skip[i] set to true.
    */
   virtual void DoResolve(const std::vector<std::string> &names,
+                         const std::vector<bool> &skip,
                          std::vector<std::vector<std::string> > *ipv4_addresses,
                          std::vector<std::vector<std::string> > *ipv6_addresses,
                          std::vector<Failures> *failures,
@@ -181,6 +189,11 @@ class Resolver : SingleCopy {
    * Do not try to get AAAA records if true.
    */
   bool ipv4_only_;
+
+  /**
+   * Currently used resolver list in the form <ip address>:<port>
+   */
+  std::vector<std::string> resolvers_;
 
   /**
    * 1 + retries_ attempts to unresponsive servers, each attempt bounded by
@@ -211,14 +224,17 @@ class CaresResolver : public Resolver {
                                const unsigned timeout_ms);
   virtual ~CaresResolver();
 
-  virtual void SetResolvers(const std::vector<std::string> &new_resolvers);
+  virtual bool SetResolvers(const std::vector<std::string> &resolvers);
+  virtual bool SetSearchDomains(const std::vector<std::string> &domains);
   virtual void SetSystemResolvers();
+  virtual void SetSystemSearchDomains();
 
  protected:
   CaresResolver(const bool ipv4_only,
                 const unsigned retries,
                 const unsigned timeout_ms);
   virtual void DoResolve(const std::vector<std::string> &names,
+                         const std::vector<bool> &skip,
                          std::vector<std::vector<std::string> > *ipv4_addresses,
                          std::vector<std::vector<std::string> > *ipv6_addresses,
                          std::vector<Failures> *failures,
@@ -226,7 +242,8 @@ class CaresResolver : public Resolver {
 
  private:
   void WaitOnCares();
-  ares_channel *channel;
+  ares_channel *channel_;
+  std::vector<std::string> system_resolvers_;
 };
 
 }  // namespace dns

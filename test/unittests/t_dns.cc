@@ -3,7 +3,9 @@
 #include "../../cvmfs/dns.h"
 #include "../../cvmfs/util.h"
 
+#include <algorithm>
 #include <ctime>
+#include <cstdio>
 
 using namespace std;  // NOLINT
 
@@ -33,19 +35,29 @@ class DummyResolver : public Resolver {
   DummyResolver() : Resolver(false /* ipv4 only */, 0 /* retries */, 2000) { };
   ~DummyResolver() { };
 
-  void SetResolvers(const std::vector<std::string> &new_resolvers) {
+  virtual bool SetResolvers(const std::vector<std::string> &resolvers) {
+    return false;
   }
-  void SetSystemResolvers() {
+  virtual bool SetSearchDomains(const std::vector<std::string> &domains) {
+    return false;
+  }
+  virtual void SetSystemResolvers() {
+  }
+  virtual void SetSystemSearchDomains() {
   }
 
  protected:
   virtual void DoResolve(const vector<string> &names,
+                         const std::vector<bool> &skip,
                          vector<vector<string> > *ipv4_addresses,
                          vector<vector<string> > *ipv6_addresses,
                          vector<Failures> *failures,
                          vector<unsigned> *ttls)
   {
     for (unsigned i = 0; i < names.size(); ++i) {
+      if (skip[i])
+        continue;
+
       (*ttls)[i] = 600;
       if (names[i] == "normal") {
         (*ipv4_addresses)[i].push_back("127.0.0.1");
@@ -96,8 +108,12 @@ static void ExpectResolvedName(
   const string &ipv6)
 {
   set<string> ipv4_addresses = host.ipv4_addresses();
-  ASSERT_EQ(ipv4_addresses.size(), 1U);
-  EXPECT_EQ(*ipv4_addresses.begin(), ipv4);
+  if (!ipv4.empty()) {
+    ASSERT_EQ(ipv4_addresses.size(), 1U);
+    EXPECT_EQ(*ipv4_addresses.begin(), ipv4);
+  } else {
+    EXPECT_EQ(ipv4_addresses.size(), 0U);
+  }
   if (!ipv6.empty()) {
     EXPECT_TRUE(host.HasIpv6());
     set<string> ipv6_addresses = host.ipv6_addresses();
@@ -276,6 +292,24 @@ TEST_F(T_Dns, ResolverTtlRange) {
 }
 
 
+TEST_F(T_Dns, ResolverIpAddresses) {
+  DummyResolver resolver;
+
+  Host host = resolver.Resolve("127.0.0.1");
+  ExpectResolvedName(host, "127.0.0.1", "");
+
+  host = resolver.Resolve("[::1]");
+  ExpectResolvedName(host, "", "[::1]");
+}
+
+
+TEST_F(T_Dns, ResolverEmpty) {
+  DummyResolver resolver;
+  Host host = resolver.Resolve("");
+  EXPECT_EQ(host.status(), kFailInvalidHost);
+}
+
+
 TEST_F(T_Dns, CaresResolverConstruct) {
   CaresResolver *resolver = CaresResolver::Create(false, 2, 2000);
   EXPECT_EQ(resolver->retries(), 2U);
@@ -304,6 +338,7 @@ TEST_F(T_Dns, CaresResolverMany) {
   names.push_back("k.root-servers.net");
   names.push_back("l.root-servers.net");
   names.push_back("m.root-servers.net");
+  names.push_back("127.0.0.1");
   names.push_back("nemo.root-servers.net");
   vector<Host> hosts;
   default_resolver->ResolveMany(names, &hosts);
@@ -321,7 +356,8 @@ TEST_F(T_Dns, CaresResolverMany) {
   ExpectResolvedName(hosts[10], "193.0.14.129", "[2001:7fd::1]");
   ExpectResolvedName(hosts[11], "199.7.83.42", "[2001:500:3::42]");
   ExpectResolvedName(hosts[12], "202.12.27.33", "[2001:dc3::35]");
-  EXPECT_EQ(hosts[13].status(), kFailUnknownHost);
+  ExpectResolvedName(hosts[13], "127.0.0.1", "");
+  EXPECT_EQ(hosts[14].status(), kFailUnknownHost);
 }
 
 
@@ -347,8 +383,46 @@ TEST_F(T_Dns, CaresResolverFinalDot) {
 }
 
 
-TEST_F(T_Dns, CaresResolverTimeout) {
-  // TODO
+TEST_F(T_Dns, CaresResolverLocalhost) {
+  Host host = default_resolver->Resolve("localhost");
+  if (host.HasIpv6()) {
+    ExpectResolvedName(host, "127.0.0.1", "[::1]");
+  } else {
+    ExpectResolvedName(host, "127.0.0.1", "");
+  }
+}
+
+
+TEST_F(T_Dns, CaresResolverReadConfig) {
+  FILE *f = fopen("/etc/resolv.conf", "r");
+  ASSERT_FALSE(f == NULL);
+  vector<string> nameservers;
+  string line;
+  while (GetLineFile(f, &line)) {
+    vector<string> tokens = SplitString(line, ' ');
+    if (tokens[0] == "nameserver")
+      nameservers.push_back(tokens[1] + ":53");
+  }
+  fclose(f);
+
+  vector<string> system_resolvers = default_resolver->resolvers();
+  sort(system_resolvers.begin(), system_resolvers.end());
+  sort(nameservers.begin(), nameservers.end());
+  EXPECT_EQ(nameservers, system_resolvers);
+}
+
+TEST_F(T_Dns, CaresResolverBadResolver) {
+  CaresResolver *quick_resolver = CaresResolver::Create(false, 0, 100);
+  ASSERT_FALSE(quick_resolver == NULL);
+
+  vector<string> bad_resolvers;
+  bad_resolvers.push_back("127.0.0.1");
+  quick_resolver->SetResolvers(bad_resolvers);
+  time_t before = time(NULL);
+  Host host = quick_resolver->Resolve("a.root-servers.net");
+  time_t after = time(NULL);
+  EXPECT_EQ(host.status(), kFailInvalidResolvers);
+  EXPECT_LE(after-before, 1);
 }
 
 }  // namespace dns
