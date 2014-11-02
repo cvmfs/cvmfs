@@ -128,8 +128,12 @@ bool Resolver::IsIpv6Address(const string &address) {
 }
 
 
-Resolver::Resolver(const bool ipv4_only, const unsigned timeout_ms)
+Resolver::Resolver(
+  const bool ipv4_only,
+  const unsigned retries,
+  const unsigned timeout_ms)
   : ipv4_only_(ipv4_only)
+  , retries_(retries)
   , timeout_ms_(timeout_ms)
 {
 }
@@ -380,8 +384,11 @@ static Failures CaresExtractIpv6(
 }
 
 
-CaresResolver::CaresResolver(const bool ipv4_only, const unsigned timeout_ms)
-  : Resolver(ipv4_only, timeout_ms)
+CaresResolver::CaresResolver(
+  const bool ipv4_only,
+  const unsigned retries,
+  const unsigned timeout_ms)
+  : Resolver(ipv4_only, retries, timeout_ms)
   , channel(NULL)
 {
 }
@@ -400,9 +407,10 @@ CaresResolver::~CaresResolver() {
  */
 CaresResolver *CaresResolver::Create(
   const bool ipv4_only,
+  const unsigned retries,
   const unsigned timeout_ms)
 {
-  CaresResolver *resolver = new CaresResolver(ipv4_only, timeout_ms);
+  CaresResolver *resolver = new CaresResolver(ipv4_only, retries, timeout_ms);
   resolver->channel = reinterpret_cast<ares_channel *>(
     smalloc(sizeof(ares_channel)));
   memset(resolver->channel, 0, sizeof(ares_channel));
@@ -410,7 +418,7 @@ CaresResolver *CaresResolver::Create(
   struct ares_options options;
   memset(&options, 0, sizeof(options));
   options.timeout = timeout_ms;
-  options.tries = 1;
+  options.tries = 1 + retries;
   int retval = ares_init_options(resolver->channel, &options,
                                  ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES);
   if (retval != ARES_SUCCESS) {

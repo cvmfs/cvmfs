@@ -12,8 +12,10 @@ namespace dns {
 class T_Dns : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    default_resolver = CaresResolver::Create(false /* ipv4_only */, 5000);
-    ipv4_resolver = CaresResolver::Create(true /* ipv4_only */, 5000);
+    default_resolver =
+      CaresResolver::Create(false /* ipv4_only */, 1 /* retries */, 5000);
+    ipv4_resolver =
+      CaresResolver::Create(true /* ipv4_only */, 1 /* retries */, 5000);
   }
 
   virtual ~T_Dns() {
@@ -28,7 +30,7 @@ class T_Dns : public ::testing::Test {
 
 class DummyResolver : public Resolver {
  public:
-  DummyResolver() : Resolver(false, 2) { };
+  DummyResolver() : Resolver(false /* ipv4 only */, 0 /* retries */, 2000) { };
   ~DummyResolver() { };
 
   void SetResolvers(const std::vector<std::string> &new_resolvers) {
@@ -246,7 +248,8 @@ TEST_F(T_Dns, ResolverTtlRange) {
 
 
 TEST_F(T_Dns, CaresResolverConstruct) {
-  CaresResolver *resolver = CaresResolver::Create(false, 2000);
+  CaresResolver *resolver = CaresResolver::Create(false, 2, 2000);
+  EXPECT_EQ(resolver->retries(), 2U);
   delete resolver;
 }
 

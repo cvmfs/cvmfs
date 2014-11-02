@@ -138,7 +138,9 @@ class Host {
  */
 class Resolver : SingleCopy {
  public:
-  Resolver(const bool ipv4_only, const unsigned timeout_ms);
+  Resolver(const bool ipv4_only,
+           const unsigned retries,
+           const unsigned timeout_ms);
   virtual ~Resolver() { };
 
   virtual void SetResolvers(const std::vector<std::string> &new_resolvers) = 0;
@@ -148,6 +150,7 @@ class Resolver : SingleCopy {
                    std::vector<Host> *hosts);
 
   bool ipv4_only() const { return ipv4_only_; }
+  unsigned retries() const { return retries_; }
   unsigned timeout_ms() const { return timeout_ms_; }
 
  protected:
@@ -169,6 +172,12 @@ class Resolver : SingleCopy {
   bool ipv4_only_;
 
   /**
+   * 1 + retries_ attempts to unresponsive servers, each attempt bounded by
+   * timeout_ms_
+   */
+  unsigned retries_;
+
+  /**
    * Timeout in milliseconds for DNS queries.  Zero means no timeout.
    */
   unsigned timeout_ms_;
@@ -186,14 +195,18 @@ class CaresResolver : public Resolver {
  public:
   static const unsigned kMaxAddresses = 16;
 
-  static CaresResolver *Create(const bool ipv4_only, const unsigned timeout_ms);
+  static CaresResolver *Create(const bool ipv4_only,
+                               const unsigned retries,
+                               const unsigned timeout_ms);
   virtual ~CaresResolver();
 
   virtual void SetResolvers(const std::vector<std::string> &new_resolvers);
   virtual void SetSystemResolvers();
 
  protected:
-  CaresResolver(const bool ipv4_only, const unsigned timeout_ms);
+  CaresResolver(const bool ipv4_only,
+                const unsigned retries,
+                const unsigned timeout_ms);
   virtual void DoResolve(const std::vector<std::string> &names,
                          std::vector<std::vector<std::string> > *ipv4_addresses,
                          std::vector<std::vector<std::string> > *ipv6_addresses,
