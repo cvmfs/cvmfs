@@ -74,7 +74,7 @@ class Host {
 
   time_t deadline() const { return deadline_; }
   int64_t id() const { return id_; };
-  bool hasIpv6() const { return !ipv6_addresses_.empty(); }
+  bool HasIpv6() const { return !ipv6_addresses_.empty(); }
   std::set<std::string> ipv4_addresses() const { return ipv4_addresses_; }
   std::set<std::string> ipv6_addresses() const { return ipv6_addresses_; }
   std::string name() const { return name_; }
@@ -91,7 +91,7 @@ class Host {
    /**
     * Counter that is increased with every creation of a host object.  Allows to
     * distinguish two Host objects with the same host name.  E.g. when the proxy
-    * list in Download.cc reads "http:/A:3128|http:/A:3128".
+    * list in Download.cc reads "http://A:3128|http://A:3128".
     */
   static atomic_int64 global_id_;
 
@@ -119,12 +119,12 @@ class Host {
   std::set<std::string> ipv6_addresses_;
 
   /**
-   * The fully qualified host name.
+   * The host name either fully qualified or within the search domain.
    */
   std::string name_;
 
   /**
-   * Status of the name resolution
+   * Error code of the name resolution that led to this object.
    */
   Failures status_;
 };
@@ -132,8 +132,9 @@ class Host {
 
 /**
  * Abstract interface of a name resolver.  Returns a Host object upon successful
- * name resolution.  Can be configured with DNS servers, with a timeout, and
- * whether to use IPv4 only or not.
+ * name resolution.  Also provides a vector interface to resolve multiple names
+ * in parallel.  Can be configured with DNS servers, with a timeout, and whether
+ * to use IPv4 only or not.
  */
 class Resolver : SingleCopy {
  public:
@@ -143,20 +144,24 @@ class Resolver : SingleCopy {
   virtual void SetResolvers(const std::vector<std::string> &new_resolvers) = 0;
   virtual void SetSystemResolvers() = 0;
   Host Resolve(const std::string &name);
+  void ResolveMany(std::vector<std::string> &names,
+                   std::vector<Host> *hosts);
 
   bool ipv4_only() const { return ipv4_only_; }
   unsigned timeout_ms() const { return timeout_ms_; }
 
  protected:
-   /**
-    * Takes a host name and returns the resolved lists of A and AAAA records.
-    * To keep it simple, returns only a single TTL, the lower value of both
-    * records.
-    */
-  virtual Failures DoResolve(const std::string &name,
-                             std::vector<std::string> *ipv4_addresses,
-                             std::vector<std::string> *ipv6_addresses,
-                             unsigned *ttl) = 0;
+  /**
+   * Takes host names and returns the resolved lists of A and AAAA records in
+   * the same order.  To keep it simple, returns only a single TTL per host,
+   * the lower value of both record types A/AAAA.  The output vectors have
+   * the same size as the input vector names.
+   */
+  virtual void DoResolve(const std::vector<std::string> &names,
+                         std::vector<std::vector<std::string> > *ipv4_addresses,
+                         std::vector<std::vector<std::string> > *ipv6_addresses,
+                         std::vector<Failures> *failures,
+                         std::vector<unsigned> *ttls) = 0;
 
   /**
    * Do not try to get AAAA records if true.
@@ -175,24 +180,25 @@ class Resolver : SingleCopy {
 
 
 /**
- * Implementation of the Resolver class using the c-ares library.
+ * Implementation of the Resolver interface using the c-ares library.
  */
 class CaresResolver : public Resolver {
  public:
   static const unsigned kMaxAddresses = 16;
 
   static CaresResolver *Create(const bool ipv4_only, const unsigned timeout_ms);
-  ~CaresResolver();
+  virtual ~CaresResolver();
 
-  void SetResolvers(const std::vector<std::string> &new_resolvers);
-  void SetSystemResolvers();
+  virtual void SetResolvers(const std::vector<std::string> &new_resolvers);
+  virtual void SetSystemResolvers();
 
  protected:
   CaresResolver(const bool ipv4_only, const unsigned timeout_ms);
-  virtual Failures DoResolve(const std::string &name,
-                             std::vector<std::string> *ipv4_addresses,
-                             std::vector<std::string> *ipv6_addresses,
-                             unsigned *ttl);
+  virtual void DoResolve(const std::vector<std::string> &names,
+                         std::vector<std::vector<std::string> > *ipv4_addresses,
+                         std::vector<std::vector<std::string> > *ipv6_addresses,
+                         std::vector<Failures> *failures,
+                         std::vector<unsigned> *ttls);
 
  private:
   void WaitOnCares();

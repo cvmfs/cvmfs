@@ -136,51 +136,74 @@ Resolver::Resolver(const bool ipv4_only, const unsigned timeout_ms)
 
 
 /**
- * Calls the overwritten concrete resolver, verifies the sanity of the returned
- * addresses and constructs the Host object.
+ * Wrapper around the vector interface.
  */
 Host Resolver::Resolve(const string &name) {
-  Host host;
-  host.name_ = name;
-  vector<string> ipv4_addresses;
-  vector<string> ipv6_addresses;
-  unsigned ttl;
-  host.status_ = DoResolve(name, &ipv4_addresses, &ipv6_addresses, &ttl);
-  if (host.status_ != kFailOk)
-    return host;
+  vector<string> names;
+  names.push_back(name);
+  vector<Host> hosts;
+  ResolveMany(names, &hosts);
+  return hosts[0];
+}
 
-  host.deadline_ = time(NULL) + ttl;
 
-  // Verify addresses and make them readily available for curl
-  for (unsigned i = 0; i < ipv4_addresses.size(); ++i) {
-    if (!IsIpv4Address(ipv4_addresses[i])) {
-      LogCvmfs(kLogDns, kLogDebug | kLogSyslogWarn,
-               "host name %s resolves to invalid IPv4 address %s",
-               name.c_str(), ipv4_addresses[i].c_str());
+/**
+ * Calls the overwritten concrete resolver, verifies the sanity of the returned
+ * addresses and constructs the Host objects in the same order as the names.
+ */
+void Resolver::ResolveMany(vector<string> &names, vector<Host> *hosts) {
+  unsigned num = names.size();
+  if (num == 0)
+    return;
+
+  vector<vector<string> > ipv4_addresses(num);
+  vector<vector<string> > ipv6_addresses(num);
+  vector<Failures> failures(num);
+  vector<unsigned> ttls(num);
+  DoResolve(names, &ipv4_addresses, &ipv6_addresses, &failures, &ttls);
+
+  for (unsigned i = 0; i < num; ++i) {
+    Host host;
+    host.name_ = names[i];
+    host.status_ = failures[i];
+    if (host.status_ != kFailOk) {
+      hosts->push_back(host);
       continue;
     }
-    LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
-             name.c_str(), ipv4_addresses[i].c_str());
-    host.ipv4_addresses_.insert(ipv4_addresses[i]);
-  }
 
-  for (unsigned i = 0; i < ipv6_addresses.size(); ++i) {
-    if (!IsIpv6Address(ipv6_addresses[i])) {
-      LogCvmfs(kLogDns, kLogDebug | kLogSyslogWarn,
-               "host name %s resolves to invalid IPv6 address %s",
-               name.c_str(), ipv6_addresses[i].c_str());
-      continue;
+    host.deadline_ = time(NULL) + ttls[i];
+
+    // Verify addresses and make them readily available for curl
+    for (unsigned j = 0; j < ipv4_addresses[i].size(); ++j) {
+      if (!IsIpv4Address(ipv4_addresses[i][j])) {
+        LogCvmfs(kLogDns, kLogDebug | kLogSyslogWarn,
+                 "host name %s resolves to invalid IPv4 address %s",
+                 names[i].c_str(), ipv4_addresses[i][j].c_str());
+        continue;
+      }
+      LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
+               names[i].c_str(), ipv4_addresses[i][j].c_str());
+      host.ipv4_addresses_.insert(ipv4_addresses[i][j]);
     }
-    // For URLs we need brackets around IPv6 addresses
-    LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
-             name.c_str(), ipv6_addresses[i].c_str());
-    host.ipv6_addresses_.insert("[" + ipv6_addresses[i] + "]");
+
+    for (unsigned j = 0; j < ipv6_addresses[i].size(); ++j) {
+      if (!IsIpv6Address(ipv6_addresses[i][j])) {
+        LogCvmfs(kLogDns, kLogDebug | kLogSyslogWarn,
+                 "host name %s resolves to invalid IPv6 address %s",
+                 names[i].c_str(), ipv6_addresses[i][j].c_str());
+        continue;
+      }
+      // For URLs we need brackets around IPv6 addresses
+      LogCvmfs(kLogDns, kLogDebug, "add address %s -> %s",
+               names[i].c_str(), ipv6_addresses[i][j].c_str());
+      host.ipv6_addresses_.insert("[" + ipv6_addresses[i][j] + "]");
+    }
+
+    if (host.ipv4_addresses_.empty() && host.ipv6_addresses_.empty())
+      host.status_ = kFailNoAddress;
+
+    hosts->push_back(host);
   }
-
-  if (host.ipv4_addresses_.empty() && host.ipv6_addresses_.empty())
-    host.status_ = kFailNoAddress;
-
-  return host;
 }
 
 
@@ -409,47 +432,66 @@ CaresResolver *CaresResolver::Create(
  * Pushes all the DNS queries into the c-ares channel and waits for the results
  * on the file descriptors.
  */
-Failures CaresResolver::DoResolve(
-  const string &name,
-  vector<string> *ipv4_addresses,
-  vector<string> *ipv6_addresses,
-  unsigned *ttl)
+void CaresResolver::DoResolve(
+  const vector<string> &names,
+  vector<vector<string> > *ipv4_addresses,
+  vector<vector<string> > *ipv6_addresses,
+  vector<Failures> *failures,
+  vector<unsigned> *ttls)
 {
-  QueryInfo *info_ipv4 = NULL;
-  QueryInfo *info_ipv6 = NULL;
+  unsigned num = names.size();
+  if (num == 0)
+    return;
 
-  if (!ipv4_only()) {
-    info_ipv6 = new QueryInfo(ipv6_addresses, name, kRrAaaa);
-    ares_search(
-      *channel, name.c_str(), ns_c_in, ns_t_aaaa, CallbackCares, info_ipv6);
-  }
-  info_ipv4 = new QueryInfo(ipv4_addresses, name, kRrA);
-  ares_search(
-    *channel, name.c_str(), ns_c_in, ns_t_a, CallbackCares, info_ipv4);
+  vector<QueryInfo *> infos_ipv4(num, NULL);
+  vector<QueryInfo *> infos_ipv6(num, NULL);
 
-  bool still_busy = true;
-  do {
-    WaitOnCares();
-    if ((!info_ipv4 || info_ipv4->complete) &&
-        (!info_ipv6 || info_ipv6->complete))
-    {
-      still_busy = false;
+  for (unsigned i = 0; i < num; ++i) {
+    if (!ipv4_only()) {
+      infos_ipv6[i] = new QueryInfo(&(*ipv6_addresses)[i], names[i], kRrAaaa);
+      ares_search(*channel, names[i].c_str(), ns_c_in, ns_t_aaaa,
+                  CallbackCares, infos_ipv6[i]);
     }
-  } while (still_busy);
+    infos_ipv4[i] = new QueryInfo(&(*ipv4_addresses)[i], names[i], kRrA);
+    ares_search(*channel, names[i].c_str(), ns_c_in, ns_t_a,
+                CallbackCares, infos_ipv4[i]);
+  }
+
+  bool all_complete;
+  do {
+    all_complete = true;
+    WaitOnCares();
+    for (unsigned i = 0; i < num; ++i) {
+      if ((infos_ipv4[i] && !infos_ipv4[i]->complete) ||
+          (infos_ipv6[i] && !infos_ipv6[i]->complete))
+      {
+        all_complete = false;
+        break;
+      }
+    }
+  } while (!all_complete);
 
   // Silently ignore errors with IPv4/6 if there are at least some usable IP
   // addresses.
-  Failures status = kFailOther;
-  *ttl = unsigned(-1);
-  if (info_ipv6) {
-    *ttl = std::min(info_ipv6->ttl, *ttl);
-    status = info_ipv6->status;
+  for (unsigned i = 0; i < num; ++i) {
+    Failures status = kFailOther;
+    (*ttls)[i] = unsigned(-1);
+    if (infos_ipv6[i]) {
+      (*ttls)[i] = std::min(infos_ipv6[i]->ttl, (*ttls)[i]);
+      status = infos_ipv6[i]->status;
+    }
+    if (infos_ipv4[i]) {
+      (*ttls)[i] = std::min(infos_ipv4[i]->ttl, (*ttls)[i]);
+      if (status != kFailOk)
+        status = infos_ipv4[i]->status;
+    }
+    (*failures)[i] = status;
   }
-  if ((status != kFailOk) && info_ipv4) {
-    *ttl = std::min(info_ipv6->ttl, *ttl);
-    status = info_ipv4->status;
+
+  for (unsigned i = 0; i < num; ++i) {
+    delete infos_ipv4[i];
+    delete infos_ipv6[i];
   }
-  return status;
 }
 
 

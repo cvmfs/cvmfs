@@ -12,7 +12,17 @@ namespace dns {
 class T_Dns : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    default_resolver = CaresResolver::Create(false /* ipv4_only */, 5000);
+    ipv4_resolver = CaresResolver::Create(true /* ipv4_only */, 5000);
   }
+
+  virtual ~T_Dns() {
+    delete default_resolver;
+    delete ipv4_resolver;
+  }
+
+  CaresResolver *default_resolver;
+  CaresResolver *ipv4_resolver;
 };
 
 
@@ -27,43 +37,69 @@ class DummyResolver : public Resolver {
   }
 
  protected:
-  virtual Failures DoResolve(const string &name,
-                             vector<string> *ipv4_addresses,
-                             vector<string> *ipv6_addresses,
-                             unsigned *ttl)
+  virtual void DoResolve(const vector<string> &names,
+                         vector<vector<string> > *ipv4_addresses,
+                         vector<vector<string> > *ipv6_addresses,
+                         vector<Failures> *failures,
+                         vector<unsigned> *ttls)
   {
-    if (name == "normal") {
-      ipv4_addresses->push_back("127.0.0.1");
-      ipv4_addresses->push_back("127.0.0.2");
-      ipv6_addresses->push_back("0000:0000:0000:0000:0000:0000:0000:0001");
-      ipv6_addresses->push_back("0000:0000:0000:0000:0000:0000:0000:a00F");
-    } else if (name == "ipv4") {
-      ipv4_addresses->push_back("127.0.0.1");
-      ipv4_addresses->push_back("127.0.0.2");
-    } else if (name == "ipv6") {
-      ipv6_addresses->push_back("0000:0000:0000:0000:0000:0000:0000:0001");
-      ipv6_addresses->push_back("0000:0000:0000:0000:0000:0000:0000:a00F");
-    } else if (name == "bad-ipv4") {
-      ipv4_addresses->push_back("127.0.0.a");
-      ipv4_addresses->push_back("127.0.0.12345");
-      ipv4_addresses->push_back("127.0.0");
-      ipv4_addresses->push_back("abc127.0.0.1");
-      ipv4_addresses->push_back("127.0.0.1");
-    } else if (name == "bad-ipv6") {
-      ipv6_addresses->push_back("0000:0000:0000:0000:0000:0000:0000:000G");
-      ipv6_addresses->push_back("0000:0000:0000:0000:0000:0000:0000:fffff");
-      ipv6_addresses->push_back("0000:0000:0000:0000:0000:0000:0000");
-      ipv6_addresses->push_back("abc0000:0000:0000:0000:0000:0000:0000:0001");
-      ipv6_addresses->push_back("0000:0000:0000:0000:0000:0000:0000:0001");
-    } else if (name == "timeout") {
-      return kFailTimeout;
-    } else if (name == "empty") {
-      // No IP addresses returned
+    for (unsigned i = 0; i < names.size(); ++i) {
+      (*ttls)[i] = 600;
+      if (names[i] == "normal") {
+        (*ipv4_addresses)[i].push_back("127.0.0.1");
+        (*ipv4_addresses)[i].push_back("127.0.0.2");
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:0001");
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:a00F");
+      } else if (names[i] == "ipv4") {
+        (*ipv4_addresses)[i].push_back("127.0.0.1");
+        (*ipv4_addresses)[i].push_back("127.0.0.2");
+      } else if (names[i] == "ipv6") {
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:0001");
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:a00F");
+      } else if (names[i] == "bad-ipv4") {
+        (*ipv4_addresses)[i].push_back("127.0.0.a");
+        (*ipv4_addresses)[i].push_back("127.0.0.12345");
+        (*ipv4_addresses)[i].push_back("127.0.0");
+        (*ipv4_addresses)[i].push_back("abc127.0.0.1");
+        (*ipv4_addresses)[i].push_back("127.0.0.1");
+      } else if (names[i] == "bad-ipv6") {
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:000G");
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:0001");
+      } else if (names[i] == "timeout") {
+        (*failures)[i] = kFailTimeout;
+        continue;
+      } else if (names[i] == "empty") {
+        // No IP addresses returned
+      }
+      (*failures)[i] = kFailOk;
     }
-    *ttl = 600;
-    return kFailOk;
   }
 };
+
+static void ExpectResolvedName(
+  const Host &host,
+  const string &ipv4,
+  const string &ipv6)
+{
+  set<string> ipv4_addresses = host.ipv4_addresses();
+  ASSERT_EQ(ipv4_addresses.size(), 1U);
+  EXPECT_EQ(*ipv4_addresses.begin(), ipv4);
+  if (!ipv6.empty()) {
+    EXPECT_TRUE(host.HasIpv6());
+    set<string> ipv6_addresses = host.ipv6_addresses();
+    ASSERT_EQ(ipv6_addresses.size(), 1U);
+    EXPECT_EQ(*ipv6_addresses.begin(), ipv6);
+  } else {
+    EXPECT_FALSE(host.HasIpv6());
+    EXPECT_EQ(host.ipv6_addresses().size(), 0U);
+  }
+}
 
 
 TEST_F(T_Dns, Host) {
@@ -113,8 +149,8 @@ TEST_F(T_Dns, HostEquivalent) {
   EXPECT_TRUE(host.IsEquivalent(host2));
   EXPECT_TRUE(host2.IsEquivalent(host));
 
-  EXPECT_FALSE(host.hasIpv6());
-  EXPECT_FALSE(host2.hasIpv6());
+  EXPECT_FALSE(host.HasIpv6());
+  EXPECT_FALSE(host2.HasIpv6());
 
   host.ipv6_addresses_.insert("[::1]");
   EXPECT_FALSE(host.IsEquivalent(host2));
@@ -156,7 +192,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "normal");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
-  EXPECT_TRUE(host.hasIpv6());
+  EXPECT_TRUE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 2U);
   EXPECT_EQ(host.ipv6_addresses().size(), 2U);
 
@@ -164,7 +200,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "ipv4");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
-  EXPECT_FALSE(host.hasIpv6());
+  EXPECT_FALSE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 2U);
   EXPECT_EQ(host.ipv6_addresses().size(), 0U);
 
@@ -172,7 +208,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "ipv6");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
-  EXPECT_TRUE(host.hasIpv6());
+  EXPECT_TRUE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 0U);
   EXPECT_EQ(host.ipv6_addresses().size(), 2U);
 
@@ -180,7 +216,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "bad-ipv4");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
-  EXPECT_FALSE(host.hasIpv6());
+  EXPECT_FALSE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 1U);
   EXPECT_EQ(host.ipv6_addresses().size(), 0U);
 
@@ -188,7 +224,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "bad-ipv6");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
-  EXPECT_TRUE(host.hasIpv6());
+  EXPECT_TRUE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 0U);
   EXPECT_EQ(host.ipv6_addresses().size(), 1U);
 
@@ -203,23 +239,84 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_FALSE(host.IsValid());
 }
 
-TEST_F(T_Dns, CaresResolver) {
+
+TEST_F(T_Dns, ResolverTtlRange) {
+  // TODO
+}
+
+
+TEST_F(T_Dns, CaresResolverConstruct) {
   CaresResolver *resolver = CaresResolver::Create(false, 2000);
-  Host host = resolver->Resolve("donaldduck.ch");
-  set<string> ipv4_addresses = host.ipv4_addresses();
-  set<string> ipv6_addresses = host.ipv6_addresses();
-  printf("Status is %s, deadline is %s\n",
-    Code2Ascii(host.status()), StringifyTime(host.deadline(), true).c_str());
-  for (set<string>::const_iterator i = ipv4_addresses.begin(),
-       iEnd = ipv4_addresses.end(); i != iEnd; ++i)
-  {
-    printf("Resolves to %s\n", i->c_str());
-  }
-  for (set<string>::const_iterator i = ipv6_addresses.begin(),
-       iEnd = ipv6_addresses.end(); i != iEnd; ++i)
-  {
-    printf("Resolves(6) to %s\n", i->c_str());
-  }
+  delete resolver;
+}
+
+
+TEST_F(T_Dns, CaresResolverSimple) {
+  Host host = default_resolver->Resolve("a.root-servers.net");
+  ExpectResolvedName(host, "198.41.0.4", "[2001:503:ba3e::2:30]");
+}
+
+
+TEST_F(T_Dns, CaresResolverMany) {
+  vector<string> names;
+  names.push_back("a.root-servers.net");
+  names.push_back("b.root-servers.net");
+  names.push_back("c.root-servers.net");
+  names.push_back("d.root-servers.net");
+  names.push_back("e.root-servers.net");
+  names.push_back("f.root-servers.net");
+  names.push_back("g.root-servers.net");
+  names.push_back("h.root-servers.net");
+  names.push_back("i.root-servers.net");
+  names.push_back("j.root-servers.net");
+  names.push_back("k.root-servers.net");
+  names.push_back("l.root-servers.net");
+  names.push_back("m.root-servers.net");
+  names.push_back("nemo.root-servers.net");
+  vector<Host> hosts;
+  default_resolver->ResolveMany(names, &hosts);
+  ASSERT_EQ(hosts.size(), names.size());
+  ExpectResolvedName(hosts[0], "198.41.0.4", "[2001:503:ba3e::2:30]");
+  ExpectResolvedName(hosts[1], "192.228.79.201", "[2001:500:84::b]");
+  ExpectResolvedName(hosts[2], "192.33.4.12", "[2001:500:2::c]");
+  ExpectResolvedName(hosts[3], "199.7.91.13", "[2001:500:2d::d]");
+  ExpectResolvedName(hosts[4], "192.203.230.10", "");
+  ExpectResolvedName(hosts[5], "192.5.5.241", "[2001:500:2f::f]");
+  ExpectResolvedName(hosts[6], "192.112.36.4", "");
+  ExpectResolvedName(hosts[7], "128.63.2.53", "[2001:500:1::803f:235]");
+  ExpectResolvedName(hosts[8], "192.36.148.17", "[2001:7fe::53]");
+  ExpectResolvedName(hosts[9], "192.58.128.30", "[2001:503:c27::2:30]");
+  ExpectResolvedName(hosts[10], "193.0.14.129", "[2001:7fd::1]");
+  ExpectResolvedName(hosts[11], "199.7.83.42", "[2001:500:3::42]");
+  ExpectResolvedName(hosts[12], "202.12.27.33", "[2001:dc3::35]");
+  EXPECT_EQ(hosts[13].status(), kFailUnknownHost);
+}
+
+
+TEST_F(T_Dns, CaresResolverIpv4) {
+  Host host = ipv4_resolver->Resolve("a.root-servers.net");
+  ExpectResolvedName(host, "198.41.0.4", "");
+}
+
+
+TEST_F(T_Dns, CaresResolverSameResult) {
+  Host host = default_resolver->Resolve("a.root-servers.net");
+  Host host2 = default_resolver->Resolve("a.root-servers.net");
+  EXPECT_TRUE(host.IsEquivalent(host2));
+  EXPECT_TRUE(host2.IsEquivalent(host));
+}
+
+
+TEST_F(T_Dns, CaresResolverFinalDot) {
+  Host host = default_resolver->Resolve("a.root-servers.net");
+  Host host2 = default_resolver->Resolve("a.root-servers.net.");
+  EXPECT_EQ(host.ipv4_addresses(), host2.ipv4_addresses());
+  EXPECT_EQ(host.ipv6_addresses(), host2.ipv6_addresses());
+}
+
+
+TEST_F(T_Dns, CaresResolverTimeout) {
+  // TODO
 }
 
 }  // namespace dns
