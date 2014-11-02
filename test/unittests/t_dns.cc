@@ -15,9 +15,9 @@ class T_Dns : public ::testing::Test {
  protected:
   virtual void SetUp() {
     default_resolver =
-      CaresResolver::Create(false /* ipv4_only */, 1 /* retries */, 5000);
+      CaresResolver::Create(false /* ipv4_only */, 1 /* retries */, 2000);
     ipv4_resolver =
-      CaresResolver::Create(true /* ipv4_only */, 1 /* retries */, 5000);
+      CaresResolver::Create(true /* ipv4_only */, 1 /* retries */, 2000);
   }
 
   virtual ~T_Dns() {
@@ -393,23 +393,44 @@ TEST_F(T_Dns, CaresResolverLocalhost) {
 }
 
 
+TEST_F(T_Dns, CaresResolverSearchDomain) {
+  /*Host host = default_resolver->Resolve("a");
+  EXPECT_EQ(host.status(), kFailUnknownHost);
+
+  vector<string> new_domains;
+  new_domains.push_back("root-servers.net");
+  bool retval = default_resolver->SetSearchDomains(new_domains);
+  EXPECT_EQ(retval, true);
+  host = default_resolver->Resolve("a");
+  ExpectResolvedName(host, "198.41.0.4", "[2001:503:ba3e::2:30]");*/
+}
+
+
 TEST_F(T_Dns, CaresResolverReadConfig) {
   FILE *f = fopen("/etc/resolv.conf", "r");
   ASSERT_FALSE(f == NULL);
   vector<string> nameservers;
+  vector<string> domains;
   string line;
   while (GetLineFile(f, &line)) {
     vector<string> tokens = SplitString(line, ' ');
     if (tokens[0] == "nameserver")
       nameservers.push_back(tokens[1] + ":53");
+    else if (tokens[0] == "search")
+      domains.push_back(tokens[1]);
   }
   fclose(f);
 
   vector<string> system_resolvers = default_resolver->resolvers();
+  vector<string> system_domains = default_resolver->domains();
   sort(system_resolvers.begin(), system_resolvers.end());
+  sort(system_domains.begin(), system_domains.end());
   sort(nameservers.begin(), nameservers.end());
+  sort(domains.begin(), domains.end());
   EXPECT_EQ(nameservers, system_resolvers);
+  EXPECT_EQ(domains, system_domains);
 }
+
 
 TEST_F(T_Dns, CaresResolverBadResolver) {
   CaresResolver *quick_resolver = CaresResolver::Create(false, 0, 100);
@@ -417,7 +438,8 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
 
   vector<string> bad_resolvers;
   bad_resolvers.push_back("127.0.0.1");
-  quick_resolver->SetResolvers(bad_resolvers);
+  bool retval = quick_resolver->SetResolvers(bad_resolvers);
+  ASSERT_EQ(retval, true);
   time_t before = time(NULL);
   Host host = quick_resolver->Resolve("a.root-servers.net");
   time_t after = time(NULL);

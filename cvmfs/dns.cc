@@ -474,13 +474,24 @@ CaresResolver *CaresResolver::Create(
   struct ares_addr_node *addresses;
   struct ares_addr_node *iter;
   struct ares_options options;
+  int optmask;
   memset(&options, 0, sizeof(options));
   options.timeout = timeout_ms;
   options.tries = 1 + retries;
-  retval = ares_init_options(resolver->channel_, &options,
-                             ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES);
+  optmask = ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES;
+  retval = ares_init_options(resolver->channel_, &options, optmask);
   if (retval != ARES_SUCCESS)
     goto create_fail;
+
+  // Save search domains
+  retval = ares_save_options(*resolver->channel_, &options, &optmask);
+  if (retval != ARES_SUCCESS)
+    goto create_fail;
+  for (int i = 0; i < options.ndomains; ++i) {
+    resolver->domains_.push_back(options.domains[i]);
+  }
+  ares_destroy_options(&options);
+  resolver->system_domains_ = resolver->domains_;
 
   // Save the system default resolvers
   addresses = NULL;
@@ -622,16 +633,45 @@ bool CaresResolver::SetResolvers(const vector<string> &resolvers) {
 
 
 bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
+  /*struct ares_options options;
+  int optmask;
+  int retval = ares_save_options(*channel_, &options, &optmask);
+  assert(retval == ARES_SUCCESS);
+
+  if (options.ndomains > 0) {
+    for (int i = 0; i < options.ndomains; ++i)
+      free(options.domains[i]);
+    free(options.domains);
+  }
+
+  options.ndomains = domains.size();
+  if (options.ndomains > 0) {
+    options.domains = reinterpret_cast<char **>(
+      smalloc(options.ndomains * sizeof(char **)));
+    for (int i = 0; i < options.ndomains; ++i) {
+      options.domains[i] = strdup(domains[i].c_str());
+    }
+  }
+  retval = ares_init_options(channel_, &options, optmask);
+  ares_destroy_options(&options);
+
+  if (retval == ARES_SUCCESS) {
+    domains_ = domains;
+    return true;
+  }*/
   return false;
 }
 
 
 void CaresResolver::SetSystemResolvers() {
-  resolvers_ = system_resolvers_;
+  int retval = SetResolvers(system_resolvers_);
+  assert(retval == true);
 }
 
 
 void CaresResolver::SetSystemSearchDomains() {
+  int retval = SetSearchDomains(system_domains_);
+  assert(retval == true);
 }
 
 

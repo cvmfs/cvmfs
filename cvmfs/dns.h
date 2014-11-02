@@ -165,6 +165,7 @@ class Resolver : SingleCopy {
   void ResolveMany(const std::vector<std::string> &names,
                    std::vector<Host> *hosts);
 
+  std::vector<std::string> domains() const { return domains_; }
   bool ipv4_only() const { return ipv4_only_; }
   std::vector<std::string> resolvers() const { return resolvers_; }
   unsigned retries() const { return retries_; }
@@ -184,6 +185,11 @@ class Resolver : SingleCopy {
                          std::vector<std::vector<std::string> > *ipv6_addresses,
                          std::vector<Failures> *failures,
                          std::vector<unsigned> *ttls) = 0;
+
+  /**
+   * Currently active search domain list
+   */
+  std::vector<std::string> domains_;
 
   /**
    * Do not try to get AAAA records if true.
@@ -217,6 +223,9 @@ class Resolver : SingleCopy {
  */
 class CaresResolver : public Resolver {
  public:
+  /**
+   * More IP addresses for a single name will be ignored.
+   */
   static const unsigned kMaxAddresses = 16;
 
   static CaresResolver *Create(const bool ipv4_only,
@@ -244,6 +253,7 @@ class CaresResolver : public Resolver {
   void WaitOnCares();
   ares_channel *channel_;
   std::vector<std::string> system_resolvers_;
+  std::vector<std::string> system_domains_;
 };
 
 }  // namespace dns
