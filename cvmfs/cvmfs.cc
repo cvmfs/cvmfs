@@ -2277,24 +2277,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
       *g_boot_error = "failed to download history: " + StringifyInt(retval_dl);
       return loader::kFailHistory;
     }
-    history::TagList tag_list;
-    history::HistoryDatabase *tag_db =
-      history::HistoryDatabase::Open(history_path,
-                                     history::HistoryDatabase::kOpenReadOnly);
-    if (NULL == tag_db) {
+    UnlinkGuard history_file(history_path);
+    UniquePtr<history::History> tag_db(history::History::Open(history_path));
+    if (! tag_db) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
                "failed to open history database (%s)", history_path.c_str());
-      unlink(history_path.c_str());
       return loader::kFailHistory;
     }
-    retval = tag_list.Load(tag_db);
-    delete tag_db;
-    unlink(history_path.c_str());
-    if (!retval) {
-      *g_boot_error = "failed to read history database";
-      return loader::kFailHistory;
-    }
-    history::Tag tag;
+    history::History::Tag tag;
     if (*cvmfs::repository_tag_ == "") {
       time_t repository_utctime = IsoTimestamp2UtcTime(repository_date);
       if (repository_utctime == 0) {
@@ -2302,7 +2292,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                         repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
         return loader::kFailHistory;
       }
-      retval = tag_list.FindTagByDate(repository_utctime, &tag);
+      retval = tag_db->Get(repository_utctime, &tag);
       if (!retval) {
         *g_boot_error = "no repository state as early as utc timestamp " +
                         StringifyTime(repository_utctime, true);
@@ -2314,7 +2304,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                tag.name.c_str());
       *cvmfs::repository_tag_ = tag.name;
     } else {
-      retval = tag_list.FindTag(*cvmfs::repository_tag_, &tag);
+      retval = tag_db->Get(*cvmfs::repository_tag_, &tag);
       if (!retval) {
         *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
         return loader::kFailHistory;
