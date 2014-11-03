@@ -27,7 +27,7 @@ class T_History : public ::testing::Test {
   }
 
   std::string GetHistoryFilename() const {
-    const std::string path = CreateTempPath(sandbox + "/catalog", 0600);
+    const std::string path = CreateTempPath(sandbox + "/history", 0600);
     CheckEmpty(path);
     return path;
   }
@@ -532,4 +532,38 @@ TEST_F(T_History, GetChannelTips) {
   EXPECT_TRUE (CheckListing(tags, expected));
 
   delete history2;
+}
+
+
+TEST_F(T_History, GetHashes) {
+  const std::string hp = GetHistoryFilename();
+  History *history = History::Create(hp, fqrn);
+  ASSERT_NE (static_cast<History*>(NULL), history);
+  EXPECT_EQ (fqrn, history->fqrn());
+
+  const unsigned int dummy_count = 1000;
+  const TagVector dummy_tags = GetDummyTags(dummy_count);
+  ASSERT_TRUE (history->BeginTransaction());
+        TagVector::const_reverse_iterator i    = dummy_tags.rbegin();
+  const TagVector::const_reverse_iterator iend = dummy_tags.rend();
+  for (; i != iend; ++i) {
+    ASSERT_TRUE (history->Insert(*i));
+  }
+  EXPECT_TRUE (history->CommitTransaction());
+
+  EXPECT_EQ (dummy_count, history->GetNumberOfTags());
+
+  std::vector<shash::Any> hashes;
+  ASSERT_TRUE (history->GetHashes(&hashes));
+
+        TagVector::const_iterator j    = dummy_tags.begin();
+  const TagVector::const_iterator jend = dummy_tags.end();
+        std::vector<shash::Any>::const_iterator k    = hashes.begin();
+  const std::vector<shash::Any>::const_iterator kend = hashes.end();
+  ASSERT_EQ (dummy_tags.size(), hashes.size());
+  for (; j != jend; ++j, ++k) {
+    EXPECT_EQ (j->root_hash, *k);
+  }
+
+  delete history;
 }
