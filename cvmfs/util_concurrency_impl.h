@@ -135,6 +135,22 @@ Observable<ParamT>::~Observable() {
 
 
 template <typename ParamT>
+template <class DelegateT, class ClosureDataT>
+typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
+        typename BoundClosure<ParamT,
+                              DelegateT,
+                              ClosureDataT>::CallbackMethod   method,
+        DelegateT                                            *delegate,
+        ClosureDataT                                          data) {
+  // create a new BoundClosure, register it and return the handle
+  CallbackBase<ParamT> *callback =
+    Observable<ParamT>::MakeClosure(method, delegate, data);
+  RegisterListener(callback);
+  return callback;
+}
+
+
+template <typename ParamT>
 template <class DelegateT>
 typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
     typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,

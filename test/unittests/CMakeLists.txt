@@ -45,6 +45,8 @@ set (CVMFS_UNITTEST_SOURCES
   t_callbacks.cc
   t_lru.cc
   t_sqlite_database.cc
+  t_unique_ptr.cc
+  t_unlink_guard.cc
 
   # test utility functions
   testutil.cc testutil.h

@@ -393,6 +393,10 @@ uint64_t Catalog::GetRevision() const {
   return result;
 }
 
+uint64_t Catalog::GetLastModified() const {
+  return database().GetProperty<int>("last_modified");
+}
+
 
 uint64_t Catalog::GetNumEntries() const {
   const string sql = "SELECT count(*) FROM catalog;";

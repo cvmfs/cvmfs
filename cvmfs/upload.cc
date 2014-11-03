@@ -60,6 +60,10 @@ void Spooler::ProcessCatalog(const std::string &local_path) {
   file_processor_->Process(local_path, false, "C");
 }
 
+void Spooler::ProcessHistory(const std::string &local_path) {
+  file_processor_->Process(local_path, false, "H");
+}
+
 
 void Spooler::Upload(const std::string &local_path,
                      const std::string &remote_path) {

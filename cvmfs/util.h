@@ -226,15 +226,40 @@ class UniquePtr : SingleCopy {
   inline UniquePtr(T *ref) : ref_(ref) {}
   inline ~UniquePtr()                 { delete ref_; }
 
-  inline operator bool() const        { return (ref_ != NULL); }
-  inline operator T*() const          { return *ref_; }
+  inline operator bool() const        { return IsValid(); }
+  inline T& operator*() const         { return *ref_; }
   inline UniquePtr& operator=(T* ref) { ref_ = ref; return *this; }
   inline T* operator->() const        { return ref_; }
 
   inline T* weak_ref() const          { return ref_; }
+  inline bool IsValid() const         { return (ref_ != NULL); }
+  inline T*   Release()               { T* r = ref_; ref_ = NULL; return r; }
 
  private:
   T *ref_;
+};
+
+
+/**
+ * RAII object to call `unlink()` on a containing file when it gets out of scope
+ */
+class UnlinkGuard : SingleCopy {
+ public:
+  inline UnlinkGuard() : enabled_(false) {}
+  inline UnlinkGuard(const std::string &path) : path_(path), enabled_(true) {}
+  inline ~UnlinkGuard() { if (IsEnabled()) unlink(path_.c_str()); }
+
+  inline void Set(const std::string &path) { path_ = path; Enable(); }
+
+  inline bool IsEnabled() const { return enabled_;  }
+  inline void Enable()          { enabled_ = true;  }
+  inline void Disable()         { enabled_ = false; }
+
+  const std::string& path() const { return path_; }
+
+ private:
+  std::string  path_;
+  bool         enabled_;
 };
 
 /**

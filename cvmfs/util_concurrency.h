@@ -321,6 +321,27 @@ class Observable : public Callbackable<ParamT>,
   /**
    * Registers a method of a specific object as a listener to the Observable
    * object. The method is invoked on the given delegate when the callback is
+   * fired by the observed object using NotifyListeners(). Since this is meant
+   * to be a closure, it also passes the third argument to the method being in-
+   * voked by the Observable object.
+   *
+   * @param DelegateT  the type of the delegate object
+   * @param method     a pointer to the method to be invoked by the callback
+   * @param delegate   a pointer to the object to invoke the callback on
+   * @param closure    something to be passed to `method`
+   * @return  a handle to the registered callback
+   */
+  template <class DelegateT, class ClosureDataT>
+  callback_ptr RegisterListener(
+          typename BoundClosure<ParamT,
+                                DelegateT,
+                                ClosureDataT>::CallbackMethod   method,
+          DelegateT                                            *delegate,
+          ClosureDataT                                          data);
+
+  /**
+   * Registers a method of a specific object as a listener to the Observable
+   * object. The method is invoked on the given delegate when the callback is
    * fired by the observed object using NotifyListeners().
    *
    * @param DelegateT  the type of the delegate object
