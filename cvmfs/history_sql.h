@@ -91,6 +91,12 @@ class SqlListTags : public SqlRetrieveTag {
 };
 
 
+class SqlGetChannelTips : public SqlRetrieveTag {
+ public:
+  SqlGetChannelTips(const HistoryDatabase *database);
+};
+
+
 
 
 

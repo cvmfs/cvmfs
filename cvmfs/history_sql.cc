@@ -157,6 +157,15 @@ SqlListTags::SqlListTags(const HistoryDatabase *database) {
   assert (success);
 }
 
+SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
+  const bool success = Init(database->sqlite_db(),
+                            "SELECT " + GetDatabaseFields() + ", "
+                            "  MAX(revision) AS max_rev "
+                            "FROM tags "
+                            "GROUP BY channel;");
+  assert (success);
+}
+
 
 
 

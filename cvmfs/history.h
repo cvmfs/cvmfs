@@ -24,6 +24,7 @@ class SqlRemoveTag;
 class SqlFindTag;
 class SqlCountTags;
 class SqlListTags;
+class SqlGetChannelTips;
 
 class History {
  public:
@@ -106,14 +107,15 @@ class History {
   bool PrepareQueries();
 
  private:
-  UniquePtr<HistoryDatabase>   database_;
-  std::string                  fqrn_;
+  UniquePtr<HistoryDatabase>      database_;
+  std::string                     fqrn_;
 
-  UniquePtr<SqlInsertTag>      insert_tag_;
-  UniquePtr<SqlRemoveTag>      remove_tag_;
-  UniquePtr<SqlFindTag>        find_tag_;
-  UniquePtr<SqlCountTags>      count_tags_;
-  UniquePtr<SqlListTags>       list_tags_;
+  UniquePtr<SqlInsertTag>         insert_tag_;
+  UniquePtr<SqlRemoveTag>         remove_tag_;
+  UniquePtr<SqlFindTag>           find_tag_;
+  UniquePtr<SqlCountTags>         count_tags_;
+  UniquePtr<SqlListTags>          list_tags_;
+  UniquePtr<SqlGetChannelTips>    channel_tips_;
 };
 
 

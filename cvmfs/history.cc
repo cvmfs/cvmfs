@@ -118,12 +118,14 @@ bool History::Initialize() {
 
 bool History::PrepareQueries() {
   assert (database_);
-  insert_tag_ = new SqlInsertTag(database_.weak_ref());
-  remove_tag_ = new SqlRemoveTag(database_.weak_ref());
-  find_tag_   = new SqlFindTag(database_.weak_ref());
-  count_tags_ = new SqlCountTags(database_.weak_ref());
-  list_tags_  = new SqlListTags(database_.weak_ref());
-  return (insert_tag_ && remove_tag_ && find_tag_ && count_tags_ && list_tags_);
+  insert_tag_   = new SqlInsertTag(database_.weak_ref());
+  remove_tag_   = new SqlRemoveTag(database_.weak_ref());
+  find_tag_     = new SqlFindTag(database_.weak_ref());
+  count_tags_   = new SqlCountTags(database_.weak_ref());
+  list_tags_    = new SqlListTags(database_.weak_ref());
+  channel_tips_ = new SqlGetChannelTips(database_.weak_ref());
+  return (insert_tag_ && remove_tag_ && find_tag_ && count_tags_ &&
+          list_tags_ && channel_tips_);
 }
 
 
