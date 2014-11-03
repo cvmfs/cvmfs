@@ -32,17 +32,20 @@ class T_History : public ::testing::Test {
     return path;
   }
 
-  History::Tag GetDummyTag() const {
+  History::Tag GetDummyTag(
+        const std::string            &name      = "foobar",
+        const uint64_t                revision  = 42,
+        const History::UpdateChannel  channel   = History::kChannelTest) const {
       shash::Any root_hash(shash::kSha1);
       root_hash.Randomize();
 
       History::Tag dummy;
-      dummy.name        = "foobar";
+      dummy.name        = name;
       dummy.root_hash   = root_hash;
       dummy.size        = 1337;
-      dummy.revision    = 42;
+      dummy.revision    = revision;
       dummy.timestamp   = 564993000;
-      dummy.channel     = History::kChannelTest;
+      dummy.channel     = channel;
       dummy.description = "This is just a small dummy";
 
       return dummy;
@@ -71,14 +74,50 @@ class T_History : public ::testing::Test {
     return result;
   }
 
-  void CompareTags(const History::Tag &rhs, const History::Tag &lhs) const {
-    EXPECT_EQ (rhs.name,        lhs.name);
-    EXPECT_EQ (rhs.root_hash,   lhs.root_hash);
-    EXPECT_EQ (rhs.size,        lhs.size);
-    EXPECT_EQ (rhs.revision,    lhs.revision);
-    EXPECT_EQ (rhs.timestamp,   lhs.timestamp);
-    EXPECT_EQ (rhs.channel,     lhs.channel);
-    EXPECT_EQ (rhs.description, lhs.description);
+  bool CheckListing(const TagVector &lhs, const TagVector &rhs) const {
+    if (lhs.size() != rhs.size()) {
+      return false;
+    }
+
+          TagVector::const_iterator i    = lhs.begin();
+    const TagVector::const_iterator iend = lhs.end();
+    for (; i != iend; ++i) {
+      bool found = false;
+            TagVector::const_iterator j    = rhs.begin();
+      const TagVector::const_iterator jend = rhs.end();
+      for (; j != jend; ++j) {
+        if (TagsEqual(*i, *j)) {
+          found = true;
+          break;
+        }
+      }
+
+      if (! found) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  bool TagsEqual(const History::Tag &lhs, const History::Tag &rhs) const {
+    return (lhs.name        == rhs.name)        &&
+           (lhs.root_hash   == rhs.root_hash)   &&
+           (lhs.size        == rhs.size)        &&
+           (lhs.revision    == rhs.revision)    &&
+           (lhs.timestamp   == rhs.timestamp)   &&
+           (lhs.channel     == rhs.channel)     &&
+           (lhs.description == rhs.description);
+  }
+
+  void CompareTags(const History::Tag &lhs, const History::Tag &rhs) const {
+    EXPECT_EQ (lhs.name,        rhs.name);
+    EXPECT_EQ (lhs.root_hash,   rhs.root_hash);
+    EXPECT_EQ (lhs.size,        rhs.size);
+    EXPECT_EQ (lhs.revision,    rhs.revision);
+    EXPECT_EQ (lhs.timestamp,   rhs.timestamp);
+    EXPECT_EQ (lhs.channel,     rhs.channel);
+    EXPECT_EQ (lhs.description, rhs.description);
   }
 
  private:
@@ -435,4 +474,62 @@ TEST_F(T_History, RemoveTagsWithReOpen) {
   }
 
   delete history3;
+}
+
+
+TEST_F(T_History, GetChannelTips) {
+  const std::string hp = GetHistoryFilename();
+  History *history1 = History::Create(hp, fqrn);
+  ASSERT_NE (static_cast<History*>(NULL), history1);
+  EXPECT_EQ (fqrn, history1->fqrn());
+
+  history1->BeginTransaction();
+  const History::Tag trunk_tip = GetDummyTag("zap", 4, History::kChannelTrunk);
+  ASSERT_TRUE (history1->Insert(GetDummyTag("foo",  1, History::kChannelTrunk)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("bar",  2, History::kChannelTrunk)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("baz",  3, History::kChannelTrunk)));
+  ASSERT_TRUE (history1->Insert(trunk_tip));
+
+  const History::Tag test_tip = GetDummyTag("yolo",   6, History::kChannelTest);
+  ASSERT_TRUE (history1->Insert(GetDummyTag("moep",   3, History::kChannelTest)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("lol",    4, History::kChannelTest)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("cheers", 5, History::kChannelTest)));
+  ASSERT_TRUE (history1->Insert(test_tip));
+  history1->CommitTransaction();
+
+  TagVector tags;
+  ASSERT_TRUE (history1->Tips(&tags));
+  EXPECT_EQ (2u, tags.size());
+
+  TagVector expected; // TODO: C++11 initializer lists
+  expected.push_back(trunk_tip);
+  expected.push_back(test_tip);
+  EXPECT_TRUE (CheckListing(tags, expected));
+
+  history1->BeginTransaction();
+  const History::Tag prod_tip = GetDummyTag("prod", 10, History::kChannelProd);
+  ASSERT_TRUE (history1->Insert(GetDummyTag("vers", 3, History::kChannelProd)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("bug",  6, History::kChannelProd)));
+  ASSERT_TRUE (history1->Insert(prod_tip));
+  history1->CommitTransaction();
+
+  tags.clear();
+  ASSERT_TRUE (history1->Tips(&tags));
+  EXPECT_EQ (3u, tags.size());
+
+  expected.push_back(prod_tip);
+  EXPECT_TRUE (CheckListing(tags, expected));
+
+  delete history1;
+
+  History *history2 = History::Open(hp);
+  ASSERT_NE (static_cast<History*>(NULL), history2);
+  EXPECT_EQ (fqrn, history2->fqrn());
+
+  tags.clear();
+  ASSERT_TRUE (history2->Tips(&tags));
+  EXPECT_EQ   (3u, tags.size());
+  EXPECT_TRUE (CheckListing(tags, expected));
+
+  delete history2;
 }
