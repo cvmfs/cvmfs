@@ -139,6 +139,19 @@ bool SqlFindTag::BindName(const std::string &name) {
 }
 
 
+SqlFindTagByDate::SqlFindTagByDate(const HistoryDatabase *database) {
+  const bool success = Init(database->sqlite_db(),
+                            "SELECT " + GetDatabaseFields() + " FROM tags "
+                            "WHERE timestamp > :timestamp "
+                            "ORDER BY revision LIMIT 1;");
+  assert (success);
+}
+
+bool SqlFindTagByDate::BindTimestamp(const time_t timestamp) {
+  return BindInt64(1, timestamp);
+}
+
+
 SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
                             "SELECT count(*) FROM tags;");

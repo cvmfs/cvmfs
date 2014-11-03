@@ -118,15 +118,16 @@ bool History::Initialize() {
 
 bool History::PrepareQueries() {
   assert (database_);
-  insert_tag_   = new SqlInsertTag(database_.weak_ref());
-  remove_tag_   = new SqlRemoveTag(database_.weak_ref());
-  find_tag_     = new SqlFindTag(database_.weak_ref());
-  count_tags_   = new SqlCountTags(database_.weak_ref());
-  list_tags_    = new SqlListTags(database_.weak_ref());
-  channel_tips_ = new SqlGetChannelTips(database_.weak_ref());
-  get_hashes_   = new SqlGetHashes(database_.weak_ref());
-  return (insert_tag_ && remove_tag_ && find_tag_ && count_tags_ &&
-          list_tags_ && channel_tips_ && get_hashes_);
+  insert_tag_       = new SqlInsertTag      (database_.weak_ref());
+  remove_tag_       = new SqlRemoveTag      (database_.weak_ref());
+  find_tag_         = new SqlFindTag        (database_.weak_ref());
+  find_tag_by_date_ = new SqlFindTagByDate  (database_.weak_ref());
+  count_tags_       = new SqlCountTags      (database_.weak_ref());
+  list_tags_        = new SqlListTags       (database_.weak_ref());
+  channel_tips_     = new SqlGetChannelTips (database_.weak_ref());
+  get_hashes_       = new SqlGetHashes      (database_.weak_ref());
+  return (insert_tag_ && remove_tag_ && find_tag_  && find_tag_by_date_ &&
+          count_tags_ && list_tags_ && channel_tips_ && get_hashes_);
 }
 
 
@@ -197,6 +198,22 @@ bool History::Get(const std::string &name, Tag *tag) const {
 
   *tag = find_tag_->RetrieveTag();
   return find_tag_->Reset();
+}
+
+
+bool History::Get(const time_t timestamp, Tag *tag) const {
+  assert (database_);
+  assert (find_tag_by_date_.IsValid());
+  assert (NULL != tag);
+
+  if (! find_tag_by_date_->BindTimestamp(timestamp) ||
+      ! find_tag_by_date_->FetchRow()) {
+    find_tag_by_date_->Reset();
+    return false;
+  }
+
+  *tag = find_tag_by_date_->RetrieveTag();
+  return find_tag_by_date_->Reset();
 }
 
 

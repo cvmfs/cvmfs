@@ -78,6 +78,13 @@ class SqlFindTag : public SqlRetrieveTag {
 };
 
 
+class SqlFindTagByDate : public SqlRetrieveTag {
+ public:
+  SqlFindTagByDate(const HistoryDatabase *database);
+  bool BindTimestamp(const time_t timestamp);
+};
+
+
 class SqlCountTags : public sqlite::Sql {
  public:
   SqlCountTags(const HistoryDatabase *database);

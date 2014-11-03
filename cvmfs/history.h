@@ -22,6 +22,7 @@ class HistoryDatabase;
 class SqlInsertTag;
 class SqlRemoveTag;
 class SqlFindTag;
+class SqlFindTagByDate;
 class SqlCountTags;
 class SqlListTags;
 class SqlGetChannelTips;
@@ -94,6 +95,7 @@ class History {
   bool Remove(const std::string &name);
   bool Exists(const std::string &name) const;
   bool Get(const std::string &name, Tag *tag) const;
+  bool Get(const time_t timestamp, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 
@@ -120,6 +122,7 @@ class History {
   UniquePtr<SqlInsertTag>         insert_tag_;
   UniquePtr<SqlRemoveTag>         remove_tag_;
   UniquePtr<SqlFindTag>           find_tag_;
+  UniquePtr<SqlFindTagByDate>     find_tag_by_date_;
   UniquePtr<SqlCountTags>         count_tags_;
   UniquePtr<SqlListTags>          list_tags_;
   UniquePtr<SqlGetChannelTips>    channel_tips_;
