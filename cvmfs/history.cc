@@ -200,15 +200,26 @@ bool History::Get(const std::string &name, Tag *tag) const {
 
 
 bool History::List(std::vector<Tag> *tags) const {
-  assert (database_);
   assert (list_tags_.IsValid());
-  assert (NULL != tags);
+  return RunListing(tags, list_tags_.weak_ref());
+}
 
-  while (list_tags_->FetchRow()) {
-    tags->push_back(list_tags_->RetrieveTag());
+bool History::Tips(std::vector<Tag> *channel_tips) const {
+  assert (channel_tips_.IsValid());
+  return RunListing(channel_tips, channel_tips_.weak_ref());
+}
+
+
+template <class SqlListingT>
+bool History::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
+  assert (database_);
+  assert (NULL != list);
+
+  while (sql->FetchRow()) {
+    list->push_back(sql->RetrieveTag());
   }
 
-  return list_tags_->Reset();
+  return sql->Reset();
 }
 
 

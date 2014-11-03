@@ -94,9 +94,9 @@ class History {
   bool Exists(const std::string &name) const;
   bool Get(const std::string &name, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
+  bool Tips(std::vector<Tag> *channel_tips) const;
 
   const std::string& fqrn() const { return fqrn_; }
-
 
  protected:
   static History* Open(const std::string &file_name, const bool read_write);
@@ -105,6 +105,10 @@ class History {
 
   bool Initialize();
   bool PrepareQueries();
+
+ private:
+  template <class SqlListingT>
+  bool RunListing(std::vector<Tag> *list, SqlListingT *sql) const;
 
  private:
   UniquePtr<HistoryDatabase>      database_;
