@@ -35,7 +35,8 @@ class T_History : public ::testing::Test {
   History::Tag GetDummyTag(
         const std::string            &name      = "foobar",
         const uint64_t                revision  = 42,
-        const History::UpdateChannel  channel   = History::kChannelTest) const {
+        const History::UpdateChannel  channel   = History::kChannelTest,
+        const time_t                  timestamp = 564993000) const {
       shash::Any root_hash(shash::kSha1);
       root_hash.Randomize();
 
@@ -44,7 +45,7 @@ class T_History : public ::testing::Test {
       dummy.root_hash   = root_hash;
       dummy.size        = 1337;
       dummy.revision    = revision;
-      dummy.timestamp   = 564993000;
+      dummy.timestamp   = timestamp;
       dummy.channel     = channel;
       dummy.description = "This is just a small dummy";
 
@@ -564,6 +565,44 @@ TEST_F(T_History, GetHashes) {
   for (; j != jend; ++j, ++k) {
     EXPECT_EQ (j->root_hash, *k);
   }
+
+  delete history;
+}
+
+
+TEST_F(T_History, GetTagByDate) {
+  const std::string hp = GetHistoryFilename();
+  History *history = History::Create(hp, fqrn);
+  ASSERT_NE (static_cast<History*>(NULL), history);
+  EXPECT_EQ (fqrn, history->fqrn());
+
+  const History::UpdateChannel c = History::kChannelTest;
+  const History::Tag t3010 = GetDummyTag("f5", 1, c, 1414690911);
+  const History::Tag t3110 = GetDummyTag("f4", 2, c, 1414777311);
+  const History::Tag t0111 = GetDummyTag("f3", 3, c, 1414863711);
+  const History::Tag t0211 = GetDummyTag("f2", 4, c, 1414950111);
+  const History::Tag t0311 = GetDummyTag("f1", 5, c, 1415036511);
+
+  history->BeginTransaction();
+  ASSERT_TRUE (history->Insert(t0311));
+  ASSERT_TRUE (history->Insert(t0211));
+  ASSERT_TRUE (history->Insert(t0111));
+  ASSERT_TRUE (history->Insert(t3110));
+  ASSERT_TRUE (history->Insert(t3010));
+  history->CommitTransaction();
+
+  const time_t ts2510 = 1414255311;
+  const time_t ts0111 = 1414860111;
+  const time_t ts0411 = 1415126511;
+
+  History::Tag tag;
+  EXPECT_TRUE (history->Get(ts2510, &tag));
+  CompareTags(t3010, tag);
+
+  EXPECT_TRUE (history->Get(ts0111, &tag));
+  CompareTags(t0111, tag);
+
+  EXPECT_FALSE (history->Get(ts0411, &tag));
 
   delete history;
 }
