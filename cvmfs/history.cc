@@ -124,8 +124,9 @@ bool History::PrepareQueries() {
   count_tags_   = new SqlCountTags(database_.weak_ref());
   list_tags_    = new SqlListTags(database_.weak_ref());
   channel_tips_ = new SqlGetChannelTips(database_.weak_ref());
+  get_hashes_   = new SqlGetHashes(database_.weak_ref());
   return (insert_tag_ && remove_tag_ && find_tag_ && count_tags_ &&
-          list_tags_ && channel_tips_);
+          list_tags_ && channel_tips_ && get_hashes_);
 }
 
 
@@ -209,7 +210,6 @@ bool History::Tips(std::vector<Tag> *channel_tips) const {
   return RunListing(channel_tips, channel_tips_.weak_ref());
 }
 
-
 template <class SqlListingT>
 bool History::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
   assert (database_);
@@ -222,6 +222,17 @@ bool History::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
   return sql->Reset();
 }
 
+
+bool History::GetHashes(std::vector<shash::Any> *hashes) const {
+  assert (database_);
+  assert (NULL != hashes);
+
+  while (get_hashes_->FetchRow()) {
+    hashes->push_back(get_hashes_->RetrieveHash());
+  }
+
+  return get_hashes_->Reset();
+}
 
 
 //------------------------------------------------------------------------------

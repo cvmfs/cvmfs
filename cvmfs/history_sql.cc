@@ -166,7 +166,16 @@ SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
   assert (success);
 }
 
+SqlGetHashes::SqlGetHashes(const HistoryDatabase *database) {
+  const bool success = Init(database->sqlite_db(),
+                            "SELECT DISTINCT hash FROM tags "
+                            "ORDER BY revision ASC");
+  assert (success);
+}
 
+shash::Any SqlGetHashes::RetrieveHash() const {
+  return shash::MkFromHexPtr(shash::HexPtr(RetrieveString(0)));
+}
 
 
 

@@ -25,6 +25,7 @@ class SqlFindTag;
 class SqlCountTags;
 class SqlListTags;
 class SqlGetChannelTips;
+class SqlGetHashes;
 
 class History {
  public:
@@ -96,6 +97,8 @@ class History {
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 
+  bool GetHashes(std::vector<shash::Any> *hashes) const;
+
   const std::string& fqrn() const { return fqrn_; }
 
  protected:
@@ -120,6 +123,7 @@ class History {
   UniquePtr<SqlCountTags>         count_tags_;
   UniquePtr<SqlListTags>          list_tags_;
   UniquePtr<SqlGetChannelTips>    channel_tips_;
+  UniquePtr<SqlGetHashes>         get_hashes_;
 };
 
 

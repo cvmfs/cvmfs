@@ -97,6 +97,11 @@ class SqlGetChannelTips : public SqlRetrieveTag {
 };
 
 
+class SqlGetHashes : public sqlite::Sql {
+ public:
+  SqlGetHashes(const HistoryDatabase *database);
+  shash::Any RetrieveHash() const;
+};
 
 
 
