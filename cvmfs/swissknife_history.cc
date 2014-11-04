@@ -501,16 +501,19 @@ ParameterList CommandCreateTag::GetParams() {
 
 int CommandCreateTag::Main(const ArgumentList &args) {
   typedef history::History::UpdateChannel TagChannel;
-  const std::string tag_name        = *args.find('a')->second;
-  const std::string tag_description = (args.find('d') != args.end())
-                                        ? *args.find('d')->second
-                                        : "";
-  const TagChannel  tag_channel     = (args.find('c') != args.end())
-                                        ? static_cast<TagChannel>(
-                                            String2Uint64(
-                                              *args.find('c')->second))
-                                        : history::History::kChannelTrunk;
-  const bool        undo_tags       = (args.find('x') != args.end());
+  const std::string tag_name         = *args.find('a')->second;
+  const std::string tag_description  = (args.find('d') != args.end())
+                                         ? *args.find('d')->second
+                                         : "";
+  const TagChannel  tag_channel      = (args.find('c') != args.end())
+                                         ? static_cast<TagChannel>(
+                                             String2Uint64(
+                                               *args.find('c')->second))
+                                         : history::History::kChannelTrunk;
+  const bool        undo_tags        = (args.find('x') != args.end());
+  const std::string root_hash_string = (args.find('h') != args.end())
+                                         ? *args.find('h')->second
+                                         : "";
 
   if (tag_name.find(" ") != std::string::npos) {
     LogCvmfs(kLogCvmfs, kLogStderr, "tag names must not contain spaces");
@@ -525,18 +528,15 @@ int CommandCreateTag::Main(const ArgumentList &args) {
     return 1;
   }
 
-  // check if the tag to be created exists
-  if (env->history->Exists(tag_name)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "a tag with the name '%s' already exists.",
-             tag_name.c_str());
-    return 1;
-  }
-
   // set the root hash to be tagged to the current HEAD if no other hash was
   // given by the user
   shash::Any root_hash;
-  if (args.find('h') != args.end()) {
-    const std::string root_hash_string = *args.find('h')->second;
+  if (root_hash_string.empty()) {
+    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no catalog hash provided, using hash"
+                                        "of current HEAD catalog (%s)",
+             env->manifest->catalog_hash().ToString().c_str());
+    root_hash = env->manifest->catalog_hash();
+  } else {
     root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_string));
     if (root_hash.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to read provided catalog "
@@ -544,11 +544,6 @@ int CommandCreateTag::Main(const ArgumentList &args) {
                root_hash_string.c_str());
       return 1;
     }
-  } else {
-    LogCvmfs(kLogCvmfs, kLogVerboseMsg, "no catalog hash provided, using hash"
-                                        "of current HEAD catalog (%s)",
-             env->manifest->catalog_hash().ToString().c_str());
-    root_hash = env->manifest->catalog_hash();
   }
 
   // open the catalog to be tagged (to check for existance and for meta info)
@@ -565,17 +560,54 @@ int CommandCreateTag::Main(const ArgumentList &args) {
     return 1;
   }
 
-  // build up the new tag information
+  // check if the tag to be created exists (and move it perhaps)
+  bool move_tag = false;
+  if (env->history->Exists(tag_name)) {
+    if (root_hash_string.empty()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "a tag with the name '%s' already exists. "
+                                      "Do you want to move it? (-h <root hash>)",
+               tag_name.c_str());
+      return 1;
+    }
+
+    move_tag = true;
+  }
+
+  // get the already existent tag (in the moving case)
   history::History::Tag new_tag;
+  shash::Any            old_hash;
+  if (move_tag && ! env->history->Get(tag_name, &new_tag)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to retrieve tag '%s' for moving",
+             tag_name.c_str());
+    return 1;
+  } else {
+    old_hash = new_tag.root_hash;
+  }
+
+  // set up the tag to be inserted
   new_tag.name        = tag_name;
   new_tag.root_hash   = root_hash;
   new_tag.size        = GetFileSize(catalog_path.path());
   new_tag.revision    = catalog->GetRevision();
   new_tag.timestamp   = catalog->GetLastModified();
   new_tag.channel     = tag_channel;
-  new_tag.description = tag_description;
+  new_tag.description = (! tag_description.empty()) ? tag_description : "";
 
   // insert the new tag into the history database
+  if (move_tag) {
+    assert (! old_hash.IsNull());
+    LogCvmfs(kLogCvmfs, kLogStdout, "moving tag '%s' from '%s' to '%s'",
+             tag_name.c_str(),
+             old_hash.ToString().c_str(),
+             root_hash.ToString().c_str());
+
+    if (! env->history->Remove(tag_name)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "removing old tag '%s' before move failed",
+               tag_name.c_str());
+      return 1;
+    }
+  }
+
   if (! env->history->Insert(new_tag)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to insert new tag");
     return 1;
