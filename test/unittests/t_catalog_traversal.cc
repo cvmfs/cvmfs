@@ -12,9 +12,9 @@ using namespace swissknife;
 
 static const std::string rhs        = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
 static const shash::Any  root_hash  = shash::Any(shash::kSha1, shash::HexPtr(rhs), 'C');
-static history::TagList *g_tag_list = NULL; // needs to be global to 'mimic' the
-                                            // real world, where the repo itself
-                                            // is 'global'
+static UniquePtr<history::History> *g_tag_list; // needs to be global to 'mimic' the
+                                                // real world, where the repo itself
+                                                // is 'global'
 
 /**
  * This is a mock of an ObjectFetcher that does essentially nothing.
@@ -26,8 +26,8 @@ class MockObjectFetcher {
   manifest::Manifest* FetchManifest() {
     return new manifest::Manifest(root_hash, 0, "");
   }
-  history::TagList FetchTagList() {
-    return (g_tag_list != NULL) ? *g_tag_list : history::TagList();
+  history::History* FetchHistory() {
+    return (g_tag_list != NULL) ? g_tag_list->Release() : NULL;
   }
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {
@@ -198,6 +198,10 @@ typedef std::vector<CatalogIdentifier>                   CatalogIdentifiers;
 
 class T_CatalogTraversal : public ::testing::Test {
  public:
+  static const std::string sandbox;
+  static const std::string fqrn;
+
+ public:
   MockCatalog *dummy_catalog_hierarchy;
 
  protected:
@@ -214,17 +218,38 @@ class T_CatalogTraversal : public ::testing::Test {
 
  protected:
   void SetUp() {
+    // create a dummy history file
+    const bool retval = MkdirDeep(sandbox, 0700);
+    ASSERT_TRUE (retval) << "failed to create sandbox";
+    const std::string history_db = GetHistoryFilename();
+    named_snapshots_ = history::History::Create(history_db,
+                                                T_CatalogTraversal::fqrn);
+    ASSERT_TRUE (named_snapshots_.IsValid());
+    g_tag_list = &named_snapshots_; // a pointer to a UniquePtr, I should burn
+                                    // in hell for that. (If the testee code is
+                                    // actually requesting this, the UniquePtr
+                                    // will be released - thus not freed in
+                                    // MockObjectFetcher::FetchHistory)
+
     dice_.InitLocaltime();
     MockCatalog::Reset();
     SetupDummyCatalogs();
     EXPECT_EQ (initial_catalog_instances, MockCatalog::instances);
-    g_tag_list = &named_snapshots_;
   }
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
     g_tag_list = NULL;
+
+    const bool retval = RemoveTree(sandbox);
+    ASSERT_TRUE (retval) << "failed to remove sandbox";
+  }
+
+  std::string GetHistoryFilename() const {
+    const std::string path = CreateTempPath(sandbox + "/history", 0600);
+    CheckEmpty(path);
+    return path;
   }
 
   void CheckVisitedCatalogs(const CatalogIdentifiers expected,
@@ -261,6 +286,10 @@ class T_CatalogTraversal : public ::testing::Test {
   }
 
  private:
+  void CheckEmpty(const std::string &str) const {
+    ASSERT_FALSE (str.empty());
+  }
+
   CatalogPathMap& GetCatalogTree(const unsigned int  revision,
                                  RevisionMap        &revisions) const {
     RevisionMap::iterator rev_itr = revisions.find(revision);
@@ -337,22 +366,20 @@ class T_CatalogTraversal : public ::testing::Test {
       MakeRevision(r, revisions);
     }
 
-    history::TagList::Failures f;
-    f = named_snapshots_.Insert(history::Tag(
-                                        "Revision2", root_catalogs[2], 1337,
-                                        2, t(27,11,1987), history::kChannelProd,
-                                        "this is revision 2"));
-    EXPECT_EQ (history::TagList::kFailOk, f);
-    f = named_snapshots_.Insert(history::Tag(
-                                        "Revision5", root_catalogs[5], 42,
-                                        5, t(11, 9,2001), history::kChannelProd,
-                                        "this is revision 5"));
-    EXPECT_EQ (history::TagList::kFailOk, f);
-    f = named_snapshots_.Insert(history::Tag(
-                                        "Revision6", root_catalogs[6], 7,
-                                        6, t(10, 7,2014), history::kChannelTrunk,
-                                        "this is revision 6 - the newest!"));
-    EXPECT_EQ (history::TagList::kFailOk, f);
+    named_snapshots_->BeginTransaction();
+    EXPECT_TRUE (named_snapshots_->Insert(history::History::Tag(
+                                          "Revision2", root_catalogs[2], 1337,
+                                          2, t(27,11,1987), history::History::kChannelProd,
+                                          "this is revision 2")));
+    EXPECT_TRUE (named_snapshots_->Insert(history::History::Tag(
+                                          "Revision5", root_catalogs[5], 42,
+                                          5, t(11, 9,2001), history::History::kChannelProd,
+                                          "this is revision 5")));
+    EXPECT_TRUE (named_snapshots_->Insert(history::History::Tag(
+                                          "Revision6", root_catalogs[6], 7,
+                                          6, t(10, 7,2014), history::History::kChannelTrunk,
+                                          "this is revision 6 - the newest!")));
+    named_snapshots_->CommitTransaction();
   }
 
   void MakeRevision(const unsigned int revision, RevisionMap &revisions) {
@@ -514,10 +541,13 @@ class T_CatalogTraversal : public ::testing::Test {
   typedef std::map<unsigned int, shash::Any> RootCatalogMap;
 
  private:
-  Prng             dice_;
-  RootCatalogMap   root_catalogs_;
-  history::TagList named_snapshots_;
+  Prng                         dice_;
+  RootCatalogMap               root_catalogs_;
+  UniquePtr<history::History>  named_snapshots_;
 };
+
+const std::string T_CatalogTraversal::sandbox = "/tmp/cvmfs_ut_catalog_traversal";
+const std::string T_CatalogTraversal::fqrn    = "test.cern.ch";
 
 
 //

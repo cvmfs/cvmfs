@@ -219,8 +219,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     typedef std::vector<shash::Any> HashList;
 
     TraversalContext ctx(default_history_depth_);
-    const history::TagList tags = GetRepositoryTagList();
-    const HashList root_hashes = tags.GetReferencedHashes();
+    const UniquePtr<history::History> tag_db(GetHistory());
+    HashList root_hashes;
+    const bool success = tag_db->GetHashes(&root_hashes);
+    assert (success);
 
     // traversing referenced named root hashes in reverse chronological order
     // to make sure that overlapping history traversals don't leave out catalog
@@ -407,8 +409,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return root_catalog_hash;
   }
 
-  history::TagList GetRepositoryTagList() {
-    return object_fetcher_.FetchTagList();
+  history::History* GetHistory() {
+    return object_fetcher_.FetchHistory();
   }
 
  private:

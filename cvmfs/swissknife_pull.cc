@@ -33,6 +33,7 @@
 #include "smalloc.h"
 #include "hash.h"
 #include "atomic.h"
+#include "history.h"
 
 using namespace std;  // NOLINT
 using namespace swissknife;  // NOLINT
@@ -378,7 +379,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     pull_history = true;
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
-  map<string, shash::Any> historic_tags;
+  typedef std::vector<history::History::Tag> TagVector;
+  TagVector historic_tags;
 
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            stratum0_url->c_str());
@@ -482,22 +484,21 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const std::string history_db_path = history_path + ".uncompressed";
     retval = zlib::DecompressPath2Path(history_path, history_db_path);
     assert(retval);
-    history::HistoryDatabase *history_db =
-      history::HistoryDatabase::Open(history_db_path,
-                                     history::HistoryDatabase::kOpenReadWrite);
-    if (NULL == history_db) {
+    history::History *tag_db = history::History::Open(history_db_path);
+    if (NULL == tag_db) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
                history_db_path.c_str());
       unlink(history_db_path.c_str());
       goto fini;
     }
-    history::TagList tag_list;
-    assert(retval);
-    retval = tag_list.Load(history_db);
-    delete history_db;
-    assert(retval);
-    unlink((history_db_path).c_str());
-    historic_tags = tag_list.GetAllHashes();
+    retval = tag_db->List(&historic_tags);
+    delete tag_db;
+    unlink(history_db_path.c_str());
+    if (! retval) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to read history database (%s)",
+               history_db_path.c_str());
+      goto fini;
+    }
 
     LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
              historic_tags.size());
@@ -526,12 +527,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
   retval = Pull(ensemble.manifest->catalog_hash(), "", true);
   pull_history = false;
-  for (map<string, shash::Any>::const_iterator i = historic_tags.begin(),
-       iEnd = historic_tags.end(); i != iEnd; ++i)
-  {
+  for (TagVector::const_iterator i    = historic_tags.begin(),
+                                 iend = historic_tags.end();
+       i != iend; ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
-             i->first.c_str());
-    bool retval2 = Pull(i->second, "", true);
+             i->name.c_str());
+    bool retval2 = Pull(i->root_hash, "", true);
     retval = retval && retval2;
   }
 
