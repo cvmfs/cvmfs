@@ -437,7 +437,7 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
   ASSERT_FALSE(quick_resolver == NULL);
 
   vector<string> bad_resolvers;
-  bad_resolvers.push_back("127.0.0.1");
+  bad_resolvers.push_back("127.0.0.2");
   bool retval = quick_resolver->SetResolvers(bad_resolvers);
   ASSERT_EQ(retval, true);
   time_t before = time(NULL);
