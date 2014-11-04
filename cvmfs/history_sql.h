@@ -110,25 +110,4 @@ class SqlGetHashes : public sqlite::Sql {
   shash::Any RetrieveHash() const;
 };
 
-
-
-
-
-
-
-
-
-class SqlTag : public sqlite::Sql {
- public:
-  SqlTag(const HistoryDatabase &database, const std::string &statement) {
-    Init(database.sqlite_db(), statement);
-  }
-
-  bool BindTag(const History::Tag &tag);
-  History::Tag RetrieveTag();
-};
-
-
-
-
 } /* namespace history */

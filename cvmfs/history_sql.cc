@@ -115,6 +115,9 @@ bool SqlInsertTag::BindTag(const History::Tag &tag) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
 SqlRemoveTag::SqlRemoveTag(const HistoryDatabase *database) {
   const std::string stmt = "DELETE FROM tags WHERE name = :name;";
   const bool success = Init(database->sqlite_db(), stmt);
@@ -124,6 +127,9 @@ SqlRemoveTag::SqlRemoveTag(const HistoryDatabase *database) {
 bool SqlRemoveTag::BindName(const std::string &name) {
   return BindText(1, name);
 }
+
+
+//------------------------------------------------------------------------------
 
 
 SqlFindTag::SqlFindTag(const HistoryDatabase *database) {
@@ -139,6 +145,9 @@ bool SqlFindTag::BindName(const std::string &name) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
 SqlFindTagByDate::SqlFindTagByDate(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
                             "SELECT " + GetDatabaseFields() + " FROM tags "
@@ -152,6 +161,9 @@ bool SqlFindTagByDate::BindTimestamp(const time_t timestamp) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
 SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
                             "SELECT count(*) FROM tags;");
@@ -163,12 +175,19 @@ int SqlCountTags::RetrieveCount() const {
 }
 
 
+//------------------------------------------------------------------------------
+
+
 SqlListTags::SqlListTags(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
                             "SELECT " + GetDatabaseFields() + " FROM tags "
                             "ORDER BY revision DESC;");
   assert (success);
 }
+
+
+//------------------------------------------------------------------------------
+
 
 SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
@@ -189,44 +208,5 @@ SqlGetHashes::SqlGetHashes(const HistoryDatabase *database) {
 shash::Any SqlGetHashes::RetrieveHash() const {
   return shash::MkFromHexPtr(shash::HexPtr(RetrieveString(0)));
 }
-
-
-
-
-
-
-
-bool SqlTag::BindTag(const History::Tag &tag) {
-  return (
-    BindText(1, tag.name) &&
-    BindTextTransient(2, tag.root_hash.ToString()) && // temporary from ToString
-    BindInt64(3, tag.revision) &&
-    BindInt64(4, tag.timestamp) &&
-    BindInt64(5, tag.channel) &&
-    BindText(6, tag.description) &&
-    BindInt64(7, tag.size)
-  );
-}
-
-
-History::Tag SqlTag::RetrieveTag() {
-  History::Tag result;
-  result.name = std::string(reinterpret_cast<const char *>(RetrieveText(0)));
-  const std::string hash_str(reinterpret_cast<const char *>(RetrieveText(1)));
-  result.root_hash = shash::MkFromHexPtr(shash::HexPtr(hash_str));
-  result.revision = RetrieveInt64(2);
-  result.timestamp = RetrieveInt64(3);
-  result.channel = static_cast<History::UpdateChannel>(RetrieveInt64(4));
-  result.description = std::string(reinterpret_cast<const char *>(RetrieveText(5)));
-  result.size = RetrieveInt64(6);
-  return result;
-}
-
-
-
-
-
-
-
 
 }; /* namespace history */

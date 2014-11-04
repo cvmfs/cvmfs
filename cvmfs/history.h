@@ -129,46 +129,6 @@ class History {
   UniquePtr<SqlGetHashes>         get_hashes_;
 };
 
-
-class TagList {
- public:
-  struct ChannelTag {
-    ChannelTag(const UpdateChannel c, const shash::Any &h) :
-      channel(c), root_hash(h) { }
-    UpdateChannel channel;
-    shash::Any root_hash;
-  };
-
-  enum Failures {
-    kFailOk = 0,
-    kFailTagExists,
-  };
-
-  bool FindTag(const std::string &name, Tag *tag);
-  bool FindTagByDate(const time_t seconds_utc, Tag *tag);
-  bool FindRevision(const unsigned revision, Tag *tag);
-  bool FindHash(const shash::Any &hash, Tag *tag);
-  Failures Insert(const Tag &tag);
-  void Remove(const std::string &name);
-  void Rollback(const unsigned until_revision);
-  // Ordered list, newest releases first
-  std::vector<ChannelTag> GetChannelTops();
-  std::string List();
-  std::map<std::string, shash::Any> GetAllHashes();
-
-  /**
-   * This returns a list of referenced catalog root hashes sorted by revision
-   * from HEAD to tail.
-   * @return  a sorted list of all referenced root catalog hashes.
-   */
-  std::vector<shash::Any> GetReferencedHashes() const;
-
-  bool Load(HistoryDatabase *database);
-  bool Store(HistoryDatabase *database);
- private:
-  std::vector<Tag> list_;
-};
-
 }  // namespace hsitory
 
 #endif  // CVMFS_HISTORY_H_
