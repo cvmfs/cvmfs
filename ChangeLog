@@ -1,4 +1,5 @@
 2.1.20:
+  * Stop renaming catalogs in alien cache
   * Make installation of bash completion files opt-out
   * Apply umask to the mode when creating files on the Stratum 0/1 (CVM-660)
   * Make server transaction handling more robust against failures and
