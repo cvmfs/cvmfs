@@ -670,6 +670,7 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
 ParameterList CommandListTags::GetParams() {
   ParameterList r;
   InsertCommonParameters(r);
+  r.push_back(Parameter::Switch('x', "machine readable output"));
   return r;
 }
 
@@ -750,7 +751,25 @@ void CommandListTags::PrintHumanReadableList(
 }
 
 
+void CommandListTags::PrintMachineReadableList(const TagList &tags) const {
+        TagList::const_iterator i    = tags.begin();
+  const TagList::const_iterator iend = tags.end();
+  for (; i != iend; ++i) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s",
+             i->name.c_str(),
+             i->root_hash.ToString().c_str(),
+             StringifyInt(i->size).c_str(),
+             StringifyInt(i->revision).c_str(),
+             StringifyInt(i->timestamp).c_str(),
+             i->GetChannelName(),
+             i->description.c_str());
+  }
+}
+
+
 int CommandListTags::Main(const ArgumentList &args) {
+  const bool machine_readable = (args.find('x') != args.end());
+
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
   UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
@@ -766,7 +785,11 @@ int CommandListTags::Main(const ArgumentList &args) {
     return 1;
   }
 
-  PrintHumanReadableList(tags);
+  if (machine_readable) {
+    PrintMachineReadableList(tags);
+  } else {
+    PrintHumanReadableList(tags);
+  }
 
   return 0;
 }

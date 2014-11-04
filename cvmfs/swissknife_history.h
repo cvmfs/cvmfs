@@ -150,6 +150,7 @@ class CommandListTags : public CommandTag {
                          const std::string  &fill_char = " ") const;
 
   void PrintHumanReadableList(const TagList &tags) const;
+  void PrintMachineReadableList(const TagList &tags) const;
 };
 
 
