@@ -28,8 +28,25 @@ class SqlListTags;
 class SqlGetChannelTips;
 class SqlGetHashes;
 
+/**
+ * This class wraps the history of a repository, i.e. it contains a database
+ * of named snapshots or tags. Internally it uses the HistoryDatabase class
+ * to store those tags in an SQLite file.
+ *
+ * Each tag contains meta information (i.e. description, date) and points to
+ * one specific catalog revision (revision, root catalog hash). Furthermore
+ * tags are associated with _one_ update channel. This can be used in clients
+ * to selectively apply file system snapshots of a specific update channel.
+ */
 class History {
  public:
+  /**
+   * Available update channels
+   *   o Trunk (the default)
+   *   o Development
+   *   o Testing
+   *   o Production
+   */
   enum UpdateChannel {
     kChannelTrunk = 0,
     kChannelDevel = 4,
@@ -37,6 +54,12 @@ class History {
     kChannelProd = 64,
   };
 
+  /**
+   * The Tag structure contains information about one specific named snap-
+   * shot stored in the history database. Tags can be retrieved from this
+   * history class both by 'name' and by 'date'. Naturally, tags can also
+   * be saved into the History using this struct as a container.
+   */
   struct Tag {
     Tag() :
       size(0), revision(0), timestamp(0), channel(kChannelTrunk) {}
@@ -79,16 +102,60 @@ class History {
 
  public:
   ~History();
-
+  
+  /**
+   * Opens an available history database file in read-only mode and returns
+   * a pointer to a History object wrapping this database.
+   * Note: The caller is assumed to retain ownership of the pointer and the
+   *       history database is closed on deletion of the History object.
+   * 
+   * @param file_name  the path to the history SQLite file to be opened
+   * @return           pointer to History object or NULL on error
+   */
   static History* Open(const std::string &file_name);
+
+  /**
+   * Same as History::Open(), but opens the history database file in read/write
+   * mode. This allows to use the modifying methods of the History object.
+   *
+   * @param file_name  the path to the history SQLite file to be opened
+   * @return           pointer to History object or NULL on error
+   */
   static History* OpenWritable(const std::string &file_name);
+
+  /**
+   * Creates an empty History database. Since a History object is always
+   * associated to a specific repository, one needs to specify the fully
+   * qualified repository name (FQRN) on creation of the History database.
+   * Note: pointer ownership is assumed to be retained by the caller.
+   *
+   * @param file_name  the path of the new history file.
+   * @param fqrn       the FQRN of the repository containing this History
+   * @return           pointer to empty History object or NULL on error
+   */
   static History* Create(const std::string &file_name, const std::string &fqrn);
 
   bool IsWritable() const;
   int GetNumberOfTags() const;
 
+  /**
+   * Opens a new database transaction in the underlying SQLite database
+   * This can greatly improve performance when used before inserting or
+   * removing multiple tags.
+   */
   bool BeginTransaction()  const;
+
+  /**
+   * Closes a transaction (see BeginTransaction())
+   */
   bool CommitTransaction() const;
+
+  /**
+   * Sets the internal pointer to the previous revision of this History file.
+   * Note: This must be handled by the user code.
+   * 
+   * @param history_hash  the content hash of the previous revision
+   */
   bool SetPreviousRevision(const shash::Any &history_hash);
 
   bool Insert(const Tag &tag);
@@ -99,6 +166,13 @@ class History {
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 
+  /**
+   * Provides a list of all referenced catalog hashes in this History.
+   * The hashes will be ordered by their associated revision number in
+   * acending order.
+   *
+   * @param hashes  pointer to the result vector to be filled
+   */
   bool GetHashes(std::vector<shash::Any> *hashes) const;
 
   const std::string& fqrn() const { return fqrn_; }
