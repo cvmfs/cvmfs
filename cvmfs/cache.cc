@@ -786,28 +786,38 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
 
   // Try from cache
   const string cache_path = *cache_path_ + hash.MakePath(1, 2);
-  *catalog_path = cache_path + "T";
-  retval = Rename(cache_path.c_str(), catalog_path->c_str());
-  if (retval == 0) {
-    LogCvmfs(kLogCache, kLogDebug, "found catalog %s in cache",
-             hash.ToString().c_str());
-
-    if (cache_mode_ == kCacheReadWrite) {
-      size = GetFileSize(catalog_path->c_str());
-      pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
-      if (!pin_retval) {
-        quota::Remove(hash);
-        unlink(catalog_path->c_str());
-        LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-                 "failed to pin cached copy of catalog %s (no space)",
-                 hash.ToString().c_str());
-        return catalog::kLoadNoSpace;
-      }
-    }
-    // Pinned, can be safely renamed
-    retval = Rename(catalog_path->c_str(), cache_path.c_str());
+  if (alien_cache_) {
     *catalog_path = cache_path;
-    return catalog::kLoadNew;
+    if (FileExists(cache_path)) {
+      // on alien cache, if the file exists, just use it
+      LogCvmfs(kLogCache, kLogDebug, "found catalog %s in alien cache",
+	       hash.ToString().c_str());
+      return catalog::kLoadNew;
+    }
+  } else {
+    *catalog_path = cache_path + "T";
+    retval = Rename(cache_path.c_str(), catalog_path->c_str());
+    if (retval == 0) {
+      LogCvmfs(kLogCache, kLogDebug, "found catalog %s in cache",
+	       hash.ToString().c_str());
+
+      if (cache_mode_ == kCacheReadWrite) {
+	size = GetFileSize(catalog_path->c_str());
+	pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
+	if (!pin_retval) {
+	  quota::Remove(hash);
+	  unlink(catalog_path->c_str());
+	  LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+		   "failed to pin cached copy of catalog %s (no space)",
+		   hash.ToString().c_str());
+	  return catalog::kLoadNoSpace;
+	}
+      }
+      // Pinned, can be safely renamed
+      retval = Rename(catalog_path->c_str(), cache_path.c_str());
+      *catalog_path = cache_path;
+      return catalog::kLoadNew;
+    }
   }
 
   if (cache_mode_ == kCacheReadOnly)
