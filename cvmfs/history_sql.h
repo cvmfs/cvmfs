@@ -9,6 +9,11 @@
 
 namespace history {
 
+/**
+ * This class wraps the database structure of the History SQLite database files.
+ * For that it inherits from sqlite::Database<>, please look there for further
+ * details.
+ */
 class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
  public:
   static const float kLatestSchema;
@@ -23,7 +28,8 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
 
   bool CheckSchemaCompatibility();
   bool LiveSchemaUpgradeIfNecessary();
-  bool CompactizeDatabase() const;
+  bool CompactDatabase() const { return true; }; // no implementation specific
+                                                 // database compaction.
 
  protected:
   // TODO: C++11 - constructor inheritance
