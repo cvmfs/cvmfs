@@ -178,7 +178,7 @@ cvmfs_run_test() {
   produce_files_in $reference_dir4 || return 4
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO -a $first_tag -t "$first_tag_desc" || return $?
+  publish_repo $CVMFS_TEST_REPO -a $first_tag -m "$first_tag_desc" || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir1 || return $?
@@ -197,7 +197,7 @@ cvmfs_run_test() {
   change_files_1_in $reference_dir4 || return 8
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO -a $second_tag -t "$second_tag_desc" || return $?
+  publish_repo $CVMFS_TEST_REPO -a $second_tag -m "$second_tag_desc" || return $?
 
   echo "compare the changed directories"
   compare_directories $repo_dir $reference_dir2 || return $?
@@ -214,7 +214,7 @@ cvmfs_run_test() {
   change_files_2_in $reference_dir3 || return 8
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO -a $third_tag -t "$third_tag_desc" || return $?
+  publish_repo $CVMFS_TEST_REPO -a $third_tag -m "$third_tag_desc" || return $?
 
   echo "compare the changed directories"
   compare_directories $repo_dir $reference_dir3 || return $?
@@ -360,7 +360,7 @@ cvmfs_run_test() {
   local newest_hash=$(sudo cvmfs_server list-tags $CVMFS_TEST_REPO | tail -n1 | awk '{print $3}')
 
   echo "moving tag '$first_tag' to hash '$newest_hash'"
-  publish_repo $CVMFS_TEST_REPO -a $first_tag -h $newest_hash -t "$first_tag_desc+1" || return $?
+  cvmfs_server tag -a $first_tag -h $newest_hash -m "$first_tag_desc+1" $CVMFS_TEST_REPO || return $?
 
   echo "compare to reference directory"
   compare_directories $repo_dir $reference_dir1 || return 20

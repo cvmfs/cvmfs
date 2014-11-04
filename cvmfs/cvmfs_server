@@ -212,7 +212,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
-                [-a tag name] [-c tag channel] [-t tag description]
+                [-a tag name] [-c tag channel] [-m tag description]
                 [-n manual revision number] [-v be verbose]
                 <fully qualified name>
                 Make a new repository snapshot
@@ -236,7 +236,7 @@ Supported Commands:
   info          <fully qualified name>
                 Print summary about the repository
   tag           Create and manage named snapshots
-                [-a create tag <name>] [-c channel] [-d message] [-h root hash]
+                [-a create tag <name>] [-c channel] [-m message] [-h root hash]
                 [-r remove tag <name>] [-f don't ask again]
                 [-i inspect tag <name>]
                 [-l list tags (alias for list-tags)]
@@ -2904,7 +2904,7 @@ tag() {
       c)
         add_tag_channel=$OPTARG
         ;;
-      d)
+      m)
         add_tag_description="$OPTARG"
         ;;
       h)
@@ -3355,7 +3355,7 @@ publish() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:c:t:vn:" option
+  while getopts "dDpa:c:m:vn:" option
   do
     case $option in
       d)
@@ -3373,7 +3373,7 @@ publish() {
       c)
         tag_channel="$OPTARG"
       ;;
-      t)
+      m)
         tag_description="$OPTARG"
       ;;
       v)
