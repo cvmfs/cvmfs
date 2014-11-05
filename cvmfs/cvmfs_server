@@ -2639,7 +2639,8 @@ rmfs() {
   done
 
   # sanity checks
-  is_root || die "Only root can remove a repository"
+  is_root               || die "Only root can remove a repository"
+  check_autofs_on_cvmfs && die "Autofs on /cvmfs has to be disabled"
   ensure_enabled_apache_modules
 
   # get repository names
