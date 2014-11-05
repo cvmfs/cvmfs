@@ -1632,7 +1632,7 @@ EOF
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
     Options -MultiViews
-    AllowOverride All
+    AllowOverride Limit
     $(get_compatible_apache_allow_from_all_config)
 
     EnableMMAP Off
@@ -2365,7 +2365,7 @@ EOF
 Alias /cvmfs/$alias_name ${storage_dir}
 <Directory "${storage_dir}">
     Options -MultiViews
-    AllowOverride All
+    AllowOverride Limit
     $(get_compatible_apache_allow_from_all_config)
 
     EnableMMAP Off
