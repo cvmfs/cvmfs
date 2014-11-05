@@ -20,10 +20,8 @@ cd ${SOURCE_DIRECTORY}/test
                           src/007-testjobs                \
                           src/024-reload-during-asetup    \
                           src/045-oasis                   \
-                          src/518-hardlinkstresstest      \
                           src/523-corruptchunkfailover    \
-                          src/524-corruptmanifestfailover \
-                          src/562-aufsexdevrename         || it_retval=$?
+                          src/524-corruptmanifestfailover || it_retval=$?
 
 echo "running CernVM-FS migration test cases..."
 ./run.sh $MIGRATIONTEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
