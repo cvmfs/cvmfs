@@ -143,14 +143,22 @@ cvmfs_version_string() {
   fi
   echo $version_string
 }
+# makes sure that a version is always of the form x.y.z
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  echo "$version_string"
+}
 version_major() { echo $1 | cut --delimiter=. --fields=1; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2; }
 version_patch() { echo $1 | cut --delimiter=. --fields=3; }
 prepend_zeros() { printf %05d "$1"; }
 compare_versions() {
-  local lhs=$1
+  local lhs="$(normalize_version $1)"
   local comparison_operator=$2
-  local rhs=$3
+  local rhs="$(normalize_version $3)"
 
   local lhs1=$(prepend_zeros $(version_major $lhs))
   local lhs2=$(prepend_zeros $(version_minor $lhs))
@@ -1081,7 +1089,7 @@ find_hazardous_aufs_config() {
 
   # check if we are running the custom SL6 kernel (and if it is recent enough)
   if uname -r | grep -q "el6.aufs"; then
-    local krnl_revision="$(uname -r | sed 's/^.*-\([0-9]\+\.[0-9]\+\.[0-9]\+\)\..*/\1/')"
+    local krnl_revision="$(uname -r | sed 's/^.*-\(.\+\)\.el6.*/\1/')"
     if compare_versions "$krnl_revision" -ge "$krnl_sl6_minimal_fixed"; then
       return 1 # kernel contains the AUFS workaround fix
     fi
@@ -2636,7 +2644,8 @@ rmfs() {
   done
 
   # sanity checks
-  is_root || die "Only root can remove a repository"
+  is_root               || die "Only root can remove a repository"
+  check_autofs_on_cvmfs && die "Autofs on /cvmfs has to be disabled"
   ensure_enabled_apache_modules
 
   # get repository names

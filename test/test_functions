@@ -60,14 +60,22 @@ else
   APACHE_BIN="/usr/sbin/httpd"
 fi
 
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  echo "$version_string"
+}
+
 version_major() { echo $1 | cut --delimiter=. --fields=1; }
 version_minor() { echo $1 | cut --delimiter=. --fields=2; }
 version_patch() { echo $1 | cut --delimiter=. --fields=3; }
 prepend_zeros() { printf %05d "$1"; }
 compare_versions() {
-  local lhs=$1
+  local lhs="$(normalize_version $1)"
   local comparison_operator=$2
-  local rhs=$3
+  local rhs="$(normalize_version $3)"
 
   local lhs1=$(prepend_zeros $(version_major $lhs))
   local lhs2=$(prepend_zeros $(version_minor $lhs))
