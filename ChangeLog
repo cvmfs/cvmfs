@@ -1,4 +1,6 @@
 2.1.20:
+  * Use AllowOverride Limit instead of AllowOverride All in Stratum 0/1
+    default configuration (CVM-661)
   * Stop renaming catalogs in alien cache
   * Make installation of bash completion files opt-out
   * Apply umask to the mode when creating files on the Stratum 0/1 (CVM-660)
