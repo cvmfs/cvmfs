@@ -3538,7 +3538,8 @@ publish() {
       -f $name \
       -b $base_hash \
       $hash_algo \
-      -a $tag_name"
+      -a $tag_name \
+      -x" # -x enables magic undo tag handling
     if [ ! -z "$tag_channel" ]; then
       tag_command="$tag_command -c $tag_channel"
     fi
@@ -3599,7 +3600,8 @@ rollback() {
   local spool_dir
   local stratum0
   local upstream
-  local target_tag="trunk-previous"
+  local target_tag=""
+  local undo_rollback=1
   local force=0
 
   # optional parameter handling
@@ -3609,6 +3611,7 @@ rollback() {
     case $option in
       t)
         target_tag=$OPTARG
+        undo_rollback=0
       ;;
       f)
         force=1
@@ -3646,9 +3649,21 @@ rollback() {
   [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
   is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
 
+  if [ $undo_rollback -eq 1 ]; then
+    if ! check_tag_existence $name "trunk-previous"; then
+      die "More than one anonymous undo rollback is not supported. Please specify a tag name (-t)"
+    fi
+  elif ! check_tag_existence $name "$target_tag"; then
+    die "Target tag '$target_tag' does not exist"
+  fi
+
   if [ $force -ne 1 ]; then
     local reply
-    read -p "You are about to ROLLBACK to $target_tag AS THE LATEST REVISION!  Are you sure (y/N)? " reply
+    if [ $undo_rollback -eq 1 ]; then
+      read -p "You are about to UNDO your last published revision!  Are you sure (y/N)? " reply
+    else
+      read -p "You are about to ROLLBACK to $target_tag AS THE LATEST REVISION!  Are you sure (y/N)? " reply
+    fi
     if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
       return 1
     fi
@@ -3667,8 +3682,10 @@ rollback() {
     -r $upstream                                        \
     -m ${spool_dir}/tmp/manifest                        \
     -b $base_hash                                       \
-    -e $CVMFS_HASH_ALGORITHM                            \
-    -n $target_tag"
+    -e $CVMFS_HASH_ALGORITHM"
+  if [ ! -z "$target_tag" ]; then
+    rollback_command="$rollback_command -n $target_tag"
+  fi
 
   # check if we have open file descriptors on /cvmfs/<name>
   local use_fd_fallback=0
