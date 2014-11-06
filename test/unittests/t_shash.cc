@@ -83,21 +83,21 @@ TEST(T_Shash, ToStringWithSuffix) {
 
   shash::Any hash_md5(shash::kMd5);
   hash_md5.Randomize(prng);
-  hash_md5.suffix = 'C';
+  hash_md5.modifier = 'C';
   ASSERT_FALSE (hash_md5.IsNull());
   EXPECT_EQ    ("583525ddfde0ebe0b3afff68cde4d983C", hash_md5.ToStringWithSuffix());
   EXPECT_EQ    ("583525ddfde0ebe0b3afff68cde4d983", hash_md5.ToString());
 
   shash::Any hash_sha1(shash::kSha1);
   hash_sha1.Randomize(prng);
-  hash_sha1.suffix = 'A';
+  hash_sha1.modifier = 'A';
   ASSERT_FALSE (hash_sha1.IsNull());
   EXPECT_EQ    ("efc0075d82e876211b66b4b0b91ce2ec217ee60aA", hash_sha1.ToStringWithSuffix());
   EXPECT_EQ    ("efc0075d82e876211b66b4b0b91ce2ec217ee60a", hash_sha1.ToString());
 
   shash::Any hash_rmd160(shash::kRmd160);
   hash_rmd160.Randomize(prng);
-  hash_rmd160.suffix = 'Q';
+  hash_rmd160.modifier = 'Q';
   ASSERT_FALSE (hash_rmd160.IsNull());
   EXPECT_EQ    ("850b90946048b2760f4d50ce83249dad6317ef10-rmd160Q", hash_rmd160.ToStringWithSuffix());
   EXPECT_EQ    ("850b90946048b2760f4d50ce83249dad6317ef10-rmd160", hash_rmd160.ToString());
@@ -218,7 +218,7 @@ TEST(T_Shash, HashSuffix) {
 
   shash::Any hash_md5(shash::kMd5);
   hash_md5.Randomize(prng);
-  hash_md5.suffix = 'A';
+  hash_md5.modifier = 'A';
   ASSERT_FALSE (hash_md5.IsNull());
   ASSERT_TRUE  (hash_md5.HasSuffix());
   EXPECT_EQ ("2ec5fe3c17045abdb136a5e6a913e32aA",        hash_md5.ToStringWithSuffix());
@@ -232,7 +232,7 @@ TEST(T_Shash, HashSuffix) {
 
   shash::Any hash_sha1(shash::kSha1);
   hash_sha1.Randomize(prng);
-  hash_sha1.suffix = 'B';
+  hash_sha1.modifier = 'B';
   ASSERT_FALSE (hash_sha1.IsNull());
   ASSERT_TRUE  (hash_sha1.HasSuffix());
   EXPECT_EQ ("b75ae68b53d2fc149b77e504132d37569b7e766bB",        hash_sha1.ToStringWithSuffix());
@@ -246,7 +246,7 @@ TEST(T_Shash, HashSuffix) {
 
   shash::Any hash_rmd160(shash::kRmd160);
   hash_rmd160.Randomize(prng);
-  hash_rmd160.suffix = 'C';
+  hash_rmd160.modifier = 'C';
   ASSERT_FALSE (hash_rmd160.IsNull());
   ASSERT_TRUE  (hash_rmd160.HasSuffix());
   EXPECT_EQ ("a74a19bd6162343a21c8590aa9cebca9014c636d-rmd160C",        hash_rmd160.ToStringWithSuffix());
@@ -267,10 +267,10 @@ TEST(T_Shash, Equality) {
   shash::Any hash_md5_4(shash::kMd5); hash_md5_4.Randomize(1337);
   shash::Any hash_md5_5(shash::kMd5); hash_md5_5.Randomize(42);
   shash::Any hash_md5_6(shash::kMd5); hash_md5_6.Randomize(42);
-  shash::Any hash_md5_7(shash::kMd5); ASSERT_TRUE (hash_md5_7.IsNull()); hash_md5_7.suffix = 'A';
-  shash::Any hash_md5_8(shash::kMd5); ASSERT_TRUE (hash_md5_8.IsNull()); hash_md5_8.suffix = 'A';
-  shash::Any hash_md5_9(shash::kMd5); hash_md5_9.Randomize(7); hash_md5_9.suffix = 'A';
-  shash::Any hash_md5_0(shash::kMd5); hash_md5_0.Randomize(7); hash_md5_0.suffix = 'A';
+  shash::Any hash_md5_7(shash::kMd5); ASSERT_TRUE (hash_md5_7.IsNull()); hash_md5_7.modifier = 'A';
+  shash::Any hash_md5_8(shash::kMd5); ASSERT_TRUE (hash_md5_8.IsNull()); hash_md5_8.modifier = 'A';
+  shash::Any hash_md5_9(shash::kMd5); hash_md5_9.Randomize(7); hash_md5_9.modifier = 'A';
+  shash::Any hash_md5_0(shash::kMd5); hash_md5_0.Randomize(7); hash_md5_0.modifier = 'A';
 
   EXPECT_EQ (hash_md5_1, hash_md5_2); EXPECT_EQ (hash_md5_1, hash_md5_1);
   EXPECT_EQ (hash_md5_3, hash_md5_4); EXPECT_EQ (hash_md5_3, hash_md5_3);
@@ -310,10 +310,10 @@ TEST(T_Shash, Equality) {
   shash::Any hash_sha1_4(shash::kSha1); hash_sha1_4.Randomize(153);
   shash::Any hash_sha1_5(shash::kSha1); hash_sha1_5.Randomize(8761);
   shash::Any hash_sha1_6(shash::kSha1); hash_sha1_6.Randomize(8761);
-  shash::Any hash_sha1_7(shash::kSha1); ASSERT_TRUE (hash_sha1_7.IsNull()); hash_sha1_7.suffix = 'B';
-  shash::Any hash_sha1_8(shash::kSha1); ASSERT_TRUE (hash_sha1_8.IsNull()); hash_sha1_8.suffix = 'B';
-  shash::Any hash_sha1_9(shash::kSha1); hash_sha1_9.Randomize(1); hash_sha1_9.suffix = 'B';
-  shash::Any hash_sha1_0(shash::kSha1); hash_sha1_0.Randomize(1); hash_sha1_0.suffix = 'B';
+  shash::Any hash_sha1_7(shash::kSha1); ASSERT_TRUE (hash_sha1_7.IsNull()); hash_sha1_7.modifier = 'B';
+  shash::Any hash_sha1_8(shash::kSha1); ASSERT_TRUE (hash_sha1_8.IsNull()); hash_sha1_8.modifier = 'B';
+  shash::Any hash_sha1_9(shash::kSha1); hash_sha1_9.Randomize(1); hash_sha1_9.modifier = 'B';
+  shash::Any hash_sha1_0(shash::kSha1); hash_sha1_0.Randomize(1); hash_sha1_0.modifier = 'B';
 
   EXPECT_EQ (hash_sha1_1, hash_sha1_2); EXPECT_EQ (hash_sha1_1, hash_sha1_1);
   EXPECT_EQ (hash_sha1_3, hash_sha1_4); EXPECT_EQ (hash_sha1_3, hash_sha1_3);
@@ -353,10 +353,10 @@ TEST(T_Shash, Equality) {
   shash::Any hash_rmd_4(shash::kRmd160); hash_rmd_4.Randomize(234);
   shash::Any hash_rmd_5(shash::kRmd160); hash_rmd_5.Randomize(883);
   shash::Any hash_rmd_6(shash::kRmd160); hash_rmd_6.Randomize(883);
-  shash::Any hash_rmd_7(shash::kRmd160); ASSERT_TRUE (hash_rmd_7.IsNull()); hash_rmd_7.suffix = 'C';
-  shash::Any hash_rmd_8(shash::kRmd160); ASSERT_TRUE (hash_rmd_8.IsNull()); hash_rmd_8.suffix = 'C';
-  shash::Any hash_rmd_9(shash::kRmd160); hash_rmd_9.Randomize(8); hash_rmd_9.suffix = 'C';
-  shash::Any hash_rmd_0(shash::kRmd160); hash_rmd_0.Randomize(8); hash_rmd_0.suffix = 'C';
+  shash::Any hash_rmd_7(shash::kRmd160); ASSERT_TRUE (hash_rmd_7.IsNull()); hash_rmd_7.modifier = 'C';
+  shash::Any hash_rmd_8(shash::kRmd160); ASSERT_TRUE (hash_rmd_8.IsNull()); hash_rmd_8.modifier = 'C';
+  shash::Any hash_rmd_9(shash::kRmd160); hash_rmd_9.Randomize(8); hash_rmd_9.modifier = 'C';
+  shash::Any hash_rmd_0(shash::kRmd160); hash_rmd_0.Randomize(8); hash_rmd_0.modifier = 'C';
 
   EXPECT_EQ (hash_rmd_1, hash_rmd_2); EXPECT_EQ (hash_rmd_1, hash_rmd_1);
   EXPECT_EQ (hash_rmd_3, hash_rmd_4); EXPECT_EQ (hash_rmd_3, hash_rmd_3);
@@ -393,20 +393,20 @@ TEST(T_Shash, Equality) {
 
 
 template <shash::Algorithms algo_>
-static shash::Any make_hash(const std::string &hash, const char suffix) {
+static shash::Any make_hash(const std::string &hash, const char modifier) {
   shash::Any any_hash(algo_, shash::HexPtr(hash));
-  any_hash.suffix = suffix;
+  any_hash.modifier = modifier;
   return any_hash;
 }
 
-static shash::Any md5(const std::string &hash, const char suffix = 0) {
-  return make_hash<shash::kMd5>(hash, suffix);
+static shash::Any md5(const std::string &hash, const char modifier = 0) {
+  return make_hash<shash::kMd5>(hash, modifier);
 }
-static shash::Any sha1(const std::string &hash, const char suffix = 0) {
-  return make_hash<shash::kSha1>(hash, suffix);
+static shash::Any sha1(const std::string &hash, const char modifier = 0) {
+  return make_hash<shash::kSha1>(hash, modifier);
 }
-static shash::Any rmd160(const std::string &hash, const char suffix = 0) {
-  return make_hash<shash::kRmd160>(hash, suffix);
+static shash::Any rmd160(const std::string &hash, const char modifier = 0) {
+  return make_hash<shash::kRmd160>(hash, modifier);
 }
 
 
