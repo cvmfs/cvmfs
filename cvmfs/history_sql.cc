@@ -209,4 +209,21 @@ shash::Any SqlGetHashes::RetrieveHash() const {
   return shash::MkFromHexPtr(shash::HexPtr(RetrieveString(0)));
 }
 
+
+//------------------------------------------------------------------------------
+
+
+SqlRollbackTag::SqlRollbackTag(const HistoryDatabase *database) {
+  const bool success = Init(database->sqlite_db(),
+                            "DELETE FROM tags "
+                            "  WHERE revision >= :target_rev "
+                            "    AND channel  =  :target_chan;");
+  assert (success);
+}
+
+bool SqlRollbackTag::BindTargetTag(const History::Tag &target_tag) {
+  return BindInt64(1, target_tag.revision) &&
+         BindInt64(2, target_tag.channel);
+}
+
 }; /* namespace history */

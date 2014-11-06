@@ -27,6 +27,7 @@ class SqlCountTags;
 class SqlListTags;
 class SqlGetChannelTips;
 class SqlGetHashes;
+class SqlRollbackTag;
 
 /**
  * This class wraps the history of a repository, i.e. it contains a database
@@ -102,13 +103,13 @@ class History {
 
  public:
   ~History();
-  
+
   /**
    * Opens an available history database file in read-only mode and returns
    * a pointer to a History object wrapping this database.
    * Note: The caller is assumed to retain ownership of the pointer and the
    *       history database is closed on deletion of the History object.
-   * 
+   *
    * @param file_name  the path to the history SQLite file to be opened
    * @return           pointer to History object or NULL on error
    */
@@ -153,7 +154,7 @@ class History {
   /**
    * Sets the internal pointer to the previous revision of this History file.
    * Note: This must be handled by the user code.
-   * 
+   *
    * @param history_hash  the content hash of the previous revision
    */
   bool SetPreviousRevision(const shash::Any &history_hash);
@@ -165,6 +166,18 @@ class History {
   bool Get(const time_t timestamp, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
+
+  /**
+   * Rolls back the history to the provided target tag and deletes all tags
+   * of the containing channel in between.
+   *
+   * Note: this assumes that the provided target tag was already updated with
+   *       the republished root catalog information.
+   *
+   * @param updated_target_tag  the tag to be rolled back to (updated: see Note)
+   * @return                    true on success
+   */
+  bool Rollback(const Tag &updated_target_tag);
 
   /**
    * Provides a list of all referenced catalog hashes in this History.
@@ -201,6 +214,7 @@ class History {
   UniquePtr<SqlListTags>          list_tags_;
   UniquePtr<SqlGetChannelTips>    channel_tips_;
   UniquePtr<SqlGetHashes>         get_hashes_;
+  UniquePtr<SqlRollbackTag>       rollback_tag_;
 };
 
 }  // namespace hsitory

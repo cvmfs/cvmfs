@@ -116,4 +116,11 @@ class SqlGetHashes : public sqlite::Sql {
   shash::Any RetrieveHash() const;
 };
 
+
+class SqlRollbackTag : public sqlite::Sql {
+ public:
+  SqlRollbackTag(const HistoryDatabase *database);
+  bool BindTargetTag(const History::Tag &target_tag);
+};
+
 } /* namespace history */
