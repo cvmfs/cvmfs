@@ -139,6 +139,14 @@ change_files_3_in() {
   popdir
 }
 
+change_files_4_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+  rm -fR ${working_dir}/*
+  popdir
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -148,10 +156,12 @@ cvmfs_run_test() {
   mkdir reference_dir2
   mkdir reference_dir3
   mkdir reference_dir4
+  mkdir reference_dir5
   local reference_dir1=$scratch_dir/reference_dir1
   local reference_dir2=$scratch_dir/reference_dir2
   local reference_dir3=$scratch_dir/reference_dir3
   local reference_dir4=$scratch_dir/reference_dir4
+  local reference_dir5=$scratch_dir/reference_dir5
 
   local first_tag="initial"
   local first_tag_desc="initial-tag"
@@ -178,6 +188,7 @@ cvmfs_run_test() {
   produce_files_in $reference_dir2 || return 4
   produce_files_in $reference_dir3 || return 4
   produce_files_in $reference_dir4 || return 4
+  produce_files_in $reference_dir5 || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO -a $first_tag -m "$first_tag_desc" || return $?
@@ -197,6 +208,7 @@ cvmfs_run_test() {
   change_files_1_in $reference_dir2 || return 8
   change_files_1_in $reference_dir3 || return 8
   change_files_1_in $reference_dir4 || return 8
+  change_files_1_in $reference_dir5 || return 8
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO -a $second_tag -m "$second_tag_desc" || return $?
@@ -423,6 +435,87 @@ cvmfs_run_test() {
      [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ]; then
     return 25
   fi
+
+  # ============================================================================
+
+  echo "create a new revision to be able to roll back to something"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "deleting everything in the repository"
+  change_files_4_in $repo_dir || return 26
+
+  echo "change exactly the same stuff in the scratch space"
+  change_files_4_in $reference_dir5 || return 27
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare to reference directory"
+  compare_directories $repo_dir $reference_dir5 || return 28
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "current tag statistics:"
+  cvmfs_server list-tags $CVMFS_TEST_REPO
+
+  echo "check tag existence (especially $prev_trunk_tag)"
+  if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$trunk_tag"        && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
+    echo "all tags and their descriptions found"
+  else
+    return 29
+  fi
+  if [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$first_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$first_tag_desc"  | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ]; then
+    return 30
+  fi
+
+  echo "open transaction to do an undo"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "initiate a rollback"
+  cvmfs_server rollback -f $CVMFS_TEST_REPO || return 31
+
+  echo "compare to reference directory"
+  compare_directories $repo_dir $reference_dir1 || return 32
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "current tag statistics:"
+  cvmfs_server list-tags $CVMFS_TEST_REPO
+
+  echo "check tag existence (especially $prev_trunk_tag)"
+  if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$trunk_tag"; then
+    echo "all tags and their descriptions found"
+  else
+    return 33
+  fi
+  if [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$first_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$first_tag_desc"  | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$prev_trunk_tag"  | wc -l) -ne 0 ]; then
+    return 34
+  fi
+
+  # ============================================================================
+
+  echo "open transaction to do another undo rollback"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "initiate a rollback (should fail)"
+  cvmfs_server rollback -f $CVMFS_TEST_REPO && return 35
+
+  echo "abort transaction"
+  cvmfs_server abort -f $CVMFS_TEST_REPO || return 36
 
   return 0
 }
