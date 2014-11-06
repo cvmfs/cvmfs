@@ -322,16 +322,16 @@ cvmfs_run_test() {
   cvmfs_server list-tags $CVMFS_TEST_REPO
 
   echo "check tag descriptions"
-  if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"; then
+  if cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$first_tag_desc"; then
     echo "all tags and their descriptions found"
   else
     return 18
   fi
-  if [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag"      | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag"       | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  | wc -l) -ne 0 ]; then
+  if [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$second_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$second_tag_desc" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  | wc -l) -ne 0 ]; then
     return 19
   fi
 
@@ -357,7 +357,7 @@ cvmfs_run_test() {
   echo "init a new transaction to move a tag"
   start_transaction $CVMFS_TEST_REPO || return $?
 
-  local newest_hash=$(sudo cvmfs_server list-tags $CVMFS_TEST_REPO | tail -n1 | awk '{print $3}')
+  local newest_hash=$(sudo cvmfs_server list-tags -x $CVMFS_TEST_REPO | head -n1 | awk '{print $2}')
 
   echo "moving tag '$first_tag' to hash '$newest_hash'"
   cvmfs_server tag -a $first_tag -h $newest_hash -m "$first_tag_desc+1" $CVMFS_TEST_REPO || return $?

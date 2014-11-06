@@ -678,7 +678,7 @@ check_catalog_presence() {
   local catalog_path=$1
   local repo_name=$2
 
-  cvmfs_server list-catalogs -m $repo_name | grep -x -q $catalog_path
+  cvmfs_server list-catalogs -x $repo_name | grep -x -q $catalog_path
   return $?
 }
 
@@ -688,7 +688,7 @@ check_catalog_presence() {
 get_catalog_count() {
   local repo_name=$1
 
-  echo $(cvmfs_server list-catalogs -m $repo_name | wc -l)
+  echo $(cvmfs_server list-catalogs -x $repo_name | wc -l)
 }
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure

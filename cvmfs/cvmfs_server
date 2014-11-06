@@ -230,7 +230,7 @@ Supported Commands:
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
   list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
-                [-m machine readable]
+                [-x machine readable]
                 <fully qualified name>
                 Print a full list of all nested catalogs of a repository
   info          <fully qualified name>
@@ -239,9 +239,10 @@ Supported Commands:
                 [-a create tag <name>] [-c channel] [-m message] [-h root hash]
                 [-r remove tag <name>] [-f don't ask again]
                 [-i inspect tag <name>]
-                [-l list tags (alias for list-tags)]
+                [-l list tags (alias for list-tags)] [-x machine readable]
                 <fully qualified name>
-  list-tags     <fully qualified name>
+  list-tags     [-x machine readable]
+                <fully qualified name>
                 Print named tags (snapshots) of the repository
   check         [-c disable data chunk existence check]
                 [-i check data integrity] (may take some time)]
@@ -2786,7 +2787,7 @@ list_catalogs() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "sehm" option
+  while getopts "sehx" option
   do
     case $option in
       s)
@@ -2798,7 +2799,7 @@ list_catalogs() {
       h)
         param_list="$param_list -d"
       ;;
-      m)
+      x)
         param_list=$(echo "$param_list" | sed 's/-t\s\?//')
       ;;
       ?)
@@ -2891,10 +2892,11 @@ tag() {
   local remove_tag_force=0
   local action_inspect=0
   local action_list=0
+  local list_machine_readable=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "a:c:d:h:r:f:li:" option
+  while getopts "a:c:m:h:r:f:lxi:" option
   do
     case $option in
       a)
@@ -2922,6 +2924,9 @@ tag() {
       l)
         action_list=1
         ;;
+      x)
+        list_machine_readable=1
+        ;;
       i)
         tag_name="$OPTARG"
         action_inspect=1
@@ -2944,7 +2949,7 @@ tag() {
 
   # check for the alias of `cvmfs_server list-tags`
   if [ $action_list -eq 1 ] || [ $actions -eq 0 ]; then
-    list_tags $name
+    list_tags $([ $list_machine_readable -ne 0 ] && echo "-x") $name
     exit $?
   fi
 
@@ -3040,25 +3045,47 @@ lstags() {
 
 list_tags() {
   local name
+  local machine_readable=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "x" option; do
+    case $option in
+      x)
+        machine_readable=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command list-tags: Unrecognized option: $1"
+      ;;
+    esac
+  done
 
   # get repository name
+  shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
   name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum0 $name || die "This is not a stratum 0 repository"
+  is_stratum0 $name                || die "This is not a stratum 0 repository"
 
   # get repository information
   load_repo_config $name
   local base_hash=$(get_mounted_root_hash $name)
-  cvmfs_swissknife tag_list                            \
+  local user_shell="$(get_user_shell $name)"
+  local list_command="cvmfs_swissknife tag_list        \
     -w $CVMFS_STRATUM0                                 \
     -t ${CVMFS_SPOOL_DIR}/tmp                          \
     -p /etc/cvmfs/keys/${name}.pub                     \
     -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
     -f $name                                           \
-    -b $base_hash
+    -b $base_hash"
+  if [ $machine_readable -ne 0 ]; then
+    list_command="$list_command -x"
+  fi
+
+  $user_shell "$list_command"
 }
 
 
