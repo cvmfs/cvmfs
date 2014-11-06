@@ -159,6 +159,8 @@ cvmfs_run_test() {
   local second_tag_desc="intermediate-revision"
   local third_tag="third_tag"
   local third_tag_desc="last-tag-revision"
+  local trunk_tag="trunk"
+  local prev_trunk_tag="trunk-previous"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log || return $?
@@ -228,12 +230,14 @@ cvmfs_run_test() {
   cvmfs_server list-tags $CVMFS_TEST_REPO
 
   echo "check tag descriptions"
-  if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag"       && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag_desc"; then
+  if cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$third_tag"       && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"       && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
     echo "all tags and their descriptions found"
   else
     return 9
@@ -260,13 +264,15 @@ cvmfs_run_test() {
   if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
      cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag_desc"; then
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$trunk_tag"; then
     echo "all tags and their descriptions found"
   else
     return 11
   fi
-  if [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag"      | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag_desc" | wc -l) -ne 0 ]; then
+  if [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$prev_trunk_tag" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag_desc" | wc -l) -ne 0 ]; then
     return 12
   fi
 
@@ -294,13 +300,15 @@ cvmfs_run_test() {
   if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
      cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag_desc"  && \
      cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag_desc"; then
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$trunk_tag"       && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
     echo "all tags and their descriptions found"
   else
     return 15
   fi
-  if [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag"      | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag_desc" | wc -l) -ne 0 ]; then
+  if [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep "$third_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep "$third_tag_desc" | wc -l) -ne 0 ]; then
     return 16
   fi
 
@@ -322,16 +330,18 @@ cvmfs_run_test() {
   cvmfs_server list-tags $CVMFS_TEST_REPO
 
   echo "check tag descriptions"
-  if cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
-     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$first_tag_desc"; then
+  if cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$first_tag"      && \
+     cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$first_tag_desc" && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO    | grep -q "$trunk_tag"; then
     echo "all tags and their descriptions found"
   else
     return 18
   fi
-  if [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$second_tag"      | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$second_tag_desc" | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$third_tag"       | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  | wc -l) -ne 0 ]; then
+  if [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$prev_trunk_tag"  | wc -l) -ne 0 ]; then
     return 19
   fi
 
@@ -372,16 +382,18 @@ cvmfs_run_test() {
   cvmfs_server list-tags $CVMFS_TEST_REPO
 
   echo "check tag descriptions"
-  if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag"       && \
-     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag_desc+1"; then
+  if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag"        && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$first_tag_desc+1" && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$trunk_tag"        && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
     echo "all tags and their descriptions found"
   else
     return 21
   fi
-  if [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag"      | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$second_tag_desc" | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag"       | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  | wc -l) -ne 0 ]; then
+  if [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ]; then
     return 22
   fi
 
