@@ -397,6 +397,33 @@ cvmfs_run_test() {
     return 22
   fi
 
+  # ============================================================================
+
+  echo "init a new transaction to remove tag"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "remove tag '$first_tag'"
+  cvmfs_server tag -r $first_tag -f $CVMFS_TEST_REPO || return 23
+
+  echo "current tag statistics:"
+  cvmfs_server list-tags $CVMFS_TEST_REPO
+
+  echo "check tag existence"
+  if cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$trunk_tag"        && \
+     cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
+    echo "all tags and their descriptions found"
+  else
+    return 24
+  fi
+  if [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$first_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$first_tag_desc"  | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ]; then
+    return 25
+  fi
+
   return 0
 }
 
