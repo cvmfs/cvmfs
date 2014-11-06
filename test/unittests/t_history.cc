@@ -606,3 +606,88 @@ TEST_F(T_History, GetTagByDate) {
 
   delete history;
 }
+
+
+TEST_F(T_History, RollbackToOldTag) {
+  const std::string hp = GetHistoryFilename();
+  History *history1 = History::Create(hp, fqrn);
+  ASSERT_NE (static_cast<History*>(NULL), history1);
+  EXPECT_EQ (fqrn, history1->fqrn());
+
+  const History::UpdateChannel c_test = History::kChannelTest;
+  const History::UpdateChannel c_prod = History::kChannelProd;
+
+  ASSERT_TRUE (history1->BeginTransaction());
+  ASSERT_TRUE (history1->Insert(GetDummyTag("foo",            1, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("bar",            2, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("first_release",  3, c_prod)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("moep",           4, c_test))); // <--
+  ASSERT_TRUE (history1->Insert(GetDummyTag("lol",            5, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("second_release", 6, c_prod)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("third_release",  7, c_prod)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("rofl",           8, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("also_rofl",      8, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("forth_release",  9, c_prod)));
+  ASSERT_TRUE (history1->CommitTransaction());
+
+  delete history1;
+
+  History *history2 = History::OpenWritable(hp);
+  ASSERT_NE (static_cast<History*>(NULL), history2);
+  EXPECT_EQ (fqrn, history2->fqrn());
+
+  ASSERT_TRUE (history2->BeginTransaction());
+  History::Tag rollback_target;
+  EXPECT_TRUE (history2->Get("moep", &rollback_target));
+
+  shash::Any new_root_hash(shash::kSha1);
+  new_root_hash.Randomize();
+  rollback_target.revision  = 10;
+  rollback_target.root_hash = new_root_hash;
+  EXPECT_TRUE (history2->Rollback(rollback_target));
+  ASSERT_TRUE (history2->CommitTransaction());
+
+  EXPECT_TRUE  (history2->Exists("foo"));
+  EXPECT_TRUE  (history2->Exists("bar"));
+  EXPECT_TRUE  (history2->Exists("first_release"));
+  EXPECT_TRUE  (history2->Exists("moep"));
+  EXPECT_TRUE  (history2->Exists("second_release"));
+  EXPECT_TRUE  (history2->Exists("third_release"));
+  EXPECT_TRUE  (history2->Exists("forth_release"));
+  EXPECT_FALSE (history2->Exists("lol"));
+  EXPECT_FALSE (history2->Exists("rofl"));
+  EXPECT_FALSE (history2->Exists("also_rofl"));
+
+  History::Tag rolled_back_tag;
+  ASSERT_TRUE (history2->Get("moep", &rolled_back_tag));
+  EXPECT_EQ (10u,           rolled_back_tag.revision);
+  EXPECT_EQ (new_root_hash, rolled_back_tag.root_hash);
+
+  delete history2;
+
+  History *history3 = History::OpenWritable(hp);
+  ASSERT_NE (static_cast<History*>(NULL), history3);
+  EXPECT_EQ (fqrn, history3->fqrn());
+
+  ASSERT_TRUE (history3->BeginTransaction());
+  History::Tag rollback_target_malicious;
+  EXPECT_TRUE (history3->Get("bar", &rollback_target_malicious));
+
+  rollback_target_malicious.name      = "barlol";
+  rollback_target_malicious.revision  = 11;
+  EXPECT_FALSE (history3->Rollback(rollback_target_malicious));
+  ASSERT_TRUE  (history3->CommitTransaction());
+
+  EXPECT_TRUE  (history3->Exists("foo"));
+  EXPECT_TRUE  (history3->Exists("bar"));
+  EXPECT_TRUE  (history3->Exists("first_release"));
+  EXPECT_TRUE  (history3->Exists("moep"));
+  EXPECT_TRUE  (history3->Exists("second_release"));
+  EXPECT_TRUE  (history3->Exists("third_release"));
+  EXPECT_TRUE  (history3->Exists("forth_release"));
+  EXPECT_FALSE (history3->Exists("lol"));
+  EXPECT_FALSE (history3->Exists("rofl"));
+  EXPECT_FALSE (history3->Exists("also_rofl"));
+
+  delete history3;
+}
