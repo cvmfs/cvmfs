@@ -933,7 +933,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
-  // fand tag to be rolled back to
+  // find tag to be rolled back to
   history::History::Tag target_tag;
   const bool found = env->history->Get(tag_name, &target_tag);
   if (! found) {
@@ -972,9 +972,11 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   }
 
   // update the catalog to be republished
+  catalog->Transaction();
   catalog->UpdateLastModified();
   catalog->SetRevision(current_revision + 1);
   catalog->SetPreviousRevision(env->manifest->catalog_hash());
+  catalog->Commit();
 
   // Upload catalog (handing over ownership of catalog pointer)
   if (! UploadCatalogAndUpdateManifest(env.weak_ref(), catalog.Release())) {
@@ -982,17 +984,22 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // update target tag with newly published root catalog information
+  history::History::Tag updated_target_tag(target_tag);
+  updated_target_tag.root_hash   = env->manifest->catalog_hash();
+  updated_target_tag.size        = env->manifest->catalog_size();
+  updated_target_tag.revision    = env->manifest->revision();
+  updated_target_tag.timestamp   = env->manifest->publish_timestamp();
+  if (! env->history->Rollback(updated_target_tag)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to rollback history to '%s'",
+                                    updated_target_tag.name.c_str());
+    return 1;
+  }
+
   // set the magic undo tags
-  history::History::Tag new_head("TEMPLATE",
-                                 env->manifest->catalog_hash(),
-                                 env->manifest->catalog_size(),
-                                 env->manifest->revision(),
-                                 env->manifest->publish_timestamp(),
-                                 history::History::kChannelTrunk,
-                                 "TEMPLATE");
-  if (! UpdateUndoTags(env.weak_ref(), new_head, undo_rollback)) {
+  if (! UpdateUndoTags(env.weak_ref(), updated_target_tag, undo_rollback)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to update magic undo tags");
-    return false;
+    return 1;
   }
 
   // finalize the history and upload it
