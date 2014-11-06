@@ -2919,7 +2919,7 @@ tag() {
         action_remove=1
         ;;
       f)
-        remove_tag_force=$OPTARG
+        remove_tag_force=1
         ;;
       l)
         action_list=1
