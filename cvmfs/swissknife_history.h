@@ -71,7 +71,8 @@ class CommandTag : public Command {
                            Future<shash::Any>     *hash);
 
   bool UpdateUndoTags(Environment                  *env,
-                      const history::History::Tag  &current_head_template);
+                      const history::History::Tag  &current_head_template,
+                      const bool                    undo_rollback = false);
 
   manifest::Manifest* FetchManifest(const std::string  &repository_url,
                                     const std::string  &repository_name,

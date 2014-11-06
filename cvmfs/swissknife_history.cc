@@ -282,7 +282,8 @@ void CommandTag::UploadClosure(const upload::SpoolerResult  &result,
 
 bool CommandTag::UpdateUndoTags(
                           Environment                  *env,
-                          const history::History::Tag  &current_head_template) {
+                          const history::History::Tag  &current_head_template,
+                          const bool                    undo_rollback) {
   assert (env->history.IsValid());
 
   history::History::Tag current_head;
@@ -302,13 +303,15 @@ bool CommandTag::UpdateUndoTags(
     }
 
     // set previous HEAD tag where current HEAD used to be
-    current_old_head             = current_head;
-    current_old_head.name        = CommandTag::kPreviousHeadTag;
-    current_old_head.channel     = history::History::kChannelTrunk;
-    current_old_head.description = CommandTag::kPreviousHeadTagDescription;
-    if (! env->history->Insert(current_old_head)) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to set previous HEAD tag");
-      return false;
+    if (! undo_rollback) {
+      current_old_head             = current_head;
+      current_old_head.name        = CommandTag::kPreviousHeadTag;
+      current_old_head.channel     = history::History::kChannelTrunk;
+      current_old_head.description = CommandTag::kPreviousHeadTagDescription;
+      if (! env->history->Insert(current_old_head)) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to set previous HEAD tag");
+        return false;
+      }
     }
   }
 
@@ -911,13 +914,16 @@ ParameterList CommandRollbackTag::GetParams() {
   ParameterList r;
   InsertCommonParameters(r);
 
-  r.push_back(Parameter::Mandatory('n', "name of the tag to be republished"));
+  r.push_back(Parameter::Optional('n', "name of the tag to be republished"));
   return r;
 }
 
 
 int CommandRollbackTag::Main(const ArgumentList &args) {
-  const std::string tag_name = *args.find('n')->second;
+  const bool        undo_rollback = (args.find('n') == args.end());
+  const std::string tag_name      = (! undo_rollback)
+                                       ? *args.find('n')->second
+                                       : CommandTag::kPreviousHeadTag;
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
@@ -931,7 +937,13 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
   history::History::Tag target_tag;
   const bool found = env->history->Get(tag_name, &target_tag);
   if (! found) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' does not exist", tag_name.c_str());
+    if (undo_rollback) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "only one anonymous rollback supported - "
+                                      "perhaps you want to provide a tag name?");
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' does not exist",
+                                      tag_name.c_str());
+    }
     return 1;
   }
 
@@ -978,7 +990,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
                                  env->manifest->publish_timestamp(),
                                  history::History::kChannelTrunk,
                                  "TEMPLATE");
-  if (! UpdateUndoTags(env.weak_ref(), new_head)) {
+  if (! UpdateUndoTags(env.weak_ref(), new_head, undo_rollback)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to update magic undo tags");
     return false;
   }
