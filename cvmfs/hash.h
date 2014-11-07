@@ -40,6 +40,7 @@ enum Algorithms {
   kAny,
 };
 
+const char kSuffixNone         = 0;
 const char kSuffixCatalog      = 'C';
 const char kSuffixHistory      = 'H';
 const char kSuffixMicroCatalog = 'L'; // currently unused
@@ -142,7 +143,7 @@ struct Digest {
   }
 
   Digest() :
-    algorithm(algorithm_), modifier(0)
+    algorithm(algorithm_), modifier(kSuffixNone)
   {
     memset(digest, 0, digest_size_);
   }
@@ -208,7 +209,7 @@ struct Digest {
     }
   }
 
-  bool HasSuffix() const { return modifier != 0; }
+  bool HasSuffix() const { return modifier != kSuffixNone; }
 
   std::string ToString(const bool with_modifier = false) const {
     Hex hex(this);
@@ -347,12 +348,17 @@ struct Rmd160 : public Digest<20, kRmd160> { };
  */
 struct Any : public Digest<20, kAny> {
   Any() : Digest<20, kAny>() { }
+
   explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
+
   Any(const Algorithms     a,
       const unsigned char *digest_buffer, const unsigned buffer_size,
-      const char           modifier = 0) :
+      const char           modifier = kSuffixNone) :
     Digest<20, kAny>(a, digest_buffer, buffer_size, modifier) { }
-  explicit Any(const Algorithms a, const HexPtr hex, const char modifier = 0) :
+
+  explicit Any(const Algorithms  a,
+               const HexPtr      hex,
+               const char        modifier = kSuffixNone) :
     Digest<20, kAny>(a, hex, modifier) { }
 };
 
