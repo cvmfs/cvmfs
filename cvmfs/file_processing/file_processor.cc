@@ -77,7 +77,9 @@ void FileProcessor::FileDone(File *file) {
   ChunkVector::const_iterator iend = generated_chunks.end();
   for (; i != iend; ++i) {
     Chunk *current_chunk = *i;
-    resulting_chunks.PushBack(FileChunk(current_chunk->content_hash(),
+    shash::Any chunk_hash = current_chunk->content_hash();
+    chunk_hash.set_modifier(shash::kSuffixPartial);
+    resulting_chunks.PushBack(FileChunk(chunk_hash,
                                         current_chunk->offset(),
                                         current_chunk->size()));
   }

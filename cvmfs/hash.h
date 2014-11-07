@@ -210,6 +210,7 @@ struct Digest {
   }
 
   bool HasSuffix() const { return modifier != kSuffixNone; }
+  void set_modifier(const char m) { modifier = m; }
 
   std::string ToString(const bool with_modifier = false) const {
     Hex hex(this);

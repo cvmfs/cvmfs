@@ -121,7 +121,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
     return NULL;
   }
   string file_path_compressed = file_path + ".compressed";
-  shash::Any hash_catalog(hash_algorithm);
+  shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
   bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
                                         &hash_catalog);
   if (!retval) {

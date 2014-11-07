@@ -710,7 +710,7 @@ int FetchChunk(const FileChunk &chunk,
                download::DownloadManager *download_manager)
 {
   return Fetch(chunk.content_hash(),
-               FileChunk::kCasSuffix,
+               shash::kSuffixPartial,
                chunk.size(),
                cvmfs_path,
                volatile_content,

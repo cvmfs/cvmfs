@@ -338,10 +338,10 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         const shash::Any &chunk_hash = this_chunk.content_hash();
         const string chunk_path = "data"                            +
                                   chunk_hash.MakePathExplicit(1, 2) +
-                                  FileChunk::kCasSuffix;
+                                  shash::kSuffixPartial;
         if (!Exists(chunk_path)) {
           const std::string chunk_name = this_chunk.content_hash().ToString() +
-                                         FileChunk::kCasSuffix;
+                                         shash::kSuffixPartial;
           LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
                                           "offset: %d | size: %d) missing",
                    chunk_name.c_str(),
