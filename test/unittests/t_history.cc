@@ -592,17 +592,21 @@ TEST_F(T_History, GetTagByDate) {
   history->CommitTransaction();
 
   const time_t ts2510 = 1414255311;
-  const time_t ts0111 = 1414860111;
+  const time_t ts0111 = 1414864111;
+  const time_t ts3110 = 1414777311;
   const time_t ts0411 = 1415126511;
 
   History::Tag tag;
-  EXPECT_TRUE (history->Get(ts2510, &tag));
-  CompareTags(t3010, tag);
+  EXPECT_FALSE (history->Get(ts2510, &tag)); // No revision yet
+
+  EXPECT_TRUE (history->Get(ts3110, &tag));
+  CompareTags(t3110, tag);
 
   EXPECT_TRUE (history->Get(ts0111, &tag));
   CompareTags(t0111, tag);
 
-  EXPECT_FALSE (history->Get(ts0411, &tag));
+  EXPECT_TRUE (history->Get(ts0411, &tag));
+  CompareTags(t0311, tag);
 
   delete history;
 }
