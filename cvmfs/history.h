@@ -162,8 +162,8 @@ class History {
   bool Insert(const Tag &tag);
   bool Remove(const std::string &name);
   bool Exists(const std::string &name) const;
-  bool Get(const std::string &name, Tag *tag) const;
-  bool Get(const time_t timestamp, Tag *tag) const;
+  bool GetByName(const std::string &name, Tag *tag) const;
+  bool GetByDate(const time_t timestamp, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 

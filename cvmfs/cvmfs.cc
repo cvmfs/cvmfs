@@ -2292,7 +2292,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                         repository_date + ". Use YYYY-MM-DDTHH:MM:SSZ";
         return loader::kFailHistory;
       }
-      retval = tag_db->Get(repository_utctime, &tag);
+      retval = tag_db->GetByDate(repository_utctime, &tag);
       if (!retval) {
         *g_boot_error = "no repository state as early as utc timestamp " +
                         StringifyTime(repository_utctime, true);
@@ -2304,7 +2304,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
                tag.name.c_str());
       *cvmfs::repository_tag_ = tag.name;
     } else {
-      retval = tag_db->Get(*cvmfs::repository_tag_, &tag);
+      retval = tag_db->GetByName(*cvmfs::repository_tag_, &tag);
       if (!retval) {
         *g_boot_error = "no such tag: " + *cvmfs::repository_tag_;
         return loader::kFailHistory;

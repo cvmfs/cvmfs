@@ -295,7 +295,7 @@ bool CommandTag::UpdateUndoTags(
   }
 
   // check if we have a current HEAD tag that needs to renamed to previous HEAD
-  if (env->history->Get(CommandTag::kHeadTag, &current_head)) {
+  if (env->history->GetByName(CommandTag::kHeadTag, &current_head)) {
     // remove current HEAD tag
     if (! env->history->Remove(CommandTag::kHeadTag)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to remove current HEAD tag");
@@ -579,7 +579,7 @@ int CommandCreateTag::Main(const ArgumentList &args) {
   // get the already existent tag (in the moving case)
   history::History::Tag new_tag;
   shash::Any            old_hash;
-  if (move_tag && ! env->history->Get(tag_name, &new_tag)) {
+  if (move_tag && ! env->history->GetByName(tag_name, &new_tag)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to retrieve tag '%s' for moving",
              tag_name.c_str());
     return 1;
@@ -892,7 +892,7 @@ int CommandInfoTag::Main(const ArgumentList &args) {
   }
 
   history::History::Tag tag;
-  const bool found = env->history->Get(tag_name, &tag);
+  const bool found = env->history->GetByName(tag_name, &tag);
   if (! found) {
     LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' does not exist", tag_name.c_str());
     return 1;
@@ -935,7 +935,7 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
 
   // find tag to be rolled back to
   history::History::Tag target_tag;
-  const bool found = env->history->Get(tag_name, &target_tag);
+  const bool found = env->history->GetByName(tag_name, &target_tag);
   if (! found) {
     if (undo_rollback) {
       LogCvmfs(kLogCvmfs, kLogStderr, "only one anonymous rollback supported - "

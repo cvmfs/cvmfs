@@ -662,7 +662,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
     history::History::Tag tag;
-    const bool retval = tag_db->Get(tag_name, &tag);
+    const bool retval = tag_db->GetByName(tag_name, &tag);
     delete tag_db;
     unlink(tmp_file.c_str());
     if (!retval) {

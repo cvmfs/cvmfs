@@ -184,11 +184,11 @@ bool History::Remove(const std::string &name) {
 
 bool History::Exists(const std::string &name) const {
   Tag existing_tag;
-  return Get(name, &existing_tag);
+  return GetByName(name, &existing_tag);
 }
 
 
-bool History::Get(const std::string &name, Tag *tag) const {
+bool History::GetByName(const std::string &name, Tag *tag) const {
   assert (database_);
   assert (find_tag_.IsValid());
   assert (NULL != tag);
@@ -204,7 +204,7 @@ bool History::Get(const std::string &name, Tag *tag) const {
 }
 
 
-bool History::Get(const time_t timestamp, Tag *tag) const {
+bool History::GetByDate(const time_t timestamp, Tag *tag) const {
   assert (database_);
   assert (find_tag_by_date_.IsValid());
   assert (NULL != tag);
@@ -251,7 +251,7 @@ bool History::Rollback(const Tag &updated_target_tag) {
   const bool need_to_commit = BeginTransaction();
 
   // retrieve the old version of the target tag from the history
-  success = Get(updated_target_tag.name, &old_target_tag);
+  success = GetByName(updated_target_tag.name, &old_target_tag);
   if (! success) {
     LogCvmfs(kLogHistory, kLogDebug, "failed to retrieve old target tag '%s'",
                                      updated_target_tag.name.c_str());

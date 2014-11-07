@@ -215,7 +215,7 @@ TEST_F(T_History, InsertAndFindTag) {
   EXPECT_EQ (1, history->GetNumberOfTags());
 
   History::Tag tag;
-  ASSERT_TRUE (history->Get(dummy.name, &tag));
+  ASSERT_TRUE (history->GetByName(dummy.name, &tag));
   CompareTags (dummy, tag);
 
   delete history;
@@ -232,7 +232,7 @@ TEST_F(T_History, InsertReopenAndFindTag) {
   EXPECT_EQ (1, history1->GetNumberOfTags());
 
   History::Tag tag1;
-  ASSERT_TRUE (history1->Get(dummy.name, &tag1));
+  ASSERT_TRUE (history1->GetByName(dummy.name, &tag1));
   CompareTags (dummy, tag1);
   delete history1;
 
@@ -241,7 +241,7 @@ TEST_F(T_History, InsertReopenAndFindTag) {
   EXPECT_EQ (fqrn, history2->fqrn());
 
   History::Tag tag2;
-  ASSERT_TRUE (history2->Get(dummy.name, &tag2));
+  ASSERT_TRUE (history2->GetByName(dummy.name, &tag2));
   CompareTags (dummy, tag2);
   delete history2;
 }
@@ -597,15 +597,15 @@ TEST_F(T_History, GetTagByDate) {
   const time_t ts0411 = 1415126511;
 
   History::Tag tag;
-  EXPECT_FALSE (history->Get(ts2510, &tag)); // No revision yet
+  EXPECT_FALSE (history->GetByDate(ts2510, &tag)); // No revision yet
 
-  EXPECT_TRUE (history->Get(ts3110, &tag));
+  EXPECT_TRUE (history->GetByDate(ts3110, &tag));
   CompareTags(t3110, tag);
 
-  EXPECT_TRUE (history->Get(ts0111, &tag));
+  EXPECT_TRUE (history->GetByDate(ts0111, &tag));
   CompareTags(t0111, tag);
 
-  EXPECT_TRUE (history->Get(ts0411, &tag));
+  EXPECT_TRUE (history->GetByDate(ts0411, &tag));
   CompareTags(t0311, tag);
 
   delete history;
@@ -642,7 +642,7 @@ TEST_F(T_History, RollbackToOldTag) {
 
   ASSERT_TRUE (history2->BeginTransaction());
   History::Tag rollback_target;
-  EXPECT_TRUE (history2->Get("moep", &rollback_target));
+  EXPECT_TRUE (history2->GetByName("moep", &rollback_target));
 
   shash::Any new_root_hash(shash::kSha1);
   new_root_hash.Randomize();
@@ -663,7 +663,7 @@ TEST_F(T_History, RollbackToOldTag) {
   EXPECT_FALSE (history2->Exists("also_rofl"));
 
   History::Tag rolled_back_tag;
-  ASSERT_TRUE (history2->Get("moep", &rolled_back_tag));
+  ASSERT_TRUE (history2->GetByName("moep", &rolled_back_tag));
   EXPECT_EQ (10u,           rolled_back_tag.revision);
   EXPECT_EQ (new_root_hash, rolled_back_tag.root_hash);
 
@@ -675,7 +675,7 @@ TEST_F(T_History, RollbackToOldTag) {
 
   ASSERT_TRUE (history3->BeginTransaction());
   History::Tag rollback_target_malicious;
-  EXPECT_TRUE (history3->Get("bar", &rollback_target_malicious));
+  EXPECT_TRUE (history3->GetByName("bar", &rollback_target_malicious));
 
   rollback_target_malicious.name      = "barlol";
   rollback_target_malicious.revision  = 11;
