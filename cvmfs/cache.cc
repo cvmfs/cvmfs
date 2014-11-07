@@ -240,7 +240,7 @@ void TearDown2ReadOnly() {
  * \return Absolute path in local cache.
  */
 static inline string GetPathInCache(const shash::Any &id) {
-  return *cache_path_ + id.MakePath(1, 2);
+  return *cache_path_ + id.MakePathExplicit(1, 2);
 }
 
 
@@ -572,7 +572,7 @@ static int Fetch(const shash::Any &checksum,
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", cvmfs_path.c_str());
   atomic_inc64(&num_download_);
 
-  const string url = "/data" + checksum.MakePath(1, 2) + hash_suffix;
+  const string url = "/data" + checksum.MakePathExplicit(1, 2) + hash_suffix;
   string final_path;
   string temp_path;
   int fd;  // Used to write the downloaded file
@@ -785,7 +785,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
   bool pin_retval;
 
   // Try from cache
-  const string cache_path = *cache_path_ + hash.MakePath(1, 2);
+  const string cache_path = *cache_path_ + hash.MakePathExplicit(1, 2);
   if (alien_cache_) {
     *catalog_path = cache_path;
     if (FileExists(cache_path)) {
@@ -835,7 +835,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
     return catalog::kLoadFail;
   }
 
-  const string url = "/data" + hash.MakePath(1, 2) + "C";
+  const string url = "/data" + hash.MakePathExplicit(1, 2) + "C";
   download::JobInfo download_catalog(&url, true, true, catalog_file, &hash);
   download_catalog.extra_info = &cvmfs_path;
   download_manager_->Fetch(&download_catalog);
@@ -925,7 +925,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
     for (; (separator_pos < read_bytes) && (tmp[separator_pos] != 'T');
          ++separator_pos) { }
     cache_hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)));
-    if (!FileExists(*cache_path_ + cache_hash.MakePath(1, 2))) {
+    if (!FileExists(*cache_path_ + cache_hash.MakePathExplicit(1, 2))) {
       LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
       cache_hash = shash::Any();
     } else {
@@ -958,7 +958,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
       // TODO remove code duplication
       if (catalog_path) {
         if (cache_mode_ == kCacheReadWrite) {
-          *catalog_path = *cache_path_ + cache_hash.MakePath(1, 2);
+          *catalog_path = *cache_path_ + cache_hash.MakePathExplicit(1, 2);
           int64_t size = GetFileSize(*catalog_path);
           retval = quota::Pin(cache_hash, uint64_t(size),
                               cvmfs_path, true);
@@ -986,7 +986,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
   // Short way out, use cached copy
   if (ensemble.manifest->catalog_hash() == cache_hash) {
     if (catalog_path) {
-      *catalog_path = *cache_path_ + cache_hash.MakePath(1, 2);
+      *catalog_path = *cache_path_ + cache_hash.MakePathExplicit(1, 2);
       // quota::Pin is only effective on first load, afterwards it is a NOP
       if (cache_mode_ == kCacheReadWrite) {
         int64_t size = GetFileSize(*catalog_path);

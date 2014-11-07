@@ -403,7 +403,7 @@ bool CommandTag::FetchObject(const std::string  &repository_url,
 
   download::Failures dl_retval;
   const std::string url =
-    repository_url + "/data" + object_hash.MakePath(1, 2) + hash_suffix;
+    repository_url + "/data" + object_hash.MakePathExplicit(1, 2) + hash_suffix;
 
   download::JobInfo download_object(&url, true, false, &destination_path,
                                     &object_hash);

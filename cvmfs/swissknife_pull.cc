@@ -160,7 +160,7 @@ static void *MainWorker(void *data) {
                           shash::kDigestSizes[next_chunk.hash_algorithm]);
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
-    string chunk_path = "data" + chunk_hash.MakePath(1, 2);
+    string chunk_path = "data" + chunk_hash.MakePathExplicit(1, 2);
 
     if (!Peek(chunk_path, next_chunk.type)) {
       string tmp_file;
@@ -204,7 +204,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
   download::Failures dl_retval;
 
   // Check if the catalog already exists
-  if (Peek("data" + catalog_hash.MakePath(1, 2), 'C')) {
+  if (Peek("data" + catalog_hash.MakePathExplicit(1, 2), 'C')) {
     LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog up to date");
     return true;
   }
@@ -233,7 +233,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
     return false;
   }
   const string url_catalog = *stratum0_url + "/data" +
-                             catalog_hash.MakePath(1, 2) + "C";
+                             catalog_hash.MakePathExplicit(1, 2) + "C";
   download::JobInfo download_catalog(&url_catalog, false, false,
                                      fcatalog_vanilla, &catalog_hash);
   dl_retval = g_download_manager->Fetch(&download_catalog);
@@ -325,7 +325,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
   delete catalog;
   unlink(file_catalog.c_str());
   WaitForStorage();
-  Store(file_catalog_vanilla, "data" + catalog_hash.MakePath(1, 2), 'C');
+  Store(file_catalog_vanilla, "data" + catalog_hash.MakePathExplicit(1, 2), 'C');
   return true;
 
  pull_cleanup:
@@ -470,7 +470,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (!ensemble.manifest->history().IsNull()) {
     shash::Any history_hash = ensemble.manifest->history();
     const string history_url = *stratum0_url + "/data" +
-      history_hash.MakePath(1, 2) + "H";
+      history_hash.MakePathExplicit(1, 2) + "H";
     const string history_path = *temp_dir + "/" + history_hash.ToString();
     download::JobInfo download_history(&history_url, false, false,
                                        &history_path,
@@ -503,7 +503,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
              historic_tags.size());
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading history database");
-    Store(history_path, "data" + history_hash.MakePath(1, 2), 'H');
+    Store(history_path, "data" + history_hash.MakePathExplicit(1, 2), 'H');
     WaitForStorage();
     unlink(history_path.c_str());
   }
@@ -562,7 +562,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading manifest ensemble");
     WaitForStorage();
     const string certificate_path =
-      "data" + ensemble.manifest->certificate().MakePath(1, 2);
+      "data" + ensemble.manifest->certificate().MakePathExplicit(1, 2);
     if (!Peek(certificate_path, 'X')) {
       StoreBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path,
                   'X', true);

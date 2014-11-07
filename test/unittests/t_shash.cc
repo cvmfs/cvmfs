@@ -129,26 +129,26 @@ TEST(T_Shash, MakePathExplicit) {
   shash::Any hash_md5(shash::kMd5);
   hash_md5.Randomize(prng);
   ASSERT_FALSE (hash_md5.IsNull());
-  EXPECT_EQ ("/91/3969a1ae06052779065b87eb53cb64",   hash_md5.MakePath(1, 2));
-  EXPECT_EQ ("/913/969/a1ae06052779065b87eb53cb64",  hash_md5.MakePath(2, 3));
-  EXPECT_EQ ("/913969a1ae06052779065b87eb53cb64",    hash_md5.MakePath(0, 3));
-  EXPECT_EQ ("/9/1/3/969a1ae06052779065b87eb53cb64", hash_md5.MakePath(3, 1));
+  EXPECT_EQ ("/91/3969a1ae06052779065b87eb53cb64",   hash_md5.MakePathExplicit(1, 2));
+  EXPECT_EQ ("/913/969/a1ae06052779065b87eb53cb64",  hash_md5.MakePathExplicit(2, 3));
+  EXPECT_EQ ("/913969a1ae06052779065b87eb53cb64",    hash_md5.MakePathExplicit(0, 3));
+  EXPECT_EQ ("/9/1/3/969a1ae06052779065b87eb53cb64", hash_md5.MakePathExplicit(3, 1));
 
   shash::Any hash_sha1(shash::kSha1);
   hash_sha1.Randomize(prng);
   ASSERT_FALSE (hash_sha1.IsNull());
-  EXPECT_EQ ("/c9/116bb5576d69586386887c6a9eeeb569a406a1",   hash_sha1.MakePath(1, 2));
-  EXPECT_EQ ("/c91/16b/b5576d69586386887c6a9eeeb569a406a1",  hash_sha1.MakePath(2, 3));
-  EXPECT_EQ ("/c9116bb5576d69586386887c6a9eeeb569a406a1",    hash_sha1.MakePath(0, 3));
-  EXPECT_EQ ("/c/9/1/16bb5576d69586386887c6a9eeeb569a406a1", hash_sha1.MakePath(3, 1));
+  EXPECT_EQ ("/c9/116bb5576d69586386887c6a9eeeb569a406a1",   hash_sha1.MakePathExplicit(1, 2));
+  EXPECT_EQ ("/c91/16b/b5576d69586386887c6a9eeeb569a406a1",  hash_sha1.MakePathExplicit(2, 3));
+  EXPECT_EQ ("/c9116bb5576d69586386887c6a9eeeb569a406a1",    hash_sha1.MakePathExplicit(0, 3));
+  EXPECT_EQ ("/c/9/1/16bb5576d69586386887c6a9eeeb569a406a1", hash_sha1.MakePathExplicit(3, 1));
 
   shash::Any hash_rmd160(shash::kRmd160);
   hash_rmd160.Randomize(prng);
   ASSERT_FALSE (hash_rmd160.IsNull());
-  EXPECT_EQ ("/2e/5beea626f6ddef63d56405371f80732782086f-rmd160",   hash_rmd160.MakePath(1, 2));
-  EXPECT_EQ ("/2e5/bee/a626f6ddef63d56405371f80732782086f-rmd160",  hash_rmd160.MakePath(2, 3));
-  EXPECT_EQ ("/2e5beea626f6ddef63d56405371f80732782086f-rmd160",    hash_rmd160.MakePath(0, 3));
-  EXPECT_EQ ("/2/e/5/beea626f6ddef63d56405371f80732782086f-rmd160", hash_rmd160.MakePath(3, 1));
+  EXPECT_EQ ("/2e/5beea626f6ddef63d56405371f80732782086f-rmd160",   hash_rmd160.MakePathExplicit(1, 2));
+  EXPECT_EQ ("/2e5/bee/a626f6ddef63d56405371f80732782086f-rmd160",  hash_rmd160.MakePathExplicit(2, 3));
+  EXPECT_EQ ("/2e5beea626f6ddef63d56405371f80732782086f-rmd160",    hash_rmd160.MakePathExplicit(0, 3));
+  EXPECT_EQ ("/2/e/5/beea626f6ddef63d56405371f80732782086f-rmd160", hash_rmd160.MakePathExplicit(3, 1));
 }
 
 
@@ -159,26 +159,26 @@ TEST(T_Shash, MakePathExplicitWithPrefix) {
   shash::Any hash_md5(shash::kMd5);
   hash_md5.Randomize(prng);
   ASSERT_FALSE (hash_md5.IsNull());
-  EXPECT_EQ ("dataA/91/3969a1ae06052779065b87eb53cb64",   hash_md5.MakePath(1, 2, "dataA"));
-  EXPECT_EQ ("dataB/913/969/a1ae06052779065b87eb53cb64",  hash_md5.MakePath(2, 3, "dataB"));
-  EXPECT_EQ ("dataC/913969a1ae06052779065b87eb53cb64",    hash_md5.MakePath(0, 3, "dataC"));
-  EXPECT_EQ ("dataD/9/1/3/969a1ae06052779065b87eb53cb64", hash_md5.MakePath(3, 1, "dataD"));
+  EXPECT_EQ ("dataA/91/3969a1ae06052779065b87eb53cb64",   hash_md5.MakePathExplicit(1, 2, "dataA"));
+  EXPECT_EQ ("dataB/913/969/a1ae06052779065b87eb53cb64",  hash_md5.MakePathExplicit(2, 3, "dataB"));
+  EXPECT_EQ ("dataC/913969a1ae06052779065b87eb53cb64",    hash_md5.MakePathExplicit(0, 3, "dataC"));
+  EXPECT_EQ ("dataD/9/1/3/969a1ae06052779065b87eb53cb64", hash_md5.MakePathExplicit(3, 1, "dataD"));
 
   shash::Any hash_sha1(shash::kSha1);
   hash_sha1.Randomize(prng);
   ASSERT_FALSE (hash_sha1.IsNull());
-  EXPECT_EQ ("dataA/c9/116bb5576d69586386887c6a9eeeb569a406a1",   hash_sha1.MakePath(1, 2, "dataA"));
-  EXPECT_EQ ("dataB/c91/16b/b5576d69586386887c6a9eeeb569a406a1",  hash_sha1.MakePath(2, 3, "dataB"));
-  EXPECT_EQ ("dataC/c9116bb5576d69586386887c6a9eeeb569a406a1",    hash_sha1.MakePath(0, 3, "dataC"));
-  EXPECT_EQ ("dataD/c/9/1/16bb5576d69586386887c6a9eeeb569a406a1", hash_sha1.MakePath(3, 1, "dataD"));
+  EXPECT_EQ ("dataA/c9/116bb5576d69586386887c6a9eeeb569a406a1",   hash_sha1.MakePathExplicit(1, 2, "dataA"));
+  EXPECT_EQ ("dataB/c91/16b/b5576d69586386887c6a9eeeb569a406a1",  hash_sha1.MakePathExplicit(2, 3, "dataB"));
+  EXPECT_EQ ("dataC/c9116bb5576d69586386887c6a9eeeb569a406a1",    hash_sha1.MakePathExplicit(0, 3, "dataC"));
+  EXPECT_EQ ("dataD/c/9/1/16bb5576d69586386887c6a9eeeb569a406a1", hash_sha1.MakePathExplicit(3, 1, "dataD"));
 
   shash::Any hash_rmd160(shash::kRmd160);
   hash_rmd160.Randomize(prng);
   ASSERT_FALSE (hash_rmd160.IsNull());
-  EXPECT_EQ ("dataA/2e/5beea626f6ddef63d56405371f80732782086f-rmd160",   hash_rmd160.MakePath(1, 2, "dataA"));
-  EXPECT_EQ ("dataB/2e5/bee/a626f6ddef63d56405371f80732782086f-rmd160",  hash_rmd160.MakePath(2, 3, "dataB"));
-  EXPECT_EQ ("dataC/2e5beea626f6ddef63d56405371f80732782086f-rmd160",    hash_rmd160.MakePath(0, 3, "dataC"));
-  EXPECT_EQ ("dataD/2/e/5/beea626f6ddef63d56405371f80732782086f-rmd160", hash_rmd160.MakePath(3, 1, "dataD"));
+  EXPECT_EQ ("dataA/2e/5beea626f6ddef63d56405371f80732782086f-rmd160",   hash_rmd160.MakePathExplicit(1, 2, "dataA"));
+  EXPECT_EQ ("dataB/2e5/bee/a626f6ddef63d56405371f80732782086f-rmd160",  hash_rmd160.MakePathExplicit(2, 3, "dataB"));
+  EXPECT_EQ ("dataC/2e5beea626f6ddef63d56405371f80732782086f-rmd160",    hash_rmd160.MakePathExplicit(0, 3, "dataC"));
+  EXPECT_EQ ("dataD/2/e/5/beea626f6ddef63d56405371f80732782086f-rmd160", hash_rmd160.MakePathExplicit(3, 1, "dataD"));
 }
 
 

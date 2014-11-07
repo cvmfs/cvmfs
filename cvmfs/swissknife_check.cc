@@ -205,7 +205,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     // Check if the chunk is there
     if (!entries[i].checksum().IsNull() && check_chunks) {
-      string chunk_path = "data" + entries[i].checksum().MakePath(1, 2);
+      string chunk_path = "data" +
+                          entries[i].checksum().MakePathExplicit(1, 2);
       if (entries[i].IsDirectory())
         chunk_path += "L";
       if (!Exists(chunk_path)) {
@@ -334,8 +335,9 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         aggregated_file_size += this_chunk.size();
 
         // are all data chunks in the data store?
-        const string chunk_path = "data"                           +
-                                  this_chunk.content_hash().MakePath(1, 2) +
+        const shash::Any &chunk_hash = this_chunk.content_hash();
+        const string chunk_path = "data"                            +
+                                  chunk_hash.MakePathExplicit(1, 2) +
                                   FileChunk::kCasSuffix;
         if (!Exists(chunk_path)) {
           const std::string chunk_name = this_chunk.content_hash().ToString() +
@@ -398,7 +400,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 string CommandCheck::DownloadPiece(const shash::Any catalog_hash,
                                    const char suffix)
 {
-  string source = "data" + catalog_hash.MakePath(1,2);
+  string source = "data" + catalog_hash.MakePathExplicit(1, 2);
   source.push_back(suffix);
   const string dest = "/tmp/" + catalog_hash.ToString();
   const string url = *remote_repository + "/" + source;
@@ -417,7 +419,7 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash,
 string CommandCheck::DecompressPiece(const shash::Any catalog_hash,
                                      const char suffix)
 {
-  string source = "data" + catalog_hash.MakePath(1,2);
+  string source = "data" + catalog_hash.MakePathExplicit(1, 2);
   source.push_back(suffix);
   const string dest = "/tmp/" + catalog_hash.ToString();
   if (!zlib::DecompressPath2Path(source, dest))
@@ -627,7 +629,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
 
   // Validate Manifest
   const string certificate_path =
-    "data" + manifest->certificate().MakePath(1, 2) + "X";
+    "data" + manifest->certificate().MakePathExplicit(1, 2) + "X";
   if (!Exists(certificate_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());

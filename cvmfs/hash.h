@@ -233,20 +233,20 @@ struct Digest {
   }
 
   std::string MakePath(const std::string &prefix = "data") const {
-    return MakePath(1, 2, prefix);
+    return MakePathExplicit(1, 2, prefix);
   }
 
   std::string MakePathWithSuffix(const std::string &prefix = "data") const {
-    return MakePath(1, 2, prefix, true);
+    return MakePathExplicit(1, 2, prefix, true);
   }
 
   /**
    * Create a path string from the hex notation of the digest.
    */
-  std::string MakePath(const unsigned      dir_levels,
-                       const unsigned      digits_per_level,
-                       const std::string  &prefix = "",
-                       const bool          with_modifier = false) const
+  std::string MakePathExplicit(const unsigned      dir_levels,
+                               const unsigned      digits_per_level,
+                               const std::string  &prefix = "",
+                               const bool          with_modifier = false) const
   {
     Hex hex(this);
     const bool use_modifier = with_modifier && HasSuffix();

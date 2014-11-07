@@ -193,7 +193,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
   }
 
   const std::string final_path = "data" +
-                                 content_hash.MakePath(1, 2) +
+                                 content_hash.MakePathExplicit(1, 2) +
                                  hash_suffix;
 
   retval = Move(local_handle->temporary_path.c_str(), final_path.c_str());
