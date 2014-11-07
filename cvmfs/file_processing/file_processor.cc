@@ -78,7 +78,7 @@ void FileProcessor::FileDone(File *file) {
   for (; i != iend; ++i) {
     Chunk *current_chunk = *i;
     shash::Any chunk_hash = current_chunk->content_hash();
-    chunk_hash.set_modifier(shash::kSuffixPartial);
+    chunk_hash.set_suffix(shash::kSuffixPartial);
     resulting_chunks.PushBack(FileChunk(chunk_hash,
                                         current_chunk->offset(),
                                         current_chunk->size()));

@@ -484,7 +484,7 @@ class T_CatalogTraversal : public ::testing::Test {
                   const shash::Any   &catalog_hash = shash::Any(shash::kSha1)) {
     // produce a random hash if no catalog has was given
     shash::Any effective_clg_hash = catalog_hash;
-    effective_clg_hash.modifier = 'C';
+    effective_clg_hash.set_suffix(shash::kSuffixCatalog);
     if (effective_clg_hash.IsNull()) {
       effective_clg_hash.Randomize(dice_);
     }
