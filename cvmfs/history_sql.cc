@@ -149,6 +149,11 @@ bool SqlFindTag::BindName(const std::string &name) {
 
 
 SqlFindTagByDate::SqlFindTagByDate(const HistoryDatabase *database) {
+  // figure out the tag that was HEAD to a given point in time
+  //
+  // conceptually goes back in the revision history  |  ORDER BY revision DESC
+  // and picks the first tag                         |  LIMIT 1
+  // that is older than the given timestamp          |  WHICH timestamp <= :ts
   const bool success = Init(database->sqlite_db(),
                             "SELECT " + GetDatabaseFields() + " FROM tags "
                             "WHERE timestamp <= :timestamp "
