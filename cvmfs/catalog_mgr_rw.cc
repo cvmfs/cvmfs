@@ -786,7 +786,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   assert(catalog_size > 0);
 
   // Compress catalog
-  shash::Any hash_catalog(spooler_->GetHashAlgorithm());
+  shash::Any hash_catalog(spooler_->GetHashAlgorithm(), shash::kSuffixCatalog);
   if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_catalog))

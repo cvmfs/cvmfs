@@ -67,7 +67,7 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
 }
 
 
-Any MkFromHexPtr(const HexPtr hex) {
+Any MkFromHexPtr(const HexPtr hex, const char modifier) {
   Any result;
 
   const unsigned length = hex.str->length();
@@ -79,6 +79,7 @@ Any MkFromHexPtr(const HexPtr hex) {
   if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdentifierSizes[kRmd160]))
     result = Any(kRmd160, hex);
 
+  result.modifier = modifier;
   return result;
 }
 

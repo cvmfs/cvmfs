@@ -70,7 +70,8 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
                                               ? shash::Any()
                                               : shash::MkFromHexPtr(
                                                     shash::HexPtr(
-                                                      *args.find('b')->second));
+                                                      *args.find('b')->second),
+                                                    shash::kSuffixCatalog);
   const std::string       repo_name       = (args.find('f') == args.end())
                                               ? ""
                                               : *args.find('f')->second;
@@ -642,7 +643,8 @@ shash::Any CommandCreateTag::GetTagRootHash(
              env->manifest->catalog_hash().ToString().c_str());
     root_hash = env->manifest->catalog_hash();
   } else {
-    root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_string));
+    root_hash = shash::MkFromHexPtr(shash::HexPtr(root_hash_string),
+                                    shash::kSuffixCatalog);
     if (root_hash.IsNull()) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to read provided catalog "
                                       "hash '%s'",

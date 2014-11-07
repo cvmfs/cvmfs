@@ -329,8 +329,9 @@ int cvmfs_context::Setup(const options &opts) {
                                                download_manager_);
   bool clg_mgr_init;
   if (! opts.root_hash.empty()) {
-    clg_mgr_init = catalog_manager_->InitFixed(
-      shash::MkFromHexPtr(shash::HexPtr(opts.root_hash)));
+    const shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(opts.root_hash),
+                                                shash::kSuffixCatalog);
+    clg_mgr_init = catalog_manager_->InitFixed(hash);
   } else {
     clg_mgr_init = catalog_manager_->Init();
   }

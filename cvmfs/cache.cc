@@ -490,7 +490,7 @@ static bool CommitFromMem(const shash::Any &id, const unsigned char *buffer,
  *         On failure a negative error code.
  */
 static int Fetch(const shash::Any &checksum,
-                 const string     &hash_suffix,
+                 const char        hash_suffix,
                  const uint64_t    size,
                  const string     &cvmfs_path,
                  const bool        volatile_content,
@@ -686,7 +686,11 @@ int FetchDirent(const catalog::DirectoryEntry &d,
                 const bool volatile_content,
                 download::DownloadManager *download_manager)
 {
-  return Fetch(d.checksum(), "", d.size(), cvmfs_path, volatile_content,
+  return Fetch(d.checksum(),
+               shash::kSuffixNone,
+               d.size(),
+               cvmfs_path,
+               volatile_content,
                download_manager);
 }
 
@@ -924,7 +928,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
     int separator_pos = 0;
     for (; (separator_pos < read_bytes) && (tmp[separator_pos] != 'T');
          ++separator_pos) { }
-    cache_hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)));
+    cache_hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)),
+                                     shash::kSuffixCatalog);
     if (!FileExists(*cache_path_ + cache_hash.MakePathExplicit(1, 2))) {
       LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
       cache_hash = shash::Any();

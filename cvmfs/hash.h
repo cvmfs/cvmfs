@@ -349,7 +349,9 @@ struct Rmd160 : public Digest<20, kRmd160> { };
 struct Any : public Digest<20, kAny> {
   Any() : Digest<20, kAny>() { }
 
-  explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
+  explicit Any(const Algorithms a,
+               const char       m = kSuffixNone) :
+    Digest<20, kAny>() { algorithm = a; modifier = m; }
 
   Any(const Algorithms     a,
       const unsigned char *digest_buffer, const unsigned buffer_size,
@@ -412,7 +414,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
-Any MkFromHexPtr(const HexPtr hex);
+Any MkFromHexPtr(const HexPtr hex, const char modifier = kSuffixNone);
 
 }  // namespace hash
 

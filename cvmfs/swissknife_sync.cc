@@ -222,7 +222,9 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   const string dirtab_file   = *args.find('d')->second;
   union_dir_                 = MakeCanonicalPath(*args.find('u')->second);
   scratch_dir_               = MakeCanonicalPath(*args.find('s')->second);
-  const string base_hash_str = *args.find('b')->second;
+  const shash::Any base_hash = shash::MkFromHexPtr(
+                                      shash::HexPtr(*args.find('b')->second),
+                                      shash::kSuffixCatalog);
   const string stratum0      = *args.find('w')->second;
   const string dir_temp      = *args.find('t')->second;
   verbose_                   = (args.find('x') != args.end());
@@ -247,7 +249,6 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
 
   // initialize catalog infrastructure
   g_download_manager->Init(1, true);
-  const shash::Any base_hash = shash::MkFromHexPtr(shash::HexPtr(base_hash_str));
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
@@ -462,7 +463,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.dir_scratch = MakeCanonicalPath(*args.find('s')->second);
   params.dir_rdonly = MakeCanonicalPath(*args.find('c')->second);
   params.dir_temp = MakeCanonicalPath(*args.find('t')->second);
-  params.base_hash = *args.find('b')->second;
+  params.base_hash = shash::MkFromHexPtr(shash::HexPtr(*args.find('b')->second),
+                                         shash::kSuffixCatalog);
   params.stratum0 = *args.find('w')->second;
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
@@ -525,9 +527,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   g_download_manager->Init(1, true);
 
   catalog::WritableCatalogManager
-    catalog_manager(shash::MkFromHexPtr(shash::HexPtr(params.base_hash)),
-                    params.stratum0, params.dir_temp, params.spooler,
-                    g_download_manager, params.catalog_entry_warn_threshold);
+    catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
+                    params.spooler, g_download_manager,
+                    params.catalog_entry_warn_threshold);
   catalog_manager.Init();
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;

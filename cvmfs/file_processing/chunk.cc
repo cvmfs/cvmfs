@@ -161,5 +161,6 @@ Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
 
 
 std::string Chunk::hash_suffix() const {
-  return (IsBulkChunk()) ? file_->hash_suffix() : FileChunk::kCasSuffix;
+  return (IsBulkChunk()) ? file_->hash_suffix()
+                         : std::string(&shash::kSuffixPartial, 1);
 }

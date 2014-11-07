@@ -46,7 +46,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   iter = content.find('C');
   if ((iter = content.find('C')) == content.end())
     return NULL;
-  catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second));
+  catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second),
+                              shash::kSuffixCatalog);
   if ((iter = content.find('R')) == content.end())
     return NULL;
   root_path = shash::Md5(shash::HexPtr(iter->second));
@@ -68,13 +69,16 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
   if ((iter = content.find('L')) != content.end())
-    micro_catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second));
+    micro_catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second),
+                                      shash::kSuffixMicroCatalog);
   if ((iter = content.find('N')) != content.end())
     repository_name = iter->second;
   if ((iter = content.find('X')) != content.end())
-    certificate = MkFromHexPtr(shash::HexPtr(iter->second));
+    certificate = MkFromHexPtr(shash::HexPtr(iter->second),
+                               shash::kSuffixCertificate);
   if ((iter = content.find('H')) != content.end())
-    history = MkFromHexPtr(shash::HexPtr(iter->second));
+    history = MkFromHexPtr(shash::HexPtr(iter->second),
+                           shash::kSuffixHistory);
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
 
