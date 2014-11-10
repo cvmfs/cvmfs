@@ -450,14 +450,7 @@ history::History* CommandTag::GetHistory(
       return NULL;
     }
 
-    if (history->fqrn() != manifest->repository_name()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "history database does not belong to "
-                                      "this repository ('%s' vs '%s')",
-               history->fqrn().c_str(), manifest->repository_name().c_str());
-      delete history;
-      unlink(history_path.c_str());
-      return NULL;
-    }
+    assert (history->fqrn() == manifest->repository_name());
   }
 
   return history;
