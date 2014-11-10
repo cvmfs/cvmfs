@@ -2896,7 +2896,7 @@ tag() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "a:c:m:h:r:f:lxi:" option
+  while getopts "a:c:m:h:r:flxi:" option
   do
     case $option in
       a)
