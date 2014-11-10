@@ -2977,9 +2977,14 @@ tag() {
     return $?
   fi
 
-  if [ $action_add -eq 1 ]; then
-    is_in_transaction $name || die "Open a transaction before adding tags!"
+  # all following commands need an open repository transaction and are supposed
+  # to commit or abort it after performing a tag database manipulation
+  is_in_transaction $name && die "Cannot change repository tags while in a transaction"
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open transaction for tag manipulation"
 
+  # adds (or moves) a tag in the database
+  if [ $action_add -eq 1 ]; then
     local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
     local tag_create_command="cvmfs_swissknife tag_create \
       -w $CVMFS_STRATUM0                                  \
@@ -3003,12 +3008,10 @@ tag() {
     fi
     $user_shell "$tag_create_command" || exit 1
     sign_manifest $name $new_manifest || die "Failed to sign repo"
-    close_transaction $name 0
   fi
 
+  # removes one or more tags from the database
   if [ $action_remove -eq 1 ]; then
-    is_in_transaction $name || die "Open a transaction before removing tags!"
-
     if [ $remove_tag_force -eq 0 ]; then
       echo "You are about to remove these tags from $name:"
       for t in $tag_names; do echo "* $t"; done
@@ -3033,7 +3036,6 @@ tag() {
       -e $CVMFS_HASH_ALGORITHM                           \
       -d '$tag_names'" || exit 1
     sign_manifest $name $new_manifest || die "Failed to sign repo"
-    close_transaction $name 0
   fi
 }
 
