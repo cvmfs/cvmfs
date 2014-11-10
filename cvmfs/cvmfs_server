@@ -3045,6 +3045,7 @@ tag() {
 
 lstags() {
   list_tags "$@" # backward compatibility alias
+  echo "NOTE: cvmfs_server lstags is deprecated! Use cvmfs_server list-tags instead" 1>&2
 }
 
 list_tags() {
