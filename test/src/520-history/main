@@ -511,6 +511,21 @@ cvmfs_run_test() {
   echo "abort transaction"
   cvmfs_server abort -f $CVMFS_TEST_REPO || return 36
 
+  # ============================================================================
+
+  echo "open transaction to see if tag removal fails in transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  local oldest_tag="$(sudo cvmfs_server list-tags -x $CVMFS_TEST_REPO | tail -n1 | awk '{print $1}')"
+  echo "trying to remove $oldest_tag (should fail)"
+  cvmfs_server tag -r $oldest_tag -f $CVMFS_TEST_REPO  && return 37
+
+  echo "check if tag is still there"
+  cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$oldest_tag" || return 38
+
+  echo "abort transaction"
+  cvmfs_server abort -f $CVMFS_TEST_REPO || return 39
+
   return 0
 }
 
