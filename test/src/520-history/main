@@ -526,6 +526,29 @@ cvmfs_run_test() {
   echo "abort transaction"
   cvmfs_server abort -f $CVMFS_TEST_REPO || return 39
 
+  # ============================================================================
+
+  local oldest_tags="$(sudo cvmfs_server list-tags -x $CVMFS_TEST_REPO | tail -n3 | awk '{print $1}')"
+  local remove_flags=""
+  local oldest_tags_list=""
+  for tag in $oldest_tags; do
+    remove_flags="-r $tag $remove_flags"
+    oldest_tags_list="$tag $oldest_tags_list"
+  done
+  echo "removing multiple tags ($oldest_tags_list)"
+  cvmfs_server tag $remove_flags -f $CVMFS_TEST_REPO || return 40
+
+  echo "check that trunk is still there"
+  cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$trunk_tag" || return 41
+
+  echo "check that the tags ($oldest_tags_list) are gone"
+  for tag in $oldest_tags; do
+    cvmfs_server list-tags $CVMFS_TEST_REPO | grep -q "$tag" && return 42
+  done
+
+  echo "check the number of tags"
+  [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | wc -l) -eq 4 ] || return 43
+
   return 0
 }
 
