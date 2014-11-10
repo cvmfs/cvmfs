@@ -2965,6 +2965,18 @@ tag() {
   local base_hash="$(get_mounted_root_hash $name)"
   local user_shell="$(get_user_shell $name)"
 
+  # tag inspection does not need to open a repository transaction
+  if [ $action_inspect -eq 1 ]; then
+    $user_shell "cvmfs_swissknife tag_info               \
+      -w $CVMFS_STRATUM0                                 \
+      -t ${CVMFS_SPOOL_DIR}/tmp                          \
+      -p /etc/cvmfs/keys/${name}.pub                     \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
+      -f $name                                           \
+      -n $tag_name"
+    return $?
+  fi
+
   if [ $action_add -eq 1 ]; then
     is_in_transaction $name || die "Open a transaction before adding tags!"
 
@@ -3022,16 +3034,6 @@ tag() {
       -d '$tag_names'" || exit 1
     sign_manifest $name $new_manifest || die "Failed to sign repo"
     close_transaction $name 0
-  fi
-
-  if [ $action_inspect -eq 1 ]; then
-    $user_shell "cvmfs_swissknife tag_info               \
-      -w $CVMFS_STRATUM0                                 \
-      -t ${CVMFS_SPOOL_DIR}/tmp                          \
-      -p /etc/cvmfs/keys/${name}.pub                     \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
-      -f $name                                           \
-      -n $tag_name"
   fi
 }
 
