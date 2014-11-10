@@ -376,9 +376,6 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "init a new transaction to move a tag"
-  start_transaction $CVMFS_TEST_REPO || return $?
-
   local newest_hash=$(sudo cvmfs_server list-tags -x $CVMFS_TEST_REPO | head -n1 | awk '{print $2}')
 
   echo "moving tag '$first_tag' to hash '$newest_hash'"
@@ -410,9 +407,6 @@ cvmfs_run_test() {
   fi
 
   # ============================================================================
-
-  echo "init a new transaction to remove tag"
-  start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "remove tag '$first_tag'"
   cvmfs_server tag -r $first_tag -f $CVMFS_TEST_REPO || return 23
