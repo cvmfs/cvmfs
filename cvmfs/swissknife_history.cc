@@ -593,6 +593,13 @@ int CommandCreateTag::Main(const ArgumentList &args) {
     old_hash = new_tag.root_hash;
   }
 
+  // check if we would move the tag to the same hash
+  if (move_tag && old_hash == root_hash) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' already points to '%s'",
+             tag_name.c_str(), old_hash.ToString().c_str());
+    return 1;
+  }
+
   // set up the tag to be inserted
   new_tag.name        = tag_name;
   new_tag.root_hash   = root_hash;
