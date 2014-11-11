@@ -839,6 +839,7 @@ ParameterList CommandInfoTag::GetParams() {
   InsertCommonParameters(r);
 
   r.push_back(Parameter::Mandatory('n', "name of the tag to be inspected"));
+  r.push_back(Parameter::Switch   ('x', "machine readable output"));
   return r;
 }
 
@@ -880,7 +881,8 @@ void CommandInfoTag::PrintHumanReadableInfo(
 
 
 int CommandInfoTag::Main(const ArgumentList &args) {
-  const std::string tag_name = *args.find('n')->second;
+  const std::string tag_name         = *args.find('n')->second;
+  const bool        machine_readable = (args.find('x') != args.end());
 
   // initialize the Environment (taking ownership)
   const bool history_read_write = false;
@@ -897,7 +899,11 @@ int CommandInfoTag::Main(const ArgumentList &args) {
     return 1;
   }
 
-  PrintHumanReadableInfo(tag);
+  if (machine_readable) {
+    PrintTagMachineReadable(tag);
+  } else {
+    PrintHumanReadableInfo(tag);
+  }
 
   return 0;
 
