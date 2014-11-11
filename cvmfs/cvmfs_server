@@ -3039,7 +3039,7 @@ tag() {
       -m $new_manifest                                   \
       -b $base_hash                                      \
       -e $CVMFS_HASH_ALGORITHM                           \
-      -d '$tag_names'" || exit 1
+      -d '$tag_names'" || die "Did not remove anything"
     sign_manifest $name $new_manifest || die "Failed to sign repo"
   fi
 }
