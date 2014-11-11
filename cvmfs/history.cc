@@ -263,7 +263,7 @@ bool History::Rollback(const Tag &updated_target_tag) {
   assert (old_target_tag.description == updated_target_tag.description);
 
   // rollback the history to the target tag
-  // (essentially removing all intermediate tags including the old target tag)
+  // (essentially removing all intermediate tags + the old target tag)
   success = rollback_tag_->BindTargetTag(old_target_tag) &&
             rollback_tag_->Execute()                     &&
             rollback_tag_->Reset();
