@@ -80,8 +80,11 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandPeek());
   command_list.push_back(new swissknife::CommandSync());
   command_list.push_back(new swissknife::CommandApplyDirtab());
-  command_list.push_back(new swissknife::CommandTag());
-  command_list.push_back(new swissknife::CommandRollback());
+  command_list.push_back(new swissknife::CommandCreateTag());
+  command_list.push_back(new swissknife::CommandRemoveTag());
+  command_list.push_back(new swissknife::CommandListTags());
+  command_list.push_back(new swissknife::CommandInfoTag());
+  command_list.push_back(new swissknife::CommandRollbackTag());
   command_list.push_back(new swissknife::CommandSign());
   command_list.push_back(new swissknife::CommandLetter());
   command_list.push_back(new swissknife::CommandCheck());

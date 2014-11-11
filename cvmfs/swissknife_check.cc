@@ -649,27 +649,22 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     else
       tmp_file = DownloadPiece(manifest->history(), 'H');
     if (tmp_file == "") {
-      LogCvmfs(kLogCvmfs, kLogStdout, "failed to load history database %s",
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to load history database %s",
                manifest->history().ToString().c_str());
       delete manifest;
       return 1;
     }
-    history::HistoryDatabase *tag_db =
-      history::HistoryDatabase::Open(tmp_file,
-                                     history::HistoryDatabase::kOpenReadOnly);
+    history::History *tag_db = history::History::Open(tmp_file);
     if (NULL == tag_db) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "failed to open history database");
-      unlink(tmp_file.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database %s at %s",
+               manifest->history().ToString().c_str(), tmp_file.c_str());
       delete manifest;
       return 1;
     }
-    history::TagList tag_list;
-    int retval = tag_list.Load(tag_db);
+    history::History::Tag tag;
+    const bool retval = tag_db->GetByName(tag_name, &tag);
     delete tag_db;
-    assert(retval);
     unlink(tmp_file.c_str());
-    history::Tag tag;
-    retval = tag_list.FindTag(tag_name, &tag);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStdout, "no such tag: %s", tag_name.c_str());
       unlink(tmp_file.c_str());

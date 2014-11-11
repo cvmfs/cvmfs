@@ -11,293 +11,298 @@
 
 #include "logging.h"
 #include "util.h"
+#include "history_sql.h"
 
 using namespace std;  // NOLINT
 
 namespace history {
 
-const float HistoryDatabase::kLatestSchema = 1.0;
-const float HistoryDatabase::kLatestSupportedSchema = 1.0;
-const unsigned HistoryDatabase::kLatestSchemaRevision = 1;
+
+const std::string History::kPreviousRevisionKey = "previous_revision";
+
+History::~History() {}
 
 
-/**
- * This method creates a new database file and initializes the database schema.
- */
-bool HistoryDatabase::CreateEmptyDatabase() {
-  assert (read_write());
-  return sqlite::Sql(sqlite_db(),
-    "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
-    "  timestamp INTEGER, channel INTEGER, description TEXT, size INTEGER, "
-    "  CONSTRAINT pk_tags PRIMARY KEY (name))").Execute();
+History* History::Open(const std::string &file_name) {
+  const bool read_write = false;
+  return Open(file_name, read_write);
 }
 
 
-bool HistoryDatabase::InsertInitialValues(const std::string &repository_name) {
-  assert (read_write());
-  return this->SetProperty("fqrn", repository_name);
+History* History::OpenWritable(const std::string &file_name) {
+  const bool read_write = true;
+  return Open(file_name, read_write);
 }
 
 
-bool HistoryDatabase::CheckSchemaCompatibility() {
-  return ! ((schema_version() < kLatestSupportedSchema - kSchemaEpsilon) ||
-            (schema_version() > kLatestSchema          + kSchemaEpsilon));
+History* History::Open(const std::string &file_name, const bool read_write) {
+  History *history = new History();
+  if (NULL == history || ! history->OpenDatabase(file_name, read_write)) {
+    delete history;
+    return NULL;
+  }
+
+  LogCvmfs(kLogHistory, kLogDebug, "opened history database '%s' for "
+                                   "repository '%s' %s",
+           file_name.c_str(), history->fqrn().c_str(),
+           ((history->IsWritable()) ? "(writable)" : ""));
+
+  return history;
 }
 
 
-bool HistoryDatabase::LiveSchemaUpgradeIfNecessary() {
-  assert (read_write());
+History* History::Create(const std::string &file_name,
+                         const std::string &fqrn) {
+  History *history = new History();
+  if (NULL == history || ! history->CreateDatabase(file_name, fqrn)) {
+    delete history;
+    return NULL;
+  }
 
-  if (schema_revision() == 0) {
-    LogCvmfs(kLogHistory, kLogDebug, "upgrading schema revision");
+  LogCvmfs(kLogHistory, kLogDebug, "created empty history database '%s' for"
+                                   "repository '%s'",
+           file_name.c_str(), fqrn.c_str());
+  return history;
+}
 
-    sqlite::Sql sql_upgrade(sqlite_db(), "ALTER TABLE tags ADD size INTEGER;");
-    if (!sql_upgrade.Execute()) {
-      LogCvmfs(kLogHistory, kLogDebug, "failed to upgrade tags table");
-      return false;
-    }
 
-    set_schema_revision(1);
-    if (! StoreSchemaRevision()) {
-      LogCvmfs(kLogHistory, kLogDebug, "failed tp upgrade schema revision");
-      return false;
-    }
+bool History::OpenDatabase(const std::string &file_name, const bool read_write)
+{
+  assert (! database_);
+  const HistoryDatabase::OpenMode mode = (read_write)
+                                           ? HistoryDatabase::kOpenReadWrite
+                                           : HistoryDatabase::kOpenReadOnly;
+  database_ = HistoryDatabase::Open(file_name, mode);
+  if (! database_.IsValid()) {
+    return false;
+  }
+
+  if (! database_->HasProperty(HistoryDatabase::kFqrnKey)) {
+    LogCvmfs(kLogHistory, kLogDebug, "opened history database does not provide "
+                                     "an FQRN under '%s'",
+             HistoryDatabase::kFqrnKey.c_str());
+    return false;
+  }
+
+  fqrn_ = database_->GetProperty<std::string>(HistoryDatabase::kFqrnKey);
+  return Initialize();
+}
+
+
+bool History::CreateDatabase(const std::string &file_name,
+                             const std::string &fqrn) {
+  assert (! database_);
+  assert (fqrn_.empty());
+  fqrn_     = fqrn;
+  database_ = HistoryDatabase::Create(file_name);
+  if (! database_ || ! database_->InsertInitialValues(fqrn)) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to initialize empty database '%s',"
+                                     "for repository '%s'",
+             file_name.c_str(), fqrn.c_str());
+    return false;
+  }
+
+  return Initialize();
+}
+
+
+bool History::Initialize() {
+  if (! PrepareQueries()) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to prepare statements of history");
+    return false;
   }
 
   return true;
 }
 
 
-//------------------------------------------------------------------------------
+bool History::PrepareQueries() {
+  assert (database_);
+  insert_tag_       = new SqlInsertTag      (database_.weak_ref());
+  remove_tag_       = new SqlRemoveTag      (database_.weak_ref());
+  find_tag_         = new SqlFindTag        (database_.weak_ref());
+  find_tag_by_date_ = new SqlFindTagByDate  (database_.weak_ref());
+  count_tags_       = new SqlCountTags      (database_.weak_ref());
+  list_tags_        = new SqlListTags       (database_.weak_ref());
+  channel_tips_     = new SqlGetChannelTips (database_.weak_ref());
+  get_hashes_       = new SqlGetHashes      (database_.weak_ref());
+  rollback_tag_     = new SqlRollbackTag    (database_.weak_ref());
 
-
-bool SqlTag::BindTag(const Tag &tag) {
-  return (
-    BindText(1, tag.name) &&
-    BindTextTransient(2, tag.root_hash.ToString()) && // temporary from ToString
-    BindInt64(3, tag.revision) &&
-    BindInt64(4, tag.timestamp) &&
-    BindInt64(5, tag.channel) &&
-    BindText(6, tag.description) &&
-    BindInt64(7, tag.size)
-  );
+  return (insert_tag_ && remove_tag_ && find_tag_  && find_tag_by_date_ &&
+          count_tags_ && list_tags_ && channel_tips_ && get_hashes_ &&
+          rollback_tag_);
 }
 
 
-Tag SqlTag::RetrieveTag() {
-  Tag result;
-  result.name = string(reinterpret_cast<const char *>(RetrieveText(0)));
-  const string hash_str(reinterpret_cast<const char *>(RetrieveText(1)));
-  result.root_hash = shash::MkFromHexPtr(shash::HexPtr(hash_str));
-  result.revision = RetrieveInt64(2);
-  result.timestamp = RetrieveInt64(3);
-  result.channel = static_cast<UpdateChannel>(RetrieveInt64(4));
-  result.description = string(reinterpret_cast<const char *>(RetrieveText(5)));
-  result.size = RetrieveInt64(6);
-  return result;
+bool History::BeginTransaction()  const { return database_->BeginTransaction();  }
+bool History::CommitTransaction() const { return database_->CommitTransaction(); }
+
+
+bool History::SetPreviousRevision(const shash::Any &history_hash) {
+  assert (database_);
+  assert (IsWritable());
+  return database_->SetProperty(kPreviousRevisionKey, history_hash.ToString());
 }
 
 
-//------------------------------------------------------------------------------
+bool History::IsWritable() const {
+  assert (database_);
+  return database_->read_write();
+}
 
-
-bool TagList::Load(HistoryDatabase *database) {
-  assert(database);
-  string size_field = "0";
-  if (database->schema_revision() >= 1)
-    size_field = "size";
-  SqlTag sql_load(*database,
-    // NULL for size automatically converted to 0
-    "SELECT name, hash, revision, timestamp, channel, description, " +
-    size_field +
-    " FROM tags ORDER BY revision;");
-  while (sql_load.FetchRow())
-    list_.push_back(sql_load.RetrieveTag());
-
-  return true;
+int History::GetNumberOfTags() const {
+  assert (database_);
+  assert (count_tags_.IsValid());
+  bool retval = count_tags_->FetchRow();
+  assert (retval);
+  const int count = count_tags_->RetrieveCount();
+  retval = count_tags_->Reset();
+  assert (retval);
+  return count;
 }
 
 
-bool TagList::Store(HistoryDatabase *database) {
-  assert(database);
-  SqlTag sql_erase(*database, "DELETE FROM tags;");
-  bool retval = sql_erase.Execute();
-  assert(retval);
+bool History::Insert(const History::Tag &tag) {
+  assert (database_);
+  assert (insert_tag_.IsValid());
 
-  SqlTag sql_store(*database,
-    "INSERT INTO tags "
-    "(name, hash, revision, timestamp, channel, description, size) VALUES "
-    "(:n, :h, :r, :t, :c, :d, :s);");
-  for (unsigned i = 0; i < list_.size(); ++i) {
-    retval = sql_store.BindTag(list_[i]);
-    assert(retval);
-    retval = sql_store.Execute();
-    if (!retval) {
-      LogCvmfs(kLogHistory, kLogStderr, "failed to store taglist (%s)",
-               database->GetLastErrorMsg().c_str());
-      abort();
-    }
-    sql_store.Reset();
-  }
-
-  return true;
+  return insert_tag_->BindTag(tag) &&
+         insert_tag_->Execute()    &&
+         insert_tag_->Reset();
 }
 
 
-string TagList::List() {
-  string result =
-    "NAME | HASH | SIZE | REVISION | TIMESTAMP | CHANNEL | DESCRIPTION\n";
-  for (unsigned i = 0; i < list_.size(); ++i) {
-    Tag tag(list_[i]);
-    string tag_size = "n/a";
-    if (tag.size > 0 && tag.size < 1024)
-      tag_size = StringifyInt(tag.size);
-    else if (tag.size >= 1024 && tag.size < 1024*1024)
-      tag_size = StringifyInt(tag.size/1024) + "kB";
-    else if (tag.size >= 1024*1024)
-      tag_size = StringifyInt(tag.size/(1024*1024)) + "MB";
-    result += tag.name + " | " + tag.root_hash.ToString() + " | " +
-              tag_size + " | " +
-              StringifyInt(tag.revision) + " | " +
-              StringifyTime(tag.timestamp, true) + " | " +
-              StringifyInt(tag.channel) + " | " + tag.description + "\n";
-  }
-  return result;
+bool History::Remove(const std::string &name) {
+  assert (database_);
+  assert (remove_tag_.IsValid());
+
+  return remove_tag_->BindName(name) &&
+         remove_tag_->Execute()      &&
+         remove_tag_->Reset();
 }
 
 
-bool TagList::FindTag(const string &name, Tag *tag) {
-  assert(tag);
-  for (unsigned i = 0; i < list_.size(); ++i) {
-    if (list_[i].name == name) {
-      *tag = list_[i];
-      return true;
-    }
-  }
-  return false;
-}
-
-
-bool TagList::FindTagByDate(const time_t seconds_utc, Tag *tag) {
-  assert(tag);
-  bool result = false;
-  for (unsigned i = 0; i < list_.size(); ++i) {
-    if (list_[i].timestamp > seconds_utc)
-      break;
-    *tag = list_[i];
-    result = true;
-  }
-  return result;
-}
-
-
-bool TagList::FindRevision(const unsigned revision, Tag *tag) {
-  assert(tag);
-  for (unsigned i = 0; i < list_.size(); ++i) {
-    if (list_[i].revision == revision) {
-      *tag = list_[i];
-      return true;
-    }
-  }
-  return false;
-}
-
-
-bool TagList::FindHash(const shash::Any &hash, Tag *tag) {
-  assert(tag);
-  for (unsigned i = 0; i < list_.size(); ++i) {
-    if (list_[i].root_hash == hash) {
-      *tag = list_[i];
-      return true;
-    }
-  }
-  return false;
-}
-
-
-void TagList::Remove(const string &name) {
-  for (vector<Tag>::iterator i = list_.begin(); i < list_.end(); ++i) {
-    if (i->name == name) {
-      list_.erase(i);
-      return;
-    }
-  }
-}
-
-
-TagList::Failures TagList::Insert(const Tag &tag) {
+bool History::Exists(const std::string &name) const {
   Tag existing_tag;
-  if (FindTag(tag.name, &existing_tag))
-    return kFailTagExists;
-
-  list_.push_back(tag);
-  return kFailOk;
+  return GetByName(name, &existing_tag);
 }
 
 
-map<string, shash::Any> TagList::GetAllHashes() {
-  map<string, shash::Any> result;
-  for (unsigned i = 0; i < list_.size(); ++i) {
-    result[list_[i].name] = list_[i].root_hash;
+bool History::GetByName(const std::string &name, Tag *tag) const {
+  assert (database_);
+  assert (find_tag_.IsValid());
+  assert (NULL != tag);
+
+  if (! find_tag_->BindName(name) ||
+      ! find_tag_->FetchRow()) {
+    find_tag_->Reset();
+    return false;
   }
-  return result;
+
+  *tag = find_tag_->RetrieveTag();
+  return find_tag_->Reset();
 }
 
 
-struct revision_comparator {
-  bool operator() (const Tag &tag1, const Tag &tag2) {
-    return tag1.revision < tag2.revision;
+bool History::GetByDate(const time_t timestamp, Tag *tag) const {
+  assert (database_);
+  assert (find_tag_by_date_.IsValid());
+  assert (NULL != tag);
+
+  if (! find_tag_by_date_->BindTimestamp(timestamp) ||
+      ! find_tag_by_date_->FetchRow()) {
+    find_tag_by_date_->Reset();
+    return false;
   }
-};
 
-struct hash_extractor {
-  const shash::Any& operator() (const Tag &tag) {
-    return tag.root_hash;
-  }
-};
-
-std::vector<shash::Any> TagList::GetReferencedHashes() const {
-  // copy the internal tag list and sort it by decending revision
-  std::vector<Tag> tags = list_;
-  std::sort(tags.begin(), tags.end(), revision_comparator());
-
-  // extract the root catalog hashes from it
-  std::vector<shash::Any> hashes(tags.size());
-  std::transform(tags.begin(), tags.end(), hashes.begin(), hash_extractor());
-  return hashes;
+  *tag = find_tag_by_date_->RetrieveTag();
+  return find_tag_by_date_->Reset();
 }
 
 
-// Ordered list, newest releases first
-vector<TagList::ChannelTag> TagList::GetChannelTops() {
-  vector<ChannelTag> result;
-  if (list_.size() == 0)
-    return result;
+bool History::List(std::vector<Tag> *tags) const {
+  assert (list_tags_.IsValid());
+  return RunListing(tags, list_tags_.weak_ref());
+}
 
-  vector<Tag> sorted_tag_list(list_);
-  sort(sorted_tag_list.begin(), sorted_tag_list.end());
+bool History::Tips(std::vector<Tag> *channel_tips) const {
+  assert (channel_tips_.IsValid());
+  return RunListing(channel_tips, channel_tips_.weak_ref());
+}
 
-  set<UpdateChannel> processed_channels;
-  for (int i = sorted_tag_list.size()-1; i >= 0; --i) {
-    UpdateChannel channel = sorted_tag_list[i].channel;
-    if (channel == kChannelTrunk)
-      continue;
-    if (processed_channels.find(channel) == processed_channels.end()) {
-      result.push_back(ChannelTag(channel, sorted_tag_list[i].root_hash));
-      processed_channels.insert(channel);
-    }
+template <class SqlListingT>
+bool History::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
+  assert (database_);
+  assert (NULL != list);
+
+  while (sql->FetchRow()) {
+    list->push_back(sql->RetrieveTag());
   }
-  return result;
+
+  return sql->Reset();
 }
 
 
-void TagList::Rollback(const unsigned until_revision) {
-  for (vector<Tag>::iterator i = list_.begin(); i < list_.end(); ) {
-    if (i->revision >= until_revision)
-      i = list_.erase(i);
-    else
-      ++i;
+bool History::Rollback(const Tag &updated_target_tag) {
+  Tag old_target_tag;
+  bool success = false;
+
+  // open a transaction (if non open yet)
+  const bool need_to_commit = BeginTransaction();
+
+  // retrieve the old version of the target tag from the history
+  success = GetByName(updated_target_tag.name, &old_target_tag);
+  if (! success) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to retrieve old target tag '%s'",
+                                     updated_target_tag.name.c_str());
+    return false;
   }
+
+  // sanity checks
+  assert (old_target_tag.channel     == updated_target_tag.channel);
+  assert (old_target_tag.description == updated_target_tag.description);
+
+  // rollback the history to the target tag
+  // (essentially removing all intermediate tags + the old target tag)
+  success = rollback_tag_->BindTargetTag(old_target_tag) &&
+            rollback_tag_->Execute()                     &&
+            rollback_tag_->Reset();
+  if (! success || Exists(old_target_tag.name)) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to remove intermediate tags in "
+                                     "channel '%d' until '%s' - '%d'",
+                                     old_target_tag.channel,
+                                     old_target_tag.name.c_str(),
+                                     old_target_tag.revision);
+    return false;
+  }
+
+  // insert the provided updated target tag into the history concluding the
+  // rollback operation
+  success = Insert(updated_target_tag);
+  if (! success) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to insert updated target tag '%s'",
+                                     updated_target_tag.name.c_str());
+    return false;
+  }
+
+  if (need_to_commit) {
+    success = CommitTransaction();
+    assert (success);
+  }
+
+  return true;
+}
+
+
+bool History::GetHashes(std::vector<shash::Any> *hashes) const {
+  assert (database_);
+  assert (NULL != hashes);
+
+  while (get_hashes_->FetchRow()) {
+    hashes->push_back(get_hashes_->RetrieveHash());
+  }
+
+  return get_hashes_->Reset();
 }
 
 }  // namespace history

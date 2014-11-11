@@ -6,7 +6,7 @@ get_catalog_file_size() {
   local repo_name="$1"
   local catalog_path="$2"
 
-  cvmfs_server list-catalogs -ms $repo_name | grep -e "^.* $catalog_path$" | sed 's/^\([0-9]*\)B\s.*$/\1/'
+  cvmfs_server list-catalogs -xs $repo_name | grep -e "^.* $catalog_path$" | sed 's/^\([0-9]*\)B\s.*$/\1/'
 }
 
 cvmfs_run_test() {

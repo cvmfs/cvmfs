@@ -63,6 +63,7 @@ set (CVMFS2_DEBUG_SOURCES
   glue_buffer.h glue_buffer.cc
   loader.h compat.cc compat.h
   history.h history.cc
+  history_sql.h history_sql.cc
   quota_listener.h quota_listener.cc
   auto_umount.h auto_umount.cc
   cvmfs.h cvmfs.cc
@@ -154,6 +155,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   dirtab.h dirtab.cc
   history.h history.cc
+  history_sql.h history_sql.cc
   letter.h letter.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc

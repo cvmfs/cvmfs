@@ -7,60 +7,190 @@
 
 #include <string>
 #include "swissknife.h"
+#include "hash.h"
+#include "util_concurrency.h"
+#include "history.h"
+
+namespace manifest {
+  class Manifest;
+}
+
+namespace catalog {
+  class Catalog;
+  class WritableCatalog;
+}
+
+namespace upload {
+  class SpoolerDefinition;
+  class SpoolerResult;
+  class Spooler;
+}
 
 namespace swissknife {
 
+
 class CommandTag : public Command {
  public:
-  ~CommandTag() { };
-  std::string GetName() { return "tag"; };
-  std::string GetDescription() {
-    return "Tags a snapshot.";
-  };
-  ParameterList GetParams() {
-    ParameterList r;
-    r.push_back(Parameter::Mandatory('r', "repository directory / url"));
-    r.push_back(Parameter::Mandatory('b', "base hash"));
-    r.push_back(Parameter::Mandatory('t', "trunk hash"));
-    r.push_back(Parameter::Mandatory('s', "trunk catalog size"));
-    r.push_back(Parameter::Mandatory('i', "trunk revision"));
-    r.push_back(Parameter::Mandatory('n', "repository name"));
-    r.push_back(Parameter::Mandatory('k', "repository public key"));
-    r.push_back(Parameter::Mandatory('o', "history db output file"));
-    r.push_back(Parameter::Optional ('d', "delete a tag"));
-    r.push_back(Parameter::Optional ('a', "add a tag (format: \"name@channel@desc\")"));
-    r.push_back(Parameter::Optional ('h', "tag hash (if different from trunk)"));
-    r.push_back(Parameter::Switch   ('l', "list tags"));
-    r.push_back(Parameter::Optional ('z', "trusted certificate dir(s)"));
+  static const std::string kHeadTag;
+  static const std::string kHeadTagDescription;
+  static const std::string kPreviousHeadTag;
+  static const std::string kPreviousHeadTagDescription;
 
-    return r;
+ protected:
+  typedef std::vector<history::History::Tag> TagList;
+
+ protected:
+  struct Environment {
+    Environment(const std::string &repository_url,
+                const std::string &tmp_path) :
+      repository_url(repository_url), tmp_path(tmp_path) {}
+
+    const std::string              repository_url;
+    const std::string              tmp_path;
+
+    UnlinkGuard                    manifest_path;
+    UniquePtr<manifest::Manifest>  manifest;
+    UniquePtr<manifest::Manifest>  previous_manifest;
+    UniquePtr<history::History>    history;
+    UniquePtr<upload::Spooler>     spooler;
+    UnlinkGuard                    history_path;
+  };
+
+ public:
+  CommandTag() {};
+
+ protected:
+  void InsertCommonParameters(ParameterList &parameters);
+
+  Environment* InitializeEnvironment(const ArgumentList &args,
+                                     const bool read_write);
+  bool CloseAndPublishHistory(Environment *environment);
+  bool UploadCatalogAndUpdateManifest(Environment               *env,
+                                      catalog::WritableCatalog  *catalog);
+  void UploadClosure(const upload::SpoolerResult  &result,
+                           Future<shash::Any>     *hash);
+
+  bool UpdateUndoTags(Environment                  *env,
+                      const history::History::Tag  &current_head_template,
+                      const bool                    undo_rollback = false);
+
+  manifest::Manifest* FetchManifest(const std::string  &repository_url,
+                                    const std::string  &repository_name,
+                                    const std::string  &pubkey_path,
+                                    const std::string  &trusted_certs,
+                                    const shash::Any   &base_hash) const;
+  bool FetchObject(const std::string  &repository_url,
+                   const shash::Any   &object_hash,
+                   const std::string  &hash_suffix,
+                   const std::string   destination_path) const;
+  history::History* GetHistory(const manifest::Manifest  *manifest,
+                               const std::string         &repository_url,
+                               const std::string         &history_path,
+                               const bool                 read_write) const;
+
+  catalog::Catalog* GetCatalog(const std::string  &repository_url,
+                               const shash::Any   &catalog_hash,
+                               const std::string   catalog_path,
+                               const bool          read_write) const;
+
+  void PrintTagMachineReadable(const history::History::Tag &tag) const;
+};
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+class CommandCreateTag : public CommandTag {
+ public:
+  std::string GetName() { return "tag_create"; }
+  std::string GetDescription() {
+    return "Create a tag for a specific snapshot.";
   }
+
+  ParameterList GetParams();
   int Main(const ArgumentList &args);
 };
 
 
-class CommandRollback : public Command {
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+class CommandRemoveTag : public CommandTag {
  public:
-  ~CommandRollback() { };
-  std::string GetName() { return "rollback"; };
+  std::string GetName() { return "tag_remove"; }
   std::string GetDescription() {
-    return "Re-publishes a previous tagged snapshot.  All intermediate "
-           "snapshots become inaccessible.";
-  };
-  ParameterList GetParams() {
-    ParameterList r;
-    r.push_back(Parameter::Mandatory('r', "spooler definition"));
-    r.push_back(Parameter::Mandatory('u', "repository directory / url"));
-    r.push_back(Parameter::Mandatory('b', "base hash"));
-    r.push_back(Parameter::Mandatory('n', "repository name"));
-    r.push_back(Parameter::Mandatory('k', "repository public key"));
-    r.push_back(Parameter::Mandatory('o', "history db output file"));
-    r.push_back(Parameter::Mandatory('m', "manifest output file"));
-    r.push_back(Parameter::Mandatory('t', "revert to this tag"));
-    r.push_back(Parameter::Mandatory('d', "temp directory"));
-    r.push_back(Parameter::Optional ('z', "trusted certificate dir(s)"));
-    return r;
+    return "Remove one or more tags.";
   }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
+};
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+class CommandListTags : public CommandTag {
+ public:
+  std::string GetName() { return "tag_list"; }
+  std::string GetDescription() {
+    return "List tags in the tag database.";
+  }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
+
+ protected:
+  std::string AddPadding(const std::string  &str,
+                         const size_t        padding,
+                         const bool          align_right = false,
+                         const std::string  &fill_char = " ") const;
+
+  void PrintHumanReadableList(const TagList &tags) const;
+  void PrintMachineReadableList(const TagList &tags) const;
+};
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+class CommandInfoTag : public CommandTag {
+ public:
+  std::string GetName() { return "tag_info"; }
+  std::string GetDescription() {
+    return "Obtain detailed information about a tag.";
+  }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
+
+ protected:
+  std::string HumanReadableFilesize(const size_t filesize) const;
+  void PrintHumanReadableInfo(const history::History::Tag &tag) const;
+};
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+class CommandRollbackTag : public CommandTag {
+ public:
+  std::string GetName() { return "tag_rollback"; }
+  std::string GetDescription() {
+    return "Rollback repository to a given tag.";
+  }
+
+  ParameterList GetParams();
   int Main(const ArgumentList &args);
 };
 

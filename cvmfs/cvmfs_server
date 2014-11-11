@@ -117,8 +117,8 @@ cvmfs_mkfqrn() {
 is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
-    resign list info list-tags lstags check transaction abort snapshot skeleton \
-    migrate list-catalogs update-geodb"
+    resign list info tag list-tags lstags check transaction abort snapshot \
+    skeleton migrate list-catalogs update-geodb"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -212,8 +212,8 @@ Supported Commands:
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
-                [-a tag name] [-c tag channel] [-t tag description] [-h hash]
-                [-r tag name] [-n manual revision number] [-v be verbose]
+                [-a tag name] [-c tag channel] [-m tag description]
+                [-n manual revision number] [-v be verbose]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -230,12 +230,19 @@ Supported Commands:
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
   list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
-                [-m machine readable]
+                [-x machine readable]
                 <fully qualified name>
                 Print a full list of all nested catalogs of a repository
   info          <fully qualified name>
                 Print summary about the repository
-  list-tags     <fully qualified name>
+  tag           Create and manage named snapshots
+                [-a create tag <name>] [-c channel] [-m message] [-h root hash]
+                [-r remove tag <name>] [-f don't ask again]
+                [-i inspect tag <name>] [-x machine readable]
+                [-l list tags (alias for list-tags)] [-x machine readable]
+                <fully qualified name>
+  list-tags     [-x machine readable]
+                <fully qualified name>
                 Print named tags (snapshots) of the repository
   check         [-c disable data chunk existence check]
                 [-i check data integrity] (may take some time)]
@@ -1500,6 +1507,25 @@ get_published_root_hash() {
 }
 
 
+# checks if a given tag already exists in the repository's history database
+#
+# @param repository_name   the name of the repository to be checked
+# @param tag               the tag name to be checked
+# @return                  0 if tag already exists
+check_tag_existence() {
+  local repository_name="$1"
+  local tag="$2"
+
+  load_repo_config $repository_name
+  cvmfs_swissknife tag_info                   \
+    -w $CVMFS_STRATUM0                        \
+    -t ${CVMFS_SPOOL_DIR}/tmp                 \
+    -p /etc/cvmfs/keys/${repository_name}.pub \
+    -f $repository_name                       \
+    -n "$tag" 2>&1 | grep -qv "does not exist" > /dev/null
+}
+
+
 migrate_legacy_dirtab() {
   local name=$1
   local dirtab_path="/cvmfs/${name}/.cvmfsdirtab"
@@ -2761,7 +2787,7 @@ list_catalogs() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "sehm" option
+  while getopts "sehx" option
   do
     case $option in
       s)
@@ -2773,7 +2799,7 @@ list_catalogs() {
       h)
         param_list="$param_list -d"
       ;;
-      m)
+      x)
         param_list=$(echo "$param_list" | sed 's/-t\s\?//')
       ;;
       ?)
@@ -2854,29 +2880,222 @@ Copy /etc/cvmfs/keys/${name}.pub to the client"
 ################################################################################
 
 
+tag() {
+  local name
+  local tag_name=""
+  local action_add=0
+  local add_tag_channel
+  local add_tag_description
+  local add_tag_root_hash
+  local action_remove=0
+  local tag_names=""
+  local remove_tag_force=0
+  local action_inspect=0
+  local action_list=0
+  local machine_readable=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "a:c:m:h:r:flxi:" option
+  do
+    case $option in
+      a)
+        tag_name="$OPTARG"
+        action_add=1
+      ;;
+      c)
+        add_tag_channel=$OPTARG
+        ;;
+      m)
+        add_tag_description="$OPTARG"
+        ;;
+      h)
+        add_tag_root_hash=$OPTARG
+        ;;
+      r)
+        [ -z "$tag_names" ]      \
+          && tag_names="$OPTARG" \
+          || tag_names="$tag_names $OPTARG"
+        action_remove=1
+        ;;
+      f)
+        remove_tag_force=1
+        ;;
+      l)
+        action_list=1
+        ;;
+      x)
+        machine_readable=1
+        ;;
+      i)
+        tag_name="$OPTARG"
+        action_inspect=1
+        ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command tag: Unrecognized option: $1"
+      ;;
+    esac
+  done
+
+  # get repository name
+  shift $(($OPTIND-1))
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # check for ambiguous action requests
+  local actions=$(( $action_remove+$action_list+$action_add+$action_inspect ))
+  [ $actions -le 1 ] || die "Ambiguous parameters. Please either add, remove or list tags."
+
+  # check for the alias of `cvmfs_server list-tags`
+  if [ $action_list -eq 1 ] || [ $actions -eq 0 ]; then
+    list_tags $([ $machine_readable -ne 0 ] && echo "-x") $name
+    exit $?
+  fi
+
+  # sanity checks
+  load_repo_config $name
+  is_owner_or_root $name                    || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  is_stratum0 $name                         || die "This is not a stratum 0 repository"
+  ! is_publishing $name                     || die "Repository is currently publishing"
+  [ ! -z "$tag_name" -o ! -z "$tag_names" ] || die "Tag name missing"
+  echo "$tag_name" | grep -q -v " "         || die "Spaces are not allowed in tag names"
+  health_check $name
+
+  local base_hash="$(get_mounted_root_hash $name)"
+  local user_shell="$(get_user_shell $name)"
+
+  # tag inspection does not need to open a repository transaction
+  if [ $action_inspect -eq 1 ]; then
+    local tag_list_command=
+    local tag_list_command="cvmfs_swissknife tag_info    \
+      -w $CVMFS_STRATUM0                                 \
+      -t ${CVMFS_SPOOL_DIR}/tmp                          \
+      -p /etc/cvmfs/keys/${name}.pub                     \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
+      -f $name                                           \
+      -n $tag_name"
+    if [ $machine_readable -ne 0 ]; then
+      tag_list_command="$tag_list_command -x"
+    fi
+    $user_shell "$tag_list_command"
+    return $?
+  fi
+
+  # all following commands need an open repository transaction and are supposed
+  # to commit or abort it after performing a tag database manipulation
+  is_in_transaction $name && die "Cannot change repository tags while in a transaction"
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open transaction for tag manipulation"
+
+  # adds (or moves) a tag in the database
+  if [ $action_add -eq 1 ]; then
+    local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    local tag_create_command="cvmfs_swissknife tag_create \
+      -w $CVMFS_STRATUM0                                  \
+      -t ${CVMFS_SPOOL_DIR}/tmp                           \
+      -p /etc/cvmfs/keys/${name}.pub                      \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs  \
+      -f $name                                            \
+      -r $CVMFS_UPSTREAM_STORAGE                          \
+      -m $new_manifest                                    \
+      -b $base_hash                                       \
+      -e $CVMFS_HASH_ALGORITHM                            \
+      -a $tag_name"
+    if [ ! -z "$add_tag_channel" ]; then
+      tag_create_command="$tag_create_command -c $add_tag_channel"
+    fi
+    if [ ! -z "$add_tag_description" ]; then
+      tag_create_command="$tag_create_command -d '$add_tag_description'"
+    fi
+    if [ ! -z "$add_tag_root_hash" ]; then
+      tag_create_command="$tag_create_command -h $add_tag_root_hash"
+    fi
+    $user_shell "$tag_create_command" || exit 1
+    sign_manifest $name $new_manifest || die "Failed to sign repo"
+  fi
+
+  # removes one or more tags from the database
+  if [ $action_remove -eq 1 ]; then
+    if [ $remove_tag_force -eq 0 ]; then
+      echo "You are about to remove these tags from $name:"
+      for t in $tag_names; do echo "* $t"; done
+      echo
+      local reply
+      read -p "Are you sure (y/N)? " reply
+      if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+        return 1
+      fi
+    fi
+
+    local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    $user_shell "cvmfs_swissknife tag_remove             \
+      -w $CVMFS_STRATUM0                                 \
+      -t ${CVMFS_SPOOL_DIR}/tmp                          \
+      -p /etc/cvmfs/keys/${name}.pub                     \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
+      -f $name                                           \
+      -r $CVMFS_UPSTREAM_STORAGE                         \
+      -m $new_manifest                                   \
+      -b $base_hash                                      \
+      -e $CVMFS_HASH_ALGORITHM                           \
+      -d '$tag_names'" || die "Did not remove anything"
+    sign_manifest $name $new_manifest || die "Failed to sign repo"
+  fi
+}
+
+
+################################################################################
+
+
 lstags() {
   list_tags "$@" # backward compatibility alias
+  echo "NOTE: cvmfs_server lstags is deprecated! Use cvmfs_server list-tags instead" 1>&2
 }
 
 list_tags() {
   local name
+  local machine_readable=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "x" option; do
+    case $option in
+      x)
+        machine_readable=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command list-tags: Unrecognized option: $1"
+      ;;
+    esac
+  done
 
   # get repository name
+  shift $(($OPTIND-1))
   check_parameter_count_with_guessing $#
   name=$(get_or_guess_repository_name $1)
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum0 $name || die "This is not a stratum 0 repository"
+  is_stratum0 $name                || die "This is not a stratum 0 repository"
 
   # get repository information
   load_repo_config $name
   local base_hash=$(get_mounted_root_hash $name)
-  cvmfs_swissknife tag -r $CVMFS_STRATUM0 -b $base_hash -t 0000000000000000000000000000000000000000 \
-    -i 0 -s 0 -n ${name} -o ${CVMFS_SPOOL_DIR}/show_history \
-    -k /etc/cvmfs/keys/${name}.pub \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs -l
-  rm -f ${CVMFS_SPOOL_DIR}/show_history
+  local user_shell="$(get_user_shell $name)"
+  local list_command="cvmfs_swissknife tag_list        \
+    -w $CVMFS_STRATUM0                                 \
+    -t ${CVMFS_SPOOL_DIR}/tmp                          \
+    -p /etc/cvmfs/keys/${name}.pub                     \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
+    -f $name                                           \
+    -b $base_hash"
+  if [ $machine_readable -ne 0 ]; then
+    list_command="$list_command -x"
+  fi
+
+  $user_shell "$list_command"
 }
 
 
@@ -3167,16 +3386,13 @@ publish() {
   local tag_name=
   local tag_channel=00
   local tag_description=
-  local tag_hash=
-  local add_tag=
-  local remove_tag=
   local retcode=0
   local verbosity=""
   local manual_revision=""
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:h:c:t:r:vn:" option
+  while getopts "dDpa:c:m:vn:" option
   do
     case $option in
       d)
@@ -3189,26 +3405,13 @@ publish() {
         tweaks_option="-d"
       ;;
       a)
-        add_tag="-a"
         tag_name="$OPTARG"
       ;;
-      h)
-        add_tag="-a"
-        tag_hash="-h $OPTARG"
-      ;;
       c)
-        add_tag="-a"
         tag_channel="$OPTARG"
       ;;
-      t)
-        add_tag="-a"
+      m)
         tag_description="$OPTARG"
-      ;;
-      r)
-        remove_tag="-d '$OPTARG'"
-        if [ "x$OPTARG" = "xtrunk" -o "x$OPTARG" = "xtrunk-previous" ]; then
-          echo "Warning: won't delete $OPTARG tag"
-        fi
       ;;
       v)
         verbosity="-x"
@@ -3230,14 +3433,9 @@ publish() {
   check_multiple_repository_existence "$names"
 
   # sanity checks
-  if [ "x$add_tag" != "x" ]; then
-    [ "x$tag_name" != "x" ]               || die "Tag name missing"
+  if [ ! -z "$tag_name" ]; then
     echo $tag_name | grep -q -v " "       || die "Spaces are not allowed in tag names"
-    if list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
-       [ x"$tag_hash" = "x" ]; then
-      die "Tag name '$tag_name' is already in use. Maybe you wanted to specify -h to move it?"
-    fi
-    add_tag="-a \"${tag_name}@${tag_channel}@${tag_description}\""
+    check_tag_existence $name "$tag_name" && die "Tag name '$tag_name' is already in use."
   fi
 
   for name in $names; do
@@ -3267,13 +3465,6 @@ publish() {
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
-    if [ "x$add_tag" != "x" ] && \
-       list_tags $name | cut --delimiter=' ' --fields=1 | grep -q "^$tag_name$" &&
-       [ x"$tag_hash" = "x" ]; then
-      echo "Tag name '$tag_name' is already in use for repository $name. Maybe you wanted to specify -h to move it?"
-      retcode=1
-      continue
-    fi
     local revision_number=$($swissknife info -r $stratum0 -v)
     if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
       echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
@@ -3281,11 +3472,10 @@ publish() {
       continue
     fi
 
-    if [ "x$CVMFS_AUTO_TAG" = "xtrue" -a "x$tag_name" = "x" ]; then
+    if [ -z "$tag_name" ] && [ x"$CVMFS_AUTO_TAG" = x"true" ]; then
       local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
       tag_name="generic-$timestamp"
       echo "Using auto tag '$tag_name'"
-      add_tag="-a $tag_name"
     fi
 
     # enable the debug mode?
@@ -3349,13 +3539,23 @@ publish() {
     if [ "x$manual_revision" != "x" ]; then
       sync_command="$sync_command -v $manual_revision"
     fi
-    local tag_command="$swissknife tag -r $stratum0 \
+    local tag_command="$swissknife tag_create \
+      -r $upstream \
+      -w $stratum0 \
+      -t ${spool_dir}/tmp \
+      -m ${spool_dir}/tmp/manifest \
+      -p /etc/cvmfs/keys/${name}.pub \
+      -f $name \
       -b $base_hash \
-      -n $name \
-      -o ${spool_dir}/tmp/history \
-      -k /etc/cvmfs/keys/${name}.pub \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
-      $add_tag $remove_tag"
+      $hash_algo \
+      -a $tag_name \
+      -x" # -x enables magic undo tag handling
+    if [ ! -z "$tag_channel" ]; then
+      tag_command="$tag_command -c $tag_channel"
+    fi
+    if [ ! -z "$tag_description" ]; then
+      tag_command="$tag_command -d '$tag_description'"
+    fi
 
     # ---> do it! (from here on we are changing things)
     publish_before_hook $name
@@ -3369,12 +3569,6 @@ publish() {
     publish_starting $name
     $user_shell "$sync_command"      || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     [ -f ${spool_dir}/tmp/manifest ] || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
-
-    # gather information of new (uncommitted) revision
-    local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-    local trunk_revision=$(grep "^S" ${spool_dir}/tmp/manifest | tr -d S)
-    local trunk_size=$(grep "^B" ${spool_dir}/tmp/manifest | tr -d B)
-    tag_command="$tag_command -t $trunk_hash -s $trunk_size -i $trunk_revision $tag_hash"
 
     # committing newly created revision
     echo "Tagging $name"
@@ -3416,7 +3610,8 @@ rollback() {
   local spool_dir
   local stratum0
   local upstream
-  local target_tag="trunk-previous"
+  local target_tag=""
+  local undo_rollback=1
   local force=0
 
   # optional parameter handling
@@ -3426,6 +3621,7 @@ rollback() {
     case $option in
       t)
         target_tag=$OPTARG
+        undo_rollback=0
       ;;
       f)
         force=1
@@ -3459,65 +3655,60 @@ rollback() {
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $user"
   check_repository_compatibility
   check_expiry $stratum0  || die "Repository whitelist is expired!"
-  is_in_transaction $name || die "Not in a transaction"
-  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
+  is_in_transaction $name && die "Cannot rollback a repository in a transaction"
   is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
+
+  if [ $undo_rollback -eq 1 ]; then
+    if ! check_tag_existence $name "trunk-previous"; then
+      die "More than one anonymous undo rollback is not supported. Please specify a tag name (-t)"
+    fi
+  elif ! check_tag_existence $name "$target_tag"; then
+    die "Target tag '$target_tag' does not exist"
+  fi
 
   if [ $force -ne 1 ]; then
     local reply
-    read -p "You are about to IRREVERSIBLY ROLLBACK AND REPUBLISH TAG $target_tag AS THE LATEST REVISION!  Are you sure (y/N)? " reply
+    if [ $undo_rollback -eq 1 ]; then
+      read -p "You are about to UNDO your last published revision!  Are you sure (y/N)? " reply
+    else
+      read -p "You are about to ROLLBACK to $target_tag AS THE LATEST REVISION!  Are you sure (y/N)? " reply
+    fi
     if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
       return 1
     fi
   fi
 
   # prepare the shell commands
-  local swissknife="cvmfs_swissknife"
-
   local user_shell="$(get_user_shell $name)"
   local base_hash=$(get_mounted_root_hash $name)
 
-  local rollback_command="$swissknife rollback -u $stratum0 \
-    -r $upstream \
-    -b $base_hash \
-    -n $name \
-    -k /etc/cvmfs/keys/${name}.pub \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
-    -o ${spool_dir}/tmp/history \
-    -m ${spool_dir}/tmp/manifest \
-    -d ${spool_dir}/tmp \
-    -t $target_tag"
-
-  # check if we have open file descriptors on /cvmfs/<name>
-  local use_fd_fallback=0
-  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
+  local rollback_command="cvmfs_swissknife tag_rollback \
+    -w $stratum0                                        \
+    -t ${spool_dir}/tmp                                 \
+    -p /etc/cvmfs/keys/${name}.pub                      \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs  \
+    -f $name                                            \
+    -r $upstream                                        \
+    -m ${spool_dir}/tmp/manifest                        \
+    -b $base_hash                                       \
+    -e $CVMFS_HASH_ALGORITHM"
+  if [ ! -z "$target_tag" ]; then
+    rollback_command="$rollback_command -n $target_tag"
+  fi
 
   # do it!
-  publish_before_hook
-  publish_starting $name
-  $user_shell "$rollback_command" || { publish_failed $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
+  echo "Rolling back repository (leaving behind $base_hash)"
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open transaction for rollback"
+
+  $user_shell "$rollback_command" || die "Rollback failed\n\nExecuted Command:\n$rollback_command";
 
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-  sign_manifest $name ${spool_dir}/tmp/manifest || { publish_failed; die "Signing failed"; }
+  sign_manifest $name ${spool_dir}/tmp/manifest || die "Signing failed";
   set_ro_root_hash $name $trunk_hash
 
   echo "Flushing file system buffers"
   sync
-
-  # check again for open file descriptors (potential race condition)
-  if has_file_descriptors_on_mount_point $name && \
-     [ $use_fd_fallback -ne 1 ]; then
-    file_descriptor_warning $name
-    echo "Forcing remount of already rolled back repository revision"
-    use_fd_fallback=1
-  else
-    echo "Remounting rolled back repository revision"
-  fi
-
-  sync
-  close_transaction  $name $use_fd_fallback
-  publish_after_hook $name
-  publish_succeeded  $name
 }
 
 

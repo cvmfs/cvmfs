@@ -78,24 +78,9 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
 
-  // Z expands to a pipe-separated string of channel-hash pairs
-  vector<history::TagList::ChannelTag> channel_tops;
-  if ((iter = content.find('Z')) != content.end()) {
-    vector<string> elements = SplitString(iter->second, '|');
-    for (unsigned i = 0; i < elements.size(); ++i) {
-      assert(elements[i].length() > 2);
-      int channel_int = 16 * HexDigit2Int(elements[i][0]) +
-                        HexDigit2Int(elements[i][1]);
-      history::UpdateChannel channel =
-        static_cast<history::UpdateChannel>(channel_int);
-      channel_tops.push_back(history::TagList::ChannelTag(
-        channel, MkFromHexPtr(shash::HexPtr(elements[i].substr(2)))));
-    }
-  }
-
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
-                      history, publish_timestamp, channel_tops);
+                      history, publish_timestamp);
 }
 
 
@@ -133,11 +118,7 @@ string Manifest::ExportString() const {
     manifest += "H" + history_.ToString() + "\n";
   if (publish_timestamp_ > 0)
     manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
-
-  for (unsigned i = 0; i < channel_tops_.size(); ++i) {
-    manifest += "Z" + StringifyByteAsHex(channel_tops_[i].channel) +
-                channel_tops_[i].root_hash.ToString() + "\n";
-  }
+  // Reserved: Z -> for identification of channel tips
 
   return manifest;
 }
