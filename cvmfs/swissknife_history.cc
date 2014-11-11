@@ -682,10 +682,19 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
     return 1;
   }
 
-  // delete the tags from the tag database
+  // delete the tags from the tag database and print their root hashes
   i = condemned_tags.begin();
   env->history->BeginTransaction();
   for (; i != iend; ++i) {
+    // print some information about the tag to be deleted
+    history::History::Tag condemned_tag;
+    const bool found_tag = env->history->GetByName(*i, &condemned_tag);
+    assert (found_tag);
+    LogCvmfs(kLogCvmfs, kLogStdout, "deleting '%s' (%s)",
+             condemned_tag.name.c_str(),
+             condemned_tag.root_hash.ToString().c_str());
+
+    // remove the tag
     if (! env->history->Remove(*i)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to remove tag '%s' from history",
                i->c_str());
