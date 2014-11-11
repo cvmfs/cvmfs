@@ -534,6 +534,29 @@ cvmfs_run_test() {
   echo "check the number of tags"
   [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | wc -l) -eq 4 ] || return 43
 
+  # ============================================================================
+
+  echo "create a new revision to have an undo point"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO      || return 44
+
+  echo "check if trunk-previous is there"
+  cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 45
+
+  # ============================================================================
+
+  echo "open transaction to see if rollback fails in transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "try to rollback (should fail)"
+  cvmfs_server rollback -f $CVMFS_TEST_REPO && return 46
+
+  echo "check if tag is still there"
+  cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 47
+
+  echo "abort transaction"
+  cvmfs_server abort -f $CVMFS_TEST_REPO || return 48
+
   return 0
 }
 
