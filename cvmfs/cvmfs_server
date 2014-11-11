@@ -3692,6 +3692,7 @@ rollback() {
   fi
 
   # do it!
+  echo "Rolling back repository (leaving behind $base_hash)"
   trap "close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for rollback"
 
