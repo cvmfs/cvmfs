@@ -532,7 +532,7 @@ cvmfs_run_test() {
   done
 
   echo "check the number of tags"
-  [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | wc -l) -eq 4 ] || return 43
+  [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | wc -l) -eq 5 ] || return 43
 
   # ============================================================================
 
