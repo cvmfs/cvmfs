@@ -92,6 +92,8 @@ class CommandTag : public Command {
                                const shash::Any   &catalog_hash,
                                const std::string   catalog_path,
                                const bool          read_write) const;
+
+  void PrintTagMachineReadable(const history::History::Tag &tag) const;
 };
 
 

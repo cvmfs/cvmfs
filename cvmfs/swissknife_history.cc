@@ -477,6 +477,19 @@ catalog::Catalog* CommandTag::GetCatalog(
 }
 
 
+void CommandTag::PrintTagMachineReadable(const history::History::Tag &tag) const
+{
+   LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s",
+             tag.name.c_str(),
+             tag.root_hash.ToString().c_str(),
+             StringifyInt(tag.size).c_str(),
+             StringifyInt(tag.revision).c_str(),
+             StringifyInt(tag.timestamp).c_str(),
+             tag.GetChannelName(),
+             tag.description.c_str());
+}
+
+
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
@@ -783,14 +796,7 @@ void CommandListTags::PrintMachineReadableList(const TagList &tags) const {
         TagList::const_iterator i    = tags.begin();
   const TagList::const_iterator iend = tags.end();
   for (; i != iend; ++i) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s",
-             i->name.c_str(),
-             i->root_hash.ToString().c_str(),
-             StringifyInt(i->size).c_str(),
-             StringifyInt(i->revision).c_str(),
-             StringifyInt(i->timestamp).c_str(),
-             i->GetChannelName(),
-             i->description.c_str());
+    PrintTagMachineReadable(*i);
   }
 }
 
