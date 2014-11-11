@@ -626,6 +626,7 @@ TEST_F(T_History, RollbackToOldTag) {
   ASSERT_TRUE (history1->Insert(GetDummyTag("bar",            2, c_test)));
   ASSERT_TRUE (history1->Insert(GetDummyTag("first_release",  3, c_prod)));
   ASSERT_TRUE (history1->Insert(GetDummyTag("moep",           4, c_test))); // <--
+  ASSERT_TRUE (history1->Insert(GetDummyTag("moep_duplicate", 4, c_test)));
   ASSERT_TRUE (history1->Insert(GetDummyTag("lol",            5, c_test)));
   ASSERT_TRUE (history1->Insert(GetDummyTag("second_release", 6, c_prod)));
   ASSERT_TRUE (history1->Insert(GetDummyTag("third_release",  7, c_prod)));
@@ -655,6 +656,7 @@ TEST_F(T_History, RollbackToOldTag) {
   EXPECT_TRUE  (history2->Exists("bar"));
   EXPECT_TRUE  (history2->Exists("first_release"));
   EXPECT_TRUE  (history2->Exists("moep"));
+  EXPECT_TRUE  (history2->Exists("moep_duplicate"));
   EXPECT_TRUE  (history2->Exists("second_release"));
   EXPECT_TRUE  (history2->Exists("third_release"));
   EXPECT_TRUE  (history2->Exists("forth_release"));
@@ -686,6 +688,7 @@ TEST_F(T_History, RollbackToOldTag) {
   EXPECT_TRUE  (history3->Exists("bar"));
   EXPECT_TRUE  (history3->Exists("first_release"));
   EXPECT_TRUE  (history3->Exists("moep"));
+  EXPECT_TRUE  (history2->Exists("moep_duplicate"));
   EXPECT_TRUE  (history3->Exists("second_release"));
   EXPECT_TRUE  (history3->Exists("third_release"));
   EXPECT_TRUE  (history3->Exists("forth_release"));
