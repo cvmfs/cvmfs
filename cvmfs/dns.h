@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+#include "gtest/gtest_prod.h"
+
 #include "atomic.h"
 #include "duplex_cares.h"
 #include "util.h"
@@ -52,6 +54,10 @@ inline const char *Code2Ascii(const Failures error) {
 
   return texts[error];
 }
+
+
+std::string RewriteUrl(std::string url, const std::string &ip);
+
 
 /**
  * Stores the resolved IPv4 and IPv6 addresses of a host name including their

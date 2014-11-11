@@ -5,24 +5,25 @@
 #ifndef CVMFS_DOWNLOAD_H_
 #define CVMFS_DOWNLOAD_H_
 
+#include <poll.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <poll.h>
 
 #include <cstdio>
-
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
 
 #include "gtest/gtest_prod.h"
 
-#include "duplex_curl.h"
-#include "compression.h"
-#include "prng.h"
-#include "hash.h"
 #include "atomic.h"
+#include "compression.h"
+#include "dns.h"
+#include "duplex_curl.h"
+#include "hash.h"
+#include "prng.h"
+
 
 namespace download {
 
@@ -53,12 +54,13 @@ enum Failures {
   kFailProxyHttp,
   kFailHostHttp,
   kFailBadData,
+  kFailTooBig,
   kFailOther,
 };  // Failures
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 12;
+  const int kNumElems = 13;
   if (error >= kNumElems)
     return "no text available (internal error)";
 
@@ -74,7 +76,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[8] = "proxy returned HTTP error";
   texts[9] = "host returned HTTP error";
   texts[10] = "corrupted data received";
-  texts[11] = "unknown network error";
+  texts[11] = "resource too big to download";
+  texts[12] = "unknown network error";
 
   return texts[error];
 }
@@ -243,6 +246,11 @@ class HeaderLists {
 
 class DownloadManager {
  public:
+  /**
+   * Do not download files larger than 1M into memory.
+   */
+  static const unsigned kMaxMemSize = 1024*1024;
+
   DownloadManager();
   ~DownloadManager();
 
@@ -252,6 +260,7 @@ class DownloadManager {
   Failures Fetch(JobInfo *info);
 
   void SetDnsServer(const std::string &address);
+  void SetDnsParameters(const unsigned retries, const unsigned timeout_sec);
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   const Statistics &GetStatistics();
@@ -332,6 +341,11 @@ class DownloadManager {
   unsigned opt_backoff_max_ms_;
   bool enable_info_header_;
   bool opt_ipv4_only_;
+
+  /**
+   * Used to resolve proxy addresses (host addresses are resolved by the proxy).
+   */
+  dns::CaresResolver *resolver;
 
   /**
    * More than one proxy group can be considered as group of primary proxies

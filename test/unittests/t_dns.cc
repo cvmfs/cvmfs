@@ -126,6 +126,28 @@ static void ExpectResolvedName(
 }
 
 
+TEST_F(T_Dns, RewriteUrl) {
+  EXPECT_EQ(RewriteUrl("http://localhost:3128", "127.0.0.1"),
+            "http://127.0.0.1:3128");
+  EXPECT_EQ(RewriteUrl("http://localhost:3128", "[::1]"),
+            "http://[::1]:3128");
+  EXPECT_EQ(RewriteUrl("http://localhost/foo", "127.0.0.1"),
+            "http://127.0.0.1/foo");
+  EXPECT_EQ(RewriteUrl("http://localhost", "127.0.0.1"), "http://127.0.0.1");
+  EXPECT_EQ(RewriteUrl("http://127.0.0.1", "127.0.0.1"), "http://127.0.0.1");
+  EXPECT_EQ(RewriteUrl("http://[::1]", "127.0.0.1"), "http://127.0.0.1");
+  EXPECT_EQ(RewriteUrl("http://[::1]:3128", "127.0.0.1"),
+            "http://127.0.0.1:3128");
+  EXPECT_EQ(RewriteUrl("http://[::1:3128", "127.0.0.1"), "http://[::1:3128");
+  EXPECT_EQ(RewriteUrl("http://[::1", "127.0.0.1"), "http://[::1");
+  EXPECT_EQ(RewriteUrl("", "127.0.0.1"), "");
+  EXPECT_EQ(RewriteUrl("http", "127.0.0.1"), "http");
+  EXPECT_EQ(RewriteUrl("http:/", "127.0.0.1"), "http:/");
+  EXPECT_EQ(RewriteUrl("http://", "127.0.0.1"), "http://");
+  EXPECT_EQ(RewriteUrl("file:///foo/bar", "127.0.0.1"), "file:///foo/bar");
+}
+
+
 TEST_F(T_Dns, Host) {
   Host host;
   Host host2;

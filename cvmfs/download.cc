@@ -205,10 +205,19 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     char *tmp = (char *)alloca(num_bytes+1);
     uint64_t length = 0;
     sscanf(header_line.c_str(), "%s %"PRIu64, tmp, &length);
-    if (length > 0)
+    if (length > 0) {
+      if (length > DownloadManager::kMaxMemSize) {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
+                 "resource %s too large to store in memory (%"PRIu64")",
+                 info->url->c_str(), length);
+        info->error_code = kFailTooBig;
+        return 0;
+      }
       info->destination_mem.data = static_cast<char *>(smalloc(length));
-    else
+    } else {
+      // Empty resource
       info->destination_mem.data = NULL;
+    }
     info->destination_mem.size = length;
   }
 
@@ -625,7 +634,7 @@ void DownloadManager::ReleaseCurlHandle(CURL *handle) {
 
 
 /**
- * Request parameters set the URL and other options such as timeout and
+ * HTTP request options: set the URL and other options such as timeout and
  * proxy.
  */
 void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
@@ -1099,6 +1108,8 @@ DownloadManager::DownloadManager() {
   enable_info_header_ = false;
   opt_ipv4_only_ = false;
 
+  resolver = NULL;
+
   opt_timestamp_backup_proxies_ = 0;
   opt_timestamp_failover_proxies_ = 0;
   opt_proxy_groups_reset_after_ = 0;
@@ -1181,6 +1192,16 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 
   prng_.InitLocaltime();
 
+  // Name resolving
+  if ((getenv("CVMFS_IPV4_ONLY") != NULL) &&
+      (strlen(getenv("CVMFS_IPV4_ONLY")) > 0))
+  {
+    opt_ipv4_only_ = true;
+  }
+  resolver = dns::CaresResolver::Create(opt_ipv4_only_,
+                                        2 /* retries */, 2000 /* timeout */);
+  assert(resolver);
+
   // Parsing environment variables
   if (use_system_proxy) {
     if (getenv("http_proxy") == NULL) {
@@ -1188,11 +1209,6 @@ void DownloadManager::Init(const unsigned max_pool_handles,
     } else {
       SetProxyChain(string(getenv("http_proxy")));
     }
-  }
-  if ((getenv("CVMFS_IPV4_ONLY") != NULL) &&
-      (strlen(getenv("CVMFS_IPV4_ONLY")) > 0))
-  {
-    opt_ipv4_only_ = true;
   }
 }
 
@@ -1351,6 +1367,23 @@ void DownloadManager::SetDnsServer(const string &address) {
   }
   pthread_mutex_unlock(lock_options_);
   LogCvmfs(kLogDownload, kLogSyslog, "set nameserver to %s", address.c_str());
+}
+
+
+/**
+ * Sets the DNS query timeout parameters.
+ */
+void DownloadManager::SetDnsParameters(
+  const unsigned retries,
+  const unsigned timeout_sec)
+{
+  pthread_mutex_lock(lock_options_);
+  delete resolver;
+  resolver = NULL;
+  resolver =
+    dns::CaresResolver::Create(opt_ipv4_only_, retries, timeout_sec*1000);
+  assert(resolver);
+  pthread_mutex_unlock(lock_options_);
 }
 
 

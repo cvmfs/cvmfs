@@ -23,6 +23,55 @@ using namespace std;  // NOLINT
 
 namespace dns {
 
+/**
+ * Replaces the host name in the url with the given IP address.  If it is an
+ * IPv6 address, it has to be in brackets.  If the input is not a valid URL,
+ * it is returned unmodified.
+ */
+string RewriteUrl(string url, const string &ip) {
+  unsigned pos_begin = 0;
+  unsigned pos_end = 0;
+  unsigned len = url.size();
+  unsigned i = 0;
+
+  // Search '//' in the url string and jump behind
+  for (; i < len; ++i) {
+    if ((url[i] == '/') && (i < len-2) && (url[i+1] == '/')) {
+      i += 2;
+      pos_begin = i;
+      break;
+    }
+  }
+
+  // Find the end of the hostname part
+  if (pos_begin) {
+    bool in_ipv6 = ((i < len) && (url[i] == '['));
+    for (; i < len; ++i) {
+      if (in_ipv6) {
+        if (url[i] != ']')
+          continue;
+        in_ipv6 = false;
+      }
+
+      if ((url[i] == ':') || (url[i] == '/'))
+        break;
+    }
+    if (!in_ipv6)
+      pos_end = i;
+
+    if (pos_end > pos_begin) {
+      return url.replace(pos_begin, pos_end - pos_begin, ip);
+    }
+  }
+
+  // Not a valid URL or no hostname in it
+  return url;
+}
+
+
+//------------------------------------------------------------------------------
+
+
 atomic_int64 Host::global_id_ = 0;
 
 void Host::CopyFrom(const Host &other) {
