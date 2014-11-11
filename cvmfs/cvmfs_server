@@ -3650,8 +3650,7 @@ rollback() {
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $user"
   check_repository_compatibility
   check_expiry $stratum0  || die "Repository whitelist is expired!"
-  is_in_transaction $name || die "Not in a transaction"
-  [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || die "Open writable file descriptors on $name"
+  is_in_transaction $name && die "Cannot rollback a repository in a transaction"
   is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
 
   if [ $undo_rollback -eq 1 ]; then
@@ -3692,36 +3691,18 @@ rollback() {
     rollback_command="$rollback_command -n $target_tag"
   fi
 
-  # check if we have open file descriptors on /cvmfs/<name>
-  local use_fd_fallback=0
-  handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
-
   # do it!
-  publish_before_hook
-  publish_starting $name
-  $user_shell "$rollback_command" || { publish_failed $name; die "Rollback failed\n\nExecuted Command:\n$rollback_command"; }
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open transaction for rollback"
+
+  $user_shell "$rollback_command" || die "Rollback failed\n\nExecuted Command:\n$rollback_command";
 
   local trunk_hash=$(grep "^C" ${spool_dir}/tmp/manifest | tr -d C)
-  sign_manifest $name ${spool_dir}/tmp/manifest || { publish_failed; die "Signing failed"; }
+  sign_manifest $name ${spool_dir}/tmp/manifest || die "Signing failed";
   set_ro_root_hash $name $trunk_hash
 
   echo "Flushing file system buffers"
   sync
-
-  # check again for open file descriptors (potential race condition)
-  if has_file_descriptors_on_mount_point $name && \
-     [ $use_fd_fallback -ne 1 ]; then
-    file_descriptor_warning $name
-    echo "Forcing remount of already rolled back repository revision"
-    use_fd_fallback=1
-  else
-    echo "Remounting rolled back repository revision"
-  fi
-
-  sync
-  close_transaction  $name $use_fd_fallback
-  publish_after_hook $name
-  publish_succeeded  $name
 }
 
 
