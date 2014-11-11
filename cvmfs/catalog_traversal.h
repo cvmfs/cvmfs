@@ -809,8 +809,8 @@ class ObjectFetcher {
     return manifest;
   }
 
-  inline history::TagList FetchTagList() {
-    return history::TagList();
+  inline history::History* FetchHistory() {
+    return NULL;
   }
 
   inline bool Fetch(const shash::Any  &catalog_hash,
