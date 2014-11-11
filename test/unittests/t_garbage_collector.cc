@@ -55,6 +55,10 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
 
 class T_GarbageCollector : public ::testing::Test {
  public:
+  static const std::string sandbox;
+  static const std::string fqrn;
+
+ public:
   MockCatalog *dummy_catalog_hierarchy;
 
  protected:
@@ -64,16 +68,40 @@ class T_GarbageCollector : public ::testing::Test {
 
  protected:
   void SetUp() {
+    // TODO: Remove code duplication with t_catalog_traversal.cc
+    //       Most likely this requires `History` to be mockable
+
+    // create a dummy history file
+    const bool retval = MkdirDeep(sandbox, 0700);
+    ASSERT_TRUE (retval) << "failed to create sandbox";
+    const std::string history_db = GetHistoryFilename();
+    named_snapshots_ = history::History::Create(history_db,
+                                                T_GarbageCollector::fqrn);
+    ASSERT_TRUE (named_snapshots_.IsValid());
+    MockObjectFetcher::s_history = &named_snapshots_; // a pointer to a UniquePtr, I should burn
+                                                      // in hell for that. (If the testee code is
+                                                      // actually requesting this, the UniquePtr
+                                                      // will be released - thus not freed in
+                                                      // MockObjectFetcher::FetchHistory)
+
     dice_.InitLocaltime();
     MockCatalog::Reset();
     SetupDummyCatalogs();
-    MockObjectFetcher::s_tag_list = &named_snapshots_;
   }
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
-    MockObjectFetcher::s_tag_list = NULL;
+    MockObjectFetcher::s_history = NULL; // TODO: potential memory leak!
+
+    const bool retval = RemoveTree(sandbox);
+    ASSERT_TRUE (retval) << "failed to remove sandbox";
+  }
+
+  std::string GetHistoryFilename() const {
+    const std::string path = CreateTempPath(sandbox + "/history", 0600);
+    CheckEmpty(path);
+    return path;
   }
 
   GcConfiguration GetStandardGarbageCollectorConfiguration() const {
@@ -265,22 +293,23 @@ class T_GarbageCollector : public ::testing::Test {
     // # Furthermore revision 5 is marked as the current trunk (HEAD).
     // #
     //
-    history::TagList::Failures f;
-    f = named_snapshots_.Insert(history::Tag(
+    named_snapshots_->BeginTransaction();
+    ASSERT_TRUE (named_snapshots_->Insert(history::History::Tag(
                                      "Revision2", c[mp(2,"00")]->hash(),
                                      1337, 2, t(27,11,1987),
-                                     history::kChannelProd, "this is rev 2"));
-    EXPECT_EQ (history::TagList::kFailOk, f);
-    f = named_snapshots_.Insert(history::Tag(
+                                     history::History::kChannelProd,
+                                     "this is rev 2")));
+    ASSERT_TRUE (named_snapshots_->Insert(history::History::Tag(
                                      "Revision4", c[mp(4,"00")]->hash(),
-                                     42, 4, t(11, 9,2001), history::kChannelProd,
-                                     "this is revision 4"));
-    EXPECT_EQ (history::TagList::kFailOk, f);
-    f = named_snapshots_.Insert(history::Tag(
+                                     42, 4, t(11, 9,2001),
+                                     history::History::kChannelProd,
+                                     "this is revision 4")));
+    ASSERT_TRUE (named_snapshots_->Insert(history::History::Tag(
                                      "Revision5", c[mp(5,"00")]->hash(),
-                                     7, 5, t(10, 7,2014), history::kChannelTrunk,
-                                     "this is revision 5 - the newest!"));
-    EXPECT_EQ (history::TagList::kFailOk, f);
+                                     7, 5, t(10, 7,2014),
+                                     history::History::kChannelTrunk,
+                                     "this is revision 5 - the newest!")));
+    named_snapshots_->CommitTransaction();
   }
 
   MockCatalog* CreateAndRegisterCatalog(
@@ -346,13 +375,21 @@ class T_GarbageCollector : public ::testing::Test {
     return mktime(&time_descriptor);
   }
 
+ private:
+  void CheckEmpty(const std::string &str) const {
+    ASSERT_FALSE (str.empty());
+  }
+
  protected:
-  RevisionMap      catalogs_;
-  history::TagList named_snapshots_;
+  RevisionMap                  catalogs_;
+  UniquePtr<history::History>  named_snapshots_;
 
  private:
-  Prng             dice_;
+  Prng  dice_;
 };
+
+const std::string T_GarbageCollector::sandbox = "/tmp/cvmfs_ut_garbage_collector";
+const std::string T_GarbageCollector::fqrn    = "test.cern.ch";
 
 
 TEST_F(T_GarbageCollector, InitializeGarbageCollector) {
