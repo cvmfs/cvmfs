@@ -257,9 +257,6 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "start transaction to rollback"
-  start_transaction $CVMFS_TEST_REPO || return $?
-
   echo "rollback to second tagged revision: $second_tag"
   cvmfs_server rollback -f -t $second_tag $CVMFS_TEST_REPO || return $?
 
@@ -325,9 +322,6 @@ cvmfs_run_test() {
   fi
 
   # ============================================================================
-
-  echo "start transaction to rollback"
-  start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "rollback to first tagged revision: $first_tag"
   cvmfs_server rollback -f -t $first_tag $CVMFS_TEST_REPO || return $?
@@ -469,9 +463,6 @@ cvmfs_run_test() {
     return 30
   fi
 
-  echo "open transaction to do an undo"
-  start_transaction $CVMFS_TEST_REPO || return $?
-
   echo "initiate a rollback"
   cvmfs_server rollback -f $CVMFS_TEST_REPO || return 31
 
@@ -502,14 +493,8 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "open transaction to do another undo rollback"
-  start_transaction $CVMFS_TEST_REPO || return $?
-
   echo "initiate a rollback (should fail)"
   cvmfs_server rollback -f $CVMFS_TEST_REPO && return 35
-
-  echo "abort transaction"
-  cvmfs_server abort -f $CVMFS_TEST_REPO || return 36
 
   # ============================================================================
 
