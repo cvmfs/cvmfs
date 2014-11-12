@@ -2947,9 +2947,10 @@ tag() {
   [ $actions -eq 1 ] || die "Ambiguous parameters. Please either add, remove, inspect or list tags."
 
   # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
   load_repo_config $name
-  is_stratum0 $name                         || die "This is not a stratum 0 repository"
-  ! is_publishing $name                     || die "Repository is currently publishing"
+  is_stratum0 $name                || die "This is not a stratum 0 repository"
+  ! is_publishing $name            || die "Repository is currently publishing"
   health_check $name
 
   local base_hash="$(get_mounted_root_hash $name)"
