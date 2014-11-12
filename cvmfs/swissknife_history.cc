@@ -565,6 +565,14 @@ int CommandCreateTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // check if the catalog is a root catalog
+  if (! catalog->root_prefix().IsEmpty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "cannot tag catalog '%s' that is not a "
+                                    "root catalog.",
+             root_hash.ToString().c_str());
+    return 1;
+  }
+
   // create a template for the new tag to be created, moved or used as undo tag
   history::History::Tag tag_template;
   tag_template.name        = "<template>";
