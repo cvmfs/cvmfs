@@ -239,9 +239,7 @@ Supported Commands:
                 [-a create tag <name>] [-c channel] [-m message] [-h root hash]
                 [-r remove tag <name>] [-f don't ask again]
                 [-i inspect tag <name>] [-x machine readable]
-                [-l list tags (alias for list-tags)] [-x machine readable]
-                <fully qualified name>
-  list-tags     [-x machine readable]
+                [-l list tags] [-x machine readable]
                 <fully qualified name>
                 Print named tags (snapshots) of the repository
   check         [-c disable data chunk existence check]
@@ -2945,36 +2943,27 @@ tag() {
 
   # check for ambiguous action requests
   local actions=$(( $action_remove+$action_list+$action_add+$action_inspect ))
-  [ $actions -le 1 ] || die "Ambiguous parameters. Please either add, remove or list tags."
-
-  # check for the alias of `cvmfs_server list-tags`
-  if [ $action_list -eq 1 ] || [ $actions -eq 0 ]; then
-    list_tags $([ $machine_readable -ne 0 ] && echo "-x") $name
-    exit $?
-  fi
+  [ $actions -gt 0 ] || { action_list=1; actions=$(( $actions + 1 )); } # listing is the default action
+  [ $actions -eq 1 ] || die "Ambiguous parameters. Please either add, remove, inspect or list tags."
 
   # sanity checks
   load_repo_config $name
-  is_owner_or_root $name                    || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   is_stratum0 $name                         || die "This is not a stratum 0 repository"
   ! is_publishing $name                     || die "Repository is currently publishing"
-  [ ! -z "$tag_name" -o ! -z "$tag_names" ] || die "Tag name missing"
-  echo "$tag_name" | grep -q -v " "         || die "Spaces are not allowed in tag names"
   health_check $name
 
   local base_hash="$(get_mounted_root_hash $name)"
   local user_shell="$(get_user_shell $name)"
 
-  # tag inspection does not need to open a repository transaction
-  if [ $action_inspect -eq 1 ]; then
-    local tag_list_command=
-    local tag_list_command="cvmfs_swissknife tag_info    \
+  # tag listing does not need an open repository transaction
+  if [ $action_list -eq 1 ] || [ $actions -eq 0 ]; then
+    local tag_list_command="cvmfs_swissknife tag_list    \
       -w $CVMFS_STRATUM0                                 \
       -t ${CVMFS_SPOOL_DIR}/tmp                          \
       -p /etc/cvmfs/keys/${name}.pub                     \
       -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
       -f $name                                           \
-      -n $tag_name"
+      -b $base_hash"
     if [ $machine_readable -ne 0 ]; then
       tag_list_command="$tag_list_command -x"
     fi
@@ -2982,8 +2971,29 @@ tag() {
     return $?
   fi
 
+  # tag inspection does not need to open a repository transaction
+  if [ $action_inspect -eq 1 ]; then
+    local tag_inspect_command="cvmfs_swissknife tag_info \
+      -w $CVMFS_STRATUM0                                 \
+      -t ${CVMFS_SPOOL_DIR}/tmp                          \
+      -p /etc/cvmfs/keys/${name}.pub                     \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
+      -f $name                                           \
+      -n $tag_name"
+    if [ $machine_readable -ne 0 ]; then
+      tag_inspect_command="$tag_inspect_command -x"
+    fi
+    $user_shell "$tag_inspect_command"
+    return $?
+  fi
+
   # all following commands need an open repository transaction and are supposed
-  # to commit or abort it after performing a tag database manipulation
+  # to commit or abort it after performing a tag database manipulation. Hence,
+  # they also need to performed by the repository owner or root
+  is_owner_or_root $name                    || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  [ ! -z "$tag_name" -o ! -z "$tag_names" ] || die "Tag name missing"
+  echo "$tag_name" | grep -q -v " "         || die "Spaces are not allowed in tag names"
+
   is_in_transaction $name && die "Cannot change repository tags while in a transaction"
   trap "close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for tag manipulation"
@@ -3049,53 +3059,13 @@ tag() {
 
 
 lstags() {
-  list_tags "$@" # backward compatibility alias
-  echo "NOTE: cvmfs_server lstags is deprecated! Use cvmfs_server list-tags instead" 1>&2
+  tag -l "$@" # backward compatibility alias
+  echo "NOTE: cvmfs_server lstags is deprecated! Use cvmfs_server tag instead" 1>&2
 }
 
 list_tags() {
-  local name
-  local machine_readable=0
-
-  # optional parameter handling
-  OPTIND=1
-  while getopts "x" option; do
-    case $option in
-      x)
-        machine_readable=1
-      ;;
-      ?)
-        shift $(($OPTIND-2))
-        usage "Command list-tags: Unrecognized option: $1"
-      ;;
-    esac
-  done
-
-  # get repository name
-  shift $(($OPTIND-1))
-  check_parameter_count_with_guessing $#
-  name=$(get_or_guess_repository_name $1)
-
-  # sanity checks
-  check_repository_existence $name || die "The repository $name does not exist"
-  is_stratum0 $name                || die "This is not a stratum 0 repository"
-
-  # get repository information
-  load_repo_config $name
-  local base_hash=$(get_mounted_root_hash $name)
-  local user_shell="$(get_user_shell $name)"
-  local list_command="cvmfs_swissknife tag_list        \
-    -w $CVMFS_STRATUM0                                 \
-    -t ${CVMFS_SPOOL_DIR}/tmp                          \
-    -p /etc/cvmfs/keys/${name}.pub                     \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
-    -f $name                                           \
-    -b $base_hash"
-  if [ $machine_readable -ne 0 ]; then
-    list_command="$list_command -x"
-  fi
-
-  $user_shell "$list_command"
+  tag -l "$@" # backward compatibility alias
+  echo "NOTE: cvmfs_server list-tags is deprecated! Use cvmfs_server tag instead" 1>&2
 }
 
 
