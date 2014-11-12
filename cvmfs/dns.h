@@ -56,6 +56,7 @@ inline const char *Code2Ascii(const Failures error) {
 }
 
 
+std::string ExtractHost(const std::string &url);
 std::string RewriteUrl(const std::string &url, const std::string &ip);
 std::string StripIp(const std::string &decorated_ip);
 

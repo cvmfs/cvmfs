@@ -129,6 +129,24 @@ static void ExpectResolvedName(
 //------------------------------------------------------------------------------
 
 
+TEST_F(T_Dns, ExtractHost) {
+  EXPECT_EQ(ExtractHost("http://localhost:3128"), "localhost");
+  EXPECT_EQ(ExtractHost("http://localhost/foo"), "localhost");
+  EXPECT_EQ(ExtractHost("http://localhost"), "localhost");
+  EXPECT_EQ(ExtractHost("http://127.0.0.1"), "127.0.0.1");
+  EXPECT_EQ(ExtractHost("http://[::1]"), "[::1]");
+  EXPECT_EQ(ExtractHost("http://[::1]:3128"), "[::1]");
+  EXPECT_EQ(ExtractHost("http://[::1]/foo"), "[::1]");
+  EXPECT_EQ(ExtractHost(""), "");
+  EXPECT_EQ(ExtractHost("localhost"), "");
+  EXPECT_EQ(ExtractHost("http:/"), "");
+  EXPECT_EQ(ExtractHost("http://"), "");
+  EXPECT_EQ(ExtractHost("http://:"), "");
+  EXPECT_EQ(ExtractHost("http://["), "");
+  EXPECT_EQ(ExtractHost("http://[]"), "[]");
+}
+
+
 TEST_F(T_Dns, RewriteUrl) {
   EXPECT_EQ(RewriteUrl("http://localhost:3128", "127.0.0.1"),
             "http://127.0.0.1:3128");
@@ -147,6 +165,10 @@ TEST_F(T_Dns, RewriteUrl) {
   EXPECT_EQ(RewriteUrl("http", "127.0.0.1"), "http");
   EXPECT_EQ(RewriteUrl("http:/", "127.0.0.1"), "http:/");
   EXPECT_EQ(RewriteUrl("http://", "127.0.0.1"), "http://");
+  EXPECT_EQ(RewriteUrl("http://:", "127.0.0.1"), "http://:");
+  EXPECT_EQ(RewriteUrl("http:///", "127.0.0.1"), "http:///");
+  EXPECT_EQ(RewriteUrl("http://[", "127.0.0.1"), "http://[");
+  EXPECT_EQ(RewriteUrl("http://[]", "127.0.0.1"), "http://127.0.0.1");
   EXPECT_EQ(RewriteUrl("file:///foo/bar", "127.0.0.1"), "file:///foo/bar");
 }
 

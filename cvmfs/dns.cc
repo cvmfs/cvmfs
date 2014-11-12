@@ -24,28 +24,32 @@ using namespace std;  // NOLINT
 namespace dns {
 
 /**
- * Replaces the host name in the url with the given IP address.  If it is an
- * IPv6 address, it has to be in brackets.  If the input is not a valid URL,
- * it is returned unmodified.
+ * Sets pos_begin and pos_end to the first/last character of the host name in
+ * a string like http://<hostname>:<port>.  Works also if the host name is an
+ * IPv4/6 address.  Sets pos_begin and pos_end to 0 if url doesn't match the
+ * format.
  */
-string RewriteUrl(const string &url, const string &ip) {
-  unsigned pos_begin = 0;
-  unsigned pos_end = 0;
-  unsigned len = url.size();
+static void PinpointHostSubstr(
+  const std::string &url,
+  unsigned *pos_begin,
+  unsigned *pos_end)
+{
+  *pos_begin = *pos_end = 0;
+  const unsigned len = url.size();
   unsigned i = 0;
 
   // Search '//' in the url string and jump behind
   for (; i < len; ++i) {
     if ((url[i] == '/') && (i < len-2) && (url[i+1] == '/')) {
       i += 2;
-      pos_begin = i;
+      *pos_begin = i;
       break;
     }
   }
 
   // Find the end of the hostname part
-  if (pos_begin) {
-    bool in_ipv6 = ((i < len) && (url[i] == '['));
+  if (*pos_begin > 0) {
+    bool in_ipv6 = (url[i] == '[');
     for (; i < len; ++i) {
       if (in_ipv6) {
         if (url[i] != ']')
@@ -57,16 +61,43 @@ string RewriteUrl(const string &url, const string &ip) {
         break;
     }
     if (!in_ipv6)
-      pos_end = i;
+      *pos_end = i - 1;
 
-    if (pos_end > pos_begin) {
-      string result = url;
-      return result.replace(pos_begin, pos_end - pos_begin, ip);
-    }
+    if (*pos_end < *pos_begin)
+      *pos_end = *pos_begin = 0;
   }
+}
 
-  // Not a valid URL or no hostname in it
-  return url;
+
+/**
+ * Returns the host name from a string in the format http://<hostname>:<port>
+ * or an empty string if url doesn't match the format.
+ */
+std::string ExtractHost(const std::string &url) {
+  unsigned pos_begin;
+  unsigned pos_end;
+  PinpointHostSubstr(url, &pos_begin, &pos_end);
+  if (pos_begin == 0)
+    return "";
+  return url.substr(pos_begin, (pos_end - pos_begin) + 1);
+}
+
+
+/**
+ * Replaces the host name in the url with the given IP address.  If it is an
+ * IPv6 address, it has to be in brackets.  If the input is not a valid URL,
+ * it is returned unmodified.
+ */
+string RewriteUrl(const string &url, const string &ip) {
+  unsigned pos_begin;
+  unsigned pos_end;
+  PinpointHostSubstr(url, &pos_begin, &pos_end);
+  if (pos_begin == 0)
+    return url;
+
+  string result = url;
+  result.replace(pos_begin, (pos_end - pos_begin) + 1, ip);
+  return result;
 }
 
 
