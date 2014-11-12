@@ -30,31 +30,31 @@
 #include "cvmfs_config.h"
 #include "download.h"
 
-#include <stdint.h>
-#include <inttypes.h>
-#include <unistd.h>
-#include <pthread.h>
 #include <alloca.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <poll.h>
+#include <pthread.h>
+#include <stdint.h>
 #include <sys/time.h>
+#include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
-
 #include <set>
 
-#include "duplex_curl.h"
-#include "logging.h"
 #include "atomic.h"
-#include "hash.h"
-#include "prng.h"
-#include "util.h"
 #include "compression.h"
-#include "smalloc.h"
+#include "duplex_curl.h"
+#include "hash.h"
+#include "logging.h"
+#include "prng.h"
 #include "sanitizer.h"
+#include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -590,6 +590,25 @@ void HeaderLists::AddBlock(){
 
 
 //------------------------------------------------------------------------------
+
+
+string DownloadManager::ProxyInfo::Print() {
+  string result = url;
+  if (address.status() == dns::kFailOk) {
+    int remaining =
+      static_cast<int>(address.deadline()) - static_cast<int>(time(NULL));
+    string expinfo = (remaining >= 0) ? "+" : "";
+    if (remaining >= 3600) {
+      expinfo += StringifyInt(remaining/3600) + "h";
+    } else if (remaining >= 60) {
+      expinfo += StringifyInt(remaining/60) + "m";
+    } else {
+      expinfo += StringifyInt(remaining) + "s";
+    }
+    result += " (" + address.name() + ", " + expinfo + ")";
+  }
+  return result;
+}
 
 
 /**
@@ -1695,29 +1714,88 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
     return;
   }
 
+  // Resolve server names in provided urls, skip DIRECT
+  vector<string> urls;  // All encountered URLs
   vector<string> proxy_groups = SplitString(proxy_list, ';');
-  opt_proxy_groups_ = new vector< vector<ProxyInfo> >();
-  opt_num_proxies_ = 0;
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
     vector<string> this_group = SplitString(proxy_groups[i], '|');
-    vector<ProxyInfo> proxies;
     for (unsigned j = 0; j < this_group.size(); ++j) {
-      ProxyInfo info;
-      info.url = this_group[j];
-      proxies.push_back(info);
+      // Note: DIRECT strings will be "extracted" to an empty string and not
+      // resolved.
+      urls.push_back(dns::ExtractHost(this_group[j]));
     }
-    opt_proxy_groups_->push_back(proxies);
+  }
+  vector<dns::Host> addresses;
+  LogCvmfs(kLogDownload, kLogDebug, "resolving %u proxy addresses",
+           urls.size());
+  resolver->ResolveMany(urls, &addresses);
+
+  // Construct opt_proxy_groups_: traverse proxy list in same order and expand
+  // names to resolved IP addresses.
+  opt_proxy_groups_ = new vector< vector<ProxyInfo> >();
+  opt_num_proxies_ = 0;
+  unsigned num_proxy = 0;  // Combined i, j counter
+  for (unsigned i = 0; i < proxy_groups.size(); ++i) {
+    vector<string> this_group = SplitString(proxy_groups[i], '|');
+    vector<ProxyInfo> infos;
+    for (unsigned j = 0; j < this_group.size(); ++j, ++num_proxy) {
+      if (this_group[j] == "DIRECT") {
+        infos.push_back(ProxyInfo("DIRECT"));
+        continue;
+      }
+
+      // IPv6 addresses have precedence
+      set<string>::const_iterator iter_ips;
+      if (addresses[num_proxy].HasIpv6()) {
+        // IPv6
+        iter_ips = addresses[num_proxy].ipv6_addresses().begin();
+        for (; iter_ips != addresses[num_proxy].ipv6_addresses().end();
+             ++iter_ips)
+        {
+          string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
+          infos.push_back(ProxyInfo(addresses[num_proxy], url_ip));
+        }
+      } else {
+        // IPv4
+        iter_ips = addresses[num_proxy].ipv4_addresses().begin();
+        for (; iter_ips != addresses[num_proxy].ipv4_addresses().end();
+             ++iter_ips)
+        {
+          string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
+          infos.push_back(ProxyInfo(addresses[num_proxy], url_ip));
+        }
+      }
+    }
+    opt_proxy_groups_->push_back(infos);
     opt_num_proxies_ += (*opt_proxy_groups_)[i].size();
   }
+  LogCvmfs(kLogDownload, kLogDebug,
+           "installed %u proxies in %u load-balance groups",
+           opt_num_proxies_, opt_proxy_groups_->size());
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 1;
 
-  /* Select random start proxy from the first group */
+  // Check nothing stupid happend
+  for (unsigned i = 0; i < opt_proxy_groups_->size(); ) {
+    if ((*opt_proxy_groups_)[i].empty())
+      opt_proxy_groups_->erase(opt_proxy_groups_->begin()+i);
+    else
+      ++i;
+  }
+  if (opt_proxy_groups_->empty()) {
+    delete opt_proxy_groups_;
+    opt_proxy_groups_ = NULL;
+    opt_proxy_groups_current_ = 0;
+    opt_proxy_groups_current_burned_ = 0;
+    opt_num_proxies_ = 0;
+    pthread_mutex_unlock(lock_options_);
+    return;
+  }
+
+  // Select random start proxy from the first group.
   if ((*opt_proxy_groups_)[0].size() > 1) {
     int random_index = prng_.Next((*opt_proxy_groups_)[0].size());
-    ProxyInfo tmp = (*opt_proxy_groups_)[0][0];
-    (*opt_proxy_groups_)[0][0] = (*opt_proxy_groups_)[0][random_index];
-    (*opt_proxy_groups_)[0][random_index] = tmp;
+    swap((*opt_proxy_groups_)[0][0], (*opt_proxy_groups_)[0][random_index]);
   }
   //LogCvmfs(kLogDownload, kLogSyslog, "using proxy %s",
   //         (*opt_proxy_groups_)[0][0].c_str());

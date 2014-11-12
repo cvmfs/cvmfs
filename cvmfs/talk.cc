@@ -272,9 +272,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
           for (unsigned i = 0; i < proxy_chain.size(); ++i) {
             vector<string> urls;
             for (unsigned j = 0; j < proxy_chain[i].size(); ++j) {
-              urls.push_back(proxy_chain[i][j].url);
+              urls.push_back(proxy_chain[i][j].Print());
             }
-            proxy_str += 
+            proxy_str +=
               "[" + StringifyInt(i) + "] " + JoinStrings(urls, ", ") + "\n";
           }
           proxy_str += "Active proxy: [" + StringifyInt(active_group) + "] " +

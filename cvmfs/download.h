@@ -247,6 +247,13 @@ class HeaderLists {
 class DownloadManager {
  public:
   struct ProxyInfo {
+    ProxyInfo() { }
+    explicit ProxyInfo(const std::string &url) : url(url) { }
+    ProxyInfo(const dns::Host &address, const std::string &url)
+      : address(address)
+      , url(url)
+    { }
+    std::string Print();
     dns::Host address;
     std::string url;
   };

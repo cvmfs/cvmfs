@@ -89,9 +89,9 @@ class Host {
   time_t deadline() const { return deadline_; }
   int64_t id() const { return id_; }
   bool HasIpv6() const { return !ipv6_addresses_.empty(); }
-  std::set<std::string> ipv4_addresses() const { return ipv4_addresses_; }
-  std::set<std::string> ipv6_addresses() const { return ipv6_addresses_; }
-  std::string name() const { return name_; }
+  const std::set<std::string> &ipv4_addresses() const { return ipv4_addresses_; }
+  const std::set<std::string> &ipv6_addresses() const { return ipv6_addresses_; }
+  const std::string &name() const { return name_; }
   Failures status() const { return status_; }
 
  private:
@@ -173,9 +173,9 @@ class Resolver : SingleCopy {
   void ResolveMany(const std::vector<std::string> &names,
                    std::vector<Host> *hosts);
 
-  std::vector<std::string> domains() const { return domains_; }
+  const std::vector<std::string> &domains() const { return domains_; }
   bool ipv4_only() const { return ipv4_only_; }
-  std::vector<std::string> resolvers() const { return resolvers_; }
+  const std::vector<std::string> &resolvers() const { return resolvers_; }
   unsigned retries() const { return retries_; }
   unsigned timeout_ms() const { return timeout_ms_; }
 
