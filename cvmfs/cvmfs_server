@@ -3540,16 +3540,18 @@ publish() {
       sync_command="$sync_command -v $manual_revision"
     fi
     local tag_command="$swissknife tag_create \
-      -r $upstream \
-      -w $stratum0 \
-      -t ${spool_dir}/tmp \
-      -m ${spool_dir}/tmp/manifest \
-      -p /etc/cvmfs/keys/${name}.pub \
-      -f $name \
-      -b $base_hash \
-      $hash_algo \
-      -a $tag_name \
+      -r $upstream                            \
+      -w $stratum0                            \
+      -t ${spool_dir}/tmp                     \
+      -m ${spool_dir}/tmp/manifest            \
+      -p /etc/cvmfs/keys/${name}.pub          \
+      -f $name                                \
+      -b $base_hash                           \
+      $hash_algo                              \
       -x" # -x enables magic undo tag handling
+    if [ ! -z "$tag_name" ]; then
+      tag_command="$tag_command -a $tag_name"
+    fi
     if [ ! -z "$tag_channel" ]; then
       tag_command="$tag_command -c $tag_channel"
     fi

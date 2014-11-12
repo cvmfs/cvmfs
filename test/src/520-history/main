@@ -354,7 +354,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "create a couple of revisions..."
-  iterations=5
+  local iterations=5
   while [ $iterations -gt 0 ]; do
     echo "init a new transaction in $CVMFS_TEST_REPO"
     start_transaction $CVMFS_TEST_REPO || return $?
@@ -556,6 +556,58 @@ cvmfs_run_test() {
 
   echo "abort transaction"
   cvmfs_server abort -f $CVMFS_TEST_REPO || return 48
+
+  # ============================================================================
+
+  echo "delete all auto tags"
+  local auto_tags="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $1}')"
+  remove_flags=""
+  for tag in $auto_tags; do
+    remove_flags="-r $tag $remove_flags"
+  done
+  cvmfs_server tag $remove_flags -f $CVMFS_TEST_REPO || return 49
+
+  echo "check if trunk and trunk-previous are there"
+  cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"      || return 50
+  cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 50
+
+  echo "check the number of tags"
+  [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | wc -l) -eq 2 ] || return 51
+
+  # ============================================================================
+
+  echo "disable auto tagging"
+  local conf_file="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+  cat $conf_file | sed 's/^\(CVMFS_AUTO_TAG=\).*$/\1false/' | tee server.conf || return 52
+  sudo cp server.conf $conf_file || return 53
+
+  echo "get revision of current trunk tag"
+  local trunk_revision_1="$(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep '^trunk ' | awk '{print $4}')"
+
+  echo "create a couple of revisions..."
+  iterations=5
+  while [ $iterations -gt 0 ]; do
+    echo "init a new transaction in $CVMFS_TEST_REPO"
+    start_transaction $CVMFS_TEST_REPO || return $?
+
+    echo "creating CVMFS snapshot"
+    publish_repo $CVMFS_TEST_REPO || return $?
+
+    iterations=$(( $iterations - 1))
+  done
+
+  echo "check if trunk and trunk-previous are there"
+  cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"      || return 54
+  cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 54
+
+  echo "check the number of tags"
+  [ $(cvmfs_server list-tags -x $CVMFS_TEST_REPO | wc -l) -eq 2 ] || return 55
+
+  echo "get revision of current trunk tag"
+  local trunk_revision_2="$(cvmfs_server list-tags -x $CVMFS_TEST_REPO | grep '^trunk ' | awk '{print $4}')"
+
+  echo "check trunk revision progress"
+  [ $(( $trunk_revision_1 + 5 )) -eq $trunk_revision_2 ] || return 56
 
   return 0
 }

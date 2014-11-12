@@ -111,6 +111,17 @@ class CommandCreateTag : public CommandTag {
 
   ParameterList GetParams();
   int Main(const ArgumentList &args);
+
+ protected:
+  shash::Any GetTagRootHash(Environment *env,
+                            const std::string &root_hash_string) const;
+  bool ManipulateTag(Environment                  *env,
+                     const history::History::Tag  &tag_template,
+                     const bool                    user_provided_hash);
+  bool MoveTag(Environment                  *env,
+               const history::History::Tag  &tag_template);
+  bool CreateTag(Environment                  *env,
+                 const history::History::Tag  &new_tag);
 };
 
 
