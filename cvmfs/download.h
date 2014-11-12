@@ -246,6 +246,11 @@ class HeaderLists {
 
 class DownloadManager {
  public:
+  struct ProxyInfo {
+    dns::Host address;
+    std::string url;
+  };
+
   /**
    * Do not download files larger than 1M into memory.
    */
@@ -270,7 +275,7 @@ class DownloadManager {
   void ProbeHosts();
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list);
-  void GetProxyInfo(std::vector< std::vector<std::string> > *proxy_chain,
+  void GetProxyInfo(std::vector< std::vector<ProxyInfo> > *proxy_chain,
                     unsigned *current_group);
   void RebalanceProxies();
   void SwitchProxyGroup();
@@ -326,21 +331,36 @@ class DownloadManager {
   char *opt_dns_server_;
   unsigned opt_timeout_proxy_ ;
   unsigned opt_timeout_direct_;
-  std::vector<std::string> *opt_host_chain_;
-  std::vector<int> *opt_host_chain_rtt_; /**< created by SetHostChain(),
-                                            filled by probe_hosts.  Contains time to get .cvmfschecksum in ms.
-                                            -1 is unprobed, -2 is error */
-  unsigned opt_host_chain_current_;
-  std::vector< std::vector<std::string> > *opt_proxy_groups_;
-  unsigned opt_proxy_groups_current_;
-  unsigned opt_proxy_groups_current_burned_;
-  unsigned opt_num_proxies_;
-
   unsigned opt_max_retries_;
   unsigned opt_backoff_init_ms_;
   unsigned opt_backoff_max_ms_;
   bool enable_info_header_;
   bool opt_ipv4_only_;
+
+  // Host list
+  std::vector<std::string> *opt_host_chain_;
+  /**
+   * Created by SetHostChain(), filled by probe_hosts.  Contains time to get
+   * .cvmfschecksum in ms. -1 is unprobed, -2 is error.
+   */
+  std::vector<int> *opt_host_chain_rtt_;
+  unsigned opt_host_chain_current_;
+
+  // Proxy list
+  std::vector< std::vector<ProxyInfo> > *opt_proxy_groups_;
+  /**
+   * The current load-balancing group (first dimension in opt_proxy_groups_).
+   */
+  unsigned opt_proxy_groups_current_;
+  /**
+   * Number of proxy servers that failed within current load-balance group.
+   * Between 0 and (*opt_proxy_groups_)[opt_proxy_groups_current_].size().
+   */
+  unsigned opt_proxy_groups_current_burned_;
+  /**
+   * Overall number of proxies summed over all the groups.
+   */
+  unsigned opt_num_proxies_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).

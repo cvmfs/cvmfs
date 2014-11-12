@@ -1498,11 +1498,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.nioerr") {
     attribute_value = StringifyInt(atomic_read32(&num_io_error_));
   } else if (attr == "user.proxy") {
-    vector< vector<string> > proxy_chain;
+    vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
     unsigned current_group;
     download_manager_->GetProxyInfo(&proxy_chain, &current_group);
     if (proxy_chain.size()) {
-      attribute_value = proxy_chain[current_group][0];
+      attribute_value = proxy_chain[current_group][0].url;
     } else {
       attribute_value = "DIRECT";
     }

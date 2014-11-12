@@ -407,17 +407,21 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   g_download_manager->Init(num_parallel+1, true);
   //download::ActivatePipelining();
   unsigned current_group;
-  vector< vector<string> > proxies;
+  vector< vector<download::DownloadManager::ProxyInfo> > proxies;
   g_download_manager->GetProxyInfo(&proxies, &current_group);
   if (proxies.size() > 0) {
     string proxy_str = "\nWarning, replicating through proxies\n";
     proxy_str += "  Load-balance groups:\n";
     for (unsigned i = 0; i < proxies.size(); ++i) {
-      proxy_str += "  [" + StringifyInt(i) + "] " +
-      JoinStrings(proxies[i], ", ") + "\n";
+      vector<string> urls;
+      for (unsigned j = 0; j < proxies[i].size(); ++j) {
+        urls.push_back(proxies[i][j].url);
+      }
+      proxy_str +=
+        "  [" + StringifyInt(i) + "] " + JoinStrings(urls, ", ") + "\n";
     }
     proxy_str += "  Active proxy: [" + StringifyInt(current_group) + "] " +
-    proxies[current_group][0];
+                 proxies[current_group][0].url;
     LogCvmfs(kLogCvmfs, kLogStdout, "%s\n", proxy_str.c_str());
   }
   g_download_manager->SetTimeout(timeout, timeout);

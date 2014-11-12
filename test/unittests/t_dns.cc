@@ -126,6 +126,9 @@ static void ExpectResolvedName(
 }
 
 
+//------------------------------------------------------------------------------
+
+
 TEST_F(T_Dns, RewriteUrl) {
   EXPECT_EQ(RewriteUrl("http://localhost:3128", "127.0.0.1"),
             "http://127.0.0.1:3128");

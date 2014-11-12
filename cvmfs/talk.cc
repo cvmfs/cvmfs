@@ -262,7 +262,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "OK\n");
         }
       } else if (line == "proxy info") {
-        vector< vector<string> > proxy_chain;
+        vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
         unsigned active_group;
         cvmfs::download_manager_->GetProxyInfo(&proxy_chain, &active_group);
 
@@ -270,11 +270,15 @@ static void *MainTalk(void *data __attribute__((unused))) {
         if (proxy_chain.size()) {
           proxy_str += "Load-balance groups:\n";
           for (unsigned i = 0; i < proxy_chain.size(); ++i) {
-            proxy_str += "[" + StringifyInt(i) + "] " +
-                         JoinStrings(proxy_chain[i], ", ") + "\n";
+            vector<string> urls;
+            for (unsigned j = 0; j < proxy_chain[i].size(); ++j) {
+              urls.push_back(proxy_chain[i][j].url);
+            }
+            proxy_str += 
+              "[" + StringifyInt(i) + "] " + JoinStrings(urls, ", ") + "\n";
           }
           proxy_str += "Active proxy: [" + StringifyInt(active_group) + "] " +
-                       proxy_chain[active_group][0] + "\n";
+                       proxy_chain[active_group][0].url + "\n";
         } else {
           proxy_str = "No proxies defined\n";
         }
