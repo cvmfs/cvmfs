@@ -733,6 +733,8 @@ close_transaction() {
   local name=$1
   local use_fd_fallback=$2
 
+  is_in_transaction $name || return 0
+
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
   local tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
