@@ -168,7 +168,8 @@ cvmfs_run_test() {
   local second_tag="intermediate"
   local second_tag_desc="intermediate-revision"
   local third_tag="third_tag"
-  local third_tag_desc="last-tag-revision"
+  local third_tag_desc1="last-tag-revision \"ololol!\" ' -- DROP TABLE properties;"
+  local third_tag_desc2="last-tag-revision ololol! ' -- DROP TABLE properties;" # double quotes will be removed by shell!
   local trunk_tag="trunk"
   local prev_trunk_tag="trunk-previous"
 
@@ -228,7 +229,7 @@ cvmfs_run_test() {
   change_files_2_in $reference_dir3 || return 8
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO -a $third_tag -m "$third_tag_desc" || return $?
+  publish_repo $CVMFS_TEST_REPO -a $third_tag -m "$third_tag_desc1" || return $?
 
   echo "compare the changed directories"
   compare_directories $repo_dir $reference_dir3 || return $?
@@ -247,7 +248,7 @@ cvmfs_run_test() {
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$second_tag"      && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$second_tag_desc" && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$third_tag"       && \
-     cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$third_tag_desc"  && \
+     cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$third_tag_desc2" && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"       && \
      cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag"; then
     echo "all tags and their descriptions found"
@@ -279,9 +280,9 @@ cvmfs_run_test() {
   else
     return 11
   fi
-  if [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag"      | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$prev_trunk_tag" | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc" | wc -l) -ne 0 ]; then
+  if [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$prev_trunk_tag"  | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc2" | wc -l) -ne 0 ]; then
     return 12
   fi
 
@@ -316,8 +317,8 @@ cvmfs_run_test() {
   else
     return 15
   fi
-  if [ $(cvmfs_server tag -l $CVMFS_TEST_REPO | grep "$third_tag"      | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server tag -l $CVMFS_TEST_REPO | grep "$third_tag_desc" | wc -l) -ne 0 ]; then
+  if [ $(cvmfs_server tag -l $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server tag -l $CVMFS_TEST_REPO | grep "$third_tag_desc2" | wc -l) -ne 0 ]; then
     return 16
   fi
 
@@ -346,7 +347,7 @@ cvmfs_run_test() {
   if [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc2" | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$prev_trunk_tag"  | wc -l) -ne 0 ]; then
     return 19
   fi
@@ -396,7 +397,7 @@ cvmfs_run_test() {
   if [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ]; then
+     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc2" | wc -l) -ne 0 ]; then
     return 22
   fi
 
@@ -420,7 +421,7 @@ cvmfs_run_test() {
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ]; then
+     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc2" | wc -l) -ne 0 ]; then
     return 25
   fi
 
@@ -459,7 +460,7 @@ cvmfs_run_test() {
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ]; then
+     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc2" | wc -l) -ne 0 ]; then
     return 30
   fi
 
@@ -486,7 +487,7 @@ cvmfs_run_test() {
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag"      | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$second_tag_desc" | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag"       | wc -l) -ne 0 ] || \
-     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc"  | wc -l) -ne 0 ] || \
+     [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$third_tag_desc2" | wc -l) -ne 0 ] || \
      [ $(cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep "$prev_trunk_tag"  | wc -l) -ne 0 ]; then
     return 34
   fi
