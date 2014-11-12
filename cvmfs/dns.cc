@@ -28,7 +28,7 @@ namespace dns {
  * IPv6 address, it has to be in brackets.  If the input is not a valid URL,
  * it is returned unmodified.
  */
-string RewriteUrl(string url, const string &ip) {
+string RewriteUrl(const string &url, const string &ip) {
   unsigned pos_begin = 0;
   unsigned pos_end = 0;
   unsigned len = url.size();
@@ -60,12 +60,28 @@ string RewriteUrl(string url, const string &ip) {
       pos_end = i;
 
     if (pos_end > pos_begin) {
-      return url.replace(pos_begin, pos_end - pos_begin, ip);
+      string result = url;
+      return result.replace(pos_begin, pos_end - pos_begin, ip);
     }
   }
 
   // Not a valid URL or no hostname in it
   return url;
+}
+
+
+/**
+ * Removes the brackets from IPv6 addresses.  Leaves IPv4 addresses unchanged.
+ */
+string StripIp(const string &decorated_ip) {
+  if (!decorated_ip.empty()) {
+    if ((decorated_ip[0] == '[') &&
+        (decorated_ip[decorated_ip.length()-1] == ']'))
+    {
+      return decorated_ip.substr(1, decorated_ip.length()-2);
+    }
+  }
+  return decorated_ip;
 }
 
 

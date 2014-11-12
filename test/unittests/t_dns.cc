@@ -148,6 +148,18 @@ TEST_F(T_Dns, RewriteUrl) {
 }
 
 
+TEST_F(T_Dns, StripIp) {
+  EXPECT_EQ(StripIp("[::1]"), "::1");
+  EXPECT_EQ(StripIp("127.0.0.1"), "127.0.0.1");
+  EXPECT_EQ(StripIp("[]"), "");
+  EXPECT_EQ(StripIp(""), "");
+  EXPECT_EQ(StripIp("["), "[");
+  EXPECT_EQ(StripIp("]"), "]");
+  EXPECT_EQ(StripIp("[::1"), "[::1");
+  EXPECT_EQ(StripIp("::1"), "::1");
+}
+
+
 TEST_F(T_Dns, Host) {
   Host host;
   Host host2;

@@ -56,7 +56,8 @@ inline const char *Code2Ascii(const Failures error) {
 }
 
 
-std::string RewriteUrl(std::string url, const std::string &ip);
+std::string RewriteUrl(const std::string &url, const std::string &ip);
+std::string StripIp(const std::string &decorated_ip);
 
 
 /**
