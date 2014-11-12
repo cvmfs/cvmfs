@@ -482,9 +482,9 @@ void CommandTag::PrintTagMachineReadable(const history::History::Tag &tag) const
    LogCvmfs(kLogCvmfs, kLogStdout, "%s %s %d %d %d %s %s",
              tag.name.c_str(),
              tag.root_hash.ToString().c_str(),
-             StringifyInt(tag.size).c_str(),
-             StringifyInt(tag.revision).c_str(),
-             StringifyInt(tag.timestamp).c_str(),
+             tag.size,
+             tag.revision,
+             tag.timestamp,
              tag.GetChannelName(),
              tag.description.c_str());
 }
@@ -944,14 +944,14 @@ std::string CommandInfoTag::HumanReadableFilesize(const size_t filesize) const {
 void CommandInfoTag::PrintHumanReadableInfo(
                                        const history::History::Tag &tag) const {
   LogCvmfs(kLogCvmfs, kLogStdout, "Name:         %s\n"
-                                  "Revision:     %s\n"
+                                  "Revision:     %d\n"
                                   "Channel:      %s\n"
                                   "Timestamp:    %s\n"
                                   "Root Hash:    %s\n"
                                   "Catalog Size: %s\n"
                                   "%s",
            tag.name.c_str(),
-           StringifyInt(tag.revision).c_str(),
+           tag.revision,
            tag.GetChannelName(),
            StringifyTime(tag.timestamp, true /* utc */).c_str(),
            tag.root_hash.ToString().c_str(),
