@@ -3017,7 +3017,7 @@ tag() {
       tag_create_command="$tag_create_command -c $add_tag_channel"
     fi
     if [ ! -z "$add_tag_description" ]; then
-      tag_create_command="$tag_create_command -d '$add_tag_description'"
+      tag_create_command="$tag_create_command -d \"$add_tag_description\""
     fi
     if [ ! -z "$add_tag_root_hash" ]; then
       tag_create_command="$tag_create_command -h $add_tag_root_hash"
@@ -3527,7 +3527,7 @@ publish() {
       tag_command="$tag_command -c $tag_channel"
     fi
     if [ ! -z "$tag_description" ]; then
-      tag_command="$tag_command -d '$tag_description'"
+      tag_command="$tag_command -d \"$tag_description\""
     fi
 
     # ---> do it! (from here on we are changing things)
