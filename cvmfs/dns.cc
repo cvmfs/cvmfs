@@ -132,20 +132,20 @@ void Host::CopyFrom(const Host &other) {
 
 
 /**
- * Creates a copy of the original host with a new ID and adds by_seconds to the
- * deadline.
+ * Creates a copy of the original host with a new ID and sets a new dealine
+ * given in seconds from the current time.
  */
-Host Host::ExtendDeadline(const Host &original, unsigned by_seconds) {
+Host Host::ExtendDeadline(const Host &original, unsigned seconds_from_now) {
   Host new_host(original);
   new_host.id_ = atomic_xadd64(&global_id_, 1);
-  new_host.deadline_ += by_seconds;
+  new_host.deadline_ += time(NULL) + seconds_from_now;
   return new_host;
 }
 
 
 /**
  * All fields except the unique id_ are set by the resolver.  Host objects
- * can be copied around but only the resolve can create valid, new objects.
+ * can be copied around but only the resolver can create valid, new objects.
  */
 Host::Host()
   : deadline_(0)
@@ -182,6 +182,16 @@ bool Host::IsEquivalent(const Host &other) const {
 
 
 /**
+ * Compares the TTL from a provious call to time() with the current time.
+ */
+bool Host::IsExpired() const {
+  time_t now = time(NULL);
+  assert(now != static_cast<time_t>(-1));
+  return deadline_ < now;
+}
+
+
+/**
  * A host object is valid after it has been successfully resolved and until the
  * DNS ttl expires.  Successful name resolution means that there is at least
  * one IP address.
@@ -191,10 +201,7 @@ bool Host::IsValid() const {
     return false;
 
   assert(!ipv4_addresses_.empty() || !ipv6_addresses_.empty());
-
-  time_t now = time(NULL);
-  assert(now != static_cast<time_t>(-1));
-  return deadline_ >= now;
+  return !IsExpired();
 }
 
 
@@ -276,6 +283,7 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
 
   // Deal with special names: empty, IPv4, IPv6
   for (unsigned i = 0; i < num; ++i) {
+    LogCvmfs(kLogDns, kLogDebug, "preparing %s", names[i].c_str());
     if (names[i].empty()) {
       Host invalid_host;
       invalid_host.name_ = "";
@@ -290,7 +298,10 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       ipv4_host.deadline_ = time(NULL) + kMaxTtl;
       hosts->push_back(ipv4_host);
       skip[i] = true;
-    } else if ((names[i][0] == '[') && (names[i][names[i].length()-1] == ']')) {
+    } else if ((names[i].length() >= 3) &&
+               (names[i][0] == '[') &&
+               (names[i][names[i].length()-1] == ']'))
+    {
       Host ipv6_host;
       ipv6_host.name_ = names[i];
       ipv6_host.status_ = kFailOk;

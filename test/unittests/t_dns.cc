@@ -250,6 +250,24 @@ TEST_F(T_Dns, HostEquivalent) {
 }
 
 
+TEST_F(T_Dns, HostExpired) {
+  Host host;
+  host.name_ = "name";
+  host.status_ = kFailOther;
+  host.deadline_ = 0;
+  EXPECT_TRUE(host.IsExpired());
+
+  host.deadline_ = time(NULL) + 10;
+  EXPECT_FALSE(host.IsExpired());
+
+  host.ipv4_addresses_.insert("10.0.0.1");
+  host.status_ = kFailOk;
+  EXPECT_FALSE(host.IsExpired());
+  host.deadline_ = 0;
+  EXPECT_TRUE(host.IsExpired());
+}
+
+
 TEST_F(T_Dns, HostValid) {
   Host host;
   EXPECT_FALSE(host.IsValid());
@@ -276,10 +294,11 @@ TEST_F(T_Dns, HostExtendDeadline) {
   host.ipv6_addresses_.insert("[::2]");
   host.status_ = kFailOk;
 
-  Host host2 = Host::ExtendDeadline(host, 1);
+  Host host2 = Host::ExtendDeadline(host, 10);
   EXPECT_TRUE(host.IsEquivalent(host2));
   EXPECT_TRUE(host2.IsEquivalent(host));
-  EXPECT_EQ(host2.deadline(), 2U);
+  EXPECT_GE(host2.deadline(), time(NULL) + 9);
+  EXPECT_LE(host2.deadline(), time(NULL) + 11);
 }
 
 
@@ -359,6 +378,9 @@ TEST_F(T_Dns, ResolverIpAddresses) {
 
   host = resolver.Resolve("[::1]");
   ExpectResolvedName(host, "", "[::1]");
+
+  host = resolver.Resolve("[]");
+  EXPECT_FALSE(host.IsValid());
 }
 
 

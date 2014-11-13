@@ -74,16 +74,18 @@ std::string StripIp(const std::string &decorated_ip);
  */
 class Host {
   FRIEND_TEST(T_Dns, HostEquivalent);
+  FRIEND_TEST(T_Dns, HostExpired);
   FRIEND_TEST(T_Dns, HostValid);
   FRIEND_TEST(T_Dns, HostExtendDeadline);
   friend class Resolver;
 
  public:
-  static Host ExtendDeadline(const Host &original, unsigned by_seconds);
+  static Host ExtendDeadline(const Host &original, unsigned seconds_from_now);
   Host();
   Host(const Host &other);
   Host &operator= (const Host &other);
   bool IsEquivalent(const Host &other) const;
+  bool IsExpired() const;
   bool IsValid() const;
 
   time_t deadline() const { return deadline_; }

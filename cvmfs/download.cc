@@ -594,18 +594,20 @@ void HeaderLists::AddBlock(){
 
 string DownloadManager::ProxyInfo::Print() {
   string result = url;
-  if (address.status() == dns::kFailOk) {
-    int remaining =
-      static_cast<int>(address.deadline()) - static_cast<int>(time(NULL));
-    string expinfo = (remaining >= 0) ? "+" : "";
-    if (remaining >= 3600) {
-      expinfo += StringifyInt(remaining/3600) + "h";
-    } else if (remaining >= 60) {
-      expinfo += StringifyInt(remaining/60) + "m";
-    } else {
-      expinfo += StringifyInt(remaining) + "s";
-    }
-    result += " (" + address.name() + ", " + expinfo + ")";
+  int remaining =
+    static_cast<int>(host.deadline()) - static_cast<int>(time(NULL));
+  string expinfo = (remaining >= 0) ? "+" : "";
+  if (abs(remaining) >= 3600) {
+    expinfo += StringifyInt(remaining/3600) + "h";
+  } else if (abs(remaining) >= 60) {
+    expinfo += StringifyInt(remaining/60) + "m";
+  } else {
+    expinfo += StringifyInt(remaining) + "s";
+  }
+  if (host.status() == dns::kFailOk) {
+    result += " (" + host.name() + ", " + expinfo + ")";
+  } else {
+    result += " (:unresolved:, " + expinfo + ")";
   }
   return result;
 }
@@ -700,7 +702,8 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
 
 
 /**
- * Sets the URL specific options such as host to use and timeout.
+ * Sets the URL specific options such as host to use and timeout.  It might also
+ * set an error code, in which case the further processing should react on.
  */
 void DownloadManager::SetUrlOptions(JobInfo *info) {
   CURL *curl_handle = info->curl_handle;
@@ -767,10 +770,18 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       ((*opt_proxy_groups_)[opt_proxy_groups_current_][0].url == "DIRECT"))
   {
     info->proxy = "";
+    curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
   } else {
-    info->proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0].url;
+    ProxyInfo *proxy = &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]);
+    ValidateProxyIpsUnlocked(proxy->url, proxy->host);
+    info->proxy = proxy->url;
+    if (proxy->host.status() == dns::kFailOk) {
+      curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
+    } else {
+      // We know it can't work, don't even try to download
+      curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "http://$");
+    }
   }
-  curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
   if (info->proxy != "") {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_proxy_);
     curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_proxy_);
@@ -789,6 +800,81 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
                    EscapeUrl((url_prefix + *(info->url))).c_str());
   //LogCvmfs(kLogDownload, kLogDebug, "set url %s for info %p / curl handle %p",
   //         EscapeUrl((url_prefix + *(info->url))).c_str(), info, curl_handle);
+}
+
+
+/**
+ * Checks if the name resolving information is still up to date.  The host
+ * object should be one from the current load-balance group.  If the information
+ * changed, gather new set of resolved IPs and, if different, exchange them in
+ * the load-balance group on the fly.  In the latter case, also rebalance the
+ * proxies.  The options mutex needs to be open.
+ */
+void DownloadManager::ValidateProxyIpsUnlocked(
+  const string &url,
+  const dns::Host &host)
+{
+  if (!host.IsExpired())
+    return;
+  LogCvmfs(kLogDownload, kLogDebug, "validate DNS entry for %s",
+           host.name().c_str());
+
+  unsigned group_idx = opt_proxy_groups_current_;
+  dns::Host new_host = resolver->Resolve(host.name());
+
+  bool update_only = true;  // No changes to the list of IP addresses.
+  if (new_host.status() != dns::kFailOk) {
+    // Try again later when resolving fails.
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+             "failed to resolve IP addresses for %s (%d - %s)",
+             host.name().c_str(), new_host.status(),
+             dns::Code2Ascii(new_host.status()));
+    new_host = dns::Host::ExtendDeadline(host, dns::Resolver::kMinTtl);
+  } else if (!host.IsEquivalent(new_host)) {
+    update_only = false;
+  }
+
+  if (update_only) {
+    for (unsigned i = 0; i < (*opt_proxy_groups_)[group_idx].size(); ++i) {
+      if ((*opt_proxy_groups_)[group_idx][i].host.id() == host.id())
+        (*opt_proxy_groups_)[group_idx][i].host = new_host;
+    }
+    return;
+  }
+
+  assert(new_host.status() == dns::kFailOk);
+
+  // Remove old host objects, insert new objects, and rebalance.
+  LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+           "DNS entries for proxy %s changed, adjusting", host.name().c_str());
+  vector<ProxyInfo> *group = &((*opt_proxy_groups_)[opt_proxy_groups_current_]);
+  for (unsigned i = 0; i < group->size(); ) {
+    if ((*group)[i].host.id() == host.id()) {
+      group->erase(group->begin() + i);
+    } else {
+      i++;
+    }
+  }
+  vector<ProxyInfo> new_infos;
+  // IPv6 addresses have precedence
+  set<string>::const_iterator iter_ips;
+  if (new_host.HasIpv6()) {
+    iter_ips = new_host.ipv6_addresses().begin();
+    for (; iter_ips != new_host.ipv6_addresses().end(); ++iter_ips) {
+      string url_ip = dns::RewriteUrl(url, *iter_ips);
+      new_infos.push_back(ProxyInfo(new_host, url_ip));
+    }
+  } else {
+    // IPv4
+    iter_ips = new_host.ipv4_addresses().begin();
+    for (; iter_ips != new_host.ipv4_addresses().end(); ++iter_ips) {
+      string url_ip = dns::RewriteUrl(url, *iter_ips);
+      new_infos.push_back(ProxyInfo(new_host, url_ip));
+    }
+  }
+  group->insert(group->end(), new_infos.begin(), new_infos.end());
+
+  RebalanceProxiesUnlocked();
 }
 
 
@@ -1220,7 +1306,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
     opt_ipv4_only_ = true;
   }
   resolver = dns::CaresResolver::Create(opt_ipv4_only_,
-                                        2 /* retries */, 2000 /* timeout */);
+                                        3 /* retries */, 3000 /* timeout */);
   assert(resolver);
 
   // Parsing environment variables
@@ -1385,6 +1471,11 @@ void DownloadManager::SetDnsServer(const string &address) {
   if (address != "") {
     opt_dns_server_ = strdup(address.c_str());
     assert(opt_dns_server_);
+
+    vector<string> servers;
+    servers.push_back(address);
+    bool retval = resolver->SetResolvers(servers);
+    assert(retval);
   }
   pthread_mutex_unlock(lock_options_);
   LogCvmfs(kLogDownload, kLogSyslog, "set nameserver to %s", address.c_str());
@@ -1725,10 +1816,10 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
       urls.push_back(dns::ExtractHost(this_group[j]));
     }
   }
-  vector<dns::Host> addresses;
+  vector<dns::Host> hosts;
   LogCvmfs(kLogDownload, kLogDebug, "resolving %u proxy addresses",
            urls.size());
-  resolver->ResolveMany(urls, &addresses);
+  resolver->ResolveMany(urls, &hosts);
 
   // Construct opt_proxy_groups_: traverse proxy list in same order and expand
   // names to resolved IP addresses.
@@ -1744,25 +1835,30 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
         continue;
       }
 
+      if (hosts[num_proxy].status() != dns::kFailOk) {
+        infos.push_back(ProxyInfo(hosts[num_proxy], this_group[j]));
+        continue;
+      }
+
       // IPv6 addresses have precedence
       set<string>::const_iterator iter_ips;
-      if (addresses[num_proxy].HasIpv6()) {
+      if (hosts[num_proxy].HasIpv6()) {
         // IPv6
-        iter_ips = addresses[num_proxy].ipv6_addresses().begin();
-        for (; iter_ips != addresses[num_proxy].ipv6_addresses().end();
+        iter_ips = hosts[num_proxy].ipv6_addresses().begin();
+        for (; iter_ips != hosts[num_proxy].ipv6_addresses().end();
              ++iter_ips)
         {
           string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
-          infos.push_back(ProxyInfo(addresses[num_proxy], url_ip));
+          infos.push_back(ProxyInfo(hosts[num_proxy], url_ip));
         }
       } else {
         // IPv4
-        iter_ips = addresses[num_proxy].ipv4_addresses().begin();
-        for (; iter_ips != addresses[num_proxy].ipv4_addresses().end();
+        iter_ips = hosts[num_proxy].ipv4_addresses().begin();
+        for (; iter_ips != hosts[num_proxy].ipv4_addresses().end();
              ++iter_ips)
         {
           string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
-          infos.push_back(ProxyInfo(addresses[num_proxy], url_ip));
+          infos.push_back(ProxyInfo(hosts[num_proxy], url_ip));
         }
       }
     }
@@ -1774,23 +1870,6 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
            opt_num_proxies_, opt_proxy_groups_->size());
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 1;
-
-  // Check nothing stupid happend
-  for (unsigned i = 0; i < opt_proxy_groups_->size(); ) {
-    if ((*opt_proxy_groups_)[i].empty())
-      opt_proxy_groups_->erase(opt_proxy_groups_->begin()+i);
-    else
-      ++i;
-  }
-  if (opt_proxy_groups_->empty()) {
-    delete opt_proxy_groups_;
-    opt_proxy_groups_ = NULL;
-    opt_proxy_groups_current_ = 0;
-    opt_proxy_groups_current_burned_ = 0;
-    opt_num_proxies_ = 0;
-    pthread_mutex_unlock(lock_options_);
-    return;
-  }
 
   // Select random start proxy from the first group.
   if ((*opt_proxy_groups_)[0].size() > 1) {
@@ -1837,9 +1916,7 @@ void DownloadManager::RebalanceProxiesUnlocked() {
   opt_proxy_groups_current_burned_ = 1;
   vector<ProxyInfo> *group = &((*opt_proxy_groups_)[opt_proxy_groups_current_]);
   int select = prng_.Next(group->size());
-  const ProxyInfo swap = (*group)[select];
-  (*group)[select] = (*group)[0];
-  (*group)[0] = swap;
+  swap((*group)[select], (*group)[0]);
   //LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
   //         "switching proxy from %s to %s (rebalance)",
   //         (*group)[select].c_str(), swap.c_str());

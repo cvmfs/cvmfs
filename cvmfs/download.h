@@ -249,12 +249,12 @@ class DownloadManager {
   struct ProxyInfo {
     ProxyInfo() { }
     explicit ProxyInfo(const std::string &url) : url(url) { }
-    ProxyInfo(const dns::Host &address, const std::string &url)
-      : address(address)
+    ProxyInfo(const dns::Host &host, const std::string &url)
+      : host(host)
       , url(url)
     { }
     std::string Print();
-    dns::Host address;
+    dns::Host host;
     std::string url;
   };
 
@@ -307,6 +307,7 @@ class DownloadManager {
   void ReleaseCurlHandle(CURL *handle);
   void InitializeRequest(JobInfo *info, CURL *handle);
   void SetUrlOptions(JobInfo *info);
+  void ValidateProxyIpsUnlocked(const std::string &url, const dns::Host &host);
   void UpdateStatistics(CURL *handle);
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
