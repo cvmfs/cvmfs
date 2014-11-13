@@ -118,19 +118,20 @@ bool History::Initialize() {
 
 bool History::PrepareQueries() {
   assert (database_);
-  insert_tag_       = new SqlInsertTag      (database_.weak_ref());
-  remove_tag_       = new SqlRemoveTag      (database_.weak_ref());
-  find_tag_         = new SqlFindTag        (database_.weak_ref());
-  find_tag_by_date_ = new SqlFindTagByDate  (database_.weak_ref());
-  count_tags_       = new SqlCountTags      (database_.weak_ref());
-  list_tags_        = new SqlListTags       (database_.weak_ref());
-  channel_tips_     = new SqlGetChannelTips (database_.weak_ref());
-  get_hashes_       = new SqlGetHashes      (database_.weak_ref());
-  rollback_tag_     = new SqlRollbackTag    (database_.weak_ref());
+  insert_tag_         = new SqlInsertTag        (database_.weak_ref());
+  remove_tag_         = new SqlRemoveTag        (database_.weak_ref());
+  find_tag_           = new SqlFindTag          (database_.weak_ref());
+  find_tag_by_date_   = new SqlFindTagByDate    (database_.weak_ref());
+  count_tags_         = new SqlCountTags        (database_.weak_ref());
+  list_tags_          = new SqlListTags         (database_.weak_ref());
+  channel_tips_       = new SqlGetChannelTips   (database_.weak_ref());
+  get_hashes_         = new SqlGetHashes        (database_.weak_ref());
+  rollback_tag_       = new SqlRollbackTag      (database_.weak_ref());
+  list_rollback_tags_ = new SqlListRollbackTags (database_.weak_ref());
 
-  return (insert_tag_ && remove_tag_ && find_tag_  && find_tag_by_date_ &&
-          count_tags_ && list_tags_ && channel_tips_ && get_hashes_ &&
-          rollback_tag_);
+  return (insert_tag_   && remove_tag_ && find_tag_     && find_tag_by_date_ &&
+          count_tags_   && list_tags_  && channel_tips_ && get_hashes_       &&
+          rollback_tag_ && list_rollback_tags_);
 }
 
 
@@ -291,6 +292,27 @@ bool History::Rollback(const Tag &updated_target_tag) {
   }
 
   return true;
+}
+
+
+bool History::ListTagsAffectedByRollback(const std::string  &target_tag_name,
+                                         std::vector<Tag>   *tags) const {
+  // retrieve the old version of the target tag from the history
+  Tag target_tag;
+  if (! GetByName(target_tag_name, &target_tag)) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to retrieve target tag '%s'",
+                                     target_tag_name.c_str());
+    return false;
+  }
+
+  // prepage listing command to find affected tags for a potential rollback
+  if (! list_rollback_tags_->BindTargetTag(target_tag)) {
+    LogCvmfs(kLogHistory, kLogDebug, "failed to prepare rollback listing query");
+    return false;
+  }
+
+  // run the listing and return the results
+  return RunListing(tags, list_rollback_tags_.weak_ref());
 }
 
 
