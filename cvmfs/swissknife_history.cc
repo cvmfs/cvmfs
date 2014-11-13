@@ -490,6 +490,20 @@ void CommandTag::PrintTagMachineReadable(const history::History::Tag &tag) const
 }
 
 
+std::string CommandTag::AddPadding(const std::string  &str,
+                                   const size_t        padding,
+                                   const bool          align_right,
+                                   const std::string  &fill_char) const {
+  assert (str.size() <= padding);
+  std::string result(str);
+  result.reserve(padding);
+  const size_t pos = (align_right) ? 0 : str.size();
+  const size_t padding_width = padding - str.size();
+  for (size_t i = 0; i < padding_width; ++i) result.insert(pos, fill_char);
+  return result;
+}
+
+
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
@@ -801,19 +815,6 @@ ParameterList CommandListTags::GetParams() {
   InsertCommonParameters(r);
   r.push_back(Parameter::Switch('x', "machine readable output"));
   return r;
-}
-
-std::string CommandListTags::AddPadding(const std::string  &str,
-                                        const size_t        padding,
-                                        const bool          align_right,
-                                        const std::string  &fill_char) const {
-  assert (str.size() <= padding);
-  std::string result(str);
-  result.reserve(padding);
-  const size_t pos = (align_right) ? 0 : str.size();
-  const size_t padding_width = padding - str.size();
-  for (size_t i = 0; i < padding_width; ++i) result.insert(pos, fill_char);
-  return result;
 }
 
 

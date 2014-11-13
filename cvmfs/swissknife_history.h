@@ -94,6 +94,11 @@ class CommandTag : public Command {
                                const bool          read_write) const;
 
   void PrintTagMachineReadable(const history::History::Tag &tag) const;
+
+  std::string AddPadding(const std::string  &str,
+                         const size_t        padding,
+                         const bool          align_right = false,
+                         const std::string  &fill_char = " ") const;
 };
 
 
@@ -158,11 +163,6 @@ class CommandListTags : public CommandTag {
   int Main(const ArgumentList &args);
 
  protected:
-  std::string AddPadding(const std::string  &str,
-                         const size_t        padding,
-                         const bool          align_right = false,
-                         const std::string  &fill_char = " ") const;
-
   void PrintHumanReadableList(const TagList &tags) const;
   void PrintMachineReadableList(const TagList &tags) const;
 };
