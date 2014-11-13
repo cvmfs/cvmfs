@@ -610,6 +610,35 @@ cvmfs_run_test() {
   echo "check trunk revision progress"
   [ $(( $trunk_revision_1 + 5 )) -eq $trunk_revision_2 ] || return 56
 
+  # ============================================================================
+
+  echo "check if we have undo tags"
+  cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"      || return 57
+  cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 58
+
+  echo "try to delete undo tags (should fail)"
+  cvmfs_server tag -r $trunk_tag -f                    $CVMFS_TEST_REPO && return 59
+  cvmfs_server tag -f -r $prev_trunk_tag               $CVMFS_TEST_REPO && return 60
+  cvmfs_server tag -r $trunk_tag -r $prev_trunk_tag -f $CVMFS_TEST_REPO && return 61
+
+  echo "check that we still have undo tags"
+  cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$trunk_tag"      || return 62
+  cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" || return 63
+
+  # ============================================================================
+
+  echo "perform an undo-rollback to get rid of $prev_trunk_tag"
+  cvmfs_server rollback -f $CVMFS_TEST_REPO || return 64
+
+  echo "check if $prev_trunk_tag is gone"
+  cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" && return 64
+
+  echo "try to recreate $prev_trunk_tag (should fail)"
+  cvmfs_server tag -a $prev_trunk_tag $CVMFS_TEST_REPO && return 65
+
+  echo "check if $prev_trunk_tag is still not there"
+  cvmfs_server tag -l -x $CVMFS_TEST_REPO | grep -q "$prev_trunk_tag" && return 66
+
   return 0
 }
 
