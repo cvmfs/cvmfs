@@ -504,6 +504,11 @@ std::string CommandTag::AddPadding(const std::string  &str,
 }
 
 
+bool CommandTag::IsUndoTagName(const std::string &tag_name) const {
+  return tag_name == CommandTag::kHeadTag ||
+         tag_name == CommandTag::kPreviousHeadTag;
+}
+
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
@@ -547,6 +552,11 @@ int CommandCreateTag::Main(const ArgumentList &args) {
 
   if (tag_name.empty() && ! undo_tags) {
     LogCvmfs(kLogCvmfs, kLogStderr, "nothing to do");
+    return 1;
+  }
+
+  if (IsUndoTagName(tag_name)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "undo tags are managed internally");
     return 1;
   }
 
@@ -749,6 +759,18 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
   const std::string tags_to_delete = *args.find('d')->second;
 
   const TagNames condemned_tags = SplitString(tags_to_delete, ' ');
+
+  // check if user tries to remove a magic undo tag
+        TagNames::const_iterator i    = condemned_tags.begin();
+  const TagNames::const_iterator iend = condemned_tags.end();
+  for (; i != iend; ++i) {
+    if (IsUndoTagName(*i)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "undo tags are handled internally and "
+                                      "cannot be deleted");
+      return 1;
+    }
+  }
+
   LogCvmfs(kLogCvmfs, kLogDebug, "proceeding to delete %d tags",
            condemned_tags.size());
 
@@ -761,10 +783,8 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
   }
 
   // check if the tags to be deleted exist
-        TagNames::const_iterator i    = condemned_tags.begin();
-  const TagNames::const_iterator iend = condemned_tags.end();
   bool all_exist = true;
-  for (; i != iend; ++i) {
+  for (i = condemned_tags.begin(); i != iend; ++i) {
     if (! env->history->Exists(*i)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' does not exist",
                i->c_str());

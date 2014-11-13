@@ -99,6 +99,8 @@ class CommandTag : public Command {
                          const size_t        padding,
                          const bool          align_right = false,
                          const std::string  &fill_char = " ") const;
+
+  bool IsUndoTagName(const std::string &tag_name) const;
 };
 
 
