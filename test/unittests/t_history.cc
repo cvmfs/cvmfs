@@ -645,10 +645,24 @@ TEST_F(T_History, RollbackToOldTag) {
   History::Tag rollback_target;
   EXPECT_TRUE (history2->GetByName("moep", &rollback_target));
 
+  TagVector gone;
+  EXPECT_TRUE (history2->ListTagsAffectedByRollback("moep", &gone));
+  ASSERT_EQ (4u, gone.size());
+  if (gone[0].name == "also_rofl") { // order of rev 8 tags is undefined
+    EXPECT_EQ ("also_rofl", gone[0].name); EXPECT_EQ (8, gone[0].revision);
+    EXPECT_EQ ("rofl",      gone[1].name); EXPECT_EQ (8, gone[1].revision);
+  } else {
+    EXPECT_EQ ("rofl",      gone[0].name); EXPECT_EQ (8, gone[0].revision);
+    EXPECT_EQ ("also_rofl", gone[1].name); EXPECT_EQ (8, gone[1].revision);
+  }
+  EXPECT_EQ ("lol",       gone[2].name); EXPECT_EQ (5, gone[2].revision);
+  EXPECT_EQ ("moep",      gone[3].name); EXPECT_EQ (4, gone[3].revision);
+
   shash::Any new_root_hash(shash::kSha1);
   new_root_hash.Randomize();
   rollback_target.revision  = 10;
   rollback_target.root_hash = new_root_hash;
+
   EXPECT_TRUE (history2->Rollback(rollback_target));
   ASSERT_TRUE (history2->CommitTransaction());
 
@@ -697,4 +711,82 @@ TEST_F(T_History, RollbackToOldTag) {
   EXPECT_FALSE (history3->Exists("also_rofl"));
 
   delete history3;
+}
+
+
+TEST_F(T_History, ListTagsAffectedByRollback) {
+  const std::string hp = GetHistoryFilename();
+  History *history1 = History::Create(hp, fqrn);
+  ASSERT_NE (static_cast<History*>(NULL), history1);
+  EXPECT_EQ (fqrn, history1->fqrn());
+
+  const History::UpdateChannel c_test = History::kChannelTest;
+  const History::UpdateChannel c_prod = History::kChannelProd;
+
+  ASSERT_TRUE (history1->BeginTransaction());
+  ASSERT_TRUE (history1->Insert(GetDummyTag("foo",            1, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("bar",            2, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("first_release",  3, c_prod)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("test_release",   3, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("moep",           4, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("moep_duplicate", 4, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("lol",            5, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("second_release", 6, c_prod)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("third_release",  7, c_prod)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("rofl",           8, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("also_rofl",      8, c_test)));
+  ASSERT_TRUE (history1->Insert(GetDummyTag("forth_release",  9, c_prod)));
+  ASSERT_TRUE (history1->CommitTransaction());
+
+  TagVector gone;
+  EXPECT_TRUE (history1->ListTagsAffectedByRollback("moep",  &gone));
+  ASSERT_EQ (4u, gone.size());
+  if (gone[0].name == "also_rofl") { // order of rev 8 tags is undefined
+    EXPECT_EQ ("also_rofl", gone[0].name); EXPECT_EQ (8, gone[0].revision);
+    EXPECT_EQ ("rofl",      gone[1].name); EXPECT_EQ (8, gone[1].revision);
+  } else {
+    EXPECT_EQ ("rofl",      gone[0].name); EXPECT_EQ (8, gone[0].revision);
+    EXPECT_EQ ("also_rofl", gone[1].name); EXPECT_EQ (8, gone[1].revision);
+  }
+  EXPECT_EQ ("lol",       gone[2].name); EXPECT_EQ (5, gone[2].revision);
+  EXPECT_EQ ("moep",      gone[3].name); EXPECT_EQ (4, gone[3].revision);
+
+  gone.clear();
+  EXPECT_FALSE (history1->ListTagsAffectedByRollback("unobtainium", &gone));
+  EXPECT_TRUE  (gone.empty());
+
+  gone.clear();
+  EXPECT_TRUE (history1->ListTagsAffectedByRollback("second_release", &gone));
+  ASSERT_EQ (3u, gone.size());
+  EXPECT_EQ ("forth_release",  gone[0].name); EXPECT_EQ (9, gone[0].revision);
+  EXPECT_EQ ("third_release",  gone[1].name); EXPECT_EQ (7, gone[1].revision);
+  EXPECT_EQ ("second_release", gone[2].name); EXPECT_EQ (6, gone[2].revision);
+
+  gone.clear();
+  EXPECT_TRUE (history1->ListTagsAffectedByRollback("bar", &gone));
+  ASSERT_EQ (7u, gone.size());
+  if (gone[0].name == "also_rofl") { // undefined order for same revision
+    EXPECT_EQ ("also_rofl",      gone[0].name); EXPECT_EQ (8, gone[0].revision);
+    EXPECT_EQ ("rofl",           gone[1].name); EXPECT_EQ (8, gone[1].revision);
+  } else {
+    EXPECT_EQ ("rofl",           gone[0].name); EXPECT_EQ (8, gone[0].revision);
+    EXPECT_EQ ("also_rofl",      gone[1].name); EXPECT_EQ (8, gone[1].revision);
+  }
+  EXPECT_EQ ("lol",            gone[2].name); EXPECT_EQ (5, gone[2].revision);
+  if (gone[3].name == "moep_duplicate") { // undefined order of same revision
+    EXPECT_EQ ("moep_duplicate", gone[3].name); EXPECT_EQ (4, gone[3].revision);
+    EXPECT_EQ ("moep",           gone[4].name); EXPECT_EQ (4, gone[4].revision);
+  } else {
+    EXPECT_EQ ("moep",           gone[3].name); EXPECT_EQ (4, gone[3].revision);
+    EXPECT_EQ ("moep_duplicate", gone[4].name); EXPECT_EQ (4, gone[4].revision);
+  }
+  EXPECT_EQ ("test_release",   gone[5].name); EXPECT_EQ (3, gone[5].revision);
+  EXPECT_EQ ("bar",            gone[6].name); EXPECT_EQ (2, gone[6].revision);
+
+  gone.clear();
+  EXPECT_TRUE (history1->ListTagsAffectedByRollback("forth_release", &gone));
+  ASSERT_EQ (1u, gone.size());
+  EXPECT_EQ ("forth_release", gone[0].name); EXPECT_EQ (9, gone[0].revision);
+
+  delete history1;
 }

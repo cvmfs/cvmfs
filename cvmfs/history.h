@@ -28,6 +28,7 @@ class SqlListTags;
 class SqlGetChannelTips;
 class SqlGetHashes;
 class SqlRollbackTag;
+class SqlListRollbackTags;
 
 /**
  * This class wraps the history of a repository, i.e. it contains a database
@@ -180,6 +181,19 @@ class History {
   bool Rollback(const Tag &updated_target_tag);
 
   /**
+   * Lists the tags that would be deleted by a rollback to the tag specified.
+   *
+   * Note: This doesn't change the database but is mainly used for sanity checks
+   *       and user output.
+   *
+   * @param target_tag_name  the tag name for the planned rollback
+   * @param tags             pointer to the result tag list to be filled
+   * @return                 true on success
+   */
+  bool ListTagsAffectedByRollback(const std::string  &target_tag_name,
+                                  std::vector<Tag>   *tags) const;
+
+  /**
    * Provides a list of all referenced catalog hashes in this History.
    * The hashes will be ordered by their associated revision number in
    * acending order.
@@ -215,6 +229,7 @@ class History {
   UniquePtr<SqlGetChannelTips>    channel_tips_;
   UniquePtr<SqlGetHashes>         get_hashes_;
   UniquePtr<SqlRollbackTag>       rollback_tag_;
+  UniquePtr<SqlListRollbackTags>  list_rollback_tags_;
 };
 
 }  // namespace hsitory

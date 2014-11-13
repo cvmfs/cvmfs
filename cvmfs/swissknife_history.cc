@@ -490,6 +490,25 @@ void CommandTag::PrintTagMachineReadable(const history::History::Tag &tag) const
 }
 
 
+std::string CommandTag::AddPadding(const std::string  &str,
+                                   const size_t        padding,
+                                   const bool          align_right,
+                                   const std::string  &fill_char) const {
+  assert (str.size() <= padding);
+  std::string result(str);
+  result.reserve(padding);
+  const size_t pos = (align_right) ? 0 : str.size();
+  const size_t padding_width = padding - str.size();
+  for (size_t i = 0; i < padding_width; ++i) result.insert(pos, fill_char);
+  return result;
+}
+
+
+bool CommandTag::IsUndoTagName(const std::string &tag_name) const {
+  return tag_name == CommandTag::kHeadTag ||
+         tag_name == CommandTag::kPreviousHeadTag;
+}
+
 //
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
@@ -536,6 +555,11 @@ int CommandCreateTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  if (IsUndoTagName(tag_name)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "undo tags are managed internally");
+    return 1;
+  }
+
   // initialize the Environment (taking ownership)
   const bool history_read_write = true;
   UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
@@ -561,6 +585,14 @@ int CommandCreateTag::Main(const ArgumentList &args) {
                                                        catalog_read_write));
   if (! catalog) {
     LogCvmfs(kLogCvmfs, kLogStderr, "catalog with hash '%s' does not exist",
+             root_hash.ToString().c_str());
+    return 1;
+  }
+
+  // check if the catalog is a root catalog
+  if (! catalog->root_prefix().IsEmpty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "cannot tag catalog '%s' that is not a "
+                                    "root catalog.",
              root_hash.ToString().c_str());
     return 1;
   }
@@ -727,6 +759,18 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
   const std::string tags_to_delete = *args.find('d')->second;
 
   const TagNames condemned_tags = SplitString(tags_to_delete, ' ');
+
+  // check if user tries to remove a magic undo tag
+        TagNames::const_iterator i    = condemned_tags.begin();
+  const TagNames::const_iterator iend = condemned_tags.end();
+  for (; i != iend; ++i) {
+    if (IsUndoTagName(*i)) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "undo tags are handled internally and "
+                                      "cannot be deleted");
+      return 1;
+    }
+  }
+
   LogCvmfs(kLogCvmfs, kLogDebug, "proceeding to delete %d tags",
            condemned_tags.size());
 
@@ -739,10 +783,8 @@ int CommandRemoveTag::Main(const ArgumentList &args) {
   }
 
   // check if the tags to be deleted exist
-        TagNames::const_iterator i    = condemned_tags.begin();
-  const TagNames::const_iterator iend = condemned_tags.end();
   bool all_exist = true;
-  for (; i != iend; ++i) {
+  for (i = condemned_tags.begin(); i != iend; ++i) {
     if (! env->history->Exists(*i)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "tag '%s' does not exist",
                i->c_str());
@@ -793,19 +835,6 @@ ParameterList CommandListTags::GetParams() {
   InsertCommonParameters(r);
   r.push_back(Parameter::Switch('x', "machine readable output"));
   return r;
-}
-
-std::string CommandListTags::AddPadding(const std::string  &str,
-                                        const size_t        padding,
-                                        const bool          align_right,
-                                        const std::string  &fill_char) const {
-  assert (str.size() <= padding);
-  std::string result(str);
-  result.reserve(padding);
-  const size_t pos = (align_right) ? 0 : str.size();
-  const size_t padding_width = padding - str.size();
-  for (size_t i = 0; i < padding_width; ++i) result.insert(pos, fill_char);
-  return result;
 }
 
 
@@ -1032,6 +1061,15 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // list the tags that will be deleted
+  TagList affected_tags;
+  if (! env->history->ListTagsAffectedByRollback(tag_name, &affected_tags)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to list condemned tags prior to "
+                                    "rollback to '%s'",
+             tag_name.c_str());
+    return 1;
+  }
+
   // check if tag is valid to be rolled back to
   const uint64_t current_revision = env->manifest->revision();
   assert (target_tag.revision <= current_revision);
@@ -1092,5 +1130,25 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // print the tags that have been removed by the rollback
+  PrintDeletedTagList(affected_tags);
+
   return 0;
+}
+
+
+void CommandRollbackTag::PrintDeletedTagList(const TagList &tags) const {
+  size_t longest_name = 0;
+        TagList::const_iterator i    = tags.begin();
+  const TagList::const_iterator iend = tags.end();
+  for (; i != iend; ++i) {
+    longest_name = std::max(i->name.size(), longest_name);
+  }
+
+  i = tags.begin();
+  for (; i != iend; ++i) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "removed tag %s (%s)",
+             AddPadding(i->name, longest_name).c_str(),
+             i->root_hash.ToString().c_str());
+  }
 }

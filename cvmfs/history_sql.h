@@ -117,10 +117,27 @@ class SqlGetHashes : public sqlite::Sql {
 };
 
 
-class SqlRollbackTag : public sqlite::Sql {
+class SqlRollback : public SqlRetrieveTag {
+ protected:
+  static const std::string rollback_condition;
+
+ public:
+  bool BindTargetTag(const History::Tag &target_tag);
+
+ protected:
+  std::string GetRollbackCondition() const;
+};
+
+
+class SqlRollbackTag : public SqlRollback {
  public:
   SqlRollbackTag(const HistoryDatabase *database);
-  bool BindTargetTag(const History::Tag &target_tag);
+};
+
+
+class SqlListRollbackTags : public SqlRollback {
+ public:
+  SqlListRollbackTags(const HistoryDatabase *database);
 };
 
 } /* namespace history */
