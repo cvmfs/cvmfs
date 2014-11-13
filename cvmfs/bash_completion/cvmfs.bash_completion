@@ -1,6 +1,6 @@
 # Bash completion script for cvmfs_config.
 #
-# Steve Traylen, <steve.traylen@cern.ch>, 13th January 2014 
+# Steve Traylen, <steve.traylen@cern.ch>, 13th January 2014
 #  -> cvmfs_config
 # Rene Meusel, <rene.meusel@cern.ch>, 21st January 2014
 #  -> cvmfs_server
@@ -74,16 +74,26 @@ __hosted_repos() {
   echo "$reply" | awk '{ print $1 }'
 }
 
+__tags() {
+  local reply=""
+  for repo in $(__hosted_repos '/stratum0/'); do
+    reply="$(cvmfs_server tag -lx $repo | awk '{print $1}') $reply"
+  done
+  echo $reply
+}
+
 
 _cvmfs_server()
 {
   local cur cmd
   COMPREPLY=()
   cur="${COMP_WORDS[COMP_CWORD]}"
+  prev_idx=$(( $COMP_CWORD - 1))
+  prev="${COMP_WORDS[$prev_idx]}"
   cmd="${COMP_WORDS[1]}"
 
   local -r cmds="mkfs add-replica import publish rollback rmfs \
-    resign list info list-tags check transaction abort snapshot migrate \
+    resign list info tag check transaction abort snapshot migrate \
     list-catalogs"
 
   if [ $COMP_CWORD -le 1 ]; then
@@ -112,9 +122,15 @@ _cvmfs_server()
       return 0
       ;;
 
-    list-tags)
-      COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/')" ${cur}) )
-      return 0
+    tag)
+      case "$prev" in
+        -a|-r|-i)
+          COMPREPLY=( $(compgen -W "$(__tags)" ${cur}))
+          ;;
+        *)
+          COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/')" ${cur}) )
+          return 0
+      esac
       ;;
 
     transaction)
@@ -131,7 +147,6 @@ _cvmfs_server()
       COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum1/')" ${cur}) )
       return 0
       ;;
-
 
     rmfs)
       COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}) )
