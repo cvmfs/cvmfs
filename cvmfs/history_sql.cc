@@ -218,19 +218,31 @@ shash::Any SqlGetHashes::RetrieveHash() const {
 //------------------------------------------------------------------------------
 
 
-SqlRollbackTag::SqlRollbackTag(const HistoryDatabase *database) {
-  const bool success = Init(database->sqlite_db(),
-                            "DELETE FROM tags "
-                            "  WHERE (revision > :target_rev  OR"
-                            "         name     = :target_name)"
-                            "    AND channel  = :target_chan;");
-  assert (success);
-}
-
-bool SqlRollbackTag::BindTargetTag(const History::Tag &target_tag) {
+bool SqlRollback::BindTargetTag(const History::Tag &target_tag) {
   return BindInt64(1, target_tag.revision) &&
          BindText (2, target_tag.name)     &&
          BindInt64(3, target_tag.channel);
 }
+
+const std::string SqlRollback::rollback_condition =
+                                             "(revision > :target_rev  OR "
+                                             " name     = :target_name)   "
+                                             "AND channel  = :target_chan ";
+
+std::string SqlRollback::GetRollbackCondition() const {
+  return SqlRollback::rollback_condition;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlRollbackTag::SqlRollbackTag(const HistoryDatabase *database) {
+  const bool success = Init(database->sqlite_db(),
+                            "DELETE FROM tags WHERE "
+                             + GetRollbackCondition() + ";");
+  assert (success);
+}
+
 
 }; /* namespace history */
