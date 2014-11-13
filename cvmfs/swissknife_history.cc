@@ -1041,6 +1041,15 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // list the tags that will be deleted
+  TagList affected_tags;
+  if (! env->history->ListTagsAffectedByRollback(tag_name, &affected_tags)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to list condemned tags prior to "
+                                    "rollback to '%s'",
+             tag_name.c_str());
+    return 1;
+  }
+
   // check if tag is valid to be rolled back to
   const uint64_t current_revision = env->manifest->revision();
   assert (target_tag.revision <= current_revision);
@@ -1101,5 +1110,25 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // print the tags that have been removed by the rollback
+  PrintDeletedTagList(affected_tags);
+
   return 0;
+}
+
+
+void CommandRollbackTag::PrintDeletedTagList(const TagList &tags) const {
+  size_t longest_name = 0;
+        TagList::const_iterator i    = tags.begin();
+  const TagList::const_iterator iend = tags.end();
+  for (; i != iend; ++i) {
+    longest_name = std::max(i->name.size(), longest_name);
+  }
+
+  i = tags.begin();
+  for (; i != iend; ++i) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "removed tag %s (%s)",
+             AddPadding(i->name, longest_name).c_str(),
+             i->root_hash.ToString().c_str());
+  }
 }

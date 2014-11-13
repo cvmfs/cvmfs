@@ -203,6 +203,9 @@ class CommandRollbackTag : public CommandTag {
 
   ParameterList GetParams();
   int Main(const ArgumentList &args);
+
+ protected:
+  void PrintDeletedTagList(const TagList &tags) const;
 };
 
 }  // namespace swissknife
