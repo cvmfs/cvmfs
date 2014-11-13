@@ -30,11 +30,14 @@ cvmfs_run_test() {
   echo "publish again (should fail)"
   publish_repo $CVMFS_TEST_REPO && return 3
 
-  echo "rollback to trunk-previous (should fail - not in a transaction)"
-  rollback_repo $CVMFS_TEST_REPO "trunk-previous" && return 4
-
   echo "open transaction for rollback"
   start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "rollback to trunk-previous (should fail - in a transaction)"
+  rollback_repo $CVMFS_TEST_REPO "trunk-previous" && return 4
+
+  echo "abort transaction"
+  abort_transaction $CVMFS_TEST_REPO || return $?
 
   echo "rollback to trunc-previous (should fail - unknown tag)"
   rollback_repo $CVMFS_TEST_REPO "trunc-previous" && return 5
