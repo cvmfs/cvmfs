@@ -283,7 +283,6 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
 
   // Deal with special names: empty, IPv4, IPv6
   for (unsigned i = 0; i < num; ++i) {
-    LogCvmfs(kLogDns, kLogDebug, "preparing %s", names[i].c_str());
     if (names[i].empty()) {
       Host invalid_host;
       invalid_host.name_ = "";

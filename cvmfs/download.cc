@@ -593,6 +593,9 @@ void HeaderLists::AddBlock(){
 
 
 string DownloadManager::ProxyInfo::Print() {
+  if (url == "DIRECT")
+    return url;
+  
   string result = url;
   int remaining =
     static_cast<int>(host.deadline()) - static_cast<int>(time(NULL));
@@ -778,8 +781,9 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     if (proxy->host.status() == dns::kFailOk) {
       curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
     } else {
-      // We know it can't work, don't even try to download
-      curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "http://$");
+      // We know it can't work, don't even try to download: TODO
+      curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
+      //curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "http://$.");
     }
   }
   if (info->proxy != "") {
