@@ -134,6 +134,10 @@ class SqlRollbackTag : public SqlRollback {
   SqlRollbackTag(const HistoryDatabase *database);
 };
 
+
+class SqlListRollbackTags : public SqlRollback {
+ public:
+  SqlListRollbackTags(const HistoryDatabase *database);
 };
 
 } /* namespace history */

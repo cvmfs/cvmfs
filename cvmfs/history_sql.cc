@@ -245,4 +245,15 @@ SqlRollbackTag::SqlRollbackTag(const HistoryDatabase *database) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
+SqlListRollbackTags::SqlListRollbackTags(const HistoryDatabase *database) {
+  const bool success = Init(database->sqlite_db(),
+                            "SELECT " + GetDatabaseFields() + " FROM tags "
+                            "WHERE " + GetRollbackCondition() + " "
+                            "ORDER BY revision DESC;");
+  assert (success);
+}
+
 }; /* namespace history */
