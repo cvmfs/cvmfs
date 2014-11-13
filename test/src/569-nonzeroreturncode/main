@@ -45,20 +45,38 @@ cvmfs_run_test() {
   echo "rollback to trunk-previous"
   rollback_repo $CVMFS_TEST_REPO "trunk-previous" || return $?
 
+  echo "inspect unknown tag (should fail)"
+  cvmfs_server tag -i "foobar" $CVMFS_TEST_REPO && return 6
+
+  echo "list unknown repo (should fail)"
+  cvmfs_server tag -l ${CVMFS_TEST_REPO}.unobtainium && return 7
+
+  echo "delete unknown tag (should fail)"
+  cvmfs_server tag -r trunc-previous -f $CVMFS_TEST_REPO && return 8
+
+  echo "open transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "try to add a tag (should fail - due to transaction)"
+  cvmfs_server tag -a "foobar" -m "this fails!" $CVMFS_TEST_REPO && return 9
+
+  echo "abort transaction"
+  abort_transaction $CVMFS_TEST_REPO || return $?
+
   echo "resign repository"
   sudo cvmfs_server resign $CVMFS_TEST_REPO || return $?
 
   echo "resign with broken master key (should fail)"
   local master_key="/etc/cvmfs/keys/${CVMFS_TEST_REPO}.masterkey"
   sudo cp $master_key .
-  echo "this is not valid!" | sudo tee $master_key || return 6
-  sudo cvmfs_server resign $CVMFS_TEST_REPO && return 7
+  echo "this is not valid!" | sudo tee $master_key || return 10
+  sudo cvmfs_server resign $CVMFS_TEST_REPO && return 11
 
   echo "remove repository"
   destroy_repo $CVMFS_TEST_REPO || return $?
 
   echo "remove again (should fail)"
-  destroy_repo $CVMFS_TEST_REPO && return 8
+  destroy_repo $CVMFS_TEST_REPO && return 12
 
   return 0
 }
