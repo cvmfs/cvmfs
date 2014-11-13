@@ -645,10 +645,24 @@ TEST_F(T_History, RollbackToOldTag) {
   History::Tag rollback_target;
   EXPECT_TRUE (history2->GetByName("moep", &rollback_target));
 
+  TagVector gone;
+  EXPECT_TRUE (history2->ListTagsAffectedByRollback("moep", &gone));
+  ASSERT_EQ (4u, gone.size());
+  if (gone[0].name == "also_rofl") { // order of rev 8 tags is undefined
+    EXPECT_EQ ("also_rofl", gone[0].name); EXPECT_EQ (8, gone[0].revision);
+    EXPECT_EQ ("rofl",      gone[1].name); EXPECT_EQ (8, gone[1].revision);
+  } else {
+    EXPECT_EQ ("rofl",      gone[0].name); EXPECT_EQ (8, gone[0].revision);
+    EXPECT_EQ ("also_rofl", gone[1].name); EXPECT_EQ (8, gone[1].revision);
+  }
+  EXPECT_EQ ("lol",       gone[2].name); EXPECT_EQ (5, gone[2].revision);
+  EXPECT_EQ ("moep",      gone[3].name); EXPECT_EQ (4, gone[3].revision);
+
   shash::Any new_root_hash(shash::kSha1);
   new_root_hash.Randomize();
   rollback_target.revision  = 10;
   rollback_target.root_hash = new_root_hash;
+
   EXPECT_TRUE (history2->Rollback(rollback_target));
   ASSERT_TRUE (history2->CommitTransaction());
 
