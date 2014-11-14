@@ -18,7 +18,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "signature.h"
-#include "history.h"
+#include "history_sqlite.h"
 
 
 namespace catalog {
@@ -850,7 +850,7 @@ class ObjectFetcher {
     }
 
     // TODO: need to unlink history_db_path after usage
-    history::History *history = history::History::Open(history_db_path);
+    history::History *history = history::SqliteHistory::Open(history_db_path);
     if (NULL != history) {
       LogCvmfs(kLogCatalogTraversal, error_sink_,
                "failed to open history database (%s)",

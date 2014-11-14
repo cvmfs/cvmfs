@@ -62,8 +62,9 @@ set (CVMFS2_DEBUG_SOURCES
   nfs_shared_maps.h nfs_shared_maps.cc
   glue_buffer.h glue_buffer.cc
   loader.h compat.cc compat.h
-  history.h history.cc
+  history.h
   history_sql.h history_sql.cc
+  history_sqlite.h history_sqlite.cc
   quota_listener.h quota_listener.cc
   auto_umount.h auto_umount.cc
   cvmfs.h cvmfs.cc
@@ -154,8 +155,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   dirtab.h dirtab.cc
-  history.h history.cc
+  history.h
   history_sql.h history_sql.cc
+  history_sqlite.h history_sqlite.cc
   letter.h letter.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc

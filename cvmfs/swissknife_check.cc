@@ -25,7 +25,7 @@
 #include "compression.h"
 #include "shortstring.h"
 #include "download.h"
-#include "history.h"
+#include "history_sqlite.h"
 
 using namespace std;  // NOLINT
 using namespace swissknife;
@@ -656,7 +656,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
       delete manifest;
       return 1;
     }
-    history::History *tag_db = history::History::Open(tmp_file);
+    history::History *tag_db = history::SqliteHistory::Open(tmp_file);
     if (NULL == tag_db) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database %s at %s",
                manifest->history().ToString().c_str(), tmp_file.c_str());
