@@ -80,6 +80,10 @@ class History {
       return this->revision < other.revision;
     }
 
+    bool operator >(const Tag &other) const {
+      return this->revision > other.revision;
+    }
+
     std::string    name;
     shash::Any     root_hash;
     uint64_t       size;
