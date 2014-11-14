@@ -723,6 +723,71 @@ TYPED_TEST(T_History, GetHashes) {
 }
 
 
+TYPED_TEST(T_History, GetHashesWithDuplicates) {
+  typedef typename TestFixture::TagVector            TagVector;
+  typedef typename TagVector::const_iterator         TagVectorItr;
+  typedef typename TagVector::const_reverse_iterator TagVectorRevItr;
+
+  const std::string hp = TestFixture::GetHistoryFilename();
+  History *history = TestFixture::CreateHistory(hp);
+  ASSERT_NE (static_cast<History*>(NULL), history);
+  EXPECT_EQ (TestFixture::fqrn, history->fqrn());
+
+  const unsigned int dummy_count         = 1000;
+  const unsigned int duplicate_frequency = 40;
+  const TagVector dummy_tags = TestFixture::GetDummyTags(dummy_count);
+  shash::Any dupl_hash(shash::kSha1);
+  dupl_hash.Randomize(this->prng_);
+  ASSERT_TRUE (history->BeginTransaction());
+        TagVectorRevItr i    = dummy_tags.rbegin();
+  const TagVectorRevItr iend = dummy_tags.rend();
+  for (unsigned int nr = 0; i != iend; ++i, ++nr) {
+    ASSERT_TRUE (history->Insert(*i));
+    if (nr % duplicate_frequency == 0) {
+      // insert a duplicate
+      History::Tag dupl = *i;
+      dupl.name = i->name + "_duplicate";
+      history->Insert(dupl);
+    }
+  }
+
+  // insert three duplicates
+  History::Tag dummy = TestFixture::GetDummyTag("dupl1", 2000);
+  dummy.root_hash = dupl_hash;
+  ASSERT_TRUE (history->Insert(dummy));
+
+  dummy.name     = "dupl2";
+  dummy.revision = 2001;
+  ASSERT_TRUE (history->Insert(dummy));
+
+  dummy.name     = "dupl3";
+  dummy.revision = 2002;
+  ASSERT_TRUE (history->Insert(dummy));
+
+  EXPECT_TRUE (history->CommitTransaction());
+
+  EXPECT_EQ (dummy_count + 3 + (dummy_count / duplicate_frequency),
+             history->GetNumberOfTags());
+
+  std::vector<shash::Any> hashes;
+  ASSERT_TRUE (history->GetHashes(&hashes));
+
+        TagVectorItr j    = dummy_tags.begin();
+  const TagVectorItr jend = dummy_tags.end();
+        std::vector<shash::Any>::const_iterator k    = hashes.begin();
+  const std::vector<shash::Any>::const_iterator kend = hashes.end();
+  ASSERT_EQ (dummy_count + 1, hashes.size());
+  for (; j != jend; ++j, ++k) {
+    EXPECT_EQ (j->root_hash, *k);
+  }
+
+  // check the duplicate hash
+  EXPECT_EQ (dupl_hash, *k);
+
+  TestFixture::CloseHistory(history);
+}
+
+
 TYPED_TEST(T_History, GetTagByDate) {
   const std::string hp = TestFixture::GetHistoryFilename();
   History *history = TestFixture::CreateHistory(hp);
