@@ -314,13 +314,65 @@ class MockCatalog {
 };
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+class MockHistory : public history::History {
+ public:
+  typedef std::map<std::string, history::History::Tag> TagMap;
+
+ public:
+  // TODO: count number of instances
+  MockHistory(const bool          writable,
+              const std::string  &fqrn);
+  MockHistory(const MockHistory &other);
+  ~MockHistory() {}
+
+  history::History* Clone(const bool writable = false) const;
+
+  bool IsWritable()        const { return writable_;    }
+  int GetNumberOfTags()    const { return tags_.size(); }
+  bool BeginTransaction()  const { return true;         }
+  bool CommitTransaction() const { return true;         }
+
+  bool SetPreviousRevision(const shash::Any &history_hash) { return true; }
+
+  bool Insert(const Tag &tag);
+  bool Remove(const std::string &name);
+  bool Exists(const std::string &name) const;
+  bool GetByName(const std::string &name, Tag *tag) const;
+  bool GetByDate(const time_t timestamp, Tag *tag) const;
+  bool List(std::vector<Tag> *tags) const;
+  bool Tips(std::vector<Tag> *channel_tips) const;
+
+  bool Rollback(const Tag &updated_target_tag);
+  bool ListTagsAffectedByRollback(const std::string  &target_tag_name,
+                                  std::vector<Tag>   *tags) const;
+
+  bool GetHashes(std::vector<shash::Any> *hashes) const;
+
+ protected:
+  void set_writable(const bool writable) { writable_ = writable; }
+
+ private:
+  TagMap     tags_;
+  bool       writable_;
+};
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
 
 /**
  * This is a mock of an ObjectFetcher that does essentially nothing.
  */
 class MockObjectFetcher {
  public:
-  static UniquePtr<history::History>  *s_history;
+  static MockHistory                  *s_history;
   static std::set<shash::Any>         *deleted_catalogs;
 
  public:
@@ -328,9 +380,7 @@ class MockObjectFetcher {
  public:
   manifest::Manifest* FetchManifest();
   history::History* FetchHistory() {
-    return (MockObjectFetcher::s_history != NULL)
-              ? s_history->Release()
-              : NULL;
+    return MockObjectFetcher::s_history->Clone();
   }
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {

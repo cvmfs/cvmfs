@@ -177,7 +177,7 @@ void MockCatalog::AddFile(const shash::Any   &content_hash,
 }
 
 
-UniquePtr<history::History>* MockObjectFetcher::s_history;
+MockHistory* MockObjectFetcher::s_history                 = NULL;
 std::set<shash::Any>* MockObjectFetcher::deleted_catalogs = NULL;
 
 void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
@@ -212,4 +212,81 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
 
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   return new manifest::Manifest(MockCatalog::root_hash, 0, "");
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+MockHistory::MockHistory(const bool          writable,
+                         const std::string  &fqrn) : writable_(writable) {
+  set_fqrn(fqrn);
+}
+
+
+MockHistory::MockHistory(const MockHistory &other) :
+  tags_(other.tags_)
+{
+  set_fqrn(other.fqrn());
+}
+
+
+history::History* MockHistory::Clone(const bool writable) const {
+  MockHistory *new_copy = new MockHistory(*this);
+  new_copy->set_writable(writable);
+  return new_copy;
+}
+
+
+bool MockHistory::Insert(const Tag &tag) {
+
+  return true;
+}
+
+bool MockHistory::Remove(const std::string &name) {
+
+  return true;
+}
+
+bool MockHistory::Exists(const std::string &name) const {
+
+  return true;
+}
+
+bool MockHistory::GetByName(const std::string &name, Tag *tag) const {
+
+  return true;
+}
+
+bool MockHistory::GetByDate(const time_t timestamp, Tag *tag) const {
+
+  return true;
+}
+
+bool MockHistory::List(std::vector<Tag> *tags) const {
+
+  return true;
+}
+
+bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
+
+  return true;
+}
+
+bool MockHistory::Rollback(const Tag &updated_target_tag) {
+
+  return true;
+}
+
+bool MockHistory:: ListTagsAffectedByRollback(const std::string  &tag_name,
+                                              std::vector<Tag>   *tags) const {
+
+  return true;
+}
+
+bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
+
+  return true;
 }
