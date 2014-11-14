@@ -240,53 +240,127 @@ history::History* MockHistory::Clone(const bool writable) const {
 }
 
 
-bool MockHistory::Insert(const Tag &tag) {
+void MockHistory::GetTags(std::vector<Tag> *tags) const {
+  tags->clear();
+  tags->resize(tags_.size());
+  std::transform(tags_.begin(), tags_.end(),
+                 tags->begin(), MockHistory::get_tag);
+}
 
+
+bool MockHistory::Insert(const Tag &tag) {
+  if (Exists(tag.name)) {
+    return false;
+  }
+
+  tags_[tag.name] = tag;
   return true;
 }
 
 bool MockHistory::Remove(const std::string &name) {
-
-  return true;
+  return (Exists(name))
+            ? tags_.erase(name) == 1
+            : true;
 }
 
 bool MockHistory::Exists(const std::string &name) const {
-
-  return true;
+  return tags_.find(name) != tags_.end();
 }
 
 bool MockHistory::GetByName(const std::string &name, Tag *tag) const {
-
+  TagMap::const_iterator t = tags_.find(name);
+  if (t == tags_.end()) {
+    return false;
+  }
+  *tag = t->second;
   return true;
 }
 
 bool MockHistory::GetByDate(const time_t timestamp, Tag *tag) const {
+  typedef std::vector<Tag> Tags;
+  Tags tags;
+  if (! List(&tags)) {
+    return false;
+  }
 
+  DateSmallerThan pred(timestamp);
+  const Tags::const_iterator t = std::find_if(tags.begin(), tags.end(), pred);
+  if (t == tags.end()) {
+    return false;
+  }
+
+  *tag = *t;
   return true;
 }
 
 bool MockHistory::List(std::vector<Tag> *tags) const {
-
+  GetTags(tags);
+  std::sort(tags->rbegin(), tags->rend());
   return true;
 }
 
 bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
+  // extract tags from TagMap
+  GetTags(channel_tips);
 
+  // find hash duplicates
+  std::sort(channel_tips->begin(), channel_tips->end(),
+            MockHistory::gt_channel_revision);
+  std::vector<Tag>::iterator last = std::unique(channel_tips->begin(),
+                                                channel_tips->end(),
+                                                MockHistory::eq_channel);
+  channel_tips->erase(last, channel_tips->end());
   return true;
 }
 
 bool MockHistory::Rollback(const Tag &updated_target_tag) {
+  std::vector<Tag> affected_tags;
+  if (! ListTagsAffectedByRollback(updated_target_tag.name, &affected_tags)) {
+    return false;
+  }
 
-  return true;
+  TagRemover remover(this);
+  std::for_each(affected_tags.begin(), affected_tags.end(), remover);
+
+  return Insert(updated_target_tag);
 }
 
 bool MockHistory:: ListTagsAffectedByRollback(const std::string  &tag_name,
                                               std::vector<Tag>   *tags) const {
+  History::Tag target_tag;
+  if (! GetByName(tag_name, &target_tag)) {
+    return false;
+  }
+
+  GetTags(tags);
+
+  // TODO: C++11 use std::copy_if (that was forgotten to be put into C++98 -.-)
+  RollbackPredicate pred(target_tag, true /* inverse */);
+  std::vector<Tag>::iterator last = std::remove_copy_if(tags->begin(),
+                                                        tags->end(),
+                                                        tags->begin(), pred);
+  tags->erase(last, tags->end());
+  std::sort(tags->rbegin(), tags->rend());
 
   return true;
 }
 
 bool MockHistory::GetHashes(std::vector<shash::Any> *hashes) const {
+  // extract tags from TagMap
+  std::vector<Tag> tags;
+  GetTags(&tags);
 
+  // find hash duplicates
+  std::sort(tags.begin(), tags.end(), MockHistory::gt_hashes);
+  std::vector<Tag>::iterator last = std::unique(tags.begin(), tags.end(),
+                                                MockHistory::eq_hashes);
+  tags.erase(last, tags.end());
+  std::sort(tags.rbegin(), tags.rend());
+
+  // extract hashes from deduplicated vector
+  hashes->clear();
+  hashes->resize(tags.size());
+  std::transform(tags.rbegin(), tags.rend(),
+                 hashes->begin(), MockHistory::get_hash);
   return true;
 }

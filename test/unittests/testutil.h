@@ -353,12 +353,71 @@ class MockHistory : public history::History {
 
   bool GetHashes(std::vector<shash::Any> *hashes) const;
 
- protected:
+ public:
   void set_writable(const bool writable) { writable_ = writable; }
 
+ protected:
+  void GetTags(std::vector<Tag> *tags) const;
+
  private:
-  TagMap     tags_;
-  bool       writable_;
+  static const Tag& get_tag(const TagMap::value_type &itr) {
+    return itr.second;
+  }
+
+  static const shash::Any& get_hash(const Tag &tag) {
+    return tag.root_hash;
+  }
+
+  static bool gt_channel_revision(const Tag &lhs, const Tag &rhs) {
+    return (lhs.channel == rhs.channel)
+              ? lhs.revision > rhs.revision
+              : lhs.channel > rhs.channel;
+  }
+
+  static bool eq_channel(const Tag &lhs, const Tag &rhs) {
+    return lhs.channel == rhs.channel;
+  }
+
+  static bool gt_hashes(const Tag &lhs, const Tag &rhs) {
+    return lhs.root_hash > rhs.root_hash;
+  }
+
+  static bool eq_hashes(const Tag &lhs, const Tag &rhs) {
+    return lhs.root_hash == rhs.root_hash;
+  }
+
+  struct DateSmallerThan {
+    DateSmallerThan(time_t date) : date_(date) {}
+    bool operator()(const Tag &tag) const {
+      return tag.timestamp <= date_;
+    }
+    const time_t date_;
+  };
+
+  struct RollbackPredicate {
+    RollbackPredicate(const Tag &tag, const bool inverse = false) :
+      tag_(tag),
+      inverse_(inverse) {}
+    bool operator()(const Tag &tag) const {
+      const bool p = (tag.revision > tag_.revision || tag.name == tag_.name) &&
+                      tag.channel == tag_.channel;
+      return inverse_ ^ p;
+    }
+    const Tag  &tag_;
+    const bool  inverse_;
+  };
+
+  struct TagRemover {
+    TagRemover(MockHistory *history) : history_(history) {}
+    bool operator()(const Tag &tag) {
+      return history_->Remove(tag.name);
+    }
+    MockHistory *history_;
+  };
+
+ private:
+  TagMap tags_;
+  bool   writable_;
 };
 
 
