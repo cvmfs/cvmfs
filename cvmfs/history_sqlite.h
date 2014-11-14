@@ -23,7 +23,7 @@ namespace history {
  * of named snapshots or tags. Internally it uses the HistoryDatabase class
  * to store those tags in an SQLite file.
  */
-class SqliteHistory : History {
+class SqliteHistory : public History {
 
  protected:
   static const std::string kPreviousRevisionKey;

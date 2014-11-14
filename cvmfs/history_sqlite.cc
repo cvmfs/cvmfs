@@ -42,7 +42,6 @@ History* SqliteHistory::Open(const std::string &file_name,
 
 History* SqliteHistory::Create(const std::string &file_name,
                                const std::string &fqrn) {
-  const bool read_write = true;
   SqliteHistory *history = new SqliteHistory();
   if (NULL == history || ! history->CreateDatabase(file_name, fqrn)) {
     delete history;
