@@ -168,7 +168,7 @@ class T_History : public ::testing::Test {
     result.reserve(count);
     for (unsigned int i = 0; i < count; ++i) {
       shash::Any root_hash(shash::kSha1);
-      root_hash.Randomize();
+      root_hash.Randomize(prng_);
 
       History::Tag dummy;
       dummy.name        = "dummy" + StringifyInt(i);
