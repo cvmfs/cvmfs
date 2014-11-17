@@ -134,11 +134,11 @@ TEST_F(T_SQLite_Wrapper, Initialize) {}
 TEST_F(T_SQLite_Wrapper, CreateEmptyDatabase) {
   DummyDatabase *db = DummyDatabase::Create(GetDatabaseFilename());
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db);
-  EXPECT_EQ (1, DummyDatabase::instances     );
-  EXPECT_EQ (1, db->create_empty_db_calls    );
-  EXPECT_EQ (0, db->check_compatibility_calls);
-  EXPECT_EQ (0, db->live_upgrade_calls       );
-  EXPECT_EQ (0, db->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances     );
+  EXPECT_EQ (1u, db->create_empty_db_calls    );
+  EXPECT_EQ (0u, db->check_compatibility_calls);
+  EXPECT_EQ (0u, db->live_upgrade_calls       );
+  EXPECT_EQ (0u, db->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db->schema_revision());
   EXPECT_TRUE (db->IsEqualSchema(db->schema_version(),
                                  DummyDatabase::kLatestSchema));
@@ -146,18 +146,18 @@ TEST_F(T_SQLite_Wrapper, CreateEmptyDatabase) {
                                   DummyDatabase::kLatestSchema + 0.1));
   EXPECT_TRUE (db->read_write());
   delete db;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
 TEST_F(T_SQLite_Wrapper, CloseDatabase) {
   DummyDatabase *db = DummyDatabase::Create(GetDatabaseFilename());
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db);
-  EXPECT_EQ (1, DummyDatabase::instances     );
-  EXPECT_EQ (1, db->create_empty_db_calls    );
-  EXPECT_EQ (0, db->check_compatibility_calls);
-  EXPECT_EQ (0, db->live_upgrade_calls       );
-  EXPECT_EQ (0, db->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances     );
+  EXPECT_EQ (1u, db->create_empty_db_calls    );
+  EXPECT_EQ (0u, db->check_compatibility_calls);
+  EXPECT_EQ (0u, db->live_upgrade_calls       );
+  EXPECT_EQ (0u, db->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db->schema_revision());
   EXPECT_TRUE (db->IsEqualSchema(db->schema_version(),
                                  DummyDatabase::kLatestSchema));
@@ -165,7 +165,7 @@ TEST_F(T_SQLite_Wrapper, CloseDatabase) {
                                   DummyDatabase::kLatestSchema + 0.1));
   EXPECT_TRUE (db->read_write());
   delete db;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -174,11 +174,11 @@ TEST_F(T_SQLite_Wrapper, OpenDatabase) {
 
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
-  EXPECT_EQ (1, DummyDatabase::instances      );
-  EXPECT_EQ (1, db1->create_empty_db_calls    );
-  EXPECT_EQ (0, db1->check_compatibility_calls);
-  EXPECT_EQ (0, db1->live_upgrade_calls       );
-  EXPECT_EQ (0, db1->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances      );
+  EXPECT_EQ (1u, db1->create_empty_db_calls    );
+  EXPECT_EQ (0u, db1->check_compatibility_calls);
+  EXPECT_EQ (0u, db1->live_upgrade_calls       );
+  EXPECT_EQ (0u, db1->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db1->schema_revision());
   EXPECT_EQ (dbp, db1->filename());
   EXPECT_TRUE (db1->IsEqualSchema(db1->schema_version(),
@@ -187,15 +187,15 @@ TEST_F(T_SQLite_Wrapper, OpenDatabase) {
                                    DummyDatabase::kLatestSchema + 0.1));
   EXPECT_TRUE (db1->read_write());
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadOnly);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
-  EXPECT_EQ (1, DummyDatabase::instances      );
-  EXPECT_EQ (0, db2->create_empty_db_calls    );
-  EXPECT_EQ (1, db2->check_compatibility_calls);
-  EXPECT_EQ (0, db2->live_upgrade_calls       );
-  EXPECT_EQ (0, db2->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances      );
+  EXPECT_EQ (0u, db2->create_empty_db_calls    );
+  EXPECT_EQ (1u, db2->check_compatibility_calls);
+  EXPECT_EQ (0u, db2->live_upgrade_calls       );
+  EXPECT_EQ (0u, db2->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db2->schema_revision());
   EXPECT_EQ (dbp, db2->filename());
   EXPECT_TRUE (db2->IsEqualSchema(db2->schema_version(),
@@ -205,7 +205,7 @@ TEST_F(T_SQLite_Wrapper, OpenDatabase) {
   EXPECT_FALSE (db2->read_write());
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -214,11 +214,11 @@ TEST_F(T_SQLite_Wrapper, ReadWriteOpenDatabase) {
 
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
-  EXPECT_EQ (1, DummyDatabase::instances      );
-  EXPECT_EQ (1, db1->create_empty_db_calls    );
-  EXPECT_EQ (0, db1->check_compatibility_calls);
-  EXPECT_EQ (0, db1->live_upgrade_calls       );
-  EXPECT_EQ (0, db1->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances      );
+  EXPECT_EQ (1u, db1->create_empty_db_calls    );
+  EXPECT_EQ (0u, db1->check_compatibility_calls);
+  EXPECT_EQ (0u, db1->live_upgrade_calls       );
+  EXPECT_EQ (0u, db1->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db1->schema_revision());
   EXPECT_EQ (dbp, db1->filename());
   EXPECT_TRUE (db1->IsEqualSchema(db1->schema_version(),
@@ -227,15 +227,15 @@ TEST_F(T_SQLite_Wrapper, ReadWriteOpenDatabase) {
                                    DummyDatabase::kLatestSchema + 0.1));
   EXPECT_TRUE (db1->read_write());
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
-  EXPECT_EQ (1, DummyDatabase::instances      );
-  EXPECT_EQ (0, db2->create_empty_db_calls    );
-  EXPECT_EQ (1, db2->check_compatibility_calls);
-  EXPECT_EQ (1, db2->live_upgrade_calls       );
-  EXPECT_EQ (0, db2->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances      );
+  EXPECT_EQ (0u, db2->create_empty_db_calls    );
+  EXPECT_EQ (1u, db2->check_compatibility_calls);
+  EXPECT_EQ (1u, db2->live_upgrade_calls       );
+  EXPECT_EQ (0u, db2->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db2->schema_revision());
   EXPECT_EQ (dbp, db2->filename());
   EXPECT_TRUE (db2->IsEqualSchema(db2->schema_version(),
@@ -244,7 +244,7 @@ TEST_F(T_SQLite_Wrapper, ReadWriteOpenDatabase) {
                                    DummyDatabase::kLatestSchema + 0.1));
   EXPECT_TRUE (db2->read_write());
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -253,11 +253,11 @@ TEST_F(T_SQLite_Wrapper, CompactDatabase) {
 
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
-  EXPECT_EQ (1, DummyDatabase::instances      );
-  EXPECT_EQ (1, db1->create_empty_db_calls    );
-  EXPECT_EQ (0, db1->check_compatibility_calls);
-  EXPECT_EQ (0, db1->live_upgrade_calls       );
-  EXPECT_EQ (0, db1->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances      );
+  EXPECT_EQ (1u, db1->create_empty_db_calls    );
+  EXPECT_EQ (0u, db1->check_compatibility_calls);
+  EXPECT_EQ (0u, db1->live_upgrade_calls       );
+  EXPECT_EQ (0u, db1->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db1->schema_revision());
   EXPECT_EQ (dbp, db1->filename());
   EXPECT_TRUE (db1->IsEqualSchema(db1->schema_version(),
@@ -266,15 +266,15 @@ TEST_F(T_SQLite_Wrapper, CompactDatabase) {
                                    DummyDatabase::kLatestSchema + 0.1));
   EXPECT_TRUE (db1->read_write());
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
-  EXPECT_EQ (1, DummyDatabase::instances      );
-  EXPECT_EQ (0, db2->create_empty_db_calls    );
-  EXPECT_EQ (1, db2->check_compatibility_calls);
-  EXPECT_EQ (1, db2->live_upgrade_calls       );
-  EXPECT_EQ (0, db2->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances      );
+  EXPECT_EQ (0u, db2->create_empty_db_calls    );
+  EXPECT_EQ (1u, db2->check_compatibility_calls);
+  EXPECT_EQ (1u, db2->live_upgrade_calls       );
+  EXPECT_EQ (0u, db2->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db2->schema_revision());
   EXPECT_EQ (dbp, db2->filename());
   EXPECT_TRUE (db2->IsEqualSchema(db2->schema_version(),
@@ -283,11 +283,11 @@ TEST_F(T_SQLite_Wrapper, CompactDatabase) {
                                    DummyDatabase::kLatestSchema + 0.1));
 
   db2->Vacuum();
-  EXPECT_EQ (1, DummyDatabase::instances      );
-  EXPECT_EQ (0, db2->create_empty_db_calls    );
-  EXPECT_EQ (1, db2->check_compatibility_calls);
-  EXPECT_EQ (1, db2->live_upgrade_calls       );
-  EXPECT_EQ (1, db2->compact_calls            );
+  EXPECT_EQ (1u, DummyDatabase::instances      );
+  EXPECT_EQ (0u, db2->create_empty_db_calls    );
+  EXPECT_EQ (1u, db2->check_compatibility_calls);
+  EXPECT_EQ (1u, db2->live_upgrade_calls       );
+  EXPECT_EQ (1u, db2->compact_calls            );
   EXPECT_EQ (DummyDatabase::kLatestSchemaRevision, db2->schema_revision());
   EXPECT_EQ (dbp, db2->filename());
   EXPECT_TRUE (db2->IsEqualSchema(db2->schema_version(),
@@ -297,7 +297,7 @@ TEST_F(T_SQLite_Wrapper, CompactDatabase) {
   EXPECT_TRUE (db2->read_write());
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -329,7 +329,7 @@ TEST_F(T_SQLite_Wrapper, PropertyWithoutReopen) {
   EXPECT_GT (13.38,   db1->GetProperty<double>("float"));
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -345,7 +345,7 @@ TEST_F(T_SQLite_Wrapper, PropertyWithReadOnlyReopen) {
   EXPECT_TRUE (db1->SetProperty("float", 13.37));
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadOnly);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
@@ -367,7 +367,7 @@ TEST_F(T_SQLite_Wrapper, PropertyWithReadOnlyReopen) {
   EXPECT_GT (13.38,   db2->GetProperty<double>("float"));
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -383,7 +383,7 @@ TEST_F(T_SQLite_Wrapper, PropertyWithReadWriteReopen) {
   EXPECT_TRUE (db1->SetProperty("float", 13.37));
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
@@ -405,7 +405,7 @@ TEST_F(T_SQLite_Wrapper, PropertyWithReadWriteReopen) {
   EXPECT_GT (13.38,   db2->GetProperty<double>("float"));
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -417,19 +417,19 @@ TEST_F(T_SQLite_Wrapper, IncompatibleSchema) {
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
   EXPECT_LT (1.9, db1->schema_version());
   EXPECT_GT (2.1, db1->schema_version());
-  EXPECT_EQ (0, db1->check_compatibility_calls);
-  EXPECT_EQ (0, db1->live_upgrade_calls);
+  EXPECT_EQ (0u, db1->check_compatibility_calls);
+  EXPECT_EQ (0u, db1->live_upgrade_calls);
   DummyDatabase::kLatestSchema = 1.0;
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_EQ (static_cast<DummyDatabase*>(NULL), db2);
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -440,32 +440,32 @@ TEST_F(T_SQLite_Wrapper, SuccessfulSchemaUpdate) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
   EXPECT_EQ (RevisionFlags::kUpdatableRevision, db1->schema_revision());
-  EXPECT_EQ (0, db1->check_compatibility_calls);
-  EXPECT_EQ (0, db1->live_upgrade_calls);
+  EXPECT_EQ (0u, db1->check_compatibility_calls);
+  EXPECT_EQ (0u, db1->live_upgrade_calls);
   DummyDatabase::kLatestSchemaRevision = RevisionFlags::kInitialRevision;
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
-  EXPECT_EQ (db2->check_compatibility_calls, 1);
-  EXPECT_EQ (db2->live_upgrade_calls,        1);
+  EXPECT_EQ (1u, db2->check_compatibility_calls);
+  EXPECT_EQ (1u, db2->live_upgrade_calls);
   EXPECT_EQ (RevisionFlags::kUpdatedRevision, db2->schema_revision());
-  EXPECT_EQ (1, DummyDatabase::instances);
+  EXPECT_EQ (1u, DummyDatabase::instances);
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db3 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadOnly);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db3);
-  EXPECT_EQ (1, db3->check_compatibility_calls);
-  EXPECT_EQ (0, db3->live_upgrade_calls);
+  EXPECT_EQ (1u, db3->check_compatibility_calls);
+  EXPECT_EQ (0u, db3->live_upgrade_calls);
   EXPECT_EQ (RevisionFlags::kUpdatedRevision, db3->schema_revision());
-  EXPECT_EQ (1, DummyDatabase::instances);
+  EXPECT_EQ (1u, DummyDatabase::instances);
 
   delete db3;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -476,26 +476,26 @@ TEST_F(T_SQLite_Wrapper, FailingSchemaUpdate) {
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
   EXPECT_EQ (RevisionFlags::kFailingRevision, db1->schema_revision());
-  EXPECT_EQ (0, db1->check_compatibility_calls);
-  EXPECT_EQ (0, db1->live_upgrade_calls);
+  EXPECT_EQ (0u, db1->check_compatibility_calls);
+  EXPECT_EQ (0u, db1->live_upgrade_calls);
   DummyDatabase::kLatestSchemaRevision = RevisionFlags::kInitialRevision;
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadOnly);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
-  EXPECT_EQ (1, db2->check_compatibility_calls);
-  EXPECT_EQ (0, db2->live_upgrade_calls);
+  EXPECT_EQ (1u, db2->check_compatibility_calls);
+  EXPECT_EQ (0u, db2->live_upgrade_calls);
   EXPECT_EQ (RevisionFlags::kFailingRevision, db2->schema_revision());
-  EXPECT_EQ (1, DummyDatabase::instances);
+  EXPECT_EQ (1u, DummyDatabase::instances);
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   DummyDatabase *db3 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_EQ (static_cast<DummyDatabase*>(NULL), db3);
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -523,10 +523,10 @@ TEST_F(T_SQLite_Wrapper, DataAccess) {
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
-  EXPECT_EQ (0,   db1->compact_calls);
+  EXPECT_EQ (0u,   db1->compact_calls);
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   EXPECT_LT (2000000, GetFileSize(dbp));
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadOnly);
@@ -539,7 +539,7 @@ TEST_F(T_SQLite_Wrapper, DataAccess) {
   }
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 }
 
 
@@ -566,10 +566,10 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
-  EXPECT_EQ (0, db1->compact_calls);
+  EXPECT_EQ (0u, db1->compact_calls);
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   EXPECT_LT (2000000, GetFileSize(dbp));
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
@@ -581,41 +581,41 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
   }
 
   EXPECT_LT (0.9, db2->GetFreePageRatio());
-  EXPECT_EQ (0, db2->compact_calls);
+  EXPECT_EQ (0u, db2->compact_calls);
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   EXPECT_LT (2000000, GetFileSize(dbp));
   DummyDatabase *db3 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db3);
   EXPECT_LT (0.9, db3->GetFreePageRatio());
-  EXPECT_EQ (0, db3->compact_calls);
+  EXPECT_EQ (0u, db3->compact_calls);
 
   EXPECT_TRUE (db3->Vacuum());
 
   EXPECT_GT (0.1, db3->GetFreePageRatio());
-  EXPECT_EQ (1, db3->compact_calls);
+  EXPECT_EQ (1u, db3->compact_calls);
 
   delete db3;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
   EXPECT_GT (150000, GetFileSize(dbp));
 
   DummyDatabase *db4 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db4);
   EXPECT_GT (0.1, db4->GetFreePageRatio());
-  EXPECT_EQ (0, db4->compact_calls);
+  EXPECT_EQ (0u, db4->compact_calls);
 
   EXPECT_TRUE (db4->Vacuum());
   EXPECT_GT (0.1, db4->GetFreePageRatio());
-  EXPECT_EQ (1, db4->compact_calls);
+  EXPECT_EQ (1u, db4->compact_calls);
 
   EXPECT_TRUE (db4->Vacuum());
   EXPECT_GT (0.1, db4->GetFreePageRatio());
-  EXPECT_EQ (2, db4->compact_calls);
+  EXPECT_EQ (2u, db4->compact_calls);
 
   delete db4;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
   EXPECT_GT (150000, GetFileSize(dbp));
 }
 
@@ -643,10 +643,10 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
   }
 
   EXPECT_GT (0.1, db1->GetFreePageRatio());
-  EXPECT_EQ (0, db1->compact_calls);
+  EXPECT_EQ (0u, db1->compact_calls);
 
   delete db1;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   EXPECT_LT (2000000, GetFileSize(dbp));
   DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
@@ -658,20 +658,20 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
   }
 
   EXPECT_LT (0.9, db2->GetFreePageRatio());
-  EXPECT_EQ (0,   db2->compact_calls);
+  EXPECT_EQ (0u,   db2->compact_calls);
 
   DummyDatabase::compacting_fails = true;
   EXPECT_FALSE (db2->Vacuum());
   EXPECT_LT (0.9, db2->GetFreePageRatio());
-  EXPECT_EQ (1,   db2->compact_calls);
+  EXPECT_EQ (1u,   db2->compact_calls);
 
   DummyDatabase::compacting_fails = false;
   EXPECT_TRUE (db2->Vacuum());
   EXPECT_GT (0.1, db2->GetFreePageRatio());
-  EXPECT_EQ (2,   db2->compact_calls);
+  EXPECT_EQ (2u,   db2->compact_calls);
 
   delete db2;
-  EXPECT_EQ (0, DummyDatabase::instances);
+  EXPECT_EQ (0u, DummyDatabase::instances);
 
   EXPECT_GT (150000, GetFileSize(dbp));
 }
