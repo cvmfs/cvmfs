@@ -513,7 +513,6 @@ TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunking) {
 
 
 TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWaves) {
-  const bool use_chunking = true;
   upload::FileProcessor processor(uploader_, MockSpoolerDefinition());
 
   // first wave...
@@ -566,7 +565,6 @@ std::string   CallbackTest::result_local_path;
 FileChunkList CallbackTest::result_chunk_list;
 
 TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
-  const bool use_chunking = true;
   upload::FileProcessor processor(uploader_, MockSpoolerDefinition());
   processor.RegisterListener(&CallbackTest::CallbackFn);
 
@@ -583,7 +581,6 @@ TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
 
 
 TEST_F(T_FileProcessing, ProcessingCallbackForBigFile) {
-  const bool use_chunking = true;
   upload::FileProcessor processor(uploader_, MockSpoolerDefinition());
   processor.RegisterListener(&CallbackTest::CallbackFn);
 
