@@ -1,5 +1,22 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * The CernVM-FS name resolving uses objects that inherit from the Resolver
+ * interface.  Resolvers implement a vector interface that resolves mutliple
+ * names in parallel.  Common cases such as IP addresses as names are handled
+ * by the base class -- Resolver implementations only have to resolve real host
+ * names to IPv4/6 addresses, using given search domains if necessary.
+ *
+ * Name resolving information is stored in Host objects.  Host objects are
+ * immutable.  They associate a hostname with sets of IPv4 and IPv6 addresses.
+ * They also carry the result of the name resolution attempt (success, failure)
+ * and the TTL in the form of a deadline.  They are only created by a resolver
+ * and upon creation carry a unique id that corresponds to a particular name
+ * resolving attempt.
+ *
+ * The SystemResolver uses both the CaresResolver for DNS queries and the
+ * HostfileResolve for queries in /etc/hosts.  If an entry is found in
+ * /etc/hosts, the CaresResolver is unused.
  */
 
 #include "dns.h"
@@ -12,6 +29,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 
 #include "logging.h"
@@ -571,12 +589,17 @@ CaresResolver *CaresResolver::Create(
   const unsigned retries,
   const unsigned timeout_ms)
 {
+  int retval;
+  if (getenv("HOSTALIASES") == NULL) {
+    retval = setenv("HOSTALIASES", "/etc/hosts", 1);
+    assert(retval == 0);
+  }
+
   CaresResolver *resolver = new CaresResolver(ipv4_only, retries, timeout_ms);
   resolver->channel_ = reinterpret_cast<ares_channel *>(
     smalloc(sizeof(ares_channel)));
   memset(resolver->channel_, 0, sizeof(ares_channel));
 
-  int retval;
   struct ares_addr_node *addresses;
   struct ares_addr_node *iter;
   struct ares_options options;
@@ -834,6 +857,168 @@ void CaresResolver::WaitOnCares() {
                         pfd[i].fd : ARES_SOCKET_BAD);
     }
   }
+}
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Opens a file descriptor to the host file that stays open until destruction.
+ * If no path is given, the HOST_ALIASES environment variable is evaluated
+ * followed by /etc/hosts.
+ */
+HostfileResolver *HostfileResolver::Create(
+  const string &path,
+  bool ipv4_only)
+{
+  HostfileResolver *resolver = new HostfileResolver(ipv4_only);
+
+  string hosts_file = path;
+  if (hosts_file == "") {
+    char *hosts_env = getenv("HOST_ALIASES");
+    if (hosts_env != NULL) {
+      hosts_file = string(hosts_env);
+    } else {
+      hosts_file = "/etc/hosts";
+    }
+  }
+  resolver->fhosts_ = fopen(hosts_file.c_str(), "r");
+  if (!resolver->fhosts_) {
+    delete resolver;
+    return NULL;
+  }
+  return resolver;
+}
+
+
+/**
+ * Creates a fresh reverse lookup map
+ */
+void HostfileResolver::DoResolve(
+  const vector<string> &names,
+  const vector<bool> &skip,
+  vector< vector<std::string> > *ipv4_addresses,
+  vector< vector<std::string> > *ipv6_addresses,
+  vector<Failures> *failures,
+  vector<unsigned> *ttls)
+{
+  unsigned num = names.size();
+  if (num == 0)
+    return;
+
+  ParseHostFile();
+  for (unsigned i = 0; i < num; ++i) {
+    if (skip[i])
+      continue;
+
+    vector<string> effective_names;
+    if (!names[i].empty() && (names[i][names[i].length()-1] == '.')) {
+      effective_names.push_back(names[i].substr(0, names[i].length()-1));
+    } else {
+      effective_names.push_back(names[i]);
+      for (unsigned j = 0; j < domains().size(); ++j) {
+        effective_names.push_back(names[i] + "." + domains()[j]);
+      }
+    }
+
+    (*failures)[i] = kFailUnknownHost;
+    for (unsigned j = 0; j < effective_names.size(); ++j) {
+      map<string, HostEntry>::iterator iter =
+        host_map_.find(effective_names[j]);
+      if (iter != host_map_.end()) {
+        (*ipv4_addresses)[i].insert((*ipv4_addresses)[i].end(),
+                                    iter->second.ipv4_addresses.begin(),
+                                    iter->second.ipv4_addresses.end());
+        (*ipv6_addresses)[i].insert((*ipv6_addresses)[i].end(),
+                                    iter->second.ipv6_addresses.begin(),
+                                    iter->second.ipv6_addresses.end());
+        (*ttls)[i] = kMinTtl;
+        (*failures)[i] = kFailOk;
+        break;
+      }  // Host name found
+    }  // All possible names (search domains added)
+  }
+}
+
+
+HostfileResolver::HostfileResolver(const bool ipv4_only)
+  : Resolver(ipv4_only, 0, 0)
+  , fhosts_(NULL)
+{ }
+
+
+HostfileResolver::~HostfileResolver() {
+  if (fhosts_)
+    fclose(fhosts_);
+}
+
+
+/**
+ * TODO: this should be only necessary when the modification timestamp changed.
+ */
+void HostfileResolver::ParseHostFile() {
+  assert(fhosts_);
+  rewind(fhosts_);
+  host_map_.clear();
+
+  string line;
+  while (GetLineFile(fhosts_, &line)) {
+    const unsigned len = line.length();
+    unsigned i = 0;
+    string address;
+    while (i < len) {
+      if (line[i] == '#')
+        break;
+
+      while (((line[i] == ' ') || (line[i] == '\t')) && (i < len))
+        ++i;
+
+      string token;
+      while ((line[i] != ' ') && (line[i] != '\t') && (line[i] != '#') &&
+             (i < len))
+      {
+        token += line[i];
+        ++i;
+      }
+
+      if (address == "") {
+        address = token;
+      } else {
+        if (token[token.length()-1] == '.')
+          token = token.substr(0, token.length()-1);
+
+        map<string, HostEntry>::iterator iter = host_map_.find(token);
+        if (iter == host_map_.end()) {
+          HostEntry entry;
+          if (IsIpv4Address(address))
+            entry.ipv4_addresses.push_back(address);
+          else
+            if (!ipv4_only()) entry.ipv6_addresses.push_back(address);
+          //printf("ADD %s -> %s\n", token.c_str(), address.c_str());
+          host_map_[token] = entry;
+        } else {
+          if (IsIpv4Address(address))
+            iter->second.ipv4_addresses.push_back(address);
+          else
+            if (!ipv4_only()) iter->second.ipv6_addresses.push_back(address);
+          //printf("PUSHING %s -> %s\n", token.c_str(), address.c_str());
+        }
+      }
+    }  // Current line
+  }  // Hosts file
+}
+
+
+bool HostfileResolver::SetSearchDomains(const vector<string> &domains) {
+  domains_ = domains;
+  return true;
+}
+
+
+void HostfileResolver::SetSystemSearchDomains() {
+  // TODO
+  assert(false);
 }
 
 }  // namespace dns

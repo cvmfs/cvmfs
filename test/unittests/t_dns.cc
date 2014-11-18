@@ -1,11 +1,15 @@
 #include "gtest/gtest.h"
 
+#include <unistd.h>
+
 #include "../../cvmfs/dns.h"
 #include "../../cvmfs/util.h"
 
 #include <algorithm>
+#include <cassert>
 #include <ctime>
 #include <cstdio>
+#include <string>
 
 using namespace std;  // NOLINT
 
@@ -16,17 +20,39 @@ class T_Dns : public ::testing::Test {
   virtual void SetUp() {
     default_resolver =
       CaresResolver::Create(false /* ipv4_only */, 1 /* retries */, 2000);
+    assert(default_resolver);
     ipv4_resolver =
       CaresResolver::Create(true /* ipv4_only */, 1 /* retries */, 2000);
+    assert(ipv4_resolver);
+
+    fhostfile = CreateTempFile("/tmp/cvmfstest", 0600, "w", &hostfile);
+    assert(fhostfile);
+    hostfile_resolver = HostfileResolver::Create(hostfile, false);
+    assert(hostfile_resolver);
   }
 
   virtual ~T_Dns() {
     delete default_resolver;
     delete ipv4_resolver;
+    delete hostfile_resolver;
+    fclose(fhostfile);
+    unlink(hostfile.c_str());
+  }
+
+  void CreateHostfile(const string &content) {
+    int retval = ftruncate(fileno(fhostfile), 0);
+    rewind(fhostfile);
+    assert(retval == 0);
+    int num = fprintf(fhostfile, "%s", content.c_str());
+    assert((num >= 0) && (unsigned(num) == content.length()));
+    fflush(fhostfile);
   }
 
   CaresResolver *default_resolver;
   CaresResolver *ipv4_resolver;
+  HostfileResolver *hostfile_resolver;
+  FILE *fhostfile;
+  string hostfile;
 };
 
 
@@ -526,6 +552,173 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
   time_t after = time(NULL);
   EXPECT_EQ(host.status(), kFailInvalidResolvers);
   EXPECT_LE(after-before, 1);
+}
+
+
+TEST_F(T_Dns, HostfileResolverConstruct) {
+  HostfileResolver *resolver = HostfileResolver::Create("", false);
+  ASSERT_TRUE(resolver != NULL);
+  delete resolver;
+
+  resolver = HostfileResolver::Create("/no/readable/file", false);
+  EXPECT_TRUE(resolver == NULL);
+}
+
+
+TEST_F(T_Dns, HostfileResolverSimple) {
+  CreateHostfile("127.0.0.1 localhost\n::1 localhost");
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.1", "[::1]");
+
+  host = hostfile_resolver->Resolve("unknown");
+  EXPECT_EQ(host.status(), kFailUnknownHost);
+}
+
+
+TEST_F(T_Dns, HostfileResolverIpv4only) {
+  CreateHostfile("127.0.0.1 localhost\n::1 localhost\n"
+                 "::2 localhost2\n127.0.0.2 localhost2\n");
+  HostfileResolver *resolver = HostfileResolver::Create(hostfile, true);
+  Host host = resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.1", "");
+
+  host = resolver->Resolve("localhost2");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.2", "");
+  delete resolver;
+}
+
+
+TEST_F(T_Dns, HostfileResolverHostaliasEnv) {
+  CreateHostfile("127.0.0.1 weirdhost\n");
+  HostfileResolver *resolver = HostfileResolver::Create("", false);
+  Host host = resolver->Resolve("weirdhost");
+  EXPECT_EQ(host.status(), kFailUnknownHost);
+  host = resolver->Resolve("localhost");  // Should be in /etc/hosts
+  EXPECT_EQ(host.status(), kFailOk);
+  delete resolver;
+
+  int retval = setenv("HOST_ALIASES", hostfile.c_str(), 1);
+  ASSERT_EQ(retval, 0);
+  resolver = HostfileResolver::Create("", false);
+  host = resolver->Resolve("weirdhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.1", "");
+  delete resolver;
+}
+
+
+TEST_F(T_Dns, HostfileResolverRefreshedFile) {
+  CreateHostfile("127.0.0.1 localhost\n");
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.1", "");
+
+  CreateHostfile("127.0.0.2 localhost\n127.0.0.3 more\n");
+  host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.2", "");
+  host = hostfile_resolver->Resolve("more");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.3", "");
+}
+
+
+TEST_F(T_Dns, HostfileResolverSkip) {
+  CreateHostfile("127.0.0.1 localhost\n");
+  vector<Host> hosts;
+  vector<string> names;
+  names.push_back("[::1]");
+  names.push_back("localhost");
+  names.push_back("127.0.0.1");
+  names.push_back("127.0.0.1");
+  names.push_back("localhost");
+  names.push_back("unknown");
+  names.push_back("[::1]");
+  hostfile_resolver->ResolveMany(names, &hosts);
+  // IP addresses are "resolved" by the base class
+  EXPECT_EQ(hosts[0].status(), kFailOk);
+  EXPECT_EQ(hosts[1].status(), kFailOk);
+  EXPECT_EQ(hosts[2].status(), kFailOk);
+  EXPECT_EQ(hosts[3].status(), kFailOk);
+  EXPECT_EQ(hosts[4].status(), kFailOk);
+  EXPECT_EQ(hosts[5].status(), kFailUnknownHost);
+  EXPECT_EQ(hosts[6].status(), kFailOk);
+}
+
+
+TEST_F(T_Dns, HostfileResolverSearchDomains) {
+  CreateHostfile("127.0.0.1 localhost\n127.0.0.2 myhost.mydomain"
+                 "127.0.0.3 myhost.remotedomain");
+  Host host = hostfile_resolver->Resolve("localhost");
+  ExpectResolvedName(host, "127.0.0.1", "");
+  host = hostfile_resolver->Resolve("localhost.");
+  ExpectResolvedName(host, "127.0.0.1", "");
+
+  vector<string> search_domains;
+  search_domains.push_back("unused");
+  search_domains.push_back("mydomain");
+  search_domains.push_back("remotedomain");
+  hostfile_resolver->SetSearchDomains(search_domains);
+  host = hostfile_resolver->Resolve("myhost.");
+  EXPECT_EQ(host.status(), kFailUnknownHost);
+  host = hostfile_resolver->Resolve("myhost");
+  ExpectResolvedName(host, "127.0.0.2", "");
+}
+
+
+TEST_F(T_Dns, HostfileResolverEmptyFile) {
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailUnknownHost);
+}
+
+
+TEST_F(T_Dns, HostfileResolverComment) {
+  CreateHostfile("#127.0.0.1 localhost\n127.0.0.2 localhost\n"
+                 "127.0.0.3 localh#ost\n127.0.0.4 localhost2#\n");
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.2", "");
+  host = hostfile_resolver->Resolve("localh");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.3", "");
+  host = hostfile_resolver->Resolve("localhost2");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.4", "");
+}
+
+
+TEST_F(T_Dns, HostfileResolverWhitespace) {
+  CreateHostfile("127.0.0.1 localhost\n\n\n  127.0.0.2 localhost2\n"
+                 "127.0.0.3   localhost3   ");
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.1", "");
+  host = hostfile_resolver->Resolve("localhost2");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.2", "");
+  host = hostfile_resolver->Resolve("localhost3");
+  EXPECT_EQ(host.status(), kFailOk);
+  ExpectResolvedName(host, "127.0.0.3", "");
+}
+
+
+TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
+  CreateHostfile("127.0.0.1 localhost\n127.0.0.2 localhost\n"
+                 "::1 localhost\n::2 localhost\n");
+  Host host = hostfile_resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  set<string> expected_ipv4;
+  set<string> expected_ipv6;
+  expected_ipv4.insert("127.0.0.1");
+  expected_ipv4.insert("127.0.0.2");
+  expected_ipv6.insert("[::1]");
+  expected_ipv6.insert("[::2]");
+  EXPECT_EQ(host.status(), kFailOk);
+  EXPECT_EQ(host.ipv4_addresses(), expected_ipv4);
+  EXPECT_EQ(host.ipv6_addresses(), expected_ipv6);
 }
 
 }  // namespace dns

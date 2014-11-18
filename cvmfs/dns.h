@@ -8,6 +8,8 @@
 #include <stdint.h>
 
 #include <ctime>
+#include <cstdio>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -28,9 +30,9 @@ enum Failures {
   kFailInvalidResolvers,
   kFailTimeout,
   kFailInvalidHost,
-  kFailUnknownHost,
+  kFailUnknownHost,   ///< Resolver returned a negative reply
   kFailMalformed,
-  kFailNoAddress,
+  kFailNoAddress,     ///< Resolver returned a positive reply but without IPs
   kFailNotYetResolved,
   kFailOther,
 };
@@ -195,6 +197,8 @@ class Resolver : SingleCopy {
                          std::vector<std::vector<std::string> > *ipv6_addresses,
                          std::vector<Failures> *failures,
                          std::vector<unsigned> *ttls) = 0;
+  bool IsIpv4Address(const std::string &address);
+  bool IsIpv6Address(const std::string &address);
 
   /**
    * Currently active search domain list
@@ -221,10 +225,6 @@ class Resolver : SingleCopy {
    * Timeout in milliseconds for DNS queries.  Zero means no timeout.
    */
   unsigned timeout_ms_;
-
- private:
-  bool IsIpv4Address(const std::string &address);
-  bool IsIpv6Address(const std::string &address);
 };
 
 
@@ -264,6 +264,55 @@ class CaresResolver : public Resolver {
   ares_channel *channel_;
   std::vector<std::string> system_resolvers_;
   std::vector<std::string> system_domains_;
+};
+
+
+/**
+ * Resolves against static name information like in /etc/hosts.  Setting
+ * resolver addresses is a no-op for this resolver.  Search domains are not
+ * automatically found but need to be set.  Not the most efficient 
+ * implementation but in the context of cvmfs should be called at most every 5
+ * minutes.
+ */
+class HostfileResolver : public Resolver {
+ public:
+  static HostfileResolver *Create(const std::string &path, bool ipv4_only);
+  ~HostfileResolver();
+
+  virtual bool SetResolvers(const std::vector<std::string> &resolvers) {
+    return true; };
+  virtual bool SetSearchDomains(const std::vector<std::string> &domains);
+  virtual void SetSystemResolvers() { };
+  virtual void SetSystemSearchDomains();
+
+ protected:
+  HostfileResolver(const bool ipv4_only);
+  virtual void DoResolve(const std::vector<std::string> &names,
+                         const std::vector<bool> &skip,
+                         std::vector<std::vector<std::string> > *ipv4_addresses,
+                         std::vector<std::vector<std::string> > *ipv6_addresses,
+                         std::vector<Failures> *failures,
+                         std::vector<unsigned> *ttls);
+
+ private:
+  struct HostEntry {
+    std::vector<std::string> ipv4_addresses;
+    std::vector<std::string> ipv6_addresses;
+  };
+  void ParseHostFile();
+
+  /**
+   * Host names to lists of IPv4 and IPv6 addresses.  Reverse lookup in the
+   * hosts file.
+   */
+  std::map<std::string, HostEntry> host_map_;
+
+  /**
+   * Open the file descriptor when the resolver is constructed and only release
+   * on destruction.  Thereby we can be relatively sure to not see I/O errors
+   * once constructed.
+   */
+  FILE *fhosts_;
 };
 
 }  // namespace dns
