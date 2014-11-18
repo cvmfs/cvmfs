@@ -93,7 +93,7 @@ class Chunk {
 
   shash::ContextPtr& content_hash_context() { return content_hash_context_;     }
   const shash::Any&  content_hash() const   { return content_hash_;             }
-  std::string        hash_suffix() const;
+  shash::Suffix      hash_suffix() const;
   z_stream&          zlib_context()                 { return zlib_context_;     }
 
   UploadStreamHandle* upload_stream_handle() const { return upload_stream_handle_; }

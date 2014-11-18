@@ -504,7 +504,7 @@ TEST_F(T_LocalUploader, SingleStreamedUpload) {
 
   shash::Any content_hash(shash::kSha1);
   content_hash.Randomize(42);
-  const std::string hash_suffix = "A";
+  const shash::Suffix hash_suffix = 'A';
   uploader_->ScheduleCommit(handle, content_hash, hash_suffix);
   uploader_->WaitForUpload();
 
@@ -526,9 +526,9 @@ TEST_F(T_LocalUploader, SingleStreamedUpload) {
 
 
 TEST_F(T_LocalUploader, MultipleStreamedUpload) {
-  const unsigned int number_of_files        = 100;
-  const unsigned int max_buffers_per_stream = 15;
-  const std::string  hash_suffix            = "K";
+  const unsigned int  number_of_files        = 100;
+  const unsigned int  max_buffers_per_stream = 15;
+  const shash::Suffix hash_suffix            = 'K';
   BufferStreams streams = MakeRandomizedBufferStreams(number_of_files,
                                                       max_buffers_per_stream,
                                                       42);
@@ -587,8 +587,8 @@ TEST_F(T_LocalUploader, MultipleStreamedUpload) {
   BufferStreams::const_iterator kend = streams.end();
   for (; k != kend; ++k) {
     const shash::Any &content_hash = k->second.content_hash;
-    const std::string dest = "data" +
-                             content_hash.MakePathExplicit(1, 2) + hash_suffix;
+    const std::string dest =
+                    "data" + content_hash.MakePathWithSuffix(1, 2, hash_suffix);
     EXPECT_TRUE (CheckFile(dest));
     CompareBuffersAndFileContents(k->first, AbsoluteDestinationPath(dest));
   }

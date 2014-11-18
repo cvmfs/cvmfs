@@ -175,9 +175,9 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
 }
 
 
-void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
-                                           const shash::Any    content_hash,
-                                           const std::string   hash_suffix) {
+void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
+                                           const shash::Any     content_hash,
+                                           const shash::Suffix  hash_suffix) {
   int retval = 0;
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
@@ -192,9 +192,8 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
     return;
   }
 
-  const std::string final_path = "data" +
-                                 content_hash.MakePathExplicit(1, 2) +
-                                 hash_suffix;
+  const std::string final_path =
+                "data" + content_hash.MakePathWithSuffix(1, 2, hash_suffix);
 
   retval = Move(local_handle->temporary_path.c_str(), final_path.c_str());
   if (retval != 0) {

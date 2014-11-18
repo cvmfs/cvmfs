@@ -86,6 +86,7 @@ struct AsciiPtr {
   explicit AsciiPtr(const std::string &s) { str = &s; }
 };
 
+typedef char Suffix;
 
 /**
  * Holds a hash digest and provides from string / to string conversion and
@@ -97,7 +98,7 @@ template<unsigned digest_size_, Algorithms algorithm_>
 struct Digest {
   unsigned char digest[digest_size_];
   Algorithms    algorithm;
-  char          suffix;
+  Suffix        suffix;
 
   class Hex {
    public:
@@ -167,7 +168,7 @@ struct Digest {
 
   Digest(const Algorithms a,
          const unsigned char *digest_buffer, const unsigned buffer_size,
-         const char s = 0) :
+         const Suffix s = kSuffixNone) :
     algorithm(a), suffix(s)
   {
     assert(buffer_size <= digest_size_);
@@ -210,7 +211,7 @@ struct Digest {
   }
 
   bool HasSuffix() const { return suffix != kSuffixNone; }
-  void set_suffix(const char m) { suffix = m; }
+  void set_suffix(const Suffix s) { suffix = s; }
 
   std::string ToString(const bool with_suffix = false) const {
     Hex hex(this);
@@ -356,7 +357,7 @@ struct Any : public Digest<20, kAny> {
 
   Any(const Algorithms     a,
       const unsigned char *digest_buffer, const unsigned buffer_size,
-      const char           suffix = kSuffixNone) :
+      const Suffix         suffix = kSuffixNone) :
     Digest<20, kAny>(a, digest_buffer, buffer_size, suffix) { }
 
   explicit Any(const Algorithms  a,
@@ -415,7 +416,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
-Any MkFromHexPtr(const HexPtr hex, const char suffix = kSuffixNone);
+Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);
 
 }  // namespace hash
 

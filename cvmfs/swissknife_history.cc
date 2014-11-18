@@ -396,15 +396,15 @@ manifest::Manifest* CommandTag::FetchManifest(
 }
 
 
-bool CommandTag::FetchObject(const std::string  &repository_url,
-                              const shash::Any   &object_hash,
-                              const std::string  &hash_suffix,
-                              const std::string   destination_path) const {
+bool CommandTag::FetchObject(const std::string    &repository_url,
+                             const shash::Any     &object_hash,
+                             const shash::Suffix   hash_suffix,
+                             const std::string    &destination_path) const {
   assert (! object_hash.IsNull());
 
   download::Failures dl_retval;
   const std::string url =
-    repository_url + "/data" + object_hash.MakePathExplicit(1, 2) + hash_suffix;
+    repository_url + "/data" + object_hash.MakePathWithSuffix(1, 2, hash_suffix);
 
   download::JobInfo download_object(&url, true, false, &destination_path,
                                     &object_hash);
@@ -412,8 +412,8 @@ bool CommandTag::FetchObject(const std::string  &repository_url,
 
   if (dl_retval != download::kFailOk) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to download object '%s' with "
-                                    "suffix '%s' (%d - %s)",
-             object_hash.ToString().c_str(), hash_suffix.c_str(),
+                                    "suffix '%c' (%d - %s)",
+             object_hash.ToString().c_str(), hash_suffix,
              dl_retval, download::Code2Ascii(dl_retval));
     return false;
   }
@@ -438,7 +438,10 @@ history::History* CommandTag::GetHistory(
       return NULL;
     }
   } else {
-    if (! FetchObject(repository_url, history_hash, "H", history_path)) {
+    if (! FetchObject(repository_url,
+                      history_hash,
+                      shash::kSuffixHistory,
+                      history_path)) {
       return NULL;
     }
 
@@ -463,7 +466,10 @@ catalog::Catalog* CommandTag::GetCatalog(
                                        const shash::Any   &catalog_hash,
                                        const std::string   catalog_path,
                                        const bool          read_write) const {
-  if (! FetchObject(repository_url, catalog_hash, "C", catalog_path)) {
+  if (! FetchObject(repository_url,
+                    catalog_hash,
+                    shash::kSuffixCatalog,
+                    catalog_path)) {
     return NULL;
   }
 

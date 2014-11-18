@@ -57,11 +57,11 @@ void Spooler::Process(const std::string &local_path,
 
 
 void Spooler::ProcessCatalog(const std::string &local_path) {
-  file_processor_->Process(local_path, false, "C");
+  file_processor_->Process(local_path, false, shash::kSuffixCatalog);
 }
 
 void Spooler::ProcessHistory(const std::string &local_path) {
-  file_processor_->Process(local_path, false, "H");
+  file_processor_->Process(local_path, false, shash::kSuffixHistory);
 }
 
 

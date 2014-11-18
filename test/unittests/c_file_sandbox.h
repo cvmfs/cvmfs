@@ -2,11 +2,12 @@
 #define CVMFS_UTEST_FILE_SANDBOX_H
 
 #include "../../cvmfs/util.h"
+#include "../../cvmfs/hash.h"
 #include "../../cvmfs/prng.h"
 
 class FileSandbox : public ::testing::Test {
  public:
-  typedef std::pair<std::string, std::string> ExpectedHashString;
+  typedef std::pair<std::string, shash::Suffix> ExpectedHashString;
 
  public:
   FileSandbox(const std::string &sandbox_path) :

@@ -142,7 +142,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
 
   virtual void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
                                       const shash::Any            content_hash,
-                                      const std::string           hash_suffix) {
+                                      const shash::Suffix         hash_suffix) {
     assert (AbstractMockUploader::not_implemented);
   }
 

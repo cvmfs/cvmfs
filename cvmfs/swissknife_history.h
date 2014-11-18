@@ -79,10 +79,10 @@ class CommandTag : public Command {
                                     const std::string  &pubkey_path,
                                     const std::string  &trusted_certs,
                                     const shash::Any   &base_hash) const;
-  bool FetchObject(const std::string  &repository_url,
-                   const shash::Any   &object_hash,
-                   const std::string  &hash_suffix,
-                   const std::string   destination_path) const;
+  bool FetchObject(const std::string    &repository_url,
+                   const shash::Any     &object_hash,
+                   const shash::Suffix   hash_suffix,
+                   const std::string    &destination_path) const;
   history::History* GetHistory(const manifest::Manifest  *manifest,
                                const std::string         &repository_url,
                                const std::string         &history_path,

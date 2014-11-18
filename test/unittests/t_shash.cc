@@ -229,6 +229,8 @@ TEST(T_Shash, HashSuffix) {
   EXPECT_EQ ("dataX/2e/c5fe3c17045abdb136a5e6a913e32a",  hash_md5.MakePath("dataX"));
   EXPECT_EQ ("dataY/2e/c5fe3c17045abdb136a5e6a913e32a",  hash_md5.MakePath("dataY"));
   EXPECT_EQ ("dataZ/2e/c5fe3c17045abdb136a5e6a913e32a",  hash_md5.MakePath("dataZ"));
+  EXPECT_EQ ("/2e/c5fe3c17045abdb136a5e6a913e32aP",      hash_md5.MakePathWithSuffix(1, 2, shash::kSuffixPartial));
+  EXPECT_EQ ("/2ec/5fe3c17045abdb136a5e6a913e32aC",      hash_md5.MakePathWithSuffix(1, 3, shash::kSuffixCatalog));
 
   shash::Any hash_sha1(shash::kSha1);
   hash_sha1.Randomize(prng);
@@ -243,6 +245,8 @@ TEST(T_Shash, HashSuffix) {
   EXPECT_EQ ("dataX/b7/5ae68b53d2fc149b77e504132d37569b7e766b",  hash_sha1.MakePath("dataX"));
   EXPECT_EQ ("dataY/b7/5ae68b53d2fc149b77e504132d37569b7e766b",  hash_sha1.MakePath("dataY"));
   EXPECT_EQ ("dataZ/b7/5ae68b53d2fc149b77e504132d37569b7e766b",  hash_sha1.MakePath("dataZ"));
+  EXPECT_EQ ("/b7/5ae68b53d2fc149b77e504132d37569b7e766bP",      hash_sha1.MakePathWithSuffix(1, 2, shash::kSuffixPartial));
+  EXPECT_EQ ("/b75/ae68b53d2fc149b77e504132d37569b7e766bC",      hash_sha1.MakePathWithSuffix(1, 3, shash::kSuffixCatalog));
 
   shash::Any hash_rmd160(shash::kRmd160);
   hash_rmd160.Randomize(prng);
@@ -257,6 +261,8 @@ TEST(T_Shash, HashSuffix) {
   EXPECT_EQ ("dataX/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160",  hash_rmd160.MakePath("dataX"));
   EXPECT_EQ ("dataY/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160",  hash_rmd160.MakePath("dataY"));
   EXPECT_EQ ("dataZ/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160",  hash_rmd160.MakePath("dataZ"));
+  EXPECT_EQ ("/a7/4a19bd6162343a21c8590aa9cebca9014c636d-rmd160P",  hash_rmd160.MakePathWithSuffix(1, 2, shash::kSuffixPartial));
+  EXPECT_EQ ("/a74a/19bd6162343a21c8590aa9cebca9014c636d-rmd160C",  hash_rmd160.MakePathWithSuffix(1, 4, shash::kSuffixCatalog));
 }
 
 

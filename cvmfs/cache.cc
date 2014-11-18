@@ -572,7 +572,7 @@ static int Fetch(const shash::Any &checksum,
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", cvmfs_path.c_str());
   atomic_inc64(&num_download_);
 
-  const string url = "/data" + checksum.MakePathExplicit(1, 2) + hash_suffix;
+  const string url = "/data" + checksum.MakePathWithSuffix(1, 2, hash_suffix);
   string final_path;
   string temp_path;
   int fd;  // Used to write the downloaded file
