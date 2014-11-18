@@ -899,7 +899,7 @@ class ObjectFetcher {
     file_path->clear();
 
     const std::string source =
-      "data" + object_hash.MakePathExplicit(1, 2) + hash_suffix;
+      "data" + object_hash.MakePathWithSuffix(1, 2, hash_suffix);
     const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
     const std::string url = repo_url_ + "/" + source;
 
@@ -928,7 +928,7 @@ class ObjectFetcher {
     file_path->clear();
 
     const std::string source =
-      repo_url_ + "/data" + object_hash.MakePathExplicit(1, 2) + hash_suffix;
+      repo_url_ + "/data" + object_hash.MakePathWithSuffix(1, 2, hash_suffix);
     const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
     const bool file_exists = FileExists(source);
 
