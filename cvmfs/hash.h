@@ -236,23 +236,41 @@ struct Digest {
   }
 
   std::string MakePath(const std::string &prefix = "data") const {
-    return MakePathExplicit(1, 2, prefix);
+    return MakePathExplicit(1, 2, prefix, shash::kSuffixNone);
+  }
+
+  /**
+   * Note: This is a crutch method until we replace MakePathExplicit() anywhere
+   *       with MakePath() which will handle this suffix magic internally.
+   */
+  std::string MakePathWithSuffix(const unsigned   dir_levels,
+                                 const unsigned   digits_per_level,
+                                 const Suffix     hash_suffix) const {
+    const std::string no_prefix = "";
+    return MakePathExplicit(dir_levels,
+                            digits_per_level,
+                            no_prefix,
+                            hash_suffix);
   }
 
   std::string MakePathWithSuffix(const std::string &prefix = "data") const {
-    return MakePathExplicit(1, 2, prefix, true);
+    return MakePathExplicit(1, 2, prefix, suffix);
   }
 
   /**
    * Create a path string from the hex notation of the digest.
+   * Note: This method takes an explicit suffix. This is a crutch to allow for
+   *       MakePathWithSuffix() until MakePathExplicit() is replaced by the more
+   *       convenient MakePath() everywhere in the code. Then this method will
+   *       use the member variable suffix by default.
    */
-  std::string MakePathExplicit(const unsigned      dir_levels,
-                               const unsigned      digits_per_level,
-                               const std::string  &prefix = "",
-                               const bool          with_suffix = false) const
-  {
+  std::string MakePathExplicit(
+                          const unsigned      dir_levels,
+                          const unsigned      digits_per_level,
+                          const std::string  &prefix = "",
+                          const Suffix        hash_suffix = kSuffixNone) const {
     Hex hex(this);
-    const bool use_suffix = with_suffix && HasSuffix();
+    const bool use_suffix = (hash_suffix != kSuffixNone);
 
     const unsigned string_length =   prefix.length()
                                    + hex.length()
@@ -274,7 +292,7 @@ struct Digest {
 
     // (optionally) add hash hint suffix
     if (use_suffix) {
-      result[pos++] = suffix;
+      result[pos++] = hash_suffix;
     }
 
     assert (pos == string_length);
