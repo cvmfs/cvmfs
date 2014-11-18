@@ -253,16 +253,14 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  local condemned_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep generic | awk '{print $3}')"
-  local condemned_tags="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep generic | awk '{print $1}')"
-
   echo "removing generic tags"
-  local i=5
-  for tag in $condemned_tags; do
-    start_transaction $CVMFS_TEST_REPO                                       || return 9
-    publish_repo $CVMFS_TEST_REPO -a "revision_${i}_remove_autotag" -r $tag  || return 10
-    i=$(( $i + 1 ))
+  local condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $2}')"
+  local auto_tags="$(     cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $1}')"
+  local remove_flags=""
+  for tag in $auto_tags; do
+    remove_flags="-r $tag $remove_flags"
   done
+  cvmfs_server tag $remove_flags -f $CVMFS_TEST_REPO || return 9
 
   # ============================================================================
 
@@ -286,7 +284,7 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2       || return 11
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3       || return 11
 
-  local preserved_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep revision_ | awk '{print $3}')"
+  local preserved_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_' | awk '{print $2}')"
 
   echo "check if all catalog revisions are still there"
   for clg_hash in $condemned_clgs $preserved_clgs; do
@@ -321,14 +319,10 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "remove tags that contain shakespeare"
-  condemned_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep 'revision_[1|2]' | awk '{print $3}')"
-  for tag in "revision_1" "revision_2"; do
-    start_transaction $CVMFS_TEST_REPO                                       || return 18
-    publish_repo $CVMFS_TEST_REPO -a "revision_${i}_remove_autotag" -r $tag  || return 19
-    i=$(( $i + 1 ))
-  done
+  condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_[1|2]' | awk '{print $2}')"
+  cvmfs_server tag -r 'revision_1' -r 'revision_2' -f $CVMFS_TEST_REPO || return 19
 
-  preserved_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep revision_ | awk '{print $3}')"
+  preserved_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_' | awk '{print $2}')"
   echo "check if all catalog revisions are still there"
   for clg_hash in $condemned_clgs $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 20
@@ -362,12 +356,10 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "remove intermediate revision 4"
-  condemned_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep revision_4 | awk '{print $3}')"
-  start_transaction $CVMFS_TEST_REPO                                       || return 26
-  publish_repo $CVMFS_TEST_REPO -a "revision_${i}_remove_autotag" -r revision_4  || return 27
-  i=$(( $i + 1 ))
+  condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_4' | awk '{print $2}')"
+  cvmfs_server tag -r 'revision_4' -f $CVMFS_TEST_REPO || return 19
 
-  preserved_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep revision_ | awk '{print $3}')"
+  preserved_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_' | awk '{print $2}')"
   echo "check if all catalog revisions are still there"
   for clg_hash in $condemned_clgs $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 28
@@ -436,7 +428,7 @@ EOF
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 38
 
   echo "check if all tag-referenced catalogs are still there"
-  preserved_clgs="$(cvmfs_server list-tags $CVMFS_TEST_REPO | grep revision_ | awk '{print $3}')"
+  preserved_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_' | awk '{print $2}')"
   for clg_hash in $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 39
   done
