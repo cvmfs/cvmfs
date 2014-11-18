@@ -189,7 +189,7 @@ cvmfs_run_test() {
   produce_files_1_in $reference_dir1 || return 2
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO -a revision_1 -t "create some files in dir1" > publish_1.log 2>&1 || return $?
+  publish_repo $CVMFS_TEST_REPO -a revision_1 -m "create some files in dir1" > publish_1.log 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir1 || return $?
@@ -207,7 +207,7 @@ cvmfs_run_test() {
   produce_files_2_in $reference_dir2 || return 4
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO -a revision_2 -t "put some poems in dir2" > publish_2.log 2>&1 || return $?
+  publish_repo $CVMFS_TEST_REPO -a revision_2 -m "put some poems in dir2" > publish_2.log 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir2 || return $?
@@ -226,7 +226,7 @@ cvmfs_run_test() {
   produce_files_3_in $reference_dir3 || return 6
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO -a revision_3 -t "put poems in dir3 and remove dir1" > publish_3.log 2>&1 || return $?
+  publish_repo $CVMFS_TEST_REPO -a revision_3 -m "put poems in dir3 and remove dir1" > publish_3.log 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir3 || return $?
@@ -246,7 +246,7 @@ cvmfs_run_test() {
   produce_files_4_in $reference_dir4 || return 8
 
   echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO -a revision_4 -t "delete dir3" > publish_4.log 2>&1 || return $?
+  publish_repo $CVMFS_TEST_REPO -a revision_4 -m "delete dir3" > publish_4.log 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir4 || return $?
