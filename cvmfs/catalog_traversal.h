@@ -384,29 +384,29 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
     while (! ctx.catalog_stack.empty()) {
       // Get the top most catalog for the next processing step
-      CatalogJob job = ctx.catalog_stack.top(); ctx.catalog_stack.pop();
+      CatalogJob job = Pop(ctx);
 
-      // skipping duplicate catalogs might also yield postponed catalogs
-      if (WasHitBefore(job)) {
-        if (! HandlePostponedYields(ctx, job)) return false;
-        continue;
+      // download and open the catalog for processing
+      if (! PrepareCatalog(job)) {
+        return false;
       }
 
-      // download the catalog file
-      const bool successful_download = FetchCatalog(job);
-      if (job.ignore)            continue;
-      if (! successful_download) return false;
-
-      // open the catalog file
-      const bool successful_open = OpenCatalog(job);
-      if (! successful_open) return false;
+      // ignored catalogs don't need to be processed anymore but they might
+      // release postponed yields
+      if (job.ignore) {
+        if (! HandlePostponedYields(ctx, job)) {
+          return false;
+        }
+        continue;
+      }
 
       // push catalogs referenced by the current catalog (onto stack)
       PushReferencedCatalogs(ctx, job);
 
       // notify listeners
-      const bool successful_yield = YieldToListeners(ctx, job);
-      if (! successful_yield) return false;
+      if (! YieldToListeners(ctx, job)) {
+        return false;
+      }
     }
 
     // invariant: after the traversal finshed, there should be no more catalogs
@@ -417,24 +417,38 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
 
-  bool FetchCatalog(CatalogJob &job) {
-    const bool successful_fetch = object_fetcher_.Fetch( job.hash,
-                                                        &job.catalog_file_path);
+  bool PrepareCatalog(CatalogJob &job) {
+    // skipping duplicate catalogs might also yield postponed catalogs
+    if (ShouldBeSkipped(job)) {
+      job.ignore = true;
+      return true;
+    }
 
-    // Due to garbage collection, it might be that catalogs are not fetchable
-    // anymore. However, this only counts for root catalogs, since the garbage
-    // collection works on repository revision granularity.
-    if (! successful_fetch) {
+    // download the catalog file from the backend storage
+    // Note: Due to garbage collection, catalogs might not be fetchable anymore.
+    //       However, this only counts for root catalogs, since the garbage
+    //       collection works on repository revision granularity.
+    if (! FetchCatalog(job)) {
       if (ignore_load_failure_ && job.IsRootCatalog()) {
         LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignore missing root catalog "
                                                   "%s (possibly sweeped before)",
                  job.hash.ToString().c_str());
         job.ignore = true;
+        return true;
       } else {
         LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to load catalog %s",
                  job.hash.ToString().c_str());
+        return false;
       }
+    }
 
+    // open the catalog file
+    return OpenCatalog(job);
+  }
+
+
+  bool FetchCatalog(CatalogJob &job) {
+    if (! object_fetcher_.Fetch(job.hash, &job.catalog_file_path)) {
       return false;
     }
 
@@ -665,6 +679,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return true;
   }
 
+  CatalogJob Pop(TraversalContext &ctx) {
+    CatalogJob job = ctx.catalog_stack.top(); ctx.catalog_stack.pop();
+    return job;
+  }
+
   /**
    * Checks the traversal history if the given catalog was traversed or at least
    * seen before. If 'no_repeat_history' is not set this is always 'false'.
@@ -672,7 +691,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * @param job   the job to be checked against the traversal history
    * @return      true if the specified catalog was hit before
    */
-  bool WasHitBefore(const CatalogJob &job) {
+  bool ShouldBeSkipped(const CatalogJob &job) {
     if (! no_repeat_history_) {
       return false;
     }
