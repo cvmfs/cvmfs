@@ -500,6 +500,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
         + PushPreviousRevision(ctx, job);
   }
 
+  /**
+   * Pushes the previous revision of a (root) catalog.
+   * @return  the number of catalogs pushed on the processing stack
+   */
   unsigned int PushPreviousRevision(      TraversalContext  &ctx,
                                     const CatalogJob        &job)
   {
@@ -521,18 +525,21 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       return 0;
     }
 
-    const CatalogJob new_job("",
-                             previous_revision,
-                             0,
-                             job.history_depth + 1,
-                             NULL);
-    return Push(ctx, new_job) ? 1 : 0;
+    Push(ctx, CatalogJob("",
+                         previous_revision,
+                         0,
+                         job.history_depth + 1,
+                         NULL));
+    return 1;
   }
 
+  /**
+   * Pushes all the referenced nested catalogs.
+   * @return  the number of catalogs pushed on the processing stack
+   */
   unsigned int PushNestedCatalogs(      TraversalContext  &ctx,
                                   const CatalogJob        &job)
   {
-    unsigned int pushed_catalogs = 0;
     const typename CatalogT::NestedCatalogList &nested = // TODO: C++11 auto ;-)
                                               job.catalog->ListNestedCatalogs();
     typename CatalogT::NestedCatalogList::const_iterator i    = nested.begin();
@@ -544,16 +551,14 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                                job.tree_level + 1,
                                job.history_depth,
                                parent);
-      if (Push(ctx, new_job)) {
-        ++pushed_catalogs;
-      }
+      Push(ctx, new_job);
     }
 
-    return pushed_catalogs;
+    return nested.size();
   }
 
-  bool Push(TraversalContext &ctx, const shash::Any &root_catalog_hash) {
-    return Push(ctx, CatalogJob("", root_catalog_hash, 0, 0));
+  void Push(TraversalContext &ctx, const shash::Any &root_catalog_hash) {
+    Push(ctx, CatalogJob("", root_catalog_hash, 0, 0));
   }
 
 
@@ -674,9 +679,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return true;
   }
 
-  bool Push(TraversalContext &ctx, const CatalogJob &job) {
+  void Push(TraversalContext &ctx, const CatalogJob &job) {
     ctx.catalog_stack.push(job);
-    return true;
   }
 
   CatalogJob Pop(TraversalContext &ctx) {
