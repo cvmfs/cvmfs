@@ -18,6 +18,8 @@ namespace dns {
 class T_Dns : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    int retval = unsetenv("HOST_ALIASES");
+    assert(retval == 0);
     default_resolver =
       CaresResolver::Create(false /* ipv4_only */, 1 /* retries */, 2000);
     assert(default_resolver);
@@ -719,6 +721,68 @@ TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_EQ(host.ipv4_addresses(), expected_ipv4);
   EXPECT_EQ(host.ipv6_addresses(), expected_ipv6);
+}
+
+
+TEST_F(T_Dns, NormalResolverConstruct) {
+  NormalResolver *resolver = NormalResolver::Create(false, 2, 2000);
+  ASSERT_TRUE(resolver != NULL);
+  ASSERT_EQ(resolver->domains(), resolver->cares_resolver_->domains());
+  ASSERT_EQ(resolver->resolvers(), resolver->cares_resolver_->resolvers());
+  ASSERT_EQ(resolver->timeout_ms(), resolver->cares_resolver_->timeout_ms());
+  ASSERT_EQ(resolver->retries(), resolver->cares_resolver_->retries());
+  delete resolver;
+
+  int retval = setenv("HOST_ALIASES", "/no/such/file", 1);
+  ASSERT_EQ(retval, 0);
+  resolver = NormalResolver::Create(false, 2, 2000);
+  ASSERT_TRUE(resolver == NULL);
+}
+
+
+TEST_F(T_Dns, NormalResolverSimple) {
+  NormalResolver *resolver = NormalResolver::Create(false, 2, 2000);
+  ASSERT_TRUE(resolver != NULL);
+
+  Host host = resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+  host = resolver->Resolve("a.root-servers.net");
+  ExpectResolvedName(host, "198.41.0.4", "[2001:503:ba3e::2:30]");
+}
+
+
+TEST_F(T_Dns, NormalResolverLocalonly) {
+  NormalResolver *resolver = NormalResolver::Create(false, 2, 2000);
+  ASSERT_TRUE(resolver != NULL);
+
+  vector<string> no_resolvers;
+  no_resolvers.push_back("127.0.0.2");
+  resolver->SetResolvers(no_resolvers);
+  Host host = resolver->Resolve("localhost");
+  EXPECT_EQ(host.status(), kFailOk);
+}
+
+
+TEST_F(T_Dns, NormalResolverCombined) {
+  NormalResolver *resolver = NormalResolver::Create(false, 2, 2000);
+  ASSERT_TRUE(resolver != NULL);
+
+  vector<string> names;
+  names.push_back("a.root-servers.net");
+  names.push_back("b.root-servers.net");
+  names.push_back("localhost");
+  names.push_back("127.0.0.1");
+  names.push_back("[::1]");
+  names.push_back("nemo.root-servers.net");
+  vector<Host> hosts;
+  default_resolver->ResolveMany(names, &hosts);
+  ASSERT_EQ(hosts.size(), names.size());
+  ExpectResolvedName(hosts[0], "198.41.0.4", "[2001:503:ba3e::2:30]");
+  ExpectResolvedName(hosts[1], "192.228.79.201", "[2001:500:84::b]");
+  EXPECT_EQ(hosts[2].status(), kFailOk);
+  ExpectResolvedName(hosts[3], "127.0.0.1", "");
+  ExpectResolvedName(hosts[4], "", "[::1]");
+  EXPECT_EQ(hosts[5].status(), kFailUnknownHost);
 }
 
 }  // namespace dns

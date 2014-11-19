@@ -232,6 +232,7 @@ class Resolver : SingleCopy {
  * Implementation of the Resolver interface using the c-ares library.
  */
 class CaresResolver : public Resolver {
+  friend class NormalResolver;
  public:
   /**
    * More IP addresses for a single name will be ignored.
@@ -270,14 +271,15 @@ class CaresResolver : public Resolver {
 /**
  * Resolves against static name information like in /etc/hosts.  Setting
  * resolver addresses is a no-op for this resolver.  Search domains are not
- * automatically found but need to be set.  Not the most efficient 
+ * automatically found but need to be set.  Not the most efficient
  * implementation but in the context of cvmfs should be called at most every 5
  * minutes.
  */
 class HostfileResolver : public Resolver {
+  friend class NormalResolver;
  public:
   static HostfileResolver *Create(const std::string &path, bool ipv4_only);
-  ~HostfileResolver();
+  virtual ~HostfileResolver();
 
   virtual bool SetResolvers(const std::vector<std::string> &resolvers) {
     return true; };
@@ -313,6 +315,37 @@ class HostfileResolver : public Resolver {
    * once constructed.
    */
   FILE *fhosts_;
+};
+
+
+/**
+ * The normal resolver combines Hostfile and C-ares resolver.  First looks up
+ * host names in the host file.  All non-matches are looked up by c-ares.
+ */
+class NormalResolver : public Resolver {
+  FRIEND_TEST(T_Dns, NormalResolverConstruct);
+ public:
+  static NormalResolver *Create(const bool ipv4_only,
+                                const unsigned retries,
+                                const unsigned timeout_ms);
+  virtual bool SetResolvers(const std::vector<std::string> &resolvers);
+  virtual bool SetSearchDomains(const std::vector<std::string> &domains);
+  virtual void SetSystemResolvers();
+  virtual void SetSystemSearchDomains();
+  virtual ~NormalResolver();
+
+ protected:
+  virtual void DoResolve(const std::vector<std::string> &names,
+                         const std::vector<bool> &skip,
+                         std::vector<std::vector<std::string> > *ipv4_addresses,
+                         std::vector<std::vector<std::string> > *ipv6_addresses,
+                         std::vector<Failures> *failures,
+                         std::vector<unsigned> *ttls);
+  NormalResolver();
+
+ private:
+  CaresResolver *cares_resolver_;
+  HostfileResolver *hostfile_resolver_;
 };
 
 }  // namespace dns

@@ -14,7 +14,7 @@
  * and upon creation carry a unique id that corresponds to a particular name
  * resolving attempt.
  *
- * The SystemResolver uses both the CaresResolver for DNS queries and the
+ * The NormalResolver uses both the CaresResolver for DNS queries and the
  * HostfileResolve for queries in /etc/hosts.  If an entry is found in
  * /etc/hosts, the CaresResolver is unused.
  */
@@ -1019,6 +1019,118 @@ bool HostfileResolver::SetSearchDomains(const vector<string> &domains) {
 void HostfileResolver::SetSystemSearchDomains() {
   // TODO
   assert(false);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Creates hostfile and c-ares resolvers and uses c-ares resolvers search
+ * domains for the hostfile resolver.
+ */
+NormalResolver *NormalResolver::Create(
+  const bool ipv4_only,
+  const unsigned retries,
+  const unsigned timeout_ms)
+{
+  CaresResolver *cares_resolver =
+    CaresResolver::Create(ipv4_only, retries, timeout_ms);
+  if (!cares_resolver)
+    return NULL;
+  HostfileResolver *hostfile_resolver = HostfileResolver::Create("", ipv4_only);
+  if (!hostfile_resolver) {
+    delete cares_resolver;
+    return NULL;
+  }
+  bool retval = hostfile_resolver->SetSearchDomains(cares_resolver->domains());
+  assert(retval);
+
+  NormalResolver *normal_resolver = new NormalResolver();
+  normal_resolver->cares_resolver_ = cares_resolver;
+  normal_resolver->hostfile_resolver_ = hostfile_resolver;
+  normal_resolver->domains_ = cares_resolver->domains();
+  normal_resolver->resolvers_ = cares_resolver->resolvers();
+  normal_resolver->retries_ = cares_resolver->retries();
+  normal_resolver->timeout_ms_ = cares_resolver->timeout_ms();
+  return normal_resolver;
+}
+
+
+/**
+ * Makes only sense for the c-ares resolver.
+ */
+bool NormalResolver::SetResolvers(const vector<string> &resolvers) {
+  return cares_resolver_->SetResolvers(resolvers);
+}
+
+
+/**
+ * Sets new search domains for both resolvers or for none.
+ */
+bool NormalResolver::SetSearchDomains(const vector<string> &domains) {
+  vector<string> old_domains = hostfile_resolver_->domains();
+  bool retval = hostfile_resolver_->SetSearchDomains(domains);
+  if (!retval)
+    return false;
+  retval = cares_resolver_->SetSearchDomains(domains);
+  if (!retval) {
+    retval = hostfile_resolver_->SetSearchDomains(old_domains);
+    assert(retval);
+    return false;
+  }
+  return true;
+}
+
+
+void NormalResolver::SetSystemResolvers() {
+  cares_resolver_->SetSystemResolvers();
+}
+
+
+void NormalResolver::SetSystemSearchDomains() {
+  cares_resolver_->SetSystemSearchDomains();
+  bool retval = hostfile_resolver_->SetSearchDomains(cares_resolver_->domains());
+  assert(retval);
+}
+
+
+/**
+ * First pass done by the hostfile resolver, all successfully resolved names
+ * are skipped by the c-ares resolver.
+ */
+void NormalResolver::DoResolve(
+  const vector<string> &names,
+  const vector<bool> &skip,
+  vector< vector<string> > *ipv4_addresses,
+  vector< vector<string> > *ipv6_addresses,
+  vector<Failures> *failures,
+  vector<unsigned> *ttls)
+{
+  unsigned num = names.size();
+  hostfile_resolver_->DoResolve(names, skip, ipv4_addresses, ipv6_addresses,
+                                failures, ttls);
+  vector<bool> skip_cares = skip;
+  for (unsigned i = 0; i < num; ++i) {
+    if ((*failures)[i] == kFailOk)
+      skip_cares[i] = true;
+  }
+  cares_resolver_->DoResolve(names, skip_cares, ipv4_addresses, ipv6_addresses,
+                             failures, ttls);
+}
+
+
+NormalResolver::NormalResolver()
+  : Resolver(false, 0, 0)
+  , cares_resolver_(NULL)
+  , hostfile_resolver_(NULL)
+{
+}
+
+
+NormalResolver::~NormalResolver() {
+  delete cares_resolver_;
+  delete hostfile_resolver_;
 }
 
 }  // namespace dns
