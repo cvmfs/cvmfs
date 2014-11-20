@@ -851,8 +851,8 @@ class ObjectFetcher {
 
     // TODO: need to unlink history_db_path after usage
     history::History *history = history::SqliteHistory::Open(history_db_path);
-    if (NULL != history) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_,
+    if (NULL == history) {
+      LogCvmfs(kLogCatalogTraversal, kLogStderr,
                "failed to open history database (%s)",
                history_db_path.c_str());
       assert (false && "history db open failed");
