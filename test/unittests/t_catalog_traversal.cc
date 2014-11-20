@@ -8,189 +8,9 @@
 #include "../../cvmfs/manifest.h"
 #include "../../cvmfs/hash.h"
 
+#include "testutil.h"
+
 using namespace swissknife;
-
-static const std::string rhs        = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
-static const shash::Any  root_hash  = shash::Any(shash::kSha1, shash::HexPtr(rhs), 'C');
-static UniquePtr<history::History> *g_tag_list; // needs to be global to 'mimic' the
-                                                // real world, where the repo itself
-                                                // is 'global'
-
-/**
- * This is a mock of an ObjectFetcher that does essentially nothing.
- */
-class MockObjectFetcher {
- public:
-  MockObjectFetcher(const CatalogTraversalParams &params) {}
- public:
-  manifest::Manifest* FetchManifest() {
-    return new manifest::Manifest(root_hash, 0, "");
-  }
-  history::History* FetchHistory() {
-    return (g_tag_list != NULL) ? g_tag_list->Release() : NULL;
-  }
-  inline bool Fetch(const shash::Any  &catalog_hash,
-                    std::string       *catalog_file) {
-    return true;
-  }
-  inline bool Exists(const std::string &file) {
-    return false;
-  }
-};
-
-
-/**
- * This is a minimal mock of a Catalog class.
- */
-class MockCatalog {
- public:
-  typedef std::map<shash::Any, MockCatalog*> AvailableCatalogs;
-  static AvailableCatalogs available_catalogs;
-  static unsigned int      instances;
-
-  static void Reset() {
-    MockCatalog::instances = 0;
-    MockCatalog::UnregisterCatalogs();
-  }
-
-  static void RegisterCatalog(MockCatalog *catalog) {
-    ASSERT_EQ (MockCatalog::available_catalogs.end(),
-               MockCatalog::available_catalogs.find(catalog->catalog_hash()));
-    MockCatalog::available_catalogs[catalog->catalog_hash()] = catalog;
-  }
-
-  static void UnregisterCatalogs() {
-    MockCatalog::AvailableCatalogs::const_iterator i, iend;
-    for (i    = MockCatalog::available_catalogs.begin(),
-         iend = MockCatalog::available_catalogs.end();
-         i != iend; ++i)
-    {
-      delete i->second;
-    }
-    MockCatalog::available_catalogs.clear();
-  }
-
-  static MockCatalog* GetCatalog(const shash::Any &catalog_hash) {
-    AvailableCatalogs::const_iterator clg_itr =
-      MockCatalog::available_catalogs.find(catalog_hash);
-    return (MockCatalog::available_catalogs.end() != clg_itr)
-      ? clg_itr->second
-      : NULL;
-  }
-
- public:
-  struct NestedCatalog {
-    PathString   path;
-    shash::Any   hash;
-    MockCatalog *child;
-    uint64_t     size;
-  };
-  typedef std::vector<NestedCatalog> NestedCatalogList;
-
- public:
-  MockCatalog(const std::string &root_path,
-              const shash::Any  &catalog_hash,
-              const uint64_t     catalog_size,
-              const unsigned int revision,
-              const bool         is_root,
-              MockCatalog *parent   = NULL,
-              MockCatalog *previous = NULL) :
-    parent_(parent), previous_(previous), root_path_(root_path),
-    catalog_hash_(catalog_hash), catalog_size_(catalog_size),
-    revision_(revision), is_root_(is_root)
-  {
-    if (parent != NULL) {
-      parent->RegisterChild(this);
-    }
-    ++MockCatalog::instances;
-  }
-
-  MockCatalog(const MockCatalog &other) :
-    parent_(other.parent_), previous_(other.previous_),
-    root_path_(other.root_path_), catalog_hash_(other.catalog_hash_),
-    catalog_size_(other.catalog_size_), revision_(other.revision_),
-    is_root_(other.is_root_), children_(other.children_)
-  {
-    ++MockCatalog::instances;
-  }
-
-  ~MockCatalog() {
-    --MockCatalog::instances;
-  }
-
- public: /* API in this 'public block' is used by CatalogTraversal
-          * (see catalog.h - catalog::Catalog for details)
-          */
-  static MockCatalog* AttachFreely(const std::string  &root_path,
-                                   const std::string  &file,
-                                   const shash::Any   &catalog_hash,
-                                         MockCatalog  *parent = NULL) {
-    const MockCatalog *catalog = MockCatalog::GetCatalog(catalog_hash);
-    if (catalog == NULL) {
-      return NULL;
-    } else {
-      MockCatalog *new_catalog = catalog->Clone();
-      new_catalog->set_parent(parent);
-      return new_catalog;
-    }
-  }
-
-  bool IsRoot() const { return is_root_; }
-
-  const NestedCatalogList& ListNestedCatalogs() const { return children_; }
-
-  unsigned int GetRevision() const { return revision_; }
-
-  shash::Any GetPreviousRevision() const {
-    return (previous_ != NULL) ? previous_->catalog_hash() : shash::Any();
-  }
-
- public:
-  const PathString   path()         const { return PathString(root_path_);  }
-  const std::string& root_path()    const { return root_path_;              }
-  const shash::Any&  catalog_hash() const { return catalog_hash_;           }
-  uint64_t           catalog_size() const { return catalog_size_;           }
-  unsigned int       revision()     const { return revision_;               }
-
-  MockCatalog*       parent()       const { return parent_;                 }
-  MockCatalog*       previous()     const { return previous_;               }
-
-  void set_parent(MockCatalog *parent) { parent_ = parent; }
-
- public:
-  void RegisterChild(MockCatalog *child) {
-    NestedCatalog nested;
-    nested.path  = PathString(child->root_path());
-    nested.hash  = child->catalog_hash();
-    nested.child = child;
-    nested.size  = child->catalog_size();
-    children_.push_back(nested);
-  }
-
- protected:
-  MockCatalog* Clone() const {
-    return new MockCatalog(*this);
-  }
-
- private:
-  MockCatalog        *parent_;
-  MockCatalog        *previous_;
-  const std::string   root_path_;
-  const shash::Any    catalog_hash_;
-  const uint64_t      catalog_size_;
-  const unsigned int  revision_;
-  const bool          is_root_;
-
-  NestedCatalogList   children_;
-};
-
-MockCatalog::AvailableCatalogs MockCatalog::available_catalogs;
-unsigned int                   MockCatalog::instances;
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 typedef CatalogTraversal<MockCatalog, MockObjectFetcher> MockedCatalogTraversal;
 typedef std::pair<unsigned int, std::string>             CatalogIdentifier;
@@ -225,22 +45,23 @@ class T_CatalogTraversal : public ::testing::Test {
     named_snapshots_ = history::History::Create(history_db,
                                                 T_CatalogTraversal::fqrn);
     ASSERT_TRUE (named_snapshots_.IsValid());
-    g_tag_list = &named_snapshots_; // a pointer to a UniquePtr, I should burn
-                                    // in hell for that. (If the testee code is
-                                    // actually requesting this, the UniquePtr
-                                    // will be released - thus not freed in
-                                    // MockObjectFetcher::FetchHistory)
+    MockObjectFetcher::s_history = &named_snapshots_; // a pointer to a UniquePtr, I should burn
+                                                      // in hell for that. (If the testee code is
+                                                      // actually requesting this, the UniquePtr
+                                                      // will be released - thus not freed in
+                                                      // MockObjectFetcher::FetchHistory)
 
     dice_.InitLocaltime();
     MockCatalog::Reset();
     SetupDummyCatalogs();
     EXPECT_EQ (initial_catalog_instances, MockCatalog::instances);
+    MockObjectFetcher::s_history = &named_snapshots_;
   }
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
-    g_tag_list = NULL;
+    MockObjectFetcher::s_history = NULL; // TODO: potential memory leak!
 
     const bool retval = RemoveTree(sandbox);
     ASSERT_TRUE (retval) << "failed to remove sandbox";
@@ -348,7 +169,7 @@ class T_CatalogTraversal : public ::testing::Test {
      *    Revision 3:   - adds branch 1-1                                  17      c9e011bbf7529d25c958bc0f948eefef79e991cd
      *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated      25      eec5694dfe5f2055a358acfb4fda7748c896df24
      *    Revision 5:   - adds branch 1-3                                  28      3c726334c98537e92c8b92b76852f77e3a425be9
-     *    Revision 6:   - removes branch 1-0                               21      $root_hash
+     *    Revision 6:   - removes branch 1-0                               21      MockCatalog::root_hash
      *
      */
 
@@ -358,7 +179,7 @@ class T_CatalogTraversal : public ::testing::Test {
     root_catalogs[3] = h("c9e011bbf7529d25c958bc0f948eefef79e991cd", 'C');
     root_catalogs[4] = h("eec5694dfe5f2055a358acfb4fda7748c896df24", 'C');
     root_catalogs[5] = h("3c726334c98537e92c8b92b76852f77e3a425be9", 'C');
-    root_catalogs[6] = root_hash;
+    root_catalogs[6] = MockCatalog::root_hash;
     root_catalogs_ = root_catalogs;
 
     RevisionMap revisions;
