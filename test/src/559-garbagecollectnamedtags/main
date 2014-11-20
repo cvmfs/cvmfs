@@ -266,6 +266,9 @@ cvmfs_run_test() {
 
   # ============================================================================
 
+  echo "print current named snapshot list"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 9
+
   echo "removing generic tags"
   local condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $2}' | tail -n2)"
   local auto_tags="$(     cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $1}')"
@@ -304,6 +307,9 @@ cvmfs_run_test() {
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 12
   done
 
+  echo "print current named snapshot list"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 13
+
   echo "perform garbage collection (removing all revisions that have no named snapshots)"
   cvmfs_server gc -f $CVMFS_TEST_REPO || return 13
 
@@ -330,6 +336,9 @@ cvmfs_run_test() {
   done
 
   # ============================================================================
+
+  echo "print current named snapshot list"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 18
 
   echo "remove tags that contain shakespeare"
   condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_[1|2]' | awk '{print $2}')"
@@ -367,6 +376,9 @@ cvmfs_run_test() {
   done
 
   # ============================================================================
+
+  echo "print current named snapshot list"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 26
 
   echo "remove intermediate revision 6 (revision_4)"
   condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_4' | awk '{print $2}')"
