@@ -3768,6 +3768,7 @@ gc() {
                                           -h $preserve_revisions     \
                                           -n $CVMFS_REPOSITORY_NAME  \
                                           -k $CVMFS_PUBLIC_KEY       \
+                                          -t ${CVMFS_SPOOL_DIR}/tmp  \
                                           $additional_switches"
 
     # do it
