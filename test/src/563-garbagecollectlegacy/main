@@ -58,7 +58,7 @@ cvmfs_run_test() {
   local last_legacy_catalogs="$(cat $resurrect_log | grep -o '[0-9a-f]\{2\}\/[0-9a-f]\+C' | sed 's/[\/C]//g')"
 
   echo "get all catalog hashes after the import (2.1 catalogs)"
-  local converted_catalogs="$(cvmfs_server list-catalogs -mh $legacy_repo_name | awk '{print $1}')"
+  local converted_catalogs="$(cvmfs_server list-catalogs -hx $legacy_repo_name | awk '{print $1}')"
 
   echo "create an additional revision after the migration to create the history database"
   start_transaction $legacy_repo_name || return 5
