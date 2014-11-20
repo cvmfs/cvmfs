@@ -418,7 +418,7 @@ create_empty_repo() {
   local debug_log=$3
   local extra_options="$4"
 
-  create_repo $repo $uid $debug_log $extra_options || return 101
+  create_repo $repo $uid $debug_log "$extra_options" || return 101
 
   sudo cvmfs_server transaction $repo || return 102
   rm -f /cvmfs/$repo/new_repository
