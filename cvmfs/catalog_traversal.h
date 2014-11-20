@@ -609,17 +609,21 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     assert (job.catalog != NULL);
     this->NotifyListeners(job.GetCallbackData());
 
-    // close the catalog again after it was processed
-    if (! no_close_) {
-      delete job.catalog; job.catalog = NULL;
+    // skip the catalog closing procedure if asked for
+    // Note: In this case it is the user's responsibility to both delete the
+    //       yielded catalog object and the underlying database temp file
+    if (no_close_) {
+      return true;
     }
 
-    // we can delete the temporary catalog file here
+    // we can close the catalog here and delete the temporary file
+    delete job.catalog; job.catalog = NULL;
     if (! job.catalog_file_path.empty()) {
       const int retval = unlink(job.catalog_file_path.c_str());
       if (retval != 0) {
         LogCvmfs(kLogCatalogTraversal, error_sink_, "Failed to unlink %s - %d",
                  job.catalog_file_path.c_str(), errno);
+        return false;
       }
     }
 
