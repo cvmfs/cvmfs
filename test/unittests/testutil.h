@@ -432,7 +432,15 @@ class MockHistory : public history::History {
 class MockObjectFetcher {
  public:
   static MockHistory                  *s_history;
-  static std::set<shash::Any>         *deleted_catalogs;
+  static std::set<shash::Any>         *s_deleted_catalogs;
+
+  static void Reset() {
+    if (MockObjectFetcher::s_history != NULL) {
+      delete MockObjectFetcher::s_history;
+      MockObjectFetcher::s_history = NULL;
+    }
+    MockObjectFetcher::s_deleted_catalogs = NULL;
+  }
 
  public:
   MockObjectFetcher(const swissknife::CatalogTraversalParams &params) {}
@@ -444,8 +452,8 @@ class MockObjectFetcher {
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {
     catalog_file->clear();
-    return (deleted_catalogs == NULL ||
-            deleted_catalogs->find(catalog_hash) == deleted_catalogs->end());
+    return (s_deleted_catalogs == NULL ||
+            s_deleted_catalogs->find(catalog_hash) == s_deleted_catalogs->end());
   }
   inline bool Exists(const std::string &file) {
     return false;

@@ -177,8 +177,8 @@ void MockCatalog::AddFile(const shash::Any   &content_hash,
 }
 
 
-MockHistory* MockObjectFetcher::s_history                 = NULL;
-std::set<shash::Any>* MockObjectFetcher::deleted_catalogs = NULL;
+MockHistory* MockObjectFetcher::s_history                   = NULL;
+std::set<shash::Any>* MockObjectFetcher::s_deleted_catalogs = NULL;
 
 void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
                            const size_t       chunk_size) {

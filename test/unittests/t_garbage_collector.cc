@@ -79,7 +79,7 @@ class T_GarbageCollector : public ::testing::Test {
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
-    delete MockObjectFetcher::s_history;
+    MockObjectFetcher::Reset();
   }
 
   GcConfiguration GetStandardGarbageCollectorConfiguration() const {
@@ -604,7 +604,7 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   deleted_catalogs.insert(c[mp(3,"00")]->hash());
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
   deleted_catalogs.insert(c[mp(3,"11")]->hash());
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
@@ -622,8 +622,6 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   EXPECT_TRUE (gc1);
   EXPECT_EQ (11u, gc.preserved_catalog_count());
   EXPECT_EQ ( 0u, gc.condemned_catalog_count());
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }
 
 
@@ -637,12 +635,10 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   const bool gc1 = gc.Collect();
   EXPECT_FALSE (gc1);
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }
 
 
@@ -656,7 +652,7 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
   // to simulate the actual deletion of objects
   RevisionMap     &c   = catalogs_;
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
-  MockObjectFetcher::deleted_catalogs = &upl->deleted_hashes;
+  MockObjectFetcher::s_deleted_catalogs = &upl->deleted_hashes;
 
   const bool gc1 = gc.Collect();
   EXPECT_TRUE (gc1);
@@ -689,6 +685,4 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
   EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"10")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"11")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"20")]->hash()));
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }

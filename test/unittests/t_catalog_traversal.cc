@@ -50,7 +50,7 @@ class T_CatalogTraversal : public ::testing::Test {
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
-    delete MockObjectFetcher::s_history;
+    MockObjectFetcher::Reset();
   }
 
   void CheckVisitedCatalogs(const CatalogIdentifiers &expected,
@@ -2257,7 +2257,7 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
   deleted_catalogs.insert(GetRootHash(2));
   deleted_catalogs.insert(GetRootHash(3));
   deleted_catalogs.insert(GetRootHash(4));
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2302,8 +2302,6 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
 
   CheckVisitedCatalogs(catalogs, TraverseUntilUnavailableRevisionNoRepeat_visited_catalogs);
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }
 
 
@@ -2328,7 +2326,7 @@ TEST_F(T_CatalogTraversal, TraverseWithUnavailableNestedNoRepeat) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(doomed_nested_catalog->hash());
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2373,8 +2371,6 @@ TEST_F(T_CatalogTraversal, TraverseWithUnavailableNestedNoRepeat) {
   const bool dont_check_catalog_count = false;
   CheckVisitedCatalogs(catalogs, TraverseWithUnavailableNestedNoRepeat_visited_catalogs,
                        dont_check_catalog_count);
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }
 
 
@@ -2737,7 +2733,7 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(2));
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   CatalogTraversalParams params;
   params.history             = CatalogTraversalParams::kFullHistory;
