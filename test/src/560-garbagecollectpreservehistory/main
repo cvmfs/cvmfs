@@ -188,6 +188,9 @@ cvmfs_run_test() {
 
   # ============================================================================
 
+  echo "list history of the repository"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return $?
+
   echo "check that all catalogs are present"
   for catalog in $catalogs; do
     peek_backend $CVMFS_TEST_REPO "${catalog}C" || return 4
@@ -317,6 +320,9 @@ cvmfs_run_test() {
 
   echo "delete an intermediate tag"
   cvmfs_server tag -r "revision_10" -f $CVMFS_TEST_REPO || return 24
+
+  echo "print tag list"
+  cvmfs_server tag -l || return 24
 
   echo "run garbage collection (should remove probe file 10)"
   cvmfs_server gc -f || return 25
