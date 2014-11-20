@@ -40,9 +40,9 @@ FileProcessor::~FileProcessor() {
 }
 
 
-void FileProcessor::Process(const std::string  &local_path,
-                            const bool          allow_chunking,
-                            const std::string  &hash_suffix) {
+void FileProcessor::Process(const std::string   &local_path,
+                            const bool           allow_chunking,
+                            const shash::Suffix  hash_suffix) {
   ChunkDetector *chunk_detector = (chunking_enabled_ && allow_chunking)
                                         ? new Xor32Detector(minimal_chunk_size_,
                                                             average_chunk_size_,
@@ -55,10 +55,10 @@ void FileProcessor::Process(const std::string  &local_path,
                         hash_suffix);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Scheduling '%s' for processing ("
-                                        "chunking: %s, hash_suffix: %s)",
+                                        "chunking: %s, hash_suffix: %c)",
            local_path.c_str(),
            ((allow_chunking) ? "true" : "false"),
-           hash_suffix.c_str());
+           hash_suffix);
   io_dispatcher_->ScheduleRead(file);
 }
 
@@ -77,7 +77,9 @@ void FileProcessor::FileDone(File *file) {
   ChunkVector::const_iterator iend = generated_chunks.end();
   for (; i != iend; ++i) {
     Chunk *current_chunk = *i;
-    resulting_chunks.PushBack(FileChunk(current_chunk->content_hash(),
+    shash::Any chunk_hash = current_chunk->content_hash();
+    chunk_hash.set_suffix(shash::kSuffixPartial);
+    resulting_chunks.PushBack(FileChunk(chunk_hash,
                                         current_chunk->offset(),
                                         current_chunk->size()));
   }

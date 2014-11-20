@@ -127,19 +127,23 @@ class T_AsyncReader : public FileSandbox {
     RemoveSandbox();
   }
 
-  ExpectedHashString GetEmptyFileHash(const std::string suffix = "") const {
+  ExpectedHashString GetEmptyFileHash(
+                        const shash::Suffix suffix = shash::kSuffixNone) const {
     return std::make_pair("da39a3ee5e6b4b0d3255bfef95601890afd80709", suffix);
   }
 
-  ExpectedHashString GetSmallFileHash(const std::string suffix = "") const {
+  ExpectedHashString GetSmallFileHash(
+                        const shash::Suffix suffix = shash::kSuffixNone) const {
     return std::make_pair("e86f148ca3a9a1ad9cf19979548e61c38bfa1384", suffix);
   }
 
-  ExpectedHashString GetBigFileHash(const std::string suffix = "") const {
+  ExpectedHashString GetBigFileHash(
+                        const shash::Suffix suffix = shash::kSuffixNone) const {
     return std::make_pair("59107e4c69e7687499423d3d85154fdba9cd8161", suffix);
   }
 
-  ExpectedHashString GetHugeFileHash(const std::string suffix = "") const {
+  ExpectedHashString GetHugeFileHash(
+                        const shash::Suffix suffix = shash::kSuffixNone) const {
     return std::make_pair("e09bdb4354db2ac46309130ee91ad7c4131f29ea", suffix);
   }
 };

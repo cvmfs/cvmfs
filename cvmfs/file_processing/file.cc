@@ -11,11 +11,11 @@
 
 using namespace upload;
 
-File::File(const std::string  &path,
-           IoDispatcher       *io_dispatcher,
-           ChunkDetector      *chunk_detector,
-           shash::Algorithms  hash_algorithm,
-           const std::string  &hash_suffix) :
+File::File(const std::string    &path,
+           IoDispatcher         *io_dispatcher,
+           ChunkDetector        *chunk_detector,
+           shash::Algorithms     hash_algorithm,
+           const shash::Suffix   hash_suffix) :
   AbstractFile(path, GetFileSize(path)),
   might_become_chunked_(chunk_detector != NULL &&
                         chunk_detector->MightFindChunks(size())),

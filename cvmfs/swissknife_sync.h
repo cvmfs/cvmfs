@@ -30,7 +30,7 @@ struct SyncParameters {
   std::string      dir_scratch;
   std::string      dir_rdonly;
   std::string      dir_temp;
-  std::string      base_hash;
+  shash::Any       base_hash;
   std::string      stratum0;
   std::string      manifest_path;
   std::string      spooler_definition;

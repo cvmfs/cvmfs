@@ -31,11 +31,11 @@ typedef std::vector<Chunk*> ChunkVector;
  */
 class File : public AbstractFile {
  public:
-  File(const std::string  &path,
-       IoDispatcher       *io_dispatcher,
-       ChunkDetector      *chunk_detector,
-       shash::Algorithms  hash_algorithm,
-       const std::string  &hash_suffix    = "");
+  File(const std::string    &path,
+       IoDispatcher         *io_dispatcher,
+       ChunkDetector        *chunk_detector,
+       shash::Algorithms     hash_algorithm,
+       const shash::Suffix   hash_suffix = shash::kSuffixNone);
   ~File();
 
   bool MightBecomeChunked() const { return might_become_chunked_; }
@@ -70,10 +70,10 @@ class File : public AbstractFile {
   bool HasBulkChunk()              const { return bulk_chunk_ != NULL;     }
   bool HasChunkDetector()          const { return chunk_detector_ != NULL; }
 
-        Chunk* bulk_chunk()              { return bulk_chunk_;             }
-  const Chunk* bulk_chunk()        const { return bulk_chunk_;             }
-  const ChunkVector& chunks()      const { return chunks_;                 }
-  const std::string& hash_suffix() const { return hash_suffix_;            }
+        Chunk*        bulk_chunk()        { return bulk_chunk_;  }
+  const Chunk*        bulk_chunk()  const { return bulk_chunk_;  }
+  const ChunkVector&  chunks()      const { return chunks_;      }
+  const shash::Suffix hash_suffix() const { return hash_suffix_; }
 
   Chunk* current_chunk() {
     return (chunks_.size() > 0) ? chunks_.back() : NULL;
@@ -94,7 +94,7 @@ class File : public AbstractFile {
  private:
   const bool                  might_become_chunked_; ///< Result of the chunkedness forecast
   const shash::Algorithms     hash_algorithm_;       ///< Secure hash algorithm creating content-addressable storage
-  const std::string           hash_suffix_;          ///< Suffix to be appended to the bulk chunk content hash
+  const shash::Suffix         hash_suffix_;          ///< Suffix to be appended to the bulk chunk content hash
 
   ChunkVector                 chunks_;               ///< List of generated Chunks
   Chunk                      *bulk_chunk_;           ///< Associated bulk Chunk

@@ -107,13 +107,15 @@ class Sql : public sqlite::Sql {
   /**
    * Wrapper for retrieving a cryptographic hash from a blob field.
    */
-  inline shash::Any RetrieveHashBlob(const int idx_column,
-                                     const shash::Algorithms hash_algo) const
-  {
-    if (RetrieveBytes(idx_column) > 0) {
-      return shash::Any(hash_algo,
-        static_cast<const unsigned char *>(RetrieveBlob(idx_column)),
-        RetrieveBytes(idx_column));
+  inline shash::Any RetrieveHashBlob(
+              const int                idx_column,
+              const shash::Algorithms  hash_algo,
+              const char               hash_suffix = shash::kSuffixNone) const {
+    const int byte_count = RetrieveBytes(idx_column);
+    if (byte_count > 0) {
+      const unsigned char *buffer =
+                   static_cast<const unsigned char *>(RetrieveBlob(idx_column));
+      return shash::Any(hash_algo, buffer, byte_count, hash_suffix);
     }
     return shash::Any(hash_algo);
   }
@@ -121,10 +123,12 @@ class Sql : public sqlite::Sql {
   /**
    * Wrapper for retrieving a cryptographic hash from a text field.
    */
-  inline shash::Any RetrieveHashHex(const int idx_column) const {
+  inline shash::Any RetrieveHashHex(
+                            const int  idx_column,
+                            const char hash_suffix = shash::kSuffixNone) const {
     const std::string hash_string = std::string(
       reinterpret_cast<const char *>(RetrieveText(idx_column)));
-    return shash::MkFromHexPtr(shash::HexPtr(hash_string));
+    return shash::MkFromHexPtr(shash::HexPtr(hash_string), hash_suffix);
   }
 
   /**

@@ -418,7 +418,7 @@ shash::Any Catalog::GetPreviousRevision() const {
   pthread_mutex_lock(lock_);
   Sql stmt(database(), sql);
   if (stmt.FetchRow())
-    result = stmt.RetrieveHashHex(0);
+    result = stmt.RetrieveHashHex(0, shash::kSuffixCatalog);
   pthread_mutex_unlock(lock_);
 
   return result;

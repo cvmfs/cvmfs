@@ -40,6 +40,7 @@ enum Algorithms {
   kAny,
 };
 
+const char kSuffixNone         = 0;
 const char kSuffixCatalog      = 'C';
 const char kSuffixHistory      = 'H';
 const char kSuffixMicroCatalog = 'L'; // currently unused
@@ -57,12 +58,12 @@ const unsigned kMaxDigestSize = 20;
 /**
  * Hex representations of hashes with the same length need a suffix
  * to be distinguished from each other.  They should all have one but
- * for backwards compatibility MD5 ans SHA-1 have none.
+ * for backwards compatibility MD5 and SHA-1 have none.
  */
-extern const char *kSuffixes[];
-// in hash.cc: const char *kSuffixes[] = {"", "", "-rmd160", ""};
-const unsigned kSuffixLengths[] = {0, 0, 7, 0};
-const unsigned kMaxSuffixLength = 7;
+extern const char *kAlgorithmIds[];
+// in hash.cc: const char *kAlgorithmIds[] = {"", "", "-rmd160", ""};
+const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 0};
+const unsigned kMaxAlgorithmIdentifierSize = 7;
 
 /**
  * Corresponds to Algorithms.  There is no block size for Any
@@ -85,6 +86,7 @@ struct AsciiPtr {
   explicit AsciiPtr(const std::string &s) { str = &s; }
 };
 
+typedef char Suffix;
 
 /**
  * Holds a hash digest and provides from string / to string conversion and
@@ -96,22 +98,22 @@ template<unsigned digest_size_, Algorithms algorithm_>
 struct Digest {
   unsigned char digest[digest_size_];
   Algorithms    algorithm;
-  char          modifier;
+  Suffix        suffix;
 
   class Hex {
    public:
     Hex(const Digest<digest_size_, algorithm_> *digest) :
       digest_(*digest),
       hash_length_(2 * kDigestSizes[digest_.algorithm]),
-      suffix_length_(kSuffixLengths[digest_.algorithm]) {}
+      algo_id_length_(kAlgorithmIdSizes[digest_.algorithm]) {}
 
-    unsigned int length() const { return hash_length_ + suffix_length_; }
+    unsigned int length() const { return hash_length_ + algo_id_length_; }
 
     char operator[](const unsigned int position) const {
       assert (position < length());
       return (position < hash_length_)
         ? GetHashChar(position)
-        : GetSuffixChar(position);
+        : GetAlgorithmIdentifierChar(position);
     }
 
    protected:
@@ -123,9 +125,9 @@ struct Digest {
       return ToHex(digit);
     }
 
-    char GetSuffixChar(const unsigned int position) const {
+    char GetAlgorithmIdentifierChar(const unsigned int position) const {
       assert (position >= hash_length_);
-      return kSuffixes[digest_.algorithm][position - hash_length_];
+      return kAlgorithmIds[digest_.algorithm][position - hash_length_];
     }
 
     char ToHex(const char c) const { return c + ((c <= 9) ? '0' : 'a' - 10); }
@@ -133,22 +135,22 @@ struct Digest {
    private:
     const Digest<digest_size_, algorithm_>  &digest_;
     const unsigned int                       hash_length_;
-    const unsigned int                       suffix_length_;
+    const unsigned int                       algo_id_length_;
   };
 
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
   unsigned GetHexSize() const {
-    return 2*kDigestSizes[algorithm] + kSuffixLengths[algorithm];
+    return 2*kDigestSizes[algorithm] + kAlgorithmIdSizes[algorithm];
   }
 
   Digest() :
-    algorithm(algorithm_), modifier(0)
+    algorithm(algorithm_), suffix(kSuffixNone)
   {
     memset(digest, 0, digest_size_);
   }
 
   explicit Digest(const Algorithms a, const HexPtr hex, const char s = 0) :
-    algorithm(a), modifier(s)
+    algorithm(a), suffix(s)
   {
     assert((algorithm_ == kAny) || (a == algorithm_));
     const unsigned char_size = 2*kDigestSizes[a];
@@ -166,8 +168,8 @@ struct Digest {
 
   Digest(const Algorithms a,
          const unsigned char *digest_buffer, const unsigned buffer_size,
-         const char s = 0) :
-    algorithm(a), modifier(s)
+         const Suffix s = kSuffixNone) :
+    algorithm(a), suffix(s)
   {
     assert(buffer_size <= digest_size_);
     memcpy(digest, digest_buffer, buffer_size);
@@ -208,20 +210,21 @@ struct Digest {
     }
   }
 
-  bool HasSuffix() const { return modifier != 0; }
+  bool HasSuffix() const { return suffix != kSuffixNone; }
+  void set_suffix(const Suffix s) { suffix = s; }
 
-  std::string ToString(const bool with_modifier = false) const {
+  std::string ToString(const bool with_suffix = false) const {
     Hex hex(this);
-    const bool     use_modifier  = with_modifier && HasSuffix();
-    const unsigned string_length = hex.length() + use_modifier;
+    const bool     use_suffix  = with_suffix && HasSuffix();
+    const unsigned string_length = hex.length() + use_suffix;
     std::string result(string_length, 0);
 
     for (unsigned int i = 0; i < hex.length(); ++i) {
       result[i] = hex[i];
     }
 
-    if (use_modifier) {
-      result[string_length - 1] = modifier;
+    if (use_suffix) {
+      result[string_length - 1] = suffix;
     }
 
     assert (result.length() == string_length);
@@ -233,29 +236,47 @@ struct Digest {
   }
 
   std::string MakePath(const std::string &prefix = "data") const {
-    return MakePath(1, 2, prefix);
+    return MakePathExplicit(1, 2, prefix, shash::kSuffixNone);
+  }
+
+  /**
+   * Note: This is a crutch method until we replace MakePathExplicit() anywhere
+   *       with MakePath() which will handle this suffix magic internally.
+   */
+  std::string MakePathWithSuffix(const unsigned   dir_levels,
+                                 const unsigned   digits_per_level,
+                                 const Suffix     hash_suffix) const {
+    const std::string no_prefix = "";
+    return MakePathExplicit(dir_levels,
+                            digits_per_level,
+                            no_prefix,
+                            hash_suffix);
   }
 
   std::string MakePathWithSuffix(const std::string &prefix = "data") const {
-    return MakePath(1, 2, prefix, true);
+    return MakePathExplicit(1, 2, prefix, suffix);
   }
 
   /**
    * Create a path string from the hex notation of the digest.
+   * Note: This method takes an explicit suffix. This is a crutch to allow for
+   *       MakePathWithSuffix() until MakePathExplicit() is replaced by the more
+   *       convenient MakePath() everywhere in the code. Then this method will
+   *       use the member variable suffix by default.
    */
-  std::string MakePath(const unsigned      dir_levels,
-                       const unsigned      digits_per_level,
-                       const std::string  &prefix = "",
-                       const bool          with_modifier = false) const
-  {
+  std::string MakePathExplicit(
+                          const unsigned      dir_levels,
+                          const unsigned      digits_per_level,
+                          const std::string  &prefix = "",
+                          const Suffix        hash_suffix = kSuffixNone) const {
     Hex hex(this);
-    const bool use_modifier = with_modifier && HasSuffix();
+    const bool use_suffix = (hash_suffix != kSuffixNone);
 
     const unsigned string_length =   prefix.length()
                                    + hex.length()
                                    + dir_levels
                                    + 1 // slash between prefix and hash
-                                   + use_modifier;
+                                   + use_suffix;
     // prepend prefix string
     std::string result(prefix);
     result.resize(string_length);
@@ -269,9 +290,9 @@ struct Digest {
       result[pos++] = hex[i];
     }
 
-    // (optionally) add hash hint modifier
-    if (use_modifier) {
-      result[pos++] = modifier;
+    // (optionally) add hash hint suffix
+    if (use_suffix) {
+      result[pos++] = hash_suffix;
     }
 
     assert (pos == string_length);
@@ -347,13 +368,20 @@ struct Rmd160 : public Digest<20, kRmd160> { };
  */
 struct Any : public Digest<20, kAny> {
   Any() : Digest<20, kAny>() { }
-  explicit Any(const Algorithms a) : Digest<20, kAny>() { algorithm = a; }
+
+  explicit Any(const Algorithms a,
+               const char       s = kSuffixNone) :
+    Digest<20, kAny>() { algorithm = a; suffix = s; }
+
   Any(const Algorithms     a,
       const unsigned char *digest_buffer, const unsigned buffer_size,
-      const char           modifier = 0) :
-    Digest<20, kAny>(a, digest_buffer, buffer_size, modifier) { }
-  explicit Any(const Algorithms a, const HexPtr hex, const char modifier = 0) :
-    Digest<20, kAny>(a, hex, modifier) { }
+      const Suffix         suffix = kSuffixNone) :
+    Digest<20, kAny>(a, digest_buffer, buffer_size, suffix) { }
+
+  explicit Any(const Algorithms  a,
+               const HexPtr      hex,
+               const char        suffix = kSuffixNone) :
+    Digest<20, kAny>(a, hex, suffix) { }
 };
 
 
@@ -406,7 +434,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
-Any MkFromHexPtr(const HexPtr hex);
+Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);
 
 }  // namespace hash
 

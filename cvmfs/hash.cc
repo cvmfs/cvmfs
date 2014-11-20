@@ -20,7 +20,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
-const char *kSuffixes[] = {"", "", "-rmd160", ""};
+const char *kAlgorithmIds[] = {"", "", "-rmd160", ""};
 
 
 bool HexPtr::IsValid() const {
@@ -40,11 +40,11 @@ bool HexPtr::IsValid() const {
   // Walk through all algorithms
   for (unsigned j = 0; j < kAny; ++j) {
     const unsigned hex_length = 2*kDigestSizes[j];
-    const unsigned suffix_length = kSuffixLengths[j];
+    const unsigned algo_id_length = kAlgorithmIdSizes[j];
     if (i == hex_length) {
       // Right suffix?
-      for ( ; (i < l) && (i-hex_length < suffix_length); ++i, ++c) {
-        if (*c != kSuffixes[j][i-hex_length])
+      for ( ; (i < l) && (i-hex_length < algo_id_length); ++i, ++c) {
+        if (*c != kAlgorithmIds[j][i-hex_length])
           break;
       }
       if (i == l)
@@ -67,7 +67,7 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
 }
 
 
-Any MkFromHexPtr(const HexPtr hex) {
+Any MkFromHexPtr(const HexPtr hex, const char suffix) {
   Any result;
 
   const unsigned length = hex.str->length();
@@ -76,9 +76,10 @@ Any MkFromHexPtr(const HexPtr hex) {
   if (length == 2*kDigestSizes[kSha1])
     result = Any(kSha1, hex);
   // TODO compare -rmd160
-  if ((length == 2*kDigestSizes[kRmd160] + kSuffixLengths[kRmd160]))
+  if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]))
     result = Any(kRmd160, hex);
 
+  result.suffix = suffix;
   return result;
 }
 
@@ -183,7 +184,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 
   void Hmac(const string &key,
 	    const unsigned char *buffer, const unsigned buffer_size,
-	    Any *any_digest) 
+	    Any *any_digest)
 {
     Algorithms algorithm = any_digest->algorithm;
     assert(algorithm != kAny);
@@ -202,7 +203,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
     }
 
     unsigned char pad_block[block_size];
-    // Inner hash                                                                                                                                     
+    // Inner hash
     Any hash_inner(algorithm);
     ContextPtr context_inner(algorithm);
     context_inner.buffer = alloca(context_inner.size);
@@ -213,7 +214,7 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
     Update(buffer, buffer_size, context_inner);
     Final(context_inner, &hash_inner);
 
-    // Outer hash                                                                                                                                     
+    // Outer hash
     ContextPtr context_outer(algorithm);
     context_outer.buffer = alloca(context_outer.size);
     Init(context_outer);

@@ -82,9 +82,9 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
               const callback_t    *callback = NULL) :
       type(Upload), stream_handle(handle), buffer(buffer), callback(callback) {}
 
-    UploadJob(UploadStreamHandle  *handle,
-              const shash::Any    &content_hash,
-              const std::string   &hash_suffix) :
+    UploadJob(UploadStreamHandle   *handle,
+              const shash::Any     &content_hash,
+              const shash::Suffix  &hash_suffix) :
       type(Commit), stream_handle(handle), buffer(NULL), callback(NULL),
       content_hash(content_hash), hash_suffix(hash_suffix) {}
 
@@ -100,7 +100,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
     // type=Commit specific fields
     shash::Any           content_hash;
-    std::string          hash_suffix;
+    shash::Suffix        hash_suffix;
   };
 
  public:
@@ -192,9 +192,9 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param content_hash  the content hash of the full uploaded data Chunk
    * @param hash_suffix   the suffix string to be appended to the content hash
    */
-  void ScheduleCommit(UploadStreamHandle  *handle,
-                      const shash::Any    &content_hash,
-                      const std::string   &hash_suffix) {
+  void ScheduleCommit(UploadStreamHandle   *handle,
+                      const shash::Any     &content_hash,
+                      const shash::Suffix  &hash_suffix) {
     ++jobs_in_flight_;
     upload_queue_.push(UploadJob(handle, content_hash, hash_suffix));
   }

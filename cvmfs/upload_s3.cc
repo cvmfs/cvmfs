@@ -493,9 +493,9 @@ void S3Uploader::Upload(UploadStreamHandle  *handle,
 }
 
 
-void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
-                                        const shash::Any   &content_hash,
-                                        const std::string  &hash_suffix) {
+void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle   *handle,
+                                        const shash::Any     &content_hash,
+                                        const shash::Suffix   hash_suffix) {
   int retval = 0;
   S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
 
@@ -523,8 +523,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle *handle,
 
   // New file name based on content hash
   std::string final_path("data" +
-                         content_hash.MakePath(1, 2) +
-                         hash_suffix);
+                         content_hash.MakePathWithSuffix(1, 2, hash_suffix));
 
   // Request upload
   const callback_t *callback = handle->commit_callback;

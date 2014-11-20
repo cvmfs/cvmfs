@@ -76,9 +76,9 @@ class FileProcessor : public Observable<SpoolerResult> {
                 const SpoolerDefinition  &spooler_definition);
   virtual ~FileProcessor();
 
-  void Process(const std::string  &local_path,
-               const bool          allow_chunking,
-               const std::string  &hash_suffix = "");
+  void Process(const std::string   &local_path,
+               const bool           allow_chunking,
+               const shash::Suffix  hash_suffix = shash::kSuffixNone);
 
   void WaitForProcessing();
 

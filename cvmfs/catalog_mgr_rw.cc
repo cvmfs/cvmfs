@@ -121,7 +121,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
     return NULL;
   }
   string file_path_compressed = file_path + ".compressed";
-  shash::Any hash_catalog(hash_algorithm);
+  shash::Any hash_catalog(hash_algorithm, shash::kSuffixCatalog);
   bool retval = zlib::CompressPath2Path(file_path, file_path_compressed,
                                         &hash_catalog);
   if (!retval) {
@@ -139,7 +139,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
 
   // Upload catalog
   spooler->Upload(file_path_compressed,
-                  "data" + hash_catalog.MakePath(1, 2) + "C");
+                  "data" + hash_catalog.MakePathExplicit(1, 2) + "C");
   spooler->WaitForUpload();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
@@ -786,7 +786,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   assert(catalog_size > 0);
 
   // Compress catalog
-  shash::Any hash_catalog(spooler_->GetHashAlgorithm());
+  shash::Any hash_catalog(spooler_->GetHashAlgorithm(), shash::kSuffixCatalog);
   if (!zlib::CompressPath2Path(catalog->database_path(),
                                catalog->database_path() + ".compressed",
                                &hash_catalog))
@@ -797,7 +797,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 
   // Upload catalog
   spooler_->Upload(catalog->database_path() + ".compressed",
-                   "data" + hash_catalog.MakePath(1, 2) + "C");
+                   "data" + hash_catalog.MakePathExplicit(1, 2) + "C");
 
   // Update registered catalog hash in nested catalog
   if (!catalog->IsRoot()) {

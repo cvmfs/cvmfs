@@ -74,7 +74,8 @@ const std::string& SqlRetrieveTag::GetDatabaseFields() const {
 History::Tag SqlRetrieveTag::RetrieveTag() const {
   History::Tag result;
   result.name        = RetrieveString(0);
-  result.root_hash   = shash::MkFromHexPtr(shash::HexPtr(RetrieveString(1)));
+  result.root_hash   = shash::MkFromHexPtr(shash::HexPtr(RetrieveString(1)),
+                                           shash::kSuffixCatalog);
   result.revision    = RetrieveInt64(2);
   result.timestamp   = RetrieveInt64(3);
   result.channel     = static_cast<History::UpdateChannel>(RetrieveInt64(4));
@@ -211,7 +212,8 @@ SqlGetHashes::SqlGetHashes(const HistoryDatabase *database) {
 }
 
 shash::Any SqlGetHashes::RetrieveHash() const {
-  return shash::MkFromHexPtr(shash::HexPtr(RetrieveString(0)));
+  return shash::MkFromHexPtr(shash::HexPtr(RetrieveString(0)),
+                             shash::kSuffixCatalog);
 }
 
 

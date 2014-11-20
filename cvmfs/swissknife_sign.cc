@@ -158,8 +158,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     }
     free(compr_buf);
 
-    const string cert_hash_path = "data" + certificate_hash.MakePath(1, 2)
-                                  + "X";
+    const string cert_hash_path = "data" +
+                                  certificate_hash.MakePathExplicit(1, 2) + "X";
     spooler->Upload(cert_path_tmp, cert_hash_path);
 
     // Update manifest

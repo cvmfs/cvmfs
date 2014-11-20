@@ -2269,7 +2269,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
     string history_path = "txn/historydb" + history_hash.ToString() + "." +
                           *cvmfs::repository_name_;
-    string history_url = "/data" + history_hash.MakePath(1, 2) + "H";
+    string history_url = "/data" + history_hash.MakePathExplicit(1, 2) + "H";
     download::JobInfo download_history(&history_url, true, true, &history_path,
                                        &history_hash);
     retval_dl = cvmfs::download_manager_->Fetch(&download_history);
@@ -2315,7 +2315,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
-    shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)));
+    shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)),
+                                   shash::kSuffixCatalog);
     retval = cvmfs::catalog_manager_->InitFixed(hash);
   } else {
     retval = cvmfs::catalog_manager_->Init();
