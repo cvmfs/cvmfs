@@ -60,9 +60,9 @@ const unsigned kMaxDigestSize = 20;
  * to be distinguished from each other.  They should all have one but
  * for backwards compatibility MD5 and SHA-1 have none.
  */
-extern const char *kAlgorithmIdentifiers[];
-// in hash.cc: const char *kAlgorithmIdentifiers[] = {"", "", "-rmd160", ""};
-const unsigned kAlgorithmIdentifierSizes[] = {0, 0, 7, 0};
+extern const char *kAlgorithmIds[];
+// in hash.cc: const char *kAlgorithmIds[] = {"", "", "-rmd160", ""};
+const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 0};
 const unsigned kMaxAlgorithmIdentifierSize = 7;
 
 /**
@@ -105,7 +105,7 @@ struct Digest {
     Hex(const Digest<digest_size_, algorithm_> *digest) :
       digest_(*digest),
       hash_length_(2 * kDigestSizes[digest_.algorithm]),
-      algo_id_length_(kAlgorithmIdentifierSizes[digest_.algorithm]) {}
+      algo_id_length_(kAlgorithmIdSizes[digest_.algorithm]) {}
 
     unsigned int length() const { return hash_length_ + algo_id_length_; }
 
@@ -127,7 +127,7 @@ struct Digest {
 
     char GetAlgorithmIdentifierChar(const unsigned int position) const {
       assert (position >= hash_length_);
-      return kAlgorithmIdentifiers[digest_.algorithm][position - hash_length_];
+      return kAlgorithmIds[digest_.algorithm][position - hash_length_];
     }
 
     char ToHex(const char c) const { return c + ((c <= 9) ? '0' : 'a' - 10); }
@@ -140,7 +140,7 @@ struct Digest {
 
   unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
   unsigned GetHexSize() const {
-    return 2*kDigestSizes[algorithm] + kAlgorithmIdentifierSizes[algorithm];
+    return 2*kDigestSizes[algorithm] + kAlgorithmIdSizes[algorithm];
   }
 
   Digest() :

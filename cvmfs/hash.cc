@@ -20,7 +20,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
-const char *kAlgorithmIdentifiers[] = {"", "", "-rmd160", ""};
+const char *kAlgorithmIds[] = {"", "", "-rmd160", ""};
 
 
 bool HexPtr::IsValid() const {
@@ -40,11 +40,11 @@ bool HexPtr::IsValid() const {
   // Walk through all algorithms
   for (unsigned j = 0; j < kAny; ++j) {
     const unsigned hex_length = 2*kDigestSizes[j];
-    const unsigned algo_id_length = kAlgorithmIdentifierSizes[j];
+    const unsigned algo_id_length = kAlgorithmIdSizes[j];
     if (i == hex_length) {
       // Right suffix?
       for ( ; (i < l) && (i-hex_length < algo_id_length); ++i, ++c) {
-        if (*c != kAlgorithmIdentifiers[j][i-hex_length])
+        if (*c != kAlgorithmIds[j][i-hex_length])
           break;
       }
       if (i == l)
@@ -76,7 +76,7 @@ Any MkFromHexPtr(const HexPtr hex, const char suffix) {
   if (length == 2*kDigestSizes[kSha1])
     result = Any(kSha1, hex);
   // TODO compare -rmd160
-  if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdentifierSizes[kRmd160]))
+  if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]))
     result = Any(kRmd160, hex);
 
   result.suffix = suffix;
