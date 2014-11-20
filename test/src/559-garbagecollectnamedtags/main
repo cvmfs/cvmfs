@@ -253,8 +253,21 @@ cvmfs_run_test() {
 
   # ============================================================================
 
+  echo "create revisions moving the undo tags away from the system under test"
+  local publish_log_5="publish_5.log"
+  local i=2
+  while [ $i -ne 0 ]; do
+    i=$(( $i - 1 ))
+    echo "creating dummy revision $i..." >> $publish_log_5
+    start_transaction $CVMFS_TEST_REPO >> $publish_log_5 2>&1 || $?
+    publish_repo      $CVMFS_TEST_REPO >> $publish_log_5 2>&1 || $?
+    echo "done creating dummy revision $i..." >> $publish_log_5
+  done
+
+  # ============================================================================
+
   echo "removing generic tags"
-  local condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $2}')"
+  local condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $2}' | tail -n2)"
   local auto_tags="$(     cvmfs_server tag -lx $CVMFS_TEST_REPO | grep '^generic' | awk '{print $1}')"
   local remove_flags=""
   for tag in $auto_tags; do
@@ -311,7 +324,7 @@ cvmfs_run_test() {
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 16
   done
 
-  echo "check if the catalog revisions 3-8 are preserved"
+  echo "check if the catalog revisions 3-6 are preserved"
   for clg_hash in $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 17
   done
@@ -348,18 +361,18 @@ cvmfs_run_test() {
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 24
   done
 
-  echo "check if the catalog revisions 5-10 are preserved"
+  echo "check if the catalog revisions 5-6 are preserved"
   for clg_hash in $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 25
   done
 
   # ============================================================================
 
-  echo "remove intermediate revision 4"
+  echo "remove intermediate revision 6 (revision_4)"
   condemned_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_4' | awk '{print $2}')"
-  cvmfs_server tag -r 'revision_4' -f $CVMFS_TEST_REPO || return 19
+  cvmfs_server tag -r 'revision_4' -f $CVMFS_TEST_REPO || return 27
 
-  preserved_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_' | awk '{print $2}')"
+  preserved_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | awk '{print $2}')"
   echo "check if all catalog revisions are still there"
   for clg_hash in $condemned_clgs $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 28
@@ -379,7 +392,7 @@ cvmfs_run_test() {
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 32
   done
 
-  echo "check if the catalog revisions 5 and 7-11 are preserved"
+  echo "check if the catalog revisions 5 and 7-8 are preserved"
   for clg_hash in $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 33
   done
@@ -428,7 +441,7 @@ EOF
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 38
 
   echo "check if all tag-referenced catalogs are still there"
-  preserved_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | grep 'revision_' | awk '{print $2}')"
+  preserved_clgs="$(cvmfs_server tag -lx $CVMFS_TEST_REPO | awk '{print $2}')"
   for clg_hash in $preserved_clgs; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 39
   done
