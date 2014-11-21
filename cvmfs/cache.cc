@@ -502,6 +502,8 @@ static int Fetch(const shash::Any &checksum,
 
   // Try to open from local cache
   if ((fd_return = cache::Open(checksum)) >= 0) {
+    LogCvmfs(kLogCache, kLogDebug, "hit: %s",cvmfs_path.c_str());
+
     if (cache_mode_ == kCacheReadWrite)
       quota::Touch(checksum);
     return fd_return;
@@ -593,6 +595,8 @@ static int Fetch(const shash::Any &checksum,
     LogCvmfs(kLogCache, kLogDebug, "could not fdopen %s", final_path.c_str());
     goto fetch_finalize;
   }
+
+  LogCvmfs(kLogCache, kLogDebug, "miss: %s %s",cvmfs_path.c_str(),url.c_str());
 
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
