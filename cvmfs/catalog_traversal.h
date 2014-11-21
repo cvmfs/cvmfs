@@ -111,6 +111,8 @@ class ObjectFetcher;
  *
  * CatalogTraversal<> can be configured and used in various ways:
  *   -> Historic catalog traversal
+ *   -> Prune catalogs below a certain history level
+ *   -> Prune catalogs older than a certain threshold timestamp
  *   -> Never traverse a certain catalog twice
  *   -> Breadth First Traversal or Depth First Traversal
  *   -> Optional catalog memory management (no_close)
@@ -133,13 +135,16 @@ class ObjectFetcher;
  *   order'. Thus, catalogs on the way are opened, checked for their descendants
  *   and closed. Once all children and historical ancestors are processed, it is
  *   re-opened and handed out to the user.
- *   Note: This method needs more disk space to temporarily storage downloaded
- *         but not yet processed catalogs.
+ *   Note: This method needs more disk space to temporarily store downloaded but
+ *         not yet processed catalogs.
  *
  * Note: Since all CVMFS catalog files together can grow to several gigabytes in
  *       file size, each catalog is loaded, processed and removed immediately
  *       afterwards. Except if no_close is specified, which allows the user to
- *       choose when a catalog should be closed.
+ *       choose when a catalog should be closed. Keep in mind, that a user is
+ *       responsible for both deletion of the delivered catalog objects as well
+ *       as unlinking of the catalog database file.
+ *
  *
  * @param CatalogT        the catalog class that should be used for traversal
  *                        usually this will be either catalog::Catalog or
@@ -339,6 +344,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    *       track of the root catalog hashes of catalog revisions that have been
    *       pruned before. TraversePruned() will use those as entry points.
    *
+   * Note: TraversalPruned will neither take the history nor the timestamp based
+   *       thresholds into account but traverse all catalogs in can reach from
+   *       the catalogs that have previously been pruned by those thresholds.
+   *
    * @param type  breadths or depth first traversal
    * @return      true on successful traversal of all necessary catalogs or
    *              false in case of failure or no_repeat_history == false
@@ -369,24 +378,26 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * in which way catalogs are handed out to the user code.
    *
    * Each catalog is processed in these steps:
-   *  1.) Check if the catalog was processed before
-   *        Duplicated traversal can (optionally) be avoided. Note: skipped jobs
-   *        can still trigger postponed yields
-   *  2.) Pop the next catalog from the stack
+   *  1.) Pop the next catalog from the stack
    *        Catalogs are always traversed from latest to oldest revision and
    *        from root to leaf nested catalogs
-   *  3.) Fetch the catalog from the repository
-   *        Depending on where the catalog comes from, this might do different
-   *        things (see ObjectFetcherT).
-   *  4.) Open the fetched catalog
-   *        Depending on the catalog this implementation might differ
-   *        (see CatalogT::AttachFreely)
+   *  2.) Prepare the catalog for traversing
+   *    2.1.) Check if it was visited before
+   *    2.2.) Fetch the catalog database from the backend storage
+   *            This might fail and produce an error. For root catalogs this
+   *            error can be ignored (might be garbage collected before)
+   *    2.3.) Open the catalog database
+   *    2.4.) Check if the catalog is older than the timestamp threshold
+   *        After these steps the catalog is opened either opened and ready for
+   *        the traversal to continue, or it was marked for ignore (job.ignore)
+   *  3.) Check if the catalog is marked to be ignored
+   *        Catalog might not be loadable (sweeped root catalog) or is too old
+   *        Note: ignored catalogs can still trigger postponed yields
+   *  4.) Mark the catalog as visited to be able to skip it later on
    *  5.) Find and push referencing catalogs
-   *        This pushes all descendants of the current catalog onto the stack.
-   *        Note that this is dependant on the strategy (depth or breadth first)
-   *        and on the history threshold (see history_depth). Furthermore,
-   *        catalogs might not be pushed again, when seen before (see
-   *        no_repeat_history).
+   *        This pushes all descendents of the current catalog onto the stack.
+   *        Note that this is dependent on the strategy (depth or breadth first)
+   *        and on the history threshold (see history_depth).
    *  6.) Hand the catalog out to the user code
    *        Depending on the traversal strategy (depth of breadths first) this
    *        might immediately yield zero to N catalogs to the user code.
