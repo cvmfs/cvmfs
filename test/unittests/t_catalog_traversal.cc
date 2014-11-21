@@ -27,6 +27,18 @@ class T_CatalogTraversal : public ::testing::Test {
   typedef std::map<std::string, MockCatalog*>    CatalogPathMap;
   typedef std::map<unsigned int, CatalogPathMap> RevisionMap;
 
+  struct RootCatalogInfo {
+    RootCatalogInfo() {}
+    RootCatalogInfo(const shash::Any &hash, const time_t timestamp) :
+      catalog_hash(hash),
+      timestamp(timestamp) {}
+
+    shash::Any  catalog_hash;
+    time_t      timestamp;
+  };
+
+  typedef std::map<unsigned int, RootCatalogInfo> RootCatalogMap;
+
   const unsigned int max_revision;
   const unsigned int initial_catalog_instances;
 
@@ -86,7 +98,7 @@ class T_CatalogTraversal : public ::testing::Test {
 
     for (unsigned int _i = 0; _i < expected.size(); ++_i) {
       EXPECT_EQ (expected[_i], observed[_i])
-        << "traversing order changed" << std::endl
+        << "traversing order changed (idx: " << _i << ")" << std::endl
         << "found:    "
         << observed[_i].first << " " << observed[_i].second << std::endl
         << "expected: "
@@ -112,7 +124,13 @@ class T_CatalogTraversal : public ::testing::Test {
   shash::Any GetRootHash(const unsigned int revision) const {
     RootCatalogMap::const_iterator i = root_catalogs_.find(revision);
     assert (i != root_catalogs_.end());
-    return i->second;
+    return i->second.catalog_hash;
+  }
+
+  time_t GetRootTimestamp(const unsigned int revision) const {
+    RootCatalogMap::const_iterator i = root_catalogs_.find(revision);
+    assert (i != root_catalogs_.end());
+    return i->second.timestamp;
   }
 
  private:
@@ -169,23 +187,29 @@ class T_CatalogTraversal : public ::testing::Test {
      *
      * Parts of the hierarchy are created multiple times in order to get some
      * historic catalogs. To simplify the creation the history looks like so:
-     *                                                                # catalogs   root catalog hash
-     *    Revision 1:   - only the root catalog (0-0)                       1      d01c7fa072d3957ea5dd323f79fa435b33375c06
-     *    Revision 2:   - adds branch 1-0                                   8      ffee2bf068f3c793efa6ca0fa3bddb066541903b
-     *    Revision 3:   - adds branch 1-1                                  17      c9e011bbf7529d25c958bc0f948eefef79e991cd
-     *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated      25      eec5694dfe5f2055a358acfb4fda7748c896df24
-     *    Revision 5:   - adds branch 1-3                                  28      3c726334c98537e92c8b92b76852f77e3a425be9
-     *    Revision 6:   - removes branch 1-0                               21      MockCatalog::root_hash
+     *                                                                # catalogs  timestamp    root catalog hash
+     *    Revision 1:   - only the root catalog (0-0)                       1     27.11.1987   d01c7fa072d3957ea5dd323f79fa435b33375c06
+     *    Revision 2:   - adds branch 1-0                                   8     24.12.2004   ffee2bf068f3c793efa6ca0fa3bddb066541903b
+     *    Revision 3:   - adds branch 1-1                                  17     06.03.2009   c9e011bbf7529d25c958bc0f948eefef79e991cd
+     *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated      25     18.07.2010   eec5694dfe5f2055a358acfb4fda7748c896df24
+     *    Revision 5:   - adds branch 1-3                                  28     16.11.2014   3c726334c98537e92c8b92b76852f77e3a425be9
+     *    Revision 6:   - removes branch 1-0                               21     17.11.2014   MockCatalog::root_hash
      *
      */
 
     RootCatalogMap root_catalogs;
-    root_catalogs[1] = h("d01c7fa072d3957ea5dd323f79fa435b33375c06", 'C');
-    root_catalogs[2] = h("ffee2bf068f3c793efa6ca0fa3bddb066541903b", 'C');
-    root_catalogs[3] = h("c9e011bbf7529d25c958bc0f948eefef79e991cd", 'C');
-    root_catalogs[4] = h("eec5694dfe5f2055a358acfb4fda7748c896df24", 'C');
-    root_catalogs[5] = h("3c726334c98537e92c8b92b76852f77e3a425be9", 'C');
-    root_catalogs[6] = MockCatalog::root_hash;
+    root_catalogs[1] = RootCatalogInfo(h("d01c7fa072d3957ea5dd323f79fa435b33375c06", 'C'),
+                                       t(27, 11, 1987));
+    root_catalogs[2] = RootCatalogInfo(h("ffee2bf068f3c793efa6ca0fa3bddb066541903b", 'C'),
+                                       t(24, 12, 2004));
+    root_catalogs[3] = RootCatalogInfo(h("c9e011bbf7529d25c958bc0f948eefef79e991cd", 'C'),
+                                       t(06, 03, 2009));
+    root_catalogs[4] = RootCatalogInfo(h("eec5694dfe5f2055a358acfb4fda7748c896df24", 'C'),
+                                       t(18, 07, 2010));
+    root_catalogs[5] = RootCatalogInfo(h("3c726334c98537e92c8b92b76852f77e3a425be9", 'C'),
+                                       t(16, 11, 2014));
+    root_catalogs[6] = RootCatalogInfo(MockCatalog::root_hash,
+                                       t(17, 11, 2014));
     root_catalogs_ = root_catalogs;
 
     for (unsigned int r = 1; r <= max_revision; ++r) {
@@ -195,16 +219,16 @@ class T_CatalogTraversal : public ::testing::Test {
     history::History *history = MockObjectFetcher::s_history;
     history->BeginTransaction();
     EXPECT_TRUE (history->Insert(history::History::Tag(
-                                 "Revision2", root_catalogs[2], 1337,
-                                 2, t(27,11,1987), history::History::kChannelProd,
+                                 "Revision2", root_catalogs[2].catalog_hash, 1337,
+                                 2, root_catalogs[2].timestamp, history::History::kChannelProd,
                                  "this is revision 2")));
     EXPECT_TRUE (history->Insert(history::History::Tag(
-                                 "Revision5", root_catalogs[5], 42,
-                                 5, t(11, 9,2001), history::History::kChannelProd,
+                                 "Revision5", root_catalogs[5].catalog_hash, 42,
+                                 5, root_catalogs[5].timestamp, history::History::kChannelProd,
                                  "this is revision 5")));
     EXPECT_TRUE (history->Insert(history::History::Tag(
-                                 "Revision6", root_catalogs[6], 7,
-                                 6, t(10, 7,2014), history::History::kChannelTrunk,
+                                 "Revision6", root_catalogs[6].catalog_hash, 7,
+                                 6, root_catalogs[6].timestamp, history::History::kChannelTrunk,
                                  "this is revision 6 - the newest!")));
     history->CommitTransaction();
   }
@@ -222,6 +246,7 @@ class T_CatalogTraversal : public ::testing::Test {
     // create the root catalog
     MockCatalog *root_catalog = CreateAndRegisterCatalog("",
                                                          revision,
+                                                         GetRootTimestamp(revision),
                                                          NULL,
                                                          GetRootHash(revision));
 
@@ -260,42 +285,43 @@ class T_CatalogTraversal : public ::testing::Test {
   }
 
   void MakeBranch(const std::string &branch, const unsigned int revision) {
-    MockCatalog *revision_root = GetRevisionHead(revision);
+    MockCatalog   *revision_root = GetRevisionHead(revision);
+    const time_t   ts            = GetRootTimestamp(revision);
 
     if (branch == "/00/10") {
-      MockCatalog *_10 = CreateAndRegisterCatalog("/00/10",          revision, revision_root);
-      MockCatalog *_20 = CreateAndRegisterCatalog("/00/10/20",       revision,           _10);
-                         CreateAndRegisterCatalog("/00/10/21",       revision,           _10);
-      MockCatalog *_30 = CreateAndRegisterCatalog("/00/10/20/30",    revision,           _20);
-                         CreateAndRegisterCatalog("/00/10/20/31",    revision,           _20);
-                         CreateAndRegisterCatalog("/00/10/20/32",    revision,           _20);
-                         CreateAndRegisterCatalog("/00/10/20/30/40", revision,           _30);
+      MockCatalog *_10 = CreateAndRegisterCatalog("/00/10",          revision, ts +  1, revision_root);
+      MockCatalog *_20 = CreateAndRegisterCatalog("/00/10/20",       revision, ts +  2,           _10);
+                         CreateAndRegisterCatalog("/00/10/21",       revision, ts +  3,           _10);
+      MockCatalog *_30 = CreateAndRegisterCatalog("/00/10/20/30",    revision, ts +  4,           _20);
+                         CreateAndRegisterCatalog("/00/10/20/31",    revision, ts +  5,           _20);
+                         CreateAndRegisterCatalog("/00/10/20/32",    revision, ts +  6,           _20);
+                         CreateAndRegisterCatalog("/00/10/20/30/40", revision, ts +  7,           _30);
 
     } else if (branch == "/00/11") {
-      MockCatalog *_11 = CreateAndRegisterCatalog("/00/11",          revision, revision_root);
-      MockCatalog *_22 = CreateAndRegisterCatalog("/00/11/22",       revision,           _11);
-                         CreateAndRegisterCatalog("/00/11/23",       revision,           _11);
-                         CreateAndRegisterCatalog("/00/11/24",       revision,           _11);
-                         CreateAndRegisterCatalog("/00/11/22/33",    revision,           _22);
-      MockCatalog *_34 = CreateAndRegisterCatalog("/00/11/22/34",    revision,           _22);
-                         CreateAndRegisterCatalog("/00/11/22/34/41", revision,           _34);
-                         CreateAndRegisterCatalog("/00/11/22/34/42", revision,           _34);
-                         CreateAndRegisterCatalog("/00/11/22/34/43", revision,           _34);
+      MockCatalog *_11 = CreateAndRegisterCatalog("/00/11",          revision, ts +  8, revision_root);
+      MockCatalog *_22 = CreateAndRegisterCatalog("/00/11/22",       revision, ts +  9,           _11);
+                         CreateAndRegisterCatalog("/00/11/23",       revision, ts + 10,           _11);
+                         CreateAndRegisterCatalog("/00/11/24",       revision, ts + 11,           _11);
+                         CreateAndRegisterCatalog("/00/11/22/33",    revision, ts + 12,           _22);
+      MockCatalog *_34 = CreateAndRegisterCatalog("/00/11/22/34",    revision, ts + 13,           _22);
+                         CreateAndRegisterCatalog("/00/11/22/34/41", revision, ts + 14,           _34);
+                         CreateAndRegisterCatalog("/00/11/22/34/42", revision, ts + 15,           _34);
+                         CreateAndRegisterCatalog("/00/11/22/34/43", revision, ts + 16,           _34);
 
     } else if (branch == "/00/12") {
-      MockCatalog *_12 = CreateAndRegisterCatalog("/00/12",          revision, revision_root);
-                         CreateAndRegisterCatalog("/00/12/25",       revision,           _12);
-      MockCatalog *_26 = CreateAndRegisterCatalog("/00/12/26",       revision,           _12);
-                         CreateAndRegisterCatalog("/00/12/27",       revision,           _12);
-                         CreateAndRegisterCatalog("/00/12/26/35",    revision,           _26);
-                         CreateAndRegisterCatalog("/00/12/26/36",    revision,           _26);
-                         CreateAndRegisterCatalog("/00/12/26/37",    revision,           _26);
-                         CreateAndRegisterCatalog("/00/12/26/38",    revision,           _26);
+      MockCatalog *_12 = CreateAndRegisterCatalog("/00/12",          revision, ts + 17, revision_root);
+                         CreateAndRegisterCatalog("/00/12/25",       revision, ts + 28,           _12);
+      MockCatalog *_26 = CreateAndRegisterCatalog("/00/12/26",       revision, ts + 19,           _12);
+                         CreateAndRegisterCatalog("/00/12/27",       revision, ts + 20,           _12);
+                         CreateAndRegisterCatalog("/00/12/26/35",    revision, ts + 21,           _26);
+                         CreateAndRegisterCatalog("/00/12/26/36",    revision, ts + 22,           _26);
+                         CreateAndRegisterCatalog("/00/12/26/37",    revision, ts + 23,           _26);
+                         CreateAndRegisterCatalog("/00/12/26/38",    revision, ts + 24,           _26);
 
     } else if (branch == "/00/13") {
-      MockCatalog *_13 = CreateAndRegisterCatalog("/00/13",          revision, revision_root);
-                         CreateAndRegisterCatalog("/00/13/28",       revision,          _13);
-                         CreateAndRegisterCatalog("/00/13/29",       revision,          _13);
+      MockCatalog *_13 = CreateAndRegisterCatalog("/00/13",          revision, ts + 25, revision_root);
+                         CreateAndRegisterCatalog("/00/13/28",       revision, ts + 26,          _13);
+                         CreateAndRegisterCatalog("/00/13/29",       revision, ts + 27,          _13);
 
     } else {
       FAIL();
@@ -305,6 +331,7 @@ class T_CatalogTraversal : public ::testing::Test {
   MockCatalog* CreateAndRegisterCatalog(
                   const std::string  &root_path,
                   const unsigned int  revision,
+                  const time_t        timestamp,
                   MockCatalog        *parent       = NULL,
                   const shash::Any   &catalog_hash = shash::Any(shash::kSha1)) {
     // produce a random hash if no catalog has was given
@@ -335,6 +362,7 @@ class T_CatalogTraversal : public ::testing::Test {
                                            effective_clg_hash,
                                            dice_.Next(10000),
                                            revision,
+                                           timestamp,
                                            is_root,
                                            parent,
                                            previous_catalog);
@@ -349,6 +377,7 @@ class T_CatalogTraversal : public ::testing::Test {
     return shash::Any(shash::kSha1, shash::HexPtr(hash), suffix);
   }
 
+ protected:
   time_t t(const int day, const int month, const int year) const {
     struct tm time_descriptor;
 
@@ -362,13 +391,10 @@ class T_CatalogTraversal : public ::testing::Test {
     return mktime(&time_descriptor);
   }
 
- protected:
-  typedef std::map<unsigned int, shash::Any> RootCatalogMap;
-
  private:
-  Prng                         dice_;
-  RootCatalogMap               root_catalogs_;
-  RevisionMap                  revisions_;
+  Prng            dice_;
+  RootCatalogMap  root_catalogs_;
+  RevisionMap     revisions_;
 };
 
 const std::string T_CatalogTraversal::fqrn    = "test.cern.ch";
@@ -2310,16 +2336,16 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
 //
 
 
-CatalogIdentifiers TraverseWithUnavailableNestedNoRepeat_visited_catalogs;
-void TraverseWithUnavailableNestedNoRepeatCallback(
+CatalogIdentifiers UnavailableNestedNoRepeat_visited_catalogs;
+void UnavailableNestedNoRepeatCallback(
                              const MockedCatalogTraversal::CallbackData &data) {
-  TraverseWithUnavailableNestedNoRepeat_visited_catalogs.push_back(
+  UnavailableNestedNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
 
-TEST_F(T_CatalogTraversal, TraverseWithUnavailableNestedNoRepeat) {
-  TraverseWithUnavailableNestedNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraverseWithUnavailableNestedNoRepeat_visited_catalogs.size());
+TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
+  UnavailableNestedNoRepeat_visited_catalogs.clear();
+  EXPECT_EQ (0u, UnavailableNestedNoRepeat_visited_catalogs.size());
 
   MockCatalog* doomed_nested_catalog = GetCatalog(2, "/00/10/20");
   ASSERT_NE (static_cast<MockCatalog*>(NULL), doomed_nested_catalog);
@@ -2339,7 +2365,7 @@ TEST_F(T_CatalogTraversal, TraverseWithUnavailableNestedNoRepeat) {
                                      // because a missing nested catalog is con-
                                      // sidered an error!
   MockedCatalogTraversal traverse(params);
-  traverse.RegisterListener(&TraverseWithUnavailableNestedNoRepeatCallback);
+  traverse.RegisterListener(&UnavailableNestedNoRepeatCallback);
 
   const bool t1 = traverse.Traverse();
   EXPECT_FALSE (t1);
@@ -2369,7 +2395,7 @@ TEST_F(T_CatalogTraversal, TraverseWithUnavailableNestedNoRepeat) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
 
   const bool dont_check_catalog_count = false;
-  CheckVisitedCatalogs(catalogs, TraverseWithUnavailableNestedNoRepeat_visited_catalogs,
+  CheckVisitedCatalogs(catalogs, UnavailableNestedNoRepeat_visited_catalogs,
                        dont_check_catalog_count);
 }
 
