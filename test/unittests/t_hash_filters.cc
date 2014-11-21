@@ -62,7 +62,7 @@ class T_HashFilter : public ::testing::Test {
   };
 };
 
-typedef ::testing::Types<SimpleHashFilter> HashFilterTypes;
+typedef ::testing::Types<SimpleHashFilter, SmallhashFilter> HashFilterTypes;
 TYPED_TEST_CASE(T_HashFilter, HashFilterTypes);
 
 
@@ -324,7 +324,7 @@ TYPED_TEST(T_HashFilter, FillHeterogeneousWithSuffixes) {
 
 
 TYPED_TEST(T_HashFilter, FillManyRandomHashes) {
-  SimpleHashFilter filter;
+  TypeParam filter;
 
   Prng rng;
   rng.InitSeed(78475);
