@@ -79,10 +79,12 @@ struct CatalogTraversalData {
  *                             (default: /tmp)
  */
 struct CatalogTraversalParams {
-  CatalogTraversalParams() : history(0), no_repeat_history(false),
-  no_close(false), ignore_load_failure(false), quiet(false), tmp_dir("/tmp") {}
+  CatalogTraversalParams() : history(kNoHistory),
+  no_repeat_history(false), no_close(false),
+  ignore_load_failure(false), quiet(false), tmp_dir("/tmp") {}
 
   static const unsigned int kFullHistory;
+  static const unsigned int kNoHistory;
 
   std::string   repo_url;
   std::string   repo_name;
@@ -163,7 +165,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   };
 
  protected:
-  typedef std::set<shash::Any>           HashSet;
+  typedef std::set<shash::Any> HashSet;
 
  protected:
   /**
@@ -387,7 +389,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       CatalogJob job = Pop(ctx);
 
       // download and open the catalog for processing
-      if (! PrepareCatalog(job)) {
+      if (! PrepareCatalog(ctx, job)) {
         return false;
       }
 
@@ -401,6 +403,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       }
 
       // push catalogs referenced by the current catalog (onto stack)
+      MarkAsVisited(job);
       PushReferencedCatalogs(ctx, job);
 
       // notify listeners
@@ -417,7 +420,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
 
-  bool PrepareCatalog(CatalogJob &job) {
+  bool PrepareCatalog(TraversalContext &ctx, CatalogJob &job) {
     // skipping duplicate catalogs might also yield postponed catalogs
     if (ShouldBeSkipped(job)) {
       job.ignore = true;
@@ -477,6 +480,21 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
 
+  bool CloseCatalog(CatalogJob &job) {
+    delete job.catalog; job.catalog = NULL;
+    if (! job.catalog_file_path.empty()) {
+      const int retval = unlink(job.catalog_file_path.c_str());
+      if (retval != 0) {
+        LogCvmfs(kLogCatalogTraversal, error_sink_, "Failed to unlink %s - %d",
+                 job.catalog_file_path.c_str(), errno);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+
   void PushReferencedCatalogs(TraversalContext &ctx, CatalogJob &job) {
     assert (! job.ignore);
     assert (job.catalog != NULL);
@@ -519,10 +537,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // check if the next deeper history level is actually requested
+    //
     // Note: otherwise it is marked to be 'pruned' for possible later traversal
     //       (see: TraversePruned())
     if (job.history_depth >= ctx.history_depth) {
-      pruned_revisions_.insert(previous_revision);
+      MarkAsPrunedRevision(previous_revision);
       return 0;
     }
 
@@ -617,19 +636,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // we can close the catalog here and delete the temporary file
-    delete job.catalog; job.catalog = NULL;
-    if (! job.catalog_file_path.empty()) {
-      const int retval = unlink(job.catalog_file_path.c_str());
-      if (retval != 0) {
-        LogCvmfs(kLogCatalogTraversal, error_sink_, "Failed to unlink %s - %d",
-                 job.catalog_file_path.c_str(), errno);
-        return false;
-      }
-    }
-
-    // all went well...
-    return true;
+    return CloseCatalog(job);
   }
+
 
   /**
    * Pushes a catalog to the callback_stack for later yielding
@@ -693,6 +702,16 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return job;
   }
 
+  void MarkAsPrunedRevision(const shash::Any &root_catalog_hash) {
+    pruned_revisions_.insert(root_catalog_hash);
+  }
+
+  void MarkAsVisited(const CatalogJob &job) {
+    if (no_repeat_history_) {
+      visited_catalogs_.insert(job.hash);
+    }
+  }
+
   /**
    * Checks the traversal history if the given catalog was traversed or at least
    * seen before. If 'no_repeat_history' is not set this is always 'false'.
@@ -701,16 +720,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * @return      true if the specified catalog was hit before
    */
   bool ShouldBeSkipped(const CatalogJob &job) {
-    if (! no_repeat_history_) {
-      return false;
-    }
-
-    if (visited_catalogs_.count(job.hash) > 0) {
-      return true;
-    }
-
-    visited_catalogs_.insert(job.hash);
-    return false;
+    return no_repeat_history_ && (visited_catalogs_.count(job.hash) > 0);
   }
 
   shash::Any GetRepositoryRootCatalogHash() {
