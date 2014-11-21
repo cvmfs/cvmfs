@@ -10,9 +10,9 @@
 
 namespace swissknife {
 
-class CommandGC : public Command {
+class CommandGc : public Command {
  public:
-  ~CommandGC() { };
+  ~CommandGc() { };
   std::string GetName() { return "gc"; }
   std::string GetDescription() {
     return "Garbage Collect a CernVM-FS repository.";

@@ -21,7 +21,7 @@ typedef GarbageCollector<ReadonlyCatalogTraversal, SimpleHashFilter> GC;
 typedef GC::Configuration                                            GcConfig;
 
 
-ParameterList CommandGC::GetParams() {
+ParameterList CommandGc::GetParams() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory / url"));
   r.push_back(Parameter::Mandatory('u', "spooler definition string"));
@@ -36,7 +36,7 @@ ParameterList CommandGC::GetParams() {
 }
 
 
-int CommandGC::Main(const ArgumentList &args) {
+int CommandGc::Main(const ArgumentList &args) {
   const std::string &repo_url               = *args.find('r')->second;
   const std::string &spooler                = *args.find('u')->second;
   const int64_t      revisions              = String2Int64(*args.find('h')->second);
