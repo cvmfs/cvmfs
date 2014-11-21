@@ -522,9 +522,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
 
-  bool CloseCatalog(CatalogJob &job) {
+  bool CloseCatalog(CatalogJob &job, const bool unlink_db = true) {
     delete job.catalog; job.catalog = NULL;
-    if (! job.catalog_file_path.empty()) {
+    if (! job.catalog_file_path.empty() && unlink_db) {
       const int retval = unlink(job.catalog_file_path.c_str());
       if (retval != 0) {
         LogCvmfs(kLogCatalogTraversal, error_sink_, "Failed to unlink %s - %d",
@@ -708,7 +708,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
     job.postponed = true;
     if (! no_close_) {
-      delete job.catalog; job.catalog = NULL;
+      const bool unlink_db = false; // will reopened just before yielding
+      CloseCatalog(job, unlink_db);
     }
     ctx.callback_stack.push(job);
   }
