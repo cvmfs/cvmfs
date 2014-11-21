@@ -97,20 +97,20 @@ class Catalog : public SingleCopy {
   static const uint64_t kDefaultTTL = 900;  /**< 15 minutes default TTL */
 
   /**
-   * Note: is_not_root only has an effect if parent == NULL otherwise being
+   * Note: is_nested only has an effect if parent == NULL otherwise being
    *       a root catalog is determined by having a parent pointer or not.
    */
   Catalog(const PathString  &path,
           const shash::Any  &catalog_hash,
                 Catalog     *parent,
-          const bool         is_not_root = false);
+          const bool         is_nested = false);
   virtual ~Catalog();
 
   static Catalog *AttachFreely(const std::string  &root_path,
                                const std::string  &file,
                                const shash::Any   &catalog_hash,
-                                     Catalog      *parent      = NULL,
-                               const bool          is_not_root = false);
+                                     Catalog      *parent    = NULL,
+                               const bool          is_nested = false);
 
   bool OpenDatabase(const std::string &db_path);
 
