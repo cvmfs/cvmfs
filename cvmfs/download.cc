@@ -1309,8 +1309,8 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   {
     opt_ipv4_only_ = true;
   }
-  resolver = dns::CaresResolver::Create(opt_ipv4_only_,
-                                        3 /* retries */, 3000 /* timeout */);
+  resolver = dns::NormalResolver::Create(opt_ipv4_only_,
+                                         3 /* retries */, 3000 /* timeout */);
   assert(resolver);
 
   // Parsing environment variables
@@ -1497,7 +1497,7 @@ void DownloadManager::SetDnsParameters(
   delete resolver;
   resolver = NULL;
   resolver =
-    dns::CaresResolver::Create(opt_ipv4_only_, retries, timeout_sec*1000);
+    dns::NormalResolver::Create(opt_ipv4_only_, retries, timeout_sec*1000);
   assert(resolver);
   pthread_mutex_unlock(lock_options_);
 }

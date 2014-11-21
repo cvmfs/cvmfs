@@ -373,7 +373,7 @@ class DownloadManager {
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).
    */
-  dns::CaresResolver *resolver;
+  dns::NormalResolver *resolver;
 
   /**
    * More than one proxy group can be considered as group of primary proxies
