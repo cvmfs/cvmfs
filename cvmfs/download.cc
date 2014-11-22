@@ -1313,7 +1313,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
     opt_ipv4_only_ = true;
   }
   resolver = dns::NormalResolver::Create(opt_ipv4_only_,
-                                         3 /* retries */, 3000 /* timeout */);
+                                         1 /* retries */, 3000 /* timeout */);
   assert(resolver);
 
   // Parsing environment variables
