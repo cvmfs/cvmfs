@@ -190,6 +190,8 @@ TEST_F(T_Dns, RewriteUrl) {
   EXPECT_EQ(RewriteUrl("http://[::1:3128", "127.0.0.1"), "http://[::1:3128");
   EXPECT_EQ(RewriteUrl("http://[::1", "127.0.0.1"), "http://[::1");
   EXPECT_EQ(RewriteUrl("", "127.0.0.1"), "");
+  EXPECT_EQ(RewriteUrl("", ""), "");
+  EXPECT_EQ(RewriteUrl("http://localhost:3128", ""), "http://:3128");
   EXPECT_EQ(RewriteUrl("http", "127.0.0.1"), "http");
   EXPECT_EQ(RewriteUrl("http:/", "127.0.0.1"), "http:/");
   EXPECT_EQ(RewriteUrl("http://", "127.0.0.1"), "http://");
@@ -317,7 +319,7 @@ TEST_F(T_Dns, HostValid) {
 TEST_F(T_Dns, HostExtendDeadline) {
   Host host;
   host.name_ = "name";
-  host.deadline_ = 1;
+  host.deadline_ = 10000;
   host.ipv4_addresses_.insert("10.0.0.1");
   host.ipv6_addresses_.insert("[::2]");
   host.status_ = kFailOk;

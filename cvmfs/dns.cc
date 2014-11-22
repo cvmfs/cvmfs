@@ -156,7 +156,7 @@ void Host::CopyFrom(const Host &other) {
 Host Host::ExtendDeadline(const Host &original, unsigned seconds_from_now) {
   Host new_host(original);
   new_host.id_ = atomic_xadd64(&global_id_, 1);
-  new_host.deadline_ += time(NULL) + seconds_from_now;
+  new_host.deadline_ = time(NULL) + seconds_from_now;
   return new_host;
 }
 
@@ -302,12 +302,14 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
   // Deal with special names: empty, IPv4, IPv6
   for (unsigned i = 0; i < num; ++i) {
     if (names[i].empty()) {
+      LogCvmfs(kLogDns, kLogDebug, "empty hostname");
       Host invalid_host;
       invalid_host.name_ = "";
       invalid_host.status_ = kFailInvalidHost;
       hosts->push_back(invalid_host);
       skip[i] = true;
     } else if (IsIpv4Address(names[i])) {
+      LogCvmfs(kLogDns, kLogDebug, "IPv4 address %s", names[i].c_str());
       Host ipv4_host;
       ipv4_host.name_ = names[i];
       ipv4_host.status_ = kFailOk;
@@ -319,6 +321,7 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
                (names[i][0] == '[') &&
                (names[i][names[i].length()-1] == ']'))
     {
+      LogCvmfs(kLogDns, kLogDebug, "IPv6 address %s", names[i].c_str());
       Host ipv6_host;
       ipv6_host.name_ = names[i];
       ipv6_host.status_ = kFailOk;
@@ -352,6 +355,8 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
     host.deadline_ = time(NULL) + effective_ttl;
 
     if (host.status_ != kFailOk) {
+      LogCvmfs(kLogDns, kLogDebug, "failed to resolve %s - %d (%s)",
+               names[i].c_str(), host.status_, Code2Ascii(host.status_));
       (*hosts)[i] = host;
       continue;
     }
@@ -382,8 +387,11 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       host.ipv6_addresses_.insert("[" + ipv6_addresses[i][j] + "]");
     }
 
-    if (host.ipv4_addresses_.empty() && host.ipv6_addresses_.empty())
+    if (host.ipv4_addresses_.empty() && host.ipv6_addresses_.empty()) {
+      LogCvmfs(kLogDns, kLogDebug, "no addresses returned for %s",
+               names[i].c_str());
       host.status_ = kFailNoAddress;
+    }
 
     (*hosts)[i] = host;
   }

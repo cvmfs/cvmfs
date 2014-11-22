@@ -595,7 +595,7 @@ void HeaderLists::AddBlock(){
 string DownloadManager::ProxyInfo::Print() {
   if (url == "DIRECT")
     return url;
-  
+
   string result = url;
   int remaining =
     static_cast<int>(host.deadline()) - static_cast<int>(time(NULL));
@@ -775,10 +775,11 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     info->proxy = "";
     curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
   } else {
-    ProxyInfo *proxy = &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]);
-    ValidateProxyIpsUnlocked(proxy->url, proxy->host);
-    info->proxy = proxy->url;
-    if (proxy->host.status() == dns::kFailOk) {
+    ProxyInfo proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
+    ValidateProxyIpsUnlocked(proxy.url, proxy.host);
+    ProxyInfo *proxy_ptr = &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]);
+    info->proxy = proxy_ptr->url;
+    if (proxy_ptr->host.status() == dns::kFailOk) {
       curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
     } else {
       // We know it can't work, don't even try to download: TODO
@@ -828,7 +829,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
 
   bool update_only = true;  // No changes to the list of IP addresses.
   if (new_host.status() != dns::kFailOk) {
-    // Try again later when resolving fails.
+    // Try again later in case resolving fails.
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
              "failed to resolve IP addresses for %s (%d - %s)",
              host.name().c_str(), new_host.status(),
@@ -852,6 +853,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
   LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
            "DNS entries for proxy %s changed, adjusting", host.name().c_str());
   vector<ProxyInfo> *group = &((*opt_proxy_groups_)[opt_proxy_groups_current_]);
+  opt_num_proxies_ -= group->size();
   for (unsigned i = 0; i < group->size(); ) {
     if ((*group)[i].host.id() == host.id()) {
       group->erase(group->begin() + i);
@@ -877,6 +879,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
     }
   }
   group->insert(group->end(), new_infos.begin(), new_infos.end());
+  opt_num_proxies_ += new_infos.size();
 
   RebalanceProxiesUnlocked();
 }
@@ -1840,7 +1843,9 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
       }
 
       if (hosts[num_proxy].status() != dns::kFailOk) {
-        infos.push_back(ProxyInfo(hosts[num_proxy], this_group[j]));
+        dns::Host failed_host =
+          dns::Host::ExtendDeadline(hosts[num_proxy], dns::Resolver::kMinTtl);
+        infos.push_back(ProxyInfo(failed_host, this_group[j]));
         continue;
       }
 
