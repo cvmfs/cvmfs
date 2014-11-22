@@ -559,6 +559,24 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
 }
 
 
+TEST_F(T_Dns, CaresResolverTimeout) {
+  // Because of backoff, timeout can actually be as high as 2s
+  CaresResolver *quick_resolver = CaresResolver::Create(false, 3, 200);
+  ASSERT_FALSE(quick_resolver == NULL);
+
+  vector<string> bad_resolvers;
+  bad_resolvers.push_back("127.0.0.2");
+  bool retval = quick_resolver->SetResolvers(bad_resolvers);
+  ASSERT_EQ(retval, true);
+  time_t before = time(NULL);
+  Host host = quick_resolver->Resolve("a.root-servers.net");
+  time_t after = time(NULL);
+  // C-ares oddity: why is it kFailInvalidResolvers in CaresResolverBadResolver?
+  EXPECT_EQ(host.status(), kFailTimeout);
+  EXPECT_LE(after-before, 2);
+}
+
+
 TEST_F(T_Dns, HostfileResolverConstruct) {
   HostfileResolver *resolver = HostfileResolver::Create("", false);
   ASSERT_TRUE(resolver != NULL);
