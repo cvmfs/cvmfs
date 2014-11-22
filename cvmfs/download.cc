@@ -1843,6 +1843,10 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
       }
 
       if (hosts[num_proxy].status() != dns::kFailOk) {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                 "failed to resolve IP addresses for %s (%d - %s)",
+                 hosts[num_proxy].name().c_str(), hosts[num_proxy].status(),
+                 dns::Code2Ascii(hosts[num_proxy].status()));
         dns::Host failed_host =
           dns::Host::ExtendDeadline(hosts[num_proxy], dns::Resolver::kMinTtl);
         infos.push_back(ProxyInfo(failed_host, this_group[j]));

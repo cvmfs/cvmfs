@@ -157,12 +157,25 @@ run_dns_test() {
   sudo cvmfs_talk -i aleph.cern.ch cleanup 0
 
   # Spurious CVMFS_HTTP_PROXY
+  echo "Spurious CVMFS_HTTP_PROXY"
   cvmfs_umount aleph.cern.ch
   cvmfs_mount aleph.cern.ch \
     "HOST_ALIASES=${PWD}/host_tests" \
-    "CVMFS_HTTP_PROXY=';;|no-host.localdomain|;|;--?><;http://round-robin.localdomain:3128|round-robin.localdomain;|DIRECT'" || return 2
+    "CVMFS_HTTP_PROXY=';;|no-host.localdomain|;|;--?><;http://round-robin.localdomain:3128|round-robin.localdomain;|DIRECT'" || return 80
   sudo cvmfs_talk -i aleph.cern.ch proxy info
-  md5sum "$file" || return 80
+  md5sum "$file" || return 81
+
+  sudo cvmfs_talk -i aleph.cern.ch cleanup 0
+
+  # Plain IP addresses
+  echo "plain IP addresses"
+  cvmfs_umount aleph.cern.ch
+  cvmfs_mount aleph.cern.ch \
+    "HOST_ALIASES=${PWD}/host_tests" \
+    "CVMFS_HTTP_PROXY='http://127.0.0.2:3128;http://[::2]:3128;DIRECT'" || return 90
+  sudo cvmfs_talk -i aleph.cern.ch proxy info | grep "127.0.0.2" || return 91
+  sudo cvmfs_talk -i aleph.cern.ch proxy info | grep "::2" || return 92
+  md5sum "$file" || return 93
 
   return 0
 }
