@@ -823,3 +823,36 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   EXPECT_EQ (8u, gc4.condemned_catalog_count());
   EXPECT_EQ (21u, upl->deleted_hashes.size());
 }
+
+
+TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
+  // checks what happens if a future time stamp was given
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_timestamp = t(1, 1, 2014);
+  config.keep_named_snapshots   = false;
+  config.keep_history_depth     = GcConfiguration::kFullHistory;
+
+  MyGarbageCollector gc1(config);
+  EXPECT_FALSE (gc1.Collect());
+
+  GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
+  RevisionMap     &c   = catalogs_;
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash())); // same as mp(1,"11")
+  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+}
