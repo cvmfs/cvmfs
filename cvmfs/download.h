@@ -5,24 +5,25 @@
 #ifndef CVMFS_DOWNLOAD_H_
 #define CVMFS_DOWNLOAD_H_
 
+#include <poll.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <poll.h>
 
 #include <cstdio>
-
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
 
 #include "gtest/gtest_prod.h"
 
-#include "duplex_curl.h"
-#include "compression.h"
-#include "prng.h"
-#include "hash.h"
 #include "atomic.h"
+#include "compression.h"
+#include "dns.h"
+#include "duplex_curl.h"
+#include "hash.h"
+#include "prng.h"
+
 
 namespace download {
 
@@ -53,12 +54,13 @@ enum Failures {
   kFailProxyHttp,
   kFailHostHttp,
   kFailBadData,
+  kFailTooBig,
   kFailOther,
 };  // Failures
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 12;
+  const int kNumElems = 13;
   if (error >= kNumElems)
     return "no text available (internal error)";
 
@@ -74,7 +76,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[8] = "proxy returned HTTP error";
   texts[9] = "host returned HTTP error";
   texts[10] = "corrupted data received";
-  texts[11] = "unknown network error";
+  texts[11] = "resource too big to download";
+  texts[12] = "unknown network error";
 
   return texts[error];
 }
@@ -243,6 +246,23 @@ class HeaderLists {
 
 class DownloadManager {
  public:
+  struct ProxyInfo {
+    ProxyInfo() { }
+    explicit ProxyInfo(const std::string &url) : url(url) { }
+    ProxyInfo(const dns::Host &host, const std::string &url)
+      : host(host)
+      , url(url)
+    { }
+    std::string Print();
+    dns::Host host;
+    std::string url;
+  };
+
+  /**
+   * Do not download files larger than 1M into memory.
+   */
+  static const unsigned kMaxMemSize = 1024*1024;
+
   DownloadManager();
   ~DownloadManager();
 
@@ -252,6 +272,7 @@ class DownloadManager {
   Failures Fetch(JobInfo *info);
 
   void SetDnsServer(const std::string &address);
+  void SetDnsParameters(const unsigned retries, const unsigned timeout_sec);
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   const Statistics &GetStatistics();
@@ -261,7 +282,7 @@ class DownloadManager {
   void ProbeHosts();
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list);
-  void GetProxyInfo(std::vector< std::vector<std::string> > *proxy_chain,
+  void GetProxyInfo(std::vector< std::vector<ProxyInfo> > *proxy_chain,
                     unsigned *current_group);
   void RebalanceProxies();
   void SwitchProxyGroup();
@@ -286,6 +307,7 @@ class DownloadManager {
   void ReleaseCurlHandle(CURL *handle);
   void InitializeRequest(JobInfo *info, CURL *handle);
   void SetUrlOptions(JobInfo *info);
+  void ValidateProxyIpsUnlocked(const std::string &url, const dns::Host &host);
   void UpdateStatistics(CURL *handle);
   bool CanRetry(const JobInfo *info);
   void Backoff(JobInfo *info);
@@ -317,21 +339,41 @@ class DownloadManager {
   char *opt_dns_server_;
   unsigned opt_timeout_proxy_ ;
   unsigned opt_timeout_direct_;
-  std::vector<std::string> *opt_host_chain_;
-  std::vector<int> *opt_host_chain_rtt_; /**< created by SetHostChain(),
-                                            filled by probe_hosts.  Contains time to get .cvmfschecksum in ms.
-                                            -1 is unprobed, -2 is error */
-  unsigned opt_host_chain_current_;
-  std::vector< std::vector<std::string> > *opt_proxy_groups_;
-  unsigned opt_proxy_groups_current_;
-  unsigned opt_proxy_groups_current_burned_;
-  unsigned opt_num_proxies_;
-
   unsigned opt_max_retries_;
   unsigned opt_backoff_init_ms_;
   unsigned opt_backoff_max_ms_;
   bool enable_info_header_;
   bool opt_ipv4_only_;
+
+  // Host list
+  std::vector<std::string> *opt_host_chain_;
+  /**
+   * Created by SetHostChain(), filled by probe_hosts.  Contains time to get
+   * .cvmfschecksum in ms. -1 is unprobed, -2 is error.
+   */
+  std::vector<int> *opt_host_chain_rtt_;
+  unsigned opt_host_chain_current_;
+
+  // Proxy list
+  std::vector< std::vector<ProxyInfo> > *opt_proxy_groups_;
+  /**
+   * The current load-balancing group (first dimension in opt_proxy_groups_).
+   */
+  unsigned opt_proxy_groups_current_;
+  /**
+   * Number of proxy servers that failed within current load-balance group.
+   * Between 0 and (*opt_proxy_groups_)[opt_proxy_groups_current_].size().
+   */
+  unsigned opt_proxy_groups_current_burned_;
+  /**
+   * Overall number of proxies summed over all the groups.
+   */
+  unsigned opt_num_proxies_;
+
+  /**
+   * Used to resolve proxy addresses (host addresses are resolved by the proxy).
+   */
+  dns::NormalResolver *resolver;
 
   /**
    * More than one proxy group can be considered as group of primary proxies
