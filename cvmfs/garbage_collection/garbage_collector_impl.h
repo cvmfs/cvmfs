@@ -179,6 +179,13 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
   success = (success && traversal_.Traverse());
   traversal_.UnregisterListener(callback);
 
+  if (success && preserved_catalog_count() == 0) {
+    if (configuration_.verbose) {
+      LogCvmfs(kLogGc, kLogStderr, "This would delete everything! Abort.");
+    }
+    success = false;
+  }
+
   return success;
 }
 
