@@ -2,41 +2,30 @@
  * This file is part of the CernVM File System.
  */
 
-#include "history.h"
-
-#include <cstdlib>
-#include <cassert>
-
-#include <algorithm>
-
-#include "logging.h"
-#include "util.h"
-#include "history_sql.h"
+#include "history_sqlite.h"
 
 using namespace std;  // NOLINT
 
 namespace history {
 
-
-const std::string History::kPreviousRevisionKey = "previous_revision";
-
-History::~History() {}
+const std::string SqliteHistory::kPreviousRevisionKey = "previous_revision";
 
 
-History* History::Open(const std::string &file_name) {
+History* SqliteHistory::Open(const std::string &file_name) {
   const bool read_write = false;
   return Open(file_name, read_write);
 }
 
 
-History* History::OpenWritable(const std::string &file_name) {
+History* SqliteHistory::OpenWritable(const std::string &file_name) {
   const bool read_write = true;
   return Open(file_name, read_write);
 }
 
 
-History* History::Open(const std::string &file_name, const bool read_write) {
-  History *history = new History();
+History* SqliteHistory::Open(const std::string &file_name,
+                             const bool read_write) {
+  SqliteHistory *history = new SqliteHistory();
   if (NULL == history || ! history->OpenDatabase(file_name, read_write)) {
     delete history;
     return NULL;
@@ -51,9 +40,9 @@ History* History::Open(const std::string &file_name, const bool read_write) {
 }
 
 
-History* History::Create(const std::string &file_name,
-                         const std::string &fqrn) {
-  History *history = new History();
+History* SqliteHistory::Create(const std::string &file_name,
+                               const std::string &fqrn) {
+  SqliteHistory *history = new SqliteHistory();
   if (NULL == history || ! history->CreateDatabase(file_name, fqrn)) {
     delete history;
     return NULL;
@@ -66,7 +55,7 @@ History* History::Create(const std::string &file_name,
 }
 
 
-bool History::OpenDatabase(const std::string &file_name, const bool read_write)
+bool SqliteHistory::OpenDatabase(const std::string &file_name, const bool read_write)
 {
   assert (! database_);
   const HistoryDatabase::OpenMode mode = (read_write)
@@ -84,21 +73,21 @@ bool History::OpenDatabase(const std::string &file_name, const bool read_write)
     return false;
   }
 
-  fqrn_ = database_->GetProperty<std::string>(HistoryDatabase::kFqrnKey);
+  set_fqrn(database_->GetProperty<std::string>(HistoryDatabase::kFqrnKey));
   return Initialize();
 }
 
 
-bool History::CreateDatabase(const std::string &file_name,
-                             const std::string &fqrn) {
+bool SqliteHistory::CreateDatabase(const std::string &file_name,
+                                   const std::string &repo_name) {
   assert (! database_);
-  assert (fqrn_.empty());
-  fqrn_     = fqrn;
+  assert (fqrn().empty());
+  set_fqrn(repo_name);
   database_ = HistoryDatabase::Create(file_name);
-  if (! database_ || ! database_->InsertInitialValues(fqrn)) {
+  if (! database_ || ! database_->InsertInitialValues(repo_name)) {
     LogCvmfs(kLogHistory, kLogDebug, "failed to initialize empty database '%s',"
                                      "for repository '%s'",
-             file_name.c_str(), fqrn.c_str());
+             file_name.c_str(), repo_name.c_str());
     return false;
   }
 
@@ -106,7 +95,7 @@ bool History::CreateDatabase(const std::string &file_name,
 }
 
 
-bool History::Initialize() {
+bool SqliteHistory::Initialize() {
   if (! PrepareQueries()) {
     LogCvmfs(kLogHistory, kLogDebug, "failed to prepare statements of history");
     return false;
@@ -116,7 +105,7 @@ bool History::Initialize() {
 }
 
 
-bool History::PrepareQueries() {
+bool SqliteHistory::PrepareQueries() {
   assert (database_);
   insert_tag_         = new SqlInsertTag        (database_.weak_ref());
   remove_tag_         = new SqlRemoveTag        (database_.weak_ref());
@@ -135,23 +124,23 @@ bool History::PrepareQueries() {
 }
 
 
-bool History::BeginTransaction()  const { return database_->BeginTransaction();  }
-bool History::CommitTransaction() const { return database_->CommitTransaction(); }
+bool SqliteHistory::BeginTransaction()  const { return database_->BeginTransaction();  }
+bool SqliteHistory::CommitTransaction() const { return database_->CommitTransaction(); }
 
 
-bool History::SetPreviousRevision(const shash::Any &history_hash) {
+bool SqliteHistory::SetPreviousRevision(const shash::Any &history_hash) {
   assert (database_);
   assert (IsWritable());
   return database_->SetProperty(kPreviousRevisionKey, history_hash.ToString());
 }
 
 
-bool History::IsWritable() const {
+bool SqliteHistory::IsWritable() const {
   assert (database_);
   return database_->read_write();
 }
 
-int History::GetNumberOfTags() const {
+int SqliteHistory::GetNumberOfTags() const {
   assert (database_);
   assert (count_tags_.IsValid());
   bool retval = count_tags_->FetchRow();
@@ -163,7 +152,7 @@ int History::GetNumberOfTags() const {
 }
 
 
-bool History::Insert(const History::Tag &tag) {
+bool SqliteHistory::Insert(const History::Tag &tag) {
   assert (database_);
   assert (insert_tag_.IsValid());
 
@@ -173,7 +162,7 @@ bool History::Insert(const History::Tag &tag) {
 }
 
 
-bool History::Remove(const std::string &name) {
+bool SqliteHistory::Remove(const std::string &name) {
   assert (database_);
   assert (remove_tag_.IsValid());
 
@@ -183,13 +172,13 @@ bool History::Remove(const std::string &name) {
 }
 
 
-bool History::Exists(const std::string &name) const {
+bool SqliteHistory::Exists(const std::string &name) const {
   Tag existing_tag;
   return GetByName(name, &existing_tag);
 }
 
 
-bool History::GetByName(const std::string &name, Tag *tag) const {
+bool SqliteHistory::GetByName(const std::string &name, Tag *tag) const {
   assert (database_);
   assert (find_tag_.IsValid());
   assert (NULL != tag);
@@ -205,7 +194,7 @@ bool History::GetByName(const std::string &name, Tag *tag) const {
 }
 
 
-bool History::GetByDate(const time_t timestamp, Tag *tag) const {
+bool SqliteHistory::GetByDate(const time_t timestamp, Tag *tag) const {
   assert (database_);
   assert (find_tag_by_date_.IsValid());
   assert (NULL != tag);
@@ -221,18 +210,18 @@ bool History::GetByDate(const time_t timestamp, Tag *tag) const {
 }
 
 
-bool History::List(std::vector<Tag> *tags) const {
+bool SqliteHistory::List(std::vector<Tag> *tags) const {
   assert (list_tags_.IsValid());
   return RunListing(tags, list_tags_.weak_ref());
 }
 
-bool History::Tips(std::vector<Tag> *channel_tips) const {
+bool SqliteHistory::Tips(std::vector<Tag> *channel_tips) const {
   assert (channel_tips_.IsValid());
   return RunListing(channel_tips, channel_tips_.weak_ref());
 }
 
 template <class SqlListingT>
-bool History::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
+bool SqliteHistory::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
   assert (database_);
   assert (NULL != list);
 
@@ -244,7 +233,7 @@ bool History::RunListing(std::vector<Tag> *list, SqlListingT *sql) const {
 }
 
 
-bool History::Rollback(const Tag &updated_target_tag) {
+bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   Tag old_target_tag;
   bool success = false;
 
@@ -295,8 +284,9 @@ bool History::Rollback(const Tag &updated_target_tag) {
 }
 
 
-bool History::ListTagsAffectedByRollback(const std::string  &target_tag_name,
-                                         std::vector<Tag>   *tags) const {
+bool SqliteHistory::ListTagsAffectedByRollback(
+                                            const std::string  &target_tag_name,
+                                            std::vector<Tag>   *tags) const {
   // retrieve the old version of the target tag from the history
   Tag target_tag;
   if (! GetByName(target_tag_name, &target_tag)) {
@@ -316,7 +306,7 @@ bool History::ListTagsAffectedByRollback(const std::string  &target_tag_name,
 }
 
 
-bool History::GetHashes(std::vector<shash::Any> *hashes) const {
+bool SqliteHistory::GetHashes(std::vector<shash::Any> *hashes) const {
   assert (database_);
   assert (NULL != hashes);
 

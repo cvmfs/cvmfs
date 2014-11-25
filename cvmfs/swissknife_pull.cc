@@ -33,7 +33,7 @@
 #include "smalloc.h"
 #include "hash.h"
 #include "atomic.h"
-#include "history.h"
+#include "history_sqlite.h"
 
 using namespace std;  // NOLINT
 using namespace swissknife;  // NOLINT
@@ -488,7 +488,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const std::string history_db_path = history_path + ".uncompressed";
     retval = zlib::DecompressPath2Path(history_path, history_db_path);
     assert(retval);
-    history::History *tag_db = history::History::Open(history_db_path);
+    history::History *tag_db = history::SqliteHistory::Open(history_db_path);
     if (NULL == tag_db) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
                history_db_path.c_str());

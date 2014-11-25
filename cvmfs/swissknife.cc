@@ -27,6 +27,7 @@
 #include "swissknife_history.h"
 #include "swissknife_migrate.h"
 #include "swissknife_scrub.h"
+#include "swissknife_gc.h"
 
 using namespace std;  // NOLINT
 using namespace swissknife;
@@ -95,6 +96,7 @@ int main(int argc, char **argv) {
   command_list.push_back(new swissknife::CommandVersion());
   command_list.push_back(new swissknife::CommandMigrate());
   command_list.push_back(new swissknife::CommandScrub());
+  command_list.push_back(new swissknife::CommandGc());
 
   if (argc < 2) {
     swissknife::Usage();

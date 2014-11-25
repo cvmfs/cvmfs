@@ -18,7 +18,6 @@ typedef std::vector<CatalogIdentifier>                   CatalogIdentifiers;
 
 class T_CatalogTraversal : public ::testing::Test {
  public:
-  static const std::string sandbox;
   static const std::string fqrn;
 
  public:
@@ -38,39 +37,20 @@ class T_CatalogTraversal : public ::testing::Test {
 
  protected:
   void SetUp() {
-    // create a dummy history file
-    const bool retval = MkdirDeep(sandbox, 0700);
-    ASSERT_TRUE (retval) << "failed to create sandbox";
-    const std::string history_db = GetHistoryFilename();
-    named_snapshots_ = history::History::Create(history_db,
-                                                T_CatalogTraversal::fqrn);
-    ASSERT_TRUE (named_snapshots_.IsValid());
-    MockObjectFetcher::s_history = &named_snapshots_; // a pointer to a UniquePtr, I should burn
-                                                      // in hell for that. (If the testee code is
-                                                      // actually requesting this, the UniquePtr
-                                                      // will be released - thus not freed in
-                                                      // MockObjectFetcher::FetchHistory)
+    const bool writable_history = false; // MockHistory doesn't care!
+    MockObjectFetcher::s_history = new MockHistory(writable_history,
+                                                   T_CatalogTraversal::fqrn);
 
     dice_.InitLocaltime();
     MockCatalog::Reset();
     SetupDummyCatalogs();
     EXPECT_EQ (initial_catalog_instances, MockCatalog::instances);
-    MockObjectFetcher::s_history = &named_snapshots_;
   }
 
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
-    MockObjectFetcher::s_history = NULL; // TODO: potential memory leak!
-
-    const bool retval = RemoveTree(sandbox);
-    ASSERT_TRUE (retval) << "failed to remove sandbox";
-  }
-
-  std::string GetHistoryFilename() const {
-    const std::string path = CreateTempPath(sandbox + "/history", 0600);
-    CheckEmpty(path);
-    return path;
+    MockObjectFetcher::Reset();
   }
 
   void CheckVisitedCatalogs(const CatalogIdentifiers &expected,
@@ -212,20 +192,21 @@ class T_CatalogTraversal : public ::testing::Test {
       MakeRevision(r);
     }
 
-    named_snapshots_->BeginTransaction();
-    EXPECT_TRUE (named_snapshots_->Insert(history::History::Tag(
-                                          "Revision2", root_catalogs[2], 1337,
-                                          2, t(27,11,1987), history::History::kChannelProd,
-                                          "this is revision 2")));
-    EXPECT_TRUE (named_snapshots_->Insert(history::History::Tag(
-                                          "Revision5", root_catalogs[5], 42,
-                                          5, t(11, 9,2001), history::History::kChannelProd,
-                                          "this is revision 5")));
-    EXPECT_TRUE (named_snapshots_->Insert(history::History::Tag(
-                                          "Revision6", root_catalogs[6], 7,
-                                          6, t(10, 7,2014), history::History::kChannelTrunk,
-                                          "this is revision 6 - the newest!")));
-    named_snapshots_->CommitTransaction();
+    history::History *history = MockObjectFetcher::s_history;
+    history->BeginTransaction();
+    EXPECT_TRUE (history->Insert(history::History::Tag(
+                                 "Revision2", root_catalogs[2], 1337,
+                                 2, t(27,11,1987), history::History::kChannelProd,
+                                 "this is revision 2")));
+    EXPECT_TRUE (history->Insert(history::History::Tag(
+                                 "Revision5", root_catalogs[5], 42,
+                                 5, t(11, 9,2001), history::History::kChannelProd,
+                                 "this is revision 5")));
+    EXPECT_TRUE (history->Insert(history::History::Tag(
+                                 "Revision6", root_catalogs[6], 7,
+                                 6, t(10, 7,2014), history::History::kChannelTrunk,
+                                 "this is revision 6 - the newest!")));
+    history->CommitTransaction();
   }
 
   void MakeRevision(const unsigned int revision) {
@@ -388,10 +369,8 @@ class T_CatalogTraversal : public ::testing::Test {
   Prng                         dice_;
   RootCatalogMap               root_catalogs_;
   RevisionMap                  revisions_;
-  UniquePtr<history::History>  named_snapshots_;
 };
 
-const std::string T_CatalogTraversal::sandbox = "/tmp/cvmfs_ut_catalog_traversal";
 const std::string T_CatalogTraversal::fqrn    = "test.cern.ch";
 
 
@@ -2278,7 +2257,7 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
   deleted_catalogs.insert(GetRootHash(2));
   deleted_catalogs.insert(GetRootHash(3));
   deleted_catalogs.insert(GetRootHash(4));
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2323,8 +2302,6 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
 
   CheckVisitedCatalogs(catalogs, TraverseUntilUnavailableRevisionNoRepeat_visited_catalogs);
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }
 
 
@@ -2349,7 +2326,7 @@ TEST_F(T_CatalogTraversal, TraverseWithUnavailableNestedNoRepeat) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(doomed_nested_catalog->hash());
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2394,8 +2371,6 @@ TEST_F(T_CatalogTraversal, TraverseWithUnavailableNestedNoRepeat) {
   const bool dont_check_catalog_count = false;
   CheckVisitedCatalogs(catalogs, TraverseWithUnavailableNestedNoRepeat_visited_catalogs,
                        dont_check_catalog_count);
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }
 
 
@@ -2758,7 +2733,7 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(2));
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   CatalogTraversalParams params;
   params.history             = CatalogTraversalParams::kFullHistory;
@@ -2863,4 +2838,27 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
 
   CheckVisitedCatalogs(catalogs, FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs);
   CheckCatalogSequence(catalogs, FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs);
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+void FullTraversalRootCatalogDetectionCallback(
+                             const MockedCatalogTraversal::CallbackData &data) {
+  const bool should_be_root = (data.catalog->path().ToString() == "" ||
+                               data.tree_level                 == 0);
+  EXPECT_EQ (should_be_root, data.catalog->IsRoot());
+}
+
+TEST_F(T_CatalogTraversal, FullTraversalRootCatalogDetection) {
+  CatalogTraversalParams params;
+  params.history = CatalogTraversalParams::kFullHistory;
+  MockedCatalogTraversal traverse(params);
+  traverse.RegisterListener(&FullTraversalRootCatalogDetectionCallback);
+
+  const bool t1 = traverse.Traverse();
+  EXPECT_TRUE (t1);
 }
