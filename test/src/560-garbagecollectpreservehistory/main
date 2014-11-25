@@ -203,8 +203,9 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "perform garbage collection with historic revision preservation = 4 (nothing should get deleted)"
-  cvmfs_server gc -r 4 -f $CVMFS_TEST_REPO || return 6
+  local preserve=$(( $revisions - 0 ))
+  echo "perform garbage collection with historic revision preservation = $preserve (nothing should get deleted)"
+  cvmfs_server gc -r $preserve -f $CVMFS_TEST_REPO || return 6
 
   echo "check that all catalogs are present"
   for catalog in $catalogs; do
@@ -218,14 +219,15 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "perform garbage collection with historic revision preservation = 2"
-  cvmfs_server gc -r 2 -f $CVMFS_TEST_REPO || return 6
+  preserve=$(( $revisions - 3 ))
+  echo "perform garbage collection with historic revision preservation = $preserve"
+  cvmfs_server gc -r $preserve -f $CVMFS_TEST_REPO || return 6
 
   echo "check that the right catalogs are still present"
   i=0
   for catalog in $catalogs; do
     local modo=$(echo "$i % 5" | bc)
-    if [ $modo -eq 0 ] || [ $modo -gt 2 ] || [ $i -ge 16 ]; then
+    if [ $i -ge $(( $revisions - $preserve )) ] || [ $modo -eq 0 ]; then
       peek_backend $CVMFS_TEST_REPO "${catalog}C" || return 7
     else
       peek_backend $CVMFS_TEST_REPO "${catalog}C" && return 8
@@ -237,7 +239,7 @@ cvmfs_run_test() {
   i=0
   for hash in $(get_file_hashes); do
     local modo=$(echo "$i % 5" | bc)
-    if [ $modo -eq 0 ] || [ $modo -gt 2 ] || [ $i -ge 16 ]; then
+    if [ $i -ge $(( $revisions - $preserve )) ] || [ $modo -eq 0 ]; then
       peek_backend $CVMFS_TEST_REPO "$hash" || return 9
     else
       peek_backend $CVMFS_TEST_REPO "$hash" && return 10
@@ -254,17 +256,18 @@ cvmfs_run_test() {
 
   # ============================================================================
 
-  echo "perform garbage collection with historic revision preservation = 10 (shouldn't change something)"
-  cvmfs_server gc -r 10 -f $CVMFS_TEST_REPO || return 12
+  preserve=$(( $revisions - 13 ))
+  echo "perform garbage collection with historic revision preservation = $preserve"
+  cvmfs_server gc -r $preserve -f $CVMFS_TEST_REPO || return 12
 
   echo "check that the right catalogs are still present"
   i=0
   for catalog in $catalogs; do
     local modo=$(echo "$i % 5" | bc)
-    if [ $modo -eq 0 ] || [ $modo -gt 2 ] || [ $i -ge 16 ]; then
+    if [ $i -ge $(( $revisions - $preserve )) ] || [ $modo -eq 0 ]; then
       peek_backend $CVMFS_TEST_REPO "${catalog}C" || return 13
     else
-      peek_backend $CVMFS_TEST_REPO "${catalog}C" && return 14
+      peek_backend $CVMFS_TEST_REPO "${catalog}C" && return 13
     fi
     i=$(( $i + 1 ))
   done
@@ -273,13 +276,20 @@ cvmfs_run_test() {
   i=0
   for hash in $(get_file_hashes); do
     local modo=$(echo "$i % 5" | bc)
-    if [ $modo -eq 0 ] || [ $modo -gt 2 ] || [ $i -ge 16 ]; then
-      peek_backend $CVMFS_TEST_REPO "$hash" || return 15
+    if [ $i -ge $(( $revisions - $preserve )) ] || [ $modo -eq 0 ]; then
+      peek_backend $CVMFS_TEST_REPO "$hash" || return 14
     else
-      peek_backend $CVMFS_TEST_REPO "$hash" && return 16
+      peek_backend $CVMFS_TEST_REPO "$hash" && return 14
     fi
     i=$(( $i + 1 ))
   done
+
+  echo "check if the repository is still sane"
+  check_repository $CVMFS_TEST_REPO -i -t revision_0  || return 15
+  check_repository $CVMFS_TEST_REPO -i -t revision_5  || return 15
+  check_repository $CVMFS_TEST_REPO -i -t revision_10 || return 15
+  check_repository $CVMFS_TEST_REPO -i -t revision_15 || return 15
+  check_repository $CVMFS_TEST_REPO -i                || return 15
 
   # ============================================================================
 
