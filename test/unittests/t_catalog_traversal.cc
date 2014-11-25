@@ -2348,7 +2348,7 @@ TEST_F(T_CatalogTraversal, TraverseWithUnavailableNestedNoRepeat) {
   ASSERT_NE (static_cast<MockCatalog*>(NULL), doomed_nested_catalog);
 
   std::set<shash::Any> deleted_catalogs;
-  deleted_catalogs.insert(doomed_nested_catalog->catalog_hash());
+  deleted_catalogs.insert(doomed_nested_catalog->hash());
   MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
