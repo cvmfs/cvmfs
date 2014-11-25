@@ -3775,6 +3775,8 @@ gc() {
     check_repository_compatibility $name
     is_stratum0      $name || die "Garbage Collection is currently only supported on Stratum0"
     is_owner_or_root $name || die "Permission denied: Repository $name is owned by $user"
+    local head_timestamp="$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -t)"
+    [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
 
     # create user shell
     local user_shell="sh -c"
