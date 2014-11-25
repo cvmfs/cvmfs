@@ -67,6 +67,8 @@ struct CatalogTraversalData {
  *                             locations to verify the repository manifest file
  * @param history              depth of the desired catalog history traversal
  *                             (default: 0 - only HEAD catalogs are traversed)
+ * @param timestamp            timestamp of history traversal threshold
+ *                             (default: 0 - no threshold, traverse everything)
  * @param no_repeat_history    keep track of visited catalogs and don't re-visit
  *                             them in previous revisions
  * @param no_close             do not close catalogs after they were attached
@@ -79,15 +81,19 @@ struct CatalogTraversalData {
  *                             (default: /tmp)
  */
 struct CatalogTraversalParams {
-  CatalogTraversalParams() : history(0), no_repeat_history(false),
-  no_close(false), ignore_load_failure(false), quiet(false), tmp_dir("/tmp") {}
+  CatalogTraversalParams() : history(kNoHistory),
+  timestamp(kNoTimestampThreshold), no_repeat_history(false), no_close(false),
+  ignore_load_failure(false), quiet(false), tmp_dir("/tmp") {}
 
   static const unsigned int kFullHistory;
+  static const unsigned int kNoHistory;
+  static const time_t       kNoTimestampThreshold;
 
   std::string   repo_url;
   std::string   repo_name;
   std::string   repo_keys;
   unsigned int  history;
+  time_t        timestamp;
   bool          no_repeat_history;
   bool          no_close;
   bool          ignore_load_failure;
@@ -105,6 +111,8 @@ class ObjectFetcher;
  *
  * CatalogTraversal<> can be configured and used in various ways:
  *   -> Historic catalog traversal
+ *   -> Prune catalogs below a certain history level
+ *   -> Prune catalogs older than a certain threshold timestamp
  *   -> Never traverse a certain catalog twice
  *   -> Breadth First Traversal or Depth First Traversal
  *   -> Optional catalog memory management (no_close)
@@ -127,13 +135,16 @@ class ObjectFetcher;
  *   order'. Thus, catalogs on the way are opened, checked for their descendants
  *   and closed. Once all children and historical ancestors are processed, it is
  *   re-opened and handed out to the user.
- *   Note: This method needs more disk space to temporarily storage downloaded
- *         but not yet processed catalogs.
+ *   Note: This method needs more disk space to temporarily store downloaded but
+ *         not yet processed catalogs.
  *
  * Note: Since all CVMFS catalog files together can grow to several gigabytes in
  *       file size, each catalog is loaded, processed and removed immediately
  *       afterwards. Except if no_close is specified, which allows the user to
- *       choose when a catalog should be closed.
+ *       choose when a catalog should be closed. Keep in mind, that a user is
+ *       responsible for both deletion of the delivered catalog objects as well
+ *       as unlinking of the catalog database file.
+ *
  *
  * @param CatalogT        the catalog class that should be used for traversal
  *                        usually this will be either catalog::Catalog or
@@ -163,7 +174,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   };
 
  protected:
-  typedef std::set<shash::Any>           HashSet;
+  typedef std::set<shash::Any> HashSet;
 
  protected:
   /**
@@ -224,11 +235,14 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    */
   struct TraversalContext {
     TraversalContext(const unsigned       history_depth,
+                     const time_t         timestamp_threshold,
                      const TraversalType  traversal_type) :
       history_depth(history_depth),
+      timestamp_threshold(timestamp_threshold),
       traversal_type(traversal_type) {}
 
     const unsigned       history_depth;
+    const time_t         timestamp_threshold;
     const TraversalType  traversal_type;
     CatalogJobStack      catalog_stack;
     CatalogJobStack      callback_stack;
@@ -246,6 +260,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     ignore_load_failure_(params.ignore_load_failure),
     no_repeat_history_(params.no_repeat_history),
     default_history_depth_(params.history),
+    default_timestamp_threshold_(params.timestamp),
     error_sink_((params.quiet) ? kLogDebug : kLogStderr)
   {}
 
@@ -261,7 +276,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    *               failure the traversal is cancelled and false is returned.
    */
   bool Traverse(const TraversalType type = kBreadthFirstTraversal) {
-    TraversalContext ctx(default_history_depth_, type);
+    TraversalContext ctx(default_history_depth_,
+                         default_timestamp_threshold_,
+                         type);
     const shash::Any root_catalog_hash = GetRepositoryRootCatalogHash();
     if (root_catalog_hash.IsNull()) {
       return false;
@@ -281,7 +298,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                 const TraversalType   type = kBreadthFirstTraversal) {
     // add the root catalog of the repository as the first element on the job
     // stack
-    TraversalContext ctx(default_history_depth_, type);
+    TraversalContext ctx(default_history_depth_,
+                         default_timestamp_threshold_,
+                         type);
     Push(ctx, root_catalog_hash);
     return DoTraverse(ctx);
   }
@@ -297,7 +316,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   bool TraverseNamedSnapshots(const TraversalType type = kBreadthFirstTraversal) {
     typedef std::vector<shash::Any> HashList;
 
-    TraversalContext ctx(default_history_depth_, type);
+    TraversalContext ctx(default_history_depth_,
+                         default_timestamp_threshold_,
+                         type);
     const UniquePtr<history::History> tag_db(GetHistory());
     HashList root_hashes;
     const bool success = tag_db->GetHashes(&root_hashes);
@@ -323,12 +344,18 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    *       track of the root catalog hashes of catalog revisions that have been
    *       pruned before. TraversePruned() will use those as entry points.
    *
+   * Note: TraversalPruned will neither take the history nor the timestamp based
+   *       thresholds into account but traverse all catalogs in can reach from
+   *       the catalogs that have previously been pruned by those thresholds.
+   *
    * @param type  breadths or depth first traversal
    * @return      true on successful traversal of all necessary catalogs or
    *              false in case of failure or no_repeat_history == false
    */
   bool TraversePruned(const TraversalType type = kBreadthFirstTraversal) {
-    TraversalContext ctx(CatalogTraversalParams::kFullHistory, type);
+    TraversalContext ctx(CatalogTraversalParams::kFullHistory,
+                         CatalogTraversalParams::kNoTimestampThreshold,
+                         type);
     if (pruned_revisions_.empty()) {
       return false;
     }
@@ -351,24 +378,26 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * in which way catalogs are handed out to the user code.
    *
    * Each catalog is processed in these steps:
-   *  1.) Check if the catalog was processed before
-   *        Duplicated traversal can (optionally) be avoided. Note: skipped jobs
-   *        can still trigger postponed yields
-   *  2.) Pop the next catalog from the stack
+   *  1.) Pop the next catalog from the stack
    *        Catalogs are always traversed from latest to oldest revision and
    *        from root to leaf nested catalogs
-   *  3.) Fetch the catalog from the repository
-   *        Depending on where the catalog comes from, this might do different
-   *        things (see ObjectFetcherT).
-   *  4.) Open the fetched catalog
-   *        Depending on the catalog this implementation might differ
-   *        (see CatalogT::AttachFreely)
+   *  2.) Prepare the catalog for traversing
+   *    2.1.) Check if it was visited before
+   *    2.2.) Fetch the catalog database from the backend storage
+   *            This might fail and produce an error. For root catalogs this
+   *            error can be ignored (might be garbage collected before)
+   *    2.3.) Open the catalog database
+   *    2.4.) Check if the catalog is older than the timestamp threshold
+   *        After these steps the catalog is opened either opened and ready for
+   *        the traversal to continue, or it was marked for ignore (job.ignore)
+   *  3.) Check if the catalog is marked to be ignored
+   *        Catalog might not be loadable (sweeped root catalog) or is too old
+   *        Note: ignored catalogs can still trigger postponed yields
+   *  4.) Mark the catalog as visited to be able to skip it later on
    *  5.) Find and push referencing catalogs
-   *        This pushes all descendants of the current catalog onto the stack.
-   *        Note that this is dependant on the strategy (depth or breadth first)
-   *        and on the history threshold (see history_depth). Furthermore,
-   *        catalogs might not be pushed again, when seen before (see
-   *        no_repeat_history).
+   *        This pushes all descendents of the current catalog onto the stack.
+   *        Note that this is dependent on the strategy (depth or breadth first)
+   *        and on the history threshold (see history_depth).
    *  6.) Hand the catalog out to the user code
    *        Depending on the traversal strategy (depth of breadths first) this
    *        might immediately yield zero to N catalogs to the user code.
@@ -387,7 +416,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       CatalogJob job = Pop(ctx);
 
       // download and open the catalog for processing
-      if (! PrepareCatalog(job)) {
+      if (! PrepareCatalog(ctx, job)) {
         return false;
       }
 
@@ -401,6 +430,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       }
 
       // push catalogs referenced by the current catalog (onto stack)
+      MarkAsVisited(job);
       PushReferencedCatalogs(ctx, job);
 
       // notify listeners
@@ -417,7 +447,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
 
-  bool PrepareCatalog(CatalogJob &job) {
+  bool PrepareCatalog(TraversalContext &ctx, CatalogJob &job) {
     // skipping duplicate catalogs might also yield postponed catalogs
     if (ShouldBeSkipped(job)) {
       job.ignore = true;
@@ -443,7 +473,22 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // open the catalog file
-    return OpenCatalog(job);
+    if (! OpenCatalog(job)) {
+      return false;
+    }
+
+    // check the catalog's 'last modified' note to see if we need to deal
+    // with this catalog. If not, it can be closed (regardless of no_close)
+    if (IsExpiredRevision(ctx, job)) {
+      job.ignore = true;
+      MarkAsPrunedRevision(job.hash);
+      if (! CloseCatalog(job)) {
+        return false;
+      }
+      return true;
+    }
+
+    return true;
   }
 
 
@@ -474,6 +519,34 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     return true;
+  }
+
+
+  bool CloseCatalog(CatalogJob &job, const bool unlink_db = true) {
+    delete job.catalog; job.catalog = NULL;
+    if (! job.catalog_file_path.empty() && unlink_db) {
+      const int retval = unlink(job.catalog_file_path.c_str());
+      if (retval != 0) {
+        LogCvmfs(kLogCatalogTraversal, error_sink_, "Failed to unlink %s - %d",
+                 job.catalog_file_path.c_str(), errno);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+
+  bool IsExpiredRevision(TraversalContext &ctx, CatalogJob &job) {
+    // this is only checked for root catalogs as they define the timestamp of
+    // the actual repository revision (nested catalogs can be older)
+    if (! job.IsRootCatalog()) {
+      return false;
+    }
+
+    // if the root-catalog's last modification is older than the timestamp
+    assert (job.catalog != NULL);
+    return job.catalog->GetLastModified() < ctx.timestamp_threshold;
   }
 
 
@@ -519,10 +592,15 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // check if the next deeper history level is actually requested
+    //
     // Note: otherwise it is marked to be 'pruned' for possible later traversal
     //       (see: TraversePruned())
+    //
+    // Note: pruning catalog revisions based on their timestamp can not be done
+    //       here, as we need to download the catalog first. This decision is
+    //       made in IsExpiredRevision() after downloading the catalog
     if (job.history_depth >= ctx.history_depth) {
-      pruned_revisions_.insert(previous_revision);
+      MarkAsPrunedRevision(previous_revision);
       return 0;
     }
 
@@ -617,19 +695,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // we can close the catalog here and delete the temporary file
-    delete job.catalog; job.catalog = NULL;
-    if (! job.catalog_file_path.empty()) {
-      const int retval = unlink(job.catalog_file_path.c_str());
-      if (retval != 0) {
-        LogCvmfs(kLogCatalogTraversal, error_sink_, "Failed to unlink %s - %d",
-                 job.catalog_file_path.c_str(), errno);
-        return false;
-      }
-    }
-
-    // all went well...
-    return true;
+    return CloseCatalog(job);
   }
+
 
   /**
    * Pushes a catalog to the callback_stack for later yielding
@@ -640,7 +708,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
     job.postponed = true;
     if (! no_close_) {
-      delete job.catalog; job.catalog = NULL;
+      const bool unlink_db = false; // will reopened just before yielding
+      CloseCatalog(job, unlink_db);
     }
     ctx.callback_stack.push(job);
   }
@@ -693,6 +762,16 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     return job;
   }
 
+  void MarkAsPrunedRevision(const shash::Any &root_catalog_hash) {
+    pruned_revisions_.insert(root_catalog_hash);
+  }
+
+  void MarkAsVisited(const CatalogJob &job) {
+    if (no_repeat_history_) {
+      visited_catalogs_.insert(job.hash);
+    }
+  }
+
   /**
    * Checks the traversal history if the given catalog was traversed or at least
    * seen before. If 'no_repeat_history' is not set this is always 'false'.
@@ -701,16 +780,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * @return      true if the specified catalog was hit before
    */
   bool ShouldBeSkipped(const CatalogJob &job) {
-    if (! no_repeat_history_) {
-      return false;
-    }
-
-    if (visited_catalogs_.count(job.hash) > 0) {
-      return true;
-    }
-
-    visited_catalogs_.insert(job.hash);
-    return false;
+    return no_repeat_history_ && (visited_catalogs_.count(job.hash) > 0);
   }
 
   shash::Any GetRepositoryRootCatalogHash() {
@@ -740,6 +810,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   const bool            ignore_load_failure_;
   const bool            no_repeat_history_;
   const unsigned int    default_history_depth_;
+  const time_t          default_timestamp_threshold_;
   HashSet               visited_catalogs_;
   HashSet               pruned_revisions_;
   LogFacilities         error_sink_;

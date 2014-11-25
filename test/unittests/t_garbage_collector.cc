@@ -121,9 +121,9 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(1,"00")] = CreateAndRegisterCatalog("",        1,  NULL,           NULL);
-    c[mp(1,"10")] = CreateAndRegisterCatalog("/00/10",  1,  c[mp(1,"00")],  NULL);
-    c[mp(1,"11")] = CreateAndRegisterCatalog("/00/11",  1,  c[mp(1,"00")],  NULL);
+    c[mp(1,"00")] = CreateAndRegisterCatalog("",        1, t(27, 11, 1987),        NULL,           NULL);
+    c[mp(1,"10")] = CreateAndRegisterCatalog("/00/10",  1, t(27, 11, 1987) +  50,  c[mp(1,"00")],  NULL);
+    c[mp(1,"11")] = CreateAndRegisterCatalog("/00/11",  1, t(27, 11, 1987) + 100,  c[mp(1,"00")],  NULL);
 
     c[mp(1,"00")]->AddFile (h("c05b6c2319608d2dd03c0d19dba586682772b953"),       1337); // 1
     c[mp(1,"00")]->AddFile (h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1"),         42); // 1
@@ -149,8 +149,8 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(2,"00")] = CreateAndRegisterCatalog("",        2,  NULL,          c[mp(1,"00")]);
-    c[mp(2,"10")] = CreateAndRegisterCatalog("/00/10",  2,  c[mp(2,"00")], c[mp(1,"10")]);
+    c[mp(2,"00")] = CreateAndRegisterCatalog("",        2, t(3, 3, 2000),      NULL,          c[mp(1,"00")]);
+    c[mp(2,"10")] = CreateAndRegisterCatalog("/00/10",  2, t(3, 3, 2000) + 20, c[mp(2,"00")], c[mp(1,"10")]);
     c[mp(2,"11")] = ReuseCatalog(c[mp(1,"11")], c[mp(2,"00")]);
 
     c[mp(2,"00")]->AddFile (h("c05b6c2319608d2dd03c0d19dba586682772b953"),       1337); // 1
@@ -173,9 +173,9 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(3,"00")] = CreateAndRegisterCatalog("",        3,  NULL,          c[mp(2,"00")]);
-    c[mp(3,"10")] = CreateAndRegisterCatalog("/00/10",  3,  c[mp(3,"00")], c[mp(2,"10")]);
-    c[mp(3,"11")] = CreateAndRegisterCatalog("/00/11",  3,  c[mp(3,"00")], c[mp(2,"11")]);
+    c[mp(3,"00")] = CreateAndRegisterCatalog("",        3, t(24, 12, 2004),       NULL,          c[mp(2,"00")]);
+    c[mp(3,"10")] = CreateAndRegisterCatalog("/00/10",  3, t(24, 12, 2004) +  1,  c[mp(3,"00")], c[mp(2,"10")]);
+    c[mp(3,"11")] = CreateAndRegisterCatalog("/00/11",  3, t(24, 12, 2004) + 30,  c[mp(3,"00")], c[mp(2,"11")]);
 
     c[mp(3,"00")]->AddFile (h("c05b6c2319608d2dd03c0d19dba586682772b953"),       1337); // 1
     c[mp(3,"00")]->AddFile (h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1"),         42); // 1*
@@ -207,10 +207,10 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(4,"00")] = CreateAndRegisterCatalog("",          4,  NULL,          c[mp(3,"00")]);
-    c[mp(4,"10")] = CreateAndRegisterCatalog("/00/10",    4,  c[mp(4,"00")], c[mp(3,"10")]);
-    c[mp(4,"11")] = CreateAndRegisterCatalog("/00/11",    4,  c[mp(4,"00")], c[mp(3,"11")]);
-    c[mp(4,"20")] = CreateAndRegisterCatalog("/00/10/20", 4,  c[mp(4,"10")], NULL);
+    c[mp(4,"00")] = CreateAndRegisterCatalog("",          4, t(25, 12, 2004),       NULL,          c[mp(3,"00")]);
+    c[mp(4,"10")] = CreateAndRegisterCatalog("/00/10",    4, t(25, 12, 2004) + 12,  c[mp(4,"00")], c[mp(3,"10")]);
+    c[mp(4,"11")] = CreateAndRegisterCatalog("/00/11",    4, t(25, 12, 2004) + 24,  c[mp(4,"00")], c[mp(3,"11")]);
+    c[mp(4,"20")] = CreateAndRegisterCatalog("/00/10/20", 4, t(25, 12, 2004) + 36,  c[mp(4,"10")], NULL);
 
     c[mp(4,"00")]->AddFile (h("c05b6c2319608d2dd03c0d19dba586682772b953"),       1337); // 1
     c[mp(4,"00")]->AddFile (h("d2068490d25c1bd4ef2f3d3a0568a76046466860"),        123); // 3
@@ -243,10 +243,10 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    c[mp(5,"00")] = CreateAndRegisterCatalog("",          5,  NULL,          c[mp(4,"00")], MockCatalog::root_hash);
-    c[mp(5,"10")] = CreateAndRegisterCatalog("/00/10",    5,  c[mp(5,"00")], c[mp(4,"10")]);
-    c[mp(5,"11")] = CreateAndRegisterCatalog("/00/11",    5,  c[mp(5,"00")], c[mp(4,"11")]);
-    c[mp(5,"20")] = CreateAndRegisterCatalog("/00/10/20", 5,  c[mp(5,"10")], c[mp(4,"20")]);
+    c[mp(5,"00")] = CreateAndRegisterCatalog("",          5,  t(26, 12, 2004),      NULL,           c[mp(4,"00")], MockCatalog::root_hash);
+    c[mp(5,"10")] = CreateAndRegisterCatalog("/00/10",    5,  t(26, 12, 2004) + 10, c[mp(5,"00")],  c[mp(4,"10")]);
+    c[mp(5,"11")] = CreateAndRegisterCatalog("/00/11",    5,  t(26, 12, 2004) + 20, c[mp(5,"00")],  c[mp(4,"11")]);
+    c[mp(5,"20")] = CreateAndRegisterCatalog("/00/10/20", 5,  t(26, 12, 2004) + 30, c[mp(5,"10")],  c[mp(4,"20")]);
 
     c[mp(5,"00")]->AddFile (h("b52945d780f8cc16711d4e670d82499dad99032d"),       1331); // 5
     c[mp(5,"00")]->AddFile (h("d650d325d59ea9ca754f9b37293cd08d0b12584c"),        513); // 5
@@ -295,6 +295,7 @@ class T_GarbageCollector : public ::testing::Test {
   MockCatalog* CreateAndRegisterCatalog(
                   const std::string  &root_path,
                   const unsigned int  revision,
+                  const time_t        last_modified,
                   MockCatalog        *parent       = NULL,
                   MockCatalog        *previous     = NULL,
                   const shash::Any   &catalog_hash = shash::Any(shash::kSha1)) {
@@ -311,6 +312,7 @@ class T_GarbageCollector : public ::testing::Test {
                                            effective_clg_hash,
                                            dice_.Next(10000),
                                            revision,
+                                           last_modified,
                                            is_root,
                                            parent,
                                            previous);

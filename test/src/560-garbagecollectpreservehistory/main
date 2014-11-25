@@ -204,7 +204,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform garbage collection with historic revision preservation = 4 (nothing should get deleted)"
-  cvmfs_server gc -r 4 -f || return 6
+  cvmfs_server gc -r 4 -f $CVMFS_TEST_REPO || return 6
 
   echo "check that all catalogs are present"
   for catalog in $catalogs; do
@@ -219,7 +219,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform garbage collection with historic revision preservation = 2"
-  cvmfs_server gc -r 2 -f || return 6
+  cvmfs_server gc -r 2 -f $CVMFS_TEST_REPO || return 6
 
   echo "check that the right catalogs are still present"
   i=0
@@ -255,7 +255,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform garbage collection with historic revision preservation = 10 (shouldn't change something)"
-  cvmfs_server gc -r 10 -f || return 12
+  cvmfs_server gc -r 10 -f $CVMFS_TEST_REPO || return 12
 
   echo "check that the right catalogs are still present"
   i=0
@@ -284,7 +284,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform garbage collection with historic revision preservation = 0 (should only leave tagged revisions)"
-  cvmfs_server gc -r 0 -f || return 17
+  cvmfs_server gc -r 0 -f $CVMFS_TEST_REPO || return 17
 
   echo "check that the right catalogs are still present"
   i=0
@@ -322,10 +322,10 @@ cvmfs_run_test() {
   cvmfs_server tag -r "revision_10" -f $CVMFS_TEST_REPO || return 24
 
   echo "print tag list"
-  cvmfs_server tag -l || return 24
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 24
 
   echo "run garbage collection (should remove probe file 10)"
-  cvmfs_server gc -f || return 25
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 25
 
   echo "check if all expected files are still there"
   i=0

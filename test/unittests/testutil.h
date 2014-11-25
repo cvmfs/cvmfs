@@ -228,12 +228,13 @@ class MockCatalog {
               const shash::Any  &catalog_hash,
               const uint64_t     catalog_size,
               const unsigned int revision,
+              const time_t       last_modified,
               const bool         is_root,
               MockCatalog *parent   = NULL,
               MockCatalog *previous = NULL) :
     parent_(parent), previous_(previous), root_path_(root_path),
     catalog_hash_(catalog_hash), catalog_size_(catalog_size),
-    revision_(revision), is_root_(is_root)
+    revision_(revision), last_modified_(last_modified), is_root_(is_root)
   {
     if (parent != NULL) {
       parent->RegisterChild(this);
@@ -245,8 +246,8 @@ class MockCatalog {
     parent_(other.parent_), previous_(other.previous_),
     root_path_(other.root_path_), catalog_hash_(other.catalog_hash_),
     catalog_size_(other.catalog_size_), revision_(other.revision_),
-    is_root_(other.is_root_), children_(other.children_), files_(other.files_),
-    chunks_(other.chunks_)
+    last_modified_(other.last_modified_), is_root_(other.is_root_),
+    children_(other.children_), files_(other.files_), chunks_(other.chunks_)
   {
     ++MockCatalog::instances;
   }
@@ -269,7 +270,8 @@ class MockCatalog {
   const NestedCatalogList& ListNestedCatalogs() const { return children_; }
   const HashVector&        GetReferencedObjects() const;
 
-  unsigned int GetRevision() const { return revision_; }
+  unsigned int GetRevision()     const { return revision_;      }
+  uint64_t     GetLastModified() const { return last_modified_; }
 
   shash::Any GetPreviousRevision() const {
     return (previous_ != NULL) ? previous_->hash() : shash::Any();
@@ -304,6 +306,7 @@ class MockCatalog {
   const shash::Any    catalog_hash_;
   const uint64_t      catalog_size_;
   const unsigned int  revision_;
+  const time_t        last_modified_;
   const bool          is_root_;
 
   NestedCatalogList   children_;
