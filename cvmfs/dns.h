@@ -152,9 +152,9 @@ class Host {
 class Resolver : SingleCopy {
  public:
   /**
-   * Enlarge very small TTLs to 5 minutes.
+   * Enlarge very small TTLs to 1 minute.
    */
-  static const unsigned kMinTtl = 300;
+  static const unsigned kMinTtl = 60;
 
   /**
    * Cut off very large TTLs to 1 day.
