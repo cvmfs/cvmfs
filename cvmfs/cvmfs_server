@@ -3698,13 +3698,14 @@ gc() {
   local names
   local list_deleted_objects=0
   local dry_run=0
-  local preserve_revisions=0
-  local collect_statistics=0
+  local preserve_revisions=-1
+  local preserve_timestamp=0
+  local timestamp_threshold=""
   local force=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:sf" option
+  while getopts "ldr:t:f" option
   do
     case $option in
       l)
@@ -3716,8 +3717,8 @@ gc() {
       r)
         preserve_revisions="$OPTARG"
       ;;
-      s)
-        collect_statistics=1
+      t)
+        timestamp_threshold="$OPTARG"
       ;;
       f)
         force=1
@@ -3735,12 +3736,30 @@ gc() {
   names=$(get_or_guess_multiple_repository_names $@)
   check_multiple_repository_existence "$names"
 
-  # global sanity checks
-  [ $preserve_revisions -ge 0 ] || die "at least one revision needs to be preserved! (see -r)"
+  # parse timestamp (if given)
+  if [ ! -z "$timestamp_threshold"  ]; then
+    preserve_timestamp="$(date --date "$timestamp_threshold" +%s 2>/dev/null)"
+    [ $? -eq 0 ] || die "Cannot parse time stamp '$timestamp_threshold'"
+  fi
+
+  [ $preserve_revisions -ge 0 ] && [ $preserve_timestamp -gt 0 ] && die "Please specify either timestamp OR revision thresholds (-r and -t are mutual exclusive)"
+  if [ $preserve_revisions -lt 0 ] && [ $preserve_timestamp -le 0 ]; then
+    # neither revision nor timestamp threshold given... fallback to default
+    preserve_revisions=0
+  fi
+
   if [ $force -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
-    echo "Affected Repositories:      $names"
-    echo "Preserved Legacy Revisions: $preserve_revisions"
+    echo "Affected Repositories:         $names"
+    if [ $preserve_revisions -ge 0 ]; then
+      echo "Preserved Legacy Revisions:    $preserve_revisions"
+    fi
+    if [ $preserve_timestamp -gt 0 ]; then
+      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
+    fi
+    if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
+      echo "Only the latest revision will be preserved."
+    fi
     echo ""
     read -p "Please confirm this action (y/N)? " reply
     if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
@@ -3764,9 +3783,10 @@ gc() {
     local additional_switches=""
     [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
     [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
+    [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
+    [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
     local gc_command="cvmfs_swissknife gc -r $CVMFS_STRATUM0         \
                                           -u $CVMFS_UPSTREAM_STORAGE \
-                                          -h $preserve_revisions     \
                                           -n $CVMFS_REPOSITORY_NAME  \
                                           -k $CVMFS_PUBLIC_KEY       \
                                           -t ${CVMFS_SPOOL_DIR}/tmp  \
