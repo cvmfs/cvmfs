@@ -64,7 +64,6 @@ int CommandGc::Main(const ArgumentList &args) {
   config.uploader               = AbstractUploader::Construct(spooler_definition);
   config.keep_history_depth     = revisions;
   config.keep_history_timestamp = timestamp;
-  config.keep_named_snapshots   = true;
   config.dry_run                = dry_run;
   config.verbose                = list_condemned_objects;
   config.repo_url               = repo_url;

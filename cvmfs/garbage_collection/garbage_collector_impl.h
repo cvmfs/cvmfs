@@ -173,10 +173,11 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
-  if (configuration_.keep_named_snapshots) {
-    success = traversal_.TraverseNamedSnapshots();
-  }
-  success = (success && traversal_.Traverse());
+
+
+  success = traversal_.Traverse() && // traverses the current HEAD
+            traversal_.TraverseNamedSnapshots();
+
   traversal_.UnregisterListener(callback);
 
   if (success && preserved_catalog_count() == 0) {
