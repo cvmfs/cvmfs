@@ -314,13 +314,124 @@ class MockCatalog {
 };
 
 
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+class MockHistory : public history::History {
+ public:
+  typedef std::map<std::string, history::History::Tag> TagMap;
+
+ public:
+  // TODO: count number of instances
+  MockHistory(const bool          writable,
+              const std::string  &fqrn);
+  MockHistory(const MockHistory &other);
+  ~MockHistory() {}
+
+  history::History* Clone(const bool writable = false) const;
+
+  bool IsWritable()        const { return writable_;    }
+  int GetNumberOfTags()    const { return tags_.size(); }
+  bool BeginTransaction()  const { return true;         }
+  bool CommitTransaction() const { return true;         }
+
+  bool SetPreviousRevision(const shash::Any &history_hash) { return true; }
+
+  bool Insert(const Tag &tag);
+  bool Remove(const std::string &name);
+  bool Exists(const std::string &name) const;
+  bool GetByName(const std::string &name, Tag *tag) const;
+  bool GetByDate(const time_t timestamp, Tag *tag) const;
+  bool List(std::vector<Tag> *tags) const;
+  bool Tips(std::vector<Tag> *channel_tips) const;
+
+  bool Rollback(const Tag &updated_target_tag);
+  bool ListTagsAffectedByRollback(const std::string  &target_tag_name,
+                                  std::vector<Tag>   *tags) const;
+
+  bool GetHashes(std::vector<shash::Any> *hashes) const;
+
+ public:
+  void set_writable(const bool writable) { writable_ = writable; }
+
+ protected:
+  void GetTags(std::vector<Tag> *tags) const;
+
+ private:
+  static const Tag& get_tag(const TagMap::value_type &itr) {
+    return itr.second;
+  }
+
+  static const shash::Any& get_hash(const Tag &tag) {
+    return tag.root_hash;
+  }
+
+  static bool gt_channel_revision(const Tag &lhs, const Tag &rhs) {
+    return (lhs.channel == rhs.channel)
+              ? lhs.revision > rhs.revision
+              : lhs.channel > rhs.channel;
+  }
+
+  static bool eq_channel(const Tag &lhs, const Tag &rhs) {
+    return lhs.channel == rhs.channel;
+  }
+
+  static bool gt_hashes(const Tag &lhs, const Tag &rhs) {
+    return lhs.root_hash > rhs.root_hash;
+  }
+
+  static bool eq_hashes(const Tag &lhs, const Tag &rhs) {
+    return lhs.root_hash == rhs.root_hash;
+  }
+
+  struct DateSmallerThan {
+    DateSmallerThan(time_t date) : date_(date) {}
+    bool operator()(const Tag &tag) const {
+      return tag.timestamp <= date_;
+    }
+    const time_t date_;
+  };
+
+  struct RollbackPredicate {
+    RollbackPredicate(const Tag &tag, const bool inverse = false) :
+      tag_(tag),
+      inverse_(inverse) {}
+    bool operator()(const Tag &tag) const {
+      const bool p = (tag.revision > tag_.revision || tag.name == tag_.name) &&
+                      tag.channel == tag_.channel;
+      return inverse_ ^ p;
+    }
+    const Tag  &tag_;
+    const bool  inverse_;
+  };
+
+  struct TagRemover {
+    TagRemover(MockHistory *history) : history_(history) {}
+    bool operator()(const Tag &tag) {
+      return history_->Remove(tag.name);
+    }
+    MockHistory *history_;
+  };
+
+ private:
+  TagMap tags_;
+  bool   writable_;
+};
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
 
 /**
  * This is a mock of an ObjectFetcher that does essentially nothing.
  */
 class MockObjectFetcher {
  public:
-  static UniquePtr<history::History>  *s_history;
+  static MockHistory                  *s_history;
   static std::set<shash::Any>         *deleted_catalogs;
 
  public:
@@ -328,9 +439,7 @@ class MockObjectFetcher {
  public:
   manifest::Manifest* FetchManifest();
   history::History* FetchHistory() {
-    return (MockObjectFetcher::s_history != NULL)
-              ? s_history->Release()
-              : NULL;
+    return MockObjectFetcher::s_history->Clone();
   }
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {

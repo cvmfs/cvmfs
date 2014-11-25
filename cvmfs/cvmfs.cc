@@ -94,7 +94,7 @@
 #include "loader.h"
 #include "glue_buffer.h"
 #include "compat.h"
-#include "history.h"
+#include "history_sqlite.h"
 #include "manifest_fetch.h"
 #include "auto_umount.h"
 
@@ -2278,7 +2278,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailHistory;
     }
     UnlinkGuard history_file(history_path);
-    UniquePtr<history::History> tag_db(history::History::Open(history_path));
+    UniquePtr<history::History> tag_db(history::SqliteHistory::Open(history_path));
     if (! tag_db) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslog,
                "failed to open history database (%s)", history_path.c_str());

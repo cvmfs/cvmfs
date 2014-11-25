@@ -9,7 +9,7 @@
 #include "swissknife.h"
 #include "hash.h"
 #include "util_concurrency.h"
-#include "history.h"
+#include "history_sqlite.h"
 
 namespace manifest {
   class Manifest;

@@ -18,7 +18,7 @@
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "signature.h"
-#include "history.h"
+#include "history_sqlite.h"
 
 
 namespace catalog {
@@ -850,7 +850,7 @@ class ObjectFetcher {
     }
 
     // TODO: need to unlink history_db_path after usage
-    history::History *history = history::History::Open(history_db_path);
+    history::History *history = history::SqliteHistory::Open(history_db_path);
     if (NULL != history) {
       LogCvmfs(kLogCatalogTraversal, error_sink_,
                "failed to open history database (%s)",
@@ -899,7 +899,7 @@ class ObjectFetcher {
     file_path->clear();
 
     const std::string source =
-      "data" + object_hash.MakePathExplicit(1, 2) + hash_suffix;
+      "data" + object_hash.MakePathWithSuffix(1, 2, hash_suffix);
     const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
     const std::string url = repo_url_ + "/" + source;
 
@@ -928,7 +928,7 @@ class ObjectFetcher {
     file_path->clear();
 
     const std::string source =
-      repo_url_ + "/data" + object_hash.MakePathExplicit(1, 2) + hash_suffix;
+      repo_url_ + "/data" + object_hash.MakePathWithSuffix(1, 2, hash_suffix);
     const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
     const bool file_exists = FileExists(source);
 

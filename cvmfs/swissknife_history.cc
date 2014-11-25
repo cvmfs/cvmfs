@@ -431,8 +431,8 @@ history::History* CommandTag::GetHistory(
   history::History *history;
 
   if (history_hash.IsNull()) {
-    history = history::History::Create(history_path,
-                                       manifest->repository_name());
+    history = history::SqliteHistory::Create(history_path,
+                                             manifest->repository_name());
     if (NULL == history) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to create history database");
       return NULL;
@@ -445,8 +445,8 @@ history::History* CommandTag::GetHistory(
       return NULL;
     }
 
-    history = (read_write) ? history::History::OpenWritable(history_path)
-                           : history::History::Open(history_path);
+    history = (read_write) ? history::SqliteHistory::OpenWritable(history_path)
+                           : history::SqliteHistory::Open(history_path);
     if (NULL == history) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database (%s)",
                history_path.c_str());
