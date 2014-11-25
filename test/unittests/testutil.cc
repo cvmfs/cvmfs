@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 #include <gtest/gtest.h>
 
@@ -119,8 +120,8 @@ void MockCatalog::Reset() {
 
 void MockCatalog::RegisterCatalog(MockCatalog *catalog) {
   ASSERT_EQ (MockCatalog::available_catalogs.end(),
-             MockCatalog::available_catalogs.find(catalog->catalog_hash()));
-  MockCatalog::available_catalogs[catalog->catalog_hash()] = catalog;
+             MockCatalog::available_catalogs.find(catalog->hash()));
+  MockCatalog::available_catalogs[catalog->hash()] = catalog;
 }
 
 void MockCatalog::UnregisterCatalogs() {
@@ -159,7 +160,7 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
 void MockCatalog::RegisterChild(MockCatalog *child) {
   NestedCatalog nested;
   nested.path  = PathString(child->root_path());
-  nested.hash  = child->catalog_hash();
+  nested.hash  = child->hash();
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);
@@ -185,29 +186,23 @@ void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
   chunks_.push_back(c);
 }
 
+template <class T>
+struct HashExtractor {
+  const shash::Any& operator() (const T &object) const {
+    return object.hash;
+  }
+};
+
 const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
   if (referenced_objects_.empty()) {
-    referenced_objects_.reserve(   children_.size()
-                                 + files_.size()
-                                 + chunks_.size());
+    const size_t num_objs = files_.size() + chunks_.size();
+    referenced_objects_.resize(num_objs);
+    HashVector::iterator i = referenced_objects_.begin();
 
-          NestedCatalogList::const_iterator i    = children_.begin();
-    const NestedCatalogList::const_iterator iend = children_.end();
-    for (; i != iend; ++i) {
-      referenced_objects_.push_back(i->hash);
-    }
-
-          FileList::const_iterator j    = files_.begin();
-    const FileList::const_iterator jend = files_.end();
-    for (; j != jend; ++j) {
-      referenced_objects_.push_back(j->hash);
-    }
-
-          ChunkList::const_iterator k    = chunks_.begin();
-    const ChunkList::const_iterator kend = chunks_.end();
-    for (; k != kend; ++k) {
-      referenced_objects_.push_back(k->hash);
-    }
+    i = std::transform(files_.begin(), files_.end(),
+                       i, HashExtractor<File>());
+    i = std::transform(chunks_.begin(), chunks_.end(),
+                       i, HashExtractor<Chunk>());
   }
 
   return referenced_objects_;

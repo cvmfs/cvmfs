@@ -217,6 +217,18 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
   /**
+   * Overloaded Remove method used to remove a object based on its content hash.
+   *
+   * @param hash_to_delete  the content hash of a file to be deleted
+   * @return                true on successful removal (removing a non-existant
+   *                        object is a successful deletion as well!)
+   */
+  virtual bool Remove(const shash::Any &hash_to_delete) {
+    return Remove(hash_to_delete.MakePath("data"));
+  }
+
+
+  /**
    * Checks if a file is already present in the backend storage. This might be a
    * synchronous operation.
    *
