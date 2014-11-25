@@ -25,8 +25,9 @@ ParameterList CommandGc::GetParams() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory / url"));
   r.push_back(Parameter::Mandatory('u', "spooler definition string"));
-  r.push_back(Parameter::Mandatory('h', "conserve <h> revisions"));
   r.push_back(Parameter::Mandatory('n', "fully qualified repository name"));
+  r.push_back(Parameter::Optional ('h', "conserve <h> revisions"));
+  r.push_back(Parameter::Optional ('z', "conserve revisions younger than <z>"));
   r.push_back(Parameter::Optional ('k', "repository master key(s)"));
   r.push_back(Parameter::Optional ('t', "temporary directory"));
   r.push_back(Parameter::Switch   ('d', "dry run"));
@@ -39,8 +40,9 @@ ParameterList CommandGc::GetParams() {
 int CommandGc::Main(const ArgumentList &args) {
   const std::string &repo_url               = *args.find('r')->second;
   const std::string &spooler                = *args.find('u')->second;
-  const int64_t      revisions              = String2Int64(*args.find('h')->second);
-  const std::string &repo_name              = (args.count('n') > 0) ? *args.find('n')->second : "";
+  const std::string &repo_name              = *args.find('n')->second;
+  const int64_t      revisions              = (args.count('h') > 0) ? String2Int64(*args.find('h')->second) : GcConfig::kFullHistory;
+  const time_t       timestamp              = (args.count('z') > 0) ? static_cast<time_t>(String2Int64(*args.find('z')->second)) : GcConfig::kNoTimestamp;
   const std::string &repo_keys              = (args.count('k') > 0) ? *args.find('k')->second : "";
   const bool         dry_run                = (args.count('d') > 0);
   const bool         list_condemned_objects = (args.count('l') > 0);
@@ -51,17 +53,24 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
+  if (timestamp == GcConfig::kNoTimestamp &&
+      revisions == GcConfig::kFullHistory) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "neither a timestamp nor history threshold given");
+    return 1;
+  }
+
   GcConfig config;
   const upload::SpoolerDefinition spooler_definition(spooler, shash::kAny);
-  config.uploader             = AbstractUploader::Construct(spooler_definition);
-  config.keep_history_depth   = revisions;
-  config.keep_named_snapshots = true;
-  config.dry_run              = dry_run;
-  config.verbose              = list_condemned_objects;
-  config.repo_url             = repo_url;
-  config.repo_name            = repo_name;
-  config.repo_keys            = repo_keys;
-  config.tmp_dir              = temp_directory;
+  config.uploader               = AbstractUploader::Construct(spooler_definition);
+  config.keep_history_depth     = revisions;
+  config.keep_history_timestamp = timestamp;
+  config.keep_named_snapshots   = true;
+  config.dry_run                = dry_run;
+  config.verbose                = list_condemned_objects;
+  config.repo_url               = repo_url;
+  config.repo_name              = repo_name;
+  config.repo_keys              = repo_keys;
+  config.tmp_dir                = temp_directory;
 
   if (config.uploader == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
