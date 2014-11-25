@@ -371,6 +371,44 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
 //------------------------------------------------------------------------------
 
 
+SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
+  const string statement =
+    (database.schema_version() < 2.4-CatalogDatabase::kSchemaEpsilon)
+    ? "SELECT hash, flags, 0 "
+      "  FROM catalog "
+      "  WHERE length(hash) > 0;"
+
+    : "SELECT hash, flags, 0 "
+      "  FROM catalog "
+      "  WHERE length(catalog.hash) > 0 "
+      "UNION "
+      "SELECT chunks.hash, catalog.flags, 1 "
+      "  FROM catalog "
+      "  LEFT JOIN chunks "
+      "  ON catalog.md5path_1 = chunks.md5path_1 AND "
+      "     catalog.md5path_2 = chunks.md5path_2 "
+      "  WHERE length(catalog.hash) > 0;";
+
+  const bool successful_init = Init(database.sqlite_db(), statement);
+  assert (successful_init);
+}
+
+
+shash::Any SqlListContentHashes::GetHash() const {
+  const unsigned int      db_flags       = RetrieveInt(1);
+  const shash::Algorithms hash_algorithm = RetrieveHashAlgorithm(db_flags);
+  shash::Any              hash           = RetrieveHashBlob(0, hash_algorithm);
+  if (RetrieveInt(2) == 1) {
+    hash.suffix = shash::kSuffixPartial;
+  }
+
+  return hash;
+}
+
+
+//------------------------------------------------------------------------------
+
+
 string SqlLookup::GetFieldsToSelect(const float schema_version) const {
   if (schema_version < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     return "catalog.hash, catalog.inode, catalog.size, catalog.mode, "

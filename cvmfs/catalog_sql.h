@@ -255,6 +255,16 @@ class SqlDirentWrite : public SqlDirent {
 //------------------------------------------------------------------------------
 
 
+class SqlListContentHashes : public SqlDirent {
+ public:
+  SqlListContentHashes(const CatalogDatabase &database);
+  shash::Any GetHash() const;
+};
+
+
+//------------------------------------------------------------------------------
+
+
 class SqlLookup : public SqlDirent {
  protected:
   /**

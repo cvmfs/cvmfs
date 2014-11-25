@@ -89,18 +89,28 @@ class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
   friend class SqlLookup;                  // for mangled inode and uid/gid maps
   friend class swissknife::CommandMigrate; // for catalog version migration
+
+ public:
+  typedef std::vector<shash::Any> HashVector;
+
  public:
   static const uint64_t kDefaultTTL = 900;  /**< 15 minutes default TTL */
 
+  /**
+   * Note: is_not_root only has an effect if parent == NULL otherwise being
+   *       a root catalog is determined by having a parent pointer or not.
+   */
   Catalog(const PathString  &path,
-          const shash::Any   &catalog_hash,
-                Catalog     *parent);
+          const shash::Any  &catalog_hash,
+                Catalog     *parent,
+          const bool         is_not_root = false);
   virtual ~Catalog();
 
   static Catalog *AttachFreely(const std::string  &root_path,
                                const std::string  &file,
                                const shash::Any   &catalog_hash,
-                                     Catalog      *parent = NULL);
+                                     Catalog      *parent      = NULL,
+                               const bool          is_not_root = false);
 
   bool OpenDatabase(const std::string &db_path);
 
@@ -144,6 +154,8 @@ class Catalog : public SingleCopy {
                          const shash::Algorithms interpret_hashes_as,
                          FileChunkList *chunks) const;
 
+  const HashVector& GetReferencedObjects() const;
+
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   uint64_t GetLastModified() const;
@@ -161,11 +173,13 @@ class Catalog : public SingleCopy {
   inline PathString root_prefix() const { return root_prefix_; }
   inline shash::Any hash() const { return catalog_hash_; }
   inline bool volatile_flag() const { return volatile_flag_; }
+  inline uint64_t revision() const { return GetRevision(); }
 
   inline bool IsInitialized() const {
     return inode_range_.IsInitialized() && initialized_;
   }
-  inline bool IsRoot() const { return NULL == parent_; }
+  inline bool IsRoot() const { return is_root_; }
+  inline bool HasParent() const { return parent_ != NULL; }
   inline virtual bool IsWritable() const { return false; }
 
   typedef struct {
@@ -231,6 +245,7 @@ class Catalog : public SingleCopy {
   PathString root_prefix_;
   PathString path_;
   bool volatile_flag_;
+  const bool is_root_;
 
   Catalog *parent_;
   NestedCatalogMap children_;
@@ -253,6 +268,8 @@ class Catalog : public SingleCopy {
   SqlNestedCatalogListing  *sql_list_nested_;
   SqlAllChunks             *sql_all_chunks_;
   SqlChunksListing         *sql_chunks_listing_;
+
+  mutable HashVector        referenced_hashes_;
 };  // class Catalog
 
 }  // namespace catalog

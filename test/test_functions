@@ -691,6 +691,23 @@ get_catalog_count() {
   echo $(cvmfs_server list-catalogs -x $repo_name | wc -l)
 }
 
+# retrieves the hash of the current root catalog of the given
+# repository by investigating the manifest
+# @param repo_name  the name of the repository
+# @return           the current root catalog hash
+get_current_root_catalog() {
+  local repo_name=$1
+  local manifest_url="$(get_repo_url $repo_name)/.cvmfspublished"
+  local catalog_record=$(curl "$manifest_url" 2>/dev/null | grep --text '^C[a-f0-9]*\(-[a-z0-9]*\)\?$')
+                                                                        # ^^~~~~~~~^ ^~~~~~~~~~~~^
+                                                                        # ||       | |           |
+                                                                        # ||       | +-----------+-- (optional) Hash Suffix
+                                                                        # |+-------+---------------- Hash String
+                                                                        # +------------------------- Manifest Field Identifier
+  local characters=$(echo -n $catalog_record | wc -c)
+  echo -n $catalog_record | tail -c $(( $characters - 1 ))
+}
+
 # uses `cvmfs_server check` to check the integrity of the catalog structure
 # additionally it might check the backend storage integrity as well when
 # provided with -i
@@ -1002,13 +1019,20 @@ _resign_legacy_repository() {
 # extracts a tarball into the root directory!
 # Note: it expects the tarball to define the full destination path.
 # @param tarball  the path to the tarball to be planted
+# @param verbose  print the verbose output of tar
 plant_tarball() {
   local tarball="$1"
+  local verbose="$2"
   local olddir="$(pwd)"
+  local tar_params="xzf"
 
-  cd /                  || return 101
-  sudo tar xzf $tarball || return 102
-  cd $olddir            || return 103
+  if [ x"$verbose" != x"" ]; then
+    tar_params="${tar_params}v"
+  fi
+
+  cd /                          || return 101
+  sudo tar $tar_params $tarball || return 102
+  cd $olddir                    || return 103
 }
 
 
@@ -1017,15 +1041,44 @@ plant_tarball() {
 #       it expects a repo keychain to be planted in /etc/keys/${legacy_repo_name}
 # @param tarball           path to the tarball containing the legacy repo
 # @param legacy_repo_name  FQRN of the repository to be planted
+# @param verbose           print verbose output
 plant_legacy_repository_revision() {
   local tarball="$1"
   local legacy_repo_name="$2"
+  local verbose="$3"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
 
-  plant_tarball "$tarball"                                             || return 104
+  plant_tarball "$tarball" "$verbose"                                  || return 104
   [ -d ${legacy_repo_storage}/pub ]                                    || return 105
   [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
   [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
   sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
   _resign_legacy_repository "$legacy_repo_name"                        || return 109
+}
+
+
+# creates a path into the CAS of CVMFS server
+#
+# @param content_hash   the content hash to be checked
+make_path() {
+  local content_hash="$1"
+  local characters=$(echo -n $content_hash | wc -c)
+  local head_cnt=2
+  local tail_cnt=$(( $characters - $head_cnt ))
+  echo "data/$(echo -n $content_hash | head -c $head_cnt)/$(echo -n $content_hash | tail -c $tail_cnt)"
+}
+
+
+# peeks in the upstream storage to find a given content hash
+#
+# @param repository     the repository name to be queried
+# @param content_hash   the content has to be checked for availability
+# @return 0             on successfully found object
+peek_backend() {
+  local repo_name="$1"
+  local content_hash="$2"
+  local remote_path=$(make_path $content_hash)
+
+  load_repo_config $repo_name
+  cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
 }

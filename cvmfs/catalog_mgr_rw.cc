@@ -800,7 +800,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
                    "data" + hash_catalog.MakePathExplicit(1, 2) + "C");
 
   // Update registered catalog hash in nested catalog
-  if (!catalog->IsRoot()) {
+  if (catalog->HasParent()) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "updating nested catalog link");
     WritableCatalog *parent = static_cast<WritableCatalog *>(catalog->parent());
     parent->UpdateNestedCatalog(catalog->path().ToString(), hash_catalog,

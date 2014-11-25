@@ -464,7 +464,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     job.catalog = CatalogT::AttachFreely(job.path,
                                          job.catalog_file_path,
                                          job.hash,
-                                         job.parent);
+                                         job.parent,
+                                         ! job.IsRootCatalog());
 
     if (job.catalog == NULL) {
       LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to open catalog %s",
@@ -833,13 +834,38 @@ class ObjectFetcher {
   }
 
   inline history::History* FetchHistory() {
-    return NULL;
+    manifest::Manifest *manifest = FetchManifest();
+    assert (manifest != NULL);
+
+    const shash::Any history_hash = manifest->history();
+    delete manifest;
+
+    std::string history_db_path;
+    const bool fetched_successful = Fetch(history_hash, &history_db_path, 'H');
+    if (! fetched_successful) {
+      LogCvmfs(kLogCatalogTraversal, error_sink_,
+               "failed to fetch history database (%s)",
+               history_hash.ToString().c_str());
+      assert (false && "history db download failed");
+    }
+
+    // TODO: need to unlink history_db_path after usage
+    history::History *history = history::History::Open(history_db_path);
+    if (NULL != history) {
+      LogCvmfs(kLogCatalogTraversal, error_sink_,
+               "failed to open history database (%s)",
+               history_db_path.c_str());
+      assert (false && "history db open failed");
+    }
+
+    return history;
   }
 
-  inline bool Fetch(const shash::Any  &catalog_hash,
-                    std::string       *catalog_file) {
-    return (is_remote_) ? DownloadCatalog  (catalog_hash, catalog_file)
-                        : DecompressCatalog(catalog_hash, catalog_file);
+  inline bool Fetch(const shash::Any  &object_hash,
+                    std::string       *object_file,
+                    const char         hash_suffix = 'C') {
+    return (is_remote_) ? Download  (object_hash, hash_suffix, object_file)
+                        : Decompress(object_hash, hash_suffix, object_file);
   }
 
 
@@ -861,63 +887,66 @@ class ObjectFetcher {
 
  protected:
   /**
-   * Downloads a catalog from a remote repository and extracts it in one shot
-   * @param catalog_hash   the SHA-1 hash of the catalog to be downloaded
-   * @param catalog_file   output parameter for the loaded catalog file
-   * @return               true, if catalog was successfully downloaded
+   * Downloads an object from a remote repository and extracts it in one shot
+   * @param object_hash    the SHA-1 hash of the object to be downloaded
+   * @param hash_suffix    hash suffix for the object to be downloaded
+   * @param file_path      output parameter for the loaded object file
+   * @return               true, if object was successfully downloaded
    */
-  bool DownloadCatalog(const shash::Any  &catalog_hash,
-                       std::string       *catalog_file) {
-    catalog_file->clear();
+  bool Download(const shash::Any  &object_hash,
+                const char         hash_suffix,
+                std::string       *file_path) {
+    file_path->clear();
 
-    const std::string source = "data" +
-                               catalog_hash.MakePathExplicit(1, 2) + "C";
-    const std::string dest = temporary_directory_ + "/" + catalog_hash.ToString();
+    const std::string source =
+      "data" + object_hash.MakePathExplicit(1, 2) + hash_suffix;
+    const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
     const std::string url = repo_url_ + "/" + source;
 
-    download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
+    download::JobInfo download_catalog(&url, true, false, &dest, &object_hash);
     download::Failures retval = download_manager_.Fetch(&download_catalog);
 
     if (! ignore_load_failure_ && retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to download catalog "
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to download object "
                                                   "%s (%d - %s)",
-               catalog_hash.ToString().c_str(), retval, Code2Ascii(retval));
+               object_hash.ToString().c_str(), retval, Code2Ascii(retval));
     }
 
-    *catalog_file = dest;
+    *file_path = dest;
     return retval == download::kFailOk;
   }
 
 
   /**
-   * Decompresses a catalog that resides on local storage.
-   * @param catalog_hash   the SHA-1 hash of the catalog to be extracted
-   * @return               the path to the extracted catalog file
+   * Decompresses an object that resides on local storage.
+   * @param object_hash    the SHA-1 hash of the object to be extracted
+   * @return               the path to the extracted object file
    */
-  bool DecompressCatalog(const shash::Any  &catalog_hash,
-                         std::string       *catalog_file) {
-    catalog_file->clear();
+  bool Decompress(const shash::Any  &object_hash,
+                  const char         hash_suffix,
+                  std::string       *file_path) {
+    file_path->clear();
 
     const std::string source =
-      repo_url_ + "/data" + catalog_hash.MakePathExplicit(1, 2) + "C";
-    const std::string dest = temporary_directory_ + "/" + catalog_hash.ToString();
+      repo_url_ + "/data" + object_hash.MakePathExplicit(1, 2) + hash_suffix;
+    const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
     const bool file_exists = FileExists(source);
 
     if (! ignore_load_failure_ && ! file_exists) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to locate catalog %s "
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to locate object %s "
                                                   "at '%s'",
-               catalog_hash.ToString().c_str(), dest.c_str());
+               object_hash.ToString().c_str(), dest.c_str());
     }
 
     if (! file_exists || ! zlib::DecompressPath2Path(source, dest)) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to extract catalog %s "
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to extract object %s "
                                                   "from '%s' to '%s' (errno: %d)",
-               catalog_hash.ToString().c_str(), source.c_str(), dest.c_str(),
+               object_hash.ToString().c_str(), source.c_str(), dest.c_str(),
                errno);
       return false;
     }
 
-    *catalog_file = dest;
+    *file_path = dest;
     return true;
   }
 

@@ -656,7 +656,7 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
  * @return true on success, false otherwise
  */
 void AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
-  if (!catalog->IsRoot())
+  if (catalog->HasParent())
     catalog->parent()->RemoveChild(catalog);
 
   ReleaseInodes(catalog->inode_range());

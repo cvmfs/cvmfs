@@ -261,7 +261,8 @@ class MockCatalog {
   static MockCatalog* AttachFreely(const std::string  &root_path,
                                    const std::string  &file,
                                    const shash::Any   &catalog_hash,
-                                         MockCatalog  *parent = NULL);
+                                         MockCatalog  *parent      = NULL,
+                                   const bool          is_not_root = false);
 
   bool IsRoot() const { return is_root_; }
 
