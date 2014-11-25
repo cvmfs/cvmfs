@@ -316,8 +316,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   bool TraverseNamedSnapshots(const TraversalType type = kBreadthFirstTraversal) {
     typedef std::vector<shash::Any> HashList;
 
-    TraversalContext ctx(default_history_depth_,
-                         default_timestamp_threshold_,
+    TraversalContext ctx(CatalogTraversalParams::kNoHistory,
+                         CatalogTraversalParams::kNoTimestampThreshold,
                          type);
     const UniquePtr<history::History> tag_db(GetHistory());
     HashList root_hashes;
