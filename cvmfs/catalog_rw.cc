@@ -19,10 +19,12 @@ namespace catalog {
 
 WritableCatalog::WritableCatalog(const string      &path,
                                  const shash::Any  &catalog_hash,
-                                 Catalog           *parent) :
+                                       Catalog     *parent,
+                                 const bool         is_not_root) :
   Catalog(PathString(path.data(), path.length()),
           catalog_hash,  // This is 0 for a newly created catalog!
-          parent),
+          parent,
+          is_not_root),
   sql_insert_(NULL),
   sql_unlink_(NULL),
   sql_touch_(NULL),
@@ -38,9 +40,10 @@ WritableCatalog::WritableCatalog(const string      &path,
 WritableCatalog *WritableCatalog::AttachFreely(const string      &root_path,
                                                const string      &file,
                                                const shash::Any  &catalog_hash,
-                                                     Catalog     *parent) {
+                                                     Catalog     *parent,
+                                               const bool         is_not_root) {
   WritableCatalog *catalog =
-    new WritableCatalog(root_path, catalog_hash, parent);
+    new WritableCatalog(root_path, catalog_hash, parent, is_not_root);
   const bool successful_init = catalog->InitStandalone(file);
   if (!successful_init) {
     delete catalog;
@@ -546,7 +549,7 @@ void WritableCatalog::UpdateNestedCatalog(const string &path,
 
 
 void WritableCatalog::MergeIntoParent() {
-  assert(!IsRoot());
+  assert(!IsRoot() && HasParent());
   WritableCatalog *parent = GetWritableParent();
 
   CopyToParent();

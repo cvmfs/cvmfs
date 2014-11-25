@@ -41,13 +41,15 @@ class WritableCatalog : public Catalog {
  public:
   WritableCatalog(const std::string &path,
                   const shash::Any  &catalog_hash,
-                  Catalog           *parent);
+                        Catalog     *parent,
+                  const bool         is_not_root = false);
   virtual ~WritableCatalog();
 
   static WritableCatalog *AttachFreely(const std::string &root_path,
                                        const std::string &file,
                                        const shash::Any  &catalog_hash,
-                                             Catalog     *parent = NULL);
+                                             Catalog     *parent      = NULL,
+                                       const bool         is_not_root = false);
 
   void Transaction();
   void Commit();

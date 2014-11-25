@@ -10,6 +10,7 @@
 #define CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H
 
 #include "../hash.h"
+#include "../smallhash.h"
 
 /**
  * Abstract base class of a HashFilter to define the common interface.
@@ -79,6 +80,48 @@ class SimpleHashFilter : public AbstractHashFilter {
  private:
   std::set<shash::Any>  hashes_;
   bool                  frozen_;
+};
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+/**
+ * This is an implementation of AbstractHashFilter using the SmallHash structure
+ * for internal storage.
+ */
+class SmallhashFilter : public AbstractHashFilter {
+ protected:
+  static uint32_t hasher(const shash::Any &key) {
+    // Don't start with the first bytes, because == is using them as well
+    return (uint32_t) *((uint32_t *)key.digest + 1);
+  }
+
+ public:
+  SmallhashFilter() : frozen_(false) {
+    // zero_element is MD5("unobtanium")
+    shash::Any zero_element(shash::kMd5,
+                            shash::HexPtr("d61f853acc5a39e01f3906f73e31d256"));
+    hashmap_.Init(1048576, zero_element, &SmallhashFilter::hasher);
+  }
+
+  void Fill(const shash::Any &hash) {
+    assert (! frozen_);
+    hashmap_.Insert(hash, true);
+  }
+
+  bool Contains(const shash::Any &hash) const {
+    return hashmap_.Contains(hash);
+  }
+
+  void   Freeze()      { frozen_ = true;         }
+  size_t Count() const { return hashmap_.size(); }
+
+ private:
+  SmallHashDynamic<shash::Any, bool>  hashmap_;
+  bool                                frozen_;
 };
 
 #endif /* CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H */

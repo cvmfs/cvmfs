@@ -118,7 +118,7 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
-    skeleton migrate list-catalogs update-geodb"
+    skeleton migrate list-catalogs update-geodb gc"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -227,6 +227,10 @@ Supported Commands:
                 Re-publishes the given tag as the new latest revision.
                 All snapshots between trunk and the target tag become
                 inaccessible.  Without a tag name, trunk-previous is used.
+  gc            [-l list deleted objects] [-r conserve <r> revisions]
+                [-s collect statistics] [-d dry run] [-f don't ask again]
+                <fully qualified name>
+                (Garbage Collection) removes unreferenced repository revisions
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
   list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
@@ -990,7 +994,7 @@ get_or_guess_multiple_repository_names() {
     else
       for name in $names; do
         if ! contains "$repo_names" $(basename $name); then
-          repo_names="$repo_names $(basename $name)"
+          repo_names="$(basename $name) $repo_names"
         fi
       done
     fi
@@ -3684,6 +3688,96 @@ rollback() {
 
   echo "Flushing file system buffers"
   sync
+}
+
+
+################################################################################
+
+
+gc() {
+  local names
+  local list_deleted_objects=0
+  local dry_run=0
+  local preserve_revisions=0
+  local collect_statistics=0
+  local force=0
+
+  # optional parameter handling
+  OPTIND=1
+  while getopts "ldr:sf" option
+  do
+    case $option in
+      l)
+        list_deleted_objects=1
+      ;;
+      d)
+        dry_run=1
+      ;;
+      r)
+        preserve_revisions="$OPTARG"
+      ;;
+      s)
+        collect_statistics=1
+      ;;
+      f)
+        force=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command gc: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  # get repository names
+  check_parameter_count_for_multiple_repositories $#
+  names=$(get_or_guess_multiple_repository_names $@)
+  check_multiple_repository_existence "$names"
+
+  # global sanity checks
+  [ $preserve_revisions -ge 0 ] || die "at least one revision needs to be preserved! (see -r)"
+  if [ $force -eq 0 ]; then
+    echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
+    echo "Affected Repositories:      $names"
+    echo "Preserved Legacy Revisions: $preserve_revisions"
+    echo ""
+    read -p "Please confirm this action (y/N)? " reply
+    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+      return 1
+    fi
+  fi
+
+  for name in $names; do
+
+    load_repo_config $name
+
+    # sanity checks
+    check_repository_compatibility $name
+    is_stratum0      $name || die "Garbage Collection is currently only supported on Stratum0"
+    is_owner_or_root $name || die "Permission denied: Repository $name is owned by $user"
+
+    # create user shell
+    local user_shell="sh -c"
+    [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
+
+    local additional_switches=""
+    [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
+    [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
+    local gc_command="cvmfs_swissknife gc -r $CVMFS_STRATUM0         \
+                                          -u $CVMFS_UPSTREAM_STORAGE \
+                                          -h $preserve_revisions     \
+                                          -n $CVMFS_REPOSITORY_NAME  \
+                                          -k $CVMFS_PUBLIC_KEY       \
+                                          -t ${CVMFS_SPOOL_DIR}/tmp  \
+                                          $additional_switches"
+
+    # do it
+    if ! $user_shell "$gc_command"; then
+      die "Fail! Executed Command: $gc_command"
+    fi
+
+  done
 }
 
 

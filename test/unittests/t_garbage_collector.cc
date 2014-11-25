@@ -55,7 +55,6 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
 
 class T_GarbageCollector : public ::testing::Test {
  public:
-  static const std::string sandbox;
   static const std::string fqrn;
 
  public:
@@ -68,21 +67,9 @@ class T_GarbageCollector : public ::testing::Test {
 
  protected:
   void SetUp() {
-    // TODO: Remove code duplication with t_catalog_traversal.cc
-    //       Most likely this requires `History` to be mockable
-
-    // create a dummy history file
-    const bool retval = MkdirDeep(sandbox, 0700);
-    ASSERT_TRUE (retval) << "failed to create sandbox";
-    const std::string history_db = GetHistoryFilename();
-    named_snapshots_ = history::History::Create(history_db,
-                                                T_GarbageCollector::fqrn);
-    ASSERT_TRUE (named_snapshots_.IsValid());
-    MockObjectFetcher::s_history = &named_snapshots_; // a pointer to a UniquePtr, I should burn
-                                                      // in hell for that. (If the testee code is
-                                                      // actually requesting this, the UniquePtr
-                                                      // will be released - thus not freed in
-                                                      // MockObjectFetcher::FetchHistory)
+    const bool writable_history = false; // MockHistory doesn't care!
+    MockObjectFetcher::s_history = new MockHistory(writable_history,
+                                                   T_GarbageCollector::fqrn);
 
     dice_.InitLocaltime();
     MockCatalog::Reset();
@@ -92,16 +79,7 @@ class T_GarbageCollector : public ::testing::Test {
   void TearDown() {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
-    MockObjectFetcher::s_history = NULL; // TODO: potential memory leak!
-
-    const bool retval = RemoveTree(sandbox);
-    ASSERT_TRUE (retval) << "failed to remove sandbox";
-  }
-
-  std::string GetHistoryFilename() const {
-    const std::string path = CreateTempPath(sandbox + "/history", 0600);
-    CheckEmpty(path);
-    return path;
+    MockObjectFetcher::Reset();
   }
 
   GcConfiguration GetStandardGarbageCollectorConfiguration() const {
@@ -109,7 +87,7 @@ class T_GarbageCollector : public ::testing::Test {
     config.keep_history_depth = 1;
     config.dry_run            = false;
     config.repo_url           = "http://localhost/cvmfs/dummy.local";
-    config.repo_name          = "not.important.local";
+    config.repo_name          = T_GarbageCollector::fqrn;
     config.repo_keys          = "";
     config.tmp_dir            = "/tmp";
     config.uploader           = GC_MockUploader::MockConstruct();
@@ -293,23 +271,25 @@ class T_GarbageCollector : public ::testing::Test {
     // # Furthermore revision 5 is marked as the current trunk (HEAD).
     // #
     //
-    named_snapshots_->BeginTransaction();
-    ASSERT_TRUE (named_snapshots_->Insert(history::History::Tag(
+
+    history::History *history = MockObjectFetcher::s_history;
+    history->BeginTransaction();
+    ASSERT_TRUE (history->Insert(history::History::Tag(
                                      "Revision2", c[mp(2,"00")]->hash(),
                                      1337, 2, t(27,11,1987),
                                      history::History::kChannelProd,
                                      "this is rev 2")));
-    ASSERT_TRUE (named_snapshots_->Insert(history::History::Tag(
+    ASSERT_TRUE (history->Insert(history::History::Tag(
                                      "Revision4", c[mp(4,"00")]->hash(),
                                      42, 4, t(11, 9,2001),
                                      history::History::kChannelProd,
                                      "this is revision 4")));
-    ASSERT_TRUE (named_snapshots_->Insert(history::History::Tag(
+    ASSERT_TRUE (history->Insert(history::History::Tag(
                                      "Revision5", c[mp(5,"00")]->hash(),
                                      7, 5, t(10, 7,2014),
                                      history::History::kChannelTrunk,
                                      "this is revision 5 - the newest!")));
-    named_snapshots_->CommitTransaction();
+    history->CommitTransaction();
   }
 
   MockCatalog* CreateAndRegisterCatalog(
@@ -382,13 +362,11 @@ class T_GarbageCollector : public ::testing::Test {
 
  protected:
   RevisionMap                  catalogs_;
-  UniquePtr<history::History>  named_snapshots_;
 
  private:
   Prng  dice_;
 };
 
-const std::string T_GarbageCollector::sandbox = "/tmp/cvmfs_ut_garbage_collector";
 const std::string T_GarbageCollector::fqrn    = "test.cern.ch";
 
 
@@ -626,7 +604,7 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   deleted_catalogs.insert(c[mp(3,"00")]->hash());
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
   deleted_catalogs.insert(c[mp(3,"11")]->hash());
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
@@ -644,8 +622,6 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   EXPECT_TRUE (gc1);
   EXPECT_EQ (11u, gc.preserved_catalog_count());
   EXPECT_EQ ( 0u, gc.condemned_catalog_count());
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }
 
 
@@ -659,12 +635,10 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
-  MockObjectFetcher::deleted_catalogs = &deleted_catalogs;
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
   const bool gc1 = gc.Collect();
   EXPECT_FALSE (gc1);
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }
 
 
@@ -678,7 +652,7 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
   // to simulate the actual deletion of objects
   RevisionMap     &c   = catalogs_;
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
-  MockObjectFetcher::deleted_catalogs = &upl->deleted_hashes;
+  MockObjectFetcher::s_deleted_catalogs = &upl->deleted_hashes;
 
   const bool gc1 = gc.Collect();
   EXPECT_TRUE (gc1);
@@ -711,6 +685,4 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
   EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"10")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"11")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"20")]->hash()));
-
-  MockObjectFetcher::deleted_catalogs = NULL;
 }

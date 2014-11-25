@@ -29,7 +29,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
 
   if (configuration_.verbose) {
     if (data.catalog->IsRoot()) {
-      LogCvmfs(kLogGC, kLogStdout, "Preserving Revision %d",
+      LogCvmfs(kLogGc, kLogStdout, "Preserving Revision %d",
                                    data.catalog->revision());
     }
     PrintCatalogTreeEntry(data.tree_level, data.catalog);
@@ -55,7 +55,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
 
   if (configuration_.verbose) {
     if (data.catalog->IsRoot()) {
-      LogCvmfs(kLogGC, kLogStdout, "Sweeping Revision %d",
+      LogCvmfs(kLogGc, kLogStdout, "Sweeping Revision %d",
                                    data.catalog->revision());
     }
     PrintCatalogTreeEntry(data.tree_level, data.catalog);
@@ -90,7 +90,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
   ++condemned_objects_;
 
   if (configuration_.verbose) {
-    LogCvmfs(kLogGC, kLogStdout, "Sweep: %s", hash.ToString().c_str());
+    LogCvmfs(kLogGc, kLogStdout, "Sweep: %s", hash.ToString().c_str());
   }
 
   if (configuration_.dry_run) {
@@ -110,17 +110,17 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::VerifyConfiguration() con
   }
 
   if (cfg.repo_url.empty()) {
-    LogCvmfs(kLogGC, kLogDebug, "No repository url provided");
+    LogCvmfs(kLogGc, kLogDebug, "No repository url provided");
     return false;
   }
 
   if (cfg.repo_name.empty()) {
-    LogCvmfs(kLogGC, kLogDebug, "No repository name provided");
+    LogCvmfs(kLogGc, kLogDebug, "No repository name provided");
     return false;
   }
 
   if (cfg.tmp_dir.empty() || ! DirectoryExists(cfg.tmp_dir)) {
-    LogCvmfs(kLogGC, kLogDebug, "Temporary directory '%s' doesn't exist",
+    LogCvmfs(kLogGc, kLogDebug, "Temporary directory '%s' doesn't exist",
                                 cfg.tmp_dir.c_str());
     return false;
   }
@@ -135,7 +135,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
 
   success = VerifyConfiguration();
   if (! success) {
-    LogCvmfs(kLogGC, kLogStderr, "Malformed GarbageCollector configuration.");
+    LogCvmfs(kLogGc, kLogStderr, "Malformed GarbageCollector configuration.");
   }
 
   success = (success && AnalyzePreservedCatalogTree());
@@ -148,7 +148,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTree() {
   if (configuration_.verbose) {
-    LogCvmfs(kLogGC, kLogStdout, "Preserving data objects in catalog tree");
+    LogCvmfs(kLogGc, kLogStdout, "Preserving data objects in catalog tree");
   }
   bool success = true;
 
@@ -171,10 +171,10 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
   const bool has_condemned_revisions = (traversal_.pruned_revision_count() > 0);
   if (configuration_.verbose) {
     if (! has_condemned_revisions) {
-      LogCvmfs(kLogGC, kLogStdout, "Nothing to be sweeped.");
+      LogCvmfs(kLogGc, kLogStdout, "Nothing to be sweeped.");
 
     } else {
-      LogCvmfs(kLogGC, kLogStdout, "Sweeping unreferenced data objects in "
+      LogCvmfs(kLogGc, kLogStdout, "Sweeping unreferenced data objects in "
                                    "remaining catalogs");
     }
   }
@@ -211,7 +211,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
                                           ? "/"
                                           : catalog->path().ToString();
 
-  LogCvmfs(kLogGC, kLogStdout, "%s%s %s",
+  LogCvmfs(kLogGc, kLogStdout, "%s%s %s",
     tree_indent.c_str(),
     hash_string.c_str(),
     path.c_str());
