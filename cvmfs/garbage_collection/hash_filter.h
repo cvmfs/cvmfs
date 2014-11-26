@@ -17,6 +17,8 @@
  */
 class AbstractHashFilter {
  public:
+  virtual ~AbstractHashFilter() {}
+
   /**
    * Adds the given hash to the filter
    *
