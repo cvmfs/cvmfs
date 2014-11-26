@@ -40,6 +40,11 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
   HistoryDatabase(const std::string  &filename,
                   const OpenMode      open_mode) :
     sqlite::Database<HistoryDatabase>(filename, open_mode) {}
+
+ private:
+  bool CreateTagsTable();
+
+  bool UpgradeSchemaRevision_10_1();
 };
 
 

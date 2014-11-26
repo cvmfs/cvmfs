@@ -7,9 +7,9 @@
 
 namespace history {
 
-const float HistoryDatabase::kLatestSchema = 1.0;
-const float HistoryDatabase::kLatestSupportedSchema = 1.0;
-const unsigned HistoryDatabase::kLatestSchemaRevision = 1;
+const float    HistoryDatabase::kLatestSchema          = 1.0;
+const float    HistoryDatabase::kLatestSupportedSchema = 1.0;
+const unsigned HistoryDatabase::kLatestSchemaRevision  = 1;
 
 const std::string HistoryDatabase::kFqrnKey = "fqrn";
 
@@ -18,6 +18,13 @@ const std::string HistoryDatabase::kFqrnKey = "fqrn";
  * This method creates a new database file and initializes the database schema.
  */
 bool HistoryDatabase::CreateEmptyDatabase() {
+  assert (read_write());
+
+  return CreateTagsTable();
+}
+
+
+bool HistoryDatabase::CreateTagsTable() {
   assert (read_write());
   return sqlite::Sql(sqlite_db(),
     "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
@@ -40,23 +47,35 @@ bool HistoryDatabase::CheckSchemaCompatibility() {
 
 bool HistoryDatabase::LiveSchemaUpgradeIfNecessary() {
   assert (read_write());
+  assert (IsEqualSchema(schema_version(), 1.0));
 
-  if (schema_revision() == 0) {
-    LogCvmfs(kLogHistory, kLogDebug, "upgrading schema revision");
-
-    sqlite::Sql sql_upgrade(sqlite_db(), "ALTER TABLE tags ADD size INTEGER;");
-    if (!sql_upgrade.Execute()) {
-      LogCvmfs(kLogHistory, kLogDebug, "failed to upgrade tags table");
-      return false;
-    }
-
-    set_schema_revision(1);
-    if (! StoreSchemaRevision()) {
-      LogCvmfs(kLogHistory, kLogDebug, "failed tp upgrade schema revision");
-      return false;
-    }
+  if (schema_revision() == kLatestSchemaRevision) {
+    return true;
   }
 
+  LogCvmfs(kLogHistory, kLogDebug, "upgrading history schema revision "
+                                   "%.2f (Rev: %d) to %.2f (Rev: %d)",
+           schema_version(), schema_revision(),
+           kLatestSchema, kLatestSchemaRevision);
+
+  const bool success = UpgradeSchemaRevision_10_1();
+
+  return success && StoreSchemaRevision();
+}
+
+
+bool HistoryDatabase::UpgradeSchemaRevision_10_1() {
+  if (schema_revision() > 0) {
+    return true;
+  }
+
+  sqlite::Sql sql_upgrade(sqlite_db(), "ALTER TABLE tags ADD size INTEGER;");
+  if (!sql_upgrade.Execute()) {
+    LogCvmfs(kLogHistory, kLogStderr, "failed to upgrade tags table");
+    return false;
+  }
+
+  set_schema_revision(1);
   return true;
 }
 
