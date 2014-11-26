@@ -141,19 +141,25 @@ class SqliteHistory : public History {
   template <class SqlListingT>
   bool RunListing(std::vector<Tag> *list, SqlListingT *sql) const;
 
- private:
-  UniquePtr<HistoryDatabase>      database_;
+  bool KeepHashReference(const Tag &tag);
 
-  UniquePtr<SqlInsertTag>         insert_tag_;
-  UniquePtr<SqlRemoveTag>         remove_tag_;
-  UniquePtr<SqlFindTag>           find_tag_;
-  UniquePtr<SqlFindTagByDate>     find_tag_by_date_;
-  UniquePtr<SqlCountTags>         count_tags_;
-  UniquePtr<SqlListTags>          list_tags_;
-  UniquePtr<SqlGetChannelTips>    channel_tips_;
-  UniquePtr<SqlGetHashes>         get_hashes_;
-  UniquePtr<SqlRollbackTag>       rollback_tag_;
-  UniquePtr<SqlListRollbackTags>  list_rollback_tags_;
+ private:
+  UniquePtr<HistoryDatabase>        database_;
+
+  UniquePtr<SqlInsertTag>           insert_tag_;
+  UniquePtr<SqlRemoveTag>           remove_tag_;
+  UniquePtr<SqlFindTag>             find_tag_;
+  UniquePtr<SqlFindTagByDate>       find_tag_by_date_;
+  UniquePtr<SqlCountTags>           count_tags_;
+  UniquePtr<SqlListTags>            list_tags_;
+  UniquePtr<SqlGetChannelTips>      channel_tips_;
+  UniquePtr<SqlGetHashes>           get_hashes_;
+  UniquePtr<SqlRollbackTag>         rollback_tag_;
+  UniquePtr<SqlListRollbackTags>    list_rollback_tags_;
+  UniquePtr<SqlRecycleBinInsert>    recycle_insert_;
+  UniquePtr<SqlRecycleBinList>      recycle_list_;
+  UniquePtr<SqlRecycleBinFlush>     recycle_empty_;
+  UniquePtr<SqlRecycleBinRollback>  recycle_rollback_;
 };
 
 } /* namespace history */
