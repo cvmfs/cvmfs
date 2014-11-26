@@ -21,7 +21,7 @@ typedef CatalogTraversal<MockCatalog, MockObjectFetcher> MockedCatalogTraversal;
 class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
  public:
   GC_MockUploader(const SpoolerDefinition &spooler_definition) :
-    AbstractMockUploader(spooler_definition) {}
+    AbstractMockUploader<GC_MockUploader>(spooler_definition) {}
 
   upload::UploadStreamHandle* InitStreamedUpload(
                                             const callback_t *callback = NULL) {
@@ -31,13 +31,13 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
   void Upload(upload::UploadStreamHandle  *abstract_handle,
               upload::CharBuffer          *buffer,
               const callback_t            *callback = NULL) {
-    assert (AbstractMockUploader::not_implemented);
+    assert (AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *abstract_handle,
                               const shash::Any            content_hash,
                               const std::string           hash_suffix) {
-    assert (AbstractMockUploader::not_implemented);
+    assert (AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
   bool Remove(const shash::Any &hash_to_delete) {
