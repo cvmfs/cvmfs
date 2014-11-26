@@ -128,6 +128,7 @@ class History {
   virtual bool Tips(std::vector<Tag> *channel_tips) const            = 0;
 
   virtual bool ListRecycleBin(std::vector<shash::Any> *hashes) const = 0;
+  virtual bool EmptyRecycleBin()                                     = 0;
 
   /**
    * Rolls back the history to the provided target tag and deletes all tags

@@ -275,6 +275,14 @@ bool SqliteHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
 }
 
 
+bool SqliteHistory::EmptyRecycleBin() {
+  assert (database_);
+  assert (recycle_empty_.IsValid());
+  return recycle_empty_->Execute() &&
+         recycle_empty_->Reset();
+}
+
+
 bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   assert (database_);
   assert (recycle_rollback_.IsValid());
