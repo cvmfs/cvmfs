@@ -1516,6 +1516,20 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     } else {
       attribute_value = "internal error: no hosts defined";
     }
+  } else if (attr == "user.host_list") {
+    vector<string> host_chain;
+    vector<int> rtt;
+    unsigned current_host;
+    download_manager_->GetHostInfo(&host_chain, &rtt, &current_host);
+    if (host_chain.size()) {
+      attribute_value = host_chain[current_host];
+      for (unsigned i = 1; i < host_chain.size(); ++i) {
+        attribute_value +=
+          ";" + host_chain[(i+current_host) % host_chain.size()];
+      }
+    } else {
+      attribute_value = "internal error: no hosts defined";
+    }
   } else if (attr == "user.uptime") {
     time_t now = time(NULL);
     uint64_t uptime = now - boot_time_;
