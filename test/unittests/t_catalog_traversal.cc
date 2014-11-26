@@ -456,6 +456,7 @@ TEST_F(T_CatalogTraversal, SimpleTraversal) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
 
   CheckVisitedCatalogs(catalogs, SimpleTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, SimpleTraversal_visited_catalogs);
 }
 
 
@@ -542,6 +543,7 @@ TEST_F(T_CatalogTraversal, ZeroLevelHistoryTraversal) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
 
   CheckVisitedCatalogs(catalogs, ZeroLevelHistoryTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, ZeroLevelHistoryTraversal_visited_catalogs);
 }
 
 
@@ -620,6 +622,7 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversal) {
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
 
   CheckVisitedCatalogs(catalogs, FirstLevelHistoryTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, FirstLevelHistoryTraversal_visited_catalogs);
 }
 
 
@@ -733,14 +736,13 @@ TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversal) {
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
   catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(4, "/00/11"));
   catalogs.push_back(std::make_pair(4, "/00/11/24"));
   catalogs.push_back(std::make_pair(4, "/00/11/23"));
@@ -750,15 +752,17 @@ TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversal) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
 
   CheckVisitedCatalogs(catalogs, SecondLevelHistoryTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, SecondLevelHistoryTraversal_visited_catalogs);
 }
 
 
@@ -836,14 +840,13 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversal) {
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
   catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(4, "/00/11"));
   catalogs.push_back(std::make_pair(4, "/00/11/24"));
   catalogs.push_back(std::make_pair(4, "/00/11/23"));
@@ -853,6 +856,15 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversal) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
@@ -860,7 +872,6 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversal) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(3, "/00/11"));
   catalogs.push_back(std::make_pair(3, "/00/11/24"));
   catalogs.push_back(std::make_pair(3, "/00/11/23"));
@@ -870,13 +881,6 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversal) {
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
@@ -888,6 +892,7 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversal) {
   catalogs.push_back(std::make_pair(1, ""));
 
   CheckVisitedCatalogs(catalogs, FullHistoryTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, FullHistoryTraversal_visited_catalogs);
 }
 
 
@@ -948,6 +953,7 @@ TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(4, ""));
 
   CheckVisitedCatalogs(catalogs, SecondLevelHistoryTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, SecondLevelHistoryTraversalNoRepeat_visited_catalogs);
 }
 
 
@@ -1022,6 +1028,7 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversalNoRepeat) {
   EXPECT_EQ (initial_catalog_instances, FullHistoryTraversalNoRepeat_visited_catalogs.size());
 
   CheckVisitedCatalogs(catalogs, FullHistoryTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, FullHistoryTraversalNoRepeat_visited_catalogs);
 }
 
 
@@ -1072,19 +1079,19 @@ TEST_F(T_CatalogTraversal, MultiTraversal) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
   CheckVisitedCatalogs(catalogs, MultiTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversal_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
   EXPECT_TRUE (t2);
 
   catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(4, "/00/11"));
   catalogs.push_back(std::make_pair(4, "/00/11/24"));
   catalogs.push_back(std::make_pair(4, "/00/11/23"));
@@ -1094,14 +1101,16 @@ TEST_F(T_CatalogTraversal, MultiTraversal) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
   CheckVisitedCatalogs(catalogs, MultiTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversal_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
   EXPECT_TRUE (t3);
@@ -1115,6 +1124,7 @@ TEST_F(T_CatalogTraversal, MultiTraversal) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   CheckVisitedCatalogs(catalogs, MultiTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversal_visited_catalogs);
 }
 
 
@@ -1166,6 +1176,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
   CheckVisitedCatalogs(catalogs, MultiTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalNoRepeat_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
   EXPECT_TRUE (t2);
@@ -1179,12 +1190,14 @@ TEST_F(T_CatalogTraversal, MultiTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   CheckVisitedCatalogs(catalogs, MultiTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalNoRepeat_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
   EXPECT_TRUE (t3);
 
   catalogs.push_back(std::make_pair(2, ""));
   CheckVisitedCatalogs(catalogs, MultiTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalNoRepeat_visited_catalogs);
 }
 
 
@@ -1264,19 +1277,19 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
   CheckVisitedCatalogs(catalogs, MultiTraversalFirstLevelHistory_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistory_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
   EXPECT_TRUE (t2);
 
   catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(4, "/00/11"));
   catalogs.push_back(std::make_pair(4, "/00/11/24"));
   catalogs.push_back(std::make_pair(4, "/00/11/23"));
@@ -1286,6 +1299,15 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
@@ -1293,7 +1315,6 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(3, "/00/11"));
   catalogs.push_back(std::make_pair(3, "/00/11/24"));
   catalogs.push_back(std::make_pair(3, "/00/11/23"));
@@ -1303,14 +1324,8 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   CheckVisitedCatalogs(catalogs, MultiTraversalFirstLevelHistory_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistory_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
   EXPECT_TRUE (t3);
@@ -1325,6 +1340,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(1, ""));
   CheckVisitedCatalogs(catalogs, MultiTraversalFirstLevelHistory_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistory_visited_catalogs);
 }
 
 
@@ -1385,6 +1401,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   CheckVisitedCatalogs(catalogs, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
   EXPECT_TRUE (t2);
@@ -1401,6 +1418,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
   CheckVisitedCatalogs(catalogs, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
   EXPECT_TRUE (t3);
@@ -1408,6 +1426,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(1, ""));
   CheckVisitedCatalogs(catalogs, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs);
 }
 
 
@@ -1490,6 +1509,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSimpleTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterSimpleTraversal_visited_catalogs);
   EXPECT_EQ (1u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned();
@@ -1524,14 +1544,13 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
   catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(4, "/00/11"));
   catalogs.push_back(std::make_pair(4, "/00/11/24"));
   catalogs.push_back(std::make_pair(4, "/00/11/23"));
@@ -1541,6 +1560,15 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
@@ -1548,7 +1576,6 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(3, "/00/11"));
   catalogs.push_back(std::make_pair(3, "/00/11/24"));
   catalogs.push_back(std::make_pair(3, "/00/11/23"));
@@ -1558,13 +1585,6 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
@@ -1576,6 +1596,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
   catalogs.push_back(std::make_pair(1, ""));
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSimpleTraversal_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterSimpleTraversal_visited_catalogs);
   EXPECT_EQ (0u, traverse.pruned_revision_count());
 }
 
@@ -1630,6 +1651,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs);
   EXPECT_EQ (1u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned();
@@ -1658,6 +1680,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(1, ""));
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs);
   EXPECT_EQ (0u, traverse.pruned_revision_count());
 }
 
@@ -1721,6 +1744,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSecondLevelHistoryTraversalNoRepea
   catalogs.push_back(std::make_pair(4, ""));
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs);
   EXPECT_EQ (1u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned();
@@ -1740,6 +1764,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSecondLevelHistoryTraversalNoRepea
   catalogs.push_back(std::make_pair(1, ""));
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs);
   EXPECT_EQ (0u, traverse.pruned_revision_count());
 }
 
@@ -1793,6 +1818,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
   EXPECT_TRUE (t2);
@@ -1806,19 +1832,21 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
   EXPECT_TRUE (t3);
 
   catalogs.push_back(std::make_pair(2, ""));
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
   EXPECT_EQ (3u, traverse.pruned_revision_count());
 
   const bool t4 = traverse.TraversePruned();
   EXPECT_TRUE (t4);
 
-  catalogs.push_back(std::make_pair(5, ""));
+  catalogs.push_back(std::make_pair(1, ""));
   catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(3, "/00/11"));
   catalogs.push_back(std::make_pair(3, "/00/11/24"));
@@ -1829,11 +1857,12 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(1, ""));
+  catalogs.push_back(std::make_pair(5, ""));
 
   EXPECT_EQ (0u, traverse.pruned_revision_count());
   EXPECT_EQ (initial_catalog_instances, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 }
 
 
@@ -1921,6 +1950,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagList) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagList_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraverseRepositoryTagList_visited_catalogs);
 }
 
 
@@ -1943,14 +1973,14 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
   CatalogIdentifiers catalogs;
 
   CatalogTraversalParams params;
-  params.history = 2;
+  params.history = 2; // doesn't have any effect on TraverseNamedSnapshot()
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TraverseRepositoryTagListSecondHistoryLevelCallback);
 
   const bool t1 = traverse.TraverseNamedSnapshots();
   EXPECT_TRUE (t1);
 
-  catalogs.push_back(std::make_pair(2, ""));                // Revision 2 ... 1
+  catalogs.push_back(std::make_pair(2, ""));                // Revision 2
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
@@ -1958,8 +1988,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(1, ""));
-  catalogs.push_back(std::make_pair(5, ""));                // Revision 5 ... 3
+  catalogs.push_back(std::make_pair(5, ""));                // Revision 5
   catalogs.push_back(std::make_pair(4, "/00/12"));
   catalogs.push_back(std::make_pair(4, "/00/12/27"));
   catalogs.push_back(std::make_pair(4, "/00/12/26"));
@@ -1987,49 +2016,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
   catalogs.push_back(std::make_pair(5, "/00/13"));
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
-  catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/11/24"));
-  catalogs.push_back(std::make_pair(4, "/00/11/23"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(3, ""));
-  catalogs.push_back(std::make_pair(3, "/00/11"));
-  catalogs.push_back(std::make_pair(3, "/00/11/24"));
-  catalogs.push_back(std::make_pair(3, "/00/11/23"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(6, ""));                // Revision 6 ... 4
+  catalogs.push_back(std::make_pair(6, ""));                // Revision 6
   catalogs.push_back(std::make_pair(5, "/00/13"));
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
@@ -2050,61 +2037,10 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(5, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/11/24"));
-  catalogs.push_back(std::make_pair(4, "/00/11/23"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(5, "/00/13"));
-  catalogs.push_back(std::make_pair(5, "/00/13/29"));
-  catalogs.push_back(std::make_pair(5, "/00/13/28"));
-  catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/11/24"));
-  catalogs.push_back(std::make_pair(4, "/00/11/23"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs);
+  EXPECT_EQ (3u, traverse.pruned_revision_count());
 }
 
 
@@ -2127,7 +2063,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) 
   CatalogIdentifiers catalogs;
 
   CatalogTraversalParams params;
-  params.history           = 2;
+  params.history           = 2; // doesn't have any effect on TraverseNamedSnapshot()
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TraverseRepositoryTagListSecondHistoryLevelNoRepeatCallback);
@@ -2135,7 +2071,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) 
   const bool t1 = traverse.TraverseNamedSnapshots();
   EXPECT_TRUE (t1);
 
-  catalogs.push_back(std::make_pair(2, ""));                // Revision 2 ... 1
+  catalogs.push_back(std::make_pair(2, ""));                // Revision 2
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
@@ -2143,8 +2079,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) 
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(1, ""));
-  catalogs.push_back(std::make_pair(5, ""));                // Revision 5 ... 3
+  catalogs.push_back(std::make_pair(5, ""));                // Revision 5
   catalogs.push_back(std::make_pair(4, "/00/12"));
   catalogs.push_back(std::make_pair(4, "/00/12/27"));
   catalogs.push_back(std::make_pair(4, "/00/12/26"));
@@ -2165,20 +2100,11 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) 
   catalogs.push_back(std::make_pair(5, "/00/13"));
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
-  catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(3, ""));
-  catalogs.push_back(std::make_pair(3, "/00/11"));
-  catalogs.push_back(std::make_pair(3, "/00/11/24"));
-  catalogs.push_back(std::make_pair(3, "/00/11/23"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(6, ""));                // Revision 6 ... 4
+  catalogs.push_back(std::make_pair(6, ""));                // Revision 6
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs);
+  EXPECT_EQ (3u, traverse.pruned_revision_count());
 }
 
 
@@ -2201,7 +2127,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
   CatalogIdentifiers catalogs;
 
   CatalogTraversalParams params;
-  params.history           = 1;
+  params.history           = 1; // doesn't have any effect on TraverseNamedSnapshot()
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeatCallback);
@@ -2209,7 +2135,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
   const bool t1 = traverse.TraverseNamedSnapshots();
   EXPECT_TRUE (t1);
 
-  catalogs.push_back(std::make_pair(2, ""));                // Revision 2 ... 1
+  catalogs.push_back(std::make_pair(2, ""));                // Revision 2
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
@@ -2217,8 +2143,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
   catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(1, ""));
-  catalogs.push_back(std::make_pair(5, ""));                // Revision 5 ... 4
+  catalogs.push_back(std::make_pair(5, ""));                // Revision 5
   catalogs.push_back(std::make_pair(4, "/00/12"));
   catalogs.push_back(std::make_pair(4, "/00/12/27"));
   catalogs.push_back(std::make_pair(4, "/00/12/26"));
@@ -2239,14 +2164,16 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
   catalogs.push_back(std::make_pair(5, "/00/13"));
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
-  catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(6, ""));                // Revision 6 ... 5
+  catalogs.push_back(std::make_pair(6, ""));                // Revision 6
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs);
+  EXPECT_EQ (3u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned();
   EXPECT_TRUE (t2);
 
+  catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(3, "/00/11"));
   catalogs.push_back(std::make_pair(3, "/00/11/24"));
@@ -2257,8 +2184,11 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(1, ""));
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs);
+  EXPECT_EQ (0u, traverse.pruned_revision_count());
 }
 
 
@@ -2994,13 +2924,22 @@ TEST_F(T_CatalogTraversal, TimestampThresholdAndNamedSnapshots) {
   EXPECT_EQ (0u, TimestampThresholdAndNamedSnapshots_visited_catalogs.size());
 
   CatalogTraversalParams params;
-  params.timestamp = t(6, 6, 2010);
+  params.timestamp = t(6, 6, 2010); // no effect on NamedSnapshotTraversal()
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdAndNamedSnapshotsCallback);
   const bool t1 = traverse.TraverseNamedSnapshots(MockedCatalogTraversal::kBreadthFirstTraversal);
   EXPECT_TRUE (t1);
 
   CatalogIdentifiers catalogs;
+
+  catalogs.push_back(std::make_pair(2, ""));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
   catalogs.push_back(std::make_pair(5, ""));
   catalogs.push_back(std::make_pair(4, "/00/12"));
   catalogs.push_back(std::make_pair(4, "/00/12/27"));
@@ -3053,6 +2992,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdAndNamedSnapshots) {
 
   CheckVisitedCatalogs(catalogs, TimestampThresholdAndNamedSnapshots_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdAndNamedSnapshots_visited_catalogs);
+  EXPECT_EQ (3u, traverse.pruned_revision_count());
 }
 
 
@@ -3061,71 +3001,91 @@ TEST_F(T_CatalogTraversal, TimestampThresholdAndNamedSnapshots) {
 //
 
 
-CatalogIdentifiers TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeat_visited_catalogs;
-void TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeatCallback(
+CatalogIdentifiers TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs;
+void TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeatCallback(
                              const MockedCatalogTraversal::CallbackData &data) {
-  TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeat_visited_catalogs.push_back(
+  TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
 
-TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeat) {
+TEST_F(T_CatalogTraversal, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat) {
   // Note: future in a sense of: younger than newest mocked revision!
-  TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeat_visited_catalogs.size());
+  TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.clear();
+  EXPECT_EQ (0u, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.size());
 
   CatalogTraversalParams params;
-  params.timestamp         = t(6, 6, 2008);
-  params.history           = 2;
+  params.timestamp         = t(6, 6, 2008); // no effect on NamedSnapshotTraversal()
+  params.history           = 2;             // no effect on NamedSnapshotTraversal()
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
-  traverse.RegisterListener(&TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeatCallback);
-  const bool t1 = traverse.TraverseNamedSnapshots(MockedCatalogTraversal::kBreadthFirstTraversal);
-  EXPECT_TRUE (t1);
+  traverse.RegisterListener(&TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeatCallback);
+
+  const bool t1 = traverse.Traverse(MockedCatalogTraversal::kDepthFirstTraversal);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
-  catalogs.push_back(std::make_pair(5, ""));                // Revision 5 ... 3
-  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(4, "/00/11/24"));
+  catalogs.push_back(std::make_pair(4, "/00/11/23"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22"));
+  catalogs.push_back(std::make_pair(4, "/00/11"));
   catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
   catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
   catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
   catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
   catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
   catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/11/24"));
-  catalogs.push_back(std::make_pair(4, "/00/11/23"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
-  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(2, "/00/10"));
-  catalogs.push_back(std::make_pair(2, "/00/10/21"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
-  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
-  catalogs.push_back(std::make_pair(5, "/00/13"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
-  catalogs.push_back(std::make_pair(4, ""));
-  catalogs.push_back(std::make_pair(3, ""));
-  catalogs.push_back(std::make_pair(3, "/00/11"));
+  catalogs.push_back(std::make_pair(5, "/00/13"));
+  catalogs.push_back(std::make_pair(5, ""));
+  catalogs.push_back(std::make_pair(6, ""));
+
+  CheckVisitedCatalogs(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
+  EXPECT_EQ (1u, traverse.pruned_revision_count());
+
+  const bool t2 = traverse.TraverseNamedSnapshots();
+  EXPECT_TRUE (t2);
+
+  catalogs.push_back(std::make_pair(2, ""));
+
+  CheckVisitedCatalogs(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
+  EXPECT_EQ (2u, traverse.pruned_revision_count());
+
+  const bool t3 = traverse.TraversePruned(MockedCatalogTraversal::kDepthFirstTraversal);
+  EXPECT_TRUE (t3);
+
+  catalogs.push_back(std::make_pair(1, ""));
   catalogs.push_back(std::make_pair(3, "/00/11/24"));
   catalogs.push_back(std::make_pair(3, "/00/11/23"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22"));
-  catalogs.push_back(std::make_pair(3, "/00/11/22/34"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/43"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(3, "/00/11/22/34"));
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
-  catalogs.push_back(std::make_pair(6, ""));                // Revision 6 ... 4
+  catalogs.push_back(std::make_pair(3, "/00/11/22"));
+  catalogs.push_back(std::make_pair(3, "/00/11"));
+  catalogs.push_back(std::make_pair(3, ""));
 
-  CheckVisitedCatalogs(catalogs, TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeat_visited_catalogs);
-  CheckCatalogSequence(catalogs, TimestampThresholdHistoryDepthAndNamedSnapshotsNoRepeat_visited_catalogs);
+  CheckVisitedCatalogs(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
+  EXPECT_EQ (0u, traverse.pruned_revision_count());
 }
 
 
@@ -3227,8 +3187,8 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnaps
   EXPECT_EQ (0u, TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs.size());
 
   CatalogTraversalParams params;
-  params.timestamp         = t(6, 6, 2003);
-  params.history           = 1;
+  params.timestamp         = t(6, 6, 2003); // no effect on TraverseNamedSnapshots()
+  params.history           = 1;             // no effect on TraverseNamedSnapshots()
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeatCallback);
@@ -3244,6 +3204,14 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnaps
   catalogs.push_back(std::make_pair(2, "/00/10/20"));
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, ""));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
   catalogs.push_back(std::make_pair(4, "/00/11/24"));
   catalogs.push_back(std::make_pair(4, "/00/11/23"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
@@ -3253,15 +3221,6 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnaps
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
   catalogs.push_back(std::make_pair(4, "/00/11/22"));
   catalogs.push_back(std::make_pair(4, "/00/11"));
-  catalogs.push_back(std::make_pair(4, "/00/12/27"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
-  catalogs.push_back(std::make_pair(4, "/00/12/26"));
-  catalogs.push_back(std::make_pair(4, "/00/12/25"));
-  catalogs.push_back(std::make_pair(4, "/00/12"));
-  catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(5, "/00/13/29"));
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -3270,6 +3229,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnaps
 
   CheckVisitedCatalogs(catalogs, TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs);
+  EXPECT_EQ (3u, traverse.pruned_revision_count());
 }
 
 
@@ -3404,15 +3364,86 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
   catalogs.push_back(std::make_pair(5, ""));
   catalogs.push_back(std::make_pair(6, ""));
 
-  EXPECT_EQ (1u, traverse.pruned_revision_count());
+  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  CheckVisitedCatalogs(catalogs, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs);
+  CheckCatalogSequence(catalogs, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs);
 
   const bool t2 = traverse.TraversePruned(MockedCatalogTraversal::kDepthFirstTraversal);
   EXPECT_TRUE (t2);
 
   catalogs.push_back(std::make_pair(1, ""));
+  // revision 3 is unreachable as revision 4 is not available...
 
   EXPECT_EQ (0u, traverse.pruned_revision_count());
-
   CheckVisitedCatalogs(catalogs, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs);
+}
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+CatalogIdentifiers NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs;
+void NamedSnapshotTraversalWithTimestampThresholdNoRepeatCallback(
+                             const MockedCatalogTraversal::CallbackData &data) {
+  NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs.push_back(
+    std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
+}
+
+TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat) {
+  // Note: future in a sense of: younger than newest mocked revision!
+  NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs.clear();
+  EXPECT_EQ (0u, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs.size());
+
+  std::set<shash::Any> deleted_catalogs;
+  deleted_catalogs.insert(GetRootHash(4));
+  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+
+  CatalogTraversalParams params;
+  params.timestamp           = t(17, 11, 2014) - 10; // excludes all revisions but HEAD
+  params.no_repeat_history   = true;
+  MockedCatalogTraversal traverse(params);
+  traverse.RegisterListener(&NamedSnapshotTraversalWithTimestampThresholdNoRepeatCallback);
+  const bool t1 = traverse.TraverseNamedSnapshots();
+  EXPECT_TRUE (t1);
+
+  CatalogIdentifiers catalogs;
+
+  catalogs.push_back(std::make_pair(2, ""));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30"));
+  catalogs.push_back(std::make_pair(2, "/00/10/20/30/40"));
+  catalogs.push_back(std::make_pair(5, ""));
+  catalogs.push_back(std::make_pair(4, "/00/12"));
+  catalogs.push_back(std::make_pair(4, "/00/12/27"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/38"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/37"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/36"));
+  catalogs.push_back(std::make_pair(4, "/00/12/26/35"));
+  catalogs.push_back(std::make_pair(4, "/00/12/25"));
+  catalogs.push_back(std::make_pair(4, "/00/11"));
+  catalogs.push_back(std::make_pair(4, "/00/11/24"));
+  catalogs.push_back(std::make_pair(4, "/00/11/23"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/43"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
+  catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(5, "/00/13"));
+  catalogs.push_back(std::make_pair(5, "/00/13/29"));
+  catalogs.push_back(std::make_pair(5, "/00/13/28"));
+  catalogs.push_back(std::make_pair(6, ""));
+
+  EXPECT_EQ (3u, traverse.pruned_revision_count());
+
+  CheckVisitedCatalogs(catalogs, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs);
 }

@@ -40,13 +40,17 @@ template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
  public:
   struct Configuration {
-    Configuration() : uploader(NULL), keep_history_depth(1),
-                      keep_named_snapshots(true), dry_run(false),
+    static const unsigned int kFullHistory;
+    static const unsigned int kNoHistory;
+    static const time_t       kNoTimestamp;
+
+    Configuration() : uploader(NULL), keep_history_depth(kFullHistory),
+                      keep_history_timestamp(kNoTimestamp), dry_run(false),
                       verbose(false) {}
 
     upload::AbstractUploader  *uploader;
     unsigned int               keep_history_depth;
-    bool                       keep_named_snapshots;
+    time_t                     keep_history_timestamp;
     bool                       dry_run;
     bool                       verbose;
     std::string                repo_url;

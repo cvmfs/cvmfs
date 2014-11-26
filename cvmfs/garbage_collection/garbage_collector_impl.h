@@ -2,7 +2,23 @@
  * This file is part of the CernVM File System.
  */
 
+#include <limits>
+
 #include "../logging.h"
+
+template<class CatalogTraversalT, class HashFilterT>
+const unsigned int GarbageCollector<CatalogTraversalT,
+                                    HashFilterT>::Configuration::kFullHistory =
+  std::numeric_limits<unsigned int>::max();
+
+template<class CatalogTraversalT, class HashFilterT>
+const unsigned int GarbageCollector<CatalogTraversalT,
+                                    HashFilterT>::Configuration::kNoHistory = 0;
+
+template<class CatalogTraversalT, class HashFilterT>
+const time_t GarbageCollector<CatalogTraversalT,
+                              HashFilterT>::Configuration::kNoTimestamp = 0;
+
 
 template <class CatalogTraversalT, class HashFilterT>
 swissknife::CatalogTraversalParams
@@ -11,6 +27,7 @@ swissknife::CatalogTraversalParams
 {
   swissknife::CatalogTraversalParams params;
   params.history             = config.keep_history_depth;
+  params.timestamp           = config.keep_history_timestamp;
   params.no_repeat_history   = true;
   params.ignore_load_failure = true;
   params.quiet               = ! config.verbose;
@@ -156,11 +173,19 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
-  if (configuration_.keep_named_snapshots) {
-    success = traversal_.TraverseNamedSnapshots();
-  }
-  success = (success && traversal_.Traverse());
+
+
+  success = traversal_.Traverse() && // traverses the current HEAD
+            traversal_.TraverseNamedSnapshots();
+
   traversal_.UnregisterListener(callback);
+
+  if (success && preserved_catalog_count() == 0) {
+    if (configuration_.verbose) {
+      LogCvmfs(kLogGc, kLogStderr, "This would delete everything! Abort.");
+    }
+    success = false;
+  }
 
   return success;
 }
