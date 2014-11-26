@@ -893,6 +893,8 @@ HostfileResolver *HostfileResolver::Create(
   }
   resolver->fhosts_ = fopen(hosts_file.c_str(), "r");
   if (!resolver->fhosts_) {
+    LogCvmfs(kLogDns, kLogDebug | kLogSyslogWarn, "failed to read host file %s",
+             hosts_file.c_str());
     delete resolver;
     return NULL;
   }
