@@ -405,6 +405,16 @@ cvmfs_chksetup() {
         fi
       done
 
+      # Check readability of hosts file
+      local host_file=/etc/hosts
+      if [ ! -z $HOST_ALIASES ]; then
+        host_file="$HOST_ALIASES"
+      fi
+      if ! runas $CVMFS_USER "test -r $host_file"; then
+        echo "Error: $host_file is not readable by $CVMFS_USER"
+        num_errors=$(($num_errors+1))
+      fi
+
       # Check that number of open files is reasonably high
       if [ $CVMFS_NFILES -lt 8192 ]; then
         echo "Warning: maximum number of open files is low ($CVMFS_NFILES) for $fqrn"
