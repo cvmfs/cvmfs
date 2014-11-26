@@ -117,15 +117,17 @@ class History {
    *
    * @param history_hash  the content hash of the previous revision
    */
-  virtual bool SetPreviousRevision(const shash::Any &history_hash) = 0;
+  virtual bool SetPreviousRevision(const shash::Any &history_hash)   = 0;
 
-  virtual bool Insert(const Tag &tag)                              = 0;
-  virtual bool Remove(const std::string &name)                     = 0;
-  virtual bool Exists(const std::string &name) const               = 0;
-  virtual bool GetByName(const std::string &name, Tag *tag) const  = 0;
-  virtual bool GetByDate(const time_t timestamp, Tag *tag) const   = 0;
-  virtual bool List(std::vector<Tag> *tags) const                  = 0;
-  virtual bool Tips(std::vector<Tag> *channel_tips) const          = 0;
+  virtual bool Insert(const Tag &tag)                                = 0;
+  virtual bool Remove(const std::string &name)                       = 0;
+  virtual bool Exists(const std::string &name) const                 = 0;
+  virtual bool GetByName(const std::string &name, Tag *tag) const    = 0;
+  virtual bool GetByDate(const time_t timestamp, Tag *tag) const     = 0;
+  virtual bool List(std::vector<Tag> *tags) const                    = 0;
+  virtual bool Tips(std::vector<Tag> *channel_tips) const            = 0;
+
+  virtual bool ListRecycleBin(std::vector<shash::Any> *hashes) const = 0;
 
   /**
    * Rolls back the history to the provided target tag and deletes all tags

@@ -95,6 +95,8 @@ class SqliteHistory : public History {
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
 
+  bool ListRecycleBin(std::vector<shash::Any> *hashes) const;
+
   /**
    * Rolls back the history to the provided target tag and deletes all tags
    * of the containing channel in between.
