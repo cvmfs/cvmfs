@@ -9,7 +9,16 @@ namespace history {
 
 const float    HistoryDatabase::kLatestSchema          = 1.0;
 const float    HistoryDatabase::kLatestSupportedSchema = 1.0;
-const unsigned HistoryDatabase::kLatestSchemaRevision  = 1;
+const unsigned HistoryDatabase::kLatestSchemaRevision  = 2;
+
+/**
+ * Database Schema ChangeLog:
+ *
+ * Schema Version 1.0
+ *   -> Revision 2: add table 'recycle_bin'
+ *   -> Revision 1: add field 'size'
+ *
+ */
 
 const std::string HistoryDatabase::kFqrnKey = "fqrn";
 
@@ -20,7 +29,8 @@ const std::string HistoryDatabase::kFqrnKey = "fqrn";
 bool HistoryDatabase::CreateEmptyDatabase() {
   assert (read_write());
 
-  return CreateTagsTable();
+  return CreateTagsTable() &&
+         CreateRecycleBinTable();
 }
 
 
@@ -30,6 +40,14 @@ bool HistoryDatabase::CreateTagsTable() {
     "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
     "  timestamp INTEGER, channel INTEGER, description TEXT, size INTEGER, "
     "  CONSTRAINT pk_tags PRIMARY KEY (name))").Execute();
+}
+
+
+bool HistoryDatabase::CreateRecycleBinTable() {
+  assert (read_write());
+  return sqlite::Sql(sqlite_db(),
+    "CREATE TABLE recycle_bin (hash TEXT, flags INTEGER, "
+    "  CONSTRAINT pk_hash PRIMARY KEY (hash))").Execute();
 }
 
 
@@ -58,7 +76,8 @@ bool HistoryDatabase::LiveSchemaUpgradeIfNecessary() {
            schema_version(), schema_revision(),
            kLatestSchema, kLatestSchemaRevision);
 
-  const bool success = UpgradeSchemaRevision_10_1();
+  const bool success = UpgradeSchemaRevision_10_1() &&
+                       UpgradeSchemaRevision_10_2();
 
   return success && StoreSchemaRevision();
 }
@@ -76,6 +95,21 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_1() {
   }
 
   set_schema_revision(1);
+  return true;
+}
+
+
+bool HistoryDatabase::UpgradeSchemaRevision_10_2() {
+  if (schema_revision() > 1) {
+    return true;
+  }
+
+  if (! CreateRecycleBinTable()) {
+    LogCvmfs(kLogHistory, kLogStderr, "failed to upgrade history database");
+    return false;
+  }
+
+  set_schema_revision(2);
   return true;
 }
 

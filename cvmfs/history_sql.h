@@ -43,8 +43,10 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
 
  private:
   bool CreateTagsTable();
+  bool CreateRecycleBinTable();
 
   bool UpgradeSchemaRevision_10_1();
+  bool UpgradeSchemaRevision_10_2();
 };
 
 
