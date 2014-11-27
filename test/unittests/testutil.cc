@@ -258,9 +258,13 @@ bool MockHistory::Insert(const Tag &tag) {
 }
 
 bool MockHistory::Remove(const std::string &name) {
-  return (Exists(name))
-            ? tags_.erase(name) == 1
-            : true;
+  Tag tag;
+  if (! GetByName(name, &tag)) {
+    return true;
+  }
+
+  recycle_bin_.insert(tag.root_hash);
+  return tags_.erase(name) == 1;
 }
 
 bool MockHistory::Exists(const std::string &name) const {
@@ -310,6 +314,17 @@ bool MockHistory::Tips(std::vector<Tag> *channel_tips) const {
                                                 channel_tips->end(),
                                                 MockHistory::eq_channel);
   channel_tips->erase(last, channel_tips->end());
+  return true;
+}
+
+bool MockHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
+  hashes->clear();
+  hashes->insert(hashes->end(), recycle_bin_.begin(), recycle_bin_.end());
+  return true;
+}
+
+bool MockHistory::EmptyRecycleBin() {
+  recycle_bin_.clear();
   return true;
 }
 

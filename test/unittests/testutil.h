@@ -325,6 +325,7 @@ class MockCatalog {
 class MockHistory : public history::History {
  public:
   typedef std::map<std::string, history::History::Tag> TagMap;
+  typedef std::set<shash::Any>                         HashSet;
 
  public:
   // TODO: count number of instances
@@ -349,6 +350,9 @@ class MockHistory : public history::History {
   bool GetByDate(const time_t timestamp, Tag *tag) const;
   bool List(std::vector<Tag> *tags) const;
   bool Tips(std::vector<Tag> *channel_tips) const;
+
+  bool ListRecycleBin(std::vector<shash::Any> *hashes) const;
+  bool EmptyRecycleBin();
 
   bool Rollback(const Tag &updated_target_tag);
   bool ListTagsAffectedByRollback(const std::string  &target_tag_name,
@@ -419,8 +423,9 @@ class MockHistory : public history::History {
   };
 
  private:
-  TagMap tags_;
-  bool   writable_;
+  TagMap  tags_;
+  HashSet recycle_bin_;
+  bool    writable_;
 };
 
 
