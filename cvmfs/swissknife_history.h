@@ -210,6 +210,23 @@ class CommandRollbackTag : public CommandTag {
   void PrintDeletedTagList(const TagList &tags) const;
 };
 
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+class CommandEmptyRecycleBin : public CommandTag {
+ public:
+  std::string GetName() { return "tag_empty_bin"; }
+  std::string GetDescription() {
+    return "Empty the internal recycle bin of the history database.";
+  }
+
+  ParameterList GetParams();
+  int Main(const ArgumentList &args);
+};
+
 }  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_HISTORY_H_

@@ -1160,3 +1160,38 @@ void CommandRollbackTag::PrintDeletedTagList(const TagList &tags) const {
              i->root_hash.ToString().c_str());
   }
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+ParameterList CommandEmptyRecycleBin::GetParams() {
+  ParameterList r;
+  InsertCommonParameters(r);
+  return r;
+}
+
+
+int CommandEmptyRecycleBin::Main(const ArgumentList &args) {
+  // initialize the Environment (taking ownership)
+  const bool history_read_write = true;
+  UniquePtr<Environment> env(InitializeEnvironment(args, history_read_write));
+  if (! env) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to init environment");
+    return 1;
+  }
+
+  if (! env->history->EmptyRecycleBin()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to empty recycle bin");
+    return 1;
+  }
+
+  // finalize the history and upload it
+  if (! CloseAndPublishHistory(env.weak_ref())) {
+    return 1;
+  }
+
+  return 0;
+}
