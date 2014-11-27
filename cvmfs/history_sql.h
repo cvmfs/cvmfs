@@ -61,10 +61,31 @@ class SqlHistory : public sqlite::Sql {
 
 /**
  * A mixin that allows to inject the RetrieveTag() method if it is needed in an
- * SQL query subclass. This allows us to orchestrate specific functionality in
- * those classes as we need it, without relying on multiple inheritance.
- * Otherwise one would inherit from sqlite::Sql more than once when inheriting
- * from more than one of those mixin classes in a query subclass.
+ * SQL query subclass.
+ *
+ * This allows us to orchestrate specific functionality in those classes as we
+ * need it, without relying on multiple inheritance. Otherwise one would inherit
+ * from sqlite::Sql more than once when inheriting from more than one of those
+ * mixin classes in a query subclass.
+ * In contrast, the mixins produce a clear (single) inheritance graph for each
+ * of the derived classes by chaining the functionality as seen below.
+ *
+ * Example:
+ * class SqlListRollbackTags : public SqlRetrieveTag<SqlRollback<SqlHistory>> {}
+ *
+ *    ################     Note: both SqlRetrieveTag and SqlRollback need the
+ *    # sqlite::Sql  #           functionality provided in sqlite::Sql, thus
+ *    ################           would otherwise be derived from it individually
+ *          ´|`
+ *           |
+ *    ################      ####################      #################
+ *    #  SqlHistory  # <--- #  SqlRetrieveTag  # <--- #  SqlRollback  #
+ *    ################      ####################      #################
+ *                                                           ´|`
+ *                                                            |
+ *                                                #########################
+ *                                                #  SqlListRollbackTags  #
+ *                                                #########################
  *
  * Note: MixinT needs to be eventually derived from sqlite::Sql as it uses
  *       Sql::Retrieve...() methods to extract information from SQLite rows.
