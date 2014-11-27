@@ -61,7 +61,10 @@ class SqlHistory : public sqlite::Sql {
 
 /**
  * A mixin that allows to inject the RetrieveTag() method if it is needed in an
- * SQL query subclass.
+ * SQL query subclass. This allows us to orchestrate specific functionality in
+ * those classes as we need it, without relying on multiple inheritance.
+ * Otherwise one would inherit from sqlite::Sql more than once when inheriting
+ * from more than one of those mixin classes in a query subclass.
  *
  * Note: MixinT needs to be eventually derived from sqlite::Sql as it uses
  *       Sql::Retrieve...() methods to extract information from SQLite rows.
@@ -153,7 +156,9 @@ class SqlGetHashes : public SqlHistory {
 
 /**
  * Mixin to inject the rollback condition definition and the BindTargetTag()
- * method into other subclasses
+ * method into other subclasses.
+ *
+ * Note: See documentation of the SqlRetrieveTag<> for further details.
  *
  * @param MixinT  the class that should gain BindTargetTags()'s functionality
  * @param offset  offset for SQLite placeholders, if used inside other complex
