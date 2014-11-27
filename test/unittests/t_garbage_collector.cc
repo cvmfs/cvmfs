@@ -376,7 +376,7 @@ class T_GarbageCollector : public ::testing::Test {
   Prng  dice_;
 };
 
-const std::string T_GarbageCollector::fqrn    = "test.cern.ch";
+const std::string T_GarbageCollector::fqrn = "test.cern.ch";
 
 
 TEST_F(T_GarbageCollector, InitializeGarbageCollector) {
