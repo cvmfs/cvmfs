@@ -3773,8 +3773,9 @@ gc() {
 
     # sanity checks
     check_repository_compatibility $name
-    is_stratum0      $name || die "Garbage Collection is currently only supported on Stratum0"
-    is_owner_or_root $name || die "Permission denied: Repository $name is owned by $user"
+    is_stratum0       $name || die "Garbage Collection is currently only supported on Stratum0"
+    is_in_transaction $name && die "Cannot run garbage collection while in a transaction"
+    is_owner_or_root  $name || die "Permission denied: Repository $name is owned by $user"
     local head_timestamp="$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -t)"
     [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
 
@@ -3782,6 +3783,8 @@ gc() {
     local user_shell="sh -c"
     [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
 
+    # prepare swissknife commands
+    local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
     local additional_switches=""
     [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
     [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
@@ -3794,9 +3797,30 @@ gc() {
                                           -t ${CVMFS_SPOOL_DIR}/tmp  \
                                           $additional_switches"
 
-    # do it
-    if ! $user_shell "$gc_command"; then
-      die "Fail! Executed Command: $gc_command"
+    local base_hash=$(get_mounted_root_hash $name)
+    local tag_command="cvmfs_swissknife tag_empty_bin \
+      -r $CVMFS_UPSTREAM_STORAGE                      \
+      -w $CVMFS_STRATUM0                              \
+      -t ${CVMFS_SPOOL_DIR}/tmp                       \
+      -m $new_manifest                                \
+      -p /etc/cvmfs/keys/${name}.pub                  \
+      -f $name                                        \
+      -b $base_hash                                   \
+      -e $CVMFS_HASH_ALGORITHM"
+
+    # do it!
+    trap "close_transaction $name 0" EXIT HUP INT TERM
+    open_transaction $name || die "Failed to open transaction for garbage collection"
+
+    echo "Running Garbage Collection"
+    $user_shell "$gc_command" || die "Fail! Executed Command: $gc_command"
+
+    if [ ! $dry_run ]; then
+      echo "Updating History Database"
+      $user_shell "$tag_command" || die "Fail! Executed Command: $tag_command"
+
+      echo "Signing Repository Manifest"
+      sign_manifest $name $new_manifest || die "Fail!"
     fi
 
   done

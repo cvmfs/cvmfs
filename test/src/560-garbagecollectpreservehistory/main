@@ -334,17 +334,20 @@ cvmfs_run_test() {
   echo "print tag list"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 24
 
+  echo "run a garbage collection dry run"
+  cvmfs_server gc -l -d -f $CVMFS_TEST_REPO || return 25
+
   echo "run garbage collection (should remove probe file 10)"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 25
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 26
 
   echo "check if all expected files are still there"
   i=0
   for hash in $(get_file_hashes); do
     local modo=$(echo "$i % 5" | bc)
     if [ $modo -eq 0 -a $i -ne 10 ] || [ $i -ge 16 ]; then
-      peek_backend $CVMFS_TEST_REPO "$hash" || return 26
+      peek_backend $CVMFS_TEST_REPO "$hash" || return 27
     else
-      peek_backend $CVMFS_TEST_REPO "$hash" && return 27
+      peek_backend $CVMFS_TEST_REPO "$hash" && return 28
     fi
     i=$(( $i + 1 ))
   done
