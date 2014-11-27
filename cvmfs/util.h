@@ -13,17 +13,19 @@
 #include <fcntl.h>
 #include <pthread.h>
 
+#include <algorithm>
 #include <cstdio>
-
-#include <string>
 #include <map>
-#include <vector>
 #include <set>
+#include <string>
+#include <vector>
+
 #include <gtest/gtest_prod.h>
 
+#include "hash.h"
 #include "murmur.h"
 #include "platform.h"
-#include "hash.h"
+#include "prng.h"
 #include "shortstring.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -206,6 +208,20 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
 void SafeSleepMs(const unsigned ms);
 
+/**
+ * Knuth's random shuffle algorithm.
+ */
+template <typename T>
+std::vector<T> Shuffle(const std::vector<T> &input, Prng *prng) {
+  std::vector<T> shuffled(input);
+  unsigned N = shuffled.size();
+  // No shuffling for the last element
+  for (unsigned i = 0; i < N; ++i) {
+    const unsigned swap_idx = i + prng->Next(N - i);
+    std::swap(shuffled[i], shuffled[swap_idx]);
+  }
+  return shuffled;
+}
 
 template <typename hashed_type>
 struct hash_murmur {
