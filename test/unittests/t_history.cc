@@ -1150,6 +1150,7 @@ TYPED_TEST(T_History, EmptyRecycleBin) {
   TestFixture::CloseHistory(history1);
 
   History *history2 = TestFixture::OpenWritableHistory(hp);
+  ASSERT_NE (static_cast<History*>(NULL), history2);
   EXPECT_EQ (3u, history2->GetNumberOfTags());
 
   ASSERT_TRUE (history2->ListRecycleBin(&hashes));
@@ -1176,6 +1177,21 @@ TYPED_TEST(T_History, EmptyRecycleBin) {
   ASSERT_TRUE (history2->CommitTransaction());
 
   TestFixture::CloseHistory(history2);
+
+  History *history3 = TestFixture::OpenWritableHistory(hp);
+  ASSERT_NE (static_cast<History*>(NULL), history3);
+
+  ASSERT_TRUE (history3->ListRecycleBin(&hashes));
+  EXPECT_EQ (0u, hashes.size());
+  hashes.clear();
+
+  EXPECT_TRUE (history3->EmptyRecycleBin());
+  EXPECT_EQ (1u, history3->GetNumberOfTags());
+  ASSERT_TRUE (history3->ListRecycleBin(&hashes));
+  EXPECT_EQ (0u, hashes.size());
+  hashes.clear();
+
+  TestFixture::CloseHistory(history3);
 }
 
 
