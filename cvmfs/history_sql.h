@@ -219,6 +219,11 @@ class SqlRecycleBinFlush : public SqlRecycleBin {
 };
 
 
+/**
+ * Shadows all hashes that are going to be deleted by the history rollback into
+ * the recycle bin.
+ * See: SqlRollback::BindTargetTag()
+ */
 class SqlRecycleBinRollback : public SqlRollback<SqlRecycleBin, 1> {
  public:
   SqlRecycleBinRollback(const HistoryDatabase *database);
