@@ -879,3 +879,80 @@ TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
   EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
 }
+
+
+TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  config.keep_history_depth = 0;
+
+  // wire up std::set<> deleted_hashes in uploader with the MockObjectFetcher
+  // to simulate the actual deletion of objects
+  RevisionMap     &c   = catalogs_;
+  GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
+  MockObjectFetcher::s_deleted_catalogs = &upl->deleted_hashes;
+
+  // run a first garbage collection (leaving only named snapshots)
+  MyGarbageCollector gc1(config);
+  EXPECT_TRUE (gc1.Collect());
+
+  EXPECT_EQ (11u, gc1.preserved_catalog_count());
+  EXPECT_EQ ( 5u, gc1.condemned_catalog_count());
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash())); // 1,"11" == 2,"11"
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
+  EXPECT_FALSE (upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
+  EXPECT_FALSE (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
+  EXPECT_FALSE (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+
+  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
+  EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE  (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_TRUE  (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
+
+  EXPECT_EQ (11u, upl->deleted_hashes.size());
+
+  // delete named tag to produce a catalog revision that is not referenced by
+  // standard CVMFS data structures
+  history::History *history = MockObjectFetcher::s_history;
+  ASSERT_TRUE (history->Remove("Revision2"));
+  EXPECT_EQ (2u, history->GetNumberOfTags());
+
+  // run a second GarbageCollection to remove revision 2
+  MyGarbageCollector gc2(config);
+  EXPECT_TRUE (gc2.Collect());
+
+  EXPECT_EQ (8u, gc2.preserved_catalog_count());
+  EXPECT_EQ (3u, gc2.condemned_catalog_count());
+
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+
+  EXPECT_TRUE (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
+  EXPECT_TRUE (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+}
