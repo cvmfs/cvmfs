@@ -12,10 +12,14 @@
 #include <set>
 #include <map>
 #include <string>
+#include <utility>
+#include <climits>
 
 #include "duplex_curl.h"
 #include "prng.h"
 #include "util_concurrency.h"
+#include "dns.h"
+#include "util.h"
 
 namespace s3fanout {
 
@@ -139,6 +143,16 @@ struct JobInfo {
   unsigned backoff_ms;
 };  // JobInfo
 
+struct S3FanOutDnsEntry {
+  S3FanOutDnsEntry() : counter(0), dns_name(), ip(), port("80"),
+     clist(NULL), sharehandle(NULL) {}
+  unsigned int counter;
+  std::string dns_name;
+  std::string ip;
+  std::string port;
+  struct curl_slist *clist;
+  CURLSH *sharehandle;
+};  // S3FanOutDnsEntry
 
 class S3FanoutManager : SingleCopy {
  public:
@@ -172,6 +186,10 @@ class S3FanoutManager : SingleCopy {
 
   CURL *AcquireCurlHandle() const;
   void ReleaseCurlHandle(JobInfo *info, CURL *handle) const;
+  int InitializeDnsSettings(CURL *handle,
+                            std::string remote_host) const;
+  void InitializeDnsSettingsCurl(CURL *handle, CURLSH *sharehandle,
+                                 curl_slist *clist) const;
   Failures InitializeRequest(JobInfo *info, CURL *handle) const;
   void SetUrlOptions(JobInfo *info) const;
   void UpdateStatistics(CURL *handle);
@@ -195,7 +213,9 @@ class S3FanoutManager : SingleCopy {
   Prng prng_;
   std::set<CURL *> *pool_handles_idle_;
   std::set<CURL *> *pool_handles_inuse_;
-  std::map<CURL *, CURLSH *> *pool_sharehandles_;
+  std::set<S3FanOutDnsEntry *> *sharehandles_;
+  std::map<CURL *, S3FanOutDnsEntry *> *curl_sharehandles_;
+  dns::CaresResolver *resolver;
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;

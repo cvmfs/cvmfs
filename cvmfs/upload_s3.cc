@@ -202,8 +202,13 @@ void S3Uploader::WorkerThread() {
       // Report and clean completed jobs
       s3fanout::JobInfo *info = *it;
       if (info->error_code == s3fanout::kFailOk) {
-        Respond(static_cast<callback_t*>(info->callback),
-                UploaderResults(0, info->mmf->file_path()));
+        if (info->origin == s3fanout::kOriginMem) {
+          Respond(static_cast<callback_t*>(info->callback),
+          UploaderResults(0));
+        } else {
+          Respond(static_cast<callback_t*>(info->callback),
+                  UploaderResults(0, info->mmf->file_path()));
+        }
       } else {
         LogCvmfs(kLogS3Fanout, kLogStderr, "Upload job for '%s' failed. "
                                            "(error code: %d - %s)",
@@ -388,6 +393,11 @@ bool S3Uploader::UploadFile(const std::string &filename,
                                                   (unsigned char*)buff,
                                                   size_of_file);
   info->request        = s3fanout::JobInfo::kReqPut;
+#ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
+  if (filename.substr(0, 1) != ".") {
+    info->request        = s3fanout::JobInfo::kReqHead;
+  }
+#endif
   info->origin_mem.pos = 0;
   info->callback       = const_cast<void*>(static_cast<void const*>(callback));
   info->mmf            = mmf;
