@@ -11,14 +11,58 @@
 #include "garbage_collection/hash_filter.h"
 #include "upload_facility.h"
 
+#include "manifest.h"
+
 #include <string>
 
 using namespace swissknife;  // NOLINT
-using namespace upload;
+using namespace upload;      // NOLINT
 
 
 typedef GarbageCollector<ReadonlyCatalogTraversal, SimpleHashFilter> GC;
 typedef GC::Configuration                                            GcConfig;
+
+
+
+bool CommandGc::CheckGarbageCollectability(
+                                         const std::string &repository_url,
+                                         const std::string &repository_name,
+                                         const std::string &pubkey_path) const {
+  UniquePtr<manifest::ManifestEnsemble> ensemble(new manifest::ManifestEnsemble);
+
+  // initialize the (global) download manager
+  g_download_manager->Init(1, true);
+
+  // initialize the (global) signature manager
+  g_signature_manager->Init();
+  if (! g_signature_manager->LoadPublicRsaKeys(pubkey_path)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key '%s'",
+             pubkey_path.c_str());
+    return false;
+  }
+
+  // fetch (and verify) the manifest
+  manifest::Failures retval;
+  retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
+                           g_signature_manager, g_download_manager,
+                           ensemble.weak_ref());
+
+  if (retval != manifest::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
+                                    "(%d - %s)",
+             retval, manifest::Code2Ascii(retval));
+    return false;
+  }
+
+  // check if manifest fetching was successful
+  if (! ensemble->manifest) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
+    return NULL;
+  }
+
+  // check if the manifest allows garbage collection
+  return ensemble->manifest->garbage_collectable();
+}
 
 
 ParameterList CommandGc::GetParams() {
@@ -56,6 +100,11 @@ int CommandGc::Main(const ArgumentList &args) {
   if (timestamp == GcConfig::kNoTimestamp &&
       revisions == GcConfig::kFullHistory) {
     LogCvmfs(kLogCvmfs, kLogStderr, "neither a timestamp nor history threshold given");
+    return 1;
+  }
+
+  if (! CheckGarbageCollectability(repo_url, repo_name, repo_keys)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "repository does not allow garbage collection");
     return 1;
   }
 
