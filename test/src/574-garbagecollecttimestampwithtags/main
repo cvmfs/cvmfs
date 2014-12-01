@@ -195,7 +195,7 @@ cvmfs_run_test() {
 
   timestamp0="$(get_timestamp)"
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($timestamp0)"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
   root_catalog0="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
   # ============================================================================

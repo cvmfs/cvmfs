@@ -172,7 +172,7 @@ cvmfs_run_test() {
   local preserved_clgs=""
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
   condemned_clgs="$condemned_clgs $(get_current_root_catalog $CVMFS_TEST_REPO)"
 
   # ============================================================================
