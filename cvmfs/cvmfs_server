@@ -3538,6 +3538,9 @@ publish() {
     if [ "x$manual_revision" != "x" ]; then
       sync_command="$sync_command -v $manual_revision"
     fi
+    if [ "x$CVMFS_GARBAGE_COLLECTION" = "xtrue" ]; then
+      sync_command="$sync_command -g"
+    fi
     local tag_command="$swissknife tag_create \
       -r $upstream                            \
       -w $stratum0                            \

@@ -475,6 +475,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('m') != args.end()) params.mucatalogs = true;
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
+  if (args.find('g') != args.end()) params.garbage_collectable = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -551,6 +552,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   sync->Traverse();
   // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest = mediator.Commit();
+  manifest->set_garbage_collectability(params.garbage_collectable);
 
   g_download_manager->Fini();
 
