@@ -71,6 +71,7 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Optional ('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional ('a', "hash algorithm (default: SHA-1)"));
     r.push_back(Parameter::Switch   ('v', "repository containing volatile files"));
+    r.push_back(Parameter::Switch   ('z', "mark new repository as garbage collectable"));
     return r;
   }
   int Main(const ArgumentList &args);
