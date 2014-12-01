@@ -1053,7 +1053,7 @@ cvmfs_bugreport() {
                  'cat /etc/fuse.conf'  'ls -la /usr/bin/fusermount' 'ls -la /bin/fusermount' \
                  'cat /etc/auto.master' 'cat /etc/sysconfig/autofs' 'cat /etc/default/autofs' \
                  'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' 'cat /proc/cpuinfo' \
-                 'cat /etc/hosts' )
+                 'cat /etc/hosts' 'free -m' )
       ;;
 
     Darwin )
@@ -1063,7 +1063,7 @@ cvmfs_bugreport() {
                   'cvmfs_config probe' 'cvmfs_config status' 'cvmfs_talk internal affairs' \
                   'mount' 'df -h' 'ps -ef' 'cvmfs_config showconfig' 'cvmfs_config chksetup' \
                   'cvmfs_config stat -v' 'cat /etc/fuse.conf' \
-                  'cat /etc/auto_master' 'sysctl vfs.autofs' 'cat /etc/exports' )
+                  'cat /etc/auto_master' 'sysctl vfs.autofs' 'cat /etc/exports' 'cat /etc/hosts' )
       ;;
 
     * )
