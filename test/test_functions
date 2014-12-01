@@ -369,7 +369,8 @@ create_repo() {
   local repo=$1
   local uid=$2
   local debug_log=$3
-  local extra_options="$4"
+  shift 3
+  local extra_options="$*"
 
   echo "Shutting down autofs for the cvmfs mounts"
   autofs_switch off || return 100
@@ -416,7 +417,8 @@ create_empty_repo() {
   local repo=$1
   local uid=$2
   local debug_log=$3
-  local extra_options="$4"
+  shift 3
+  local extra_options="$*"
 
   create_repo $repo $uid $debug_log "$extra_options" || return 101
 
