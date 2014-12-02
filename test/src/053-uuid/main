@@ -1,0 +1,33 @@
+
+cvmfs_test_name="Uuid generation and cache"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount grid.cern.ch || return 1
+  local uuid_file="$(get_cvmfs_cachedir grid.cern.ch)/uuid"
+  local uuid="$(cat ${uuid_file})"
+  echo "$uuid"
+  if [ "x$uuid" = "x" ]; then
+    return 2
+  fi
+
+  cvmfs_umount grid.cern.ch
+  cvmfs_mount grid.cern.ch || return 10
+  local uuid_cached="$(cat ${uuid_file})"
+  echo "$uuid_cached"
+  if [ "x$uuid" != "x$uuid_cached" ]; then
+    return 11
+  fi
+
+  cvmfs_umount grid.cern.ch
+  sudo cvmfs_config wipecache
+  cvmfs_mount grid.cern.ch || return 20
+  local uuid_new="$(cat ${uuid_file})"
+  echo "$uuid_new"
+  if [ "x$uuid" = "x$uuid_new" ]; then
+    return 21
+  fi
+
+  return 0
+}
