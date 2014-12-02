@@ -369,7 +369,8 @@ create_repo() {
   local repo=$1
   local uid=$2
   local debug_log=$3
-  local extra_options="$4"
+  shift 3
+  local extra_options="$*"
 
   echo "Shutting down autofs for the cvmfs mounts"
   autofs_switch off || return 100
@@ -416,7 +417,8 @@ create_empty_repo() {
   local repo=$1
   local uid=$2
   local debug_log=$3
-  local extra_options="$4"
+  shift 3
+  local extra_options="$*"
 
   create_repo $repo $uid $debug_log "$extra_options" || return 101
 
@@ -1081,4 +1083,24 @@ peek_backend() {
 
   load_repo_config $repo_name
   cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
+}
+
+
+# switches on/off the garbage collection for a given repository
+#
+# @param name  the name of the repository to be changed
+# @return      0 return code on success
+toggle_gc() {
+  local name=$1
+  local cfg_file="/etc/cvmfs/repositories.d/${name}/server.conf"
+  local tmp_file="$(mktemp)"
+
+  local value="$(cat $cfg_file | grep 'CVMFS_GARBAGE_COLLECTION' | sed -e 's/.*=\([a-z]\+\)/\1/')"
+  local new_value="true"
+  [ x"$value" = x"true" ] && new_value="false"
+
+  cat $cfg_file | sed -e "s/\(CVMFS_GARBAGE_COLLECTION\)=[a-z]\+/\1=$new_value/" > $tmp_file
+  sudo cp -f $tmp_file $cfg_file || return 1
+  rm -f $tmp_file                || return 2
+  return 0
 }

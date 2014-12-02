@@ -19,6 +19,7 @@ struct SyncParameters {
     use_file_chunking(false),
     ignore_xdir_hardlinks(false),
     stop_for_catalog_tweaks(false),
+    garbage_collectable(false),
     catalog_entry_warn_threshold(500000),
     min_file_chunk_size(4*1024*1024),
     avg_file_chunk_size(8*1024*1024),
@@ -41,6 +42,7 @@ struct SyncParameters {
   bool             use_file_chunking;
   bool             ignore_xdir_hardlinks;
   bool             stop_for_catalog_tweaks;
+  bool             garbage_collectable;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
   size_t           avg_file_chunk_size;
@@ -71,6 +73,7 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Optional ('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional ('a', "hash algorithm (default: SHA-1)"));
     r.push_back(Parameter::Switch   ('v', "repository containing volatile files"));
+    r.push_back(Parameter::Switch   ('z', "mark new repository as garbage collectable"));
     return r;
   }
   int Main(const ArgumentList &args);
@@ -194,6 +197,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch   ('i', "ignore x-directory hardlinks"));
     r.push_back(Parameter::Switch   ('d', "pause publishing to allow for "
                                           "catalog tweaks"));
+    r.push_back(Parameter::Switch   ('g', "repo is garbage collectable"));
     r.push_back(Parameter::Switch   ('p', "enable file chunking"));
     r.push_back(Parameter::Optional ('z', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional ('a', "desired average chunk size in bytes"));

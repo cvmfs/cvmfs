@@ -65,6 +65,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   shash::Any certificate;
   shash::Any history;
   uint64_t publish_timestamp = 0;
+  bool garbage_collectable = false;
 
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
@@ -81,10 +82,12 @@ Manifest *Manifest::Load(const map<char, string> &content) {
                            shash::kSuffixHistory);
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
+  if ((iter = content.find('G')) != content.end())
+    garbage_collectable = (iter->second == "yes");
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
-                      history, publish_timestamp);
+                      history, publish_timestamp, garbage_collectable);
 }
 
 
@@ -98,6 +101,7 @@ Manifest::Manifest(const shash::Any &catalog_hash,
   ttl_ = catalog::Catalog::kDefaultTTL;
   revision_ = 0;
   publish_timestamp_ = 0;
+  garbage_collectable_ = false;
 }
 
 
@@ -110,7 +114,8 @@ string Manifest::ExportString() const {
     "B" + StringifyInt(catalog_size_) + "\n" +
     "R" + root_path_.ToString() + "\n" +
     "D" + StringifyInt(ttl_) + "\n" +
-    "S" + StringifyInt(revision_) + "\n";
+    "S" + StringifyInt(revision_) + "\n" +
+    "G" + StringifyBool(garbage_collectable_) + "\n";
 
   if (!micro_catalog_hash_.IsNull())
     manifest += "L" + micro_catalog_hash_.ToString() + "\n";

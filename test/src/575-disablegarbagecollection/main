@@ -1,0 +1,168 @@
+
+cvmfs_test_name="Disable Garbage Collection"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local sentinel0="7a7b8c1a53908fcf59d5c3b6dfec71b69595d265"
+  local sentinel1="bb32ded6fcae6139f2a77ea1c7ec6454cd1e1f6e"
+  local sentinel2="eafdf64e6b502b46184f4e37b7c806e2ec57e7e0"
+  local sentinel3="0e65bf413fbde0ebee028d3747b7dc4c02ae60b0"
+  local sentinel4="a4f5077d7425ca05e67003e863dbf44db8e51873"
+  local sentinel5="af59156fa51c8ca20d0fd1e3ff74598b713acd80"
+
+  echo "create a repository with garbage collection disabled"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return 1
+
+  echo "create some sentinel files in separate transactions"
+  local i=5
+  while [ $i -ge 0 ]; do
+    start_transaction $CVMFS_TEST_REPO || return 2
+    local delete_file="${repo_dir}/$(( $i + 1 )).txt"
+    local new_file="${repo_dir}/${i}.txt"
+    echo "deleting $delete_file and creating $new_file"
+    echo "$i" > $new_file
+    rm -f $delete_file
+    publish_repo $CVMFS_TEST_REPO -a "revision-${i}" || return 3
+    i=$(( $i - 1 ))
+  done
+
+  echo "list the tags of the repository"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 4
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 5
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 5
+  peek_backend $CVMFS_TEST_REPO $sentinel2 || return 5
+  peek_backend $CVMFS_TEST_REPO $sentinel3 || return 5
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 5
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 5
+
+  echo "try to run a garbage collection (should fail)"
+  cvmfs_server gc -f $CVMFS_TEST_REPO && return 6
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 7
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 7
+  peek_backend $CVMFS_TEST_REPO $sentinel2 || return 7
+  peek_backend $CVMFS_TEST_REPO $sentinel3 || return 7
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 7
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 7
+
+  echo "enable the garbage collection feature"
+  toggle_gc $CVMFS_TEST_REPO || return 8
+
+  echo "try to run a garbage collection (should fail)"
+  cvmfs_server gc -f $CVMFS_TEST_REPO && return 9
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 10
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 10
+  peek_backend $CVMFS_TEST_REPO $sentinel2 || return 10
+  peek_backend $CVMFS_TEST_REPO $sentinel3 || return 10
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 10
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 10
+
+  echo "create a new revision for setting to take effect"
+  start_transaction $CVMFS_TEST_REPO || return 11
+  publish_repo $CVMFS_TEST_REPO      || return 12
+
+  echo "try to run a garbage collection"
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 13
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 14
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 14
+  peek_backend $CVMFS_TEST_REPO $sentinel2 || return 14
+  peek_backend $CVMFS_TEST_REPO $sentinel3 || return 14
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 14
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 14
+
+  echo "remove revision tag 3"
+  cvmfs_server tag -f -r 'revision-3' $CVMFS_TEST_REPO || return 15
+
+  echo "run garbage collection"
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 16
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 17
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 17
+  peek_backend $CVMFS_TEST_REPO $sentinel2 || return 17
+  peek_backend $CVMFS_TEST_REPO $sentinel3 && return 18
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 17
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 17
+
+  echo "disable garbage collection again"
+  toggle_gc $CVMFS_TEST_REPO || return 19
+
+  cat /etc/cvmfs/repositories.d/test.cern.ch/server.conf
+
+  echo "try to run a garbage collection (should fail)"
+  cvmfs_server gc -f $CVMFS_TEST_REPO && return 20
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 21
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 21
+  peek_backend $CVMFS_TEST_REPO $sentinel2 || return 21
+  peek_backend $CVMFS_TEST_REPO $sentinel3 && return 21
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 21
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 21
+
+  echo "remove revision 2"
+  cvmfs_server tag -f -r 'revision-2' $CVMFS_TEST_REPO || return 22
+
+  echo "try to run a garbage collection (should fail)"
+  cvmfs_server gc -f $CVMFS_TEST_REPO && return 23
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 24
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 24
+  peek_backend $CVMFS_TEST_REPO $sentinel2 || return 24
+  peek_backend $CVMFS_TEST_REPO $sentinel3 && return 24
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 24
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 24
+
+  echo "create a new revision for setting to take effect"
+  start_transaction $CVMFS_TEST_REPO || return 25
+  publish_repo $CVMFS_TEST_REPO      || return 26
+
+  echo "try to run a garbage collection (should fail)"
+  cvmfs_server gc -f $CVMFS_TEST_REPO && return 27
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 28
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 28
+  peek_backend $CVMFS_TEST_REPO $sentinel2 || return 28
+  peek_backend $CVMFS_TEST_REPO $sentinel3 && return 28
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 28
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 28
+
+  echo "re-enable again"
+  toggle_gc         $CVMFS_TEST_REPO || return 29
+  start_transaction $CVMFS_TEST_REPO || return 30
+  publish_repo      $CVMFS_TEST_REPO || return 31
+
+  echo "try to run a garbage collection"
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 32
+
+  echo "check availability of sentinel files"
+  peek_backend $CVMFS_TEST_REPO $sentinel0 || return 33
+  peek_backend $CVMFS_TEST_REPO $sentinel1 || return 33
+  peek_backend $CVMFS_TEST_REPO $sentinel2 && return 34
+  peek_backend $CVMFS_TEST_REPO $sentinel3 && return 35
+  peek_backend $CVMFS_TEST_REPO $sentinel4 || return 33
+  peek_backend $CVMFS_TEST_REPO $sentinel5 || return 33
+
+  echo "check sanity of repository"
+  check_repository $CVMFS_TEST_REPO -i               || return 36
+  check_repository $CVMFS_TEST_REPO -i -t revision-0 || return 37
+  check_repository $CVMFS_TEST_REPO -i -t revision-1 || return 38
+  check_repository $CVMFS_TEST_REPO -i -t revision-4 || return 39
+  check_repository $CVMFS_TEST_REPO -i -t revision-5 || return 40
+
+  return 0
+}

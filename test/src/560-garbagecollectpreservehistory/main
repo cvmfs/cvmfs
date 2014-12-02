@@ -148,7 +148,7 @@ cvmfs_run_test() {
   local revisions=17
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
 
   # ============================================================================
 

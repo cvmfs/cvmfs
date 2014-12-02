@@ -199,7 +199,8 @@ Supported Commands:
   mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
-                [-s S3 config file] [-k path to existing keychain]
+                [-z enable garbage collection] [-s S3 config file]
+                [-k path to existing keychain]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
@@ -704,6 +705,17 @@ is_master_replica() {
   fi
 
   [ "x$is_master_replica" = "xtrue" ]
+}
+
+# checks if a repository is flagged as being garbage collectable
+# (this is a safe guard to avoid mistakenly deleting data in production repos)
+#
+# @param name  the name of the repository to be checked
+# @return      0 if it is garbage collectable
+is_garbage_collectable() {
+  local name=$1
+  load_repo_config $name
+  [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]
 }
 
 # checks if a repository is currently in a transaction
@@ -1618,6 +1630,7 @@ create_config_files_for_new_repository() {
   local unionfs=$5
   local hash_algo=$6
   local autotagging=$7
+  local garbage_collectable=$8
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -1645,6 +1658,7 @@ CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
 CVMFS_UNION_FS_TYPE=$unionfs
 CVMFS_HASH_ALGORITHM=$hash_algo
 CVMFS_AUTO_TAG=$autotagging
+CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 EOF
 
   # make sure that the config file does not exist, yet
@@ -2092,12 +2106,13 @@ mkfs() {
   local autotagging=true
   local unionfs
   local hash_algo
+  local garbage_collectable=false
   local s3_config=""
   local keys_import_location
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:vga:s:k:" option; do
+  while getopts "w:u:o:mf:vga:zs:k:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2122,6 +2137,9 @@ mkfs() {
       ;;
       a)
         hash_algo=$OPTARG
+      ;;
+      z)
+        garbage_collectable=true
       ;;
       s)
         s3_config=$OPTARG
@@ -2201,7 +2219,7 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo $autotagging || die "fail"
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo $autotagging $garbage_collectable || die "fail"
   if is_local_upstream $upstream; then
     reload_apache > /dev/null
   fi
@@ -2245,11 +2263,15 @@ mkfs() {
     echo -n "(repository flagged volatile)... "
   fi
   local user_shell="$(get_user_shell $name)"
-  $user_shell "cvmfs_swissknife create \
-    -t $temp_dir \
-    -r $upstream \
-    -a $hash_algo $volatile_opt \
-    -o ${temp_dir}/new_manifest" > /dev/null   || die "fail! (cannot init repo)"
+  local create_cmd="cvmfs_swissknife create \
+    -t $temp_dir                            \
+    -r $upstream                            \
+    -a $hash_algo $volatile_opt             \
+    -o ${temp_dir}/new_manifest"
+  if $garbage_collectable; then
+    create_cmd="$create_cmd -z"
+  fi
+  $user_shell "$create_cmd" > /dev/null        || die "fail! (cannot init repo)"
   sign_manifest $name ${temp_dir}/new_manifest || die "fail! (cannot sign repo)"
   echo "done"
 
@@ -2558,7 +2580,7 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs sha1 true || die "fail!"
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs sha1 true false || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -3516,6 +3538,9 @@ publish() {
     if [ "x$manual_revision" != "x" ]; then
       sync_command="$sync_command -v $manual_revision"
     fi
+    if [ "x$CVMFS_GARBAGE_COLLECTION" = "xtrue" ]; then
+      sync_command="$sync_command -g"
+    fi
     local tag_command="$swissknife tag_create \
       -r $upstream                            \
       -w $stratum0                            \
@@ -3773,9 +3798,10 @@ gc() {
 
     # sanity checks
     check_repository_compatibility $name
-    is_stratum0       $name || die "Garbage Collection is currently only supported on Stratum0"
-    is_in_transaction $name && die "Cannot run garbage collection while in a transaction"
-    is_owner_or_root  $name || die "Permission denied: Repository $name is owned by $user"
+    is_stratum0            $name || die "Garbage Collection is currently only supported on Stratum0"
+    is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
+    is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
+    is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
     local head_timestamp="$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -t)"
     [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
 

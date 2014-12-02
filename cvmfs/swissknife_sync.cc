@@ -108,9 +108,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
-  bool volatile_content = false;
-  if (args.find('v') != args.end())
-    volatile_content = true;
+  const bool volatile_content    = (args.count('v') > 0);
+  const bool garbage_collectable = (args.count('z') > 0);
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
@@ -119,7 +118,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(
-      dir_temp, volatile_content, spooler);
+      dir_temp, volatile_content, garbage_collectable, spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;
@@ -476,6 +475,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('m') != args.end()) params.mucatalogs = true;
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
+  if (args.find('g') != args.end()) params.garbage_collectable = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -552,6 +552,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   sync->Traverse();
   // TODO: consider using the unique pointer to come in Github Pull Request 46
   manifest::Manifest *manifest = mediator.Commit();
+  manifest->set_garbage_collectability(params.garbage_collectable);
 
   g_download_manager->Fini();
 
