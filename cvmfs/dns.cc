@@ -24,6 +24,7 @@
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <errno.h>
+#include <netdb.h>
 #include <poll.h>
 #include <unistd.h>
 
@@ -88,7 +89,7 @@ static void PinpointHostSubstr(
 
 
 /**
- * Returns the host name from a string in the format 
+ * Returns the host name from a string in the format
  * http://<hostname>:<port>[/path]
  * or an empty string if url doesn't match the format.
  */
@@ -616,7 +617,8 @@ CaresResolver *CaresResolver::Create(
   memset(&options, 0, sizeof(options));
   options.timeout = timeout_ms;
   options.tries = 1 + retries;
-  optmask = ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES;
+  options.lookups = strdup("b");
+  optmask = ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES | ARES_OPT_LOOKUPS;
   retval = ares_init_options(resolver->channel_, &options, optmask);
   if (retval != ARES_SUCCESS)
     goto create_fail;
@@ -770,34 +772,50 @@ bool CaresResolver::SetResolvers(const vector<string> &resolvers) {
 }
 
 
+/**
+ * Changes the options of the active channel.  This is hacky and deals with
+ * c-ares internal data structures because there is no way to do it via public
+ * APIs.
+ */
 bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
-  /*struct ares_options options;
-  int optmask;
-  int retval = ares_save_options(*channel_, &options, &optmask);
-  assert(retval == ARES_SUCCESS);
+  // From ares_private.h
+  struct {
+    int flags;
+    int timeout;
+    int tries;
+    int ndots;
+    int rotate;
+    int udp_port;
+    int tcp_port;
+    int socket_send_buffer_size;
+    int socket_receive_buffer_size;
+    char **domains;
+    int ndomains;
+    // More fields come in the original data structure
+  } ares_channelhead;
 
-  if (options.ndomains > 0) {
-    for (int i = 0; i < options.ndomains; ++i)
-      free(options.domains[i]);
-    free(options.domains);
+  memcpy(&ares_channelhead, *channel_, sizeof(ares_channelhead));
+  if (ares_channelhead.domains) {
+    for (int i = 0; i < ares_channelhead.ndomains; ++i) {
+      free(ares_channelhead.domains[i]);
+    }
+    free(ares_channelhead.domains);
+    ares_channelhead.domains = NULL;
   }
 
-  options.ndomains = domains.size();
-  if (options.ndomains > 0) {
-    options.domains = reinterpret_cast<char **>(
-      smalloc(options.ndomains * sizeof(char **)));
-    for (int i = 0; i < options.ndomains; ++i) {
-      options.domains[i] = strdup(domains[i].c_str());
+  ares_channelhead.ndomains = int(domains.size());
+  if (ares_channelhead.ndomains > 0) {
+    ares_channelhead.domains = reinterpret_cast<char **>(
+      smalloc(ares_channelhead.ndomains * sizeof(char **)));
+    for (int i = 0; i < ares_channelhead.ndomains; ++i) {
+      ares_channelhead.domains[i] = strdup(domains[i].c_str());
     }
   }
-  retval = ares_init_options(channel_, &options, optmask);
-  ares_destroy_options(&options);
 
-  if (retval == ARES_SUCCESS) {
-    domains_ = domains;
-    return true;
-  }*/
-  return false;
+  memcpy(*channel_, &ares_channelhead, sizeof(ares_channelhead));
+
+  domains_ = domains;
+  return true;
 }
 
 
@@ -1075,7 +1093,7 @@ bool NormalResolver::SetResolvers(const vector<string> &resolvers) {
 
 
 /**
- * Sets new search domains for both resolvers or for none.
+ * Set new search domains for both resolvers or for none.
  */
 bool NormalResolver::SetSearchDomains(const vector<string> &domains) {
   vector<string> old_domains = hostfile_resolver_->domains();

@@ -512,15 +512,22 @@ TEST_F(T_Dns, CaresResolverLocalhost) {
 
 
 TEST_F(T_Dns, CaresResolverSearchDomain) {
-  /*Host host = default_resolver->Resolve("a");
+  Host host = default_resolver->Resolve("a");
   EXPECT_EQ(host.status(), kFailUnknownHost);
 
   vector<string> new_domains;
+  new_domains.push_back("no.such.domain");
   new_domains.push_back("root-servers.net");
   bool retval = default_resolver->SetSearchDomains(new_domains);
   EXPECT_EQ(retval, true);
   host = default_resolver->Resolve("a");
-  ExpectResolvedName(host, "198.41.0.4", "[2001:503:ba3e::2:30]");*/
+  ExpectResolvedName(host, "198.41.0.4", "[2001:503:ba3e::2:30]");
+  
+  new_domains.clear();
+  retval = default_resolver->SetSearchDomains(new_domains);
+  EXPECT_EQ(retval, true);
+  host = default_resolver->Resolve("a");
+  EXPECT_EQ(host.status(), kFailUnknownHost);
 }
 
 
