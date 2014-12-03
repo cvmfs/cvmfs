@@ -6,7 +6,7 @@ count_dns_changes() {
   if [ ! -f $syslog_file ]; then
     syslog_file=/var/log/syslog
   fi
-  cat $syslog_file $CVMFS_TEST_SYSLOG_TARGET | \
+  sudo cat $syslog_file $CVMFS_TEST_SYSLOG_TARGET | \
     grep 'DNS entries for proxy .* changed, adjusting' | wc -l
 }
 
@@ -16,7 +16,7 @@ find_in_syslog() {
   if [ ! -f $syslog_file ]; then
     syslog_file=/var/log/syslog
   fi
-  cat $syslog_file $CVMFS_TEST_SYSLOG_TARGET | grep "$what"
+  sudo cat $syslog_file $CVMFS_TEST_SYSLOG_TARGET | grep "$what"
 }
 
 run_dns_test() {
@@ -38,11 +38,11 @@ run_dns_test() {
   echo "127.0.0.3 round-robin.localdomain" > host_tests
   echo "127.0.0.2 round-robin.localdomain" >> host_tests
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
-  date $(date +%m%d%H%M%Y.%S -d '+1 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '+1 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info
   md5sum "$file"
   retval=$?
-  date $(date +%m%d%H%M%Y.%S -d '-1 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '-1 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info | grep round-robin.localdomain | \
     grep 127.0.0.2 | grep 127.0.0.3 || return 10
   if [ $retval -ne 0 ]; then return 11; fi
@@ -55,11 +55,11 @@ run_dns_test() {
   num_dns_changes=$(count_dns_changes)
   echo "127.0.0.4 round-robin.localdomain" >> host_tests
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
-  date $(date +%m%d%H%M%Y.%S -d '+2 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '+2 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info
   md5sum "$file"
   retval=$?
-  date $(date +%m%d%H%M%Y.%S -d '-2 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '-2 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info | grep round-robin.localdomain | \
     grep 127.0.0.2 | grep 127.0.0.3 | grep 127.0.0.4 || return 20
   if [ $retval -ne 0 ]; then return 21; fi
@@ -72,11 +72,11 @@ run_dns_test() {
   num_dns_changes=$(count_dns_changes)
   echo "127.0.0.2 round-robin.localdomain" > host_tests
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
-  date $(date +%m%d%H%M%Y.%S -d '+3 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '+3 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info
   md5sum "$file"
   retval=$?
-  date $(date +%m%d%H%M%Y.%S -d '-3 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '-3 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info | grep round-robin.localdomain | \
     grep 127.0.0.2 || return 30
   if [ $retval -ne 0 ]; then return 31; fi
@@ -90,11 +90,11 @@ run_dns_test() {
   echo "::3 round-robin.localdomain" >> host_tests
   echo "127.0.0.2 round-robin.localdomain" >> host_tests  # IPv6 has precedence
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
-  date $(date +%m%d%H%M%Y.%S -d '+4 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '+4 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info
   md5sum "$file"
   retval=$?
-  date $(date +%m%d%H%M%Y.%S -d '-4 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '-4 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info | grep round-robin.localdomain | \
     grep "::2" | grep "::3" || return 40
   if [ $retval -ne 0 ]; then return 41; fi
@@ -108,11 +108,11 @@ run_dns_test() {
   echo "127.0.0.2 round-robin.localdomain" > host_tests
   echo "127.0.0.3 round-robin.localdomain" >> host_tests
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
-  date $(date +%m%d%H%M%Y.%S -d '+5 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '+5 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info
   md5sum "$file"
   retval=$?
-  date $(date +%m%d%H%M%Y.%S -d '-5 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '-5 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info | grep round-robin.localdomain | \
     grep "127.0.0.2" | grep "127.0.0.3" || return 50
   if [ $retval -ne 0 ]; then return 51; fi
@@ -125,11 +125,11 @@ run_dns_test() {
   num_dns_changes=$(count_dns_changes)
   echo "127.0.0.5 round-robin2.localdomain" > host_tests # hostname changes
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
-  date $(date +%m%d%H%M%Y.%S -d '+6 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '+6 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info
   md5sum "$file"
   retval=$?
-  date $(date +%m%d%H%M%Y.%S -d '-6 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '-6 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info | grep round-robin.localdomain | \
     grep "127.0.0.2" | grep "127.0.0.3" || return 60
   if [ $retval -ne 0 ]; then return 61; fi
@@ -144,11 +144,11 @@ run_dns_test() {
   echo "127.0.0.5 round-robin.localdomain" > host_tests
   echo "127.0.0.6 round-robin.localdomain" >> host_tests
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
-  date $(date +%m%d%H%M%Y.%S -d '+7 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '+7 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info
   md5sum "$file"
   retval=$?
-  date $(date +%m%d%H%M%Y.%S -d '-7 hour')
+  sudo date $(date +%m%d%H%M%Y.%S -d '-7 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info | grep round-robin.localdomain | \
     grep "127.0.0.5" | grep "127.0.0.6" || return 70
   if [ $retval -ne 0 ]; then return 71; fi
