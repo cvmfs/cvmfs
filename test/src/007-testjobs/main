@@ -9,7 +9,7 @@ cvmfs_run_test() {
   . /cvmfs/lhcb.cern.ch/etc/login.sh || return 2
   . SetupProject.sh Brunel v44r9 || return 3
   gaudirun.py ${BRUNELSYSROOT}/tests/options/testBrunel.py || return 4
-  check_memory lhcb.cern.ch 50000
+  check_memory lhcb.cern.ch 55000
 
   # TODO: ask for current version
   #export ATL_LOCAL_ROOT=/cvmfs/atlas.cern.ch/repo

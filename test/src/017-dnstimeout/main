@@ -37,7 +37,8 @@ cvmfs_run_test() {
 
   num_host=$(cvmfs_config showconfig $repo |grep CVMFS_SERVER_URL | tr \; \\n  | wc -l)
 
-  local expected_max=$(($num_host*3 + 2))
+  # 8 seconds for resolving the proxies at the beginning
+  local expected_max=$(($num_host*3 + 8 + 2))
   if [ $seconds -gt $expected_max ]; then
     echo "timeout was too long: $seconds (expected at most $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1

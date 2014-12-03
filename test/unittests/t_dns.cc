@@ -525,8 +525,12 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
   string line;
   while (GetLineFile(f, &line)) {
     vector<string> tokens = SplitString(line, ' ');
-    if (tokens[0] == "nameserver")
-      nameservers.push_back(tokens[1] + ":53");
+    if (tokens[0] == "nameserver") {
+      if (tokens[1].find(":") != string::npos)
+        nameservers.push_back("[" + tokens[1] + "]:53");
+      else  
+        nameservers.push_back(tokens[1] + ":53");
+    }
     else if (tokens[0] == "search")
       domains.push_back(tokens[1]);
   }
