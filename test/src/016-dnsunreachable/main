@@ -6,7 +6,7 @@ do_faulty_mount() {
               "CVMFS_DNS_SERVER=127.0.0.2" \
               "CVMFS_TIMEOUT=3" \
               "CVMFS_TIMEOUT_DIRECT=3" \
-              "CVMFS_MAX_RETRIES=0"
+              "CVMFS_MAX_RETRIES=1"
 }
 
 cvmfs_run_test() {
@@ -27,8 +27,8 @@ cvmfs_run_test() {
   local seconds
   seconds=$(stop_watch do_faulty_mount)
 
-  if [ $seconds -gt 5 ]; then
-    echo "timeout was too long: $seconds (expected at most 5)"
+  if [ $seconds -gt 8 ]; then
+    echo "timeout was too long: $seconds (expected at most 8)"
     CVMFS_TIME_WARNING_FLAG=1
   fi
 
