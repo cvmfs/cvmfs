@@ -373,8 +373,7 @@ bool S3Uploader::UploadFile(const std::string &filename,
                             char              *buff,
                             unsigned long     size_of_file,
                             const callback_t  *callback,
-                            MemoryMappedFile  *mmf)
-{
+                            MemoryMappedFile  *mmf) {
   // Choose S3 account and bucket based on the filename
   std::string access_key, secret_key, bucket_name;
   const std::string mangled_filename = repository_alias_ + "/" + filename;
@@ -387,7 +386,13 @@ bool S3Uploader::UploadFile(const std::string &filename,
                                                   mangled_filename,
                                                   (unsigned char*)buff,
                                                   size_of_file);
+
   info->request        = s3fanout::JobInfo::kReqPut;
+#ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
+  if (filename.substr(0, 1) != ".") {
+    info->request        = s3fanout::JobInfo::kReqHead;
+  }
+#endif
   info->origin_mem.pos = 0;
   info->callback       = const_cast<void*>(static_cast<void const*>(callback));
   info->mmf            = mmf;
