@@ -3815,7 +3815,6 @@ gc() {
 
     # sanity checks
     check_repository_compatibility $name
-    is_stratum0            $name || die "Garbage Collection is currently only supported on Stratum0"
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
     is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
@@ -3828,28 +3827,36 @@ gc() {
 
     # prepare swissknife commands
     local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    local repository_url="$CVMFS_STRATUM0"
+    if is_stratum1 $name; then
+      [ ! -z $CVMFS_STRATUM1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
+      repository_url="$CVMFS_STRATUM1"
+    fi
     local additional_switches=""
     [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
     [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
     [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
     [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
-    local gc_command="cvmfs_swissknife gc -r $CVMFS_STRATUM0         \
+    local gc_command="cvmfs_swissknife gc -r $repository_url         \
                                           -u $CVMFS_UPSTREAM_STORAGE \
                                           -n $CVMFS_REPOSITORY_NAME  \
                                           -k $CVMFS_PUBLIC_KEY       \
-                                          -t ${CVMFS_SPOOL_DIR}/tmp  \
+                                          -t ${CVMFS_SPOOL_DIR}/tmp/ \
                                           $additional_switches"
 
-    local base_hash=$(get_mounted_root_hash $name)
-    local tag_command="cvmfs_swissknife tag_empty_bin \
-      -r $CVMFS_UPSTREAM_STORAGE                      \
-      -w $CVMFS_STRATUM0                              \
-      -t ${CVMFS_SPOOL_DIR}/tmp                       \
-      -m $new_manifest                                \
-      -p /etc/cvmfs/keys/${name}.pub                  \
-      -f $name                                        \
-      -b $base_hash                                   \
-      -e $CVMFS_HASH_ALGORITHM"
+    local tag_command=""
+    if is_stratum0 $name; then
+      local base_hash=$(get_mounted_root_hash $name)
+      tag_command="cvmfs_swissknife tag_empty_bin \
+        -r $CVMFS_UPSTREAM_STORAGE                \
+        -w $CVMFS_STRATUM0                        \
+        -t ${CVMFS_SPOOL_DIR}/tmp                 \
+        -m $new_manifest                          \
+        -p /etc/cvmfs/keys/${name}.pub            \
+        -f $name                                  \
+        -b $base_hash                             \
+        -e $CVMFS_HASH_ALGORITHM"
+      fi
 
     # do it!
     if [ $open_transaction -eq 1 ]; then
@@ -3860,7 +3867,7 @@ gc() {
     echo "Running Garbage Collection"
     $user_shell "$gc_command" || die "Fail! Executed Command: $gc_command"
 
-    if [ ! $dry_run ]; then
+    if [ ! $dry_run ] && is_stratum0 $name; then
       echo "Updating History Database"
       $user_shell "$tag_command" || die "Fail! Executed Command: $tag_command"
 
