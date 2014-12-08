@@ -6,7 +6,6 @@
 
 #include <pthread.h>
 #include <utility>
-#include "ares.h"
 
 #include "cvmfs_config.h"
 #include "s3fanout.h"
@@ -424,8 +423,10 @@ int S3FanoutManager::InitializeDnsSettings(CURL *handle,
   }
 
   // Remove port number if such exists
-  std::string remote_host = host_with_port.substr(0, host_with_port.find(":"));
-  std::string remote_port = host_with_port.substr(host_with_port.find(":")+1);
+  if (host_with_port.compare(0, 7, "http://") != 0)
+    host_with_port = "http://" + host_with_port;
+  std::string remote_host = dns::ExtractHost(host_with_port);
+  std::string remote_port = dns::ExtractPort(host_with_port);
 
   // If we have the name already resolved, use the least used IP
   S3FanOutDnsEntry *useme = NULL;
