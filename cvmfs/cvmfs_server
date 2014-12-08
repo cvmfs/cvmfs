@@ -733,6 +733,7 @@ open_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
+  is_stratum0 $name                 || die "Cannot open transaction on Stratum1"
   mkdir "$tx_lock" > /dev/null 2>&1 || die "Failed to create transaction lock"
   cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
 }
