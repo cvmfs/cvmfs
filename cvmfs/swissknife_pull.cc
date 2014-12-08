@@ -197,9 +197,7 @@ static void *MainWorker(void *data) {
 }
 
 
-static bool Pull(const shash::Any &catalog_hash, const std::string &path,
-                 const bool with_nested)
-{
+static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   int retval;
   download::Failures dl_retval;
 
@@ -300,26 +298,24 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path,
     } else {
       LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
                previous_catalog.ToString().c_str());
-      retval = Pull(previous_catalog, path, false);
+      retval = Pull(previous_catalog, path);
       if (!retval)
         return false;
     }
   }
 
   // Nested catalogs
-  if (with_nested) {
-    const catalog::Catalog::NestedCatalogList &nested_catalogs =
-      catalog->ListNestedCatalogs();
-    for (catalog::Catalog::NestedCatalogList::const_iterator i =
-         nested_catalogs.begin(), iEnd = nested_catalogs.end();
-         i != iEnd; ++i)
-    {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
-               i->path.c_str());
-      retval = Pull(i->hash, i->path.ToString(), true);
-      if (!retval)
-        return false;
-    }
+  const catalog::Catalog::NestedCatalogList &nested_catalogs =
+    catalog->ListNestedCatalogs();
+  for (catalog::Catalog::NestedCatalogList::const_iterator i =
+       nested_catalogs.begin(), iEnd = nested_catalogs.end();
+       i != iEnd; ++i)
+  {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
+             i->path.c_str());
+    retval = Pull(i->hash, i->path.ToString());
+    if (!retval)
+      return false;
   }
 
   delete catalog;
@@ -529,14 +525,14 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from trunk catalog at /");
-  retval = Pull(ensemble.manifest->catalog_hash(), "", true);
+  retval = Pull(ensemble.manifest->catalog_hash(), "");
   pull_history = false;
   for (TagVector::const_iterator i    = historic_tags.begin(),
                                  iend = historic_tags.end();
        i != iend; ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from %s repository tag",
              i->name.c_str());
-    bool retval2 = Pull(i->root_hash, "", true);
+    bool retval2 = Pull(i->root_hash, "");
     retval = retval && retval2;
   }
 
