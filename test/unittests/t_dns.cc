@@ -178,17 +178,22 @@ TEST_F(T_Dns, ExtractHost) {
 TEST_F(T_Dns, ExtractPort) {
   EXPECT_EQ(ExtractPort("http://localhost:8"), "8");
   EXPECT_EQ(ExtractPort("http://localhost:3128"), "3128");
-  EXPECT_EQ(ExtractPort("http://localhost/foo:80"), "80");
+  EXPECT_EQ(ExtractPort("http://localhost/foo:80"), "");
+  EXPECT_EQ(ExtractPort("http://localhost:80/foo"), "80");
   EXPECT_EQ(ExtractPort("http://localhost"), "");
+  EXPECT_EQ(ExtractPort("http://localhost:port"), "");
   EXPECT_EQ(ExtractPort("http://127.0.0.1:3128"), "3128");
-  EXPECT_EQ(ExtractPort("http://127.0.0.1/foo:3128"), "3128");
+  EXPECT_EQ(ExtractPort("http://127.0.0.1:3128/foo"), "3128");
   EXPECT_EQ(ExtractPort("http://127.0.0.1"), "");
+  EXPECT_EQ(ExtractPort("http://127.0.0.1:port"), "");
   EXPECT_EQ(ExtractPort("http://[::1]:3128"), "3128");
-  EXPECT_EQ(ExtractPort("http://[::1]/foo:8080"), "8080");
+  EXPECT_EQ(ExtractPort("http://[::1]:8080/foo"), "8080");
   EXPECT_EQ(ExtractPort("http://[::1]"), "");
+  EXPECT_EQ(ExtractPort("http://[::1]:port"), "");
   EXPECT_EQ(ExtractPort(""), "");
   EXPECT_EQ(ExtractPort("localhost"), "");
   EXPECT_EQ(ExtractPort("localhost:80"), "");
+  EXPECT_EQ(ExtractPort("localhost:port"), "");
   EXPECT_EQ(ExtractPort("http:/"), "");
   EXPECT_EQ(ExtractPort("http:/:80"), "");
   EXPECT_EQ(ExtractPort("http://"), "");
@@ -198,6 +203,8 @@ TEST_F(T_Dns, ExtractPort) {
   EXPECT_EQ(ExtractPort("http://[:80"), "");
   EXPECT_EQ(ExtractPort("http://[]"), "");
   EXPECT_EQ(ExtractPort("http://[]:80"), "80");
+  EXPECT_EQ(ExtractPort("http://[]:port"), "");
+  EXPECT_EQ(ExtractPort("http://localhost:port"), "");
 }
 
 
