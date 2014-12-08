@@ -3857,7 +3857,7 @@ gc() {
         -f $name                                  \
         -b $base_hash                             \
         -e $CVMFS_HASH_ALGORITHM"
-      fi
+    fi
 
     # do it!
     if [ $open_transaction -eq 1 ]; then
@@ -3868,7 +3868,7 @@ gc() {
     echo "Running Garbage Collection"
     $user_shell "$gc_command" || die "Fail! Executed Command: $gc_command"
 
-    if [ ! $dry_run ] && is_stratum0 $name; then
+    if is_stratum0 $name && [ $dry_run -eq 0 ]; then
       echo "Updating History Database"
       $user_shell "$tag_command" || die "Fail! Executed Command: $tag_command"
 
