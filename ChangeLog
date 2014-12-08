@@ -1,4 +1,5 @@
 2.1.20:
+  * Fix traversal of nested catalogs in intermediate catalogs during snapshot
   * Resolve round-robin DNS entries for proxies to a load-balance group
     (CVM-457)
   * Use AllowOverride Limit instead of AllowOverride All in Stratum 0/1
