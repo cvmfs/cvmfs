@@ -304,18 +304,20 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
     }
   }
 
-  // Nested catalogs
-  const catalog::Catalog::NestedCatalogList &nested_catalogs =
-    catalog->ListNestedCatalogs();
-  for (catalog::Catalog::NestedCatalogList::const_iterator i =
-       nested_catalogs.begin(), iEnd = nested_catalogs.end();
-       i != iEnd; ++i)
+  // Nested catalogs (in a nested code block because goto fail...)
   {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
-             i->path.c_str());
-    retval = Pull(i->hash, i->path.ToString());
-    if (!retval)
-      return false;
+    const catalog::Catalog::NestedCatalogList &nested_catalogs =
+      catalog->ListNestedCatalogs();
+    for (catalog::Catalog::NestedCatalogList::const_iterator i =
+         nested_catalogs.begin(), iEnd = nested_catalogs.end();
+         i != iEnd; ++i)
+    {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
+               i->path.c_str());
+      retval = Pull(i->hash, i->path.ToString());
+      if (!retval)
+        return false;
+    }
   }
 
   delete catalog;
