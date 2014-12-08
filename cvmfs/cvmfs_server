@@ -204,7 +204,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
-                [-a silence apache warning]
+                [-w stratum1 url] [-a silence apache warning]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -2303,6 +2303,7 @@ add_replica() {
   local name
   local alias_name
   local stratum0
+  local stratum1_url
   local public_key
   local upstream
   local owner
@@ -2310,7 +2311,7 @@ add_replica() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:a" option
+  while getopts "o:u:n:w:a" option
   do
     case $option in
       u)
@@ -2321,6 +2322,9 @@ add_replica() {
       ;;
       n)
         alias_name=$OPTARG
+      ;;
+      w)
+        stratum1_url=$OPTARG
       ;;
       a)
         silence_httpd_warning=1
@@ -2368,6 +2372,8 @@ add_replica() {
   local temp_dir="${spool_dir}/tmp"
   local storage_dir=""
   is_local_upstream $upstream && storage_dir=$(get_upstream_config $upstream)
+  local stratum1="http://localhost/cvmfs/${alias_name}"
+  [ ! -z "$stratum1_url" ] && stratum1="$stratum1_url"
 
   # additional sanity checks
   is_root || die "Only root can create a new repository"
@@ -2399,6 +2405,7 @@ CVMFS_REPOSITORY_TYPE=stratum1
 CVMFS_USER=$cvmfs_user
 CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
+CVMFS_STRATUM1=$stratum1
 CVMFS_UPSTREAM_STORAGE=$upstream
 EOF
   cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
