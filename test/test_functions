@@ -353,6 +353,11 @@ check_memory() {
 }
 
 
+min() {
+  [ $1 -lt $2 ] && echo $1 || echo $2
+}
+
+
 destroy_repo() {
   local repo=$1
   sudo cvmfs_server rmfs -f $repo || return 100
