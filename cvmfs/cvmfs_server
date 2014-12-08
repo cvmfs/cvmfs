@@ -3831,6 +3831,7 @@ gc() {
     if is_stratum1 $name; then
       [ ! -z $CVMFS_STRATUM1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
       repository_url="$CVMFS_STRATUM1"
+      open_transaction=0
     fi
     local additional_switches=""
     [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
