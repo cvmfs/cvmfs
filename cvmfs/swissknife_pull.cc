@@ -63,6 +63,7 @@ string              *stratum0_url = NULL;
 string              *temp_dir = NULL;
 unsigned             num_parallel = 1;
 bool                 pull_history = false;
+bool                 is_garbage_collectable = false;
 upload::Spooler     *spooler = NULL;
 int                  pipe_chunks[2];
 // required for concurrent reading
@@ -237,10 +238,17 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   dl_retval = g_download_manager->Fetch(&download_catalog);
   fclose(fcatalog_vanilla);
   if (dl_retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d - %s)",
-             catalog_hash.ToString().c_str(), dl_retval,
-             download::Code2Ascii(dl_retval));
-    goto pull_cleanup;
+    if (path == "" && is_garbage_collectable) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "skipping missing root catalog %s - "
+                                      "probably sweeped by garbage collection",
+               catalog_hash.ToString().c_str());
+      goto pull_skip;
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d - %s)",
+               catalog_hash.ToString().c_str(), dl_retval,
+               download::Code2Ascii(dl_retval));
+      goto pull_cleanup;
+    }
   }
   retval = zlib::DecompressPath2Path(file_catalog_vanilla, file_catalog);
   if (!retval) {
@@ -331,6 +339,11 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   unlink(file_catalog.c_str());
   unlink(file_catalog_vanilla.c_str());
   return false;
+
+ pull_skip:
+  unlink(file_catalog.c_str());
+  unlink(file_catalog_vanilla.c_str());
+  return true;
 }
 
 
@@ -456,6 +469,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              m_retval, manifest::Code2Ascii(m_retval));
     goto fini;
   }
+
+  is_garbage_collectable = ensemble.manifest->garbage_collectable();
 
   // Manifest available, now the spooler's hash algorithm can be determined
   // That doesn't actually matter because the replication does no re-hashing
