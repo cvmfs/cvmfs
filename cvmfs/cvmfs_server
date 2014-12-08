@@ -3740,10 +3740,11 @@ gc() {
   local preserve_timestamp=0
   local timestamp_threshold=""
   local force=0
+  local open_transaction=1
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:f" option
+  while getopts "ldr:t:fk" option
   do
     case $option in
       l)
@@ -3760,6 +3761,9 @@ gc() {
       ;;
       f)
         force=1
+      ;;
+      k)
+        open_transaction=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3848,8 +3852,10 @@ gc() {
       -e $CVMFS_HASH_ALGORITHM"
 
     # do it!
-    trap "close_transaction $name 0" EXIT HUP INT TERM
-    open_transaction $name || die "Failed to open transaction for garbage collection"
+    if [ $open_transaction -eq 1 ]; then
+      trap "close_transaction $name 0" EXIT HUP INT TERM
+      open_transaction $name || die "Failed to open transaction for garbage collection"
+    fi
 
     echo "Running Garbage Collection"
     $user_shell "$gc_command" || die "Fail! Executed Command: $gc_command"
