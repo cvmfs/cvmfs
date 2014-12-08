@@ -792,8 +792,9 @@ publish_repo() {
 # @param name  the name of the repository to load the configs for
 load_repo_config() {
   local name=$1
-  . /etc/cvmfs/repositories.d/${name}/server.conf
-  . /etc/cvmfs/repositories.d/${name}/client.conf
+  local conf_dir="/etc/cvmfs/repositories.d/${name}"
+  [ ! -f "${conf_dir}/server.conf" ] || . ${conf_dir}/server.conf
+  [ ! -f "${conf_dir}/client.conf" ] || . ${conf_dir}/client.conf
 }
 
 

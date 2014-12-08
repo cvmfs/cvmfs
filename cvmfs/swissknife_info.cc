@@ -52,6 +52,8 @@ swissknife::ParameterList swissknife::CommandInfo::GetParams() {
   r.push_back(Parameter::Switch   ('m', "check if repository is marked as "
                                         "replication master copy"));
   r.push_back(Parameter::Switch   ('v', "repository revision number"));
+  r.push_back(Parameter::Switch   ('g', "check if repository is garbage "
+                                        "collectable"));
   r.push_back(Parameter::Switch   ('h', "print results in human readable form"));
   // to be extended...
   return r;
@@ -149,6 +151,12 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Revision:                        " : "",
              (StringifyInt(manifest->revision())).c_str());
+  }
+
+  if (args.count('g') > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
+             (human_readable) ? "Garbage Collectable:             " : "",
+             (StringifyBool(manifest->garbage_collectable())).c_str());
   }
 
   delete manifest;

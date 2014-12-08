@@ -204,7 +204,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
-                [-a silence apache warning]
+                [-w stratum1 url] [-a silence apache warning]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -733,6 +733,7 @@ open_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
+  is_stratum0 $name                 || die "Cannot open transaction on Stratum1"
   mkdir "$tx_lock" > /dev/null 2>&1 || die "Failed to create transaction lock"
   cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
 }
@@ -2303,6 +2304,7 @@ add_replica() {
   local name
   local alias_name
   local stratum0
+  local stratum1_url
   local public_key
   local upstream
   local owner
@@ -2310,7 +2312,7 @@ add_replica() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:a" option
+  while getopts "o:u:n:w:a" option
   do
     case $option in
       u)
@@ -2321,6 +2323,9 @@ add_replica() {
       ;;
       n)
         alias_name=$OPTARG
+      ;;
+      w)
+        stratum1_url=$OPTARG
       ;;
       a)
         silence_httpd_warning=1
@@ -2368,6 +2373,12 @@ add_replica() {
   local temp_dir="${spool_dir}/tmp"
   local storage_dir=""
   is_local_upstream $upstream && storage_dir=$(get_upstream_config $upstream)
+  local garbage_collectable=false;
+  if [ "$(cvmfs_swissknife info -r $stratum0 -g 2>/dev/null)" = "yes" ]; then
+    garbage_collectable=true;
+  fi
+  local stratum1="http://localhost/cvmfs/${alias_name}"
+  [ ! -z "$stratum1_url" ] && stratum1="$stratum1_url"
 
   # additional sanity checks
   is_root || die "Only root can create a new repository"
@@ -2399,7 +2410,9 @@ CVMFS_REPOSITORY_TYPE=stratum1
 CVMFS_USER=$cvmfs_user
 CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
+CVMFS_STRATUM1=$stratum1
 CVMFS_UPSTREAM_STORAGE=$upstream
+CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 EOF
   cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
 # Created by cvmfs_server.
@@ -3727,10 +3740,11 @@ gc() {
   local preserve_timestamp=0
   local timestamp_threshold=""
   local force=0
+  local open_transaction=1
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:f" option
+  while getopts "ldr:t:fk" option
   do
     case $option in
       l)
@@ -3747,6 +3761,9 @@ gc() {
       ;;
       f)
         force=1
+      ;;
+      k)
+        open_transaction=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3798,7 +3815,6 @@ gc() {
 
     # sanity checks
     check_repository_compatibility $name
-    is_stratum0            $name || die "Garbage Collection is currently only supported on Stratum0"
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
     is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
@@ -3811,37 +3827,48 @@ gc() {
 
     # prepare swissknife commands
     local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    local repository_url="$CVMFS_STRATUM0"
+    if is_stratum1 $name; then
+      [ ! -z $CVMFS_STRATUM1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
+      repository_url="$CVMFS_STRATUM1"
+      open_transaction=0
+    fi
     local additional_switches=""
     [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
     [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
     [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
     [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
-    local gc_command="cvmfs_swissknife gc -r $CVMFS_STRATUM0         \
+    local gc_command="cvmfs_swissknife gc -r $repository_url         \
                                           -u $CVMFS_UPSTREAM_STORAGE \
                                           -n $CVMFS_REPOSITORY_NAME  \
                                           -k $CVMFS_PUBLIC_KEY       \
-                                          -t ${CVMFS_SPOOL_DIR}/tmp  \
+                                          -t ${CVMFS_SPOOL_DIR}/tmp/ \
                                           $additional_switches"
 
-    local base_hash=$(get_mounted_root_hash $name)
-    local tag_command="cvmfs_swissknife tag_empty_bin \
-      -r $CVMFS_UPSTREAM_STORAGE                      \
-      -w $CVMFS_STRATUM0                              \
-      -t ${CVMFS_SPOOL_DIR}/tmp                       \
-      -m $new_manifest                                \
-      -p /etc/cvmfs/keys/${name}.pub                  \
-      -f $name                                        \
-      -b $base_hash                                   \
-      -e $CVMFS_HASH_ALGORITHM"
+    local tag_command=""
+    if is_stratum0 $name; then
+      local base_hash=$(get_mounted_root_hash $name)
+      tag_command="cvmfs_swissknife tag_empty_bin \
+        -r $CVMFS_UPSTREAM_STORAGE                \
+        -w $CVMFS_STRATUM0                        \
+        -t ${CVMFS_SPOOL_DIR}/tmp                 \
+        -m $new_manifest                          \
+        -p /etc/cvmfs/keys/${name}.pub            \
+        -f $name                                  \
+        -b $base_hash                             \
+        -e $CVMFS_HASH_ALGORITHM"
+      fi
 
     # do it!
-    trap "close_transaction $name 0" EXIT HUP INT TERM
-    open_transaction $name || die "Failed to open transaction for garbage collection"
+    if [ $open_transaction -eq 1 ]; then
+      trap "close_transaction $name 0" EXIT HUP INT TERM
+      open_transaction $name || die "Failed to open transaction for garbage collection"
+    fi
 
     echo "Running Garbage Collection"
     $user_shell "$gc_command" || die "Fail! Executed Command: $gc_command"
 
-    if [ ! $dry_run ]; then
+    if [ ! $dry_run ] && is_stratum0 $name; then
       echo "Updating History Database"
       $user_shell "$tag_command" || die "Fail! Executed Command: $tag_command"
 
@@ -3881,7 +3908,6 @@ snapshot() {
 
     # get repository information
     load_repo_config $alias_name
-    . /etc/cvmfs/repositories.d/$alias_name/replica.conf
     name=$CVMFS_REPOSITORY_NAME
     user=$CVMFS_USER
     spool_dir=$CVMFS_SPOOL_DIR
@@ -3893,7 +3919,7 @@ snapshot() {
     retries=$CVMFS_HTTP_RETRIES
 
     # more sanity checks
-    is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
+    is_owner_or_root $alias_name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
     if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
         # this might have been missed if add-replica -a was used or
