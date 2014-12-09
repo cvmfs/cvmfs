@@ -3794,16 +3794,20 @@ gc() {
 
   if [ $force -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
-    echo "Affected Repositories:         $names"
-    if [ $preserve_revisions -ge 0 ]; then
-      echo "Preserved Legacy Revisions:    $preserve_revisions"
-    fi
-    if [ $preserve_timestamp -gt 0 ]; then
-      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
-    fi
-    if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
-      echo "Only the latest revision will be preserved."
-    fi
+  fi
+
+  echo "Affected Repositories:         $names"
+  if [ $preserve_revisions -ge 0 ]; then
+    echo "Preserved Legacy Revisions:    $preserve_revisions"
+  fi
+  if [ $preserve_timestamp -gt 0 ]; then
+    echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
+  fi
+  if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
+    echo "Only the latest revision will be preserved."
+  fi
+
+  if [ $force -eq 0 ]; then
     echo ""
     read -p "Please confirm this action (y/N)? " reply
     if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
