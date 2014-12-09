@@ -68,3 +68,61 @@ TEST(T_Util, Shuffle) {
   }
   EXPECT_EQ(prod_shuffled, prod_v);
 }
+
+
+TEST(T_Util, SortTeam) {
+  vector<int> tractor;
+  vector<string> towed;
+
+  SortTeam(&tractor, &towed);
+  ASSERT_TRUE(tractor.empty());
+  ASSERT_TRUE(towed.empty());
+
+  tractor.push_back(1);
+  towed.push_back("one");
+  SortTeam(&tractor, &towed);
+  ASSERT_EQ(tractor.size(), towed.size());
+  ASSERT_EQ(tractor.size(), 1U);
+  EXPECT_EQ(tractor[0], 1);
+  EXPECT_EQ(towed[0], "one");
+
+  tractor.push_back(2);
+  towed.push_back("two");
+  SortTeam(&tractor, &towed);
+  ASSERT_EQ(tractor.size(), towed.size());
+  ASSERT_EQ(tractor.size(), 2U);
+  EXPECT_EQ(tractor[0], 1);
+  EXPECT_EQ(tractor[1], 2);
+  EXPECT_EQ(towed[0], "one");
+  EXPECT_EQ(towed[1], "two");
+  
+  tractor.push_back(3);
+  towed.push_back("three");
+  SortTeam(&tractor, &towed);
+  ASSERT_EQ(tractor.size(), towed.size());
+  ASSERT_EQ(tractor.size(), 3U);
+  EXPECT_EQ(tractor[0], 1);
+  EXPECT_EQ(tractor[1], 2);
+  EXPECT_EQ(tractor[2], 3);
+  EXPECT_EQ(towed[0], "one");
+  EXPECT_EQ(towed[1], "two");
+  EXPECT_EQ(towed[2], "three");
+  
+  tractor.clear();
+  towed.clear();
+  tractor.push_back(3);
+  tractor.push_back(2);
+  tractor.push_back(1);
+  towed.push_back("three");
+  towed.push_back("two");
+  towed.push_back("one");
+  SortTeam(&tractor, &towed);
+  ASSERT_EQ(tractor.size(), towed.size());
+  ASSERT_EQ(tractor.size(), 3U);
+  EXPECT_EQ(tractor[0], 1);
+  EXPECT_EQ(tractor[1], 2);
+  EXPECT_EQ(tractor[2], 3);
+  EXPECT_EQ(towed[0], "one");
+  EXPECT_EQ(towed[1], "two");
+  EXPECT_EQ(towed[2], "three");
+}

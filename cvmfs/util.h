@@ -208,6 +208,7 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
 
 void SafeSleepMs(const unsigned ms);
 
+
 /**
  * Knuth's random shuffle algorithm.
  */
@@ -222,6 +223,34 @@ std::vector<T> Shuffle(const std::vector<T> &input, Prng *prng) {
   }
   return shuffled;
 }
+
+
+/**
+ * Sorts the vector tractor and applies the same permutation to towed.  Both
+ * vectors have to be of the same size.  Type T must be sortable (< operator).
+ * Uses insertion sort (n^2), only efficient for small vectors.
+ */
+template <typename T, typename U>
+void SortTeam(std::vector<T> *tractor, std::vector<U> *towed) {
+  assert(tractor);
+  assert(towed);
+  assert(tractor->size() == towed->size());
+  unsigned N = tractor->size();
+
+  // Insertion sort on both, tractor and towed
+  for (unsigned i = 1; i < N; ++i) {
+    T val_tractor = (*tractor)[i];
+    U val_towed = (*towed)[i];
+    int pos;
+    for (pos = i-1; (pos >= 0) && ((*tractor)[pos] > val_tractor); --pos) {
+      (*tractor)[pos+1] = (*tractor)[pos];
+      (*towed)[pos+1] = (*towed)[pos];
+    }
+    (*tractor)[pos+1] = val_tractor;
+    (*towed)[pos+1] = val_towed;
+  }
+}
+
 
 template <typename hashed_type>
 struct hash_murmur {
