@@ -487,17 +487,6 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       return false;
     }
 
-    // check the catalog's 'last modified' note to see if we need to deal
-    // with this catalog. If not, it can be closed (regardless of no_close)
-    if (IsExpiredRevision(ctx, job)) {
-      job.ignore = true;
-      MarkAsPrunedRevision(job.hash);
-      if (! CloseCatalog(job)) {
-        return false;
-      }
-      return true;
-    }
-
     return true;
   }
 
@@ -547,16 +536,23 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
 
-  bool IsExpiredRevision(TraversalContext &ctx, CatalogJob &job) {
-    // this is only checked for root catalogs as they define the timestamp of
-    // the actual repository revision (nested catalogs can be older)
-    if (! job.IsRootCatalog()) {
-      return false;
-    }
-
-    // if the root-catalog's last modification is older than the timestamp
+  /**
+   * Checks if a root catalog is below one of the pruning thresholds.
+   * Pruning thesholds can be either the catalog's history depth or a timestamp
+   * threshold applied to the last modified timestamp of the catalog.
+   *
+   * @param ctx  traversal context for traversal-specific state
+   * @param job  the job defining the current catalog
+   * @return     true if either history or timestamp threshold are satisfied
+   */
+  bool IsBelowPruningThresholds(TraversalContext &ctx, const CatalogJob &job) {
+    assert (job.IsRootCatalog());
     assert (job.catalog != NULL);
-    return job.catalog->GetLastModified() < ctx.timestamp_threshold;
+
+    const bool h = job.history_depth >= ctx.history_depth;
+    const bool t = job.catalog->GetLastModified() < ctx.timestamp_threshold;
+
+    return t || h;
   }
 
 
@@ -602,14 +598,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     }
 
     // check if the next deeper history level is actually requested
-    //
     // Note: otherwise it is marked to be 'pruned' for possible later traversal
     //       (see: TraversePruned())
-    //
-    // Note: pruning catalog revisions based on their timestamp can not be done
-    //       here, as we need to download the catalog first. This decision is
-    //       made in IsExpiredRevision() after downloading the catalog
-    if (job.history_depth >= ctx.history_depth) {
+    // Note: if the current catalog is below the timestamp threshold it will be
+    //       traversed and only its ancestor revision will not be pushed anymore
+    if (IsBelowPruningThresholds(ctx, job)) {
       MarkAsPrunedRevision(previous_revision);
       return 0;
     }
