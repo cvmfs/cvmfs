@@ -69,6 +69,11 @@ TEST_F(T_Download, SortWrtGeoReply) {
   EXPECT_EQ(input_hosts.size(), 2U);
   EXPECT_EQ(input_hosts[0], "b");
   EXPECT_EQ(input_hosts[1], "a");
+  
+  EXPECT_TRUE(download_mgr.SortWrtGeoReply("2,1\n", &input_hosts));
+  EXPECT_EQ(input_hosts.size(), 2U);
+  EXPECT_EQ(input_hosts[0], "a");
+  EXPECT_EQ(input_hosts[1], "b");
 }
 
 }  // namespace download
