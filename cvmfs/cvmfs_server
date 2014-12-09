@@ -1635,9 +1635,12 @@ create_config_files_for_new_repository() {
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
+  local repo_cfg_dir="/etc/cvmfs/repositories.d/${name}"
+  local server_conf="${repo_cfg_dir}/server.conf"
+  local client_conf="${repo_cfg_dir}/client.conf"
 
-  mkdir -p /etc/cvmfs/repositories.d/${name}
-  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+  mkdir -p $repo_cfg_dir
+  cat > $server_conf << EOF
 # Created by cvmfs_server.
 CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
 CVMFS_REPOSITORY_NAME=$name
@@ -1657,6 +1660,13 @@ CVMFS_HASH_ALGORITHM=$hash_algo
 CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 EOF
+
+  # append GC specific configuration
+  if [ x"$garbage_collectable" = x"true" ]; then
+    cat >> $server_conf << EOF
+CVMFS_GC_TIMESTAMP_THRESHOLD='3 days ago'
+EOF
+  fi
 
   # make sure that the config file does not exist, yet
   remove_apache_config_file "cvmfs.${name}.conf" || true
@@ -1692,7 +1702,7 @@ Alias /cvmfs/$name ${repository_dir}
 EOF
   fi
 
-  cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
+  cat > $client_conf << EOF
 # Created by cvmfs_server.  Don't touch.
 CVMFS_CACHE_BASE=$cache_dir
 CVMFS_RELOAD_SOCKETS=$cache_dir
@@ -1700,7 +1710,7 @@ CVMFS_QUOTA_LIMIT=4000
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-CVMFS_TRUSTED_CERTS=/etc/cvmfs/repositories.d/${name}/trusted_certs
+CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
 CVMFS_CHECK_PERMISSIONS=yes
 CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
