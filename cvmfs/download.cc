@@ -1881,10 +1881,12 @@ bool DownloadManager::SortWrtGeoReply(
 {
   if (reply_order.empty())
     return false;
-  sanitizer::InputSanitizer sanitizer("09 ,");
+  sanitizer::InputSanitizer sanitizer("09 , \n");
   if (!sanitizer.IsValid(reply_order))
     return false;
-  vector<string> reply_strings = SplitString(reply_order, ',');
+  sanitizer::InputSanitizer strip_newline("09 ,");
+  vector<string> reply_strings = 
+    SplitString(strip_newline.Filter(reply_order), ',');
   vector<uint64_t> reply_vals;
   for (unsigned i = 0; i < reply_strings.size(); ++i) {
     if (reply_strings[i].empty())
