@@ -228,10 +228,6 @@ Supported Commands:
                 Re-publishes the given tag as the new latest revision.
                 All snapshots between trunk and the target tag become
                 inaccessible.  Without a tag name, trunk-previous is used.
-  gc            [-l list deleted objects] [-d dry run]  [-f don't ask again]
-                [-r conserve <r> revisions] [-t conserve revisions after <t>]
-                <fully qualified name>
-                (Garbage Collection) removes unreferenced repository revisions
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
   list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
@@ -1639,9 +1635,12 @@ create_config_files_for_new_repository() {
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
+  local repo_cfg_dir="/etc/cvmfs/repositories.d/${name}"
+  local server_conf="${repo_cfg_dir}/server.conf"
+  local client_conf="${repo_cfg_dir}/client.conf"
 
-  mkdir -p /etc/cvmfs/repositories.d/${name}
-  cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
+  mkdir -p $repo_cfg_dir
+  cat > $server_conf << EOF
 # Created by cvmfs_server.
 CVMFS_CREATOR_VERSION=$(cvmfs_version_string)
 CVMFS_REPOSITORY_NAME=$name
@@ -1661,6 +1660,13 @@ CVMFS_HASH_ALGORITHM=$hash_algo
 CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 EOF
+
+  # append GC specific configuration
+  if [ x"$garbage_collectable" = x"true" ]; then
+    cat >> $server_conf << EOF
+CVMFS_GC_TIMESTAMP_THRESHOLD='3 days ago'
+EOF
+  fi
 
   # make sure that the config file does not exist, yet
   remove_apache_config_file "cvmfs.${name}.conf" || true
@@ -1696,7 +1702,7 @@ Alias /cvmfs/$name ${repository_dir}
 EOF
   fi
 
-  cat > /etc/cvmfs/repositories.d/${name}/client.conf << EOF
+  cat > $client_conf << EOF
 # Created by cvmfs_server.  Don't touch.
 CVMFS_CACHE_BASE=$cache_dir
 CVMFS_RELOAD_SOCKETS=$cache_dir
@@ -1704,7 +1710,7 @@ CVMFS_QUOTA_LIMIT=4000
 CVMFS_SERVER_URL=$stratum0
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${name}.pub
-CVMFS_TRUSTED_CERTS=/etc/cvmfs/repositories.d/${name}/trusted_certs
+CVMFS_TRUSTED_CERTS=${repo_cfg_dir}/trusted_certs
 CVMFS_CHECK_PERMISSIONS=yes
 CVMFS_IGNORE_SIGNATURE=no
 CVMFS_AUTO_UPDATE=no
@@ -3513,6 +3519,7 @@ publish() {
     local user_shell="$(get_user_shell $name)"
 
     local base_hash=$(get_mounted_root_hash $name)
+    local manifest="${spool_dir}/tmp/manifest"
     local dirtab_command="$swissknife dirtab $verbosity \
       -d /cvmfs/${name}/.cvmfsdirtab                    \
       -b $base_hash                                     \
@@ -3531,7 +3538,7 @@ publish() {
       -b $base_hash \
       -r ${upstream} \
       -w $stratum0 \
-      -o ${spool_dir}/tmp/manifest \
+      -o $manifest \
       $hash_algo $log_level $tweaks_option"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
@@ -3558,7 +3565,7 @@ publish() {
       -r $upstream                            \
       -w $stratum0                            \
       -t ${spool_dir}/tmp                     \
-      -m ${spool_dir}/tmp/manifest            \
+      -m $manifest                            \
       -p /etc/cvmfs/keys/${name}.pub          \
       -f $name                                \
       -b $base_hash                           \
@@ -3584,13 +3591,32 @@ publish() {
 
     # synchronize the repository
     publish_starting $name
-    $user_shell "$sync_command"      || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
-    [ -f ${spool_dir}/tmp/manifest ] || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+    $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
+    [ -f $manifest ]            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+    local trunk_hash=$(grep "^C" $manifest | tr -d C)
+
+    # add a tag for the new revision
+    echo "Tagging $name"
+    $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+
+    # run the automatic garbage collection (if configured)
+    if is_garbage_collectable $name && [ ! -z "$CVMFS_GC_TIMESTAMP_THRESHOLD" ]
+    then
+      echo "Running automatic garbage collection"
+      local tst="$(date --date "$CVMFS_GC_TIMESTAMP_THRESHOLD" +%s 2>/dev/null)"
+      [ $? -eq 0 ] || { publish_failed $name; die "Cannot parse time stamp '$timestamp_threshold'"; }
+      local dry_run=0
+      __run_gc $name       \
+               $manifest   \
+               $trunk_hash \
+               $stratum0   \
+               $dry_run    \
+               -z $tst || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
+    fi
 
     # committing newly created revision
-    echo "Tagging $name"
-    $user_shell "$tag_command"                    || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
-    sign_manifest $name ${spool_dir}/tmp/manifest || { publish_failed $name; die "Signing failed"; }
+    echo "Signing new manifest"
+    sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     set_ro_root_hash $name $trunk_hash
 
     # finalizing transaction
@@ -3740,11 +3766,10 @@ gc() {
   local preserve_timestamp=0
   local timestamp_threshold=""
   local force=0
-  local open_transaction=1
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:fk" option
+  while getopts "ldr:t:f" option
   do
     case $option in
       l)
@@ -3761,9 +3786,6 @@ gc() {
       ;;
       f)
         force=1
-      ;;
-      k)
-        open_transaction=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3792,16 +3814,20 @@ gc() {
 
   if [ $force -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
-    echo "Affected Repositories:         $names"
-    if [ $preserve_revisions -ge 0 ]; then
-      echo "Preserved Legacy Revisions:    $preserve_revisions"
-    fi
-    if [ $preserve_timestamp -gt 0 ]; then
-      echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
-    fi
-    if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
-      echo "Only the latest revision will be preserved."
-    fi
+  fi
+
+  echo "Affected Repositories:         $names"
+  if [ $preserve_revisions -ge 0 ]; then
+    echo "Preserved Legacy Revisions:    $preserve_revisions"
+  fi
+  if [ $preserve_timestamp -gt 0 ]; then
+    echo "Preserve Revisions newer than: $(date -d@$preserve_timestamp +'%x %X')"
+  fi
+  if [ $preserve_revisions -le 0 ] && [ $preserve_timestamp -le 0 ]; then
+    echo "Only the latest revision will be preserved."
+  fi
+
+  if [ $force -eq 0 ]; then
     echo ""
     read -p "Please confirm this action (y/N)? " reply
     if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
@@ -3816,67 +3842,101 @@ gc() {
     # sanity checks
     check_repository_compatibility $name
     is_garbage_collectable $name || die "Garbage Collection is not enabled for $name"
-    is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
+    is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
+
     local head_timestamp="$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -t)"
     [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
 
-    # create user shell
-    local user_shell="sh -c"
-    [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
-
-    # prepare swissknife commands
-    local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
+    # figure out the URL of the repository
     local repository_url="$CVMFS_STRATUM0"
     if is_stratum1 $name; then
       [ ! -z $CVMFS_STRATUM1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
       repository_url="$CVMFS_STRATUM1"
-      open_transaction=0
     fi
+
+    # generate the garbage collection configuration
     local additional_switches=""
     [ $list_deleted_objects -ne 0 ] && additional_switches="$additional_switches -l"
     [ $dry_run              -ne 0 ] && additional_switches="$additional_switches -d"
     [ $preserve_revisions   -ge 0 ] && additional_switches="$additional_switches -h $preserve_revisions"
     [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
-    local gc_command="cvmfs_swissknife gc -r $repository_url         \
-                                          -u $CVMFS_UPSTREAM_STORAGE \
-                                          -n $CVMFS_REPOSITORY_NAME  \
-                                          -k $CVMFS_PUBLIC_KEY       \
-                                          -t ${CVMFS_SPOOL_DIR}/tmp/ \
-                                          $additional_switches"
 
-    local tag_command=""
+    # retrieve the base hash of the repository to be editied
+    local base_hash="xx"
+    local manifest="xx"
+
+    # gather extra information for a stratum0 repository and open a transaction
     if is_stratum0 $name; then
-      local base_hash=$(get_mounted_root_hash $name)
-      tag_command="cvmfs_swissknife tag_empty_bin \
-        -r $CVMFS_UPSTREAM_STORAGE                \
-        -w $CVMFS_STRATUM0                        \
-        -t ${CVMFS_SPOOL_DIR}/tmp                 \
-        -m $new_manifest                          \
-        -p /etc/cvmfs/keys/${name}.pub            \
-        -f $name                                  \
-        -b $base_hash                             \
-        -e $CVMFS_HASH_ALGORITHM"
-    fi
+      base_hash="$(get_mounted_root_hash $name)"
+      manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
 
-    # do it!
-    if [ $open_transaction -eq 1 ]; then
       trap "close_transaction $name 0" EXIT HUP INT TERM
       open_transaction $name || die "Failed to open transaction for garbage collection"
     fi
 
+    # run the garbage collection
     echo "Running Garbage Collection"
-    $user_shell "$gc_command" || die "Fail! Executed Command: $gc_command"
+    __run_gc $name           \
+             $manifest       \
+             $base_hash      \
+             $repository_url \
+             $dry_run        \
+             $additional_switches || die "Fail ($?)!"
 
+    # sign the result
     if is_stratum0 $name && [ $dry_run -eq 0 ]; then
-      echo "Updating History Database"
-      $user_shell "$tag_command" || die "Fail! Executed Command: $tag_command"
-
       echo "Signing Repository Manifest"
-      sign_manifest $name $new_manifest || die "Fail!"
+      sign_manifest $name $manifest || die "Fail!"
     fi
 
+    # close the transaction
+    trap - EXIT HUP INT TERM
+    close_transaction $name 0
+
   done
+}
+
+__run_gc() {
+  local name="$1"
+  local manifest="$2"
+  local base_hash="$3"
+  local repository_url="$4"
+  local dry_run="$5"
+  shift 5
+  local additional_switches="$*"
+
+  load_repo_config $name
+
+  # sanity checks
+  is_in_transaction      $name || is_stratum1 $name || return 1
+  is_garbage_collectable $name ||                      return 2
+
+  # do it!
+  local user_shell="$(get_user_shell $name)"
+
+  local gc_command="cvmfs_swissknife gc -r $repository_url         \
+                                        -u $CVMFS_UPSTREAM_STORAGE \
+                                        -n $CVMFS_REPOSITORY_NAME  \
+                                        -k $CVMFS_PUBLIC_KEY       \
+                                        -t ${CVMFS_SPOOL_DIR}/tmp/ \
+                                        $additional_switches"
+  $user_shell "$gc_command" || return 3
+
+  if is_stratum0 $name && [ $dry_run -eq 0 ]; then
+    tag_command="cvmfs_swissknife tag_empty_bin \
+      -r $CVMFS_UPSTREAM_STORAGE                \
+      -w $CVMFS_STRATUM0                        \
+      -t ${CVMFS_SPOOL_DIR}/tmp                 \
+      -m $manifest                              \
+      -p /etc/cvmfs/keys/${name}.pub            \
+      -f $name                                  \
+      -b $base_hash                             \
+      -e $CVMFS_HASH_ALGORITHM"
+    $user_shell "$tag_command" || return 4
+  fi
+
+  return 0
 }
 
 
