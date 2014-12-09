@@ -715,7 +715,7 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
 
 TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_timestamp = t(24, 12, 2004) - 1;
+  config.keep_history_timestamp = t(24, 12, 2004) - 1; // just before rev 3
   config.keep_history_depth     = GcConfiguration::kFullHistory;
 
   MyGarbageCollector gc1(config);
@@ -752,7 +752,7 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  config.keep_history_timestamp = t(24, 12, 2004);
+  config.keep_history_timestamp = t(24, 12, 2004); // just at rev 3
   MyGarbageCollector gc2(config);
   EXPECT_TRUE (gc2.Collect());
 
@@ -762,12 +762,22 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  config.keep_history_timestamp = t(24, 12, 2004) + 1;
+  config.keep_history_timestamp = t(24, 12, 2004) + 1; // just after rev 3
   MyGarbageCollector gc3(config);
   EXPECT_TRUE (gc3.Collect());
 
-  EXPECT_EQ (11u, gc3.preserved_catalog_count());
-  EXPECT_EQ ( 5u, gc3.condemned_catalog_count());
+  EXPECT_EQ (14u, gc3.preserved_catalog_count());
+  EXPECT_EQ ( 2u, gc3.condemned_catalog_count());
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  config.keep_history_timestamp = t(25, 12, 2004) + 1; // just after rev 4
+  MyGarbageCollector gc4(config);
+  EXPECT_TRUE (gc4.Collect());
+
+  EXPECT_EQ (11u, gc4.preserved_catalog_count());
+  EXPECT_EQ (5u, gc4.condemned_catalog_count());
+  EXPECT_EQ (11u, upl->deleted_hashes.size());
 
   EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
   EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
@@ -833,13 +843,52 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  config.keep_history_timestamp = t(25, 12, 2004);
-  MyGarbageCollector gc4(config);
-  EXPECT_TRUE (gc4.Collect());
+  history::History *history = MockObjectFetcher::s_history;
+  ASSERT_TRUE (history->Remove("Revision4")); // make Revision4 deletable
 
-  EXPECT_EQ (11u, gc4.preserved_catalog_count());
-  EXPECT_EQ (5u, gc4.condemned_catalog_count());
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  config.keep_history_timestamp = t(26, 12, 2004) - 1; // just before rev 5
+  MyGarbageCollector gc5(config);
+  EXPECT_TRUE (gc5.Collect());
+
+  EXPECT_EQ (11u, gc5.preserved_catalog_count());
+  EXPECT_EQ (5u, gc5.condemned_catalog_count());
   EXPECT_EQ (11u, upl->deleted_hashes.size());
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  config.keep_history_timestamp = t(26, 12, 2004); // just at rev 5
+  MyGarbageCollector gc6(config);
+  EXPECT_TRUE (gc6.Collect());
+
+  EXPECT_EQ (11u, gc6.preserved_catalog_count());
+  EXPECT_EQ (5u, gc6.condemned_catalog_count());
+  EXPECT_EQ (11u, upl->deleted_hashes.size());
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  config.keep_history_timestamp = t(26, 12, 2004) + 1; // just after rev 5
+  MyGarbageCollector gc7(config);
+  EXPECT_TRUE (gc7.Collect());
+
+  EXPECT_EQ (7u, gc7.preserved_catalog_count());
+  EXPECT_EQ (9u, gc7.condemned_catalog_count());
+  EXPECT_EQ (29u, upl->deleted_hashes.size());
+
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"20")]->hash()));
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash()));
 }
 
 
@@ -849,35 +898,35 @@ TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
   config.keep_history_timestamp = t(1, 1, 2014);
   config.keep_history_depth     = GcConfiguration::kFullHistory;
 
-  // remove all named snapshots (GC would actually delete everything)
+  // remove all named snapshots (GC can potentially delete everything)
   history::History *history = MockObjectFetcher::s_history;
   ASSERT_TRUE (history->Remove("Revision2"));
   ASSERT_TRUE (history->Remove("Revision4"));
   ASSERT_TRUE (history->Remove("Revision5"));
 
   MyGarbageCollector gc1(config);
-  EXPECT_FALSE (gc1.Collect());
+  EXPECT_TRUE (gc1.Collect());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash())); // same as mp(1,"11")
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"11")]->hash())); // same as mp(1,"11")
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash())); // timestamp threshold indicates
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash())); // that everything should be
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash())); // deleted. However, the latest
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash())); // revision will always stay!
 }
 
 
