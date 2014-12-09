@@ -3595,9 +3595,27 @@ publish() {
     [ -f $manifest ]            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
     local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
-    # committing newly created revision
+    # add a tag for the new revision
     echo "Tagging $name"
-    $user_shell "$tag_command"    || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+    $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+
+    # run the automatic garbage collection (if configured)
+    if is_garbage_collectable $name && [ ! -z "$CVMFS_GC_TIMESTAMP_THRESHOLD" ]
+    then
+      echo "Running automatic garbage collection"
+      local tst="$(date --date "$CVMFS_GC_TIMESTAMP_THRESHOLD" +%s 2>/dev/null)"
+      [ $? -eq 0 ] || { publish_failed $name; die "Cannot parse time stamp '$timestamp_threshold'"; }
+      local dry_run=0
+      __run_gc $name       \
+               $manifest   \
+               $trunk_hash \
+               $stratum0   \
+               $dry_run    \
+               -z $tst || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
+    fi
+
+    # committing newly created revision
+    echo "Signing new manifest"
     sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     set_ro_root_hash $name $trunk_hash
 
