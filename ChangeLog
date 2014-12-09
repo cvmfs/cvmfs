@@ -1,4 +1,8 @@
 2.1.20:
+  * Add support for automatically ordering Stratum 1 servers according to
+    geographic loations (CVM-629, CVM-630)
+  * Add CVMFS_USE_GEOAPI parameter
+  * Add host_list extended attribute
   * Fix traversal of nested catalogs in intermediate catalogs during snapshot
   * Resolve round-robin DNS entries for proxies to a load-balance group
     (CVM-457)
@@ -31,7 +35,6 @@
     dodgy file locking support such as Lustre
   * Change libcvmfs to access /cvmfs instead of /cvmfs/<repo>
   * Add OSG, EGI public keys and config (CVM-641)
-  * Add geo api to cvmfs-server (CVM-629)
   * Allow for setting a revision number using
     'cvmfs_server publish -n' (CVM-633)
   * Work around gcc4.1 compiler bugs
