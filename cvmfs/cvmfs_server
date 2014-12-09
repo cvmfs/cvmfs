@@ -3828,8 +3828,7 @@ gc() {
     [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
 
     # create user shell
-    local user_shell="sh -c"
-    [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
+    local user_shell="$(get_user_shell $name)"
 
     # prepare swissknife commands
     local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
