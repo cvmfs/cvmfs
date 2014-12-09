@@ -3635,3 +3635,36 @@ TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat)
   CheckVisitedCatalogs(catalogs, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs);
 }
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
+CatalogIdentifiers TraverseNamedSnapshotsWithoutHistory_visited_catalogs;
+void TraverseNamedSnapshotsWithoutHistoryCallback(
+                             const MockedCatalogTraversal::CallbackData &data) {
+  TraverseNamedSnapshotsWithoutHistory_visited_catalogs.push_back(
+    std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
+}
+
+TEST_F(T_CatalogTraversal, TraverseNamedSnapshotsWithoutHistory) {
+  TraverseNamedSnapshotsWithoutHistory_visited_catalogs.clear();
+  EXPECT_EQ (0u, TraverseNamedSnapshotsWithoutHistory_visited_catalogs.size());
+
+  MockObjectFetcher::history_available = false;
+
+  CatalogTraversalParams params;
+  MockedCatalogTraversal traverse(params);
+  traverse.RegisterListener(&TraverseNamedSnapshotsWithoutHistoryCallback);
+  const bool t1 = traverse.TraverseNamedSnapshots();
+  EXPECT_TRUE (t1);
+
+  CatalogIdentifiers catalogs;
+  // nothing to be traversed
+
+  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  CheckVisitedCatalogs(catalogs, TraverseNamedSnapshotsWithoutHistory_visited_catalogs);
+  CheckCatalogSequence(catalogs, TraverseNamedSnapshotsWithoutHistory_visited_catalogs);
+}
