@@ -122,7 +122,7 @@ def api(path_info, repo_name, version, start_response, environ):
         # return a bad request only if all the server names were bad
         return cvmfs_api.bad_request(start_response, 'no server addr found in database')
 
-    response_body = string.join(indexes, ',')
+    response_body = string.join(indexes, ',') + '\n'
 
     status = '200 OK'
     response_headers = [('Content-Type', 'text/plain'),
