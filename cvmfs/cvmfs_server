@@ -3519,6 +3519,7 @@ publish() {
     local user_shell="$(get_user_shell $name)"
 
     local base_hash=$(get_mounted_root_hash $name)
+    local manifest="${spool_dir}/tmp/manifest"
     local dirtab_command="$swissknife dirtab $verbosity \
       -d /cvmfs/${name}/.cvmfsdirtab                    \
       -b $base_hash                                     \
@@ -3537,7 +3538,7 @@ publish() {
       -b $base_hash \
       -r ${upstream} \
       -w $stratum0 \
-      -o ${spool_dir}/tmp/manifest \
+      -o $manifest \
       $hash_algo $log_level $tweaks_option"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
@@ -3564,7 +3565,7 @@ publish() {
       -r $upstream                            \
       -w $stratum0                            \
       -t ${spool_dir}/tmp                     \
-      -m ${spool_dir}/tmp/manifest            \
+      -m $manifest                            \
       -p /etc/cvmfs/keys/${name}.pub          \
       -f $name                                \
       -b $base_hash                           \
@@ -3590,13 +3591,13 @@ publish() {
 
     # synchronize the repository
     publish_starting $name
-    $user_shell "$sync_command"      || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
-    [ -f ${spool_dir}/tmp/manifest ] || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+    $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
+    [ -f $manifest ]            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
 
     # committing newly created revision
     echo "Tagging $name"
-    $user_shell "$tag_command"                    || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
-    sign_manifest $name ${spool_dir}/tmp/manifest || { publish_failed $name; die "Signing failed"; }
+    $user_shell "$tag_command"    || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
+    sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     set_ro_root_hash $name $trunk_hash
 
     # finalizing transaction
