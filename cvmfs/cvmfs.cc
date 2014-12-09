@@ -1819,6 +1819,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   map<uint64_t, uint64_t> gid_map;
   uint64_t initial_generation = 0;
   cvmfs::Uuid *uuid;
+  bool use_geo_api = false;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
   cvmfs::backoff_throttle_ = new BackoffThrottle();
@@ -1872,6 +1873,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       options::IsOn(parameter))
   {
     send_info_header = true;
+  }
+  if (options::GetValue("CVMFS_USE_GEOAPI", &parameter) &&
+      options::IsOn(parameter))
+  {
+    use_geo_api = true;
   }
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
@@ -2239,6 +2245,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   cvmfs::download_manager_->SetProxyChain(proxies);
   g_download_ready = true;
+  if (use_geo_api) {
+    cvmfs::download_manager_->ProbeHostsGeo();
+  }
 
   cvmfs::signature_manager_ = new signature::SignatureManager();
   cvmfs::signature_manager_->Init();
