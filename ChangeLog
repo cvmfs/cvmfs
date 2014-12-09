@@ -1,4 +1,5 @@
 2.1.20:
+  * Add support for garbage-collected repositories (CVM-583)
   * Add support for automatically ordering Stratum 1 servers according to
     geographic loations (CVM-629, CVM-630)
   * Add CVMFS_USE_GEOAPI parameter
