@@ -364,7 +364,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform garbage collection to delete initial (mkfs) revisions"
-  cvmfs_server gc -f -t "$timestamp1" $CVMFS_TEST_REPO || return 21
+  cvmfs_server gc -f -t "$timestamp2" $CVMFS_TEST_REPO || return 21
 
   echo "check if the catalog revisions 2-6 are preserved"
   for clg_hash in $root_catalog1 $root_catalog2 \
@@ -384,7 +384,7 @@ cvmfs_run_test() {
 
   echo "perform garbage collection to delete shakespeare revisions"
   echo "(should not delete anything since it still has a tag)"
-  cvmfs_server gc -f -t "$timestamp3" $CVMFS_TEST_REPO || return 25
+  cvmfs_server gc -f -t "$timestamp4" $CVMFS_TEST_REPO || return 25
 
   echo "check if shakespeare is still there"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    || return 26
@@ -416,7 +416,7 @@ cvmfs_run_test() {
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 30
 
   echo "perform garbage collection again to delete shakespeare revisions"
-  cvmfs_server gc -f -t "$timestamp3" $CVMFS_TEST_REPO || return 31
+  cvmfs_server gc -f -t "$timestamp4" $CVMFS_TEST_REPO || return 31
 
   echo "check if shakespeare is gone"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 32
@@ -467,9 +467,9 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 || return 41
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 41
 
-  echo "check if the catalogs 1-6 are gone"
+  echo "check if the catalogs 1-5 are gone"
   for clg_hash in $root_catalog0 $root_catalog1 $root_catalog2 \
-                  $root_catalog3 $root_catalog4 $root_catalog5; do
+                  $root_catalog3 $root_catalog4; do
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 42
   done
 
