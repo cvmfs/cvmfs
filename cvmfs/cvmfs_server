@@ -228,10 +228,6 @@ Supported Commands:
                 Re-publishes the given tag as the new latest revision.
                 All snapshots between trunk and the target tag become
                 inaccessible.  Without a tag name, trunk-previous is used.
-  gc            [-l list deleted objects] [-d dry run]  [-f don't ask again]
-                [-r conserve <r> revisions] [-t conserve revisions after <t>]
-                <fully qualified name>
-                (Garbage Collection) removes unreferenced repository revisions
   resign        <fully qualified name>
                 Re-sign the 30 day whitelist
   list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
