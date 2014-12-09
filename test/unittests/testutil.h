@@ -439,8 +439,9 @@ class MockHistory : public history::History {
  */
 class MockObjectFetcher {
  public:
-  static MockHistory                  *s_history;
-  static std::set<shash::Any>         *s_deleted_catalogs;
+  static MockHistory          *s_history;
+  static std::set<shash::Any> *s_deleted_catalogs;
+  static bool                  history_available;
 
   static void Reset() {
     if (MockObjectFetcher::s_history != NULL) {
@@ -448,6 +449,7 @@ class MockObjectFetcher {
       MockObjectFetcher::s_history = NULL;
     }
     MockObjectFetcher::s_deleted_catalogs = NULL;
+    MockObjectFetcher::history_available = true;
   }
 
  public:
@@ -455,7 +457,9 @@ class MockObjectFetcher {
  public:
   manifest::Manifest* FetchManifest();
   history::History* FetchHistory() {
-    return MockObjectFetcher::s_history->Clone();
+    return (MockObjectFetcher::history_available)
+              ? MockObjectFetcher::s_history->Clone()
+              : NULL;
   }
   inline bool Fetch(const shash::Any  &catalog_hash,
                     std::string       *catalog_file) {
