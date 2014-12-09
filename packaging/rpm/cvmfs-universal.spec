@@ -44,6 +44,7 @@ BuildRequires: fuse-devel
 BuildRequires: pkgconfig
 BuildRequires: openssl-devel
 BuildRequires: libattr-devel
+BuildRequires: libuuid-devel
 %if 0%{?el5}
 BuildRequires: buildsys-macros
 %endif
