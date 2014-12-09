@@ -354,7 +354,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform garbage collection to delete initial (mkfs) revisions"
-  cvmfs_server gc -f -t "$timestamp1" $CVMFS_TEST_REPO || return 21
+  cvmfs_server gc -f -t "$timestamp2" $CVMFS_TEST_REPO || return 21
 
   echo "check if the catalog revisions 2-6 are preserved"
   for clg_hash in $root_catalog1 $root_catalog2 \
@@ -373,7 +373,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "perform garbage collection to delete shakespeare revisions"
-  cvmfs_server gc -f -t "$timestamp3" $CVMFS_TEST_REPO || return 25
+  cvmfs_server gc -f -t "$timestamp4" $CVMFS_TEST_REPO || return 25
 
   echo "check if shakespeare is gone"
   peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 26
