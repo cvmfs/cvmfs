@@ -11,23 +11,18 @@ cvmfs_run_test() {
   cvmfs_mount grid.cern.ch || return 1
 
   sudo cvmfs_talk -i grid.cern.ch host probe geo || return 10
-  sudo cvmfs_talk -i grid.cern.ch host info > geo_probe.formatted || return 11
-  cat geo_probe.formatted | grep "\[" | awk '{print $1 " " $2}' > geo_probe
-  rm -f geo_probe.formatted
+  local geo_probe=$(attr -qg host_list /cvmfs/grid.cern.ch)
 
   sudo cvmfs_talk -i grid.cern.ch host probe || return 2
-  sudo cvmfs_talk -i grid.cern.ch host info > normal_probe.formatted || return 3
-  cat normal_probe.formatted | grep "\[" | awk '{print $1 " " $2}' > normal_probe
-  rm -f normal_probe.formatted
+  local normal_probe=$(attr -qg host_list /cvmfs/grid.cern.ch)
 
-  cat geo_probe
-  cat normal_probe
+  echo "$geo_probe"
+  echo "$normal_probe"
 
-  if ! diff geo_probe normal_probe; then
+  if [ "x$geo_probe" != "x$normal_probe" ]; then
     return 20;
   fi
 
   sudo rm -f /etc/cvmfs/config.d/grid.cern.ch.local
-
   return 0
 }
