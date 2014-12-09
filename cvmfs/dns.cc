@@ -88,7 +88,8 @@ static void PinpointHostSubstr(
 
 
 /**
- * Returns the host name from a string in the format http://<hostname>:<port>
+ * Returns the host name from a string in the format
+ * http://<hostname>:<port>/path
  * or an empty string if url doesn't match the format.
  */
 std::string ExtractHost(const std::string &url) {
@@ -98,6 +99,37 @@ std::string ExtractHost(const std::string &url) {
   if (pos_begin == 0)
     return "";
   return url.substr(pos_begin, (pos_end - pos_begin) + 1);
+}
+
+
+/**
+ * Returns the port from a string in the format
+ * http://<hostname>:<port>/path
+ * or an empty string if url doesn't match the format.
+ */
+std::string ExtractPort(const std::string &url) {
+  unsigned pos_begin;
+  unsigned pos_end;
+  PinpointHostSubstr(url, &pos_begin, &pos_end);
+  if (pos_begin == 0 ||
+      pos_end + 2 >= url.size() ||
+      url.at(pos_end + 1) != ':')
+      return "";
+
+  // Do not include path
+  std::size_t pos_port = url.find("/", pos_end);
+  std::string retme;
+  if (pos_port == std::string::npos)
+    retme = url.substr(pos_end + 2);
+  else
+    retme = url.substr(pos_end + 2, pos_port - pos_end - 2);
+
+  // Port is an integer
+  for (std::string::iterator it = retme.begin(); it != retme.end(); ++it)
+    if (isdigit(*it) == 0)
+      return "";
+
+  return retme;
 }
 
 

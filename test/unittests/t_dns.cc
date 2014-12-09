@@ -175,6 +175,39 @@ TEST_F(T_Dns, ExtractHost) {
 }
 
 
+TEST_F(T_Dns, ExtractPort) {
+  EXPECT_EQ(ExtractPort("http://localhost:8"), "8");
+  EXPECT_EQ(ExtractPort("http://localhost:3128"), "3128");
+  EXPECT_EQ(ExtractPort("http://localhost/foo:80"), "");
+  EXPECT_EQ(ExtractPort("http://localhost:80/foo"), "80");
+  EXPECT_EQ(ExtractPort("http://localhost"), "");
+  EXPECT_EQ(ExtractPort("http://localhost:port"), "");
+  EXPECT_EQ(ExtractPort("http://127.0.0.1:3128"), "3128");
+  EXPECT_EQ(ExtractPort("http://127.0.0.1:3128/foo"), "3128");
+  EXPECT_EQ(ExtractPort("http://127.0.0.1"), "");
+  EXPECT_EQ(ExtractPort("http://127.0.0.1:port"), "");
+  EXPECT_EQ(ExtractPort("http://[::1]:3128"), "3128");
+  EXPECT_EQ(ExtractPort("http://[::1]:8080/foo"), "8080");
+  EXPECT_EQ(ExtractPort("http://[::1]"), "");
+  EXPECT_EQ(ExtractPort("http://[::1]:port"), "");
+  EXPECT_EQ(ExtractPort(""), "");
+  EXPECT_EQ(ExtractPort("localhost"), "");
+  EXPECT_EQ(ExtractPort("localhost:80"), "");
+  EXPECT_EQ(ExtractPort("localhost:port"), "");
+  EXPECT_EQ(ExtractPort("http:/"), "");
+  EXPECT_EQ(ExtractPort("http:/:80"), "");
+  EXPECT_EQ(ExtractPort("http://"), "");
+  EXPECT_EQ(ExtractPort("http://:"), "");
+  EXPECT_EQ(ExtractPort("http://:80"), "");
+  EXPECT_EQ(ExtractPort("http://["), "");
+  EXPECT_EQ(ExtractPort("http://[:80"), "");
+  EXPECT_EQ(ExtractPort("http://[]"), "");
+  EXPECT_EQ(ExtractPort("http://[]:80"), "80");
+  EXPECT_EQ(ExtractPort("http://[]:port"), "");
+  EXPECT_EQ(ExtractPort("http://localhost:port"), "");
+}
+
+
 TEST_F(T_Dns, RewriteUrl) {
   EXPECT_EQ(RewriteUrl("http://localhost:3128", "127.0.0.1"),
             "http://127.0.0.1:3128");
@@ -528,7 +561,7 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
     if (tokens[0] == "nameserver") {
       if (tokens[1].find(":") != string::npos)
         nameservers.push_back("[" + tokens[1] + "]:53");
-      else  
+      else
         nameservers.push_back(tokens[1] + ":53");
     }
     else if (tokens[0] == "search")
