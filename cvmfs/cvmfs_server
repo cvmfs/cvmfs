@@ -3593,6 +3593,7 @@ publish() {
     publish_starting $name
     $user_shell "$sync_command" || { publish_failed $name; die "Synchronization failed\n\nExecuted Command:\n$sync_command";   }
     [ -f $manifest ]            || { publish_failed $name; die "Manifest creation failed\n\nExecuted Command:\n$sync_command"; }
+    local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
     # committing newly created revision
     echo "Tagging $name"
