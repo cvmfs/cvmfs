@@ -320,6 +320,12 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                          CatalogTraversalParams::kNoTimestampThreshold,
                          type);
     const UniquePtr<history::History> tag_db(GetHistory());
+    if (! tag_db.IsValid()) {
+      LogCvmfs(kLogCatalogTraversal, kLogDebug, "didn't find a history database "
+                                                "to traverse");
+      return true;
+    }
+
     HashList root_hashes;
     bool success = tag_db->GetHashes(&root_hashes);
     assert (success);
@@ -917,6 +923,11 @@ class ObjectFetcher {
 
     const shash::Any history_hash = manifest->history();
     delete manifest;
+
+    if (history_hash.IsNull()) {
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "no history database found");
+      return NULL;
+    }
 
     std::string history_db_path;
     const bool fetched_successful = Fetch(history_hash, &history_db_path, 'H');
