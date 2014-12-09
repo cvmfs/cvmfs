@@ -44,10 +44,15 @@ BuildRequires: fuse-devel
 BuildRequires: pkgconfig
 BuildRequires: openssl-devel
 BuildRequires: libattr-devel
-BuildRequires: libuuid-devel
 %if 0%{?el5}
 BuildRequires: buildsys-macros
 %endif
+%if 0%{?el5} || 0%{?el4}
+BuildRequires: e2fsprogs-devel
+%else
+BuildRequires: libuuid-devel
+%endif
+
 
 Requires: bash
 Requires: coreutils
