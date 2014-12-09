@@ -97,6 +97,7 @@
 #include "history.h"
 #include "manifest_fetch.h"
 #include "auto_umount.h"
+#include "uuid.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -1813,9 +1814,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
   string trusted_certs = "";
+  string proxy_template = "";
   map<uint64_t, uint64_t> uid_map;
   map<uint64_t, uint64_t> gid_map;
   uint64_t initial_generation = 0;
+  cvmfs::Uuid *uuid;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
   cvmfs::backoff_throttle_ = new BackoffThrottle();
@@ -1951,6 +1954,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   if (options::GetValue("CVMFS_INITIAL_GENERATION", &parameter)) {
     initial_generation = String2Uint64(parameter);
+  }
+  if (options::GetValue("CVMFS_PROXY_TEMPLATE", &parameter)) {
+    proxy_template = parameter;
   }
 
   // Fill cvmfs option variables from configuration
@@ -2200,6 +2206,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   g_talk_ready = true;
 
+  // Uuid: create or load from cache (only for proxy template)
+  uuid = cvmfs::Uuid::Create("./uuid");
+  if (uuid == NULL) {
+    *g_boot_error = "failed to load/store uuid";
+    return loader::kFailCacheDir;
+  }
+
   // Network initialization
   cvmfs::download_manager_ = new download::DownloadManager();
   cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false);
@@ -2213,6 +2226,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->SetRetryParameters(max_retries,
                                                backoff_init,
                                                backoff_max);
+  cvmfs::download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
+  delete uuid;
+  uuid = NULL;
   if (send_info_header)
     cvmfs::download_manager_->EnableInfoHeader();
   proxies = download::ResolveProxyDescription(proxies,

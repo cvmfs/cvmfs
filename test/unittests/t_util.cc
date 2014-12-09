@@ -95,7 +95,7 @@ TEST(T_Util, SortTeam) {
   EXPECT_EQ(tractor[1], 2);
   EXPECT_EQ(towed[0], "one");
   EXPECT_EQ(towed[1], "two");
-  
+
   tractor.push_back(3);
   towed.push_back("three");
   SortTeam(&tractor, &towed);
@@ -107,7 +107,7 @@ TEST(T_Util, SortTeam) {
   EXPECT_EQ(towed[0], "one");
   EXPECT_EQ(towed[1], "two");
   EXPECT_EQ(towed[2], "three");
-  
+
   tractor.clear();
   towed.clear();
   tractor.push_back(3);
@@ -125,4 +125,12 @@ TEST(T_Util, SortTeam) {
   EXPECT_EQ(towed[0], "one");
   EXPECT_EQ(towed[1], "two");
   EXPECT_EQ(towed[2], "three");
+}
+
+
+TEST(T_Util, String2Uint64) {
+  EXPECT_EQ(String2Uint64("0"), 0U);
+  EXPECT_EQ(String2Uint64("10"), 10U);
+  EXPECT_EQ(String2Uint64("18446744073709551615000"), 18446744073709551615LLU);
+  EXPECT_EQ(String2Uint64("1a"), 1U);
 }

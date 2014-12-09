@@ -68,7 +68,7 @@ static inline bool EscapeUrlChar(char input, char output[3]) {
       (input == '/') || (input == ':') || (input == '.') ||
       (input == '+') || (input == '-') ||
       (input == '_') || (input == '~') ||
-      (input == '[') || (input == ']'))
+      (input == '[') || (input == ']') || (input == ','))
   {
     output[0] = input;
     return false;
@@ -799,10 +799,24 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   if (info->probe_hosts && opt_host_chain_)
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
+
+  string url = url_prefix + *(info->url);
+  if (url.find("@proxy@") != string::npos) {
+    string replacement;
+    if (proxy_template_forced_ != "") {
+      replacement = proxy_template_forced_;
+    } else if (info->proxy == "") {
+      replacement = proxy_template_direct_;
+    } else {
+      replacement =
+        (*opt_proxy_groups_)[opt_proxy_groups_current_][0].host.name();
+    }
+    replacement = (replacement == "") ? proxy_template_direct_ : replacement;
+    url = ReplaceAll(url, "@proxy@", replacement);
+  }
   pthread_mutex_unlock(lock_options_);
 
-  curl_easy_setopt(curl_handle, CURLOPT_URL,
-                   EscapeUrl((url_prefix + *(info->url))).c_str());
+  curl_easy_setopt(curl_handle, CURLOPT_URL, EscapeUrl(url).c_str());
   //LogCvmfs(kLogDownload, kLogDebug, "set url %s for info %p / curl handle %p",
   //         EscapeUrl((url_prefix + *(info->url))).c_str(), info, curl_handle);
 }
@@ -1086,8 +1100,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
              "same url: %d", same_url_retry);
     // Reset internal state and destination
     if ((info->destination == kDestinationMem) && info->destination_mem.data) {
-      if (info->destination_mem.data)
-        free(info->destination_mem.data);
+      free(info->destination_mem.data);
       info->destination_mem.data = NULL;
       info->destination_mem.size = 0;
       info->destination_mem.pos = 0;
@@ -1767,18 +1780,7 @@ void DownloadManager::ProbeHosts() {
     }
   }
 
-  // Sort entries, insertion sort on both, rtt and hosts
-  for (i = 1; i < host_chain.size(); ++i) {
-    int val_rtt = host_rtt[i];
-    string val_host = host_chain[i];
-    int pos;
-    for (pos = i-1; (pos >= 0) && (host_rtt[pos] > val_rtt); --pos) {
-      host_rtt[pos+1] = host_rtt[pos];
-      host_chain[pos+1] = host_chain[pos];
-    }
-    host_rtt[pos+1] = val_rtt;
-    host_chain[pos+1] = val_host;
-  }
+  SortTeam(&host_rtt, &host_chain);
   for (i = 0; i < host_chain.size(); ++i) {
     if (host_rtt[i] == INT_MAX) host_rtt[i] = -2;
   }
@@ -1790,6 +1792,110 @@ void DownloadManager::ProbeHosts() {
   opt_host_chain_rtt_ = new vector<int>(host_rtt);
   opt_host_chain_current_ = 0;
   pthread_mutex_unlock(lock_options_);
+}
+
+
+/**
+ * Uses the Geo-API of Stratum 1s to let any of them order the list of servers.
+ * Tries at most three random ones before giving up.
+ * If you change the host list in between by SetHostChain(), it will be
+ * overwritten by this function.
+ */
+bool DownloadManager::ProbeHostsGeo() {
+  vector<string> host_chain;
+  vector<int> host_rtt;
+  unsigned current_host;
+
+  GetHostInfo(&host_chain, &host_rtt, &current_host);
+  if (host_chain.size() < 2)
+    return true;
+
+  // Protect against concurrent access to prng_
+  pthread_mutex_lock(lock_options_);
+  vector<string> host_chain_shuffled = Shuffle(host_chain, &prng_);
+  pthread_mutex_unlock(lock_options_);
+
+  vector<string> host_names;
+  for (unsigned i = 0; i < host_chain.size(); ++i)
+    host_names.push_back(dns::ExtractHost(host_chain[i]));
+  SortTeam(&host_names, &host_chain);
+  string host_list = JoinStrings(host_names, ",");
+
+  // Request ordered list of stratum 1s via Geo-API
+  bool success = false;
+  unsigned max_attempts = std::min(host_chain_shuffled.size(), size_t(3));
+  for (unsigned i = 0; i < max_attempts; ++i) {
+    string url = host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/" + host_list;
+    LogCvmfs(kLogDownload, kLogDebug,
+             "requesting ordered server list from %s", url.c_str());
+    JobInfo info(&url, false, false, NULL);
+    Failures result = Fetch(&info);
+    if (result == kFailOk) {
+      string order(info.destination_mem.data, info.destination_mem.size);
+      free(info.destination_mem.data);
+      bool retval = SortWrtGeoReply(order, &host_chain);
+      if (!retval) {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+                 "retrieved invalid GeoAPI reply from %s [%s]",
+                 url.c_str(), order.c_str());
+      } else {
+        LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+                 "geographic order of stratum 1 servers retrieved from %s",
+                 dns::ExtractHost(host_chain_shuffled[i]).c_str());
+        success = true;
+        break;
+      }
+    } else {
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+               "GeoAPI request %s failed with error %d [%s]",
+               url.c_str(), result, Code2Ascii(result));
+    }
+  }
+  if (!success) {
+    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+             "failed to retrieve geographic order of stratum 1 servers");
+    return false;
+  }
+
+  pthread_mutex_lock(lock_options_);
+  delete opt_host_chain_;
+  delete opt_host_chain_rtt_;
+  opt_host_chain_ = new vector<string>(host_chain);
+  opt_host_chain_rtt_ = new vector<int>(host_chain.size(), -1);
+  opt_host_chain_current_ = 0;
+  pthread_mutex_unlock(lock_options_);
+
+  return true;
+}
+
+
+/**
+ * Validates a string of the form "1,4,2,3" representing the optimal order of
+ * hosts in the array input_hosts.  Returns true if the input_hosts string is
+ * sorted according to reply_order and false if the reply_order string is
+ * invalid.
+ */
+bool DownloadManager::SortWrtGeoReply(
+  const string &reply_order,
+  vector<string> *input_hosts)
+{
+  if (reply_order.empty())
+    return false;
+  sanitizer::InputSanitizer sanitizer("09 ,");
+  if (!sanitizer.IsValid(reply_order))
+    return false;
+  vector<string> reply_strings = SplitString(reply_order, ',');
+  vector<uint64_t> reply_vals;
+  for (unsigned i = 0; i < reply_strings.size(); ++i) {
+    if (reply_strings[i].empty())
+      return false;
+    reply_vals.push_back(String2Uint64(reply_strings[i]));
+  }
+  if (reply_vals.size() != input_hosts->size())
+    return false;
+
+  SortTeam(&reply_vals, input_hosts);
+  return true;
 }
 
 
@@ -2018,6 +2124,17 @@ void DownloadManager::SetRetryParameters(const unsigned max_retries,
   opt_max_retries_ = max_retries;
   opt_backoff_init_ms_ = backoff_init_ms;
   opt_backoff_max_ms_ = backoff_max_ms;
+  pthread_mutex_unlock(lock_options_);
+}
+
+
+void DownloadManager::SetProxyTemplates(
+  const std::string &direct,
+  const std::string &forced)
+{
+  pthread_mutex_lock(lock_options_);
+  proxy_template_direct_ = direct;
+  proxy_template_forced_ = forced;
   pthread_mutex_unlock(lock_options_);
 }
 

@@ -41,7 +41,7 @@ Uuid *Uuid::Create(const string &store_path) {
     return uuid.Release();
   }
 
-  // Read from file
+  // Read from cached file
   bool retval = GetLineFile(f, &uuid->uuid_);
   fclose(f);
   if (!retval)

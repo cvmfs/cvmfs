@@ -51,5 +51,24 @@ TEST_F(T_Download, File) {
 }
 
 
+TEST_F(T_Download, SortWrtGeoReply) {
+  vector<string> input_hosts;
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("", &input_hosts));
+
+  input_hosts.push_back("a");
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("a", &input_hosts));
+  EXPECT_TRUE(download_mgr.SortWrtGeoReply("0", &input_hosts));
+  EXPECT_EQ(input_hosts.size(), 1U);
+  EXPECT_EQ(input_hosts[0], "a");
+
+  input_hosts.push_back("b");
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply(",", &input_hosts));
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("2,", &input_hosts));
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("3,2,1", &input_hosts));
+  EXPECT_TRUE(download_mgr.SortWrtGeoReply("2,1", &input_hosts));
+  EXPECT_EQ(input_hosts.size(), 2U);
+  EXPECT_EQ(input_hosts[0], "b");
+  EXPECT_EQ(input_hosts[1], "a");
+}
 
 }  // namespace download
