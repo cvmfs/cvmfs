@@ -1813,20 +1813,20 @@ setup_and_mount_new_repository() {
   if [ $unionfs = "overlayfs" ]; then
       echo -n "(overlayfs) "
       if has_selinux && try_mount_remount_cycle_overlayfs; then
-        selinux_context="context=\"system_u:object_r:default_t:s0\""
+        selinux_context=",context=\"system_u:object_r:default_t:s0\""
       fi
       cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
-overlayfs_$name /cvmfs/$name overlayfs upperdir=${scratch_dir},lowerdir=${rdonly_dir},ro,$selinux_context 0 0 # added by CernVM-FS for $name
+overlayfs_$name /cvmfs/$name overlayfs upperdir=${scratch_dir},lowerdir=${rdonly_dir},ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   else
       echo -n "(aufs) "
       if has_selinux && try_mount_remount_cycle_aufs; then
-        selinux_context="context=\"system_u:object_r:default_t:s0\""
+        selinux_context=",context=\"system_u:object_r:default_t:s0\""
       fi
       cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
-aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro,$selinux_context 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   fi
   local user_shell="$(get_user_shell $name)"
