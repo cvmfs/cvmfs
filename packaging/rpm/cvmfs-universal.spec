@@ -72,7 +72,6 @@ Requires: gdb
 %if 0%{?suse_version}
 Requires: libfuse2
 Requires: glibc
-Requires: util-linux
 Requires: pwdutils
   %if 0%{?suse_version} < 1200
 Requires: sysvinit
@@ -86,8 +85,14 @@ Requires: which
 Requires: shadow-utils
   %if 0%{?el5} || 0%{?el4}
 Requires: SysVinit
+Requires: e2fsprogs
   %else
 Requires: sysvinit-tools
+    %if 0%{?el6}
+Requires: util-linux-ng
+    %else
+Requires: util-linux
+    %endif
   %endif
 %endif
 Requires: cvmfs-keys >= 1.2
