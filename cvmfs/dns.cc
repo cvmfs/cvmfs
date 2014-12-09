@@ -24,6 +24,7 @@
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <errno.h>
+#include <netdb.h>
 #include <poll.h>
 #include <unistd.h>
 
@@ -88,7 +89,8 @@ static void PinpointHostSubstr(
 
 
 /**
- * Returns the host name from a string in the format http://<hostname>:<port>
+ * Returns the host name from a string in the format
+ * http://<hostname>:<port>[/path]
  * or an empty string if url doesn't match the format.
  */
 std::string ExtractHost(const std::string &url) {
@@ -297,6 +299,7 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
   vector<vector<string> > ipv6_addresses(num);
   vector<Failures> failures(num);
   vector<unsigned> ttls(num);
+  vector<string> fqdns(num);
   vector<bool> skip(num);
 
   // Deal with special names: empty, IPv4, IPv6
@@ -335,7 +338,8 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
     }
   }
 
-  DoResolve(names, skip, &ipv4_addresses, &ipv6_addresses, &failures, &ttls);
+  DoResolve(
+    names, skip, &ipv4_addresses, &ipv6_addresses, &failures, &ttls, &fqdns);
 
   // Construct host objects
   for (unsigned i = 0; i < num; ++i) {
@@ -343,7 +347,7 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       continue;
 
     Host host;
-    host.name_ = names[i];
+    host.name_ = fqdns[i];
     host.status_ = failures[i];
 
     unsigned effective_ttl = ttls[i];
@@ -408,10 +412,20 @@ enum ResourceRecord {
   kRrAaaa,
 };
 
+/**
+ * Used to transport a name resolving request across the asynchronous c-ares
+ * interface.  The QueryInfo objects are used for both IPv4 and IPv6 requests.
+ * The addresses are entered directly via pointers, ttls and fqdns are later
+ * merged into a single response (for IPv4/IPv6).
+ */
 struct QueryInfo {
-  QueryInfo(vector<string> *a, const string &n, const ResourceRecord r)
+  QueryInfo(
+    vector<string> *a,
+    const string &n,
+    const ResourceRecord r)
     : addresses(a)
     , complete(false)
+    , fqdn(n)
     , name(n)
     , record(r)
     , status(kFailOther)
@@ -420,6 +434,7 @@ struct QueryInfo {
 
   vector<string> *addresses;
   bool complete;
+  string fqdn;
   string name;
   ResourceRecord record;
   Failures status;
@@ -431,10 +446,12 @@ struct QueryInfo {
 
 static Failures CaresExtractIpv4(const unsigned char *abuf, int alen,
                                  vector<string> *addresses,
-                                 unsigned *ttl);
+                                 unsigned *ttl,
+                                 string *fqdn);
 static Failures CaresExtractIpv6(const unsigned char *abuf, int alen,
                                  vector<string> *addresses,
-                                 unsigned *ttl);
+                                 unsigned *ttl,
+                                 string *fqdn);
 
 /**
  * Called when a DNS query returns or times out.  Sets the return status and the
@@ -455,10 +472,12 @@ static void CallbackCares(
       Failures retval;
       switch (info->record) {
         case kRrA:
-          retval = CaresExtractIpv4(abuf, alen, info->addresses, &info->ttl);
+          retval = CaresExtractIpv4(
+            abuf, alen, info->addresses, &info->ttl, &info->fqdn);
           break;
         case kRrAaaa:
-          retval = CaresExtractIpv6(abuf, alen, info->addresses, &info->ttl);
+          retval = CaresExtractIpv6(
+            abuf, alen, info->addresses, &info->ttl, &info->fqdn);
           break;
         default:
           // Never here.
@@ -495,14 +514,25 @@ static Failures CaresExtractIpv4(
   const unsigned char *abuf,
   int alen,
   vector<string> *addresses,
-  unsigned *ttl)
+  unsigned *ttl,
+  string *fqdn)
 {
+  struct hostent *host_entry = NULL;
   struct ares_addrttl records[CaresResolver::kMaxAddresses];
   int naddrttls = CaresResolver::kMaxAddresses;
-  int retval = ares_parse_a_reply(abuf, alen, NULL, records, &naddrttls);
+  int retval = ares_parse_a_reply(abuf, alen, &host_entry, records, &naddrttls);
 
   switch (retval) {
     case ARES_SUCCESS:
+      if (host_entry == NULL)
+        return kFailMalformed;
+      if (host_entry->h_name == NULL) {
+        ares_free_hostent(host_entry);
+        return kFailMalformed;
+      }
+      *fqdn = string(host_entry->h_name);
+      ares_free_hostent(host_entry);
+
       if (naddrttls <= 0)
         return kFailMalformed;
       *ttl = unsigned(-1);
@@ -535,14 +565,26 @@ static Failures CaresExtractIpv6(
   const unsigned char *abuf,
   int alen,
   vector<string> *addresses,
-  unsigned *ttl)
+  unsigned *ttl,
+  string *fqdn)
 {
+  struct hostent *host_entry = NULL;
   struct ares_addr6ttl records[CaresResolver::kMaxAddresses];
   int naddrttls = CaresResolver::kMaxAddresses;
-  int retval = ares_parse_aaaa_reply(abuf, alen, NULL, records, &naddrttls);
+  int retval =
+    ares_parse_aaaa_reply(abuf, alen, &host_entry, records, &naddrttls);
 
   switch (retval) {
     case ARES_SUCCESS:
+      if (host_entry == NULL)
+        return kFailMalformed;
+      if (host_entry->h_name == NULL) {
+        ares_free_hostent(host_entry);
+        return kFailMalformed;
+      }
+      *fqdn = string(host_entry->h_name);
+      ares_free_hostent(host_entry);
+
       if (naddrttls <= 0)
         return kFailMalformed;
       *ttl = unsigned(-1);
@@ -615,7 +657,8 @@ CaresResolver *CaresResolver::Create(
   memset(&options, 0, sizeof(options));
   options.timeout = timeout_ms;
   options.tries = 1 + retries;
-  optmask = ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES;
+  options.lookups = strdup("b");
+  optmask = ARES_OPT_TIMEOUTMS | ARES_OPT_TRIES | ARES_OPT_LOOKUPS;
   retval = ares_init_options(resolver->channel_, &options, optmask);
   if (retval != ARES_SUCCESS)
     goto create_fail;
@@ -694,7 +737,8 @@ void CaresResolver::DoResolve(
   vector<vector<string> > *ipv4_addresses,
   vector<vector<string> > *ipv6_addresses,
   vector<Failures> *failures,
-  vector<unsigned> *ttls)
+  vector<unsigned> *ttls,
+  vector<string> *fqdns)
 {
   unsigned num = names.size();
   if (num == 0)
@@ -739,12 +783,18 @@ void CaresResolver::DoResolve(
 
     Failures status = kFailOther;
     (*ttls)[i] = unsigned(-1);
+    (*fqdns)[i] = "";
     if (infos_ipv6[i]) {
-      (*ttls)[i] = std::min(infos_ipv6[i]->ttl, (*ttls)[i]);
       status = infos_ipv6[i]->status;
+      if (status == kFailOk) {
+        (*ttls)[i] = std::min(infos_ipv6[i]->ttl, (*ttls)[i]);
+        (*fqdns)[i] = infos_ipv6[i]->fqdn;
+      }
     }
     if (infos_ipv4[i]) {
       (*ttls)[i] = std::min(infos_ipv4[i]->ttl, (*ttls)[i]);
+      if ((*fqdns)[i] == "")
+        (*fqdns)[i] = infos_ipv4[i]->fqdn;
       if (status != kFailOk)
         status = infos_ipv4[i]->status;
     }
@@ -769,34 +819,50 @@ bool CaresResolver::SetResolvers(const vector<string> &resolvers) {
 }
 
 
+/**
+ * Changes the options of the active channel.  This is hacky and deals with
+ * c-ares internal data structures because there is no way to do it via public
+ * APIs.
+ */
 bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
-  /*struct ares_options options;
-  int optmask;
-  int retval = ares_save_options(*channel_, &options, &optmask);
-  assert(retval == ARES_SUCCESS);
+  // From ares_private.h
+  struct {
+    int flags;
+    int timeout;
+    int tries;
+    int ndots;
+    int rotate;
+    int udp_port;
+    int tcp_port;
+    int socket_send_buffer_size;
+    int socket_receive_buffer_size;
+    char **domains;
+    int ndomains;
+    // More fields come in the original data structure
+  } ares_channelhead;
 
-  if (options.ndomains > 0) {
-    for (int i = 0; i < options.ndomains; ++i)
-      free(options.domains[i]);
-    free(options.domains);
+  memcpy(&ares_channelhead, *channel_, sizeof(ares_channelhead));
+  if (ares_channelhead.domains) {
+    for (int i = 0; i < ares_channelhead.ndomains; ++i) {
+      free(ares_channelhead.domains[i]);
+    }
+    free(ares_channelhead.domains);
+    ares_channelhead.domains = NULL;
   }
 
-  options.ndomains = domains.size();
-  if (options.ndomains > 0) {
-    options.domains = reinterpret_cast<char **>(
-      smalloc(options.ndomains * sizeof(char **)));
-    for (int i = 0; i < options.ndomains; ++i) {
-      options.domains[i] = strdup(domains[i].c_str());
+  ares_channelhead.ndomains = int(domains.size());
+  if (ares_channelhead.ndomains > 0) {
+    ares_channelhead.domains = reinterpret_cast<char **>(
+      smalloc(ares_channelhead.ndomains * sizeof(char **)));
+    for (int i = 0; i < ares_channelhead.ndomains; ++i) {
+      ares_channelhead.domains[i] = strdup(domains[i].c_str());
     }
   }
-  retval = ares_init_options(channel_, &options, optmask);
-  ares_destroy_options(&options);
 
-  if (retval == ARES_SUCCESS) {
-    domains_ = domains;
-    return true;
-  }*/
-  return false;
+  memcpy(*channel_, &ares_channelhead, sizeof(ares_channelhead));
+
+  domains_ = domains;
+  return true;
 }
 
 
@@ -903,6 +969,20 @@ HostfileResolver *HostfileResolver::Create(
 
 
 /**
+ * Used to process longer domain names before shorter ones, in order to get
+ * the correct fully qualified domain name.  Reversed return value in order to
+ * sort in descending order.
+ */
+static bool SortNameLength(const string &a, const string &b) {
+  unsigned len_a = a.length();
+  unsigned len_b = b.length();
+  if (len_a != len_b)
+    return len_a > len_b;
+  return a > b;
+}
+
+
+/**
  * Creates a fresh reverse lookup map
  */
 void HostfileResolver::DoResolve(
@@ -911,7 +991,8 @@ void HostfileResolver::DoResolve(
   vector< vector<std::string> > *ipv4_addresses,
   vector< vector<std::string> > *ipv6_addresses,
   vector<Failures> *failures,
-  vector<unsigned> *ttls)
+  vector<unsigned> *ttls,
+  vector<string> *fqdns)
 {
   unsigned num = names.size();
   if (num == 0)
@@ -932,7 +1013,11 @@ void HostfileResolver::DoResolve(
       }
     }
 
+    // Use the longest matching name as fqdn
+    std::sort(effective_names.begin(), effective_names.end(), SortNameLength);
+
     (*failures)[i] = kFailUnknownHost;
+    (*fqdns)[i] = names[i];
     for (unsigned j = 0; j < effective_names.size(); ++j) {
       map<string, HostEntry>::iterator iter =
         host_map_.find(effective_names[j]);
@@ -944,6 +1029,7 @@ void HostfileResolver::DoResolve(
                                     iter->second.ipv6_addresses.begin(),
                                     iter->second.ipv6_addresses.end());
         (*ttls)[i] = kMinTtl;
+        (*fqdns)[i] = effective_names[j];
         (*failures)[i] = kFailOk;
         break;
       }  // Host name found
@@ -1076,7 +1162,7 @@ bool NormalResolver::SetResolvers(const vector<string> &resolvers) {
 
 
 /**
- * Sets new search domains for both resolvers or for none.
+ * Set new search domains for both resolvers or for none.
  */
 bool NormalResolver::SetSearchDomains(const vector<string> &domains) {
   vector<string> old_domains = hostfile_resolver_->domains();
@@ -1115,18 +1201,19 @@ void NormalResolver::DoResolve(
   vector< vector<string> > *ipv4_addresses,
   vector< vector<string> > *ipv6_addresses,
   vector<Failures> *failures,
-  vector<unsigned> *ttls)
+  vector<unsigned> *ttls,
+  vector<string> *fqdns)
 {
   unsigned num = names.size();
   hostfile_resolver_->DoResolve(names, skip, ipv4_addresses, ipv6_addresses,
-                                failures, ttls);
+                                failures, ttls, fqdns);
   vector<bool> skip_cares = skip;
   for (unsigned i = 0; i < num; ++i) {
     if ((*failures)[i] == kFailOk)
       skip_cares[i] = true;
   }
   cares_resolver_->DoResolve(names, skip_cares, ipv4_addresses, ipv6_addresses,
-                             failures, ttls);
+                             failures, ttls, fqdns);
 }
 
 

@@ -68,7 +68,7 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_CONFIG_REPOSITORY"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
-          CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER"
+          CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI"
 required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_RELOAD_SOCKETS \
                CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
@@ -556,12 +556,14 @@ cvmfs_chksetup() {
       done
 
       # Check for network
+      local uuid=$(uuidgen)
       if [ ! -z "$CVMFS_HTTP_PROXY" -a ! -z "$CVMFS_SERVER_URL"  ]; then
         server_list=`echo "$CVMFS_SERVER_URL" | sed -e 's/,/ /g' -e 's/;/ /g'`
         for server in $server_list
         do
           local proxy_list
           proxy_list=`echo "$CVMFS_HTTP_PROXY" | sed -e 's/;/ /g' -e 's/|/ /g'`
+          local first_proxy=
           for proxy in $proxy_list
           do
             org=`cvmfs_getorg $fqrn`
@@ -588,6 +590,23 @@ cvmfs_chksetup() {
               echo "Warning: failed to access $url through proxy $proxy"
               num_warnings=$(($num_warnings+1))
             fi
+
+            # Check Geo-API
+            if [ "x$first_proxy" = "x" ]; then
+              if [ ! -z "$CVMFS_USE_GEOAPI" ]; then
+                if check_is_on CVMFS_USE_GEOAPI; then
+                  local server_name=$(echo $server | sed s,^http://,, | cut -d/ -f1 | sed 's/:[0-9]*$//')
+                  url=$(echo $server | sed s/@org@/$org/g | sed s/@fqrn@/$fqrn/g)
+                  url="${url}/api/v1.0/geo/${uuid}/$server_name"
+                  $proxy_param curl -H "Pragma:" -f --connect-timeout $timeout $url > /dev/null 2>&1
+                  if [ $? -ne 0 ]; then
+                    echo "Warning: failed to use Geo-API with ${server_name}"
+                    num_warnings=$(($num_warnings+1))
+                  fi
+                fi
+              fi
+            fi
+            first_proxy="taken"
           done
         done
       fi

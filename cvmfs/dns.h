@@ -71,8 +71,11 @@ std::string StripIp(const std::string &decorated_ip);
  *
  * A host object can be copied into a new object with an extended deadline.
  * This is useful if an attempt to resolve a name fails where it previously
- * succeeded.  In this case, the extended deadline can be used to retry the
- * name resolution only after some grace period.
+ * succeeded.  In this case, the extended deadline can be used to delay another
+ * name resolution attempt for some grace period.
+ *
+ * For successful name resolution, the name is the fully qualified domain name,
+ * even if a short name was given to the resolver.
  */
 class Host {
   FRIEND_TEST(T_Dns, HostEquivalent);
@@ -189,14 +192,16 @@ class Resolver : SingleCopy {
    * the same order.  To keep it simple, returns only a single TTL per host,
    * the lower value of both record types A/AAAA.  The output vectors have
    * the same size as the input vector names.  Names that are handled by the
-   * base class are marked with skip[i] set to true.
+   * base class are marked with skip[i] set to true. The input names are
+   * completed to fully qualified domain names.
    */
   virtual void DoResolve(const std::vector<std::string> &names,
                          const std::vector<bool> &skip,
                          std::vector<std::vector<std::string> > *ipv4_addresses,
                          std::vector<std::vector<std::string> > *ipv6_addresses,
                          std::vector<Failures> *failures,
-                         std::vector<unsigned> *ttls) = 0;
+                         std::vector<unsigned> *ttls,
+                         std::vector<std::string> *fqdns) = 0;
   bool IsIpv4Address(const std::string &address);
   bool IsIpv6Address(const std::string &address);
 
@@ -258,7 +263,8 @@ class CaresResolver : public Resolver {
                          std::vector<std::vector<std::string> > *ipv4_addresses,
                          std::vector<std::vector<std::string> > *ipv6_addresses,
                          std::vector<Failures> *failures,
-                         std::vector<unsigned> *ttls);
+                         std::vector<unsigned> *ttls,
+                         std::vector<std::string> *fqdns);
 
  private:
   void WaitOnCares();
@@ -294,7 +300,8 @@ class HostfileResolver : public Resolver {
                          std::vector<std::vector<std::string> > *ipv4_addresses,
                          std::vector<std::vector<std::string> > *ipv6_addresses,
                          std::vector<Failures> *failures,
-                         std::vector<unsigned> *ttls);
+                         std::vector<unsigned> *ttls,
+                         std::vector<std::string> *fqdns);
 
  private:
   struct HostEntry {
@@ -340,7 +347,8 @@ class NormalResolver : public Resolver {
                          std::vector<std::vector<std::string> > *ipv4_addresses,
                          std::vector<std::vector<std::string> > *ipv6_addresses,
                          std::vector<Failures> *failures,
-                         std::vector<unsigned> *ttls);
+                         std::vector<unsigned> *ttls,
+                         std::vector<std::string> *fqdns);
   NormalResolver();
 
  private:

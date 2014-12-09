@@ -51,6 +51,8 @@ set (CVMFS_UNITTEST_SOURCES
   t_dns.cc
   t_garbage_collector.cc
   t_hash_filters.cc
+  t_download.cc
+  t_uuid.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -67,6 +69,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util_concurrency.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc
   ${CVMFS_SOURCE_DIR}/util_concurrency_impl.h
+  ${CVMFS_SOURCE_DIR}/uuid.h
+  ${CVMFS_SOURCE_DIR}/uuid.cc
 
   ${CVMFS_SOURCE_DIR}/platform.h
   ${CVMFS_SOURCE_DIR}/platform_linux.h
@@ -130,7 +134,11 @@ set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -D_FILE_OFFSET_BITS=64")
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
-set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+if (MACOSX)
+  set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+else (MACOSX)
+  set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS} -luuid")
+endif (MACOSX)
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 #

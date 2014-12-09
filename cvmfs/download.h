@@ -245,6 +245,7 @@ class HeaderLists {
 
 
 class DownloadManager {
+  FRIEND_TEST(T_Download, SortWrtGeoReply);
  public:
   struct ProxyInfo {
     ProxyInfo() { }
@@ -280,6 +281,7 @@ class DownloadManager {
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
   void ProbeHosts();
+  bool ProbeHostsGeo();
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list);
   void GetProxyInfo(std::vector< std::vector<ProxyInfo> > *proxy_chain,
@@ -293,6 +295,7 @@ class DownloadManager {
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
+  void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnablePipelining();
  private:
@@ -300,6 +303,8 @@ class DownloadManager {
                                 void *userp, void *socketp);
   static void *MainDownload(void *data);
 
+  bool SortWrtGeoReply(const std::string &reply_order,
+                       std::vector<std::string> *input_hosts);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
   void RebalanceProxiesUnlocked();
@@ -374,6 +379,19 @@ class DownloadManager {
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).
    */
   dns::NormalResolver *resolver;
+
+  /**
+   * Used to replace @proxy@ in the Geo-API calls to order Stratum 1 servers,
+   * in case the active proxy is DIRECT (no proxy).  Should be a UUID
+   * identifying the host.
+   */
+  std::string proxy_template_direct_;
+  /**
+   * Used to force a value for @proxy@ in the Geo-API calls to order Stratum 1
+   * servers.  If empty, the fully qualified domain name of the active proxy
+   * server is used.
+   */
+  std::string proxy_template_forced_;
 
   /**
    * More than one proxy group can be considered as group of primary proxies

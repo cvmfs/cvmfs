@@ -250,6 +250,12 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "host probe") {
         cvmfs::download_manager_->ProbeHosts();
         Answer(con_fd, "OK\n");
+      } else if (line == "host probe geo") {
+        bool retval = cvmfs::download_manager_->ProbeHostsGeo();
+        if (retval)
+          Answer(con_fd, "OK\n");
+        else
+          Answer(con_fd, "Failed\n");
       } else if (line == "host switch") {
         cvmfs::download_manager_->SwitchHost();
         Answer(con_fd, "OK\n");

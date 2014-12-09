@@ -29,6 +29,7 @@ set (CVMFS_CLIENT_SOURCES
   platform.h platform_osx.h platform_linux.h
   monitor.h monitor.cc
   prng.h util.cc util.h
+  uuid.h uuid.cc
   backoff.h backoff.cc
   duplex_zlib.h compression.h compression.cc
   sanitizer.cc sanitizer.h
@@ -205,7 +206,11 @@ set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -
 #
 # set some include and linking stuff
 #
-set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -ldl -lm")
+if (MACOSX)
+  set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -ldl -lm")
+else (MACOSX)
+  set (CVMFS2_LD_FLAGS "${CVMFS2_LD_FLAGS} -luuid -ldl -lm")
+endif (MACOSX)
 include_directories (${INCLUDE_DIRECTORIES})
 
 #
@@ -261,7 +266,7 @@ if (BUILD_CVMFS)
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
   set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS_LOADER_CFLAGS}" LINK_FLAGS "${CVMFS_LOADER_LD_FLAGS}")
-  set_target_properties (cvmfs_fuse_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_DEBUG_LD_FLAGS}")
+  set_target_properties (cvmfs_fuse_debug PROPERTIES COMPILE_FLAGS "${CVMFS2_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS} ${CVMFS2_DEBUG_LD_FLAGS}")
   set_target_properties (cvmfs_fuse PROPERTIES COMPILE_FLAGS "${CVMFS2_CFLAGS}" LINK_FLAGS "${CVMFS2_LD_FLAGS}")
   set_target_properties (cvmfs_fsck PROPERTIES COMPILE_FLAGS "${CVMFS_FSCK_CFLAGS}" LINK_FLAGS "${CVMFS_FSCK_LD_FLAGS}")
 
@@ -327,7 +332,12 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread dl )
+  # OS X has the uuid functions as part of the libc
+  if (MACOSX)
+    target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} pthread dl )
+  else (MACOSX)
+    target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} uuid pthread dl )
+  endif (MACOSX)
   add_dependencies (test_libcvmfs libcvmfs)
 
 endif (BUILD_LIBCVMFS)

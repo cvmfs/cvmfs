@@ -39,6 +39,8 @@ sub usage {
   print "  host info              get host chain and their rtt,            \n";
   print "                         if already probed                        \n";
   print "  host probe             orders the host chain according to rtt   \n";
+  print "  host probe geo         let Stratum 1s order the host chain using\n";
+  print "                         the Geo-API                              \n";
   print "  host switch            switches to the next host in the chain   \n";
   print "  host set <host list>   sets a new host chain                    \n";
   print "  proxy info             gets the currently active proxy server   \n";
