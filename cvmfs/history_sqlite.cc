@@ -74,7 +74,8 @@ bool SqliteHistory::OpenDatabase(const std::string &file_name, const bool read_w
   }
 
   set_fqrn(database_->GetProperty<std::string>(HistoryDatabase::kFqrnKey));
-  return Initialize();
+  PrepareQueries();
+  return true;
 }
 
 
@@ -91,22 +92,14 @@ bool SqliteHistory::CreateDatabase(const std::string &file_name,
     return false;
   }
 
-  return Initialize();
-}
-
-
-bool SqliteHistory::Initialize() {
-  if (! PrepareQueries()) {
-    LogCvmfs(kLogHistory, kLogDebug, "failed to prepare statements of history");
-    return false;
-  }
-
+  PrepareQueries();
   return true;
 }
 
 
-bool SqliteHistory::PrepareQueries() {
+void SqliteHistory::PrepareQueries() {
   assert (database_);
+
   find_tag_           = new SqlFindTag          (database_.weak_ref());
   find_tag_by_date_   = new SqlFindTagByDate    (database_.weak_ref());
   count_tags_         = new SqlCountTags        (database_.weak_ref());
@@ -114,7 +107,10 @@ bool SqliteHistory::PrepareQueries() {
   channel_tips_       = new SqlGetChannelTips   (database_.weak_ref());
   get_hashes_         = new SqlGetHashes        (database_.weak_ref());
   list_rollback_tags_ = new SqlListRollbackTags (database_.weak_ref());
-  recycle_list_       = new SqlRecycleBinList   (database_.weak_ref());
+
+  if (database_->ContainsRecycleBin()) {
+    recycle_list_ = new SqlRecycleBinList(database_.weak_ref());
+  }
 
   if (IsWritable()) {
     insert_tag_         = new SqlInsertTag          (database_.weak_ref());
@@ -124,15 +120,6 @@ bool SqliteHistory::PrepareQueries() {
     recycle_empty_      = new SqlRecycleBinFlush    (database_.weak_ref());
     recycle_rollback_   = new SqlRecycleBinRollback (database_.weak_ref());
   }
-
-  return (find_tag_           && find_tag_by_date_ && count_tags_   &&
-          list_tags_          && channel_tips_     && get_hashes_   &&
-          list_rollback_tags_ && recycle_list_     &&
-
-          (! IsWritable() || (
-                insert_tag_    && remove_tag_     && recycle_empty_ &&
-                rollback_tag_  && recycle_insert_ && recycle_rollback_))
-          );
 }
 
 
@@ -263,9 +250,12 @@ bool SqliteHistory::KeepHashReference(const Tag &tag) {
 
 bool SqliteHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
   assert (database_);
-  assert (recycle_list_.IsValid());
-  assert (NULL != hashes);
 
+  if (! database_->ContainsRecycleBin()) {
+    return false;
+  }
+
+  assert (NULL != hashes);
   hashes->clear();
   while (recycle_list_->FetchRow()) {
     hashes->push_back(recycle_list_->RetrieveHash());
@@ -277,6 +267,7 @@ bool SqliteHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
 
 bool SqliteHistory::EmptyRecycleBin() {
   assert (database_);
+  assert (IsWritable());
   assert (recycle_empty_.IsValid());
   return recycle_empty_->Execute() &&
          recycle_empty_->Reset();
@@ -285,6 +276,7 @@ bool SqliteHistory::EmptyRecycleBin() {
 
 bool SqliteHistory::Rollback(const Tag &updated_target_tag) {
   assert (database_);
+  assert (IsWritable());
   assert (recycle_rollback_.IsValid());
   assert (rollback_tag_.IsValid());
 

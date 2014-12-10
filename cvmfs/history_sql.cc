@@ -57,6 +57,11 @@ bool HistoryDatabase::InsertInitialValues(const std::string &repository_name) {
 }
 
 
+bool HistoryDatabase::ContainsRecycleBin() const {
+  return schema_version() >= 1.0 - kSchemaEpsilon && schema_revision() >= 2;
+}
+
+
 bool HistoryDatabase::CheckSchemaCompatibility() {
   return ! ((schema_version() < kLatestSupportedSchema - kSchemaEpsilon) ||
             (schema_version() > kLatestSchema          + kSchemaEpsilon));
