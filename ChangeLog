@@ -2,6 +2,7 @@
   * Add support for garbage-collected repositories (CVM-583)
   * Add support for automatically ordering Stratum 1 servers according to
     geographic loations (CVM-629, CVM-630)
+  * Add 'host probe geo' command to cvmfs_talk
   * Add CVMFS_USE_GEOAPI parameter
   * Add host_list extended attribute
   * Fix traversal of nested catalogs in intermediate catalogs during snapshot
