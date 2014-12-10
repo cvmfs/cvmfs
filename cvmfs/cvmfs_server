@@ -3812,11 +3812,15 @@ gc() {
     preserve_revisions=0
   fi
 
-  if [ $force -eq 0 ]; then
+  if [ $force -eq 0 ] && [ $dry_run -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
 
+  local dry_run_msg="no"
+  if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
+
   echo "Affected Repositories:         $names"
+  echo "Dry Run (no actual deletion):  $dry_run_msg"
   if [ $preserve_revisions -ge 0 ]; then
     echo "Preserved Legacy Revisions:    $preserve_revisions"
   fi
@@ -3871,8 +3875,10 @@ gc() {
       base_hash="$(get_mounted_root_hash $name)"
       manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
 
-      trap "close_transaction $name 0" EXIT HUP INT TERM
-      open_transaction $name || die "Failed to open transaction for garbage collection"
+      if [ $dry_run -eq 0 ]; then
+        trap "close_transaction $name 0" EXIT HUP INT TERM
+        open_transaction $name || die "Failed to open transaction for garbage collection"
+      fi
     fi
 
     # run the garbage collection
@@ -3888,11 +3894,11 @@ gc() {
     if is_stratum0 $name && [ $dry_run -eq 0 ]; then
       echo "Signing Repository Manifest"
       sign_manifest $name $manifest || die "Fail!"
-    fi
 
-    # close the transaction
-    trap - EXIT HUP INT TERM
-    close_transaction $name 0
+      # close the transaction
+      trap - EXIT HUP INT TERM
+      close_transaction $name 0
+    fi
 
   done
 }
@@ -3909,8 +3915,11 @@ __run_gc() {
   load_repo_config $name
 
   # sanity checks
-  is_in_transaction      $name || is_stratum1 $name || return 1
-  is_garbage_collectable $name ||                      return 2
+  is_garbage_collectable $name || return 1
+  if [ $dry_run -eq 0 ]; then
+    is_in_transaction $name || is_stratum1 $name || return 2
+  fi
+
 
   # do it!
   local user_shell="$(get_user_shell $name)"
