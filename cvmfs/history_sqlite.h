@@ -136,9 +136,7 @@ class SqliteHistory : public History {
   static History* Open(const std::string &file_name, const bool read_write);
   bool OpenDatabase(const std::string &file_name, const bool read_write);
   bool CreateDatabase(const std::string &file_name, const std::string &fqrn);
-
-  bool Initialize();
-  bool PrepareQueries();
+  void PrepareQueries();
 
  private:
   template <class SqlListingT>

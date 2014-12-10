@@ -74,7 +74,8 @@ bool SqliteHistory::OpenDatabase(const std::string &file_name, const bool read_w
   }
 
   set_fqrn(database_->GetProperty<std::string>(HistoryDatabase::kFqrnKey));
-  return Initialize();
+  PrepareQueries();
+  return true;
 }
 
 
@@ -91,22 +92,14 @@ bool SqliteHistory::CreateDatabase(const std::string &file_name,
     return false;
   }
 
-  return Initialize();
-}
-
-
-bool SqliteHistory::Initialize() {
-  if (! PrepareQueries()) {
-    LogCvmfs(kLogHistory, kLogDebug, "failed to prepare statements of history");
-    return false;
-  }
-
+  PrepareQueries();
   return true;
 }
 
 
-bool SqliteHistory::PrepareQueries() {
+void SqliteHistory::PrepareQueries() {
   assert (database_);
+
   find_tag_           = new SqlFindTag          (database_.weak_ref());
   find_tag_by_date_   = new SqlFindTagByDate    (database_.weak_ref());
   count_tags_         = new SqlCountTags        (database_.weak_ref());
@@ -124,15 +117,6 @@ bool SqliteHistory::PrepareQueries() {
     recycle_empty_      = new SqlRecycleBinFlush    (database_.weak_ref());
     recycle_rollback_   = new SqlRecycleBinRollback (database_.weak_ref());
   }
-
-  return (find_tag_           && find_tag_by_date_ && count_tags_   &&
-          list_tags_          && channel_tips_     && get_hashes_   &&
-          list_rollback_tags_ && recycle_list_     &&
-
-          (! IsWritable() || (
-                insert_tag_    && remove_tag_     && recycle_empty_ &&
-                rollback_tag_  && recycle_insert_ && recycle_rollback_))
-          );
 }
 
 
