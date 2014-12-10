@@ -3915,8 +3915,11 @@ __run_gc() {
   load_repo_config $name
 
   # sanity checks
-  is_in_transaction      $name || is_stratum1 $name || return 1
-  is_garbage_collectable $name ||                      return 2
+  is_garbage_collectable $name || return 1
+  if [ $dry_run -eq 0 ]; then
+    is_in_transaction $name || is_stratum1 $name || return 2
+  fi
+
 
   # do it!
   local user_shell="$(get_user_shell $name)"
