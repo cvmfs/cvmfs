@@ -29,11 +29,12 @@ class HistoryDatabase : public sqlite::Database<HistoryDatabase> {
   bool CreateEmptyDatabase();
   bool InsertInitialValues(const std::string &repository_name);
 
+  bool ContainsRecycleBin() const;
+
   bool CheckSchemaCompatibility();
   bool LiveSchemaUpgradeIfNecessary();
   bool CompactDatabase() const { return true; }; // no implementation specific
                                                  // database compaction.
-
  protected:
   // TODO: C++11 - constructor inheritance
   friend class sqlite::Database<HistoryDatabase>;
