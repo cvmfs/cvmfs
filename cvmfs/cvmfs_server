@@ -3816,7 +3816,11 @@ gc() {
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
 
+  local dry_run_msg="no"
+  if [ $dry_run -eq 1 ]; then dry_run_msg="yes"; fi
+
   echo "Affected Repositories:         $names"
+  echo "Dry Run (no actual deletion):  $dry_run_msg"
   if [ $preserve_revisions -ge 0 ]; then
     echo "Preserved Legacy Revisions:    $preserve_revisions"
   fi
