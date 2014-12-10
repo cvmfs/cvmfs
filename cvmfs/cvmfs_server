@@ -3875,8 +3875,10 @@ gc() {
       base_hash="$(get_mounted_root_hash $name)"
       manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
 
-      trap "close_transaction $name 0" EXIT HUP INT TERM
-      open_transaction $name || die "Failed to open transaction for garbage collection"
+      if [ $dry_run -eq 0 ]; then
+        trap "close_transaction $name 0" EXIT HUP INT TERM
+        open_transaction $name || die "Failed to open transaction for garbage collection"
+      fi
     fi
 
     # run the garbage collection
