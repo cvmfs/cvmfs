@@ -1,6 +1,6 @@
 
 %{?suse_version:%define dist .suse%suse_version}
-%if 0%{?el6} || 0%{?el7} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20}
+%if 0%{?el6} || 0%{?el7} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20} || 0%{?fc21}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
@@ -247,8 +247,8 @@ mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 %endif
 
-# Fix docdir on FC20
-%if 0%{?fc20}
+# Fix docdir on FC20, FC21
+%if 0%{?fc20} || 0%{?fc21}
 rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
 %endif
 
@@ -378,6 +378,9 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Wed Dec 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20
+- Add libuuid-devel dependency
+- Fixes for Fedora 21
 * Tue Oct 21 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20
 - /etc/auto.cvmfs is now a link to /usr/libexec/cvmfs/auto.cvmfs
 * Thu Apr 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.18
