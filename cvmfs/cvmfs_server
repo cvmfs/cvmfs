@@ -3812,7 +3812,7 @@ gc() {
     preserve_revisions=0
   fi
 
-  if [ $force -eq 0 ]; then
+  if [ $force -eq 0 ] && [ $dry_run -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
 
