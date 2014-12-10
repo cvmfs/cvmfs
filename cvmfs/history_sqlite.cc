@@ -107,7 +107,10 @@ void SqliteHistory::PrepareQueries() {
   channel_tips_       = new SqlGetChannelTips   (database_.weak_ref());
   get_hashes_         = new SqlGetHashes        (database_.weak_ref());
   list_rollback_tags_ = new SqlListRollbackTags (database_.weak_ref());
-  recycle_list_       = new SqlRecycleBinList   (database_.weak_ref());
+
+  if (database_->ContainsRecycleBin()) {
+    recycle_list_ = new SqlRecycleBinList(database_.weak_ref());
+  }
 
   if (IsWritable()) {
     insert_tag_         = new SqlInsertTag          (database_.weak_ref());
@@ -247,9 +250,12 @@ bool SqliteHistory::KeepHashReference(const Tag &tag) {
 
 bool SqliteHistory::ListRecycleBin(std::vector<shash::Any> *hashes) const {
   assert (database_);
-  assert (recycle_list_.IsValid());
-  assert (NULL != hashes);
 
+  if (! database_->ContainsRecycleBin()) {
+    return false;
+  }
+
+  assert (NULL != hashes);
   hashes->clear();
   while (recycle_list_->FetchRow()) {
     hashes->push_back(recycle_list_->RetrieveHash());
