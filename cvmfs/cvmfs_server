@@ -3892,11 +3892,11 @@ gc() {
     if is_stratum0 $name && [ $dry_run -eq 0 ]; then
       echo "Signing Repository Manifest"
       sign_manifest $name $manifest || die "Fail!"
-    fi
 
-    # close the transaction
-    trap - EXIT HUP INT TERM
-    close_transaction $name 0
+      # close the transaction
+      trap - EXIT HUP INT TERM
+      close_transaction $name 0
+    fi
 
   done
 }
