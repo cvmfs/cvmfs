@@ -1,0 +1,200 @@
+
+cvmfs_test_name="Garbage Collect Orphaned Named Snapshots on Stratum1"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_579_REPLICA_NAME=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_579_REPLICA_NAME ]; then
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_579_REPLICA_NAME
+  fi
+}
+
+create_revision() {
+  local repo_name=$1
+
+  start_transaction $repo_name > /dev/null 2>&1 || return 1
+  publish_repo      $repo_name > /dev/null 2>&1 || return 2
+
+  echo "$(get_current_root_catalog $repo_name)C"
+}
+
+snapshot_repo() {
+  local replica_name=$1
+
+  echo "snapshotting new revision to $replica_name"
+  cvmfs_server snapshot $replica_name || return 1
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local catalog1
+  local catalog2
+  local catalog3
+  local catalog4
+  local catalog5
+  local catalog6
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+
+  # ============================================================================
+
+  # echo "install a desaster cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create Stratum1 repository on the same machine"
+  local replica_name="${CVMFS_TEST_REPO}.replic"
+  CVMFS_TEST_579_REPLICA_NAME="$replica_name"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 1
+
+  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  cvmfs_server snapshot $replica_name || return 2
+
+  # ============================================================================
+
+  echo "create an initial revision and snapshot it to the stratum 1"
+  catalog1=$(create_revision $CVMFS_TEST_REPO)
+  snapshot_repo $replica_name || return 3
+
+  echo "list repository tags"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 4
+
+  echo "check if the catalog is there"
+  peek_backend $CVMFS_TEST_REPO $catalog1 || return 5
+  peek_backend $replica_name    $catalog1 || return 6
+
+  # ============================================================================
+
+  echo "create a revision on stratum 0 and tag it"
+  local orphan_tag="poor-orphan"
+  catalog2="$(create_revision $CVMFS_TEST_REPO)"
+  cvmfs_server tag -a $orphan_tag $CVMFS_TEST_REPO || return 7
+
+  echo "list repository tags"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 8
+
+  # ============================================================================
+
+  echo "create three more revisions"
+  catalog3="$(create_revision $CVMFS_TEST_REPO)"
+  catalog4="$(create_revision $CVMFS_TEST_REPO)"
+  catalog5="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "list repository tags"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 9
+
+  echo "do a snapshot to stratum 1"
+  snapshot_repo $replica_name || return $?
+
+  echo "check that all catalogs are there"
+  peek_backend $CVMFS_TEST_REPO $catalog1 || return 10
+  peek_backend $CVMFS_TEST_REPO $catalog2 || return 11
+  peek_backend $CVMFS_TEST_REPO $catalog3 || return 12
+  peek_backend $CVMFS_TEST_REPO $catalog4 || return 13
+  peek_backend $CVMFS_TEST_REPO $catalog5 || return 14
+
+  peek_backend $replica_name    $catalog1 || return 15
+  peek_backend $replica_name    $catalog2 || return 16
+  peek_backend $replica_name    $catalog3 || return 17
+  peek_backend $replica_name    $catalog4 || return 18
+  peek_backend $replica_name    $catalog5 || return 19
+
+  # ============================================================================
+
+  echo "run a garbage collection on the stratum 1"
+  cvmfs_server gc -f $replica_name || return 20
+
+  echo "check if the catalogs are gone"
+  peek_backend $replica_name $catalog1 && return 21 # GC'ed
+  peek_backend $replica_name $catalog2 || return 22 # orphan-tag
+  peek_backend $replica_name $catalog3 && return 23 # GC'ed
+  peek_backend $replica_name $catalog4 || return 24 # trunk-previous
+  peek_backend $replica_name $catalog5 || return 25 # trunk
+
+  # ============================================================================
+
+  echo "run a garbage collection on the stratum 0"
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 26
+
+  echo "check if the catalogs are gone"
+  peek_backend $CVMFS_TEST_REPO $catalog1 && return 27 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog2 || return 28 # orphan-tag
+  peek_backend $CVMFS_TEST_REPO $catalog3 && return 29 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog4 || return 30 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $catalog5 || return 31 # trunk
+
+  echo "delete orphan tag on stratum 0"
+  cvmfs_server tag -r $orphan_tag -f $CVMFS_TEST_REPO || return 32
+
+  echo "list repository tags"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 33
+
+  # ============================================================================
+
+  echo "run a garbage collection on stratum 0"
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 34
+
+  echo "check that catalogs are gone"
+  peek_backend $CVMFS_TEST_REPO $catalog1 && return 35 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog2 && return 36 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog3 && return 37 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog4 || return 38 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $catalog5 || return 39 # trunk
+
+  # ============================================================================
+
+  echo "create another revision"
+  catalog6="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "list repository tags"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 40
+
+  echo "check that catalogs are gone"
+  peek_backend $CVMFS_TEST_REPO $catalog1 && return 41 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog2 && return 42 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog3 && return 43 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog4 || return 44 # not GC'ed yet
+  peek_backend $CVMFS_TEST_REPO $catalog5 || return 45 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $catalog6 || return 46 # trunk
+
+  # ============================================================================
+
+  echo "do a snapshot to stratum 1"
+  snapshot_repo $replica_name || $?
+
+  # ============================================================================
+
+  echo "run a garbage collection on stratum 0"
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 47
+
+  echo "check that catalogs are gone"
+  peek_backend $CVMFS_TEST_REPO $catalog1 && return 48 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog2 && return 49 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog3 && return 50 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog4 && return 51 # GC'ed
+  peek_backend $CVMFS_TEST_REPO $catalog5 || return 52 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $catalog6 || return 53 # trunk
+
+  # ============================================================================
+
+  echo "run a garbage collection on stratum 1"
+  cvmfs_server gc -f $replica_name || return 54
+
+  peek_backend $replica_name $catalog1 && return 55 # GC'ed
+  peek_backend $replica_name $catalog2 && return 56 # GC'ed
+  peek_backend $replica_name $catalog3 && return 57 # GC'ed
+  peek_backend $replica_name $catalog4 && return 58 # GC'ed
+  peek_backend $replica_name $catalog5 || return 59 # trunk-previous
+  peek_backend $replica_name $catalog6 || return 60 # trunk
+
+  return 0
+}
