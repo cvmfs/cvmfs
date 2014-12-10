@@ -172,6 +172,11 @@ _cvmfs_server()
       COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}) )
       return 0
       ;;
+
+    gc)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}))
+      return 0
+      ;;
   esac
 }
 
