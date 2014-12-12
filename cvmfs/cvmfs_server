@@ -3802,8 +3802,7 @@ gc() {
 
   # parse timestamp (if given)
   if [ ! -z "$timestamp_threshold"  ]; then
-    preserve_timestamp="$(date --date "$timestamp_threshold" +%s 2>/dev/null)"
-    [ $? -eq 0 ] || die "Cannot parse time stamp '$timestamp_threshold'"
+    preserve_timestamp="$(date --date "$timestamp_threshold" +%s 2>/dev/null)" || die "Cannot parse time stamp '$timestamp_threshold'"
   fi
 
   [ $preserve_revisions -ge 0 ] && [ $preserve_timestamp -gt 0 ] && die "Please specify either timestamp OR revision thresholds (-r and -t are mutual exclusive)"
