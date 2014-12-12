@@ -316,6 +316,8 @@ void *S3FanoutManager::MainUpload(void *data) {
 CURL *S3FanoutManager::AcquireCurlHandle() const {
   CURL *handle;
 
+  MutexLockGuard guard(curl_handle_lock_);
+
   if (pool_handles_idle_->empty()) {
     CURLcode retval;
 
@@ -347,6 +349,8 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
     curl_slist_free_all(info->http_headers);
     info->http_headers = NULL;
   }
+
+  MutexLockGuard guard(curl_handle_lock_);
 
   set<CURL *>::iterator elem = pool_handles_inuse_->find(handle);
   assert(elem != pool_handles_inuse_->end());
@@ -800,6 +804,10 @@ S3FanoutManager::S3FanoutManager() {
       reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(jobs_todo_lock_, NULL);
   assert(retval == 0);
+  curl_handle_lock_ =
+      reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  retval = pthread_mutex_init(curl_handle_lock_, NULL);
+  assert(retval == 0);
 
   opt_timeout_ = 0;
   opt_backoff_init_ms_ = 0;
@@ -820,6 +828,8 @@ S3FanoutManager::~S3FanoutManager() {
   free(jobs_completed_lock_);
   pthread_mutex_destroy(jobs_todo_lock_);
   free(jobs_todo_lock_);
+  pthread_mutex_destroy(curl_handle_lock_);
+  free(curl_handle_lock_);
 }
 
 
