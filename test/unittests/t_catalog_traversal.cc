@@ -377,20 +377,6 @@ class T_CatalogTraversal : public ::testing::Test {
     return shash::Any(shash::kSha1, shash::HexPtr(hash), suffix);
   }
 
- protected:
-  time_t t(const int day, const int month, const int year) const {
-    struct tm time_descriptor;
-
-    time_descriptor.tm_hour = 0;
-    time_descriptor.tm_min  = 0;
-    time_descriptor.tm_sec  = 0;
-    time_descriptor.tm_mday = day;
-    time_descriptor.tm_mon  = month;
-    time_descriptor.tm_year = year;
-
-    return mktime(&time_descriptor);
-  }
-
  private:
   Prng            dice_;
   RootCatalogMap  root_catalogs_;

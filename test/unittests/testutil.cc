@@ -66,6 +66,19 @@ pid_t GetParentPid(const pid_t pid) {
   return parent_pid;
 }
 
+time_t t(const int day, const int month, const int year) {
+  struct tm time_descriptor;
+
+  time_descriptor.tm_hour = 0;
+  time_descriptor.tm_min  = 0;
+  time_descriptor.tm_sec  = 0;
+  time_descriptor.tm_mday = day;
+  time_descriptor.tm_mon  = month;
+  time_descriptor.tm_year = year - 1900;
+
+  return mktime(&time_descriptor);
+}
+
 namespace catalog {
 
 DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
