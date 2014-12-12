@@ -323,19 +323,6 @@ CURL *S3FanoutManager::AcquireCurlHandle() const {
     handle = curl_easy_init();
     assert(handle != NULL);
 
-    // Set dedicated share handle for each easy handle in order to make sure
-    // that the easy handles do not share resolved addresses. This approach was
-    // needed to access efficiently S3 servers that use DNS load balancing, i.e.
-    // use several ips for one hostname.
-    CURLSH *sharehandle = curl_share_init();
-    assert(sharehandle != NULL);
-    CURLSHcode share_retval = curl_share_setopt(sharehandle, CURLSHOPT_SHARE,
-                                                CURL_LOCK_DATA_DNS);
-    assert(share_retval == CURLSHE_OK);
-    retval = curl_easy_setopt(handle, CURLOPT_SHARE, sharehandle);
-    assert(retval == CURLE_OK);
-    pool_sharehandles_->insert(std::make_pair(handle, sharehandle));
-
     // Other settings
     retval = curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     assert(retval == CURLE_OK);
@@ -366,11 +353,11 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
 
   if (pool_handles_idle_->size() > pool_max_handles_) {
     CURL *handle = *elem;
+    curl_easy_setopt(handle, CURLOPT_SHARE, NULL);
     curl_easy_cleanup(*elem);
-    curl_share_cleanup(pool_sharehandles_->find(handle)->second);
-    pool_sharehandles_->erase(handle);
+    curl_sharehandles_->erase(handle);
   } else {
-    pool_handles_idle_->insert(*elem);
+    pool_handles_idle_->insert(handle);
   }
 
   pool_handles_inuse_->erase(elem);
@@ -397,7 +384,7 @@ string S3FanoutManager::MkAuthoritzation(const string &access_key,
                    "x-amz-acl:public-read" + "\n" +  // default ACL
                    "/" + bucket + "/" + object_key;
   LogCvmfs(kLogS3Fanout, kLogDebug,
-           "string to sign for: %s", object_key.c_str());
+           "%s string to sign for: %s", request.c_str(), object_key.c_str());
 
   shash::Any hmac;
   hmac.algorithm = shash::kSha1;
@@ -408,6 +395,97 @@ string S3FanoutManager::MkAuthoritzation(const string &access_key,
   return "Authorization: AWS " + access_key + ":" +
       Base64(string(reinterpret_cast<char *>(hmac.digest),
                     hmac.GetDigestSize()));
+}
+
+
+void S3FanoutManager::InitializeDnsSettingsCurl(CURL *handle,
+                                                CURLSH *sharehandle,
+                                                curl_slist *clist) const {
+
+  CURLcode retval = curl_easy_setopt(handle, CURLOPT_SHARE, sharehandle);
+  assert(retval == CURLE_OK);
+  retval = curl_easy_setopt(handle, CURLOPT_RESOLVE, clist);
+  assert(retval == CURLE_OK);
+
+}
+
+
+int S3FanoutManager::InitializeDnsSettings(CURL *handle,
+                                           std::string host_with_port) const {
+
+  // Use existing handle
+  std::map<CURL *, S3FanOutDnsEntry *>::const_iterator it =
+      curl_sharehandles_->find(handle);
+  if (it != curl_sharehandles_->end()) {
+    InitializeDnsSettingsCurl(handle, it->second->sharehandle,
+                              it->second->clist);
+    return 0;
+  }
+
+  // Remove port number if such exists
+  if (host_with_port.compare(0, 7, "http://") != 0)
+    host_with_port = "http://" + host_with_port;
+  std::string remote_host = dns::ExtractHost(host_with_port);
+  std::string remote_port = dns::ExtractPort(host_with_port);
+
+  // If we have the name already resolved, use the least used IP
+  S3FanOutDnsEntry *useme = NULL;
+  unsigned int usemin = UINT_MAX;
+  std::set<S3FanOutDnsEntry *>::iterator its3 = sharehandles_->begin();
+  for (; its3 != sharehandles_->end(); ++its3) {
+    if ((*its3)->dns_name == remote_host) {
+      if (usemin >= (*its3)->counter) {
+        usemin = (*its3)->counter;
+        useme = (*its3);
+      }
+    }
+  }
+  if (useme != NULL) {
+    curl_sharehandles_->insert(std::pair<CURL *,
+                              S3FanOutDnsEntry *>(handle, useme));
+    useme->counter++;
+    InitializeDnsSettingsCurl(handle, useme->sharehandle, useme->clist);
+    return 0;
+  }
+
+  // We need to resolve the hostname
+  // TODO(ssheikki): support ipv6 also...  if (opt_ipv4_only_)
+  dns::Host host = resolver->Resolve(remote_host);
+  set<string> ipv4_addresses = host.ipv4_addresses();
+  std::set<string>::iterator its = ipv4_addresses.begin();
+  S3FanOutDnsEntry *dnse = NULL;
+  for ( ; its != ipv4_addresses.end(); ++its) {
+    dnse = new S3FanOutDnsEntry();
+    dnse->counter = 0;
+    dnse->dns_name = remote_host;
+    dnse->port = remote_port.size() == 0 ? "80" : remote_port;
+    dnse->ip = *its;
+    dnse->clist = NULL;
+    dnse->clist = curl_slist_append(dnse->clist,
+                                    (dnse->dns_name+":"+
+                                     dnse->port+":"+
+                                     dnse->ip).c_str());
+    dnse->sharehandle = curl_share_init();
+    assert(dnse->sharehandle != NULL);
+    CURLSHcode share_retval = curl_share_setopt(dnse->sharehandle,
+                                                CURLSHOPT_SHARE,
+                                                CURL_LOCK_DATA_DNS);
+    assert(share_retval == CURLSHE_OK);
+    sharehandles_->insert(dnse);
+  }
+  if (dnse == NULL) {
+    LogCvmfs(kLogS3Fanout, kLogDebug | kLogSyslogErr,
+             "Error: DNS resolve failed for address '%s'.",
+             remote_host.c_str());
+    assert(dnse != NULL);
+    return -1;
+  }
+  curl_sharehandles_->insert(std::pair<CURL *,
+                             S3FanOutDnsEntry *>(handle, dnse));
+  dnse->counter++;
+  InitializeDnsSettingsCurl(handle, dnse->sharehandle, dnse->clist);
+
+  return 0;
 }
 
 
@@ -422,6 +500,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   info->num_retries = 0;
   info->backoff_ms = 0;
   info->http_headers = NULL;
+
+  InitializeDnsSettings(handle, info->hostname);
 
   // HEAD or PUT
   shash::Any content_md5;
@@ -446,11 +526,6 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                                            "",
                                            info->bucket,
                                            info->object_key).c_str());
-    info->http_headers =
-        curl_slist_append(info->http_headers, "Content-Length: 0");
-
-    retval = curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, req.c_str());
-    assert(retval == CURLE_OK);
   } else {
     retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 1);
     assert(retval == CURLE_OK);
@@ -574,6 +649,7 @@ bool S3FanoutManager::CanRetry(const JobInfo *info) {
 
   return
       (info->error_code == kFailHostConnection ||
+       info->error_code == kFailHostResolve ||
        info->error_code == kFailServiceUnavailable) &&
       (info->num_retries < max_retries);
 }
@@ -656,7 +732,15 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->request = JobInfo::kReqPut;
     curl_slist_free_all(info->http_headers);
     info->http_headers = NULL;
-    InitializeRequest(info, info->curl_handle);
+    s3fanout::Failures init_failure = InitializeRequest(info,
+                                                        info->curl_handle);
+    assert(init_failure == s3fanout::kFailOk);
+    SetUrlOptions(info);
+    // Reset origin
+    if (info->origin == kOriginMem)
+      info->origin_mem.pos = 0;
+    if (info->origin == kOriginPath)
+      rewind(info->origin_file);
     return true;  // Again, Put
   }
 
@@ -692,7 +776,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 S3FanoutManager::S3FanoutManager() {
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
-  pool_sharehandles_ = NULL;
+  sharehandles_ = NULL;
+  curl_sharehandles_ = NULL;
   pool_max_handles_ = 0;
   curl_multi_ = NULL;
   user_agent_ = new string();
@@ -722,6 +807,8 @@ S3FanoutManager::S3FanoutManager() {
 
   opt_ipv4_only_ = false;
 
+  resolver = dns::CaresResolver::Create(opt_ipv4_only_, 2, 2000);
+
   statistics_ = NULL;
 }
 
@@ -736,13 +823,14 @@ S3FanoutManager::~S3FanoutManager() {
 }
 
 
-void S3FanoutManager::Init(const unsigned max_pool_handles) {
+void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   atomic_init32(&multi_threaded_);
   CURLcode retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
   pool_handles_idle_ = new set<CURL *>;
   pool_handles_inuse_ = new set<CURL *>;
-  pool_sharehandles_ = new map<CURL *, CURLSH *>;
+  curl_sharehandles_ = new map<CURL *, S3FanOutDnsEntry *>;
+  sharehandles_ = new set<S3FanOutDnsEntry *>;
   pool_max_handles_ = max_pool_handles;
   watch_fds_max_ = 4*pool_max_handles_;
 
@@ -795,23 +883,27 @@ void S3FanoutManager::Fini() {
   for (; i != iEnd; ++i) {
     curl_easy_cleanup(*i);
   }
-  map<CURL *, CURLSH *>::iterator             it    =
-      pool_sharehandles_->begin();
-  const map<CURL *, CURLSH *>::const_iterator itEnd =
-      pool_sharehandles_->end();
-  for (; it != itEnd; ++it) {
-    curl_share_cleanup(it->second);
+
+  set<S3FanOutDnsEntry *>::iterator             is    = sharehandles_->begin();
+  const set<S3FanOutDnsEntry *>::const_iterator isEnd = sharehandles_->end();
+  for (; is != isEnd; ++is) {
+    curl_share_cleanup((*is)->sharehandle);
+    curl_slist_free_all((*is)->clist);
+    delete *is;
   }
   pool_handles_idle_->clear();
-  pool_sharehandles_->clear();
+  curl_sharehandles_->clear();
+  sharehandles_->clear();
   delete pool_handles_idle_;
   delete pool_handles_inuse_;
-  delete pool_sharehandles_;
+  delete curl_sharehandles_;
+  delete sharehandles_;
   delete user_agent_;
   curl_multi_cleanup(curl_multi_);
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
-  pool_sharehandles_ = NULL;
+  curl_sharehandles_ = NULL;
+  sharehandles_ = NULL;
   user_agent_ = NULL;
   curl_multi_ = NULL;
 
