@@ -1112,11 +1112,23 @@ toggle_gc() {
 }
 
 
+# get the current unix timestamp
 get_timestamp() {
   date --date='2 seconds ago' +@%s
 }
 
+# display a timestamp in human readable form
 display_timestamp() {
   local timestamp=$1
   date --date="$timestamp"
+}
+
+
+# copy all content of /bin/* into a given directory (for server testing purposes)
+#
+# @param destination_directory
+cp_bin() {
+  local destination_directory="$1"
+  cp -R /bin/* $destination_directory       || return 1
+  sudo chmod -R a+rw $destination_directory || return 2
 }
