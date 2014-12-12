@@ -2,6 +2,7 @@
 #define CVMFS_UNITTEST_TESTUTIL
 
 #include <sys/types.h>
+#include <ctime>
 
 #include "../../cvmfs/upload_facility.h"
 #include "../../cvmfs/hash.h"
@@ -10,6 +11,8 @@
 #include "../../cvmfs/history.h"
 
 pid_t GetParentPid(const pid_t pid);
+
+time_t t(const int day, const int month, const int year);
 
 namespace catalog {
 
