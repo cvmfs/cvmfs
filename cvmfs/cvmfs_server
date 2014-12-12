@@ -1129,6 +1129,7 @@ find_hazardous_aufs_config() {
 # @param name  the FQRN of the repository to be checked
 health_check() {
   local name=$1
+  local quiet=${2-0}
 
   # for stratum 1 repositories there are no health checks
   if is_stratum1 $name; then
@@ -1136,7 +1137,7 @@ health_check() {
   fi
 
   # check configuration for harzardous AUFS setup
-  if find_hazardous_aufs_config $name; then
+  if [ $quiet -eq 0 ] && find_hazardous_aufs_config $name; then
     load_repo_config $name
     echo "WARNING: AUFS config is vulnerable to kernel deadlocks. Please store "
     echo "         the scratch space and the cvmfs client cache on different "
@@ -2829,6 +2830,7 @@ resign() {
 list_catalogs() {
   local name
   local param_list="-t"
+  local silence_warnings=0
 
   # optional parameter handling
   OPTIND=1
@@ -2846,6 +2848,7 @@ list_catalogs() {
       ;;
       x)
         param_list=$(echo "$param_list" | sed 's/-t\s\?//')
+        silence_warnings=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2861,7 +2864,7 @@ list_catalogs() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  health_check $name
+  health_check $name $silence_warnings
 
   # get repository information
   load_repo_config $name
@@ -2938,6 +2941,7 @@ tag() {
   local action_inspect=0
   local action_list=0
   local machine_readable=0
+  local silence_warnings=0
 
   # optional parameter handling
   OPTIND=1
@@ -2971,6 +2975,7 @@ tag() {
         ;;
       x)
         machine_readable=1
+        silence_warnings=1
         ;;
       i)
         tag_name="$OPTARG"
@@ -2998,7 +3003,7 @@ tag() {
   load_repo_config $name
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
-  health_check $name
+  health_check $name $silence_warnings
 
   local base_hash="$(get_mounted_root_hash $name)"
   local user_shell="$(get_user_shell $name)"
