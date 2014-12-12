@@ -257,10 +257,10 @@ cvmfs_run_test() {
   [ x"181e8566ef9ef4063a00e56ec82cc99682ac795c" = x"$big_sha1" ] || return 22
 
   echo "run a new transaction"
-  start_transaction "$legacy_repo_name"      || return 23
-  cp /bin/* /cvmfs/${legacy_repo_name}/dir7  || return 24
-  touch $big_file                            || return 25
-  publish_repo "$legacy_repo_name"           || return 26
+  start_transaction "$legacy_repo_name"  || return 23
+  cp_bin /cvmfs/${legacy_repo_name}/dir7 || return 24
+  touch $big_file                        || return 25
+  publish_repo "$legacy_repo_name"       || return 26
 
   echo "check if big file is still the same content hash (now it should be chunked)"
   local big_sha1_2="$(cat $big_file | sha1sum | head -c40)"

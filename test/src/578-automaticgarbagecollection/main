@@ -2,13 +2,9 @@
 cvmfs_test_name="Automatic Garbage Collection"
 cvmfs_test_autofs_on_startup=false
 
-get_timestamp() {
-  date --iso-8601='seconds' --date='2 seconds ago'
-}
-
 create_revision() {
   local repo_name=$1
-  local publish_log="$(mktemp ./publishXXXXX.log)"
+  local publish_log="$(mktemp ./publish.log.XXXXX)"
 
   start_transaction $repo_name > /dev/null 2>&1    || return 1
   publish_repo      $repo_name > $publish_log 2>&1 || return 2
@@ -32,7 +28,7 @@ cvmfs_run_test() {
 
   local seconds=10
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(get_timestamp))"
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp now))"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
   root_catalog0="$(get_current_root_catalog $CVMFS_TEST_REPO)C"
 
@@ -48,7 +44,7 @@ cvmfs_run_test() {
   echo "list named snapshots"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
 
-  echo "create revision 1 ($(get_timestamp))"
+  echo "create revision 1 ($(display_timestamp now))"
   root_catalog1="$(create_revision $CVMFS_TEST_REPO)"
 
   echo "list named snapshots"
@@ -64,7 +60,7 @@ cvmfs_run_test() {
   echo "sleep $seconds seconds"
   sleep $seconds
 
-  echo "create revision 2 ($(get_timestamp))"
+  echo "create revision 2 ($(display_timestamp now))"
   root_catalog2="$(create_revision $CVMFS_TEST_REPO)"
 
   echo "list named snapshots"
@@ -81,7 +77,7 @@ cvmfs_run_test() {
   echo "sleep $seconds seconds"
   sleep $seconds
 
-  echo "create revision 3 ($(get_timestamp))"
+  echo "create revision 3 ($(display_timestamp now))"
   root_catalog3="$(create_revision $CVMFS_TEST_REPO)"
 
   echo "list named snapshots"
@@ -99,7 +95,7 @@ cvmfs_run_test() {
   echo "sleep $seconds seconds"
   sleep $seconds
 
-  echo "create revision 4 ($(get_timestamp))"
+  echo "create revision 4 ($(display_timestamp now))"
   root_catalog4="$(create_revision $CVMFS_TEST_REPO)"
 
   echo "list named snapshots"
@@ -118,7 +114,7 @@ cvmfs_run_test() {
   echo "sleep $seconds seconds"
   sleep $seconds
 
-  echo "create revision 5 ($(get_timestamp))"
+  echo "create revision 5 ($(display_timestamp now))"
   root_catalog5="$(create_revision $CVMFS_TEST_REPO)"
 
   echo "list named snapshots"
@@ -143,7 +139,7 @@ cvmfs_run_test() {
   echo "sleep $seconds seconds"
   sleep $seconds
 
-  echo "create revision 6 ($(get_timestamp))"
+  echo "create revision 6 ($(display_timestamp now))"
   root_catalog6="$(create_revision $CVMFS_TEST_REPO)"
 
   echo "list named snapshots"

@@ -160,8 +160,8 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "put some stuff in the repository"
-  mkdir ${repo_dir}/bin     || return 28
-  cp /bin/* ${repo_dir}/bin || return 29
+  mkdir ${repo_dir}/bin  || return 28
+  cp_bin ${repo_dir}/bin || return 29
 
   echo "publish (try if repo is still functional)"
   local publish_log_6="${scratch_dir}/publish_6.log"
@@ -179,7 +179,7 @@ cvmfs_run_test() {
   local i=1
   while [ $i -lt 10 ]; do
     mkdir ${repo_dir}/bin${i}               || return 32
-    cp /bin/* ${repo_dir}/bin${i}           || return 33
+    cp_bin ${repo_dir}/bin${i}              || return 33
     touch ${repo_dir}/bin${i}/.cvmfscatalog || return 34
     i=$(( $i + 1 ))
   done

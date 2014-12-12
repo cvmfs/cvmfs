@@ -766,7 +766,7 @@ publish_repo() {
   # parse the command line arguments (keep quotation marks)
   args="-v"
   while [ $# -gt 0 ]; do
-    if echo $1 | grep -q "\s"; then
+    if echo "$1" | grep -q "[:space:]"; then
       args="$args \"$1\""
     else
       args="$args $1"
@@ -1109,4 +1109,29 @@ toggle_gc() {
   sudo cp -f $tmp_file $cfg_file || return 1
   rm -f $tmp_file                || return 2
   return 0
+}
+
+
+# get the current unix timestamp
+get_timestamp() {
+  date --date='2 seconds ago' +@%s
+}
+
+# display a timestamp in human readable form
+display_timestamp() {
+  local timestamp=$1
+  date --date="$timestamp"
+}
+
+
+# copy all content of /bin/* into a given directory (for server testing purposes)
+#
+# @param destination_directory
+cp_bin() {
+  local destination_directory="$1"
+  cp -R /bin/* $destination_directory       || return 1
+  sudo chmod -R a+rw $destination_directory || return 2
+  for f in $(find $destination_directory -type f); do
+    sudo chmod 0444 $f || return 3
+  done
 }

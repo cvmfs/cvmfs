@@ -21,12 +21,12 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "create a synthetically huge root catalog"
-  mkdir ${repo_dir}/foo     || return 1
-  mkdir ${repo_dir}/bar     || return 2
-  mkdir ${repo_dir}/baz     || return 3
-  cp /bin/* ${repo_dir}/foo || return 4
-  cp /bin/* ${repo_dir}/bar || return 5
-  cp /bin/* ${repo_dir}/baz || return 6
+  mkdir ${repo_dir}/foo  || return 1
+  mkdir ${repo_dir}/bar  || return 2
+  mkdir ${repo_dir}/baz  || return 3
+  cp_bin ${repo_dir}/foo || return 4
+  cp_bin ${repo_dir}/bar || return 5
+  cp_bin ${repo_dir}/baz || return 6
 
   echo "create a first snapshot of the root catalog"
   publish_repo $CVMFS_TEST_REPO > /dev/null || return 7
@@ -78,8 +78,8 @@ cvmfs_run_test() {
 
   echo "add some stuff"
   mkdir ${repo_dir}/bam
-  cp /bin/* ${repo_dir}/bam
-  cp /bin/* ${repo_dir}/foo
+  cp_bin ${repo_dir}/bam
+  cp_bin ${repo_dir}/foo
 
   echo "publish last revision (addition should not trigger defragmentation)"
   [ $(publish_repo $CVMFS_TEST_REPO | grep -e 'gets defragmented.*free pages' | wc -l) -eq 0 ] || return 18
