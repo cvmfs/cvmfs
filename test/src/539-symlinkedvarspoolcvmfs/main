@@ -6,7 +6,7 @@ produce_files_in() {
 
   pushdir $working_dir
 
-  cp /bin/* $working_dir
+  cp_bin $working_dir
 
   popdir
 }

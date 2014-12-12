@@ -44,7 +44,7 @@ produce_files_in_2() {
   mkdir People/Russians/MikhailKalashnikov People/Russians/YuriGagarin People/Russians/VladimirVladimirovichPutin
 
   # add some files to some of the directories
-  cp /bin/* People/Germans/AlbertEinstein
+  cp_bin People/Germans/AlbertEinstein
   cp /etc/passwd People/Americans/BarackObama
   cp /usr/bin/* People/Russians/MikhailKalashnikov
 

@@ -99,7 +99,7 @@ create_repo_content() {
       ;;
     11)
       mkdir -p dir1/sub1
-      cp /bin/* dir1/sub1
+      cp_bin dir1/sub1
       ;;
     12)
       echo "this"     > dir3/sub2/moep1
@@ -126,7 +126,7 @@ create_repo_content() {
     16)
       mkdir -p dir1/sub2 dir1/sub3
       touch dir1/sub2/.cvmfscatalog
-      cp /bin/* dir1/sub2
+      cp_bin dir1/sub2
       ;;
     17)
       echo "That"     > dir1/sub3/bar1

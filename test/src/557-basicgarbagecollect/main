@@ -50,7 +50,7 @@ produce_files_2_in() {
   pushdir $working_dir
 
   mkdir dir2
-  cp /bin/* dir2
+  cp_bin dir2
 
   popdir
 }
@@ -60,7 +60,7 @@ produce_files_3_in() {
   pushdir $working_dir
 
   mkdir dir3
-  cp /bin/* dir3
+  cp_bin dir3
 
   touch dir3/kafka
   echo "Deeply lost in the night."                                   >> dir3/kafka

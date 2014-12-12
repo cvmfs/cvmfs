@@ -16,7 +16,7 @@ produce_files_in_0() {
   mkdir People/French/ZinedineZidane People/French/MarcChagall People/French/MarieCurie
 
   # add some files to some of the directories
-  cp /bin/* People/Germans/AlbertEinstein
+  cp_bin People/Germans/AlbertEinstein
   cp /etc/passwd People/Americans/BarackObama
   cp /usr/bin/* People/Russians/MikhailKalashnikov
 

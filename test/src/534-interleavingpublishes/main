@@ -15,7 +15,7 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "filling the repository with contents of /bin"
-  cp /bin/* $repo_dir || return 1
+  cp_bin $repo_dir || return 1
 
   echo "creating CVMFS snapshot (in the backgroud)"
   cvmfs_server publish $CVMFS_TEST_REPO &
@@ -46,7 +46,7 @@ cvmfs_run_test() {
 
   echo "filling the repository with contents of /bin again"
   mkdir ${repo_dir}/new || return 4
-  cp /bin/* ${repo_dir}/new || return 5
+  cp_bin ${repo_dir}/new || return 5
 
   echo "creating CVMFS snapshot (in the background)"
   cvmfs_server publish $CVMFS_TEST_REPO &
