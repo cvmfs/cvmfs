@@ -260,9 +260,23 @@ class DownloadManager {
   };
 
   /**
+   * No attempt was made to order stratum 1 servers
+   */
+  static const int kProbeUnprobed;
+  /**
+   * The rtt to a stratum 1 could not be determined because the stratum 1
+   * was unreachable.
+   */
+  static const int kProbeDown;
+  /**
+   * The stratum 1 server was put in order according to a Geo-API result
+   */
+  static const int kProbeGeo;
+
+  /**
    * Do not download files larger than 1M into memory.
    */
-  static const unsigned kMaxMemSize = 1024*1024;
+  static const unsigned kMaxMemSize;
 
   DownloadManager();
   ~DownloadManager();
