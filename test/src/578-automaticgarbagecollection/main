@@ -4,7 +4,7 @@ cvmfs_test_autofs_on_startup=false
 
 create_revision() {
   local repo_name=$1
-  local publish_log="$(mktemp ./publishXXXXX.log)"
+  local publish_log="$(mktemp ./publish.log.XXXXX)"
 
   start_transaction $repo_name > /dev/null 2>&1    || return 1
   publish_repo      $repo_name > $publish_log 2>&1 || return 2
