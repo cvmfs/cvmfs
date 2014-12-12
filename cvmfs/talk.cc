@@ -236,10 +236,12 @@ static void *MainTalk(void *data __attribute__((unused))) {
         string host_str;
         for (unsigned i = 0; i < host_chain.size(); ++i) {
           host_str += "  [" + StringifyInt(i) + "] " + host_chain[i] + " (";
-          if (rtt[i] == -1)
+          if (rtt[i] == download::DownloadManager::kProbeUnprobed)
             host_str += "unprobed";
-          else if (rtt[i] == -2)
+          else if (rtt[i] == download::DownloadManager::kProbeDown)
             host_str += "host down";
+          else if (rtt[i] == download::DownloadManager::kProbeGeo)
+            host_str += "geographically ordered";
           else
             host_str += StringifyInt(rtt[i]) + " ms";
           host_str += ")\n";

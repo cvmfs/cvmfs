@@ -60,7 +60,6 @@ using namespace std;  // NOLINT
 
 namespace download {
 
-
 static inline bool EscapeUrlChar(char input, char output[3]) {
   if (((input >= '0') && (input <= '9')) ||
       ((input >= 'A') && (input <= 'Z')) ||
@@ -281,6 +280,14 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
   return num_bytes;
 }
+
+
+//------------------------------------------------------------------------------
+
+const int DownloadManager::kProbeUnprobed = -1;
+const int DownloadManager::kProbeDown     = -2;
+const int DownloadManager::kProbeGeo      = -3;
+const unsigned DownloadManager::kMaxMemSize = 1024*1024;
 
 
 /**
@@ -1571,11 +1578,10 @@ void DownloadManager::SetHostChain(const string &host_list) {
   }
 
   opt_host_chain_ = new vector<string>(SplitString(host_list, ';'));
-  opt_host_chain_rtt_ = new vector<int>();
+  opt_host_chain_rtt_ =
+    new vector<int>(opt_host_chain_->size(), kProbeUnprobed);
   //LogCvmfs(kLogDownload, kLogSyslog, "using host %s",
   //         (*opt_host_chain_)[0].c_str());
-  for (unsigned i = 0, s = opt_host_chain_->size(); i < s; ++i)
-    opt_host_chain_rtt_->push_back(-1);
   pthread_mutex_unlock(lock_options_);
 }
 
@@ -1782,7 +1788,7 @@ void DownloadManager::ProbeHosts() {
 
   SortTeam(&host_rtt, &host_chain);
   for (i = 0; i < host_chain.size(); ++i) {
-    if (host_rtt[i] == INT_MAX) host_rtt[i] = -2;
+    if (host_rtt[i] == INT_MAX) host_rtt[i] = kProbeDown;
   }
 
   pthread_mutex_lock(lock_options_);
@@ -1861,7 +1867,7 @@ bool DownloadManager::ProbeHostsGeo() {
   delete opt_host_chain_;
   delete opt_host_chain_rtt_;
   opt_host_chain_ = new vector<string>(host_chain);
-  opt_host_chain_rtt_ = new vector<int>(host_chain.size(), -1);
+  opt_host_chain_rtt_ = new vector<int>(host_chain.size(), kProbeGeo);
   opt_host_chain_current_ = 0;
   pthread_mutex_unlock(lock_options_);
 
@@ -1885,7 +1891,7 @@ bool DownloadManager::SortWrtGeoReply(
   if (!sanitizer.IsValid(reply_order))
     return false;
   sanitizer::InputSanitizer strip_newline("09 ,");
-  vector<string> reply_strings = 
+  vector<string> reply_strings =
     SplitString(strip_newline.Filter(reply_order), ',');
   vector<uint64_t> reply_vals;
   for (unsigned i = 0; i < reply_strings.size(); ++i) {
