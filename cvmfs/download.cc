@@ -1848,6 +1848,7 @@ bool DownloadManager::ProbeHostsGeo() {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
                  "geographic order of stratum 1 servers retrieved from %s",
                  dns::ExtractHost(host_chain_shuffled[i]).c_str());
+        LogCvmfs(kLogDownload, kLogDebug, "order is %s", order.c_str());
         success = true;
         break;
       }
