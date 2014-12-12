@@ -311,10 +311,10 @@ cvmfs_run_test() {
   # ============================================================================
 
   echo "try some invalid date formats for garbage collection"
-  cvmfs_server gc -f -t 'foo'            $CVMFS_TEST_REPO && return 11
-  cvmfs_server gc -f -t 'in the morning' $CVMFS_TEST_REPO && return 12
-  cvmfs_server gc -f -t 'later today'    $CVMFS_TEST_REPO && return 13
-  cvmfs_server gc -f -t '13.12.'         $CVMFS_TEST_REPO && return 14
+  cvmfs_server gc -f -t 'foo'            $CVMFS_TEST_REPO 2>&1 | grep 'Cannot parse' || return 11
+  cvmfs_server gc -f -t 'in the morning' $CVMFS_TEST_REPO 2>&1 | grep 'Cannot parse' || return 12
+  cvmfs_server gc -f -t 'later today'    $CVMFS_TEST_REPO 2>&1 | grep 'Cannot parse' || return 13
+  cvmfs_server gc -f -t '13.12.'         $CVMFS_TEST_REPO 2>&1 | grep 'Cannot parse' || return 14
 
   echo "try to provide a timestamp in the future (should fail)"
   cvmfs_server gc -f -t 'tomorrow' $CVMFS_TEST_REPO && return 15
