@@ -49,7 +49,7 @@
   * Compact inflated catalogs on publish
   * Add 'letter' command to cvmfs_swissknife
   * Use sqlite 3.8.4.3
-  * Use libcurl 7.37
+  * Use libcurl 7.39
   * Use leveldb 1.15
   * Rename cvmfs_server lstags command to list-tags
   * Add extended attribute user.tag
