@@ -192,6 +192,7 @@ TEST_F(T_Dns, ExtractPort) {
   EXPECT_EQ(ExtractPort("http://[::1]:port"), "");
   EXPECT_EQ(ExtractPort(""), "");
   EXPECT_EQ(ExtractPort("localhost"), "");
+  EXPECT_EQ(ExtractPort("localhost:"), "");
   EXPECT_EQ(ExtractPort("localhost:80"), "");
   EXPECT_EQ(ExtractPort("localhost:port"), "");
   EXPECT_EQ(ExtractPort("http:/"), "");
