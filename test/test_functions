@@ -766,7 +766,7 @@ publish_repo() {
   # parse the command line arguments (keep quotation marks)
   args="-v"
   while [ $# -gt 0 ]; do
-    if echo $1 | grep -q "\s"; then
+    if echo "$1" | grep -q "[:space:]"; then
       args="$args \"$1\""
     else
       args="$args $1"

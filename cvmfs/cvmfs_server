@@ -4369,7 +4369,7 @@ if is_subcommand $subcommand; then
   # parse the command line arguments (keep quotation marks)
   args=""
   while [ $# -gt 0 ]; do
-    if echo $1 | grep -q "\s"; then
+    if echo "$1" | grep -q "[:space:]"; then
       args="$args \"$1\""
     else
       args="$args $1"
