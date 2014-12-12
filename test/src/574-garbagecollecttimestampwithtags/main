@@ -13,10 +13,6 @@ inflate_file() {
   done
 }
 
-get_timestamp() {
-  date --iso-8601='seconds' --date='2 seconds ago'
-}
-
 produce_files_1_in() {
   local working_dir=$1
   pushdir $working_dir
@@ -194,7 +190,7 @@ cvmfs_run_test() {
   local tag5="dummy"
 
   timestamp0="$(get_timestamp)"
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($timestamp0)"
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp $timestamp0))"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
   root_catalog0="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
@@ -210,7 +206,7 @@ cvmfs_run_test() {
   produce_files_1_in $reference_dir1 || return 2
 
   timestamp1="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($timestamp1)"
+  echo "creating CVMFS snapshot ($(display_timestamp $timestamp1))"
   publish_repo $CVMFS_TEST_REPO -a "$tag1" > publish_1.log 2>&1 || return $?
   root_catalog1="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
@@ -230,7 +226,7 @@ cvmfs_run_test() {
   produce_files_2_in $reference_dir2 || return 4
 
   timestamp2="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($timestamp2)"
+  echo "creating CVMFS snapshot ($(display_timestamp $timestamp2))"
   publish_repo $CVMFS_TEST_REPO -a "$tag2" > publish_2.log 2>&1 || return $?
   root_catalog2="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
@@ -251,7 +247,7 @@ cvmfs_run_test() {
   produce_files_3_in $reference_dir3 || return 6
 
   timestamp3="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($timestamp3)"
+  echo "creating CVMFS snapshot ($(display_timestamp $timestamp3))"
   publish_repo $CVMFS_TEST_REPO -a "$tag3" > publish_3.log 2>&1 || return $?
   root_catalog3="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
@@ -273,7 +269,7 @@ cvmfs_run_test() {
   produce_files_4_in $reference_dir4 || return 8
 
   timestamp4="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($timestamp4)"
+  echo "creating CVMFS snapshot ($(display_timestamp $timestamp4))"
   publish_repo $CVMFS_TEST_REPO -a "$tag4" > publish_4.log 2>&1 || return $?
   root_catalog4="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
@@ -286,7 +282,7 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   timestamp5="$(get_timestamp)"
-  echo "creating CVMFS snapshot ($timestamp5)"
+  echo "creating CVMFS snapshot ($(display_timestamp $timestamp5))"
   publish_repo $CVMFS_TEST_REPO -a "$tag5" > publish_5.log 2>&1 || return $?
   root_catalog5="$(get_current_root_catalog $CVMFS_TEST_REPO)"
 
@@ -446,7 +442,7 @@ cvmfs_run_test() {
   # ============================================================================
 
   timestamp6="$(get_timestamp)"
-  echo "rollback to the time where kafka was still among us ($timestamp6)"
+  echo "rollback to the time where kafka was still among us ($(display_timestamp $timestamp6))"
   rollback_repo $CVMFS_TEST_REPO $tag3 || return 37
 
   echo "list tags"
