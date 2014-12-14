@@ -57,23 +57,37 @@ TEST_F(T_Download, SortWrtGeoReply) {
 
   input_hosts.push_back("a");
   EXPECT_FALSE(download_mgr.SortWrtGeoReply("a", &input_hosts));
-  EXPECT_TRUE(download_mgr.SortWrtGeoReply("0", &input_hosts));
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("1,1", &input_hosts));
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("1,3", &input_hosts));
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("2,3", &input_hosts));
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("2", &input_hosts));
+  EXPECT_TRUE(download_mgr.SortWrtGeoReply("1", &input_hosts));
   EXPECT_EQ(input_hosts.size(), 1U);
   EXPECT_EQ(input_hosts[0], "a");
 
   input_hosts.push_back("b");
   EXPECT_FALSE(download_mgr.SortWrtGeoReply(",", &input_hosts));
   EXPECT_FALSE(download_mgr.SortWrtGeoReply("2,", &input_hosts));
+  EXPECT_FALSE(download_mgr.SortWrtGeoReply("1", &input_hosts));
   EXPECT_FALSE(download_mgr.SortWrtGeoReply("3,2,1", &input_hosts));
   EXPECT_TRUE(download_mgr.SortWrtGeoReply("2,1", &input_hosts));
   EXPECT_EQ(input_hosts.size(), 2U);
   EXPECT_EQ(input_hosts[0], "b");
   EXPECT_EQ(input_hosts[1], "a");
-  
+
   EXPECT_TRUE(download_mgr.SortWrtGeoReply("2,1\n", &input_hosts));
   EXPECT_EQ(input_hosts.size(), 2U);
   EXPECT_EQ(input_hosts[0], "a");
   EXPECT_EQ(input_hosts[1], "b");
+
+  input_hosts.push_back("c");
+  input_hosts.push_back("d");
+  EXPECT_TRUE(download_mgr.SortWrtGeoReply("4,3,1,2\n", &input_hosts));
+  EXPECT_EQ(input_hosts.size(), 4U);
+  EXPECT_EQ(input_hosts[0], "d");
+  EXPECT_EQ(input_hosts[1], "c");
+  EXPECT_EQ(input_hosts[2], "a");
+  EXPECT_EQ(input_hosts[3], "b");
 }
 
 }  // namespace download

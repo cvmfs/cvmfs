@@ -1877,10 +1877,10 @@ bool DownloadManager::ProbeHostsGeo() {
 
 
 /**
- * Validates a string of the form "1,4,2,3" representing the optimal order of
- * hosts in the array input_hosts.  Returns true if the input_hosts string is
- * sorted according to reply_order and false if the reply_order string is
- * invalid.
+ * Validates a string of the form "1,4,2,3" representing in which order the
+ * array input_hosts should be put for optimal geographic proximity. Returns
+ * true if the input_hosts string is sorted according to reply_order and false
+ * if the reply_order string is invalid.
  */
 bool DownloadManager::SortWrtGeoReply(
   const string &reply_order,
@@ -1903,7 +1903,16 @@ bool DownloadManager::SortWrtGeoReply(
   if (reply_vals.size() != input_hosts->size())
     return false;
 
-  SortTeam(&reply_vals, input_hosts);
+  // Check if reply_vals contains the number 1..n
+  set<uint64_t> coverage(reply_vals.begin(), reply_vals.end());
+  if (coverage.size() != reply_vals.size())
+    return false;
+  if ((*coverage.begin() != 1) || ((*coverage.end()-- != coverage.size())))
+    return false;
+
+  vector<string> tmp(*input_hosts);
+  for (unsigned i = 0; i < reply_vals.size(); ++i)
+    (*input_hosts)[i] = tmp[reply_vals[i]-1];
   return true;
 }
 
