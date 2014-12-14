@@ -351,19 +351,6 @@ class T_GarbageCollector : public ::testing::Test {
     return std::make_pair(revision, clg_index);
   }
 
-  time_t t(const int day, const int month, const int year) const {
-    struct tm time_descriptor;
-
-    time_descriptor.tm_hour = 0;
-    time_descriptor.tm_min  = 0;
-    time_descriptor.tm_sec  = 0;
-    time_descriptor.tm_mday = day;
-    time_descriptor.tm_mon  = month;
-    time_descriptor.tm_year = year;
-
-    return mktime(&time_descriptor);
-  }
-
  private:
   void CheckEmpty(const std::string &str) const {
     ASSERT_FALSE (str.empty());
