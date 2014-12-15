@@ -1958,6 +1958,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailOptions;
     }
   }
+  if (options::GetValue("CVMFS_CLAIM_OWNERSHIP", &parameter) &&
+      options::IsOn(parameter))
+  {
+    g_claim_ownership = true;
+  }
   if (options::GetValue("CVMFS_INITIAL_GENERATION", &parameter)) {
     initial_generation = String2Uint64(parameter);
   }

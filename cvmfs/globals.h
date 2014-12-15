@@ -11,6 +11,7 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+extern bool g_claim_ownership;
 extern uid_t g_uid;
 extern gid_t g_gid;
 

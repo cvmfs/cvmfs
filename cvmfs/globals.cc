@@ -8,6 +8,7 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+bool g_claim_ownership = false;
 uid_t g_uid = 0;
 gid_t g_gid = 0;
 
