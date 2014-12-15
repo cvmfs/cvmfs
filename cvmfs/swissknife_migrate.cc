@@ -119,12 +119,15 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
   const bool generate_full_catalog_tree = true;
-  CatalogTraversalParams params;
-  params.repo_url  = repo_url;
-  params.repo_name = repo_name;
-  params.repo_keys = repo_keys;
-  params.no_close  = generate_full_catalog_tree;
-  params.tmp_dir   = tmp_dir;
+
+  typedef HttpObjectFetcher<typename WritableCatalogTraversal::Catalog>
+          WritableHttpObjectFetcher;
+  UniquePtr<WritableHttpObjectFetcher> object_fetcher(
+    WritableHttpObjectFetcher::Create(repo_name, repo_url, repo_keys, tmp_dir));
+
+  WritableCatalogTraversal::Parameters params;
+  params.no_close       = generate_full_catalog_tree;
+  params.object_fetcher = object_fetcher.weak_ref();
   WritableCatalogTraversal traversal(params);
   traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
 

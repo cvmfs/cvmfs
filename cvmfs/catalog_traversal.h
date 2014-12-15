@@ -8,18 +8,19 @@
 #include <cassert>
 #include <stack>
 #include <string>
+#include <limits>
 
 #include "catalog.h"
 #include "util.h"
 #include "util_concurrency.h"
-#include "download.h"
 #include "logging.h"
 #include "compression.h"
 
 #include "manifest.h"
-#include "manifest_fetch.h"
 #include "signature.h"
 #include "history_sqlite.h"
+
+#include "object_fetcher.h"
 
 
 namespace catalog {
@@ -56,54 +57,6 @@ struct CatalogTraversalData {
   const size_t        file_size;
   const unsigned int  history_depth;
 };
-
-
-/**
- * @param repo_url             the path to the repository to be traversed:
- *                             -> either absolute path to the local catalogs
- *                             -> or an URL to a remote repository
- * @param repo_name            fully qualified repository name (used for remote
- *                             repository signature check) (optional)
- * @param repo_keys            a comma separated list of public key file
- *                             locations to verify the repository manifest file
- * @param history              depth of the desired catalog history traversal
- *                             (default: 0 - only HEAD catalogs are traversed)
- * @param timestamp            timestamp of history traversal threshold
- *                             (default: 0 - no threshold, traverse everything)
- * @param no_repeat_history    keep track of visited catalogs and don't re-visit
- *                             them in previous revisions
- * @param no_close             do not close catalogs after they were attached
- *                             (catalogs retain their parent/child pointers)
- * @param ignore_load_failure  suppressed an error message if a revision's root
- *                             catalog could not be loaded (i.e. was sweeped
- *                             before by a garbage collection run)
- * @param quiet                silence messages that would go to stderr
- * @param tmp_dir              path to the temporary directory to be used
- *                             (default: /tmp)
- */
-struct CatalogTraversalParams {
-  CatalogTraversalParams() : history(kNoHistory),
-  timestamp(kNoTimestampThreshold), no_repeat_history(false), no_close(false),
-  ignore_load_failure(false), quiet(false), tmp_dir("/tmp") {}
-
-  static const unsigned int kFullHistory;
-  static const unsigned int kNoHistory;
-  static const time_t       kNoTimestampThreshold;
-
-  std::string   repo_url;
-  std::string   repo_name;
-  std::string   repo_keys;
-  unsigned int  history;
-  time_t        timestamp;
-  bool          no_repeat_history;
-  bool          no_close;
-  bool          ignore_load_failure;
-  bool          quiet;
-  std::string   tmp_dir;
-};
-
-
-class ObjectFetcher;
 
 /**
  * This class traverses the catalog hierarchy of a CVMFS repository recursively.
@@ -162,11 +115,60 @@ class ObjectFetcher;
  *          directly after the callback method returns, unless you create the
  *          CatalogTraversal object with no_close = true.
  */
-template<class CatalogT, class ObjectFetcherT = ObjectFetcher>
+template<class CatalogT>
 class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
  public:
-  typedef CatalogTraversalData<CatalogT> CallbackData;
-  typedef CatalogT                       Catalog;
+  typedef CatalogTraversalData<CatalogT>   CallbackData;
+  typedef CatalogT                         Catalog;
+  typedef AbstractObjectFetcher<CatalogT>  ObjectFetcher;
+
+
+  /**
+   * @param repo_url             the path to the repository to be traversed:
+   *                             -> either absolute path to the local catalogs
+   *                             -> or an URL to a remote repository
+   * @param repo_name            fully qualified repository name (used for remote
+   *                             repository signature check) (optional)
+   * @param repo_keys            a comma separated list of public key file
+   *                             locations to verify the repository manifest file
+   * @param history              depth of the desired catalog history traversal
+   *                             (default: 0 - only HEAD catalogs are traversed)
+   * @param timestamp            timestamp of history traversal threshold
+   *                             (default: 0 - no threshold, traverse everything)
+   * @param no_repeat_history    keep track of visited catalogs and don't re-visit
+   *                             them in previous revisions
+   * @param no_close             do not close catalogs after they were attached
+   *                             (catalogs retain their parent/child pointers)
+   * @param ignore_load_failure  suppressed an error message if a revision's root
+   *                             catalog could not be loaded (i.e. was sweeped
+   *                             before by a garbage collection run)
+   * @param quiet                silence messages that would go to stderr
+   * @param tmp_dir              path to the temporary directory to be used
+   *                             (default: /tmp)
+   */
+  struct Parameters {
+    Parameters()
+      : object_fetcher(NULL)
+      , history(kNoHistory)
+      , timestamp(kNoTimestampThreshold)
+      , no_repeat_history(false)
+      , no_close(false)
+      , ignore_load_failure(false)
+      , quiet(false) {}
+
+    static const unsigned int kFullHistory;
+    static const unsigned int kNoHistory;
+    static const time_t       kNoTimestampThreshold;
+
+    ObjectFetcher *object_fetcher;
+
+    unsigned int   history;
+    time_t         timestamp;
+    bool           no_repeat_history;
+    bool           no_close;
+    bool           ignore_load_failure;
+    bool           quiet;
+  };
 
  public:
   enum TraversalType {
@@ -254,16 +256,17 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    * Constructs a new catalog traversal engine based on the construction
    * parameters described in struct ConstructionParams.
    */
-	CatalogTraversal(const CatalogTraversalParams &params) :
-    object_fetcher_(params),
-    repo_name_(params.repo_name),
+	CatalogTraversal(const Parameters &params) :
+    object_fetcher_(params.object_fetcher),
     no_close_(params.no_close),
     ignore_load_failure_(params.ignore_load_failure),
     no_repeat_history_(params.no_repeat_history),
     default_history_depth_(params.history),
     default_timestamp_threshold_(params.timestamp),
     error_sink_((params.quiet) ? kLogDebug : kLogStderr)
-  {}
+  {
+    assert (object_fetcher_ != NULL);
+  }
 
 
   /**
@@ -317,10 +320,10 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   bool TraverseNamedSnapshots(const TraversalType type = kBreadthFirstTraversal) {
     typedef std::vector<shash::Any> HashList;
 
-    TraversalContext ctx(CatalogTraversalParams::kNoHistory,
-                         CatalogTraversalParams::kNoTimestampThreshold,
+    TraversalContext ctx(Parameters::kNoHistory,
+                         Parameters::kNoTimestampThreshold,
                          type);
-    const UniquePtr<history::History> tag_db(GetHistory());
+    const UniquePtr<history::History> tag_db(object_fetcher_->FetchHistory());
     if (! tag_db.IsValid()) {
       LogCvmfs(kLogCatalogTraversal, kLogDebug, "didn't find a history database "
                                                 "to traverse");
@@ -370,8 +373,8 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
    *              false in case of failure or no_repeat_history == false
    */
   bool TraversePruned(const TraversalType type = kBreadthFirstTraversal) {
-    TraversalContext ctx(CatalogTraversalParams::kFullHistory,
-                         CatalogTraversalParams::kNoTimestampThreshold,
+    TraversalContext ctx(Parameters::kFullHistory,
+                         Parameters::kNoTimestampThreshold,
                          type);
     if (pruned_revisions_.empty()) {
       return false;
@@ -471,11 +474,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       return true;
     }
 
-    // download the catalog file from the backend storage
-    // Note: Due to garbage collection, catalogs might not be fetchable anymore.
-    //       However, this only counts for root catalogs, since the garbage
-    //       collection works on repository revision granularity.
-    if (! FetchCatalog(job)) {
+    job.catalog = object_fetcher_->FetchCatalog(job.hash,
+                                                "" /* TODO: ?? */,
+                                                ! job.IsRootCatalog(),
+                                                job.parent);
+    if (! job.catalog) {
       if (ignore_load_failure_ && job.IsRootCatalog()) {
         LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignore missing root catalog "
                                                   "%s (possibly sweeped before)",
@@ -489,26 +492,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       }
     }
 
-    // open the catalog file
-    if (! OpenCatalog(job)) {
-      return false;
-    }
+    job.catalog_file_size = GetFileSize(job.catalog->database_path());
 
     return true;
   }
 
 
-  bool FetchCatalog(CatalogJob &job) {
-    if (! object_fetcher_.Fetch(job.hash, &job.catalog_file_path)) {
-      return false;
-    }
-
-    job.catalog_file_size = GetFileSize(job.catalog_file_path);
-    return true;
-  }
-
-
-  bool OpenCatalog(CatalogJob &job) {
+  bool ReopenCatalog(CatalogJob &job) {
     assert (! job.ignore);
     assert (job.catalog == NULL);
 
@@ -519,7 +509,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                                          ! job.IsRootCatalog());
 
     if (job.catalog == NULL) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to open catalog %s",
+      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to re-open catalog %s",
                job.hash.ToString().c_str());
       return false;
     }
@@ -691,7 +681,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     // catalog was pushed on ctx.callback_stack before, it might need to be re-
     // opened. If CatalogTraversal<> is configured with no_close, it was not
     // closed before, hence does not need a re-open.
-    if (job.postponed && ! no_close_ && ! OpenCatalog(job)) {
+    if (job.postponed && ! no_close_ && ! ReopenCatalog(job)) {
       return false;
     }
 
@@ -798,260 +788,41 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   shash::Any GetRepositoryRootCatalogHash() {
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
-    manifest::Manifest *manifest = object_fetcher_.FetchManifest();
-    if (!manifest) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_,
-        "Failed to load manifest for repository %s", repo_name_.c_str());
+    UniquePtr<manifest::Manifest> manifest(object_fetcher_->FetchManifest());
+    if (! manifest) {
       return shash::Any();
     }
 
-    const shash::Any root_catalog_hash = manifest->catalog_hash();
-    delete manifest;
-
-    return root_catalog_hash;
-  }
-
-  history::History* GetHistory() {
-    return object_fetcher_.FetchHistory();
+    return manifest->catalog_hash();
   }
 
  private:
-  ObjectFetcherT        object_fetcher_;
-  const std::string     repo_name_;
-  const bool            no_close_;
-  const bool            ignore_load_failure_;
-  const bool            no_repeat_history_;
-  const unsigned int    default_history_depth_;
-  const time_t          default_timestamp_threshold_;
-  HashSet               visited_catalogs_;
-  HashSet               pruned_revisions_;
-  LogFacilities         error_sink_;
+  ObjectFetcher          *object_fetcher_;
+  const bool              no_close_;
+  const bool              ignore_load_failure_;
+  const bool              no_repeat_history_;
+  const unsigned int      default_history_depth_;
+  const time_t            default_timestamp_threshold_;
+  HashSet                 visited_catalogs_;
+  HashSet                 pruned_revisions_;
+  LogFacilities           error_sink_;
 };
 
 typedef CatalogTraversal<catalog::Catalog>         ReadonlyCatalogTraversal;
 typedef CatalogTraversal<catalog::WritableCatalog> WritableCatalogTraversal;
 
+template <class CatalogT>
+const unsigned int
+  CatalogTraversal<CatalogT>::Parameters::kFullHistory =
+    std::numeric_limits<unsigned int>::max();
 
+template <class CatalogT>
+const unsigned int
+  CatalogTraversal<CatalogT>::Parameters::kNoHistory = 0;
 
-/**
- * This is the default class implementing the data object fetching strategy of
- * the CatalogTraversal<> template. It abstracts all accesses to external file
- * or HTTP resources. There is no need to change the default ObjectFetcher of
- * CatalogTraversal<> except for unit-testing.
- */
-class ObjectFetcher {
- public:
-  ObjectFetcher(const CatalogTraversalParams &params) :
-    repo_url_(MakeCanonicalPath(params.repo_url)),
-    repo_name_(params.repo_name),
-    repo_keys_(params.repo_keys),
-    is_remote_(params.repo_url.substr(0, 7) == "http://"),
-    ignore_load_failure_(params.ignore_load_failure),
-    temporary_directory_(params.tmp_dir),
-    error_sink_((params.quiet) ? kLogDebug : kLogStderr)
-  {
-    if (is_remote_) {
-      download_manager_.Init(1, true);
-    }
-  }
-
-  virtual ~ObjectFetcher() {
-    if (is_remote_) {
-      download_manager_.Fini();
-    }
-  }
-
-
- public:
-  manifest::Manifest* FetchManifest() {
-    manifest::Manifest *manifest = NULL;
-    // Grab manifest file
-    if (!is_remote_) {
-      // Locally
-      manifest = manifest::Manifest::LoadFile(repo_url_ + "/.cvmfspublished");
-    } else {
-      // Remote
-      const std::string url = repo_url_ + "/.cvmfspublished";
-
-      // Initialize signature module
-      signature::SignatureManager signature_manager;
-      signature_manager.Init();
-      const bool success = signature_manager.LoadPublicRsaKeys(repo_keys_);
-      if (!success) {
-        LogCvmfs(kLogCatalogTraversal, error_sink_,
-          "cvmfs public key(s) could not be loaded.");
-        signature_manager.Fini();
-        return NULL;
-      }
-
-      // Download manifest file
-      struct manifest::ManifestEnsemble manifest_ensemble;
-      manifest::Failures retval = manifest::Fetch(
-                                    repo_url_,
-                                    repo_name_,
-                                    0,
-                                    NULL,
-                                    &signature_manager,
-                                    &download_manager_,
-                                    &manifest_ensemble);
-
-      // We don't need the signature module from now on
-      signature_manager.Fini();
-
-      // Check if manifest was loaded correctly
-      if (retval == manifest::kFailOk) {
-        manifest = new manifest::Manifest(*manifest_ensemble.manifest);
-      } else if (retval == manifest::kFailNameMismatch) {
-        LogCvmfs(kLogCatalogTraversal, error_sink_,
-                 "repository name mismatch. No name provided?");
-      } else if (retval == manifest::kFailBadSignature   ||
-                 retval == manifest::kFailBadCertificate ||
-                 retval == manifest::kFailBadWhitelist)
-      {
-        LogCvmfs(kLogCatalogTraversal, error_sink_,
-                 "repository signature mismatch. No key(s) provided?");
-      } else {
-        LogCvmfs(kLogCatalogTraversal, error_sink_,
-                 "failed to load manifest (%d - %s)",
-                 retval, Code2Ascii(retval));
-      }
-    }
-
-    return manifest;
-  }
-
-  inline history::History* FetchHistory() {
-    manifest::Manifest *manifest = FetchManifest();
-    assert (manifest != NULL);
-
-    const shash::Any history_hash = manifest->history();
-    delete manifest;
-
-    if (history_hash.IsNull()) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "no history database found");
-      return NULL;
-    }
-
-    std::string history_db_path;
-    const bool fetched_successful = Fetch(history_hash, &history_db_path, 'H');
-    if (! fetched_successful) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_,
-               "failed to fetch history database (%s)",
-               history_hash.ToString().c_str());
-      assert (false && "history db download failed");
-    }
-
-    // TODO: need to unlink history_db_path after usage
-    history::History *history = history::SqliteHistory::Open(history_db_path);
-    if (NULL == history) {
-      LogCvmfs(kLogCatalogTraversal, kLogStderr,
-               "failed to open history database (%s)",
-               history_db_path.c_str());
-      assert (false && "history db open failed");
-    }
-
-    return history;
-  }
-
-  inline bool Fetch(const shash::Any  &object_hash,
-                    std::string       *object_file,
-                    const char         hash_suffix = 'C') {
-    return (is_remote_) ? Download  (object_hash, hash_suffix, object_file)
-                        : Decompress(object_hash, hash_suffix, object_file);
-  }
-
-
-  /**
-   * Checks if a file exists, both remotely or locally, depending on the type
-   * of repository currently traversed
-   * @param file   the file to be checked for existence
-   * @return       true if the file exists, false otherwise
-   */
-  inline bool Exists(const std::string &file) {
-    if (is_remote_) {
-      download::JobInfo head(&file, false);
-      return download_manager_.Fetch(&head) == download::kFailOk;
-    } else {
-      return FileExists(file);
-    }
-  }
-
-
- protected:
-  /**
-   * Downloads an object from a remote repository and extracts it in one shot
-   * @param object_hash    the SHA-1 hash of the object to be downloaded
-   * @param hash_suffix    hash suffix for the object to be downloaded
-   * @param file_path      output parameter for the loaded object file
-   * @return               true, if object was successfully downloaded
-   */
-  bool Download(const shash::Any  &object_hash,
-                const char         hash_suffix,
-                std::string       *file_path) {
-    file_path->clear();
-
-    const std::string source =
-      "data" + object_hash.MakePathWithSuffix(1, 2, hash_suffix);
-    const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
-    const std::string url = repo_url_ + "/" + source;
-
-    download::JobInfo download_catalog(&url, true, false, &dest, &object_hash);
-    download::Failures retval = download_manager_.Fetch(&download_catalog);
-
-    if (! ignore_load_failure_ && retval != download::kFailOk) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to download object "
-                                                  "%s (%d - %s)",
-               object_hash.ToString().c_str(), retval, Code2Ascii(retval));
-    }
-
-    *file_path = dest;
-    return retval == download::kFailOk;
-  }
-
-
-  /**
-   * Decompresses an object that resides on local storage.
-   * @param object_hash    the SHA-1 hash of the object to be extracted
-   * @return               the path to the extracted object file
-   */
-  bool Decompress(const shash::Any  &object_hash,
-                  const char         hash_suffix,
-                  std::string       *file_path) {
-    file_path->clear();
-
-    const std::string source =
-      repo_url_ + "/data" + object_hash.MakePathWithSuffix(1, 2, hash_suffix);
-    const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
-    const bool file_exists = FileExists(source);
-
-    if (! ignore_load_failure_ && ! file_exists) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to locate object %s "
-                                                  "at '%s'",
-               object_hash.ToString().c_str(), dest.c_str());
-    }
-
-    if (! file_exists || ! zlib::DecompressPath2Path(source, dest)) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to extract object %s "
-                                                  "from '%s' to '%s' (errno: %d)",
-               object_hash.ToString().c_str(), source.c_str(), dest.c_str(),
-               errno);
-      return false;
-    }
-
-    *file_path = dest;
-    return true;
-  }
-
- private:
-  const std::string          repo_url_;
-  const std::string          repo_name_;
-  const std::string          repo_keys_;
-  const bool                 is_remote_;
-  const bool                 ignore_load_failure_;
-  const std::string          temporary_directory_;
-  download::DownloadManager  download_manager_;
-  LogFacilities              error_sink_;
-};
+template <class CatalogT>
+const time_t
+  CatalogTraversal<CatalogT>::Parameters::kNoTimestampThreshold = 0;
 
 }
 
