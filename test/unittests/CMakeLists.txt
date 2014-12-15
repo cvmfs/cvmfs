@@ -118,7 +118,6 @@ set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
 
-  ${CVMFS_SOURCE_DIR}/catalog_traversal.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/sql.cc

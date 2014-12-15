@@ -16,7 +16,8 @@
 using namespace swissknife;
 using namespace upload;
 
-typedef CatalogTraversal<MockCatalog, MockObjectFetcher> MockedCatalogTraversal;
+typedef CatalogTraversal<MockCatalog>                MockedCatalogTraversal;
+typedef typename MockedCatalogTraversal::Parameters  TraversalParams;
 
 class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
  public:
@@ -82,15 +83,12 @@ class T_GarbageCollector : public ::testing::Test {
     MockObjectFetcher::Reset();
   }
 
-  GcConfiguration GetStandardGarbageCollectorConfiguration() const {
+  GcConfiguration GetStandardGarbageCollectorConfiguration() {
     MyGarbageCollector::Configuration config;
     config.keep_history_depth = 1;
     config.dry_run            = false;
-    config.repo_url           = "http://localhost/cvmfs/dummy.local";
-    config.repo_name          = T_GarbageCollector::fqrn;
-    config.repo_keys          = "";
-    config.tmp_dir            = "/tmp";
     config.uploader           = GC_MockUploader::MockConstruct();
+    config.object_fetcher     = &object_fetcher_;
     return config;
   }
 
@@ -360,7 +358,8 @@ class T_GarbageCollector : public ::testing::Test {
   RevisionMap                  catalogs_;
 
  private:
-  Prng  dice_;
+  Prng               dice_;
+  MockObjectFetcher  object_fetcher_;
 };
 
 const std::string T_GarbageCollector::fqrn = "test.cern.ch";
@@ -376,7 +375,7 @@ TEST_F(T_GarbageCollector, InitializeGarbageCollector) {
 
 TEST_F(T_GarbageCollector, KeepEverything) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth   = CatalogTraversalParams::kFullHistory;
+  config.keep_history_depth   = TraversalParams::kFullHistory;
 
   MyGarbageCollector gc(config);
   const bool gc1 = gc.Collect();
@@ -579,7 +578,7 @@ TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
 
 TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth = CatalogTraversalParams::kFullHistory;
+  config.keep_history_depth = TraversalParams::kFullHistory;
   MyGarbageCollector gc(config);
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
@@ -614,7 +613,7 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
 
 TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth   = CatalogTraversalParams::kFullHistory;
+  config.keep_history_depth   = TraversalParams::kFullHistory;
   MyGarbageCollector gc(config);
 
   RevisionMap &c   = catalogs_;
