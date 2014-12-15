@@ -12,9 +12,10 @@
 
 using namespace swissknife;
 
-typedef CatalogTraversal<MockCatalog, MockObjectFetcher> MockedCatalogTraversal;
-typedef std::pair<unsigned int, std::string>             CatalogIdentifier;
-typedef std::vector<CatalogIdentifier>                   CatalogIdentifiers;
+typedef CatalogTraversal<MockCatalog>                MockedCatalogTraversal;
+typedef typename MockedCatalogTraversal::Parameters  TraversalParams;
+typedef std::pair<unsigned int, std::string>         CatalogIdentifier;
+typedef std::vector<CatalogIdentifier>               CatalogIdentifiers;
 
 class T_CatalogTraversal : public ::testing::Test {
  public:
@@ -64,6 +65,12 @@ class T_CatalogTraversal : public ::testing::Test {
     MockCatalog::UnregisterCatalogs();
     EXPECT_EQ (0u, MockCatalog::instances);
     MockObjectFetcher::Reset();
+  }
+
+  TraversalParams GetBasicTraversalParams() {
+    TraversalParams params;
+    params.object_fetcher = &object_fetcher_;
+    return params;
   }
 
   void CheckVisitedCatalogs(const CatalogIdentifiers &expected,
@@ -379,9 +386,11 @@ class T_CatalogTraversal : public ::testing::Test {
   }
 
  private:
-  Prng            dice_;
-  RootCatalogMap  root_catalogs_;
-  RevisionMap     revisions_;
+  Prng              dice_;
+  RootCatalogMap    root_catalogs_;
+  RevisionMap       revisions_;
+
+  MockObjectFetcher object_fetcher_;
 };
 
 const std::string T_CatalogTraversal::fqrn    = "test.cern.ch";
@@ -393,7 +402,7 @@ const std::string T_CatalogTraversal::fqrn    = "test.cern.ch";
 
 
 TEST_F(T_CatalogTraversal, Initialize) {
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams() = GetBasicTraversalParams();
   MockedCatalogTraversal traverse(params);
 }
 
@@ -413,7 +422,7 @@ TEST_F(T_CatalogTraversal, SimpleTraversal) {
   SimpleTraversal_visited_catalogs.clear();
   EXPECT_EQ (0u, SimpleTraversal_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&SimpleTraversalCallback);
   const bool t1 = traverse.Traverse();
@@ -463,7 +472,7 @@ TEST_F(T_CatalogTraversal, SimpleTraversalNoClose) {
   SimpleTraversalNoCloseCallback_visited_catalogs.clear();
   EXPECT_EQ (0u, SimpleTraversalNoCloseCallback_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.no_close = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&SimpleTraversalNoCloseCallback);
@@ -499,7 +508,7 @@ TEST_F(T_CatalogTraversal, ZeroLevelHistoryTraversal) {
   ZeroLevelHistoryTraversal_visited_catalogs.clear();
   EXPECT_EQ (0u, ZeroLevelHistoryTraversal_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history = 0;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&ZeroLevelHistoryTraversalCallback);
@@ -550,7 +559,7 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversal) {
   FirstLevelHistoryTraversal_visited_catalogs.clear();
   EXPECT_EQ (0u, FirstLevelHistoryTraversal_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history = 1;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FirstLevelHistoryTraversalCallback);
@@ -629,7 +638,7 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
   FirstLevelHistoryTraversalNoClose_visited_catalogs.clear();
   EXPECT_EQ (0u, FirstLevelHistoryTraversalNoClose_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history  = 1;
   params.no_close = true;
   MockedCatalogTraversal traverse(params);
@@ -665,7 +674,7 @@ TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversal) {
   SecondLevelHistoryTraversal_visited_catalogs.clear();
   EXPECT_EQ (0u, SecondLevelHistoryTraversal_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history = 2;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&SecondLevelHistoryTraversalCallback);
@@ -769,8 +778,8 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversal) {
   FullHistoryTraversal_visited_catalogs.clear();
   EXPECT_EQ (0u, FullHistoryTraversal_visited_catalogs.size());
 
-  CatalogTraversalParams params;
-  params.history = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history = TraversalParams::kFullHistory;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullHistoryTraversalCallback);
   const bool t1 = traverse.Traverse();
@@ -899,7 +908,7 @@ TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversalNoRepeat) {
   SecondLevelHistoryTraversalNoRepeat_visited_catalogs.clear();
   EXPECT_EQ (0u, SecondLevelHistoryTraversalNoRepeat_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 2;
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
@@ -960,8 +969,8 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversalNoRepeat) {
   FullHistoryTraversalNoRepeat_visited_catalogs.clear();
   EXPECT_EQ (0u, FullHistoryTraversalNoRepeat_visited_catalogs.size());
 
-  CatalogTraversalParams params;
-  params.history           = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history           = TraversalParams::kFullHistory;
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullHistoryTraversalNoRepeatCallback);
@@ -1037,7 +1046,7 @@ TEST_F(T_CatalogTraversal, MultiTraversal) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&MultiTraversalCallback);
 
@@ -1133,7 +1142,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalNoRepeat) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&MultiTraversalNoRepeatCallback);
@@ -1206,7 +1215,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history = 1;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&MultiTraversalFirstLevelHistoryCallback);
@@ -1349,7 +1358,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 1;
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
@@ -1435,7 +1444,7 @@ TEST_F(T_CatalogTraversal, EmptyTraversePruned) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 0;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&EmptyTraversePrunedCallback);
@@ -1465,7 +1474,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history = 0;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TraversePrunedAfterSimpleTraversalCallback);
@@ -1606,7 +1615,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversalNoRepeat) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 0;
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
@@ -1690,7 +1699,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSecondLevelHistoryTraversalNoRepea
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 2;
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
@@ -1774,7 +1783,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 0;
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
@@ -1871,7 +1880,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagList) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TraverseRepositoryTagListCallback);
 
@@ -1959,7 +1968,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history = 2; // doesn't have any effect on TraverseNamedSnapshot()
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TraverseRepositoryTagListSecondHistoryLevelCallback);
@@ -2049,7 +2058,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) 
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 2; // doesn't have any effect on TraverseNamedSnapshot()
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
@@ -2113,7 +2122,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 1; // doesn't have any effect on TraverseNamedSnapshot()
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
@@ -2204,7 +2213,7 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history             = 4;
   params.no_repeat_history   = true;
   params.ignore_load_failure = true;
@@ -2273,7 +2282,7 @@ TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history             = 4;
   params.quiet               = true;
   params.no_repeat_history   = true;
@@ -2333,8 +2342,8 @@ TEST_F(T_CatalogTraversal, DepthFirstSearchFullHistoryTraversalNoRepeat) {
   DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.clear();
   EXPECT_EQ (0u, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.size());
 
-  CatalogTraversalParams params;
-  params.history           = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history           = TraversalParams::kFullHistory;
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&DepthFirstSearchFullHistoryTraversalNoRepeatCallback);
@@ -2409,8 +2418,8 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversal) {
   FullHistoryDepthFirstTraversal_visited_catalogs.clear();
   EXPECT_EQ (0u, FullHistoryDepthFirstTraversal_visited_catalogs.size());
 
-  CatalogTraversalParams params;
-  params.history = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history = TraversalParams::kFullHistory;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullHistoryDepthFirstTraversalCallback);
   const bool t1 = traverse.Traverse(MockedCatalogTraversal::kDepthFirstTraversal);
@@ -2542,7 +2551,7 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat) 
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 0;
   params.no_repeat_history = true;
   MockedCatalogTraversal traverse(params);
@@ -2635,7 +2644,7 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversalSequence) {
 
   CatalogIdentifiers catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.history           = 0;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&DepthFirstTraversalSequenceCallback);
@@ -2678,8 +2687,8 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
   deleted_catalogs.insert(GetRootHash(2));
   MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
-  CatalogTraversalParams params;
-  params.history             = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history             = TraversalParams::kFullHistory;
   params.ignore_load_failure = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullHistoryDepthFirstTraversalUnavailableAncestorCallback);
@@ -2797,8 +2806,8 @@ void FullTraversalRootCatalogDetectionCallback(
 }
 
 TEST_F(T_CatalogTraversal, FullTraversalRootCatalogDetection) {
-  CatalogTraversalParams params;
-  params.history = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history = TraversalParams::kFullHistory;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullTraversalRootCatalogDetectionCallback);
 
@@ -2823,8 +2832,8 @@ TEST_F(T_CatalogTraversal, TimestampThreshold) {
   TimestampThreshold_visited_catalogs.clear();
   EXPECT_EQ (0u, TimestampThreshold_visited_catalogs.size());
 
-  CatalogTraversalParams params;
-  params.history             = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history             = TraversalParams::kFullHistory;
   params.timestamp           = t(16, 11, 2014) + 1;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdCallback);
@@ -2905,8 +2914,8 @@ TEST_F(T_CatalogTraversal, FutureTimestampThreshold) {
   FutureTimestampThreshold_visited_catalogs.clear();
   EXPECT_EQ (0u, FutureTimestampThreshold_visited_catalogs.size());
 
-  CatalogTraversalParams params;
-  params.history             = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history             = TraversalParams::kFullHistory;
   params.timestamp           = t(31, 12, 2014);
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FutureTimestampThresholdCallback);
@@ -2958,7 +2967,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdAndNamedSnapshots) {
   TimestampThresholdAndNamedSnapshots_visited_catalogs.clear();
   EXPECT_EQ (0u, TimestampThresholdAndNamedSnapshots_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.timestamp = t(6, 6, 2010); // no effect on NamedSnapshotTraversal()
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdAndNamedSnapshotsCallback);
@@ -3048,7 +3057,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterTimestampThresholdHistoryDepthAndN
   TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.clear();
   EXPECT_EQ (0u, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.timestamp         = t(6, 6, 2008); // no effect on NamedSnapshotTraversal()
   params.history           = 2;             // no effect on NamedSnapshotTraversal()
   params.no_repeat_history = true;
@@ -3140,8 +3149,8 @@ TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirst) {
   TimestampThresholdDepthFirst_visited_catalogs.clear();
   EXPECT_EQ (0u, TimestampThresholdDepthFirst_visited_catalogs.size());
 
-  CatalogTraversalParams params;
-  params.history             = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history             = TraversalParams::kFullHistory;
   params.timestamp           = t(16, 11, 2014) + 1;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdDepthFirstCallback);
@@ -3220,8 +3229,8 @@ TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirstAndTraversePruned) {
   TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs.clear();
   EXPECT_EQ (0u, TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs.size());
 
-  CatalogTraversalParams params;
-  params.history             = CatalogTraversalParams::kFullHistory;
+  TraversalParams params = GetBasicTraversalParams();
+  params.history             = TraversalParams::kFullHistory;
   params.timestamp           = t(16, 11, 2014) + 1;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdDepthFirstAndTraversePrunedCallback);
@@ -3361,7 +3370,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnaps
   TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs.clear();
   EXPECT_EQ (0u, TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs.size());
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.timestamp         = t(6, 6, 2003); // no effect on TraverseNamedSnapshots()
   params.history           = 1;             // no effect on TraverseNamedSnapshots()
   params.no_repeat_history = true;
@@ -3429,7 +3438,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
   deleted_catalogs.insert(GetRootHash(4));
   MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.timestamp           = t(6, 6, 2003);
   params.history             = 1;
   params.no_repeat_history   = true;
@@ -3497,7 +3506,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
   deleted_catalogs.insert(GetRootHash(4));
   MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.timestamp           = t(6, 6, 2003);
   params.history             = 1;
   params.no_repeat_history   = true;
@@ -3576,7 +3585,7 @@ TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat)
   deleted_catalogs.insert(GetRootHash(4));
   MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   params.timestamp           = t(17, 11, 2014) - 10; // excludes all revisions but HEAD
   params.no_repeat_history   = true;
   MockedCatalogTraversal traverse(params);
@@ -3642,7 +3651,7 @@ TEST_F(T_CatalogTraversal, TraverseNamedSnapshotsWithoutHistory) {
 
   MockObjectFetcher::history_available = false;
 
-  CatalogTraversalParams params;
+  TraversalParams params = GetBasicTraversalParams();
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TraverseNamedSnapshotsWithoutHistoryCallback);
   const bool t1 = traverse.TraverseNamedSnapshots();
