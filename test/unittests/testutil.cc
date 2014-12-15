@@ -224,8 +224,32 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
   return referenced_objects_;
 }
 
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   return new manifest::Manifest(MockCatalog::root_hash, 0, "");
+}
+
+
+MockCatalog* MockObjectFetcher::FetchCatalog(const shash::Any  &catalog_hash,
+                                             const std::string &catalog_path,
+                                             const bool         is_nested,
+                                                   MockCatalog *parent) {
+  // check if catalog is marked as deleted
+  if (s_deleted_catalogs != NULL &&
+      s_deleted_catalogs->find(catalog_hash) != s_deleted_catalogs->end()) {
+    return NULL;
+  }
+
+  return MockCatalog::AttachFreely(catalog_path,
+                                   "",
+                                   catalog_hash,
+                                   parent,
+                                   is_nested);
 }
 
 

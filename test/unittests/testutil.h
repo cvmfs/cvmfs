@@ -9,6 +9,7 @@
 #include "../../cvmfs/directory_entry.h"
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/history.h"
+#include "../../cvmfs/object_fetcher.h"
 
 pid_t GetParentPid(const pid_t pid);
 
@@ -285,14 +286,16 @@ class MockCatalog {
   }
 
  public:
-  const PathString   path()         const { return PathString(root_path_);  }
-  const std::string& root_path()    const { return root_path_;              }
-  const shash::Any&  hash()         const { return catalog_hash_;           }
-  uint64_t           catalog_size() const { return catalog_size_;           }
-  unsigned int       revision()     const { return revision_;               }
+  const PathString   path()          const { return PathString(root_path_);  }
+  const std::string& root_path()     const { return root_path_;              }
+  const shash::Any&  hash()          const { return catalog_hash_;           }
+  uint64_t           catalog_size()  const { return catalog_size_;           }
+  unsigned int       revision()      const { return revision_;               }
 
-  MockCatalog*       parent()       const { return parent_;                 }
-  MockCatalog*       previous()     const { return previous_;               }
+  MockCatalog*       parent()        const { return parent_;                 }
+  MockCatalog*       previous()      const { return previous_;               }
+
+  std::string        database_path() const { return ""; }
 
   void set_parent(MockCatalog *parent) { parent_ = parent; }
 
@@ -449,7 +452,7 @@ class MockHistory : public history::History {
 /**
  * This is a mock of an ObjectFetcher that does essentially nothing.
  */
-class MockObjectFetcher {
+class MockObjectFetcher : public AbstractObjectFetcher<MockCatalog> {
  public:
   static MockHistory          *s_history;
   static std::set<shash::Any> *s_deleted_catalogs;
@@ -465,23 +468,21 @@ class MockObjectFetcher {
   }
 
  public:
-  MockObjectFetcher(const swissknife::CatalogTraversalParams &params) {}
+  MockObjectFetcher() {}
+
  public:
   manifest::Manifest* FetchManifest();
-  history::History* FetchHistory() {
+
+  history::History* FetchHistory(const shash::Any &hash = shash::Any()) {
     return (MockObjectFetcher::history_available)
               ? MockObjectFetcher::s_history->Clone()
               : NULL;
   }
-  inline bool Fetch(const shash::Any  &catalog_hash,
-                    std::string       *catalog_file) {
-    catalog_file->clear();
-    return (s_deleted_catalogs == NULL ||
-            s_deleted_catalogs->find(catalog_hash) == s_deleted_catalogs->end());
-  }
-  inline bool Exists(const std::string &file) {
-    return false;
-  }
+
+  MockCatalog* FetchCatalog(const shash::Any  &catalog_hash,
+                            const std::string &catalog_path,
+                            const bool         is_nested = false,
+                                  MockCatalog *parent    = NULL);
 };
 
 #endif /* CVMFS_UNITTEST_TESTUTIL */
