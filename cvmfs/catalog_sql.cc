@@ -476,8 +476,13 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.hardlink_group_   = Hardlinks2HardlinkGroup(hardlinks);
     result.inode_            = catalog->GetMangledInode(RetrieveInt64(12),
                                                         result.hardlink_group_);
-    result.uid_              = RetrieveInt64(13);
-    result.gid_              = RetrieveInt64(14);
+    if (g_claim_ownership) {
+      result.uid_             = g_uid;
+      result.gid_             = g_gid;
+    } else {
+      result.uid_              = RetrieveInt64(13);
+      result.gid_              = RetrieveInt64(14);
+    }
     result.is_chunked_file_  = (database_flags & kFlagFileChunk);
     result.checksum_         =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
