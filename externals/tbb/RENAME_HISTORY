@@ -6,7 +6,7 @@ $  tar xzf <original tgz file>
 $  mv <resulting directory> tbb-${TBB_VERSION}
 $  tar czf tbb-${TBB_VERSION}.tar.gz tbb-${TBB_VERSION}
 
-Additionally we apply two patches to the build system of TBB before compilation
+Additionally we apply 3 patches to the build system of TBB before compilation.
 Those allow both for easier handling of the build products as well as custom
 naming of the resulting shared objects. In detail:
 
@@ -24,8 +24,15 @@ by the TBB make file. We use these to conveniently access the build results out
 of CMake later on. The original output directory names contain version and plat-
 form information and are therefore hard to access in an automatic fashion.
 
+ -> 32bit_mock.patch
+
+Sets the build architecture to ia32 on certain old 32 bit platforms.
+
+
+
 Here you have a mapping to the original archive names:
 
 Original Name                   Repackaged Archive        TBB Version
 tbb41_20130613oss_src.tgz       tbb-4.1-4.tar.gz          4.1 Update 4
 tbb42_20131118oss_src.tgz       tbb-4.2-2.tar.gz          4.2 Update 2
+tbb43_20141023oss_src.tgz       tbb-4.3-1.tar.gz          4.3 Update 1
