@@ -1,4 +1,6 @@
 2.1.20:
+  * Allow cvmfs to claim ownership of files and directories through 
+    CVMFS_CLAIM_OWNERSHIP (CVM-678)
   * Add support for garbage-collected repositories (CVM-583)
   * Add support for automatically ordering Stratum 1 servers according to
     geographic loations (CVM-629, CVM-630)
