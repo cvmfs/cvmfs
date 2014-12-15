@@ -48,6 +48,7 @@
   * Use file catalogs when processing .cvmfsdirtab (CVM-620)
   * Compact inflated catalogs on publish
   * Add 'letter' command to cvmfs_swissknife
+  * Use tbb 4.3 update 1
   * Use sqlite 3.8.4.3
   * Use libcurl 7.39
   * Use leveldb 1.15
