@@ -10,7 +10,7 @@ using namespace swissknife;
 
 CommandListCatalogs::CommandListCatalogs() :
   print_tree_(false), print_hash_(false), print_size_(false),
-  print_entries_(false) {}
+  print_entries_(false), object_fetcher_(NULL) {}
 
 
 ParameterList CommandListCatalogs::GetParams() {
@@ -18,6 +18,7 @@ ParameterList CommandListCatalogs::GetParams() {
   r.push_back(Parameter::Mandatory('r', "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Optional ('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional ('k', "repository master key(s)"));
+  r.push_back(Parameter::Optional ('l', "temporary directory"));
   r.push_back(Parameter::Switch   ('t', "print tree structure of catalogs"));
   r.push_back(Parameter::Switch   ('d', "print digest for each catalog"));
   r.push_back(Parameter::Switch   ('s', "print catalog file sizes"));
@@ -32,14 +33,18 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   print_size_    = (args.count('s') > 0);
   print_entries_ = (args.count('e') > 0);
 
-  const std::string &repo_url = *args.find('r')->second;
+  const std::string &repo_url  = *args.find('r')->second;
   const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second : "";
   const std::string &repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
+  const std::string &tmp_dir   = (args.count('l') > 0) ? *args.find('l')->second : "/tmp";
 
-  CatalogTraversalParams params;
-  params.repo_url  = repo_url;
-  params.repo_name = repo_name;
-  params.repo_keys = repo_keys;
+  object_fetcher_ = ReadonlyHttpObjectFetcher::Create(repo_name,
+                                                      repo_url,
+                                                      repo_keys,
+                                                      tmp_dir);
+
+  ReadonlyCatalogTraversal::Parameters params;
+  params.object_fetcher = object_fetcher_.weak_ref();
   ReadonlyCatalogTraversal traversal(params);
   traversal.RegisterListener(&CommandListCatalogs::CatalogCallback, this);
 

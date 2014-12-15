@@ -21,20 +21,33 @@ const time_t GarbageCollector<CatalogTraversalT,
 
 
 template <class CatalogTraversalT, class HashFilterT>
-swissknife::CatalogTraversalParams
+GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
+                                             const Configuration &configuration)
+  : configuration_(configuration)
+  , traversal_(
+      GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
+                                                                configuration))
+  , hash_filter_()
+  , preserved_catalogs_(0)
+  , condemned_catalogs_(0)
+  , condemned_objects_(0)
+{
+  assert (configuration_.uploader != NULL);
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
+typename GarbageCollector<CatalogTraversalT, HashFilterT>::TraversalParameters
   GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
   const GarbageCollector<CatalogTraversalT, HashFilterT>::Configuration &config)
 {
-  swissknife::CatalogTraversalParams params;
+  TraversalParameters params;
+  params.object_fetcher      = config.object_fetcher;
   params.history             = config.keep_history_depth;
   params.timestamp           = config.keep_history_timestamp;
   params.no_repeat_history   = true;
   params.ignore_load_failure = true;
   params.quiet               = ! config.verbose;
-  params.repo_url            = config.repo_url;
-  params.repo_name           = config.repo_name;
-  params.repo_keys           = config.repo_keys;
-  params.tmp_dir             = config.tmp_dir;
   return params;
 }
 
@@ -119,41 +132,8 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
 
 
 template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::VerifyConfiguration() const {
-  const Configuration &cfg = configuration_;
-
-  if (cfg.uploader == NULL) {
-    return false;
-  }
-
-  if (cfg.repo_url.empty()) {
-    LogCvmfs(kLogGc, kLogDebug, "No repository url provided");
-    return false;
-  }
-
-  if (cfg.repo_name.empty()) {
-    LogCvmfs(kLogGc, kLogDebug, "No repository name provided");
-    return false;
-  }
-
-  if (cfg.tmp_dir.empty() || ! DirectoryExists(cfg.tmp_dir)) {
-    LogCvmfs(kLogGc, kLogDebug, "Temporary directory '%s' doesn't exist",
-                                cfg.tmp_dir.c_str());
-    return false;
-  }
-
-  return true;
-}
-
-
-template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
   bool success = true;
-
-  success = VerifyConfiguration();
-  if (! success) {
-    LogCvmfs(kLogGc, kLogStderr, "Malformed GarbageCollector configuration.");
-  }
 
   success = (success && AnalyzePreservedCatalogTree());
   success = (success && SweepCondemnedCatalogTree());
@@ -174,8 +154,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
 
-
-  success = traversal_.Traverse() && // traverses the current HEAD
+  success = traversal_.Traverse() &&
             traversal_.TraverseNamedSnapshots();
 
   traversal_.UnregisterListener(callback);

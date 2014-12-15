@@ -11,6 +11,10 @@
 namespace swissknife {
 
 class CommandGc : public Command {
+ protected:
+  typedef HttpObjectFetcher<typename ReadonlyCatalogTraversal::Catalog>
+          ReadonlyHttpObjectFetcher;
+
  public:
   ~CommandGc() { };
   std::string GetName() { return "gc"; }
@@ -21,9 +25,10 @@ class CommandGc : public Command {
   int Main(const ArgumentList &args);
 
  protected:
-  bool CheckGarbageCollectability(const std::string &repository_url,
-                                  const std::string &repository_name,
-                                  const std::string &pubkey_path) const;
+  bool CheckGarbageCollectability() const;
+
+ private:
+  UniquePtr<ReadonlyHttpObjectFetcher> object_fetcher_;
 };
 
 }

@@ -8,6 +8,7 @@
 #include "swissknife.h"
 
 #include "hash.h"
+#include "object_fetcher.h"
 #include "catalog_traversal.h"
 
 namespace catalog {
@@ -17,6 +18,10 @@ namespace catalog {
 namespace swissknife {
 
 class CommandListCatalogs : public Command {
+ protected:
+  typedef HttpObjectFetcher<typename ReadonlyCatalogTraversal::Catalog>
+          ReadonlyHttpObjectFetcher;
+
  public:
   CommandListCatalogs();
   ~CommandListCatalogs() { };
@@ -37,6 +42,8 @@ class CommandListCatalogs : public Command {
   bool print_hash_;
   bool print_size_;
   bool print_entries_;
+
+  UniquePtr<ReadonlyHttpObjectFetcher> object_fetcher_;
 };
 
 }

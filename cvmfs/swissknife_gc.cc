@@ -22,46 +22,14 @@ using namespace upload;      // NOLINT
 typedef GarbageCollector<ReadonlyCatalogTraversal, SimpleHashFilter> GC;
 typedef GC::Configuration                                            GcConfig;
 
-
-
-bool CommandGc::CheckGarbageCollectability(
-                                         const std::string &repository_url,
-                                         const std::string &repository_name,
-                                         const std::string &pubkey_path) const {
-  UniquePtr<manifest::ManifestEnsemble> ensemble(new manifest::ManifestEnsemble);
-
-  // initialize the (global) download manager
-  g_download_manager->Init(1, true);
-
-  // initialize the (global) signature manager
-  g_signature_manager->Init();
-  if (! g_signature_manager->LoadPublicRsaKeys(pubkey_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key '%s'",
-             pubkey_path.c_str());
+bool CommandGc::CheckGarbageCollectability() const {
+  UniquePtr<manifest::Manifest> manifest(object_fetcher_->FetchManifest());
+  if (! manifest) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest");
     return false;
   }
 
-  // fetch (and verify) the manifest
-  manifest::Failures retval;
-  retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
-                           g_signature_manager, g_download_manager,
-                           ensemble.weak_ref());
-
-  if (retval != manifest::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
-                                    "(%d - %s)",
-             retval, manifest::Code2Ascii(retval));
-    return false;
-  }
-
-  // check if manifest fetching was successful
-  if (! ensemble->manifest) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
-    return NULL;
-  }
-
-  // check if the manifest allows garbage collection
-  return ensemble->manifest->garbage_collectable();
+  return manifest->garbage_collectable();
 }
 
 
@@ -103,7 +71,12 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  if (! CheckGarbageCollectability(repo_url, repo_name, repo_keys)) {
+  object_fetcher_ = ReadonlyHttpObjectFetcher::Create(repo_name,
+                                                      repo_url,
+                                                      repo_keys,
+                                                      temp_directory);
+
+  if (! CheckGarbageCollectability()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "repository does not allow garbage collection");
     return 1;
   }
@@ -115,10 +88,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.keep_history_timestamp = timestamp;
   config.dry_run                = dry_run;
   config.verbose                = list_condemned_objects;
-  config.repo_url               = repo_url;
-  config.repo_name              = repo_name;
-  config.repo_keys              = repo_keys;
-  config.tmp_dir                = temp_directory;
+  config.object_fetcher         = object_fetcher_.weak_ref();
 
   if (config.uploader == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",

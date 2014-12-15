@@ -113,6 +113,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   compression.h compression.cc
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
+  object_fetcher.h
 
   file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
   file_processing/char_buffer.h
@@ -148,7 +149,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   file_chunk.h file_chunk.cc
   directory_entry.h directory_entry.cc
   shortstring.h
-  catalog_traversal.h catalog_traversal.cc
+  catalog_traversal.h
   sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
