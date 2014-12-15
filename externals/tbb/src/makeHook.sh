@@ -1,4 +1,6 @@
 #!/bin/sh
 
 make clean
-CUSTOM_SUFFIX=_cvmfs make
+export CUSTOM_SUFFIX=_cvmfs;          \
+export CXXFLAGS="$CXXFLAGS -Wformat"; \
+make
