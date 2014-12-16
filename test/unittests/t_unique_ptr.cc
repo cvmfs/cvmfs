@@ -18,7 +18,7 @@ class Foo {
     ++Foo::global_destructor_calls;
   }
 
-  unsigned int GetIdentifier() const {
+  int GetIdentifier() const {
     ++local_method_calls;
     ++Foo::global_method_calls;
     return identifier;

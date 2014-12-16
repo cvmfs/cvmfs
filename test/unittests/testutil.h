@@ -339,10 +339,10 @@ class MockHistory : public history::History {
 
   history::History* Clone(const bool writable = false) const;
 
-  bool IsWritable()        const { return writable_;    }
-  int GetNumberOfTags()    const { return tags_.size(); }
-  bool BeginTransaction()  const { return true;         }
-  bool CommitTransaction() const { return true;         }
+  bool IsWritable()          const { return writable_;    }
+  unsigned GetNumberOfTags() const { return tags_.size(); }
+  bool BeginTransaction()    const { return true;         }
+  bool CommitTransaction()   const { return true;         }
 
   bool SetPreviousRevision(const shash::Any &history_hash) { return true; }
 

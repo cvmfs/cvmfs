@@ -153,7 +153,7 @@ class SqlFindTagByDate : public SqlRetrieveTag<SqlHistory> {
 class SqlCountTags : public SqlHistory {
  public:
   SqlCountTags(const HistoryDatabase *database);
-  int RetrieveCount() const;
+  unsigned RetrieveCount() const;
 };
 
 

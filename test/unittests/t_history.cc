@@ -287,7 +287,7 @@ TYPED_TEST(T_History, InsertTag) {
   ASSERT_NE (static_cast<History*>(NULL), history);
   EXPECT_EQ (TestFixture::fqrn, history->fqrn());
   ASSERT_TRUE (history->Insert(TestFixture::GetDummyTag()));
-  EXPECT_EQ (1, history->GetNumberOfTags());
+  EXPECT_EQ (1u, history->GetNumberOfTags());
   TestFixture::CloseHistory(history);
 }
 
@@ -298,9 +298,9 @@ TYPED_TEST(T_History, InsertTwice) {
   ASSERT_NE (static_cast<History*>(NULL), history);
   EXPECT_EQ (TestFixture::fqrn, history->fqrn());
   ASSERT_TRUE  (history->Insert(TestFixture::GetDummyTag()));
-  EXPECT_EQ (1, history->GetNumberOfTags());
+  EXPECT_EQ (1u, history->GetNumberOfTags());
   ASSERT_FALSE (history->Insert(TestFixture::GetDummyTag()));
-  EXPECT_EQ (1, history->GetNumberOfTags());
+  EXPECT_EQ (1u, history->GetNumberOfTags());
   TestFixture::CloseHistory(history);
 }
 
@@ -337,7 +337,7 @@ TYPED_TEST(T_History, InsertAndFindTag) {
   EXPECT_EQ (TestFixture::fqrn, history->fqrn());
   History::Tag dummy = TestFixture::GetDummyTag();
   EXPECT_TRUE (history->Insert(dummy));
-  EXPECT_EQ (1, history->GetNumberOfTags());
+  EXPECT_EQ (1u, history->GetNumberOfTags());
 
   History::Tag tag;
   ASSERT_TRUE (history->GetByName(dummy.name, &tag));
@@ -870,14 +870,14 @@ TYPED_TEST(T_History, RollbackToOldTag) {
   EXPECT_TRUE (history2->ListTagsAffectedByRollback("moep", &gone));
   ASSERT_EQ (4u, gone.size());
   if (gone[0].name == "also_rofl") { // order of rev 8 tags is undefined
-    EXPECT_EQ ("also_rofl", gone[0].name); EXPECT_EQ (8, gone[0].revision);
-    EXPECT_EQ ("rofl",      gone[1].name); EXPECT_EQ (8, gone[1].revision);
+    EXPECT_EQ ("also_rofl", gone[0].name); EXPECT_EQ (8u, gone[0].revision);
+    EXPECT_EQ ("rofl",      gone[1].name); EXPECT_EQ (8u, gone[1].revision);
   } else {
-    EXPECT_EQ ("rofl",      gone[0].name); EXPECT_EQ (8, gone[0].revision);
-    EXPECT_EQ ("also_rofl", gone[1].name); EXPECT_EQ (8, gone[1].revision);
+    EXPECT_EQ ("rofl",      gone[0].name); EXPECT_EQ (8u, gone[0].revision);
+    EXPECT_EQ ("also_rofl", gone[1].name); EXPECT_EQ (8u, gone[1].revision);
   }
-  EXPECT_EQ ("lol",       gone[2].name); EXPECT_EQ (5, gone[2].revision);
-  EXPECT_EQ ("moep",      gone[3].name); EXPECT_EQ (4, gone[3].revision);
+  EXPECT_EQ ("lol",       gone[2].name); EXPECT_EQ (5u, gone[2].revision);
+  EXPECT_EQ ("moep",      gone[3].name); EXPECT_EQ (4u, gone[3].revision);
 
   shash::Any new_root_hash(shash::kSha1);
   new_root_hash.Randomize();
@@ -966,14 +966,14 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
   EXPECT_TRUE (history1->ListTagsAffectedByRollback("moep",  &gone));
   ASSERT_EQ (4u, gone.size());
   if (gone[0].name == "also_rofl") { // order of rev 8 tags is undefined
-    EXPECT_EQ ("also_rofl", gone[0].name); EXPECT_EQ (8, gone[0].revision);
-    EXPECT_EQ ("rofl",      gone[1].name); EXPECT_EQ (8, gone[1].revision);
+    EXPECT_EQ ("also_rofl", gone[0].name); EXPECT_EQ (8u, gone[0].revision);
+    EXPECT_EQ ("rofl",      gone[1].name); EXPECT_EQ (8u, gone[1].revision);
   } else {
-    EXPECT_EQ ("rofl",      gone[0].name); EXPECT_EQ (8, gone[0].revision);
-    EXPECT_EQ ("also_rofl", gone[1].name); EXPECT_EQ (8, gone[1].revision);
+    EXPECT_EQ ("rofl",      gone[0].name); EXPECT_EQ (8u, gone[0].revision);
+    EXPECT_EQ ("also_rofl", gone[1].name); EXPECT_EQ (8u, gone[1].revision);
   }
-  EXPECT_EQ ("lol",       gone[2].name); EXPECT_EQ (5, gone[2].revision);
-  EXPECT_EQ ("moep",      gone[3].name); EXPECT_EQ (4, gone[3].revision);
+  EXPECT_EQ ("lol",       gone[2].name); EXPECT_EQ (5u, gone[2].revision);
+  EXPECT_EQ ("moep",      gone[3].name); EXPECT_EQ (4u, gone[3].revision);
 
   gone.clear();
   EXPECT_FALSE (history1->ListTagsAffectedByRollback("unobtainium", &gone));
@@ -982,35 +982,35 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
   gone.clear();
   EXPECT_TRUE (history1->ListTagsAffectedByRollback("second_release", &gone));
   ASSERT_EQ (3u, gone.size());
-  EXPECT_EQ ("forth_release",  gone[0].name); EXPECT_EQ (9, gone[0].revision);
-  EXPECT_EQ ("third_release",  gone[1].name); EXPECT_EQ (7, gone[1].revision);
-  EXPECT_EQ ("second_release", gone[2].name); EXPECT_EQ (6, gone[2].revision);
+  EXPECT_EQ ("forth_release",  gone[0].name); EXPECT_EQ (9u, gone[0].revision);
+  EXPECT_EQ ("third_release",  gone[1].name); EXPECT_EQ (7u, gone[1].revision);
+  EXPECT_EQ ("second_release", gone[2].name); EXPECT_EQ (6u, gone[2].revision);
 
   gone.clear();
   EXPECT_TRUE (history1->ListTagsAffectedByRollback("bar", &gone));
   ASSERT_EQ (7u, gone.size());
   if (gone[0].name == "also_rofl") { // undefined order for same revision
-    EXPECT_EQ ("also_rofl",      gone[0].name); EXPECT_EQ (8, gone[0].revision);
-    EXPECT_EQ ("rofl",           gone[1].name); EXPECT_EQ (8, gone[1].revision);
+    EXPECT_EQ ("also_rofl",      gone[0].name); EXPECT_EQ (8u, gone[0].revision);
+    EXPECT_EQ ("rofl",           gone[1].name); EXPECT_EQ (8u, gone[1].revision);
   } else {
-    EXPECT_EQ ("rofl",           gone[0].name); EXPECT_EQ (8, gone[0].revision);
-    EXPECT_EQ ("also_rofl",      gone[1].name); EXPECT_EQ (8, gone[1].revision);
+    EXPECT_EQ ("rofl",           gone[0].name); EXPECT_EQ (8u, gone[0].revision);
+    EXPECT_EQ ("also_rofl",      gone[1].name); EXPECT_EQ (8u, gone[1].revision);
   }
-  EXPECT_EQ ("lol",            gone[2].name); EXPECT_EQ (5, gone[2].revision);
+  EXPECT_EQ ("lol",            gone[2].name); EXPECT_EQ (5u, gone[2].revision);
   if (gone[3].name == "moep_duplicate") { // undefined order of same revision
-    EXPECT_EQ ("moep_duplicate", gone[3].name); EXPECT_EQ (4, gone[3].revision);
-    EXPECT_EQ ("moep",           gone[4].name); EXPECT_EQ (4, gone[4].revision);
+    EXPECT_EQ ("moep_duplicate", gone[3].name); EXPECT_EQ (4u, gone[3].revision);
+    EXPECT_EQ ("moep",           gone[4].name); EXPECT_EQ (4u, gone[4].revision);
   } else {
-    EXPECT_EQ ("moep",           gone[3].name); EXPECT_EQ (4, gone[3].revision);
-    EXPECT_EQ ("moep_duplicate", gone[4].name); EXPECT_EQ (4, gone[4].revision);
+    EXPECT_EQ ("moep",           gone[3].name); EXPECT_EQ (4u, gone[3].revision);
+    EXPECT_EQ ("moep_duplicate", gone[4].name); EXPECT_EQ (4u, gone[4].revision);
   }
-  EXPECT_EQ ("test_release",   gone[5].name); EXPECT_EQ (3, gone[5].revision);
-  EXPECT_EQ ("bar",            gone[6].name); EXPECT_EQ (2, gone[6].revision);
+  EXPECT_EQ ("test_release",   gone[5].name); EXPECT_EQ (3u, gone[5].revision);
+  EXPECT_EQ ("bar",            gone[6].name); EXPECT_EQ (2u, gone[6].revision);
 
   gone.clear();
   EXPECT_TRUE (history1->ListTagsAffectedByRollback("forth_release", &gone));
   ASSERT_EQ (1u, gone.size());
-  EXPECT_EQ ("forth_release", gone[0].name); EXPECT_EQ (9, gone[0].revision);
+  EXPECT_EQ ("forth_release", gone[0].name); EXPECT_EQ (9u, gone[0].revision);
 
   TestFixture::CloseHistory(history1);
 }

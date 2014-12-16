@@ -139,12 +139,12 @@ bool SqliteHistory::IsWritable() const {
   return database_->read_write();
 }
 
-int SqliteHistory::GetNumberOfTags() const {
+unsigned SqliteHistory::GetNumberOfTags() const {
   assert (database_);
   assert (count_tags_.IsValid());
   bool retval = count_tags_->FetchRow();
   assert (retval);
-  const int count = count_tags_->RetrieveCount();
+  const unsigned count = count_tags_->RetrieveCount();
   retval = count_tags_->Reset();
   assert (retval);
   return count;

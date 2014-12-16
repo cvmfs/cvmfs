@@ -439,7 +439,8 @@ TEST_F(T_SQLite_Wrapper, SuccessfulSchemaUpdate) {
   DummyDatabase::kLatestSchemaRevision = RevisionFlags::kUpdatableRevision;
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
-  EXPECT_EQ (RevisionFlags::kUpdatableRevision, db1->schema_revision());
+  EXPECT_EQ (unsigned(RevisionFlags::kUpdatableRevision),
+             db1->schema_revision());
   EXPECT_EQ (0u, db1->check_compatibility_calls);
   EXPECT_EQ (0u, db1->live_upgrade_calls);
   DummyDatabase::kLatestSchemaRevision = RevisionFlags::kInitialRevision;
@@ -451,7 +452,7 @@ TEST_F(T_SQLite_Wrapper, SuccessfulSchemaUpdate) {
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
   EXPECT_EQ (1u, db2->check_compatibility_calls);
   EXPECT_EQ (1u, db2->live_upgrade_calls);
-  EXPECT_EQ (RevisionFlags::kUpdatedRevision, db2->schema_revision());
+  EXPECT_EQ (unsigned(RevisionFlags::kUpdatedRevision), db2->schema_revision());
   EXPECT_EQ (1u, DummyDatabase::instances);
 
   delete db2;
@@ -461,7 +462,7 @@ TEST_F(T_SQLite_Wrapper, SuccessfulSchemaUpdate) {
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db3);
   EXPECT_EQ (1u, db3->check_compatibility_calls);
   EXPECT_EQ (0u, db3->live_upgrade_calls);
-  EXPECT_EQ (RevisionFlags::kUpdatedRevision, db3->schema_revision());
+  EXPECT_EQ (unsigned(RevisionFlags::kUpdatedRevision), db3->schema_revision());
   EXPECT_EQ (1u, DummyDatabase::instances);
 
   delete db3;
@@ -475,7 +476,7 @@ TEST_F(T_SQLite_Wrapper, FailingSchemaUpdate) {
   DummyDatabase::kLatestSchemaRevision = RevisionFlags::kFailingRevision;
   DummyDatabase *db1 = DummyDatabase::Create(dbp);
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db1);
-  EXPECT_EQ (RevisionFlags::kFailingRevision, db1->schema_revision());
+  EXPECT_EQ (unsigned(RevisionFlags::kFailingRevision), db1->schema_revision());
   EXPECT_EQ (0u, db1->check_compatibility_calls);
   EXPECT_EQ (0u, db1->live_upgrade_calls);
   DummyDatabase::kLatestSchemaRevision = RevisionFlags::kInitialRevision;
@@ -487,7 +488,7 @@ TEST_F(T_SQLite_Wrapper, FailingSchemaUpdate) {
   ASSERT_NE (static_cast<DummyDatabase*>(NULL), db2);
   EXPECT_EQ (1u, db2->check_compatibility_calls);
   EXPECT_EQ (0u, db2->live_upgrade_calls);
-  EXPECT_EQ (RevisionFlags::kFailingRevision, db2->schema_revision());
+  EXPECT_EQ (unsigned(RevisionFlags::kFailingRevision), db2->schema_revision());
   EXPECT_EQ (1u, DummyDatabase::instances);
 
   delete db2;
