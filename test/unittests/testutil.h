@@ -185,14 +185,17 @@ class MockObjectStorage {
   static AvailableObjects available_objects;
 
  public:
+  static std::set<shash::Any> *s_deleted_objects;
+
+ public:
   static void Reset() {
     MockObjectStorage::UnregisterObjects();
+    s_deleted_objects = NULL;
     ObjectT::ResetGlobalState();
   }
 
   static void RegisterObject(const shash::Any &hash, ObjectT *object) {
-    ASSERT_EQ (MockObjectStorage::available_objects.end(),
-               MockObjectStorage::available_objects.find(hash));
+    ASSERT_FALSE (Exists(hash));
     MockObjectStorage::available_objects[hash] = object;
   }
 
@@ -208,17 +211,28 @@ class MockObjectStorage {
   }
 
   static ObjectT* Get(const shash::Any &hash) {
-    typename AvailableObjects::const_iterator itr =
-      MockObjectStorage<ObjectT>::available_objects.find(hash);
-    return (MockObjectStorage<ObjectT>::available_objects.end() != itr)
-      ? itr->second
+    return (Exists(hash) && ! IsDeleted(hash))
+      ? available_objects[hash]
       : NULL;
+  }
+
+ protected:
+  static bool IsDeleted(const shash::Any &hash) {
+    return s_deleted_objects != NULL &&
+           s_deleted_objects->find(hash) != s_deleted_objects->end();
+  }
+
+  static bool Exists(const shash::Any &hash) {
+    return available_objects.find(hash) != available_objects.end();
   }
 };
 
 template <class ObjectT>
 typename MockObjectStorage<ObjectT>::AvailableObjects
   MockObjectStorage<ObjectT>::available_objects;
+
+template <class ObjectT>
+std::set<shash::Any>* MockObjectStorage<ObjectT>::s_deleted_objects;
 
 
 //
@@ -505,35 +519,12 @@ class MockHistory : public history::History,
  */
 class MockObjectFetcher : public AbstractObjectFetcher<MockCatalog> {
  public:
-  static MockHistory          *s_history;
-  static std::set<shash::Any> *s_deleted_catalogs;
-  static bool                  history_available;
-
-  static void Reset() {
-    if (MockObjectFetcher::s_history != NULL) {
-      delete MockObjectFetcher::s_history;
-      MockObjectFetcher::s_history = NULL;
-    }
-    MockObjectFetcher::s_deleted_catalogs = NULL;
-    MockObjectFetcher::history_available = true;
-  }
-
- public:
-  MockObjectFetcher() {}
-
- public:
   manifest::Manifest* FetchManifest();
-
-  history::History* FetchHistory(const shash::Any &hash = shash::Any()) {
-    return (MockObjectFetcher::history_available)
-              ? MockObjectFetcher::s_history->Clone()
-              : NULL;
-  }
-
-  MockCatalog* FetchCatalog(const shash::Any  &catalog_hash,
-                            const std::string &catalog_path,
-                            const bool         is_nested = false,
-                                  MockCatalog *parent    = NULL);
+  history::History*   FetchHistory(const shash::Any &hash = shash::Any());
+  MockCatalog*        FetchCatalog(const shash::Any  &catalog_hash,
+                                   const std::string &catalog_path,
+                                   const bool         is_nested = false,
+                                         MockCatalog *parent    = NULL);
 };
 
 #endif /* CVMFS_UNITTEST_TESTUTIL */
