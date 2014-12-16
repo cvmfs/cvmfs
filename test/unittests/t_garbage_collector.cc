@@ -993,3 +993,89 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
   EXPECT_TRUE (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
   EXPECT_TRUE (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
 }
+
+
+TEST_F(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  MyGarbageCollector gc(config);
+
+  GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
+  RevisionMap     &c   = catalogs_;
+
+  // wire up std::set<> deleted_hashes in uploader with the MockObjectFetcher
+  // to simulate the actual deletion of objects
+  MockCatalog::s_deleted_objects = &upl->deleted_hashes;
+
+  const bool gc1 = gc.Collect();
+  EXPECT_TRUE (gc1);
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "11")]->hash()));
+
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "10")]->hash()));
+
+  EXPECT_EQ (11u, gc.preserved_catalog_count());
+
+  // + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + -
+
+  // mock a history database chain that contains the information of the deleted
+  // snapshot "Revision2" in its recycle bin and remove it entirely from the
+  // latest history database
+  MockHistory *history         = MockHistory::Get(MockHistory::root_hash);
+  MockHistory *old_history     = static_cast<MockHistory*>(history->Clone());
+  MockHistory *initial_history = static_cast<MockHistory*>(history->Clone());
+
+  old_history->Remove("Revision2");
+  history->Remove("Revision2");
+  history->EmptyRecycleBin();
+
+  shash::Any old_history_hash     = h("cb431d5bd49df9ba5f1be54642bb8790477ee7f7",
+                                      shash::kSuffixHistory);
+  shash::Any initial_history_hash = h("963f943b84c478731329709ff90d64978f7feeb4",
+                                      shash::kSuffixHistory);
+
+  history->SetPreviousRevision(old_history_hash);
+  old_history->SetPreviousRevision(initial_history_hash);
+  MockHistory::RegisterObject(old_history_hash, old_history);
+  MockHistory::RegisterObject(initial_history_hash, initial_history);
+
+  // + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + -
+
+  config.base_history_database = initial_history_hash;
+  MyGarbageCollector new_gc(config);
+  const bool gc2 = new_gc.Collect();
+  EXPECT_TRUE (gc2);
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "20")]->hash()));
+
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "10")]->hash()));
+
+  EXPECT_EQ (8u, new_gc.preserved_catalog_count());
+}
