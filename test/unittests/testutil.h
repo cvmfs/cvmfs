@@ -374,23 +374,31 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 //
 
 
-class MockHistory : public history::History {
+class MockHistory : public history::History,
+                    public MockObjectStorage<MockHistory> {
  public:
   typedef std::map<std::string, history::History::Tag> TagMap;
   typedef std::set<shash::Any>                         HashSet;
 
+  static const std::string rhs;
+  static const shash::Any  root_hash;
+  static unsigned int      instances;
+
  public:
-  // TODO: count number of instances
+  static void ResetGlobalState();
+
+  static history::History* Open(const shash::Any &hash);
   MockHistory(const bool          writable,
               const std::string  &fqrn);
   MockHistory(const MockHistory &other);
-  ~MockHistory() {}
+  ~MockHistory();
 
  protected:
   // silence coverity
   MockHistory& operator= (const MockHistory &other);
 
  public:
+  history::History* Open() const;
   history::History* Clone(const bool writable = false) const;
 
   bool IsWritable()          const { return writable_;    }
@@ -399,6 +407,7 @@ class MockHistory : public history::History {
   bool CommitTransaction()   const { return true;         }
 
   bool SetPreviousRevision(const shash::Any &history_hash) { return true; }
+  shash::Any previous_revision() const { return shash::Any(); }
 
   bool Insert(const Tag &tag);
   bool Remove(const std::string &name);

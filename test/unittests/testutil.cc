@@ -162,11 +162,6 @@ void MockCatalog::AddFile(const shash::Any   &content_hash,
   files_.push_back(f);
 }
 
-
-MockHistory* MockObjectFetcher::s_history                   = NULL;
-std::set<shash::Any>* MockObjectFetcher::s_deleted_catalogs = NULL;
-bool MockObjectFetcher::history_available                   = true;
-
 void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
                            const size_t       chunk_size) {
   MockCatalog::Chunk c;
@@ -231,9 +226,27 @@ MockCatalog* MockObjectFetcher::FetchCatalog(const shash::Any  &catalog_hash,
 //
 
 
+unsigned int      MockHistory::instances = 0;
+const std::string MockHistory::rhs       = "b46091c745a1ffef707dd7eabec852fb8679cf28";
+const shash::Any  MockHistory::root_hash = shash::Any(shash::kSha1,
+                                                      shash::HexPtr(MockHistory::rhs),
+                                                      shash::kSuffixHistory);
+
+void MockHistory::ResetGlobalState() {
+  MockHistory::instances = 0;
+}
+
+
+history::History* MockHistory::Open(const shash::Any &hash) {
+  MockHistory *history = MockHistory::Get(hash);
+  return (history != NULL) ? history->Clone() : NULL;
+}
+
+
 MockHistory::MockHistory(const bool          writable,
                          const std::string  &fqrn) : writable_(writable) {
   set_fqrn(fqrn);
+  ++MockHistory::instances;
 }
 
 
@@ -243,6 +256,12 @@ MockHistory::MockHistory(const MockHistory &other) :
   writable_(other.writable_)
 {
   set_fqrn(other.fqrn());
+  ++MockHistory::instances;
+}
+
+
+MockHistory::~MockHistory() {
+  --MockHistory::instances;
 }
 
 
