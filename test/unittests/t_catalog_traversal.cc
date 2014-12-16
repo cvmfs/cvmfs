@@ -62,7 +62,7 @@ class T_CatalogTraversal : public ::testing::Test {
   }
 
   void TearDown() {
-    MockCatalog::UnregisterCatalogs();
+    MockCatalog::Reset();
     EXPECT_EQ (0u, MockCatalog::instances);
     MockObjectFetcher::Reset();
   }
@@ -376,7 +376,7 @@ class T_CatalogTraversal : public ::testing::Test {
                                            previous_catalog);
 
     // register the new catalog in the data structures
-    MockCatalog::RegisterCatalog(catalog);
+    MockCatalog::RegisterObject(catalog->hash(), catalog);
     catalogs[root_path] = catalog;
     return catalog;
   }
