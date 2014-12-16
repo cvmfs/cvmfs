@@ -68,19 +68,14 @@ class T_GarbageCollector : public ::testing::Test {
 
  protected:
   void SetUp() {
-    const bool writable_history = false; // MockHistory doesn't care!
-    MockObjectFetcher::s_history = new MockHistory(writable_history,
-                                                   T_GarbageCollector::fqrn);
-
     dice_.InitLocaltime();
-    MockCatalog::Reset();
     SetupDummyCatalogs();
   }
 
   void TearDown() {
     MockCatalog::Reset();
+    MockHistory::Reset();
     EXPECT_EQ (0u, MockCatalog::instances);
-    MockObjectFetcher::Reset();
   }
 
   GcConfiguration GetStandardGarbageCollectorConfiguration() {
@@ -277,7 +272,11 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    history::History *history = MockObjectFetcher::s_history;
+    const bool writable_history = false; // MockHistory doesn't care!
+    MockHistory *history = new MockHistory(writable_history,
+                                           T_GarbageCollector::fqrn);
+    MockHistory::RegisterObject(MockHistory::root_hash, history);
+
     history->BeginTransaction();
     ASSERT_TRUE (history->Insert(history::History::Tag(
                                      "Revision2", c[mp(2,"00")]->hash(),
@@ -590,7 +589,7 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   deleted_catalogs.insert(c[mp(3,"00")]->hash());
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
   deleted_catalogs.insert(c[mp(3,"11")]->hash());
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
@@ -620,7 +619,7 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   const bool gc1 = gc.Collect();
   EXPECT_FALSE (gc1);
@@ -636,7 +635,7 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
   // to simulate the actual deletion of objects
   RevisionMap     &c   = catalogs_;
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
-  MockObjectFetcher::s_deleted_catalogs = &upl->deleted_hashes;
+  MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
   const bool gc1 = gc.Collect();
   EXPECT_TRUE (gc1);
@@ -829,7 +828,8 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  history::History *history = MockObjectFetcher::s_history;
+  history::History *history = MockHistory::Get(MockHistory::root_hash);;
+  ASSERT_NE   (static_cast<history::History*>(NULL), history);
   ASSERT_TRUE (history->Remove("Revision4")); // make Revision4 deletable
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -885,7 +885,8 @@ TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
   config.keep_history_depth     = GcConfiguration::kFullHistory;
 
   // remove all named snapshots (GC can potentially delete everything)
-  history::History *history = MockObjectFetcher::s_history;
+  history::History *history = MockHistory::Get(MockHistory::root_hash);;
+  ASSERT_NE   (static_cast<history::History*>(NULL), history);
   ASSERT_TRUE (history->Remove("Revision2"));
   ASSERT_TRUE (history->Remove("Revision4"));
   ASSERT_TRUE (history->Remove("Revision5"));
@@ -924,7 +925,7 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
   // to simulate the actual deletion of objects
   RevisionMap     &c   = catalogs_;
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
-  MockObjectFetcher::s_deleted_catalogs = &upl->deleted_hashes;
+  MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
   // run a first garbage collection (leaving only named snapshots)
   MyGarbageCollector gc1(config);
@@ -966,7 +967,8 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 
   // delete named tag to produce a catalog revision that is not referenced by
   // standard CVMFS data structures
-  history::History *history = MockObjectFetcher::s_history;
+  history::History *history = MockHistory::Get(MockHistory::root_hash);
+  ASSERT_NE   (static_cast<history::History*>(NULL), history);
   ASSERT_TRUE (history->Remove("Revision2"));
   EXPECT_EQ (2u, history->GetNumberOfTags());
 
