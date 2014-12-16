@@ -274,7 +274,7 @@ class UniquePtr : SingleCopy {
 
   inline operator bool() const        { return IsValid(); }
   inline T& operator*() const         { return *ref_; }
-  inline UniquePtr& operator=(T* ref) { ref_ = ref; return *this; }
+  inline UniquePtr& operator=(T* ref) { delete ref_; ref_ = ref; return *this; }
   inline T* operator->() const        { return ref_; }
 
   inline T* weak_ref() const          { return ref_; }
