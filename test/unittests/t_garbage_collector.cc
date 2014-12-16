@@ -78,7 +78,7 @@ class T_GarbageCollector : public ::testing::Test {
   }
 
   void TearDown() {
-    MockCatalog::UnregisterCatalogs();
+    MockCatalog::Reset();
     EXPECT_EQ (0u, MockCatalog::instances);
     MockObjectFetcher::Reset();
   }
@@ -323,7 +323,7 @@ class T_GarbageCollector : public ::testing::Test {
                                            previous);
 
     // register the new catalog in the data structures
-    MockCatalog::RegisterCatalog(catalog);
+    MockCatalog::RegisterObject(catalog->hash(), catalog);
     return catalog;
   }
 
