@@ -51,20 +51,15 @@ class T_CatalogTraversal : public ::testing::Test {
 
  protected:
   void SetUp() {
-    const bool writable_history = false; // MockHistory doesn't care!
-    MockObjectFetcher::s_history = new MockHistory(writable_history,
-                                                   T_CatalogTraversal::fqrn);
-
     dice_.InitLocaltime();
-    MockCatalog::Reset();
     SetupDummyCatalogs();
     EXPECT_EQ (initial_catalog_instances, MockCatalog::instances);
   }
 
   void TearDown() {
     MockCatalog::Reset();
+    MockHistory::Reset();
     EXPECT_EQ (0u, MockCatalog::instances);
-    MockObjectFetcher::Reset();
   }
 
   TraversalParams GetBasicTraversalParams() {
@@ -224,7 +219,11 @@ class T_CatalogTraversal : public ::testing::Test {
       MakeRevision(r);
     }
 
-    history::History *history = MockObjectFetcher::s_history;
+    const bool writable_history = false; // MockHistory doesn't care!
+    MockHistory *history = new MockHistory(writable_history,
+                                           T_CatalogTraversal::fqrn);
+    MockHistory::RegisterObject(MockHistory::root_hash, history);
+
     history->BeginTransaction();
     EXPECT_TRUE (history->Insert(history::History::Tag(
                                  "Revision2", root_catalogs[2].catalog_hash, 1337,
@@ -328,8 +327,8 @@ class T_CatalogTraversal : public ::testing::Test {
 
     } else if (branch == "/00/13") {
       MockCatalog *_13 = CreateAndRegisterCatalog("/00/13",          revision, ts + 25, revision_root);
-                         CreateAndRegisterCatalog("/00/13/28",       revision, ts + 26,          _13);
-                         CreateAndRegisterCatalog("/00/13/29",       revision, ts + 27,          _13);
+                         CreateAndRegisterCatalog("/00/13/28",       revision, ts + 26,           _13);
+                         CreateAndRegisterCatalog("/00/13/29",       revision, ts + 27,           _13);
 
     } else {
       FAIL();
@@ -2209,7 +2208,7 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
   deleted_catalogs.insert(GetRootHash(2));
   deleted_catalogs.insert(GetRootHash(3));
   deleted_catalogs.insert(GetRootHash(4));
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2278,7 +2277,7 @@ TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(doomed_nested_catalog->hash());
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2685,7 +2684,7 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(2));
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   TraversalParams params = GetBasicTraversalParams();
   params.history             = TraversalParams::kFullHistory;
@@ -3436,7 +3435,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   TraversalParams params = GetBasicTraversalParams();
   params.timestamp           = t(6, 6, 2003);
@@ -3504,7 +3503,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   TraversalParams params = GetBasicTraversalParams();
   params.timestamp           = t(6, 6, 2003);
@@ -3583,7 +3582,7 @@ TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat)
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   TraversalParams params = GetBasicTraversalParams();
   params.timestamp           = t(17, 11, 2014) - 10; // excludes all revisions but HEAD
@@ -3649,7 +3648,9 @@ TEST_F(T_CatalogTraversal, TraverseNamedSnapshotsWithoutHistory) {
   TraverseNamedSnapshotsWithoutHistory_visited_catalogs.clear();
   EXPECT_EQ (0u, TraverseNamedSnapshotsWithoutHistory_visited_catalogs.size());
 
-  MockObjectFetcher::history_available = false;
+  std::set<shash::Any> deleted_history;
+  deleted_history.insert(MockHistory::root_hash);
+  MockHistory::s_deleted_objects = &deleted_history;
 
   TraversalParams params = GetBasicTraversalParams();
   MockedCatalogTraversal traverse(params);
