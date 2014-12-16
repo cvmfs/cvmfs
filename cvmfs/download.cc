@@ -637,7 +637,6 @@ CURL *DownloadManager::AcquireCurlHandle() {
 
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     //curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
-    curl_easy_setopt(handle, CURLOPT_LOW_SPEED_LIMIT, 100);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlData);
   } else {
@@ -794,6 +793,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
       //curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "http://$.");
     }
   }
+  curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
   if (info->proxy != "") {
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, opt_timeout_proxy_);
     curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_TIME, opt_timeout_proxy_);
@@ -1229,6 +1229,7 @@ DownloadManager::DownloadManager() {
   opt_dns_server_ = NULL;
   opt_timeout_proxy_ = 0;
   opt_timeout_direct_ = 0;
+  opt_low_speed_limit_ = 0;
   opt_host_chain_ = NULL;
   opt_host_chain_rtt_ = NULL;
   opt_host_chain_current_ = 0;
@@ -1304,6 +1305,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
 
   opt_timeout_proxy_ = 5;
   opt_timeout_direct_ = 10;
+  opt_low_speed_limit_ = 1024;
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 0;
   opt_num_proxies_ = 0;
@@ -1537,6 +1539,18 @@ void DownloadManager::SetTimeout(const unsigned seconds_proxy,
   pthread_mutex_lock(lock_options_);
   opt_timeout_proxy_ = seconds_proxy;
   opt_timeout_direct_ = seconds_direct;
+  pthread_mutex_unlock(lock_options_);
+}
+
+
+/**
+ * Sets contains the average transfer speed in bytes per second that the
+ * transfer should be below during CURLOPT_LOW_SPEED_TIME seconds for libcurl to
+ * consider it to be too slow and abort.  Only effective for new connections.
+ */
+void DownloadManager::SetLowSpeedLimit(const unsigned low_speed_limit) {
+  pthread_mutex_lock(lock_options_);
+  opt_low_speed_limit_ = low_speed_limit;
   pthread_mutex_unlock(lock_options_);
 }
 
