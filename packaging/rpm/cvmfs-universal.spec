@@ -87,7 +87,11 @@ Requires: shadow-utils
 Requires: SysVinit
 Requires: e2fsprogs
   %else
+    %if 0%{?fc21}
+Requires: procps-ng
+    %else
 Requires: sysvinit-tools
+    %endif
     %if 0%{?el6}
 Requires: util-linux-ng
     %else
