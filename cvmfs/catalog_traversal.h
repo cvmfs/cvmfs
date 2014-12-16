@@ -311,8 +311,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
   /**
    * Figures out all named tags in a repository and uses all of them as entry
-   * points into the traversal process. Catalog hashes in the recycle bin of the
-   * history database will be added as 'pruned'.
+   * points into the traversal process.
    *
    * @param type  breadths or depth first traversal
    * @return      true when catalog traversal successfully finished
@@ -341,16 +340,6 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     const HashList::const_reverse_iterator iend = root_hashes.rend();
     for (; i != iend; ++i) {
       Push(ctx, *i);
-    }
-
-    // mark all catalogs in the history's recycle bin as 'pruned' catalogs
-    HashList recycle_bin;
-    success = tag_db->ListRecycleBin(&recycle_bin);
-    assert (success);
-          HashList::const_iterator j    = recycle_bin.begin();
-    const HashList::const_iterator jend = recycle_bin.end();
-    for (; j != jend; ++j) {
-      MarkAsPrunedRevision(*j);
     }
 
     return DoTraverse(ctx);

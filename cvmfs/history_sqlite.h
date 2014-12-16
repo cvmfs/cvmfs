@@ -86,6 +86,7 @@ class SqliteHistory : public History {
    * @param history_hash  the content hash of the previous revision
    */
   bool SetPreviousRevision(const shash::Any &history_hash);
+  shash::Any previous_revision() const;
 
   bool Insert(const Tag &tag);
   bool Remove(const std::string &name);

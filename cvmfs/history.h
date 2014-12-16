@@ -118,6 +118,7 @@ class History {
    * @param history_hash  the content hash of the previous revision
    */
   virtual bool SetPreviousRevision(const shash::Any &history_hash)   = 0;
+  virtual shash::Any previous_revision() const                       = 0;
 
   virtual bool Insert(const Tag &tag)                                = 0;
   virtual bool Remove(const std::string &name)                       = 0;

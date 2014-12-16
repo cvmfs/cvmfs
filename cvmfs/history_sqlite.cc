@@ -134,6 +134,14 @@ bool SqliteHistory::SetPreviousRevision(const shash::Any &history_hash) {
 }
 
 
+shash::Any SqliteHistory::previous_revision() const {
+  assert (database_);
+  const std::string hash_str =
+                      database_->GetProperty<std::string>(kPreviousRevisionKey);
+  return shash::MkFromHexPtr(shash::HexPtr(hash_str), shash::kSuffixHistory);
+}
+
+
 bool SqliteHistory::IsWritable() const {
   assert (database_);
   return database_->read_write();
