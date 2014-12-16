@@ -481,6 +481,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
       }
     }
 
+    job.catalog_file_path = job.catalog->database_path();
     job.catalog_file_size = GetFileSize(job.catalog->database_path());
 
     return true;

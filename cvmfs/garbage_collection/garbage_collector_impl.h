@@ -206,8 +206,8 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
         this);
 
   bool success = false;
-  success = traversal_.TraversePruned(CatalogTraversalT::kDepthFirstTraversal);
 
+  success = traversal_.TraversePruned(CatalogTraversalT::kDepthFirstTraversal);
         RecycledCatalogs::const_iterator i    = snapshots_to_recycle.begin();
   const RecycledCatalogs::const_iterator iend = snapshots_to_recycle.end();
   for (; success && i != iend; ++i) {
