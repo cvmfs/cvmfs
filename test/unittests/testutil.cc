@@ -199,7 +199,24 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
 
 
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
-  return new manifest::Manifest(MockCatalog::root_hash, 0, "");
+  const uint64_t    catalog_size = 0;
+  const std::string root_path    = "";
+  manifest::Manifest* manifest = new manifest::Manifest(MockCatalog::root_hash,
+                                                        catalog_size,
+                                                        root_path);
+  manifest->set_history(MockHistory::root_hash);
+  return manifest;
+}
+
+
+history::History* MockObjectFetcher::FetchHistory(const shash::Any &hash) {
+  shash::Any history_hash(hash);
+  if (hash.IsNull()) {
+    UniquePtr<manifest::Manifest> manifest(FetchManifest());
+    history_hash = manifest->history();
+  }
+
+  return MockHistory::Open(history_hash);
 }
 
 
@@ -207,12 +224,6 @@ MockCatalog* MockObjectFetcher::FetchCatalog(const shash::Any  &catalog_hash,
                                              const std::string &catalog_path,
                                              const bool         is_nested,
                                                    MockCatalog *parent) {
-  // check if catalog is marked as deleted
-  if (s_deleted_catalogs != NULL &&
-      s_deleted_catalogs->find(catalog_hash) != s_deleted_catalogs->end()) {
-    return NULL;
-  }
-
   return MockCatalog::AttachFreely(catalog_path,
                                    "",
                                    catalog_hash,
