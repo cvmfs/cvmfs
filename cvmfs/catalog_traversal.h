@@ -5,8 +5,9 @@
 #ifndef CVMFS_CATALOG_TRAVERSAL_H_
 #define CVMFS_CATALOG_TRAVERSAL_H_
 
-#include <string>
+#include <cassert>
 #include <stack>
+#include <string>
 
 #include "catalog.h"
 #include "util.h"
@@ -556,7 +557,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     assert (job.catalog != NULL);
 
     const bool h = job.history_depth >= ctx.history_depth;
-    const bool t = job.catalog->GetLastModified() < ctx.timestamp_threshold;
+    assert(ctx.timestamp_threshold >= 0);
+    const bool t =
+      job.catalog->GetLastModified() < unsigned(ctx.timestamp_threshold);
 
     return t || h;
   }

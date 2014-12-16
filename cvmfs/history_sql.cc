@@ -4,6 +4,7 @@
 
 #include "history_sql.h"
 
+#include <cassert>
 
 namespace history {
 
@@ -209,8 +210,10 @@ SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
   assert (success);
 }
 
-int SqlCountTags::RetrieveCount() const {
-  return RetrieveInt64(0);
+unsigned SqlCountTags::RetrieveCount() const {
+  uint64_t count = RetrieveInt64(0);
+  assert(count >= 0);
+  return count;
 }
 
 

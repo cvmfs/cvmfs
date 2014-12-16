@@ -65,7 +65,7 @@ class SqliteHistory : public History {
   static History* Create(const std::string &file_name, const std::string &fqrn);
 
   bool IsWritable() const;
-  int GetNumberOfTags() const;
+  unsigned GetNumberOfTags() const;
 
   /**
    * Opens a new database transaction in the underlying SQLite database

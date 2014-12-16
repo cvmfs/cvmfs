@@ -97,7 +97,7 @@ class History {
   virtual ~History() {};
 
   virtual bool IsWritable() const     = 0;
-  virtual int GetNumberOfTags() const = 0;
+  virtual unsigned GetNumberOfTags() const = 0;
 
   /**
    * Opens a new database transaction in the underlying SQLite database
