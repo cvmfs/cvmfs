@@ -420,8 +420,11 @@ class MockHistory : public history::History,
   bool BeginTransaction()    const { return true;         }
   bool CommitTransaction()   const { return true;         }
 
-  bool SetPreviousRevision(const shash::Any &history_hash) { return true; }
-  shash::Any previous_revision() const { return shash::Any(); }
+  bool SetPreviousRevision(const shash::Any &history_hash) {
+    previous_revision_ = history_hash;
+    return true;
+  }
+  shash::Any previous_revision() const { return previous_revision_; }
 
   bool Insert(const Tag &tag);
   bool Remove(const std::string &name);
@@ -503,9 +506,10 @@ class MockHistory : public history::History,
   };
 
  private:
-  TagMap  tags_;
-  HashSet recycle_bin_;
-  bool    writable_;
+  TagMap      tags_;
+  HashSet     recycle_bin_;
+  bool        writable_;
+  shash::Any  previous_revision_;
 };
 
 

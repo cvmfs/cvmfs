@@ -261,10 +261,11 @@ MockHistory::MockHistory(const bool          writable,
 }
 
 
-MockHistory::MockHistory(const MockHistory &other) :
-  tags_(other.tags_),
-  recycle_bin_(other.recycle_bin_),
-  writable_(other.writable_)
+MockHistory::MockHistory(const MockHistory &other)
+  : tags_(other.tags_)
+  , recycle_bin_(other.recycle_bin_)
+  , writable_(other.writable_)
+  , previous_revision_(other.previous_revision_)
 {
   set_fqrn(other.fqrn());
   ++MockHistory::instances;
