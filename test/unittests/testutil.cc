@@ -122,7 +122,7 @@ unsigned int MockCatalog::instances = 0;
 const std::string MockCatalog::rhs       = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
 const shash::Any  MockCatalog::root_hash = shash::Any(shash::kSha1,
                                                       shash::HexPtr(MockCatalog::rhs),
-                                                      'C');
+                                                      shash::kSuffixCatalog);
 
 void MockCatalog::ResetGlobalState() {
   MockCatalog::instances = 0;
@@ -133,8 +133,8 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
                                        const shash::Any   &catalog_hash,
                                              MockCatalog  *parent,
                                        const bool          is_not_root) {
-  const MockCatalog *catalog = MockCatalog::Get(catalog_hash);
-  assert (catalog->IsRoot() || is_not_root);
+  MockCatalog *catalog = MockCatalog::Get(catalog_hash);
+
   if (catalog == NULL) {
     return NULL;
   }
