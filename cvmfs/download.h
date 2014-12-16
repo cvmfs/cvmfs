@@ -290,6 +290,7 @@ class DownloadManager {
   void SetDnsParameters(const unsigned retries, const unsigned timeout_sec);
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
+  void SetLowSpeedLimit(const unsigned low_speed_limit);
   const Statistics &GetStatistics();
   void SetHostChain(const std::string &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
@@ -356,8 +357,9 @@ class DownloadManager {
   pthread_mutex_t *lock_options_;
   pthread_mutex_t *lock_synchronous_mode_;
   char *opt_dns_server_;
-  unsigned opt_timeout_proxy_ ;
+  unsigned opt_timeout_proxy_;
   unsigned opt_timeout_direct_;
+  unsigned opt_low_speed_limit_;
   unsigned opt_max_retries_;
   unsigned opt_backoff_init_ms_;
   unsigned opt_backoff_max_ms_;

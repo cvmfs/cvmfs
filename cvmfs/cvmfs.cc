@@ -111,6 +111,7 @@ namespace cvmfs {
 
 const char *kDefaultCachedir = "/var/lib/cvmfs/default";
 const unsigned kDefaultTimeout = 2;
+const unsigned kDefaultLowSpeedLimit = 1024;
 const double kDefaultKCacheTimeout = 60.0;
 const unsigned kReloadSafetyMargin = 500;  // in milliseconds
 const unsigned kDefaultNumConnections = 16;
@@ -1789,6 +1790,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   uint64_t mem_cache_size = cvmfs::kDefaultMemcache;
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
+  unsigned low_speed_limit = cvmfs::kDefaultLowSpeedLimit;
   unsigned proxy_reset_after = 0;
   unsigned host_reset_after = 0;
   unsigned max_retries = 1;
@@ -1859,6 +1861,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     timeout = String2Uint64(parameter);
   if (options::GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
     timeout_direct = String2Uint64(parameter);
+  if (options::GetValue("CVMFS_LOW_SPEED_LIMIT", &parameter))
+    low_speed_limit = String2Uint64(parameter);
   if (options::GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
     proxy_reset_after = String2Uint64(parameter);
   if (options::GetValue("CVMFS_HOST_RESET_AFTER", &parameter))
@@ -2232,6 +2236,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::download_manager_->SetDnsServer(dns_server);
   }
   cvmfs::download_manager_->SetTimeout(timeout, timeout_direct);
+  cvmfs::download_manager_->SetLowSpeedLimit(low_speed_limit);
   cvmfs::download_manager_->SetProxyGroupResetDelay(proxy_reset_after);
   cvmfs::download_manager_->SetHostResetDelay(host_reset_after);
   cvmfs::download_manager_->SetRetryParameters(max_retries,
