@@ -4,15 +4,18 @@ cvmfs_test_name="Low speed limit"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount cms.cern.ch || return 1
+  cvmfs_mount ams.cern.ch || return 1
+  ls /cvmfs/ams.cern.ch/Offline || return 2
 
   cvmfs_umount cms.cern.ch
+  sudo cvmfs_config wipecache
+  
   # TODO: traffic shaping
-  #cvmfs_mount cms.cern.ch "CVMFS_TIMEOUT=1" "CVMFS_TIMEOUT_DIRECT=1" \
-     "CVMFS_LOW_SPEED_LIMT=1073741824"
-  #if [ $? -eq 0 ]; then
-  #  return 10
-  #fi
+  cvmfs_mount ams.cern.ch "CVMFS_TIMEOUT=1" "CVMFS_TIMEOUT_DIRECT=1" \
+     "CVMFS_LOW_SPEED_LIMIT=1073741824" && ls /cvmfs/ams.cern.ch/Offline
+  if [ $? -eq 0 ]; then
+    return 10
+  fi
 
   return 0
 }
