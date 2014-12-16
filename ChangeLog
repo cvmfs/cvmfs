@@ -1,4 +1,6 @@
 2.1.20:
+  * Add CVMFS_LOW_SPEED_LIMIT parameter, increase threshold for stale
+    connections from 100B/s to 1kB/s (CVM-718)
   * Allow cvmfs to claim ownership of files and directories through 
     CVMFS_CLAIM_OWNERSHIP (CVM-678)
   * Add support for garbage-collected repositories (CVM-583)
@@ -33,6 +35,7 @@
   * Warn when aufs version is known to potentially cause deadlocks
   * Fix alien cache catalog updates (CVM-653)
   * Add underscore and tilde to the set of unescaped URI characters
+  * Fix packaging for Fedora 21
   * Fix SElinux packaging for RHEL7 and Fedora 20
   * Disable SQlite locking on the client; improves performance
     and allows to store cache directory on file systems with
