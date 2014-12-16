@@ -117,43 +117,15 @@ DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
 //
 
 
-MockCatalog::AvailableCatalogs MockCatalog::available_catalogs;
-unsigned int                   MockCatalog::instances = 0;
+unsigned int MockCatalog::instances = 0;
 
 const std::string MockCatalog::rhs       = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
 const shash::Any  MockCatalog::root_hash = shash::Any(shash::kSha1,
                                                       shash::HexPtr(MockCatalog::rhs),
                                                       'C');
 
-
-void MockCatalog::Reset() {
+void MockCatalog::ResetGlobalState() {
   MockCatalog::instances = 0;
-  MockCatalog::UnregisterCatalogs();
-}
-
-void MockCatalog::RegisterCatalog(MockCatalog *catalog) {
-  ASSERT_EQ (MockCatalog::available_catalogs.end(),
-             MockCatalog::available_catalogs.find(catalog->hash()));
-  MockCatalog::available_catalogs[catalog->hash()] = catalog;
-}
-
-void MockCatalog::UnregisterCatalogs() {
-  MockCatalog::AvailableCatalogs::const_iterator i, iend;
-  for (i    = MockCatalog::available_catalogs.begin(),
-       iend = MockCatalog::available_catalogs.end();
-       i != iend; ++i)
-  {
-    delete i->second;
-  }
-  MockCatalog::available_catalogs.clear();
-}
-
-MockCatalog* MockCatalog::GetCatalog(const shash::Any &catalog_hash) {
-  AvailableCatalogs::const_iterator clg_itr =
-    MockCatalog::available_catalogs.find(catalog_hash);
-  return (MockCatalog::available_catalogs.end() != clg_itr)
-    ? clg_itr->second
-    : NULL;
 }
 
 MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
@@ -161,7 +133,8 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
                                        const shash::Any   &catalog_hash,
                                              MockCatalog  *parent,
                                        const bool          is_not_root) {
-  const MockCatalog *catalog = MockCatalog::GetCatalog(catalog_hash);
+  const MockCatalog *catalog = MockCatalog::Get(catalog_hash);
+  assert (catalog->IsRoot() || is_not_root);
   if (catalog == NULL) {
     return NULL;
   }

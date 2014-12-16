@@ -178,6 +178,54 @@ const std::string AbstractMockUploader<DerivedT>::sandbox_tmp_dir = g_sandbox_tm
 //
 
 
+template <class ObjectT>
+class MockObjectStorage {
+ private:
+  typedef std::map<shash::Any, ObjectT*> AvailableObjects;
+  static AvailableObjects available_objects;
+
+ public:
+  static void Reset() {
+    MockObjectStorage::UnregisterObjects();
+    ObjectT::ResetGlobalState();
+  }
+
+  static void RegisterObject(const shash::Any &hash, ObjectT *object) {
+    ASSERT_EQ (MockObjectStorage::available_objects.end(),
+               MockObjectStorage::available_objects.find(hash));
+    MockObjectStorage::available_objects[hash] = object;
+  }
+
+  static void UnregisterObjects() {
+    typename MockObjectStorage<ObjectT>::AvailableObjects::const_iterator i, iend;
+    for (i    = MockObjectStorage<ObjectT>::available_objects.begin(),
+         iend = MockObjectStorage<ObjectT>::available_objects.end();
+         i != iend; ++i)
+    {
+      delete i->second;
+    }
+    MockObjectStorage<ObjectT>::available_objects.clear();
+  }
+
+  static ObjectT* Get(const shash::Any &hash) {
+    typename AvailableObjects::const_iterator itr =
+      MockObjectStorage<ObjectT>::available_objects.find(hash);
+    return (MockObjectStorage<ObjectT>::available_objects.end() != itr)
+      ? itr->second
+      : NULL;
+  }
+};
+
+template <class ObjectT>
+typename MockObjectStorage<ObjectT>::AvailableObjects
+  MockObjectStorage<ObjectT>::available_objects;
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 namespace manifest {
   class Manifest;
 }
@@ -190,19 +238,11 @@ namespace swissknife {
 /**
  * This is a minimal mock of a Catalog class.
  */
-class MockCatalog {
+class MockCatalog : public MockObjectStorage<MockCatalog> {
  public:
-  typedef std::map<shash::Any, MockCatalog*> AvailableCatalogs;
-  static AvailableCatalogs available_catalogs;
-  static unsigned int      instances;
-
   static const std::string rhs;
   static const shash::Any  root_hash;
-
-  static void Reset();
-  static void RegisterCatalog(MockCatalog *catalog);
-  static void UnregisterCatalogs();
-  static MockCatalog* GetCatalog(const shash::Any &catalog_hash);
+  static unsigned int      instances;
 
  public:
   struct NestedCatalog {
@@ -228,6 +268,8 @@ class MockCatalog {
   typedef std::vector<shash::Any> HashVector;
 
  public:
+  static void ResetGlobalState();
+
   MockCatalog(const std::string &root_path,
               const shash::Any  &catalog_hash,
               const uint64_t     catalog_size,
