@@ -134,3 +134,17 @@ TEST(T_Util, String2Uint64) {
   EXPECT_EQ(String2Uint64("18446744073709551615000"), 18446744073709551615LLU);
   EXPECT_EQ(String2Uint64("1a"), 1U);
 }
+
+
+TEST(T_Util, IsRemotePath) {
+  EXPECT_TRUE  (IsRemotePath("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
+  EXPECT_TRUE  (IsRemotePath("http://"));
+  EXPECT_TRUE  (IsRemotePath("http://foobar"));
+  EXPECT_TRUE  (IsRemotePath("HTTP://www.google.com"));
+  EXPECT_TRUE  (IsRemotePath("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
+  EXPECT_FALSE (IsRemotePath("http:/foobar"));
+  EXPECT_FALSE (IsRemotePath("http"));
+  EXPECT_FALSE (IsRemotePath("/srv/cvmfs/cms.cern.ch"));
+  EXPECT_FALSE (IsRemotePath("srv/cvmfs/cms.cern.ch"));
+  EXPECT_FALSE (IsRemotePath("http//foobar"));
+}
