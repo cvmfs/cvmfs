@@ -90,11 +90,7 @@ static void PinpointHostSubstr(
 
 /**
  * Returns the host name from a string in the format
-<<<<<<< HEAD
  * http://<hostname>:<port>[/path]
-=======
- * http://<hostname>:<port>/path
->>>>>>> f6a97a478f0848d3656ab9da593e9da0cb85cab8
  * or an empty string if url doesn't match the format.
  */
 std::string ExtractHost(const std::string &url) {
