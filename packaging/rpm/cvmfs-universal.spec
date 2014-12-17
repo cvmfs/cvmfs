@@ -99,7 +99,7 @@ Requires: util-linux
     %endif
   %endif
 %endif
-Requires: cvmfs-keys >= 1.2
+Requires: cvmfs-config
 
 # SELinux integration
 # These are needed to build the selinux policy module.
@@ -242,8 +242,11 @@ mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/config.d
 mkdir -p $RPM_BUILD_ROOT/etc/cvmfs/repositories.d
 mkdir -p $RPM_BUILD_ROOT/etc/bash_completion.d
 
-# Keys are in cvmfs-keys
-rm -f $RPM_BUILD_ROOT/etc/cvmfs/keys/*
+# Keys and configs are in cvmfs-config
+rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
+rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/*.conf
+rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
+rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
 
 # Fix docdir on SuSE
 %if 0%{?suse_version}
@@ -344,7 +347,6 @@ fi
 %attr(700,cvmfs,cvmfs) %dir /var/lib/cvmfs
 %{_sysconfdir}/cvmfs/default.d/README
 %config %{_sysconfdir}/cvmfs/default.conf
-%config %{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
 %dir %{_sysconfdir}/bash_completion.d
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README ChangeLog
@@ -382,6 +384,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Wed Dec 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20
+- Adjust for new cvmfs-config-... packages
 * Wed Dec 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20
 - Add libuuid-devel dependency
 - Fixes for Fedora 21
