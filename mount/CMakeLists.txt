@@ -55,6 +55,24 @@ if (MACOSX)
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
+  install (
+    FILES         config.d/grid.cern.ch.conf
+    DESTINATION   "/etc/cvmfs/config.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         config.d/atlas-nightlies.cern.ch.conf
+    DESTINATION   "/etc/cvmfs/config.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         config.d/cms.cern.ch.conf
+    DESTINATION   "/etc/cvmfs/config.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
   if (INSTALL_CERN_KEYS)
     install (
       FILES         keys/cern.ch.pub
@@ -159,6 +177,24 @@ else (MACOSX)
   install (
     FILES         domain.d/cern.ch.conf
     DESTINATION   "/etc/cvmfs/domain.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         config.d/grid.cern.ch.conf
+    DESTINATION   "/etc/cvmfs/config.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         config.d/atlas-nightlies.cern.ch.conf
+    DESTINATION   "/etc/cvmfs/config.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         config.d/cms.cern.ch.conf
+    DESTINATION   "/etc/cvmfs/config.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
