@@ -25,6 +25,10 @@
             <mod>group</mod>
             <mod>owner</mod>
           </f>
+          <f n="50-cern.conf" o="root" g="wheel" p="33188">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
           <mod>group</mod>
           <mod>owner</mod>
         </f>
@@ -44,39 +48,60 @@
           <mod>group</mod>
           <mod>owner</mod>
         </f>
+        <f n="config.d" o="root" g="wheel" p="16877">
+          <f n="atlas-nightlies.cern.ch.conf" o="root" g="wheel" p="33188">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="cms.cern.ch.conf" o="root" g="wheel" p="33188">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <f n="grid.cern.ch.conf" o="root" g="wheel" p="33188">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
+          <mod>group</mod>
+          <mod>owner</mod>
+        </f>
         <f n="keys" o="root" g="wheel" p="16877">
-          <f n="cern.ch.pub" o="root" g="wheel" p="33060">
-            <mod>group</mod>
+          <f n="cern.ch" o="root" g="wheel" p="16877">
+            <f n="cern.ch.pub" o="root" g="wheel" p="33188">
+              <mod>group</mod>
+              <mod>owner</mod>
+            </f>
+            <f n="cern-it1.cern.ch.pub" o="root" g="wheel" p="33188">
+              <mod>group</mod>
+              <mod>owner</mod>
+            </f>
+            <f n="cern-it2.cern.ch.pub" o="root" g="wheel" p="33188">
+              <mod>group</mod>
+              <mod>owner</mod>
+            </f>
+            <f n="cern-it3.cern.ch.pub" o="root" g="wheel" p="33188">
+              <mod>group</mod>
+              <mod>owner</mod>
+            </f>
+            <mod>group</mod>    
             <mod>owner</mod>
           </f>
-          <f n="cern-it1.cern.ch.pub" o="root" g="wheel" p="33060">
-            <mod>group</mod>
+          <f n="egi.eu" o="root" g="wheel" p="16877">
+            <f n="egi.eu.pub" o="root" g="wheel" p="33188">
+              <mod>group</mod>
+              <mod>owner</mod>
+            </f>
+            <mod>group</mod>    
             <mod>owner</mod>
           </f>
-          <f n="cern-it2.cern.ch.pub" o="root" g="wheel" p="33060">
-            <mod>group</mod>
+          <f n="opensciencegrid.org" o="root" g="wheel" p="16877">
+            <f n="opensciencegrid.org.pub" o="root" g="wheel" p="33188">
+              <mod>group</mod>
+              <mod>owner</mod>
+            </f>
+            <mod>group</mod>    
             <mod>owner</mod>
           </f>
-          <f n="cern-it3.cern.ch.pub" o="root" g="wheel" p="33060">
-            <mod>group</mod>
-            <mod>owner</mod>
-          </f>
-          <f n="opensciencegrid.org.pub" o="root" g="wheel" p="33060">
-            <mod>group</mod>
-            <mod>owner</mod>
-          </f>
-          <f n="egi.eu.pub" o="root" g="wheel" p="33060">
-            <mod>group</mod>
-            <mod>owner</mod>
-          </f>
-          <mod>group</mod>
-          <mod>owner</mod>
-        </f>
-        <f n="replica.conf" o="root" g="wheel" p="33204">
-          <mod>mode</mod>
-          <mod>group</mod>
-          <mod>owner</mod>
-        </f>
+        </f>  
         <f n="serverorder.sh" o="root" g="wheel" p="33188">
           <mod>group</mod>
           <mod>owner</mod>
@@ -132,25 +157,7 @@
             <mod>group</mod>
             <mod>owner</mod>
           </f>
-          <f n="cvmfs_sign" o="root" g="wheel" p="33261">
-            <mod>group</mod>
-            <mod>owner</mod>
-          </f>
-          <f n="cvmfs_snapshot" o="root" g="wheel" p="33277">
-            <mod>mode</mod>
-            <mod>group</mod>
-            <mod>owner</mod>
-          </f>
-          <f n="cvmfs_sync" o="root" g="wheel" p="33277">
-            <mod>mode</mod>
-            <mod>group</mod>
-            <mod>owner</mod>
-          </f>
           <f n="cvmfs_talk" o="root" g="wheel" p="33133">
-            <mod>group</mod>
-            <mod>owner</mod>
-          </f>
-          <f n="cvmfs_zpipe" o="root" g="wheel" p="33261">
             <mod>group</mod>
             <mod>owner</mod>
           </f>
