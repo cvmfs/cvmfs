@@ -16,6 +16,9 @@
 #include "signature.h"
 
 
+template <class ConcreteObjectFetcherT>
+struct object_fetcher_traits;
+
 /**
  * This is the default class implementing the data object fetching strategy. It
  * is meant to be used when CVMFS specific data structures need to be downloaded
@@ -25,21 +28,55 @@
  * access logic in one central point. This also comes in handy when unit testing
  * components that depend on downloading CVMFS data structures from a repository
  * backen storage like CatalogTraversal<> or GarbageCollector.
- *
- * Since we are handling I/O here, it is implemented using pure virtual method
- * calls in an abstract interface class.
  */
-template <class CatalogT>
+template <class DerivedT>
 class AbstractObjectFetcher {
  public:
-  virtual ~AbstractObjectFetcher() {}
+  typedef typename object_fetcher_traits<DerivedT>::catalog_t catalog_t;
+  typedef typename object_fetcher_traits<DerivedT>::history_t history_t;
 
-  virtual manifest::Manifest*  FetchManifest() = 0;
-  virtual history::History*    FetchHistory(const shash::Any &hash = shash::Any()) = 0;
-  virtual CatalogT*            FetchCatalog(const shash::Any  &catalog_hash,
-                                            const std::string &catalog_path,
-                                            const bool         is_nested = false,
-                                                  CatalogT    *parent    = NULL)  = 0;
+  static const std::string kManifestFilename;
+
+ public:
+  manifest::Manifest* FetchManifest() {
+    return static_cast<DerivedT*>(this)->FetchManifest();
+  }
+
+  history_t* FetchHistory(const shash::Any &history_hash = shash::Any()) {
+    // retrieve the current HEAD history hash (if nothing else given)
+    shash::Any effective_history_hash = (! history_hash.IsNull())
+            ? history_hash
+            : GetHistoryHash();
+
+    // download the history hash
+    std::string path;
+    if (effective_history_hash.IsNull() ||
+        ! Fetch(effective_history_hash, shash::kSuffixHistory, &path)) {
+      return NULL;
+    }
+
+    // open the history file
+    return history_t::Open(path);
+  }
+
+
+  catalog_t* FetchCatalog(const shash::Any  &catalog_hash,
+                          const std::string &catalog_path,
+                          const bool         is_nested = false,
+                                catalog_t   *parent    = NULL) {
+    assert (! catalog_hash.IsNull());
+
+    std::string path;
+    if (! Fetch(catalog_hash, shash::kSuffixCatalog, &path)) {
+      return NULL;
+    }
+
+    return catalog_t::AttachFreely(catalog_path,
+                                   path,
+                                   catalog_hash,
+                                   parent,
+                                   is_nested);
+  }
 
  public:
   bool HasHistory() {
@@ -48,6 +85,14 @@ class AbstractObjectFetcher {
   }
 
  protected:
+  bool Fetch(const shash::Any    &object_hash,
+             const shash::Suffix  hash_suffix,
+             std::string         *file_path) {
+    return static_cast<DerivedT*>(this)->Fetch(object_hash,
+                                               hash_suffix,
+                                               file_path);
+  }
+
   shash::Any GetHistoryHash() {
     UniquePtr<manifest::Manifest> manifest(FetchManifest());
     if (! manifest || manifest->history().IsNull()) {
@@ -58,26 +103,112 @@ class AbstractObjectFetcher {
   }
 };
 
-template <class CatalogT>
-class HttpObjectFetcher : public AbstractObjectFetcher<CatalogT> {
+template <class DerivedT>
+const std::string AbstractObjectFetcher<DerivedT>::kManifestFilename =
+                                                              ".cvmfspublished";
+
+
+/**
+ * TODO: Documentation goes here
+ */
+template <class CatalogT = catalog::Catalog,
+          class HistoryT = history::SqliteHistory>
+class LocalObjectFetcher :
+  public AbstractObjectFetcher<LocalObjectFetcher<CatalogT, HistoryT> >
+{
+ protected:
+  typedef LocalObjectFetcher<CatalogT, HistoryT> this_t;
+  typedef AbstractObjectFetcher<this_t>          base_t;
+
  public:
-  static HttpObjectFetcher<CatalogT>* Create(const std::string &repo_name,
-                                             const std::string &repo_url,
-                                             const std::string &repo_keys,
-                                             const std::string &temp_dir) {
-    UniquePtr<HttpObjectFetcher> fetcher(new HttpObjectFetcher(repo_name,
-                                                               repo_url,
-                                                               repo_keys,
-                                                               temp_dir));
+  LocalObjectFetcher(const std::string &base_path,
+                     const std::string &temp_dir)
+    : base_path_(base_path)
+    , temporary_directory_(temp_dir) {}
+
+  manifest::Manifest* FetchManifest() {
+    return manifest::Manifest::LoadFile(BuildPath(base_t::kManifestFilename));
+  }
+
+  bool Fetch(const shash::Any    &object_hash,
+             const shash::Suffix  hash_suffix,
+             std::string         *file_path) {
+    assert (file_path != NULL);
+    file_path->clear();
+
+    const std::string source = BuildPath(object_hash, hash_suffix);
+    const std::string dest   = temporary_directory_ + "/" +
+                               object_hash.ToString();
+    if (! FileExists(source)) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s at '%s'",
+               object_hash.ToString().c_str(), dest.c_str());
+      return false;
+    }
+
+    if (! zlib::DecompressPath2Path(source, dest)) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
+                                        "to '%s' (errno: %d)",
+               object_hash.ToString().c_str(), source.c_str(), dest.c_str(),
+               errno);
+      return false;
+    }
+
+    *file_path = dest;
+    return true;
+  }
+
+
+ protected:
+  std::string BuildPath(const std::string &relative_path) const {
+    return base_path_ + "/" + relative_path;
+  }
+
+  std::string BuildPath(const shash::Any    &hash,
+                        const shash::Suffix  suffix) const {
+    return BuildPath("data" + hash.MakePathWithSuffix(1, 2, suffix));
+  }
+
+ private:
+  const std::string base_path_;
+  const std::string temporary_directory_;
+};
+
+template <class CatalogT, class HistoryT>
+struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT> > {
+    typedef CatalogT catalog_t;
+    typedef HistoryT history_t;
+};
+
+
+/**
+ * TODO: Documentation goes here
+ */
+template <class CatalogT = catalog::Catalog,
+          class HistoryT = history::SqliteHistory>
+class HttpObjectFetcher :
+  public AbstractObjectFetcher<HttpObjectFetcher<CatalogT, HistoryT> >
+{
+ protected:
+  typedef HttpObjectFetcher<CatalogT, HistoryT>  this_t;
+  typedef AbstractObjectFetcher<this_t>          base_t;
+
+ public:
+  static this_t* Create(const std::string &repo_name,
+                        const std::string &repo_url,
+                        const std::string &repo_keys,
+                        const std::string &temp_dir) {
+    UniquePtr<this_t> fetcher(new this_t(repo_name,
+                                         repo_url,
+                                         repo_keys,
+                                         temp_dir));
     assert (fetcher);
     return (fetcher->Initialize()) ? fetcher.Release() : NULL;
   }
 
-  virtual ~HttpObjectFetcher() {
+  ~HttpObjectFetcher() {
     signature_manager_.Fini();
     download_manager_.Fini();
   }
-
 
  protected:
   bool Initialize() {
@@ -86,12 +217,11 @@ class HttpObjectFetcher : public AbstractObjectFetcher<CatalogT> {
     return signature_manager_.LoadPublicRsaKeys(repo_keys_);
   }
 
-
  public:
   manifest::Manifest* FetchManifest() {
     manifest::Manifest *manifest = NULL;
 
-    const std::string url = BuildUrl(".cvmfspublished");
+    const std::string url = BuildUrl(base_t::kManifestFilename);
 
     // Download manifest file
     struct manifest::ManifestEnsemble manifest_ensemble;
@@ -124,45 +254,6 @@ class HttpObjectFetcher : public AbstractObjectFetcher<CatalogT> {
     return manifest;
   }
 
-
-  history::History* FetchHistory(const shash::Any &history_hash = shash::Any()) {
-    // retrieve the current HEAD history hash (if nothing else given)
-    shash::Any effective_history_hash = (! history_hash.IsNull())
-                      ? history_hash
-                      : this->AbstractObjectFetcher<CatalogT>::GetHistoryHash();
-
-    // download the history hash
-    std::string path;
-    if (effective_history_hash.IsNull() ||
-        ! Fetch(effective_history_hash, shash::kSuffixHistory, &path)) {
-      return NULL;
-    }
-
-    // open the history file
-    return history::SqliteHistory::Open(path);
-  }
-
-
-  CatalogT* FetchCatalog(const shash::Any  &catalog_hash,
-                         const std::string &catalog_path,
-                         const bool         is_nested = false,
-                               CatalogT    *parent    = NULL) {
-    assert (! catalog_hash.IsNull());
-
-    std::string path;
-    if (! Fetch(catalog_hash, shash::kSuffixCatalog, &path)) {
-      return NULL;
-    }
-
-    return CatalogT::AttachFreely(catalog_path,
-                                  path,
-                                  catalog_hash,
-                                  parent,
-                                  is_nested);
-  }
-
-
- protected:
   bool Fetch(const shash::Any     &object_hash,
              const shash::Suffix   hash_suffix,
              std::string          *object_file) {
@@ -187,6 +278,7 @@ class HttpObjectFetcher : public AbstractObjectFetcher<CatalogT> {
     return retval == download::kFailOk;
   }
 
+ protected:
   HttpObjectFetcher(const std::string &repo_name,
                     const std::string &repo_url,
                     const std::string &repo_keys,
@@ -210,6 +302,12 @@ class HttpObjectFetcher : public AbstractObjectFetcher<CatalogT> {
   const std::string            temporary_directory_;
   download::DownloadManager    download_manager_;
   signature::SignatureManager  signature_manager_;
+};
+
+template <class CatalogT, class HistoryT>
+struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT> > {
+    typedef CatalogT catalog_t;
+    typedef HistoryT history_t;
 };
 
 #endif /* OBJECT_FETCHER_H */
