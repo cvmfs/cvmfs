@@ -11,20 +11,20 @@ namespace history {
 const std::string SqliteHistory::kPreviousRevisionKey = "previous_revision";
 
 
-History* SqliteHistory::Open(const std::string &file_name) {
+SqliteHistory* SqliteHistory::Open(const std::string &file_name) {
   const bool read_write = false;
   return Open(file_name, read_write);
 }
 
 
-History* SqliteHistory::OpenWritable(const std::string &file_name) {
+SqliteHistory* SqliteHistory::OpenWritable(const std::string &file_name) {
   const bool read_write = true;
   return Open(file_name, read_write);
 }
 
 
-History* SqliteHistory::Open(const std::string &file_name,
-                             const bool read_write) {
+SqliteHistory* SqliteHistory::Open(const std::string &file_name,
+                                   const bool read_write) {
   SqliteHistory *history = new SqliteHistory();
   if (NULL == history || ! history->OpenDatabase(file_name, read_write)) {
     delete history;
@@ -40,8 +40,8 @@ History* SqliteHistory::Open(const std::string &file_name,
 }
 
 
-History* SqliteHistory::Create(const std::string &file_name,
-                               const std::string &fqrn) {
+SqliteHistory* SqliteHistory::Create(const std::string &file_name,
+                                     const std::string &fqrn) {
   SqliteHistory *history = new SqliteHistory();
   if (NULL == history || ! history->CreateDatabase(file_name, fqrn)) {
     delete history;

@@ -40,7 +40,7 @@ class SqliteHistory : public History {
    * @param file_name  the path to the history SQLite file to be opened
    * @return           pointer to History object or NULL on error
    */
-  static History* Open(const std::string &file_name);
+  static SqliteHistory* Open(const std::string &file_name);
 
   /**
    * Same as SqliteHistory::Open(), but opens the history database file in
@@ -50,7 +50,7 @@ class SqliteHistory : public History {
    * @param file_name  the path to the history SQLite file to be opened
    * @return           pointer to History object or NULL on error
    */
-  static History* OpenWritable(const std::string &file_name);
+  static SqliteHistory* OpenWritable(const std::string &file_name);
 
   /**
    * Creates an empty History database. Since a History object is always
@@ -62,7 +62,8 @@ class SqliteHistory : public History {
    * @param fqrn       the FQRN of the repository containing this History
    * @return           pointer to empty History object or NULL on error
    */
-  static History* Create(const std::string &file_name, const std::string &fqrn);
+  static SqliteHistory* Create(const std::string &file_name,
+                               const std::string &fqrn);
 
   bool IsWritable() const;
   unsigned GetNumberOfTags() const;
@@ -134,7 +135,8 @@ class SqliteHistory : public History {
   bool GetHashes(std::vector<shash::Any> *hashes) const;
 
  protected:
-  static History* Open(const std::string &file_name, const bool read_write);
+  static SqliteHistory* Open(const std::string &file_name,
+                             const bool read_write);
   bool OpenDatabase(const std::string &file_name, const bool read_write);
   bool CreateDatabase(const std::string &file_name, const std::string &fqrn);
   void PrepareQueries();
