@@ -147,7 +147,6 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
-Requires: cvmfs-keys >= 1.2
 
 Conflicts: cvmfs-server < 2.1
 
@@ -247,6 +246,7 @@ rm -rf $RPM_BUILD_ROOT/etc/cvmfs/keys/*
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/config.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/domain.d/*.conf
 rm -f $RPM_BUILD_ROOT/etc/cvmfs/default.d/*.conf
+rm -f $RPM_BUILD_ROOT/etc/cvmfs/serverorder.sh
 
 # Fix docdir on SuSE
 %if 0%{?suse_version}

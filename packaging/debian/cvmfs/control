@@ -9,7 +9,7 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 Package: cvmfs
 Architecture: i386 amd64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: cvmfs-keys (>= 1.2), bash, coreutils, grep, gawk, sed, perl, sudo, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb, uuid-dev, uuid
+Depends: cvmfs-config, bash, coreutils, grep, gawk, sed, perl, sudo, psmisc, autofs, fuse, curl, attr, libfuse2, debianutils, libc-bin, sysvinit-utils, zlib1g, gdb, uuid-dev, uuid
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System
@@ -18,7 +18,7 @@ Description: CernVM File System
 Package: cvmfs-server
 Architecture: amd64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: cvmfs (= ${source:Version}), insserv, initscripts, bash, coreutils, grep, sed, sudo, psmisc, curl, gzip, attr, openssl, apache2, cvmfs-keys (>= 1.2)
+Depends: cvmfs (= ${source:Version}), insserv, initscripts, bash, coreutils, grep, sed, sudo, psmisc, curl, gzip, attr, openssl, apache2
 Conflicts: cvmfs-server (< 2.1)
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
