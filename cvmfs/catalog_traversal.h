@@ -46,10 +46,12 @@ struct CatalogTraversalData {
                        const shash::Any   &catalog_hash,
                        const unsigned      tree_level,
                        const size_t        file_size,
-                       const unsigned int  history_depth) :
-    catalog(catalog), catalog_hash(catalog_hash), tree_level(tree_level),
-    file_size(file_size),
-    history_depth(history_depth) {}
+                       const unsigned int  history_depth)
+  : catalog(catalog)
+  , catalog_hash(catalog_hash)
+  , tree_level(tree_level)
+  , file_size(file_size)
+  , history_depth(history_depth) {}
 
   const CatalogT     *catalog;
   const shash::Any    catalog_hash;
