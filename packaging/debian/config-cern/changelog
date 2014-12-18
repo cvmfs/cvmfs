@@ -1,0 +1,5 @@
+cvmfs-config-cern (1.0-1) lucid; urgency=low
+
+  * Initial packaging
+  
+ -- Jakob Blomer <jblomer@cern.ch>  Thu, 18 Dec 2014 12:00:00 +0000

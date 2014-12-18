@@ -16,7 +16,7 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 reachability_timeout=1800  # (  30 minutes )
 accessibility_timeout=7200 # ( 120 minutes )
-keys_package_base_url="https://ecsft.cern.ch/dist/cvmfs/cvmfs-keys"
+config_package_base_url="https://ecsft.cern.ch/dist/cvmfs/cvmfs-config"
 
 # static information (check also remote_setup.sh and remote_run.sh)
 cvmfs_workspace="/tmp/cvmfs-test-workspace"
@@ -45,7 +45,7 @@ userdata=""
 # package download locations
 server_package=""
 client_package=""
-keys_package=""
+config_package=""
 unittest_package=""
 source_tarball="source.tar.gz" # will be prepended by ${testee_url} later
 
@@ -277,7 +277,7 @@ setup_virtual_machine() {
       -c $client_package                                           \
       -t $source_tarball                                           \
       -g $unittest_package                                         \
-      -k $keys_package                                             \
+      -k $config_package                                           \
       -r $platform_setup_script
   check_retcode $?
   if [ $? -ne 0 ]; then
@@ -398,12 +398,12 @@ fi
 client_package=$(read_package_map   ${testee_url}/pkgmap "$platform" 'client'   )
 server_package=$(read_package_map   ${testee_url}/pkgmap "$platform" 'server'   )
 unittest_package=$(read_package_map ${testee_url}/pkgmap "$platform" 'unittests')
-keys_package=$(read_package_map     ${testee_url}/pkgmap "$platform" 'keys'     )
+config_package=$(read_package_map   ${testee_url}/pkgmap "$platform" 'config'   )
 
 # check if all necessary packages were found
 if [ x$server_package        = "x" ] ||
    [ x$client_package        = "x" ] ||
-   [ x$keys_package          = "x" ] ||
+   [ x$config_package        = "x" ] ||
    [ x$unittest_package      = "x" ]; then
   usage "Incomplete pkgmap file"
 fi
@@ -412,7 +412,7 @@ fi
 client_package="${testee_url}/${client_package}"
 server_package="${testee_url}/${server_package}"
 unittest_package="${testee_url}/${unittest_package}"
-keys_package="${keys_package_base_url}/${keys_package}"
+config_package="${config_package_base_url}/${config_package}"
 source_tarball="${testee_url}/${source_tarball}"
 
 # load EC2 configuration

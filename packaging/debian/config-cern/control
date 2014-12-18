@@ -1,0 +1,15 @@
+Source: cvmfs-config-cern
+Maintainer: Jakob Blomer <jblomer@cern.ch>
+Section: utils
+Priority: extra
+Standards-Version: 3.9.3.1
+Build-Depends: debhelper (>= 9), make
+Homepage: http://cernvm.cern.ch/portal/filesystem
+
+Package: cvmfs-config-cern
+Architecture: all 
+Depends: curl ${misc:Depends}
+Breaks: cvmfs (< 2.1.20), cvmfs-server (< 2.1.20)
+Replaces: cvmfs-keys
+Provides: cvmfs-config
+Description: CernVM File System CERN Configuration and Public Keys
