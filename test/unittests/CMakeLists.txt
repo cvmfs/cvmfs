@@ -53,6 +53,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_hash_filters.cc
   t_download.cc
   t_uuid.cc
+  t_object_fetcher.cc
 
   # test utility functions
   testutil.cc testutil.h
