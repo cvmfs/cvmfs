@@ -79,6 +79,10 @@ time_t t(const int day, const int month, const int year) {
   return mktime(&time_descriptor);
 }
 
+shash::Any h(const std::string &hash, const shash::Suffix suffix) {
+  return shash::Any(shash::kSha1, shash::HexPtr(hash), suffix);
+}
+
 namespace catalog {
 
 DirectoryEntry DirectoryEntryTestFactory::RegularFile() {

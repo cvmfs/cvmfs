@@ -380,10 +380,6 @@ class T_CatalogTraversal : public ::testing::Test {
     return catalog;
   }
 
-  shash::Any h(const std::string &hash, const char suffix = 0) {
-    return shash::Any(shash::kSha1, shash::HexPtr(hash), suffix);
-  }
-
  private:
   Prng              dice_;
   RootCatalogMap    root_catalogs_;
