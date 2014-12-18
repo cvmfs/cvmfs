@@ -16,6 +16,16 @@
 #include "signature.h"
 
 
+/**
+ * Trait class to define the concrete object types produced by the methods of
+ * concrete instantiations of AbstractObjectFetcher<>. For each implementation
+ * of AbstractObjectFetcher<> one needs to provide a specialisation of this
+ * trait. Note that this specialisation can be templated with the actual para-
+ * meters, hence the parameter space does not explode.
+ *
+ * See: http://stackoverflow.com/questions/6006614/
+ *      c-static-polymorphism-crtp-and-using-typedefs-from-derived-classes
+ */
 template <class ConcreteObjectFetcherT>
 struct object_fetcher_traits;
 
@@ -24,10 +34,13 @@ struct object_fetcher_traits;
  * is meant to be used when CVMFS specific data structures need to be downloaded
  * from a backend storage of a repository.
  *
+ * ObjectFetchers are supposed to be configured for one specific repository. How
+ * this is done depends on the concrete implementation of this base class.
+ *
  * It abstracts all accesses to external file or HTTP resources and gathers this
  * access logic in one central point. This also comes in handy when unit testing
  * components that depend on downloading CVMFS data structures from a repository
- * backen storage like CatalogTraversal<> or GarbageCollector.
+ * backend storage like CatalogTraversal<> or GarbageCollector<>.
  */
 template <class DerivedT>
 class AbstractObjectFetcher {
@@ -38,10 +51,24 @@ class AbstractObjectFetcher {
   static const std::string kManifestFilename;
 
  public:
+  /**
+   * Fetches and opens the manifest of the repository this object fetcher is
+   * configured for. Note that the user is responsible to clean up this object.
+   *
+   * @return  a manifest object or NULL on error
+   */
   manifest::Manifest* FetchManifest() {
     return static_cast<DerivedT*>(this)->FetchManifest();
   }
 
+  /**
+   * Downloads and opens (read-only) a history database. Note that the user is
+   * responsible to remove the history object after usage.
+   *
+   * @param history_hash  (optional) the content hash of the history database
+   *                                 if left blank, the latest one is downloaded
+   * @return              a history database object or NULL on error
+   */
   history_t* FetchHistory(const shash::Any &history_hash = shash::Any()) {
     // retrieve the current HEAD history hash (if nothing else given)
     shash::Any effective_history_hash = (! history_hash.IsNull())
@@ -59,7 +86,16 @@ class AbstractObjectFetcher {
     return history_t::Open(path);
   }
 
-
+  /**
+   * Downloads and opens a catalog. Note that the user is responsible to remove
+   * the catalog object after usage.
+   *
+   * @param catalog_hash   the content hash of the catalog object
+   * @param catalog_path   the root_path the catalog is mounted on
+   * @param is_nested      a hint if the catalog to be loaded is a nested one
+   * @param parent         (optional) parent catalog of the requested catalog
+   * @return               a catalog object or NULL on error
+   */
   catalog_t* FetchCatalog(const shash::Any  &catalog_hash,
                           const std::string &catalog_path,
                           const bool         is_nested = false,
@@ -85,6 +121,16 @@ class AbstractObjectFetcher {
   }
 
  protected:
+  /**
+   * Internal function used to download objects defined by the given content
+   * hash. This needs to be implemented depending on the concrete implementation
+   * of this base class.
+   *
+   * @param object_hash  the content hash of the object to be downloaded
+   * @param hash_suffix  the (optional) hash suffix of the object to be fetched
+   * @param file_path    temporary file path to store the download result
+   * @return             true on success (if false, file_path is invalid)
+   */
   bool Fetch(const shash::Any    &object_hash,
              const shash::Suffix  hash_suffix,
              std::string         *file_path) {
@@ -93,6 +139,12 @@ class AbstractObjectFetcher {
                                                file_path);
   }
 
+  /**
+   * Retrieves the history content hash of the HEAD history database from the
+   * repository's manifest
+   *
+   * @return  the content hash of the HEAD history db or a null-hash on error
+   */
   shash::Any GetHistoryHash() {
     UniquePtr<manifest::Manifest> manifest(FetchManifest());
     if (! manifest || manifest->history().IsNull()) {
@@ -109,7 +161,9 @@ const std::string AbstractObjectFetcher<DerivedT>::kManifestFilename =
 
 
 /**
- * TODO: Documentation goes here
+ * This is an AbstractObjectFetcher<> accessing locally stored repository files.
+ * Note that this implementation does not take care of any repository signature
+ * verification.
  */
 template <class CatalogT = catalog::Catalog,
           class HistoryT = history::SqliteHistory>
@@ -121,6 +175,12 @@ class LocalObjectFetcher :
   typedef AbstractObjectFetcher<this_t>          base_t;
 
  public:
+  /**
+   * LocalObjectFetcher can reside on the stack or the heap.
+   *
+   * @param base_path  the path to the repository's backend storage
+   * @param temp_dir   location to store decompressed tmp data
+   */
   LocalObjectFetcher(const std::string &base_path,
                      const std::string &temp_dir)
     : base_path_(base_path)
@@ -181,7 +241,9 @@ struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT> > {
 
 
 /**
- * TODO: Documentation goes here
+ * This implements the AbstractObjectFetcher<> to retrieve repository objects
+ * from a remote location through HTTP. It verifies the repository's signature
+ * and the downloaded data integrity.
  */
 template <class CatalogT = catalog::Catalog,
           class HistoryT = history::SqliteHistory>
@@ -193,6 +255,18 @@ class HttpObjectFetcher :
   typedef AbstractObjectFetcher<this_t>          base_t;
 
  public:
+  /**
+   * Factory method to instatiate an HttpObjectFetcher<>. This implementation
+   * contains internal state that cannot be copied and needs destruction. Hence
+   * it can only reside on the stack and the user is reponsible to delete the
+   * instance after usage.
+   *
+   * @param repo_name  the name of the repository to download objects from
+   * @param repo_url   the URL to the repository's backend storage
+   * @param repo_keys  a list of public keys to access the repository
+   * @param temp_dir   location to store decompressed tmp data
+   * @return           a HttpObjectFetcher<> object or NULL on error
+   */
   static this_t* Create(const std::string &repo_name,
                         const std::string &repo_url,
                         const std::string &repo_keys,
