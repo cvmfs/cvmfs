@@ -18,24 +18,15 @@
 using namespace swissknife;  // NOLINT
 using namespace upload;      // NOLINT
 
-
+typedef HttpObjectFetcher<>                                          ObjectFetcher;
+typedef CatalogTraversal<ObjectFetcher>                              ReadonlyCatalogTraversal;
 typedef GarbageCollector<ReadonlyCatalogTraversal, SimpleHashFilter> GC;
 typedef GC::Configuration                                            GcConfig;
-
-bool CommandGc::CheckGarbageCollectability() const {
-  UniquePtr<manifest::Manifest> manifest(object_fetcher_->FetchManifest());
-  if (! manifest) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest");
-    return false;
-  }
-
-  return manifest->garbage_collectable();
-}
 
 
 ParameterList CommandGc::GetParams() {
   ParameterList r;
-  r.push_back(Parameter::Mandatory('r', "repository directory / url"));
+  r.push_back(Parameter::Mandatory('r', "repository url"));
   r.push_back(Parameter::Mandatory('u', "spooler definition string"));
   r.push_back(Parameter::Mandatory('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional ('h', "conserve <h> revisions"));
@@ -71,12 +62,18 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  object_fetcher_ = ReadonlyHttpObjectFetcher::Create(repo_name,
-                                                      repo_url,
-                                                      repo_keys,
-                                                      temp_directory);
+  UniquePtr<ObjectFetcher> object_fetcher(ObjectFetcher::Create(repo_name,
+                                                                repo_url,
+                                                                repo_keys,
+                                                                temp_directory));
+  if (! object_fetcher) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to connect to repository");
+    return 1;
+  }
 
-  if (! CheckGarbageCollectability()) {
+
+  UniquePtr<manifest::Manifest> manifest(object_fetcher->FetchManifest());
+  if (! manifest || ! manifest->garbage_collectable()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "repository does not allow garbage collection");
     return 1;
   }
@@ -88,7 +85,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.keep_history_timestamp = timestamp;
   config.dry_run                = dry_run;
   config.verbose                = list_condemned_objects;
-  config.object_fetcher         = object_fetcher_.weak_ref();
+  config.object_fetcher         = object_fetcher.weak_ref();
 
   if (config.uploader == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",

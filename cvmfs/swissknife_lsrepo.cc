@@ -10,7 +10,7 @@ using namespace swissknife;
 
 CommandListCatalogs::CommandListCatalogs() :
   print_tree_(false), print_hash_(false), print_size_(false),
-  print_entries_(false), object_fetcher_(NULL) {}
+  print_entries_(false) {}
 
 
 ParameterList CommandListCatalogs::GetParams() {
@@ -38,22 +38,30 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   const std::string &repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
   const std::string &tmp_dir   = (args.count('l') > 0) ? *args.find('l')->second : "/tmp";
 
-  object_fetcher_ = ReadonlyHttpObjectFetcher::Create(repo_name,
-                                                      repo_url,
-                                                      repo_keys,
-                                                      tmp_dir);
+  bool success = false;
+  if (IsRemotePath(repo_url)) {
+    UniquePtr<HttpObjectFetcher<catalog::Catalog, history::SqliteHistory> > fetcher(
+                                      HttpObjectFetcher<catalog::Catalog, history::SqliteHistory>::Create(repo_name,
+                                                                  repo_url,
+                                                                  repo_keys,
+                                                                  tmp_dir));
+    if (! fetcher) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to connect to remote repository");
+      return 1;
+    }
 
-  ReadonlyCatalogTraversal::Parameters params;
-  params.object_fetcher = object_fetcher_.weak_ref();
-  ReadonlyCatalogTraversal traversal(params);
-  traversal.RegisterListener(&CommandListCatalogs::CatalogCallback, this);
+    success = Run(fetcher.weak_ref());
+  } else {
+    LocalObjectFetcher<> fetcher(repo_url, tmp_dir);
+    success = Run(&fetcher);
+  }
 
-  return traversal.Traverse() ? 0 : 1;
+  return (success) ? 0 : 1;
 }
 
 
 void CommandListCatalogs::CatalogCallback(
-                           const ReadonlyCatalogTraversal::CallbackData &data) {
+                           const CatalogTraversalData<catalog::Catalog> &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string clg_size;

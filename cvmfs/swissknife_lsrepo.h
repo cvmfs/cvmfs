@@ -18,10 +18,6 @@ namespace catalog {
 namespace swissknife {
 
 class CommandListCatalogs : public Command {
- protected:
-  typedef HttpObjectFetcher<typename ReadonlyCatalogTraversal::Catalog>
-          ReadonlyHttpObjectFetcher;
-
  public:
   CommandListCatalogs();
   ~CommandListCatalogs() { };
@@ -35,15 +31,23 @@ class CommandListCatalogs : public Command {
 
   int Main(const ArgumentList &args);
 
-  void CatalogCallback(const ReadonlyCatalogTraversal::CallbackData &data);
+ protected:
+  template <class ObjectFetcherT>
+  bool Run(ObjectFetcherT *object_fetcher) {
+    typename CatalogTraversal<ObjectFetcherT>::Parameters params;
+    params.object_fetcher = object_fetcher;
+    CatalogTraversal<ObjectFetcherT> traversal(params);
+    traversal.RegisterListener(&CommandListCatalogs::CatalogCallback, this);
+    return traversal.Traverse();
+  }
+
+  void CatalogCallback(const CatalogTraversalData<catalog::Catalog> &data);
 
  private:
   bool print_tree_;
   bool print_hash_;
   bool print_size_;
   bool print_entries_;
-
-  UniquePtr<ReadonlyHttpObjectFetcher> object_fetcher_;
 };
 
 }

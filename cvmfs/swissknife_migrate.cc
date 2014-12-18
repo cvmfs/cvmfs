@@ -118,21 +118,27 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
-  const bool generate_full_catalog_tree = true;
-
-  typedef HttpObjectFetcher<typename WritableCatalogTraversal::Catalog>
-          WritableHttpObjectFetcher;
-  UniquePtr<WritableHttpObjectFetcher> object_fetcher(
-    WritableHttpObjectFetcher::Create(repo_name, repo_url, repo_keys, tmp_dir));
-
-  WritableCatalogTraversal::Parameters params;
-  params.no_close       = generate_full_catalog_tree;
-  params.object_fetcher = object_fetcher.weak_ref();
-  WritableCatalogTraversal traversal(params);
-  traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
 
   catalog_loading_stopwatch_.Start();
-  const bool loading_successful = traversal.Traverse();
+  bool loading_successful = false;
+  if (IsRemotePath(repo_url)) {
+    typedef HttpObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
+    UniquePtr<ObjectFetcher> fetcher(ObjectFetcher::Create(repo_name,
+                                                           repo_url,
+                                                           repo_keys,
+                                                           tmp_dir));
+
+    if (! fetcher) {
+      LogCvmfs(kLogCatalog, kLogStderr, "failed to connect to remote repository");
+      return 4;
+    }
+
+    loading_successful = LoadCatalogs(fetcher.weak_ref());
+  } else {
+    typedef LocalObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
+    ObjectFetcher fetcher(repo_url, tmp_dir);
+    loading_successful = LoadCatalogs(&fetcher);
+  }
   catalog_loading_stopwatch_.Stop();
 
   if (!loading_successful) {
@@ -263,7 +269,7 @@ bool CommandMigrate::DoMigrationAndCommit(
 
 
 void CommandMigrate::CatalogCallback(
-                           const WritableCatalogTraversal::CallbackData &data) {
+                   const CatalogTraversalData<catalog::WritableCatalog> &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string path;

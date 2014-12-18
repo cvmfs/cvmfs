@@ -207,7 +207,19 @@ class CommandMigrate : public Command {
   static const catalog::DirectoryEntry& GetNestedCatalogMarkerDirent();
 
  protected:
-  void CatalogCallback(const WritableCatalogTraversal::CallbackData &data);
+  template <class ObjectFetcherT>
+  bool LoadCatalogs(ObjectFetcherT *object_fetcher) {
+    typename CatalogTraversal<ObjectFetcherT>::Parameters params;
+    const bool generate_full_catalog_tree = true;
+    params.no_close       = generate_full_catalog_tree;
+    params.object_fetcher = object_fetcher;
+    CatalogTraversal<ObjectFetcherT> traversal(params);
+    traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
+
+    return traversal.Traverse();
+  }
+
+  void CatalogCallback(const CatalogTraversalData<catalog::WritableCatalog> &data);
   void MigrationCallback(PendingCatalog *const &data);
   void UploadCallback(const upload::SpoolerResult &result);
 
