@@ -37,6 +37,7 @@ namespace swissknife {
  * @param catalog_hash        the content hash of the catalog
  * @param tree_level          the depth in the nested catalog tree
  *                            (starting at zero)
+ * @param file_size           the size of the downloaded catalog database file
  * @param history_depth       the distance from the current HEAD revision
  *                            (current HEAD has history_depth 0)
  */
@@ -75,6 +76,7 @@ struct CatalogTraversalData {
  *   -> Use all Named Snapshots of a repository as traversal entry point
  *   -> Traverse starting from a provided catalog
  *   -> Traverse catalogs that were previously skipped
+ *   -> Produce various flavours of catalogs (writable, mocked, ...)
  *
  * Breadth First Traversal Strategy
  *   Catalogs are handed out to the user identical as they are traversed.
@@ -102,18 +104,12 @@ struct CatalogTraversalData {
  *       as unlinking of the catalog database file.
  *
  *
- * @param CatalogT        the catalog class that should be used for traversal
- *                        usually this will be either catalog::Catalog or
- *                        catalog::WritableCatalog
- *                        (please consider to use the typedef'ed versions of
- *                        this template i.e. [Readable|Writable]CatalogTraversal)
+ * @param ObjectFetcherT  Strategy Pattern implementation that defines how to
+ *                        retrieve catalogs from various backend storage types.
+ *                        Furthermore the ObjectFetcherT::catalog_t is the type
+ *                        of catalog to be instantiated by CatalogTraversal<>.
  *
- * @param ObjectFetcherT  Strategy Pattern implementation that is supposed to be
- *                        used mainly for unit-testability. Normal usage should
- *                        not bring up the need to actually set this to anything
- *                        different than the default value (see below)
- *
- * CAUTION: the Catalog* pointer passed into the callback becomes invalid
+ * CAUTION: the catalog_t* pointer passed into the callback becomes invalid
  *          directly after the callback method returns, unless you create the
  *          CatalogTraversal object with no_close = true.
  */
@@ -352,13 +348,14 @@ class CatalogTraversal
    * This traverses all catalogs that were left out by previous traversal runs.
    *
    * Note: This method asserts that previous traversal runs left out certain
-   *       catalogs due to history_depth restrictions. CatalogTraversal keeps
-   *       track of the root catalog hashes of catalog revisions that have been
-   *       pruned before. TraversePruned() will use those as entry points.
+   *       catalogs due to history_depth or timestamp restrictions.
+   *       CatalogTraversal keeps track of the root catalog hashes of catalog
+   *       revisions that have been pruned before. TraversePruned() will use
+   *       those as entry points.
    *
-   * Note: TraversalPruned will neither take the history nor the timestamp based
-   *       thresholds into account but traverse all catalogs in can reach from
-   *       the catalogs that have previously been pruned by those thresholds.
+   * Note: TraversaPruned() will neither take the history nor the timestamp
+   *       based thresholds into account but traverse all catalogs in can reach
+   *       from the catalogs previously been pruned by those thresholds.
    *
    * @param type  breadths or depth first traversal
    * @return      true on successful traversal of all necessary catalogs or
