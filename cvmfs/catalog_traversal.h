@@ -115,13 +115,14 @@ struct CatalogTraversalData {
  *          directly after the callback method returns, unless you create the
  *          CatalogTraversal object with no_close = true.
  */
-template<class CatalogT>
-class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
+template<class ObjectFetcherT>
+class CatalogTraversal
+  : public Observable<CatalogTraversalData<typename ObjectFetcherT::catalog_t> >
+{
  public:
-  typedef CatalogTraversalData<CatalogT>   CallbackData;
-  typedef CatalogT                         Catalog;
-  typedef AbstractObjectFetcher<CatalogT>  ObjectFetcher;
-
+  typedef ObjectFetcherT                      object_fetcher_t;
+  typedef typename ObjectFetcherT::catalog_t  catalog_t;
+  typedef CatalogTraversalData<catalog_t>     callback_data_t;
 
   /**
    * @param repo_url             the path to the repository to be traversed:
@@ -160,14 +161,14 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     static const unsigned int kNoHistory;
     static const time_t       kNoTimestampThreshold;
 
-    ObjectFetcher *object_fetcher;
+    ObjectFetcherT *object_fetcher;
 
-    unsigned int   history;
-    time_t         timestamp;
-    bool           no_repeat_history;
-    bool           no_close;
-    bool           ignore_load_failure;
-    bool           quiet;
+    unsigned int    history;
+    time_t          timestamp;
+    bool            no_repeat_history;
+    bool            no_close;
+    bool            ignore_load_failure;
+    bool            quiet;
   };
 
  public:
@@ -189,7 +190,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
                const shash::Any   &hash,
                const unsigned      tree_level,
                const unsigned      history_depth,
-                     CatalogT     *parent = NULL) :
+                     catalog_t    *parent = NULL) :
       path(path),
       hash(hash),
       tree_level(tree_level),
@@ -203,9 +204,9 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
 
     bool IsRootCatalog() const { return tree_level == 0; }
 
-    CallbackData GetCallbackData() const {
-      return CallbackData(catalog, hash, tree_level,
-                          catalog_file_size, history_depth);
+    callback_data_t GetCallbackData() const {
+      return callback_data_t(catalog, hash, tree_level,
+                             catalog_file_size, history_depth);
     }
 
     // initial state description
@@ -213,13 +214,13 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     const shash::Any    hash;
     const unsigned      tree_level;
     const unsigned      history_depth;
-          CatalogT     *parent;
+          catalog_t    *parent;
 
     // dynamic processing state (used internally)
     std::string   catalog_file_path;
     size_t        catalog_file_size;
     bool          ignore;
-    CatalogT     *catalog;
+    catalog_t    *catalog;
     unsigned int  referenced_catalogs;
     bool          postponed;
   };
@@ -492,11 +493,11 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
     assert (! job.ignore);
     assert (job.catalog == NULL);
 
-    job.catalog = CatalogT::AttachFreely(job.path,
-                                         job.catalog_file_path,
-                                         job.hash,
-                                         job.parent,
-                                         ! job.IsRootCatalog());
+    job.catalog = catalog_t::AttachFreely(job.path,
+                                          job.catalog_file_path,
+                                          job.hash,
+                                          job.parent,
+                                          ! job.IsRootCatalog());
 
     if (job.catalog == NULL) {
       LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to re-open catalog %s",
@@ -611,12 +612,12 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   unsigned int PushNestedCatalogs(      TraversalContext  &ctx,
                                   const CatalogJob        &job)
   {
-    const typename CatalogT::NestedCatalogList &nested = // TODO: C++11 auto ;-)
-                                              job.catalog->ListNestedCatalogs();
-    typename CatalogT::NestedCatalogList::const_iterator i    = nested.begin();
-    typename CatalogT::NestedCatalogList::const_iterator iend = nested.end();
+    typedef typename catalog_t::NestedCatalogList NestedCatalogList;
+    const NestedCatalogList &nested = job.catalog->ListNestedCatalogs();
+    typename NestedCatalogList::const_iterator i    = nested.begin();
+    typename NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
-      CatalogT* parent = (no_close_) ? job.catalog : NULL;
+      catalog_t* parent = (no_close_) ? job.catalog : NULL;
       const CatalogJob new_job(i->path.ToString(),
                                i->hash,
                                job.tree_level + 1,
@@ -787,7 +788,7 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   }
 
  private:
-  ObjectFetcher          *object_fetcher_;
+  ObjectFetcherT         *object_fetcher_;
   const bool              no_close_;
   const bool              ignore_load_failure_;
   const bool              no_repeat_history_;
@@ -798,21 +799,18 @@ class CatalogTraversal : public Observable<CatalogTraversalData<CatalogT> > {
   LogFacilities           error_sink_;
 };
 
-typedef CatalogTraversal<catalog::Catalog>         ReadonlyCatalogTraversal;
-typedef CatalogTraversal<catalog::WritableCatalog> WritableCatalogTraversal;
-
-template <class CatalogT>
+template <class ObjectFetcherT>
 const unsigned int
-  CatalogTraversal<CatalogT>::Parameters::kFullHistory =
+  CatalogTraversal<ObjectFetcherT>::Parameters::kFullHistory =
     std::numeric_limits<unsigned int>::max();
 
-template <class CatalogT>
+template <class ObjectFetcherT>
 const unsigned int
-  CatalogTraversal<CatalogT>::Parameters::kNoHistory = 0;
+  CatalogTraversal<ObjectFetcherT>::Parameters::kNoHistory = 0;
 
-template <class CatalogT>
+template <class ObjectFetcherT>
 const time_t
-  CatalogTraversal<CatalogT>::Parameters::kNoTimestampThreshold = 0;
+  CatalogTraversal<ObjectFetcherT>::Parameters::kNoTimestampThreshold = 0;
 
 }
 
