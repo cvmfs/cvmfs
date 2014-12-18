@@ -16,5 +16,4 @@ sbin/mount.cvmfs
 etc/cvmfs/config.sh
 etc/cvmfs/default.conf
 etc/cvmfs/default.d/README
-etc/cvmfs/domain.d/cern.ch.conf
 etc/bash_completion.d/cvmfs
