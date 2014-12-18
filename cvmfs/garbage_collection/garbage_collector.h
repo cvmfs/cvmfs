@@ -36,13 +36,10 @@
 
 #include "../upload_facility.h"
 
-template <class CatalogT>
-class AbstractObjectFetcher;
-
 template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
  protected:
-  typedef AbstractObjectFetcher<typename CatalogTraversalT::Catalog> ObjectFetcher;
+  typedef typename CatalogTraversalT::object_fetcher_t object_fetcher_t;
 
  public:
   struct Configuration {
@@ -61,7 +58,7 @@ class GarbageCollector {
       , verbose(false) {}
 
     upload::AbstractUploader  *uploader;
-    ObjectFetcher             *object_fetcher;
+    object_fetcher_t          *object_fetcher;
     unsigned int               keep_history_depth;
     time_t                     keep_history_timestamp;
     shash::Any                 base_history_database;
@@ -70,10 +67,10 @@ class GarbageCollector {
   };
 
  protected:
-  typedef typename CatalogTraversalT::Catalog       MyCatalog;
-  typedef typename CatalogTraversalT::CallbackData  MyCallbackData;
-  typedef typename CatalogTraversalT::Parameters    TraversalParameters;
-  typedef std::vector<shash::Any>                   HashVector;
+  typedef typename CatalogTraversalT::catalog_t        catalog_t;
+  typedef typename CatalogTraversalT::callback_data_t  traversal_callback_data_t;
+  typedef typename CatalogTraversalT::Parameters       TraversalParameters;
+  typedef std::vector<shash::Any>                      HashVector;
 
  public:
   GarbageCollector(const Configuration &configuration);
@@ -88,8 +85,8 @@ class GarbageCollector {
   static TraversalParameters GetTraversalParams(
                                             const Configuration &configuration);
 
-  void PreserveDataObjects(const MyCallbackData &data);
-  void SweepDataObjects   (const MyCallbackData &data);
+  void PreserveDataObjects(const traversal_callback_data_t &data);
+  void SweepDataObjects   (const traversal_callback_data_t &data);
 
   bool AnalyzePreservedCatalogTree();
   bool SweepCondemnedCatalogTree();
@@ -100,7 +97,7 @@ class GarbageCollector {
   void Sweep(const shash::Any &hash);
 
   void PrintCatalogTreeEntry(const unsigned int  tree_level,
-                             const MyCatalog    *catalog) const;
+                             const catalog_t    *catalog) const;
 
  private:
   const Configuration   configuration_;
