@@ -465,7 +465,7 @@ class CatalogTraversal
     }
 
     job.catalog = object_fetcher_->FetchCatalog(job.hash,
-                                                "" /* TODO: ?? */,
+                                                job.path,
                                                 ! job.IsRootCatalog(),
                                                 job.parent);
     if (! job.catalog) {
