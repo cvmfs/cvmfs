@@ -339,10 +339,6 @@ class T_GarbageCollector : public ::testing::Test {
     return i->second;
   }
 
-  shash::Any h(const std::string &hash, const char suffix = 0) {
-    return shash::Any(shash::kSha1, shash::HexPtr(hash), suffix);
-  }
-
   std::pair<unsigned int, std::string> mp(const unsigned int   revision,
                                           const std::string   &clg_index) {
     return std::make_pair(revision, clg_index);
