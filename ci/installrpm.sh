@@ -14,11 +14,9 @@ for cvmfsrpm in $cvmfsrpms; do
 done
 
 initScriptsVersion=1.0.18-2
-keysVersion=1.4-1
+configVersion=1.0-1
 
-curl -k https://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs/EL/5/x86_64/cvmfs-init-scripts-${initScriptsVersion}.noarch.rpm > $tmpdir/cvmfs-init-scripts-${initScriptsVersion}.noarch.rpm
-curl -k https://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs/EL/5/x86_64/cvmfs-keys-${keysVersion}.noarch.rpm > $tmpdir/cvmfs-keys-${keysVersion}.noarch.rpm
+curl -k https://ecsft.cern.ch/dist/cvmfs/cvmfs-config/cvmfs-config-cern-${configVersion}.noarch.rpm > $tmpdir/cvmfs-config-${configVersion}.noarch.rpm
 
-sudo rpm -vi $tmpdir/cvmfs-keys-${keysVersion}.noarch.rpm $cvmfsrpms
-sudo rpm -vi $tmpdir/cvmfs-init-scripts-${initScriptsVersion}.noarch.rpm
+sudo rpm -vi $tmpdir/cvmfs-config-${configVersion}.noarch.rpm $cvmfsrpms
 sudo cvmfs_config setup
