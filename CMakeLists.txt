@@ -83,7 +83,7 @@ option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose 
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
 option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin"                  ON)
-option (INSTALL_CERN_KEYS       "Install CERN specific public key chain"                           ON)
+option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
 option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
 option (SQLITE3_BUILTIN         "Don't use system SQLite3"                                         ON)
 option (LIBCURL_BUILTIN         "Don't use system libcurl"                                         ON)

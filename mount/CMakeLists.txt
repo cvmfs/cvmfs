@@ -73,7 +73,7 @@ if (MACOSX)
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
-  if (INSTALL_CERN_KEYS)
+  if (INSTALL_PUBLIC_KEYS)
     install (
       FILES         keys/cern.ch.pub
       DESTINATION   "/etc/cvmfs/keys/cern.ch"
@@ -97,7 +97,19 @@ if (MACOSX)
       DESTINATION   "/etc/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
-  endif (INSTALL_CERN_KEYS)
+
+    install (
+      FILES         keys/egi.eu.pub
+      DESTINATION   "/etc/cvmfs/keys/egi.eu"
+      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+
+    install (
+      FILES         keys/opensciencegrid.org.pub
+      DESTINATION   "/etc/cvmfs/keys/opensciencegrid.org"
+      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+  endif (INSTALL_PUBLIC_KEYS)
 
   install (
     FILES         serverorder.sh
@@ -106,26 +118,8 @@ if (MACOSX)
   )
 
   install (
-    FILES         domain.d/egi.eu.conf
-    DESTINATION   "/etc/cvmfs/domain.d"
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  install (
     FILES         domain.d/opensciencegrid.org.conf
     DESTINATION   "/etc/cvmfs/domain.d"
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  install (
-    FILES         keys/egi.eu.pub
-    DESTINATION   "/etc/cvmfs/keys/egi.eu"
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  install (
-    FILES         keys/opensciencegrid.org.pub
-    DESTINATION   "/etc/cvmfs/keys/opensciencegrid.org"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
@@ -169,6 +163,12 @@ else (MACOSX)
   )
 
   install (
+    FILES         default.d/README
+    DESTINATION   "/etc/cvmfs/default.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
     FILES         default.d/50-cern.conf
     DESTINATION   "/etc/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
@@ -176,6 +176,18 @@ else (MACOSX)
 
   install (
     FILES         domain.d/cern.ch.conf
+    DESTINATION   "/etc/cvmfs/domain.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         domain.d/egi.eu.conf
+    DESTINATION   "/etc/cvmfs/domain.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         domain.d/opensciencegrid.org.conf
     DESTINATION   "/etc/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
@@ -198,13 +210,7 @@ else (MACOSX)
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
-  install (
-    FILES         default.d/README
-    DESTINATION   "/etc/cvmfs/default.d"
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  if (INSTALL_CERN_KEYS)
+  if (INSTALL_PUBLIC_KEYS)
     install (
       FILES         keys/cern.ch.pub
       DESTINATION   "/etc/cvmfs/keys/cern.ch"
@@ -228,5 +234,23 @@ else (MACOSX)
       DESTINATION   "/etc/cvmfs/keys/cern.ch"
       PERMISSIONS   OWNER_READ GROUP_READ WORLD_READ
     )
-  endif (INSTALL_CERN_KEYS)
+
+    install (
+      FILES         keys/egi.eu.pub
+      DESTINATION   "/etc/cvmfs/keys/egi.eu"
+      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+
+    install (
+      FILES         keys/opensciencegrid.org.pub
+      DESTINATION   "/etc/cvmfs/keys/opensciencegrid.org"
+      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+  endif (INSTALL_PUBLIC_KEYS)
+
+  install (
+    FILES         serverorder.sh
+    DESTINATION   "/etc/cvmfs"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
 endif (MACOSX)
