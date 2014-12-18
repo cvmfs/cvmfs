@@ -208,27 +208,12 @@ manifest::Manifest* MockObjectFetcher::FetchManifest() {
   return manifest;
 }
 
-
-history::History* MockObjectFetcher::FetchHistory(const shash::Any &hash) {
-  shash::Any history_hash(hash);
-  if (hash.IsNull()) {
-    UniquePtr<manifest::Manifest> manifest(FetchManifest());
-    history_hash = manifest->history();
-  }
-
-  return MockHistory::Open(history_hash);
-}
-
-
-MockCatalog* MockObjectFetcher::FetchCatalog(const shash::Any  &catalog_hash,
-                                             const std::string &catalog_path,
-                                             const bool         is_nested,
-                                                   MockCatalog *parent) {
-  return MockCatalog::AttachFreely(catalog_path,
-                                   "",
-                                   catalog_hash,
-                                   parent,
-                                   is_nested);
+bool MockObjectFetcher::Fetch(const shash::Any    &object_hash,
+                              const shash::Suffix  hash_suffix,
+                              std::string         *file_path) {
+  assert (file_path != NULL);
+  *file_path = object_hash.ToString();
+  return true;
 }
 
 
@@ -248,8 +233,10 @@ void MockHistory::ResetGlobalState() {
 }
 
 
-history::History* MockHistory::Open(const shash::Any &hash) {
-  MockHistory *history = MockHistory::Get(hash);
+MockHistory* MockHistory::Open(const std::string &path) {
+  const shash::Any history_hash(shash::MkFromHexPtr(shash::HexPtr(path),
+                                                    shash::kSuffixHistory));
+  MockHistory *history = MockHistory::Get(history_hash);
   return (history != NULL) ? history->Clone() : NULL;
 }
 
@@ -277,7 +264,7 @@ MockHistory::~MockHistory() {
 }
 
 
-history::History* MockHistory::Clone(const bool writable) const {
+MockHistory* MockHistory::Clone(const bool writable) const {
   MockHistory *new_copy = new MockHistory(*this);
   new_copy->set_writable(writable);
   return new_copy;

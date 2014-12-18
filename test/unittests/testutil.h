@@ -401,7 +401,7 @@ class MockHistory : public history::History,
  public:
   static void ResetGlobalState();
 
-  static history::History* Open(const shash::Any &hash);
+  static MockHistory* Open(const std::string &path);
   MockHistory(const bool          writable,
               const std::string  &fqrn);
   MockHistory(const MockHistory &other);
@@ -412,8 +412,8 @@ class MockHistory : public history::History,
   MockHistory& operator= (const MockHistory &other);
 
  public:
-  history::History* Open() const;
-  history::History* Clone(const bool writable = false) const;
+  MockHistory* Open() const;
+  MockHistory* Clone(const bool writable = false) const;
 
   bool IsWritable()          const { return writable_;    }
   unsigned GetNumberOfTags() const { return tags_.size(); }
@@ -518,17 +518,25 @@ class MockHistory : public history::History,
 //
 
 
+class MockObjectFetcher;
+
+template <>
+struct object_fetcher_traits<MockObjectFetcher> {
+  typedef MockCatalog catalog_t;
+  typedef MockHistory history_t;
+};
+
 /**
  * This is a mock of an ObjectFetcher that does essentially nothing.
  */
-class MockObjectFetcher : public AbstractObjectFetcher<MockCatalog> {
+class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
  public:
   manifest::Manifest* FetchManifest();
-  history::History*   FetchHistory(const shash::Any &hash = shash::Any());
-  MockCatalog*        FetchCatalog(const shash::Any  &catalog_hash,
-                                   const std::string &catalog_path,
-                                   const bool         is_nested = false,
-                                         MockCatalog *parent    = NULL);
+
+  bool Fetch(const shash::Any    &object_hash,
+             const shash::Suffix  hash_suffix,
+             std::string         *file_path);
 };
+
 
 #endif /* CVMFS_UNITTEST_TESTUTIL */
