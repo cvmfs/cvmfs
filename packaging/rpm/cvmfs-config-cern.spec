@@ -21,7 +21,8 @@ Provides: cvmfs-keys
 Obsoletes: cvmfs-keys
 Obsoletes: cvmfs-init-scripts
 
-Requires: cvmfs >= 2.1.20
+Conflicts: cvmfs < 2.1.20
+Conflicts: cvmfs-server < 2.1.20
 
 %description
 Configuration parameters and public keys for CernVM-FS repositories under the

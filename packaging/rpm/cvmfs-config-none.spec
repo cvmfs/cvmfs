@@ -8,7 +8,8 @@ License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Provides: cvmfs-config
-Requires: cvmfs >= 2.1.20
+Conflicts: cvmfs < 2.1.20
+Conflicts: cvmfs-server < 2.1.20
 
 %description
 Empty configuration for CernVM-FS, used to fulfill the cvmfs dependency on cvmfs-config
