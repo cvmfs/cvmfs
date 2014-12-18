@@ -16,7 +16,7 @@
 using namespace swissknife;
 using namespace upload;
 
-typedef CatalogTraversal<MockCatalog>                MockedCatalogTraversal;
+typedef CatalogTraversal<MockObjectFetcher>          MockedCatalogTraversal;
 typedef typename MockedCatalogTraversal::Parameters  TraversalParams;
 
 class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
