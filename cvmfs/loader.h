@@ -84,14 +84,14 @@ inline const char *Code2Ascii(const Failures error) {
 
 enum StateId {
   kStateUnknown = 0,
-  kStateOpenDirs,
-  kStateOpenFiles,
-  kStateGlueBuffer,
-  kStateInodeGeneration,
-  kStateOpenFilesCounter,
-  kStateGlueBufferV2,
-  kStateGlueBufferV3,
-  kStateGlueBufferV4,  // >= 2.1.20
+  kStateOpenDirs,           // >= 2.1.4
+  kStateOpenFiles,          // >= 2.1.4
+  kStateGlueBuffer,         // >= 2.1.9
+  kStateInodeGeneration,    // >= 2.1.9
+  kStateOpenFilesCounter,   // >= 2.1.9
+  kStateGlueBufferV2,       // >= 2.1.10
+  kStateGlueBufferV3,       // >= 2.1.15
+  kStateGlueBufferV4,       // >= 2.1.20
 };
 
 
