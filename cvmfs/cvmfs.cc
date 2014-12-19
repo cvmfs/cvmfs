@@ -2591,7 +2591,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     glue::InodeTracker *saved_inode_tracker =
       new glue::InodeTracker(*cvmfs::inode_tracker_);
     loader::SavedState *state_glue_buffer = new loader::SavedState();
-    state_glue_buffer->state_id = loader::kStateGlueBufferV3;
+    state_glue_buffer->state_id = loader::kStateGlueBufferV4;
     state_glue_buffer->state = saved_inode_tracker;
     saved_states->push_back(state_glue_buffer);
   }
@@ -2665,8 +2665,17 @@ static bool RestoreState(const int fd_progress,
                                         cvmfs::inode_tracker_);
       SendMsg2Socket(fd_progress, " done\n");
     }
-
+    
     if (saved_states[i]->state_id == loader::kStateGlueBufferV3) {
+      SendMsg2Socket(fd_progress, "Migrating inode tracker (v3 to v4)... ");
+      compat::inode_tracker_v3::InodeTracker *saved_inode_tracker =
+        (compat::inode_tracker_v3::InodeTracker *)saved_states[i]->state;
+      compat::inode_tracker_v3::Migrate(saved_inode_tracker,
+                                        cvmfs::inode_tracker_);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateGlueBufferV4) {
       SendMsg2Socket(fd_progress, "Restoring inode tracker... ");
       delete cvmfs::inode_tracker_;
       glue::InodeTracker *saved_inode_tracker =
