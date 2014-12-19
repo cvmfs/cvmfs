@@ -396,7 +396,7 @@ public:
   PathMap() {
     assert(false);
   }
-  bool LookupPath(const shash::Md5 &md5path, PathString *path) {
+  bool LookupPath(const shash_v1::Md5 &md5path, PathString *path) {
     PathInfo value;
     bool found = map_.Lookup(md5path, &value);
     path->Assign(value.path);
@@ -404,15 +404,15 @@ public:
   }
   uint64_t LookupInode(const PathString &path) {
     PathInfo value;
-    bool found = map_.Lookup(shash::Md5(path.GetChars(), path.GetLength()),
+    bool found = map_.Lookup(shash_v1::Md5(path.GetChars(), path.GetLength()),
                              &value);
     if (found) return value.inode;
     return 0;
   }
-  shash::Md5 Insert(const PathString &path, const uint64_t inode) {
+  shash_v1::Md5 Insert(const PathString &path, const uint64_t inode) {
     assert(false);
   }
-  void Erase(const shash::Md5 &md5path) {
+  void Erase(const shash_v1::Md5 &md5path) {
     assert(false);
   }
   void Clear() { assert(false); }
@@ -423,7 +423,7 @@ public:
     uint64_t inode;
     PathString path;
   };
-  SmallHashDynamic<shash::Md5, PathInfo> map_;
+  SmallHashDynamic<shash_v1::Md5, PathInfo> map_;
 };
 
 class InodeMap {
@@ -431,11 +431,11 @@ public:
   InodeMap() {
     assert(false);
   }
-  bool LookupMd5Path(const uint64_t inode, shash::Md5 *md5path) {
+  bool LookupMd5Path(const uint64_t inode, shash_v1::Md5 *md5path) {
     bool found = map_.Lookup(inode, md5path);
     return found;
   }
-  void Insert(const uint64_t inode, const shash::Md5 &md5path) {
+  void Insert(const uint64_t inode, const shash_v1::Md5 &md5path) {
     assert(false);
   }
   void Erase(const uint64_t inode) {
@@ -443,7 +443,7 @@ public:
   }
   void Clear() { assert(false); }
  public:
-  SmallHashDynamic<uint64_t, shash::Md5> map_;
+  SmallHashDynamic<uint64_t, shash_v1::Md5> map_;
 };
 
 
@@ -496,7 +496,7 @@ public:
   }
   bool FindPath(const uint64_t inode, PathString *path) {
     //Lock();
-    shash::Md5 md5path;
+    shash_v1::Md5 md5path;
     bool found = inode_map_.LookupMd5Path(inode, &md5path);
     if (found) {
       found = path_map_.LookupPath(md5path, path);

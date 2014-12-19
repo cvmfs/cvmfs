@@ -2658,7 +2658,7 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateGlueBufferV2) {
-      SendMsg2Socket(fd_progress, "Migrating inode tracker (v2 to v3)... ");
+      SendMsg2Socket(fd_progress, "Migrating inode tracker (v2 to v4)... ");
       compat::inode_tracker_v2::InodeTracker *saved_inode_tracker =
         (compat::inode_tracker_v2::InodeTracker *)saved_states[i]->state;
       compat::inode_tracker_v2::Migrate(saved_inode_tracker,
