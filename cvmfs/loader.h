@@ -92,6 +92,7 @@ enum StateId {
   kStateGlueBufferV2,       // >= 2.1.10
   kStateGlueBufferV3,       // >= 2.1.15
   kStateGlueBufferV4,       // >= 2.1.20
+  kStateOpenFilesV2,        // >= 2.1.20
 };
 
 
