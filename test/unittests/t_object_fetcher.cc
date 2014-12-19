@@ -1,6 +1,7 @@
-#include <gtest/gtest.h>
+  #include <gtest/gtest.h>
 
 #include "../../cvmfs/util.h"
+#include "../../cvmfs/catalog_sql.h"
 #include "../../cvmfs/history_sqlite.h"
 #include "../../cvmfs/compression.h"
 
@@ -11,12 +12,13 @@ using namespace history;
 template <class ObjectFetcherT>
 class T_ObjectFetcher : public ::testing::Test {
  protected:
-  static const std::string sandbox;
-  static const std::string fqrn;
-  static const std::string backend_storage;
-  static const std::string backend_storage_dir;
-  static const std::string manifest_path;
-  static const std::string temp_directory;
+  static const std::string  sandbox;
+  static const std::string  fqrn;
+  static const std::string  backend_storage;
+  static const std::string  backend_storage_dir;
+  static const std::string  manifest_path;
+  static const std::string  temp_directory;
+  static const unsigned int catalog_revision;
 
   static const shash::Any previous_history_hash;
 
@@ -60,6 +62,9 @@ class T_ObjectFetcher : public ::testing::Test {
     // create some history objects
     CreateHistory(previous_history_hash);
     CreateHistory(MockHistory::root_hash, previous_history_hash);
+
+    // create a catalog
+    CreateCatalog(MockCatalog::root_hash, "");
   }
 
   ObjectFetcherT* GetObjectFetcher() {
@@ -73,6 +78,13 @@ class T_ObjectFetcher : public ::testing::Test {
                          previous_revision);
   }
 
+  void CreateCatalog(const shash::Any  &content_hash,
+                     const std::string  root_path) {
+    return CreateCatalog(type<ObjectFetcherT>(),
+                         content_hash,
+                         root_path);
+  }
+
   bool NeedsSandbox() {
     return NeedsSandbox(type<ObjectFetcherT>());
   }
@@ -84,15 +96,15 @@ class T_ObjectFetcher : public ::testing::Test {
   //          explicit-specialization-of-template-class-member-function
   template <typename T> struct type {};
 
-  ObjectFetcherT* GetObjectFetcher(const type<LocalObjectFetcher<> > t) {
+  ObjectFetcherT* GetObjectFetcher(const type<LocalObjectFetcher<> > type_spec) {
     return new LocalObjectFetcher<>(backend_storage, temp_directory);
   }
 
-  ObjectFetcherT* GetObjectFetcher(const type<MockObjectFetcher> t) {
+  ObjectFetcherT* GetObjectFetcher(const type<MockObjectFetcher> type_spec) {
     return new MockObjectFetcher();
   }
 
-  void CreateHistory(const type<LocalObjectFetcher<> > t,
+  void CreateHistory(const type<LocalObjectFetcher<> > type_spec,
                      const shash::Any &content_hash,
                      const shash::Any &previous_revision) {
     const std::string tmp_path = CreateTempPath(sandbox, 0700);
@@ -105,13 +117,10 @@ class T_ObjectFetcher : public ::testing::Test {
     history->SetPreviousRevision(previous_revision);
     delete history;
 
-    const std::string result_path =
-                      backend_storage + "/" + content_hash.MakePathWithSuffix();
-    ASSERT_TRUE(zlib::CompressPath2Path(tmp_path, result_path)) <<
-      "failed to compress file " << tmp_path << " to " << result_path;
+    InsertIntoStorage(tmp_path, content_hash);
   }
 
-  void CreateHistory(const type<MockObjectFetcher> t,
+  void CreateHistory(const type<MockObjectFetcher> type_spec,
                      const shash::Any &content_hash,
                      const shash::Any &previous_revision) {
     const bool writable = true;
@@ -120,8 +129,53 @@ class T_ObjectFetcher : public ::testing::Test {
     MockHistory::RegisterObject(content_hash, history);
   }
 
-  bool NeedsSandbox(const type<LocalObjectFetcher<> > t) { return true;  }
-  bool NeedsSandbox(const type<MockObjectFetcher>     t) { return false; }
+  void CreateCatalog(const type<LocalObjectFetcher<> > type_spec,
+                     const shash::Any  &content_hash,
+                     const std::string &root_path) {
+    const std::string tmp_path = CreateTempPath(sandbox, 0700);
+    ASSERT_FALSE (tmp_path.empty()) << "failed to create tmp in: " << sandbox;
+
+    // TODO: WritableCatalog::Create()
+    const bool volatile_content = false;
+    catalog::CatalogDatabase *catalog_db =
+                                     catalog::CatalogDatabase::Create(tmp_path);
+    ASSERT_NE (static_cast<catalog::CatalogDatabase*>(NULL), catalog_db) <<
+      "failed to create new catalog database in: " << tmp_path;
+
+    catalog::DirectoryEntry root_entry; // mocked root entry...
+    const bool success = catalog_db->InsertInitialValues(root_path,
+                                                         volatile_content,
+                                                         root_entry) &&
+                         catalog_db->SetProperty("revision", catalog_revision);
+    ASSERT_TRUE (success) << "failed to initialise catalog in: " << tmp_path;
+    delete catalog_db;
+
+    InsertIntoStorage(tmp_path, MockCatalog::root_hash);
+  }
+
+  void CreateCatalog(const type<MockObjectFetcher > type_spec,
+                     const shash::Any  &content_hash,
+                     const std::string &root_path) {
+    MockCatalog *catalog = new MockCatalog(root_path,
+                                           content_hash,
+                                           1024,
+                                           catalog_revision,
+                                           t(27, 11, 1987),
+                                           true);
+    // register the new catalog in the data structures
+    MockCatalog::RegisterObject(catalog->hash(), catalog);
+  }
+
+  void InsertIntoStorage(const std::string &tmp_path,
+                         const shash::Any  &content_hash) {
+    const std::string result_path =
+                      backend_storage + "/" + content_hash.MakePathWithSuffix();
+    ASSERT_TRUE(zlib::CompressPath2Path(tmp_path, result_path)) <<
+      "failed to compress file " << tmp_path << " to " << result_path;
+  }
+
+  bool NeedsSandbox(const type<LocalObjectFetcher<> > type_spec) { return true;  }
+  bool NeedsSandbox(const type<MockObjectFetcher>     type_spec) { return false; }
 };
 
 template <class ObjectFetcherT>
@@ -129,7 +183,7 @@ const std::string T_ObjectFetcher<ObjectFetcherT>::sandbox =
   "/tmp/cvmfs_ut_object_fetcher";
 
 template <class ObjectFetcherT>
-const std::string T_ObjectFetcher<ObjectFetcherT>::fqrn    = "test.cern.ch";
+const std::string T_ObjectFetcher<ObjectFetcherT>::fqrn = "test.cern.ch";
 
 template <class ObjectFetcherT>
 const std::string T_ObjectFetcher<ObjectFetcherT>::backend_storage =
@@ -151,7 +205,8 @@ template <class ObjectFetcherT>
 const shash::Any T_ObjectFetcher<ObjectFetcherT>::previous_history_hash =
   h("200176676aa95c7e3053104c5d9e88f98febc671", shash::kSuffixHistory);
 
-
+template <class ObjectFetcherT>
+const unsigned int T_ObjectFetcher<ObjectFetcherT>::catalog_revision = 1;
 
 typedef ::testing::Types<
   MockObjectFetcher,
@@ -181,6 +236,8 @@ TYPED_TEST(T_ObjectFetcher, FetchHistory) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
+  EXPECT_TRUE (object_fetcher->HasHistory());
+
   UniquePtr<typename TypeParam::history_t> history(object_fetcher->FetchHistory());
   ASSERT_TRUE (history.IsValid());
   EXPECT_EQ (TestFixture::previous_history_hash, history->previous_revision());
@@ -205,7 +262,29 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidHistory) {
   UniquePtr<typename TypeParam::history_t> history(
       object_fetcher->FetchHistory(h("400d35465f179a4acacb5fe749e6ce20a0bbdb84",
                                      shash::kSuffixHistory)));
-  ASSERT_FALSE (history.IsValid()) << "History found: " << history.weak_ref();
+  ASSERT_FALSE (history.IsValid());
 }
 
 
+TYPED_TEST(T_ObjectFetcher, FetchCatalog) {
+  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE (object_fetcher.IsValid());
+
+  UniquePtr<typename TypeParam::catalog_t> catalog(
+    object_fetcher->FetchCatalog(MockCatalog::root_hash, ""));
+
+  ASSERT_TRUE (catalog.IsValid());
+  EXPECT_EQ   ("",                            catalog->path().ToString());
+  EXPECT_EQ   (TestFixture::catalog_revision, catalog->revision());
+}
+
+
+TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalog) {
+  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE (object_fetcher.IsValid());
+
+  UniquePtr<typename TypeParam::catalog_t> catalog(
+    object_fetcher->FetchCatalog(h("5739dc30f42525a261b2f4b383b220df3e36f04d",
+                                   shash::kSuffixCatalog), ""));
+  ASSERT_FALSE (catalog.IsValid());
+}
