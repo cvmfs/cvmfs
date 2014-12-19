@@ -487,7 +487,7 @@ class InodeTracker {
 
 
  private:
-  static const unsigned kVersion = 3;
+  static const unsigned kVersion = 4;
 
   void InitLock();
   void CopyFrom(const InodeTracker &other);

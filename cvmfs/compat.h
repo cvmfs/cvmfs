@@ -16,12 +16,129 @@
 #include <google/sparse_hash_map>
 
 #include "shortstring.h"
+#include "bigvector.h"
 #include "atomic.h"
 #include "catalog_mgr.h"
 #include "util.h"
 #include "glue_buffer.h"
 
 namespace compat {
+
+namespace shash_v1 {
+
+enum Algorithms {
+  kMd5 = 0,
+  kSha1,
+  kRmd160,
+  kAny,
+};
+const unsigned kDigestSizes[] = {16, 20, 20, 20};
+const unsigned kMaxDigestSize = 20;
+extern const char *kSuffixes[];
+const unsigned kSuffixLengths[] = {0, 0, 7, 0};
+const unsigned kMaxSuffixLength = 7;
+
+template<unsigned digest_size_, Algorithms algorithm_>
+struct Digest {
+  unsigned char digest[digest_size_];
+  Algorithms algorithm;
+
+  unsigned GetDigestSize() const { return kDigestSizes[algorithm]; }
+  unsigned GetHexSize() const {
+    return 2*kDigestSizes[algorithm] + kSuffixLengths[algorithm];
+  }
+
+  Digest() {
+    algorithm = algorithm_;
+    memset(digest, 0, digest_size_);
+  }
+
+  Digest(const Algorithms a,
+         const unsigned char *digest_buffer, const unsigned buffer_size)
+  {
+    algorithm = a;
+    assert(buffer_size <= digest_size_);
+    memcpy(digest, digest_buffer, buffer_size);
+  }
+
+  std::string ToString() const {
+    const unsigned string_length = GetHexSize();
+    std::string result(string_length, 0);
+
+    unsigned i;
+    for (i = 0; i < kDigestSizes[algorithm]; ++i) {
+      char dgt1 = (unsigned)digest[i] / 16;
+      char dgt2 = (unsigned)digest[i] % 16;
+      dgt1 += (dgt1 <= 9) ? '0' : 'a' - 10;
+      dgt2 += (dgt2 <= 9) ? '0' : 'a' - 10;
+      result[i*2] = dgt1;
+      result[i*2+1] = dgt2;
+    }
+    unsigned pos = i*2;
+    for (const char *s = kSuffixes[algorithm]; *s != '\0'; ++s) {
+      result[pos] = *s;
+      pos++;
+    }
+    return result;
+  }
+
+  bool IsNull() const {
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
+      if (digest[i] != 0)
+        return false;
+    return true;
+  }
+
+  bool operator ==(const Digest<digest_size_, algorithm_> &other) const {
+    if (this->algorithm != other.algorithm)
+      return false;
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i)
+      if (this->digest[i] != other.digest[i])
+        return false;
+    return true;
+  }
+
+  bool operator !=(const Digest<digest_size_, algorithm_> &other) const {
+    return !(*this == other);
+  }
+
+  bool operator <(const Digest<digest_size_, algorithm_> &other) const {
+    if (this->algorithm != other.algorithm)
+      return (this->algorithm < other.algorithm);
+    for (unsigned i = 0; i < kDigestSizes[algorithm]; ++i) {
+      if (this->digest[i] > other.digest[i])
+        return false;
+      if (this->digest[i] < other.digest[i])
+        return true;
+    }
+    return false;
+  }
+
+  bool operator >(const Digest<digest_size_, algorithm_> &other) const {
+    if (this->algorithm != other.algorithm)
+      return (this->algorithm > other.algorithm);
+    for (int i = 0; i < kDigestSizes[algorithm]; ++i) {
+      if (this->digest[i] < other.digest[i])
+        return false;
+      if (this->digest[i] > other.digest[i])
+        return true;
+    }
+    return false;
+  }
+};
+
+
+struct Md5 : public Digest<16, kMd5> {
+  Md5() : Digest<16, kMd5>() { }
+  Md5(const char *chars, const unsigned length);
+};
+
+}  // namespace shash_v1
+
+
+//------------------------------------------------------------------------------
+
+
 namespace inode_tracker{
 
 struct Dirent {
@@ -131,7 +248,10 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker);
 }  // namespace inode_tracker
 
 
-namespace inode_tracker_v2{
+//------------------------------------------------------------------------------
+
+
+namespace inode_tracker_v2 {
 
 template<class Key, class Value, class Derived>
 class SmallHashBase {
@@ -411,6 +531,236 @@ public:
 void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker);
 
 }  // namespace inode_tracker_v2
+
+
+//------------------------------------------------------------------------------
+
+
+namespace inode_tracker_v3 {
+
+class StringRef {
+ public:
+  StringRef() { length_ = NULL; }
+  uint16_t length() const { return *length_; }
+  uint16_t size() const { return sizeof(uint16_t) + *length_; }
+  static uint16_t size(const uint16_t length) {
+    return sizeof(uint16_t) + length;
+  }
+  char *data() const { return reinterpret_cast<char *>(length_ + 1); }
+  static StringRef Place(const uint16_t length, const char *str,
+                         void *addr)
+  {
+    assert(false);
+  }
+ private:
+  uint16_t *length_;
+};
+
+class StringHeap : public SingleCopy {
+ public:
+  StringHeap() { assert(false); }
+  StringHeap(const uint32_t minimum_size) { assert(false); }
+  void Init(const uint32_t minimum_size) { assert(false); }
+
+  ~StringHeap() {
+    for (unsigned i = 0; i < bins_.size(); ++i) {
+      smunmap(bins_.At(i));
+    }
+  }
+
+  StringRef AddString(const uint16_t length, const char *str) {
+    assert(false);
+  }
+  void RemoveString(const StringRef str_ref) { assert(false); }
+  double GetUsage() const { assert(false); }
+  uint64_t used() const { assert(false); }
+
+ private:
+  void AddBin(const uint64_t size) { assert(false); }
+
+  uint64_t size_;
+  uint64_t used_;
+  uint64_t bin_size_;
+  uint64_t bin_used_;
+  BigVector<void *> bins_;
+};
+
+
+class PathStore {
+ public:
+  PathStore() { assert(false); }
+  ~PathStore() {
+    delete string_heap_;
+  }
+  explicit PathStore(const PathStore &other) { assert(false); }
+  PathStore &operator= (const PathStore &other) { assert(false); }
+
+  void Insert(const shash_v1::Md5 &md5path, const PathString &path) {
+    assert(false);
+  }
+
+  bool Lookup(const shash_v1::Md5 &md5path, PathString *path) {
+    PathInfo info;
+    bool retval = map_.Lookup(md5path, &info);
+    if (!retval)
+      return false;
+
+    if (info.parent.IsNull()) {
+      return true;
+    }
+
+    retval = Lookup(info.parent, path);
+    assert(retval);
+    path->Append("/", 1);
+    path->Append(info.name.data(), info.name.length());
+    return true;
+  }
+
+  void Erase(const shash_v1::Md5 &md5path) { assert(false); }
+  void Clear() { assert(false); }
+
+ //private:
+  struct PathInfo {
+    PathInfo() {
+      refcnt = 1;
+    }
+    shash_v1::Md5 parent;
+    uint32_t refcnt;
+    StringRef name;
+  };
+  void CopyFrom(const PathStore &other) { assert(false); }
+  SmallHashDynamic<shash_v1::Md5, PathInfo> map_;
+  StringHeap *string_heap_;
+};
+
+
+class PathMap {
+ public:
+  PathMap() {
+    assert(false);
+  }
+  bool LookupPath(const shash_v1::Md5 &md5path, PathString *path) {
+    bool found = path_store_.Lookup(md5path, path);
+    return found;
+  }
+  uint64_t LookupInode(const PathString &path) { assert(false); }
+  shash_v1::Md5 Insert(const PathString &path, const uint64_t inode) {
+    assert(false);
+  }
+  void Erase(const shash_v1::Md5 &md5path) {
+    assert(false);
+  }
+  void Clear() { assert(false); }
+ public:
+  SmallHashDynamic<shash_v1::Md5, uint64_t> map_;
+  PathStore path_store_;
+};
+
+class InodeMap {
+public:
+  InodeMap() {
+    assert(false);
+  }
+  bool LookupMd5Path(const uint64_t inode, shash_v1::Md5 *md5path) {
+    bool found = map_.Lookup(inode, md5path);
+    return found;
+  }
+  void Insert(const uint64_t inode, const shash_v1::Md5 &md5path) {
+    assert(false);
+  }
+  void Erase(const uint64_t inode) {
+    assert(false);
+  }
+  void Clear() { assert(false); }
+ public:
+  SmallHashDynamic<uint64_t, shash_v1::Md5> map_;
+};
+
+
+class InodeReferences {
+public:
+  InodeReferences() {
+    assert(false);
+  }
+  bool Get(const uint64_t inode, const uint32_t by) {
+    assert(false);
+  }
+  bool Put(const uint64_t inode, const uint32_t by) {
+    assert(false);
+  }
+  void Clear() { assert(false); }
+ public:
+  SmallHashDynamic<uint64_t, uint32_t> map_;
+};
+
+class InodeTracker {
+public:
+  struct Statistics {
+    Statistics() { assert(false); }
+    std::string Print() { assert(false); }
+    atomic_int64 num_inserts;
+    atomic_int64 num_removes;
+    atomic_int64 num_references;
+    atomic_int64 num_hits_inode;
+    atomic_int64 num_hits_path;
+    atomic_int64 num_misses_path;
+  };
+  Statistics GetStatistics() { assert(false); }
+
+  InodeTracker() { assert(false); }
+  explicit InodeTracker(const InodeTracker &other) { assert(false); }
+  InodeTracker &operator= (const InodeTracker &other) { assert(false); }
+  ~InodeTracker() {
+    pthread_mutex_destroy(lock_);
+    free(lock_);
+  };
+  void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
+  {
+    assert(false);
+  }
+  void VfsGet(const uint64_t inode, const PathString &path) {
+    assert(false);
+  }
+  void VfsPut(const uint64_t inode, const uint32_t by) {
+    assert(false);
+  }
+  bool FindPath(const uint64_t inode, PathString *path) {
+    //Lock();
+    shash_v1::Md5 md5path;
+    bool found = inode_map_.LookupMd5Path(inode, &md5path);
+    if (found) {
+      found = path_map_.LookupPath(md5path, path);
+      assert(found);
+    }
+    //Unlock();
+    //if (found) atomic_inc64(&statistics_.num_hits_path);
+    //else atomic_inc64(&statistics_.num_misses_path);
+    return found;
+  }
+
+  uint64_t FindInode(const PathString &path) {
+    assert(false);
+  }
+
+ public:
+  static const unsigned kVersion = 3;
+
+  void InitLock() { assert(false); }
+  void CopyFrom(const InodeTracker &other) { assert(false); }
+  inline void Lock() const { assert(false); }
+  inline void Unlock() const { assert(false); }
+
+  unsigned version_;
+  pthread_mutex_t *lock_;
+  PathMap path_map_;
+  InodeMap inode_map_;
+  InodeReferences inode_references_;
+  Statistics statistics_;
+};
+
+void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker);
+
+}  // namespace inode_tracker_v3
 
 }  // namespace compat
 

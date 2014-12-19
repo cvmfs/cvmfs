@@ -91,6 +91,7 @@ enum StateId {
   kStateOpenFilesCounter,
   kStateGlueBufferV2,
   kStateGlueBufferV3,
+  kStateGlueBufferV4,  // >= 2.1.20
 };
 
 
