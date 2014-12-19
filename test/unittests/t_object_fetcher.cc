@@ -184,15 +184,8 @@ class T_ObjectFetcher : public ::testing::Test {
                                                    catalog_size,
                                                    root_path));
       manifest->set_history(MockHistory::root_hash);
+      manifest->set_repository_name(fqrn);
       ASSERT_TRUE (manifest->Export(manifest_path)) << "failed to create manifest";
-    }
-
-    // create some history objects
-    CreateHistory(previous_history_hash);
-    CreateHistory(MockHistory::root_hash, previous_history_hash);
-
-    // create a catalog
-    CreateCatalog(MockCatalog::root_hash, "");
   }
 
   ObjectFetcherT* GetObjectFetcher() {
@@ -228,6 +221,13 @@ class T_ObjectFetcher : public ::testing::Test {
     return new LocalObjectFetcher<>(backend_storage, temp_directory);
   }
 
+  ObjectFetcherT* GetObjectFetcher(const type<HttpObjectFetcher<> > type_spec) {
+    return HttpObjectFetcher<>::Create(fqrn,
+                                       "file://" + backend_storage,
+                                       public_key_path,
+                                       temp_directory);
+  }
+
   ObjectFetcherT* GetObjectFetcher(const type<MockObjectFetcher> type_spec) {
     return new MockObjectFetcher();
   }
@@ -235,7 +235,18 @@ class T_ObjectFetcher : public ::testing::Test {
   void CreateHistory(const type<LocalObjectFetcher<> > type_spec,
                      const shash::Any &content_hash,
                      const shash::Any &previous_revision) {
-    const std::string tmp_path = CreateTempPath(sandbox, 0700);
+    CreateSandboxHistory(content_hash, previous_revision);
+  }
+
+  void CreateHistory(const type<HttpObjectFetcher<> > type_spec,
+                     const shash::Any &content_hash,
+                     const shash::Any &previous_revision) {
+    CreateSandboxHistory(content_hash, previous_revision);
+  }
+
+  void CreateSandboxHistory(const shash::Any &content_hash,
+                            const shash::Any &previous_revision) {
+    const std::string tmp_path = CreateTempPath(sandbox + "/history", 0700);
     ASSERT_FALSE (tmp_path.empty()) << "failed to create tmp in: " << sandbox;
 
     history::SqliteHistory *history =
@@ -260,7 +271,18 @@ class T_ObjectFetcher : public ::testing::Test {
   void CreateCatalog(const type<LocalObjectFetcher<> > type_spec,
                      const shash::Any  &content_hash,
                      const std::string &root_path) {
-    const std::string tmp_path = CreateTempPath(sandbox, 0700);
+    CreateSandboxCatalog(content_hash, root_path);
+  }
+
+  void CreateCatalog(const type<HttpObjectFetcher<> > type_spec,
+                     const shash::Any  &content_hash,
+                     const std::string &root_path) {
+    CreateSandboxCatalog(content_hash, root_path);
+  }
+
+  void CreateSandboxCatalog(const shash::Any  &content_hash,
+                            const std::string &root_path) {
+    const std::string tmp_path = CreateTempPath(sandbox + "/catalog", 0700);
     ASSERT_FALSE (tmp_path.empty()) << "failed to create tmp in: " << sandbox;
 
     // TODO: WritableCatalog::Create()
@@ -303,6 +325,7 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   bool NeedsSandbox(const type<LocalObjectFetcher<> > type_spec) { return true;  }
+  bool NeedsSandbox(const type<HttpObjectFetcher<> >  type_spec) { return true;  }
   bool NeedsSandbox(const type<MockObjectFetcher>     type_spec) { return false; }
 };
 
@@ -358,7 +381,8 @@ const unsigned int T_ObjectFetcher<ObjectFetcherT>::catalog_revision = 1;
 
 typedef ::testing::Types<
   MockObjectFetcher,
-  LocalObjectFetcher<> > ObjectFetcherTypes;
+  LocalObjectFetcher<>,
+  HttpObjectFetcher<> > ObjectFetcherTypes;
 TYPED_TEST_CASE(T_ObjectFetcher, ObjectFetcherTypes);
 
 
