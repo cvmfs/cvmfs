@@ -90,7 +90,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/options.h
   ${CVMFS_SOURCE_DIR}/options.cc
 
-  ${CVMFS_SOURCE_DIR}/catalog_counters.h
+  ${CVMFS_SOURCE_DIR}/globals.cc
+
+  ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
 
   ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
