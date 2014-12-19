@@ -121,6 +121,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/dirtab.h
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/signature.cc
+  ${CVMFS_SOURCE_DIR}/whitelist.cc
 
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
