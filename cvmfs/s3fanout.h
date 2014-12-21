@@ -183,6 +183,7 @@ class S3FanoutManager : SingleCopy {
   pthread_mutex_t *jobs_todo_lock_;
   std::vector<s3fanout::JobInfo*> jobs_completed_;
   pthread_mutex_t *jobs_completed_lock_;
+  pthread_mutex_t *curl_handle_lock_;
 
   CURL *AcquireCurlHandle() const;
   void ReleaseCurlHandle(JobInfo *info, CURL *handle) const;
