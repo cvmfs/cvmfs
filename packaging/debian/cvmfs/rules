@@ -47,12 +47,12 @@ install: build debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-uni
 	
 	# Add here commands to install the package into debian/gentoo.
 	dh_auto_install --destdir=${CURDIR}/debian/tmp
-	dh_install --fail-missing --sourcedir=${CURDIR}/debian/tmp
 	rm -rf ${CURDIR}/debian/tmp/etc/cvmfs/keys/*
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/config.d/*.conf
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/domain.d/*.conf
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/default.d/*.conf
 	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/serverorder.sh
+	dh_install --fail-missing --sourcedir=${CURDIR}/debian/tmp
 
 # Build architecture-independent files here.
 binary-indep: build install
