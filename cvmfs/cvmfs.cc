@@ -2686,7 +2686,10 @@ static bool RestoreState(const int fd_progress,
 
     if (saved_states[i]->state_id == loader::kStateOpenFiles) {
       SendMsg2Socket(fd_progress, "Migrating chunk tables (v1 to v2)... ");
-      // TODO
+      compat::chunk_tables::ChunkTables *saved_chunk_tables =
+        (compat::chunk_tables::ChunkTables *)saved_states[i]->state;
+      compat::chunk_tables::Migrate(saved_chunk_tables, cvmfs::chunk_tables_);
+      SendMsg2Socket(fd_progress, " done\n");
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFilesV2) {
@@ -2750,10 +2753,20 @@ static void FreeSavedState(const int fd_progress,
           saved_states[i]->state);
         break;
       case loader::kStateGlueBufferV3:
+        SendMsg2Socket(fd_progress, "Releasing saved glue buffer (version 3)\n");
+        delete static_cast<compat::inode_tracker_v3::InodeTracker *>(
+          saved_states[i]->state);
+        break;
+      case loader::kStateGlueBufferV4:
         SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
         break;
       case loader::kStateOpenFiles:
+        SendMsg2Socket(fd_progress, "Releasing chunk tables (version 1)\n");
+        delete static_cast<compat::chunk_tables::ChunkTables *>(
+          saved_states[i]->state);
+        break;
+      case loader::kStateOpenFilesV2:
         SendMsg2Socket(fd_progress, "Releasing chunk tables\n");
         delete static_cast<ChunkTables *>(saved_states[i]->state);
         break;
