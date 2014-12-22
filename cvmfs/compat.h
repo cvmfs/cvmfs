@@ -15,12 +15,14 @@
 
 #include <google/sparse_hash_map>
 
-#include "shortstring.h"
-#include "bigvector.h"
 #include "atomic.h"
+#include "bigvector.h"
 #include "catalog_mgr.h"
-#include "util.h"
+#include "file_chunk.h"
 #include "glue_buffer.h"
+#include "hash.h"
+#include "shortstring.h"
+#include "util.h"
 
 namespace compat {
 
@@ -127,11 +129,16 @@ struct Digest {
   }
 };
 
-
 struct Md5 : public Digest<16, kMd5> {
   Md5() : Digest<16, kMd5>() { }
   Md5(const char *chars, const unsigned length);
 };
+
+struct Any : public Digest<20, kAny> {
+  Any() : Digest<20, kAny>() { }
+};
+
+void MigrateAny(const Any *old_hash, shash::Any *new_hash);
 
 }  // namespace shash_v1
 
@@ -761,6 +768,61 @@ public:
 void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker);
 
 }  // namespace inode_tracker_v3
+
+
+namespace chunk_tables {
+
+class FileChunk {
+ public:
+  FileChunk() { assert(false); }
+  FileChunk(const shash_v1::Any &hash, const off_t offset, const size_t size) {
+    assert(false);
+  }
+  inline const shash_v1::Any& content_hash() const { return content_hash_; }
+  inline off_t offset() const { return offset_; }
+  inline size_t size() const { return size_; }
+ //protected:
+  shash_v1::Any content_hash_; //!< content hash of the compressed file chunk
+  off_t offset_;               //!< byte offset in the uncompressed input file
+  size_t size_;                //!< uncompressed size of the data chunk
+};
+
+struct FileChunkReflist {
+  FileChunkReflist() { assert(false); }
+  FileChunkReflist(BigVector<FileChunk> *l, const PathString &p) {
+    assert(false);
+  }
+  BigVector<FileChunk> *list;
+  PathString path;
+};
+
+struct ChunkTables {
+  ChunkTables() { assert(false); }
+  ~ChunkTables();
+  ChunkTables(const ChunkTables &other) { assert(false); }
+  ChunkTables &operator= (const ChunkTables &other) { assert(false); }
+  void CopyFrom(const ChunkTables &other) { assert(false); }
+  void InitLocks() { assert(false); }
+  void InitHashmaps() { assert(false); }
+  pthread_mutex_t *Handle2Lock(const uint64_t handle) const { assert(false); }
+  inline void Lock() { assert(false); }
+  inline void Unlock() { assert(false); }
+
+  int version;
+  static const unsigned kNumHandleLocks = 128;
+  SmallHashDynamic<uint64_t, ::ChunkFd> handle2fd;
+  // The file descriptors attached to handles need to be locked.
+  // Using a hash map to survive with a small, fixed number of locks
+  BigVector<pthread_mutex_t *> handle_locks;
+  SmallHashDynamic<uint64_t, FileChunkReflist> inode2chunks;
+  SmallHashDynamic<uint64_t, uint32_t> inode2references;
+  uint64_t next_handle;
+  pthread_mutex_t *lock;
+};
+
+void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables);
+
+}  // namespace chunk_tables
 
 }  // namespace compat
 
