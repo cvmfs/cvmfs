@@ -32,13 +32,16 @@ cern.ch domain
 
 %install
 rm -rf $RPM_BUILD_ROOT
-for key in %{SOURCE0} %{SOURCE1} %{SOURCE2} %{SOURCE3}; do
-    install -D -m 444 "${key}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/keys/cern.ch/${key}
+for cvmfsdir in keys/cern.ch domain.d default.d config.d; do
+    mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/$cvmfsdir
 done
-install -D -m 444 %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/domain.d/cern.ch.conf
-install -D -m 444 %{SOURCE5} $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/default.d/50-cern.conf
+for key in %{SOURCE0} %{SOURCE1} %{SOURCE2} %{SOURCE3}; do
+    install -D -m 444 "${key}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/keys/cern.ch
+done
+install -D -m 444 %{SOURCE4} $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/domain.d
+install -D -m 444 %{SOURCE5} $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/default.d
 for conf in %{SOURCE6} %{SOURCE7} %{SOURCE8}; do
-    install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d/${conf}
+    install -D -m 444 "${conf}" $RPM_BUILD_ROOT%{_sysconfdir}/cvmfs/config.d
 done
 
 %files
