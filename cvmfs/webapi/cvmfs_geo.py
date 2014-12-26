@@ -8,7 +8,7 @@ import GeoIP
 
 gi = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCity.dat", GeoIP.GEOIP_STANDARD)
 
-positive_expire_secs = 60*60*24*3  # 3 days
+positive_expire_secs = 60*60  # 1 hour
 
 # function came from http://www.johndcook.com/python_longitude_latitude.html
 def distance_on_unit_sphere(lat1, long1, lat2, long2):
@@ -126,7 +126,8 @@ def api(path_info, repo_name, version, start_response, environ):
 
     status = '200 OK'
     response_headers = [('Content-Type', 'text/plain'),
-                  ('Cache-control', 'max-age=' + str(positive_expire_secs))]
+                  ('Cache-Control', 'max-age=' + str(positive_expire_secs)),
+                  ('Content-Length', str(len(response_body)))]
     start_response(status, response_headers)
 
     return [response_body]
