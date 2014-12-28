@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Hotpatching During Linux Kernel TAR"
+cvmfs_test_name="Hotpatching during Linux kernel tar and checksumming large files"
 
 
 skip_bytes() {
@@ -23,6 +23,14 @@ tar_gzip_and_hash() {
 }
 
 
+checksum_large_files() {
+  local dir=$1
+  local result_file=$2
+
+  find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file
+}
+
+
 cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
@@ -30,9 +38,13 @@ cvmfs_run_test() {
   . ${script_location}/../common.sh
 
   local src_dir='/cvmfs/sft.cern.ch/lcg/external/experimental'
+  local xxl_files_dir='/cvmfs/cernvm-prod.cern.ch'
   local tar_log1="tar_1.log"
   local tar_log2="tar_2.log"
   local tar_log3="tar_3.log"
+  local chksum_log1="chksum_log1"
+  local chksum_log2="chksum_log2"
+  local chksum_log3="chksum_log3"
   local md5_1=""
   local md5_2=""
   local md5_3=""
@@ -72,12 +84,14 @@ cvmfs_run_test() {
   sudo cvmfs_config chksetup || return 6
 
   # mount a repository
-  echo "mounting sft.cern.ch"
-  cvmfs_mount sft.cern.ch "CVMFS_KCACHE_TIMEOUT=10" || return 7
+  echo "mounting sft.cern.ch and cernvm-prod.cern.ch"
+  cvmfs_mount sft.cern.ch,cernvm-prod.cern.ch "CVMFS_KCACHE_TIMEOUT=10" || return 7
 
   # do some hammering on the file system (without interruption)
   echo "tar $src_dir (without interruption)"
   md5_1=$(tar_gzip_and_hash $src_dir $tar_log1)
+  echo "checksumming large files in $xxl_files_dir (without interruption)"
+  checksum_large_files $xxl_files_dir $chksum_log1
 
   # do some hammering on the file system
   sudo cvmfs_talk -i sft cleanup 0
@@ -85,9 +99,13 @@ cvmfs_run_test() {
   tar_gzip_and_hash $src_dir $tar_log2 $md5_output &
   local tar_pid=$!
   echo "tar runs under PID $tar_pid"
+  echo "starting to checksum large files in $xxl_files_dir (log output in separate file)"
+  checksum_large_files $xxl_files_dir $chksum_log2 &
+  local chksum_pid=$!
+  echo "checksumming runs under PID chksum_pid"
 
   # wait some time to bring tar up to speed
-  echo "giving tar some time to screw around"
+  echo "giving tar and checksumming some time to screw around"
   sleep 5 || return 10
 
   echo "==><><><><><><><><><><=="
@@ -97,8 +115,10 @@ cvmfs_run_test() {
   # do the CernVM-FS package update
   echo "updating CernVM-FS package to version $current_version"
   kill -0 $tar_pid || return 11 # tar finished already >.<
+  kill -0 $chksum_pid || return 11 # checksumming finished already >.<
   install_package $CVMFS_CLIENT_PACKAGE || return 12
   kill -0 $tar_pid || return 13 # tar finished already >.<
+  kill -0 $chksum_pid || return 13 # checksumming finished already >.<
 
   # wait for the file system hammering to finish and collect the pieces
   echo "waiting for tar to be finished... "
@@ -106,10 +126,15 @@ cvmfs_run_test() {
   tar_exit_code=$?
   echo "tar is done (exit code: $tar_exit_code)"
   md5_2=$(cat $md5_output)
+  wait $chksum_pid || return 14
+  chksum_exit_code=$?
+  echo "checksumming is done (exit code: $chksum_exit_code)"
 
   # do some hammering on the file system (after update)
   echo "tar $src_dir (without interruption - after update)"
   md5_3=$(tar_gzip_and_hash $src_dir $tar_log3)
+  echo "checksumming large files in $xxl_files_dir (without interruption - after update)"
+  checksum_large_files $xxl_files_dir $chksum_log3
 
   # check the outcome
   echo "compare the output of all tar runs"
@@ -120,7 +145,13 @@ cvmfs_run_test() {
      [ x"$md5_2" != x"$md5_3" ]; then
     return 18
   fi
+  if ! diff -q $tar_log1 $tar_log2; then
+    return 19
+  fi
+  if ! diff -q $tar_log2 $tar_log3; then
+    return 20
+  fi
 
   # all done
-  return $tar_exit_code
+  return $(($tar_exit_code + $chksum_exit_code))
 }
