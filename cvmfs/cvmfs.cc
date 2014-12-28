@@ -2689,7 +2689,8 @@ static bool RestoreState(const int fd_progress,
       compat::chunk_tables::ChunkTables *saved_chunk_tables =
         (compat::chunk_tables::ChunkTables *)saved_states[i]->state;
       compat::chunk_tables::Migrate(saved_chunk_tables, cvmfs::chunk_tables_);
-      SendMsg2Socket(fd_progress, " done\n");
+      SendMsg2Socket(fd_progress,
+        StringifyInt(cvmfs::chunk_tables_->handle2fd.size()) + " handles\n");
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFilesV2) {
