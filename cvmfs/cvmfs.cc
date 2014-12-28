@@ -2591,7 +2591,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
     glue::InodeTracker *saved_inode_tracker =
       new glue::InodeTracker(*cvmfs::inode_tracker_);
     loader::SavedState *state_glue_buffer = new loader::SavedState();
-    state_glue_buffer->state_id = loader::kStateGlueBufferV3;
+    state_glue_buffer->state_id = loader::kStateGlueBufferV4;
     state_glue_buffer->state = saved_inode_tracker;
     saved_states->push_back(state_glue_buffer);
   }
@@ -2600,7 +2600,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   SendMsg2Socket(fd_progress, msg_progress);
   ChunkTables *saved_chunk_tables = new ChunkTables(*cvmfs::chunk_tables_);
   loader::SavedState *state_chunk_tables = new loader::SavedState();
-  state_chunk_tables->state_id = loader::kStateOpenFiles;
+  state_chunk_tables->state_id = loader::kStateOpenFilesV2;
   state_chunk_tables->state = saved_chunk_tables;
   saved_states->push_back(state_chunk_tables);
 
@@ -2650,7 +2650,7 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateGlueBuffer) {
-      SendMsg2Socket(fd_progress, "Migrating inode tracker (v1 to v3)... ");
+      SendMsg2Socket(fd_progress, "Migrating inode tracker (v1 to v4)... ");
       compat::inode_tracker::InodeTracker *saved_inode_tracker =
         (compat::inode_tracker::InodeTracker *)saved_states[i]->state;
       compat::inode_tracker::Migrate(saved_inode_tracker, cvmfs::inode_tracker_);
@@ -2658,7 +2658,7 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateGlueBufferV2) {
-      SendMsg2Socket(fd_progress, "Migrating inode tracker (v2 to v3)... ");
+      SendMsg2Socket(fd_progress, "Migrating inode tracker (v2 to v4)... ");
       compat::inode_tracker_v2::InodeTracker *saved_inode_tracker =
         (compat::inode_tracker_v2::InodeTracker *)saved_states[i]->state;
       compat::inode_tracker_v2::Migrate(saved_inode_tracker,
@@ -2667,6 +2667,15 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateGlueBufferV3) {
+      SendMsg2Socket(fd_progress, "Migrating inode tracker (v3 to v4)... ");
+      compat::inode_tracker_v3::InodeTracker *saved_inode_tracker =
+        (compat::inode_tracker_v3::InodeTracker *)saved_states[i]->state;
+      compat::inode_tracker_v3::Migrate(saved_inode_tracker,
+                                        cvmfs::inode_tracker_);
+      SendMsg2Socket(fd_progress, " done\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateGlueBufferV4) {
       SendMsg2Socket(fd_progress, "Restoring inode tracker... ");
       delete cvmfs::inode_tracker_;
       glue::InodeTracker *saved_inode_tracker =
@@ -2676,6 +2685,15 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFiles) {
+      SendMsg2Socket(fd_progress, "Migrating chunk tables (v1 to v2)... ");
+      compat::chunk_tables::ChunkTables *saved_chunk_tables =
+        (compat::chunk_tables::ChunkTables *)saved_states[i]->state;
+      compat::chunk_tables::Migrate(saved_chunk_tables, cvmfs::chunk_tables_);
+      SendMsg2Socket(fd_progress,
+        StringifyInt(cvmfs::chunk_tables_->handle2fd.size()) + " handles\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateOpenFilesV2) {
       SendMsg2Socket(fd_progress, "Restoring chunk tables... ");
       delete cvmfs::chunk_tables_;
       ChunkTables *saved_chunk_tables = (ChunkTables *)saved_states[i]->state;
@@ -2736,10 +2754,20 @@ static void FreeSavedState(const int fd_progress,
           saved_states[i]->state);
         break;
       case loader::kStateGlueBufferV3:
+        SendMsg2Socket(fd_progress, "Releasing saved glue buffer (version 3)\n");
+        delete static_cast<compat::inode_tracker_v3::InodeTracker *>(
+          saved_states[i]->state);
+        break;
+      case loader::kStateGlueBufferV4:
         SendMsg2Socket(fd_progress, "Releasing saved glue buffer\n");
         delete static_cast<glue::InodeTracker *>(saved_states[i]->state);
         break;
       case loader::kStateOpenFiles:
+        SendMsg2Socket(fd_progress, "Releasing chunk tables (version 1)\n");
+        delete static_cast<compat::chunk_tables::ChunkTables *>(
+          saved_states[i]->state);
+        break;
+      case loader::kStateOpenFilesV2:
         SendMsg2Socket(fd_progress, "Releasing chunk tables\n");
         delete static_cast<ChunkTables *>(saved_states[i]->state);
         break;

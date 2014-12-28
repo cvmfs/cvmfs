@@ -132,6 +132,11 @@ class SmallHashBase {
   Key empty_key() const { return empty_key_; }
   Key *keys() const { return keys_; }
   Value *values() const { return values_; }
+  
+  // Only needed by compat
+  void SetHasher(uint32_t (*hasher)(const Key &key)) {
+    hasher_ = hasher;
+  }
 
  protected:
   uint32_t ScaleHash(const Key &key) const {

@@ -96,6 +96,8 @@ struct ChunkTables {
     assert(retval == 0);
   }
 
+  static const unsigned kVersion = 2;
+  
   int version;
   static const unsigned kNumHandleLocks = 128;
   SmallHashDynamic<uint64_t, ChunkFd> handle2fd;

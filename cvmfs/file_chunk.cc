@@ -39,7 +39,7 @@ void ChunkTables::InitHashmaps() {
 
 ChunkTables::ChunkTables() {
   next_handle = 2;
-  version = 1;
+  version = kVersion;
   InitLocks();
   InitHashmaps();
 }
@@ -56,7 +56,7 @@ ChunkTables::~ChunkTables() {
 
 
 ChunkTables::ChunkTables(const ChunkTables &other) {
-  version = 1;
+  version = kVersion;
   InitLocks();
   InitHashmaps();
   CopyFrom(other);
