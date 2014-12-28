@@ -582,7 +582,7 @@ TEST_F(T_Dns, CaresResolverLocalhost) {
       localname += ".localdomain";
   }
 
-  Host host = default_resolver->Resolve("localhost");
+  Host host = default_resolver->Resolve(localname);
   if (host.HasIpv6()) {
     ExpectResolvedName(host, localname, "127.0.0.1", "[::1]");
   } else {
@@ -645,7 +645,7 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
 
 
 TEST_F(T_Dns, CaresResolverBadResolver) {
-  CaresResolver *quick_resolver = CaresResolver::Create(false, 0, 100);
+  UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
   ASSERT_FALSE(quick_resolver == NULL);
 
   vector<string> bad_resolvers;
@@ -662,7 +662,7 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
 
 TEST_F(T_Dns, CaresResolverTimeout) {
   // Because of backoff, timeout can actually be as high as 2s
-  CaresResolver *quick_resolver = CaresResolver::Create(false, 3, 200);
+  UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 3, 200));
   ASSERT_FALSE(quick_resolver == NULL);
 
   vector<string> bad_resolvers;
@@ -685,6 +685,7 @@ TEST_F(T_Dns, HostfileResolverConstruct) {
 
   resolver = HostfileResolver::Create("/no/readable/file", false);
   EXPECT_TRUE(resolver == NULL);
+  delete resolver;
 }
 
 
@@ -846,23 +847,22 @@ TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
 
 
 TEST_F(T_Dns, NormalResolverConstruct) {
-  NormalResolver *resolver = NormalResolver::Create(false, 2, 2000);
+  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver != NULL);
   ASSERT_EQ(resolver->domains(), resolver->cares_resolver_->domains());
   ASSERT_EQ(resolver->resolvers(), resolver->cares_resolver_->resolvers());
   ASSERT_EQ(resolver->timeout_ms(), resolver->cares_resolver_->timeout_ms());
   ASSERT_EQ(resolver->retries(), resolver->cares_resolver_->retries());
-  delete resolver;
 
   int retval = setenv("HOST_ALIASES", "/no/such/file", 1);
   ASSERT_EQ(retval, 0);
-  resolver = NormalResolver::Create(false, 2, 2000);
-  ASSERT_TRUE(resolver == NULL);
+  UniquePtr<NormalResolver> resolver2(NormalResolver::Create(false, 2, 2000));
+  ASSERT_TRUE(resolver2 == NULL);
 }
 
 
 TEST_F(T_Dns, NormalResolverSimple) {
-  NormalResolver *resolver = NormalResolver::Create(false, 2, 2000);
+  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver != NULL);
 
   Host host = resolver->Resolve("localhost");
@@ -874,7 +874,7 @@ TEST_F(T_Dns, NormalResolverSimple) {
 
 
 TEST_F(T_Dns, NormalResolverLocalonly) {
-  NormalResolver *resolver = NormalResolver::Create(false, 2, 2000);
+  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver != NULL);
 
   vector<string> no_resolvers;
@@ -886,7 +886,7 @@ TEST_F(T_Dns, NormalResolverLocalonly) {
 
 
 TEST_F(T_Dns, NormalResolverCombined) {
-  NormalResolver *resolver = NormalResolver::Create(false, 2, 2000);
+  UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
   ASSERT_TRUE(resolver != NULL);
 
   vector<string> names;
