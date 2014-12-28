@@ -27,7 +27,18 @@ checksum_large_files() {
   local dir=$1
   local result_file=$2
 
-  find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file
+  local pid1=
+  local pid2=
+  local pid3=
+  (find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file) &
+  pid1=$!
+  (find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file) &
+  pid2=$!
+  (find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file) &
+  pid3=$!
+  wait pid1
+  wait pid2
+  wait pid3
 }
 
 
