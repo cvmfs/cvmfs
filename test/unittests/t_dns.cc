@@ -785,7 +785,8 @@ TEST_F(T_Dns, HostfileResolverSearchDomains) {
   search_domains.push_back("unused");
   search_domains.push_back("mydomain");
   search_domains.push_back("remotedomain");
-  hostfile_resolver->SetSearchDomains(search_domains);
+  bool retval = hostfile_resolver->SetSearchDomains(search_domains);
+  EXPECT_EQ(retval, true);
   host = hostfile_resolver->Resolve("myhost.");
   EXPECT_EQ(host.status(), kFailUnknownHost);
   host = hostfile_resolver->Resolve("myhost");
