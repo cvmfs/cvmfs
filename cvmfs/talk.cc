@@ -332,34 +332,34 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "Usage: proxy fallback <proxy list>\n");
         } else {
           string fallback_proxies = line.substr(15);
-	  vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
-	  unsigned fallback_group;
+          vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
+          unsigned fallback_group;
 
-	  // get existing non-fallback proxies
-	  cvmfs::download_manager_->GetProxyInfo(&proxy_chain, NULL, &fallback_group);
-	  std::string proxies;
-	  for (unsigned i = 0; i < fallback_group; ++i) {
-	    if (proxy_chain[i].size() == 0) {
-	      // ignore DIRECT
-	      continue;
-	    }
-	    if (proxies.size() != 0)
-	      proxies.append(";");
-	    for (unsigned j = 0; j < proxy_chain[i].size(); ++j) {
-	      if (j > 0)
-		proxies.append("|");
-	      proxies.append(proxy_chain[i][j].Print());
-	    }
-	  }
+          // get existing non-fallback proxies
+          cvmfs::download_manager_->GetProxyInfo(&proxy_chain, NULL, &fallback_group);
+          std::string proxies;
+          for (unsigned i = 0; i < fallback_group; ++i) {
+            if (proxy_chain[i].size() == 0) {
+              // ignore DIRECT
+              continue;
+            }
+            if (proxies.size() != 0)
+              proxies.append(";");
+            for (unsigned j = 0; j < proxy_chain[i].size(); ++j) {
+              if (j > 0)
+                proxies.append("|");
+              proxies.append(proxy_chain[i][j].Print());
+            }
+          }
 
-	  if ((fallback_proxies == "") && (proxies == "")) {
-	    // if emptying out fallback_proxies, and proxies is also empty,
-	    //  put a DIRECT proxy back in because there has to be something
-	    proxies = "DIRECT";
-	  }
+          if ((fallback_proxies == "") && (proxies == "")) {
+            // if emptying out fallback_proxies, and proxies is also empty,
+            //  put a DIRECT proxy back in because there has to be something
+            proxies = "DIRECT";
+          }
 
-	  cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
-	  Answer(con_fd, "OK\n");
+          cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
+          Answer(con_fd, "OK\n");
         }
       } else if (line == "timeout info") {
         unsigned timeout;
