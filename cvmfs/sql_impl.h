@@ -240,7 +240,7 @@ template <class DerivedT>
 template <typename T>
 T Database<DerivedT>::GetProperty(const std::string &key) const {
   assert (get_property_);
-  const bool retval = get_property_->BindText(1, key);
+  const bool retval = get_property_->BindText(1, key) &&
                       get_property_->FetchRow();
   assert (retval);
   const T result = get_property_->Retrieve<T>(0);
