@@ -24,10 +24,9 @@ Database<DerivedT>::Database(const std::string  &filename,
 
 template <class DerivedT>
 DerivedT* Database<DerivedT>::Create(const std::string &filename) {
-  // TODO: SharedPointer to avoid 'delete' in error conditions
-  DerivedT *database = new DerivedT(filename, kOpenReadWrite);
+  UniquePtr<DerivedT> database(new DerivedT(filename, kOpenReadWrite));
 
-  if (! database) {
+  if (! database.IsValid()) {
     LogCvmfs(kLogSql, kLogDebug, "Failed to create new database object");
     return NULL;
   }
@@ -39,48 +38,49 @@ DerivedT* Database<DerivedT>::Create(const std::string &filename) {
                          SQLITE_OPEN_CREATE;
   if (! database->OpenDatabase(open_flags)) {
     LogCvmfs(kLogSql, kLogDebug, "Failed to create new database file");
-    delete database;
     return NULL;
   }
 
   if (! database->CreatePropertiesTable()) {
     database->PrintSqlError("Failed to create common properties table");
-    delete database;
     return NULL;
   }
 
   if (! database->CreateEmptyDatabase()) {
     database->PrintSqlError("Failed to create empty database");
-    delete database;
     return NULL;
   }
 
   if (! database->PrepareCommonQueries()) {
     database->PrintSqlError("Failed to initialize properties queries");
-    delete database;
     return NULL;
   }
 
   if (! database->StoreSchemaRevision()) {
     database->PrintSqlError("Failed to store initial schema revision");
-    delete database;
     return NULL;
   }
 
-  return database;
+  return database.Release();
 }
 
 
 template <class DerivedT>
 DerivedT* Database<DerivedT>::Open(const std::string  &filename,
                                    const OpenMode      open_mode) {
-  DerivedT* database = new DerivedT(filename, open_mode);
-  if (! database->Initialize()) {
-    delete database;
-    database = NULL;
+  UniquePtr<DerivedT> database(new DerivedT(filename, open_mode));
+
+  if (! database.IsValid()) {
+    LogCvmfs(kLogSql, kLogDebug, "Failed to open database file '%s' - errno: %d",
+             filename.c_str(), errno);
+    return NULL;
   }
 
-  return database;
+  if (! database->Initialize()) {
+    return NULL;
+  }
+
+  return database.Release();
 }
 
 
