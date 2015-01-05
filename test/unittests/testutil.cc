@@ -242,7 +242,8 @@ MockHistory::MockHistory(const bool          writable,
 
 MockHistory::MockHistory(const MockHistory &other) :
   tags_(other.tags_),
-  recycle_bin_(other.recycle_bin_)
+  recycle_bin_(other.recycle_bin_),
+  writable_(other.writable_)
 {
   set_fqrn(other.fqrn());
 }
