@@ -8,7 +8,7 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs-config-egi
 Architecture: all 
-Depends: cvmfs-config-cern curl ${misc:Depends}
+Depends: cvmfs-config-cern, curl ${misc:Depends}
 Breaks: cvmfs (< 2.1.20), cvmfs-server (< 2.1.20)
 Replaces: cvmfs-keys (= 1.5)
 Provides: cvmfs-config

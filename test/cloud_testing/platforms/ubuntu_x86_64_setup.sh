@@ -34,7 +34,7 @@ echo "done"
 
 # install deb packages
 echo "installing DEB packages... "
-install_deb $KEYS_PACKAGE
+install_deb "$CONFIG_PACKAGES"
 install_deb $CLIENT_PACKAGE
 install_deb $SERVER_PACKAGE
 install_deb $UNITTEST_PACKAGE
