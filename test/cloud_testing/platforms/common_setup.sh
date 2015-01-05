@@ -9,7 +9,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #
 #  SERVER_PACKAGE        location of the CernVM-FS server package to install
 #  CLIENT_PACKAGE        location of the CernVM-FS client package to install
-#  KEYS_PACKAGE          location of the CernVM-FS public keys package
+#  CONFIG_PACKAGES       location of the CernVM-FS config packages
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
 #  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
 #  TEST_LOGFILE          location of the test logfile to be used
@@ -20,7 +20,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
 UNITTEST_PACKAGE=""
-KEYS_PACKAGE=""
+CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
 TEST_LOGFILE=""
 UNITTEST_LOGFILE=""
@@ -36,7 +36,7 @@ while getopts "s:c:k:t:g:l:u:m:" option; do
       CLIENT_PACKAGE=$OPTARG
       ;;
     k)
-      KEYS_PACKAGE=$OPTARG
+      CONFIG_PACKAGES="$OPTARG"
       ;;
     t)
       SOURCE_DIRECTORY=$OPTARG
@@ -61,14 +61,14 @@ while getopts "s:c:k:t:g:l:u:m:" option; do
 done
 
 # check that all mandatory parameters are set
-if [ x$SERVER_PACKAGE        = "x" ] ||
-   [ x$CLIENT_PACKAGE        = "x" ] ||
-   [ x$KEYS_PACKAGE          = "x" ] ||
-   [ x$SOURCE_DIRECTORY      = "x" ] ||
-   [ x$UNITTEST_PACKAGE      = "x" ] ||
-   [ x$TEST_LOGFILE          = "x" ] ||
-   [ x$UNITTEST_LOGFILE      = "x" ] ||
-   [ x$MIGRATIONTEST_LOGFILE = "x" ]; then
+if [ "x$SERVER_PACKAGE"        = "x" ] ||
+   [ "x$CLIENT_PACKAGE"        = "x" ] ||
+   [ "x$CONFIG_PACKAGES"       = "x" ] ||
+   [ "x$SOURCE_DIRECTORY"      = "x" ] ||
+   [ "x$UNITTEST_PACKAGE"      = "x" ] ||
+   [ "x$TEST_LOGFILE"          = "x" ] ||
+   [ "x$UNITTEST_LOGFILE"      = "x" ] ||
+   [ "x$MIGRATIONTEST_LOGFILE" = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
@@ -115,37 +115,43 @@ check_package_manager_response() {
 
 
 install_rpm() {
-  local rpm_file=$1
+  local rpm_files="$1"
   local yum_output
-  local rpm_name=$(rpm_name_string $rpm_file)
 
-  # check if the given rpm is already installed
-  if rpm -q $rpm_name > /dev/null 2>&1; then
-    echo "RPM '$rpm_name' is already installed"
-    exit 101
-  fi
+  for this_rpm in $rpm_files; do
+    local rpm_name=$(rpm_name_string $this_rpm)
 
-  # install the RPM
-  echo -n "Installing RPM '$rpm_name' ... "
-  yum_output=$(sudo yum -y install --nogpgcheck $rpm_file 2>&1)
-  check_package_manager_response $? "Yum" "$yum_output"
+    # check if the given rpm is already installed
+    if rpm -q $rpm_name > /dev/null 2>&1; then
+      echo "RPM '$rpm_name' is already installed"
+      exit 101
+    fi
+
+    # install the RPM
+    echo -n "Installing RPM '$rpm_name' ... "
+    yum_output=$(sudo yum -y install --nogpgcheck $this_rpm 2>&1)
+    check_package_manager_response $? "Yum" "$yum_output"
+  done
 }
 
 
 install_deb() {
-  local deb_file=$1
+  local deb_files="$1"
   local deb_output
-  local deb_name=$(deb_name_string $deb_file)
 
-  # install DEB package
-  echo -n "Installing DEB package '$deb_name' ... "
-  deb_output=$(sudo gdebi --non-interactive --quiet $deb_file)
-  check_package_manager_response $? "DPKG" "$deb_output"
+  for this_deb in $deb_files; do
+    local deb_name=$(deb_name_string $this_deb)
+
+    # install DEB package
+    echo -n "Installing DEB package '$deb_name' ... "
+    deb_output=$(sudo gdebi --non-interactive --quiet $this_deb)
+    check_package_manager_response $? "DPKG" "$deb_output"
+  done
 }
 
 
 install_from_repo() {
-  local package_name=$1
+  local package_names="$1"
   local pkg_mgr
   local pkg_mgr_output
 
@@ -157,8 +163,8 @@ install_from_repo() {
   fi
 
   # install package from repository
-  echo -n "Installing Package '$package_name' ... "
-  pkg_mgr_output=$(sudo $pkg_mgr -y install $package_name 2>&1)
+  echo -n "Installing Packages '$package_names' ... "
+  pkg_mgr_output=$(sudo $pkg_mgr -y install $package_names 2>&1)
   check_package_manager_response $? $pkg_mgr "$pkg_mgr_output"
 }
 

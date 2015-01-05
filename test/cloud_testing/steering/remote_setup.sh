@@ -17,7 +17,7 @@ usage() {
   echo "-c <cvmfs client package>  CernVM-FS client package to be tested"
   echo "-t <cvmfs source tarball>  CernVM-FS sources containing associated tests"
   echo "-g <cvmfs tests package>   CernVM-FS unit tests package"
-  echo "-k <cvmfs keys package>    CernVM-FS public keys package"
+  echo "-k <cvmfs config packages> CernVM-FS config packages"
   echo "-r <setup script>          platform specific script (inside the tarball)"
   echo
   echo "Optional parameters:"
@@ -78,7 +78,7 @@ platform_script=""
 platform_script_path=""
 server_package=""
 client_package=""
-keys_package=""
+config_packages=""
 source_tarball=""
 unittest_package=""
 test_username="sftnight"
@@ -128,7 +128,7 @@ while getopts "r:s:c:t:g:k:p:u:" option; do
       unittest_package=$OPTARG
       ;;
     k)
-      keys_package=$OPTARG
+      config_packages="$OPTARG"
       ;;
     p)
       platform_script_path=$OPTARG
@@ -147,12 +147,12 @@ done
 sudo echo "testing sudo..." || exit 2
 
 # check if we have all bits and pieces
-if [ x$platform_script  = "x" ] ||
-   [ x$server_package   = "x" ] ||
-   [ x$client_package   = "x" ] ||
-   [ x$keys_package     = "x" ] ||
-   [ x$source_tarball   = "x" ] ||
-   [ x$unittest_package = "x" ]; then
+if [ "x$platform_script"  = "x" ] ||
+   [ "x$server_package"   = "x" ] ||
+   [ "x$client_package"   = "x" ] ||
+   [ "x$config_packages"  = "x" ] ||
+   [ "x$source_tarball"   = "x" ] ||
+   [ "x$unittest_package" = "x" ]; then
   usage "Missing parameter(s)"
 fi
 
@@ -172,16 +172,18 @@ fi
 echo "downloading packages..."
 download $server_package
 download $client_package
-download $keys_package
 download $source_tarball
 download $unittest_package
+for pkg in $config_packages; do
+  download $pkg
+done
 
 # get local file path of downloaded files
 server_package=$(readlink --canonicalize $(basename $server_package))
 client_package=$(readlink --canonicalize $(basename $client_package))
-keys_package=$(readlink --canonicalize $(basename $keys_package))
 source_tarball=$(readlink --canonicalize $(basename $source_tarball))
 unittest_package=$(readlink --canonicalize $(basename $unittest_package))
+config_packages=$(for pkg in $config_packages; do readlink --canonicalize $(basename $pkg); done)
 
 # extract the source tarball
 extract_location=$(tar -tzf $source_tarball | head -n1)
@@ -223,7 +225,7 @@ echo "running platform specific script $platform_script... "
 sudo -H -E -u $test_username sh $platform_script_abs -s $server_package           \
                                                      -c $client_package           \
                                                      -g $unittest_package         \
-                                                     -k $keys_package             \
+                                                     -k "$config_packages"        \
                                                      -t $cvmfs_source_directory   \
                                                      -l $cvmfs_test_log           \
                                                      -u $cvmfs_unittest_log       \

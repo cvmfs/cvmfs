@@ -6,8 +6,8 @@ script_location=$(dirname $(readlink --canonicalize $0))
 
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
-install_rpm $KEYS_PACKAGE
-install_rpm $CLIENT_PACKAGE
+install_rpm "$CONFIG_PACKAGES"
+install_rpm $CLIENT_PACKAGES
 install_rpm $SERVER_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 
