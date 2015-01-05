@@ -259,6 +259,10 @@ class MockCatalog {
     --MockCatalog::instances;
   }
 
+ protected:
+  // silence coverity
+  MockCatalog& operator= (const MockCatalog &other);
+
  public: /* API in this 'public block' is used by CatalogTraversal
           * (see catalog.h - catalog::Catalog for details)
           */
