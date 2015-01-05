@@ -36,7 +36,7 @@ echo "done"
 
 # install RPM packages
 echo "installing RPM packages... "
-install_rpm $KEYS_PACKAGE
+install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
 install_rpm $UNITTEST_PACKAGE
