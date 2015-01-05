@@ -18,7 +18,9 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Provides: cvmfs-config
 Obsoletes: cvmfs-keys <= 1.4
+Conflicts: cvmfs-keys
 Obsoletes: cvmfs-init-scripts
+Conflicts: cvmfs-init-scripts
 
 Conflicts: cvmfs < 2.1.20
 Conflicts: cvmfs-server < 2.1.20
