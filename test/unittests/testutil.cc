@@ -162,14 +162,14 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
                                              MockCatalog  *parent,
                                        const bool          is_not_root) {
   const MockCatalog *catalog = MockCatalog::GetCatalog(catalog_hash);
-  assert (catalog->IsRoot() || is_not_root);
   if (catalog == NULL) {
     return NULL;
-  } else {
-    MockCatalog *new_catalog = catalog->Clone();
-    new_catalog->set_parent(parent);
-    return new_catalog;
   }
+
+  assert (catalog->IsRoot() || is_not_root);
+  MockCatalog *new_catalog = catalog->Clone();
+  new_catalog->set_parent(parent);
+  return new_catalog;
 }
 
 void MockCatalog::RegisterChild(MockCatalog *child) {
