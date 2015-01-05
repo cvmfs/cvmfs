@@ -550,17 +550,17 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   sync->Traverse();
-  // TODO: consider using the unique pointer to come in Github Pull Request 46
-  manifest::Manifest *manifest = mediator.Commit();
-  manifest->set_garbage_collectability(params.garbage_collectable);
-
-  g_download_manager->Fini();
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
-  if (!manifest) {
+  UniquePtr<manifest::Manifest> manifest(mediator.Commit());
+
+  if (! manifest.IsValid()) {
     PrintError("something went wrong during sync");
     return 4;
   }
+
+  manifest->set_garbage_collectability(params.garbage_collectable);
+  g_download_manager->Fini();
 
   // finalize the spooler
   params.spooler->WaitForUpload();
@@ -568,10 +568,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Failed to create new repository");
-    delete manifest;
     return 5;
   }
-  delete manifest;
 
   return 0;
 }
