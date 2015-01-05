@@ -29,6 +29,10 @@
             <mod>group</mod>
             <mod>owner</mod>
           </f>
+          <f n="60-egi.conf" o="root" g="wheel" p="33188">
+            <mod>group</mod>
+            <mod>owner</mod>
+          </f>
           <mod>group</mod>
           <mod>owner</mod>
         </f>

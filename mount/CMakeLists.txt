@@ -44,6 +44,12 @@ if (MACOSX)
   )
 
   install (
+    FILES         default.d/60-egi.conf
+    DESTINATION   "/etc/cvmfs/default.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
     FILES         default.d/README
     DESTINATION   "/etc/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
@@ -170,6 +176,12 @@ else (MACOSX)
 
   install (
     FILES         default.d/50-cern.conf
+    DESTINATION   "/etc/cvmfs/default.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         default.d/60-egi.conf
     DESTINATION   "/etc/cvmfs/default.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
