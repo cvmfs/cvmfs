@@ -247,7 +247,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       if (info->destination_mem.size == 0)
 	LogCvmfs(kLogDownload, kLogDebug, "Content-Length was missing or zero, but %d bytes were received", info->destination_mem.pos + num_bytes);
       else
-	LogCvmfs(kLogDownload, kLogDebug, "Data callback failed with too much data: start %d, bytes %d, expected content-length %d", 
+	LogCvmfs(kLogDownload, kLogDebug, "Data callback failed with too much data: start %d, bytes %d, expected content-length %d",
 	  info->destination_mem.pos, num_bytes, info->destination_mem.size);
       info->error_code = kFailBadData;
       return 0;
@@ -990,6 +990,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
           info->error_code = kFailBadData;
           break;
         }
+      }
+
+      // Set actual size in case of file:// download into memory
+      if ((info->destination == kDestinationMem) &&
+          (HasPrefix(*(info->url), "file://", false)))
+      {
+        info->destination_mem.size = info->destination_mem.pos;
       }
 
       // Decompress memory in a single run
