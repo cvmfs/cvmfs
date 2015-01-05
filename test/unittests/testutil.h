@@ -337,6 +337,11 @@ class MockHistory : public history::History {
   MockHistory(const MockHistory &other);
   ~MockHistory() {}
 
+ protected:
+  // silence coverity
+  MockHistory& operator= (const MockHistory &other);
+
+ public:
   history::History* Clone(const bool writable = false) const;
 
   bool IsWritable()          const { return writable_;    }
