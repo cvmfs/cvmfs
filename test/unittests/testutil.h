@@ -197,7 +197,7 @@ class MockObjectStorage {
   }
 
   static void RegisterObject(const shash::Any &hash, ObjectT *object) {
-    ASSERT_FALSE (Exists(hash));
+    ASSERT_FALSE (Exists(hash)) << "exists already: " << hash.ToString();
     MockObjectStorage::available_objects[hash] = object;
   }
 
