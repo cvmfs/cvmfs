@@ -30,6 +30,7 @@ class T_ObjectFetcher : public ::testing::Test {
   static shash::Any root_hash;
   static shash::Any history_hash;
   static shash::Any previous_history_hash;
+  static shash::Any certificate_hash;
 
  protected:
   virtual void SetUp() {
@@ -57,6 +58,7 @@ class T_ObjectFetcher : public ::testing::Test {
     root_hash             = shash::Any();
     history_hash          = shash::Any();
     previous_history_hash = shash::Any();
+    certificate_hash      = shash::Any();
   }
 
   void InitializeSandbox() {
@@ -168,6 +170,10 @@ class T_ObjectFetcher : public ::testing::Test {
     WriteFile(private_key_path, private_key);
     WriteFile(master_key_path,  master_key);
     WriteFile(certificate_path, certificate);
+
+    certificate_hash = h("0000000000000000000000000000000000000000",
+                         shash::kSuffixCertificate);
+    InsertIntoStorage(certificate_path, &certificate_hash);
   }
 
   void WriteFile(const std::string &path, const std::string &content) {
@@ -191,6 +197,7 @@ class T_ObjectFetcher : public ::testing::Test {
                                                    catalog_size,
                                                    root_path));
       manifest->set_history(history_hash);
+      manifest->set_certificate(certificate_hash);
       manifest->set_repository_name(fqrn);
       ASSERT_TRUE (manifest->Export(manifest_path)) << "failed to create manifest";
   }
@@ -410,6 +417,9 @@ shash::Any T_ObjectFetcher<ObjectFetcherT>::history_hash;
 
 template <class ObjectFetcherT>
 shash::Any T_ObjectFetcher<ObjectFetcherT>::previous_history_hash;
+
+template <class ObjectFetcherT>
+shash::Any T_ObjectFetcher<ObjectFetcherT>::certificate_hash;
 
 typedef ::testing::Types<
   MockObjectFetcher,
