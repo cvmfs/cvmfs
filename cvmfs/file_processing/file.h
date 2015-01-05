@@ -73,7 +73,7 @@ class File : public AbstractFile {
         Chunk*        bulk_chunk()        { return bulk_chunk_;  }
   const Chunk*        bulk_chunk()  const { return bulk_chunk_;  }
   const ChunkVector&  chunks()      const { return chunks_;      }
-  const shash::Suffix hash_suffix() const { return hash_suffix_; }
+        shash::Suffix hash_suffix() const { return hash_suffix_; }
 
   Chunk* current_chunk() {
     return (chunks_.size() > 0) ? chunks_.back() : NULL;
