@@ -26,13 +26,14 @@ template <class DerivedT>
 DerivedT* Database<DerivedT>::Create(const std::string &filename) {
   // TODO: SharedPointer to avoid 'delete' in error conditions
   DerivedT *database = new DerivedT(filename, kOpenReadWrite);
-  database->set_schema_version(DerivedT::kLatestSchema);
-  database->set_schema_revision(DerivedT::kLatestSchemaRevision);
 
   if (! database) {
     LogCvmfs(kLogSql, kLogDebug, "Failed to create new database object");
     return NULL;
   }
+
+  database->set_schema_version(DerivedT::kLatestSchema);
+  database->set_schema_revision(DerivedT::kLatestSchemaRevision);
 
   const int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
                          SQLITE_OPEN_CREATE;
