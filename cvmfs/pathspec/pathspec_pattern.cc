@@ -31,14 +31,17 @@ PathspecElementPattern::PathspecElementPattern(
 PathspecElementPattern& PathspecElementPattern::operator=(
                                             const PathspecElementPattern& other)
 {
-  valid_ = other.valid_;
-  subpatterns_.clear();
-  subpatterns_.reserve(other.subpatterns_.size());
-  SubPatterns::const_iterator i    = other.subpatterns_.begin();
-  SubPatterns::const_iterator iend = other.subpatterns_.end();
-  for (; i != iend; ++i) {
-    subpatterns_.push_back((*i)->Clone());
+  if (this != &other) {
+    valid_ = other.valid_;
+    subpatterns_.clear();
+    subpatterns_.reserve(other.subpatterns_.size());
+    SubPatterns::const_iterator i    = other.subpatterns_.begin();
+    SubPatterns::const_iterator iend = other.subpatterns_.end();
+    for (; i != iend; ++i) {
+      subpatterns_.push_back((*i)->Clone());
+    }
   }
+
   return *this;
 }
 
