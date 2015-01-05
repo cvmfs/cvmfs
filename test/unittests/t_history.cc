@@ -923,7 +923,7 @@ TYPED_TEST(T_History, RollbackToOldTag) {
   EXPECT_TRUE  (history3->Exists("bar"));
   EXPECT_TRUE  (history3->Exists("first_release"));
   EXPECT_TRUE  (history3->Exists("moep"));
-  EXPECT_TRUE  (history2->Exists("moep_duplicate"));
+  EXPECT_TRUE  (history3->Exists("moep_duplicate"));
   EXPECT_TRUE  (history3->Exists("second_release"));
   EXPECT_TRUE  (history3->Exists("third_release"));
   EXPECT_TRUE  (history3->Exists("forth_release"));

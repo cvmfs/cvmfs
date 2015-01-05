@@ -259,6 +259,10 @@ class MockCatalog {
     --MockCatalog::instances;
   }
 
+ protected:
+  // silence coverity
+  MockCatalog& operator= (const MockCatalog &other);
+
  public: /* API in this 'public block' is used by CatalogTraversal
           * (see catalog.h - catalog::Catalog for details)
           */
@@ -337,6 +341,11 @@ class MockHistory : public history::History {
   MockHistory(const MockHistory &other);
   ~MockHistory() {}
 
+ protected:
+  // silence coverity
+  MockHistory& operator= (const MockHistory &other);
+
+ public:
   history::History* Clone(const bool writable = false) const;
 
   bool IsWritable()          const { return writable_;    }

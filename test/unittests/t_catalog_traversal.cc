@@ -28,7 +28,7 @@ class T_CatalogTraversal : public ::testing::Test {
   typedef std::map<unsigned int, CatalogPathMap> RevisionMap;
 
   struct RootCatalogInfo {
-    RootCatalogInfo() {}
+    RootCatalogInfo() : timestamp(0) {}
     RootCatalogInfo(const shash::Any &hash, const time_t timestamp) :
       catalog_hash(hash),
       timestamp(timestamp) {}
@@ -44,6 +44,7 @@ class T_CatalogTraversal : public ::testing::Test {
 
  public:
   T_CatalogTraversal() :
+    dummy_catalog_hierarchy(NULL),
     max_revision(6),
     initial_catalog_instances(42) /* depends on max_revision */ {}
 

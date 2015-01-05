@@ -101,19 +101,18 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   string root_path = "";
 
   // Create the database schema and the inital root entry
-  CatalogDatabase *new_catalog_db = CatalogDatabase::Create(file_path);
-  if (NULL == new_catalog_db ||
-      ! new_catalog_db->InsertInitialValues(root_path,
-                                            volatile_content,
-                                            root_entry))
   {
-    LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
-             file_path.c_str());
-    return NULL;
+    UniquePtr<CatalogDatabase> new_clg_db(CatalogDatabase::Create(file_path));
+    if (! new_clg_db.IsValid() ||
+        ! new_clg_db->InsertInitialValues(root_path,
+                                          volatile_content,
+                                          root_entry))
+    {
+      LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
+               file_path.c_str());
+      return NULL;
+    }
   }
-
-  // closing the newly created catalog again
-  delete new_catalog_db;
 
   // Compress root catalog;
   int64_t catalog_size = GetFileSize(file_path);

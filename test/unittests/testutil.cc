@@ -162,14 +162,14 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
                                              MockCatalog  *parent,
                                        const bool          is_not_root) {
   const MockCatalog *catalog = MockCatalog::GetCatalog(catalog_hash);
-  assert (catalog->IsRoot() || is_not_root);
   if (catalog == NULL) {
     return NULL;
-  } else {
-    MockCatalog *new_catalog = catalog->Clone();
-    new_catalog->set_parent(parent);
-    return new_catalog;
   }
+
+  assert (catalog->IsRoot() || is_not_root);
+  MockCatalog *new_catalog = catalog->Clone();
+  new_catalog->set_parent(parent);
+  return new_catalog;
 }
 
 void MockCatalog::RegisterChild(MockCatalog *child) {
@@ -242,7 +242,8 @@ MockHistory::MockHistory(const bool          writable,
 
 MockHistory::MockHistory(const MockHistory &other) :
   tags_(other.tags_),
-  recycle_bin_(other.recycle_bin_)
+  recycle_bin_(other.recycle_bin_),
+  writable_(other.writable_)
 {
   set_fqrn(other.fqrn());
 }
