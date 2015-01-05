@@ -16,6 +16,7 @@ Requires: cvmfs-config-cern
 
 Provides: cvmfs-config
 Obsoletes: cvmfs-keys
+Obsoletes: cvmfs-init-scripts
 
 Conflicts: cvmfs < 2.1.20
 Conflicts: cvmfs-server < 2.1.20
