@@ -44,6 +44,7 @@ class T_CatalogTraversal : public ::testing::Test {
 
  public:
   T_CatalogTraversal() :
+    dummy_catalog_hierarchy(NULL),
     max_revision(6),
     initial_catalog_instances(42) /* depends on max_revision */ {}
 
