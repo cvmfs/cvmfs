@@ -15,8 +15,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Requires: cvmfs-config-cern
 
 Provides: cvmfs-config
-Provides: cvmfs-keys
-Obsoletes: cvmfs-keys = 1.5
+Obsoletes: cvmfs-keys
 
 Conflicts: cvmfs < 2.1.20
 Conflicts: cvmfs-server < 2.1.20
