@@ -69,6 +69,13 @@ template <class DerivedT>
 DerivedT* Database<DerivedT>::Open(const std::string  &filename,
                                    const OpenMode      open_mode) {
   UniquePtr<DerivedT> database(new DerivedT(filename, open_mode));
+
+  if (! database.IsValid()) {
+    LogCvmfs(kLogSql, kLogDebug, "Failed to open database file '%s' - errno: %d",
+             filename.c_str(), errno);
+    return NULL;
+  }
+
   if (! database->Initialize()) {
     return NULL;
   }
