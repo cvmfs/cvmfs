@@ -637,16 +637,18 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
     return false;
   }
   const bool volatile_content = false;
-  CatalogDatabase *new_catalog_db = CatalogDatabase::Create(clg_db_path);
-  if (NULL == new_catalog_db ||
-      ! new_catalog_db->InsertInitialValues(root_path, volatile_content)) {
-    Error("Failed to create database for new catalog");
-    unlink(clg_db_path.c_str());
-    return false;
+
+  {
+    // TODO: Attach catalog should work with an open catalog database as well,
+    //       to remove this inefficiency
+    UniquePtr<CatalogDatabase> new_clg_db(CatalogDatabase::Create(clg_db_path));
+    if (! new_clg_db.IsValid() ||
+        ! new_clg_db->InsertInitialValues(root_path, volatile_content)) {
+      Error("Failed to create database for new catalog");
+      unlink(clg_db_path.c_str());
+      return false;
+    }
   }
-  delete new_catalog_db; // TODO: Attach catalog should work with an open
-                         //       catalog database as well, to remove this
-                         //       inefficiency
 
   // Attach the just created nested catalog database
   WritableCatalog *writable_catalog =
