@@ -199,7 +199,50 @@ class T_ObjectFetcher : public ::testing::Test {
       manifest->set_history(history_hash);
       manifest->set_certificate(certificate_hash);
       manifest->set_repository_name(fqrn);
-      ASSERT_TRUE (manifest->Export(manifest_path)) << "failed to create manifest";
+
+      SignAndExportManifest(manifest.weak_ref(), manifest_path);
+  }
+
+  void SignAndExportManifest(      manifest::Manifest  *manifest,
+                             const std::string         &manifest_path) {
+    std::string signed_manifest = manifest->ExportString();
+    shash::Any published_hash = h("0000000000000000000000000000000000000000");
+    shash::HashMem(
+      reinterpret_cast<const unsigned char *>(signed_manifest.data()),
+      signed_manifest.length(), &published_hash);
+    signed_manifest += "--\n" + published_hash.ToString() + "\n";
+
+    signature::SignatureManager signature_manager;
+    signature_manager.Init();
+
+    ASSERT_TRUE (signature_manager.LoadCertificatePath(certificate_path));
+    ASSERT_TRUE (signature_manager.LoadPrivateKeyPath(private_key_path, ""));
+
+    // Sign manifest
+    unsigned char *sig;
+    unsigned sig_size;
+    ASSERT_TRUE (signature_manager.Sign(
+                  reinterpret_cast<const unsigned char *>(
+                    published_hash.ToString().data()),
+                    published_hash.GetHexSize(),
+                  &sig, &sig_size));
+
+    // Write new manifest
+    FILE *fmanifest = fopen(manifest_path.c_str(), "w");
+    ASSERT_NE (static_cast<FILE*>(NULL), fmanifest);
+
+    int bytes_written = fwrite(signed_manifest.data(),
+                               1, signed_manifest.length(),
+                               fmanifest);
+    ASSERT_EQ (signed_manifest.length(), bytes_written);
+
+    bytes_written = fwrite(sig, 1, sig_size, fmanifest);
+    ASSERT_EQ (sig_size, bytes_written);
+
+    free(sig);
+    fclose(fmanifest);
+
+    signature_manager.Fini();
   }
 
   ObjectFetcherT* GetObjectFetcher() {
