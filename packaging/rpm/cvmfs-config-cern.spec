@@ -17,8 +17,7 @@ License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Provides: cvmfs-config
-Provides: cvmfs-keys
-Obsoletes: cvmfs-keys
+Obsoletes: cvmfs-keys <= 1.4
 Obsoletes: cvmfs-init-scripts
 
 Conflicts: cvmfs < 2.1.20

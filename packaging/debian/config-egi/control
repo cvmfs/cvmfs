@@ -1,4 +1,4 @@
-Source: cvmfs-config-cern
+Source: cvmfs-config-egi
 Maintainer: Jakob Blomer <jblomer@cern.ch>
 Section: utils
 Priority: extra
@@ -6,10 +6,10 @@ Standards-Version: 3.9.3.1
 Build-Depends: debhelper (>= 9), make
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
-Package: cvmfs-config-cern
+Package: cvmfs-config-egi
 Architecture: all 
-Depends: curl ${misc:Depends}
+Depends: cvmfs-config-cern curl ${misc:Depends}
 Breaks: cvmfs (< 2.1.20), cvmfs-server (< 2.1.20)
-Replaces: cvmfs-keys (<= 1.4)
+Replaces: cvmfs-keys (= 1.5)
 Provides: cvmfs-config
-Description: CernVM File System CERN Configuration and Public Keys
+Description: CernVM File System Configuration and Public Keys for EGI
