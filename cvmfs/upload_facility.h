@@ -80,7 +80,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
     UploadJob(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
               const callback_t    *callback = NULL) :
-      type(Upload), stream_handle(handle), buffer(buffer), callback(callback) {}
+      type(Upload), stream_handle(handle), buffer(buffer), callback(callback),
+      hash_suffix(shash::kSuffixNone) {}
 
     UploadJob(UploadStreamHandle   *handle,
               const shash::Any     &content_hash,
@@ -89,7 +90,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
       content_hash(content_hash), hash_suffix(hash_suffix) {}
 
     UploadJob() :
-      type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL) {}
+      type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL),
+      hash_suffix(shash::kSuffixNone) {}
 
     Type                 type;
     UploadStreamHandle  *stream_handle;
