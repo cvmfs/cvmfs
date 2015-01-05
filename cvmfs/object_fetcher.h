@@ -258,7 +258,7 @@ class HttpObjectFetcher :
   /**
    * Factory method to instatiate an HttpObjectFetcher<>. This implementation
    * contains internal state that cannot be copied and needs destruction. Hence
-   * it can only reside on the stack and the user is reponsible to delete the
+   * it can only reside on the heap and the user is reponsible to delete the
    * instance after usage.
    *
    * @param repo_name  the name of the repository to download objects from
