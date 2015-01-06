@@ -12,10 +12,10 @@
 
 using namespace swissknife;
 
-typedef CatalogTraversal<MockObjectFetcher>          MockedCatalogTraversal;
-typedef typename MockedCatalogTraversal::Parameters  TraversalParams;
-typedef std::pair<unsigned int, std::string>         CatalogIdentifier;
-typedef std::vector<CatalogIdentifier>               CatalogIdentifiers;
+typedef CatalogTraversal<MockObjectFetcher>   MockedCatalogTraversal;
+typedef MockedCatalogTraversal::Parameters    TraversalParams;
+typedef std::pair<unsigned int, std::string>  CatalogIdentifier;
+typedef std::vector<CatalogIdentifier>        CatalogIdentifiers;
 
 class T_CatalogTraversal : public ::testing::Test {
  public:
