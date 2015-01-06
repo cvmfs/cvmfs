@@ -9,43 +9,42 @@
 #include "cvmfs_config.h"
 #include "util.h"
 
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/file.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/select.h>
 #include <arpa/inet.h>
-#include <sys/wait.h>
-#include <sys/mman.h>
-#include <time.h>
-#include <inttypes.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <signal.h>
-#include <pwd.h>
 #include <grp.h>
+#include <inttypes.h>
+#include <pthread.h>
+#include <pwd.h>
+#include <signal.h>
+#include <sys/file.h>
+#include <sys/mman.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 
-#include <cctype>
+#include <algorithm>
+#include <cassert>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
-#include <cassert>
-
-#include <algorithm>
-#include <string>
+#include <cctype>
 #include <map>
 #include <set>
+#include <string>
 
-#include "platform.h"
-#include "hash.h"
-#include "smalloc.h"
-#include "logging.h"
 #include "fs_traversal.h"
+#include "hash.h"
+#include "logging.h"
+#include "platform.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
@@ -407,7 +406,8 @@ bool SymlinkExists(const string &path) {
 
 
 /**
- * The mkdir -p command.
+ * The mkdir -p command.  Additionally checks if the directory is writable
+ * if it exists.
  */
 bool MkdirDeep(const std::string &path, const mode_t mode) {
   if (path == "") return false;
@@ -415,15 +415,18 @@ bool MkdirDeep(const std::string &path, const mode_t mode) {
   int retval = mkdir(path.c_str(), mode);
   if (retval == 0) return true;
 
-  if (errno == EEXIST) {
-    platform_stat64 info;
-    if ((platform_lstat(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode))
-      return true;
-    return false;
+  if ((errno == ENOENT) && (MkdirDeep(GetParentPath(path), mode))) {
+    return MkdirDeep(path, mode);
   }
 
-  if ((errno == ENOENT) && (MkdirDeep(GetParentPath(path), mode))) {
-    return mkdir(path.c_str(), mode) == 0;
+  if (errno == EEXIST) {
+    platform_stat64 info;
+    if ((platform_stat(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode)) {
+      // Check writability
+      retval = utimes(path.c_str(), NULL);
+      if (retval == 0)
+        return true;
+    }
   }
 
   return false;
@@ -443,14 +446,15 @@ bool MakeCacheDirectories(const string &path, const mode_t mode) {
 
   platform_stat64 stat_info;
   if (platform_stat(this_path.c_str(), &stat_info) != 0) {
-    if (mkdir(this_path.c_str(), mode) != 0) return false;
     this_path = canonical_path + "/txn";
-    if (mkdir(this_path.c_str(), mode) != 0) return false;
-    for (int i = 0; i < 0xff; i++) {
+    if (!MkdirDeep(this_path, mode))
+      return false;
+    for (int i = 0; i <= 0xff; i++) {
       char hex[3];
       snprintf(hex, sizeof(hex), "%02x", i);
       this_path = canonical_path + "/" + string(hex);
-      if (mkdir(this_path.c_str(), mode) != 0) return false;
+      if (!MkdirDeep(this_path, mode))
+        return false;
     }
   }
   return true;
