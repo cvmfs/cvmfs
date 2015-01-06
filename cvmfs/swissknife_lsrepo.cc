@@ -39,7 +39,7 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   const std::string &tmp_dir   = (args.count('l') > 0) ? *args.find('l')->second : "/tmp";
 
   bool success = false;
-  if (IsRemotePath(repo_url)) {
+  if (IsHttpUrl(repo_url)) {
     download::DownloadManager   download_manager;
     signature::SignatureManager signature_manager;
     download_manager.Init(1, true);

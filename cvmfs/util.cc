@@ -162,7 +162,7 @@ bool IsAbsolutePath(const std::string &path) {
 }
 
 
-bool IsRemotePath(const std::string &path) {
+bool IsHttpUrl(const std::string &path) {
   if (path.length() < 7) {
     return false;
   }

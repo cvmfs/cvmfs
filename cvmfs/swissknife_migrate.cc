@@ -121,7 +121,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   catalog_loading_stopwatch_.Start();
   bool loading_successful = false;
-  if (IsRemotePath(repo_url)) {
+  if (IsHttpUrl(repo_url)) {
     typedef HttpObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
 
     download::DownloadManager   download_manager;
