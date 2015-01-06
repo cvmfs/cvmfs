@@ -182,6 +182,12 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveLatestHistoryData
   const bool success = traversal_.TraverseNamedSnapshots();
   traversal_.UnregisterListener(callback);
 
+  // preserve the latest history database file itself
+  object_fetcher_t *fetcher = configuration_.object_fetcher;
+  UniquePtr<manifest::Manifest> manifest(fetcher->FetchManifest());
+  assert (manifest.IsValid());
+  hash_filter_.Fill(manifest->history());
+
   return success;
 }
 
