@@ -15,7 +15,7 @@
 namespace upload
 {
   struct LocalStreamHandle : public UploadStreamHandle {
-    LocalStreamHandle(const callback_t   *commit_callback,
+    LocalStreamHandle(const CallbackTN   *commit_callback,
                       const int           tmp_fd,
                       const std::string  &tmp_path) :
       UploadStreamHandle(commit_callback),
@@ -52,12 +52,12 @@ namespace upload
      */
     void FileUpload(const std::string  &local_path,
                     const std::string  &remote_path,
-                    const callback_t   *callback = NULL);
+                    const CallbackTN   *callback = NULL);
 
-    UploadStreamHandle* InitStreamedUpload(const callback_t *callback = NULL);
+    UploadStreamHandle* InitStreamedUpload(const CallbackTN *callback = NULL);
     void Upload(UploadStreamHandle  *handle,
                 CharBuffer          *buffer,
-                const callback_t    *callback = NULL);
+                const CallbackTN    *callback = NULL);
     void FinalizeStreamedUpload(UploadStreamHandle  *handle,
                                 const shash::Any     content_hash,
                                 const shash::Suffix  hash_suffix);

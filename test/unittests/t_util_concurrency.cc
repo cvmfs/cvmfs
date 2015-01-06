@@ -215,14 +215,14 @@ TEST(T_UtilConcurrency, Observable) {
   ASSERT_EQ (-1, observer.observation_result);
   ASSERT_EQ (-1, g_fn_observation_result);
 
-  DummyObservable::callback_t *bound_callback =
+  DummyObservable::CallbackTN *bound_callback =
     observee.RegisterListener(&DummyObserver::CallbackMd, &observer);
-  DummyObservable::callback_t *closure_callback =
+  DummyObservable::CallbackTN *closure_callback =
     observee.RegisterListener(&DummyObserver::ClosureMd, &observer, 123);
-  DummyObservable::callback_t *static_callback =
+  DummyObservable::CallbackTN *static_callback =
     observee.RegisterListener(&ObserverFn);
 
-  static const DummyObservable::callback_t *null_clb = NULL;
+  static const DummyObservable::CallbackTN *null_clb = NULL;
 
   ASSERT_NE (null_clb, bound_callback);
   ASSERT_NE (null_clb, closure_callback);

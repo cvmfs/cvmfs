@@ -106,21 +106,21 @@ struct CatalogTraversalData {
  *
  * @param ObjectFetcherT  Strategy Pattern implementation that defines how to
  *                        retrieve catalogs from various backend storage types.
- *                        Furthermore the ObjectFetcherT::catalog_t is the type
+ *                        Furthermore the ObjectFetcherT::CatalogTN is the type
  *                        of catalog to be instantiated by CatalogTraversal<>.
  *
- * CAUTION: the catalog_t* pointer passed into the callback becomes invalid
+ * CAUTION: the CatalogTN* pointer passed into the callback becomes invalid
  *          directly after the callback method returns, unless you create the
  *          CatalogTraversal object with no_close = true.
  */
 template<class ObjectFetcherT>
 class CatalogTraversal
-  : public Observable<CatalogTraversalData<typename ObjectFetcherT::catalog_t> >
+  : public Observable<CatalogTraversalData<typename ObjectFetcherT::CatalogTN> >
 {
  public:
-  typedef ObjectFetcherT                      object_fetcher_t;
-  typedef typename ObjectFetcherT::catalog_t  catalog_t;
-  typedef CatalogTraversalData<catalog_t>     callback_data_t;
+  typedef ObjectFetcherT                      ObjectFetcherTN;
+  typedef typename ObjectFetcherT::CatalogTN  CatalogTN;
+  typedef CatalogTraversalData<CatalogTN>     CallbackDataTN;
 
   /**
    * @param repo_url             the path to the repository to be traversed:
@@ -188,7 +188,7 @@ class CatalogTraversal
                const shash::Any   &hash,
                const unsigned      tree_level,
                const unsigned      history_depth,
-                     catalog_t    *parent = NULL) :
+                     CatalogTN    *parent = NULL) :
       path(path),
       hash(hash),
       tree_level(tree_level),
@@ -202,9 +202,9 @@ class CatalogTraversal
 
     bool IsRootCatalog() const { return tree_level == 0; }
 
-    callback_data_t GetCallbackData() const {
-      return callback_data_t(catalog, hash, tree_level,
-                             catalog_file_size, history_depth);
+    CallbackDataTN GetCallbackData() const {
+      return CallbackDataTN(catalog, hash, tree_level,
+                            catalog_file_size, history_depth);
     }
 
     // initial state description
@@ -212,13 +212,13 @@ class CatalogTraversal
     const shash::Any    hash;
     const unsigned      tree_level;
     const unsigned      history_depth;
-          catalog_t    *parent;
+          CatalogTN    *parent;
 
     // dynamic processing state (used internally)
     std::string   catalog_file_path;
     size_t        catalog_file_size;
     bool          ignore;
-    catalog_t    *catalog;
+    CatalogTN    *catalog;
     unsigned int  referenced_catalogs;
     bool          postponed;
   };
@@ -492,7 +492,7 @@ class CatalogTraversal
     assert (! job.ignore);
     assert (job.catalog == NULL);
 
-    job.catalog = catalog_t::AttachFreely(job.path,
+    job.catalog = CatalogTN::AttachFreely(job.path,
                                           job.catalog_file_path,
                                           job.hash,
                                           job.parent,
@@ -611,12 +611,12 @@ class CatalogTraversal
   unsigned int PushNestedCatalogs(      TraversalContext  &ctx,
                                   const CatalogJob        &job)
   {
-    typedef typename catalog_t::NestedCatalogList NestedCatalogList;
+    typedef typename CatalogTN::NestedCatalogList NestedCatalogList;
     const NestedCatalogList &nested = job.catalog->ListNestedCatalogs();
     typename NestedCatalogList::const_iterator i    = nested.begin();
     typename NestedCatalogList::const_iterator iend = nested.end();
     for (; i != iend; ++i) {
-      catalog_t* parent = (no_close_) ? job.catalog : NULL;
+      CatalogTN* parent = (no_close_) ? job.catalog : NULL;
       const CatalogJob new_job(i->path.ToString(),
                                i->hash,
                                job.tree_level + 1,

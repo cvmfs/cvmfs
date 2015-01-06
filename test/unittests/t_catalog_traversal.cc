@@ -408,7 +408,7 @@ TEST_F(T_CatalogTraversal, Initialize) {
 
 
 CatalogIdentifiers SimpleTraversal_visited_catalogs;
-void SimpleTraversalCallback(const MockedCatalogTraversal::callback_data_t &data) {
+void SimpleTraversalCallback(const MockedCatalogTraversal::CallbackDataTN &data) {
   SimpleTraversal_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -458,7 +458,7 @@ TEST_F(T_CatalogTraversal, SimpleTraversal) {
 
 std::vector<MockCatalog*> SimpleTraversalNoCloseCallback_visited_catalogs;
 void SimpleTraversalNoCloseCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   SimpleTraversalNoCloseCallback_visited_catalogs.push_back(
     const_cast<MockCatalog*>(data.catalog));
 }
@@ -494,7 +494,7 @@ TEST_F(T_CatalogTraversal, SimpleTraversalNoClose) {
 
 CatalogIdentifiers ZeroLevelHistoryTraversal_visited_catalogs;
 void ZeroLevelHistoryTraversalCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   ZeroLevelHistoryTraversal_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -545,7 +545,7 @@ TEST_F(T_CatalogTraversal, ZeroLevelHistoryTraversal) {
 
 CatalogIdentifiers FirstLevelHistoryTraversal_visited_catalogs;
 void FirstLevelHistoryTraversalCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   FirstLevelHistoryTraversal_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -624,7 +624,7 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversal) {
 
 std::vector<MockCatalog*> FirstLevelHistoryTraversalNoClose_visited_catalogs;
 void FirstLevelHistoryTraversalNoCloseCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   FirstLevelHistoryTraversalNoClose_visited_catalogs.push_back(
                                         const_cast<MockCatalog*>(data.catalog));
 }
@@ -660,7 +660,7 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
 
 CatalogIdentifiers SecondLevelHistoryTraversal_visited_catalogs;
 void SecondLevelHistoryTraversalCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   SecondLevelHistoryTraversal_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -764,7 +764,7 @@ TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversal) {
 
 CatalogIdentifiers FullHistoryTraversal_visited_catalogs;
 void FullHistoryTraversalCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   FullHistoryTraversal_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -894,7 +894,7 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversal) {
 
 CatalogIdentifiers SecondLevelHistoryTraversalNoRepeat_visited_catalogs;
 void SecondLevelHistoryTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   SecondLevelHistoryTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -955,7 +955,7 @@ TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversalNoRepeat) {
 
 CatalogIdentifiers FullHistoryTraversalNoRepeat_visited_catalogs;
 void FullHistoryTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   FullHistoryTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1030,7 +1030,7 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversalNoRepeat) {
 
 CatalogIdentifiers MultiTraversal_visited_catalogs;
 void MultiTraversalCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   MultiTraversal_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1126,7 +1126,7 @@ TEST_F(T_CatalogTraversal, MultiTraversal) {
 
 CatalogIdentifiers MultiTraversalNoRepeat_visited_catalogs;
 void MultiTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   MultiTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1199,7 +1199,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalNoRepeat) {
 
 CatalogIdentifiers MultiTraversalFirstLevelHistory_visited_catalogs;
 void MultiTraversalFirstLevelHistoryCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   MultiTraversalFirstLevelHistory_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1342,7 +1342,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
 
 CatalogIdentifiers MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs;
 void MultiTraversalFirstLevelHistoryNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1428,7 +1428,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
 
 CatalogIdentifiers EmptyTraversePruned_visited_catalogs;
 void EmptyTraversePrunedCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   EmptyTraversePruned_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1458,7 +1458,7 @@ TEST_F(T_CatalogTraversal, EmptyTraversePruned) {
 
 CatalogIdentifiers TraversePrunedAfterSimpleTraversal_visited_catalogs;
 void TraversePrunedAfterSimpleTraversalCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraversePrunedAfterSimpleTraversal_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1599,7 +1599,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
 
 CatalogIdentifiers TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs;
 void TraversePrunedAfterSimpleTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1683,7 +1683,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversalNoRepeat) {
 
 CatalogIdentifiers TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs;
 void TraversePrunedAfterSecondLevelHistoryTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1767,7 +1767,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSecondLevelHistoryTraversalNoRepea
 
 CatalogIdentifiers TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs;
 void TraversePrunedAfterMultiTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1864,7 +1864,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
 
 CatalogIdentifiers TraverseRepositoryTagList_visited_catalogs;
 void TraverseRepositoryTagListCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraverseRepositoryTagList_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -1952,7 +1952,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagList) {
 
 CatalogIdentifiers TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs;
 void TraverseRepositoryTagListSecondHistoryLevelCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2042,7 +2042,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
 
 CatalogIdentifiers TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs;
 void TraverseRepositoryTagListSecondHistoryLevelNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2106,7 +2106,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) 
 
 CatalogIdentifiers TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs;
 void TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2190,7 +2190,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
 
 CatalogIdentifiers TraverseUntilUnavailableRevisionNoRepeat_visited_catalogs;
 void TraverseUntilUnavailableRevisionNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraverseUntilUnavailableRevisionNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2259,7 +2259,7 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
 
 CatalogIdentifiers UnavailableNestedNoRepeat_visited_catalogs;
 void UnavailableNestedNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   UnavailableNestedNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2328,7 +2328,7 @@ TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
 
 CatalogIdentifiers DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs;
 void DepthFirstSearchFullHistoryTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2404,7 +2404,7 @@ TEST_F(T_CatalogTraversal, DepthFirstSearchFullHistoryTraversalNoRepeat) {
 
 CatalogIdentifiers FullHistoryDepthFirstTraversal_visited_catalogs;
 void FullHistoryDepthFirstTraversalCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   FullHistoryDepthFirstTraversal_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2535,7 +2535,7 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversal) {
 
 CatalogIdentifiers DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs;
 void DepthFirstTraversePrunedAfterMultiTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2628,7 +2628,7 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat) 
 
 CatalogIdentifiers DepthFirstTraversalSequence_visited_catalogs;
 void DepthFirstTraversalSequenceCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   DepthFirstTraversalSequence_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2669,7 +2669,7 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversalSequence) {
 
 CatalogIdentifiers FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs;
 void FullHistoryDepthFirstTraversalUnavailableAncestorCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2794,7 +2794,7 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
 
 
 void FullTraversalRootCatalogDetectionCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   const bool should_be_root = (data.catalog->path().ToString() == "" ||
                                data.tree_level                 == 0);
   EXPECT_EQ (should_be_root, data.catalog->IsRoot());
@@ -2818,7 +2818,7 @@ TEST_F(T_CatalogTraversal, FullTraversalRootCatalogDetection) {
 
 CatalogIdentifiers TimestampThreshold_visited_catalogs;
 void TimestampThresholdCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TimestampThreshold_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2899,7 +2899,7 @@ TEST_F(T_CatalogTraversal, TimestampThreshold) {
 
 CatalogIdentifiers FutureTimestampThreshold_visited_catalogs;
 void FutureTimestampThresholdCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   FutureTimestampThreshold_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -2952,7 +2952,7 @@ TEST_F(T_CatalogTraversal, FutureTimestampThreshold) {
 
 CatalogIdentifiers TimestampThresholdAndNamedSnapshots_visited_catalogs;
 void TimestampThresholdAndNamedSnapshotsCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TimestampThresholdAndNamedSnapshots_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -3042,7 +3042,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdAndNamedSnapshots) {
 
 CatalogIdentifiers TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs;
 void TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -3135,7 +3135,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterTimestampThresholdHistoryDepthAndN
 
 CatalogIdentifiers TimestampThresholdDepthFirst_visited_catalogs;
 void TimestampThresholdDepthFirstCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TimestampThresholdDepthFirst_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -3215,7 +3215,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirst) {
 
 CatalogIdentifiers TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs;
 void TimestampThresholdDepthFirstAndTraversePrunedCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -3355,7 +3355,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirstAndTraversePruned) {
 
 CatalogIdentifiers TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs;
 void TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -3419,7 +3419,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnaps
 
 CatalogIdentifiers TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeat_visited_catalogs;
 void TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -3487,7 +3487,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
 
 CatalogIdentifiers TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs;
 void TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePrunedCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -3566,7 +3566,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
 
 CatalogIdentifiers NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs;
 void NamedSnapshotTraversalWithTimestampThresholdNoRepeatCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }
@@ -3635,7 +3635,7 @@ TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat)
 
 CatalogIdentifiers TraverseNamedSnapshotsWithoutHistory_visited_catalogs;
 void TraverseNamedSnapshotsWithoutHistoryCallback(
-                             const MockedCatalogTraversal::callback_data_t &data) {
+                             const MockedCatalogTraversal::CallbackDataTN &data) {
   TraverseNamedSnapshotsWithoutHistory_visited_catalogs.push_back(
     std::make_pair(data.catalog->GetRevision(), data.catalog->path().ToString()));
 }

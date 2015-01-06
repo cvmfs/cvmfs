@@ -154,7 +154,7 @@ int DummyCallbackableVoid::g_void_callback_calls = 0;
 TEST(T_Callbacks, CallbackableCallback) {
   ASSERT_EQ (-1, DummyCallbackable::g_callback_result);
 
-  DummyCallbackable::callback_t *callback =
+  DummyCallbackable::CallbackTN *callback =
     DummyCallbackable::MakeCallback(&DummyCallbackable::CallbackFn);
   EXPECT_EQ (-1, DummyCallbackable::g_callback_result);
 
@@ -169,7 +169,7 @@ TEST(T_Callbacks, CallbackableBoundCallback) {
   DummyCallbackable callbackable;
   ASSERT_EQ (-1, callbackable.callback_result);
 
-  DummyCallbackable::callback_t *callback =
+  DummyCallbackable::CallbackTN *callback =
     DummyCallbackable::MakeCallback(&DummyCallbackable::CallbackMd,
                                     &callbackable);
   (*callback)(1337);
@@ -184,7 +184,7 @@ TEST(T_Callbacks, CallbackableBoundClosure) {
   ClosureData closure_data;
   ASSERT_EQ (closure_data_item, closure_data.data);
 
-  DummyCallbackable::callback_t *callback =
+  DummyCallbackable::CallbackTN *callback =
     DummyCallbackable::MakeClosure(&DummyCallbackable::CallbackClosureMd,
                                    &callbackable,
                                     closure_data);
@@ -200,7 +200,7 @@ TEST(T_Callbacks, CallbackableBoundClosure) {
 TEST(T_Callbacks, CallbackableVoidCallback) {
   ASSERT_EQ (0, DummyCallbackableVoid::g_void_callback_calls);
 
-  DummyCallbackableVoid::callback_t *callback =
+  DummyCallbackableVoid::CallbackTN *callback =
     DummyCallbackableVoid::MakeCallback(&DummyCallbackableVoid::CallbackFn);
   EXPECT_EQ (0, DummyCallbackableVoid::g_void_callback_calls);
 
@@ -219,7 +219,7 @@ TEST(T_Callbacks, CallbackableVoidBoundCallback) {
   DummyCallbackableVoid callbackable;
   ASSERT_EQ (-1, callbackable.callback_result);
 
-  DummyCallbackableVoid::callback_t *callback =
+  DummyCallbackableVoid::CallbackTN *callback =
     DummyCallbackableVoid::MakeCallback(&DummyCallbackableVoid::CallbackMd,
                                         &callbackable);
   EXPECT_EQ (-1, callbackable.callback_result);
@@ -237,7 +237,7 @@ TEST(T_Callbacks, CallbackableVoidBoundClosure) {
   ClosureData closure_data;
   ASSERT_EQ (closure_data_item, closure_data.data);
 
-  DummyCallbackableVoid::callback_t *callback =
+  DummyCallbackableVoid::CallbackTN *callback =
     DummyCallbackableVoid::MakeClosure(&DummyCallbackableVoid::CallbackClosureMd,
                                        &callbackable,
                                         closure_data);

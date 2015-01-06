@@ -68,7 +68,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
                                                         SpoolerDefinition>,
                          public Callbackable<UploaderResults> {
  protected:
-  typedef Callbackable<UploaderResults>::callback_t* callback_ptr;
+  typedef Callbackable<UploaderResults>::CallbackTN* CallbackPtr;
 
   struct UploadJob {
     enum Type {
@@ -79,7 +79,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
     UploadJob(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
-              const callback_t    *callback = NULL) :
+              const CallbackTN    *callback = NULL) :
       type(Upload), stream_handle(handle), buffer(buffer), callback(callback),
       hash_suffix(shash::kSuffixNone) {}
 
@@ -98,7 +98,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
     // type=Upload specific fields
     CharBuffer          *buffer;
-    const callback_t    *callback;
+    const CallbackTN    *callback;
 
     // type=Commit specific fields
     shash::Any           content_hash;
@@ -138,7 +138,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    */
   void Upload(const std::string  &local_path,
               const std::string  &remote_path,
-              const callback_t   *callback = NULL) {
+              const CallbackTN   *callback = NULL) {
     ++jobs_in_flight_;
     FileUpload(local_path, remote_path, callback);
   }
@@ -156,7 +156,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @return           a pointer to the initialized UploadStreamHandle
    */
   virtual UploadStreamHandle* InitStreamedUpload(
-                                       const callback_t   *callback = NULL) = 0;
+                                       const CallbackTN   *callback = NULL) = 0;
 
 
   /**
@@ -176,7 +176,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    */
   void ScheduleUpload(UploadStreamHandle  *handle,
                       CharBuffer          *buffer,
-                      const callback_t    *callback = NULL) {
+                      const CallbackTN    *callback = NULL) {
     ++jobs_in_flight_;
     upload_queue_.push(UploadJob(handle, buffer, callback));
   }
@@ -258,7 +258,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
-                          const callback_t   *callback = NULL) = 0;
+                          const CallbackTN   *callback = NULL) = 0;
 
   /**
    * This notifies the callback that is associated to a finishing job. Please
@@ -269,7 +269,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *       Therefore you must not call Respond() twice or use the callback later
    *       by any means!
    */
-  void Respond(const callback_t       *callback,
+  void Respond(const CallbackTN       *callback,
                const UploaderResults  &result) const {
     if (callback != NULL) {
       (*callback)(result);
@@ -360,13 +360,13 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
  * the streamed upload is committed.
  */
 struct UploadStreamHandle {
-  typedef AbstractUploader::callback_t callback_t;
+  typedef AbstractUploader::CallbackTN CallbackTN;
 
-  UploadStreamHandle(const callback_t *commit_callback) :
+  UploadStreamHandle(const CallbackTN *commit_callback) :
     commit_callback(commit_callback) {}
   virtual ~UploadStreamHandle() {}
 
-  const callback_t *commit_callback;
+  const CallbackTN *commit_callback;
 };
 
 

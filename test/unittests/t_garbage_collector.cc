@@ -25,13 +25,13 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
     AbstractMockUploader<GC_MockUploader>(spooler_definition) {}
 
   upload::UploadStreamHandle* InitStreamedUpload(
-                                            const callback_t *callback = NULL) {
+                                            const CallbackTN *callback = NULL) {
     return NULL;
   }
 
   void Upload(upload::UploadStreamHandle  *abstract_handle,
               upload::CharBuffer          *buffer,
-              const callback_t            *callback = NULL) {
+              const CallbackTN            *callback = NULL) {
     assert (AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 

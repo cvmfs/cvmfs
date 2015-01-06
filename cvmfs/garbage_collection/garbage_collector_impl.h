@@ -60,7 +60,8 @@ typename GarbageCollector<CatalogTraversalT, HashFilterT>::TraversalParameters
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
- const GarbageCollector<CatalogTraversalT, HashFilterT>::traversal_callback_data_t &data) {
+ const GarbageCollector<CatalogTraversalT,
+                        HashFilterT>::TraversalCallbackDataTN &data) {
   ++preserved_catalogs_;
 
   if (configuration_.verbose) {
@@ -86,7 +87,8 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
- const GarbageCollector<CatalogTraversalT, HashFilterT>::traversal_callback_data_t &data) {
+ const GarbageCollector<CatalogTraversalT,
+                        HashFilterT>::TraversalCallbackDataTN &data) {
   ++condemned_catalogs_;
 
   if (configuration_.verbose) {
@@ -155,7 +157,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
   }
   bool success = true;
 
-  typename CatalogTraversalT::callback_t *callback =
+  typename CatalogTraversalT::CallbackTN *callback =
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
@@ -200,7 +202,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
     return true;
   }
 
-  typename CatalogTraversalT::callback_t *callback =
+  typename CatalogTraversalT::CallbackTN *callback =
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
         this);
@@ -227,7 +229,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GetHistoryRecycleBinContents(
   assert (result_set != NULL);
   result_set->clear();
 
-  object_fetcher_t *fetcher = configuration_.object_fetcher;
+  ObjectFetcherTN *fetcher = configuration_.object_fetcher;
   const shash::Any &base_hash = configuration_.base_history_database;
 
   // fetch the latest history database
@@ -276,7 +278,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GetHistoryRecycleBinContents(
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
                                               const unsigned int  tree_level,
-                                              const catalog_t    *catalog) const
+                                              const CatalogTN    *catalog) const
 {
   std::string tree_indent;
   for (unsigned int i = 0; i < tree_level; ++i) {
