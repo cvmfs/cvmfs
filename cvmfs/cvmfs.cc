@@ -2119,7 +2119,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
   if (!cache::Init(alien_cache, alien_cache != ".")) {
-    *g_boot_error = "Failed to setup cache in " + *cvmfs::cachedir_ +
+    *g_boot_error = "Failed to setup cache in " + alien_cache +
                     ": " + strerror(errno);
     return loader::kFailCacheDir;
   }
