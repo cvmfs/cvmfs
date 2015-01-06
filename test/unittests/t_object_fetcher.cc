@@ -53,6 +53,8 @@ class T_ObjectFetcher : public ::testing::Test {
     if (NeedsSandbox()) {
       const bool retval = RemoveTree(sandbox);
       ASSERT_TRUE (retval) << "failed to remove sandbox";
+
+      FinalizeExternalManagers();
     }
 
     MockHistory::Reset();
@@ -76,6 +78,7 @@ class T_ObjectFetcher : public ::testing::Test {
       WriteKeychain();
       WriteManifest();
       WriteWhitelist();
+      InitializeExternalManagers();
     }
   }
 
@@ -310,6 +313,17 @@ class T_ObjectFetcher : public ::testing::Test {
     return ss.str();
   }
 
+  void InitializeExternalManagers() {
+    download_manager_.Init(1, true);
+    signature_manager_.Init();
+    ASSERT_TRUE(signature_manager_.LoadPublicRsaKeys(public_key_path));
+  }
+
+  void FinalizeExternalManagers() {
+    download_manager_.Fini();
+    signature_manager_.Fini();
+  }
+
   ObjectFetcherT* GetObjectFetcher() {
     return GetObjectFetcher(type<ObjectFetcherT>());
   }
@@ -344,10 +358,11 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   ObjectFetcherT* GetObjectFetcher(const type<HttpObjectFetcher<> > type_spec) {
-    return HttpObjectFetcher<>::Create(fqrn,
-                                       "file://" + backend_storage,
-                                       public_key_path,
-                                       temp_directory);
+    return new HttpObjectFetcher<>(fqrn,
+                                   "file://" + backend_storage,
+                                   temp_directory,
+                                   &download_manager_,
+                                   &signature_manager_);
   }
 
   ObjectFetcherT* GetObjectFetcher(const type<MockObjectFetcher> type_spec) {
@@ -469,6 +484,10 @@ class T_ObjectFetcher : public ::testing::Test {
   bool NeedsSandbox(const type<LocalObjectFetcher<> > type_spec) { return true;  }
   bool NeedsSandbox(const type<HttpObjectFetcher<> >  type_spec) { return true;  }
   bool NeedsSandbox(const type<MockObjectFetcher>     type_spec) { return false; }
+
+ private:
+  download::DownloadManager    download_manager_;
+  signature::SignatureManager  signature_manager_;
 };
 
 template <class ObjectFetcherT>
