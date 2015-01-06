@@ -7,14 +7,12 @@
 
 #include <string>
 
+#include "catalog.h"
+#include "download.h"
+#include "history_sqlite.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#include "history_sqlite.h"
-#include "catalog.h"
-
-#include "download.h"
 #include "signature.h"
-
 
 /**
  * Trait class to define the concrete object types produced by the methods of
