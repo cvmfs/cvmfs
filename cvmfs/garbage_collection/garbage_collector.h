@@ -40,6 +40,7 @@ template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
  protected:
   typedef typename CatalogTraversalT::ObjectFetcherTN ObjectFetcherTN;
+  typedef typename ObjectFetcherTN::HistoryTN         HistoryTN;
 
  public:
   struct Configuration {

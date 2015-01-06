@@ -174,7 +174,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveLatestHistoryData
   }
 
   // traverse the latest history database
-  typename CatalogTraversalT::callback_t *callback =
+  typename CatalogTraversalT::CallbackTN *callback =
   traversal_.RegisterListener(
      &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
       this);
@@ -183,7 +183,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveLatestHistoryData
   traversal_.UnregisterListener(callback);
 
   // preserve the latest history database file itself
-  object_fetcher_t *fetcher = configuration_.object_fetcher;
+  ObjectFetcherTN *fetcher = configuration_.object_fetcher;
   UniquePtr<manifest::Manifest> manifest(fetcher->FetchManifest());
   assert (manifest.IsValid());
   hash_filter_.Fill(manifest->history());
