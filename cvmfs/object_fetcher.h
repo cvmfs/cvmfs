@@ -256,40 +256,24 @@ class HttpObjectFetcher :
 
  public:
   /**
-   * Factory method to instatiate an HttpObjectFetcher<>. This implementation
-   * contains internal state that cannot be copied and needs destruction. Hence
-   * it can only reside on the heap and the user is reponsible to delete the
-   * instance after usage.
+   * HttpObjectFetcher<> contains external DownloadManager and SignatureManager
+   * hence it essentially is a wrapper object and can be copied.
    *
-   * @param repo_name  the name of the repository to download objects from
-   * @param repo_url   the URL to the repository's backend storage
-   * @param repo_keys  a list of public keys to access the repository
-   * @param temp_dir   location to store decompressed tmp data
-   * @return           a HttpObjectFetcher<> object or NULL on error
+   * @param repo_name      the name of the repository to download objects from
+   * @param repo_url       the URL to the repository's backend storage
+   * @param temp_dir       location to store decompressed tmp data
+   * @param download_mgr   pointer to the download manager to be used
+   * @param signature_mgr  pointer to the signature manager to be used
+   *
+   * @return               a HttpObjectFetcher<> object or NULL on error
    */
-  static this_t* Create(const std::string &repo_name,
-                        const std::string &repo_url,
-                        const std::string &repo_keys,
-                        const std::string &temp_dir) {
-    UniquePtr<this_t> fetcher(new this_t(repo_name,
-                                         repo_url,
-                                         repo_keys,
-                                         temp_dir));
-    assert (fetcher);
-    return (fetcher->Initialize()) ? fetcher.Release() : NULL;
-  }
-
-  ~HttpObjectFetcher() {
-    signature_manager_.Fini();
-    download_manager_.Fini();
-  }
-
- protected:
-  bool Initialize() {
-    download_manager_.Init(1, true);
-    signature_manager_.Init();
-    return signature_manager_.LoadPublicRsaKeys(repo_keys_);
-  }
+  HttpObjectFetcher(const std::string           &repo_name,
+                    const std::string           &repo_url,
+                    const std::string           &temp_dir,
+                    download::DownloadManager   *download_mgr,
+                    signature::SignatureManager *signature_mgr) :
+    repo_url_(repo_url), repo_name_(repo_name), temporary_directory_(temp_dir),
+    download_manager_(download_mgr), signature_manager_(signature_mgr) {}
 
  public:
   manifest::Manifest* FetchManifest() {
@@ -304,8 +288,8 @@ class HttpObjectFetcher :
                                   repo_name_,
                                   0,
                                   NULL,
-                                  &signature_manager_,
-                                  &download_manager_,
+                                  signature_manager_,
+                                  download_manager_,
                                   &manifest_ensemble);
 
     // Check if manifest was loaded correctly
@@ -340,7 +324,7 @@ class HttpObjectFetcher :
     const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
 
     download::JobInfo download_catalog(&url, true, false, &dest, &object_hash);
-    download::Failures retval = download_manager_.Fetch(&download_catalog);
+    download::Failures retval = download_manager_->Fetch(&download_catalog);
 
     if (retval != download::kFailOk) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
@@ -353,13 +337,6 @@ class HttpObjectFetcher :
   }
 
  protected:
-  HttpObjectFetcher(const std::string &repo_name,
-                    const std::string &repo_url,
-                    const std::string &repo_keys,
-                    const std::string &temp_dir) :
-    repo_url_(repo_url), repo_name_(repo_name), repo_keys_(repo_keys),
-    temporary_directory_(temp_dir) {}
-
   std::string BuildUrl(const std::string &relative_path) const {
     return repo_url_ + "/" + relative_path;
   }
@@ -372,10 +349,9 @@ class HttpObjectFetcher :
  private:
   const std::string            repo_url_;
   const std::string            repo_name_;
-  const std::string            repo_keys_;
   const std::string            temporary_directory_;
-  download::DownloadManager    download_manager_;
-  signature::SignatureManager  signature_manager_;
+  download::DownloadManager   *download_manager_;
+  signature::SignatureManager *signature_manager_;
 };
 
 template <class CatalogT, class HistoryT>
