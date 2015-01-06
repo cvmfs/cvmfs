@@ -73,7 +73,7 @@ void LocalUploader::WorkerThread() {
 
 void LocalUploader::FileUpload(const std::string &local_path,
                                const std::string &remote_path,
-                               const callback_t   *callback) {
+                               const CallbackTN   *callback) {
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "FileUpload call started.");
 
@@ -139,7 +139,7 @@ int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
 
 
 UploadStreamHandle* LocalUploader::InitStreamedUpload(
-                                                   const callback_t *callback) {
+                                                   const CallbackTN *callback) {
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
   if (tmp_fd < 0) {
@@ -152,7 +152,7 @@ UploadStreamHandle* LocalUploader::InitStreamedUpload(
 
 void LocalUploader::Upload(UploadStreamHandle  *handle,
                            CharBuffer          *buffer,
-                           const callback_t    *callback) {
+                           const CallbackTN    *callback) {
   assert (buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
@@ -208,7 +208,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
     return;
   }
 
-  const callback_t *callback = handle->commit_callback;
+  const CallbackTN *callback = handle->commit_callback;
   delete local_handle;
 
   Respond(callback, UploaderResults(0));

@@ -203,10 +203,10 @@ void S3Uploader::WorkerThread() {
       s3fanout::JobInfo *info = *it;
       if (info->error_code == s3fanout::kFailOk) {
         if (info->origin == s3fanout::kOriginMem) {
-          Respond(static_cast<callback_t*>(info->callback),
+          Respond(static_cast<CallbackTN*>(info->callback),
           UploaderResults(0));
         } else {
-          Respond(static_cast<callback_t*>(info->callback),
+          Respond(static_cast<CallbackTN*>(info->callback),
                   UploaderResults(0, info->mmf->file_path()));
         }
       } else {
@@ -215,7 +215,7 @@ void S3Uploader::WorkerThread() {
                  info->origin_path.c_str(), info->error_code,
                  s3fanout::Code2Ascii(info->error_code));
 
-        Respond(static_cast<callback_t*>(info->callback),
+        Respond(static_cast<CallbackTN*>(info->callback),
                 UploaderResults(99, info->mmf->file_path()));
       }
       info->mmf->Unmap();
@@ -340,7 +340,7 @@ int S3Uploader::SelectBucket(const std::string &rem_filename) const {
 
 void S3Uploader::FileUpload(const std::string &local_path,
                             const std::string &remote_path,
-                            const callback_t  *callback) {
+                            const CallbackTN  *callback) {
   // Check that we can read the given file
   MemoryMappedFile *mmf = new MemoryMappedFile(local_path);
   if (!mmf->Map()) {
@@ -377,7 +377,7 @@ void S3Uploader::FileUpload(const std::string &local_path,
 bool S3Uploader::UploadFile(const std::string &filename,
                             char              *buff,
                             unsigned long     size_of_file,
-                            const callback_t  *callback,
+                            const CallbackTN  *callback,
                             MemoryMappedFile  *mmf)
 {
   // Choose S3 account and bucket based on the filename
@@ -456,7 +456,7 @@ int S3Uploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
 }
 
 
-UploadStreamHandle *S3Uploader::InitStreamedUpload(const callback_t *callback) {
+UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
 
@@ -477,7 +477,7 @@ UploadStreamHandle *S3Uploader::InitStreamedUpload(const callback_t *callback) {
 
 void S3Uploader::Upload(UploadStreamHandle  *handle,
                         CharBuffer          *buffer,
-                        const callback_t    *callback) {
+                        const CallbackTN    *callback) {
   assert(buffer->IsInitialized());
   S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
 
@@ -536,7 +536,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle   *handle,
                          content_hash.MakePathWithSuffix(1, 2, hash_suffix));
 
   // Request upload
-  const callback_t *callback = handle->commit_callback;
+  const CallbackTN *callback = handle->commit_callback;
   const bool retval_b = UploadFile(final_path,
                                    reinterpret_cast<char*>(mmf->buffer()),
                                    static_cast<long unsigned int>(mmf->size()),

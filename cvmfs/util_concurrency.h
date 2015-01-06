@@ -312,8 +312,8 @@ template <typename ParamT>
 class Observable : public Callbackable<ParamT>,
                    SingleCopy {
  protected:
-  typedef typename Callbackable<ParamT>::callback_t*  callback_ptr;
-  typedef std::set<callback_ptr>                      Callbacks;
+  typedef typename Callbackable<ParamT>::CallbackTN*  CallbackPtr;
+  typedef std::set<CallbackPtr>                       Callbacks;
 
  public:
   virtual ~Observable();
@@ -332,7 +332,7 @@ class Observable : public Callbackable<ParamT>,
    * @return  a handle to the registered callback
    */
   template <class DelegateT, class ClosureDataT>
-  callback_ptr RegisterListener(
+  CallbackPtr RegisterListener(
           typename BoundClosure<ParamT,
                                 DelegateT,
                                 ClosureDataT>::CallbackMethod   method,
@@ -350,7 +350,7 @@ class Observable : public Callbackable<ParamT>,
    * @return  a handle to the registered callback
    */
   template <class DelegateT>
-  callback_ptr RegisterListener(
+  CallbackPtr RegisterListener(
           typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
           DelegateT *delegate);
 
@@ -362,7 +362,7 @@ class Observable : public Callbackable<ParamT>,
    * @param fn  a pointer to the function to be called by the callback
    * @return  a handle to the registered callback
    */
-  callback_ptr RegisterListener(typename Callback<ParamT>::CallbackFunction fn);
+  CallbackPtr RegisterListener(typename Callback<ParamT>::CallbackFunction fn);
 
   /**
    * Removes the given callback from the listeners group of this Observable.
@@ -370,7 +370,7 @@ class Observable : public Callbackable<ParamT>,
    * @param callback_object  a callback handle that was returned by
    *                         RegisterListener() before.
    */
-  void UnregisterListener(callback_ptr callback_object);
+  void UnregisterListener(CallbackPtr callback_object);
 
   /**
    * Removes all listeners from the Observable
@@ -380,7 +380,7 @@ class Observable : public Callbackable<ParamT>,
  protected:
   Observable(); // don't instantiate this as a stand alone object
 
-  void RegisterListener(callback_ptr callback_object);
+  void RegisterListener(CallbackPtr callback_object);
 
   /**
    * Notifies all registered listeners and passes them the provided argument

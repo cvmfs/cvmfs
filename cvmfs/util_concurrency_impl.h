@@ -136,7 +136,7 @@ Observable<ParamT>::~Observable() {
 
 template <typename ParamT>
 template <class DelegateT, class ClosureDataT>
-typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
+typename Observable<ParamT>::CallbackPtr Observable<ParamT>::RegisterListener(
         typename BoundClosure<ParamT,
                               DelegateT,
                               ClosureDataT>::CallbackMethod   method,
@@ -152,7 +152,7 @@ typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
 
 template <typename ParamT>
 template <class DelegateT>
-typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
+typename Observable<ParamT>::CallbackPtr Observable<ParamT>::RegisterListener(
     typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
     DelegateT *delegate) {
   // create a new BoundCallback, register it and return the handle
@@ -164,7 +164,7 @@ typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
 
 
 template <typename ParamT>
-typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
+typename Observable<ParamT>::CallbackPtr Observable<ParamT>::RegisterListener(
     typename Callback<ParamT>::CallbackFunction fn) {
   // create a new Callback, register it and return the handle
   CallbackBase<ParamT> *callback =
@@ -176,7 +176,7 @@ typename Observable<ParamT>::callback_ptr Observable<ParamT>::RegisterListener(
 
 template <typename ParamT>
 void Observable<ParamT>::RegisterListener(
-    Observable<ParamT>::callback_ptr callback_object) {
+    Observable<ParamT>::CallbackPtr callback_object) {
   // register a generic CallbackBase callback
   WriteLockGuard guard(listeners_rw_lock_);
   listeners_.insert(callback_object);
@@ -185,7 +185,7 @@ void Observable<ParamT>::RegisterListener(
 
 template <typename ParamT>
 void Observable<ParamT>::UnregisterListener(
-    typename Observable<ParamT>::callback_ptr callback_object) {
+    typename Observable<ParamT>::CallbackPtr callback_object) {
   // remove a callback handle from the callbacks list
   // if it is not registered --> crash
   WriteLockGuard guard(listeners_rw_lock_);

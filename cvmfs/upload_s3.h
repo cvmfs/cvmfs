@@ -15,7 +15,7 @@
 namespace upload {
 
 struct S3StreamHandle : public UploadStreamHandle {
-    S3StreamHandle(const callback_t   *commit_callback,
+    S3StreamHandle(const CallbackTN   *commit_callback,
                    const int           tmp_fd,
                    const std::string  &tmp_path) :
     UploadStreamHandle(commit_callback),
@@ -50,12 +50,12 @@ class S3Uploader : public AbstractUploader {
    */
   void FileUpload(const std::string  &local_path,
                   const std::string  &remote_path,
-                  const callback_t   *callback = NULL);
+                  const CallbackTN   *callback = NULL);
 
-  UploadStreamHandle* InitStreamedUpload(const callback_t *callback = NULL);
+  UploadStreamHandle* InitStreamedUpload(const CallbackTN *callback = NULL);
   void Upload(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
-              const callback_t    *callback = NULL);
+              const CallbackTN    *callback = NULL);
   void FinalizeStreamedUpload(UploadStreamHandle   *handle,
                               const shash::Any     &content_hash,
                               const shash::Suffix   hash_suffix);
@@ -79,7 +79,7 @@ class S3Uploader : public AbstractUploader {
   bool UploadFile(const std::string &filename,
                   char              *buff,
                   unsigned long      size_of_file,
-                  const callback_t  *callback,
+                  const CallbackTN  *callback,
                   MemoryMappedFile  *mmf);
 
   int GetKeysAndBucket(const std::string  &filename,

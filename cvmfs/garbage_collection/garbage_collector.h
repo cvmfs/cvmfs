@@ -39,7 +39,7 @@
 template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
  protected:
-  typedef typename CatalogTraversalT::object_fetcher_t object_fetcher_t;
+  typedef typename CatalogTraversalT::ObjectFetcherTN ObjectFetcherTN;
 
  public:
   struct Configuration {
@@ -58,7 +58,7 @@ class GarbageCollector {
       , verbose(false) {}
 
     upload::AbstractUploader  *uploader;
-    object_fetcher_t          *object_fetcher;
+    ObjectFetcherTN           *object_fetcher;
     unsigned int               keep_history_depth;
     time_t                     keep_history_timestamp;
     shash::Any                 base_history_database;
@@ -67,10 +67,10 @@ class GarbageCollector {
   };
 
  protected:
-  typedef typename CatalogTraversalT::catalog_t        catalog_t;
-  typedef typename CatalogTraversalT::callback_data_t  traversal_callback_data_t;
-  typedef typename CatalogTraversalT::Parameters       TraversalParameters;
-  typedef std::vector<shash::Any>                      HashVector;
+  typedef typename CatalogTraversalT::CatalogTN       CatalogTN;
+  typedef typename CatalogTraversalT::CallbackDataTN  TraversalCallbackDataTN;
+  typedef typename CatalogTraversalT::Parameters      TraversalParameters;
+  typedef std::vector<shash::Any>                     HashVector;
 
  public:
   GarbageCollector(const Configuration &configuration);
@@ -85,8 +85,8 @@ class GarbageCollector {
   static TraversalParameters GetTraversalParams(
                                             const Configuration &configuration);
 
-  void PreserveDataObjects(const traversal_callback_data_t &data);
-  void SweepDataObjects   (const traversal_callback_data_t &data);
+  void PreserveDataObjects(const TraversalCallbackDataTN &data);
+  void SweepDataObjects   (const TraversalCallbackDataTN &data);
 
   bool AnalyzePreservedCatalogTree();
   bool SweepCondemnedCatalogTree();
@@ -97,7 +97,7 @@ class GarbageCollector {
   void Sweep(const shash::Any &hash);
 
   void PrintCatalogTreeEntry(const unsigned int  tree_level,
-                             const catalog_t    *catalog) const;
+                             const CatalogTN    *catalog) const;
 
  private:
   const Configuration   configuration_;

@@ -569,7 +569,7 @@ class BoundClosure<void, DelegateT, ClosureDataT> : public CallbackBase<void> {
 template <class ParamT>
 class Callbackable {
  public:
-  typedef CallbackBase<ParamT> callback_t;
+  typedef CallbackBase<ParamT> CallbackTN;
 
  public:
   /**
@@ -581,7 +581,7 @@ class Callbackable {
    * @param closure_data  The closure data to be passed along to <method>
    */
   template <class DelegateT, typename ClosureDataT>
-  static callback_t* MakeClosure(
+  static CallbackTN* MakeClosure(
       typename BoundClosure<ParamT, DelegateT, ClosureDataT>::CallbackMethod method,
       DelegateT           *delegate,
       const ClosureDataT  &closure_data) {
@@ -597,7 +597,7 @@ class Callbackable {
    * @param delegate  The delegate object on which <method> will be called
    */
   template <class DelegateT>
-  static callback_t* MakeCallback(
+  static CallbackTN* MakeCallback(
         typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
         DelegateT *delegate) {
     return new BoundCallback<ParamT, DelegateT>(method, delegate);
@@ -609,7 +609,7 @@ class Callbackable {
    *
    * @param function  Function pointer to the function to be invoked
    */
-  static callback_t* MakeCallback(
+  static CallbackTN* MakeCallback(
         typename Callback<ParamT>::CallbackFunction function) {
     return new Callback<ParamT>(function);
   }

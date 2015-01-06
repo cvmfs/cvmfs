@@ -16,7 +16,7 @@
 #include "testutil.h"
 
 struct MockStreamHandle : public upload::UploadStreamHandle {
-  MockStreamHandle(const callback_t *commit_callback) :
+  MockStreamHandle(const CallbackTN *commit_callback) :
     UploadStreamHandle(commit_callback),
     data(NULL), nbytes(0), marker(0) {}
 
@@ -112,13 +112,13 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
   }
 
   upload::UploadStreamHandle* InitStreamedUpload(
-                                            const callback_t *callback = NULL) {
+                                            const CallbackTN *callback = NULL) {
     return new MockStreamHandle(callback);
   }
 
   void Upload(upload::UploadStreamHandle  *handle,
               upload::CharBuffer          *buffer,
-              const callback_t            *callback = NULL) {
+              const CallbackTN            *callback = NULL) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
     assert (local_handle != NULL);
     local_handle->Append(buffer);
@@ -136,7 +136,7 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
     results_.push_back(Result(local_handle, content_hash, hash_suffix));
 
     // remove the stream handle and fire callback
-    const callback_t *callback = local_handle->commit_callback;
+    const CallbackTN *callback = local_handle->commit_callback;
     delete handle;
     Respond(callback, upload::UploaderResults(0));
   }

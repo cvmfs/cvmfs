@@ -43,8 +43,8 @@ struct object_fetcher_traits;
 template <class DerivedT>
 class AbstractObjectFetcher {
  public:
-  typedef typename object_fetcher_traits<DerivedT>::catalog_t catalog_t;
-  typedef typename object_fetcher_traits<DerivedT>::history_t history_t;
+  typedef typename object_fetcher_traits<DerivedT>::CatalogTN CatalogTN;
+  typedef typename object_fetcher_traits<DerivedT>::HistoryTN HistoryTN;
 
   static const std::string kManifestFilename;
 
@@ -67,7 +67,7 @@ class AbstractObjectFetcher {
    *                                 if left blank, the latest one is downloaded
    * @return              a history database object or NULL on error
    */
-  history_t* FetchHistory(const shash::Any &history_hash = shash::Any()) {
+  HistoryTN* FetchHistory(const shash::Any &history_hash = shash::Any()) {
     // retrieve the current HEAD history hash (if nothing else given)
     shash::Any effective_history_hash = (! history_hash.IsNull())
             ? history_hash
@@ -81,7 +81,7 @@ class AbstractObjectFetcher {
     }
 
     // open the history file
-    return history_t::Open(path);
+    return HistoryTN::Open(path);
   }
 
   /**
@@ -94,10 +94,10 @@ class AbstractObjectFetcher {
    * @param parent         (optional) parent catalog of the requested catalog
    * @return               a catalog object or NULL on error
    */
-  catalog_t* FetchCatalog(const shash::Any  &catalog_hash,
+  CatalogTN* FetchCatalog(const shash::Any  &catalog_hash,
                           const std::string &catalog_path,
                           const bool         is_nested = false,
-                                catalog_t   *parent    = NULL) {
+                                CatalogTN   *parent    = NULL) {
     assert (! catalog_hash.IsNull());
 
     std::string path;
@@ -105,7 +105,7 @@ class AbstractObjectFetcher {
       return NULL;
     }
 
-    return catalog_t::AttachFreely(catalog_path,
+    return CatalogTN::AttachFreely(catalog_path,
                                    path,
                                    catalog_hash,
                                    parent,
@@ -169,8 +169,8 @@ class LocalObjectFetcher :
   public AbstractObjectFetcher<LocalObjectFetcher<CatalogT, HistoryT> >
 {
  protected:
-  typedef LocalObjectFetcher<CatalogT, HistoryT> this_t;
-  typedef AbstractObjectFetcher<this_t>          base_t;
+  typedef LocalObjectFetcher<CatalogT, HistoryT> ThisTN;
+  typedef AbstractObjectFetcher<ThisTN>          BaseTN;
 
  public:
   /**
@@ -185,7 +185,7 @@ class LocalObjectFetcher :
     , temporary_directory_(temp_dir) {}
 
   manifest::Manifest* FetchManifest() {
-    return manifest::Manifest::LoadFile(BuildPath(base_t::kManifestFilename));
+    return manifest::Manifest::LoadFile(BuildPath(BaseTN::kManifestFilename));
   }
 
   bool Fetch(const shash::Any    &object_hash,
@@ -233,8 +233,8 @@ class LocalObjectFetcher :
 
 template <class CatalogT, class HistoryT>
 struct object_fetcher_traits<LocalObjectFetcher<CatalogT, HistoryT> > {
-    typedef CatalogT catalog_t;
-    typedef HistoryT history_t;
+    typedef CatalogT CatalogTN;
+    typedef HistoryT HistoryTN;
 };
 
 
@@ -249,8 +249,8 @@ class HttpObjectFetcher :
   public AbstractObjectFetcher<HttpObjectFetcher<CatalogT, HistoryT> >
 {
  protected:
-  typedef HttpObjectFetcher<CatalogT, HistoryT>  this_t;
-  typedef AbstractObjectFetcher<this_t>          base_t;
+  typedef HttpObjectFetcher<CatalogT, HistoryT>  ThisTN;
+  typedef AbstractObjectFetcher<ThisTN>          BaseTN;
 
  public:
   /**
@@ -277,7 +277,7 @@ class HttpObjectFetcher :
   manifest::Manifest* FetchManifest() {
     manifest::Manifest *manifest = NULL;
 
-    const std::string url = BuildUrl(base_t::kManifestFilename);
+    const std::string url = BuildUrl(BaseTN::kManifestFilename);
 
     // Download manifest file
     struct manifest::ManifestEnsemble manifest_ensemble;
@@ -354,8 +354,8 @@ class HttpObjectFetcher :
 
 template <class CatalogT, class HistoryT>
 struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT> > {
-    typedef CatalogT catalog_t;
-    typedef HistoryT history_t;
+    typedef CatalogT CatalogTN;
+    typedef HistoryT HistoryTN;
 };
 
 #endif /* OBJECT_FETCHER_H */
