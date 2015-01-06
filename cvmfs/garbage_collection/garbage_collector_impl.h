@@ -141,40 +141,59 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
-  bool success = true;
-
-  success = (success && AnalyzePreservedCatalogTree());
-  success = (success && SweepCondemnedCatalogTree());
-
-  return success;
+  return AnalyzePreservedCatalogTree()   &&
+         PreserveLatestHistoryDatabase() &&
+         CheckPreservedRevisions()       &&
+         SweepCondemnedCatalogTree()     &&
+         SweepHistoricRevisions();
 }
 
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTree() {
   if (configuration_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Preserving data objects in catalog tree");
+    LogCvmfs(kLogGc, kLogStdout, "Preserving data objects in latest revision");
   }
-  bool success = true;
 
   typename CatalogTraversalT::CallbackTN *callback =
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
 
-  success = traversal_.Traverse() &&
-            traversal_.TraverseNamedSnapshots();
-
+  const bool success = traversal_.Traverse();
   traversal_.UnregisterListener(callback);
 
-  if (success && preserved_catalog_count() == 0) {
-    if (configuration_.verbose) {
-      LogCvmfs(kLogGc, kLogStderr, "This would delete everything! Abort.");
-    }
-    success = false;
+  return success;
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveLatestHistoryDatabase() {
+  if (configuration_.verbose) {
+    LogCvmfs(kLogGc, kLogStdout, "Preserving data objects in historic revisions");
   }
 
+  // traverse the latest history database
+  typename CatalogTraversalT::callback_t *callback =
+  traversal_.RegisterListener(
+     &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
+      this);
+
+  const bool success = traversal_.TraverseNamedSnapshots();
+  traversal_.UnregisterListener(callback);
+
   return success;
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions() {
+  const bool keeps_revisions = (preserved_catalog_count() > 0);
+  if (keeps_revisions && configuration_.verbose) {
+    LogCvmfs(kLogGc, kLogStderr, "This would delete everything! Abort.");
+  }
+
+  return keeps_revisions;
 }
 
 
@@ -219,6 +238,13 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
   traversal_.UnregisterListener(callback);
 
   return success;
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions() {
+
+  return true;
 }
 
 
