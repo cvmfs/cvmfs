@@ -233,7 +233,82 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions() {
+  if (configuration_.verbose) {
+    LogCvmfs(kLogGc, kLogStdout, "Sweeping Historic Snapshots");
+  }
 
+  ObjectFetcherTN *fetcher = configuration_.object_fetcher;
+
+  // find the content hash for the current HEAD history database
+  UniquePtr<manifest::Manifest> manifest(fetcher->FetchManifest());
+  assert (manifest.IsValid());
+  if (manifest->history().IsNull()) {
+    if (configuration_.verbose) {
+      LogCvmfs(kLogGc, kLogStdout, "No history found");
+    }
+    return true;
+  }
+
+  typename CatalogTraversalT::CallbackTN *callback =
+    traversal_.RegisterListener(
+       &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
+        this);
+
+  // go through all legacy history databases and sweep the revisions in the
+  // recycle bins along with the legacy history databases itself
+  shash::Any   history_hash  = manifest->history();
+  unsigned int history_depth = 0;
+  while (! history_hash.IsNull()) {
+
+    // fetch the history database for the current history hash
+    UniquePtr<HistoryTN> history(fetcher->FetchHistory(history_hash));
+
+    // check if the history database was successfully fetched and stop execution
+    // (if the HEAD history was not accessible we report a failure otherwise
+    //  it is assumed that the rest of the history chain was swept before)
+    const bool download_successful = history.IsValid();
+    if (! download_successful) {
+      const bool is_head_history = (manifest->history() == history_hash);
+      if (is_head_history) {
+        LogCvmfs(kLogGc, kLogStderr, "Failed to fetch latest history (%s)",
+                 history_hash.ToString().c_str());
+        return false;
+      }
+
+      if (configuration_.verbose) {
+        LogCvmfs(kLogGc, kLogStdout, "History chain ended after %d databases "
+                                     "with %s. Done.",
+                 history_depth, history_hash.ToString().c_str());
+      }
+
+      break;
+    }
+
+    // list the recycle bin of the current history database for sweeping
+    typedef std::vector<shash::Any> Hashes;
+    Hashes recycled_snapshots;
+    if (! history->ListRecycleBin(&recycled_snapshots)) {
+      return false;
+    }
+
+    // sweep all revisions that were marked as deleted in the recycle bin
+          Hashes::const_iterator i    = recycled_snapshots.begin();
+    const Hashes::const_iterator iend = recycled_snapshots.end();
+    for (; i != iend; ++i) {
+      if (! traversal_.Traverse(*i, CatalogTraversalT::kDepthFirstTraversal)) {
+        return false;
+      }
+    }
+
+    // sweep the history database file itself
+    CheckAndSweep(history_hash);
+
+    // continue with the next history database hash
+    history_hash = history->previous_revision();
+    ++history_depth;
+  }
+
+  traversal_.UnregisterListener(callback);
   return true;
 }
 
