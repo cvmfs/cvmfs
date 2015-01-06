@@ -388,7 +388,7 @@ class T_ObjectFetcher : public ::testing::Test {
     ASSERT_FALSE (tmp_path.empty()) << "failed to create tmp in: " << sandbox;
 
     history::SqliteHistory *history =
-                              ObjectFetcherT::history_t::Create(tmp_path, fqrn);
+                              ObjectFetcherT::HistoryTN::Create(tmp_path, fqrn);
     ASSERT_NE (static_cast<history::SqliteHistory*>(NULL), history) <<
       "failed to create new history database in: " << tmp_path;
     history->SetPreviousRevision(previous_revision);
@@ -584,7 +584,7 @@ TYPED_TEST(T_ObjectFetcher, FetchHistory) {
 
   EXPECT_TRUE (object_fetcher->HasHistory());
 
-  UniquePtr<typename TypeParam::history_t> history(object_fetcher->FetchHistory());
+  UniquePtr<typename TypeParam::HistoryTN> history(object_fetcher->FetchHistory());
   ASSERT_TRUE (history.IsValid());
   EXPECT_EQ (TestFixture::previous_history_hash, history->previous_revision());
 }
@@ -594,7 +594,7 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistory) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
-  UniquePtr<typename TypeParam::history_t> history(
+  UniquePtr<typename TypeParam::HistoryTN> history(
               object_fetcher->FetchHistory(TestFixture::previous_history_hash));
   ASSERT_TRUE (history.IsValid())
     << "didn't find: " << TestFixture::previous_history_hash.ToStringWithSuffix();
@@ -606,7 +606,7 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidHistory) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
-  UniquePtr<typename TypeParam::history_t> history(
+  UniquePtr<typename TypeParam::HistoryTN> history(
       object_fetcher->FetchHistory(h("400d35465f179a4acacb5fe749e6ce20a0bbdb84",
                                      shash::kSuffixHistory)));
   ASSERT_FALSE (history.IsValid());
@@ -617,7 +617,7 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalog) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
-  UniquePtr<typename TypeParam::catalog_t> catalog(
+  UniquePtr<typename TypeParam::CatalogTN> catalog(
     object_fetcher->FetchCatalog(TestFixture::root_hash, ""));
 
   ASSERT_TRUE (catalog.IsValid());
@@ -630,7 +630,7 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalog) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
-  UniquePtr<typename TypeParam::catalog_t> catalog(
+  UniquePtr<typename TypeParam::CatalogTN> catalog(
     object_fetcher->FetchCatalog(h("5739dc30f42525a261b2f4b383b220df3e36f04d",
                                    shash::kSuffixCatalog), ""));
   ASSERT_FALSE (catalog.IsValid());

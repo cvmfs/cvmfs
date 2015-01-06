@@ -12,7 +12,7 @@ using namespace upload;
 
 
 struct UF_MockStreamHandle : public upload::UploadStreamHandle {
-  UF_MockStreamHandle(const callback_t *commit_callback) :
+  UF_MockStreamHandle(const CallbackTN *commit_callback) :
     UploadStreamHandle(commit_callback),
     commits(0), uploads(0)
   {
@@ -43,7 +43,7 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
     initialize_called(false) {}
 
   upload::UploadStreamHandle* InitStreamedUpload(
-                                            const callback_t *callback = NULL) {
+                                            const CallbackTN *callback = NULL) {
     return new UF_MockStreamHandle(callback);
   }
 
@@ -55,7 +55,7 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
 
   void Upload(upload::UploadStreamHandle  *abstract_handle,
               upload::CharBuffer          *buffer,
-              const callback_t            *callback = NULL) {
+              const CallbackTN            *callback = NULL) {
     UF_MockStreamHandle* handle =
                              static_cast<UF_MockStreamHandle*>(abstract_handle);
     handle->uploads++;
@@ -68,7 +68,7 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
     UF_MockStreamHandle* handle =
                              static_cast<UF_MockStreamHandle*>(abstract_handle);
     handle->commits++;
-    const UF_MockStreamHandle::callback_t *callback = handle->commit_callback;
+    const UF_MockStreamHandle::CallbackTN *callback = handle->commit_callback;
     delete handle;
     Respond(callback, UploaderResults(0));
   }

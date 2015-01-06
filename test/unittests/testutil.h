@@ -131,19 +131,19 @@ class AbstractMockUploader : public upload::AbstractUploader {
 
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
-                          const callback_t   *callback = NULL) {
+                          const CallbackTN   *callback = NULL) {
     assert (AbstractMockUploader::not_implemented);
   }
 
   virtual upload::UploadStreamHandle* InitStreamedUpload(
-                                            const callback_t *callback = NULL) {
+                                            const CallbackTN *callback = NULL) {
     assert (AbstractMockUploader::not_implemented);
     return NULL;
   }
 
   virtual void Upload(upload::UploadStreamHandle  *handle,
                       upload::CharBuffer          *buffer,
-                      const callback_t            *callback = NULL) {
+                      const CallbackTN            *callback = NULL) {
     assert (AbstractMockUploader::not_implemented);
   }
 
@@ -524,8 +524,8 @@ class MockObjectFetcher;
 
 template <>
 struct object_fetcher_traits<MockObjectFetcher> {
-  typedef MockCatalog catalog_t;
-  typedef MockHistory history_t;
+  typedef MockCatalog CatalogTN;
+  typedef MockHistory HistoryTN;
 };
 
 /**
