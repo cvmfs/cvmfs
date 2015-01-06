@@ -195,7 +195,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveLatestHistoryData
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions() {
   const bool keeps_revisions = (preserved_catalog_count() > 0);
-  if (keeps_revisions && configuration_.verbose) {
+  if (! keeps_revisions && configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStderr, "This would delete everything! Abort.");
   }
 
