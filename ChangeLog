@@ -1,4 +1,6 @@
 2.1.20:
+  * Fix concurrent creation of cache sub directories (CVM-672)
+  * Replace cvmfs-keys package by cvmfs-config-... packages (CVM-617)
   * Add CVMFS_LOW_SPEED_LIMIT parameter, increase threshold for stale
     connections from 100B/s to 1kB/s (CVM-718)
   * Allow cvmfs to claim ownership of files and directories through 
