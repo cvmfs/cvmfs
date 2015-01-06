@@ -245,10 +245,17 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     // Write to memory
     if (info->destination_mem.pos + num_bytes > info->destination_mem.size) {
       if (info->destination_mem.size == 0)
-        LogCvmfs(kLogDownload, kLogDebug, "Content-Length was missing or zero, but %d bytes were received", info->destination_mem.pos + num_bytes);
+        LogCvmfs(kLogDownload,
+                 kLogDebug,
+                 "Content-Length was missing or zero, but %d bytes received",
+                 info->destination_mem.pos + num_bytes);
       else
-        LogCvmfs(kLogDownload, kLogDebug, "Data callback failed with too much data: start %d, bytes %d, expected content-length %d", 
-          info->destination_mem.pos, num_bytes, info->destination_mem.size);
+        LogCvmfs(kLogDownload,
+                 kLogDebug,
+                 "Callback had too much data: start %d, bytes %d, expected %d", 
+                 info->destination_mem.pos,
+                 num_bytes,
+                 info->destination_mem.size);
       info->error_code = kFailBadData;
       return 0;
     }
