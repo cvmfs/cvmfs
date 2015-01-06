@@ -1,13 +1,14 @@
-#include <gtest/gtest.h>
-#include <cstdio>
 #include <cerrno>
+#include <cstdio>
 #include <ctime>
 #include <sstream>
 
-#include "../../cvmfs/util.h"
+#include <gtest/gtest.h>
+
 #include "../../cvmfs/catalog_sql.h"
-#include "../../cvmfs/history_sqlite.h"
 #include "../../cvmfs/compression.h"
+#include "../../cvmfs/history_sqlite.h"
+#include "../../cvmfs/util.h"
 
 #include "testutil.h"
 
