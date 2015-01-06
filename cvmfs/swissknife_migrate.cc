@@ -123,17 +123,26 @@ int CommandMigrate::Main(const ArgumentList &args) {
   bool loading_successful = false;
   if (IsRemotePath(repo_url)) {
     typedef HttpObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
-    UniquePtr<ObjectFetcher> fetcher(ObjectFetcher::Create(repo_name,
-                                                           repo_url,
-                                                           repo_keys,
-                                                           tmp_dir));
 
-    if (! fetcher) {
-      LogCvmfs(kLogCatalog, kLogStderr, "failed to connect to remote repository");
-      return 4;
+    download::DownloadManager   download_manager;
+    signature::SignatureManager signature_manager;
+    download_manager.Init(1, true);
+    signature_manager.Init();
+    if (! signature_manager.LoadPublicRsaKeys(repo_keys)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
+      return 1;
     }
 
-    loading_successful = LoadCatalogs(fetcher.weak_ref());
+    ObjectFetcher fetcher(repo_name,
+                          repo_url,
+                          tmp_dir,
+                          &download_manager,
+                          &signature_manager);
+
+    loading_successful = LoadCatalogs(&fetcher);
+
+    download_manager.Fini();
+    signature_manager.Fini();
   } else {
     typedef LocalObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
     ObjectFetcher fetcher(repo_url, tmp_dir);
