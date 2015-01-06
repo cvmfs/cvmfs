@@ -62,17 +62,22 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  UniquePtr<ObjectFetcher> object_fetcher(ObjectFetcher::Create(repo_name,
-                                                                repo_url,
-                                                                repo_keys,
-                                                                temp_directory));
-  if (! object_fetcher) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to connect to repository");
+  download::DownloadManager   download_manager;
+  signature::SignatureManager signature_manager;
+  download_manager.Init(1, true);
+  signature_manager.Init();
+  if (! signature_manager.LoadPublicRsaKeys(repo_keys)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
     return 1;
   }
 
+  ObjectFetcher object_fetcher(repo_name,
+                               repo_url,
+                               temp_directory,
+                               &download_manager,
+                               &signature_manager);
 
-  UniquePtr<manifest::Manifest> manifest(object_fetcher->FetchManifest());
+  UniquePtr<manifest::Manifest> manifest(object_fetcher.FetchManifest());
   if (! manifest || ! manifest->garbage_collectable()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "repository does not allow garbage collection");
     return 1;
@@ -85,7 +90,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.keep_history_timestamp = timestamp;
   config.dry_run                = dry_run;
   config.verbose                = list_condemned_objects;
-  config.object_fetcher         = object_fetcher.weak_ref();
+  config.object_fetcher         = &object_fetcher;
 
   if (config.uploader == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
@@ -94,5 +99,10 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   GC collector(config);
-  return collector.Collect() ? 0 : 1;
+  const bool success = collector.Collect();
+
+  download_manager.Fini();
+  signature_manager.Fini();
+
+  return success ? 0 : 1;
 }

@@ -40,17 +40,25 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
 
   bool success = false;
   if (IsRemotePath(repo_url)) {
-    UniquePtr<HttpObjectFetcher<catalog::Catalog, history::SqliteHistory> > fetcher(
-                                      HttpObjectFetcher<catalog::Catalog, history::SqliteHistory>::Create(repo_name,
-                                                                  repo_url,
-                                                                  repo_keys,
-                                                                  tmp_dir));
-    if (! fetcher) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to connect to remote repository");
+    download::DownloadManager   download_manager;
+    signature::SignatureManager signature_manager;
+    download_manager.Init(1, true);
+    signature_manager.Init();
+    if (! signature_manager.LoadPublicRsaKeys(repo_keys)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
       return 1;
     }
 
-    success = Run(fetcher.weak_ref());
+    HttpObjectFetcher<catalog::Catalog,
+                      history::SqliteHistory> fetcher(repo_name,
+                                                      repo_url,
+                                                      tmp_dir,
+                                                      &download_manager,
+                                                      &signature_manager);
+    success = Run(&fetcher);
+
+    download_manager.Fini();
+    signature_manager.Fini();
   } else {
     LocalObjectFetcher<> fetcher(repo_url, tmp_dir);
     success = Run(&fetcher);
