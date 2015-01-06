@@ -205,44 +205,28 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions()
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree() {
-  typedef std::set<shash::Any> RecycledCatalogs;
-  RecycledCatalogs snapshots_to_recycle;
-  if (! GetHistoryRecycleBinContents(&snapshots_to_recycle)) {
-    return false;
-  }
-
-  const bool has_condemned_revisions = (traversal_.pruned_revision_count() > 0 ||
-                                        snapshots_to_recycle.size()        > 0);
   if (configuration_.verbose) {
-    if (! has_condemned_revisions) {
-      LogCvmfs(kLogGc, kLogStdout, "Nothing to be sweeped.");
-
-    } else {
-      LogCvmfs(kLogGc, kLogStdout, "Sweeping unreferenced data objects in "
-                                   "remaining catalogs");
-    }
+    LogCvmfs(kLogGc, kLogStdout, "Sweeping Condemned Catalog Graphs");
   }
 
-  if (! has_condemned_revisions) {
+  // check if we have anything to sweep in this stage
+  const bool no_condemned_revisions = (traversal_.pruned_revision_count() == 0);
+  if (no_condemned_revisions) {
+    if (configuration_.verbose) {
+      LogCvmfs(kLogGc, kLogStdout, "Nothing to be swept.");
+    }
     return true;
   }
 
+  // sweep all previously pruned revisions including their history
   typename CatalogTraversalT::CallbackTN *callback =
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
         this);
 
-  bool success = false;
-
-  success = traversal_.TraversePruned(CatalogTraversalT::kDepthFirstTraversal);
-        RecycledCatalogs::const_iterator i    = snapshots_to_recycle.begin();
-  const RecycledCatalogs::const_iterator iend = snapshots_to_recycle.end();
-  for (; success && i != iend; ++i) {
-    success = traversal_.Traverse(*i, CatalogTraversalT::kDepthFirstTraversal);
-  }
-
+  const bool success = traversal_.TraversePruned(
+                                       CatalogTraversalT::kDepthFirstTraversal);
   traversal_.UnregisterListener(callback);
-
   return success;
 }
 
