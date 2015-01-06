@@ -136,15 +136,15 @@ TEST(T_Util, String2Uint64) {
 }
 
 
-TEST(T_Util, IsRemotePath) {
-  EXPECT_TRUE  (IsRemotePath("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
-  EXPECT_TRUE  (IsRemotePath("http://"));
-  EXPECT_TRUE  (IsRemotePath("http://foobar"));
-  EXPECT_TRUE  (IsRemotePath("HTTP://www.google.com"));
-  EXPECT_TRUE  (IsRemotePath("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
-  EXPECT_FALSE (IsRemotePath("http:/foobar"));
-  EXPECT_FALSE (IsRemotePath("http"));
-  EXPECT_FALSE (IsRemotePath("/srv/cvmfs/cms.cern.ch"));
-  EXPECT_FALSE (IsRemotePath("srv/cvmfs/cms.cern.ch"));
-  EXPECT_FALSE (IsRemotePath("http//foobar"));
+TEST(T_Util, IsHttpUrl) {
+  EXPECT_TRUE  (IsHttpUrl("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
+  EXPECT_TRUE  (IsHttpUrl("http://"));
+  EXPECT_TRUE  (IsHttpUrl("http://foobar"));
+  EXPECT_TRUE  (IsHttpUrl("HTTP://www.google.com"));
+  EXPECT_TRUE  (IsHttpUrl("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
+  EXPECT_FALSE (IsHttpUrl("http:/foobar"));
+  EXPECT_FALSE (IsHttpUrl("http"));
+  EXPECT_FALSE (IsHttpUrl("/srv/cvmfs/cms.cern.ch"));
+  EXPECT_FALSE (IsHttpUrl("srv/cvmfs/cms.cern.ch"));
+  EXPECT_FALSE (IsHttpUrl("http//foobar"));
 }
