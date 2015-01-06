@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <cstdio>
 #include <cerrno>
+#include <ctime>
+#include <sstream>
 
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/catalog_sql.h"
@@ -19,6 +21,7 @@ class T_ObjectFetcher : public ::testing::Test {
   static const std::string  backend_storage;
   static const std::string  backend_storage_dir;
   static const std::string  manifest_path;
+  static const std::string  whitelist_path;
   static const std::string  temp_directory;
   static const std::string  public_key_path;
   static const std::string  private_key_path;
@@ -72,6 +75,7 @@ class T_ObjectFetcher : public ::testing::Test {
     if (NeedsSandbox()) {
       WriteKeychain();
       WriteManifest();
+      WriteWhitelist();
     }
   }
 
@@ -188,29 +192,66 @@ class T_ObjectFetcher : public ::testing::Test {
     ASSERT_EQ (0, retval) << "failed to close. errno: " << errno;
   }
 
-  void WriteManifest() {
-      // create manifest
-      const uint64_t    catalog_size = 0;
-      const std::string root_path    = "";
-      UniquePtr<manifest::Manifest> manifest(new manifest::Manifest(
-                                                   root_hash,
-                                                   catalog_size,
-                                                   root_path));
-      manifest->set_history(history_hash);
-      manifest->set_certificate(certificate_hash);
-      manifest->set_repository_name(fqrn);
+  void SignString(std::string                  *str,
+                  signature::SignatureManager  &signature_manager) const {
+    shash::Any hash = h("0000000000000000000000000000000000000000");
+    shash::HashMem(
+      reinterpret_cast<const unsigned char *>(str->data()),
+      str->length(), &hash);
 
-      SignAndExportManifest(manifest.weak_ref(), manifest_path);
+    unsigned char *sig;
+    unsigned sig_size;
+    ASSERT_TRUE (signature_manager.Sign(
+                  reinterpret_cast<const unsigned char *>(
+                    hash.ToString().data()),
+                    hash.GetHexSize(),
+                  &sig, &sig_size));
+
+    *str += "--\n";
+    *str += hash.ToString() + "\n";
+    *str += std::string(reinterpret_cast<char*>(sig), sig_size);
   }
 
-  void SignAndExportManifest(      manifest::Manifest  *manifest,
-                             const std::string         &manifest_path) {
-    std::string signed_manifest = manifest->ExportString();
-    shash::Any published_hash = h("0000000000000000000000000000000000000000");
+  void SignStringRsa(std::string *str) {
+    shash::Any hash = h("0000000000000000000000000000000000000000");
     shash::HashMem(
-      reinterpret_cast<const unsigned char *>(signed_manifest.data()),
-      signed_manifest.length(), &published_hash);
-    signed_manifest += "--\n" + published_hash.ToString() + "\n";
+      reinterpret_cast<const unsigned char *>(str->data()),
+      str->length(), &hash);
+    std::string hash_string = hash.ToString();
+
+    FILE *f_rsa_pkey = fopen(master_key_path.c_str(), "r");
+    ASSERT_NE (static_cast<FILE*>(NULL), f_rsa_pkey);
+    RSA *rsa = PEM_read_RSAPrivateKey(f_rsa_pkey, NULL, NULL, NULL);
+    ASSERT_NE (static_cast<RSA*>(NULL), rsa);
+    fclose(f_rsa_pkey);
+
+    unsigned char *sig = (unsigned char*)malloc(RSA_size(rsa));
+    const int res =
+      RSA_private_encrypt(hash_string.length(),
+                          reinterpret_cast<const unsigned char *>(
+                            hash_string.data()),
+                          sig, rsa, RSA_PKCS1_PADDING);
+    ASSERT_NE (-1, res) << "RSA error code: " << ERR_get_error();
+
+    *str += "--\n";
+    *str += hash_string + "\n";
+    *str += std::string(reinterpret_cast<char*>(sig), res);
+
+    free(sig);
+    RSA_free(rsa);
+  }
+
+  void WriteManifest() {
+    // create manifest
+    const uint64_t    catalog_size = 0;
+    const std::string root_path    = "";
+    UniquePtr<manifest::Manifest> manifest(new manifest::Manifest(
+                                                 root_hash,
+                                                 catalog_size,
+                                                 root_path));
+    manifest->set_history(history_hash);
+    manifest->set_certificate(certificate_hash);
+    manifest->set_repository_name(fqrn);
 
     signature::SignatureManager signature_manager;
     signature_manager.Init();
@@ -218,31 +259,49 @@ class T_ObjectFetcher : public ::testing::Test {
     ASSERT_TRUE (signature_manager.LoadCertificatePath(certificate_path));
     ASSERT_TRUE (signature_manager.LoadPrivateKeyPath(private_key_path, ""));
 
-    // Sign manifest
-    unsigned char *sig;
-    unsigned sig_size;
-    ASSERT_TRUE (signature_manager.Sign(
-                  reinterpret_cast<const unsigned char *>(
-                    published_hash.ToString().data()),
-                    published_hash.GetHexSize(),
-                  &sig, &sig_size));
-
-    // Write new manifest
-    FILE *fmanifest = fopen(manifest_path.c_str(), "w");
-    ASSERT_NE (static_cast<FILE*>(NULL), fmanifest);
-
-    int bytes_written = fwrite(signed_manifest.data(),
-                               1, signed_manifest.length(),
-                               fmanifest);
-    ASSERT_EQ (signed_manifest.length(), bytes_written);
-
-    bytes_written = fwrite(sig, 1, sig_size, fmanifest);
-    ASSERT_EQ (sig_size, bytes_written);
-
-    free(sig);
-    fclose(fmanifest);
+    std::string manifest_string = manifest->ExportString();
+    SignString(&manifest_string, signature_manager);
+    WriteFile(manifest_path, manifest_string);
 
     signature_manager.Fini();
+  }
+
+  void WriteWhitelist() {
+    std::stringstream whitelist;
+    whitelist << MakeWhitelistTimestamp(time(0)) << std::endl;
+    whitelist << "E" << MakeWhitelistTimestamp(time(0) + 30 /*days*/ *24*60*60)
+              << std::endl;
+    whitelist << "N" << fqrn << std::endl;
+
+    signature::SignatureManager signature_manager;
+    signature_manager.Init();
+
+    ASSERT_TRUE (signature_manager.LoadCertificatePath(certificate_path));
+    ASSERT_TRUE (signature_manager.LoadPrivateKeyPath(master_key_path, ""));
+
+    whitelist << signature_manager.FingerprintCertificate(shash::kSha1)
+              << std::endl;
+    std::string whitelist_string = whitelist.str();
+
+    SignStringRsa(&whitelist_string);
+    WriteFile(whitelist_path, whitelist_string);
+
+    signature_manager.Fini();
+  }
+
+  std::string MakeWhitelistTimestamp(const time_t timestamp) const {
+    struct tm* ti = localtime(&timestamp);
+
+    std::stringstream ss;
+    ss << std::setfill('0')
+       << std::setw(4) << ti->tm_year + 1900
+       << std::setw(2) << ti->tm_mon  + 1
+       << std::setw(2) << ti->tm_mday
+       << std::setw(2) << ti->tm_hour
+       << std::setw(2) << ti->tm_min
+       << std::setw(2) << ti->tm_sec;
+
+    return ss.str();
   }
 
   ObjectFetcherT* GetObjectFetcher() {
@@ -424,6 +483,10 @@ const std::string T_ObjectFetcher<ObjectFetcherT>::backend_storage_dir =
 template <class ObjectFetcherT>
 const std::string T_ObjectFetcher<ObjectFetcherT>::manifest_path =
   T_ObjectFetcher<ObjectFetcherT>::backend_storage + "/.cvmfspublished";
+
+template <class ObjectFetcherT>
+const std::string T_ObjectFetcher<ObjectFetcherT>::whitelist_path =
+  T_ObjectFetcher<ObjectFetcherT>::backend_storage + "/.cvmfswhitelist";
 
 template <class ObjectFetcherT>
 const std::string T_ObjectFetcher<ObjectFetcherT>::temp_directory =
