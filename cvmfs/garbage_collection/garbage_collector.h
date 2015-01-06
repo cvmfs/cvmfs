@@ -89,7 +89,10 @@ class GarbageCollector {
   void SweepDataObjects   (const TraversalCallbackDataTN &data);
 
   bool AnalyzePreservedCatalogTree();
+  bool PreserveLatestHistoryDatabase();
+  bool CheckPreservedRevisions();
   bool SweepCondemnedCatalogTree();
+  bool SweepHistoricRevisions();
 
   bool GetHistoryRecycleBinContents(std::set<shash::Any> *result_set) const;
 
