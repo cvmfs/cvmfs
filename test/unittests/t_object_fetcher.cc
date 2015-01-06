@@ -192,13 +192,9 @@ class T_ObjectFetcher : public ::testing::Test {
     ASSERT_EQ (0, retval) << "failed to close. errno: " << errno;
   }
 
-  void SignString(std::string                  *str,
-                  signature::SignatureManager  &signature_manager) const {
-    shash::Any hash = h("0000000000000000000000000000000000000000");
-    shash::HashMem(
-      reinterpret_cast<const unsigned char *>(str->data()),
-      str->length(), &hash);
-
+  void Sign(const shash::Any              hash,
+            signature::SignatureManager  &signature_manager,
+            std::string                  *signature) const {
     unsigned char *sig;
     unsigned sig_size;
     ASSERT_TRUE (signature_manager.Sign(
@@ -206,19 +202,12 @@ class T_ObjectFetcher : public ::testing::Test {
                     hash.ToString().data()),
                     hash.GetHexSize(),
                   &sig, &sig_size));
-
-    *str += "--\n";
-    *str += hash.ToString() + "\n";
-    *str += std::string(reinterpret_cast<char*>(sig), sig_size);
+    *signature = std::string(reinterpret_cast<char*>(sig), sig_size);
   }
 
-  void SignStringRsa(std::string *str) {
-    shash::Any hash = h("0000000000000000000000000000000000000000");
-    shash::HashMem(
-      reinterpret_cast<const unsigned char *>(str->data()),
-      str->length(), &hash);
+  void SignRsa(const shash::Any  hash,
+               std::string      *signature) const {
     std::string hash_string = hash.ToString();
-
     FILE *f_rsa_pkey = fopen(master_key_path.c_str(), "r");
     ASSERT_NE (static_cast<FILE*>(NULL), f_rsa_pkey);
     RSA *rsa = PEM_read_RSAPrivateKey(f_rsa_pkey, NULL, NULL, NULL);
@@ -232,13 +221,30 @@ class T_ObjectFetcher : public ::testing::Test {
                             hash_string.data()),
                           sig, rsa, RSA_PKCS1_PADDING);
     ASSERT_NE (-1, res) << "RSA error code: " << ERR_get_error();
-
-    *str += "--\n";
-    *str += hash_string + "\n";
-    *str += std::string(reinterpret_cast<char*>(sig), res);
+    *signature = std::string(reinterpret_cast<char*>(sig), res);
 
     free(sig);
     RSA_free(rsa);
+  }
+
+  void SignString(std::string                  *str,
+                  signature::SignatureManager  &signature_manager,
+                  const bool                    rsa = false) const {
+    shash::Any hash = h("0000000000000000000000000000000000000000");
+    shash::HashMem(
+      reinterpret_cast<const unsigned char *>(str->data()),
+      str->length(), &hash);
+
+    std::string sig;
+    if (rsa) {
+      SignRsa(hash, &sig);
+    } else {
+      Sign(hash, signature_manager, &sig);
+    }
+
+    *str += "--\n";
+    *str += hash.ToString() + "\n";
+    *str += sig;
   }
 
   void WriteManifest() {
@@ -283,7 +289,7 @@ class T_ObjectFetcher : public ::testing::Test {
               << std::endl;
     std::string whitelist_string = whitelist.str();
 
-    SignStringRsa(&whitelist_string);
+    SignString(&whitelist_string, signature_manager, true);
     WriteFile(whitelist_path, whitelist_string);
 
     signature_manager.Fini();
