@@ -229,3 +229,32 @@ TEST_F(T_UniquePtr, AssignmentOperator) {
   EXPECT_EQ (1343, foo->GetIdentifier());
   EXPECT_EQ (1u, foo->local_method_calls);
 }
+
+
+TEST_F(T_UniquePtr, SelfAssignment) {
+  Foo *bare_foo = new Foo(12342);
+  UniquePtr<Foo> foo(bare_foo);
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  foo = bare_foo;
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  (foo = bare_foo) = bare_foo;
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  EXPECT_EQ (12342, foo->GetIdentifier());
+  EXPECT_EQ (1u, foo->local_method_calls);
+
+  bare_foo = NULL;
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  foo = bare_foo;
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_destructor_calls);
+}
