@@ -1,4 +1,5 @@
 2.1.20:
+  * CVMFS_PUBLIC_KEY takes precedence over CVMFS_KEYS_DIR (CVM-652)
   * Fix error reporting when creating alien cache (CVM-677)
   * Fix concurrent creation of cache sub directories (CVM-672)
   * Replace cvmfs-keys package by cvmfs-config-... packages (CVM-617)
