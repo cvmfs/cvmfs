@@ -38,40 +38,42 @@
 
 template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
+ protected:
+  typedef typename CatalogTraversalT::object_fetcher_t object_fetcher_t;
+
  public:
   struct Configuration {
     static const unsigned int kFullHistory;
     static const unsigned int kNoHistory;
     static const time_t       kNoTimestamp;
+    static const shash::Any   kLatestHistoryDatabase;
 
-    Configuration() : uploader(NULL), keep_history_depth(kFullHistory),
-                      keep_history_timestamp(kNoTimestamp), dry_run(false),
-                      verbose(false) {}
+    Configuration()
+      : uploader(NULL)
+      , object_fetcher(NULL)
+      , keep_history_depth(kFullHistory)
+      , keep_history_timestamp(kNoTimestamp)
+      , base_history_database(kLatestHistoryDatabase)
+      , dry_run(false)
+      , verbose(false) {}
 
     upload::AbstractUploader  *uploader;
+    object_fetcher_t          *object_fetcher;
     unsigned int               keep_history_depth;
     time_t                     keep_history_timestamp;
+    shash::Any                 base_history_database;
     bool                       dry_run;
     bool                       verbose;
-    std::string                repo_url;
-    std::string                repo_name;
-    std::string                repo_keys;
-    std::string                tmp_dir;
   };
 
  protected:
-  typedef typename CatalogTraversalT::Catalog          MyCatalog;
-  typedef typename CatalogTraversalT::CallbackData     MyCallbackData;
+  typedef typename CatalogTraversalT::catalog_t        catalog_t;
+  typedef typename CatalogTraversalT::callback_data_t  traversal_callback_data_t;
+  typedef typename CatalogTraversalT::Parameters       TraversalParameters;
   typedef std::vector<shash::Any>                      HashVector;
 
  public:
-  GarbageCollector(const Configuration &configuration) :
-    configuration_(configuration),
-    traversal_(
-      GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
-                                                                configuration)),
-    hash_filter_(),
-    preserved_catalogs_(0), condemned_catalogs_(0), condemned_objects_(0) {}
+  GarbageCollector(const Configuration &configuration);
 
   bool Collect();
 
@@ -80,21 +82,22 @@ class GarbageCollector {
   unsigned int condemned_objects_count() const { return condemned_objects_;  }
 
  protected:
-  static swissknife::CatalogTraversalParams GetTraversalParams(
+  static TraversalParameters GetTraversalParams(
                                             const Configuration &configuration);
 
-  void PreserveDataObjects(const MyCallbackData &data);
-  void SweepDataObjects   (const MyCallbackData &data);
+  void PreserveDataObjects(const traversal_callback_data_t &data);
+  void SweepDataObjects   (const traversal_callback_data_t &data);
 
-  bool VerifyConfiguration() const;
   bool AnalyzePreservedCatalogTree();
   bool SweepCondemnedCatalogTree();
+
+  bool GetHistoryRecycleBinContents(std::set<shash::Any> *result_set) const;
 
   void CheckAndSweep(const shash::Any &hash);
   void Sweep(const shash::Any &hash);
 
   void PrintCatalogTreeEntry(const unsigned int  tree_level,
-                             const MyCatalog    *catalog) const;
+                             const catalog_t    *catalog) const;
 
  private:
   const Configuration   configuration_;

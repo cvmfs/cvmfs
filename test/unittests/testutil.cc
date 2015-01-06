@@ -79,6 +79,10 @@ time_t t(const int day, const int month, const int year) {
   return mktime(&time_descriptor);
 }
 
+shash::Any h(const std::string &hash, const shash::Suffix suffix) {
+  return shash::Any(shash::kSha1, shash::HexPtr(hash), suffix);
+}
+
 namespace catalog {
 
 DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
@@ -117,43 +121,15 @@ DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
 //
 
 
-MockCatalog::AvailableCatalogs MockCatalog::available_catalogs;
-unsigned int                   MockCatalog::instances = 0;
+unsigned int MockCatalog::instances = 0;
 
 const std::string MockCatalog::rhs       = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
 const shash::Any  MockCatalog::root_hash = shash::Any(shash::kSha1,
                                                       shash::HexPtr(MockCatalog::rhs),
-                                                      'C');
+                                                      shash::kSuffixCatalog);
 
-
-void MockCatalog::Reset() {
+void MockCatalog::ResetGlobalState() {
   MockCatalog::instances = 0;
-  MockCatalog::UnregisterCatalogs();
-}
-
-void MockCatalog::RegisterCatalog(MockCatalog *catalog) {
-  ASSERT_EQ (MockCatalog::available_catalogs.end(),
-             MockCatalog::available_catalogs.find(catalog->hash()));
-  MockCatalog::available_catalogs[catalog->hash()] = catalog;
-}
-
-void MockCatalog::UnregisterCatalogs() {
-  MockCatalog::AvailableCatalogs::const_iterator i, iend;
-  for (i    = MockCatalog::available_catalogs.begin(),
-       iend = MockCatalog::available_catalogs.end();
-       i != iend; ++i)
-  {
-    delete i->second;
-  }
-  MockCatalog::available_catalogs.clear();
-}
-
-MockCatalog* MockCatalog::GetCatalog(const shash::Any &catalog_hash) {
-  AvailableCatalogs::const_iterator clg_itr =
-    MockCatalog::available_catalogs.find(catalog_hash);
-  return (MockCatalog::available_catalogs.end() != clg_itr)
-    ? clg_itr->second
-    : NULL;
 }
 
 MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
@@ -161,7 +137,8 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
                                        const shash::Any   &catalog_hash,
                                              MockCatalog  *parent,
                                        const bool          is_not_root) {
-  const MockCatalog *catalog = MockCatalog::GetCatalog(catalog_hash);
+  MockCatalog *catalog = MockCatalog::Get(catalog_hash);
+
   if (catalog == NULL) {
     return NULL;
   }
@@ -188,11 +165,6 @@ void MockCatalog::AddFile(const shash::Any   &content_hash,
   f.size = file_size;
   files_.push_back(f);
 }
-
-
-MockHistory* MockObjectFetcher::s_history                   = NULL;
-std::set<shash::Any>* MockObjectFetcher::s_deleted_catalogs = NULL;
-bool MockObjectFetcher::history_available                   = true;
 
 void MockCatalog::AddChunk(const shash::Any  &chunk_content_hash,
                            const size_t       chunk_size) {
@@ -224,8 +196,28 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
   return referenced_objects_;
 }
 
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
-  return new manifest::Manifest(MockCatalog::root_hash, 0, "");
+  const uint64_t    catalog_size = 0;
+  const std::string root_path    = "";
+  manifest::Manifest* manifest = new manifest::Manifest(MockCatalog::root_hash,
+                                                        catalog_size,
+                                                        root_path);
+  manifest->set_history(MockHistory::root_hash);
+  return manifest;
+}
+
+bool MockObjectFetcher::Fetch(const shash::Any    &object_hash,
+                              const shash::Suffix  hash_suffix,
+                              std::string         *file_path) {
+  assert (file_path != NULL);
+  *file_path = object_hash.ToString();
+  return true;
 }
 
 
@@ -234,22 +226,49 @@ manifest::Manifest* MockObjectFetcher::FetchManifest() {
 //
 
 
+unsigned int      MockHistory::instances = 0;
+const std::string MockHistory::rhs       = "b46091c745a1ffef707dd7eabec852fb8679cf28";
+const shash::Any  MockHistory::root_hash = shash::Any(shash::kSha1,
+                                                      shash::HexPtr(MockHistory::rhs),
+                                                      shash::kSuffixHistory);
+
+void MockHistory::ResetGlobalState() {
+  MockHistory::instances = 0;
+}
+
+
+MockHistory* MockHistory::Open(const std::string &path) {
+  const shash::Any history_hash(shash::MkFromHexPtr(shash::HexPtr(path),
+                                                    shash::kSuffixHistory));
+  MockHistory *history = MockHistory::Get(history_hash);
+  return (history != NULL) ? history->Clone() : NULL;
+}
+
+
 MockHistory::MockHistory(const bool          writable,
                          const std::string  &fqrn) : writable_(writable) {
   set_fqrn(fqrn);
+  ++MockHistory::instances;
 }
 
 
-MockHistory::MockHistory(const MockHistory &other) :
-  tags_(other.tags_),
-  recycle_bin_(other.recycle_bin_),
-  writable_(other.writable_)
+MockHistory::MockHistory(const MockHistory &other)
+  : tags_(other.tags_)
+  , recycle_bin_(other.recycle_bin_)
+  , writable_(other.writable_)
+  , previous_revision_(other.previous_revision_)
 {
   set_fqrn(other.fqrn());
+  ++MockHistory::instances;
 }
 
 
-history::History* MockHistory::Clone(const bool writable) const {
+MockHistory::~MockHistory() {
+  --MockHistory::instances;
+}
+
+
+MockHistory* MockHistory::Clone(const bool writable) const {
   MockHistory *new_copy = new MockHistory(*this);
   new_copy->set_writable(writable);
   return new_copy;

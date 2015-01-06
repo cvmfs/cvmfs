@@ -19,11 +19,6 @@ class CommandGc : public Command {
   };
   ParameterList GetParams();
   int Main(const ArgumentList &args);
-
- protected:
-  bool CheckGarbageCollectability(const std::string &repository_url,
-                                  const std::string &repository_name,
-                                  const std::string &pubkey_path) const;
 };
 
 }

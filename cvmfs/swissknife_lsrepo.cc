@@ -18,6 +18,7 @@ ParameterList CommandListCatalogs::GetParams() {
   r.push_back(Parameter::Mandatory('r', "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Optional ('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional ('k', "repository master key(s)"));
+  r.push_back(Parameter::Optional ('l', "temporary directory"));
   r.push_back(Parameter::Switch   ('t', "print tree structure of catalogs"));
   r.push_back(Parameter::Switch   ('d', "print digest for each catalog"));
   r.push_back(Parameter::Switch   ('s', "print catalog file sizes"));
@@ -32,23 +33,43 @@ int CommandListCatalogs::Main(const ArgumentList &args) {
   print_size_    = (args.count('s') > 0);
   print_entries_ = (args.count('e') > 0);
 
-  const std::string &repo_url = *args.find('r')->second;
+  const std::string &repo_url  = *args.find('r')->second;
   const std::string &repo_name = (args.count('n') > 0) ? *args.find('n')->second : "";
   const std::string &repo_keys = (args.count('k') > 0) ? *args.find('k')->second : "";
+  const std::string &tmp_dir   = (args.count('l') > 0) ? *args.find('l')->second : "/tmp";
 
-  CatalogTraversalParams params;
-  params.repo_url  = repo_url;
-  params.repo_name = repo_name;
-  params.repo_keys = repo_keys;
-  ReadonlyCatalogTraversal traversal(params);
-  traversal.RegisterListener(&CommandListCatalogs::CatalogCallback, this);
+  bool success = false;
+  if (IsHttpUrl(repo_url)) {
+    download::DownloadManager   download_manager;
+    signature::SignatureManager signature_manager;
+    download_manager.Init(1, true);
+    signature_manager.Init();
+    if (! signature_manager.LoadPublicRsaKeys(repo_keys)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
+      return 1;
+    }
 
-  return traversal.Traverse() ? 0 : 1;
+    HttpObjectFetcher<catalog::Catalog,
+                      history::SqliteHistory> fetcher(repo_name,
+                                                      repo_url,
+                                                      tmp_dir,
+                                                      &download_manager,
+                                                      &signature_manager);
+    success = Run(&fetcher);
+
+    download_manager.Fini();
+    signature_manager.Fini();
+  } else {
+    LocalObjectFetcher<> fetcher(repo_url, tmp_dir);
+    success = Run(&fetcher);
+  }
+
+  return (success) ? 0 : 1;
 }
 
 
 void CommandListCatalogs::CatalogCallback(
-                           const ReadonlyCatalogTraversal::CallbackData &data) {
+                           const CatalogTraversalData<catalog::Catalog> &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string clg_size;

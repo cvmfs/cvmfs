@@ -18,56 +18,15 @@
 using namespace swissknife;  // NOLINT
 using namespace upload;      // NOLINT
 
-
+typedef HttpObjectFetcher<>                                          ObjectFetcher;
+typedef CatalogTraversal<ObjectFetcher>                              ReadonlyCatalogTraversal;
 typedef GarbageCollector<ReadonlyCatalogTraversal, SimpleHashFilter> GC;
 typedef GC::Configuration                                            GcConfig;
 
 
-
-bool CommandGc::CheckGarbageCollectability(
-                                         const std::string &repository_url,
-                                         const std::string &repository_name,
-                                         const std::string &pubkey_path) const {
-  UniquePtr<manifest::ManifestEnsemble> ensemble(new manifest::ManifestEnsemble);
-
-  // initialize the (global) download manager
-  g_download_manager->Init(1, true);
-
-  // initialize the (global) signature manager
-  g_signature_manager->Init();
-  if (! g_signature_manager->LoadPublicRsaKeys(pubkey_path)) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load public repository key '%s'",
-             pubkey_path.c_str());
-    return false;
-  }
-
-  // fetch (and verify) the manifest
-  manifest::Failures retval;
-  retval = manifest::Fetch(repository_url, repository_name, 0, NULL,
-                           g_signature_manager, g_download_manager,
-                           ensemble.weak_ref());
-
-  if (retval != manifest::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch repository manifest "
-                                    "(%d - %s)",
-             retval, manifest::Code2Ascii(retval));
-    return false;
-  }
-
-  // check if manifest fetching was successful
-  if (! ensemble->manifest) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
-    return NULL;
-  }
-
-  // check if the manifest allows garbage collection
-  return ensemble->manifest->garbage_collectable();
-}
-
-
 ParameterList CommandGc::GetParams() {
   ParameterList r;
-  r.push_back(Parameter::Mandatory('r', "repository directory / url"));
+  r.push_back(Parameter::Mandatory('r', "repository url"));
   r.push_back(Parameter::Mandatory('u', "spooler definition string"));
   r.push_back(Parameter::Mandatory('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional ('h', "conserve <h> revisions"));
@@ -103,7 +62,23 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
-  if (! CheckGarbageCollectability(repo_url, repo_name, repo_keys)) {
+  download::DownloadManager   download_manager;
+  signature::SignatureManager signature_manager;
+  download_manager.Init(1, true);
+  signature_manager.Init();
+  if (! signature_manager.LoadPublicRsaKeys(repo_keys)) {
+    LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
+    return 1;
+  }
+
+  ObjectFetcher object_fetcher(repo_name,
+                               repo_url,
+                               temp_directory,
+                               &download_manager,
+                               &signature_manager);
+
+  UniquePtr<manifest::Manifest> manifest(object_fetcher.FetchManifest());
+  if (! manifest || ! manifest->garbage_collectable()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "repository does not allow garbage collection");
     return 1;
   }
@@ -115,10 +90,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.keep_history_timestamp = timestamp;
   config.dry_run                = dry_run;
   config.verbose                = list_condemned_objects;
-  config.repo_url               = repo_url;
-  config.repo_name              = repo_name;
-  config.repo_keys              = repo_keys;
-  config.tmp_dir                = temp_directory;
+  config.object_fetcher         = &object_fetcher;
 
   if (config.uploader == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
@@ -127,5 +99,10 @@ int CommandGc::Main(const ArgumentList &args) {
   }
 
   GC collector(config);
-  return collector.Collect() ? 0 : 1;
+  const bool success = collector.Collect();
+
+  download_manager.Fini();
+  signature_manager.Fini();
+
+  return success ? 0 : 1;
 }

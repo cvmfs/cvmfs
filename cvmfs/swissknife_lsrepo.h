@@ -8,6 +8,7 @@
 #include "swissknife.h"
 
 #include "hash.h"
+#include "object_fetcher.h"
 #include "catalog_traversal.h"
 
 namespace catalog {
@@ -30,7 +31,17 @@ class CommandListCatalogs : public Command {
 
   int Main(const ArgumentList &args);
 
-  void CatalogCallback(const ReadonlyCatalogTraversal::CallbackData &data);
+ protected:
+  template <class ObjectFetcherT>
+  bool Run(ObjectFetcherT *object_fetcher) {
+    typename CatalogTraversal<ObjectFetcherT>::Parameters params;
+    params.object_fetcher = object_fetcher;
+    CatalogTraversal<ObjectFetcherT> traversal(params);
+    traversal.RegisterListener(&CommandListCatalogs::CatalogCallback, this);
+    return traversal.Traverse();
+  }
+
+  void CatalogCallback(const CatalogTraversalData<catalog::Catalog> &data);
 
  private:
   bool print_tree_;

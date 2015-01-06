@@ -37,7 +37,7 @@ class Foo {
 
 unsigned int Foo::global_constructor_calls = 0;
 unsigned int Foo::global_destructor_calls  = 0;
-unsigned int Foo::global_method_calls         = 0;
+unsigned int Foo::global_method_calls      = 0;
 
 
 class T_UniquePtr : public ::testing::Test {
@@ -192,6 +192,69 @@ TEST_F(T_UniquePtr, ReleaseOwnership) {
   EXPECT_EQ (837456, weak_foo->GetIdentifier());
 
   delete weak_foo;
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_destructor_calls);
+}
+
+
+TEST_F(T_UniquePtr, AssignmentOperator) {
+  UniquePtr<Foo> foo(new Foo(12342));
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+
+  EXPECT_EQ (0u, foo->local_destructor_calls);
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  foo = NULL;
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_destructor_calls);
+
+  foo = new Foo(871256);
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (2u, Foo::global_constructor_calls);
+
+  EXPECT_EQ (0u, foo->local_destructor_calls);
+  EXPECT_EQ (1u, Foo::global_destructor_calls);
+
+  EXPECT_EQ (871256, foo->GetIdentifier());
+  EXPECT_EQ (1u, foo->local_method_calls);
+
+  foo = new Foo(1343);
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (3u, Foo::global_constructor_calls);
+
+  EXPECT_EQ (0u, foo->local_destructor_calls);
+  EXPECT_EQ (2u, Foo::global_destructor_calls);
+
+  EXPECT_EQ (1343, foo->GetIdentifier());
+  EXPECT_EQ (1u, foo->local_method_calls);
+}
+
+
+TEST_F(T_UniquePtr, SelfAssignment) {
+  Foo *bare_foo = new Foo(12342);
+  UniquePtr<Foo> foo(bare_foo);
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  foo = bare_foo;
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  (foo = bare_foo) = bare_foo;
+  EXPECT_EQ (1u, foo->local_constructor_calls);
+  EXPECT_EQ (1u, Foo::global_constructor_calls);
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  EXPECT_EQ (12342, foo->GetIdentifier());
+  EXPECT_EQ (1u, foo->local_method_calls);
+
+  bare_foo = NULL;
+  EXPECT_EQ (0u, Foo::global_destructor_calls);
+
+  foo = bare_foo;
   EXPECT_EQ (1u, Foo::global_constructor_calls);
   EXPECT_EQ (1u, Foo::global_destructor_calls);
 }

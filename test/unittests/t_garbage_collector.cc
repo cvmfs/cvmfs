@@ -16,7 +16,8 @@
 using namespace swissknife;
 using namespace upload;
 
-typedef CatalogTraversal<MockCatalog, MockObjectFetcher> MockedCatalogTraversal;
+typedef CatalogTraversal<MockObjectFetcher>          MockedCatalogTraversal;
+typedef typename MockedCatalogTraversal::Parameters  TraversalParams;
 
 class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
  public:
@@ -67,30 +68,22 @@ class T_GarbageCollector : public ::testing::Test {
 
  protected:
   void SetUp() {
-    const bool writable_history = false; // MockHistory doesn't care!
-    MockObjectFetcher::s_history = new MockHistory(writable_history,
-                                                   T_GarbageCollector::fqrn);
-
     dice_.InitLocaltime();
-    MockCatalog::Reset();
     SetupDummyCatalogs();
   }
 
   void TearDown() {
-    MockCatalog::UnregisterCatalogs();
+    MockCatalog::Reset();
+    MockHistory::Reset();
     EXPECT_EQ (0u, MockCatalog::instances);
-    MockObjectFetcher::Reset();
   }
 
-  GcConfiguration GetStandardGarbageCollectorConfiguration() const {
+  GcConfiguration GetStandardGarbageCollectorConfiguration() {
     MyGarbageCollector::Configuration config;
     config.keep_history_depth = 1;
     config.dry_run            = false;
-    config.repo_url           = "http://localhost/cvmfs/dummy.local";
-    config.repo_name          = T_GarbageCollector::fqrn;
-    config.repo_keys          = "";
-    config.tmp_dir            = "/tmp";
     config.uploader           = GC_MockUploader::MockConstruct();
+    config.object_fetcher     = &object_fetcher_;
     return config;
   }
 
@@ -279,7 +272,11 @@ class T_GarbageCollector : public ::testing::Test {
     // #
     //
 
-    history::History *history = MockObjectFetcher::s_history;
+    const bool writable_history = false; // MockHistory doesn't care!
+    MockHistory *history = new MockHistory(writable_history,
+                                           T_GarbageCollector::fqrn);
+    MockHistory::RegisterObject(MockHistory::root_hash, history);
+
     history->BeginTransaction();
     ASSERT_TRUE (history->Insert(history::History::Tag(
                                      "Revision2", c[mp(2,"00")]->hash(),
@@ -325,7 +322,7 @@ class T_GarbageCollector : public ::testing::Test {
                                            previous);
 
     // register the new catalog in the data structures
-    MockCatalog::RegisterCatalog(catalog);
+    MockCatalog::RegisterObject(catalog->hash(), catalog);
     return catalog;
   }
 
@@ -342,10 +339,6 @@ class T_GarbageCollector : public ::testing::Test {
     return i->second;
   }
 
-  shash::Any h(const std::string &hash, const char suffix = 0) {
-    return shash::Any(shash::kSha1, shash::HexPtr(hash), suffix);
-  }
-
   std::pair<unsigned int, std::string> mp(const unsigned int   revision,
                                           const std::string   &clg_index) {
     return std::make_pair(revision, clg_index);
@@ -360,7 +353,8 @@ class T_GarbageCollector : public ::testing::Test {
   RevisionMap                  catalogs_;
 
  private:
-  Prng  dice_;
+  Prng               dice_;
+  MockObjectFetcher  object_fetcher_;
 };
 
 const std::string T_GarbageCollector::fqrn = "test.cern.ch";
@@ -376,7 +370,7 @@ TEST_F(T_GarbageCollector, InitializeGarbageCollector) {
 
 TEST_F(T_GarbageCollector, KeepEverything) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth   = CatalogTraversalParams::kFullHistory;
+  config.keep_history_depth   = TraversalParams::kFullHistory;
 
   MyGarbageCollector gc(config);
   const bool gc1 = gc.Collect();
@@ -579,7 +573,7 @@ TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
 
 TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth = CatalogTraversalParams::kFullHistory;
+  config.keep_history_depth = TraversalParams::kFullHistory;
   MyGarbageCollector gc(config);
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
@@ -591,7 +585,7 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   deleted_catalogs.insert(c[mp(3,"00")]->hash());
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
   deleted_catalogs.insert(c[mp(3,"11")]->hash());
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
   EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
@@ -614,14 +608,14 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
 
 TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth   = CatalogTraversalParams::kFullHistory;
+  config.keep_history_depth   = TraversalParams::kFullHistory;
   MyGarbageCollector gc(config);
 
   RevisionMap &c   = catalogs_;
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(c[mp(3,"10")]->hash());
-  MockObjectFetcher::s_deleted_catalogs = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   const bool gc1 = gc.Collect();
   EXPECT_FALSE (gc1);
@@ -637,7 +631,7 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
   // to simulate the actual deletion of objects
   RevisionMap     &c   = catalogs_;
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
-  MockObjectFetcher::s_deleted_catalogs = &upl->deleted_hashes;
+  MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
   const bool gc1 = gc.Collect();
   EXPECT_TRUE (gc1);
@@ -830,7 +824,8 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  history::History *history = MockObjectFetcher::s_history;
+  history::History *history = MockHistory::Get(MockHistory::root_hash);;
+  ASSERT_NE   (static_cast<history::History*>(NULL), history);
   ASSERT_TRUE (history->Remove("Revision4")); // make Revision4 deletable
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -886,7 +881,8 @@ TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
   config.keep_history_depth     = GcConfiguration::kFullHistory;
 
   // remove all named snapshots (GC can potentially delete everything)
-  history::History *history = MockObjectFetcher::s_history;
+  history::History *history = MockHistory::Get(MockHistory::root_hash);;
+  ASSERT_NE   (static_cast<history::History*>(NULL), history);
   ASSERT_TRUE (history->Remove("Revision2"));
   ASSERT_TRUE (history->Remove("Revision4"));
   ASSERT_TRUE (history->Remove("Revision5"));
@@ -925,7 +921,7 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
   // to simulate the actual deletion of objects
   RevisionMap     &c   = catalogs_;
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
-  MockObjectFetcher::s_deleted_catalogs = &upl->deleted_hashes;
+  MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
   // run a first garbage collection (leaving only named snapshots)
   MyGarbageCollector gc1(config);
@@ -967,7 +963,8 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 
   // delete named tag to produce a catalog revision that is not referenced by
   // standard CVMFS data structures
-  history::History *history = MockObjectFetcher::s_history;
+  history::History *history = MockHistory::Get(MockHistory::root_hash);
+  ASSERT_NE   (static_cast<history::History*>(NULL), history);
   ASSERT_TRUE (history->Remove("Revision2"));
   EXPECT_EQ (2u, history->GetNumberOfTags());
 
@@ -991,4 +988,90 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 
   EXPECT_TRUE (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
   EXPECT_TRUE (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+}
+
+
+TEST_F(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
+  GcConfiguration config = GetStandardGarbageCollectorConfiguration();
+  MyGarbageCollector gc(config);
+
+  GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
+  RevisionMap     &c   = catalogs_;
+
+  // wire up std::set<> deleted_hashes in uploader with the MockObjectFetcher
+  // to simulate the actual deletion of objects
+  MockCatalog::s_deleted_objects = &upl->deleted_hashes;
+
+  const bool gc1 = gc.Collect();
+  EXPECT_TRUE (gc1);
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "11")]->hash()));
+
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "10")]->hash()));
+
+  EXPECT_EQ (11u, gc.preserved_catalog_count());
+
+  // + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + -
+
+  // mock a history database chain that contains the information of the deleted
+  // snapshot "Revision2" in its recycle bin and remove it entirely from the
+  // latest history database
+  MockHistory *history         = MockHistory::Get(MockHistory::root_hash);
+  MockHistory *old_history     = static_cast<MockHistory*>(history->Clone());
+  MockHistory *initial_history = static_cast<MockHistory*>(history->Clone());
+
+  old_history->Remove("Revision2");
+  history->Remove("Revision2");
+  history->EmptyRecycleBin();
+
+  shash::Any old_history_hash     = h("cb431d5bd49df9ba5f1be54642bb8790477ee7f7",
+                                      shash::kSuffixHistory);
+  shash::Any initial_history_hash = h("963f943b84c478731329709ff90d64978f7feeb4",
+                                      shash::kSuffixHistory);
+
+  history->SetPreviousRevision(old_history_hash);
+  old_history->SetPreviousRevision(initial_history_hash);
+  MockHistory::RegisterObject(old_history_hash, old_history);
+  MockHistory::RegisterObject(initial_history_hash, initial_history);
+
+  // + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + -
+
+  config.base_history_database = initial_history_hash;
+  MyGarbageCollector new_gc(config);
+  const bool gc2 = new_gc.Collect();
+  EXPECT_TRUE (gc2);
+
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "20")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "00")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "10")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "11")]->hash()));
+  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "20")]->hash()));
+
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "10")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "11")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "00")]->hash()));
+  EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "10")]->hash()));
+
+  EXPECT_EQ (8u, new_gc.preserved_catalog_count());
 }

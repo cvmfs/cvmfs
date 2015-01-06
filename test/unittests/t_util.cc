@@ -134,3 +134,17 @@ TEST(T_Util, String2Uint64) {
   EXPECT_EQ(String2Uint64("18446744073709551615000"), 18446744073709551615LLU);
   EXPECT_EQ(String2Uint64("1a"), 1U);
 }
+
+
+TEST(T_Util, IsHttpUrl) {
+  EXPECT_TRUE  (IsHttpUrl("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
+  EXPECT_TRUE  (IsHttpUrl("http://"));
+  EXPECT_TRUE  (IsHttpUrl("http://foobar"));
+  EXPECT_TRUE  (IsHttpUrl("HTTP://www.google.com"));
+  EXPECT_TRUE  (IsHttpUrl("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
+  EXPECT_FALSE (IsHttpUrl("http:/foobar"));
+  EXPECT_FALSE (IsHttpUrl("http"));
+  EXPECT_FALSE (IsHttpUrl("/srv/cvmfs/cms.cern.ch"));
+  EXPECT_FALSE (IsHttpUrl("srv/cvmfs/cms.cern.ch"));
+  EXPECT_FALSE (IsHttpUrl("http//foobar"));
+}

@@ -11,20 +11,20 @@ namespace history {
 const std::string SqliteHistory::kPreviousRevisionKey = "previous_revision";
 
 
-History* SqliteHistory::Open(const std::string &file_name) {
+SqliteHistory* SqliteHistory::Open(const std::string &file_name) {
   const bool read_write = false;
   return Open(file_name, read_write);
 }
 
 
-History* SqliteHistory::OpenWritable(const std::string &file_name) {
+SqliteHistory* SqliteHistory::OpenWritable(const std::string &file_name) {
   const bool read_write = true;
   return Open(file_name, read_write);
 }
 
 
-History* SqliteHistory::Open(const std::string &file_name,
-                             const bool read_write) {
+SqliteHistory* SqliteHistory::Open(const std::string &file_name,
+                                   const bool read_write) {
   SqliteHistory *history = new SqliteHistory();
   if (NULL == history || ! history->OpenDatabase(file_name, read_write)) {
     delete history;
@@ -40,8 +40,8 @@ History* SqliteHistory::Open(const std::string &file_name,
 }
 
 
-History* SqliteHistory::Create(const std::string &file_name,
-                               const std::string &fqrn) {
+SqliteHistory* SqliteHistory::Create(const std::string &file_name,
+                                     const std::string &fqrn) {
   SqliteHistory *history = new SqliteHistory();
   if (NULL == history || ! history->CreateDatabase(file_name, fqrn)) {
     delete history;
@@ -131,6 +131,14 @@ bool SqliteHistory::SetPreviousRevision(const shash::Any &history_hash) {
   assert (database_);
   assert (IsWritable());
   return database_->SetProperty(kPreviousRevisionKey, history_hash.ToString());
+}
+
+
+shash::Any SqliteHistory::previous_revision() const {
+  assert (database_);
+  const std::string hash_str =
+                      database_->GetProperty<std::string>(kPreviousRevisionKey);
+  return shash::MkFromHexPtr(shash::HexPtr(hash_str), shash::kSuffixHistory);
 }
 
 

@@ -53,6 +53,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_hash_filters.cc
   t_download.cc
   t_uuid.cc
+  t_object_fetcher.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -89,7 +90,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/options.h
   ${CVMFS_SOURCE_DIR}/options.cc
 
-  ${CVMFS_SOURCE_DIR}/catalog_counters.h
+  ${CVMFS_SOURCE_DIR}/globals.cc
+
+  ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
 
   ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
@@ -117,8 +121,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/dirtab.h
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/signature.cc
+  ${CVMFS_SOURCE_DIR}/whitelist.cc
 
-  ${CVMFS_SOURCE_DIR}/catalog_traversal.cc
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
   ${CVMFS_SOURCE_DIR}/sql.cc

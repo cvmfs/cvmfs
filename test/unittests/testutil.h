@@ -9,10 +9,13 @@
 #include "../../cvmfs/directory_entry.h"
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/history.h"
+#include "../../cvmfs/object_fetcher.h"
 
 pid_t GetParentPid(const pid_t pid);
 
 time_t t(const int day, const int month, const int year);
+shash::Any h(const std::string &hash,
+             const shash::Suffix suffix = shash::kSuffixNone);
 
 namespace catalog {
 
@@ -177,6 +180,68 @@ const std::string AbstractMockUploader<DerivedT>::sandbox_tmp_dir = g_sandbox_tm
 //
 
 
+template <class ObjectT>
+class MockObjectStorage {
+ private:
+  typedef std::map<shash::Any, ObjectT*> AvailableObjects;
+  static AvailableObjects available_objects;
+
+ public:
+  static std::set<shash::Any> *s_deleted_objects;
+
+ public:
+  static void Reset() {
+    MockObjectStorage::UnregisterObjects();
+    s_deleted_objects = NULL;
+    ObjectT::ResetGlobalState();
+  }
+
+  static void RegisterObject(const shash::Any &hash, ObjectT *object) {
+    ASSERT_FALSE (Exists(hash)) << "exists already: " << hash.ToString();
+    MockObjectStorage::available_objects[hash] = object;
+  }
+
+  static void UnregisterObjects() {
+    typename MockObjectStorage<ObjectT>::AvailableObjects::const_iterator i, iend;
+    for (i    = MockObjectStorage<ObjectT>::available_objects.begin(),
+         iend = MockObjectStorage<ObjectT>::available_objects.end();
+         i != iend; ++i)
+    {
+      delete i->second;
+    }
+    MockObjectStorage<ObjectT>::available_objects.clear();
+  }
+
+  static ObjectT* Get(const shash::Any &hash) {
+    return (Exists(hash) && ! IsDeleted(hash))
+      ? available_objects[hash]
+      : NULL;
+  }
+
+ protected:
+  static bool IsDeleted(const shash::Any &hash) {
+    return s_deleted_objects != NULL &&
+           s_deleted_objects->find(hash) != s_deleted_objects->end();
+  }
+
+  static bool Exists(const shash::Any &hash) {
+    return available_objects.find(hash) != available_objects.end();
+  }
+};
+
+template <class ObjectT>
+typename MockObjectStorage<ObjectT>::AvailableObjects
+  MockObjectStorage<ObjectT>::available_objects;
+
+template <class ObjectT>
+std::set<shash::Any>* MockObjectStorage<ObjectT>::s_deleted_objects;
+
+
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+//
+
+
 namespace manifest {
   class Manifest;
 }
@@ -189,19 +254,11 @@ namespace swissknife {
 /**
  * This is a minimal mock of a Catalog class.
  */
-class MockCatalog {
+class MockCatalog : public MockObjectStorage<MockCatalog> {
  public:
-  typedef std::map<shash::Any, MockCatalog*> AvailableCatalogs;
-  static AvailableCatalogs available_catalogs;
-  static unsigned int      instances;
-
   static const std::string rhs;
   static const shash::Any  root_hash;
-
-  static void Reset();
-  static void RegisterCatalog(MockCatalog *catalog);
-  static void UnregisterCatalogs();
-  static MockCatalog* GetCatalog(const shash::Any &catalog_hash);
+  static unsigned int      instances;
 
  public:
   struct NestedCatalog {
@@ -227,6 +284,8 @@ class MockCatalog {
   typedef std::vector<shash::Any> HashVector;
 
  public:
+  static void ResetGlobalState();
+
   MockCatalog(const std::string &root_path,
               const shash::Any  &catalog_hash,
               const uint64_t     catalog_size,
@@ -285,14 +344,16 @@ class MockCatalog {
   }
 
  public:
-  const PathString   path()         const { return PathString(root_path_);  }
-  const std::string& root_path()    const { return root_path_;              }
-  const shash::Any&  hash()         const { return catalog_hash_;           }
-  uint64_t           catalog_size() const { return catalog_size_;           }
-  unsigned int       revision()     const { return revision_;               }
+  const PathString   path()          const { return PathString(root_path_);  }
+  const std::string& root_path()     const { return root_path_;              }
+  const shash::Any&  hash()          const { return catalog_hash_;           }
+  uint64_t           catalog_size()  const { return catalog_size_;           }
+  unsigned int       revision()      const { return revision_;               }
 
-  MockCatalog*       parent()       const { return parent_;                 }
-  MockCatalog*       previous()     const { return previous_;               }
+  MockCatalog*       parent()        const { return parent_;                 }
+  MockCatalog*       previous()      const { return previous_;               }
+
+  std::string        database_path() const { return ""; }
 
   void set_parent(MockCatalog *parent) { parent_ = parent; }
 
@@ -329,31 +390,43 @@ class MockCatalog {
 //
 
 
-class MockHistory : public history::History {
+class MockHistory : public history::History,
+                    public MockObjectStorage<MockHistory> {
  public:
   typedef std::map<std::string, history::History::Tag> TagMap;
   typedef std::set<shash::Any>                         HashSet;
 
+  static const std::string rhs;
+  static const shash::Any  root_hash;
+  static unsigned int      instances;
+
  public:
-  // TODO: count number of instances
+  static void ResetGlobalState();
+
+  static MockHistory* Open(const std::string &path);
   MockHistory(const bool          writable,
               const std::string  &fqrn);
   MockHistory(const MockHistory &other);
-  ~MockHistory() {}
+  ~MockHistory();
 
  protected:
   // silence coverity
   MockHistory& operator= (const MockHistory &other);
 
  public:
-  history::History* Clone(const bool writable = false) const;
+  MockHistory* Open() const;
+  MockHistory* Clone(const bool writable = false) const;
 
   bool IsWritable()          const { return writable_;    }
   unsigned GetNumberOfTags() const { return tags_.size(); }
   bool BeginTransaction()    const { return true;         }
   bool CommitTransaction()   const { return true;         }
 
-  bool SetPreviousRevision(const shash::Any &history_hash) { return true; }
+  bool SetPreviousRevision(const shash::Any &history_hash) {
+    previous_revision_ = history_hash;
+    return true;
+  }
+  shash::Any previous_revision() const { return previous_revision_; }
 
   bool Insert(const Tag &tag);
   bool Remove(const std::string &name);
@@ -435,9 +508,10 @@ class MockHistory : public history::History {
   };
 
  private:
-  TagMap  tags_;
-  HashSet recycle_bin_;
-  bool    writable_;
+  TagMap      tags_;
+  HashSet     recycle_bin_;
+  bool        writable_;
+  shash::Any  previous_revision_;
 };
 
 
@@ -446,42 +520,25 @@ class MockHistory : public history::History {
 //
 
 
+class MockObjectFetcher;
+
+template <>
+struct object_fetcher_traits<MockObjectFetcher> {
+  typedef MockCatalog catalog_t;
+  typedef MockHistory history_t;
+};
+
 /**
  * This is a mock of an ObjectFetcher that does essentially nothing.
  */
-class MockObjectFetcher {
- public:
-  static MockHistory          *s_history;
-  static std::set<shash::Any> *s_deleted_catalogs;
-  static bool                  history_available;
-
-  static void Reset() {
-    if (MockObjectFetcher::s_history != NULL) {
-      delete MockObjectFetcher::s_history;
-      MockObjectFetcher::s_history = NULL;
-    }
-    MockObjectFetcher::s_deleted_catalogs = NULL;
-    MockObjectFetcher::history_available = true;
-  }
-
- public:
-  MockObjectFetcher(const swissknife::CatalogTraversalParams &params) {}
+class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
  public:
   manifest::Manifest* FetchManifest();
-  history::History* FetchHistory() {
-    return (MockObjectFetcher::history_available)
-              ? MockObjectFetcher::s_history->Clone()
-              : NULL;
-  }
-  inline bool Fetch(const shash::Any  &catalog_hash,
-                    std::string       *catalog_file) {
-    catalog_file->clear();
-    return (s_deleted_catalogs == NULL ||
-            s_deleted_catalogs->find(catalog_hash) == s_deleted_catalogs->end());
-  }
-  inline bool Exists(const std::string &file) {
-    return false;
-  }
+
+  bool Fetch(const shash::Any    &object_hash,
+             const shash::Suffix  hash_suffix,
+             std::string         *file_path);
 };
+
 
 #endif /* CVMFS_UNITTEST_TESTUTIL */

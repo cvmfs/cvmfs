@@ -162,6 +162,18 @@ bool IsAbsolutePath(const std::string &path) {
 }
 
 
+bool IsHttpUrl(const std::string &path) {
+  if (path.length() < 7) {
+    return false;
+  }
+
+  std::string prefix = path.substr(0, 7);
+  std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+
+  return prefix == "http://";
+}
+
+
 /**
  * Abort() on failure
  */

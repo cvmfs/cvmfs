@@ -118,18 +118,36 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   // Load the full catalog hierarchy
   LogCvmfs(kLogCatalog, kLogStdout, "Loading current catalog tree...");
-  const bool generate_full_catalog_tree = true;
-  CatalogTraversalParams params;
-  params.repo_url  = repo_url;
-  params.repo_name = repo_name;
-  params.repo_keys = repo_keys;
-  params.no_close  = generate_full_catalog_tree;
-  params.tmp_dir   = tmp_dir;
-  WritableCatalogTraversal traversal(params);
-  traversal.RegisterListener(&CommandMigrate::CatalogCallback, this);
 
   catalog_loading_stopwatch_.Start();
-  const bool loading_successful = traversal.Traverse();
+  bool loading_successful = false;
+  if (IsHttpUrl(repo_url)) {
+    typedef HttpObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
+
+    download::DownloadManager   download_manager;
+    signature::SignatureManager signature_manager;
+    download_manager.Init(1, true);
+    signature_manager.Init();
+    if (! signature_manager.LoadPublicRsaKeys(repo_keys)) {
+      LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
+      return 1;
+    }
+
+    ObjectFetcher fetcher(repo_name,
+                          repo_url,
+                          tmp_dir,
+                          &download_manager,
+                          &signature_manager);
+
+    loading_successful = LoadCatalogs(&fetcher);
+
+    download_manager.Fini();
+    signature_manager.Fini();
+  } else {
+    typedef LocalObjectFetcher<catalog::WritableCatalog> ObjectFetcher;
+    ObjectFetcher fetcher(repo_url, tmp_dir);
+    loading_successful = LoadCatalogs(&fetcher);
+  }
   catalog_loading_stopwatch_.Stop();
 
   if (!loading_successful) {
@@ -260,7 +278,7 @@ bool CommandMigrate::DoMigrationAndCommit(
 
 
 void CommandMigrate::CatalogCallback(
-                           const WritableCatalogTraversal::CallbackData &data) {
+                   const CatalogTraversalData<catalog::WritableCatalog> &data) {
   std::string tree_indent;
   std::string hash_string;
   std::string path;

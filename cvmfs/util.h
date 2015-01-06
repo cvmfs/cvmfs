@@ -68,6 +68,7 @@ PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 NameString GetFileName(const PathString &path);
 bool IsAbsolutePath(const std::string &path);
+bool IsHttpUrl(const std::string &path);
 
 void CreateFile(const std::string &path, const int mode);
 int MakeSocket(const std::string &path, const int mode);
@@ -274,8 +275,14 @@ class UniquePtr : SingleCopy {
 
   inline operator bool() const        { return IsValid(); }
   inline T& operator*() const         { return *ref_; }
-  inline UniquePtr& operator=(T* ref) { ref_ = ref; return *this; }
   inline T* operator->() const        { return ref_; }
+  inline UniquePtr& operator=(T* ref) {
+    if (ref_ != ref) {
+      delete ref_;
+      ref_ = ref;
+    }
+    return *this;
+  }
 
   inline T* weak_ref() const          { return ref_; }
   inline bool IsValid() const         { return (ref_ != NULL); }

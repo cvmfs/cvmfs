@@ -19,29 +19,48 @@ template<class CatalogTraversalT, class HashFilterT>
 const time_t GarbageCollector<CatalogTraversalT,
                               HashFilterT>::Configuration::kNoTimestamp = 0;
 
+template<class CatalogTraversalT, class HashFilterT>
+const shash::Any GarbageCollector<
+                   CatalogTraversalT,
+                   HashFilterT>::Configuration::kLatestHistoryDatabase =
+  shash::Any();
+
 
 template <class CatalogTraversalT, class HashFilterT>
-swissknife::CatalogTraversalParams
+GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
+                                             const Configuration &configuration)
+  : configuration_(configuration)
+  , traversal_(
+      GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
+                                                                configuration))
+  , hash_filter_()
+  , preserved_catalogs_(0)
+  , condemned_catalogs_(0)
+  , condemned_objects_(0)
+{
+  assert (configuration_.uploader != NULL);
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
+typename GarbageCollector<CatalogTraversalT, HashFilterT>::TraversalParameters
   GarbageCollector<CatalogTraversalT, HashFilterT>::GetTraversalParams(
   const GarbageCollector<CatalogTraversalT, HashFilterT>::Configuration &config)
 {
-  swissknife::CatalogTraversalParams params;
+  TraversalParameters params;
+  params.object_fetcher      = config.object_fetcher;
   params.history             = config.keep_history_depth;
   params.timestamp           = config.keep_history_timestamp;
   params.no_repeat_history   = true;
   params.ignore_load_failure = true;
   params.quiet               = ! config.verbose;
-  params.repo_url            = config.repo_url;
-  params.repo_name           = config.repo_name;
-  params.repo_keys           = config.repo_keys;
-  params.tmp_dir             = config.tmp_dir;
   return params;
 }
 
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
- const GarbageCollector<CatalogTraversalT, HashFilterT>::MyCallbackData &data) {
+ const GarbageCollector<CatalogTraversalT, HashFilterT>::traversal_callback_data_t &data) {
   ++preserved_catalogs_;
 
   if (configuration_.verbose) {
@@ -67,7 +86,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
- const GarbageCollector<CatalogTraversalT, HashFilterT>::MyCallbackData &data) {
+ const GarbageCollector<CatalogTraversalT, HashFilterT>::traversal_callback_data_t &data) {
   ++condemned_catalogs_;
 
   if (configuration_.verbose) {
@@ -119,41 +138,8 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
 
 
 template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::VerifyConfiguration() const {
-  const Configuration &cfg = configuration_;
-
-  if (cfg.uploader == NULL) {
-    return false;
-  }
-
-  if (cfg.repo_url.empty()) {
-    LogCvmfs(kLogGc, kLogDebug, "No repository url provided");
-    return false;
-  }
-
-  if (cfg.repo_name.empty()) {
-    LogCvmfs(kLogGc, kLogDebug, "No repository name provided");
-    return false;
-  }
-
-  if (cfg.tmp_dir.empty() || ! DirectoryExists(cfg.tmp_dir)) {
-    LogCvmfs(kLogGc, kLogDebug, "Temporary directory '%s' doesn't exist",
-                                cfg.tmp_dir.c_str());
-    return false;
-  }
-
-  return true;
-}
-
-
-template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
   bool success = true;
-
-  success = VerifyConfiguration();
-  if (! success) {
-    LogCvmfs(kLogGc, kLogStderr, "Malformed GarbageCollector configuration.");
-  }
 
   success = (success && AnalyzePreservedCatalogTree());
   success = (success && SweepCondemnedCatalogTree());
@@ -174,8 +160,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
 
-
-  success = traversal_.Traverse() && // traverses the current HEAD
+  success = traversal_.Traverse() &&
             traversal_.TraverseNamedSnapshots();
 
   traversal_.UnregisterListener(callback);
@@ -193,7 +178,14 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree() {
-  const bool has_condemned_revisions = (traversal_.pruned_revision_count() > 0);
+  typedef std::set<shash::Any> RecycledCatalogs;
+  RecycledCatalogs snapshots_to_recycle;
+  if (! GetHistoryRecycleBinContents(&snapshots_to_recycle)) {
+    return false;
+  }
+
+  const bool has_condemned_revisions = (traversal_.pruned_revision_count() > 0 ||
+                                        snapshots_to_recycle.size()        > 0);
   if (configuration_.verbose) {
     if (! has_condemned_revisions) {
       LogCvmfs(kLogGc, kLogStdout, "Nothing to be sweeped.");
@@ -212,8 +204,16 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
     traversal_.RegisterListener(
        &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
         this);
-  const bool success =
-             traversal_.TraversePruned(CatalogTraversalT::kDepthFirstTraversal);
+
+  bool success = false;
+
+  success = traversal_.TraversePruned(CatalogTraversalT::kDepthFirstTraversal);
+        RecycledCatalogs::const_iterator i    = snapshots_to_recycle.begin();
+  const RecycledCatalogs::const_iterator iend = snapshots_to_recycle.end();
+  for (; success && i != iend; ++i) {
+    success = traversal_.Traverse(*i, CatalogTraversalT::kDepthFirstTraversal);
+  }
+
   traversal_.UnregisterListener(callback);
 
   return success;
@@ -221,9 +221,62 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
 
 
 template <class CatalogTraversalT, class HashFilterT>
+bool
+GarbageCollector<CatalogTraversalT, HashFilterT>::GetHistoryRecycleBinContents(
+                                       std::set<shash::Any> *result_set) const {
+  assert (result_set != NULL);
+  result_set->clear();
+
+  object_fetcher_t *fetcher = configuration_.object_fetcher;
+  const shash::Any &base_hash = configuration_.base_history_database;
+
+  // fetch the latest history database
+  unsigned int history_db_depth = 0;
+  UniquePtr<history::History> history(fetcher->FetchHistory());
+  if (! history) {
+    if (configuration_.verbose) {
+      LogCvmfs(kLogGc, kLogStdout, "No recycle bin and/or history found");
+    }
+    return true;
+  }
+
+  while (true) {
+    if (configuration_.verbose) {
+      LogCvmfs(kLogGc, kLogStdout, "Looking for deleted named snapshots (%d)",
+               history_db_depth);
+    }
+
+    std::vector<shash::Any> recycle_hashes;
+    if (! history->ListRecycleBin(&recycle_hashes)) {
+      return false;
+    }
+
+    result_set->insert(recycle_hashes.begin(), recycle_hashes.end());
+    const shash::Any previous_hash = history->previous_revision();
+
+    if (base_hash.IsNull()     ||
+        previous_hash.IsNull() ||
+        previous_hash == base_hash) {
+      break;
+    }
+
+    history = fetcher->FetchHistory(previous_hash);
+    if (! history) {
+      LogCvmfs(kLogGc, kLogStderr, "Failed to fetch previous history (%s)",
+               previous_hash.ToString().c_str());
+      return false;
+    }
+    ++history_db_depth;
+  }
+
+  return true;
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
                                               const unsigned int  tree_level,
-                                              const MyCatalog    *catalog) const
+                                              const catalog_t    *catalog) const
 {
   std::string tree_indent;
   for (unsigned int i = 0; i < tree_level; ++i) {
