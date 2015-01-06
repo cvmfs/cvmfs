@@ -10,6 +10,7 @@ Package: cvmfs-config-egi
 Architecture: all 
 Depends: cvmfs-config-cern, curl ${misc:Depends}
 Replaces: cvmfs-keys (>= 1.5)
-Breaks: cvmfs-keys, cvmfs (< 2.1.20), cvmfs-server (< 2.1.20)
+Conflicts: cvmfs-keys
+Breaks: cvmfs (< 2.1.20), cvmfs-server (< 2.1.20)
 Provides: cvmfs-config
 Description: CernVM File System Configuration and Public Keys for EGI
