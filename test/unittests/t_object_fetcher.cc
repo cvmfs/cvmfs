@@ -37,7 +37,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
  protected:
   virtual void SetUp() {
-    if (NeedsSandbox()) {
+    if (NeedsFilesystemSandbox()) {
       const bool retval = MkdirDeep(sandbox,                        0700) &&
                           MkdirDeep(backend_storage,                0700) &&
                           MkdirDeep(backend_storage_dir,            0700) &&
@@ -50,7 +50,7 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   virtual void TearDown() {
-    if (NeedsSandbox()) {
+    if (NeedsFilesystemSandbox()) {
       const bool retval = RemoveTree(sandbox);
       ASSERT_TRUE (retval) << "failed to remove sandbox";
 
@@ -74,7 +74,7 @@ class T_ObjectFetcher : public ::testing::Test {
     // create a catalog
     CreateCatalog(&root_hash, "");
 
-    if (NeedsSandbox()) {
+    if (NeedsFilesystemSandbox()) {
       WriteKeychain();
       WriteManifest();
       WriteWhitelist();
@@ -342,8 +342,8 @@ class T_ObjectFetcher : public ::testing::Test {
                          root_path);
   }
 
-  bool NeedsSandbox() {
-    return NeedsSandbox(type<ObjectFetcherT>());
+  bool NeedsFilesystemSandbox() {
+    return NeedsFilesystemSandbox(type<ObjectFetcherT>());
   }
 
  private:
@@ -481,9 +481,9 @@ class T_ObjectFetcher : public ::testing::Test {
       " (errno: " << errno << ")";
   }
 
-  bool NeedsSandbox(const type<LocalObjectFetcher<> > type_spec) { return true;  }
-  bool NeedsSandbox(const type<HttpObjectFetcher<> >  type_spec) { return true;  }
-  bool NeedsSandbox(const type<MockObjectFetcher>     type_spec) { return false; }
+  bool NeedsFilesystemSandbox(const type<LocalObjectFetcher<> > type_spec) { return true;  }
+  bool NeedsFilesystemSandbox(const type<HttpObjectFetcher<> >  type_spec) { return true;  }
+  bool NeedsFilesystemSandbox(const type<MockObjectFetcher>     type_spec) { return false; }
 
  private:
   download::DownloadManager    download_manager_;
