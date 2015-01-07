@@ -120,11 +120,11 @@ class Database : SingleCopy {
   bool SetProperty(const std::string &key, const T value);
   bool HasProperty(const std::string &key) const;
 
-  sqlite3     *sqlite_db()       const { return sqlite_db_;       }
-  std::string  filename()        const { return filename_;        }
-  float        schema_version()  const { return schema_version_;  }
-  unsigned     schema_revision() const { return schema_revision_; }
-  bool         read_write()      const { return read_write_;      }
+  sqlite3     *sqlite_db()       const { return sqlite_db_;            }
+  std::string  filename()        const { return db_file_guard_.path(); }
+  float        schema_version()  const { return schema_version_;       }
+  unsigned     schema_revision() const { return schema_revision_;      }
+  bool         read_write()      const { return read_write_;           }
 
   /**
    * Figures out the ratio of free SQLite memory pages in the SQLite database
@@ -184,7 +184,7 @@ class Database : SingleCopy {
 
  private:
   sqlite3            *sqlite_db_;
-  const std::string   filename_;
+  UnlinkGuard         db_file_guard_;
   const bool          read_write_;
   float               schema_version_;
   unsigned            schema_revision_;
