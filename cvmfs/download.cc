@@ -1863,6 +1863,8 @@ bool DownloadManager::ProbeGeo() {
     host_names.push_back(proxy_chain[i][0].host.name());
   }
   // There's no reason to sort fallbacks, they're set by a widely shared config
+  //  plus it would require extracting just the fallback part of the vector
+  //  in order to SortTeam it.
 
   string host_list = JoinStrings(host_names, ",");
 
@@ -1905,9 +1907,18 @@ bool DownloadManager::ProbeGeo() {
   }
 
   pthread_mutex_lock(lock_options_);
-  // sort host chain and fallback proxies by the geo order
-  vector< vector<ProxyInfo> > tmp_fallback_groups((*opt_proxy_groups_).begin() + opt_proxy_groups_fallback_,
-                                                  (*opt_proxy_groups_).end());
+  delete opt_host_chain_;
+  opt_host_chain_ = new vector<string>(host_chain.size());
+
+  vector< vector< ProxyInfo> > *proxy_groups = 
+        new vector< vector<ProxyInfo> > (
+            opt_proxy_groups_fallback_ + proxy_chain.size() - fallback_group);
+  // first copy the non-fallback part of the current proxy chain
+  for (unsigned i = 0; i < opt_proxy_groups_fallback_; ++i) {
+    (*proxy_groups)[i] = (*opt_proxy_groups_)[i];
+  }
+
+  // copy the host chain and fallback proxies by geo order
   unsigned hosti = 0;
   unsigned proxyi = opt_proxy_groups_fallback_;
   for (unsigned i = 0; i < geo_order.size(); ++i) {
@@ -1915,8 +1926,12 @@ bool DownloadManager::ProbeGeo() {
     if (orderval < (uint64_t) first_geo_fallback)
       (*opt_host_chain_)[hosti++] = host_chain[orderval];
     else
-      (*opt_proxy_groups_)[proxyi++] = tmp_fallback_groups[orderval - first_geo_fallback];
+      (*proxy_groups)[proxyi++] = proxy_chain[
+            fallback_group + orderval - first_geo_fallback];
   }
+
+  delete opt_proxy_groups_;
+  opt_proxy_groups_ = proxy_groups;
 
   delete opt_host_chain_rtt_;
   opt_host_chain_rtt_ = new vector<int>(first_geo_fallback, kProbeGeo);
