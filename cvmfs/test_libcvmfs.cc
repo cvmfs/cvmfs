@@ -102,7 +102,8 @@ cvmfs_context* cvmfs_test_attach(const char *repo_name)
 	if (i == attached_repos.end()) {
 		const char *repo_options = "repo_name=%s.cern.ch,url=http://cvmfs-stratum-one.cern.ch/opt/%s;http://cernvmfs.gridpp.rl.ac.uk/opt/%s;http://cvmfs.racf.bnl.gov/opt/%s,pubkey=/etc/cvmfs/keys/cern.ch.pub";
 		char options[TEST_LINE_MAX];
-		sprintf(options, repo_options, repo_name, repo_name, repo_name, repo_name);
+		snprintf(options, TEST_LINE_MAX, repo_options, repo_name, repo_name, 
+             repo_name, repo_name);
 
 		printf("attaching repo with options: %s\n", options);
 		ctx = cvmfs_attach_repo(options);

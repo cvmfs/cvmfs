@@ -401,6 +401,9 @@ cvmfs_context::~cvmfs_context() {
   if (tracer_ready_) {
     tracer::Fini();
   }
+
+  delete backoff_throttle_;
+  backoff_throttle_ = NULL;
 }
 
 bool cvmfs_context::GetDirentForPath(const PathString         &path,
