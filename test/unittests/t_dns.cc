@@ -19,18 +19,18 @@ class T_Dns : public ::testing::Test {
  protected:
   virtual void SetUp() {
     int retval = unsetenv("HOST_ALIASES");
-    assert(retval == 0);
+    ASSERT_EQ(0, retval);
     default_resolver =
       CaresResolver::Create(false /* ipv4_only */, 1 /* retries */, 2000);
-    assert(default_resolver);
+    ASSERT_TRUE(default_resolver);
     ipv4_resolver =
       CaresResolver::Create(true /* ipv4_only */, 1 /* retries */, 2000);
-    assert(ipv4_resolver);
+    ASSERT_TRUE(ipv4_resolver);
 
     fhostfile = CreateTempFile("/tmp/cvmfstest", 0600, "w", &hostfile);
-    assert(fhostfile);
+    ASSERT_TRUE(fhostfile);
     hostfile_resolver = HostfileResolver::Create(hostfile, false);
-    assert(hostfile_resolver);
+    ASSERT_TRUE(hostfile_resolver);
   }
 
   virtual ~T_Dns() {
@@ -44,9 +44,10 @@ class T_Dns : public ::testing::Test {
   void CreateHostfile(const string &content) {
     int retval = ftruncate(fileno(fhostfile), 0);
     rewind(fhostfile);
-    assert(retval == 0);
+    ASSERT_EQ(0, retval);
     int num = fprintf(fhostfile, "%s", content.c_str());
-    assert((num >= 0) && (unsigned(num) == content.length()));
+    ASSERT_LT(0, num);
+    ASSERT_EQ(unsigned(num), content.length());
     fflush(fhostfile);
   }
 
