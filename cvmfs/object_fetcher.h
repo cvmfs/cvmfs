@@ -208,8 +208,10 @@ class LocalObjectFetcher :
     file_path->clear();
 
     const std::string source = BuildPath(object_hash, hash_suffix);
-    const std::string dest   = temporary_directory_ + "/" +
-                               object_hash.ToString();
+    const std::string dest   = CreateTempPath(temporary_directory_ + "/" +
+                                              object_hash.ToStringWithSuffix(),
+                                              0600);
+
     if (! FileExists(source)) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s at '%s'",
                object_hash.ToString().c_str(), dest.c_str());
@@ -332,7 +334,9 @@ class HttpObjectFetcher :
     object_file->clear();
 
     const std::string url  = BuildUrl(object_hash, hash_suffix);
-    const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
+    const std::string dest = CreateTempPath(temporary_directory_ + "/" +
+                                            object_hash.ToStringWithSuffix(),
+                                            0600);
 
     download::JobInfo download_catalog(&url, true, false, &dest, &object_hash);
     download::Failures retval = download_manager_->Fetch(&download_catalog);
