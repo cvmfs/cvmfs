@@ -1,4 +1,6 @@
 2.1.20:
+  * Ensure autofs is running after 'cvmfs_config setup'
+  * Fix rebuilding cache database on XFS (CVM-685)
   * CVMFS_PUBLIC_KEY takes precedence over CVMFS_KEYS_DIR (CVM-652)
   * Fix error reporting when creating alien cache (CVM-677)
   * Fix concurrent creation of cache sub directories (CVM-672)
