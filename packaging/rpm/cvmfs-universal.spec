@@ -32,19 +32,6 @@ Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-%if 0%{?el4}
-BuildRequires: gcc4
-BuildRequires: gcc4-c++
-%else
-BuildRequires: gcc
-BuildRequires: gcc-c++
-%endif
-BuildRequires: patch
-BuildRequires: cmake
-BuildRequires: fuse-devel
-BuildRequires: pkgconfig
-BuildRequires: openssl-devel
-BuildRequires: libattr-devel
 %if 0%{?el5}
 BuildRequires: buildsys-macros
 %endif
@@ -53,7 +40,21 @@ BuildRequires: e2fsprogs-devel
 %else
 BuildRequires: libuuid-devel
 %endif
-
+%if 0%{?el4}
+BuildRequires: gcc4
+BuildRequires: gcc4-c++
+%else
+BuildRequires: gcc
+BuildRequires: gcc-c++
+%endif
+BuildRequires: cmake
+BuildRequires: fuse-devel
+BuildRequires: libattr-devel
+BuildRequires: openssl-devel
+BuildRequires: patch
+BuildRequires: pkgconfig
+BuildRequires: python-devel
+BuildRequires: unzip
 
 Requires: bash
 Requires: coreutils
