@@ -64,7 +64,9 @@ class AbstractObjectFetcher {
 
   /**
    * Downloads and opens (read-only) a history database. Note that the user is
-   * responsible to remove the history object after usage.
+   * responsible to remove the history object after usage. The fetched SQLite
+   * database file will be unlinked automatically during the destruction of the
+   * HistoryTN object.
    *
    * @param history_hash  (optional) the content hash of the history database
    *                                 if left blank, the latest one is downloaded
@@ -86,7 +88,7 @@ class AbstractObjectFetcher {
     // open the history file
     HistoryTN *history = HistoryTN::Open(path);
     if (NULL != history) {
-      history->TakeFileOwnership();
+      history->TakeDatabaseFileOwnership();
     }
 
     return history;
@@ -119,7 +121,7 @@ class AbstractObjectFetcher {
                                                  parent,
                                                  is_nested);
     if (NULL != catalog) {
-      catalog->TakeFileOwnership();
+      catalog->TakeDatabaseFileOwnership();
     }
 
     return catalog;
