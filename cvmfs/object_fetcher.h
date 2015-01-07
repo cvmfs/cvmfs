@@ -33,7 +33,10 @@ struct object_fetcher_traits;
  * from a backend storage of a repository.
  *
  * ObjectFetchers are supposed to be configured for one specific repository. How
- * this is done depends on the concrete implementation of this base class.
+ * this is done depends on the concrete implementation of this base class. When
+ * a concrete implementation of ObjectFetcher<> needs to deal with files on the
+ * local file system it is obliged to take measures for proper cleanup of those
+ * files after usage.
  *
  * It abstracts all accesses to external file or HTTP resources and gathers this
  * access logic in one central point. This also comes in handy when unit testing
@@ -81,7 +84,12 @@ class AbstractObjectFetcher {
     }
 
     // open the history file
-    return HistoryTN::Open(path);
+    HistoryTN *history = HistoryTN::Open(path);
+    if (NULL != history) {
+      history->TakeFileOwnership();
+    }
+
+    return history;
   }
 
   /**
@@ -105,11 +113,16 @@ class AbstractObjectFetcher {
       return NULL;
     }
 
-    return CatalogTN::AttachFreely(catalog_path,
-                                   path,
-                                   catalog_hash,
-                                   parent,
-                                   is_nested);
+    CatalogTN *catalog = CatalogTN::AttachFreely(catalog_path,
+                                                 path,
+                                                 catalog_hash,
+                                                 parent,
+                                                 is_nested);
+    if (NULL != catalog) {
+      catalog->TakeFileOwnership();
+    }
+
+    return catalog;
   }
 
  public:
