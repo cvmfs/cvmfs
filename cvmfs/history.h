@@ -165,6 +165,13 @@ class History {
    */
   virtual bool GetHashes(std::vector<shash::Any> *hashes) const = 0;
 
+  /**
+   * If the concrete history implementation deals with local files internally
+   * the cleanup responsability is retained by the concrete implementation of
+   * this class.
+   */
+  virtual void TakeFileOwnership() {};
+
   const std::string& fqrn() const { return fqrn_; }
 
  protected:

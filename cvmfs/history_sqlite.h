@@ -134,6 +134,8 @@ class SqliteHistory : public History {
    */
   bool GetHashes(std::vector<shash::Any> *hashes) const;
 
+  void TakeFileOwnership();
+
  protected:
   static SqliteHistory* Open(const std::string &file_name,
                              const bool read_write);
