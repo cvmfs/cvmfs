@@ -356,10 +356,12 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
   assert(elem != pool_handles_inuse_->end());
 
   if (pool_handles_idle_->size() > pool_max_handles_) {
-    CURL *handle = *elem;
-    curl_easy_setopt(handle, CURLOPT_SHARE, NULL);
-    curl_easy_cleanup(*elem);
-    curl_sharehandles_->erase(handle);
+    CURLcode retval = curl_easy_setopt(handle, CURLOPT_SHARE, NULL);
+    assert(retval == CURLE_OK);
+    curl_easy_cleanup(handle);
+    std::map<CURL *, S3FanOutDnsEntry *>::size_type retitems =
+        curl_sharehandles_->erase(handle);
+    assert(retitems == 1);
   } else {
     pool_handles_idle_->insert(handle);
   }
