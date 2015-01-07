@@ -19,12 +19,6 @@ template<class CatalogTraversalT, class HashFilterT>
 const time_t GarbageCollector<CatalogTraversalT,
                               HashFilterT>::Configuration::kNoTimestamp = 0;
 
-template<class CatalogTraversalT, class HashFilterT>
-const shash::Any GarbageCollector<
-                   CatalogTraversalT,
-                   HashFilterT>::Configuration::kLatestHistoryDatabase =
-  shash::Any();
-
 
 template <class CatalogTraversalT, class HashFilterT>
 GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
