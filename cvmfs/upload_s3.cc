@@ -346,6 +346,7 @@ void S3Uploader::FileUpload(const std::string &local_path,
   if (!mmf->Map()) {
     LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload %s",
              local_path.c_str());
+    delete mmf;
     atomic_inc32(&copy_errors_);
     Respond(callback, UploaderResults(100, local_path));
     return;
@@ -525,6 +526,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle   *handle,
   if (!mmf->Map()) {
     LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload %s",
              local_handle->temporary_path.c_str());
+    delete mmf;
     atomic_inc32(&copy_errors_);
     Respond(handle->commit_callback,
             UploaderResults(100, local_handle->temporary_path));
