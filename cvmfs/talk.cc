@@ -311,18 +311,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
           if (proxies == "") {
               Answer(con_fd, "Failed, no valid proxies\n");
           } else {
-            // get existing fallback proxies
-            vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
-            unsigned fallback_group;
-            cvmfs::download_manager_->GetProxyInfo(&proxy_chain, NULL, &fallback_group);
-            std::string fallback_proxies;
-            for (unsigned i = fallback_group; i < proxy_chain.size(); ++i) {
-              if (fallback_proxies.size() != 0)
-                fallback_proxies.append(";");
-              if (proxy_chain[i].size() > 0)
-                // fallback proxies may have only one per group
-                fallback_proxies.append(proxy_chain[i][0].Print());
-            }
+            string fallback_proxies = 
+              cvmfs::download_manager_->GetFallbackProxyList();
             cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
             Answer(con_fd, "OK\n");
           }
@@ -332,25 +322,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "Usage: proxy fallback <proxy list>\n");
         } else {
           string fallback_proxies = line.substr(15);
-          vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
-          unsigned fallback_group;
-
-          // get existing non-fallback proxies
-          cvmfs::download_manager_->GetProxyInfo(&proxy_chain, NULL, &fallback_group);
-          std::string proxies;
-          for (unsigned i = 0; i < fallback_group; ++i) {
-            if (proxy_chain[i].size() == 0) {
-              // ignore DIRECT
-              continue;
-            }
-            if (proxies.size() != 0)
-              proxies.append(";");
-            for (unsigned j = 0; j < proxy_chain[i].size(); ++j) {
-              if (j > 0)
-                proxies.append("|");
-              proxies.append(proxy_chain[i][j].Print());
-            }
-          }
+          string proxies = cvmfs::download_manager_->GetProxyList();
 
           if ((fallback_proxies == "") && (proxies == "")) {
             // if emptying out fallback_proxies, and proxies is also empty,

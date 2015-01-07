@@ -303,6 +303,8 @@ class DownloadManager {
   void GetProxyInfo(std::vector< std::vector<ProxyInfo> > *proxy_chain,
                     unsigned *current_group,
                     unsigned *fallback_group);
+  std::string GetProxyList();
+  std::string GetFallbackProxyList();
   void RebalanceProxies();
   void SwitchProxyGroup();
   void SetProxyGroupResetDelay(const unsigned seconds);
@@ -398,6 +400,14 @@ class DownloadManager {
    * Overall number of proxies summed over all the groups.
    */
   unsigned opt_num_proxies_;
+  /**
+   * The original proxy list as a string
+   */
+  std::string opt_proxy_list_;
+  /**
+   * The original proxy fallback list as a string
+   */
+  std::string opt_proxy_fallback_list_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).

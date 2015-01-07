@@ -1981,6 +1981,8 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
 
   opt_timestamp_backup_proxies_ = 0;
   opt_timestamp_failover_proxies_ = 0;
+  opt_proxy_list_ = proxy_list;
+  opt_proxy_fallback_list_ = fallback_proxy_list;
   delete opt_proxy_groups_;
   if ((proxy_list == "") && (fallback_proxy_list == "")) {
     opt_proxy_groups_ = NULL;
@@ -2146,6 +2148,13 @@ void DownloadManager::GetProxyInfo(vector< vector<ProxyInfo> > *proxy_chain,
   pthread_mutex_unlock(lock_options_);
 }
 
+string DownloadManager::GetProxyList() {
+  return opt_proxy_list_;
+}
+
+string DownloadManager::GetFallbackProxyList() {
+  return opt_proxy_fallback_list_;
+}
 
 /**
  * Selects a new random proxy in the current load-balancing group.  Resets the
