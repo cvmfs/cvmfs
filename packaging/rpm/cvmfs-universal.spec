@@ -70,6 +70,7 @@ Requires: zlib
 Requires: gdb
 # Account for different package names
 %if 0%{?suse_version}
+Requires: aaa_base
 Requires: libfuse2
 Requires: glibc
 Requires: pwdutils
@@ -79,6 +80,7 @@ Requires: sysvinit
 Requires: sysvinit-tools
   %endif
 %else
+Requires: chkconfig
 Requires: fuse-libs
 Requires: glibc-common
 Requires: which
@@ -351,7 +353,7 @@ fi
 %config(noreplace) %{_sysconfdir}/bash_completion.d/cvmfs
 %doc COPYING AUTHORS README ChangeLog
 
-%files devel 
+%files devel
 %defattr(-,root,root)
 %{_libdir}/libcvmfs.a
 %{_includedir}/libcvmfs.h
@@ -362,7 +364,7 @@ fi
 %{_bindir}/cvmfs_swissknife
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
-%{_bindir}/cvmfs_server 
+%{_bindir}/cvmfs_server
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %{_libdir}/libtbb_cvmfs.so
 %{_libdir}/libtbb_cvmfs.so.2
@@ -384,6 +386,8 @@ fi
 %{_bindir}/cvmfs_unittests
 
 %changelog
+* Wed Jan 07 2015 Jakob Blomer <jblomer@cern.ch> - 2.1.20
+- Add chkconfig dependency
 * Wed Dec 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20
 - Adjust for new cvmfs-config-... packages
 * Wed Dec 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20
