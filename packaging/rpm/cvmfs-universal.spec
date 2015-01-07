@@ -39,6 +39,7 @@ BuildRequires: gcc4-c++
 BuildRequires: gcc
 BuildRequires: gcc-c++
 %endif
+BuildRequires: patch
 BuildRequires: cmake
 BuildRequires: fuse-devel
 BuildRequires: pkgconfig
