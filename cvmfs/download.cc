@@ -2002,18 +2002,20 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
   opt_proxy_groups_fallback_= proxy_groups.size();
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
     vector<string> this_group = SplitString(proxy_groups[i], '|');
+    int hostnamessize = hostnames.size();
     for (unsigned j = 0; j < this_group.size(); ++j) {
       // Note: DIRECT strings will be "extracted" to an empty string.
       string hostname = dns::ExtractHost(this_group[j]);
-      if ((hostname == "") && (fallback_proxy_list != "")) {
-        // skip DIRECTs if there are fallback proxies
-        opt_proxy_groups_fallback_--;
-      }
-      else {
+      if ((hostname != "") || (fallback_proxy_list == "")) {
         // Save the hostname.  Leave empty (DIRECT) names so indexes will
-        // match later.  They will not be resolved.
+        // match later, unless using fallback proxies.  They will not be
+	// resolved.
         hostnames.push_back(hostname);
       }
+    }
+    if (hostnamessize == hostnames.size()) {
+      // no hostnames remain in this group, skip it
+      opt_proxy_groups_fallback_--;
     }
   }
   vector<string> fallback_groups;
