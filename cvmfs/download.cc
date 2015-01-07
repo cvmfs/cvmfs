@@ -1934,7 +1934,7 @@ bool DownloadManager::ProbeGeo() {
   opt_proxy_groups_ = proxy_groups;
 
   delete opt_host_chain_rtt_;
-  opt_host_chain_rtt_ = new vector<int>(first_geo_fallback, kProbeGeo);
+  opt_host_chain_rtt_ = new vector<int>(host_chain.size(), kProbeGeo);
   opt_host_chain_current_ = 0;
   pthread_mutex_unlock(lock_options_);
 
