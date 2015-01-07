@@ -85,7 +85,8 @@ bool S3Uploader::ParseSpoolerDefinition(
   if (options::GetValue("CVMFS_S3_BUCKETS_PER_ACCOUNT", &parameter)) {
     s3_buckets_per_account = String2Uint64(parameter);
     if (s3_buckets_per_account < 1 || s3_buckets_per_account > 100) {
-      LogCvmfs(kLogSpooler, kLogStderr, "Fail, invalid CVMFS_S3_BUCKETS_PER_ACCOUNT "
+      LogCvmfs(kLogSpooler, kLogStderr,
+               "Fail, invalid CVMFS_S3_BUCKETS_PER_ACCOUNT "
                "given: '%d'.",
                s3_buckets_per_account);
       LogCvmfs(kLogSpooler, kLogStderr,
@@ -108,7 +109,8 @@ bool S3Uploader::ParseSpoolerDefinition(
     return false;
   }
   if (!options::GetValue("CVMFS_S3_BUCKET", &bucket_body_name_)) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse CVMFS_S3_BUCKET from '%s'.",
+    LogCvmfs(kLogSpooler, kLogStderr,
+             "Failed to parse CVMFS_S3_BUCKET from '%s'.",
              config_path.c_str());
     return false;
   }
@@ -550,7 +552,8 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle   *handle,
            local_handle->temporary_path.c_str());
 
   // Remove the temporary file
-  remove(local_handle->temporary_path.c_str());
+  retval = remove(local_handle->temporary_path.c_str());
+  assert(retval == 0);
   delete local_handle;
 }
 
