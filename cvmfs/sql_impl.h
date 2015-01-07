@@ -268,6 +268,14 @@ std::string Database<DerivedT>::GetLastErrorMsg() const {
 }
 
 
+template <class DerivedT>
+void Database<DerivedT>::TakeFileOwnership() {
+  db_file_guard_.Enable();
+  LogCvmfs(kLogSql, kLogDebug, "Database object took ownership of '%s'",
+           db_file_guard_.path().c_str());
+}
+
+
 /**
  * Used to check if the database needs cleanup
  */

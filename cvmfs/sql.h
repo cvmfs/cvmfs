@@ -24,6 +24,11 @@ class Sql;
  * templated methods SetProperty(), GetProperty<>() and HasProperty() that take
  * all common data types and persist it in the database.
  *
+ * By default Database<> objects do not take ownership of the underlying SQLite
+ * database file and hence do not unlink it on database closure. If the using
+ * code calls Database<>::TakeFileOwnership() the SQLite file will be unlinked
+ * in the destructor of the Database<> object.
+ *
  * Note: This implements a Curiously Recurring Template Pattern in order to
  *       implement Database::Create and Database::Open as a static polymorphism
  *
@@ -159,6 +164,14 @@ class Database : SingleCopy {
    * @return   english language error description of last error
    */
   std::string GetLastErrorMsg() const;
+
+
+  /**
+   * Transfers the ownership of the SQLite database file to the Database<> ob-
+   * ject. Hence, it will automatically unlink the file, once the Database<>
+   * object goes out of scope or is deleted.
+   */
+  void TakeFileOwnership();
 
  protected:
   /**
