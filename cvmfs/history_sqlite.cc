@@ -382,9 +382,15 @@ bool SqliteHistory::GetHashes(std::vector<shash::Any> *hashes) const {
 }
 
 
-void SqliteHistory::TakeFileOwnership() {
+void SqliteHistory::TakeDatabaseFileOwnership() {
   assert (database_);
   database_->TakeFileOwnership();
 }
+
+
+void SqliteHistory::DropDatabaseFileOwnership() {
+  assert (database_);
+  database_->DropFileOwnership();
+};
 
 }  // namespace history

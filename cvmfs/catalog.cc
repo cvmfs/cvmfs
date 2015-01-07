@@ -389,12 +389,21 @@ const Catalog::HashVector& Catalog::GetReferencedObjects() const {
 }
 
 
-void Catalog::TakeFileOwnership() {
+void Catalog::TakeDatabaseFileOwnership() {
   if (NULL == database_) {
     return;
   }
 
   database_->TakeFileOwnership();
+}
+
+
+void Catalog::DropDatabaseFileOwnership() {
+  if (NULL == database_) {
+    return;
+  }
+
+  database_->DropFileOwnership();
 }
 
 

@@ -309,7 +309,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     root_path_(other.root_path_), catalog_hash_(other.catalog_hash_),
     catalog_size_(other.catalog_size_), revision_(other.revision_),
     last_modified_(other.last_modified_), is_root_(other.is_root_),
-    children_(other.children_), files_(other.files_), chunks_(other.chunks_)
+    owns_database_file_(false), children_(other.children_),
+    files_(other.files_), chunks_(other.chunks_)
   {
     ++MockCatalog::instances;
   }
@@ -335,7 +336,9 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
   const NestedCatalogList& ListNestedCatalogs() const { return children_; }
   const HashVector&        GetReferencedObjects() const;
-  void TakeFileOwnership() {}
+  void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
+  void DropDatabaseFileOwnership() { owns_database_file_ = false; }
+  bool OwnsDatabaseFile() const    { return owns_database_file_;  }
 
   unsigned int GetRevision()     const { return revision_;      }
   uint64_t     GetLastModified() const { return last_modified_; }
@@ -377,6 +380,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   const unsigned int  revision_;
   const time_t        last_modified_;
   const bool          is_root_;
+  bool                owns_database_file_;
 
   NestedCatalogList   children_;
   FileList            files_;
