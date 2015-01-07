@@ -47,26 +47,25 @@
 #include <inttypes.h>
 #include <stdint.h>
 
-#include <cstring>
-#include <cassert>
-
-#include <map>
 #include <algorithm>
+#include <cassert>
+#include <cstring>
 #include <functional>
+#include <map>
 #include <string>
 
 #include <fuse/fuse_lowlevel.h>
 
-#include "platform.h"
-#include "murmur.h"
-#include "logging.h"
-#include "smalloc.h"
+#include "atomic.h"
 #include "directory_entry.h"
 #include "hash.h"
-#include "atomic.h"
-#include "util.h"
+#include "logging.h"
+#include "murmur.h"
+#include "platform.h"
 #include "shortstring.h"
 #include "smallhash.h"
+#include "smalloc.h"
+#include "util.h"
 
 namespace lru {
 
@@ -157,7 +156,7 @@ class LruCache : SingleCopy {
    *
    * @param T the type of object to be allocated by this MemoryAllocator
    */
-  template<class T> class MemoryAllocator {
+  template<class T> class MemoryAllocator : SingleCopy {
    public:
     /**
      * Creates a MemoryAllocator to handle a memory pool for objects of type T
@@ -496,6 +495,9 @@ class LruCache : SingleCopy {
     inline void RemoveFromList() { assert(false); }
 
    private:
+    // No assignment operator (enforced by linker error)
+    ListEntry<T>& operator=(const ListEntry<T> &other);
+
     /**
      * Pop a ListEntry from the list (arbitrary position).
      * The given ListEntry is removed from the list, deleted and it's
