@@ -2009,7 +2009,7 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
       if ((hostname != "") || (fallback_proxy_list == "")) {
         // Save the hostname.  Leave empty (DIRECT) names so indexes will
         // match later, unless using fallback proxies.  They will not be
-	// resolved.
+        // resolved.
         hostnames.push_back(hostname);
       }
     }
