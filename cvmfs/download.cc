@@ -2002,7 +2002,7 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
   opt_proxy_groups_fallback_= proxy_groups.size();
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
     vector<string> this_group = SplitString(proxy_groups[i], '|');
-    int hostnamessize = hostnames.size();
+    unsigned hostnamessize = hostnames.size();
     for (unsigned j = 0; j < this_group.size(); ++j) {
       // Note: DIRECT strings will be "extracted" to an empty string.
       string hostname = dns::ExtractHost(this_group[j]);
