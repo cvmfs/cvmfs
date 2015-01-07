@@ -323,13 +323,6 @@ static void *MainTalk(void *data __attribute__((unused))) {
         } else {
           string fallback_proxies = line.substr(15);
           string proxies = cvmfs::download_manager_->GetProxyList();
-
-          if ((fallback_proxies == "") && (proxies == "")) {
-            // if emptying out fallback_proxies, and proxies is also empty,
-            //  put a DIRECT proxy back in because there has to be something
-            proxies = "DIRECT";
-          }
-
           cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
           Answer(con_fd, "OK\n");
         }
