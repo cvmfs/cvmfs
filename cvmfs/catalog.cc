@@ -389,6 +389,15 @@ const Catalog::HashVector& Catalog::GetReferencedObjects() const {
 }
 
 
+void Catalog::TakeFileOwnership() {
+  if (NULL == database_) {
+    return;
+  }
+
+  database_->TakeFileOwnership();
+}
+
+
 uint64_t Catalog::GetTTL() const {
   const string sql = "SELECT value FROM properties WHERE key='TTL';";
 

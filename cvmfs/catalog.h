@@ -155,6 +155,7 @@ class Catalog : public SingleCopy {
                          FileChunkList *chunks) const;
 
   const HashVector& GetReferencedObjects() const;
+  void TakeFileOwnership();
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;

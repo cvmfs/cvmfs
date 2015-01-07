@@ -335,6 +335,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
   const NestedCatalogList& ListNestedCatalogs() const { return children_; }
   const HashVector&        GetReferencedObjects() const;
+  void TakeFileOwnership() {}
 
   unsigned int GetRevision()     const { return revision_;      }
   uint64_t     GetLastModified() const { return last_modified_; }
