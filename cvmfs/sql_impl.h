@@ -276,6 +276,13 @@ void Database<DerivedT>::TakeFileOwnership() {
 }
 
 
+template <class DerivedT>
+void Database<DerivedT>::DropFileOwnership() {
+  db_file_guard_.Disable();
+  LogCvmfs(kLogSql, kLogDebug, "Database object dropped ownership of '%s'",
+           db_file_guard_.path().c_str());
+}
+
 /**
  * Used to check if the database needs cleanup
  */

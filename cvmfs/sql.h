@@ -173,6 +173,22 @@ class Database : SingleCopy {
    */
   void TakeFileOwnership();
 
+  /**
+   * Resigns from the ownership of the SQLite database file underlying this
+   * Database<> object. After calling this the using code is responsible of
+   * managing the database file.
+   */
+  void DropFileOwnership();
+
+  /**
+   * Check if the SQLite database file is managed by the Database<> object
+   * Note: unmanaged means, that the using code needs to take care of the file
+   *       management (i.e. delete the file after usage)
+   *
+   * @return  false if file is unmanaged
+   */
+  bool OwnsFile() const { return db_file_guard_.IsEnabled(); }
+
  protected:
   /**
    * Private constructor! Use the factory methods DerivedT::Create() or
