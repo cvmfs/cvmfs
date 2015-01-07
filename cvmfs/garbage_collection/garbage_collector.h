@@ -92,8 +92,6 @@ class GarbageCollector {
   bool SweepCondemnedCatalogTree();
   bool SweepHistoricRevisions();
 
-  bool GetHistoryRecycleBinContents(std::set<shash::Any> *result_set) const;
-
   void CheckAndSweep(const shash::Any &hash);
   void Sweep(const shash::Any &hash);
 

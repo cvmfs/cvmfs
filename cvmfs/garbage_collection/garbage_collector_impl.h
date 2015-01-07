@@ -244,59 +244,6 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions() 
 
 
 template <class CatalogTraversalT, class HashFilterT>
-bool
-GarbageCollector<CatalogTraversalT, HashFilterT>::GetHistoryRecycleBinContents(
-                                       std::set<shash::Any> *result_set) const {
-  assert (result_set != NULL);
-  result_set->clear();
-
-  ObjectFetcherTN *fetcher = configuration_.object_fetcher;
-  const shash::Any &base_hash = configuration_.base_history_database;
-
-  // fetch the latest history database
-  unsigned int history_db_depth = 0;
-  UniquePtr<history::History> history(fetcher->FetchHistory());
-  if (! history) {
-    if (configuration_.verbose) {
-      LogCvmfs(kLogGc, kLogStdout, "No recycle bin and/or history found");
-    }
-    return true;
-  }
-
-  while (true) {
-    if (configuration_.verbose) {
-      LogCvmfs(kLogGc, kLogStdout, "Looking for deleted named snapshots (%d)",
-               history_db_depth);
-    }
-
-    std::vector<shash::Any> recycle_hashes;
-    if (! history->ListRecycleBin(&recycle_hashes)) {
-      return false;
-    }
-
-    result_set->insert(recycle_hashes.begin(), recycle_hashes.end());
-    const shash::Any previous_hash = history->previous_revision();
-
-    if (base_hash.IsNull()     ||
-        previous_hash.IsNull() ||
-        previous_hash == base_hash) {
-      break;
-    }
-
-    history = fetcher->FetchHistory(previous_hash);
-    if (! history) {
-      LogCvmfs(kLogGc, kLogStderr, "Failed to fetch previous history (%s)",
-               previous_hash.ToString().c_str());
-      return false;
-    }
-    ++history_db_depth;
-  }
-
-  return true;
-}
-
-
-template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
                                               const unsigned int  tree_level,
                                               const CatalogTN    *catalog) const
