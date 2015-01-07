@@ -7,6 +7,7 @@
 #ifndef CVMFS_PLATFORM_LINUX_H_
 #define CVMFS_PLATFORM_LINUX_H_
 
+#include <sys/types.h> // contains ssize_t needed inside <attr/xattr.h>
 #include <attr/xattr.h>
 #include <dirent.h>
 #include <errno.h>
@@ -20,7 +21,6 @@
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/select.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include <cassert>
