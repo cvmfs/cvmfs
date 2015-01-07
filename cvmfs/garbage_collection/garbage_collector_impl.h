@@ -136,7 +136,6 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
   return AnalyzePreservedCatalogTree()   &&
-         PreserveLatestHistoryDatabase() &&
          CheckPreservedRevisions()       &&
          SweepCondemnedCatalogTree()     &&
          SweepHistoricRevisions();
@@ -154,33 +153,9 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
        &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
         this);
 
-  const bool success = traversal_.Traverse();
+  const bool success = traversal_.Traverse() &&
+                       traversal_.TraverseNamedSnapshots();
   traversal_.UnregisterListener(callback);
-
-  return success;
-}
-
-
-template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveLatestHistoryDatabase() {
-  if (configuration_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Preserving data objects in historic revisions");
-  }
-
-  // traverse the latest history database
-  typename CatalogTraversalT::CallbackTN *callback =
-  traversal_.RegisterListener(
-     &GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects,
-      this);
-
-  const bool success = traversal_.TraverseNamedSnapshots();
-  traversal_.UnregisterListener(callback);
-
-  // preserve the latest history database file itself
-  ObjectFetcherTN *fetcher = configuration_.object_fetcher;
-  UniquePtr<manifest::Manifest> manifest(fetcher->FetchManifest());
-  assert (manifest.IsValid());
-  hash_filter_.Fill(manifest->history());
 
   return success;
 }

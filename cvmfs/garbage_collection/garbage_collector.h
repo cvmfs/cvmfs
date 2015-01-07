@@ -88,7 +88,6 @@ class GarbageCollector {
   void SweepDataObjects   (const TraversalCallbackDataTN &data);
 
   bool AnalyzePreservedCatalogTree();
-  bool PreserveLatestHistoryDatabase();
   bool CheckPreservedRevisions();
   bool SweepCondemnedCatalogTree();
   bool SweepHistoricRevisions();
