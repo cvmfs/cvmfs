@@ -235,7 +235,7 @@ class S3FanoutManager : SingleCopy {
   std::set<CURL *> *pool_handles_inuse_;
   std::set<S3FanOutDnsEntry *> *sharehandles_;
   std::map<CURL *, S3FanOutDnsEntry *> *curl_sharehandles_;
-  dns::CaresResolver *resolver;
+  dns::CaresResolver *resolver_;
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;

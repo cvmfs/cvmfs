@@ -454,7 +454,7 @@ int S3FanoutManager::InitializeDnsSettings(CURL *handle,
 
   // We need to resolve the hostname
   // TODO(ssheikki): support ipv6 also...  if (opt_ipv4_only_)
-  dns::Host host = resolver->Resolve(remote_host);
+  dns::Host host = resolver_->Resolve(remote_host);
   set<string> ipv4_addresses = host.ipv4_addresses();
   std::set<string>::iterator its = ipv4_addresses.begin();
   S3FanOutDnsEntry *dnse = NULL;
@@ -784,7 +784,7 @@ S3FanoutManager::S3FanoutManager() {
   curl_sharehandles_ = NULL;
   pool_max_handles_ = 0;
   curl_multi_ = NULL;
-  user_agent_ = new string();
+  user_agent_ = NULL;
 
   atomic_init32(&multi_threaded_);
   watch_fds_ = NULL;
@@ -810,13 +810,15 @@ S3FanoutManager::S3FanoutManager() {
   assert(retval == 0);
 
   opt_timeout_ = 0;
+  opt_max_retries_ = 0;
   opt_backoff_init_ms_ = 0;
   opt_backoff_max_ms_ = 0;
-
   opt_ipv4_only_ = false;
 
-  resolver = dns::CaresResolver::Create(opt_ipv4_only_, 2, 2000);
-
+  max_available_jobs_ = 0;
+  thread_upload_ = 0;
+  thread_upload_run_ = false;
+  resolver_ = NULL;
   statistics_ = NULL;
 }
 
@@ -849,6 +851,7 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
 
   opt_timeout_ = 20;
   statistics_ = new Statistics();
+  user_agent_ = new string();
   *user_agent_ = "User-Agent: cvmfs " + string(VERSION);
 
   curl_multi_ = curl_multi_init();
@@ -878,6 +881,8 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   watch_fds_inuse_ = 0;
 
   SetRetryParameters(3, 100, 2000);
+
+  resolver_ = dns::CaresResolver::Create(opt_ipv4_only_, 2, 2000);
 }
 
 
