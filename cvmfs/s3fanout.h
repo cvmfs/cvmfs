@@ -102,35 +102,54 @@ struct JobInfo {
     const unsigned char *data;
   } origin_mem;
 
-  const std::string origin_path;
   const std::string access_key;
   const std::string secret_key;
+  const std::string hostname;
   const std::string bucket;
   const std::string object_key;
-  const std::string hostname;
+  const std::string origin_path;
   bool test_and_set;
   void *callback;  // Callback to be called when job is finished
   MemoryMappedFile *mmf;
 
   // One constructor per destination + head request
-  // TODO: Beautify constructors
-  JobInfo() { http_headers = NULL; }
-  JobInfo(const std::string a, const std::string s, const std::string h,
-          const std::string b, const std::string k, const std::string p) :
-          origin(kOriginPath),
-          origin_path(p),
-          access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
-          { http_headers = NULL;
-            test_and_set = false; }
-  JobInfo(const std::string a, const std::string s, const std::string h,
-          const std::string b, const std::string k,
+  JobInfo() { JobInfoInit(); }
+  JobInfo(const std::string access_key, const std::string secret_key,
+          const std::string hostname,   const std::string bucket,
+          const std::string object_key, const std::string origin_path) :
+          access_key(access_key), secret_key(secret_key),
+          hostname(hostname), bucket(bucket),
+          object_key(object_key), origin_path(origin_path) {
+    JobInfoInit();
+    origin = kOriginPath;
+  }
+  JobInfo(const std::string access_key, const std::string secret_key,
+          const std::string hostname,   const std::string bucket,
+          const std::string object_key,
           const unsigned char *buffer, size_t size) :
-          origin(kOriginMem),
-          access_key(a), secret_key(s), bucket(b), object_key(k), hostname(h)
-          { http_headers = NULL;
-            test_and_set = false;
-            origin_mem.size = size;
-            origin_mem.data = buffer; }
+          access_key(access_key), secret_key(secret_key),
+          hostname(hostname), bucket(bucket),
+          object_key(object_key) {
+    JobInfoInit();
+    origin = kOriginMem;
+    origin_mem.size = size;
+    origin_mem.data = buffer;
+  }
+  void JobInfoInit() {
+    http_headers = NULL;
+    test_and_set = false;
+    origin_mem.pos = 0;
+    origin_mem.size = 0;
+    origin_mem.data = NULL;
+    callback = NULL;
+    mmf = NULL;
+    origin_file = NULL;
+    request = kReqHead;
+    error_code = kFailOk;
+    num_retries = 0;
+    backoff_ms = 0;
+    origin = kOriginPath;
+  }
   ~JobInfo() {}
 
   // Internal state, don't touch
@@ -216,7 +235,7 @@ class S3FanoutManager : SingleCopy {
   std::set<CURL *> *pool_handles_inuse_;
   std::set<S3FanOutDnsEntry *> *sharehandles_;
   std::map<CURL *, S3FanOutDnsEntry *> *curl_sharehandles_;
-  dns::CaresResolver *resolver;
+  dns::CaresResolver *resolver_;
   uint32_t pool_max_handles_;
   CURLM *curl_multi_;
   std::string *user_agent_;
