@@ -2052,8 +2052,12 @@ void DownloadManager::SetProxyChain(const string &proxy_list,
       if (this_group[j] == "DIRECT") {
         if (fallback_proxy_list == "")
           infos.push_back(ProxyInfo("DIRECT"));
-        else
+        else {
           --num_proxy;
+           LogCvmfs(kLogDownload,
+                    kLogDebug,
+                    "skipping DIRECT proxy to use fallback proxy");
+        }
         continue;
       }
 
