@@ -40,6 +40,11 @@ template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
  protected:
   typedef typename CatalogTraversalT::ObjectFetcherTN ObjectFetcherTN;
+  typedef typename ObjectFetcherTN::HistoryTN         HistoryTN;
+  typedef typename CatalogTraversalT::CatalogTN       CatalogTN;
+  typedef typename CatalogTraversalT::CallbackDataTN  TraversalCallbackDataTN;
+  typedef typename CatalogTraversalT::Parameters      TraversalParameters;
+  typedef std::vector<shash::Any>                     HashVector;
 
  public:
   struct Configuration {
@@ -53,7 +58,6 @@ class GarbageCollector {
       , object_fetcher(NULL)
       , keep_history_depth(kFullHistory)
       , keep_history_timestamp(kNoTimestamp)
-      , base_history_database(kLatestHistoryDatabase)
       , dry_run(false)
       , verbose(false) {}
 
@@ -61,16 +65,9 @@ class GarbageCollector {
     ObjectFetcherTN           *object_fetcher;
     unsigned int               keep_history_depth;
     time_t                     keep_history_timestamp;
-    shash::Any                 base_history_database;
     bool                       dry_run;
     bool                       verbose;
   };
-
- protected:
-  typedef typename CatalogTraversalT::CatalogTN       CatalogTN;
-  typedef typename CatalogTraversalT::CallbackDataTN  TraversalCallbackDataTN;
-  typedef typename CatalogTraversalT::Parameters      TraversalParameters;
-  typedef std::vector<shash::Any>                     HashVector;
 
  public:
   GarbageCollector(const Configuration &configuration);
@@ -89,9 +86,9 @@ class GarbageCollector {
   void SweepDataObjects   (const TraversalCallbackDataTN &data);
 
   bool AnalyzePreservedCatalogTree();
+  bool CheckPreservedRevisions();
   bool SweepCondemnedCatalogTree();
-
-  bool GetHistoryRecycleBinContents(std::set<shash::Any> *result_set) const;
+  bool SweepHistoricRevisions();
 
   void CheckAndSweep(const shash::Any &hash);
   void Sweep(const shash::Any &hash);
