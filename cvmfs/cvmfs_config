@@ -78,7 +78,7 @@ cvmfs_config_usage() {
  echo "Common configuration tasks for CernVM-FS"
  echo "Usage: $0 <command>"
  echo "Commands are"
- echo "  setup [nouser] [nocfgmod]"
+ echo "  setup [nouser] [nocfgmod] [nostart]"
  echo "  chksetup"
  echo "  showconfig [<repository>]"
  echo "  stat [-v | <repository>]"
@@ -94,11 +94,9 @@ cvmfs_config_usage() {
 cvmfs_setup() {
   local nouser
   local nocfgmod
-  local noservice
   local nostart
   nouser=0
   nocfgmod=0
-  noservice=0
   nostart=0
 
   if ! cvmfs_readconfig; then
@@ -116,6 +114,10 @@ cvmfs_setup() {
       nocfgmod)
          shift 1
          nocfgmod=1
+      ;;
+      nostart)
+         shift 1
+         nostart=1
       ;;
       *)
         echo "Bad option: $1"
@@ -155,12 +157,12 @@ cvmfs_setup() {
   fi
 
   if [ $nocfgmod -eq 0 ]; then
-    if ! configure_autofs; then
-      echo "Cannot configure autofs!"
-      exit 1
-    fi
     if ! configure_fuse; then
       echo "Cannot configure fuse!"
+      exit 1
+    fi
+    if ! configure_autofs; then
+      echo "Cannot configure autofs!"
       exit 1
     fi
 
@@ -169,6 +171,10 @@ cvmfs_setup() {
       echo "Cannot configure sudoers"
       exit 1
     fi
+  fi
+
+  if [ $nostart -eq 0 ]; then
+    activate_service autofs
   fi
 }
 
@@ -1320,6 +1326,46 @@ check_user_in_group() {
     * )
       echo "Architecture $sys_arch is not supported"
       exit 1 ;;
+  esac
+}
+
+activate_service() {
+  local svc=$1
+
+  case $sys_arch in
+    Linux )
+      if [ -e /usr/bin/systemctl ]; then
+        /usr/bin/systemctl start -q ${svc}.service
+        /usr/bin/systemctl enable -q ${svc}.service
+      elif [ -e /sbin/service -o -e /usr/sbin/service ]; then
+        local servicebin=/sbin/service
+        if [ ! -e $servicebin ]; then
+          servicebin=/usr/sbin/service
+        fi
+        $servicebin $svc status >/dev/null 2>&1
+        if [ $? -ne 0 ]; then
+          $servicebin $svc start >/dev/null
+        fi
+
+        if [ -e /sbin/chkconfig ]; then
+          # Prevent on upstart managed systems
+          if [ ! -L $svc ]; then
+            /sbin/chkconfig $svc on
+          fi
+        fi
+      else
+        echo "Utility to manage services missing"
+        exit 1
+      fi
+    ;;
+    Darwin )
+      # Not supported at this point
+      :
+    ;;
+    * )
+      echo "Architecture $sys_arch is not supported"
+      exit 1
+    ;;
   esac
 }
 

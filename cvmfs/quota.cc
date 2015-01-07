@@ -850,7 +850,7 @@ bool RebuildDatabase() {
   DIR *dirp = NULL;
   string path;
 
-  LogCvmfs(kLogQuota, kLogSyslog | kLogDebug, "re-building cache-database");
+  LogCvmfs(kLogQuota, kLogSyslog | kLogDebug, "re-building cache database");
 
   // Empty cache catalog and fscache
   sql = "DELETE FROM cache_catalog; DELETE FROM fscache;";
@@ -876,9 +876,10 @@ bool RebuildDatabase() {
       goto build_return;
     }
     while ((d = platform_readdir(dirp)) != NULL) {
-      if (d->d_type != DT_REG) continue;
-
       if (stat((path + "/" + string(d->d_name)).c_str(), &info) == 0) {
+        if (!S_ISREG(info.st_mode))
+          continue;
+        
         string hash = string(hex) + string(d->d_name);
         sqlite3_bind_text(stmt_insert, 1, hash.data(), hash.length(),
                           SQLITE_STATIC);

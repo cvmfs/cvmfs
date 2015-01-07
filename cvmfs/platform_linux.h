@@ -7,26 +7,26 @@
 #ifndef CVMFS_PLATFORM_LINUX_H_
 #define CVMFS_PLATFORM_LINUX_H_
 
-#include <pthread.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/prctl.h>
 #include <attr/xattr.h>
-#include <sys/mount.h>
-#include <sys/file.h>
-#include <sys/select.h>
-#include <signal.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
-#include <unistd.h>
 #include <mntent.h>
+#include <pthread.h>
+#include <signal.h>
+#include <sys/file.h>
+#include <sys/mount.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <sys/select.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdio>
-
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -179,9 +179,12 @@ inline bool platform_allow_ptrace(const pid_t pid) {
 #ifdef PR_SET_PTRACER
   // On Ubuntu, yama prevents all processes from ptracing other processes, even
   // when they are owned by the same user. Therefore the watchdog would not be
-  // able to create a stacktrace, without this extra permission:
+  // able to create a stacktrace, without this extra permission.
   const int retval = prctl(PR_SET_PTRACER, pid, 0, 0, 0);
-  return (retval == 0);
+  // On some platforms (e.g. CentOS7), PR_SET_PTRACER is defined but not
+  // supported by the kernel.  That's fine and we don't have to care about it
+  // when it happens.
+  return (retval == 0) || (errno == EINVAL);
 #else
   // On other platforms this is currently a no-op
   return true;
