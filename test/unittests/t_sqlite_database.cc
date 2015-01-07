@@ -684,6 +684,7 @@ TEST_F(T_SQLite_Wrapper, TakeFileOwnership) {
 
   DummyDatabase *db1 = DummyDatabase::Create(file_name1);
   ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db1);
+  EXPECT_FALSE(db1->OwnsFile());
   EXPECT_TRUE (FileExists(file_name1));
   delete db1;
 
@@ -692,6 +693,7 @@ TEST_F(T_SQLite_Wrapper, TakeFileOwnership) {
 
   DummyDatabase *db2 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadOnly);
   ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db2);
+  EXPECT_FALSE(db2->OwnsFile());
   EXPECT_TRUE (FileExists(file_name1));
   delete db2;
 
@@ -700,6 +702,7 @@ TEST_F(T_SQLite_Wrapper, TakeFileOwnership) {
 
   DummyDatabase *db3 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadWrite);
   ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db3);
+  EXPECT_FALSE(db3->OwnsFile());
   EXPECT_TRUE (FileExists(file_name1));
   delete db3;
 
@@ -709,7 +712,9 @@ TEST_F(T_SQLite_Wrapper, TakeFileOwnership) {
   DummyDatabase *db4 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadOnly);
   ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db4);
   EXPECT_TRUE (FileExists(file_name1));
+  EXPECT_FALSE(db4->OwnsFile());
   db4->TakeFileOwnership();
+  EXPECT_TRUE (db4->OwnsFile());
   EXPECT_TRUE (FileExists(file_name1));
   delete db4;
 
@@ -720,8 +725,10 @@ TEST_F(T_SQLite_Wrapper, TakeFileOwnership) {
   ASSERT_TRUE (FileExists(file_name2));
   DummyDatabase *db5 = DummyDatabase::Create(file_name2);
   ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db5);
+  EXPECT_FALSE(db5->OwnsFile());
   EXPECT_TRUE (FileExists(file_name2));
   db5->TakeFileOwnership();
+  EXPECT_TRUE (db5->OwnsFile());
   delete db5;
 
   EXPECT_EQ   (0u, DummyDatabase::instances);
@@ -731,6 +738,7 @@ TEST_F(T_SQLite_Wrapper, TakeFileOwnership) {
   ASSERT_TRUE (FileExists(file_name3));
   DummyDatabase *db6 = DummyDatabase::Create(file_name3);
   ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db6);
+  EXPECT_FALSE(db6->OwnsFile());
   EXPECT_TRUE (FileExists(file_name3));
   delete db6;
 
@@ -739,8 +747,10 @@ TEST_F(T_SQLite_Wrapper, TakeFileOwnership) {
 
   DummyDatabase *db7 = DummyDatabase::Open(file_name3, DummyDatabase::kOpenReadWrite);
   ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db7);
+  EXPECT_FALSE(db7->OwnsFile());
   EXPECT_TRUE (FileExists(file_name3));
   db7->TakeFileOwnership();
+  EXPECT_TRUE (db7->OwnsFile());
   EXPECT_TRUE (FileExists(file_name3));
   delete db7;
 
