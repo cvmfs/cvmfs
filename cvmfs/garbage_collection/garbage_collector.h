@@ -41,6 +41,10 @@ class GarbageCollector {
  protected:
   typedef typename CatalogTraversalT::ObjectFetcherTN ObjectFetcherTN;
   typedef typename ObjectFetcherTN::HistoryTN         HistoryTN;
+  typedef typename CatalogTraversalT::CatalogTN       CatalogTN;
+  typedef typename CatalogTraversalT::CallbackDataTN  TraversalCallbackDataTN;
+  typedef typename CatalogTraversalT::Parameters      TraversalParameters;
+  typedef std::vector<shash::Any>                     HashVector;
 
  public:
   struct Configuration {
@@ -64,12 +68,6 @@ class GarbageCollector {
     bool                       dry_run;
     bool                       verbose;
   };
-
- protected:
-  typedef typename CatalogTraversalT::CatalogTN       CatalogTN;
-  typedef typename CatalogTraversalT::CallbackDataTN  TraversalCallbackDataTN;
-  typedef typename CatalogTraversalT::Parameters      TraversalParameters;
-  typedef std::vector<shash::Any>                     HashVector;
 
  public:
   GarbageCollector(const Configuration &configuration);
