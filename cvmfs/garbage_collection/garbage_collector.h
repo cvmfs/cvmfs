@@ -54,7 +54,6 @@ class GarbageCollector {
       , object_fetcher(NULL)
       , keep_history_depth(kFullHistory)
       , keep_history_timestamp(kNoTimestamp)
-      , base_history_database(kLatestHistoryDatabase)
       , dry_run(false)
       , verbose(false) {}
 
@@ -62,7 +61,6 @@ class GarbageCollector {
     ObjectFetcherTN           *object_fetcher;
     unsigned int               keep_history_depth;
     time_t                     keep_history_timestamp;
-    shash::Any                 base_history_database;
     bool                       dry_run;
     bool                       verbose;
   };
