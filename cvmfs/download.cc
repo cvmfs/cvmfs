@@ -1933,7 +1933,7 @@ bool DownloadManager::SortWrtGeoReply(
   set<uint64_t> coverage(reply_vals.begin(), reply_vals.end());
   if (coverage.size() != reply_vals.size())
     return false;
-  if ((*coverage.begin() != 1) || ((*coverage.rbegin() != coverage.size())))
+  if ((*coverage.begin() != 1) || (*coverage.rbegin() != coverage.size()))
     return false;
 
   vector<string> tmp(*input_hosts);
