@@ -1680,8 +1680,8 @@ EOF
   if is_local_upstream $upstream; then
     local repository_dir=$(get_upstream_config $upstream)
     create_apache_config_file "cvmfs.${name}.conf" << EOF
-# Translation URL to real pathname
 KeepAlive On
+# Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
     Options -MultiViews
@@ -2434,8 +2434,8 @@ EOF
     ((echo "# Created by cvmfs_server.  Don't touch."
       cat_wsgi_config ${alias_name}; cat) | \
       create_apache_config_file "cvmfs.${alias_name}.conf") << EOF
-# Translation URL to real pathname
 KeepAlive On
+# Translation URL to real pathname
 Alias /cvmfs/$alias_name ${storage_dir}
 <Directory "${storage_dir}">
     Options -MultiViews
