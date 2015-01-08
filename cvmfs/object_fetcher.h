@@ -209,27 +209,35 @@ class LocalObjectFetcher :
     assert (file_path != NULL);
     file_path->clear();
 
+    // check if the requested file object is available locally
     const std::string source = BuildPath(object_hash, hash_suffix);
-    const std::string dest   = CreateTempPath(temporary_directory_ + "/" +
-                                              object_hash.ToStringWithSuffix(),
-                                              0600);
-
     if (! FileExists(source)) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s at '%s'",
-               object_hash.ToString().c_str(), dest.c_str());
+      LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s",
+               object_hash.ToString().c_str());
       return false;
     }
 
-    if (! zlib::DecompressPath2Path(source, dest)) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
-                                        "to '%s' (errno: %d)",
-               object_hash.ToString().c_str(), source.c_str(), dest.c_str(),
+    // create a temporary file to store the decompressed object file
+    const std::string tmp_path = temporary_directory_ + "/" +
+                                 object_hash.ToStringWithSuffix();
+    FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
+    if (NULL == f) {
+      LogCvmfs(kLogDownload, kLogStderr, "failed to create temp file (errno: %d)",
                errno);
       return false;
     }
 
-    *file_path = dest;
-    return true;
+    // decompress the requested object file
+    const bool success = zlib::DecompressPath2File(source, f);
+    if (! success) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
+                                        "to '%s' (errno: %d)",
+               object_hash.ToString().c_str(), source.c_str(),
+               file_path->c_str(), errno);
+    }
+
+    fclose(f);
+    return success;
   }
 
 
