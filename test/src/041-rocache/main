@@ -12,7 +12,7 @@ cvmfs_run_test() {
   cvmfs_mount atlas.cern.ch \
     "CVMFS_CACHE_BASE=$tmpdir" \
     "CVMFS_SHARED_CACHE=no" \
-    "CVMFS_CONFIG_REPOSITORY="  
+    "CVMFS_CONFIG_REPOSITORY="
   if [ $? -ne 0 ]; then
     sudo umount -l $tmpdir
     sudo rmdir $tmpdir
