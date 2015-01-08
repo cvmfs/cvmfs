@@ -163,7 +163,9 @@ bool Database<DerivedT>::FileReadAhead() {
   if (retval != 0) {
     LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
              "failed to read-ahead %s (%d)", filename_.c_str(), errno);
-    return false;
+    // Read-ahead is known to fail on tmpfs.  Don't consider it as a fatal
+    // error.
+    // return false;
   }
 
   return true;
