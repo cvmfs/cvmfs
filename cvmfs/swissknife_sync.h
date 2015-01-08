@@ -24,7 +24,8 @@ struct SyncParameters {
     min_file_chunk_size(4*1024*1024),
     avg_file_chunk_size(8*1024*1024),
     max_file_chunk_size(16*1024*1024),
-    manual_revision(0) {}
+    manual_revision(0),
+    max_concurrent_write_jobs(0) {}
 
   upload::Spooler *spooler;
   std::string      dir_union;
@@ -48,6 +49,7 @@ struct SyncParameters {
   size_t           avg_file_chunk_size;
   size_t           max_file_chunk_size;
   uint64_t         manual_revision;
+  uint64_t         max_concurrent_write_jobs;
 };
 
 namespace catalog {
@@ -207,6 +209,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional ('e', "hash algorithm (default: SHA-1)"));
     r.push_back(Parameter::Optional ('j', "catalog entry warning threshold"));
     r.push_back(Parameter::Optional ('v', "manual revision number"));
+    r.push_back(Parameter::Optional ('q', "number of concurrent write jobs"));
     return r;
   }
   int Main(const ArgumentList &args);

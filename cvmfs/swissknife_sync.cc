@@ -510,16 +510,25 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.manual_revision = String2Uint64(*args.find('v')->second);
   }
 
+  if (args.find('q') != args.end()) {
+    params.max_concurrent_write_jobs = String2Uint64(*args.find('q')->second);
+  }
+
   if (!CheckParams(params)) return 2;
 
   // Start spooler
-  const upload::SpoolerDefinition spooler_definition(
+  upload::SpoolerDefinition spooler_definition(
     params.spooler_definition,
     hash_algorithm,
     params.use_file_chunking,
     params.min_file_chunk_size,
     params.avg_file_chunk_size,
     params.max_file_chunk_size);
+  if (params.max_concurrent_write_jobs > 0) {
+    spooler_definition.number_of_concurrent_uploads =
+                                               params.max_concurrent_write_jobs;
+  }
+
   params.spooler = upload::Spooler::Construct(spooler_definition);
   if (NULL == params.spooler)
     return 3;
