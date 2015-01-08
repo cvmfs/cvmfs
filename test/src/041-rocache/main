@@ -11,7 +11,13 @@ cvmfs_run_test() {
 
   cvmfs_mount atlas.cern.ch \
     "CVMFS_CACHE_BASE=$tmpdir" \
-    "CVMFS_SHARED_CACHE=no" || return 2
+    "CVMFS_SHARED_CACHE=no" \
+    "CVMFS_CONFIG_REPOSITORY="
+  if [ $? -ne 0 ]; then
+    sudo umount -l $tmpdir
+    sudo rmdir $tmpdir
+    return 2
+  fi
   sudo mount -o remount,ro $tmpdir
   if [ $? -eq 0 ]; then
     echo "r/o remount is not supposed to work at this stage"

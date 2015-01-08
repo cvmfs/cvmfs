@@ -141,21 +141,21 @@ static void ExpectResolvedName(
 {
   set<string> ipv4_addresses = host.ipv4_addresses();
   if (!ipv4.empty()) {
-    ASSERT_EQ(ipv4_addresses.size(), 1U);
-    EXPECT_EQ(*ipv4_addresses.begin(), ipv4);
+    ASSERT_EQ(1U, ipv4_addresses.size());
+    EXPECT_EQ(ipv4, *ipv4_addresses.begin());
   } else {
-    EXPECT_EQ(ipv4_addresses.size(), 0U);
+    EXPECT_EQ(0U, ipv4_addresses.size());
   }
   if (!ipv6.empty()) {
     EXPECT_TRUE(host.HasIpv6());
     set<string> ipv6_addresses = host.ipv6_addresses();
-    ASSERT_EQ(ipv6_addresses.size(), 1U);
-    EXPECT_EQ(*ipv6_addresses.begin(), ipv6);
+    ASSERT_EQ(1U, ipv6_addresses.size());
+    EXPECT_EQ(ipv6, *ipv6_addresses.begin());
   } else {
     EXPECT_FALSE(host.HasIpv6());
-    EXPECT_EQ(host.ipv6_addresses().size(), 0U);
+    EXPECT_EQ(0U, host.ipv6_addresses().size());
   }
-  EXPECT_EQ(host.name(), fqdn);
+  EXPECT_EQ(fqdn, host.name());
 }
 
 
@@ -576,18 +576,16 @@ TEST_F(T_Dns, CaresResolverFinalDot) {
 
 
 TEST_F(T_Dns, CaresResolverLocalhost) {
-  string localname = "localhost";
-  vector<string> domains = default_resolver->domains();
-  for (unsigned i = 0; i < domains.size(); ++i) {
-    if (domains[i] == "localdomain")
-      localname += ".localdomain";
-  }
-
-  Host host = default_resolver->Resolve(localname);
+  Host host = default_resolver->Resolve("localhost");
+  // Not using ExpectResolvedName because the canonical name for localhost
+  // differs from system to system.
+  ASSERT_EQ(1U, host.ipv4_addresses().size());
+  EXPECT_EQ("127.0.0.1", *host.ipv4_addresses().begin());
   if (host.HasIpv6()) {
-    ExpectResolvedName(host, localname, "127.0.0.1", "[::1]");
+    ASSERT_EQ(1U, host.ipv6_addresses().size());
+    EXPECT_EQ("[::1]", *host.ipv6_addresses().begin());
   } else {
-    ExpectResolvedName(host, localname, "127.0.0.1", "");
+    EXPECT_EQ(0U, host.ipv6_addresses().size());
   }
 }
 

@@ -89,9 +89,11 @@ bool Database<DerivedT>::Initialize() {
   const int flags = (read_write_) ? SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE
                                   : SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
-  const bool successful = OpenDatabase(flags)        &&
-                          FileReadAhead()            &&
-                          PrepareCommonQueries();
+  const bool successful =
+    OpenDatabase(flags) &&
+    Configure()         &&
+    FileReadAhead()     &&
+    PrepareCommonQueries();
   if (! successful) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open database file '%s'",
                                  filename().c_str());
@@ -148,6 +150,18 @@ Database<DerivedT>::~Database() {
 
 
 template <class DerivedT>
+bool Database<DerivedT>::Configure() {
+  // Read-only databases should store temporary files in memory.  This avoids
+  // unexpected open read-write file descriptors in the cache directory like
+  // etilqs_<number>.
+  if (!read_write_) {
+    return Sql(sqlite_db_ , "PRAGMA temp_store=2;").Execute();
+  }
+  return true;
+}
+
+
+template <class DerivedT>
 bool Database<DerivedT>::FileReadAhead() {
   // Read-ahead into file system buffers
   // TODO: mmap, re-readahead
@@ -162,8 +176,10 @@ bool Database<DerivedT>::FileReadAhead() {
   close(fd_readahead);
   if (retval != 0) {
     LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
-             "failed to read-ahead %s (%d)", filename().c_str(), errno);
-    return false;
+             "failed to read-ahead %s (%d)", filename_.c_str(), errno);
+    // Read-ahead is known to fail on tmpfs.  Don't consider it as a fatal
+    // error.
+    // return false;
   }
 
   return true;

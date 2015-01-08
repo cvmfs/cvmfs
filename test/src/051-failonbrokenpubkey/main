@@ -4,7 +4,7 @@ cvmfs_test_name="Mount with Broken Public Key Files"
 CVMFS_TEST_051_KEYFILE="broken.key.051.pub"
 cleanup() {
   echo "deleting broken key file $CVMFS_TEST_051_KEYFILE"
-  sudo rm -f /etc/cvmfs/keys/$CVMFS_TEST_051_KEYFILE
+  sudo rm -f /etc/cvmfs/keys/cern.ch/$CVMFS_TEST_051_KEYFILE
 }
 
 cvmfs_run_test() {
@@ -31,7 +31,7 @@ sQIDAQAB
 -----END PUBLIC KEY¿¿
 EOF
   trap cleanup HUP INT TERM EXIT
-  sudo cp broken.pub /etc/cvmfs/keys/$CVMFS_TEST_051_KEYFILE || return 5
+  sudo cp broken.pub /etc/cvmfs/keys/cern.ch/$CVMFS_TEST_051_KEYFILE || return 5
 
   echo "try to remount the repositories (should fail now)"
   cvmfs_mount atlas.cern.ch,lhcb.cern.ch && return 6
