@@ -1681,6 +1681,7 @@ EOF
     local repository_dir=$(get_upstream_config $upstream)
     create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Translation URL to real pathname
+KeepAlive On
 Alias /cvmfs/$name ${repository_dir}
 <Directory "${repository_dir}">
     Options -MultiViews
@@ -2434,6 +2435,7 @@ EOF
       cat_wsgi_config ${alias_name}; cat) | \
       create_apache_config_file "cvmfs.${alias_name}.conf") << EOF
 # Translation URL to real pathname
+KeepAlive On
 Alias /cvmfs/$alias_name ${storage_dir}
 <Directory "${storage_dir}">
     Options -MultiViews
