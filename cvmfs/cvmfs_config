@@ -1349,7 +1349,7 @@ activate_service() {
 
         if [ -e /sbin/chkconfig ]; then
           # Prevent on upstart managed systems
-          if [ ! -L $svc ]; then
+          if [ -f /etc/init.d/$svc -a ! -L /etc/init.d/$svc ]; then
             /sbin/chkconfig $svc on
           fi
         fi
