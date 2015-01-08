@@ -24,6 +24,11 @@ class Sql;
  * templated methods SetProperty(), GetProperty<>() and HasProperty() that take
  * all common data types and persist it in the database.
  *
+ * By default Database<> objects do not take ownership of the underlying SQLite
+ * database file and hence do not unlink it on database closure. If the using
+ * code calls Database<>::TakeFileOwnership() the SQLite file will be unlinked
+ * in the destructor of the Database<> object.
+ *
  * Note: This implements a Curiously Recurring Template Pattern in order to
  *       implement Database::Create and Database::Open as a static polymorphism
  *
@@ -120,11 +125,11 @@ class Database : SingleCopy {
   bool SetProperty(const std::string &key, const T value);
   bool HasProperty(const std::string &key) const;
 
-  sqlite3     *sqlite_db()       const { return sqlite_db_;       }
-  std::string  filename()        const { return filename_;        }
-  float        schema_version()  const { return schema_version_;  }
-  unsigned     schema_revision() const { return schema_revision_; }
-  bool         read_write()      const { return read_write_;      }
+  sqlite3     *sqlite_db()       const { return sqlite_db_;            }
+  std::string  filename()        const { return db_file_guard_.path(); }
+  float        schema_version()  const { return schema_version_;       }
+  unsigned     schema_revision() const { return schema_revision_;      }
+  bool         read_write()      const { return read_write_;           }
 
   /**
    * Figures out the ratio of free SQLite memory pages in the SQLite database
@@ -160,6 +165,30 @@ class Database : SingleCopy {
    */
   std::string GetLastErrorMsg() const;
 
+
+  /**
+   * Transfers the ownership of the SQLite database file to the Database<> ob-
+   * ject. Hence, it will automatically unlink the file, once the Database<>
+   * object goes out of scope or is deleted.
+   */
+  void TakeFileOwnership();
+
+  /**
+   * Resigns from the ownership of the SQLite database file underlying this
+   * Database<> object. After calling this the using code is responsible of
+   * managing the database file.
+   */
+  void DropFileOwnership();
+
+  /**
+   * Check if the SQLite database file is managed by the Database<> object
+   * Note: unmanaged means, that the using code needs to take care of the file
+   *       management (i.e. delete the file after usage)
+   *
+   * @return  false if file is unmanaged
+   */
+  bool OwnsFile() const { return db_file_guard_.IsEnabled(); }
+
  protected:
   /**
    * Private constructor! Use the factory methods DerivedT::Create() or
@@ -184,7 +213,7 @@ class Database : SingleCopy {
 
  private:
   sqlite3            *sqlite_db_;
-  const std::string   filename_;
+  UnlinkGuard         db_file_guard_;
   const bool          read_write_;
   float               schema_version_;
   unsigned            schema_revision_;

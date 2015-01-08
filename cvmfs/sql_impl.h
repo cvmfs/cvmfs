@@ -16,7 +16,7 @@ template <class DerivedT>
 Database<DerivedT>::Database(const std::string  &filename,
                              const OpenMode      open_mode) :
   sqlite_db_(NULL),
-  filename_(filename),
+  db_file_guard_(filename, UnlinkGuard::kDisabled),
   read_write_(kOpenReadWrite == open_mode),
   schema_version_(0.0f),
   schema_revision_(0) {}
@@ -94,7 +94,7 @@ bool Database<DerivedT>::Initialize() {
                           PrepareCommonQueries();
   if (! successful) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open database file '%s'",
-                                 filename_.c_str());
+                                 filename().c_str());
     return false;
   }
 
@@ -105,7 +105,7 @@ bool Database<DerivedT>::Initialize() {
 
   if (! static_cast<DerivedT*>(this)->CheckSchemaCompatibility()) {
     LogCvmfs(kLogSql, kLogDebug, "schema version %f not supported (%s)",
-             schema_version_, filename_.c_str());
+             schema_version_, filename().c_str());
     return false;
   }
 
@@ -123,11 +123,11 @@ template <class DerivedT>
 bool Database<DerivedT>::OpenDatabase(const int flags) {
   // Open database file (depending on the flags read-only or read-write)
   LogCvmfs(kLogSql, kLogDebug, "opening database file %s",
-           filename_.c_str());
-  if (SQLITE_OK != sqlite3_open_v2(filename_.c_str(), &sqlite_db_, flags, NULL))
+           filename().c_str());
+  if (SQLITE_OK != sqlite3_open_v2(filename().c_str(), &sqlite_db_, flags, NULL))
   {
     LogCvmfs(kLogSql, kLogDebug, "cannot open database file %s",
-             filename_.c_str());
+             filename().c_str());
     return false;
   }
 
@@ -151,10 +151,10 @@ template <class DerivedT>
 bool Database<DerivedT>::FileReadAhead() {
   // Read-ahead into file system buffers
   // TODO: mmap, re-readahead
-  int fd_readahead = open(filename_.c_str(), O_RDONLY);
+  int fd_readahead = open(filename().c_str(), O_RDONLY);
   if (fd_readahead < 0) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open %s for read-ahead (%d)",
-             filename_.c_str(), errno);
+             filename().c_str(), errno);
     return false;
   }
 
@@ -162,7 +162,7 @@ bool Database<DerivedT>::FileReadAhead() {
   close(fd_readahead);
   if (retval != 0) {
     LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
-             "failed to read-ahead %s (%d)", filename_.c_str(), errno);
+             "failed to read-ahead %s (%d)", filename().c_str(), errno);
     return false;
   }
 
@@ -267,6 +267,21 @@ std::string Database<DerivedT>::GetLastErrorMsg() const {
   return msg;
 }
 
+
+template <class DerivedT>
+void Database<DerivedT>::TakeFileOwnership() {
+  db_file_guard_.Enable();
+  LogCvmfs(kLogSql, kLogDebug, "Database object took ownership of '%s'",
+           db_file_guard_.path().c_str());
+}
+
+
+template <class DerivedT>
+void Database<DerivedT>::DropFileOwnership() {
+  db_file_guard_.Disable();
+  LogCvmfs(kLogSql, kLogDebug, "Database object dropped ownership of '%s'",
+           db_file_guard_.path().c_str());
+}
 
 /**
  * Used to check if the database needs cleanup

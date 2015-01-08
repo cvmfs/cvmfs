@@ -347,6 +347,26 @@ class T_ObjectFetcher : public ::testing::Test {
     return NeedsFilesystemSandbox(type<ObjectFetcherT>());
   }
 
+  typedef std::vector<std::string> DirectoryListing;
+  void ListDirectory(const std::string &path, DirectoryListing *listing) const {
+    ASSERT_TRUE (listing != NULL);
+    listing->clear();
+
+    DIR *dp;
+    struct dirent *ep;
+    dp = opendir(path.c_str());
+    ASSERT_NE (static_cast<DIR*>(NULL), dp);
+
+    while ( (ep = readdir(dp)) ) {
+      const std::string name = ep->d_name;
+      if (name != "." && name != "..") {
+        listing->push_back(name);
+      }
+    }
+
+    closedir(dp);
+  }
+
  private:
   // type-based overloading helper struct
   // Inspired from here:
@@ -634,4 +654,62 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalog) {
     object_fetcher->FetchCatalog(h("5739dc30f42525a261b2f4b383b220df3e36f04d",
                                    shash::kSuffixCatalog), ""));
   ASSERT_FALSE (catalog.IsValid());
+}
+
+
+TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFiles) {
+  if (! TestFixture::NeedsFilesystemSandbox()) {
+    // this is only valid if we are actually creating files...
+    return;
+  }
+
+  typedef typename TestFixture::DirectoryListing DirectoryListing;
+  DirectoryListing listing;
+  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
+
+  int files = 0;
+
+  EXPECT_EQ (files, listing.size());
+
+  UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
+  ASSERT_TRUE (object_fetcher.IsValid());
+
+  UniquePtr<manifest::Manifest> manifest(object_fetcher->FetchManifest());
+  ASSERT_TRUE (manifest.IsValid());
+
+  EXPECT_EQ (files, listing.size());
+
+  UniquePtr<typename TypeParam::CatalogTN> catalog(
+    object_fetcher->FetchCatalog(TestFixture::root_hash, ""));
+  ASSERT_TRUE (catalog.IsValid());
+
+  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
+  EXPECT_LT (files, listing.size());
+  files = listing.size();
+
+  UniquePtr<typename TypeParam::HistoryTN> history(object_fetcher->FetchHistory());
+  ASSERT_TRUE (history.IsValid());
+
+  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
+  EXPECT_LT (files, listing.size());
+  files = listing.size();
+
+  delete object_fetcher.Release();
+
+  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
+  EXPECT_EQ (files, listing.size());
+
+  delete history.Release();
+
+  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
+  EXPECT_GT (files, listing.size());
+  files = listing.size();
+
+  delete catalog.Release();
+
+  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
+  EXPECT_GT (files, listing.size());
+  files = listing.size();
+
+  EXPECT_EQ (0u, listing.size());
 }

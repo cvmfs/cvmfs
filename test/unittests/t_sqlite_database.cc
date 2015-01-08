@@ -676,3 +676,171 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
 
   EXPECT_GT (150000, GetFileSize(dbp));
 }
+
+
+TEST_F(T_SQLite_Wrapper, TakeFileOwnership) {
+  const std::string file_name1 = GetDatabaseFilename();
+  ASSERT_TRUE (FileExists(file_name1));
+
+  DummyDatabase *db1 = DummyDatabase::Create(file_name1);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db1);
+  EXPECT_FALSE(db1->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name1));
+  delete db1;
+
+  EXPECT_EQ  (0u, DummyDatabase::instances);
+  EXPECT_TRUE(FileExists(file_name1));
+
+  DummyDatabase *db2 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadOnly);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db2);
+  EXPECT_FALSE(db2->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name1));
+  delete db2;
+
+  EXPECT_EQ  (0u, DummyDatabase::instances);
+  EXPECT_TRUE(FileExists(file_name1));
+
+  DummyDatabase *db3 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadWrite);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db3);
+  EXPECT_FALSE(db3->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name1));
+  delete db3;
+
+  EXPECT_EQ  (0u, DummyDatabase::instances);
+  EXPECT_TRUE(FileExists(file_name1));
+
+  DummyDatabase *db4 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadOnly);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db4);
+  EXPECT_TRUE (FileExists(file_name1));
+  EXPECT_FALSE(db4->OwnsFile());
+  db4->TakeFileOwnership();
+  EXPECT_TRUE (db4->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name1));
+  delete db4;
+
+  EXPECT_EQ   (0u, DummyDatabase::instances);
+  EXPECT_FALSE(FileExists(file_name1));
+
+  const std::string file_name2 = GetDatabaseFilename();
+  ASSERT_TRUE (FileExists(file_name2));
+  DummyDatabase *db5 = DummyDatabase::Create(file_name2);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db5);
+  EXPECT_FALSE(db5->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name2));
+  db5->TakeFileOwnership();
+  EXPECT_TRUE (db5->OwnsFile());
+  delete db5;
+
+  EXPECT_EQ   (0u, DummyDatabase::instances);
+  EXPECT_FALSE(FileExists(file_name2));
+
+  const std::string file_name3 = GetDatabaseFilename();
+  ASSERT_TRUE (FileExists(file_name3));
+  DummyDatabase *db6 = DummyDatabase::Create(file_name3);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db6);
+  EXPECT_FALSE(db6->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name3));
+  delete db6;
+
+  EXPECT_EQ  (0u, DummyDatabase::instances);
+  EXPECT_TRUE(FileExists(file_name3));
+
+  DummyDatabase *db7 = DummyDatabase::Open(file_name3, DummyDatabase::kOpenReadWrite);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db7);
+  EXPECT_FALSE(db7->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name3));
+  db7->TakeFileOwnership();
+  EXPECT_TRUE (db7->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name3));
+  delete db7;
+
+  EXPECT_EQ   (0u, DummyDatabase::instances);
+  EXPECT_FALSE(FileExists(file_name3));
+}
+
+
+TEST_F(T_SQLite_Wrapper, DropFileOwnership) {
+  const std::string file_name1 = GetDatabaseFilename();
+  ASSERT_TRUE (FileExists(file_name1));
+
+  DummyDatabase *db1 = DummyDatabase::Create(file_name1);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db1);
+  EXPECT_FALSE(db1->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name1));
+  delete db1;
+
+  EXPECT_EQ  (0u, DummyDatabase::instances);
+  EXPECT_TRUE(FileExists(file_name1));
+
+  DummyDatabase *db2 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadOnly);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db2);
+  EXPECT_FALSE(db2->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name1));
+  delete db2;
+
+  EXPECT_EQ  (0u, DummyDatabase::instances);
+  EXPECT_TRUE(FileExists(file_name1));
+
+  DummyDatabase *db3 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadWrite);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db3);
+  EXPECT_FALSE(db3->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name1));
+  delete db3;
+
+  EXPECT_EQ  (0u, DummyDatabase::instances);
+  EXPECT_TRUE(FileExists(file_name1));
+
+  DummyDatabase *db4 = DummyDatabase::Open(file_name1, DummyDatabase::kOpenReadOnly);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db4);
+  EXPECT_TRUE (FileExists(file_name1));
+  EXPECT_FALSE(db4->OwnsFile());
+  db4->TakeFileOwnership();
+  EXPECT_TRUE (db4->OwnsFile());
+  db4->DropFileOwnership();
+  EXPECT_FALSE(db4->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name1));
+  delete db4;
+
+  EXPECT_EQ   (0u, DummyDatabase::instances);
+  EXPECT_TRUE (FileExists(file_name1));
+
+  const std::string file_name2 = GetDatabaseFilename();
+  ASSERT_TRUE (FileExists(file_name2));
+  DummyDatabase *db5 = DummyDatabase::Create(file_name2);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db5);
+  EXPECT_FALSE(db5->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name2));
+  db5->TakeFileOwnership();
+  EXPECT_TRUE (db5->OwnsFile());
+  db5->DropFileOwnership();
+  EXPECT_FALSE(db5->OwnsFile());
+  delete db5;
+
+  EXPECT_EQ   (0u, DummyDatabase::instances);
+  EXPECT_TRUE (FileExists(file_name2));
+
+  const std::string file_name3 = GetDatabaseFilename();
+  ASSERT_TRUE (FileExists(file_name3));
+  DummyDatabase *db6 = DummyDatabase::Create(file_name3);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db6);
+  EXPECT_FALSE(db6->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name3));
+  delete db6;
+
+  EXPECT_EQ  (0u, DummyDatabase::instances);
+  EXPECT_TRUE(FileExists(file_name3));
+
+  DummyDatabase *db7 = DummyDatabase::Open(file_name3, DummyDatabase::kOpenReadWrite);
+  ASSERT_NE   (static_cast<DummyDatabase*>(NULL), db7);
+  EXPECT_FALSE(db7->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name3));
+  db7->TakeFileOwnership();
+  EXPECT_TRUE (db7->OwnsFile());
+  db7->DropFileOwnership();
+  EXPECT_FALSE(db7->OwnsFile());
+  EXPECT_TRUE (FileExists(file_name3));
+  delete db7;
+
+  EXPECT_EQ   (0u, DummyDatabase::instances);
+  EXPECT_TRUE (FileExists(file_name3));
+}
