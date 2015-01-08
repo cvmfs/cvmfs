@@ -343,22 +343,32 @@ class HttpObjectFetcher :
 
     object_file->clear();
 
-    const std::string url  = BuildUrl(object_hash, hash_suffix);
-    const std::string dest = CreateTempPath(temporary_directory_ + "/" +
-                                            object_hash.ToStringWithSuffix(),
-                                            0600);
-
-    download::JobInfo download_catalog(&url, true, false, &dest, &object_hash);
-    download::Failures retval = download_manager_->Fetch(&download_catalog);
-
-    if (retval != download::kFailOk) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
-                                        "%s (%d - %s)",
-               object_hash.ToString().c_str(), retval, Code2Ascii(retval));
+    // create temporary file to host the fetching result
+    const std::string tmp_path = temporary_directory_ + "/" +
+                                 object_hash.ToStringWithSuffix();
+    FILE *f = CreateTempFile(tmp_path, 0600, "w", object_file);
+    if (NULL == f) {
+      LogCvmfs(kLogDownload, kLogStderr, "failed to create temp file (errno: %d)",
+               errno);
+      return false;
     }
 
-    *object_file = dest;
-    return retval == download::kFailOk;
+    // fetch and decompress the requested objected
+    const std::string url = BuildUrl(object_hash, hash_suffix);
+    download::JobInfo download_catalog(&url, true, false, f, &object_hash);
+    download::Failures retval = download_manager_->Fetch(&download_catalog);
+    const bool success = (retval == download::kFailOk);
+
+    // error checking
+    if (! success) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
+                                        "%s to '%s' (%d - %s)",
+               object_hash.ToString().c_str(), object_file->c_str(),
+               retval, Code2Ascii(retval));
+    }
+
+    fclose(f);
+    return success;
   }
 
  protected:
