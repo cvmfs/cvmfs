@@ -481,6 +481,10 @@ class CatalogTraversal
       }
     }
 
+    // catalogs returned by ObjectFetcher<> are managing their database files by
+    // default... we need to manage this file manually here
+    job.catalog->DropDatabaseFileOwnership();
+
     job.catalog_file_path = job.catalog->database_path();
     job.catalog_file_size = GetFileSize(job.catalog->database_path());
 

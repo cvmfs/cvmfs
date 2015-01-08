@@ -246,7 +246,9 @@ MockHistory* MockHistory::Open(const std::string &path) {
 
 
 MockHistory::MockHistory(const bool          writable,
-                         const std::string  &fqrn) : writable_(writable) {
+                         const std::string  &fqrn)
+        : writable_(writable)
+        , owns_database_file_(false) {
   set_fqrn(fqrn);
   ++MockHistory::instances;
 }
@@ -257,6 +259,7 @@ MockHistory::MockHistory(const MockHistory &other)
   , recycle_bin_(other.recycle_bin_)
   , writable_(other.writable_)
   , previous_revision_(other.previous_revision_)
+  , owns_database_file_(false)
 {
   set_fqrn(other.fqrn());
   ++MockHistory::instances;

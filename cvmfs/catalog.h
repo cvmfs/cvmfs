@@ -155,6 +155,11 @@ class Catalog : public SingleCopy {
                          FileChunkList *chunks) const;
 
   const HashVector& GetReferencedObjects() const;
+  void TakeDatabaseFileOwnership();
+  void DropDatabaseFileOwnership();
+  bool OwnsDatabaseFile() const {
+    return NULL != database_ && database_->OwnsFile();
+  }
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;

@@ -146,3 +146,57 @@ TEST_F(T_UnlinkGuard, DeferredInit) {
   }
   EXPECT_FALSE (FileExists(file_path));
 }
+
+
+TEST_F(T_UnlinkGuard, DisabledInit) {
+  const std::string file_path = GetFilename();
+  {
+    ASSERT_TRUE (FileExists(file_path));
+
+    UnlinkGuard d(file_path, UnlinkGuard::kDisabled);
+    EXPECT_FALSE(d.IsEnabled());
+    EXPECT_TRUE (FileExists(file_path));
+  }
+
+  EXPECT_TRUE (FileExists(file_path));
+
+  {
+    ASSERT_TRUE (FileExists(file_path));
+
+    UnlinkGuard d(file_path, UnlinkGuard::kDisabled);
+    EXPECT_FALSE(d.IsEnabled());
+    EXPECT_TRUE (FileExists(file_path));
+
+    d.Enable();
+    EXPECT_TRUE (d.IsEnabled());
+    EXPECT_TRUE (FileExists(file_path));
+  }
+  EXPECT_FALSE (FileExists(file_path));
+}
+
+
+TEST_F(T_UnlinkGuard, ExplicitEnabledInit) {
+  const std::string file_path = GetFilename();
+  {
+    ASSERT_TRUE (FileExists(file_path));
+
+    UnlinkGuard d(file_path, UnlinkGuard::kEnabled);
+    EXPECT_TRUE (d.IsEnabled());
+    EXPECT_TRUE (FileExists(file_path));
+
+    d.Disable();
+    EXPECT_FALSE (d.IsEnabled());
+    EXPECT_TRUE  (FileExists(file_path));
+  }
+
+  EXPECT_TRUE (FileExists(file_path));
+
+  {
+    ASSERT_TRUE (FileExists(file_path));
+
+    UnlinkGuard d(file_path, UnlinkGuard::kEnabled);
+    EXPECT_TRUE (d.IsEnabled());
+    EXPECT_TRUE (FileExists(file_path));
+  }
+  EXPECT_FALSE (FileExists(file_path));
+}

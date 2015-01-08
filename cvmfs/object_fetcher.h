@@ -33,7 +33,10 @@ struct object_fetcher_traits;
  * from a backend storage of a repository.
  *
  * ObjectFetchers are supposed to be configured for one specific repository. How
- * this is done depends on the concrete implementation of this base class.
+ * this is done depends on the concrete implementation of this base class. When
+ * a concrete implementation of ObjectFetcher<> needs to deal with files on the
+ * local file system it is obliged to take measures for proper cleanup of those
+ * files after usage.
  *
  * It abstracts all accesses to external file or HTTP resources and gathers this
  * access logic in one central point. This also comes in handy when unit testing
@@ -61,7 +64,9 @@ class AbstractObjectFetcher {
 
   /**
    * Downloads and opens (read-only) a history database. Note that the user is
-   * responsible to remove the history object after usage.
+   * responsible to remove the history object after usage. The fetched SQLite
+   * database file will be unlinked automatically during the destruction of the
+   * HistoryTN object.
    *
    * @param history_hash  (optional) the content hash of the history database
    *                                 if left blank, the latest one is downloaded
@@ -81,7 +86,12 @@ class AbstractObjectFetcher {
     }
 
     // open the history file
-    return HistoryTN::Open(path);
+    HistoryTN *history = HistoryTN::Open(path);
+    if (NULL != history) {
+      history->TakeDatabaseFileOwnership();
+    }
+
+    return history;
   }
 
   /**
@@ -105,11 +115,16 @@ class AbstractObjectFetcher {
       return NULL;
     }
 
-    return CatalogTN::AttachFreely(catalog_path,
-                                   path,
-                                   catalog_hash,
-                                   parent,
-                                   is_nested);
+    CatalogTN *catalog = CatalogTN::AttachFreely(catalog_path,
+                                                 path,
+                                                 catalog_hash,
+                                                 parent,
+                                                 is_nested);
+    if (NULL != catalog) {
+      catalog->TakeDatabaseFileOwnership();
+    }
+
+    return catalog;
   }
 
  public:
@@ -194,25 +209,35 @@ class LocalObjectFetcher :
     assert (file_path != NULL);
     file_path->clear();
 
+    // check if the requested file object is available locally
     const std::string source = BuildPath(object_hash, hash_suffix);
-    const std::string dest   = temporary_directory_ + "/" +
-                               object_hash.ToString();
     if (! FileExists(source)) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s at '%s'",
-               object_hash.ToString().c_str(), dest.c_str());
+      LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s",
+               object_hash.ToString().c_str());
       return false;
     }
 
-    if (! zlib::DecompressPath2Path(source, dest)) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
-                                        "to '%s' (errno: %d)",
-               object_hash.ToString().c_str(), source.c_str(), dest.c_str(),
+    // create a temporary file to store the decompressed object file
+    const std::string tmp_path = temporary_directory_ + "/" +
+                                 object_hash.ToStringWithSuffix();
+    FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
+    if (NULL == f) {
+      LogCvmfs(kLogDownload, kLogStderr, "failed to create temp file (errno: %d)",
                errno);
       return false;
     }
 
-    *file_path = dest;
-    return true;
+    // decompress the requested object file
+    const bool success = zlib::DecompressPath2File(source, f);
+    if (! success) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
+                                        "to '%s' (errno: %d)",
+               object_hash.ToString().c_str(), source.c_str(),
+               file_path->c_str(), errno);
+    }
+
+    fclose(f);
+    return success;
   }
 
 
@@ -318,20 +343,32 @@ class HttpObjectFetcher :
 
     object_file->clear();
 
-    const std::string url  = BuildUrl(object_hash, hash_suffix);
-    const std::string dest = temporary_directory_ + "/" + object_hash.ToString();
-
-    download::JobInfo download_catalog(&url, true, false, &dest, &object_hash);
-    download::Failures retval = download_manager_->Fetch(&download_catalog);
-
-    if (retval != download::kFailOk) {
-      LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
-                                        "%s (%d - %s)",
-               object_hash.ToString().c_str(), retval, Code2Ascii(retval));
+    // create temporary file to host the fetching result
+    const std::string tmp_path = temporary_directory_ + "/" +
+                                 object_hash.ToStringWithSuffix();
+    FILE *f = CreateTempFile(tmp_path, 0600, "w", object_file);
+    if (NULL == f) {
+      LogCvmfs(kLogDownload, kLogStderr, "failed to create temp file (errno: %d)",
+               errno);
+      return false;
     }
 
-    *object_file = dest;
-    return retval == download::kFailOk;
+    // fetch and decompress the requested objected
+    const std::string url = BuildUrl(object_hash, hash_suffix);
+    download::JobInfo download_catalog(&url, true, false, f, &object_hash);
+    download::Failures retval = download_manager_->Fetch(&download_catalog);
+    const bool success = (retval == download::kFailOk);
+
+    // error checking
+    if (! success) {
+      LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
+                                        "%s to '%s' (%d - %s)",
+               object_hash.ToString().c_str(), object_file->c_str(),
+               retval, Code2Ascii(retval));
+    }
+
+    fclose(f);
+    return success;
   }
 
  protected:

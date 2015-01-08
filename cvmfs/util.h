@@ -298,8 +298,14 @@ class UniquePtr : SingleCopy {
  */
 class UnlinkGuard : SingleCopy {
  public:
+  enum InitialState { kEnabled, kDisabled };
+
+ public:
   inline UnlinkGuard() : enabled_(false) {}
-  inline UnlinkGuard(const std::string &path) : path_(path), enabled_(true) {}
+  inline UnlinkGuard(const std::string &path,
+                     const InitialState state = kEnabled)
+            : path_(path)
+            , enabled_(state == kEnabled) {}
   inline ~UnlinkGuard() { if (IsEnabled()) unlink(path_.c_str()); }
 
   inline void Set(const std::string &path) { path_ = path; Enable(); }

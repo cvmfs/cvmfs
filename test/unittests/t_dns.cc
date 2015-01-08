@@ -19,18 +19,18 @@ class T_Dns : public ::testing::Test {
  protected:
   virtual void SetUp() {
     int retval = unsetenv("HOST_ALIASES");
-    assert(retval == 0);
+    ASSERT_EQ(0, retval);
     default_resolver =
       CaresResolver::Create(false /* ipv4_only */, 1 /* retries */, 2000);
-    assert(default_resolver);
+    ASSERT_TRUE(default_resolver);
     ipv4_resolver =
       CaresResolver::Create(true /* ipv4_only */, 1 /* retries */, 2000);
-    assert(ipv4_resolver);
+    ASSERT_TRUE(ipv4_resolver);
 
     fhostfile = CreateTempFile("/tmp/cvmfstest", 0600, "w", &hostfile);
-    assert(fhostfile);
+    ASSERT_TRUE(fhostfile);
     hostfile_resolver = HostfileResolver::Create(hostfile, false);
-    assert(hostfile_resolver);
+    ASSERT_TRUE(hostfile_resolver);
   }
 
   virtual ~T_Dns() {
@@ -44,9 +44,10 @@ class T_Dns : public ::testing::Test {
   void CreateHostfile(const string &content) {
     int retval = ftruncate(fileno(fhostfile), 0);
     rewind(fhostfile);
-    assert(retval == 0);
+    ASSERT_EQ(0, retval);
     int num = fprintf(fhostfile, "%s", content.c_str());
-    assert((num >= 0) && (unsigned(num) == content.length()));
+    ASSERT_LT(0, num);
+    ASSERT_EQ(unsigned(num), content.length());
     fflush(fhostfile);
   }
 
@@ -644,7 +645,7 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
 
 TEST_F(T_Dns, CaresResolverBadResolver) {
   UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
-  ASSERT_FALSE(quick_resolver == NULL);
+  ASSERT_TRUE(quick_resolver.IsValid());
 
   vector<string> bad_resolvers;
   bad_resolvers.push_back("127.0.0.2");
@@ -661,7 +662,7 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
 TEST_F(T_Dns, CaresResolverTimeout) {
   // Because of backoff, timeout can actually be as high as 2s
   UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 3, 200));
-  ASSERT_FALSE(quick_resolver == NULL);
+  ASSERT_TRUE(quick_resolver.IsValid());
 
   vector<string> bad_resolvers;
   bad_resolvers.push_back("127.0.0.2");
@@ -847,7 +848,7 @@ TEST_F(T_Dns, HostfileResolverMultipleAddresses) {
 
 TEST_F(T_Dns, NormalResolverConstruct) {
   UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver != NULL);
+  ASSERT_TRUE(resolver.IsValid());
   ASSERT_EQ(resolver->domains(), resolver->cares_resolver_->domains());
   ASSERT_EQ(resolver->resolvers(), resolver->cares_resolver_->resolvers());
   ASSERT_EQ(resolver->timeout_ms(), resolver->cares_resolver_->timeout_ms());
@@ -856,13 +857,13 @@ TEST_F(T_Dns, NormalResolverConstruct) {
   int retval = setenv("HOST_ALIASES", "/no/such/file", 1);
   ASSERT_EQ(retval, 0);
   UniquePtr<NormalResolver> resolver2(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver2 == NULL);
+  ASSERT_FALSE(resolver2.IsValid());
 }
 
 
 TEST_F(T_Dns, NormalResolverSimple) {
   UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver != NULL);
+  ASSERT_TRUE(resolver.IsValid());
 
   Host host = resolver->Resolve("localhost");
   EXPECT_EQ(host.status(), kFailOk);
@@ -874,7 +875,7 @@ TEST_F(T_Dns, NormalResolverSimple) {
 
 TEST_F(T_Dns, NormalResolverLocalonly) {
   UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver != NULL);
+  ASSERT_TRUE(resolver.IsValid());
 
   vector<string> no_resolvers;
   no_resolvers.push_back("127.0.0.2");
@@ -886,7 +887,7 @@ TEST_F(T_Dns, NormalResolverLocalonly) {
 
 TEST_F(T_Dns, NormalResolverCombined) {
   UniquePtr<NormalResolver> resolver(NormalResolver::Create(false, 2, 2000));
-  ASSERT_TRUE(resolver != NULL);
+  ASSERT_TRUE(resolver.IsValid());
 
   vector<string> names;
   names.push_back("a.root-servers.net");
