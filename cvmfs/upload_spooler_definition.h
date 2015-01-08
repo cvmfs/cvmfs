@@ -34,12 +34,12 @@ struct SpoolerDefinition {
    * @param definition_string   the spooler definition string to be inter-
    *                            preted by the constructor
    */
-  explicit SpoolerDefinition(const std::string  &definition_string,
-                             const shash::Algorithms hash_algorithm,
-                             const bool          use_file_chunking   = false,
-                             const size_t        min_file_chunk_size = 0,
-                             const size_t        avg_file_chunk_size = 0,
-                             const size_t        max_file_chunk_size = 0);
+  explicit SpoolerDefinition(const std::string       &definition_string,
+                             const shash::Algorithms  hash_algorithm,
+                             const bool               use_file_chunking   = false,
+                             const size_t             min_file_chunk_size = 0,
+                             const size_t             avg_file_chunk_size = 0,
+                             const size_t             max_file_chunk_size = 0);
   bool IsValid() const { return valid_; }
 
   DriverType  driver_type;           //!< the type of the spooler driver
@@ -54,6 +54,7 @@ struct SpoolerDefinition {
   size_t             max_file_chunk_size;
 
   const unsigned int number_of_threads;
+  unsigned int       number_of_concurrent_uploads;
 
   bool valid_;
 };

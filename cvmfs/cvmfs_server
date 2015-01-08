@@ -3568,6 +3568,10 @@ publish() {
     if [ "x$CVMFS_GARBAGE_COLLECTION" = "xtrue" ]; then
       sync_command="$sync_command -g"
     fi
+    if [ "x$CVMFS_MAXIMAL_CONCURRENT_WRITES" != "x" ]; then
+      sync_command="$sync_command -q $CVMFS_MAXIMAL_CONCURRENT_WRITES"
+    fi
+    echo $sync_command
     local tag_command="$swissknife tag_create \
       -r $upstream                            \
       -w $stratum0                            \
