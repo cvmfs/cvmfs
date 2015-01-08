@@ -18,4 +18,3 @@ cvmfs_run_test() {
  
   return 0
 }
-

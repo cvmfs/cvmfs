@@ -174,6 +174,7 @@ class Database : SingleCopy {
   bool PrepareCommonQueries();
 
   bool OpenDatabase(const int sqlite_open_flags);
+  bool Configure();
   bool FileReadAhead();
 
   void ReadSchemaRevision();

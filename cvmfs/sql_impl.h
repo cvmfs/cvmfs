@@ -89,9 +89,11 @@ bool Database<DerivedT>::Initialize() {
   const int flags = (read_write_) ? SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE
                                   : SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READONLY;
 
-  const bool successful = OpenDatabase(flags)        &&
-                          FileReadAhead()            &&
-                          PrepareCommonQueries();
+  const bool successful =
+    OpenDatabase(flags) &&
+    Configure()         &&
+    FileReadAhead()     &&
+    PrepareCommonQueries();
   if (! successful) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open database file '%s'",
                                  filename_.c_str());
@@ -144,6 +146,18 @@ Database<DerivedT>::~Database() {
     sqlite3_close(sqlite_db_);
     sqlite_db_ = NULL;
   }
+}
+
+
+template <class DerivedT>
+bool Database<DerivedT>::Configure() {
+  // Read-only databases should store temporary files in memory.  This avoids
+  // unexpected open read-write file descriptors in the cache directory like
+  // etilqs_<number>.
+  if (!read_write_) {
+    return Sql(sqlite_db_ , "PRAGMA temp_store=2;").Execute();
+  }
+  return true;
 }
 
 
