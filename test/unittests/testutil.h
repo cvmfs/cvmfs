@@ -450,6 +450,10 @@ class MockHistory : public history::History,
 
   bool GetHashes(std::vector<shash::Any> *hashes) const;
 
+  void TakeDatabaseFileOwnership() { owns_database_file_ = true;  }
+  void DropDatabaseFileOwnership() { owns_database_file_ = false; }
+  bool OwnsDatabaseFile() const    { return owns_database_file_;  }
+
  public:
   void set_writable(const bool writable) { writable_ = writable; }
 
@@ -517,6 +521,7 @@ class MockHistory : public history::History,
   HashSet     recycle_bin_;
   bool        writable_;
   shash::Any  previous_revision_;
+  bool        owns_database_file_;
 };
 
 

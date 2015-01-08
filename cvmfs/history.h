@@ -166,10 +166,9 @@ class History {
   virtual bool GetHashes(std::vector<shash::Any> *hashes) const = 0;
 
   // database file management controls
-  virtual void TakeDatabaseFileOwnership() {};
-  virtual void DropDatabaseFileOwnership() {};
-  virtual bool OwnsDatabaseFile() const { return false; }
-
+  virtual void TakeDatabaseFileOwnership() = 0;
+  virtual void DropDatabaseFileOwnership() = 0;
+  virtual bool OwnsDatabaseFile() const    = 0;
 
   const std::string& fqrn() const { return fqrn_; }
 
