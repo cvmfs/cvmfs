@@ -52,7 +52,7 @@ TEST(T_Uuid, FromCache) {
 
 TEST(T_Uuid, FailWrite) {
   UniquePtr<Uuid> uuid(Uuid::Create("/no/such/path"));
-  EXPECT_TRUE(uuid.IsValid());
+  EXPECT_FALSE(uuid.IsValid());
 }
 
 TEST(T_Uuid, FailRead) {
@@ -62,7 +62,7 @@ TEST(T_Uuid, FailRead) {
   fclose(f);
   UnlinkGuard unlink_guard(path);
   UniquePtr<Uuid> uuid(Uuid::Create(path));
-  EXPECT_TRUE(uuid.IsValid());
+  EXPECT_FALSE(uuid.IsValid());
 }
 
 }  // namespace cvmfs
