@@ -19,7 +19,7 @@ void AbstractUploader::RegisterPlugins() {
 AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition) :
   spooler_definition_(spooler_definition),
   torn_down_(false),
-  jobs_in_flight_(spooler_definition.number_of_threads * 100) {}
+  jobs_in_flight_(spooler_definition.number_of_concurrent_uploads) {}
 
 
 bool AbstractUploader::Initialize() {

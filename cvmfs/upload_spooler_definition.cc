@@ -13,12 +13,12 @@
 using namespace upload;
 
 SpoolerDefinition::SpoolerDefinition(
-                      const std::string& definition_string,
-                      const shash::Algorithms hash_algorithm,
-                      const bool         use_file_chunking,
-                      const size_t       min_file_chunk_size,
-                      const size_t       avg_file_chunk_size,
-                      const size_t       max_file_chunk_size) :
+                      const std::string&       definition_string,
+                      const shash::Algorithms  hash_algorithm,
+                      const bool               use_file_chunking,
+                      const size_t             min_file_chunk_size,
+                      const size_t             avg_file_chunk_size,
+                      const size_t             max_file_chunk_size) :
   driver_type(Unknown),
   hash_algorithm(hash_algorithm),
   use_file_chunking(use_file_chunking),
@@ -26,6 +26,7 @@ SpoolerDefinition::SpoolerDefinition(
   avg_file_chunk_size(avg_file_chunk_size),
   max_file_chunk_size(max_file_chunk_size),
   number_of_threads(tbb::task_scheduler_init::default_num_threads()),
+  number_of_concurrent_uploads(number_of_threads * 100),
   valid_(false)
 {
   // check if given file chunking values are sane
