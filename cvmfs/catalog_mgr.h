@@ -228,7 +228,7 @@ class AbstractCatalogManager : public SingleCopy {
                                 std::string  *catalog_path,
                                 shash::Any   *catalog_hash) = 0;
   virtual void UnloadCatalog(const Catalog *catalog) { };
-  virtual void ActivateCatalog(const Catalog *catalog) { };
+  virtual void ActivateCatalog(Catalog *catalog) { };
 
   /**
    * Create a new Catalog object.

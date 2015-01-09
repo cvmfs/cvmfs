@@ -774,8 +774,9 @@ catalog::Catalog *CatalogManager::CreateCatalog(const PathString  &mountpoint,
 /**
  * Triggered when the catalog is attached (db file opened)
  */
-void CatalogManager::ActivateCatalog(const catalog::Catalog *catalog) {
-  const catalog::Counters &counters = catalog->GetCounters();
+void CatalogManager::ActivateCatalog(catalog::Catalog *catalog) {
+  const catalog::Counters &counters =
+                    const_cast<const catalog::Catalog*>(catalog)->GetCounters();
   if (catalog->IsRoot()) {
     all_inodes_ = counters.GetAllEntries();
   }
