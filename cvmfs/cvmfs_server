@@ -3636,14 +3636,14 @@ publish() {
                -z $tst || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
     fi
 
-    # committing newly created revision
-    echo "Signing new manifest"
-    sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
-    set_ro_root_hash $name $trunk_hash
-
     # finalizing transaction
     echo "Flushing file system buffers"
     sync
+
+    # committing newly created revision
+    echo "Signing new manifest"
+    sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
+    set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
 
     # check again for open file descriptors (potential race condition)
     if has_file_descriptors_on_mount_point $name && \
