@@ -654,6 +654,8 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool     stop_for_tweak
   WritableCatalogList catalogs_to_snapshot;
   GetModifiedCatalogs(&catalogs_to_snapshot);
 
+  spooler_->RegisterListener(&WritableCatalogManager::CatalogUploadCallback, this);
+
   manifest::Manifest *result = NULL;
   for (WritableCatalogList::iterator i = catalogs_to_snapshot.begin(),
        iEnd = catalogs_to_snapshot.end(); i != iEnd; ++i)
@@ -709,6 +711,8 @@ manifest::Manifest *WritableCatalogManager::Commit(const bool     stop_for_tweak
       result->set_revision((*i)->GetRevision());
     }
   }
+
+  spooler_->UnregisterListeners();
 
   return result;
 }
@@ -809,6 +813,17 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   }
 
   return hash_catalog;
+}
+
+void WritableCatalogManager::CatalogUploadCallback(
+                                          const upload::SpoolerResult &result) {
+  if (result.return_code != 0) {
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to upload '%s' (retval: %d)",
+             result.local_path.c_str(), result.return_code);
+    assert (false);
+  }
+
+  unlink(result.local_path.c_str());
 }
 
 }
