@@ -136,6 +136,7 @@ struct JobInfo {
     origin_mem.data = buffer;
   }
   void JobInfoInit() {
+    curl_handle = NULL;
     http_headers = NULL;
     test_and_set = false;
     origin_mem.pos = 0;
