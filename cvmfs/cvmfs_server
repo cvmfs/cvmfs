@@ -1131,6 +1131,9 @@ health_check() {
   local name=$1
   local quiet=${2-0}
 
+  load_repo_config $name
+  local auto_repair="$CVMFS_AUTO_REPAIR_MOUNTPOINT"
+
   # for stratum 1 repositories there are no health checks
   if is_stratum1 $name; then
     return 0
@@ -1149,7 +1152,6 @@ health_check() {
 
   # check configuration for harzardous AUFS setup
   if [ $quiet -eq 0 ] && find_hazardous_aufs_config $name; then
-    load_repo_config $name
     echo "WARNING: AUFS config is vulnerable to kernel deadlocks. Please store "
     echo "         the scratch space and the cvmfs client cache on different "
     echo "         partitions. (Silence this with CVMFS_AUFS_WARNING=false)"
@@ -1160,24 +1162,36 @@ health_check() {
     echo ""
   fi
 
-  # check mounted union file system
-  if ! is_mounted "/cvmfs/$name"; then
-    die "/cvmfs/$name is not mounted properly."
+  # check mounted read-only cvmfs client
+  if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
+    echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly." >&2
+    [ x"$auto_repair" = x"true" ] || exit 1
+    echo "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly..."
+    cvmfs_suid_helper rdonly_mount $name && echo "success" || { echo "fail"; exit 1; }
   fi
 
-  # check mounted read-only cvmfs client
-  if ! is_mounted "/var/spool/cvmfs/$name/rdonly"; then
-    die "/var/spool/cvmfs/$name/rdonly is not mounted properly."
+  # check mounted union file system
+  if ! is_mounted "/cvmfs/$name"; then
+    echo "/cvmfs/$name is not mounted properly." >&2
+    [ x"$auto_repair" = x"true" ] || exit 1
+    echo "Note: Trying to mount /cvmfs/${name}..."
+    cvmfs_suid_helper rw_mount $name && echo "success" || { echo "fail"; exit 1; }
   fi
 
   # check transaction status
   if is_in_transaction $name; then
     if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
-      die "$name is in a transaction but /cvmfs/$name is not mounted read/write"
+      echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
+      [ x"$auto_repair" = x"true" ] || exit 1
+      echo "Note: Trying to re-mount /cvmfs/${name} read/write..."
+      cvmfs_suid_helper open $name && echo "success" || { echo "fail"; exit 1; }
     fi
   else
     if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
-      die "$name is not in a transaction but /cvmfs/$name is mounted read/write"
+      echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
+      [ x"$auto_repair" = x"true" ] || exit 1
+      echo "Note: Trying to re-mount /cvmfs/${name} read-only..."
+      cvmfs_suid_helper lock $name && echo "success" || { echo "fail"; exit 1; }
     fi
   fi
 
@@ -1671,6 +1685,7 @@ CVMFS_UNION_FS_TYPE=$unionfs
 CVMFS_HASH_ALGORITHM=$hash_algo
 CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
+CVMFS_AUTO_REPAIR_MOUNTPOINT=true
 EOF
 
   # append GC specific configuration
