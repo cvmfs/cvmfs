@@ -96,7 +96,7 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   const shash::Any  &catalog_hash,
                                   catalog::Catalog *parent_catalog);
-  void ActivateCatalog(const catalog::Catalog *catalog);
+  void ActivateCatalog(catalog::Catalog *catalog);
 
  private:
   catalog::LoadError LoadCatalogCas(const shash::Any &hash,

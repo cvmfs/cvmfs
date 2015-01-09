@@ -37,6 +37,7 @@
 
 #include "catalog_rw.h"
 #include "catalog_mgr_ro.h"
+#include "upload_spooler_result.h"
 
 namespace upload {
 class Spooler;
@@ -104,6 +105,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   Catalog* CreateCatalog(const PathString &mountpoint,
                          const shash::Any &catalog_hash,
                          Catalog *parent_catalog);
+  void ActivateCatalog(Catalog *catalog);
 
   void AddFile(const DirectoryEntry  &entry,
                const std::string     &parent_directory);
@@ -125,6 +127,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
                                      WritableCatalogList *result) const;
 
   shash::Any SnapshotCatalog(WritableCatalog *catalog) const;
+  void CatalogUploadCallback(const upload::SpoolerResult &result);
 
  private:
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
