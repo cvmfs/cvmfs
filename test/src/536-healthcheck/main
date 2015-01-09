@@ -12,6 +12,9 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+  sudo sed -i "s/^\(CVMFS_AUTO_REPAIR_MOUNTPOINT\)=.*\$/\1=false/" $server_conf
+
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
@@ -35,7 +38,7 @@ cvmfs_run_test() {
   sudo umount $rd_only || return 5
 
   echo "check the repository (failure is expected)"
-  cvmfs_server check $CVMFS_TEST_REPO 2>&1 | grep -q "$repo_dir is not mounted" || return 6
+  cvmfs_server check $CVMFS_TEST_REPO 2>&1 | grep -q "$rd_only is not mounted" || return 6
 
   echo "mount union file system mountpoint"
   sudo mount $repo_dir || return 7
