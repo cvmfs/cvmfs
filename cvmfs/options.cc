@@ -9,19 +9,18 @@
 #include "cvmfs_config.h"
 #include "options.h"
 
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
-#include <cstdio>
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
-
 #include <map>
 
-#include "util.h"
-#include "sanitizer.h"
 #include "logging.h"
+#include "sanitizer.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -96,8 +95,11 @@ void ParsePath(const string &config_file, const bool external) {
       case 0: {  // Child
         close(pipe_open[0]);
         close(pipe_quit[1]);
-        retval = setpgrp();
-        assert(retval == 0);
+        // If this is not a process group leader, create a new session
+        if (getpgrp() != getpid()) {
+          pid_t new_session = setsid();
+          assert(new_session != (pid_t)-1);
+        }
         (void)open(config_file.c_str(), O_RDONLY);
         char ready = 'R';
         WritePipe(pipe_open[1], &ready, 1);
@@ -125,7 +127,8 @@ void ParsePath(const string &config_file, const bool external) {
   if (!fconfig) {
     if (external && !DirectoryExists(config_path)) {
       LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
-               "external location for configuration files does not exist: %s",                 config_path.c_str());
+               "external location for configuration files does not exist: %s",
+               config_path.c_str());
     }
     return;
   }
