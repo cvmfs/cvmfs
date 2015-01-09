@@ -105,6 +105,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   Catalog* CreateCatalog(const PathString &mountpoint,
                          const shash::Any &catalog_hash,
                          Catalog *parent_catalog);
+  void ActivateCatalog(Catalog *catalog);
 
   void AddFile(const DirectoryEntry  &entry,
                const std::string     &parent_directory);

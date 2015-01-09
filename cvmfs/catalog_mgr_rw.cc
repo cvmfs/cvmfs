@@ -69,6 +69,11 @@ Catalog* WritableCatalogManager::CreateCatalog(const PathString &mountpoint,
 }
 
 
+void WritableCatalogManager::ActivateCatalog(Catalog *catalog) {
+  catalog->TakeDatabaseFileOwnership();
+}
+
+
 /**
  * This method is invoked if we create a completely new repository.
  * The new root catalog will already contain a root entry.
