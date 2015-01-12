@@ -3617,10 +3617,10 @@ publish() {
       [ $? -eq 0 ] || { publish_failed $name; die "Cannot parse time stamp '$timestamp_threshold'"; }
       local dry_run=0
       __run_gc $name       \
-               $manifest   \
-               $trunk_hash \
                $stratum0   \
                $dry_run    \
+               $manifest   \
+               $trunk_hash \
                -z $tst || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
     fi
 
@@ -3893,10 +3893,10 @@ gc() {
     # run the garbage collection
     echo "Running Garbage Collection"
     __run_gc $name           \
-             $manifest       \
-             $base_hash      \
              $repository_url \
              $dry_run        \
+             $manifest       \
+             $base_hash      \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result
@@ -3914,21 +3914,26 @@ gc() {
 
 __run_gc() {
   local name="$1"
-  local manifest="$2"
-  local base_hash="$3"
-  local repository_url="$4"
-  local dry_run="$5"
+  local repository_url="$2"
+  local dry_run="$3"
+  local manifest="$4"
+  local base_hash="$5"
   shift 5
   local additional_switches="$*"
 
   load_repo_config $name
 
   # sanity checks
-  is_garbage_collectable $name || return 1
+  is_garbage_collectable $name  || return 1
+  [ x"$repository_url" != x"" ] || return 2
   if [ $dry_run -eq 0 ]; then
-    is_in_transaction $name || is_stratum1 $name || return 2
+    is_in_transaction $name || is_stratum1 $name || return 3
   fi
 
+  if is_stratum0 $name; then
+    [ x"$manifest"  != x"" ] || return 4
+    [ x"$base_hash" != x"" ] || return 5
+  fi
 
   # do it!
   local user_shell="$(get_user_shell $name)"
@@ -3939,7 +3944,7 @@ __run_gc() {
                                         -k $CVMFS_PUBLIC_KEY       \
                                         -t ${CVMFS_SPOOL_DIR}/tmp/ \
                                         $additional_switches"
-  $user_shell "$gc_command" || return 3
+  $user_shell "$gc_command" || return 5
 
   if is_stratum0 $name && [ $dry_run -eq 0 ]; then
     tag_command="cvmfs_swissknife tag_empty_bin \
@@ -3951,7 +3956,7 @@ __run_gc() {
       -f $name                                  \
       -b $base_hash                             \
       -e $CVMFS_HASH_ALGORITHM"
-    $user_shell "$tag_command" || return 4
+    $user_shell "$tag_command" || return 6
   fi
 
   return 0
@@ -3990,6 +3995,7 @@ snapshot() {
     user=$CVMFS_USER
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
+    stratum1=$CVMFS_STRATUM1
     upstream=$CVMFS_UPSTREAM_STORAGE
     num_workers=$CVMFS_NUM_WORKERS
     public_key=$CVMFS_PUBLIC_KEY
@@ -4030,10 +4036,10 @@ snapshot() {
     delete_command="cvmfs_swissknife remove \
                       -r ${upstream} \
                       -o .cvmfs_is_snapshotting"
+    trap "$delete_command" HUP INT TERM QUIT
 
     # do the actual snapshot actions
-    $user_shell "trap \"$delete_command\" HUP INT TERM QUIT && \
-      cvmfs_swissknife pull -m $name \
+    $user_shell "cvmfs_swissknife pull -m $name \
         -u $stratum0 \
         -r ${upstream} \
         -x ${spool_dir}/tmp \
@@ -4046,8 +4052,20 @@ snapshot() {
       -i ${spool_dir}/tmp/last_snapshot \
       -o .cvmfs_last_snapshot"
 
-    # remove magic file after successful replication
-    $user_shell "$delete_command"
+    # run the automatic garbage collection (if configured)
+    if is_garbage_collectable $name && [ ! -z "$CVMFS_GC_TIMESTAMP_THRESHOLD" ]
+    then
+      echo "Running automatic garbage collection"
+      local tst="$(date --date "$CVMFS_GC_TIMESTAMP_THRESHOLD" +%s 2>/dev/null)"
+      [ $? -eq 0 ] || die "Cannot parse time stamp '$timestamp_threshold'"
+      local dry_run=0
+      __run_gc "$alias_name" \
+               "$stratum1"   \
+               "$dry_run"    \
+               ""            \
+               ""            \
+               -z $tst || die "Garbage collection failed ($?)"
+    fi
 
   done
 
