@@ -3924,11 +3924,16 @@ __run_gc() {
   load_repo_config $name
 
   # sanity checks
-  is_garbage_collectable $name || return 1
+  is_garbage_collectable $name  || return 1
+  [ x"$repository_url" != x"" ] || return 2
   if [ $dry_run -eq 0 ]; then
-    is_in_transaction $name || is_stratum1 $name || return 2
+    is_in_transaction $name || is_stratum1 $name || return 3
   fi
 
+  if is_stratum0 $name; then
+    [ x"$manifest"  != x"" ] || return 4
+    [ x"$base_hash" != x"" ] || return 5
+  fi
 
   # do it!
   local user_shell="$(get_user_shell $name)"
@@ -3939,7 +3944,7 @@ __run_gc() {
                                         -k $CVMFS_PUBLIC_KEY       \
                                         -t ${CVMFS_SPOOL_DIR}/tmp/ \
                                         $additional_switches"
-  $user_shell "$gc_command" || return 3
+  $user_shell "$gc_command" || return 5
 
   if is_stratum0 $name && [ $dry_run -eq 0 ]; then
     tag_command="cvmfs_swissknife tag_empty_bin \
@@ -3951,7 +3956,7 @@ __run_gc() {
       -f $name                                  \
       -b $base_hash                             \
       -e $CVMFS_HASH_ALGORITHM"
-    $user_shell "$tag_command" || return 4
+    $user_shell "$tag_command" || return 6
   fi
 
   return 0
