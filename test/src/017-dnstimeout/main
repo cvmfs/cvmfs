@@ -42,7 +42,7 @@ cvmfs_run_test() {
   # beginning, there is a single request to resolve all the proxies.
   # Resolving the hosts is cut off by the CVMFS_TIMEOUT setting.
   # Two extra seconds for measurement uncertainties.
-  local expected_max=$(($num_host*3 + 9 + 2)))
+  local expected_max=$(($num_host*3 + 9 + 2))
   if [ $seconds -gt $expected_max ]; then
     echo "timeout was too long: $seconds (expected at most $expected_max)"
     CVMFS_TIME_WARNING_FLAG=1
