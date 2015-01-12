@@ -1166,15 +1166,15 @@ health_check() {
   if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
     echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly." >&2
     [ x"$auto_repair" = x"true" ] || exit 1
-    echo "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly..."
-    cvmfs_suid_helper rdonly_mount $name && echo "success" || { echo "fail"; exit 1; }
+    echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
+    cvmfs_suid_helper rdonly_mount $name > /dev/null && echo "success" || { echo "fail"; exit 1; }
   fi
 
   # check mounted union file system
   if ! is_mounted "/cvmfs/$name"; then
     echo "/cvmfs/$name is not mounted properly." >&2
     [ x"$auto_repair" = x"true" ] || exit 1
-    echo "Note: Trying to mount /cvmfs/${name}..."
+    echo -n "Note: Trying to mount /cvmfs/${name}... "
     cvmfs_suid_helper rw_mount $name && echo "success" || { echo "fail"; exit 1; }
   fi
 
@@ -1183,14 +1183,14 @@ health_check() {
     if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
       echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
       [ x"$auto_repair" = x"true" ] || exit 1
-      echo "Note: Trying to re-mount /cvmfs/${name} read/write..."
+      echo -n "Note: Trying to re-mount /cvmfs/${name} read/write... "
       cvmfs_suid_helper open $name && echo "success" || { echo "fail"; exit 1; }
     fi
   else
     if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
       echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
       [ x"$auto_repair" = x"true" ] || exit 1
-      echo "Note: Trying to re-mount /cvmfs/${name} read-only..."
+      echo -n "Note: Trying to re-mount /cvmfs/${name} read-only... "
       cvmfs_suid_helper lock $name && echo "success" || { echo "fail"; exit 1; }
     fi
   fi
