@@ -1,4 +1,4 @@
-cvmfs_test_name="Repository Health Check"
+cvmfs_test_name="Repository Health Check (Disabled Auto-Repair)"
 cvmfs_test_autofs_on_startup=false
 
 
