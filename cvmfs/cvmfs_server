@@ -3995,6 +3995,7 @@ snapshot() {
     user=$CVMFS_USER
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
+    stratum1=$CVMFS_STRATUM1
     upstream=$CVMFS_UPSTREAM_STORAGE
     num_workers=$CVMFS_NUM_WORKERS
     public_key=$CVMFS_PUBLIC_KEY
@@ -4035,10 +4036,10 @@ snapshot() {
     delete_command="cvmfs_swissknife remove \
                       -r ${upstream} \
                       -o .cvmfs_is_snapshotting"
+    trap "$delete_command" HUP INT TERM QUIT
 
     # do the actual snapshot actions
-    $user_shell "trap \"$delete_command\" HUP INT TERM QUIT && \
-      cvmfs_swissknife pull -m $name \
+    $user_shell "cvmfs_swissknife pull -m $name \
         -u $stratum0 \
         -r ${upstream} \
         -x ${spool_dir}/tmp \
@@ -4051,8 +4052,20 @@ snapshot() {
       -i ${spool_dir}/tmp/last_snapshot \
       -o .cvmfs_last_snapshot"
 
-    # remove magic file after successful replication
-    $user_shell "$delete_command"
+    # run the automatic garbage collection (if configured)
+    if is_garbage_collectable $name && [ ! -z "$CVMFS_GC_TIMESTAMP_THRESHOLD" ]
+    then
+      echo "Running automatic garbage collection"
+      local tst="$(date --date "$CVMFS_GC_TIMESTAMP_THRESHOLD" +%s 2>/dev/null)"
+      [ $? -eq 0 ] || die "Cannot parse time stamp '$timestamp_threshold'"
+      local dry_run=0
+      __run_gc "$alias_name" \
+               "$stratum1"   \
+               "$dry_run"    \
+               ""            \
+               ""            \
+               -z $tst || die "Garbage collection failed ($?)"
+    fi
 
   done
 
