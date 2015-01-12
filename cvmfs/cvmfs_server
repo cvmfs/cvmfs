@@ -3617,10 +3617,10 @@ publish() {
       [ $? -eq 0 ] || { publish_failed $name; die "Cannot parse time stamp '$timestamp_threshold'"; }
       local dry_run=0
       __run_gc $name       \
-               $manifest   \
-               $trunk_hash \
                $stratum0   \
                $dry_run    \
+               $manifest   \
+               $trunk_hash \
                -z $tst || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
     fi
 
@@ -3893,10 +3893,10 @@ gc() {
     # run the garbage collection
     echo "Running Garbage Collection"
     __run_gc $name           \
-             $manifest       \
-             $base_hash      \
              $repository_url \
              $dry_run        \
+             $manifest       \
+             $base_hash      \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result
@@ -3914,10 +3914,10 @@ gc() {
 
 __run_gc() {
   local name="$1"
-  local manifest="$2"
-  local base_hash="$3"
-  local repository_url="$4"
-  local dry_run="$5"
+  local repository_url="$2"
+  local dry_run="$3"
+  local manifest="$4"
+  local base_hash="$5"
   shift 5
   local additional_switches="$*"
 
