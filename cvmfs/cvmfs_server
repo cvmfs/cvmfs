@@ -203,8 +203,9 @@ Supported Commands:
                 [-k path to existing keychain]
                 <fully qualified repository name>
                 Creates a new repository with a given name
-  add-replica   [-u stratum1 upstream storage] [-o owner] [-n alias name]
-                [-w stratum1 url] [-a silence apache warning]
+  add-replica   [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
+                [-a silence apache warning] [-z enable garbage collection]
+                [-n alias name]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
@@ -2343,10 +2344,11 @@ add_replica() {
   local upstream
   local owner
   local silence_httpd_warning=0
+  local enable_auto_gc=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:w:a" option
+  while getopts "o:u:n:w:az" option
   do
     case $option in
       u)
@@ -2363,6 +2365,9 @@ add_replica() {
       ;;
       a)
         silence_httpd_warning=1
+      ;;
+      z)
+        enable_auto_gc=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2455,6 +2460,13 @@ CVMFS_PUBLIC_KEY=$public_key
 CVMFS_HTTP_TIMEOUT=10
 CVMFS_HTTP_RETRIES=3
 EOF
+
+  # append GC specific configuration
+  if [ $enable_auto_gc != 0 ]; then
+    cat >> /etc/cvmfs/repositories.d/${alias_name}/server.conf << EOF
+CVMFS_GC_TIMESTAMP_THRESHOLD='3 days ago'
+EOF
+  fi
 
   if is_local_upstream $upstream; then
     ((echo "# Created by cvmfs_server.  Don't touch."
