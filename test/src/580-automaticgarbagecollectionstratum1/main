@@ -54,14 +54,15 @@ cvmfs_run_test() {
   echo "register cleanup trap"
   trap cleanup EXIT HUP INT TERM || return $?
 
-  echo "create a stratum1 replication"
+  echo "create a stratum1 replication (with enabled auto garbage collection)"
   replica_name="${CVMFS_TEST_REPO}.replic"
   CVMFS_TEST_580_REPLICA_NAME="$replica_name"
   load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
-                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 4
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                  -z || return 4
 
   echo "create an initial snapshot"
   cvmfs_server snapshot $replica_name || return 5
