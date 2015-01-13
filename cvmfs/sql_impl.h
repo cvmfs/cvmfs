@@ -276,7 +276,6 @@ bool Database<DerivedT>::SetProperty(const std::string &key,
          set_property_->Reset();
 }
 
-
 template <class DerivedT>
 std::string Database<DerivedT>::GetLastErrorMsg() const {
   const std::string msg = sqlite3_errmsg(sqlite_db_);

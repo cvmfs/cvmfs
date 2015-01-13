@@ -349,8 +349,8 @@ class Sql {
    */
   inline bool Successful() const {
     return SQLITE_OK   == last_error_code_ ||
-    SQLITE_ROW  == last_error_code_ ||
-    SQLITE_DONE == last_error_code_;
+           SQLITE_ROW  == last_error_code_ ||
+           SQLITE_DONE == last_error_code_;
   }
 
   sqlite3_stmt *statement_;
