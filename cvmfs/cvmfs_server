@@ -3876,8 +3876,8 @@ gc() {
     [ $preserve_timestamp   -gt 0 ] && additional_switches="$additional_switches -z $preserve_timestamp"
 
     # retrieve the base hash of the repository to be editied
-    local base_hash="xx"
-    local manifest="xx"
+    local base_hash=""
+    local manifest=""
 
     # gather extra information for a stratum0 repository and open a transaction
     if is_stratum0 $name; then
