@@ -3937,14 +3937,13 @@ __run_gc() {
 
   # do it!
   local user_shell="$(get_user_shell $name)"
-
   local gc_command="cvmfs_swissknife gc -r $repository_url         \
                                         -u $CVMFS_UPSTREAM_STORAGE \
                                         -n $CVMFS_REPOSITORY_NAME  \
                                         -k $CVMFS_PUBLIC_KEY       \
                                         -t ${CVMFS_SPOOL_DIR}/tmp/ \
                                         $additional_switches"
-  $user_shell "$gc_command" || return 5
+  $user_shell "$gc_command" || return 6
 
   if is_stratum0 $name && [ $dry_run -eq 0 ]; then
     tag_command="cvmfs_swissknife tag_empty_bin \
@@ -3956,7 +3955,7 @@ __run_gc() {
       -f $name                                  \
       -b $base_hash                             \
       -e $CVMFS_HASH_ALGORITHM"
-    $user_shell "$tag_command" || return 6
+    $user_shell "$tag_command" || return 7
   fi
 
   return 0
