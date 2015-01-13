@@ -4052,7 +4052,7 @@ snapshot() {
       -o .cvmfs_last_snapshot"
 
     # run the automatic garbage collection (if configured)
-    if is_garbage_collectable $name && [ ! -z "$CVMFS_GC_TIMESTAMP_THRESHOLD" ]
+    if is_garbage_collectable $alias_name && [ ! -z "$CVMFS_GC_TIMESTAMP_THRESHOLD" ]
     then
       echo "Running automatic garbage collection"
       local tst="$(date --date "$CVMFS_GC_TIMESTAMP_THRESHOLD" +%s 2>/dev/null)"
