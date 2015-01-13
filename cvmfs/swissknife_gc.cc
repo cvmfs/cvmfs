@@ -67,7 +67,7 @@ int CommandGc::Main(const ArgumentList &args) {
   download_manager.Init(1, true);
   signature_manager.Init();
   if (! signature_manager.LoadPublicRsaKeys(repo_keys)) {
-    LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");
+    LogCvmfs(kLogCatalog, kLogStderr, "failed to load public key(s)");
     return 1;
   }
 
@@ -78,7 +78,12 @@ int CommandGc::Main(const ArgumentList &args) {
                                &signature_manager);
 
   UniquePtr<manifest::Manifest> manifest(object_fetcher.FetchManifest());
-  if (! manifest || ! manifest->garbage_collectable()) {
+  if (! manifest.IsValid()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "failed to load repository manifest");
+    return 1;
+  }
+
+  if (! manifest->garbage_collectable()) {
     LogCvmfs(kLogCvmfs, kLogStderr, "repository does not allow garbage collection");
     return 1;
   }
