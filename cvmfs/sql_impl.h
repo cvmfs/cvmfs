@@ -363,12 +363,12 @@ inline bool Sql::Bind(const int index, const sqlite3_int64 value) {
 
 template <>
 inline bool Sql::Bind(const int index, const std::string value) {
-  return this->BindText(index, value);
+  return this->BindTextTransient(index, value);
 }
 
 template <>
 inline bool Sql::Bind(const int index, const char *value) {
-  return this->BindText(index, value);
+  return this->BindTextTransient(index, value, strlen(value));
 }
 
 template <>
