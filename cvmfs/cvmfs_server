@@ -4025,17 +4025,17 @@ snapshot() {
       echo "Initial snapshot"
     fi
 
-    # put a magic file in the repository root to signal a snapshot in progress
-    $user_shell "date > ${spool_dir}/tmp/snapshotting"
-    $user_shell "cvmfs_swissknife upload -r ${upstream} \
-      -i ${spool_dir}/tmp/snapshotting \
-      -o .cvmfs_is_snapshotting"
-
     # command to remove the magic file when finished (or aborted)
     delete_command="cvmfs_swissknife remove \
                       -r ${upstream} \
                       -o .cvmfs_is_snapshotting"
     trap "$delete_command" HUP INT TERM QUIT
+
+    # put a magic file in the repository root to signal a snapshot in progress
+    $user_shell "date > ${spool_dir}/tmp/snapshotting"
+    $user_shell "cvmfs_swissknife upload -r ${upstream} \
+      -i ${spool_dir}/tmp/snapshotting \
+      -o .cvmfs_is_snapshotting"
 
     # do the actual snapshot actions
     $user_shell "cvmfs_swissknife pull -m $name \
