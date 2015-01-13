@@ -54,14 +54,15 @@ cvmfs_run_test() {
   echo "register cleanup trap"
   trap cleanup EXIT HUP INT TERM || return $?
 
-  echo "create a stratum1 replication"
+  echo "create a stratum1 replication (with enabled auto garbage collection)"
   replica_name="${CVMFS_TEST_REPO}.replic"
   CVMFS_TEST_580_REPLICA_NAME="$replica_name"
   load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
-                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 4
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                  -z || return 4
 
   echo "create an initial snapshot"
   cvmfs_server snapshot $replica_name || return 5
@@ -74,12 +75,9 @@ cvmfs_run_test() {
 
   echo "configure stratum 1 to automatically delete revisions older than $thresh_seconds seconds"
   local replica_server_conf="/etc/cvmfs/repositories.d/${replica_name}/server.conf"
-  if ! cat $replica_server_conf | grep -q 'CVMFS_GC_TIMESTAMP_THRESHOLD'; then
-    cat $replica_server_conf                                          >  replica_1.conf
-    echo "CVMFS_GC_TIMESTAMP_THRESHOLD='$thresh_seconds seconds ago'" >> replica_1.conf
-  else
-    cat $replica_server_conf | sed -e "s/^\(CVMFS_GC_TIMESTAMP_THRESHOLD\)=.*$/\1='$thresh_seconds seconds ago'/" > replica_1.conf
-  fi
+  cat $replica_server_conf | grep -q 'CVMFS_GC_TIMESTAMP_THRESHOLD' || return 7
+  cat $replica_server_conf                                          >  replica_1.conf
+  echo "CVMFS_GC_TIMESTAMP_THRESHOLD='$thresh_seconds seconds ago'" >> replica_1.conf
   sudo cp replica_1.conf $replica_server_conf || return 8
   cat $replica_server_conf                    || return 9
 
