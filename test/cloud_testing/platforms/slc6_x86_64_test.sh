@@ -45,12 +45,14 @@ run_unittests --gtest_shuffle \
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
-export CVMFS_TEST_SERVER_CACHE='/srv/cache' &&         \
-./run.sh $TEST_LOGFILE -x src/005-asetup               \
-                          src/024-reload-during-asetup \
-                          src/518-hardlinkstresstest   \
-                          src/523-corruptchunkfailover \
-                          src/524-corruptmanifestfailover || it_retval=$?
+export CVMFS_TEST_SERVER_CACHE='/srv/cache' &&                         \
+./run.sh $TEST_LOGFILE -x src/005-asetup                               \
+                          src/024-reload-during-asetup                 \
+                          src/518-hardlinkstresstest                   \
+                          src/523-corruptchunkfailover                 \
+                          src/524-corruptmanifestfailover              \
+                          src/577-garbagecollecthiddenstratum1revision \
+                          src/579-garbagecollectstratum1legacytag || it_retval=$?
 
 echo -n "starting FakeS3 service... "
 fakes3_pid=$(start_fakes3 $FAKE_S3_LOGFILE) || { s3_retval=$?; die "fail"; }
