@@ -300,6 +300,14 @@ class Sql {
     last_error_code_ = sqlite3_bind_text(statement_, index, value, size, dtor);
     return Successful();
   }
+
+  /**
+   * Figures out the type to be bound by template parameter deduction
+   * NOTE: For strings or char* buffers this is suboptimal, since it needs to
+   *       assume that the provided buffer is transient and copy it to be sure.
+   *       Furthermore, for char* buffers we need to assume a null-terminated
+   *       C-like string to obtain its length using strlen().
+   */
   template <typename T>
   inline bool Bind(const int index, const T value);
 
