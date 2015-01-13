@@ -3919,11 +3919,11 @@ gc() {
 
     # run the garbage collection
     echo "Running Garbage Collection"
-    __run_gc $name           \
-             $repository_url \
-             $dry_run        \
-             $manifest       \
-             $base_hash      \
+    __run_gc "$name"           \
+             "$repository_url" \
+             "$dry_run"        \
+             "$manifest"       \
+             "$base_hash"      \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result
