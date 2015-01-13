@@ -285,7 +285,10 @@ class Sql {
     return Successful();
   }
   bool BindTextTransient(const int index, const std::string &value) {
-    return BindText(index, value.data(), value.length(), SQLITE_TRANSIENT);
+    return BindTextTransient(index, value.data(), value.length());
+  }
+  bool BindTextTransient(const int index, const char *value, const int size) {
+    return BindText(index, value, size, SQLITE_TRANSIENT);
   }
   bool BindText(const int index, const std::string &value) {
     return BindText(index, value.data(), value.length(), SQLITE_STATIC);
