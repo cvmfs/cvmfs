@@ -285,7 +285,10 @@ class Sql {
     return Successful();
   }
   bool BindTextTransient(const int index, const std::string &value) {
-    return BindText(index, value.data(), value.length(), SQLITE_TRANSIENT);
+    return BindTextTransient(index, value.data(), value.length());
+  }
+  bool BindTextTransient(const int index, const char *value, const int size) {
+    return BindText(index, value, size, SQLITE_TRANSIENT);
   }
   bool BindText(const int index, const std::string &value) {
     return BindText(index, value.data(), value.length(), SQLITE_STATIC);
@@ -297,6 +300,14 @@ class Sql {
     last_error_code_ = sqlite3_bind_text(statement_, index, value, size, dtor);
     return Successful();
   }
+
+  /**
+   * Figures out the type to be bound by template parameter deduction
+   * NOTE: For strings or char* buffers this is suboptimal, since it needs to
+   *       assume that the provided buffer is transient and copy it to be sure.
+   *       Furthermore, for char* buffers we need to assume a null-terminated
+   *       C-like string to obtain its length using strlen().
+   */
   template <typename T>
   inline bool Bind(const int index, const T value);
 
@@ -338,8 +349,8 @@ class Sql {
    */
   inline bool Successful() const {
     return SQLITE_OK   == last_error_code_ ||
-    SQLITE_ROW  == last_error_code_ ||
-    SQLITE_DONE == last_error_code_;
+           SQLITE_ROW  == last_error_code_ ||
+           SQLITE_DONE == last_error_code_;
   }
 
   sqlite3_stmt *statement_;

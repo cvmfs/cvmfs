@@ -515,8 +515,8 @@ TEST_F(T_SQLite_Wrapper, DataAccess) {
 
     EXPECT_TRUE (db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
-      EXPECT_TRUE(insert.Bind(1, "foobar!" + StringifyInt(i)));
-      EXPECT_TRUE(insert.Bind(2, "this is a very useless text!!"));
+      EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
+      EXPECT_TRUE(insert.BindText         (2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }
@@ -558,8 +558,8 @@ TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
 
     EXPECT_TRUE (db1->BeginTransaction());
     for (int i = 0; i < entry_count; ++i) {
-      EXPECT_TRUE(insert.Bind(1, "foobar!" + StringifyInt(i)));
-      EXPECT_TRUE(insert.Bind(2, "this is a very useless text!!"));
+      EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
+      EXPECT_TRUE(insert.BindText         (2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }
@@ -634,10 +634,11 @@ TEST_F(T_SQLite_Wrapper, FailingCompaction) {
                                           "VALUES (:f, :b);");
 
     EXPECT_TRUE (db1->BeginTransaction());
-    for (int i = 0; i < entry_count; ++i) {
-      EXPECT_TRUE(insert.Bind(1, "foobar!" + StringifyInt(i)));
-      EXPECT_TRUE(insert.Bind(2, "this is a very useless text!!"));
+    for (int i = 1; i < entry_count; ++i) {
+      EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
+      EXPECT_TRUE(insert.BindText         (2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
+
       EXPECT_TRUE(insert.Reset());
     }
     EXPECT_TRUE (db1->CommitTransaction());

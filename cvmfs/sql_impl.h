@@ -276,7 +276,6 @@ bool Database<DerivedT>::SetProperty(const std::string &key,
          set_property_->Reset();
 }
 
-
 template <class DerivedT>
 std::string Database<DerivedT>::GetLastErrorMsg() const {
   const std::string msg = sqlite3_errmsg(sqlite_db_);
@@ -363,12 +362,12 @@ inline bool Sql::Bind(const int index, const sqlite3_int64 value) {
 
 template <>
 inline bool Sql::Bind(const int index, const std::string value) {
-  return this->BindText(index, value);
+  return this->BindTextTransient(index, value);
 }
 
 template <>
 inline bool Sql::Bind(const int index, const char *value) {
-  return this->BindText(index, value);
+  return this->BindTextTransient(index, value, strlen(value));
 }
 
 template <>
