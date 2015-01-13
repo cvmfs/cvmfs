@@ -75,12 +75,9 @@ cvmfs_run_test() {
 
   echo "configure stratum 1 to automatically delete revisions older than $thresh_seconds seconds"
   local replica_server_conf="/etc/cvmfs/repositories.d/${replica_name}/server.conf"
-  if ! cat $replica_server_conf | grep -q 'CVMFS_GC_TIMESTAMP_THRESHOLD'; then
-    cat $replica_server_conf                                          >  replica_1.conf
-    echo "CVMFS_GC_TIMESTAMP_THRESHOLD='$thresh_seconds seconds ago'" >> replica_1.conf
-  else
-    cat $replica_server_conf | sed -e "s/^\(CVMFS_GC_TIMESTAMP_THRESHOLD\)=.*$/\1='$thresh_seconds seconds ago'/" > replica_1.conf
-  fi
+  cat $replica_server_conf | grep -q 'CVMFS_GC_TIMESTAMP_THRESHOLD' || return 7
+  cat $replica_server_conf                                          >  replica_1.conf
+  echo "CVMFS_GC_TIMESTAMP_THRESHOLD='$thresh_seconds seconds ago'" >> replica_1.conf
   sudo cp replica_1.conf $replica_server_conf || return 8
   cat $replica_server_conf                    || return 9
 
