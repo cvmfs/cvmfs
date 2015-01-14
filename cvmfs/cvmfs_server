@@ -712,7 +712,11 @@ is_master_replica() {
 is_garbage_collectable() {
   local name=$1
   load_repo_config $name
-  [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]
+  if is_stratum0 $name; then
+    [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]
+  else
+    [ x"$(cvmfs_swissknife info -r $CVMFS_STRATUM1 -g)" = x"yes" ]
+  fi
 }
 
 # checks if a repository has automatic garbage collection enabled
@@ -2422,10 +2426,6 @@ add_replica() {
   local temp_dir="${spool_dir}/tmp"
   local storage_dir=""
   is_local_upstream $upstream && storage_dir=$(get_upstream_config $upstream)
-  local garbage_collectable=false;
-  if [ "$(cvmfs_swissknife info -r $stratum0 -g 2>/dev/null)" = "yes" ]; then
-    garbage_collectable=true;
-  fi
   local stratum1="http://localhost/cvmfs/${alias_name}"
   [ ! -z "$stratum1_url" ] && stratum1="$stratum1_url"
 
@@ -2461,7 +2461,6 @@ CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_STRATUM1=$stratum1
 CVMFS_UPSTREAM_STORAGE=$upstream
-CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 EOF
   cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
 # Created by cvmfs_server.
