@@ -60,24 +60,26 @@ echo "done ($fakes3_pid)"
 
 if [ $s3_retval -eq 0 ]; then
     echo "running CernVM-FS server test cases against FakeS3..."
-    export CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                    && \
-    export CVMFS_TEST_STRATUM0=$FAKE_S3_URL                        && \
-    export CVMFS_TEST_SERVER_CACHE='/srv/cache'                    && \
-    ./run.sh $TEST_S3_LOGFILE -x src/0*                               \
-                                 src/518-hardlinkstresstest           \
-                                 src/519-importlegacyrepo             \
-                                 src/522-missingchunkfailover         \
-                                 src/523-corruptchunkfailover         \
-                                 src/524-corruptmanifestfailover      \
-                                 src/525-bigrepo                      \
-                                 src/528-recreatespoolarea            \
-                                 src/530-recreatespoolarea_defaultkey \
-                                 src/537-symlinkedbackend             \
-                                 src/538-symlinkedstratum1backend     \
-                                 src/542-storagescrubbing             \
-                                 src/543-storagescrubbing_scriptable  \
-                                 src/550-livemigration                \
-                                 src/571-localbackendumask || s3_retval=$?
+    export CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                    &&         \
+    export CVMFS_TEST_STRATUM0=$FAKE_S3_URL                        &&         \
+    export CVMFS_TEST_SERVER_CACHE='/srv/cache'                    &&         \
+    ./run.sh $TEST_S3_LOGFILE -x src/0*                                       \
+                                 src/518-hardlinkstresstest                   \
+                                 src/519-importlegacyrepo                     \
+                                 src/522-missingchunkfailover                 \
+                                 src/523-corruptchunkfailover                 \
+                                 src/524-corruptmanifestfailover              \
+                                 src/525-bigrepo                              \
+                                 src/528-recreatespoolarea                    \
+                                 src/530-recreatespoolarea_defaultkey         \
+                                 src/537-symlinkedbackend                     \
+                                 src/538-symlinkedstratum1backend             \
+                                 src/542-storagescrubbing                     \
+                                 src/543-storagescrubbing_scriptable          \
+                                 src/550-livemigration                        \
+                                 src/571-localbackendumask                    \
+                                 src/577-garbagecollecthiddenstratum1revision \
+                                 src/579-garbagecollectstratum1legacytag || s3_retval=$?
 
     echo -n "killing FakeS3... "
     sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
