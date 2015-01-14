@@ -712,7 +712,21 @@ is_master_replica() {
 is_garbage_collectable() {
   local name=$1
   load_repo_config $name
-  [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]
+  if is_stratum0 $name; then
+    [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]
+  else
+    [ x"$(cvmfs_swissknife info -r $CVMFS_STRATUM1 -g)" = x"yes" ]
+  fi
+}
+
+# checks if a repository has automatic garbage collection enabled
+#
+# @param name  the name of the repository to be checked
+# @return      0 if automatic garbage collection is enabled
+has_auto_garbage_collection_enabled() {
+  local name=$1
+  load_repo_config $name
+  is_garbage_collectable $name && [ ! -z "$CVMFS_AUTO_GC_TIMESPAN" ]
 }
 
 # checks if a repository is currently in a transaction
@@ -1692,7 +1706,7 @@ EOF
   # append GC specific configuration
   if [ x"$garbage_collectable" = x"true" ]; then
     cat >> $server_conf << EOF
-CVMFS_GC_TIMESTAMP_THRESHOLD='3 days ago'
+CVMFS_AUTO_GC_TIMESPAN='3 days ago'
 EOF
   fi
 
@@ -2412,10 +2426,6 @@ add_replica() {
   local temp_dir="${spool_dir}/tmp"
   local storage_dir=""
   is_local_upstream $upstream && storage_dir=$(get_upstream_config $upstream)
-  local garbage_collectable=false;
-  if [ "$(cvmfs_swissknife info -r $stratum0 -g 2>/dev/null)" = "yes" ]; then
-    garbage_collectable=true;
-  fi
   local stratum1="http://localhost/cvmfs/${alias_name}"
   [ ! -z "$stratum1_url" ] && stratum1="$stratum1_url"
 
@@ -2451,7 +2461,6 @@ CVMFS_SPOOL_DIR=$spool_dir
 CVMFS_STRATUM0=$stratum0
 CVMFS_STRATUM1=$stratum1
 CVMFS_UPSTREAM_STORAGE=$upstream
-CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 EOF
   cat > /etc/cvmfs/repositories.d/${alias_name}/replica.conf << EOF
 # Created by cvmfs_server.
@@ -2464,7 +2473,7 @@ EOF
   # append GC specific configuration
   if [ $enable_auto_gc != 0 ]; then
     cat >> /etc/cvmfs/repositories.d/${alias_name}/server.conf << EOF
-CVMFS_GC_TIMESTAMP_THRESHOLD='3 days ago'
+CVMFS_AUTO_GC_TIMESPAN='3 days ago'
 EOF
   fi
 
@@ -3649,10 +3658,9 @@ publish() {
     $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
 
     # run the automatic garbage collection (if configured)
-    if is_garbage_collectable $name && [ ! -z "$CVMFS_GC_TIMESTAMP_THRESHOLD" ]
-    then
+    if has_auto_garbage_collection_enabled $name; then
       echo "Running automatic garbage collection"
-      local tst="$(date --date "$CVMFS_GC_TIMESTAMP_THRESHOLD" +%s 2>/dev/null)"
+      local tst="$(date --date "$CVMFS_AUTO_GC_TIMESPAN" +%s 2>/dev/null)"
       [ $? -eq 0 ] || { publish_failed $name; die "Cannot parse time stamp '$timestamp_threshold'"; }
       local dry_run=0
       __run_gc $name       \
@@ -4091,10 +4099,9 @@ snapshot() {
       -o .cvmfs_last_snapshot"
 
     # run the automatic garbage collection (if configured)
-    if is_garbage_collectable $alias_name && [ ! -z "$CVMFS_GC_TIMESTAMP_THRESHOLD" ]
-    then
+    if has_auto_garbage_collection_enabled $alias_name; then
       echo "Running automatic garbage collection"
-      local tst="$(date --date "$CVMFS_GC_TIMESTAMP_THRESHOLD" +%s 2>/dev/null)"
+      local tst="$(date --date "$CVMFS_AUTO_GC_TIMESPAN" +%s 2>/dev/null)"
       [ $? -eq 0 ] || die "Cannot parse time stamp '$timestamp_threshold'"
       local dry_run=0
       __run_gc "$alias_name" \

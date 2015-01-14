@@ -36,7 +36,7 @@ cvmfs_run_test() {
 
   echo "configure repository to automatically delete revisions older than $thresh_seconds seconds"
   local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
-  cat $server_conf | sed -e "s/^\(CVMFS_GC_TIMESTAMP_THRESHOLD\)=.*$/\1='$thresh_seconds seconds ago'/" > server_1.conf
+  cat $server_conf | sed -e "s/^\(CVMFS_AUTO_GC_TIMESPAN\)=.*$/\1='$thresh_seconds seconds ago'/" > server_1.conf
   sudo cp server_1.conf $server_conf || return 1
   cat $server_conf                   || return 2
 
@@ -134,7 +134,7 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 23 # trunk
 
   echo "disable automatic garbage collection"
-  cat $server_conf | grep -v 'CVMFS_GC_TIMESTAMP_THRESHOLD' > server_2.conf
+  cat $server_conf | grep -v 'CVMFS_AUTO_GC_TIMESPAN' > server_2.conf
   sudo cp server_2.conf $server_conf || return 24
   cat $server_conf                   || return 25
 
