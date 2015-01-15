@@ -304,6 +304,7 @@ run_test_cases() {
   run_script_on_virtual_machine $ip $username $remote_run_script \
       -s $server_package                                         \
       -c $client_package                                         \
+      -k $config_package                                         \
       -r $platform_run_script
   check_retcode $?
 
