@@ -143,7 +143,13 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
 template <class DerivedT>
 Database<DerivedT>::~Database() {
   if (NULL != sqlite_db_) {
-    sqlite3_close_v2(sqlite_db_);
+    LogCvmfs(kLogSql, kLogDebug, "closing SQLite database '%s'",
+             filename().c_str());
+    const int result = sqlite3_close_v2(sqlite_db_);
+    if (result != SQLITE_OK) {
+      LogCvmfs(kLogSql, kLogDebug, "failed to close SQLite database '%s' (%d)",
+               filename().c_str(), result);
+    }
     sqlite_db_ = NULL;
   }
 }
