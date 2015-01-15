@@ -143,7 +143,7 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
 template <class DerivedT>
 Database<DerivedT>::~Database() {
   if (NULL != sqlite_db_) {
-    sqlite3_close(sqlite_db_);
+    sqlite3_close_v2(sqlite_db_);
     sqlite_db_ = NULL;
   }
 }
