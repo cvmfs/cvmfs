@@ -2267,6 +2267,11 @@ mkfs() {
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
   check_user $cvmfs_user || die "No user $cvmfs_user"
 
+  # GC and auto-tag warning
+  if [ x"$autotagging" = x"true" ] && [ x"$garbage_collectable" = x"true" ]; then
+    echo "Note: Autotagging all revisions impedes garbage collection"
+  fi
+
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
   create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo $autotagging $garbage_collectable || die "fail"
