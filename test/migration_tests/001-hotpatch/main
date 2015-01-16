@@ -42,6 +42,33 @@ checksum_large_files() {
 }
 
 
+# Note: this can be removed after CernVM-FS 2.1.20 is released
+guess_cvmfs_keys_url() {
+  local package_version=$1
+  local package_file_name=""
+
+  # Ubuntu
+  if [ -f /etc/debian_version ]                               && \
+     [ x$(lsb_release --id --short 2>/dev/null) = x"Ubuntu" ] && \
+     [ $(uname -m) = "x86_64" ]; then
+    package_file_name="cvmfs-keys_${package_version}_all.deb"
+
+  # SLC 5 and 6
+  elif [ x$(lsb_release --id --short 2>/dev/null) = x"ScientificCERNSLC" ]; then
+    local slc_major_version=$(lsb_release --description --short | sed 's/^.* \([0-9][0-9]*\)\.[0-9][0-9]* .*$/\1/')
+    if [ x"$slc_major_version" = x"5" ] || [ x"$slc_major_version" = x"6" ]; then
+      package_file_name="cvmfs-keys-${package_version}.noarch.rpm"
+    fi
+
+  # to be extended
+  else
+    return 2
+  fi
+
+  echo ${CVMFS_EC_BASE_URL}/cvmfs-keys/${package_file_name}
+}
+
+
 cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
@@ -85,7 +112,7 @@ cvmfs_run_test() {
   #       furthermore the re-install of cvmfs-config is not needed later on!
   uninstall_package "cvmfs-config" || true # always succeeds, even if it doesn't
                                            # exist as an installed package
-  local cvmfs_keys_url=$(guess_package_url "cvmfs-keys" "1.5-1")
+  local cvmfs_keys_url=$(guess_cvmfs_keys_url "1.5-1")
   local cvmfs_keys=$(basename $cvmfs_keys_url)
   echo "Download URL for cvmfs-keys: $cvmfs_keys_url"
   wget --no-check-certificate --quiet $cvmfs_keys_url || return 21
