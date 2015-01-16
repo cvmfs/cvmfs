@@ -1139,15 +1139,33 @@ find_hazardous_aufs_config() {
 }
 
 
+__health_check_print_repair_info() {
+  local name=$1
+  local repair_in_txn=$2
+
+  load_repo_config $name
+
+  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" != x"true" ]; then
+    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT != true)" >&2
+    exit 1
+  fi
+
+  if is_in_transaction $name && [ $repair_in_txn = 0 ]; then
+    echo "Repository $name is in a transaction and cannot be repaired." >&2
+    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."     >&2
+    exit 1
+  fi
+}
+
 # checks and warns in inconsistent repository states or unfavorable configs.
 #
 # @param name  the FQRN of the repository to be checked
 health_check() {
   local name=$1
   local quiet=${2-0}
+  local repair_in_txn=${3-0}
 
   load_repo_config $name
-  local auto_repair="$CVMFS_AUTO_REPAIR_MOUNTPOINT"
 
   # for stratum 1 repositories there are no health checks
   if is_stratum1 $name; then
@@ -1180,7 +1198,7 @@ health_check() {
   # check mounted read-only cvmfs client
   if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
     echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly." >&2
-    [ x"$auto_repair" = x"true" ] || exit 1
+    __health_check_print_repair_info $name $repair_in_txn
     echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
     cvmfs_suid_helper rdonly_mount $name > /dev/null && echo "success" || { echo "fail"; exit 1; }
   fi
@@ -1188,7 +1206,7 @@ health_check() {
   # check mounted union file system
   if ! is_mounted "/cvmfs/$name"; then
     echo "/cvmfs/$name is not mounted properly." >&2
-    [ x"$auto_repair" = x"true" ] || exit 1
+    __health_check_print_repair_info $name $repair_in_txn
     echo -n "Note: Trying to mount /cvmfs/${name}... "
     cvmfs_suid_helper rw_mount $name && echo "success" || { echo "fail"; exit 1; }
   fi
@@ -1197,15 +1215,15 @@ health_check() {
   if is_in_transaction $name; then
     if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
       echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
-      [ x"$auto_repair" = x"true" ] || exit 1
-      echo -n "Note: Trying to re-mount /cvmfs/${name} read/write... "
+      __health_check_print_repair_info $name $repair_in_txn
+      echo -n "Note: Trying to remount /cvmfs/${name} read/write... "
       cvmfs_suid_helper open $name && echo "success" || { echo "fail"; exit 1; }
     fi
   else
     if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
       echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
-      [ x"$auto_repair" = x"true" ] || exit 1
-      echo -n "Note: Trying to re-mount /cvmfs/${name} read-only... "
+      __health_check_print_repair_info $name $repair_in_txn
+      echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
       cvmfs_suid_helper lock $name && echo "success" || { echo "fail"; exit 1; }
     fi
   fi
