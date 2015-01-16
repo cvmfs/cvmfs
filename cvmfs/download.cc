@@ -179,9 +179,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     if (header_line[i] == '2') {
       return num_bytes;
     } else if ((header_line.length() > i+2) && (header_line[i] == '3') &&
-	       (header_line[i+1] == '0') &&
-	       ((header_line[i+2] == '1') || (header_line[i+2] == '2') ||
-	        (header_line[i+2] == '3') || (header_line[i+2] == '7')))
+               (header_line[i+1] == '0') &&
+               ((header_line[i+2] == '1') || (header_line[i+2] == '2') ||
+                (header_line[i+2] == '3') || (header_line[i+2] == '7')))
     {
       LogCvmfs(kLogDownload, kLogDebug, "http redirect: %s",
                header_line.c_str());
@@ -656,6 +656,7 @@ CURL *DownloadManager::AcquireCurlHandle() {
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     //curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
     curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
+    curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 4);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlData);
   } else {
@@ -1053,6 +1054,9 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         info->error_code = kFailProxyConnection;
       else
         info->error_code = kFailHostConnection;
+      break;
+    case CURLE_TOO_MANY_REDIRECTS:
+      info->error_code = kFailHostConnection;
       break;
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
