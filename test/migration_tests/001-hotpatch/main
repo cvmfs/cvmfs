@@ -116,7 +116,7 @@ cvmfs_run_test() {
   local cvmfs_keys=$(basename $cvmfs_keys_url)
   echo "Download URL for cvmfs-keys: $cvmfs_keys_url"
   wget --no-check-certificate --quiet $cvmfs_keys_url || return 21
-  install_package $upstream_package || return 22
+  install_package $cvmfs_keys                         || return 22
 
   # install the upstream CernVM-FS package
   echo "installing CernVM-FS $previous_version"
