@@ -3445,7 +3445,6 @@ abort() {
     # sanity checks
     is_stratum0 $name   || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
     is_publishing $name && { echo "Repository $name is currently published (aborting abort)"; retcode=1; continue; }
-    health_check $name
 
     # get repository information
     load_repo_config $name
@@ -3467,6 +3466,11 @@ abort() {
         continue
       fi
     fi
+
+    # do a health check (might also repair out-of-sync in_transaction repos)
+    local silence_warnings=0
+    local repair_in_txn=1
+    health_check $name $silence_warnings $repair_in_txn
 
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
