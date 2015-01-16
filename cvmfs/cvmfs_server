@@ -4064,6 +4064,7 @@ snapshot() {
         # try to update the geodb, but continue if it doesn't work
         update_geodb -l || true
     fi
+    [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
 
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
