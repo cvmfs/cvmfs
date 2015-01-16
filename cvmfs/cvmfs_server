@@ -1211,6 +1211,26 @@ health_check() {
     cvmfs_suid_helper rw_mount $name && echo "success" || { echo "fail"; exit 1; }
   fi
 
+  # check mounted CVMFS revision against published one
+  # Note: this needs to repaired first, so that the consecutive checks can put
+  #       the union mountpoint in the right state afterwards
+  if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
+    echo "$name is not based on the newest published revision" >&2
+    __health_check_print_repair_info $name $repair_in_txn
+    local published_hash="$(get_published_root_hash $name)"
+    echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
+    if cvmfs_suid_helper rw_umount     $name                   && \
+       cvmfs_suid_helper rdonly_umount $name                   && \
+       set_ro_root_hash                $name "$published_hash" && \
+       cvmfs_suid_helper rdonly_mount  $name > /dev/null       && \
+       cvmfs_suid_helper rw_mount      $name; then
+      echo "success"
+    else
+      echo "fail"
+      exit 1
+    fi
+  fi
+
   # check transaction status
   if is_in_transaction $name; then
     if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
@@ -1226,11 +1246,6 @@ health_check() {
       echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
       cvmfs_suid_helper lock $name && echo "success" || { echo "fail"; exit 1; }
     fi
-  fi
-
-  # check mounted CVMFS revision against published
-  if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
-    die "$name is not based on the newest published revision"
   fi
 }
 
