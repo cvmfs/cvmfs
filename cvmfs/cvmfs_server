@@ -1152,7 +1152,7 @@ __health_check_print_repair_info() {
 
   if is_in_transaction $name && [ $repair_in_txn = 0 ]; then
     echo "Repository $name is in a transaction and cannot be repaired." >&2
-    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."     >&2
+    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."   >&2
     exit 1
   fi
 }
