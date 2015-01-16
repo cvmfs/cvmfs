@@ -1159,7 +1159,9 @@ __health_check_print_repair_info() {
 
 # checks and warns in inconsistent repository states or unfavorable configs.
 #
-# @param name  the FQRN of the repository to be checked
+# @param name           the FQRN of the repository to be checked
+# @param quiet          disable printing of warnings
+# @param repair_in_txn  repair even if currently in a transaction
 health_check() {
   local name=$1
   local quiet=${2-0}
