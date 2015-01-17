@@ -2,14 +2,32 @@
 cvmfs_test_name="Automatic Garbage Collection on Stratum 1"
 cvmfs_test_autofs_on_startup=false
 
+unix_timestamp() {
+  date +%s
+}
+
+export CVMFS_TEST_580_LAST_PUBLISH=last_publish
+export CVMFS_TEST_580_THRESH_SECONDS=20
+export CVMFS_TEST_580_SECONDS_MARGIN=10
+
 create_revision() {
   local repo_name=$1
   local publish_log="$(mktemp ./publish.log.XXXXX)"
 
   start_transaction $repo_name > /dev/null 2>&1    || return 1
   publish_repo      $repo_name > $publish_log 2>&1 || return 2
+  unix_timestamp > $CVMFS_TEST_580_LAST_PUBLISH
 
   echo "$(get_current_root_catalog $repo_name)C"
+}
+
+sleep_to_match_threshold() {
+  local last_publish=$(cat $CVMFS_TEST_580_LAST_PUBLISH)
+  local time_since_publish=$(( $(unix_timestamp) - $last_publish ))
+  local sleep_for=$(( $CVMFS_TEST_580_THRESH_SECONDS - $time_since_publish - $CVMFS_TEST_580_SECONDS_MARGIN ))
+  echo "sleep $sleep_for seconds ($time_since_publish)"
+  sleep $sleep_for
+
 }
 
 CVMFS_TEST_580_REPLICA_NAME=""
@@ -34,9 +52,8 @@ cvmfs_run_test() {
   local root_catalog5=""
   local root_catalog6=""
 
-  local seconds=10
-  local thresh_seconds=20 # Potential Race: Publishing is not supposed to take
-                          #                 longer than thresh_seconds-seconds !
+  local seconds_margin=$CVMFS_TEST_580_SECONDS_MARGIN
+  local thresh_seconds=$CVMFS_TEST_580_THRESH_SECONDS
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp now))"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
@@ -99,8 +116,7 @@ cvmfs_run_test() {
   peek_backend $replica_name    $root_catalog0 || return 16 # trunk-previous
   peek_backend $replica_name    $root_catalog1 || return 17 # trunk
 
-  echo "sleep $seconds seconds"
-  sleep $seconds
+  sleep_to_match_threshold
 
   echo "create revision 2 ($(display_timestamp now))"
   root_catalog2="$(create_revision $CVMFS_TEST_REPO)"
@@ -123,8 +139,7 @@ cvmfs_run_test() {
   peek_backend $replica_name    $root_catalog1 || return 26 # trunk-previous
   peek_backend $replica_name    $root_catalog2 || return 27 # trunk
 
-  echo "sleep $seconds seconds"
-  sleep $seconds
+  sleep_to_match_threshold
 
   echo "create revision 3 ($(display_timestamp now))"
   root_catalog3="$(create_revision $CVMFS_TEST_REPO)"
@@ -148,8 +163,7 @@ cvmfs_run_test() {
   peek_backend $replica_name    $root_catalog2 || return 37 # trunk-previous
   peek_backend $replica_name    $root_catalog3 || return 38 # trunk
 
-  echo "sleep $seconds seconds"
-  sleep $seconds
+  sleep_to_match_threshold
 
   echo "create revision 4 ($(display_timestamp now))"
   root_catalog4="$(create_revision $CVMFS_TEST_REPO)"
@@ -176,8 +190,7 @@ cvmfs_run_test() {
   peek_backend $replica_name    $root_catalog3 || return 50 # trunk-previous
   peek_backend $replica_name    $root_catalog4 || return 51 # trunk
 
-  echo "sleep $seconds seconds"
-  sleep $seconds
+  sleep_to_match_threshold
 
   echo "create revision 5 ($(display_timestamp now))"
   root_catalog5="$(create_revision $CVMFS_TEST_REPO)"
@@ -211,8 +224,7 @@ cvmfs_run_test() {
   sudo cp replica_2.conf $replica_server_conf || return 68
   cat $replica_server_conf                    || return 69
 
-  echo "sleep $seconds seconds"
-  sleep $seconds
+  sleep_to_match_threshold
 
   echo "create revision 6 ($(display_timestamp now))"
   root_catalog6="$(create_revision $CVMFS_TEST_REPO)"
