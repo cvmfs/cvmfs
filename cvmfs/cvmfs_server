@@ -1139,15 +1139,35 @@ find_hazardous_aufs_config() {
 }
 
 
+__health_check_print_repair_info() {
+  local name=$1
+  local repair_in_txn=$2
+
+  load_repo_config $name
+
+  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" != x"true" ]; then
+    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT != true)" >&2
+    exit 1
+  fi
+
+  if is_in_transaction $name && [ $repair_in_txn = 0 ]; then
+    echo "Repository $name is in a transaction and cannot be repaired." >&2
+    echo "--> Run \`cvmfs_server abort $name\` to revert and repair."   >&2
+    exit 1
+  fi
+}
+
 # checks and warns in inconsistent repository states or unfavorable configs.
 #
-# @param name  the FQRN of the repository to be checked
+# @param name           the FQRN of the repository to be checked
+# @param quiet          disable printing of warnings
+# @param repair_in_txn  repair even if currently in a transaction
 health_check() {
   local name=$1
   local quiet=${2-0}
+  local repair_in_txn=${3-0}
 
   load_repo_config $name
-  local auto_repair="$CVMFS_AUTO_REPAIR_MOUNTPOINT"
 
   # for stratum 1 repositories there are no health checks
   if is_stratum1 $name; then
@@ -1155,7 +1175,7 @@ health_check() {
   fi
 
   # health check cannot deal with repositories currently being published
-  if is_publishing $name; then
+  if [ $quiet -eq 0 ] &&  is_publishing $name; then
     echo "WARNING: The repository $name is currently publishing and should not"
     echo "be touched. If you are absolutely sure, that this is _not_ the case,"
     echo "please run the following command and retry:"
@@ -1180,7 +1200,7 @@ health_check() {
   # check mounted read-only cvmfs client
   if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
     echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly." >&2
-    [ x"$auto_repair" = x"true" ] || exit 1
+    __health_check_print_repair_info $name $repair_in_txn
     echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
     cvmfs_suid_helper rdonly_mount $name > /dev/null && echo "success" || { echo "fail"; exit 1; }
   fi
@@ -1188,31 +1208,46 @@ health_check() {
   # check mounted union file system
   if ! is_mounted "/cvmfs/$name"; then
     echo "/cvmfs/$name is not mounted properly." >&2
-    [ x"$auto_repair" = x"true" ] || exit 1
+    __health_check_print_repair_info $name $repair_in_txn
     echo -n "Note: Trying to mount /cvmfs/${name}... "
     cvmfs_suid_helper rw_mount $name && echo "success" || { echo "fail"; exit 1; }
+  fi
+
+  # check mounted CVMFS revision against published one
+  # Note: this needs to repaired first, so that the consecutive checks can put
+  #       the union mountpoint in the right state afterwards
+  if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
+    echo "$name is not based on the newest published revision" >&2
+    __health_check_print_repair_info $name $repair_in_txn
+    local published_hash="$(get_published_root_hash $name)"
+    echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
+    if cvmfs_suid_helper rw_umount     $name                   && \
+       cvmfs_suid_helper rdonly_umount $name                   && \
+       set_ro_root_hash                $name "$published_hash" && \
+       cvmfs_suid_helper rdonly_mount  $name > /dev/null       && \
+       cvmfs_suid_helper rw_mount      $name; then
+      echo "success"
+    else
+      echo "fail"
+      exit 1
+    fi
   fi
 
   # check transaction status
   if is_in_transaction $name; then
     if ! is_mounted "/cvmfs/$name" "^.* rw[, ].*$"; then
       echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
-      [ x"$auto_repair" = x"true" ] || exit 1
-      echo -n "Note: Trying to re-mount /cvmfs/${name} read/write... "
+      __health_check_print_repair_info $name $repair_in_txn
+      echo -n "Note: Trying to remount /cvmfs/${name} read/write... "
       cvmfs_suid_helper open $name && echo "success" || { echo "fail"; exit 1; }
     fi
   else
     if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
       echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
-      [ x"$auto_repair" = x"true" ] || exit 1
-      echo -n "Note: Trying to re-mount /cvmfs/${name} read-only... "
+      __health_check_print_repair_info $name $repair_in_txn
+      echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
       cvmfs_suid_helper lock $name && echo "success" || { echo "fail"; exit 1; }
     fi
-  fi
-
-  # check mounted CVMFS revision against published
-  if [ x"$(get_mounted_root_hash $name)" != x"$(get_published_root_hash $name)" ]; then
-    die "$name is not based on the newest published revision"
   fi
 }
 
@@ -3412,7 +3447,6 @@ abort() {
     # sanity checks
     is_stratum0 $name   || { echo "Repository $name is not a stratum 0 repository"; retcode=1; continue; }
     is_publishing $name && { echo "Repository $name is currently published (aborting abort)"; retcode=1; continue; }
-    health_check $name
 
     # get repository information
     load_repo_config $name
@@ -3434,6 +3468,11 @@ abort() {
         continue
       fi
     fi
+
+    # do a health check (might also repair out-of-sync in_transaction repos)
+    local silence_warnings=0
+    local repair_in_txn=1
+    health_check $name $silence_warnings $repair_in_txn
 
     # check if we have open file descriptors on /cvmfs/<name>
     local use_fd_fallback=0
