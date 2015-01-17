@@ -4064,6 +4064,7 @@ snapshot() {
         # try to update the geodb, but continue if it doesn't work
         update_geodb -l || true
     fi
+    [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
 
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
@@ -4308,7 +4309,9 @@ migrate_2_1_15() {
   fi
 
   echo "--> updating server.conf"
-  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=$destination_version/" /etc/cvmfs/repositories.d/$name/server.conf
+  local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=$destination_version/" $server_conf
+  echo "CVMFS_STRATUM1=http://localhost/cvmfs/${name}" >> $server_conf
 
   # reload (updated) repository information
   load_repo_config $name
