@@ -36,9 +36,9 @@ checksum_large_files() {
   pid2=$!
   (find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file) &
   pid3=$!
-  wait pid1
-  wait pid2
-  wait pid3
+  wait $pid1
+  wait $pid2
+  wait $pid3
 }
 
 
