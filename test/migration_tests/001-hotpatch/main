@@ -152,7 +152,7 @@ cvmfs_run_test() {
   echo "starting to checksum large files in $xxl_files_dir (log output in separate file)"
   checksum_large_files $xxl_files_dir $chksum_log2 &
   local chksum_pid=$!
-  echo "checksumming runs under PID chksum_pid"
+  echo "checksumming runs under PID $chksum_pid"
 
   # wait some time to bring tar up to speed
   echo "giving tar and checksumming some time to screw around"
