@@ -84,6 +84,19 @@ package_version() {
 }
 
 
+get_providing_package() {
+  local virt_pkg_name=$1
+
+  if has_binary yum; then
+    rpm -q --whatprovides $virt_pkg_name
+  elif has_binary dpkg; then
+    dpkg -l | grep $virt_pkg_name | awk '{print $2}'
+  else
+    return 1
+  fi
+}
+
+
 installed_package_version() {
   local pkg_name=$1
 
