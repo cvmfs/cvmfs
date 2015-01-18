@@ -110,8 +110,10 @@ cvmfs_run_test() {
   # last released cvmfs-keys package (1.5-1)
   # Note: this will not be needed after CernVM-FS 2.1.20 is released
   #       furthermore the re-install of cvmfs-config is not needed later on!
-  uninstall_package "cvmfs-config" || true # always succeeds, even if it doesn't
-                                           # exist as an installed package
+  cvmfs_config_pkg="$(get_providing_package cvmfs-config)"
+  echo "Uninstalling $cvmfs_config_pkg (providing cvmfs-config)"
+  uninstall_package $cvmfs_config_pkg || return 20
+
   local cvmfs_keys_url=$(guess_cvmfs_keys_url "1.5-1")
   local cvmfs_keys=$(basename $cvmfs_keys_url)
   echo "Download URL for cvmfs-keys: $cvmfs_keys_url"
