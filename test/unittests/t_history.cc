@@ -117,6 +117,14 @@ class T_History : public ::testing::Test {
     return false;
   }
 
+  bool IsMocked(const type<history::SqliteHistory> type_specifier) const {
+    return false;
+  }
+
+  bool IsMocked(const type<MockHistory> type_specifier) const {
+    return true;
+  }
+
  protected:
   History* CreateHistory(const std::string &filename) {
     return CreateHistory(type<HistoryT>(), filename);
@@ -136,6 +144,10 @@ class T_History : public ::testing::Test {
 
   bool NeedsSandbox() const {
     return NeedsSandbox(type<HistoryT>());
+  }
+
+  bool IsMocked() const {
+    return IsMocked(type<HistoryT>());
   }
 
   std::string GetHistoryFilename() const {
