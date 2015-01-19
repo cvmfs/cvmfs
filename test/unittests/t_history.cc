@@ -2,10 +2,12 @@
 #include <string>
 #include <map>
 
-#include "../../cvmfs/util.h"
-#include "../../cvmfs/prng.h"
 #include "testutil.h"
+
+#include "../../cvmfs/compression.h"
 #include "../../cvmfs/history_sqlite.h"
+#include "../../cvmfs/prng.h"
+#include "../../cvmfs/util.h"
 
 using namespace history;
 
@@ -14,6 +16,12 @@ class T_History : public ::testing::Test {
  protected:
   static const std::string sandbox;
   static const std::string fqrn;
+
+  static const std::string history_v1_r0;
+  static const std::string history_v1_r1;
+
+  static const std::string history_v1_r0_path;
+  static const std::string history_v1_r1_path;
 
   typedef std::vector<History::Tag>            TagVector;
   typedef std::map<std::string, MockHistory*>  MockHistoryMap;
@@ -249,6 +257,41 @@ const std::string T_History<HistoryT>::sandbox = "/tmp/cvmfs_ut_history";
 
 template <class HistoryT>
 const std::string T_History<HistoryT>::fqrn    = "test.cern.ch";
+
+template <class HistoryT>
+const std::string T_History<HistoryT>::history_v1_r0_path =
+  T_History<HistoryT>::sandbox + "/history_v1_r0";
+
+template <class HistoryT>
+const std::string T_History<HistoryT>::history_v1_r1_path =
+  T_History<HistoryT>::sandbox + "/history_v1_r1";
+
+template <class HistoryT>
+const std::string T_History<HistoryT>::history_v1_r0 =
+  "eJztlb1v00AUwM8+N00QnVBkul0main9cBxBUJeayqoiSgHHAx1QdLEv8Sn+qn2uqJjKH8HM/4SQ"
+  "mJnpwgALA3dOkVMkBAsClfvp3tO7p3vn92T7vdHTQ8oImqZ5jBmygAYUBewhBABocFkBNSoXbWmv"
+  "gF/TAJsfjDX4FWhqCmAHvlVT9eNvxEmuJy/hqt7pKOc2w5OIZHmakZxRUtSWtu86tucgz35w6KDa"
+  "jzbm5Ax5zjOvi05xVJJLe//x0chz7eGRh7L5eOn8E3f4yHaP0UPnuIo1DEtr6AcdBdAkIC+Kk4h/"
+  "+GNcsrTaL4WOzdpeOd9WVvV2W3m1SJnhWSFEvZKm8KCNBMffswpxEV6aOTmlBU0TxFN0Dhy3ixBi"
+  "NCb8mjirnX6Ik4REtSMghZ/TjInQxU0/1Fo99EqVIgHDuKM29N32z8oUUWNTaMjfh7bGlQJfA74k"
+  "Esk/Qch7zvOW1oxZXibzwLT8+4NJf9If+CTAfoCt3oAQ3MfWzqB31+KYPd+8N3ozfBdhxjsLyspJ"
+  "RIuQBKhIcFaEKesi0QP4kKc+jqIzVGYBPxrcAOL//wL4kkgk/wdNqLeq3iLmvwrfA/iJK4lEci24"
+  "rcL29vQkT/w0mdLZJpnRrUrKmwpcv1X4IYmxubUj5r8KLwC8gJ//ds4SieQP0oRtRfQEtQXXW4sW"
+  "8A15t8pp";
+
+template <class HistoryT>
+const std::string T_History<HistoryT>::history_v1_r1 =
+  "eJztl09r1EAUwCd5absVS6FlWXoQpniwoX/Y7KbZLaK4lqUUa9VtDvYg28lkYkKzSZqZLa2e6kfw"
+  "W3n21EMvxU/gQS8ezOy2ZFcoehDEkh/M5M1j3j+SN0P2Xu0EgmEvTntE4DrSkKKgJxgjhGayMYFy"
+  "1GxoI2sF/Z4ZtHqpz8APpKkHCObgs3qgXvyBXcEt4T1MVRYXlbOWIE7IkjROWCoCxnNJ2+y0W3Yb"
+  "262nO22c6/HSITvFdvu1vYKPSdhnV/Lmi909u9Pa3rVxctgd2f+ys/281dnHz9r7A1tdr2uTla1F"
+  "BQWRy074UZh96V3SF/FgPWLaNXJ54uyxMlUpl5UP3UHKgrzlcqhjaUoNXopI7zorn3D/SkzZccCD"
+  "OMJZiu2tdmcFYyyCHsvc9JJcSX0SRSzMFS7jNA0SIU2Hnnjwjo16GS99kMNY0TIfXX+gTlYelm+q"
+  "Wlp1DTlD9no02eQq3EPwMZsKCgpyuFrS3yhaKVBF2o8OVxPZ2nGfNxuWZXoNt05N0lgnTbrhWTVW"
+  "J2bD2bBqtFo1XMtZrxHV5rN60nfCgPvMxRE7EVjEeOBsBcuezC7dgJIwPMX9xCWCuU0UKqWKDNob"
+  "BvVMx3Isz2IbTeZQ5hGTsapBTcOxTIcQ5jhmbZ0yF2z+KAgzF1zgPCSPSML9WNwY7Q6S/f8Fwfds"
+  "KigouHXMga6MH2BqCSrTA5W8/wE+IfgKF9mjoKDgf2QOoHzfO0ojj9I1ytJojfrzKizPcuqzHule"
+  "/5UYdxVYmB8qjbWqvP8BzhGcwze4/NdFFBQU/BVKUFbkcQDzsKz8cgao07AwPdT9BBspCA8=";
 
 
 typedef ::testing::Types<history::SqliteHistory, MockHistory> HistoryTypes;
