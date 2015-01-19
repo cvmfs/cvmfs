@@ -29,8 +29,8 @@ class T_History : public ::testing::Test {
  protected:
   virtual void SetUp() {
     if (NeedsSandbox()) {
-      const bool retval = MkdirDeep(sandbox, 0700);
-      ASSERT_TRUE (retval) << "failed to create sandbox";
+      ASSERT_TRUE (MkdirDeep(sandbox, 0700)) << "failed to create sandbox";
+      PrepareLegacyHistoryDBs();
     }
     prng_.InitSeed(42);
   }
@@ -192,6 +192,37 @@ class T_History : public ::testing::Test {
     }
 
     return result;
+  }
+
+  void PrepareLegacyHistoryDBs() const {
+    UnpackHistory(history_v1_r0, history_v1_r0_path);
+    UnpackHistory(history_v1_r1, history_v1_r1_path);
+  }
+
+  void UnpackHistory(const std::string &base64, const std::string &dest) const {
+    ASSERT_EQ (0u, base64.length() % 4);
+    std::string  decoded;
+    char        *unpacked;
+    uint64_t     unpacked_size;
+    ASSERT_TRUE (Debase64(base64, &decoded)) << "failed to decode base64";
+    ASSERT_TRUE (zlib::DecompressMem2Mem(
+                   decoded.data(),
+                   decoded.size(),
+                   reinterpret_cast<void**>(&unpacked),
+                   &unpacked_size)) << "failed to decompress";
+    WriteFile(dest, std::string(unpacked, unpacked_size));
+  }
+
+  void WriteFile(const std::string &path, const std::string &content) const {
+    FILE *f = fopen(path.c_str(), "w+");
+    ASSERT_NE (static_cast<FILE*>(NULL), f)
+      << "failed to open. errno: " << errno;
+    const size_t bytes_written = fwrite(content.data(), 1, content.length(), f);
+    ASSERT_EQ (bytes_written, content.length())
+      << "failed to write. errno: " << errno;
+
+    const int retval = fclose(f);
+    ASSERT_EQ (0, retval) << "failed to close. errno: " << errno;
   }
 
   bool CheckListing(const TagVector &lhs, const TagVector &rhs) const {
