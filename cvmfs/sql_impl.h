@@ -14,12 +14,11 @@ namespace sqlite {
 
 template <class DerivedT>
 Database<DerivedT>::Database(const std::string  &filename,
-                             const OpenMode      open_mode) :
-  sqlite_db_(NULL),
-  db_file_guard_(filename, UnlinkGuard::kDisabled),
-  read_write_(kOpenReadWrite == open_mode),
-  schema_version_(0.0f),
-  schema_revision_(0) {}
+                             const OpenMode      open_mode)
+  : database_(filename, this)
+  , read_write_(kOpenReadWrite == open_mode)
+  , schema_version_(0.0f)
+  , schema_revision_(0) {}
 
 
 template <class DerivedT>
@@ -126,14 +125,14 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
   // Open database file (depending on the flags read-only or read-write)
   LogCvmfs(kLogSql, kLogDebug, "opening database file %s",
            filename().c_str());
-  if (SQLITE_OK != sqlite3_open_v2(filename().c_str(), &sqlite_db_, flags, NULL))
-  {
+  if (SQLITE_OK != sqlite3_open_v2(filename().c_str(),
+                                   &database_.sqlite_db, flags, NULL)) {
     LogCvmfs(kLogSql, kLogDebug, "cannot open database file %s",
              filename().c_str());
     return false;
   }
 
-  const int retval = sqlite3_extended_result_codes(sqlite_db_, 1);
+  const int retval = sqlite3_extended_result_codes(sqlite_db(), 1);
   assert (SQLITE_OK == retval);
 
   return true;
@@ -141,16 +140,17 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
 
 
 template <class DerivedT>
-Database<DerivedT>::~Database() {
-  if (NULL != sqlite_db_) {
+Database<DerivedT>::DatabaseRaiiWrapper::~DatabaseRaiiWrapper() {
+  if (NULL != sqlite_db) {
     LogCvmfs(kLogSql, kLogDebug, "closing SQLite database '%s'",
              filename().c_str());
-    const int result = sqlite3_close_v2(sqlite_db_);
+    const int result = sqlite3_close(sqlite_db);
     if (result != SQLITE_OK) {
-      LogCvmfs(kLogSql, kLogDebug, "failed to close SQLite database '%s' (%d)",
-               filename().c_str(), result);
+      LogCvmfs(kLogSql, kLogDebug, "failed to close SQLite database '%s' "
+                                   "(%d - %s)",
+               filename().c_str(), result, delegate_->GetLastErrorMsg().c_str());
     }
-    sqlite_db_ = NULL;
+    sqlite_db = NULL;
   }
 }
 
@@ -161,7 +161,7 @@ bool Database<DerivedT>::Configure() {
   // unexpected open read-write file descriptors in the cache directory like
   // etilqs_<number>.
   if (!read_write_) {
-    return Sql(sqlite_db_ , "PRAGMA temp_store=2;").Execute();
+    return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute();
   }
   return true;
 }
@@ -194,7 +194,7 @@ bool Database<DerivedT>::FileReadAhead() {
 
 template <class DerivedT>
 bool Database<DerivedT>::PrepareCommonQueries() {
-  sqlite3 *db = sqlite_db_;
+  sqlite3 *db = sqlite_db();
   begin_transaction_  = new Sql(db, "BEGIN;");
   commit_transaction_ = new Sql(db, "COMMIT;");
   has_property_       = new Sql(db, "SELECT count(*) FROM properties "
@@ -242,7 +242,7 @@ bool Database<DerivedT>::CommitTransaction() const {
 
 template <class DerivedT>
 bool Database<DerivedT>::CreatePropertiesTable() {
-  return Sql(sqlite_db_,
+  return Sql(sqlite_db(),
     "CREATE TABLE properties (key TEXT, value TEXT, "
     "CONSTRAINT pk_properties PRIMARY KEY (key));").Execute();
 }
@@ -284,24 +284,24 @@ bool Database<DerivedT>::SetProperty(const std::string &key,
 
 template <class DerivedT>
 std::string Database<DerivedT>::GetLastErrorMsg() const {
-  const std::string msg = sqlite3_errmsg(sqlite_db_);
+  const std::string msg = sqlite3_errmsg(sqlite_db());
   return msg;
 }
 
 
 template <class DerivedT>
 void Database<DerivedT>::TakeFileOwnership() {
-  db_file_guard_.Enable();
+  database_.TakeFileOwnership();
   LogCvmfs(kLogSql, kLogDebug, "Database object took ownership of '%s'",
-           db_file_guard_.path().c_str());
+           database_.filename().c_str());
 }
 
 
 template <class DerivedT>
 void Database<DerivedT>::DropFileOwnership() {
-  db_file_guard_.Disable();
+  database_.DropFileOwnership();
   LogCvmfs(kLogSql, kLogDebug, "Database object dropped ownership of '%s'",
-           db_file_guard_.path().c_str());
+           database_.filename().c_str());
 }
 
 /**
