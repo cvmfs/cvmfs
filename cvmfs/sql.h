@@ -69,6 +69,12 @@ class Sql;
 template <class DerivedT>
 class Database : SingleCopy {
  private:
+
+  /**
+   * This wraps the opaque SQLite database object along with a file unlink guard
+   * to control the life time of the database connection and the database file
+   * in an RAII fashion.
+   */
   struct DatabaseRaiiWrapper {
     DatabaseRaiiWrapper(const std::string   &filename,
                         Database<DerivedT>  *delegate)
