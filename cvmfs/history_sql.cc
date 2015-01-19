@@ -123,7 +123,11 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_2() {
 //------------------------------------------------------------------------------
 
 
-const std::string SqlHistory::db_fields =
+
+const std::string SqlHistory::db_fields_v1r0 =
+  "name, hash, revision, timestamp, channel, description";
+
+const std::string SqlHistory::db_fields_v1r1 =
   "name, hash, revision, timestamp, channel, description, size";
 
 const std::string SqlInsertTag::db_placeholders =
@@ -131,7 +135,7 @@ const std::string SqlInsertTag::db_placeholders =
 
 SqlInsertTag::SqlInsertTag(const HistoryDatabase *database) {
   const std::string stmt =
-    "INSERT INTO tags (" + db_fields + ")"
+    "INSERT INTO tags (" + db_fields(database) + ")"
     "VALUES (" + db_placeholders + ");";
   const bool success = Init(database->sqlite_db(), stmt);
   assert (success);
@@ -170,7 +174,7 @@ bool SqlRemoveTag::BindName(const std::string &name) {
 
 SqlFindTag::SqlFindTag(const HistoryDatabase *database) {
   const std::string stmt =
-    "SELECT " + db_fields + " FROM tags WHERE name = :name LIMIT 1;";
+    "SELECT " + db_fields(database) + " FROM tags WHERE name = :name LIMIT 1;";
   const bool success = Init(database->sqlite_db(), stmt);
   assert (success);
 }
@@ -190,7 +194,7 @@ SqlFindTagByDate::SqlFindTagByDate(const HistoryDatabase *database) {
   // and picks the first tag                         |  LIMIT 1
   // that is older than the given timestamp          |  WHICH timestamp <= :ts
   const bool success = Init(database->sqlite_db(),
-                            "SELECT " + db_fields + " FROM tags "
+                            "SELECT " + db_fields(database) + " FROM tags "
                             "WHERE timestamp <= :timestamp "
                             "ORDER BY revision DESC LIMIT 1;");
   assert (success);
@@ -222,7 +226,7 @@ unsigned SqlCountTags::RetrieveCount() const {
 
 SqlListTags::SqlListTags(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
-                            "SELECT " + db_fields + " FROM tags "
+                            "SELECT " + db_fields(database) + " FROM tags "
                             "ORDER BY revision DESC;");
   assert (success);
 }
@@ -233,7 +237,7 @@ SqlListTags::SqlListTags(const HistoryDatabase *database) {
 
 SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
-                            "SELECT " + db_fields + ", "
+                            "SELECT " + db_fields(database) + ", "
                             "  MAX(revision) AS max_rev "
                             "FROM tags "
                             "GROUP BY channel;");
@@ -269,7 +273,7 @@ SqlRollbackTag::SqlRollbackTag(const HistoryDatabase *database) {
 
 SqlListRollbackTags::SqlListRollbackTags(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
-                            "SELECT " + db_fields + " FROM tags "
+                            "SELECT " + db_fields(database) + " FROM tags "
                             "WHERE " + rollback_condition + " "
                             "ORDER BY revision DESC;");
   assert (success);
