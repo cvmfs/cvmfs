@@ -1515,3 +1515,81 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision1) {
 
   TestFixture::CloseHistory(history);
 }
+
+
+TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision0) {
+  if (TestFixture::IsMocked()) {
+    // this is only valid for the production code...
+    // the mocked history does not deal with legacy formats
+    return;
+  }
+
+  History *history = TestFixture::OpenWritableHistory(
+                                               TestFixture::history_v1_r0_path);
+  ASSERT_NE (static_cast<History*>(NULL), history);
+
+  const History::Tag dummy = TestFixture::GetDummyTag();
+  ASSERT_TRUE (history->Insert(dummy));
+  EXPECT_EQ (2u, history->GetNumberOfTags());
+
+  History::Tag tag;
+  ASSERT_TRUE (history->GetByName(dummy.name, &tag));
+  TestFixture::CompareTags (dummy, tag);
+
+  std::vector<shash::Any> recycled_hashes;
+  ASSERT_TRUE (history->ListRecycleBin(&recycled_hashes));
+  EXPECT_EQ (0u, recycled_hashes.size());
+
+  ASSERT_TRUE (history->Remove(dummy.name));
+  EXPECT_EQ (1u, history->GetNumberOfTags());
+
+  ASSERT_TRUE (history->ListRecycleBin(&recycled_hashes));
+  EXPECT_EQ (1u, recycled_hashes.size());
+  EXPECT_EQ (dummy.root_hash, recycled_hashes[0]);
+
+  ASSERT_TRUE (history->EmptyRecycleBin());
+
+  ASSERT_TRUE (history->ListRecycleBin(&recycled_hashes));
+  EXPECT_EQ (0u, recycled_hashes.size());
+
+  TestFixture::CloseHistory(history);
+}
+
+
+TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision1) {
+  if (TestFixture::IsMocked()) {
+    // this is only valid for the production code...
+    // the mocked history does not deal with legacy formats
+    return;
+  }
+
+  History *history = TestFixture::OpenWritableHistory(
+                                               TestFixture::history_v1_r1_path);
+  ASSERT_NE (static_cast<History*>(NULL), history);
+
+  const History::Tag dummy = TestFixture::GetDummyTag();
+  ASSERT_TRUE (history->Insert(dummy));
+  EXPECT_EQ (3u, history->GetNumberOfTags());
+
+  History::Tag tag;
+  ASSERT_TRUE (history->GetByName(dummy.name, &tag));
+  TestFixture::CompareTags (dummy, tag);
+
+  std::vector<shash::Any> recycled_hashes;
+  ASSERT_TRUE (history->ListRecycleBin(&recycled_hashes));
+  EXPECT_EQ (0u, recycled_hashes.size());
+
+  ASSERT_TRUE (history->Remove(dummy.name));
+  EXPECT_EQ (2u, history->GetNumberOfTags());
+
+  ASSERT_TRUE (history->ListRecycleBin(&recycled_hashes));
+  EXPECT_EQ (1u, recycled_hashes.size());
+  EXPECT_EQ (dummy.root_hash, recycled_hashes[0]);
+
+  ASSERT_TRUE (history->EmptyRecycleBin());
+
+  ASSERT_TRUE (history->ListRecycleBin(&recycled_hashes));
+  EXPECT_EQ (0u, recycled_hashes.size());
+
+  TestFixture::CloseHistory(history);
+}
