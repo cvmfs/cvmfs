@@ -1446,3 +1446,72 @@ TYPED_TEST(T_History, RecycleBinWithHeterogeneousHashes) {
 
   TestFixture::CloseHistory(history2);
 }
+
+
+TYPED_TEST(T_History, ReadLegacyVersion1Revision0) {
+  if (TestFixture::IsMocked()) {
+    // this is only valid for the production code...
+    // the mocked history does not deal with legacy formats
+    return;
+  }
+
+  History *history = TestFixture::OpenHistory(TestFixture::history_v1_r0_path);
+  ASSERT_NE (static_cast<History*>(NULL), history);
+
+  EXPECT_EQ   ("config-egi.egi.eu", history->fqrn());
+  EXPECT_TRUE (history->Exists("trunk"));
+
+  History::Tag trunk;
+  ASSERT_TRUE (history->GetByName("trunk", &trunk));
+  EXPECT_EQ ("trunk",                                       trunk.name);
+  EXPECT_EQ (h("d13c98b4b48cedacda328eea4a30826333312c17"), trunk.root_hash);
+  EXPECT_EQ (0u,                                            trunk.size);
+  EXPECT_EQ (1u,                                            trunk.revision);
+  EXPECT_EQ (1403013589,                                    trunk.timestamp);
+  EXPECT_EQ (History::kChannelTrunk,                        trunk.channel);
+
+  std::vector<History::Tag> tags;
+  ASSERT_TRUE (history->List(&tags));
+  EXPECT_EQ (1u, tags.size());
+
+  std::vector<shash::Any> recycled_hashes;
+  EXPECT_FALSE (history->ListRecycleBin(&recycled_hashes));
+
+  TestFixture::CloseHistory(history);
+}
+
+
+TYPED_TEST(T_History, ReadLegacyVersion1Revision1) {
+  if (TestFixture::IsMocked()) {
+    // this is only valid for the production code...
+    // the mocked history does not deal with legacy formats
+    return;
+  }
+
+  History *history = TestFixture::OpenHistory(TestFixture::history_v1_r1_path);
+  ASSERT_NE (static_cast<History*>(NULL), history);
+
+  EXPECT_EQ   ("fcc.cern.ch", history->fqrn());
+  EXPECT_TRUE (history->Exists("trunk"));
+  EXPECT_TRUE (history->Exists("trunk-previous"));
+
+  History::Tag trunk_p;
+  ASSERT_TRUE (history->GetByName("trunk-previous", &trunk_p));
+  EXPECT_EQ ("trunk-previous",                              trunk_p.name);
+  EXPECT_EQ (h("87664f7d3c4a75a8c9f62e3a47b962c001d6b52a"), trunk_p.root_hash);
+  EXPECT_EQ (14336u,                                        trunk_p.size);
+  EXPECT_EQ (2u,                                            trunk_p.revision);
+  EXPECT_EQ (1416826665,                                    trunk_p.timestamp);
+  EXPECT_EQ (History::kChannelTrunk,                        trunk_p.channel);
+
+  std::vector<History::Tag> tags;
+  ASSERT_TRUE (history->List(&tags));
+  EXPECT_EQ (2u, tags.size());
+  EXPECT_TRUE ( (tags[0].name == "trunk" && tags[1].name == "trunk-previous") ||
+                (tags[1].name == "trunk" && tags[0].name == "trunk-previous"));
+
+  std::vector<shash::Any> recycled_hashes;
+  EXPECT_FALSE (history->ListRecycleBin(&recycled_hashes));
+
+  TestFixture::CloseHistory(history);
+}
