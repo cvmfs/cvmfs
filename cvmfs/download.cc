@@ -1992,23 +1992,87 @@ bool DownloadManager::ValidateGeoReply(
 
 
 /**
- * Parses a list of ';'- and '|'-separated proxy servers for the proxy groups,
- *   and a ';'-separated list of fallback proxies.
+ * Removes DIRECT from a list of ';' and '|' separated proxies.
+ * \return true if DIRECT was present, false otherwise
+ */
+bool DownloadManager::RemoveDirect(
+  const string &proxy_list,
+  string *cleaned_list)
+{
+  assert(cleaned_list);
+  if (proxy_list == "") {
+    *cleaned_list = "";
+    return false;
+  }
+  bool result = false;
+
+  vector<string> proxy_groups = SplitString(proxy_list, ';');
+  vector<string> cleaned_groups;
+  for (unsigned i = 0; i < proxy_groups.size(); ++i) {
+    vector<string> group = SplitString(proxy_groups[i], '|');
+    vector<string> cleaned;
+    for (unsigned j = 0; j < group.size(); ++j) {
+      if ((group[j] == "DIRECT") || (group[j] == "")) {
+        result = true;
+      } else {
+        cleaned.push_back(group[j]);
+      }
+    }
+    if (!cleaned.empty())
+      cleaned_groups.push_back(JoinStrings(cleaned, "|"));
+  }
+
+  *cleaned_list = JoinStrings(cleaned_groups, ";");
+  return result;
+}
+
+
+/**
+ * Parses a list of ';'- and '|'-separated proxy servers and fallback proxy
+ *   servers for the proxy groups.
  * The empty string for both removes the proxy chain.
+ * The set_mode parameter can be used to set either proxies (leaving fallback
+ *   proxies unchanged) or fallback proxies (leaving regular proxies unchanged)
+ *   or both.
  */
 void DownloadManager::SetProxyChain(
   const string &proxy_list,
   const string &fallback_proxy_list,
-  const ProxySetModes set_mode) 
+  const ProxySetModes set_mode)
 {
   pthread_mutex_lock(lock_options_);
 
   opt_timestamp_backup_proxies_ = 0;
   opt_timestamp_failover_proxies_ = 0;
-  opt_proxy_list_ = proxy_list;
-  opt_proxy_fallback_list_ = fallback_proxy_list;
+  string set_proxy_list = opt_proxy_list_;
+  string set_proxy_fallback_list = opt_proxy_fallback_list_;
+  if ((set_mode == kSetProxyFallback) || (set_mode == kSetProxyBoth)) {
+    opt_proxy_fallback_list_ = fallback_proxy_list;
+    bool contains_direct =
+      RemoveDirect(opt_proxy_fallback_list_, &set_proxy_fallback_list);
+    if (contains_direct) {
+      LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
+               "fallback proxies do not support DIRECT, removing");
+    }
+  }
+  if ((set_mode == kSetProxyRegular) || (set_mode == kSetProxyBoth)) {
+    opt_proxy_list_ = proxy_list;
+    if (set_proxy_fallback_list == "") {
+      set_proxy_list = opt_proxy_list_;
+    } else {
+      bool contains_direct = RemoveDirect(opt_proxy_list_, &set_proxy_list);
+      if (contains_direct) {
+        LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+                 "skipping DIRECT proxy to use fallback proxy");
+      }
+    }
+  }
+
+  // From this point on, use set_proxy_list and set_fallback_proxy_list as
+  // effective proxy lists!
+
   delete opt_proxy_groups_;
-  if ((proxy_list == "") && (fallback_proxy_list == "")) {
+  if ((set_proxy_list == "") && (set_proxy_fallback_list == "")) {
     opt_proxy_groups_ = NULL;
     opt_proxy_groups_current_ = 0;
     opt_proxy_groups_current_burned_ = 0;
@@ -2018,49 +2082,40 @@ void DownloadManager::SetProxyChain(
     return;
   }
 
+  // Determine number of regular proxy groups (== first fallback proxy group)
+  opt_proxy_groups_fallback_ = 0;
+  if (set_proxy_list != "") {
+    opt_proxy_groups_fallback_ = SplitString(set_proxy_list, ';').size();
+  }
+  LogCvmfs(kLogDownload, kLogDebug, "first fallback proxy group %u",
+           opt_proxy_groups_fallback_);
+
+  // Concatenate regular proxies and fallback proxies, both of which can be
+  // empty.
+  string all_proxy_list = set_proxy_list;
+  if (set_proxy_fallback_list != "") {
+    if (all_proxy_list != "")
+      all_proxy_list += ";";
+    all_proxy_list += set_proxy_fallback_list;
+  }
+  LogCvmfs(kLogDownload, kLogDebug, "full proxy list %s",
+           all_proxy_list.c_str());
+
   // Resolve server names in provided urls
   vector<string> hostnames;  // All encountered hostnames
   vector<string> proxy_groups;
-  if (proxy_list != "")
-    proxy_groups = SplitString(proxy_list, ';');
-  opt_proxy_groups_fallback_= proxy_groups.size();
+  if (all_proxy_list != "")
+    proxy_groups = SplitString(all_proxy_list, ';');
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
     vector<string> this_group = SplitString(proxy_groups[i], '|');
-    unsigned hostnamessize = hostnames.size();
     for (unsigned j = 0; j < this_group.size(); ++j) {
       // Note: DIRECT strings will be "extracted" to an empty string.
       string hostname = dns::ExtractHost(this_group[j]);
-      if ((hostname != "") || (fallback_proxy_list == "")) {
-        // Save the hostname.  Leave empty (DIRECT) names so indexes will
-        // match later, unless using fallback proxies.  They will not be
-        // resolved.
-        hostnames.push_back(hostname);
-      }
-    }
-    if (hostnamessize == hostnames.size()) {
-      // no hostnames remain in this group, skip it
-      opt_proxy_groups_fallback_--;
-    }
-  }
-  vector<string> fallback_groups;
-  if (fallback_proxy_list != "")
-    fallback_groups = SplitString(fallback_proxy_list, ';');
-  for (unsigned i = 0; i < fallback_groups.size(); ++i) {
-    string fallback_proxy = fallback_groups[i];
-    size_t barpos = fallback_proxy.find('|');
-    if (barpos != std::string::npos) {
-      // ignore anything after a vertical bar, it's not supported in fallbacks
-      fallback_proxy = fallback_proxy.substr(0, barpos);
-    }
-    string hostname = dns::ExtractHost(fallback_proxy);
-    if (hostname != "") {
-      // Save non-DIRECT hostnames
+      // Save the hostname.  Leave empty (DIRECT) names so indexes will
+      // match later.
       hostnames.push_back(hostname);
-      // also append the fallback proxy to the proxy groups
-      proxy_groups.push_back(fallback_proxy);
     }
   }
-
   vector<dns::Host> hosts;
   LogCvmfs(kLogDownload, kLogDebug, "resolving %u proxy addresses",
            hostnames.size());
@@ -2073,17 +2128,13 @@ void DownloadManager::SetProxyChain(
   unsigned num_proxy = 0;  // Combined i, j counter
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
     vector<string> this_group = SplitString(proxy_groups[i], '|');
+    // Construct ProxyInfo objects from proxy string and DNS resolver result for
+    // every proxy in this_group.  One URL can result in multiple ProxyInfo
+    // objects, one for each IP address.
     vector<ProxyInfo> infos;
     for (unsigned j = 0; j < this_group.size(); ++j, ++num_proxy) {
       if (this_group[j] == "DIRECT") {
-        if (fallback_proxy_list == "")
-          infos.push_back(ProxyInfo("DIRECT"));
-        else {
-          --num_proxy;
-           LogCvmfs(kLogDownload,
-                    kLogDebug,
-                    "skipping DIRECT proxy to use fallback proxy");
-        }
+        infos.push_back(ProxyInfo("DIRECT"));
         continue;
       }
 
@@ -2120,10 +2171,8 @@ void DownloadManager::SetProxyChain(
         }
       }
     }
-    if (infos.size() > 0) {
-      opt_proxy_groups_->push_back(infos);
-      opt_num_proxies_ += infos.size();
-    }
+    opt_proxy_groups_->push_back(infos);
+    opt_num_proxies_ += infos.size();
   }
   LogCvmfs(kLogDownload, kLogDebug,
            "installed %u proxies in %u load-balance groups",
@@ -2131,6 +2180,7 @@ void DownloadManager::SetProxyChain(
   opt_proxy_groups_current_ = 0;
   opt_proxy_groups_current_burned_ = 1;
 
+  // Select random start proxy from the first group.
   if (opt_proxy_groups_->size() > 0) {
     // Select random start proxy from the first group.
     if ((*opt_proxy_groups_)[0].size() > 1) {
@@ -2140,6 +2190,7 @@ void DownloadManager::SetProxyChain(
     //LogCvmfs(kLogDownload, kLogSyslog, "using proxy %s",
     //         (*opt_proxy_groups_)[0][0].c_str());
   }
+
   pthread_mutex_unlock(lock_options_);
 }
 

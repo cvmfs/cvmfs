@@ -69,6 +69,31 @@ TEST_F(T_Download, LocalFile2Mem) {
 }
 
 
+TEST_F(T_Download, RemoveDirect) {
+  string cleaned = "FALSE";
+  EXPECT_FALSE(download_mgr.RemoveDirect("", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.RemoveDirect("DIRECT", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.RemoveDirect("DIRECT;DIRECT", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.RemoveDirect("DIRECT;DIRECT|DIRECT", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.RemoveDirect("DIRECT;DIRECT|", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.RemoveDirect(";", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.RemoveDirect(";||;;;|||", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_FALSE(download_mgr.RemoveDirect("A|B", &cleaned));
+  EXPECT_EQ("A|B", cleaned);
+  EXPECT_FALSE(download_mgr.RemoveDirect("A|B;C|D;E|F|G", &cleaned));
+  EXPECT_EQ("A|B;C|D;E|F|G", cleaned);
+  EXPECT_TRUE(download_mgr.RemoveDirect("A|DIRECT;C|D;E|F;DIRECT", &cleaned));
+  EXPECT_EQ("A;C|D;E|F", cleaned);
+}
+
+
 TEST_F(T_Download, ValidateGeoReply) {
   vector<uint64_t> geo_order;
   EXPECT_FALSE(download_mgr.ValidateGeoReply("", geo_order.size(), &geo_order));

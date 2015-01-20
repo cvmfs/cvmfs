@@ -246,6 +246,7 @@ class HeaderLists {
 
 class DownloadManager {
   FRIEND_TEST(T_Download, ValidateGeoReply);
+  FRIEND_TEST(T_Download, RemoveDirect);
  public:
   struct ProxyInfo {
     ProxyInfo() { }
@@ -329,6 +330,7 @@ class DownloadManager {
                                 void *userp, void *socketp);
   static void *MainDownload(void *data);
 
+  bool RemoveDirect(const std::string &proxy_list, std::string *cleaned_list);
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
