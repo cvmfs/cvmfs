@@ -45,7 +45,7 @@ userdata=""
 # package download locations
 server_package=""
 client_package=""
-config_package=""
+config_packages=""  # might be more than one... BEWARE OF SPACES!!
 unittest_package=""
 source_tarball="source.tar.gz" # will be prepended by ${testee_url} later
 
@@ -138,7 +138,10 @@ read_package_map() {
 
   local platform_found=0
   local package_url=""
+  local old_ifs="$IFS"
 
+  IFS='
+'
   for line in $(wget --no-check-certificate --quiet --output-document=- $pkgmap_url); do
     # search the desired platform
     if [ $platform_found -eq 0 ] && [ x"$line" = x"[$platform]" ]; then
@@ -155,11 +158,13 @@ read_package_map() {
 
       # check for desired package name and possibly return successfully
       if [ x"$(echo "$line" | cut -d= -f1)" = x"$package" ]; then
-        package_url=$(echo "$line" | cut -d= -f2)
+        package_url="$(echo "$line" | cut -d= -f2)"
         break
       fi
     fi
   done
+
+  IFS="$old_ifs"
 
   # check if the desired package URL was found
   if [ x"$package_url" != x"" ]; then
@@ -277,7 +282,7 @@ setup_virtual_machine() {
       -c $client_package                                           \
       -t $source_tarball                                           \
       -g $unittest_package                                         \
-      -k $config_package                                           \
+      -k "$config_packages"                                        \
       -r $platform_setup_script
   check_retcode $?
   if [ $? -ne 0 ]; then
@@ -304,7 +309,7 @@ run_test_cases() {
   run_script_on_virtual_machine $ip $username $remote_run_script \
       -s $server_package                                         \
       -c $client_package                                         \
-      -k $config_package                                         \
+      -k "$config_packages"                                      \
       -r $platform_run_script
   check_retcode $?
 
@@ -399,12 +404,12 @@ fi
 client_package=$(read_package_map   ${testee_url}/pkgmap "$platform" 'client'   )
 server_package=$(read_package_map   ${testee_url}/pkgmap "$platform" 'server'   )
 unittest_package=$(read_package_map ${testee_url}/pkgmap "$platform" 'unittests')
-config_package=$(read_package_map   ${testee_url}/pkgmap "$platform" 'config'   )
+config_packages="$(read_package_map ${testee_url}/pkgmap "$platform" 'config'   )"
 
 # check if all necessary packages were found
 if [ x$server_package        = "x" ] ||
    [ x$client_package        = "x" ] ||
-   [ x$config_package        = "x" ] ||
+   [ x$config_packages       = "x" ] ||
    [ x$unittest_package      = "x" ]; then
   usage "Incomplete pkgmap file"
 fi
@@ -413,8 +418,12 @@ fi
 client_package="${testee_url}/${client_package}"
 server_package="${testee_url}/${server_package}"
 unittest_package="${testee_url}/${unittest_package}"
-config_package="${config_package_base_url}/${config_package}"
 source_tarball="${testee_url}/${source_tarball}"
+config_package_urls=""
+for config_package in $config_packages; do
+  config_package_urls="${config_package_base_url}/${config_package} $config_package_urls"
+done
+config_packages="$config_package_urls"
 
 # load EC2 configuration
 . $ec2_config
@@ -422,12 +431,12 @@ source_tarball="${testee_url}/${source_tarball}"
 # spawn the virtual machine image, run the platform specific setup script
 # on it, wait for the spawning and setup to be complete and run the actual
 # test suite on the VM.
-spawn_virtual_machine     $ami_name "$userdata"  || die "Aborting..."
-wait_for_virtual_machine  $ip_address  $username || die "Aborting..."
-setup_virtual_machine     $ip_address  $username || die "Aborting..."
-wait_for_virtual_machine  $ip_address  $username || die "Aborting..."
-run_test_cases            $ip_address  $username || die "Aborting..."
-get_test_results          $ip_address  $username || die "Aborting..."
-tear_down_virtual_machine $instance_id           || die "Aborting..."
+spawn_virtual_machine     $ami_name   "$userdata" || die "Aborting..."
+wait_for_virtual_machine  $ip_address  $username  || die "Aborting..."
+setup_virtual_machine     $ip_address  $username  || die "Aborting..."
+wait_for_virtual_machine  $ip_address  $username  || die "Aborting..."
+run_test_cases            $ip_address  $username  || die "Aborting..."
+get_test_results          $ip_address  $username  || die "Aborting..."
+tear_down_virtual_machine $instance_id            || die "Aborting..."
 
 echo "all done"
