@@ -71,7 +71,7 @@ while getopts "r:s:c:k:p:u:" option; do
       for config_package in $OPTARG; do
         config_package_paths="$(readlink --canonicalize $(basename $config_package)) $config_package_paths"
       done
-      config_packages="config_package_paths"
+      config_packages="$config_package_paths"
       ;;
     p)
       platform_script_path=$OPTARG
