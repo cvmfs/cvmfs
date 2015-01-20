@@ -251,7 +251,8 @@ Supported Commands:
                 Checks if the repository is sane
   transaction   <fully qualified name>
                 Start to edit a repository
-  snapshot      <fully qualified name>
+  snapshot      [-t fail if other snapshot is in progress]
+                <fully qualified name>
                 Synchronize a Stratum 1 replica with the Stratum 0 source
   migrate       <fully qualified name>
                 Migrates a repository to the current version of CernVM-FS
