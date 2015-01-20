@@ -2256,7 +2256,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     *g_boot_error = "failed to discover HTTP proxy servers";
     return loader::kFailWpad;
   }
-  cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
+  cvmfs::download_manager_->SetProxyChain(
+    proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
   g_download_ready = true;
   if (use_geo_api) {
     cvmfs::download_manager_->ProbeGeo();

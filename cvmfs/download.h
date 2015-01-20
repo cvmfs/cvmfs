@@ -259,6 +259,12 @@ class DownloadManager {
     std::string url;
   };
 
+  enum ProxySetModes {
+    kSetProxyRegular = 0,
+    kSetProxyFallback,
+    kSetProxyBoth,
+  };
+
   /**
    * No attempt was made to order stratum 1 servers
    */
@@ -299,7 +305,8 @@ class DownloadManager {
   bool ProbeGeo();
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list,
-                     const std::string &fallback_proxy_list);
+                     const std::string &fallback_proxy_list,
+                     const ProxySetModes set_mode);
   void GetProxyInfo(std::vector< std::vector<ProxyInfo> > *proxy_chain,
                     unsigned *current_group,
                     unsigned *fallback_group);
@@ -323,7 +330,7 @@ class DownloadManager {
   static void *MainDownload(void *data);
 
   bool ValidateGeoReply(const std::string &reply_order,
-                        unsigned expected_size,
+                        const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
@@ -401,11 +408,11 @@ class DownloadManager {
    */
   unsigned opt_num_proxies_;
   /**
-   * The original proxy list as a string
+   * The original proxy list provided to SetProxyChain.
    */
   std::string opt_proxy_list_;
   /**
-   * The original proxy fallback list as a string
+   * The original proxy fallback list provided to SetProxyChain.
    */
   std::string opt_proxy_fallback_list_;
 

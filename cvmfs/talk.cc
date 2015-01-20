@@ -311,9 +311,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
           if (proxies == "") {
               Answer(con_fd, "Failed, no valid proxies\n");
           } else {
-            string fallback_proxies = 
-              cvmfs::download_manager_->GetFallbackProxyList();
-            cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
+            cvmfs::download_manager_->SetProxyChain(
+              proxies, "", download::DownloadManager::kSetProxyRegular);
             Answer(con_fd, "OK\n");
           }
         }
@@ -322,8 +321,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "Usage: proxy fallback <proxy list>\n");
         } else {
           string fallback_proxies = line.substr(15);
-          string proxies = cvmfs::download_manager_->GetProxyList();
-          cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
+          cvmfs::download_manager_->SetProxyChain(
+            "", fallback_proxies, download::DownloadManager::kSetProxyFallback);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "timeout info") {

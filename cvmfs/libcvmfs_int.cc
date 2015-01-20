@@ -300,7 +300,8 @@ int cvmfs_context::Setup(const options &opts) {
                                 opts.timeout_direct);
   download_manager_->SetProxyChain(
     download::ResolveProxyDescription(opts.proxies, download_manager_),
-    opts.fallback_proxies);
+    opts.fallback_proxies,
+    download::DownloadManager::kSetProxyBoth);
   //ctx.download_manager_->EnableInfoHeader();
   download_ready_ = true;
 

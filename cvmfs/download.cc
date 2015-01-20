@@ -1359,9 +1359,9 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   // Parsing environment variables
   if (use_system_proxy) {
     if (getenv("http_proxy") == NULL) {
-      SetProxyChain("", "");
+      SetProxyChain("", "", kSetProxyRegular);
     } else {
-      SetProxyChain(string(getenv("http_proxy")), "");
+      SetProxyChain(string(getenv("http_proxy")), "", kSetProxyRegular);
     }
   }
 }
@@ -1957,7 +1957,7 @@ bool DownloadManager::ProbeGeo() {
  */
 bool DownloadManager::ValidateGeoReply(
   const string &reply_order,
-  unsigned expected_size,
+  const unsigned expected_size,
   vector<uint64_t> *reply_vals)
 {
   if (reply_order.empty())
@@ -1996,8 +1996,11 @@ bool DownloadManager::ValidateGeoReply(
  *   and a ';'-separated list of fallback proxies.
  * The empty string for both removes the proxy chain.
  */
-void DownloadManager::SetProxyChain(const string &proxy_list,
-                                    const string &fallback_proxy_list) {
+void DownloadManager::SetProxyChain(
+  const string &proxy_list,
+  const string &fallback_proxy_list,
+  const ProxySetModes set_mode) 
+{
   pthread_mutex_lock(lock_options_);
 
   opt_timestamp_backup_proxies_ = 0;
