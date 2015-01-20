@@ -407,10 +407,10 @@ unittest_package=$(read_package_map ${testee_url}/pkgmap "$platform" 'unittests'
 config_packages="$(read_package_map ${testee_url}/pkgmap "$platform" 'config'   )"
 
 # check if all necessary packages were found
-if [ x$server_package        = "x" ] ||
-   [ x$client_package        = "x" ] ||
-   [ x$config_packages       = "x" ] ||
-   [ x$unittest_package      = "x" ]; then
+if [ x"$server_package"        = "x" ] ||
+   [ x"$client_package"        = "x" ] ||
+   [ x"$config_packages"       = "x" ] ||
+   [ x"$unittest_package"      = "x" ]; then
   usage "Incomplete pkgmap file"
 fi
 
