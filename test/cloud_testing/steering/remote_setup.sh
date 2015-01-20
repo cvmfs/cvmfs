@@ -187,7 +187,7 @@ config_package_paths=""
 for config_package in $config_packages; do
   config_package_paths="$(readlink --canonicalize $(basename $config_package)) $config_package_paths"
 done
-config_packages="config_package_paths"
+config_packages="$config_package_paths"
 
 # extract the source tarball
 extract_location=$(tar -tzf $source_tarball | head -n1)
