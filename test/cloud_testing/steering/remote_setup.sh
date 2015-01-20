@@ -183,7 +183,11 @@ server_package=$(readlink --canonicalize $(basename $server_package))
 client_package=$(readlink --canonicalize $(basename $client_package))
 source_tarball=$(readlink --canonicalize $(basename $source_tarball))
 unittest_package=$(readlink --canonicalize $(basename $unittest_package))
-config_packages=$(for pkg in $config_packages; do readlink --canonicalize $(basename $pkg); done)
+config_package_paths=""
+for config_package in $config_packages; do
+  config_package_paths="$(readlink --canonicalize $(basename $config_package)) $config_package_paths"
+done
+config_packages="config_package_paths"
 
 # extract the source tarball
 extract_location=$(tar -tzf $source_tarball | head -n1)
