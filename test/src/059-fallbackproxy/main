@@ -1,0 +1,21 @@
+
+cvmfs_test_name="Setting CVMFS_FALLBACK_PROXY"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount grid.cern.ch "CVMFS_FALLBACK_PROXY=http://example.com:3128" || return 1
+  sudo cvmfs_talk -i grid.cern.ch proxy info | tail -n 1 | grep 'fallback group:'
+  if [ $? -ne 0 ]; then
+    return 10
+  fi
+
+  cvmfs_umount grid.cern.ch
+  cvmfs_mount grid.cern.ch "CVMFS_FALLBACK_PROXY=" || return 2
+  sudo cvmfs_talk -i grid.cern.ch proxy info | tail -n 1 | grep 'fallback group:'
+  if [ $? -eq 0 ]; then
+    return 20
+  fi
+
+  return 0
+}
