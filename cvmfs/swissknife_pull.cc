@@ -64,6 +64,7 @@ string              *temp_dir = NULL;
 unsigned             num_parallel = 1;
 bool                 pull_history = false;
 bool                 is_garbage_collectable = false;
+bool                 wait_for_other_snapshots = true;
 upload::Spooler     *spooler = NULL;
 int                  pipe_chunks[2];
 // required for concurrent reading
@@ -388,6 +389,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     retries = String2Uint64(*args.find('a')->second);
   if (args.find('p') != args.end())
     pull_history = true;
+  if (args.find('s') != args.end())
+    wait_for_other_snapshots = false;
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   typedef std::vector<history::History::Tag> TagVector;
@@ -399,6 +402,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Wait for another instance to finish
   fd_lockfile = TryLockFile(*temp_dir + "/lock_snapshot");
   if (fd_lockfile < 0) {
+    if (! wait_for_other_snapshots) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "another snapshot is in progress... aborting");
+      return 2;
+    }
+
     LogCvmfs(kLogCvmfs, kLogStdout, "waiting for another snapshot to finish...");
     fd_lockfile = LockFile(*temp_dir + "/lock_snapshot");
     if (fd_lockfile < 0) {
