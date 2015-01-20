@@ -138,7 +138,10 @@ read_package_map() {
 
   local platform_found=0
   local package_url=""
+  local old_ifs="$IFS"
 
+  IFS='
+'
   for line in $(wget --no-check-certificate --quiet --output-document=- $pkgmap_url); do
     # search the desired platform
     if [ $platform_found -eq 0 ] && [ x"$line" = x"[$platform]" ]; then
@@ -155,11 +158,13 @@ read_package_map() {
 
       # check for desired package name and possibly return successfully
       if [ x"$(echo "$line" | cut -d= -f1)" = x"$package" ]; then
-        package_url=$(echo "$line" | cut -d= -f2)
+        package_url="$(echo "$line" | cut -d= -f2)"
         break
       fi
     fi
   done
+
+  IFS="$old_ifs"
 
   # check if the desired package URL was found
   if [ x"$package_url" != x"" ]; then
