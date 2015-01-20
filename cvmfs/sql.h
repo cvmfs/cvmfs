@@ -68,6 +68,33 @@ class Sql;
  */
 template <class DerivedT>
 class Database : SingleCopy {
+ private:
+
+  /**
+   * This wraps the opaque SQLite database object along with a file unlink guard
+   * to control the life time of the database connection and the database file
+   * in an RAII fashion.
+   */
+  struct DatabaseRaiiWrapper {
+    DatabaseRaiiWrapper(const std::string   &filename,
+                        Database<DerivedT>  *delegate)
+      : sqlite_db(NULL)
+      , db_file_guard(filename, UnlinkGuard::kDisabled)
+      , delegate_(delegate) {}
+    ~DatabaseRaiiWrapper();
+
+    sqlite3*           database() const { return sqlite_db;            }
+    const std::string& filename() const { return db_file_guard.path(); }
+
+    void TakeFileOwnership() { db_file_guard.Enable();           }
+    void DropFileOwnership() { db_file_guard.Disable();          }
+    bool OwnsFile() const    { return db_file_guard.IsEnabled(); }
+
+    sqlite3             *sqlite_db;
+    UnlinkGuard          db_file_guard;
+    Database<DerivedT>  *delegate_;
+  };
+
  public:
   enum OpenMode {
     kOpenReadOnly,
@@ -105,12 +132,6 @@ class Database : SingleCopy {
   static DerivedT* Open(const std::string  &filename,
                         const OpenMode      open_mode);
 
-  /**
-   * The internal SQLite context object is freed by this destructor. Hence, a
-   * simple `delete` is enough to uninitialize the database.
-   */
-  ~Database();
-
   bool IsEqualSchema(const float value, const float compare) const {
     return (value > compare - kSchemaEpsilon &&
             value < compare + kSchemaEpsilon);
@@ -125,11 +146,11 @@ class Database : SingleCopy {
   bool SetProperty(const std::string &key, const T value);
   bool HasProperty(const std::string &key) const;
 
-  sqlite3     *sqlite_db()       const { return sqlite_db_;            }
-  std::string  filename()        const { return db_file_guard_.path(); }
-  float        schema_version()  const { return schema_version_;       }
-  unsigned     schema_revision() const { return schema_revision_;      }
-  bool         read_write()      const { return read_write_;           }
+  sqlite3*            sqlite_db()       const { return database_.database();  }
+  const std::string&  filename()        const { return database_.filename();  }
+  float               schema_version()  const { return schema_version_;       }
+  unsigned            schema_revision() const { return schema_revision_;      }
+  bool                read_write()      const { return read_write_;           }
 
   /**
    * Figures out the ratio of free SQLite memory pages in the SQLite database
@@ -187,7 +208,7 @@ class Database : SingleCopy {
    *
    * @return  false if file is unmanaged
    */
-  bool OwnsFile() const { return db_file_guard_.IsEnabled(); }
+  bool OwnsFile() const { return database_.OwnsFile(); }
 
  protected:
   /**
@@ -213,8 +234,8 @@ class Database : SingleCopy {
   void set_schema_revision(const unsigned rev) { schema_revision_ = rev; }
 
  private:
-  sqlite3            *sqlite_db_;
-  UnlinkGuard         db_file_guard_;
+  DatabaseRaiiWrapper database_;
+
   const bool          read_write_;
   float               schema_version_;
   unsigned            schema_revision_;
