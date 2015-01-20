@@ -106,6 +106,7 @@ class cvmfs_context : SingleCopy {
     unsigned       timeout_direct;
     std::string    url;
     std::string    proxies;
+    std::string    fallback_proxies;
     std::string    tracefile;
     std::string    pubkey;
     std::string    deep_mount;

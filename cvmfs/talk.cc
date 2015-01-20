@@ -253,7 +253,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         cvmfs::download_manager_->ProbeHosts();
         Answer(con_fd, "OK\n");
       } else if (line == "host probe geo") {
-        bool retval = cvmfs::download_manager_->ProbeHostsGeo();
+        bool retval = cvmfs::download_manager_->ProbeGeo();
         if (retval)
           Answer(con_fd, "OK\n");
         else
@@ -272,7 +272,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "proxy info") {
         vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
         unsigned active_group;
-        cvmfs::download_manager_->GetProxyInfo(&proxy_chain, &active_group);
+        unsigned fallback_group;
+        cvmfs::download_manager_->GetProxyInfo(&proxy_chain, &active_group, &fallback_group);
 
         string proxy_str;
         if (proxy_chain.size()) {
@@ -287,6 +288,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
           }
           proxy_str += "Active proxy: [" + StringifyInt(active_group) + "] " +
                        proxy_chain[active_group][0].url + "\n";
+          if (fallback_group < proxy_chain.size())
+            proxy_str += "First fallback group: [" + StringifyInt(fallback_group) + "]\n";
         } else {
           proxy_str = "No proxies defined\n";
         }
@@ -308,9 +311,20 @@ static void *MainTalk(void *data __attribute__((unused))) {
           if (proxies == "") {
               Answer(con_fd, "Failed, no valid proxies\n");
           } else {
-            cvmfs::download_manager_->SetProxyChain(proxies);
+            string fallback_proxies = 
+              cvmfs::download_manager_->GetFallbackProxyList();
+            cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
             Answer(con_fd, "OK\n");
           }
+        }
+      } else if (line.substr(0, 14) == "proxy fallback") {
+        if (line.length() < 15) {
+          Answer(con_fd, "Usage: proxy fallback <proxy list>\n");
+        } else {
+          string fallback_proxies = line.substr(15);
+          string proxies = cvmfs::download_manager_->GetProxyList();
+          cvmfs::download_manager_->SetProxyChain(proxies, fallback_proxies);
+          Answer(con_fd, "OK\n");
         }
       } else if (line == "timeout info") {
         unsigned timeout;

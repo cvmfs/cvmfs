@@ -245,7 +245,7 @@ class HeaderLists {
 
 
 class DownloadManager {
-  FRIEND_TEST(T_Download, SortWrtGeoReply);
+  FRIEND_TEST(T_Download, ValidateGeoReply);
  public:
   struct ProxyInfo {
     ProxyInfo() { }
@@ -296,11 +296,15 @@ class DownloadManager {
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
   void ProbeHosts();
-  bool ProbeHostsGeo();
+  bool ProbeGeo();
   void SwitchHost();
-  void SetProxyChain(const std::string &proxy_list);
+  void SetProxyChain(const std::string &proxy_list,
+                     const std::string &fallback_proxy_list);
   void GetProxyInfo(std::vector< std::vector<ProxyInfo> > *proxy_chain,
-                    unsigned *current_group);
+                    unsigned *current_group,
+                    unsigned *fallback_group);
+  std::string GetProxyList();
+  std::string GetFallbackProxyList();
   void RebalanceProxies();
   void SwitchProxyGroup();
   void SetProxyGroupResetDelay(const unsigned seconds);
@@ -318,8 +322,9 @@ class DownloadManager {
                                 void *userp, void *socketp);
   static void *MainDownload(void *data);
 
-  bool SortWrtGeoReply(const std::string &reply_order,
-                       std::vector<std::string> *input_hosts);
+  bool ValidateGeoReply(const std::string &reply_order,
+                        unsigned expected_size,
+                        std::vector<uint64_t> *reply_vals);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
   void RebalanceProxiesUnlocked();
@@ -387,9 +392,22 @@ class DownloadManager {
    */
   unsigned opt_proxy_groups_current_burned_;
   /**
+   * The index of the first fallback proxy group.  If there are none,
+   *  it is set to the number of regular proxy groups.
+   */
+  unsigned opt_proxy_groups_fallback_;
+  /**
    * Overall number of proxies summed over all the groups.
    */
   unsigned opt_num_proxies_;
+  /**
+   * The original proxy list as a string
+   */
+  std::string opt_proxy_list_;
+  /**
+   * The original proxy fallback list as a string
+   */
+  std::string opt_proxy_fallback_list_;
 
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).
