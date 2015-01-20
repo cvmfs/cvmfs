@@ -888,18 +888,18 @@ void DownloadManager::ValidateProxyIpsUnlocked(
     }
   }
   vector<ProxyInfo> new_infos;
-  // IPv6 addresses have precedence
+  // IPv4 addresses have precedence
   set<string>::const_iterator iter_ips;
-  if (new_host.HasIpv6()) {
-    iter_ips = new_host.ipv6_addresses().begin();
-    for (; iter_ips != new_host.ipv6_addresses().end(); ++iter_ips) {
+  if (new_host.HasIpv4()) {
+    iter_ips = new_host.ipv4_addresses().begin();
+    for (; iter_ips != new_host.ipv4_addresses().end(); ++iter_ips) {
       string url_ip = dns::RewriteUrl(url, *iter_ips);
       new_infos.push_back(ProxyInfo(new_host, url_ip));
     }
   } else {
-    // IPv4
-    iter_ips = new_host.ipv4_addresses().begin();
-    for (; iter_ips != new_host.ipv4_addresses().end(); ++iter_ips) {
+    // IPv6
+    iter_ips = new_host.ipv6_addresses().begin();
+    for (; iter_ips != new_host.ipv6_addresses().end(); ++iter_ips) {
       string url_ip = dns::RewriteUrl(url, *iter_ips);
       new_infos.push_back(ProxyInfo(new_host, url_ip));
     }
@@ -2003,21 +2003,21 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
         continue;
       }
 
-      // IPv6 addresses have precedence
+      // IPv4 addresses have precedence
       set<string>::const_iterator iter_ips;
-      if (hosts[num_proxy].HasIpv6()) {
-        // IPv6
-        iter_ips = hosts[num_proxy].ipv6_addresses().begin();
-        for (; iter_ips != hosts[num_proxy].ipv6_addresses().end();
+      if (hosts[num_proxy].HasIpv4()) {
+        // IPv4
+        iter_ips = hosts[num_proxy].ipv4_addresses().begin();
+        for (; iter_ips != hosts[num_proxy].ipv4_addresses().end();
              ++iter_ips)
         {
           string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
           infos.push_back(ProxyInfo(hosts[num_proxy], url_ip));
         }
       } else {
-        // IPv4
-        iter_ips = hosts[num_proxy].ipv4_addresses().begin();
-        for (; iter_ips != hosts[num_proxy].ipv4_addresses().end();
+        // IPv6
+        iter_ips = hosts[num_proxy].ipv6_addresses().begin();
+        for (; iter_ips != hosts[num_proxy].ipv6_addresses().end();
              ++iter_ips)
         {
           string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
