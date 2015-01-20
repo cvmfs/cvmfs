@@ -141,9 +141,11 @@ static void ExpectResolvedName(
 {
   set<string> ipv4_addresses = host.ipv4_addresses();
   if (!ipv4.empty()) {
+    EXPECT_TRUE(host.HasIpv4());
     ASSERT_EQ(1U, ipv4_addresses.size());
     EXPECT_EQ(ipv4, *ipv4_addresses.begin());
   } else {
+    EXPECT_FALSE(host.HasIpv4());
     EXPECT_EQ(0U, ipv4_addresses.size());
   }
   if (!ipv6.empty()) {
@@ -408,6 +410,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "normal");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
+  EXPECT_TRUE(host.HasIpv4());
   EXPECT_TRUE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 2U);
   EXPECT_EQ(host.ipv6_addresses().size(), 2U);
@@ -416,6 +419,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "ipv4");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
+  EXPECT_TRUE(host.HasIpv4());
   EXPECT_FALSE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 2U);
   EXPECT_EQ(host.ipv6_addresses().size(), 0U);
@@ -424,6 +428,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "ipv6");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
+  EXPECT_FALSE(host.HasIpv4());
   EXPECT_TRUE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 0U);
   EXPECT_EQ(host.ipv6_addresses().size(), 2U);
@@ -432,6 +437,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "bad-ipv4");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
+  EXPECT_TRUE(host.HasIpv4());
   EXPECT_FALSE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 1U);
   EXPECT_EQ(host.ipv6_addresses().size(), 0U);
@@ -440,6 +446,7 @@ TEST_F(T_Dns, Resolver) {
   EXPECT_EQ(host.name(), "bad-ipv6");
   EXPECT_EQ(host.status(), kFailOk);
   EXPECT_TRUE(host.IsValid());
+  EXPECT_FALSE(host.HasIpv4());
   EXPECT_TRUE(host.HasIpv6());
   EXPECT_EQ(host.ipv4_addresses().size(), 0U);
   EXPECT_EQ(host.ipv6_addresses().size(), 1U);

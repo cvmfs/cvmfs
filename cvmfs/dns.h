@@ -96,6 +96,7 @@ class Host {
 
   time_t deadline() const { return deadline_; }
   int64_t id() const { return id_; }
+  bool HasIpv4() const { return !ipv4_addresses_.empty(); }
   bool HasIpv6() const { return !ipv6_addresses_.empty(); }
   const std::set<std::string> &ipv4_addresses() const { return ipv4_addresses_; }
   const std::set<std::string> &ipv6_addresses() const { return ipv6_addresses_; }
