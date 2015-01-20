@@ -251,7 +251,8 @@ Supported Commands:
                 Checks if the repository is sane
   transaction   <fully qualified name>
                 Start to edit a repository
-  snapshot      <fully qualified name>
+  snapshot      [-t fail if other snapshot is in progress]
+                <fully qualified name>
                 Synchronize a Stratum 1 replica with the Stratum 0 source
   migrate       <fully qualified name>
                 Migrates a repository to the current version of CernVM-FS
@@ -4068,6 +4069,21 @@ snapshot() {
   local timeout
   local retries
   local retcode=0
+  local dont_wait=
+
+  OPTIND=1
+  while getopts "t" option; do
+    case $option in
+      t)
+        dont_wait="-s"
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command snapshot: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
 
   # get repository names
   check_parameter_count_for_multiple_repositories $#
@@ -4137,7 +4153,7 @@ snapshot() {
         -k $public_key \
         -n $num_workers \
         -t $timeout \
-        -a $retries $with_history $log_level"
+        -a $retries $with_history $log_level $dont_wait"
     $user_shell "date > ${spool_dir}/tmp/last_snapshot"
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot \
