@@ -76,11 +76,7 @@ class S3Uploader : public AbstractUploader {
 
  private:
   bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
-  bool UploadFile(const std::string &filename,
-                  char              *buff,
-                  unsigned long      size_of_file,
-                  const CallbackTN  *callback,
-                  MemoryMappedFile  *mmf);
+  bool UploadJobInfo(s3fanout::JobInfo *info);
 
   int GetKeysAndBucket(const std::string  &filename,
                        std::string        *access_key,
