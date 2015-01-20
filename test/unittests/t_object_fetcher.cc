@@ -667,7 +667,7 @@ TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFiles) {
   DirectoryListing listing;
   TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
 
-  int files = 0;
+  size_t files = 0;
 
   EXPECT_EQ (files, listing.size());
 
