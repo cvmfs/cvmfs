@@ -250,11 +250,21 @@ run_script_on_virtual_machine() {
   local script_path=$3
   shift 3
 
+  args=""
+  while [ $# -gt 0 ]; do
+    if echo "$1" | grep -q "[[:space:]]"; then
+      args="$args \"$1\""
+    else
+      args="$args $1"
+    fi
+    shift 1
+  done
+
   ssh -i $EC2_KEY_LOCATION -o StrictHostKeyChecking=no     \
                            -o UserKnownHostsFile=/dev/null \
                            -o LogLevel=ERROR               \
                            -o BatchMode=yes                \
-      $username@$ip 'cat | bash /dev/stdin' $@ < $script_path
+      $username@$ip 'cat | bash /dev/stdin' $args < $script_path
 }
 
 
