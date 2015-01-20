@@ -88,7 +88,6 @@ run_dns_test() {
   num_dns_changes=$(count_dns_changes)
   echo "::2 round-robin.localdomain" > host_tests
   echo "::3 round-robin.localdomain" >> host_tests
-  echo "127.0.0.2 round-robin.localdomain" >> host_tests  # IPv6 has precedence
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
   sudo date $(date +%m%d%H%M%Y.%S -d '+4 hour')
   sudo cvmfs_talk -i aleph.cern.ch proxy info
@@ -105,7 +104,8 @@ run_dns_test() {
   # IPv6 --> IPv4
   echo "IPv6 --> IPv4"
   num_dns_changes=$(count_dns_changes)
-  echo "127.0.0.2 round-robin.localdomain" > host_tests
+  # IPv4 has precedence over already existing IPv6 entries
+  echo "127.0.0.2 round-robin.localdomain" >> host_tests
   echo "127.0.0.3 round-robin.localdomain" >> host_tests
   sudo cvmfs_talk -i aleph.cern.ch proxy group switch
   sudo date $(date +%m%d%H%M%Y.%S -d '+5 hour')
