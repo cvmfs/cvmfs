@@ -823,9 +823,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     string replacement;
     if (proxy_template_forced_ != "") {
       replacement = proxy_template_forced_;
-    } else if ((info->proxy == "") ||
-               (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_))
-    {
+    } else if (info->proxy == "") {
       replacement = proxy_template_direct_;
     } else {
       replacement =
