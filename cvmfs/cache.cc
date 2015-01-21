@@ -171,10 +171,7 @@ bool Init(const string &cache_path, const bool alien_cache) {
 
   if (alien_cache_) {
     if (!MakeCacheDirectories(cache_path, 0770)) {
-      /* Ignore possible EEXIST when two different processes race to create
-       * the directory hierarchy. */
-      if(errno != EEXIST)
-        return false;
+      return false;
     }
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
@@ -920,7 +917,12 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
   }
 
   // Happens only on init/remount, i.e. quota won't delete a cached catalog
-  const string checksum_path = quota::checksum_file_prefix + "." + repo_name_;
+  string checksum_path = quota::checksum_file_prefix + "." + repo_name_;
+  if (alien_cache_ && !FileExists(checksum_path)) {
+    // In case the alien cache has been preloaded, the .cvmfschecksum file
+    // must be read from the alien cache instead of the client cache
+    checksum_path = (*cache_path_) + "/" + checksum_path;
+  }
   shash::Any cache_hash;
   uint64_t cache_last_modified = 0;
 
