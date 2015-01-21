@@ -1854,6 +1854,7 @@ bool DownloadManager::ProbeGeo() {
 
   // Protect against concurrent access to prng_
   pthread_mutex_lock(lock_options_);
+  // Determine random hosts for the Geo-API query
   vector<string> host_chain_shuffled = Shuffle(host_chain, &prng_);
   pthread_mutex_unlock(lock_options_);
 
@@ -1862,15 +1863,16 @@ bool DownloadManager::ProbeGeo() {
     host_names.push_back(dns::ExtractHost(host_chain[i]));
   SortTeam(&host_names, &host_chain);
 
-  // add fallback proxy names to the end of the host list
+  // Add fallback proxy names to the end of the host list
   unsigned first_geo_fallback = host_names.size();
   for (unsigned i = fallback_group; i < proxy_chain.size(); ++i) {
-    // note that there's only ever one fallback proxy name per group
+    // We only take the first fallback proxy name from every group under the
+    // assumption that load-balanced servers are at the same location
     host_names.push_back(proxy_chain[i][0].host.name());
   }
-  // There's no reason to sort fallbacks, they're set by a widely shared config
-  //  plus it would require extracting just the fallback part of the vector
-  //  in order to SortTeam it.
+  // TODO: fallback proxies should be sorted to for maximum cache reuse.
+  // For WLCG there's no reason to sort fallbacks, they're set by a widely
+  // shared config but that can change in a different context.
 
   string host_list = JoinStrings(host_names, ",");
 
@@ -1912,6 +1914,7 @@ bool DownloadManager::ProbeGeo() {
     return false;
   }
 
+  // Re-install host chain and proxy chain
   pthread_mutex_lock(lock_options_);
   delete opt_host_chain_;
   opt_host_chain_ = new vector<string>(host_chain.size());
@@ -1919,12 +1922,14 @@ bool DownloadManager::ProbeGeo() {
   vector< vector< ProxyInfo> > *proxy_groups =
         new vector< vector<ProxyInfo> > (
             opt_proxy_groups_fallback_ + proxy_chain.size() - fallback_group);
-  // first copy the non-fallback part of the current proxy chain
+  // First copy the non-fallback part of the current proxy chain
   for (unsigned i = 0; i < opt_proxy_groups_fallback_; ++i) {
     (*proxy_groups)[i] = (*opt_proxy_groups_)[i];
   }
 
-  // copy the host chain and fallback proxies by geo order
+  // Copy the host chain and fallback proxies by geo order.  Array indices
+  // in geo_order that are smaller than first_geo_fallback refer to a 
+  // stratum 1, the others to a fallback proxy.
   unsigned hosti = 0;
   unsigned proxyi = opt_proxy_groups_fallback_;
   for (unsigned i = 0; i < geo_order.size(); ++i) {
