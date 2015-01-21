@@ -826,11 +826,21 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     } else if (info->proxy == "") {
       replacement = proxy_template_direct_;
     } else {
-      replacement =
-        (*opt_proxy_groups_)[opt_proxy_groups_current_][0].host.name();
+      if (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_) {
+        // It doesn't make sense to use the fallback proxies in Geo-API requests
+        // since the fallback proxies are supposed to get sorted, too.
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "using direct connection instead of fallback proxy");
+        info->proxy = "";
+        curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
+        replacement = proxy_template_direct_;
+      } else {
+        replacement =
+          (*opt_proxy_groups_)[opt_proxy_groups_current_][0].host.name();
+      }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
-    LogCvmfs(kLogCvmfs, kLogDebug, "replacing @proxy@ by %s",
+    LogCvmfs(kLogDownload, kLogDebug, "replacing @proxy@ by %s",
              replacement.c_str());
     url = ReplaceAll(url, "@proxy@", replacement);
   }
@@ -1112,6 +1122,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
           }
 
           // Make it a host failure
+          LogCvmfs(kLogDownload, kLogDebug, "make it a host failure");
           info->num_used_proxies = 1;
           info->error_code = kFailHostAfterProxy;
         } else {
