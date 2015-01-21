@@ -1919,6 +1919,8 @@ bool DownloadManager::ProbeGeo() {
   delete opt_host_chain_;
   opt_host_chain_ = new vector<string>(host_chain.size());
 
+  // It's possible that opt_proxy_groups_fallback_ might have changed while the
+  // lock wasn't held
   vector< vector< ProxyInfo> > *proxy_groups =
         new vector< vector<ProxyInfo> > (
             opt_proxy_groups_fallback_ + proxy_chain.size() - fallback_group);
@@ -1928,7 +1930,7 @@ bool DownloadManager::ProbeGeo() {
   }
 
   // Copy the host chain and fallback proxies by geo order.  Array indices
-  // in geo_order that are smaller than first_geo_fallback refer to a 
+  // in geo_order that are smaller than first_geo_fallback refer to a
   // stratum 1, the others to a fallback proxy.
   unsigned hosti = 0;
   unsigned proxyi = opt_proxy_groups_fallback_;
