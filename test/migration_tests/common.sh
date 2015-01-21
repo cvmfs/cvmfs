@@ -123,13 +123,13 @@ is_installed() {
 }
 
 
-install_package() {
-  local pkg_path=$1
+install_packages() {
+  local pkg_paths="$1"
 
   if has_binary yum; then
-    sudo yum -y install --nogpgcheck $pkg_path
+    sudo yum -y install --nogpgcheck $pkg_paths
   elif has_binary dpkg; then
-    sudo dpkg --install $pkg_path
+    sudo dpkg --install $pkg_paths
     sudo apt-get --assume-yes -f install
   else
     return 1
