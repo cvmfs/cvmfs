@@ -37,7 +37,9 @@ cvmfs_run_test() {
   sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=\"http://cmsopsquid.cern.ch:3128;http://cmsbproxy.fnal.gov:3128\"" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 301
   cvmfs_mount grid.cern.ch || return 3
 
+  sudo cvmfs_talk -i grid.cern.ch proxy info
   sudo cvmfs_talk -i grid.cern.ch host probe geo || return 31
+  sudo cvmfs_talk -i grid.cern.ch proxy info
   local first_fallback_proxy=$(get_first_proxyname)
   echo "first_fallback_proxy: $first_fallback_proxy"
   if [ -z "$first_fallback_proxy" ]; then
@@ -46,10 +48,12 @@ cvmfs_run_test() {
   if [ "$first_fallback_proxy" = "DIRECT" ]; then
     # DIRECT is supposed to be removed when there's a fallback proxy
     return 33
-  fi 
+  fi
 
   sudo cvmfs_talk -i grid.cern.ch proxy fallback "http://cmsbproxy.fnal.gov:3128;http://cmsopsquid.cern.ch:3128" || return 34
+  sudo cvmfs_talk -i grid.cern.ch proxy info
   sudo cvmfs_talk -i grid.cern.ch host probe geo || return 35
+  sudo cvmfs_talk -i grid.cern.ch proxy info
   local second_fallback_proxy=$(get_first_proxyname)
   echo "second_fallback_proxy: $second_fallback_proxy"
 
