@@ -2002,7 +2002,7 @@ bool DownloadManager::ValidateGeoReply(
  * Removes DIRECT from a list of ';' and '|' separated proxies.
  * \return true if DIRECT was present, false otherwise
  */
-bool DownloadManager::RemoveDirect(
+bool DownloadManager::StripDirect(
   const string &proxy_list,
   string *cleaned_list)
 {
@@ -2053,22 +2053,23 @@ void DownloadManager::SetProxyChain(
   opt_timestamp_failover_proxies_ = 0;
   string set_proxy_list = opt_proxy_list_;
   string set_proxy_fallback_list = opt_proxy_fallback_list_;
+  bool contains_direct;
   if ((set_mode == kSetProxyFallback) || (set_mode == kSetProxyBoth)) {
     opt_proxy_fallback_list_ = fallback_proxy_list;
-    bool contains_direct =
-      RemoveDirect(opt_proxy_fallback_list_, &set_proxy_fallback_list);
-    if (contains_direct) {
-      LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
-               "fallback proxies do not support DIRECT, removing");
-    }
   }
   if ((set_mode == kSetProxyRegular) || (set_mode == kSetProxyBoth)) {
     opt_proxy_list_ = proxy_list;
   }
+  contains_direct = 
+    StripDirect(opt_proxy_fallback_list_, &set_proxy_fallback_list);
+  if (contains_direct) {
+    LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
+             "fallback proxies do not support DIRECT, removing");
+  }
   if (set_proxy_fallback_list == "") {
     set_proxy_list = opt_proxy_list_;
   } else {
-    bool contains_direct = RemoveDirect(opt_proxy_list_, &set_proxy_list);
+    bool contains_direct = StripDirect(opt_proxy_list_, &set_proxy_list);
     if (contains_direct) {
       LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
                "skipping DIRECT proxy to use fallback proxy");
