@@ -2064,14 +2064,14 @@ void DownloadManager::SetProxyChain(
   }
   if ((set_mode == kSetProxyRegular) || (set_mode == kSetProxyBoth)) {
     opt_proxy_list_ = proxy_list;
-    if (set_proxy_fallback_list == "") {
-      set_proxy_list = opt_proxy_list_;
-    } else {
-      bool contains_direct = RemoveDirect(opt_proxy_list_, &set_proxy_list);
-      if (contains_direct) {
-        LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
-                 "skipping DIRECT proxy to use fallback proxy");
-      }
+  }
+  if (set_proxy_fallback_list == "") {
+    set_proxy_list = opt_proxy_list_;
+  } else {
+    bool contains_direct = RemoveDirect(opt_proxy_list_, &set_proxy_list);
+    if (contains_direct) {
+      LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+               "skipping DIRECT proxy to use fallback proxy");
     }
   }
 
