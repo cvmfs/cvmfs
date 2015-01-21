@@ -171,10 +171,7 @@ bool Init(const string &cache_path, const bool alien_cache) {
 
   if (alien_cache_) {
     if (!MakeCacheDirectories(cache_path, 0770)) {
-      /* Ignore possible EEXIST when two different processes race to create
-       * the directory hierarchy. */
-      if(errno != EEXIST)
-        return false;
+      return false;
     }
     LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Cache directory structure created.");
