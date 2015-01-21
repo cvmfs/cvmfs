@@ -68,6 +68,15 @@ guess_cvmfs_keys_url() {
   echo ${CVMFS_EC_BASE_URL}/cvmfs-keys/${package_file_name}
 }
 
+MIGTEST_001_IPV6_DISABLED=0
+cleanup() {
+  echo "running cleanup()"
+  if [ $MIGTEST_001_IPV6_DISABLED -eq 1 ]; then
+    echo "reenabling IPv6"
+    echo 0 | sudo tee /proc/sys/net/ipv6/conf/all/disable_ipv6
+  fi
+}
+
 
 cvmfs_run_test() {
   local logfile=$1
@@ -87,6 +96,32 @@ cvmfs_run_test() {
   local md5_2=""
   local md5_3=""
   local md5_output="async_md5.checksum"
+
+  # install a cleanup function
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  # disable IPv6 if it appears to be misconfigured
+  if [ -f /proc/net/if_inet6 ]; then
+    if cat /proc/net/if_inet6 | grep -q '^fe80'; then
+      echo "Found at least one link-local IPv6 address in the configuration:"
+      cat /proc/net/if_inet6 | grep '^fe80'
+
+      local test_server="ipv6.google.com"
+      if ! ping6 -c1 $test_server > /dev/null;  then
+        echo "Ping to $test_server failed... IPv6 seems to be broken... disabling it"
+        echo 1 | sudo tee /proc/sys/net/ipv6/conf/all/disable_ipv6
+
+        if [ $(cat /proc/net/if_inet6 | wc -l) -ne 0 ]; then
+          echo "WARNING: failed to disable a (probably) broken IPv6 setup"
+        else
+          echo "Successfully disabled a broken IPv6 setup"
+          MIGTEST_001_IPV6_DISABLED=1
+        fi
+      fi
+    fi
+  else
+    echo "No IPv6 available"
+  fi
 
   # download upstream package
   current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
