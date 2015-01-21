@@ -5,6 +5,10 @@ get_first_proxyname() {
     sudo cvmfs_talk -i grid.cern.ch proxy info|sed -n 's/^\[0\] //p'|sed 's/.*(//;s/,.*//'
 }
 
+get_second_proxyname() {
+    sudo cvmfs_talk -i grid.cern.ch proxy info|sed -n 's/^\[1\] //p'|sed 's/.*(//;s/,.*//'
+}
+
 cvmfs_run_test() {
   logfile=$1
 
@@ -12,6 +16,7 @@ cvmfs_run_test() {
   # Also make sure that they have large geographical distance
   sudo sh -c 'echo "CVMFS_SERVER_URL=\"http://cvmfs02.grid.sinica.edu.tw:8000/cvmfs/@fqrn@;http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;http://cvmfs.fnal.gov:8000/cvmfs/@fqrn@\"" > /etc/cvmfs/config.d/grid.cern.ch.local' || return 100
   sudo sh -c 'echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 101
+  sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 102
   cvmfs_mount grid.cern.ch || return 1
 
   sudo cvmfs_talk -i grid.cern.ch host probe geo || return 10
@@ -61,6 +66,18 @@ cvmfs_run_test() {
   #   they started in
   if [ "$first_fallback_proxy" != "$second_fallback_proxy" ]; then
     return 36
+  fi
+
+  sudo cvmfs_talk -i grid.cern.ch proxy set "http://ca-proxy.cern.ch:3128" || return 37
+  sudo cvmfs_talk -i grid.cern.ch proxy info
+  sudo cvmfs_talk -i grid.cern.ch host probe geo || return 38
+  sudo cvmfs_talk -i grid.cern.ch proxy info
+  local third_fallback_proxy=$(get_second_proxyname)
+  echo "third_fallback_proxy: $third_fallback_proxy"
+
+  # make sure that the ordering is unaffected by regular proxies
+  if [ "$third_fallback_proxy" != "$second_fallback_proxy" ]; then
+    return 39
   fi
 
   sudo rm -f /etc/cvmfs/config.d/grid.cern.ch.local

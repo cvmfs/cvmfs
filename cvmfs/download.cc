@@ -823,13 +823,17 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     string replacement;
     if (proxy_template_forced_ != "") {
       replacement = proxy_template_forced_;
-    } else if (info->proxy == "") {
+    } else if ((info->proxy == "") ||
+               (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_))
+    {
       replacement = proxy_template_direct_;
     } else {
       replacement =
         (*opt_proxy_groups_)[opt_proxy_groups_current_][0].host.name();
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
+    LogCvmfs(kLogCvmfs, kLogDebug, "replacing @proxy@ by %s",
+             replacement.c_str());
     url = ReplaceAll(url, "@proxy@", replacement);
   }
   pthread_mutex_unlock(lock_options_);
@@ -1936,11 +1940,17 @@ bool DownloadManager::ProbeGeo() {
   unsigned proxyi = opt_proxy_groups_fallback_;
   for (unsigned i = 0; i < geo_order.size(); ++i) {
     uint64_t orderval = geo_order[i];
-    if (orderval < (uint64_t) first_geo_fallback)
+    if (orderval < (uint64_t) first_geo_fallback) {
+      //LogCvmfs(kLogCvmfs, kLogSyslog, "this is orderval %u at host index %u",
+      //  orderval, hosti);
       (*opt_host_chain_)[hosti++] = host_chain[orderval];
-    else
+    } else {
+      //LogCvmfs(kLogCvmfs, kLogSyslog,
+      //  "this is orderval %u at proxy index %u, using proxy_chain index %u",
+      //  orderval, proxyi, fallback_group + orderval - first_geo_fallback);
       (*proxy_groups)[proxyi++] = proxy_chain[
             fallback_group + orderval - first_geo_fallback];
+    }
   }
 
   delete opt_proxy_groups_;
@@ -2060,7 +2070,7 @@ void DownloadManager::SetProxyChain(
   if ((set_mode == kSetProxyRegular) || (set_mode == kSetProxyBoth)) {
     opt_proxy_list_ = proxy_list;
   }
-  contains_direct = 
+  contains_direct =
     StripDirect(opt_proxy_fallback_list_, &set_proxy_fallback_list);
   if (contains_direct) {
     LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
