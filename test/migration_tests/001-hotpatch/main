@@ -118,11 +118,11 @@ cvmfs_run_test() {
   local cvmfs_keys=$(basename $cvmfs_keys_url)
   echo "Download URL for cvmfs-keys: $cvmfs_keys_url"
   wget --no-check-certificate --quiet $cvmfs_keys_url || return 21
-  install_package $cvmfs_keys                         || return 22
+  install_packages $cvmfs_keys                        || return 22
 
   # install the upstream CernVM-FS package
   echo "installing CernVM-FS $previous_version"
-  install_package $upstream_package || return 4
+  install_packages $upstream_package || return 4
 
   # make sure that autofs is running
   echo "switching on autofs"
@@ -168,7 +168,7 @@ cvmfs_run_test() {
   echo "updating CernVM-FS package to version $current_version"
   kill -0 $tar_pid || return 11 # tar finished already >.<
   kill -0 $chksum_pid || return 11 # checksumming finished already >.<
-  install_package "$CVMFS_CLIENT_PACKAGE $CVMFS_CONFIG_PACKAGES" || return 12 # TODO: revert that after 2.1.20 is released
+  install_packages "$CVMFS_CLIENT_PACKAGE $CVMFS_CONFIG_PACKAGES" || return 12 # TODO: revert that after 2.1.20 is released
   kill -0 $tar_pid || return 13 # tar finished already >.<
   kill -0 $chksum_pid || return 13 # checksumming finished already >.<
 
