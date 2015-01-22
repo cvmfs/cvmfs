@@ -42,6 +42,7 @@ install_deb $UNITTEST_PACKAGE
 # installing WSGI apache module
 echo "installing python WSGI module..."
 install_from_repo libapache2-mod-wsgi    || die "fail (installing libapache2-mod-wsgi)"
+install_from_repo default-jre            || die "fail (installing default-jre)"
 sudo service apache2 restart > /dev/null || die "fail (restarting apache)"
 
 # setup environment
