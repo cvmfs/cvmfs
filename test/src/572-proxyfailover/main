@@ -12,80 +12,6 @@ produce_files_in() {
   popdir
 }
 
-start_wiremock() {
-  local document_root="$1"
-  local port="$2"
-  local logfile="$3"
-  local is_proxy=""
-  [ -z $4 ] || is_proxy="--enable-browser-proxying"
-  run_background_service $logfile "wiremock              \
-                                   --root $document_root \
-                                   --port $port          \
-                                   $is_proxy             \
-                                   --verbose "
-}
-
-send_wiremock_admin_command() {
-  local url="$1"
-  local admin_command="$2"
-  cat | curl -X POST "${url}/__admin/${admin_command}" -d @- \
-            --header "Content-Type: application/json" > /dev/null 2>&1 || exit 1
-}
-
-shutdown_wiremock() {
-  local url="$1"
-  echo "" | send_wiremock_admin_command "$url" "shutdown"
-}
-
-alter_wiremock_settings() {
-  local url="$1"
-  cat | send_wiremock_admin_command "$url" "settings"
-}
-
-set_wiremock_response_delay() {
-  local url="$1"
-  local delay="$2"
-  echo "{\"milliseconds\": $delay}" | send_wiremock_admin_command "$url" "socket-delay"
-  # Workaround: the delay seems to take effect only after one request was posted
-  curl $url > /dev/null 2>&1
-}
-
-set_wiremock_response_fault() {
-  local url="$1"
-  local url_pattern="$2"
-  local fault_code="$3"
-
-  echo "{                                      \
-          \"request\": {                       \
-            \"method\": \"GET\",               \
-            \"urlPattern\": \"${url_pattern}\" \
-          },                                   \
-                                               \
-          \"response\": {                      \
-            \"fault\": \"${fault_code}\"       \
-          }                                    \
-        }" | send_wiremock_admin_command "$url" "mappings/new"
-}
-
-set_wiremock_empty_response_fault() {
-  local url="$1"
-  local url_pattern=".*"
-  [ -z "$2" ] || url_pattern="$2"
-  set_wiremock_response_fault "$url" "$url_pattern" "EMPTY_RESPONSE"
-}
-
-set_wiremock_garbage_response_fault() {
-  local url="$1"
-  local url_pattern=".*"
-  [ -z "$2" ] || url_pattern="$2"
-  set_wiremock_response_fault "$url" "$url_pattern" "MALFORMED_RESPONSE_CHUNK"
-}
-
-reset_wiremock() {
-  local url="$1"
-  echo "" | send_wiremock_admin_command "$url" "reset"
-}
-
 clear_cache() {
   local cache_directory="$1"
   rm -fR "$cache_directory"   || return 1
@@ -94,7 +20,7 @@ clear_cache() {
 
 get_active_proxy_group() {
   local talk_pipe="$1"
-  cvmfs_talk -p $talk_pipe proxy info | grep "Active proxy:" | sed -e 's/^.*\[\([0-9]\+\)\].*$/\1/'
+  cvmfs_talk -p "$talk_pipe" proxy info | grep "Active proxy:" | sed -e 's/^.*\[\([0-9]\+\)\].*$/\1/'
 }
 
 check_active_proxy_group() {
@@ -104,7 +30,7 @@ check_active_proxy_group() {
 
   active_proxy_group=$(get_active_proxy_group "$talk_pipe")
   echo "active proxy group: $active_proxy_group"
-  [ $active_proxy_group -eq $expected ]
+  [ x"$active_proxy_group" = x"$expected" ]
 }
 
 switch_proxy_group() {
@@ -121,7 +47,11 @@ set_proxy_chain() {
 mount_private() {
   local mountpoint="$1"
   local configuration="$2"
-  cvmfs2 -o config=$configuration $CVMFS_TEST_REPO "$mountpoint" 1>&2 || return 8
+  cvmfs2 -o config=$configuration $CVMFS_TEST_REPO "$mountpoint" 1>&2
+  if [ $? -ne 0 ]; then
+    echo "failed to mount CVMFS on $mountpoint" >&2
+    return 8
+  fi
 }
 
 TEST572_HTTP_PORT=""
@@ -169,12 +99,16 @@ reset_proxies() {
 }
 
 cvmfs_run_test() {
-  logfile=$1
+  local logfile=$1
+  local script_location=$2
+
+  local wiremock_wrapper="${script_location}/../../wiremock_wrapper.sh"
+  echo "setup wiremock environment ($wiremock_wrapper)"
+  . ${script_location}/../../wiremock_wrapper.sh
+  init_wiremock || return $?
+
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local scratch_dir=$(pwd)
-
-  echo "check that wiremock is available"
-  which wiremock || return 1
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -230,9 +164,9 @@ cvmfs_run_test() {
   echo $proxies
 
   echo "configure private mount of CVMFS"
-  local mntpnt="$(pwd)/private_mountpoint"
+  local mntpnt="$(pwd)/pmnt"
   local mnt_conf="${mntpnt}.conf"
-  local mnt_cache="${mntpnt}_cache"
+  local mnt_cache="${mntpnt}_c"
   local mnt_pipe="${mnt_cache}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
   local mnt_dummy_file="${mntpnt}/file"
   mkdir -p $mntpnt $mnt_cache || return 9
@@ -248,11 +182,11 @@ EOF
   echo "mount CVMFS with the full setup working"
   local mount_time=0
   TEST572_MOUNT_POINT="$mntpnt"
-  mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 10
+  mount_time="$(stop_watch mount_private $mntpnt $mnt_conf)" || return 10
   echo "took $mount_time seconds"
-  active_proxy_group=$(get_active_proxy_group $mnt_pipe)
-  echo "active proxy group: $active_proxy_group"
-  [ $active_proxy_group -eq 0 ] || return 11
+
+  echo "checking active proxy group through $mnt_pipe"
+  check_active_proxy_group $mnt_pipe 0 || return 11
 
   echo "umount CVMFS"
   sudo umount $mntpnt    || return 12
