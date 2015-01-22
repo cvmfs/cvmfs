@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CVMFS_WIREMOCK_JAR_LOCATION="http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock/1.53/wiremock-1.53-standalone.jar"
+CVMFS_WIREMOCK_JAR_LOCATION="https://ecsft.cern.ch/dist/cvmfs/wiremock/wiremock-1.53-standalone.jar"
 
 init_wiremock() {
   if ! which java > /dev/null 2>&1; then
