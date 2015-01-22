@@ -185,9 +185,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     {
       if (!info->follow_redirects) {
         LogCvmfs(kLogDownload, kLogDebug, "redirect support not enabled: %s",
-               header_line.c_str());
+                 header_line.c_str());
         info->error_code = kFailHostHttp;
-	return 0;
+        return 0;
       }
       LogCvmfs(kLogDownload, kLogDebug, "http redirect: %s",
                header_line.c_str());
@@ -233,9 +233,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       info->destination_mem.data = NULL;
     }
     info->destination_mem.size = length;
-  } else if (HasPrefix(header_line, "LOCATION:", true))
-  {
-    // this comes along with redirects
+  } else if (HasPrefix(header_line, "LOCATION:", true)) {
+    // This comes along with redirects
     LogCvmfs(kLogDownload, kLogDebug, "%s", header_line.c_str());
   }
 
