@@ -30,11 +30,11 @@ checksum_large_files() {
   local pid1=
   local pid2=
   local pid3=
-  (find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file) &
+  (sudo find $dir -type f -size +4M -exec sha1sum {} \; | cut -d' ' -f1 > $result_file) &
   pid1=$!
-  (find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file) &
+  (sudo find $dir -type f -size +4M -exec sha1sum {} \; | cut -d' ' -f1 > $result_file) &
   pid2=$!
-  (find $dir -type f -size +4M -exec crc32 {} \; | sort > $result_file) &
+  (sudo find $dir -type f -size +4M -exec sha1sum {} \; | cut -d' ' -f1 > $result_file) &
   pid3=$!
   wait $pid1
   wait $pid2
@@ -145,9 +145,11 @@ cvmfs_run_test() {
   # last released cvmfs-keys package (1.5-1)
   # Note: this will not be needed after CernVM-FS 2.1.20 is released
   #       furthermore the re-install of cvmfs-config is not needed later on!
-  cvmfs_config_pkg="$(get_providing_package cvmfs-config)"
-  echo "Uninstalling $cvmfs_config_pkg (providing cvmfs-config)"
-  uninstall_package $cvmfs_config_pkg || return 20
+  cvmfs_config_pkgs="$(get_providing_packages cvmfs-config)"
+  echo "Uninstalling $cvmfs_config_pkgs (providing cvmfs-config)"
+  for cvmfs_config_pkg in $cvmfs_config_pkgs; do
+    uninstall_package $cvmfs_config_pkg || return 20
+  done
 
   local cvmfs_keys_url=$(guess_cvmfs_keys_url "1.5-1")
   local cvmfs_keys=$(basename $cvmfs_keys_url)
@@ -237,6 +239,18 @@ cvmfs_run_test() {
   fi
   if ! diff -q $tar_log2 $tar_log3; then
     return 20
+  fi
+
+  echo "compare the output of all checksumming runs"
+  local chksum_chksum_1="$(cat $chksum_log1 | sort | md5sum | cut -d' ' -f1)"
+  local chksum_chksum_2="$(cat $chksum_log2 | sort | md5sum | cut -d' ' -f1)"
+  local chksum_chksum_3="$(cat $chksum_log3 | sort | md5sum | cut -d' ' -f1)"
+  echo "MD5 of sorted log (before update): $chksum_chksum_1"
+  echo "MD5 of sorted log (with reload):   $chksum_chksum_2"
+  echo "MD5 of sorted log (after update):  $chksum_chksum_3"
+  if [ x"$chksum_chksum_1" != x"$chksum_chksum_2" ] ||
+     [ x"$chksum_chksum_2" != x"$chksum_chksum_3" ]; then
+     return 21
   fi
 
   # all done
