@@ -239,6 +239,18 @@ cvmfs_run_test() {
     return 20
   fi
 
+  echo "compare the output of all checksumming runs"
+  local chksum_chksum_1="$(cat $chksum_log1 | sort | md5sum | cut -d' ' -f1)"
+  local chksum_chksum_2="$(cat $chksum_log2 | sort | md5sum | cut -d' ' -f1)"
+  local chksum_chksum_3="$(cat $chksum_log3 | sort | md5sum | cut -d' ' -f1)"
+  echo "MD5 of sorted log (before update): $chksum_chksum_1"
+  echo "MD5 of sorted log (with reload):   $chksum_chksum_2"
+  echo "MD5 of sorted log (after update):  $chksum_chksum_3"
+  if [ x"$chksum_chksum_1" != x"$chksum_chksum_2" ] ||
+     [ x"$chksum_chksum_2" != x"$chksum_chksum_3" ]; then
+     return 21
+  fi
+
   # all done
   return $(($tar_exit_code + $chksum_exit_code))
 }
