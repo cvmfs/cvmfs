@@ -856,8 +856,8 @@ void CommandListTags::PrintHumanReadableList(
   const std::string desc_label = "Description";
 
   // figure out the maximal lengths of the fields in the lists
-        TagList::const_iterator i    = tags.begin();
-  const TagList::const_iterator iend = tags.end();
+        TagList::const_reverse_iterator i    = tags.rbegin();
+  const TagList::const_reverse_iterator iend = tags.rend();
   size_t max_name_len = name_label.size();
   size_t max_rev_len  = rev_label.size();
   size_t max_chan_len = chan_label.size();
@@ -885,7 +885,7 @@ void CommandListTags::PrintHumanReadableList(
            AddPadding("", desc_label.size() + 1, false, "\u2500").c_str());
 
   // print the rows of the list
-  i = tags.begin();
+  i = tags.rbegin();
   for (; i != iend; ++i) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s \u2502 %s \u2502 %s \u2502 %s \u2502 %s",
              AddPadding(i->name,                           max_name_len).c_str(),

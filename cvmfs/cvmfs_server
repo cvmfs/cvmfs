@@ -3097,6 +3097,7 @@ tag() {
 
   local base_hash="$(get_mounted_root_hash $name)"
   local user_shell="$(get_user_shell $name)"
+  local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
   # tag listing does not need an open repository transaction
   if [ $action_list -eq 1 ] || [ $actions -eq 0 ]; then
@@ -3153,7 +3154,7 @@ tag() {
       -r $CVMFS_UPSTREAM_STORAGE                          \
       -m $new_manifest                                    \
       -b $base_hash                                       \
-      -e $CVMFS_HASH_ALGORITHM                            \
+      -e $hash_algorithm                                  \
       -a $tag_name"
     if [ ! -z "$add_tag_channel" ]; then
       tag_create_command="$tag_create_command -c $add_tag_channel"
@@ -3191,7 +3192,7 @@ tag() {
       -r $CVMFS_UPSTREAM_STORAGE                         \
       -m $new_manifest                                   \
       -b $base_hash                                      \
-      -e $CVMFS_HASH_ALGORITHM                           \
+      -e $hash_algorithm                                 \
       -d '$tag_names'" || die "Did not remove anything"
     sign_manifest $name $new_manifest || die "Failed to sign repo"
   fi
@@ -3569,10 +3570,7 @@ publish() {
     spool_dir=$CVMFS_SPOOL_DIR
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
-    hash_algo=$CVMFS_HASH_ALGORITHM
-    if [ x"$hash_algo" != "x" ]; then
-      hash_algo="-e $hash_algo"
-    fi
+    hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
     local swissknife="cvmfs_swissknife"
 
@@ -3639,7 +3637,8 @@ publish() {
       -r ${upstream} \
       -w $stratum0 \
       -o $manifest \
-      $hash_algo $log_level $tweaks_option"
+      -e $hash_algorithm \
+      $log_level $tweaks_option"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi
@@ -3672,7 +3671,7 @@ publish() {
       -p /etc/cvmfs/keys/${name}.pub          \
       -f $name                                \
       -b $base_hash                           \
-      $hash_algo                              \
+      -e $hash_algorithm                      \
       -x" # -x enables magic undo tag handling
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
@@ -3826,6 +3825,7 @@ rollback() {
   # prepare the shell commands
   local user_shell="$(get_user_shell $name)"
   local base_hash=$(get_mounted_root_hash $name)
+  local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
   local rollback_command="cvmfs_swissknife tag_rollback \
     -w $stratum0                                        \
@@ -3836,7 +3836,7 @@ rollback() {
     -r $upstream                                        \
     -m ${spool_dir}/tmp/manifest                        \
     -b $base_hash                                       \
-    -e $CVMFS_HASH_ALGORITHM"
+    -e $hash_algorithm"
   if [ ! -z "$target_tag" ]; then
     rollback_command="$rollback_command -n $target_tag"
   fi
@@ -4037,6 +4037,7 @@ __run_gc() {
                                         $additional_switches"
   $user_shell "$gc_command" || return 6
 
+  local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
   if is_stratum0 $name && [ $dry_run -eq 0 ]; then
     tag_command="cvmfs_swissknife tag_empty_bin \
       -r $CVMFS_UPSTREAM_STORAGE                \
@@ -4046,7 +4047,7 @@ __run_gc() {
       -p /etc/cvmfs/keys/${name}.pub            \
       -f $name                                  \
       -b $base_hash                             \
-      -e $CVMFS_HASH_ALGORITHM"
+      -e $hash_algorithm"
     $user_shell "$tag_command" || return 7
   fi
 
