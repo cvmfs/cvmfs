@@ -18,11 +18,12 @@ namespace catalog {
 
 // Changelog
 const float CatalogDatabase::kLatestSchema = 2.5;
-const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X catalogs (r/o)
+const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 // ChangeLog
 //   0 --> 1: add size column to nested catalog table,
 //            add schema_revision property
-const unsigned CatalogDatabase::kLatestSchemaRevision = 1;
+//   1 --> 2: add xattr column to catalog table
+const unsigned CatalogDatabase::kLatestSchemaRevision = 2;
 
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
@@ -50,6 +51,20 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
       LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
       return false;
     }
+  } if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
+
+    Sql sql_upgrade(*this, "ALTER TABLE catalog ADD xattr BLOB;");
+    if (!sql_upgrade.Execute()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade catalogs (1 --> 2)");
+      return false;
+    }
+
+    set_schema_revision(2);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+      return false;
+    }
   } else {
     LogCvmfs(kLogCatalog, kLogDebug, "schema revision is up to date.");
   }
@@ -68,6 +83,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
+    " xattr BLOB, "  
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
   Sql(*this,
     "CREATE INDEX idx_catalog_parent "
