@@ -404,6 +404,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (fd_lockfile < 0) {
     if (! wait_for_other_snapshots) {
       LogCvmfs(kLogCvmfs, kLogStderr, "another snapshot is in progress... aborting");
+      free(workers);
       return 2;
     }
 
