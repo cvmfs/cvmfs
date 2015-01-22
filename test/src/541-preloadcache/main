@@ -25,6 +25,16 @@ produce_files_in() {
 	popdir
 }
 
+
+CVMFS_TEST_541_MOUNTPOINT=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_541_MOUNTPOINT ]; then
+    sudo fusermount -u $CVMFS_TEST_541_MOUNTPOINT
+    sudo umount        $CVMFS_TEST_541_MOUNTPOINT
+  fi
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -83,12 +93,16 @@ CVMFS_SERVER_URL=NOAVAIL
 CVMFS_HTTP_PROXY=NOAVAIL
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
 EOF
-  cvmfs2 -o config=$(pwd)/local.conf $CVMFS_TEST_REPO $(pwd)/mnt || return 20
-  compare_directories $repo_dir $reference_dir
-  RETVAL=$?
-  sudo fusermount -u $(pwd)/mnt
-  sudo umount $(pwd)/mnt
 
-  return $RETVAL
+
+  # echo "install a desaster cleanup function"
+  CVMFS_TEST_541_MOUNTPOINT="$(pwd)/mnt"
+  trap cleanup EXIT HUP INT TERM || return 15
+
+  cvmfs2 -o config=$(pwd)/local.conf $CVMFS_TEST_REPO $CVMFS_TEST_541_MOUNTPOINT || return 20
+  compare_directories $repo_dir $reference_dir                  || return 21
+  compare_directories $CVMFS_TEST_541_MOUNTPOINT $reference_dir || return 22
+
+  return 0
 }
 
