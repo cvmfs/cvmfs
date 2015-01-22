@@ -13,11 +13,9 @@ for cvmfsrpm in $cvmfsrpms; do
   fi
 done
 
-cernConfigVersion=1.0-1
-egiConfigVersion=1.0-1
+defaultConfigVersion=1.0-1
 
-curl -k https://ecsft.cern.ch/dist/cvmfs/cvmfs-config/cvmfs-config-cern-${cernConfigVersion}.noarch.rpm > $tmpdir/cvmfs-config-cern-${cernConfigVersion}.noarch.rpm
-curl -k https://ecsft.cern.ch/dist/cvmfs/cvmfs-config/cvmfs-config-egi-${egiConfigVersion}.noarch.rpm > $tmpdir/cvmfs-config-egi-${egiConfigVersion}.noarch.rpm
+curl -k https://ecsft.cern.ch/dist/cvmfs/cvmfs-config/cvmfs-config-default-${defaultConfigVersion}.noarch.rpm > $tmpdir/cvmfs-config-default-${defaultConfigVersion}.noarch.rpm
 
-sudo rpm -vi $tmpdir/cvmfs-config-cern-${cernConfigVersion}.noarch.rpm $tmpdir/cvmfs-config-egi-${egiConfigVersion}.noarch.rpm $cvmfsrpms
+sudo rpm -vi $tmpdir/cvmfs-config-default-${defaultConfigVersion}.noarch.rpm $cvmfsrpms
 sudo cvmfs_config setup
