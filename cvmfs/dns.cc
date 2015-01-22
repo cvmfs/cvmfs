@@ -884,7 +884,7 @@ bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
   ares_channelhead.ndomains = int(domains.size());
   if (ares_channelhead.ndomains > 0) {
     ares_channelhead.domains = reinterpret_cast<char **>(
-      smalloc(ares_channelhead.ndomains * sizeof(char **)));
+      smalloc(ares_channelhead.ndomains * sizeof(char *)));
     for (int i = 0; i < ares_channelhead.ndomains; ++i) {
       ares_channelhead.domains[i] = strdup(domains[i].c_str());
     }

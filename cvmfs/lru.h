@@ -388,7 +388,11 @@ class LruCache : SingleCopy {
      * but not deleted.
      */
     virtual void RemoveFromList() = 0;
-  };
+  
+   private:
+    // No assignment operator (enforced by linker error)
+    ListEntry<T>& operator=(const ListEntry<T> &other);
+  };  // template<class T> class ListEntry
 
   /**
    * Specialized ListEntry to contain a data entry of type T
@@ -495,9 +499,6 @@ class LruCache : SingleCopy {
     inline void RemoveFromList() { assert(false); }
 
    private:
-    // No assignment operator (enforced by linker error)
-    ListEntry<T>& operator=(const ListEntry<T> &other);
-
     /**
      * Pop a ListEntry from the list (arbitrary position).
      * The given ListEntry is removed from the list, deleted and it's
