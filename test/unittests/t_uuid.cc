@@ -32,7 +32,8 @@ TEST(T_Uuid, Create) {
   f = fopen(path.c_str(), "r");
   ASSERT_TRUE(f != NULL);
   string line;
-  GetLineFile(f, &line);
+  bool retval = GetLineFile(f, &line);
+  EXPECT_TRUE(retval);
   fclose(f);
   EXPECT_EQ(line, uuid->uuid());
 }
