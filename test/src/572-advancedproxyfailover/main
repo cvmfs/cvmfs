@@ -124,19 +124,19 @@ mount_private() {
   cvmfs2 -o config=$configuration $CVMFS_TEST_REPO "$mountpoint" 1>&2 || return 8
 }
 
-TEST570_HTTP_PORT=""
-TEST570_PROXY_BASE_PORT=9000
-TEST570_NUM_PROXIES=0
-TEST570_PROXIES=""
-TEST570_MOUNT_POINT=""
+TEST572_HTTP_PORT=""
+TEST572_PROXY_BASE_PORT=9000
+TEST572_NUM_PROXIES=0
+TEST572_PROXIES=""
+TEST572_MOUNT_POINT=""
 cleanup() {
   echo -n "cleaning up... "
-  [ -z "$TEST570_MOUNT_POINT" ] || sudo umount $TEST570_MOUNT_POINT > /dev/null 2>&1
-  [ -z "$TEST570_HTTP_PORT" ]   || shutdown_wiremock "http://localhost:${TEST570_HTTP_PORT}"
-  if [ ! -z $TEST570_NUM_PROXIES ]; then
+  [ -z "$TEST572_MOUNT_POINT" ] || sudo umount $TEST572_MOUNT_POINT > /dev/null 2>&1
+  [ -z "$TEST572_HTTP_PORT" ]   || shutdown_wiremock "http://localhost:${TEST572_HTTP_PORT}"
+  if [ ! -z $TEST572_NUM_PROXIES ]; then
     local i=0
-    while [ $i -lt $TEST570_NUM_PROXIES ]; do
-      local proxy_port=$(( $TEST570_PROXY_BASE_PORT + $i ))
+    while [ $i -lt $TEST572_NUM_PROXIES ]; do
+      local proxy_port=$(( $TEST572_PROXY_BASE_PORT + $i ))
       shutdown_wiremock "http://localhost:${proxy_port}"
       i=$(( $i + 1 ))
     done
@@ -146,7 +146,7 @@ cleanup() {
 
 get_proxy() {
   local n=$1
-  for proxy in $TEST570_PROXIES; do
+  for proxy in $TEST572_PROXIES; do
     if [ $n -eq 0 ]; then
       echo $proxy
       return 0
@@ -157,7 +157,7 @@ get_proxy() {
 }
 
 get_proxies() {
-  echo "$TEST570_PROXIES"
+  echo "$TEST572_PROXIES"
 }
 
 reset_proxies() {
@@ -199,9 +199,9 @@ cvmfs_run_test() {
 
   echo "start a mocked HTTP server for the repository"
   local http_log="http.log"
-  TEST570_HTTP_PORT=8000
-  local http_url="http://localhost:$TEST570_HTTP_PORT"
-  start_wiremock "$http_root" $TEST570_HTTP_PORT $http_log || return 5
+  TEST572_HTTP_PORT=8000
+  local http_url="http://localhost:$TEST572_HTTP_PORT"
+  start_wiremock "$http_root" $TEST572_HTTP_PORT $http_log || return 5
   sleep 1
 
   local num_proxies=4
@@ -211,14 +211,14 @@ cvmfs_run_test() {
   while [ $i -lt $num_proxies ]; do
     local proxy_root="mocked_proxy_root_${i}"
     local proxy_log="proxy_log_${i}.log"
-    local proxy_port=$(( $TEST570_PROXY_BASE_PORT + $i ))
+    local proxy_port=$(( $TEST572_PROXY_BASE_PORT + $i ))
 
     mkdir -p $proxy_root || return 6
     start_wiremock "$proxy_root" $proxy_port $proxy_log "proxy" || return 7
 
     local proxy_url="http://localhost:${proxy_port}"
-    TEST570_NUM_PROXIES=$(( $TEST570_NUM_PROXIES + 1 ))
-    TEST570_PROXIES="$TEST570_PROXIES $proxy_url"
+    TEST572_NUM_PROXIES=$(( $TEST572_NUM_PROXIES + 1 ))
+    TEST572_PROXIES="$TEST572_PROXIES $proxy_url"
 
     i=$(( $i + 1 ))
   done
@@ -247,7 +247,7 @@ EOF
 
   echo "mount CVMFS with the full setup working"
   local mount_time=0
-  TEST570_MOUNT_POINT="$mntpnt"
+  TEST572_MOUNT_POINT="$mntpnt"
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 10
   echo "took $mount_time seconds"
   active_proxy_group=$(get_active_proxy_group $mnt_pipe)
