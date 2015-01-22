@@ -84,7 +84,7 @@ package_version() {
 }
 
 
-get_providing_package() {
+get_providing_packages() {
   local virt_pkg_name=$1
 
   if has_binary yum; then
