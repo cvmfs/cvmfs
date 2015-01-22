@@ -84,6 +84,7 @@ struct cvmfs_repo_options : public cvmfs_context::options {
     CVMFS_OPT(timeout);
     CVMFS_OPT(timeout_direct);
     CVMFS_OPT(proxies);
+    CVMFS_OPT(fallback_proxies);
     CVMFS_OPT(tracefile);
     CVMFS_OPT(allow_unsigned);
     CVMFS_OPT(pubkey);
@@ -217,17 +218,18 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
             " max_open_files             Set the maximum number of open files for CernVM-FS process (soft limit)\n\n"
 
             "repository specific options are:"
-            " repo_name=REPO_NANE     Unique name of the mounted repository, e.g. atlas.cern.ch\n"
-            " url=REPOSITORY_URL      The URL of the CernVM-FS server(s): 'url1;url2;...'\n"
-            " timeout=SECONDS         Timeout for network operations (default is %d)\n"
-            " timeout_direct=SECONDS  Timeout for network operations without proxy (default is %d)\n"
-            " proxies=HTTP_PROXIES    Set the HTTP proxy list, such as 'proxy1|proxy2;DIRECT'\n"
-            " tracefile=FILE          Trace FUSE opaerations into FILE\n"
-            " pubkey=PEMFILE          Public RSA key that is used to verify the whitelist signature.\n"
-            " allow_unsigned          Accept unsigned catalogs (allows man-in-the-middle attacks)\n"
-            " deep_mount=PREFIX       Path prefix if a repository is mounted on a nested catalog,\n"
-            "                         i.e. deep_mount=/software/15.0.1\n"
-            " mountpoint=PATH         Path to root of repository, e.g. /cvmfs/atlas.cern.ch\n"
+            " repo_name=REPO_NAME        Unique name of the mounted repository, e.g. atlas.cern.ch\n"
+            " url=REPOSITORY_URL         The URL of the CernVM-FS server(s): 'url1;url2;...'\n"
+            " timeout=SECONDS            Timeout for network operations (default is %d)\n"
+            " timeout_direct=SECONDS     Timeout for network operations without proxy (default is %d)\n"
+            " proxies=HTTP_PROXIES       Set the HTTP proxy list, such as 'proxy1|proxy2;DIRECT'\n"
+            " fallback_proxies=PROXIES   Set the fallback proxy list, such as 'proxy1;proxy2'\n"
+            " tracefile=FILE             Trace FUSE opaerations into FILE\n"
+            " pubkey=PEMFILE             Public RSA key that is used to verify the whitelist signature.\n"
+            " allow_unsigned             Accept unsigned catalogs (allows man-in-the-middle attacks)\n"
+            " deep_mount=PREFIX          Path prefix if a repository is mounted on a nested catalog,\n"
+            "                            i.e. deep_mount=/software/15.0.1\n"
+            " mountpoint=PATH            Path to root of repository, e.g. /cvmfs/atlas.cern.ch\n"
             " blacklist=FILE          Local blacklist for invalid certificates.  Has precedence over the whitelist.\n",
             PACKAGE_VERSION, defaults.timeout, defaults.timeout_direct
             );

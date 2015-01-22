@@ -244,11 +244,17 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   if (info->destination == kDestinationMem) {
     // Write to memory
     if (info->destination_mem.pos + num_bytes > info->destination_mem.size) {
-      if (info->destination_mem.size == 0)
-	LogCvmfs(kLogDownload, kLogDebug, "Content-Length was missing or zero, but %d bytes were received", info->destination_mem.pos + num_bytes);
-      else
-	LogCvmfs(kLogDownload, kLogDebug, "Data callback failed with too much data: start %d, bytes %d, expected content-length %d",
-	  info->destination_mem.pos, num_bytes, info->destination_mem.size);
+      if (info->destination_mem.size == 0) {
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "Content-Length was missing or zero, but %zu bytes received",
+                 info->destination_mem.pos + num_bytes);
+      } else {
+        LogCvmfs(kLogDownload, kLogDebug, "Callback had too much data: "
+                 "start %zu, bytes %zu, expected %zu",
+                 info->destination_mem.pos,
+                 num_bytes,
+                 info->destination_mem.size);
+      }
       info->error_code = kFailBadData;
       return 0;
     }
@@ -820,10 +826,22 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     } else if (info->proxy == "") {
       replacement = proxy_template_direct_;
     } else {
-      replacement =
-        (*opt_proxy_groups_)[opt_proxy_groups_current_][0].host.name();
+      if (opt_proxy_groups_current_ >= opt_proxy_groups_fallback_) {
+        // It doesn't make sense to use the fallback proxies in Geo-API requests
+        // since the fallback proxies are supposed to get sorted, too.
+        LogCvmfs(kLogDownload, kLogDebug,
+                 "using direct connection instead of fallback proxy");
+        info->proxy = "";
+        curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
+        replacement = proxy_template_direct_;
+      } else {
+        replacement =
+          (*opt_proxy_groups_)[opt_proxy_groups_current_][0].host.name();
+      }
     }
     replacement = (replacement == "") ? proxy_template_direct_ : replacement;
+    LogCvmfs(kLogDownload, kLogDebug, "replacing @proxy@ by %s",
+             replacement.c_str());
     url = ReplaceAll(url, "@proxy@", replacement);
   }
   pthread_mutex_unlock(lock_options_);
@@ -1104,6 +1122,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
           }
 
           // Make it a host failure
+          LogCvmfs(kLogDownload, kLogDebug, "make it a host failure");
           info->num_used_proxies = 1;
           info->error_code = kFailHostAfterProxy;
         } else {
@@ -1353,9 +1372,9 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   // Parsing environment variables
   if (use_system_proxy) {
     if (getenv("http_proxy") == NULL) {
-      SetProxyChain("");
+      SetProxyChain("", "", kSetProxyRegular);
     } else {
-      SetProxyChain(string(getenv("http_proxy")));
+      SetProxyChain(string(getenv("http_proxy")), "", kSetProxyRegular);
     }
   }
 }
@@ -1828,22 +1847,27 @@ void DownloadManager::ProbeHosts() {
 
 
 /**
- * Uses the Geo-API of Stratum 1s to let any of them order the list of servers.
- * Tries at most three random ones before giving up.
- * If you change the host list in between by SetHostChain(), it will be
- * overwritten by this function.
+ * Uses the Geo-API of Stratum 1s to let any of them order the list of servers
+ *   and fallback proxies (if any).
+ * Tries at most three random Stratum 1s before giving up.
+ * If you change the host list in between by SetHostChain() or the fallback
+ *   proxy list by SetProxyChain(), they will be overwritten by this function.
  */
-bool DownloadManager::ProbeHostsGeo() {
+bool DownloadManager::ProbeGeo() {
   vector<string> host_chain;
   vector<int> host_rtt;
   unsigned current_host;
+  vector< vector<ProxyInfo> > proxy_chain;
+  unsigned fallback_group;
 
   GetHostInfo(&host_chain, &host_rtt, &current_host);
-  if (host_chain.size() < 2)
+  GetProxyInfo(&proxy_chain, NULL, &fallback_group);
+  if ((host_chain.size() < 2) && ((proxy_chain.size() - fallback_group) < 2))
     return true;
 
   // Protect against concurrent access to prng_
   pthread_mutex_lock(lock_options_);
+  // Determine random hosts for the Geo-API query
   vector<string> host_chain_shuffled = Shuffle(host_chain, &prng_);
   pthread_mutex_unlock(lock_options_);
 
@@ -1851,11 +1875,24 @@ bool DownloadManager::ProbeHostsGeo() {
   for (unsigned i = 0; i < host_chain.size(); ++i)
     host_names.push_back(dns::ExtractHost(host_chain[i]));
   SortTeam(&host_names, &host_chain);
+
+  // Add fallback proxy names to the end of the host list
+  unsigned first_geo_fallback = host_names.size();
+  for (unsigned i = fallback_group; i < proxy_chain.size(); ++i) {
+    // We only take the first fallback proxy name from every group under the
+    // assumption that load-balanced servers are at the same location
+    host_names.push_back(proxy_chain[i][0].host.name());
+  }
+  // TODO: fallback proxies should be sorted to for maximum cache reuse.
+  // For WLCG there's no reason to sort fallbacks, they're set by a widely
+  // shared config but that can change in a different context.
+
   string host_list = JoinStrings(host_names, ",");
 
-  // Request ordered list of stratum 1s via Geo-API
+  // Request ordered list via Geo-API
   bool success = false;
   unsigned max_attempts = std::min(host_chain_shuffled.size(), size_t(3));
+  vector<uint64_t> geo_order(host_names.size());
   for (unsigned i = 0; i < max_attempts; ++i) {
     string url = host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/" + host_list;
     LogCvmfs(kLogDownload, kLogDebug,
@@ -1865,14 +1902,14 @@ bool DownloadManager::ProbeHostsGeo() {
     if (result == kFailOk) {
       string order(info.destination_mem.data, info.destination_mem.size);
       free(info.destination_mem.data);
-      bool retval = SortWrtGeoReply(order, &host_chain);
+      bool retval = ValidateGeoReply(order, host_names.size(), &geo_order);
       if (!retval) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "retrieved invalid GeoAPI reply from %s [%s]",
                  url.c_str(), order.c_str());
       } else {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
-                 "geographic order of stratum 1 servers retrieved from %s",
+                 "geographic order of servers retrieved from %s",
                  dns::ExtractHost(host_chain_shuffled[i]).c_str());
         LogCvmfs(kLogDownload, kLogDebug, "order is %s", order.c_str());
         success = true;
@@ -1886,14 +1923,63 @@ bool DownloadManager::ProbeHostsGeo() {
   }
   if (!success) {
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-             "failed to retrieve geographic order of stratum 1 servers");
+             "failed to retrieve geographic order from stratum 1 servers");
     return false;
   }
 
+  // Re-install host chain and proxy chain
   pthread_mutex_lock(lock_options_);
   delete opt_host_chain_;
+  opt_num_proxies_ = 0;
+  opt_host_chain_ = new vector<string>(host_chain.size());
+
+  // It's possible that opt_proxy_groups_fallback_ might have changed while the
+  // lock wasn't held
+  vector< vector< ProxyInfo> > *proxy_groups =
+        new vector< vector<ProxyInfo> > (
+            opt_proxy_groups_fallback_ + proxy_chain.size() - fallback_group);
+  // First copy the non-fallback part of the current proxy chain
+  for (unsigned i = 0; i < opt_proxy_groups_fallback_; ++i) {
+    (*proxy_groups)[i] = (*opt_proxy_groups_)[i];
+    opt_num_proxies_ += (*opt_proxy_groups_)[i].size();
+  }
+
+  // Copy the host chain and fallback proxies by geo order.  Array indices
+  // in geo_order that are smaller than first_geo_fallback refer to a
+  // stratum 1, the others to a fallback proxy.
+  unsigned hosti = 0;
+  unsigned proxyi = opt_proxy_groups_fallback_;
+  for (unsigned i = 0; i < geo_order.size(); ++i) {
+    uint64_t orderval = geo_order[i];
+    if (orderval < (uint64_t) first_geo_fallback) {
+      //LogCvmfs(kLogCvmfs, kLogSyslog, "this is orderval %u at host index %u",
+      //  orderval, hosti);
+      (*opt_host_chain_)[hosti++] = host_chain[orderval];
+    } else {
+      //LogCvmfs(kLogCvmfs, kLogSyslog,
+      //  "this is orderval %u at proxy index %u, using proxy_chain index %u",
+      //  orderval, proxyi, fallback_group + orderval - first_geo_fallback);
+      (*proxy_groups)[proxyi] = proxy_chain[
+            fallback_group + orderval - first_geo_fallback];
+      opt_num_proxies_ += (*proxy_groups)[proxyi].size();
+      proxyi++;
+    }
+  }
+
+  delete opt_proxy_groups_;
+  opt_proxy_groups_ = proxy_groups;
+  // In pathological cases, opt_proxy_groups_current_ can be larger now when
+  // proxies changed in-between.
+  if (opt_proxy_groups_current_ > opt_proxy_groups_->size()) {
+    if (opt_proxy_groups_->size() == 0) {
+      opt_proxy_groups_current_ = 0;
+    } else {
+      opt_proxy_groups_current_ = opt_proxy_groups_->size() - 1;
+    }
+    opt_proxy_groups_current_burned_ = 0;
+  }
+
   delete opt_host_chain_rtt_;
-  opt_host_chain_ = new vector<string>(host_chain);
   opt_host_chain_rtt_ = new vector<int>(host_chain.size(), kProbeGeo);
   opt_host_chain_current_ = 0;
   pthread_mutex_unlock(lock_options_);
@@ -1904,13 +1990,15 @@ bool DownloadManager::ProbeHostsGeo() {
 
 /**
  * Validates a string of the form "1,4,2,3" representing in which order the
- * array input_hosts should be put for optimal geographic proximity. Returns
- * true if the input_hosts string is sorted according to reply_order and false
- * if the reply_order string is invalid.
+ * the expected_size number of hosts should be put for optimal geographic
+ * proximity.  Returns false if the reply_order string is invalid, otherwise
+ * fills in the reply_vals array with zero-based order indexes (e.g.
+ * [0,3,1,2]) and returns true.
  */
-bool DownloadManager::SortWrtGeoReply(
+bool DownloadManager::ValidateGeoReply(
   const string &reply_order,
-  vector<string> *input_hosts)
+  const unsigned expected_size,
+  vector<uint64_t> *reply_vals)
 {
   if (reply_order.empty())
     return false;
@@ -1920,63 +2008,159 @@ bool DownloadManager::SortWrtGeoReply(
   sanitizer::InputSanitizer strip_newline("09 ,");
   vector<string> reply_strings =
     SplitString(strip_newline.Filter(reply_order), ',');
-  vector<uint64_t> reply_vals;
+  vector<uint64_t> tmp_vals;
   for (unsigned i = 0; i < reply_strings.size(); ++i) {
     if (reply_strings[i].empty())
       return false;
-    reply_vals.push_back(String2Uint64(reply_strings[i]));
+    tmp_vals.push_back(String2Uint64(reply_strings[i]));
   }
-  if (reply_vals.size() != input_hosts->size())
+  if (tmp_vals.size() != expected_size)
     return false;
 
-  // Check if reply_vals contains the number 1..n
-  set<uint64_t> coverage(reply_vals.begin(), reply_vals.end());
-  if (coverage.size() != reply_vals.size())
+  // Check if tmp_vals contains the number 1..n
+  set<uint64_t> coverage(tmp_vals.begin(), tmp_vals.end());
+  if (coverage.size() != tmp_vals.size())
     return false;
   if ((*coverage.begin() != 1) || (*coverage.rbegin() != coverage.size()))
     return false;
 
-  vector<string> tmp(*input_hosts);
-  for (unsigned i = 0; i < reply_vals.size(); ++i)
-    (*input_hosts)[i] = tmp[reply_vals[i]-1];
+  for (unsigned i = 0; i < expected_size; ++i) {
+    (*reply_vals)[i] = tmp_vals[i] - 1;
+  }
   return true;
 }
 
 
 /**
- * Parses a list of ';'- and '|'-separated proxy servers for the proxy groups.
- * The empty string removes the proxy chain.
+ * Removes DIRECT from a list of ';' and '|' separated proxies.
+ * \return true if DIRECT was present, false otherwise
  */
-void DownloadManager::SetProxyChain(const string &proxy_list) {
+bool DownloadManager::StripDirect(
+  const string &proxy_list,
+  string *cleaned_list)
+{
+  assert(cleaned_list);
+  if (proxy_list == "") {
+    *cleaned_list = "";
+    return false;
+  }
+  bool result = false;
+
+  vector<string> proxy_groups = SplitString(proxy_list, ';');
+  vector<string> cleaned_groups;
+  for (unsigned i = 0; i < proxy_groups.size(); ++i) {
+    vector<string> group = SplitString(proxy_groups[i], '|');
+    vector<string> cleaned;
+    for (unsigned j = 0; j < group.size(); ++j) {
+      if ((group[j] == "DIRECT") || (group[j] == "")) {
+        result = true;
+      } else {
+        cleaned.push_back(group[j]);
+      }
+    }
+    if (!cleaned.empty())
+      cleaned_groups.push_back(JoinStrings(cleaned, "|"));
+  }
+
+  *cleaned_list = JoinStrings(cleaned_groups, ";");
+  return result;
+}
+
+
+/**
+ * Parses a list of ';'- and '|'-separated proxy servers and fallback proxy
+ *   servers for the proxy groups.
+ * The empty string for both removes the proxy chain.
+ * The set_mode parameter can be used to set either proxies (leaving fallback
+ *   proxies unchanged) or fallback proxies (leaving regular proxies unchanged)
+ *   or both.
+ */
+void DownloadManager::SetProxyChain(
+  const string &proxy_list,
+  const string &fallback_proxy_list,
+  const ProxySetModes set_mode)
+{
   pthread_mutex_lock(lock_options_);
 
   opt_timestamp_backup_proxies_ = 0;
   opt_timestamp_failover_proxies_ = 0;
+  string set_proxy_list = opt_proxy_list_;
+  string set_proxy_fallback_list = opt_proxy_fallback_list_;
+  bool contains_direct;
+  if ((set_mode == kSetProxyFallback) || (set_mode == kSetProxyBoth)) {
+    opt_proxy_fallback_list_ = fallback_proxy_list;
+  }
+  if ((set_mode == kSetProxyRegular) || (set_mode == kSetProxyBoth)) {
+    opt_proxy_list_ = proxy_list;
+  }
+  contains_direct =
+    StripDirect(opt_proxy_fallback_list_, &set_proxy_fallback_list);
+  if (contains_direct) {
+    LogCvmfs(kLogDownload, kLogSyslogWarn | kLogDebug,
+             "fallback proxies do not support DIRECT, removing");
+  }
+  if (set_proxy_fallback_list == "") {
+    set_proxy_list = opt_proxy_list_;
+  } else {
+    bool contains_direct = StripDirect(opt_proxy_list_, &set_proxy_list);
+    if (contains_direct) {
+      LogCvmfs(kLogDownload, kLogSyslog | kLogDebug,
+               "skipping DIRECT proxy to use fallback proxy");
+    }
+  }
+
+  // From this point on, use set_proxy_list and set_fallback_proxy_list as
+  // effective proxy lists!
+
   delete opt_proxy_groups_;
-  if (proxy_list == "") {
+  if ((set_proxy_list == "") && (set_proxy_fallback_list == "")) {
     opt_proxy_groups_ = NULL;
     opt_proxy_groups_current_ = 0;
     opt_proxy_groups_current_burned_ = 0;
+    opt_proxy_groups_fallback_ = 0;
     opt_num_proxies_ = 0;
     pthread_mutex_unlock(lock_options_);
     return;
   }
 
-  // Resolve server names in provided urls, skip DIRECT
-  vector<string> urls;  // All encountered URLs
-  vector<string> proxy_groups = SplitString(proxy_list, ';');
+  // Determine number of regular proxy groups (== first fallback proxy group)
+  opt_proxy_groups_fallback_ = 0;
+  if (set_proxy_list != "") {
+    opt_proxy_groups_fallback_ = SplitString(set_proxy_list, ';').size();
+  }
+  LogCvmfs(kLogDownload, kLogDebug, "first fallback proxy group %u",
+           opt_proxy_groups_fallback_);
+
+  // Concatenate regular proxies and fallback proxies, both of which can be
+  // empty.
+  string all_proxy_list = set_proxy_list;
+  if (set_proxy_fallback_list != "") {
+    if (all_proxy_list != "")
+      all_proxy_list += ";";
+    all_proxy_list += set_proxy_fallback_list;
+  }
+  LogCvmfs(kLogDownload, kLogDebug, "full proxy list %s",
+           all_proxy_list.c_str());
+
+  // Resolve server names in provided urls
+  vector<string> hostnames;  // All encountered hostnames
+  vector<string> proxy_groups;
+  if (all_proxy_list != "")
+    proxy_groups = SplitString(all_proxy_list, ';');
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
     vector<string> this_group = SplitString(proxy_groups[i], '|');
     for (unsigned j = 0; j < this_group.size(); ++j) {
-      // Note: DIRECT strings will be "extracted" to an empty string and not
-      // resolved.
-      urls.push_back(dns::ExtractHost(this_group[j]));
+      // Note: DIRECT strings will be "extracted" to an empty string.
+      string hostname = dns::ExtractHost(this_group[j]);
+      // Save the hostname.  Leave empty (DIRECT) names so indexes will
+      // match later.
+      hostnames.push_back(hostname);
     }
   }
   vector<dns::Host> hosts;
   LogCvmfs(kLogDownload, kLogDebug, "resolving %u proxy addresses",
-           urls.size());
-  resolver->ResolveMany(urls, &hosts);
+           hostnames.size());
+  resolver->ResolveMany(hostnames, &hosts);
 
   // Construct opt_proxy_groups_: traverse proxy list in same order and expand
   // names to resolved IP addresses.
@@ -1985,6 +2169,9 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
   unsigned num_proxy = 0;  // Combined i, j counter
   for (unsigned i = 0; i < proxy_groups.size(); ++i) {
     vector<string> this_group = SplitString(proxy_groups[i], '|');
+    // Construct ProxyInfo objects from proxy string and DNS resolver result for
+    // every proxy in this_group.  One URL can result in multiple ProxyInfo
+    // objects, one for each IP address.
     vector<ProxyInfo> infos;
     for (unsigned j = 0; j < this_group.size(); ++j, ++num_proxy) {
       if (this_group[j] == "DIRECT") {
@@ -2026,7 +2213,7 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
       }
     }
     opt_proxy_groups_->push_back(infos);
-    opt_num_proxies_ += (*opt_proxy_groups_)[i].size();
+    opt_num_proxies_ += infos.size();
   }
   LogCvmfs(kLogDownload, kLogDebug,
            "installed %u proxies in %u load-balance groups",
@@ -2035,37 +2222,61 @@ void DownloadManager::SetProxyChain(const string &proxy_list) {
   opt_proxy_groups_current_burned_ = 1;
 
   // Select random start proxy from the first group.
-  if ((*opt_proxy_groups_)[0].size() > 1) {
-    int random_index = prng_.Next((*opt_proxy_groups_)[0].size());
-    swap((*opt_proxy_groups_)[0][0], (*opt_proxy_groups_)[0][random_index]);
+  if (opt_proxy_groups_->size() > 0) {
+    // Select random start proxy from the first group.
+    if ((*opt_proxy_groups_)[0].size() > 1) {
+      int random_index = prng_.Next((*opt_proxy_groups_)[0].size());
+      swap((*opt_proxy_groups_)[0][0], (*opt_proxy_groups_)[0][random_index]);
+    }
+    //LogCvmfs(kLogDownload, kLogSyslog, "using proxy %s",
+    //         (*opt_proxy_groups_)[0][0].c_str());
   }
-  //LogCvmfs(kLogDownload, kLogSyslog, "using proxy %s",
-  //         (*opt_proxy_groups_)[0][0].c_str());
+
   pthread_mutex_unlock(lock_options_);
 }
 
 
 /**
- * Retrieves the proxy chain and the currently active load-balancing group.
+ * Retrieves the proxy chain, optionally the currently active load-balancing
+ *   group, and optionally the index of the first fallback proxy group.
+ *   If there are no fallback proxies, the index will equal the size of
+ *   the proxy chain.
  */
 void DownloadManager::GetProxyInfo(vector< vector<ProxyInfo> > *proxy_chain,
-                                   unsigned *current_group)
+                                   unsigned *current_group,
+                                   unsigned *fallback_group)
 {
+  assert(proxy_chain != NULL);
+
   pthread_mutex_lock(lock_options_);
 
   if (!opt_proxy_groups_) {
     pthread_mutex_unlock(lock_options_);
-    proxy_chain = NULL;
-    current_group = NULL;
+    vector< vector<ProxyInfo> > empty_chain;
+    *proxy_chain = empty_chain;
+    if (current_group != NULL)
+      *current_group = 0;
+    if (fallback_group != NULL)
+      *fallback_group = 0;
     return;
   }
 
   *proxy_chain = *opt_proxy_groups_;
-  *current_group = opt_proxy_groups_current_;
+  if (current_group != NULL)
+    *current_group = opt_proxy_groups_current_;
+  if (fallback_group != NULL)
+    *fallback_group = opt_proxy_groups_fallback_;
 
   pthread_mutex_unlock(lock_options_);
 }
 
+string DownloadManager::GetProxyList() {
+  return opt_proxy_list_;
+}
+
+string DownloadManager::GetFallbackProxyList() {
+  return opt_proxy_fallback_list_;
+}
 
 /**
  * Selects a new random proxy in the current load-balancing group.  Resets the

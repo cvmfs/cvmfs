@@ -429,7 +429,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   //download::ActivatePipelining();
   unsigned current_group;
   vector< vector<download::DownloadManager::ProxyInfo> > proxies;
-  g_download_manager->GetProxyInfo(&proxies, &current_group);
+  g_download_manager->GetProxyInfo(&proxies, &current_group, NULL);
   if (proxies.size() > 0) {
     string proxy_str = "\nWarning, replicating through proxies\n";
     proxy_str += "  Load-balance groups:\n";

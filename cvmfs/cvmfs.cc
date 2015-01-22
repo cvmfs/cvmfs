@@ -1502,7 +1502,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.proxy") {
     vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
     unsigned current_group;
-    download_manager_->GetProxyInfo(&proxy_chain, &current_group);
+    download_manager_->GetProxyInfo(&proxy_chain, &current_group, NULL);
     if (proxy_chain.size()) {
       attribute_value = proxy_chain[current_group][0].url;
     } else {
@@ -1809,6 +1809,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
   string proxies = "";
+  string fallback_proxies = "";
   string dns_server = "";
   string public_keys = "";
   string root_hash = "";
@@ -1893,6 +1894,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     quota_limit = String2Int64(parameter) * 1024*1024;
   if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
+  if (options::GetValue("CVMFS_FALLBACK_PROXY", &parameter))
+    fallback_proxies = parameter;
   if (options::GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
   if (options::GetValue("CVMFS_TRUSTED_CERTS", &parameter))
@@ -2253,10 +2256,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
     *g_boot_error = "failed to discover HTTP proxy servers";
     return loader::kFailWpad;
   }
-  cvmfs::download_manager_->SetProxyChain(proxies);
+  cvmfs::download_manager_->SetProxyChain(
+    proxies, fallback_proxies, download::DownloadManager::kSetProxyBoth);
   g_download_ready = true;
   if (use_geo_api) {
-    cvmfs::download_manager_->ProbeHostsGeo();
+    cvmfs::download_manager_->ProbeGeo();
   }
 
   cvmfs::signature_manager_ = new signature::SignatureManager();

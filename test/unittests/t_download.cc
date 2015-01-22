@@ -69,43 +69,81 @@ TEST_F(T_Download, LocalFile2Mem) {
 }
 
 
-TEST_F(T_Download, SortWrtGeoReply) {
-  vector<string> input_hosts;
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("", &input_hosts));
+TEST_F(T_Download, StripDirect) {
+  string cleaned = "FALSE";
+  EXPECT_FALSE(download_mgr.StripDirect("", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.StripDirect("DIRECT", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.StripDirect("DIRECT;DIRECT", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.StripDirect("DIRECT;DIRECT|DIRECT", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.StripDirect("DIRECT;DIRECT|", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.StripDirect(";", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_TRUE(download_mgr.StripDirect(";||;;;|||", &cleaned));
+  EXPECT_EQ("", cleaned);
+  EXPECT_FALSE(download_mgr.StripDirect("A|B", &cleaned));
+  EXPECT_EQ("A|B", cleaned);
+  EXPECT_FALSE(download_mgr.StripDirect("A|B;C|D;E|F|G", &cleaned));
+  EXPECT_EQ("A|B;C|D;E|F|G", cleaned);
+  EXPECT_TRUE(download_mgr.StripDirect("A|DIRECT;C|D;E|F;DIRECT", &cleaned));
+  EXPECT_EQ("A;C|D;E|F", cleaned);
+}
 
-  input_hosts.push_back("a");
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("a", &input_hosts));
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("1,1", &input_hosts));
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("1,3", &input_hosts));
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("2,3", &input_hosts));
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("2", &input_hosts));
-  EXPECT_TRUE(download_mgr.SortWrtGeoReply("1", &input_hosts));
-  EXPECT_EQ(1U, input_hosts.size());
-  EXPECT_EQ("a", input_hosts[0]);
 
-  input_hosts.push_back("b");
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply(",", &input_hosts));
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("2,", &input_hosts));
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("1", &input_hosts));
-  EXPECT_FALSE(download_mgr.SortWrtGeoReply("3,2,1", &input_hosts));
-  EXPECT_TRUE(download_mgr.SortWrtGeoReply("2,1", &input_hosts));
-  EXPECT_EQ(2U, input_hosts.size());
-  EXPECT_EQ("b", input_hosts[0]);
-  EXPECT_EQ("a", input_hosts[1]);
+TEST_F(T_Download, ValidateGeoReply) {
+  vector<uint64_t> geo_order;
+  EXPECT_FALSE(download_mgr.ValidateGeoReply("", geo_order.size(), &geo_order));
 
-  EXPECT_TRUE(download_mgr.SortWrtGeoReply("2,1\n", &input_hosts));
-  EXPECT_EQ(2U, input_hosts.size());
-  EXPECT_EQ("a", input_hosts[0]);
-  EXPECT_EQ("b", input_hosts[1]);
+  geo_order.push_back(0);
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply("a", geo_order.size(), &geo_order));
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply("1,1", geo_order.size(), &geo_order));
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply("1,3", geo_order.size(), &geo_order));
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply("2,3", geo_order.size(), &geo_order));
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply("2", geo_order.size(), &geo_order));
+  EXPECT_TRUE(
+    download_mgr.ValidateGeoReply("1", geo_order.size(), &geo_order));
+  EXPECT_EQ(geo_order.size(), 1U);
+  EXPECT_EQ(geo_order[0], 0U);
 
-  input_hosts.push_back("c");
-  input_hosts.push_back("d");
-  EXPECT_TRUE(download_mgr.SortWrtGeoReply("4,3,1,2\n", &input_hosts));
-  EXPECT_EQ(4U, input_hosts.size());
-  EXPECT_EQ("d", input_hosts[0]);
-  EXPECT_EQ("c", input_hosts[1]);
-  EXPECT_EQ("a", input_hosts[2]);
-  EXPECT_EQ("b", input_hosts[3]);
+  geo_order.push_back(0);
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply(",", geo_order.size(), &geo_order));
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply("2,", geo_order.size(), &geo_order));
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply("1", geo_order.size(), &geo_order));
+  EXPECT_FALSE(
+    download_mgr.ValidateGeoReply("3,2,1", geo_order.size(), &geo_order));
+  EXPECT_TRUE(
+    download_mgr.ValidateGeoReply("2,1", geo_order.size(), &geo_order));
+  EXPECT_EQ(geo_order.size(), 2U);
+  EXPECT_EQ(geo_order[0], 1U);
+  EXPECT_EQ(geo_order[1], 0U);
+
+  EXPECT_TRUE(
+    download_mgr.ValidateGeoReply("2,1\n", geo_order.size(), &geo_order));
+  EXPECT_EQ(geo_order.size(), 2U);
+  EXPECT_EQ(geo_order[0], 1U);
+  EXPECT_EQ(geo_order[1], 0U);
+
+  geo_order.push_back(0);
+  geo_order.push_back(0);
+  EXPECT_TRUE(
+    download_mgr.ValidateGeoReply("4,3,1,2\n", geo_order.size(), &geo_order));
+  EXPECT_EQ(geo_order.size(), 4U);
+  EXPECT_EQ(geo_order[0], 3U);
+  EXPECT_EQ(geo_order[1], 2U);
+  EXPECT_EQ(geo_order[2], 0U);
+  EXPECT_EQ(geo_order[3], 1U);
 }
 
 }  // namespace download
