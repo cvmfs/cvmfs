@@ -223,6 +223,7 @@ class T_History : public ::testing::Test {
                    reinterpret_cast<void**>(&unpacked),
                    &unpacked_size)) << "failed to decompress";
     WriteFile(dest, std::string(unpacked, unpacked_size));
+    free (unpacked);
   }
 
   void WriteFile(const std::string &path, const std::string &content) const {
