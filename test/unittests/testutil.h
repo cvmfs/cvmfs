@@ -296,7 +296,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
               MockCatalog *previous = NULL) :
     parent_(parent), previous_(previous), root_path_(root_path),
     catalog_hash_(catalog_hash), catalog_size_(catalog_size),
-    revision_(revision), last_modified_(last_modified), is_root_(is_root)
+    revision_(revision), last_modified_(last_modified), is_root_(is_root),
+    owns_database_file_(false)
   {
     if (parent != NULL) {
       parent->RegisterChild(this);
