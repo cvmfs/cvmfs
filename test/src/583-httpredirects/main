@@ -1,0 +1,63 @@
+cvmfs_test_name="Mounting repo with http redirects"
+
+cvmfs_run_test() {
+  local test_repo1=cms.cern.ch
+  local test_repo2=grid.cern.ch
+  local apache_config_file="$(get_apache_config_filename httpredirects)"
+  local redirect_url1=http://127.0.0.1:80/cvmfs/$test_repo1
+  local redirect_url2=http://127.0.0.1:80/cvmfs/$test_repo2
+
+  echo -n "configuring apache to redirect to stratum 1 and in a loop... "
+create_apache_config_file $apache_config_file << EOF
+# Created by test case 583.  Don't touch.
+Redirect /cvmfs/$test_repo1 http://cvmfs-stratum-one.cern.ch:8000/cvmfs/$test_repo1
+Redirect /cvmfs/$test_repo2 http://127.0.0.1:80/cvmfs/$test_repo2
+EOF
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+  curl --output /dev/null --silent --head --fail "$redirect_url1/.cvmfspublished" || die "fail (404 on .cvmfspublished)"
+  curl -L --max-redirs 4 $redirect_url2/.cvmfspublished 2>&1|cat -v|grep -q "Maximum.*redirects" || die "fail (did not reach maximum redirects)"
+  echo "done"
+
+  echo "configuring cvmfs to read from redirecting apache"
+  sudo sh -c "cat > /etc/cvmfs/config.d/$test_repo1.local" << EOF || return 1
+CVMFS_SERVER_URL="$redirect_url1"
+CVMFS_HTTP_PROXY=DIRECT
+EOF
+  sudo sh -c "cat > /etc/cvmfs/config.d/$test_repo2.local" << EOF
+CVMFS_SERVER_URL="$redirect_url2;http://cvmfs-stratum-one.cern.ch:8000/cvmfs/$test_repo2"
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_FOLLOW_REDIRECTS=yes
+EOF
+
+  echo "mounting and listing $test_repo1 through redirecting apache"
+  # make sure fails first when redirects not yet enabled
+  cvmfs_mount $test_repo1 && return 2
+  sudo sh -c "cat >> /etc/cvmfs/config.d/$test_repo1.local" << EOF
+CVMFS_FOLLOW_REDIRECTS=yes
+EOF
+  # clear the failed mount
+  autofs_switch off > /dev/null
+  autofs_switch on > /dev/null
+  # wipe the cache to make sure catalog is read
+  # CVMFS_REPOSITORIES will be set because of the previous mount attempt
+  sudo cvmfs_config wipecache || return 3
+  cvmfs_mount $test_repo1 || return 4
+  ls -CF /cvmfs/$test_repo1 || return 5
+  cvmfs_umount $test_repo1
+
+  echo "mounting and listing $test_repo2 past looping apache"
+  cvmfs_mount $test_repo2 || return 6
+  ls -CF /cvmfs/$test_repo2 || return 7
+  cvmfs_umount $test_repo2
+
+  echo "removing cvmfs configuration using redirecting apache"
+  sudo rm -f /etc/cvmfs/config.d/$test_repo1.local
+
+  echo -n "removing apache redirect configuration... "
+  remove_apache_config_file "$apache_config_file"
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+  curl --output /dev/null --silent --head --fail "$redirect_url1/.cvmfspublished" && die "fail (.cvmfspublished still reachable)"
+  echo "done"
+}

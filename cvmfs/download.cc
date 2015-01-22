@@ -168,7 +168,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   //LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: Header callback with line %s",
   //         header_line.c_str());
 
-  // Check for http status code errors
+  // Check http status codes
   if (HasPrefix(header_line, "HTTP/1.", false)) {
     if (header_line.length() < 10)
       return 0;
@@ -177,6 +177,21 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     for (i = 8; (i < header_line.length()) && (header_line[i] == ' '); ++i) {}
 
     if (header_line[i] == '2') {
+      return num_bytes;
+    } else if ((header_line.length() > i+2) && (header_line[i] == '3') &&
+               (header_line[i+1] == '0') &&
+               ((header_line[i+2] == '1') || (header_line[i+2] == '2') ||
+                (header_line[i+2] == '3') || (header_line[i+2] == '7')))
+    {
+      if (!info->follow_redirects) {
+        LogCvmfs(kLogDownload, kLogDebug, "redirect support not enabled: %s",
+                 header_line.c_str());
+        info->error_code = kFailHostHttp;
+        return 0;
+      }
+      LogCvmfs(kLogDownload, kLogDebug, "http redirect: %s",
+               header_line.c_str());
+      // libcurl will handle this because of CURLOPT_FOLLOWLOCATION
       return num_bytes;
     } else {
       LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
@@ -218,6 +233,9 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
       info->destination_mem.data = NULL;
     }
     info->destination_mem.size = length;
+  } else if (HasPrefix(header_line, "LOCATION:", true)) {
+    // This comes along with redirects
+    LogCvmfs(kLogDownload, kLogDebug, "%s", header_line.c_str());
   }
 
   return num_bytes;
@@ -683,6 +701,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   info->curl_handle = handle;
   info->error_code = kFailOk;
   info->nocache = false;
+  info->follow_redirects = follow_redirects_;
   info->num_used_proxies = 1;
   info->num_used_hosts = 1;
   info->num_retries = 0;
@@ -718,6 +737,10 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
   if (opt_ipv4_only_)
     curl_easy_setopt(handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+  if (follow_redirects_) {
+    curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
+    curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 4);
+  }
 }
 
 
@@ -1057,6 +1080,9 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         info->error_code = kFailProxyConnection;
       else
         info->error_code = kFailHostConnection;
+      break;
+    case CURLE_TOO_MANY_REDIRECTS:
+      info->error_code = kFailHostConnection;
       break;
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
@@ -2401,6 +2427,11 @@ void DownloadManager::EnableInfoHeader() {
 
 void DownloadManager::EnablePipelining() {
   curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
+}
+
+
+void DownloadManager::EnableRedirects() {
+  follow_redirects_ = true;
 }
 
 
