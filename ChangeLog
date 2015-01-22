@@ -1,4 +1,9 @@
 2.1.20:
+  * Recover from inconsistent state of mount points in the server (CVM-650)
+  * Add possibility to cancel 'cvmfs_server snapshot' if a concurrent snapshot
+    is in progress (CVM-278)
+  * Add support for geographically ordered fallback proxies (CVM-708)
+  * Add support for HTTP redirects through CVMFS_FOLLOW_REDIRECTS (CVM-766)
   * Ensure autofs is running after 'cvmfs_config setup'
   * Fix rebuilding cache database on XFS (CVM-685)
   * CVMFS_PUBLIC_KEY takes precedence over CVMFS_KEYS_DIR (CVM-652)
