@@ -143,7 +143,7 @@ uninstall_package() {
   if has_binary yum; then
     sudo yum -y erase $pkg_name
   elif has_binary apt-get; then
-    sudo apt-get --assume-yes remove $pkg_name
+    sudo apt-get --assume-yes purge $pkg_name
   else
     return 1
   fi
