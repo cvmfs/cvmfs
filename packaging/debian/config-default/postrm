@@ -1,5 +1,5 @@
 #!/bin/sh
-# postrm script for cvmfs-config-cern
+# postrm script for cvmfs-config-default
 #
 # see: dh_installdeb(1)
 

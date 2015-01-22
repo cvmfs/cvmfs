@@ -8,7 +8,7 @@ set -e
 #
 
 usage() {
-  echo "Sample script that builds the cvmfs-config-cern debian package from source"
+  echo "Sample script that builds the cvmfs-config-default debian package from source"
   echo "Usage: $0 <work dir> <source tree root>"
   exit 1
 }
@@ -37,12 +37,12 @@ echo -n "initializing build environment... "
 mkdir ${workdir}/src/cvmfs
 cp -R $srctree/* ${workdir}/src/cvmfs
 mkdir ${workdir}/src/cvmfs/debian
-cp -R ${workdir}/tmp/packaging/debian/config-cern/* ${workdir}/src/cvmfs/debian
-cp ${workdir}/tmp/packaging/debian/config-cern/Makefile ${workdir}/src/cvmfs
+cp -R ${workdir}/tmp/packaging/debian/config-default/* ${workdir}/src/cvmfs/debian
+cp ${workdir}/tmp/packaging/debian/config-default/Makefile ${workdir}/src/cvmfs
 echo "done"
 
 echo -n "figuring out version number from rpm packaging... "
-upstream_version="$(cat ${srctree}/packaging/rpm/cvmfs-config-cern.spec | grep '^Version:' | awk '{print $2}')-0"
+upstream_version="$(cat ${srctree}/packaging/rpm/cvmfs-config-default.spec | grep '^Version:' | awk '{print $2}')-0"
 echo "done"
 
 echo "building..."
