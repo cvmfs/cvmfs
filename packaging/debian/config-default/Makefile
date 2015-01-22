@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 # This make file takes care of 'installing' the public key files
-# and domain configurations while 'building' the cvmfs-config-cern deb package
+# and domain configurations while 'building' the cvmfs-config-default deb package
 
 all: # nothing to build
 
