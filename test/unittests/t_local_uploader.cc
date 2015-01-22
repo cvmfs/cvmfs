@@ -231,8 +231,9 @@ class T_LocalUploader : public FileSandbox {
 
  private:
   std::string ByteToHex(const unsigned char byte) {
-    char hex[3];
-    sprintf(hex, "%02x", byte);
+    const unsigned int len = 3;
+    char hex[len];
+    snprintf(hex, len, "%02x", byte);
     return std::string(hex);
   }
 
