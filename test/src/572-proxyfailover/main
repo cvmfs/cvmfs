@@ -1,0 +1,288 @@
+cvmfs_test_name="Proxy Failover Scenarios"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "meaningless file content" > file
+  echo "more clever file content" > clever
+
+  popdir
+}
+
+clear_cache() {
+  local cache_directory="$1"
+  rm -fR "$cache_directory"   || return 1
+  mkdir -p "$cache_directory" || return 2
+}
+
+get_active_proxy_group() {
+  local talk_pipe="$1"
+  cvmfs_talk -p "$talk_pipe" proxy info | grep "Active proxy:" | sed -e 's/^.*\[\([0-9]\+\)\].*$/\1/'
+}
+
+check_active_proxy_group() {
+  local talk_pipe="$1"
+  local expected="$2"
+  local active_proxy_group
+
+  active_proxy_group=$(get_active_proxy_group "$talk_pipe")
+  echo "active proxy group: $active_proxy_group"
+  [ x"$active_proxy_group" = x"$expected" ]
+}
+
+switch_proxy_group() {
+  local talk_pipe="$1"
+  cvmfs_talk -p $talk_pipe proxy group switch
+}
+
+set_proxy_chain() {
+  local talk_pipe="$1"
+  local proxy_chain="$2"
+  cvmfs_talk -p $talk_pipe proxy set "$proxy_chain"
+}
+
+mount_private() {
+  local mountpoint="$1"
+  local configuration="$2"
+  cvmfs2 -o config=$configuration $CVMFS_TEST_REPO "$mountpoint" 1>&2
+  if [ $? -ne 0 ]; then
+    echo "failed to mount CVMFS on $mountpoint" >&2
+    return 8
+  fi
+}
+
+TEST572_HTTP_PORT=""
+TEST572_PROXY_BASE_PORT=9000
+TEST572_NUM_PROXIES=0
+TEST572_PROXIES=""
+TEST572_MOUNT_POINT=""
+cleanup() {
+  echo -n "cleaning up... "
+  [ -z "$TEST572_MOUNT_POINT" ] || sudo umount $TEST572_MOUNT_POINT > /dev/null 2>&1
+  [ -z "$TEST572_HTTP_PORT" ]   || shutdown_wiremock "http://localhost:${TEST572_HTTP_PORT}"
+  if [ ! -z $TEST572_NUM_PROXIES ]; then
+    local i=0
+    while [ $i -lt $TEST572_NUM_PROXIES ]; do
+      local proxy_port=$(( $TEST572_PROXY_BASE_PORT + $i ))
+      shutdown_wiremock "http://localhost:${proxy_port}"
+      i=$(( $i + 1 ))
+    done
+  fi
+  echo "done"
+}
+
+get_proxy() {
+  local n=$1
+  for proxy in $TEST572_PROXIES; do
+    if [ $n -eq 0 ]; then
+      echo $proxy
+      return 0
+    fi
+    n=$(( $n - 1 ))
+  done
+  return 1
+}
+
+get_proxies() {
+  echo "$TEST572_PROXIES"
+}
+
+reset_proxies() {
+  for proxy in $(get_proxies); do
+    echo "resetting: $proxy"
+    reset_wiremock "$proxy"
+  done
+  sleep 2
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  local wiremock_wrapper="${script_location}/../../wiremock_wrapper.sh"
+  echo "setup wiremock environment ($wiremock_wrapper)"
+  . ${script_location}/../../wiremock_wrapper.sh
+  init_wiremock || return $?
+
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 2
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "prepare the mocked stratum 0 repository content"
+  local http_root="mocked_http_root"
+  local repo_root="${http_root}/__files/cvmfs"
+  mkdir -p $repo_root                            || return 3
+  cp -R /srv/cvmfs/${CVMFS_TEST_REPO} $repo_root || return 4
+
+  echo "start a mocked HTTP server for the repository"
+  local http_log="http.log"
+  TEST572_HTTP_PORT=8000
+  local http_url="http://localhost:$TEST572_HTTP_PORT"
+  start_wiremock "$http_root" $TEST572_HTTP_PORT $http_log || return 5
+  sleep 1
+
+  local num_proxies=4
+  echo "start $num_proxies proxies"
+  local proxies=""
+  local i=0
+  while [ $i -lt $num_proxies ]; do
+    local proxy_root="mocked_proxy_root_${i}"
+    local proxy_log="proxy_log_${i}.log"
+    local proxy_port=$(( $TEST572_PROXY_BASE_PORT + $i ))
+
+    mkdir -p $proxy_root || return 6
+    start_wiremock "$proxy_root" $proxy_port $proxy_log "proxy" || return 7
+
+    local proxy_url="http://localhost:${proxy_port}"
+    TEST572_NUM_PROXIES=$(( $TEST572_NUM_PROXIES + 1 ))
+    TEST572_PROXIES="$TEST572_PROXIES $proxy_url"
+
+    i=$(( $i + 1 ))
+  done
+  [ $i -eq $num_proxies ] || return 8
+  sleep 1
+
+  echo "define proxy group:"
+  proxies="$(get_proxy 0)|$(get_proxy 1);$(get_proxy 2)|$(get_proxy 3)"
+  echo $proxies
+
+  echo "configure private mount of CVMFS"
+  local mntpnt="$(pwd)/pmnt"
+  local mnt_conf="${mntpnt}.conf"
+  local mnt_cache="${mntpnt}_c"
+  local mnt_pipe="${mnt_cache}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
+  local mnt_dummy_file="${mntpnt}/file"
+  mkdir -p $mntpnt $mnt_cache || return 9
+  cat > $mnt_conf << EOF
+CVMFS_CACHE_BASE=$mnt_cache
+CVMFS_RELOAD_SOCKETS=$mnt_cache
+CVMFS_SERVER_URL=$http_url/cvmfs/${CVMFS_TEST_REPO}
+CVMFS_HTTP_PROXY='$proxies'
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
+CVMFS_TIMEOUT=5
+EOF
+
+  echo "mount CVMFS with the full setup working"
+  local mount_time=0
+  TEST572_MOUNT_POINT="$mntpnt"
+  mount_time="$(stop_watch mount_private $mntpnt $mnt_conf)" || return 10
+  echo "took $mount_time seconds"
+
+  echo "checking active proxy group through $mnt_pipe"
+  check_active_proxy_group $mnt_pipe 0 || return 11
+
+  echo "umount CVMFS"
+  sudo umount $mntpnt    || return 12
+  clear_cache $mnt_cache || return 13
+
+  local proxy_delay=4000
+  echo "add ${proxy_delay}ms delay to the first proxy group"
+  set_wiremock_response_delay "$(get_proxy 0)" "$proxy_delay"
+  set_wiremock_response_delay "$(get_proxy 1)" "$proxy_delay"
+
+  echo "mount CVMFS again (should take a moment)"
+  mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 14
+  echo "took $mount_time seconds"
+  [ $mount_time -ge 3 ]                || return 15
+  check_active_proxy_group $mnt_pipe 0 || return 16
+
+  echo "umount CVMFS"
+  sudo umount $mntpnt    || return 17
+  clear_cache $mnt_cache || return 18
+
+  echo "destroy the second proxy group (very high delay)"
+  set_wiremock_response_delay "$(get_proxy 2)" "7000"
+  set_wiremock_response_delay "$(get_proxy 3)" "7000"
+
+  echo "mount CVMFS again (should take a moment)"
+  mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 19
+  echo "took $mount_time seconds"
+  [ $mount_time -ge 3 ] || return 20
+  check_active_proxy_group $mnt_pipe 0 || return 21
+
+  echo "switch proxy group to broken proxies"
+  switch_proxy_group $mnt_pipe         || return 22
+  check_active_proxy_group $mnt_pipe 1 || return 23
+
+  echo "try to access a file in the mountpoint (should take a moment)"
+  local cat_time=0
+  cat_time=$(stop_watch cat $mnt_dummy_file | tail -n1)
+  echo "took $cat_time seconds"
+  [ $cat_time -ge 3 ] || return 24
+  cat $mnt_dummy_file | grep -q "meaningless file content" || return 25
+  check_active_proxy_group $mnt_pipe 0 || return 26
+
+  echo "umount CVMFS"
+  sudo umount $mntpnt    || return 27
+  clear_cache $mnt_cache || return 28
+
+  echo "destroy the first proxy group (very high delay)"
+  set_wiremock_response_delay "$(get_proxy 0)" "7000"
+  set_wiremock_response_delay "$(get_proxy 1)" "7000"
+
+  echo "mount CVMFS again (should fail)"
+  mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" && return 29
+  echo "took $mount_time seconds"
+
+  echo "reset the proxies"
+  reset_proxies
+
+  echo "mount CVMFS again (should be quick)"
+  clear_cache $mnt_cache                                                 || return 30
+  mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 31
+  echo "took $mount_time seconds"
+  [ $mount_time -lt 3 ]                || return 32
+  check_active_proxy_group $mnt_pipe 0 || return 33
+
+  echo "destroy all proxies (very high delay)"
+  for proxy in $(get_proxies); do
+    echo "destroying: $proxy"
+    set_wiremock_response_delay "$proxy" "7000"
+  done
+  sleep 2
+
+  echo "try to access a file inside the (already mounted) mountpoint (should fail)"
+  cat $mnt_dummy_file && return 34
+
+  echo "insert DIRECT into the proxy chain"
+  set_proxy_chain $mnt_pipe "${proxies};DIRECT" || return 35
+
+  echo "try to access a file inside the (already mounted) mountpoint"
+  cat $mnt_dummy_file | grep -q "meaningless file content" || return 36
+  check_active_proxy_group $mnt_pipe 2                     || return 37
+
+  echo "reset the proxies"
+  reset_proxies
+
+  echo "umount CVMFS"
+  sudo umount $mntpnt    || return 38
+  clear_cache $mnt_cache || return 39
+
+  echo "inject response faults for first proxy group"
+  set_wiremock_garbage_response_fault "$(get_proxy 0)" ".*/data/.*"
+  set_wiremock_empty_response_fault   "$(get_proxy 1)" ".*/data/.*"
+
+  echo "mount CVMFS again (should be quick)"
+  mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 40
+  echo "took $mount_time seconds"
+  check_active_proxy_group $mnt_pipe 1 || return 41
+
+  return 0
+}
