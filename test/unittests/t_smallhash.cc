@@ -208,7 +208,7 @@ TEST_F(T_Smallhash, MultihashMultithread) {
 
   pthread_t threads[kNumThreads];
   for (unsigned i = 0; i < kNumThreads; ++i) {
-    pthread_create(&threads[i], NULL, tf_insert, (void *)i);
+    pthread_create(&threads[i], NULL, tf_insert, reinterpret_cast<void *>(i));
   }
   for (unsigned i = 0; i < kNumThreads; ++i) {
     pthread_join(threads[i], NULL);
@@ -216,7 +216,7 @@ TEST_F(T_Smallhash, MultihashMultithread) {
   EXPECT_EQ(N, GetMultiSize());
 
   for (unsigned i = 0; i < kNumThreads; ++i) {
-    pthread_create(&threads[i], NULL, tf_erase, (void *)i);
+    pthread_create(&threads[i], NULL, tf_erase, reinterpret_cast<void *>(i));
   }
   for (unsigned i = 0; i < kNumThreads; ++i) {
     pthread_join(threads[i], NULL);
