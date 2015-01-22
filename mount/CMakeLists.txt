@@ -60,6 +60,18 @@ if (MACOSX)
     DESTINATION   "/etc/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
+  
+  install (
+    FILES         domain.d/egi.eu.conf
+    DESTINATION   "/etc/cvmfs/domain.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES         domain.d/opensciencegrid.org.conf
+    DESTINATION   "/etc/cvmfs/domain.d"
+    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
 
   install (
     FILES         config.d/grid.cern.ch.conf
@@ -120,12 +132,6 @@ if (MACOSX)
   install (
     FILES         serverorder.sh
     DESTINATION   "/etc/cvmfs"
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
-
-  install (
-    FILES         domain.d/opensciencegrid.org.conf
-    DESTINATION   "/etc/cvmfs/domain.d"
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
