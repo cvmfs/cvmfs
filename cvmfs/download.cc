@@ -183,6 +183,12 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
                ((header_line[i+2] == '1') || (header_line[i+2] == '2') ||
                 (header_line[i+2] == '3') || (header_line[i+2] == '7')))
     {
+      if (!info->follow_redirects) {
+        LogCvmfs(kLogDownload, kLogDebug, "redirect support not enabled: %s",
+               header_line.c_str());
+        info->error_code = kFailHostHttp;
+	return 0;
+      }
       LogCvmfs(kLogDownload, kLogDebug, "http redirect: %s",
                header_line.c_str());
       // libcurl will handle this because of CURLOPT_FOLLOWLOCATION
@@ -655,8 +661,6 @@ CURL *DownloadManager::AcquireCurlHandle() {
 
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
     //curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
-    curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
-    curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 4);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlData);
   } else {
@@ -692,6 +696,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   info->curl_handle = handle;
   info->error_code = kFailOk;
   info->nocache = false;
+  info->follow_redirects = follow_redirects_;
   info->num_used_proxies = 1;
   info->num_used_hosts = 1;
   info->num_retries = 0;
@@ -727,6 +732,10 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
   if (opt_ipv4_only_)
     curl_easy_setopt(handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+  if (follow_redirects_) {
+    curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1);
+    curl_easy_setopt(handle, CURLOPT_MAXREDIRS, 4);
+  }
 }
 
 
@@ -2208,6 +2217,11 @@ void DownloadManager::EnableInfoHeader() {
 
 void DownloadManager::EnablePipelining() {
   curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
+}
+
+
+void DownloadManager::EnableRedirects() {
+  follow_redirects_ = true;
 }
 
 

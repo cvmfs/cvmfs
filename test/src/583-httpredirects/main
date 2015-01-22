@@ -20,13 +20,28 @@ EOF
   echo "done"
 
   echo "configuring cvmfs to read from redirecting apache"
-  sudo sh -c "(echo \"CVMFS_SERVER_URL=\\\"$redirect_url1\\\"\";echo \"CVMFS_HTTP_PROXY=DIRECT\") > /etc/cvmfs/config.d/$test_repo1.local" || return 1
-  sudo sh -c "(echo \"CVMFS_SERVER_URL=\\\"$redirect_url2;http://cvmfs-stratum-one.cern.ch:8000/cvmfs/$test_repo2\\\"\";echo \"CVMFS_HTTP_PROXY=DIRECT\") > /etc/cvmfs/config.d/$test_repo2.local" || return 2
+  sudo sh -c "cat > /etc/cvmfs/config.d/$test_repo1.local" << EOF || return 1
+CVMFS_SERVER_URL="$redirect_url1"
+CVMFS_HTTP_PROXY=DIRECT
+EOF
+  sudo sh -c "cat > /etc/cvmfs/config.d/$test_repo2.local" << EOF
+CVMFS_SERVER_URL="$redirect_url2;http://cvmfs-stratum-one.cern.ch:8000/cvmfs/$test_repo2"
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_FOLLOW_REDIRECTS=yes
+EOF
 
   echo "mounting and listing $test_repo1 through redirecting apache"
-  cvmfs_mount $test_repo1 || return 3
-  # wipe the cache & retry to make sure catalog is read
-  sudo cvmfs_config wipecache
+  # make sure fails first when redirects not yet enabled
+  cvmfs_mount $test_repo1 && return 2
+  sudo sh -c "cat >> /etc/cvmfs/config.d/$test_repo1.local" << EOF
+CVMFS_FOLLOW_REDIRECTS=yes
+EOF
+  # clear the failed mount
+  autofs_switch off > /dev/null
+  autofs_switch on > /dev/null
+  # wipe the cache to make sure catalog is read
+  # CVMFS_REPOSITORIES will be set because of the previous mount attempt
+  sudo cvmfs_config wipecache || return 3
   cvmfs_mount $test_repo1 || return 4
   ls -CF /cvmfs/$test_repo1 || return 5
   cvmfs_umount $test_repo1

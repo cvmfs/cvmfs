@@ -112,6 +112,7 @@ struct JobInfo {
   bool compressed;
   bool probe_hosts;
   bool head_request;
+  bool follow_redirects;
   Destination destination;
   struct {
     size_t size;
@@ -129,6 +130,7 @@ struct JobInfo {
     compressed = false;
     probe_hosts = false;
     head_request = false;
+    follow_redirects = false;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;
@@ -313,6 +315,7 @@ class DownloadManager {
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnablePipelining();
+  void EnableRedirects();
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -365,6 +368,7 @@ class DownloadManager {
   unsigned opt_backoff_max_ms_;
   bool enable_info_header_;
   bool opt_ipv4_only_;
+  bool follow_redirects_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;

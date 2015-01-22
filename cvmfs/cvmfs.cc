@@ -1822,6 +1822,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   uint64_t initial_generation = 0;
   cvmfs::Uuid *uuid;
   bool use_geo_api = false;
+  bool follow_redirects = false;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
   cvmfs::backoff_throttle_ = new BackoffThrottle();
@@ -1882,6 +1883,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       options::IsOn(parameter))
   {
     use_geo_api = true;
+  }
+  if (options::GetValue("CVMFS_FOLLOW_REDIRECTS", &parameter) &&
+      options::IsOn(parameter))
+  {
+    follow_redirects = true;
   }
   if (options::GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
@@ -2234,6 +2240,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->SetHostChain(hostname);
   if (!dns_server.empty()) {
     cvmfs::download_manager_->SetDnsServer(dns_server);
+  }
+  if (follow_redirects) {
+    cvmfs::download_manager_->EnableRedirects();
   }
   cvmfs::download_manager_->SetTimeout(timeout, timeout_direct);
   cvmfs::download_manager_->SetLowSpeedLimit(low_speed_limit);
