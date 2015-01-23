@@ -185,14 +185,10 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
 /**
  * Cleanup unused database space
  *
- * This creates a temporary table 'mapping' filled with the current rowIDs from
- * the catalog table. The new table will implicitly have an auto-increment rowID
- * that is compact. Thus, we create a 'mapping' from each catalog's rowID to a
- * new rowID-space that does not have any gaps. Notice, that the order of old
- * and new rowIDs will stay the same to fulfill the PRIMARY KEY constraints
- * during update.
- * Thereafter the catalog's rowIDs are mapped to their new (unique and compact)
- * rowIDs and the temporary table is deleted.
+ * This copies the entire catalog content into a temporary SQLite table, sweeps
+ * the original data from the 'catalog' table and reinserts everything from the
+ * temporary table afterwards. That way the implicit rowid field of 'catalog' is
+ * defragmented.
  *
  * Note: VACUUM used to have a similar behaviour but it was dropped from SQLite
  *       at some point. Since we compute client-inodes from the rowIDs, we are
