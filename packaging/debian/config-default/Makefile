@@ -20,7 +20,7 @@ install:
 	cp mount/domain.d/egi.eu.conf $(DESTDIR)/etc/cvmfs/domain.d
 	cp mount/domain.d/opensciencegrid.org.conf $(DESTDIR)/etc/cvmfs/domain.d
 	mkdir -p $(DESTDIR)/etc/cvmfs/default.d
-	cp mount/default.d/50-cern.conf $(DESTDIR)/etc/cvmfs/default.d
+	cp mount/default.d/50-cern-debian.conf $(DESTDIR)/etc/cvmfs/default.d
 	cp mount/default.d/60-egi.conf $(DESTDIR)/etc/cvmfs/default.d
 	mkdir -p $(DESTDIR)/etc/cvmfs/config.d
 	cp mount/config.d/atlas-nightlies.cern.ch.conf $(DESTDIR)/etc/cvmfs/config.d
