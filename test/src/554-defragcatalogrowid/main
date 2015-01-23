@@ -9,6 +9,27 @@ get_catalog_file_size() {
   cvmfs_server list-catalogs -xs $repo_name | grep -e "^.* $catalog_path$" | sed 's/^\([0-9]*\)B\s.*$/\1/'
 }
 
+
+get_and_decompress_root_catalog() {
+  local repo_name="$1"
+  local root_catalog="$(get_current_root_catalog $repo_name)C"
+  local object_url="$(get_object_url $repo_name $root_catalog)"
+  local sqlite_db="${root_catalog}.uncompressed"
+
+  wget --quiet $object_url                                             || return 1
+  cat $(basename $object_url) | cvmfs_swissknife zpipe -d > $sqlite_db || return 2
+  echo $sqlite_db
+}
+
+
+get_wasted_row_ids_in_root_catalog() {
+  local repo_name="$1"
+  local root_clg="$(get_and_decompress_root_catalog $repo_name)"
+
+  sqlite3 $root_clg "SELECT max(rowid) - count(*) FROM catalog;"
+}
+
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
