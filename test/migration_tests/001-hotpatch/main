@@ -10,10 +10,15 @@ skip_bytes() {
 tar_gzip_and_hash() {
     local dir_path=$1
     local tar_log=$2
-    local result_file=$3
+    local script_location=$3
+    local result_file=$4
 
+    local tar_archive="$(mktemp ./tar.XXXX)"
+
+    tar czv $dir_path 2>$tar_log > $tar_archive || return 1
     local md5_result
-    md5_result=$(tar czv $dir_path 2>$tar_log | skip_bytes 6 | md5sum | head -c32)
+    md5_result="$(${script_location}/tarsum $tar_archive | cut -d' ' -f1 | sort | md5sum | cut -d' ' -f1)"
+    rm -f $tar_archive || return 2
 
     if [ x"$result_file" != x"" ]; then
       echo -n "$md5_result" > $result_file
@@ -178,14 +183,14 @@ cvmfs_run_test() {
 
   # do some hammering on the file system (without interruption)
   echo "tar $src_dir (without interruption)"
-  md5_1=$(tar_gzip_and_hash $src_dir $tar_log1)
+  md5_1=$(tar_gzip_and_hash $src_dir $tar_log1 $script_location)
   echo "checksumming large files in $xxl_files_dir (without interruption)"
   checksum_large_files $xxl_files_dir $chksum_log1
 
   # do some hammering on the file system
   sudo cvmfs_talk -i sft cleanup 0
   echo "starting to tar $src_dir (log output in separate file)"
-  tar_gzip_and_hash $src_dir $tar_log2 $md5_output &
+  tar_gzip_and_hash $src_dir $tar_log2 $script_location $md5_output &
   local tar_pid=$!
   echo "tar runs under PID $tar_pid"
   echo "starting to checksum large files in $xxl_files_dir (log output in separate file)"
@@ -221,7 +226,7 @@ cvmfs_run_test() {
 
   # do some hammering on the file system (after update)
   echo "tar $src_dir (without interruption - after update)"
-  md5_3=$(tar_gzip_and_hash $src_dir $tar_log3)
+  md5_3=$(tar_gzip_and_hash $src_dir $tar_log3 $script_location)
   echo "checksumming large files in $xxl_files_dir (without interruption - after update)"
   checksum_large_files $xxl_files_dir $chksum_log3
 
