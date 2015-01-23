@@ -7,8 +7,8 @@ unix_timestamp() {
 }
 
 export CVMFS_TEST_580_LAST_PUBLISH=last_publish
-export CVMFS_TEST_580_THRESH_SECONDS=20
-export CVMFS_TEST_580_SECONDS_MARGIN=10
+export CVMFS_TEST_580_THRESH_SECONDS=200
+export CVMFS_TEST_580_SECONDS_MARGIN=50
 
 create_revision() {
   local repo_name=$1
