@@ -204,15 +204,15 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
 bool CatalogDatabase::CompactDatabase() const {
   assert (read_write());
 
-  return Sql(*this, "BEGIN;").Execute()                                 &&
-         Sql(*this, "CREATE TEMPORARY TABLE mapping AS "
-                    "  SELECT rowid AS cid FROM catalog "
-                    "  ORDER BY cid;").Execute()                        &&
-         Sql(*this, "UPDATE OR ROLLBACK catalog SET "
-                    "  rowid = (SELECT mapping.rowid FROM mapping "
-                    "           WHERE cid = catalog.rowid);").Execute() &&
-         Sql(*this, "DROP TABLE mapping;").Execute()                    &&
-         Sql(*this, "COMMIT;").Execute();
+  return Sql(*this, "BEGIN;").Execute()                                   &&
+         Sql(*this, "CREATE TEMPORARY TABLE duplicate AS "
+                    "  SELECT * FROM catalog "
+                    "  ORDER BY rowid ASC;").Execute()                    &&
+         Sql(*this, "DELETE FROM catalog;").Execute()                     &&
+         Sql(*this, "INSERT INTO catalog "
+                    "  SELECT * FROM duplicate ORDER BY rowid").Execute() &&
+         Sql(*this, "COMMIT;").Execute()                                  &&
+         Sql(*this, "DROP TABLE duplicate;").Execute();
 }
 
 
