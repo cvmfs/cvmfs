@@ -180,11 +180,19 @@ else (MACOSX)
     PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
-  install (
-    FILES         default.d/50-cern.conf
-    DESTINATION   "/etc/cvmfs/default.d"
-    PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
-  )
+  if (DEBIAN)
+    install (
+      FILES         default.d/50-cern-debian.conf
+      DESTINATION   "/etc/cvmfs/default.d"
+      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+  else (DEBIAN)
+    install (
+      FILES         default.d/50-cern.conf
+      DESTINATION   "/etc/cvmfs/default.d"
+      PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+    )
+  endif (DEBIAN)
 
   install (
     FILES         default.d/60-egi.conf
