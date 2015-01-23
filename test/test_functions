@@ -971,6 +971,14 @@ get_repo_url() {
   fi
 }
 
+get_object_url() {
+  local repo_name="$1"
+  local object_hash="$2"
+  local repo_url="$(get_repo_url $repo_name)"
+  local object_path="$(echo -n $object_hash | sed -e 's/^\(..\)\(.*\)$/\1\/\2/')"
+  echo "${repo_url}/data/${object_path}"
+}
+
 get_apache_config_filename() {
   local repo_name="$1"
   echo "${repo_name}.conf"
