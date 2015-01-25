@@ -3,6 +3,7 @@ cvmfs_test_name="HTTP Timeout"
 
 do_faulty_mount() {
   cvmfs_mount "atlas.cern.ch"          \
+	            "CVMFS_CONFIG_REPOSITORY=" \
               "CVMFS_TIMEOUT=3"        \
               "CVMFS_TIMEOUT_DIRECT=3" \
               "CVMFS_HTTP_PROXY=DIRECT" \
@@ -31,6 +32,7 @@ cvmfs_run_test() {
 
   echo "try to mount cvmfs"
   seconds=$(stop_watch do_faulty_mount)
+  echo "timeout was $seconds seconds"
 
   echo "try to list the repository"
   ls /cvmfs/atlas.cern.ch || retval=3
