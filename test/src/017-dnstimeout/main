@@ -3,6 +3,7 @@ cvmfs_test_name="DNS Timeout"
 
 do_faulty_mount() {
   cvmfs_mount $repo \
+              "CVMFS_CONFIG_REPOSITORY=" \
               "CVMFS_DNS_SERVER=127.0.0.1" \
               "CVMFS_TIMEOUT=3" \
               "CVMFS_TIMEOUT_DIRECT=3" \
@@ -34,6 +35,7 @@ cvmfs_run_test() {
   echo "trying to mount again with unresponsive DNS"
   local seconds
   seconds=$(stop_watch do_faulty_mount)
+  echo "timeout was $timeout seconds"
 
   num_host=$(cvmfs_config showconfig $repo |grep CVMFS_SERVER_URL | tr \; \\n  | wc -l)
 
