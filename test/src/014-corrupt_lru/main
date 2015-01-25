@@ -6,11 +6,12 @@ cvmfs_run_test() {
 
   local repo="atlas.cern.ch"
 
-  cvmfs_mount ${repo} || return 1
+  # Make sure that only a single repo uses the shared cache
+  cvmfs_mount ${repo} "CVMFS_CONFIG_REPOSITORY=" || return 1
 
   local cache_dir
   local cache_list
-  
+
   cache_dir=$(get_cvmfs_cachedir ${repo})
   sudo [ -f ${cache_dir}/cachedb ] || return 2
   ls /cvmfs/${repo} || return 3
@@ -20,10 +21,10 @@ cvmfs_run_test() {
     echo "$cache_list"
     return 5
   fi
-  
+
   cvmfs_umount ${repo} || 10
   sudo sh -c "echo bla > ${cache_dir}/cachedb" || return 11
-  cvmfs_mount ${repo} || return 12
+  cvmfs_mount ${repo} "CVMFS_CONFIG_REPOSITORY=" || return 12
   cat /cvmfs/${repo}/.cvmfsdirtab || return 13
   cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -v -q "automatic rebuild"; then
