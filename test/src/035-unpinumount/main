@@ -10,11 +10,10 @@ cvmfs_run_test() {
   ls /cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase || return 2
   
   num_pinned=$(sudo cvmfs_talk -i sft.cern.ch cache list pinned | wc -l)
-  [ $num_pinned -eq 3 ] || return 3
 
   cvmfs_umount atlas.cern.ch || return 4
-  num_pinned=$(sudo cvmfs_talk -i sft.cern.ch cache list pinned | wc -l)
-  [ $num_pinned -eq 1 ] || return 5
+  num_pinned2=$(sudo cvmfs_talk -i sft.cern.ch cache list pinned | wc -l)
+  [ $num_pinned -eq $(($num_pinned2 + 2)) ] || return 5
  
   return 0
 }
