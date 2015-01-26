@@ -138,9 +138,9 @@ class CatalogTraversal
    *                             them in previous revisions
    * @param no_close             do not close catalogs after they were attached
    *                             (catalogs retain their parent/child pointers)
-   * @param ignore_load_failure  suppressed an error message if a revision's root
-   *                             catalog could not be loaded (i.e. was sweeped
-   *                             before by a garbage collection run)
+   * @param ignore_load_failure  suppressed an error message if a catalog file
+   *                             could not be loaded (i.e. was sweeped before by
+   *                             a garbage collection run)
    * @param quiet                silence messages that would go to stderr
    * @param tmp_dir              path to the temporary directory to be used
    *                             (default: /tmp)
