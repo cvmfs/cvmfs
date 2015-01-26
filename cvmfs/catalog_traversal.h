@@ -468,9 +468,9 @@ class CatalogTraversal
                                                 ! job.IsRootCatalog(),
                                                 job.parent);
     if (! job.catalog) {
-      if (ignore_load_failure_ && job.IsRootCatalog()) {
-        LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignore missing root catalog "
-                                                  "%s (possibly sweeped before)",
+      if (ignore_load_failure_) {
+        LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignoring missing catalog %s "
+                                                  "(possibly swept before)",
                  job.hash.ToString().c_str());
         job.ignore = true;
         return true;
