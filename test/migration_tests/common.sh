@@ -156,11 +156,55 @@ is_installed() {
 }
 
 
+yum_install_packages() {
+  local pkg_paths="$1"
+  sudo yum -y install --nogpgcheck $pkg_paths
+}
+
+
+yum_get_package_name() {
+  local rpm_file="$1"
+  echo $(rpm -qp --queryformat '%{NAME}' $rpm_file)
+}
+
+
+yum_get_conflicts() {
+  local rpm_file="$1"
+  local conflicts="$(rpm -qp --queryformat '%{CONFLICTS}' $rpm_file)"
+  if echo "$conflicts" | grep -vq '(none)'; then
+    echo $conflicts
+  fi
+}
+
+
+yum_update_fallback() {
+  local pkg_paths="$1"
+  local to_be_uninstalled=""
+
+  for pkg in $pkg_paths; do
+    local pkg_name="$(yum_get_package_name $pkg)"
+    if is_installed $pkg_name; then
+      to_be_uninstalled="$pkg_name $to_be_uninstalled"
+    fi
+    to_be_uninstalled="$(yum_get_conflicts $pkg) $to_be_uninstalled"
+  done
+
+  if [ ! -z "$to_be_uninstalled" ]; then
+    uninstall_package "$to_be_uninstalled"
+  fi
+  yum_install_packages "$pkg_paths"
+}
+
+
 install_packages() {
   local pkg_paths="$1"
 
   if has_binary yum; then
-    sudo yum -y install --nogpgcheck $pkg_paths
+    if version_lower_or_equal $(installed_package_version 'yum') '3.2.22'; then
+      yum_update_fallback "$pkg_paths"
+    else
+      yum_install_packages "$pkg_paths"
+    fi
   elif has_binary dpkg; then
     sudo dpkg --install $pkg_paths
     sudo apt-get --assume-yes -f install
