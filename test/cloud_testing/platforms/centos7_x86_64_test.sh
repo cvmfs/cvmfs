@@ -32,7 +32,8 @@ export CVMFS_TEST_SERVER_CACHE='/srv/cache' &&         \
                           src/024-reload-during-asetup \
                           src/5* || it_retval=$?
 
-echo "running CernVM-FS migration test cases..."
-./run.sh $MIGRATIONTEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
+# TODO: enable this as soon as 2.1.20 is released
+echo "skipping CernVM-FS migration test case (no EL7 package for 2.1.19)"
+#./run.sh $MIGRATIONTEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
 
 [ $ut_retval -eq 0 ] && [ $it_retval -eq 0 ] && [ $s3_retval -eq 0 ] && [ $mg_retval -eq 0 ]
