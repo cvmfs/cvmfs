@@ -200,22 +200,18 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
 bool CatalogDatabase::CompactDatabase() const {
   assert (read_write());
 
-  return BeginTransaction()                                 &&
-         Sql(*this, "CREATE TEMPORARY TABLE tmp_catalog AS "
+  return Sql(*this, "PRAGMA foreign_keys = OFF;").Execute() &&
+         BeginTransaction()                                 &&
+         Sql(*this, "CREATE TEMPORARY TABLE duplicate AS "
                     "  SELECT * FROM catalog "
                     "  ORDER BY rowid ASC;").Execute()      &&
-         Sql(*this, "CREATE TEMPORARY TABLE tmp_chunks AS "
-                    "  SELECT * FROM chunks;").Execute()    &&
-         Sql(*this, "DELETE FROM chunks;").Execute()        &&
          Sql(*this, "DELETE FROM catalog;").Execute()       &&
          Sql(*this, "INSERT INTO catalog "
-                    "  SELECT * FROM tmp_catalog "
+                    "  SELECT * FROM duplicate "
                     "  ORDER BY rowid").Execute()           &&
-         Sql(*this, "INSERT INTO chunks "
-                    "  SELECT * FROM tmp_chunks").Execute() &&
+         Sql(*this, "DROP TABLE duplicate;").Execute()      &&
          CommitTransaction()                                &&
-         Sql(*this, "DROP TABLE tmp_chunks;").Execute()     &&
-         Sql(*this, "DROP TABLE tmp_catalog;").Execute();
+         Sql(*this, "PRAGMA foreign_keys = ON;").Execute();
 }
 
 
