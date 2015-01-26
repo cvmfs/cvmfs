@@ -215,12 +215,12 @@ install_packages() {
 
 
 uninstall_package() {
-  local pkg_name=$1
+  local pkg_names="$1"
 
   if has_binary yum; then
-    sudo yum -y erase $pkg_name
+    sudo yum -y erase $pkg_names
   elif has_binary apt-get; then
-    sudo apt-get --assume-yes purge $pkg_name
+    sudo apt-get --assume-yes purge $pkg_names
   else
     return 1
   fi
