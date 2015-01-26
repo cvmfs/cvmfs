@@ -8,12 +8,14 @@ script_location=$(dirname $(readlink --canonicalize $0))
 echo -n "creating additional disk partitions... "
 disk_to_partition=/dev/vda
 free_disk_space=$(get_unpartitioned_space $disk_to_partition)
-if [ $free_disk_space -lt 25000000000 ]; then # at least 25GB required
+if [ $free_disk_space -lt 37580963840 ]; then # at least 35GiB required
   die "fail (not enough unpartitioned disk space - $free_disk_space bytes)"
 fi
-partition_size=$(( $free_disk_space / 2 - 10240000))
-create_partition $disk_to_partition $partition_size || die "fail (creating partition 1)"
-create_partition $disk_to_partition $partition_size || die "fail (creating partition 2)"
+cache_partition_size=10737418240 # 10 GiB
+server_partition_size=$(( ( $free_disk_space - $cache_partition_size ) / 2 - 52428800))
+create_partition $disk_to_partition $server_partition_size || die "fail (creating partition 1)"
+create_partition $disk_to_partition $server_partition_size || die "fail (creating partition 2)"
+create_partition $disk_to_partition $cache_partition_size  || die "fail (creating partition 3)"
 echo "done"
 
 # custom kernel packages (figures out the newest installed kernel, downloads and
