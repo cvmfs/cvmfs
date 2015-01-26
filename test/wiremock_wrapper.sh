@@ -62,7 +62,8 @@ start_wiremock() {
                                    --root $document_root \
                                    --port $port          \
                                    $is_proxy             \
-                                   --verbose "
+                                   --verbose " > /dev/null
+  wait_for_local_port $port
 }
 
 send_wiremock_admin_command() {
