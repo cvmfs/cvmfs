@@ -32,6 +32,26 @@ EOF
   echo "done"
 }
 
+wait_for_local_port() {
+  local port="$1"
+  local initial_timeout=60
+  local timeout=$initial_timeout
+
+  echo -n "waiting for port ${port}... "
+  while ! nc -z localhost $port && [ $timeout -gt 0 ]; do
+    timeout=$(( $timeout - 1 ))
+    sleep 1
+  done
+
+  if [ $timeout -eq 0 ]; then
+    echo "fail (waited $initial_timeout seconds)"
+    return 1
+  else
+    echo "okay"
+    return 0
+  fi
+}
+
 start_wiremock() {
   local document_root="$1"
   local port="$2"
