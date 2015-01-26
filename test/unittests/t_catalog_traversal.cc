@@ -2281,10 +2281,7 @@ TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
   params.history             = 4;
   params.quiet               = true;
   params.no_repeat_history   = true;
-  params.ignore_load_failure = true; // even though load failures should be
-                                     // ignored, traversal is supposed to fail
-                                     // because a missing nested catalog is con-
-                                     // sidered an error!
+  params.ignore_load_failure = false;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&UnavailableNestedNoRepeatCallback);
 
@@ -2314,10 +2311,21 @@ TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/42"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/34/41"));
   catalogs.push_back(std::make_pair(4, "/00/11/22/33"));
+  catalogs.push_back(std::make_pair(5, ""));
+  catalogs.push_back(std::make_pair(2, "/00/10"));
+  catalogs.push_back(std::make_pair(2, "/00/10/21"));
+  // --> here the missing catalog (and its descendents should have been)
+  //     since the catalog traversal aborted, the overall traversed tree is
+  //     truncated (see `IgnoreUnavailableNestedNoRepeat`)
+  // catalogs.push_back(std::make_pair(2, "/00/10/20"));
+  // catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
+  // catalogs.push_back(std::make_pair(2, "/00/10/20/31"));
+  // ...
+  // catalogs.push_back(std::make_pair(4, ""));
+  // ...
 
-  const bool dont_check_catalog_count = false;
-  CheckVisitedCatalogs(catalogs, UnavailableNestedNoRepeat_visited_catalogs,
-                       dont_check_catalog_count);
+  CheckVisitedCatalogs(catalogs, UnavailableNestedNoRepeat_visited_catalogs);
+  CheckCatalogSequence(catalogs, UnavailableNestedNoRepeat_visited_catalogs);
 }
 
 
