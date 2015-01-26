@@ -53,6 +53,39 @@ guess_package_url() {
 }
 
 
+# makes sure that a version is always of the form x.y.z
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  echo "$version_string"
+}
+version_major() { echo $1 | cut --delimiter=. --fields=1; }
+version_minor() { echo $1 | cut --delimiter=. --fields=2; }
+version_patch() { echo $1 | cut --delimiter=. --fields=3; }
+prepend_zeros() { printf %05d "$1"; }
+compare_versions() {
+  local lhs="$(normalize_version $1)"
+  local comparison_operator=$2
+  local rhs="$(normalize_version $3)"
+
+  local lhs1=$(prepend_zeros $(version_major $lhs))
+  local lhs2=$(prepend_zeros $(version_minor $lhs))
+  local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local rhs1=$(prepend_zeros $(version_major $rhs))
+  local rhs2=$(prepend_zeros $(version_minor $rhs))
+  local rhs3=$(prepend_zeros $(version_patch $rhs))
+
+  [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
+}
+version_lower_or_equal() {
+  local testee=$1
+  local compare=$2
+  compare_versions $testee -le $compare
+}
+
+
 has_binary() {
   local binary_name=$1
   which $binary_name > /dev/null 2>&1
