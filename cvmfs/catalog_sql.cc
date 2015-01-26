@@ -190,6 +190,11 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
  * temporary table afterwards. That way the implicit rowid field of 'catalog' is
  * defragmented.
  *
+ * Since the 'chunks' table has a foreign key relationship to the 'catalog' we
+ * need to temporarily switch off the foreign key checks. Otherwise the clearing
+ * of the 'catalog' table would fail due to foreign key violations. Note that it
+ * is a NOOP to change the foreign key setting during a transaction!
+ *
  * Note: VACUUM used to have a similar behaviour but it was dropped from SQLite
  *       at some point. Since we compute client-inodes from the rowIDs, we are
  *       probably one of the few use cases where a defragmented rowID is indeed
@@ -200,15 +205,18 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
 bool CatalogDatabase::CompactDatabase() const {
   assert (read_write());
 
-  return Sql(*this, "BEGIN;").Execute()                                   &&
+  return Sql(*this, "PRAGMA foreign_keys = OFF;").Execute() &&
+         BeginTransaction()                                 &&
          Sql(*this, "CREATE TEMPORARY TABLE duplicate AS "
                     "  SELECT * FROM catalog "
-                    "  ORDER BY rowid ASC;").Execute()                    &&
-         Sql(*this, "DELETE FROM catalog;").Execute()                     &&
+                    "  ORDER BY rowid ASC;").Execute()      &&
+         Sql(*this, "DELETE FROM catalog;").Execute()       &&
          Sql(*this, "INSERT INTO catalog "
-                    "  SELECT * FROM duplicate ORDER BY rowid").Execute() &&
-         Sql(*this, "COMMIT;").Execute()                                  &&
-         Sql(*this, "DROP TABLE duplicate;").Execute();
+                    "  SELECT * FROM duplicate "
+                    "  ORDER BY rowid").Execute()           &&
+         Sql(*this, "DROP TABLE duplicate;").Execute()      &&
+         CommitTransaction()                                &&
+         Sql(*this, "PRAGMA foreign_keys = ON;").Execute();
 }
 
 
