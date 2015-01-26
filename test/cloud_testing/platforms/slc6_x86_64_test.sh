@@ -78,6 +78,7 @@ if [ $s3_retval -eq 0 ]; then
                                  src/543-storagescrubbing_scriptable          \
                                  src/550-livemigration                        \
                                  src/571-localbackendumask                    \
+                                 src/572-proxyfailover                        \
                                  src/577-garbagecollecthiddenstratum1revision \
                                  src/579-garbagecollectstratum1legacytag || s3_retval=$?
 
