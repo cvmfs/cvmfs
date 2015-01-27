@@ -63,6 +63,9 @@ cvmfs_run_test() {
   echo "enable garbage collection in the imported repository"
   toggle_gc $legacy_repo_name || return 5
 
+  echo "disable automatic garbage collection"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
   echo "create an additional revision after the migration to create the history database"
   start_transaction $legacy_repo_name || return 5
 
