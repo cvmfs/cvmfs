@@ -16,6 +16,11 @@ echo -n "mounting new disk partition into cvmfs specific location... "
 mount_partition $disk_to_partition$partition /var/lib/cvmfs || die "fail (mounting /var/lib/cvmfs $?)"
 echo "done"
 
+# reset SELinux context
+echo -n "restoring SELinux context for /var/lib/cvmfs... "
+sudo restorecon -R /var/lib/cvmfs || die "fail"
+echo "done"
+
 ut_retval=0
 it_retval=0
 mg_retval=0
