@@ -3913,6 +3913,12 @@ gc() {
     preserve_revisions=0
   fi
 
+  # print a warning to scare off people that might not know what they are doing
+  echo
+  echo 'WARNING: `cvmfs_server gc` is an internal command and will be subject to change'
+  echo '         in future versions of CernVM-FS. Please do not use it manually!'
+  echo
+
   if [ $force -eq 0 ] && [ $dry_run -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
