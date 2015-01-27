@@ -35,8 +35,17 @@ sudo service httpd start > /dev/null 2>&1 || die "fail"
 echo "OK"
 
 # create the server's client cache directory in /srv (AUFS kernel deadlock workaround)
-echo -n "creating client cache on extra partition... "
-sudo mkdir /srv/cache || die "fail"
+echo -n "creating client caches on extra partition... "
+sudo mkdir -p /srv/cache/server || die "fail (cache for server test cases)"
+sudo mkdir -p /srv/cache/client || die "fail (cache for client test cases)"
+echo "done"
+
+echo -n "bind mount client cache to /var/lib/cvmfs... "
+if [ ! -d /var/lib/cvmfs ]; then
+  sudo rm -fR   /var/lib/cvmfs || true
+  sudo mkdir -p /var/lib/cvmfs || die "fail (mkdir /var/lib/cvmfs)"
+fi
+sudo mount --bind /srv/cache/client /var/lib/cvmfs || die "fail (cannot bind mount /var/lib/cvmfs)"
 echo "done"
 
 # running unit test suite
