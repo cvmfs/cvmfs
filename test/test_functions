@@ -1122,6 +1122,20 @@ toggle_gc() {
   return 0
 }
 
+# disables the automatic garbage collection of a given repository configuration
+#
+# @param name  the name of the repository to reconfigure
+disable_auto_garbage_collection() {
+  local name="$1"
+  local cfg_file="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  if cat $cfg_file | grep -q 'CVMFS_AUTO_GC'; then
+    local tmp_cfg="$(mktemp)"
+    cat $cfg_file | sed -e 's/^\(CVMFS_AUTO_GC\)=.*$/\1=false/' > $tmp_cfg || return 1
+    sudo mv -f $tmp_cfg $cfg_file || return 2
+  fi
+}
+
 
 # get the current unix timestamp
 get_timestamp() {

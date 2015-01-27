@@ -42,6 +42,9 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
 
+  echo "disable automatic garbage collection"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
   # ============================================================================
 
   # echo "install a desaster cleanup function"
@@ -55,6 +58,9 @@ cvmfs_run_test() {
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
                   /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 1
+
+  echo "disable automatic garbage collection"
+  disable_auto_garbage_collection $replica_name || return $?
 
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
   cvmfs_server snapshot $replica_name || return 2
@@ -190,7 +196,7 @@ cvmfs_run_test() {
   cvmfs_server gc -f $replica_name || return 54
 
   peek_backend $replica_name $catalog1 && return 55 # GC'ed
-  peek_backend $replica_name $catalog2 && return 56 # GC'ed
+  peek_backend $replica_name $catalog2 && return 56 # GC'ed <-- TODO: test case fails here
   peek_backend $replica_name $catalog3 && return 57 # GC'ed
   peek_backend $replica_name $catalog4 && return 58 # GC'ed
   peek_backend $replica_name $catalog5 || return 59 # trunk-previous
