@@ -4,17 +4,6 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
-# create additional disk partitions to accomodate CVMFS cache
-echo -n "creating additional disk partitions... "
-disk_to_partition=/dev/vda
-free_disk_space=$(get_unpartitioned_space $disk_to_partition)
-if [ $free_disk_space -lt 10789847040 ]; then # at least 10GiB required
-  die "fail (not enough unpartitioned disk space - $free_disk_space bytes)"
-fi
-cache_partition_size=10737418240 # 10 GiB
-create_partition $disk_to_partition $cache_partition_size  || die "fail (creating partition 1)"
-echo "done"
-
 # install CernVM-FS RPM packages
 echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
