@@ -27,7 +27,6 @@ echo "done"
 echo "installing aufs... "
 install_rpm $(basename $aufs_user_tools)                   || die "fail (installing aufs)"
 yum list installed | grep "kernel-module-aufs" > /dev/null || die "fail (check installed aufs)"
-echo "done"
 
 echo -n "activate aufs... "
 kobj=$(rpm -ql $(rpm -qa | grep kernel-module-aufs) | tail -n1)
