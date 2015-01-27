@@ -727,7 +727,7 @@ is_garbage_collectable() {
 has_auto_garbage_collection_enabled() {
   local name=$1
   load_repo_config $name
-  is_garbage_collectable $name && [ ! -z "$CVMFS_AUTO_GC_TIMESPAN" ]
+  is_garbage_collectable $name && [ x"$CVMFS_AUTO_GC" = x"true" ]
 }
 
 # checks if a repository is currently in a transaction
@@ -1742,7 +1742,7 @@ EOF
   # append GC specific configuration
   if [ x"$garbage_collectable" = x"true" ]; then
     cat >> $server_conf << EOF
-CVMFS_AUTO_GC_TIMESPAN='3 days ago'
+CVMFS_AUTO_GC=true
 EOF
   fi
 
@@ -2514,7 +2514,7 @@ EOF
   # append GC specific configuration
   if [ $enable_auto_gc != 0 ]; then
     cat >> /etc/cvmfs/repositories.d/${alias_name}/server.conf << EOF
-CVMFS_AUTO_GC_TIMESPAN='3 days ago'
+CVMFS_AUTO_GC=true
 EOF
   fi
 
