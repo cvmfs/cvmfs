@@ -730,6 +730,21 @@ has_auto_garbage_collection_enabled() {
   is_garbage_collectable $name && [ x"$CVMFS_AUTO_GC" = x"true" ]
 }
 
+# get the configured (or default) timespan for an automatic garbage
+# collection run.
+#
+# @param name  the name of the repository to be checked
+# @return      the configured CVMFS_AUTO_GC_TIMESPAN or default (3 days ago)
+get_auto_garbage_collection_timespan() {
+  local name=$1
+  load_repo_config $name
+  if [ ! -z "$CVMFS_AUTO_GC_TIMESPAN" ]; then
+    echo "$CVMFS_AUTO_GC_TIMESPAN"
+  else
+    echo "3 days ago"
+  fi
+}
+
 # checks if a repository is currently in a transaction
 #
 # @param name  the repository name to be checked
@@ -3704,7 +3719,8 @@ publish() {
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $name; then
       echo "Running automatic garbage collection"
-      local tst="$(date --date "$CVMFS_AUTO_GC_TIMESPAN" +%s 2>/dev/null)"
+      local gc_timespan="$(get_auto_garbage_collection_timespan $name)"
+      local tst="$(date --date "$gc_timespan" +%s 2>/dev/null)"
       [ $? -eq 0 ] || { publish_failed $name; die "Cannot parse time stamp '$timestamp_threshold'"; }
       local dry_run=0
       __run_gc $name       \
@@ -4169,7 +4185,8 @@ snapshot() {
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $alias_name; then
       echo "Running automatic garbage collection"
-      local tst="$(date --date "$CVMFS_AUTO_GC_TIMESPAN" +%s 2>/dev/null)"
+      local gc_timespan="$(get_auto_garbage_collection_timespan $name)"
+      local tst="$(date --date "$gc_timespan" +%s 2>/dev/null)"
       [ $? -eq 0 ] || die "Cannot parse time stamp '$timestamp_threshold'"
       local dry_run=0
       __run_gc "$alias_name" \
