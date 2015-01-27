@@ -772,14 +772,17 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     try_again = CanRetry(info);
   }
   if (try_again) {
-    LogCvmfs(kLogDownload, kLogDebug, "Trying again to upload %s",
-             info->object_key.c_str());
-    // Reset origin
-    if (info->origin == kOriginMem)
-      info->origin_mem.pos = 0;
-    if (info->origin == kOriginPath)
-      rewind(info->origin_file);
-
+    if (info->request == JobInfo::kReqPut) {
+      LogCvmfs(kLogDownload, kLogDebug, "Trying again to upload %s",
+               info->object_key.c_str());
+      // Reset origin
+      if (info->origin == kOriginMem)
+        info->origin_mem.pos = 0;
+      if (info->origin == kOriginPath) {
+        assert(info->origin_file != NULL);
+        rewind(info->origin_file);
+      }
+    }
     Backoff(info);
     return true;  // try again
   }
