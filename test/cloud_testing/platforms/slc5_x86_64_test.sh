@@ -64,6 +64,11 @@ fi
 sudo mount --bind /srv/cache/client /var/lib/cvmfs || die "fail (cannot bind mount /var/lib/cvmfs)"
 echo "done"
 
+# reset SELinux context
+echo -n "restoring SELinux context for /var/lib/cvmfs... "
+sudo restorecon -R /var/lib/cvmfs || die "fail"
+echo "done"
+
 # running unit test suite
 run_unittests --gtest_shuffle || ut_retval=$?
 
