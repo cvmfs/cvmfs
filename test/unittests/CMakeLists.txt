@@ -54,6 +54,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_download.cc
   t_uuid.cc
   t_object_fetcher.cc
+  t_catalog_sql.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -93,6 +94,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/globals.cc
 
   ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.h
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
 

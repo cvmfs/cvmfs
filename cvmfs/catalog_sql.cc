@@ -51,7 +51,9 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
       LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
       return false;
     }
-  } if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
+  }
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
 
     Sql sql_upgrade(*this, "ALTER TABLE catalog ADD xattr BLOB;");
@@ -65,8 +67,6 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
       LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
       return false;
     }
-  } else {
-    LogCvmfs(kLogCatalog, kLogDebug, "schema revision is up to date.");
   }
 
   return true;
@@ -83,7 +83,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
-    " xattr BLOB, "  
+    " xattr BLOB, "
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
   Sql(*this,
     "CREATE INDEX idx_catalog_parent "
