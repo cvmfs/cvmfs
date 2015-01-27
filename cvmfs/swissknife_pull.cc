@@ -408,6 +408,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       return 2;
     }
 
+    if (! pull_history) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "an initial snapshot is in progress... aborting");
+      free(workers);
+      return 2;
+    }
+
     LogCvmfs(kLogCvmfs, kLogStdout, "waiting for another snapshot to finish...");
     fd_lockfile = LockFile(*temp_dir + "/lock_snapshot");
     if (fd_lockfile < 0) {
