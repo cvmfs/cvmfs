@@ -162,7 +162,7 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $catalog4 || return 50 # trunk-previous
   peek_backend $CVMFS_TEST_REPO $catalog5 || return 51 # trunk
 
-  peek_backend $replica_name    $catalog1 && return 52 # deleted by GC
+  peek_backend $replica_name    $catalog1 && return 52 # deleted by GC  <-- TODO: this test case fails here
   peek_backend $replica_name    $catalog2 && return 53 # never replicated...
   peek_backend $replica_name    $catalog3 && return 54 # deleted by GC
   peek_backend $replica_name    $catalog4 || return 55 # trunk-previous
