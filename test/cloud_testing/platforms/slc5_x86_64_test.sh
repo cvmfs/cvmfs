@@ -21,19 +21,16 @@ extend_path "/sbin"
 # format additional disks with ext4 and many inodes
 echo -n "formatting new disk partitions... "
 disk_to_partition=/dev/vda
-partition_3=$(get_last_partition_number $disk_to_partition) # 10GiB Cache Partition
-partition_2=$(( $partition_3 - 1 ))
-partition_1=$(( $partition_3 - 2 ))
+partition_2=$(get_last_partition_number $disk_to_partition)
+partition_1=$(( $partition_2 - 1 ))
 format_partition_ext4 $disk_to_partition$partition_1 || die "fail (formatting partition 1)"
 format_partition_ext4 $disk_to_partition$partition_2 || die "fail (formatting partition 2)"
-format_partition_ext4 $disk_to_partition$partition_3 || die "fail (formatting partition 3)"
 echo "done"
 
 # mount additional disk partitions on strategic cvmfs location
 echo -n "mounting new disk partitions into cvmfs specific locations... "
 mount_partition $disk_to_partition$partition_1 /srv             || die "fail (mounting /srv $?)"
 mount_partition $disk_to_partition$partition_2 /var/spool/cvmfs || die "fail (mounting /var/spool/cvmfs $?)"
-mount_partition $disk_to_partition$partition_3 /var/lib/cvmfs   || die "fail (mounting /var/lib/cvmfs $?)"
 echo "done"
 
 # start apache
@@ -54,8 +51,17 @@ sudo chcon -Rv --type=httpd_sys_content_t /srv > /dev/null || die "fail (chcon)"
 echo "done"
 
 # create the server's client cache directory in /srv (AUFS kernel deadlock workaround)
-echo -n "creating client cache on extra partition... "
-sudo mkdir /srv/cache || die "fail"
+echo -n "creating client caches on extra partition... "
+sudo mkdir -p /srv/cache/server || die "fail (cache for server test cases)"
+sudo mkdir -p /srv/cache/client || die "fail (cache for client test cases)"
+echo "done"
+
+echo -n "bind mount client cache to /var/lib/cvmfs... "
+if [ ! -d /var/lib/cvmfs ]; then
+  sudo rm -fR   /var/lib/cvmfs || true
+  sudo mkdir -p /var/lib/cvmfs || die "fail (mkdir /var/lib/cvmfs)"
+fi
+sudo mount --bind /srv/cache/client /var/lib/cvmfs || die "fail (cannot bind mount /var/lib/cvmfs)"
 echo "done"
 
 # running unit test suite
@@ -63,7 +69,7 @@ run_unittests --gtest_shuffle || ut_retval=$?
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
-export CVMFS_TEST_SERVER_CACHE='/srv/cache' &&                         \
+export CVMFS_TEST_SERVER_CACHE='/srv/cache/server' &&                  \
 ./run.sh $TEST_LOGFILE -x src/004-davinci                              \
                           src/007-testjobs                             \
                           src/045-oasis                                \
