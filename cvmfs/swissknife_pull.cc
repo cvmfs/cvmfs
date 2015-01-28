@@ -399,31 +399,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: replicating from %s",
            stratum0_url->c_str());
 
-  // Wait for another instance to finish
-  fd_lockfile = TryLockFile(*temp_dir + "/lock_snapshot");
-  if (fd_lockfile < 0) {
-    if (! wait_for_other_snapshots) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "another snapshot is in progress... aborting");
-      free(workers);
-      return 2;
-    }
-
-    if (! pull_history) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "an initial snapshot is in progress... aborting");
-      free(workers);
-      return 2;
-    }
-
-    LogCvmfs(kLogCvmfs, kLogStdout, "waiting for another snapshot to finish...");
-    fd_lockfile = LockFile(*temp_dir + "/lock_snapshot");
-    if (fd_lockfile < 0) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to lock on %s",
-               (*temp_dir + "/lock_snapshot").c_str());
-      free(workers);
-      return 1;
-    }
-  }
-
   int result = 1;
   const string url_sentinel = *stratum0_url + "/.cvmfs_master_replica";
   download::JobInfo download_sentinel(&url_sentinel, false);
