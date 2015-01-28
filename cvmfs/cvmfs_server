@@ -842,6 +842,35 @@ publish_succeeded() {
   rmdir $pub_lock > /dev/null 2>&1
 }
 
+acquire_snapshot_lock() {
+  local name=$1
+  load_repo_config $name
+  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
+  mkdir $snapshot_lock > /dev/null 2>&1 || return 1
+  trap "release_snapshot_lock $name" EXIT HUP INT TERM
+}
+
+wait_and_acquire_snapshot_lock() {
+  local name=$1
+  while ! acquire_snapshot_lock $name; do
+    sleep 10
+  done
+}
+
+release_snapshot_lock() {
+  local name=$1
+  load_repo_config $name
+  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
+  trap - EXIT HUP INT TERM
+  rmdir $snapshot_lock > /dev/null 2>&1
+}
+
+is_snapshotting() {
+  local name=$1
+  load_repo_config $name
+  [ -d ${CVMFS_SPOOL_DIR}/is_snapshotting ]
+}
+
 
 # checks if a user exists in the system
 #
