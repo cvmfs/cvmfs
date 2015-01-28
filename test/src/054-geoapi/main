@@ -28,8 +28,13 @@ cvmfs_run_test() {
   echo "geo_probe: $geo_probe"
   echo "normal_probe: $normal_probe"
 
-  if [ "$geo_probe" != "$normal_probe" ]; then
-    return 20;
+  if hostname -f | grep -q cern.ch; then
+    if [ "$geo_probe" != "http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs02.grid.sinica.edu.tw:8000/cvmfs/grid.cern.ch" ]; then
+      return 20;
+    fi
+  else
+    echo "Warning: cannot check correct ordering of stratum 1s outside cern.ch domain"
+    CVMFS_GENERAL_WARNING_FLAG=1
   fi
 
   # also test ordering of fallback proxies
