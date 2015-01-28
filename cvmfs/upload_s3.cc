@@ -114,7 +114,7 @@ bool S3Uploader::ParseSpoolerDefinition(
              config_path.c_str());
     return false;
   }
-  if (!options::GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS",
+  if (!options::GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS",
                          &parameter)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse "
              "CVMFS_S3_MAX_NUMBER_OF_PARALLELL_CONNECTIONS "
