@@ -847,7 +847,6 @@ acquire_snapshot_lock() {
   load_repo_config $name
   local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
   mkdir $snapshot_lock > /dev/null 2>&1 || return 1
-  trap "release_snapshot_lock $name" EXIT HUP INT TERM
 }
 
 wait_and_acquire_snapshot_lock() {
@@ -861,7 +860,6 @@ release_snapshot_lock() {
   local name=$1
   load_repo_config $name
   local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
-  trap - EXIT HUP INT TERM
   rmdir $snapshot_lock > /dev/null 2>&1
 }
 
@@ -4116,6 +4114,18 @@ __run_gc() {
 ################################################################################
 
 
+__snapshot_cleanup() {
+  local alias_name=$1
+
+  load_repo_config $alias_name
+  local user_shell="$(get_user_shell $alias_name)"
+
+  $user_shell "cvmfs_swissknife remove        \
+                 -r ${CVMFS_UPSTREAM_STORAGE} \
+                 -o .cvmfs_is_snapshotting" || echo "Warning: failed to remove .cvmfs_is_snapshotting"
+  release_snapshot_lock $alias_name         || echo "Warning: failed to release snapshotting lock"
+}
+
 snapshot() {
   local alias_names
   local name
@@ -4212,17 +4222,14 @@ snapshot() {
       fi
     fi
 
+    # here the lock is already acquired and needs to be cleared in case of abort
+    trap "__snapshot_cleanup $alias_name" EXIT HUP INT TERM
+
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
     if [ $initial_snapshot -eq 1 ]; then
       echo "Initial snapshot"
     fi
-
-    # command to remove the magic file when finished (or aborted)
-    delete_command="cvmfs_swissknife remove \
-                      -r ${upstream} \
-                      -o .cvmfs_is_snapshotting"
-    trap "$delete_command" HUP INT TERM QUIT
 
     # put a magic file in the repository root to signal a snapshot in progress
     $user_shell "date > ${spool_dir}/tmp/snapshotting"
@@ -4258,6 +4265,10 @@ snapshot() {
                ""            \
                -z $gc_timespan || die "Garbage collection failed ($?)"
     fi
+
+    # all done, clear the trap and run the cleanup manually
+    trap - EXIT HUP INT TERM
+    __snapshot_cleanup $alias_name
 
   done
 
