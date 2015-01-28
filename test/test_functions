@@ -278,8 +278,10 @@ get_cvmfs_cachedir() {
 
 CVMFS_MEMORY_WARNING_FLAG=0
 CVMFS_TIME_WARNING_FLAG=0
+CVMFS_GENERAL_WARNING_FLAG=0
 CVMFS_MEMORY_WARNING=254
 CVMFS_TIME_WARNING=253
+CVMFS_GENERAL_WARNING=252
 mangle_test_retval() {
   local prior_retval=$1
 
@@ -297,6 +299,11 @@ mangle_test_retval() {
   if [ $CVMFS_TIME_WARNING_FLAG -ne 0 ]; then
     return $CVMFS_TIME_WARNING
   fi
+  
+  # check if the test case produced any other warnings
+  if [ $CVMFS_GENERAL_WARNING_FLAG -ne 0 ]; then
+    return $CVMFS_GENERAL_WARNING
+  fi
 
   # return 0 if all is good
   return 0
@@ -305,6 +312,7 @@ mangle_test_retval() {
 reset_test_warning_flags() {
   CVMFS_MEMORY_WARNING_FLAG=0
   CVMFS_TIME_WARNING_FLAG=0
+  CVMFS_GENERAL_WARNING_FLAG=0
 }
 
 

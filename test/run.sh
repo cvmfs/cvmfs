@@ -179,6 +179,11 @@ do
       report_warning "Time limit exceeded!" >> $logfile
       echo "Time Warning!"
       ;;
+    $CVMFS_GENERAL_WARNING)
+      sudo rm -rf "$workdir" >> $logfile
+      report_warning "Test case finished with warnings!" >> $logfile
+      echo "Warning!"
+      ;;
     *)
       report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
       echo "Failed!"
