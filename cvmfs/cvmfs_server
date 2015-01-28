@@ -735,13 +735,21 @@ has_auto_garbage_collection_enabled() {
 #
 # @param name  the name of the repository to be checked
 # @return      the configured CVMFS_AUTO_GC_TIMESPAN or default (3 days ago)
+#              as a timestamp threshold (unix timestamp)
+#              Note: in case of a malformed timespan it might print an error to
+#                     stderr and return a non-zero code
 get_auto_garbage_collection_timespan() {
   local name=$1
+  local timespan="3 days ago"
+
   load_repo_config $name
   if [ ! -z "$CVMFS_AUTO_GC_TIMESPAN" ]; then
-    echo "$CVMFS_AUTO_GC_TIMESPAN"
-  else
-    echo "3 days ago"
+    timespan="$CVMFS_AUTO_GC_TIMESPAN"
+  fi
+
+  if ! date --date "$timespan" +%s 2>/dev/null; then
+    echo "Failed to parse CVMFS_AUTO_GC_TIMESPAN: '$timespan'" >&2
+    return 1
   fi
 }
 
@@ -3523,6 +3531,7 @@ publish() {
   local retcode=0
   local verbosity=""
   local manual_revision=""
+  local gc_timespan=0
 
   # optional parameter handling
   OPTIND=1
@@ -3596,6 +3605,7 @@ publish() {
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
+    gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
     local revision_number=$($swissknife info -r $stratum0 -v)
     if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
       echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
@@ -3719,16 +3729,13 @@ publish() {
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $name; then
       echo "Running automatic garbage collection"
-      local gc_timespan="$(get_auto_garbage_collection_timespan $name)"
-      local tst="$(date --date "$gc_timespan" +%s 2>/dev/null)"
-      [ $? -eq 0 ] || { publish_failed $name; die "Cannot parse time stamp '$timestamp_threshold'"; }
       local dry_run=0
       __run_gc $name       \
                $stratum0   \
                $dry_run    \
                $manifest   \
                $trunk_hash \
-               -z $tst || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
+               -z $gc_timespan || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
     fi
 
     # finalizing transaction
@@ -4093,6 +4100,7 @@ snapshot() {
   local retries
   local retcode=0
   local dont_wait=
+  local gc_timespan=0
 
   OPTIND=1
   while getopts "t" option; do
@@ -4143,6 +4151,7 @@ snapshot() {
         update_geodb -l || true
     fi
     [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
+    gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
 
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
@@ -4185,16 +4194,13 @@ snapshot() {
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $alias_name; then
       echo "Running automatic garbage collection"
-      local gc_timespan="$(get_auto_garbage_collection_timespan $name)"
-      local tst="$(date --date "$gc_timespan" +%s 2>/dev/null)"
-      [ $? -eq 0 ] || die "Cannot parse time stamp '$timestamp_threshold'"
       local dry_run=0
       __run_gc "$alias_name" \
                "$stratum1"   \
                "$dry_run"    \
                ""            \
                ""            \
-               -z $tst || die "Garbage collection failed ($?)"
+               -z $gc_timespan || die "Garbage collection failed ($?)"
     fi
 
   done
