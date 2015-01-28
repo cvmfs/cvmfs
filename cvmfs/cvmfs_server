@@ -842,6 +842,33 @@ publish_succeeded() {
   rmdir $pub_lock > /dev/null 2>&1
 }
 
+acquire_snapshot_lock() {
+  local name=$1
+  load_repo_config $name
+  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
+  mkdir $snapshot_lock > /dev/null 2>&1 || return 1
+}
+
+wait_and_acquire_snapshot_lock() {
+  local name=$1
+  while ! acquire_snapshot_lock $name; do
+    sleep 10
+  done
+}
+
+release_snapshot_lock() {
+  local name=$1
+  load_repo_config $name
+  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
+  rmdir $snapshot_lock > /dev/null 2>&1
+}
+
+is_snapshotting() {
+  local name=$1
+  load_repo_config $name
+  [ -d ${CVMFS_SPOOL_DIR}/is_snapshotting ]
+}
+
 
 # checks if a user exists in the system
 #
@@ -4087,6 +4114,18 @@ __run_gc() {
 ################################################################################
 
 
+__snapshot_cleanup() {
+  local alias_name=$1
+
+  load_repo_config $alias_name
+  local user_shell="$(get_user_shell $alias_name)"
+
+  $user_shell "cvmfs_swissknife remove        \
+                 -r ${CVMFS_UPSTREAM_STORAGE} \
+                 -o .cvmfs_is_snapshotting" || echo "Warning: failed to remove .cvmfs_is_snapshotting"
+  release_snapshot_lock $alias_name         || echo "Warning: failed to release snapshotting lock"
+}
+
 snapshot() {
   local alias_names
   local name
@@ -4099,14 +4138,14 @@ snapshot() {
   local timeout
   local retries
   local retcode=0
-  local dont_wait=
+  local abort_on_conflict=0
   local gc_timespan=0
 
   OPTIND=1
   while getopts "t" option; do
     case $option in
       t)
-        dont_wait="-s"
+        abort_on_conflict=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -4156,20 +4195,41 @@ snapshot() {
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
 
-    local log_level=
-    [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
-    local with_history=
-    if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -q "available"; then
-      with_history="-p"
-    else
-      echo "Initial snapshot"
+    local initial_snapshot=0
+    if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
+      initial_snapshot=1
     fi
 
-    # command to remove the magic file when finished (or aborted)
-    delete_command="cvmfs_swissknife remove \
-                      -r ${upstream} \
-                      -o .cvmfs_is_snapshotting"
-    trap "$delete_command" HUP INT TERM QUIT
+    # check for other snapshots in progress
+    if ! acquire_snapshot_lock $alias_name; then
+      if [ $abort_on_conflict -eq 1 ]; then
+        echo "another snapshot is in progress... aborting"
+        retcode=1
+        continue
+      fi
+
+      if [ $initial_snapshot -eq 1 ]; then
+        echo "an initial snapshot is in progress... aborting"
+        retcode=1
+        continue
+      fi
+
+      echo "waiting for another snapshot to finish..."
+      if ! wait_and_acquire_snapshot_lock $alias_name; then
+        echo "failed to acquire snapshot lock"
+        retcode=1
+        continue
+      fi
+    fi
+
+    # here the lock is already acquired and needs to be cleared in case of abort
+    trap "__snapshot_cleanup $alias_name" EXIT HUP INT TERM
+
+    local log_level=
+    [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
+    if [ $initial_snapshot -eq 1 ]; then
+      echo "Initial snapshot"
+    fi
 
     # put a magic file in the repository root to signal a snapshot in progress
     $user_shell "date > ${spool_dir}/tmp/snapshotting"
@@ -4178,6 +4238,8 @@ snapshot() {
       -o .cvmfs_is_snapshotting"
 
     # do the actual snapshot actions
+    local with_history=""
+    [ $initial_snapshot -ne 1 ] && with_history="-p"
     $user_shell "cvmfs_swissknife pull -m $name \
         -u $stratum0 \
         -r ${upstream} \
@@ -4185,7 +4247,8 @@ snapshot() {
         -k $public_key \
         -n $num_workers \
         -t $timeout \
-        -a $retries $with_history $log_level $dont_wait"
+        -a $retries $with_history $log_level"
+
     $user_shell "date > ${spool_dir}/tmp/last_snapshot"
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot \
@@ -4202,6 +4265,10 @@ snapshot() {
                ""            \
                -z $gc_timespan || die "Garbage collection failed ($?)"
     fi
+
+    # all done, clear the trap and run the cleanup manually
+    trap - EXIT HUP INT TERM
+    __snapshot_cleanup $alias_name
 
   done
 
