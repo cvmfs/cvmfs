@@ -4128,14 +4128,14 @@ snapshot() {
   local timeout
   local retries
   local retcode=0
-  local dont_wait=
+  local abort_on_conflict=0
   local gc_timespan=0
 
   OPTIND=1
   while getopts "t" option; do
     case $option in
       t)
-        dont_wait="-s"
+        abort_on_conflict=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -4190,6 +4190,28 @@ snapshot() {
       initial_snapshot=1
     fi
 
+    # check for other snapshots in progress
+    if ! acquire_snapshot_lock $alias_name; then
+      if [ $abort_on_conflict -eq 1 ]; then
+        echo "another snapshot is in progress... aborting"
+        retcode=1
+        continue
+      fi
+
+      if [ $initial_snapshot -eq 1 ]; then
+        echo "an initial snapshot is in progress... aborting"
+        retcode=1
+        continue
+      fi
+
+      echo "waiting for another snapshot to finish..."
+      if ! wait_and_acquire_snapshot_lock $alias_name; then
+        echo "failed to acquire snapshot lock"
+        retcode=1
+        continue
+      fi
+    fi
+
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
     if [ $initial_snapshot -eq 1 ]; then
@@ -4218,7 +4240,8 @@ snapshot() {
         -k $public_key \
         -n $num_workers \
         -t $timeout \
-        -a $retries $with_history $log_level $dont_wait"
+        -a $retries $with_history $log_level"
+
     $user_shell "date > ${spool_dir}/tmp/last_snapshot"
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot \
