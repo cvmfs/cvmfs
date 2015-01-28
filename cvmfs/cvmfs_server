@@ -4185,12 +4185,14 @@ snapshot() {
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
 
+    local initial_snapshot=0
+    if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
+      initial_snapshot=1
+    fi
+
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
-    local with_history=
-    if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -q "available"; then
-      with_history="-p"
-    else
+    if [ $initial_snapshot -eq 1 ]; then
       echo "Initial snapshot"
     fi
 
@@ -4207,6 +4209,8 @@ snapshot() {
       -o .cvmfs_is_snapshotting"
 
     # do the actual snapshot actions
+    local with_history=""
+    [ $initial_snapshot -ne 1 ] && with_history="-p"
     $user_shell "cvmfs_swissknife pull -m $name \
         -u $stratum0 \
         -r ${upstream} \
