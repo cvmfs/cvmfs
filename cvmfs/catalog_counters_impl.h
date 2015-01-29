@@ -19,8 +19,8 @@ typename TreeCountersBase<FieldT>::FieldsMap
 
 template<typename FieldT>
 bool TreeCountersBase<FieldT>::ReadFromDatabase(
-                                              const CatalogDatabase   &database,
-                                              const LegacyMode::Type   legacy)
+  const CatalogDatabase   &database,
+  const LegacyMode::Type   legacy)
 {
   bool retval = true;
 
@@ -51,7 +51,8 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(
 
 template<typename FieldT>
 bool TreeCountersBase<FieldT>::WriteToDatabase(
-                                        const CatalogDatabase &database) const {
+  const CatalogDatabase &database) const
+{
   bool retval = true;
 
   const FieldsMap map = GetFieldsMap();
@@ -75,7 +76,8 @@ bool TreeCountersBase<FieldT>::WriteToDatabase(
 
 template<typename FieldT>
 bool TreeCountersBase<FieldT>::InsertIntoDatabase(
-                                        const CatalogDatabase &database) const {
+  const CatalogDatabase &database) const
+{
   bool retval = true;
 
   const FieldsMap map = GetFieldsMap();
@@ -102,6 +104,5 @@ void TreeCountersBase<FieldT>::SetZero() {
   self.Subtract(self);
   subtree.Subtract(subtree);
 }
-
 
 }  // namespace catalog

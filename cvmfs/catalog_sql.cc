@@ -24,6 +24,7 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //   0 --> 1: add size column to nested catalog table,
 //            add schema_revision property
 //   1 --> 2: add xattr column to catalog table
+//            add self_xattrs and subtree_xattrs statistics counters
 const unsigned CatalogDatabase::kLatestSchemaRevision = 2;
 
 
@@ -57,8 +58,14 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
 
-    Sql sql_upgrade(*this, "ALTER TABLE catalog ADD xattr BLOB;");
-    if (!sql_upgrade.Execute()) {
+    Sql sql_upgrade1(*this, "ALTER TABLE catalog ADD xattr BLOB;");
+    Sql sql_upgrade2(*this,
+      "INSERT INTO statistics (counter, value) VALUES ('self_xattr', 0);");
+    Sql sql_upgrade3(*this,
+      "INSERT INTO statistics (counter, value) VALUES ('subtree_xattr', 0);");
+    if (!sql_upgrade1.Execute() || !sql_upgrade2.Execute() ||
+        !sql_upgrade3.Execute())
+    {
       LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade catalogs (1 --> 2)");
       return false;
     }

@@ -1,5 +1,10 @@
+/**
+ * This file is part of the CernVM file system.
+ */
+
 #include <gtest/gtest.h>
 
+#include "../../cvmfs/catalog_counters.h"
 #include "../../cvmfs/catalog_sql.h"
 #include "../../cvmfs/util.h"
 
@@ -35,6 +40,10 @@ static void RevertToRevision1(catalog::CatalogDatabase *db) {
     "ALTER TABLE catalog_r1 RENAME TO catalog;").Execute());
   if (!indexes_sql.empty())
     ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), indexes_sql).Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "DELETE FROM statistics WHERE counter='self_xattr';").Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "DELETE FROM statistics WHERE counter='subtree_xattr';").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
     "UPDATE properties SET value=1 WHERE key='schema_revision';").Execute());
 }
@@ -83,6 +92,8 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     UniquePtr<catalog::CatalogDatabase>
       db(catalog::CatalogDatabase::Create(path));
     ASSERT_TRUE(db.IsValid());
+    catalog::Counters counters;
+    EXPECT_TRUE(counters.InsertIntoDatabase(*db));
     RevertToRevision1(db.weak_ref());
   }
   {
@@ -95,6 +106,14 @@ TEST_F(T_CatalogSql, SchemaMigration) {
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql2.FetchRow());
     EXPECT_EQ(2, sql2.RetrieveInt(0));
+    sqlite::Sql sql3(db->sqlite_db(),
+      "SELECT value FROM statistics WHERE counter='self_xattr'");
+    ASSERT_TRUE(sql3.FetchRow());
+    EXPECT_EQ(0, sql3.RetrieveInt(0));
+    sqlite::Sql sql4(db->sqlite_db(),
+      "SELECT value FROM statistics WHERE counter='subtree_xattr'");
+    ASSERT_TRUE(sql4.FetchRow());
+    EXPECT_EQ(0, sql4.RetrieveInt(0));
   }
 
   // Revision 0 --> 2
@@ -118,5 +137,13 @@ TEST_F(T_CatalogSql, SchemaMigration) {
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql3.FetchRow());
     EXPECT_EQ(2, sql3.RetrieveInt(0));
+    sqlite::Sql sql4(db->sqlite_db(),
+      "SELECT value FROM statistics WHERE counter='self_xattr'");
+    ASSERT_TRUE(sql4.FetchRow());
+    EXPECT_EQ(0, sql4.RetrieveInt(0));
+    sqlite::Sql sql5(db->sqlite_db(),
+      "SELECT value FROM statistics WHERE counter='subtree_xattr'");
+    ASSERT_TRUE(sql5.FetchRow());
+    EXPECT_EQ(0, sql5.RetrieveInt(0));
   }
 }
