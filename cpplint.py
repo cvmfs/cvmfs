@@ -400,7 +400,7 @@ _CPP_HEADERS = frozenset([
 #   uppercase character, such as Python.h or nsStringAPI.h, for example).
 # - Lua headers.
 _THIRD_PARTY_HEADERS_PATTERN = re.compile(
-    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h)$')
+    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config.h)$')
 
 
 # Assertion macros.  These are defined in base/logging.h and

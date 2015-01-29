@@ -27,8 +27,8 @@
 class XattrList {
  public:
   static const uint8_t kVersion;
-   
-  XattrList() : version_(kVersion) { };
+
+  XattrList() : version_(kVersion) { }
 
   std::vector<std::string> ListKeys() const;
   bool Get(const std::string &key, std::string *value) const;

@@ -1,5 +1,14 @@
 --- cpplint.py.orig	2015-01-29 14:06:52.991772057 +0100
-+++ cpplint.py	2015-01-29 14:14:36.585102439 +0100
++++ cpplint.py	2015-01-29 14:39:53.584877841 +0100
+@@ -400,7 +400,7 @@
+ #   uppercase character, such as Python.h or nsStringAPI.h, for example).
+ # - Lua headers.
+ _THIRD_PARTY_HEADERS_PATTERN = re.compile(
+-    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h)$')
++    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config.h)$')
+ 
+ 
+ # Assertion macros.  These are defined in base/logging.h and
 @@ -1625,11 +1625,11 @@
    # We'll say it should occur by line 10. Don't forget there's a
    # dummy line at the front.

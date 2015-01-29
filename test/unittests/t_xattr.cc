@@ -1,7 +1,11 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/xattr.h"
 #include "../../cvmfs/util.h"
+#include "../../cvmfs/xattr.h"
 
 using namespace std;  // NOLINT
 
