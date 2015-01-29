@@ -506,20 +506,20 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     } else {
       result.uid_              = RetrieveInt64(13);
       result.gid_              = RetrieveInt64(14);
+      if (catalog->uid_map_) {
+        OwnerMap::const_iterator i = catalog->uid_map_->find(result.uid_);
+        if (i != catalog->uid_map_->end())
+          result.uid_ = i->second;
+      }
+      if (catalog->gid_map_) {
+        OwnerMap::const_iterator i = catalog->gid_map_->find(result.gid_);
+        if (i != catalog->gid_map_->end())
+          result.gid_ = i->second;
+      }
     }
     result.is_chunked_file_  = (database_flags & kFlagFileChunk);
     result.checksum_         =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
-    if (catalog->uid_map_) {
-      OwnerMap::const_iterator i = catalog->uid_map_->find(result.uid_);
-      if (i != catalog->uid_map_->end())
-        result.uid_ = i->second;
-    }
-    if (catalog->gid_map_) {
-      OwnerMap::const_iterator i = catalog->gid_map_->find(result.gid_);
-      if (i != catalog->gid_map_->end())
-        result.gid_ = i->second;
-    }
   }
 
   result.mode_     = RetrieveInt(3);
