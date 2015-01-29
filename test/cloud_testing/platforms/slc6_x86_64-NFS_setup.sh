@@ -23,7 +23,7 @@ install_rpm $UNITTEST_PACKAGE
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."
-sudo sh -c "echo CVMFS_NFS_SOURCE=yes > /etc/cvmfs/site.conf"
+sudo sh -c "echo CVMFS_NFS_SOURCE=yes > /etc/cvmfs/default.d/90-nfs.conf"
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
 sudo mkdir -p /var/log/cvmfs-test                || die "fail (mkdir /var/log/cvmfs-test)"
 sudo chown sftnight:sftnight /var/log/cvmfs-test || die "fail (chown /var/log/cvmfs-test)"
