@@ -299,7 +299,7 @@ mangle_test_retval() {
   if [ $CVMFS_TIME_WARNING_FLAG -ne 0 ]; then
     return $CVMFS_TIME_WARNING
   fi
-  
+
   # check if the test case produced any other warnings
   if [ $CVMFS_GENERAL_WARNING_FLAG -ne 0 ]; then
     return $CVMFS_GENERAL_WARNING
