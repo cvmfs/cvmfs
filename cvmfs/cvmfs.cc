@@ -1602,7 +1602,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
     "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
-    "user.ndiropen\0user.inode_max\0user.tag\0";
+    "user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0";
   string attribute_list(base_list, sizeof(base_list)-1);
   if (!d.checksum().IsNull()) {
     const char regular_file_list[] = "user.hash\0user.lhash\0";
