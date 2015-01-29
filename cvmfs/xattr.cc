@@ -78,6 +78,8 @@ bool XattrList::Set(const string &key, const string &value) {
     return false;
   if (key.length() > 256)
     return false;
+  if (key.find('\0') != string::npos)
+    return false;
   if (value.length() > 256)
     return false;
 

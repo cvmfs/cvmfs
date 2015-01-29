@@ -118,6 +118,8 @@ TEST_F(T_Xattr, Set) {
   string longstring(257, 'a');
   EXPECT_FALSE(default_list.Set(longstring, "value"));
   EXPECT_FALSE(default_list.Set("key", longstring));
+  string nullstring(1, '\0');
+  EXPECT_FALSE(default_list.Set(nullstring, "value"));
 
   XattrList new_list;
   for (unsigned i = 0; i < 256; ++i) {
@@ -151,13 +153,19 @@ TEST_F(T_Xattr, Limits) {
   XattrList large_list;
   string large_value(256, 'a');
   for (unsigned i = 0; i < 256; ++i) {
-    string large_key(256, i);
+    char hex[3];
+    snprintf(hex, sizeof(hex), "%02x", i);
+    string large_key(128, hex[0]);
+    large_key += string(128, hex[1]);
     EXPECT_TRUE(large_list.Set(large_key, large_value));
   }
   EXPECT_EQ(256U, large_list.ListKeys().size());
   for (unsigned i = 0; i < 256; ++i) {
     string value;
-    string large_key(256, i);
+    char hex[3];
+    snprintf(hex, sizeof(hex), "%02x", i);
+    string large_key(128, hex[0]);
+    large_key += string(128, hex[1]);
     EXPECT_TRUE(large_list.Get(large_key, &value));
     EXPECT_EQ(large_value, value);
   }

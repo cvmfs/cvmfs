@@ -21,8 +21,8 @@
  * to support POSIX file capabilities.  Cvmfs' support for custom extended
  * attributes is limited to 256 attributes, with names <= 256 characters and
  * values <= 256 bytes.  Thus there is no need for big endian/little endian
- * conversion.  There are no restrictions on the naming or the content except
- * that the name must not be the empty string.
+ * conversion.  The name must not be the empty string and must not contain the
+ * zero character.  There are no restrictions on the content.
  */
 class XattrList {
  public:
