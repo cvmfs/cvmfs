@@ -30,6 +30,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_chunk_detectors.cc
   t_upload_facility.cc
   t_local_uploader.cc
+  t_s3_uploader.cc
   t_file_processing.cc
   t_async_reader.cc
   t_test_utils.cc
