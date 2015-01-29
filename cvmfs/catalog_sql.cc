@@ -9,6 +9,7 @@
 #include <cstdlib>
 
 #include "catalog.h"
+#include "globals.h"
 #include "logging.h"
 #include "util.h"
 
