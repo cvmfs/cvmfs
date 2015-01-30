@@ -36,7 +36,8 @@ class Catalog;
 
 /**
  * Content-addressable chunks can be entire files, micro catalogs (ending L) or
- * pieces of large files (ending P)
+ * pieces of large files (ending P).  Micro catalogs are currently not
+ * implemented.
  */
 enum ChunkTypes {
   kChunkFile = 0,
@@ -49,7 +50,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
  public:
   static const float kLatestSchema;
   static const float kLatestSupportedSchema;  // + 1.X catalogs (r/o)
-  // backwards-compatible schema changes
+  // Backwards-compatible schema changes
   static const unsigned kLatestSchemaRevision;
 
   bool CreateEmptyDatabase();
@@ -68,8 +69,8 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   // TODO(rmeusel): C++11 - constructor inheritance
   friend class sqlite::Database<CatalogDatabase>;
   CatalogDatabase(const std::string  &filename,
-                  const OpenMode      open_mode) :
-    sqlite::Database<CatalogDatabase>(filename, open_mode) {}
+                  const OpenMode      open_mode)
+    : sqlite::Database<CatalogDatabase>(filename, open_mode) { }
 };
 
 
@@ -93,13 +94,12 @@ class Sql : public sqlite::Sql {
   virtual ~Sql() { /* Done by super class */ }
 
   /**
-   * Wrapper for retrieving MD5 hashes.
+   * Wrapper for retrieving MD5-ified path names.
    * @param idx_high offset of most significant bits in database query
    * @param idx_low offset of least significant bits in database query
    * @result the retrieved MD5 hash
    */
-  inline shash::Md5 RetrieveMd5(const int idx_high, const int idx_low) const
-  {
+  inline shash::Md5 RetrieveMd5(const int idx_high, const int idx_low) const {
     return shash::Md5(RetrieveInt64(idx_high), RetrieveInt64(idx_low));
   }
 
@@ -107,13 +107,14 @@ class Sql : public sqlite::Sql {
    * Wrapper for retrieving a cryptographic hash from a blob field.
    */
   inline shash::Any RetrieveHashBlob(
-              const int                idx_column,
-              const shash::Algorithms  hash_algo,
-              const char               hash_suffix = shash::kSuffixNone) const {
+    const int                idx_column,
+    const shash::Algorithms  hash_algo,
+    const char               hash_suffix = shash::kSuffixNone) const
+  {
     const int byte_count = RetrieveBytes(idx_column);
     if (byte_count > 0) {
-      const unsigned char *buffer =
-                   static_cast<const unsigned char *>(RetrieveBlob(idx_column));
+      const unsigned char *buffer = static_cast<const unsigned char *>(
+        RetrieveBlob(idx_column));
       return shash::Any(hash_algo, buffer, byte_count, hash_suffix);
     }
     return shash::Any(hash_algo);
@@ -123,15 +124,16 @@ class Sql : public sqlite::Sql {
    * Wrapper for retrieving a cryptographic hash from a text field.
    */
   inline shash::Any RetrieveHashHex(
-                            const int  idx_column,
-                            const char hash_suffix = shash::kSuffixNone) const {
-    const std::string hash_string = std::string(
-      reinterpret_cast<const char *>(RetrieveText(idx_column)));
+    const int  idx_column,
+    const char hash_suffix = shash::kSuffixNone) const
+  {
+    const std::string hash_string = std::string(reinterpret_cast<const char *>(
+      RetrieveText(idx_column)));
     return shash::MkFromHexPtr(shash::HexPtr(hash_string), hash_suffix);
   }
 
   /**
-   * Wrapper for binding a MD5 hash.
+   * Wrapper for binding a MD5-ified path name.
    * @param idx_high offset of most significant bits in database query
    * @param idx_low offset of least significant bits in database query
    * @param hash the hash to bind in the query
@@ -185,20 +187,19 @@ class SqlDirent : public Sql {
   static const int kFlagLink                = 8;
   static const int kFlagFileStat            = 16;  // currently unused
   static const int kFlagFileChunk           = 64;
-
   // as of 2^8: 3 bit for hashes
-  // 0: SHA-1
-  // 1: RIPEMD-160
-  // ... corresponds to shash::algorithms with offset in order to support
-  // future hashes
+  //   - 0: SHA-1
+  //   - 1: RIPEMD-160
+  // Corresponds to shash::algorithms with offset in order to support future
+  // hashes
   static const int kFlagPosHash             = 8;
 
  protected:
   /**
-   *  take the meta data from the DirectoryEntry and transform it
-   *  into a valid flags field ready to be saved in the database
-   *  @param entry the DirectoryEntry to encode
-   *  @return an integer containing the bitmap of the flags field
+   * Take the meta data from the DirectoryEntry and transform it
+   * into a valid flags field ready to be saved in the database.
+   * @param entry the DirectoryEntry to encode
+   * @return an integer containing the bitmap of the flags field
    */
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
   void StoreHashAlgorithm(const shash::Algorithms algo, unsigned *flags) const;
@@ -206,8 +207,8 @@ class SqlDirent : public Sql {
 
   /**
    * The hardlink information (hardlink group ID and linkcount) is saved in one
-   * uint_64t field in the CVMFS Catalogs. Therefore we need to do some minor
-   * bitshifting in these helper methods.
+   * uint_64t field in the CVMFS Catalogs. Therefore we need to do bitshifting
+   * in these helper methods.
    */
   uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) const;
   uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) const;
@@ -215,10 +216,9 @@ class SqlDirent : public Sql {
                          const uint32_t linkcount) const;
 
   /**
-   *  replaces place holder variables in a symbolic link by actual
-   *  path elements
-   *  @param raw_symlink the raw symlink path (may) containing place holders
-   *  @return the expanded symlink
+   * Replaces place holder variables in a symbolic link by actual path elements.
+   * @param raw_symlink the raw symlink path (may) containing place holders
+   * @return the expanded symlink
    */
   void ExpandSymlink(LinkString *raw_symlink) const;
 };
@@ -229,11 +229,11 @@ class SqlDirent : public Sql {
 
 class SqlDirentWrite : public SqlDirent {
  public:
-   /**
-    * To bind an entire DirectoryEntry
-    * @param entry the DirectoryEntry to bind in the SQL statement
-    * @return true on success, false otherwise
-    */
+  /**
+   * To bind an entire DirectoryEntry
+   * @param entry the DirectoryEntry to bind in the SQL statement
+   * @return true on success, false otherwise
+   */
   virtual bool BindDirent(const DirectoryEntry &entry) = 0;
 
  protected:
@@ -267,15 +267,15 @@ class SqlListContentHashes : public SqlDirent {
 class SqlLookup : public SqlDirent {
  protected:
   /**
-   * There are several lookup statements which all share a list of
-   * elements to load
+   * There are several lookup statements which all share a list of elements to 
+   * load.
    * @return a list of sql fields to query for DirectoryEntry
    */
   std::string GetFieldsToSelect(const float schema_version) const;
 
  public:
   /**
-   * Retrieves a DirectoryEntry from a freshly performed SqlLookup statement
+   * Retrieves a DirectoryEntry from a freshly performed SqlLookup statement.
    * @param catalog the catalog in which the DirectoryEntry resides
    * @return the retrieved DirectoryEntry
    */
@@ -333,10 +333,10 @@ class SqlLookupInode : public SqlLookup {
 
 /**
  * Filesystem like _touch_ of a DirectoryEntry. Only file system specific meta
- * data will be modified.  All CVMFS-specific administrative data stays 
+ * data will be modified.  All CVMFS-specific administrative data stays
  * unchanged.
- * NOTE: This is not a subclass of SqlDirent since it works on 
- *       DirectoryEntryBase objects, which are restricted to file system meta 
+ * NOTE: This is not a subclass of SqlDirent since it works on
+ *       DirectoryEntryBase objects, which are restricted to file system meta
  *       data.
  */
 class SqlDirentTouch : public Sql {
