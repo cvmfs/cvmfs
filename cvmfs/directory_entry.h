@@ -70,6 +70,7 @@ class DirectoryEntryBase {
     static const unsigned int kHardlinkGroup                = 0x080;
     static const unsigned int kNestedCatalogTransitionFlags = 0x100;
     static const unsigned int kChunkedFileFlag              = 0x200;
+    static const unsigned int kHasXattrsFlag                = 0x400;
   };
   typedef unsigned int Differences;
 
@@ -85,11 +86,13 @@ class DirectoryEntryBase {
     , size_(0)
     , mtime_(0)
     , linkcount_(1)  // generally a normal file has linkcount 1 -> default
+    , has_xattrs_(false)
     { }
 
   inline bool IsRegular() const                 { return S_ISREG(mode_); }
   inline bool IsLink() const                    { return S_ISLNK(mode_); }
   inline bool IsDirectory() const               { return S_ISDIR(mode_); }
+  inline bool HasXattrs() const                 { return has_xattrs_;    }
 
   inline inode_t inode() const                  { return inode_; }
   inline inode_t parent_inode() const           { return parent_inode_; }
@@ -172,6 +175,10 @@ class DirectoryEntryBase {
   time_t mtime_;
   LinkString symlink_;
   uint32_t linkcount_;
+  // In order to save memory, we only indicate if a directory entry has custom
+  // extended attributes.  Another call to the file catalog is necessary to
+  // get them.
+  bool has_xattrs_;
 
   // The cryptographic hash is not part of the file system intrinsics, though
   // it can be computed just using the file contents.  We therefore put it in

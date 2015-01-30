@@ -32,6 +32,9 @@ DirectoryEntryBase::Differences DirectoryEntryBase::CompareTo(
   if (checksum() != other.checksum()) {
     result |= Difference::kChecksum;
   }
+  if (HasXattrs() != other.HasXattrs()) {
+    result |= Difference::kHasXattrsFlag;
+  }
 
   return result;
 }

@@ -873,6 +873,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     retval = insert_nested_marker.BindPathHash(path_hash)         &&
              insert_nested_marker.BindParentPathHash(parent_hash) &&
              insert_nested_marker.BindDirent(nested_marker)       &&
+             insert_nested_marker.BindXattrEmpty()                &&   
              insert_nested_marker.Execute();
     if (! retval) {
       Error("Failed to insert nested catalog marker into new nested catalog.",
@@ -1187,8 +1188,9 @@ class SqlLookupDanglingMountpoints : public catalog::SqlLookup {
  public:
   SqlLookupDanglingMountpoints(const CatalogDatabase &database) {
     const std::string statement =
-      "SELECT DISTINCT " + GetFieldsToSelect(database.schema_version()) + " "
-      "FROM catalog "
+      "SELECT DISTINCT " + 
+      GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
+      " FROM catalog "
       "JOIN catalog AS c2 "
       "ON catalog.md5path_1 = c2.parent_1 AND catalog.md5path_2 = c2.parent_2 "
       "WHERE catalog.flags & "

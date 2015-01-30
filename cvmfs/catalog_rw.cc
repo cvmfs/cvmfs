@@ -149,6 +149,7 @@ void WritableCatalog::AddEntry(const DirectoryEntry &entry,
     sql_insert_->BindPathHash(path_hash) &&
     sql_insert_->BindParentPathHash(parent_hash) &&
     sql_insert_->BindDirent(entry) &&
+    sql_insert_->BindXattrEmpty() &&
     sql_insert_->Execute();
   assert(retval);
   sql_insert_->Reset();

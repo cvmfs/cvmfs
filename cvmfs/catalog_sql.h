@@ -273,7 +273,8 @@ class SqlLookup : public SqlDirent {
    * load.
    * @return a list of sql fields to query for DirectoryEntry
    */
-  std::string GetFieldsToSelect(const float schema_version) const;
+  std::string GetFieldsToSelect(const float schema_version,
+                                const unsigned schema_revision) const;
 
  public:
   /**
@@ -383,6 +384,8 @@ class SqlDirentInsert : public SqlDirentWrite {
   bool BindPathHash(const shash::Md5 &hash);
   bool BindParentPathHash(const shash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
+  bool BindXattr(const XattrList &xattrs);
+  bool BindXattrEmpty();
 };
 
 
@@ -524,27 +527,11 @@ class SqlAllChunks : public Sql {
 //------------------------------------------------------------------------------
 
 
-/**
- * Sets or removes (empty xattrs) of a specific Dirent without modifying
- * anything else, in particluar not the last modified timestamp.  The r/w
- * CatalogManager needs to use it sensibly.
- */
-class SqlSetXattrs : public Sql {
- public:
-  explicit SqlSetXattrs(const CatalogDatabase &database);
-  bool BindPathHash(const shash::Md5 &hash);
-  bool BindXattrs(const XattrList &xattrs);
-};
-
-
-//------------------------------------------------------------------------------
-
-
 class SqlGetXattrs : public Sql {
  public:
   explicit SqlGetXattrs(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
-  bool GetXattrs(XattrList *xattrs);
+  XattrList *GetXattrs();
 };
 
 }  // namespace catalog

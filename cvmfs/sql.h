@@ -289,6 +289,11 @@ class Sql {
                                          SQLITE_STATIC);
     return Successful();
   }
+  bool BindBlobTransient(const int index, const void* value, const int size) {
+    last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
+                                         SQLITE_TRANSIENT);
+    return Successful();
+  }
   bool BindDouble(const int index, const double value) {
     last_error_code_ = sqlite3_bind_double(statement_, index, value);
     return Successful();

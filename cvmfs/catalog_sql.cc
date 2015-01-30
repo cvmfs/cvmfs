@@ -11,6 +11,7 @@
 #include "globals.h"
 #include "logging.h"
 #include "util.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -441,7 +442,10 @@ shash::Any SqlListContentHashes::GetHash() const {
 //------------------------------------------------------------------------------
 
 
-string SqlLookup::GetFieldsToSelect(const float schema_version) const {
+string SqlLookup::GetFieldsToSelect(
+  const float schema_version,
+  const unsigned schema_revision) const
+{
   if (schema_version < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     return "catalog.hash, catalog.inode, catalog.size, catalog.mode, "
         //           0              1             2             3
@@ -451,16 +455,25 @@ string SqlLookup::GetFieldsToSelect(const float schema_version) const {
         //              8                  9                 10
            "catalog.parent_2, catalog.rowid";
         //             11              12
-  } else {
-    return "catalog.hash, catalog.hardlinks, catalog.size, catalog.mode, "
-        //           0                1               2             3
-           "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
-        //            4              5             6               7
-           "catalog.md5path_1, catalog.md5path_2, catalog.parent_1, "
-        //              8                  9                 10
-           "catalog.parent_2, catalog.rowid, catalog.uid, catalog.gid";
-        //             11               12            13           14
   }
+
+  string fields =
+    "catalog.hash, catalog.hardlinks, catalog.size, catalog.mode, "
+    //          0                1               2             3
+    "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
+    //           4              5             6               7
+    "catalog.md5path_1, catalog.md5path_2, catalog.parent_1, "
+    //              8                  9                 10
+    "catalog.parent_2, catalog.rowid, catalog.uid, catalog.gid, ";
+    //            11              12           13           14
+
+  // Field 15: has extended attributes?
+  if (schema_revision < 2) {
+    fields += "0";  // Generally no xattrs
+  } else {
+    fields += "catalog.xattr IS NOT NULL";
+  }
+  return fields;
 }
 
 
@@ -497,16 +510,22 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.linkcount_       = 1;
     result.hardlink_group_  = 0;
     result.inode_           = catalog->GetMangledInode(RetrieveInt64(12), 0);
+    result.is_chunked_file_ = false;
+    result.has_xattrs_      = false;
+    result.checksum_        = RetrieveHashBlob(0, shash::kSha1);
     result.uid_             = g_uid;
     result.gid_             = g_gid;
-    result.is_chunked_file_ = false;
-    result.checksum_        = RetrieveHashBlob(0, shash::kSha1);
   } else {
     const uint64_t hardlinks = RetrieveInt64(1);
     result.linkcount_        = Hardlinks2Linkcount(hardlinks);
     result.hardlink_group_   = Hardlinks2HardlinkGroup(hardlinks);
     result.inode_            = catalog->GetMangledInode(RetrieveInt64(12),
                                                         result.hardlink_group_);
+    result.is_chunked_file_  = (database_flags & kFlagFileChunk);
+    result.has_xattrs_       = RetrieveInt(15) != 0;
+    result.checksum_         =
+      RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
+
     if (g_claim_ownership) {
       result.uid_             = g_uid;
       result.gid_             = g_gid;
@@ -524,9 +543,6 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
           result.gid_ = i->second;
       }
     }
-    result.is_chunked_file_  = (database_flags & kFlagFileChunk);
-    result.checksum_         =
-      RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
   }
 
   result.mode_     = RetrieveInt(3);
@@ -546,8 +562,9 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
 
 SqlListing::SqlListing(const CatalogDatabase &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
-    "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
+    "SELECT " +
+    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
+    " FROM catalog WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
   Init(database.sqlite_db(), statement);
 }
 
@@ -562,8 +579,9 @@ bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
 
 SqlLookupPathHash::SqlLookupPathHash(const CatalogDatabase &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+    "SELECT " +
+    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
+    " FROM catalog WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statement);
 }
 
@@ -577,8 +595,9 @@ bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
 
 SqlLookupInode::SqlLookupInode(const CatalogDatabase &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
-    "WHERE rowid = :rowid;";
+    "SELECT " +
+    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
+    " FROM catalog WHERE rowid = :rowid;";
   Init(database.sqlite_db(), statement);
 }
 
@@ -702,10 +721,10 @@ SqlDirentInsert::SqlDirentInsert(const CatalogDatabase &database) {
   const string statement = "INSERT INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
     //    1           2         3         4       5       6        7     8
-    "mtime, flags, name, symlink, uid, gid) "
-    // 9,     10    11     12     13   14
+    "mtime, flags, name, symlink, uid, gid, xattr) "
+    // 9,     10    11     12     13   14   15
     "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :links, :size, :mode, :mtime,"
-    " :flags, :name, :symlink, :uid, :gid);";
+    " :flags, :name, :symlink, :uid, :gid, :xattr);";
   Init(database.sqlite_db(), statement);
 }
 
@@ -722,6 +741,21 @@ bool SqlDirentInsert::BindParentPathHash(const shash::Md5 &hash) {
 
 bool SqlDirentInsert::BindDirent(const DirectoryEntry &entry) {
   return BindDirentFields(5, 6, 7, 8, 9, 10, 11, 12, 13, 14, entry);
+}
+
+
+bool SqlDirentInsert::BindXattr(const XattrList &xattrs) {
+  unsigned char *packed_xattrs;
+  unsigned size;
+  xattrs.Serialize(&packed_xattrs, &size);
+  if (packed_xattrs == NULL)
+    return BindNull(15);
+  return BindBlobTransient(15, packed_xattrs, size);
+}
+
+
+bool SqlDirentInsert::BindXattrEmpty() {
+  return BindNull(15);
 }
 
 
@@ -1013,6 +1047,37 @@ bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
 
 bool SqlAllChunks::Close() {
   return Reset();
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlGetXattrs::SqlGetXattrs(const CatalogDatabase &database) {
+  const string statement =
+    "SELECT xattr FROM catalog "
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlGetXattrs::BindPathHash(const shash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+XattrList *SqlGetXattrs::GetXattrs() {
+  if (!FetchRow())
+    return NULL;
+
+  const unsigned char *packed_xattrs =
+    reinterpret_cast<const unsigned char *>(RetrieveBlob(0));
+  if (packed_xattrs == NULL)
+    return new XattrList();
+
+  int size = RetrieveBytes(0);
+  assert(size >= 0);
+  return XattrList::Deserialize(packed_xattrs, size);
 }
 
 }  // namespace catalog
