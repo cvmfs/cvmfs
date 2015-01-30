@@ -232,7 +232,7 @@ produce_last_files_in() {
 
   rm -fR poems
   rm -f unordnung
-  cp -R /bin     many_small_binaries
+  cp_bin many_small_binaries
 
   popdir
 }

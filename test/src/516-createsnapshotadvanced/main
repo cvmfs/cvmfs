@@ -90,7 +90,7 @@ EOF
 
   # create some nasty other stuff
   ln big_ascii/viel_unordnung big_ascii/ganz_viel_unordnung
-  cp /bin/cp .
+  cp_bin .
   ln -s poems/unordnung.txt unordnung
 
   popdir
