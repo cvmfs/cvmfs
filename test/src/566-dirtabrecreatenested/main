@@ -18,7 +18,7 @@ produce_files_in_0() {
   # add some files to some of the directories
   cp_bin People/Germans/AlbertEinstein
   cp /etc/passwd People/Americans/BarackObama
-  cp /usr/bin/* People/Russians/MikhailKalashnikov
+  cp_usrbin People/Russians/MikhailKalashnikov
 
   # add a file in the French People Directory
   echo "Napoleon doesn't believe in directories" > People/French/NapoleonBonaparte
