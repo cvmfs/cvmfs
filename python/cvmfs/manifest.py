@@ -23,6 +23,13 @@ class ManifestValidityError(Exception):
 class Manifest:
     """ Wraps information from .cvmfspublished"""
 
+    @staticmethod
+    def open(manifest_path):
+        """ Initializes a Manifest from a local file path """
+        f = open(manifest_path)
+        return Manifest(f)
+
+
     def __init__(self, manifest_file):
         """ Initializes a Manifest object from a file pointer to .cvmfspublished """
         for line in manifest_file.readlines():
