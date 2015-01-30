@@ -7,27 +7,26 @@ cvmfs_run_test() {
   cvmfs_mount "atlas.cern.ch,atlas-nightlies.cern.ch,atlas-condb.cern.ch" \
     "CVMFS_QUOTA_LIMIT=1500" \
     "CVMFS_CHECK_PERMISSIONS=no" || return 1
-  
+
   RETVAL=0
 
   pid_before=$(sudo cvmfs_talk -i atlas.cern.ch pid)
 
-  for d in /cvmfs/atlas.cern.ch/repo/sw/software/*; do 
-    nohup du -ch --max-depth=3 $d/ >/dev/null 2>&1 & 
+  pids_du=
+  for d in /cvmfs/atlas.cern.ch/repo/sw/software/*; do
+    nohup du -ch --max-depth=3 $d/ >/dev/null 2>&1 &
+    pids_du="$! $pids_du"
   done
-  disown -a 2>&1
   sleep 1200
-  
+
   pid_after=$(sudo cvmfs_talk -i atlas.cern.ch pid)
   if [ x"$pid_before" != x"$pid_after" ]; then
     echo "PID mismatch: pid before $pid_before, pid after $pid_after"
     RETVAL=2
   fi
 
-  sudo killall -9 cvmfs2 du 2>/dev/null
-  sleep 60
-  sudo killall -9 cvmfs2 du 2>/dev/null
+  sudo kill -9 $pids_du
+  wait $pids_du
 
   return $RETVAL
 }
-
