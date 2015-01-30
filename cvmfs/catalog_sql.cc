@@ -6,7 +6,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <cstdlib>
 
 #include "catalog.h"
 #include "globals.h"
@@ -17,7 +16,6 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-// Changelog
 const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 // ChangeLog
@@ -37,19 +35,19 @@ bool CatalogDatabase::CheckSchemaCompatibility() {
 
 
 bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
-  assert (read_write());
+  assert(read_write());
 
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
 
     Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
-    if (! sql_upgrade.Execute()) {
+    if (!sql_upgrade.Execute()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
       return false;
     }
 
     set_schema_revision(1);
-    if (! StoreSchemaRevision()) {
+    if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
       return false;
     }
@@ -82,7 +80,7 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
 
 
 bool CatalogDatabase::CreateEmptyDatabase() {
-  assert (read_write());
+  assert(read_write());
 
   // generate the catalog table and index structure
   const bool retval =
@@ -110,7 +108,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
 
-  if (! retval) {
+  if (!retval) {
     PrintSqlError("failed to create catalog database tables.");
   }
 
@@ -118,52 +116,54 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 }
 
 
-bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
-                                          const bool            volatile_content,
-                                          const DirectoryEntry &root_entry) {
-  assert (read_write());
+bool CatalogDatabase::InsertInitialValues(
+  const std::string    &root_path,
+  const bool            volatile_content,
+  const DirectoryEntry &root_entry)
+{
+  assert(read_write());
   bool retval = false;
 
   // Path hashes
   shash::Md5 root_path_hash = shash::Md5(shash::AsciiPtr(root_path));
-  shash::Md5 root_parent_hash =
-                    (root_path == "")
-                      ? shash::Md5()
-                      : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
+  shash::Md5 root_parent_hash = (root_path == "")
+    ? shash::Md5()
+    : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
 
-  // start initial filling transaction
+  // Start initial filling transaction
   retval = Sql(*this, "BEGIN;").Execute();
   if (!retval) {
     PrintSqlError("failed to enter initial filling transaction");
     return false;
   }
 
-  // insert initial values to properties
-  if (! this->SetProperty("revision", 0)) {
-    PrintSqlError("failed to insert default initial values into the newly created "
-                  "catalog tables.");
+  // Insert initial values to properties
+  if (!this->SetProperty("revision", 0)) {
+    PrintSqlError(
+      "failed to insert default initial values into the newly created "
+      "catalog tables.");
     return false;
   }
 
   if (volatile_content) {
-    if (! this->SetProperty("volatile", 1)) {
+    if (!this->SetProperty("volatile", 1)) {
       PrintSqlError("failed to insert volatile flag into the newly created "
                     "catalog tables.");
       return false;
     }
   }
 
-  // create initial statistics counters
+  // Create initial statistics counters
   catalog::Counters counters;
 
-  // insert root entry (when given)
+  // Insert root entry (when given)
   if (!root_entry.IsNegative()) {
     SqlDirentInsert sql_insert(*this);
     retval = sql_insert.BindPathHash(root_path_hash)         &&
              sql_insert.BindParentPathHash(root_parent_hash) &&
              sql_insert.BindDirent(root_entry)               &&
              sql_insert.Execute();
-    if (! retval) {
+    if (!retval) {
       PrintSqlError("failed to insert root entry into newly created catalog.");
       return false;
     }
@@ -172,21 +172,22 @@ bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
     counters.self.directories = 1;
   }
 
-  // save initial statistics counters
+  // Save initial statistics counters
   if (!counters.InsertIntoDatabase(*this)) {
     PrintSqlError("failed to insert initial catalog statistics counters.");
     return false;
   }
 
-  // insert root path (when given)
-  if (! root_path.empty()) {
-    if (! this->SetProperty("root_prefix", root_path)) {
-      PrintSqlError("failed to store root prefix in the newly created catalog.");
+  // Insert root path (when given)
+  if (!root_path.empty()) {
+    if (!this->SetProperty("root_prefix", root_path)) {
+      PrintSqlError(
+        "failed to store root prefix in the newly created catalog.");
       return false;
     }
   }
 
-  // commit initial filling transaction
+  // Commit initial filling transaction
   retval = Sql(*this, "COMMIT;").Execute();
   if (!retval) {
     PrintSqlError("failed to commit initial filling transaction");
@@ -199,9 +200,10 @@ bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
 
 double CatalogDatabase::GetRowIdWasteRatio() const {
   Sql rowid_waste_ratio_query(*this,
-   "SELECT 1.0 - CAST(COUNT(*) AS DOUBLE) / MAX(rowid) AS ratio FROM catalog;");
+    "SELECT 1.0 - CAST(COUNT(*) AS DOUBLE) / MAX(rowid) "
+    "AS ratio FROM catalog;");
   const bool retval = rowid_waste_ratio_query.FetchRow();
-  assert (retval);
+  assert(retval);
 
   return rowid_waste_ratio_query.RetrieveDouble(0);
 }
@@ -226,7 +228,7 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
  * See: http://www.sqlite.org/lang_vacuum.html
  */
 bool CatalogDatabase::CompactDatabase() const {
-  assert (read_write());
+  assert(read_write());
 
   return Sql(*this, "BEGIN;").Execute()                                 &&
          Sql(*this, "CREATE TEMPORARY TABLE mapping AS "
@@ -267,12 +269,14 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   return database_flags;
 }
 
+
 void SqlDirent::StoreHashAlgorithm(const shash::Algorithms algo,
                                    unsigned *flags) const
 {
   // Md5 unusable for content hashes
   *flags |= (algo - 1) << kFlagPosHash;
 }
+
 
 shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
   unsigned in_flags = ((7 << kFlagPosHash) & flags) >> kFlagPosHash;
@@ -282,16 +286,20 @@ shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
   return static_cast<shash::Algorithms>(in_flags);
 }
 
+
 uint32_t SqlDirent::Hardlinks2Linkcount(const uint64_t hardlinks) const {
   return (hardlinks << 32) >> 32;
 }
+
 
 uint32_t SqlDirent::Hardlinks2HardlinkGroup(const uint64_t hardlinks) const {
   return hardlinks >> 32;
 }
 
+
 uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
-                                  const uint32_t linkcount) const {
+                                  const uint32_t linkcount) const
+{
   return (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
 }
 
@@ -388,7 +396,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
     BindInt(flags_idx, CreateDatabaseFlags(entry)) &&
     BindText(name_idx, entry.name_.GetChars(), entry.name_.GetLength()) &&
     BindText(symlink_idx, entry.symlink_.GetChars(), entry.symlink_.GetLength())
-  );
+  );  // NOLINT
 }
 
 
@@ -414,7 +422,7 @@ SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
       "  WHERE length(catalog.hash) > 0;";
 
   const bool successful_init = Init(database.sqlite_db(), statement);
-  assert (successful_init);
+  assert(successful_init);
 }
 
 
@@ -475,17 +483,16 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   DirectoryEntry result;
 
   const unsigned database_flags = RetrieveInt(5);
-  //result.generation_ = catalog->GetGeneration();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);
   const char *name = reinterpret_cast<const char *>(RetrieveText(6));
   const char *symlink = reinterpret_cast<const char *>(RetrieveText(7));
 
-  // must be set later by a second catalog lookup
+  // Must be set later by a second catalog lookup
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
 
-  // retrieve the hardlink information from the hardlinks database field
+  // Retrieve the hardlink information from the hardlinks database field
   if (catalog->schema() < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     result.linkcount_       = 1;
     result.hardlink_group_  = 0;
@@ -607,7 +614,7 @@ bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
     BindText    (6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
     BindInt64   (7, entry.uid_)                                            &&
     BindInt64   (8, entry.gid_)
-  );
+  );  // NOLINT
 }
 
 
@@ -656,7 +663,8 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
 
 
 SqlNestedCatalogListing::SqlNestedCatalogListing(
-                                              const CatalogDatabase &database) {
+  const CatalogDatabase &database)
+{
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
       (database.schema_revision() >= 1))
   {
@@ -851,9 +859,10 @@ bool SqlChunksListing::BindPathHash(const shash::Md5 &hash) {
 FileChunk SqlChunksListing::GetFileChunk(
   const shash::Algorithms interpret_hash_as) const
 {
-  return FileChunk(RetrieveHashBlob(2, interpret_hash_as, shash::kSuffixPartial),
-                   RetrieveInt64(0),
-                   RetrieveInt64(1));
+  return FileChunk(
+    RetrieveHashBlob(2, interpret_hash_as, shash::kSuffixPartial),
+    RetrieveInt64(0),
+    RetrieveInt64(1));
 }
 
 

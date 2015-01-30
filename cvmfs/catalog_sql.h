@@ -30,6 +30,8 @@
 #include "shortstring.h"
 #include "sql.h"
 
+class XattrList;
+
 namespace catalog {
 
 class Catalog;
@@ -267,7 +269,7 @@ class SqlListContentHashes : public SqlDirent {
 class SqlLookup : public SqlDirent {
  protected:
   /**
-   * There are several lookup statements which all share a list of elements to 
+   * There are several lookup statements which all share a list of elements to
    * load.
    * @return a list of sql fields to query for DirectoryEntry
    */
@@ -516,6 +518,33 @@ class SqlAllChunks : public Sql {
   bool Open();
   bool Next(shash::Any *hash, ChunkTypes *type);
   bool Close();
+};
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Sets or removes (empty xattrs) of a specific Dirent without modifying
+ * anything else, in particluar not the last modified timestamp.  The r/w
+ * CatalogManager needs to use it sensibly.
+ */
+class SqlSetXattrs : public Sql {
+ public:
+  explicit SqlSetXattrs(const CatalogDatabase &database);
+  bool BindPathHash(const shash::Md5 &hash);
+  bool BindXattrs(const XattrList &xattrs);
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlGetXattrs : public Sql {
+ public:
+  explicit SqlGetXattrs(const CatalogDatabase &database);
+  bool BindPathHash(const shash::Md5 &hash);
+  bool GetXattrs(XattrList *xattrs);
 };
 
 }  // namespace catalog
