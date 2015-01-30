@@ -1168,3 +1168,16 @@ cp_bin() {
     sudo chmod 0444 $f || return 3
   done
 }
+
+
+# copy all content of /usr/bin/* into a given directory (for server testing purposes)
+#
+# @param destination_directory
+cp_usrbin() {
+  local destination_directory="$1"
+  cp -R /usr/bin/* $destination_directory   || return 1
+  sudo chmod -R a+rw $destination_directory || return 2
+  for f in $(find $destination_directory -type f); do
+    sudo chmod 0444 $f || return 3
+  done
+}
