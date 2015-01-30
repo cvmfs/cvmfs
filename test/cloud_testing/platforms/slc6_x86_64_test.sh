@@ -91,11 +91,13 @@ if [ $s3_retval -eq 0 ]; then
                                  src/542-storagescrubbing                     \
                                  src/543-storagescrubbing_scriptable          \
                                  src/550-livemigration                        \
+                                 src/563-garbagecollectlegacy                 \
                                  src/568-migratecorruptrepo                   \
                                  src/571-localbackendumask                    \
                                  src/572-proxyfailover                        \
                                  src/577-garbagecollecthiddenstratum1revision \
-                                 src/579-garbagecollectstratum1legacytag || s3_retval=$?
+                                 src/579-garbagecollectstratum1legacytag      \
+                                 src/583-httpredirects || s3_retval=$?
 
     echo -n "killing FakeS3... "
     sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
