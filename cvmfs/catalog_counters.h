@@ -23,6 +23,7 @@ class CatalogDatabase;
 struct LegacyMode {
   enum Type {  // TODO(rmeusel): C++11 typed enum
     kNoLegacy,
+    kNoXattrs,
     kLegacy
   };
 };

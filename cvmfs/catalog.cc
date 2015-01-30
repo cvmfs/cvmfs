@@ -125,11 +125,18 @@ bool Catalog::InitStandalone(const std::string &database_file) {
 
 bool Catalog::ReadCatalogCounters() {
   assert (database_ != NULL);
-  const bool statistics_loaded =
-    (database().schema_version() < CatalogDatabase::kLatestSupportedSchema -
-                                   CatalogDatabase::kSchemaEpsilon)
-      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
-      : counters_.ReadFromDatabase(database());
+  bool statistics_loaded;
+  if (database().schema_version() < 
+      CatalogDatabase::kLatestSupportedSchema - CatalogDatabase::kSchemaEpsilon)
+  {
+    statistics_loaded = 
+      counters_.ReadFromDatabase(database(), LegacyMode::kLegacy);
+  } else if (database().schema_revision() < 2) {
+    statistics_loaded = 
+      counters_.ReadFromDatabase(database(), LegacyMode::kNoXattrs);
+  } else {
+    statistics_loaded = counters_.ReadFromDatabase(database());
+  }
   return statistics_loaded;
 }
 

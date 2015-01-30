@@ -36,6 +36,11 @@ bool TreeCountersBase<FieldT>::ReadFromDatabase(
     if (current_retval) {
       *(const_cast<FieldT*>(i->second)) =
         static_cast<FieldT>(sql_counter.GetCounter());
+    } else if ( (legacy == LegacyMode::kNoXattrs) &&
+                ((i->first == "self_xattr") || (i->first == "subtree_xattr")) )
+    {
+      *(const_cast<FieldT*>(i->second)) = FieldT(0);
+      current_retval = true;
     } else if (legacy == LegacyMode::kLegacy) {
       *(const_cast<FieldT*>(i->second)) = FieldT(0);
       current_retval = true;
