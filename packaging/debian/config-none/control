@@ -8,6 +8,6 @@ Homepage: http://cernvm.cern.ch/portal/filesystem
 
 Package: cvmfs-config-none
 Architecture: all
-Breaks: cvmfs (< 2.1.20), cvmfs-server (< 2.1.20)
+Breaks: cvmfs (<< 2.1.20), cvmfs-server (<< 2.1.20)
 Provides: cvmfs-config
 Description:  CernVM File System Empty Configuration
