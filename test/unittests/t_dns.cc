@@ -18,8 +18,6 @@ namespace dns {
 class T_Dns : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    int retval = unsetenv("HOST_ALIASES");
-    ASSERT_EQ(0, retval);
     default_resolver =
       CaresResolver::Create(false /* ipv4_only */, 1 /* retries */, 2000);
     ASSERT_TRUE(default_resolver);
@@ -31,6 +29,11 @@ class T_Dns : public ::testing::Test {
     ASSERT_TRUE(fhostfile);
     hostfile_resolver = HostfileResolver::Create(hostfile, false);
     ASSERT_TRUE(hostfile_resolver);
+  }
+  
+  virtual void TearDown() {
+    int retval = unsetenv("HOST_ALIASES");
+    ASSERT_EQ(0, retval);
   }
 
   virtual ~T_Dns() {
