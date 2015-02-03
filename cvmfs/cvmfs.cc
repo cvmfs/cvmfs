@@ -22,7 +22,7 @@
 #define FUSE_USE_VERSION 26
 #define __STDC_FORMAT_MACROS
 
-#include "cvmfs_config.h"
+// #include "cvmfs_config.h"
 
 #include <dirent.h>
 #include <errno.h>
