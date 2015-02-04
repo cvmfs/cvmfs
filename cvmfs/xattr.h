@@ -29,11 +29,13 @@ class XattrList {
   static const uint8_t kVersion;
 
   XattrList() : version_(kVersion) { }
+  static XattrList *CreateFromFile(const std::string &path);
 
   std::vector<std::string> ListKeys() const;
   bool Get(const std::string &key, std::string *value) const;
   bool Set(const std::string &key, const std::string &value);
   bool Remove(const std::string &key);
+  bool IsEmpty() const { return xattrs_.empty(); }
 
   void Serialize(unsigned char **outbuf, unsigned *size) const;
   static XattrList *Deserialize(const unsigned char *inbuf,

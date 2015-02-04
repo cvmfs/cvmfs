@@ -5,6 +5,9 @@
 #include "cvmfs_config.h"
 #include "xattr.h"
 
+#include <alloca.h>
+#include <sys/xattr.h>
+
 #include <cassert>
 #include <cstring>
 
@@ -14,6 +17,49 @@
 using namespace std;  // NOLINT
 
 const uint8_t XattrList::kVersion = 1;
+
+/**
+ * Converts all the extended attributes of path into a XattrList.  Attributes
+ * that violate the XattrList restrictions are ignored.  If path does not exist
+ * or on I/O errors, NULL is returned.  The list of extended attributes is not
+ * supposed to change during the runtime of this method.  The list of values
+ * must not exceed 64kB.
+ */
+XattrList *XattrList::CreateFromFile(const std::string &path) {
+  // Parse the \0 separated list of extended attribute keys
+  char *list;
+  ssize_t sz_list = llistxattr(path.c_str(), NULL, 0);
+  if ((sz_list < 0) || (sz_list > 64*1024)) {
+    return NULL;
+  } else if (sz_list == 0) {
+    // No extended attributes
+    return new XattrList();
+  }
+  list = reinterpret_cast<char *>(alloca(sz_list));
+  sz_list = llistxattr(path.c_str(), list, sz_list);
+  if (sz_list < 0) {
+    return NULL;
+  } else if (sz_list == 0) {
+    // Can only happen if the list was removed since the previous call to
+    // llistxattr
+    return new XattrList();
+  }
+  vector<string> keys = SplitString(string(list, sz_list), '\0');
+
+  // Retrieve extended attribute values
+  XattrList *result = new XattrList();
+  char value[256];
+  for (unsigned i = 0; i < keys.size(); ++i) {
+    if (keys[i].empty())
+      continue;
+    ssize_t sz_value = lgetxattr(path.c_str(), keys[i].c_str(), value, 256);
+    if (sz_value < 0)
+      continue;
+    result->Set(keys[i], string(value, sz_value));
+  }
+  return result;
+}
+
 
 XattrList *XattrList::Deserialize(
   const unsigned char *inbuf,

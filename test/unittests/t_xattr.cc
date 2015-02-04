@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include "../../cvmfs/platform.h"
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/xattr.h"
 
@@ -19,6 +20,45 @@ class T_Xattr : public ::testing::Test {
 
   XattrList default_list;
 };
+
+
+TEST_F(T_Xattr, CreateFromFile) {
+  EXPECT_EQ(NULL, XattrList::CreateFromFile("/no/such/file"));
+
+  // Create extended attributes
+  string tmp_path;
+  FILE *f = CreateTempFile("/tmp/cvmfs-test", 0600, "w", &tmp_path);
+  ASSERT_TRUE(f != NULL);
+  fclose(f);
+  UnlinkGuard unlink_guard(tmp_path);
+
+  UniquePtr<XattrList> from_file1(XattrList::CreateFromFile(tmp_path));
+  ASSERT_TRUE(from_file1.IsValid());
+  ASSERT_TRUE(from_file1->IsEmpty());
+
+  string value;
+  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"));
+  UniquePtr<XattrList> from_file2(XattrList::CreateFromFile(tmp_path));
+  ASSERT_TRUE(from_file2.IsValid());
+  EXPECT_EQ(1U, from_file2->ListKeys().size());
+  EXPECT_TRUE(from_file2->Get("user.test", &value));
+  EXPECT_EQ("value", value);
+
+  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test2", "value2"));
+  string long_string = "user." + string(250, 'x');
+  string too_long_string = "user." + string(300, 'x');
+  ASSERT_TRUE(platform_setxattr(tmp_path, long_string, long_string));
+  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test3", too_long_string));
+  UniquePtr<XattrList> from_file3(XattrList::CreateFromFile(tmp_path));
+  ASSERT_TRUE(from_file3.IsValid());
+  EXPECT_EQ(3U, from_file3->ListKeys().size());
+  EXPECT_TRUE(from_file3->Get("user.test", &value));
+  EXPECT_EQ("value", value);
+  EXPECT_TRUE(from_file3->Get("user.test2", &value));
+  EXPECT_EQ("value2", value);
+  EXPECT_TRUE(from_file3->Get(long_string, &value));
+  EXPECT_EQ(long_string, value);
+}
 
 
 TEST_F(T_Xattr, Deserialize) {
@@ -139,6 +179,17 @@ TEST_F(T_Xattr, Remove) {
   EXPECT_TRUE(default_list.Remove("keya"));
   EXPECT_FALSE(default_list.Get("keya", &value));
   EXPECT_FALSE(default_list.Remove("keya"));
+}
+
+
+TEST_F(T_Xattr, IsEmpty) {
+  EXPECT_TRUE(XattrList().IsEmpty());
+  EXPECT_FALSE(default_list.IsEmpty());
+  vector<string> keys = default_list.ListKeys();
+  for (unsigned i = 0; i < keys.size(); ++i) {
+    EXPECT_TRUE(default_list.Remove(keys[i]));
+  }
+  EXPECT_TRUE(default_list.IsEmpty());
 }
 
 

@@ -157,6 +157,16 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
   return true;
 }
 
+inline bool platform_setxattr(
+  const std::string &path,
+  const std::string &name,
+  const std::string &value)
+{
+  int retval = setxattr(
+    path.c_str(), name.c_str(), value.c_str(), value.size(), 0, 0);
+  return retval == 0;
+}
+
 inline void platform_disable_kcache(int filedes) {
   fcntl(filedes, F_RDAHEAD, 0);
   fcntl(filedes, F_NOCACHE, 1);
