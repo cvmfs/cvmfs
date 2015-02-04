@@ -304,6 +304,10 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       retval = false;
     }
 
+    if (entries[i].HasXattrs()) {
+      computed_counters->self.xattrs++;
+    }
+
     // checking file chunk integrity
     if (entries[i].IsChunkedFile()) {
       FileChunkList chunks;
