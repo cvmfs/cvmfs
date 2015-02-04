@@ -186,6 +186,13 @@ glue::InodeTracker *inode_tracker_ = NULL;
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
 bool volatile_repository_ = false;
+/**
+ * If true, synthetic extended attributes (e.g. "user.pid") are excluded from
+ * listing.  They are still retrievable if the attribute key is known.  This
+ * helps if cvmfs is a read-only layer in a union file system stack where the
+ * synthetic attributes should not be copied up.
+ */
+bool hide_magic_xattrs_ = false;
 
 /**
  * in maintenance mode, cache timeout is 0 and catalogs are not reloaded
@@ -1586,8 +1593,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %"PRIu64", size %u",
-           uint64_t(ino), size);
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "cvmfs_listxattr on inode: %"PRIu64", size %u [hide xattrs %d]",
+           uint64_t(ino), size, hide_magic_xattrs_);
 
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
@@ -1595,6 +1603,16 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 
   if (!found) {
     ReplyNegative(d, req);
+    return;
+  }
+
+  if (hide_magic_xattrs_) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
+    if (size == 0) {
+      fuse_reply_xattr(req, 0);
+    } else {
+      fuse_reply_buf(req, NULL, 0);
+    }
     return;
   }
 
@@ -1934,6 +1952,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       !options::IsOn(parameter))
   {
     cvmfs::fixed_catalog_ = true;
+  }
+  if (options::GetValue("CVMFS_HIDE_MAGIC_XATTRS", &parameter) &&
+      options::IsOn(parameter))
+  {
+    cvmfs::hide_magic_xattrs_ = true;
   }
   if (options::GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
