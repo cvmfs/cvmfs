@@ -6,12 +6,13 @@
 
 #include "catalog_mgr.h"
 
-#include <inttypes.h>
 #include <cassert>
+#include <inttypes.h>
 
 #include "logging.h"
-#include "smalloc.h"
 #include "shortstring.h"
+#include "smalloc.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -281,6 +282,38 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   // Includes both: ENOENT and not found due to I/O error
   atomic_inc64(&statistics_.num_lookup_path_negative);
   return false;
+}
+
+
+bool AbstractCatalogManager::LookupXattrs(
+  const PathString &path,
+  XattrList *xattrs)
+{
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Find catalog, possibly load nested
+  Catalog *best_fit = FindCatalog(path);
+  Catalog *catalog = best_fit;
+  if (MountSubtree(path, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(path);
+    result = MountSubtree(path, best_fit, &catalog);
+    // DowngradeLock(); TODO
+    if (!result) {
+      Unlock();
+      return false;
+    }
+  }
+
+  atomic_inc64(&statistics_.num_lookup_xattrs);
+  result = catalog->LookupXattrsPath(path, xattrs);
+
+  Unlock();
+  return result;
 }
 
 

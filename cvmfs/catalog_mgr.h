@@ -25,6 +25,8 @@
 #include "util.h"
 #include "logging.h"
 
+class XattrList;
+
 namespace catalog {
 
 const unsigned kSqliteMemPerThread = 1*1024*1024;
@@ -68,6 +70,7 @@ struct Statistics {
   atomic_int64 num_lookup_inode;
   atomic_int64 num_lookup_path;
   atomic_int64 num_lookup_path_negative;
+  atomic_int64 num_lookup_xattrs;
   atomic_int64 num_listing;
   atomic_int64 num_nested_listing;
 
@@ -75,6 +78,7 @@ struct Statistics {
     atomic_init64(&num_lookup_inode);
     atomic_init64(&num_lookup_path);
     atomic_init64(&num_lookup_path_negative);
+    atomic_init64(&num_lookup_xattrs);
     atomic_init64(&num_listing);
     atomic_init64(&num_nested_listing);
   }
@@ -87,6 +91,9 @@ struct Statistics {
       "    " +
       "lookup(path-negative): " +
         StringifyInt(atomic_read64(&num_lookup_path_negative)) +
+      "    " +
+      "lookup(xattrs): " +
+        StringifyInt(atomic_read64(&num_lookup_xattrs)) +
       "    " +
       "listing: " + StringifyInt(atomic_read64(&num_listing)) +
       "    " +
@@ -169,6 +176,8 @@ class AbstractCatalogManager : public SingleCopy {
     p.Assign(&path[0], path.length());
     return LookupPath(p, options, entry);
   }
+  bool LookupXattrs(const PathString &path, XattrList *xattrs);
+
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
     PathString p;
