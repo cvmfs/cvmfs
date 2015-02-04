@@ -140,7 +140,7 @@ void WritableCatalog::AddEntry(
   const string &parent_path)
 {
   SetDirty();
-  
+
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
                                         entry_path.c_str(),
                                         path().c_str());
@@ -163,6 +163,7 @@ void WritableCatalog::AddEntry(
   assert(retval);
   retval = sql_insert_->Execute();
   assert(retval);
+  sql_insert_->Reset();
 
   delta_counters_.Increment(effective_entry);
 }
