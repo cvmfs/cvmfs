@@ -119,6 +119,36 @@ vector<string> XattrList::ListKeys() const {
 }
 
 
+/**
+ * The format of extended attribute lists in the (l)listxattr call is an array
+ * of all the keys concatenated and separated by null characters.  If merge_with
+ * is not empty, the final list will be have the keys from the XattrList and the
+ * keys from merge_with without duplicates.  The merge_with list is supposed to
+ * be in POSIX format.
+ */
+string XattrList::ListKeysPosix(const string &merge_with) const {
+  string result;
+  if (!merge_with.empty()) {
+    vector<string> merge_list = SplitString(merge_with, '\0');
+    for (unsigned i = 0; i < merge_list.size(); ++i) {
+      if (merge_list[i].empty())
+        continue;
+      if (xattrs_.find(merge_list[i]) == xattrs_.end()) {
+        result += merge_list[i];
+        result.push_back('\0');
+      }
+    }
+  }
+  for (map<string, string>::const_iterator i = xattrs_.begin(),
+       iEnd = xattrs_.end(); i != iEnd; ++i)
+  {
+    result += i->first;
+    result.push_back('\0');
+  }
+  return result;
+}
+
+
 bool XattrList::Set(const string &key, const string &value) {
   if (key.empty())
     return false;

@@ -32,6 +32,7 @@ class XattrList {
   static XattrList *CreateFromFile(const std::string &path);
 
   std::vector<std::string> ListKeys() const;
+  std::string ListKeysPosix(const std::string &merge_with) const;
   bool Get(const std::string &key, std::string *value) const;
   bool Set(const std::string &key, const std::string &value);
   bool Remove(const std::string &key);

@@ -147,6 +147,23 @@ TEST_F(T_Xattr, ListKeys) {
 }
 
 
+TEST_F(T_Xattr, ListKeysPosix) {
+  const char base_list[] = "user.a\0user.b\0keya\0";
+  string existing_list(base_list, sizeof(base_list)-1);
+  XattrList empty;
+  EXPECT_EQ("", empty.ListKeysPosix(""));
+  const char expect1[] = "user.a\0user.b\0keya\0";
+  EXPECT_EQ(string(expect1, sizeof(expect1)-1), 
+            empty.ListKeysPosix(existing_list));
+  const char expect2[] = "empty_key\0keya\0keyb\0";
+  EXPECT_EQ(string(expect2, sizeof(expect2)-1),
+            default_list.ListKeysPosix(""));
+  const char expect3[] = "user.a\0user.b\0empty_key\0keya\0keyb\0";
+  EXPECT_EQ(string(expect3, sizeof(expect3)-1),
+            default_list.ListKeysPosix(existing_list));
+}
+
+
 TEST_F(T_Xattr, Set) {
   string value;
   // Set a key
