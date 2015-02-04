@@ -3652,6 +3652,9 @@ publish() {
     if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
       sync_command="$sync_command -i"
     fi
+    if [ "x$CVMFS_INCLUDE_XATTRS" = "xtrue" ]; then
+      sync_command="$sync_command -k"
+    fi
     if [ "x$CVMFS_CATALOG_ENTRY_WARN_THRESHOLD" != "x" ]; then
       sync_command="$sync_command -j $CVMFS_CATALOG_ENTRY_WARN_THRESHOLD"
     fi

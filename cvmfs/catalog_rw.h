@@ -22,6 +22,8 @@
 
 #include "catalog.h"
 
+class XattrList;
+
 namespace swissknife {
 class CommandMigrate;
 }
@@ -55,6 +57,7 @@ class WritableCatalog : public Catalog {
   uint32_t GetMaxLinkId() const;
 
   void AddEntry(const DirectoryEntry &entry,
+                const XattrList &xattr,
                 const std::string &entry_path,
                 const std::string &parent_path);
   void TouchEntry(const DirectoryEntryBase &entry, const shash::Md5 &path_hash);
@@ -104,8 +107,12 @@ class WritableCatalog : public Catalog {
     UpdateEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
 
-  inline void AddEntry(const DirectoryEntry &entry, const std::string &path) {
-    AddEntry(entry, path, GetParentPath(path));
+  inline void AddEntry(
+    const DirectoryEntry &entry,
+    const XattrList &xattrs,
+    const std::string &path) 
+  {
+    AddEntry(entry, xattrs, path, GetParentPath(path));
   }
 
   void InitPreparedStatements();

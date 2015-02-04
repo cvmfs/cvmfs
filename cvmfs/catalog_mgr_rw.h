@@ -38,7 +38,9 @@
 #include "catalog_rw.h"
 #include "catalog_mgr_ro.h"
 #include "upload_spooler_result.h"
+#include "xattr.h"
 
+class XattrList;
 namespace upload {
 class Spooler;
 }
@@ -67,10 +69,13 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   // DirectoryEntry handling
   void AddFile(const DirectoryEntryBase &entry,
-               const std::string &parent_directory) {
-    AddFile(DirectoryEntry(entry), parent_directory);
+               const XattrList &xattrs,
+               const std::string &parent_directory)
+  {
+    AddFile(DirectoryEntry(entry), xattrs, parent_directory);
   }
   void AddChunkedFile(const DirectoryEntryBase &entry,
+                      const XattrList &xattrs,
                       const std::string &parent_directory,
                       const FileChunkList &file_chunks);
   void RemoveFile(const std::string &file_path);
@@ -83,6 +88,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   // Hardlink group handling
   void AddHardlinkGroup(DirectoryEntryBaseList &entries,
+                        const XattrList &xattrs,
                         const std::string &parent_directory);
   void ShrinkHardlinkGroup(const std::string &remove_path);
 
@@ -108,6 +114,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void ActivateCatalog(Catalog *catalog);
 
   void AddFile(const DirectoryEntry  &entry,
+               const XattrList       &xattrs,
                const std::string     &parent_directory);
 
  private:
@@ -137,10 +144,15 @@ class WritableCatalogManager : public SimpleCatalogManager {
   const static std::string kCatalogFilename;
 
   // private lock of WritableCatalogManager
-  pthread_mutex_t            *sync_lock_;
-  upload::Spooler            *spooler_;
+  pthread_mutex_t *sync_lock_;
+  upload::Spooler *spooler_;
 
-  uint64_t                   catalog_entry_warn_threshold_;
+  uint64_t catalog_entry_warn_threshold_;
+
+  /**
+   * Directories don't have extended attributes at this point.
+   */
+  XattrList empty_xattrs;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

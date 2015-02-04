@@ -527,11 +527,11 @@ class SqlAllChunks : public Sql {
 //------------------------------------------------------------------------------
 
 
-class SqlGetXattrs : public Sql {
+class SqlLookupXattrs : public Sql {
  public:
-  explicit SqlGetXattrs(const CatalogDatabase &database);
+  explicit SqlLookupXattrs(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
-  XattrList *GetXattrs();
+  XattrList GetXattrs();
 };
 
 }  // namespace catalog

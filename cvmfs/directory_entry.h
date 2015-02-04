@@ -128,6 +128,9 @@ class DirectoryEntryBase {
   inline void set_symlink(const LinkString &symlink) {
     symlink_ = symlink;
   }
+  inline void set_has_xattrs(const bool has_xattrs) {
+    has_xattrs_ = has_xattrs;
+  }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.

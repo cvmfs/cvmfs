@@ -463,18 +463,33 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   SyncItem &item = itr->second;
   item.SetContentHash(result.content_hash);
 
-  if (result.IsChunked()) {
-    catalog_manager_->AddChunkedFile(item.CreateBasicCatalogDirent(),
-                                     item.relative_parent_path(),
-                                     result.file_chunks);
-  } else {
-    catalog_manager_->AddFile(item.CreateBasicCatalogDirent(),
-                              item.relative_parent_path());
+  XattrList *xattrs = &default_xattrs;
+  if (params_->include_xattrs) {
+    xattrs = XattrList::CreateFromFile(result.local_path);
+    assert(xattrs != NULL);
   }
+
+  if (result.IsChunked()) {
+    catalog_manager_->AddChunkedFile(
+      item.CreateBasicCatalogDirent(),
+      *xattrs,
+      item.relative_parent_path(),
+      result.file_chunks);
+  } else {
+    catalog_manager_->AddFile(
+      item.CreateBasicCatalogDirent(),
+      *xattrs,
+      item.relative_parent_path());
+  }
+
+  if (xattrs != &default_xattrs)
+    free(xattrs);
 }
 
 
-void SyncMediator::PublishHardlinksCallback(const upload::SpoolerResult &result) {
+void SyncMediator::PublishHardlinksCallback(
+  const upload::SpoolerResult &result)
+{
   LogCvmfs(kLogPublish, kLogVerboseMsg,
            "Spooler callback for hardlink %s, digest %s, retval %d",
            result.local_path.c_str(),
@@ -561,9 +576,11 @@ void SyncMediator::AddFile(SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (entry.IsSymlink() && !params_->dry_run) {
-  // Symlinks are completely stored in the catalog
-    catalog_manager_->AddFile(entry.CreateBasicCatalogDirent(),
-                              entry.relative_parent_path());
+    // Symlinks are completely stored in the catalog
+    catalog_manager_->AddFile(
+      entry.CreateBasicCatalogDirent(),
+      default_xattrs,
+      entry.relative_parent_path());
   } else {
     // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);
@@ -665,8 +682,17 @@ void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
   {
     hardlinks.push_back(i->second.CreateBasicCatalogDirent());
   }
-  catalog_manager_->AddHardlinkGroup(hardlinks,
-                                     group.master.relative_parent_path());
+  XattrList *xattrs = &default_xattrs;
+  if (params_->include_xattrs) {
+    xattrs = XattrList::CreateFromFile(group.master.GetUnionPath());
+    assert(xattrs);
+  }
+  catalog_manager_->AddHardlinkGroup(
+    hardlinks,
+    *xattrs,
+    group.master.relative_parent_path());
+  if (xattrs != &default_xattrs)
+    free(xattrs);
 }
 
 }  // namespace publish

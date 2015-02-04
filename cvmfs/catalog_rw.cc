@@ -12,6 +12,7 @@
 
 #include "logging.h"
 #include "util.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -132,29 +133,38 @@ uint32_t WritableCatalog::GetMaxLinkId() const {
  * @param entry_path the full path of the DirectoryEntry to add
  * @param parent_path the full path of the containing directory
  */
-void WritableCatalog::AddEntry(const DirectoryEntry &entry,
-                               const string &entry_path,
-                               const string &parent_path)
+void WritableCatalog::AddEntry(
+  const DirectoryEntry &entry,
+  const XattrList &xattrs,
+  const string &entry_path,
+  const string &parent_path)
 {
   SetDirty();
-
-  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
-  shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
-
+  
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
                                         entry_path.c_str(),
                                         path().c_str());
 
+  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
+  shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
+  DirectoryEntry effective_entry(entry);
+  effective_entry.set_has_xattrs(!xattrs.IsEmpty());
+
   bool retval =
     sql_insert_->BindPathHash(path_hash) &&
     sql_insert_->BindParentPathHash(parent_hash) &&
-    sql_insert_->BindDirent(entry) &&
-    sql_insert_->BindXattrEmpty() &&
-    sql_insert_->Execute();
+    sql_insert_->BindDirent(effective_entry);
   assert(retval);
-  sql_insert_->Reset();
+  if (xattrs.IsEmpty()) {
+    retval = sql_insert_->BindXattrEmpty();
+  } else {
+    retval = sql_insert_->BindXattr(xattrs);
+  }
+  assert(retval);
+  retval = sql_insert_->Execute();
+  assert(retval);
 
-  delta_counters_.Increment(entry);
+  delta_counters_.Increment(effective_entry);
 }
 
 
@@ -173,7 +183,7 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
 
   SetDirty();
 
-  // if the entry used to be a chunked file... remove the chunks
+  // If the entry used to be a chunked file... remove the chunks
   if (entry.IsChunkedFile()) {
     RemoveFileChunks(file_path);
   }
@@ -384,13 +394,22 @@ void WritableCatalog::MoveToNestedRecursively(
   assert(retval);
 
   // Go through the listing
+  XattrList empty_xattrs;
   for (DirectoryEntryList::const_iterator i = listing.begin(),
        iEnd = listing.end(); i != iEnd; ++i)
   {
     const string full_path = i->GetFullPath(directory);
 
     // The entries are first inserted into the new catalog
-    new_nested_catalog->AddEntry(*i, full_path);
+    if (i->HasXattrs()) {
+      XattrList xattrs;
+      retval = LookupXattrsPath(PathString(full_path), &xattrs);
+      assert(retval);
+      assert(!xattrs.IsEmpty());
+      new_nested_catalog->AddEntry(*i, xattrs, full_path);
+    } else {
+      new_nested_catalog->AddEntry(*i, empty_xattrs, full_path);
+    }
 
     // Then we check if we have some special cases:
     if (i->IsNestedCatalogMountpoint()) {

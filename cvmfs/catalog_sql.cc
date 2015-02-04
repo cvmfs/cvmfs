@@ -1053,7 +1053,7 @@ bool SqlAllChunks::Close() {
 //------------------------------------------------------------------------------
 
 
-SqlGetXattrs::SqlGetXattrs(const CatalogDatabase &database) {
+SqlLookupXattrs::SqlLookupXattrs(const CatalogDatabase &database) {
   const string statement =
     "SELECT xattr FROM catalog "
     "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
@@ -1061,23 +1061,25 @@ SqlGetXattrs::SqlGetXattrs(const CatalogDatabase &database) {
 }
 
 
-bool SqlGetXattrs::BindPathHash(const shash::Md5 &hash) {
+bool SqlLookupXattrs::BindPathHash(const shash::Md5 &hash) {
   return BindMd5(1, 2, hash);
 }
 
 
-XattrList *SqlGetXattrs::GetXattrs() {
-  if (!FetchRow())
-    return NULL;
-
+XattrList SqlLookupXattrs::GetXattrs() {
   const unsigned char *packed_xattrs =
     reinterpret_cast<const unsigned char *>(RetrieveBlob(0));
   if (packed_xattrs == NULL)
-    return new XattrList();
+    return XattrList();
 
   int size = RetrieveBytes(0);
   assert(size >= 0);
-  return XattrList::Deserialize(packed_xattrs, size);
+  UniquePtr<XattrList> xattrs(XattrList::Deserialize(packed_xattrs, size));
+  if (!xattrs.IsValid()) {
+    LogCvmfs(kLogCatalog, kLogDebug, "corrupted xattr data");
+    return XattrList();
+  }
+  return *xattrs;
 }
 
 }  // namespace catalog

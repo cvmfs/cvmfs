@@ -71,6 +71,7 @@ Catalog::Catalog(const PathString &path,
   sql_list_nested_ = NULL;
   sql_all_chunks_ = NULL;
   sql_chunks_listing_ = NULL;
+  sql_lookup_xattrs_ = NULL;
 }
 
 
@@ -96,10 +97,12 @@ void Catalog::InitPreparedStatements() {
   sql_list_nested_     = new SqlNestedCatalogListing(database());
   sql_all_chunks_      = new SqlAllChunks(database());
   sql_chunks_listing_  = new SqlChunksListing(database());
+  sql_lookup_xattrs_   = new SqlLookupXattrs(database());
 }
 
 
 void Catalog::FinalizePreparedStatements() {
+  delete sql_lookup_xattrs_;
   delete sql_chunks_listing_;
   delete sql_all_chunks_;
   delete sql_listing_;
@@ -284,6 +287,25 @@ bool Catalog::LookupRawSymlink(const PathString &path,
   if (result)
     raw_symlink->Assign(dirent.symlink());
   return result;
+}
+
+
+bool Catalog::LookupXattrsMd5Path(
+  const shash::Md5 &md5path,
+  XattrList *xattrs) const
+{
+  assert(IsInitialized());
+
+  pthread_mutex_lock(lock_);
+  sql_lookup_xattrs_->BindPathHash(md5path);
+  bool found = sql_lookup_xattrs_->FetchRow();
+  if (found && (xattrs != NULL)) {
+    *xattrs = sql_lookup_xattrs_->GetXattrs();
+  }
+  sql_lookup_xattrs_->Reset();
+  pthread_mutex_unlock(lock_);
+
+  return found;
 }
 
 

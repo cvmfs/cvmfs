@@ -23,6 +23,9 @@ void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
   } else {
     assert(false);
   }
+  if (dirent.HasXattrs()) {
+    self.xattrs += delta;
+  }
 }
 
 

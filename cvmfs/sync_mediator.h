@@ -36,6 +36,7 @@
 #include "catalog_mgr_rw.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
+#include "xattr.h"
 
 namespace manifest {
 class Manifest;
@@ -194,6 +195,11 @@ class SyncMediator {
 
   const SyncParameters *params_;
   mutable unsigned int changed_items_;
+
+  /**
+   * By default, files have no extended attributes.
+   */
+  XattrList default_xattrs;
 };  // class SyncMediator
 
 }  // namespace publish
