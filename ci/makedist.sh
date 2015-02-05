@@ -18,6 +18,6 @@ fi
 echo "in directory `pwd`"
 echo "taring cvmfs version $version"
 
-git archive -v --prefix cvmfs-${version}/ --format tar master AUTHORS CMakeLists.txt COPYING CPackLists.txt  ChangeLog FAQ INSTALL NEWS README InstallerResources add-ons bootstrap.sh cmake config_cmake.h.in cvmfs doc externals keys mount test | gzip -c > $distdir/cvmfs-${version}.tar.gz || exit 8
+git archive -v --prefix cvmfs-${version}/ --format tar master AUTHORS CMakeLists.txt COPYING CPackLists.txt  ChangeLog INSTALL NEWS README InstallerResources add-ons bootstrap.sh cmake config_cmake.h.in cvmfs doc externals keys mount test | gzip -c > $distdir/cvmfs-${version}.tar.gz || exit 8
 ls $distdir
 

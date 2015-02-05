@@ -11,7 +11,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 archive_dir="$(pwd)/source_archive"
 
 # files and directories we want to have in the archive
-tarball_git_files="AUTHORS CMakeLists.txt COPYING CPackLists.txt  ChangeLog FAQ INSTALL NEWS README InstallerResources add-ons bootstrap.sh cmake config_cmake.h.in cvmfs doc externals keys mount test"
+tarball_git_files="AUTHORS CMakeLists.txt COPYING CPackLists.txt  ChangeLog INSTALL NEWS README InstallerResources add-ons bootstrap.sh cmake config_cmake.h.in cvmfs doc externals keys mount test"
 tarball_file_prefix="$CVMFS_BUILD_TAG/"
 tarball=${archive_dir}/${CVMFS_BUILD_TAG}.tar.gz
 
