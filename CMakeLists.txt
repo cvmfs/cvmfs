@@ -260,12 +260,12 @@ else (LIBCURL_BUILTIN)
     find_program(CURL_CONFIG_EXEC NAMES curl-config)
     if (CURL_CONFIG_EXEC)
       execute_process(
-  COMMAND ${CURL_CONFIG_EXEC} --features
-  OUTPUT_VARIABLE _libcurl_features
-  ERROR_VARIABLE _libcurl_features_error
-  )
+       COMMAND ${CURL_CONFIG_EXEC} --features
+       OUTPUT_VARIABLE _libcurl_features
+       ERROR_VARIABLE _libcurl_features_error
+       )
       if (NOT ${_libcurl_features} MATCHES AsynchDNS)
-  message(FATAL_ERROR "libcurl was not compiled with c-ares")
+       message(FATAL_ERROR "libcurl was not compiled with c-ares")
       endif (NOT ${_libcurl_features} MATCHES AsynchDNS)
     else (CURL_CONFIG_EXEC)
       message(SEND_ERROR "Command \"${CURL_CONFIG_EXEC} --features\" failed with output:\n${_libcurl_features_error}")
