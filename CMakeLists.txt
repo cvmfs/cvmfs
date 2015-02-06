@@ -80,6 +80,7 @@ option (BUILD_SERVER            "Build writer's end programs"                   
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
+option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
 option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin"                  ON)
@@ -259,12 +260,12 @@ else (LIBCURL_BUILTIN)
     find_program(CURL_CONFIG_EXEC NAMES curl-config)
     if (CURL_CONFIG_EXEC)
       execute_process(
-	COMMAND ${CURL_CONFIG_EXEC} --features
-	OUTPUT_VARIABLE _libcurl_features
-	ERROR_VARIABLE _libcurl_features_error
-	)
+  COMMAND ${CURL_CONFIG_EXEC} --features
+  OUTPUT_VARIABLE _libcurl_features
+  ERROR_VARIABLE _libcurl_features_error
+  )
       if (NOT ${_libcurl_features} MATCHES AsynchDNS)
-	message(FATAL_ERROR "libcurl was not compiled with c-ares")
+  message(FATAL_ERROR "libcurl was not compiled with c-ares")
       endif (NOT ${_libcurl_features} MATCHES AsynchDNS)
     else (CURL_CONFIG_EXEC)
       message(SEND_ERROR "Command \"${CURL_CONFIG_EXEC} --features\" failed with output:\n${_libcurl_features_error}")
@@ -404,3 +405,19 @@ install (
 # configure the packaging stuff
 #
 include (CPackLists.txt)
+
+#
+# Generate the documentation using doxygen
+#
+if (BUILD_DOCUMENTATION)
+  message (STATUS "Generating documentation ...")
+  set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+  set (DOXYFILE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
+  set (DOXYFILE_OUTPUT_DIR "${CMAKE_BINARY_DIR}")
+  set (DOXYFILE_LATEX "OFF")
+  execute_process (
+    COMMAND sh -c "cp ${CMAKE_SOURCE_DIR}/doc/Doxyfile.in ${CMAKE_SOURCE_DIR}/build"
+    COMMAND sh -c "/bin/sed -i 's/@VERSION@/${CernVM-FS_VERSION_STRING}/g' ${CMAKE_SOURCE_DIR}/build/Doxyfile.in"
+  )
+  include (cmake/Modules/UseDoxygen)
+endif (BUILD_DOCUMENTATION)
