@@ -417,7 +417,7 @@ if (BUILD_DOCUMENTATION)
   set (DOXYFILE_LATEX "OFF")
   execute_process (
     COMMAND sh -c "cp ${CMAKE_SOURCE_DIR}/doc/Doxyfile.in ${CMAKE_SOURCE_DIR}/build"
-    COMMAND sh -c "/bin/sed -i 's/@VERSION@/${CernVM-FS_VERSION_STRING}/g' ${CMAKE_SOURCE_DIR}/build/Doxyfile.in"
+    COMMAND sh -c "/bin/sed -i -e 's/@VERSION@/${CernVM-FS_VERSION_STRING}/g' ${CMAKE_SOURCE_DIR}/build/Doxyfile.in"
   )
   include (cmake/Modules/UseDoxygen)
 endif (BUILD_DOCUMENTATION)
