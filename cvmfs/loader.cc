@@ -752,6 +752,13 @@ int main(int argc, char *argv[]) {
       }
     }
   }
+  
+  // Protect the process from being killed by systemd
+  if (options::GetValue("CVMFS_SYSTEMD_NOKILL", &parameter) && 
+      options::IsOn(parameter))
+  {
+    argv[0][0] = '@';
+  }
 
   // Grab mountpoint
   if (grab_mountpoint_) {
