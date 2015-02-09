@@ -63,7 +63,7 @@ endmacro()
 find_package(Doxygen)
 
 if(DOXYGEN_FOUND)
-	set(DOXYFILE_IN "${CMAKE_CURRENT_SOURCE_DIR}/build/Doxyfile.in")
+	set(DOXYFILE_IN "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in")
 	set(DOXYFILE "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
 	include(FindPackageHandleStandardArgs)
 	find_package_handle_standard_args(DOXYFILE_IN DEFAULT_MSG "DOXYFILE_IN")

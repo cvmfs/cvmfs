@@ -410,14 +410,19 @@ include (CPackLists.txt)
 # Generate the documentation using doxygen
 #
 if (BUILD_DOCUMENTATION)
-  message (STATUS "Generating documentation ...")
+  message (STATUS "Generating Doxygen configuration ...")
   set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
   set (DOXYFILE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
-  set (DOXYFILE_OUTPUT_DIR "${CMAKE_BINARY_DIR}")
+  set (DOXYFILE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/")
   set (DOXYFILE_LATEX "OFF")
   execute_process (
-    COMMAND sh -c "cp ${CMAKE_SOURCE_DIR}/doc/Doxyfile.in ${CMAKE_BINARY_DIR}"
+    COMMAND sh -c "cp ${CMAKE_SOURCE_DIR}/doc/Doxyfile.in ${CMAKE_BINARY_DIR}/Doxyfile.in"
+  )
+  execute_process (
     COMMAND sh -c "/bin/sed -i -e 's/@VERSION@/${CernVM-FS_VERSION_STRING}/g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
+  )
+  execute_process (   
+    COMMAND sh -c "/bin/sed -i -e 's,@SRC_DIR@,${CMAKE_SOURCE_DIR},g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
   )
   include (cmake/Modules/UseDoxygen)
 endif (BUILD_DOCUMENTATION)
