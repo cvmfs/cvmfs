@@ -4,6 +4,7 @@
  * Runs a thread using libcurls asynchronous I/O mode to push data to S3
  */
 
+#include <cerrno>
 #include <pthread.h>
 #include <utility>
 

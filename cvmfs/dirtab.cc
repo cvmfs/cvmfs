@@ -4,6 +4,7 @@
 
 #include "dirtab.h"
 
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 
