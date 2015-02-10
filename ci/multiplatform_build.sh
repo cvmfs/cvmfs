@@ -15,6 +15,24 @@ fi
 CVMFS_SOURCE_LOCATION="$1"
 CVMFS_CONCURRENT_BUILD_JOBS="${2-1}"
 
+# figure out if the standard compiler is too old and if so look for alternatives
+if [ x"$(uname)" = x"Linux" ] && which gcc > /dev/null 2>&1; then
+  gcc_major="$(gcc --version | head -n1 | sed -e 's/^.* \([0-9]\)\..*$/\1/')"
+  if [ $gcc_major -lt 4 ]; then
+    if ! which gcc4 > /dev/null 2>&1 || \
+       ! which g++4 > /dev/null; then
+      echo "we need at least GCC 4.1"
+      exit 2
+    fi
+
+    echo "using gcc4 and g++4 without optimisation as a fallback!"
+    export CC=gcc4
+    export CXX=g++4
+    export CFLAGS="$CFLAGS -O0"     # disabling any optimisation since it likely
+    export CXXFLAGS="$CXXFLAGS -O0" # breaks the binary with this old version
+  fi
+fi
+
 echo "configuring using CMake..."
 cmake -DBUILD_SERVER=yes       \
       -DBUILD_SERVER_DEBUG=yes \
