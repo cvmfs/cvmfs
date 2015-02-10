@@ -1,3 +1,6 @@
+2.1.21:
+  * Add support for custom extended attributes and file capabilities (CVM-734)
+
 2.1.20:
   * Stop parsing of CernVM specific config files (CVM-614)
   * Add CVMFS_MAXIMAL_CONCURRENT_WRITES configuration parameters for number of
