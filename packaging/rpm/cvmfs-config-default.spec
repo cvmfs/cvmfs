@@ -77,6 +77,7 @@ done
 %changelog
 * Tue Feb 02 2015 Dave Dykstra <dwd@fnal.gov> - 1.1-1
 - add CVMFS_USE_GEOAPI=yes to egi.eu and opensciencegrid.org
+- fix BNL URL for opensciencegrid.org
 
 * Thu Jan 22 2015 Jakob Blomer <jblomer@cern.ch> - 1.0-1
 - initial packaging
