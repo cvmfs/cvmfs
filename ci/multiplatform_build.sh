@@ -33,10 +33,19 @@ if [ x"$(uname)" = x"Linux" ] && which gcc > /dev/null 2>&1; then
   fi
 fi
 
+# if we are on Mac OS X switch off both the server and the libcvmfs builds
+build_server="yes"
+build_libcvmfs="yes"
+if [ x"$(uname)" = x"Darwin" ]; then
+  build_server="no"
+  build_libcvmfs="no"
+fi
+
 echo "configuring using CMake..."
-cmake -DBUILD_SERVER=yes       \
-      -DBUILD_SERVER_DEBUG=yes \
-      -DBUILD_UNITTESTS=yes    \
+cmake -DBUILD_SERVER=$build_server       \
+      -DBUILD_SERVER_DEBUG=$build_server \
+      -DBUILD_UNITTESTS=yes              \
+      -DBUILD_LIBCVMFS=$build_libcvmfs   \
       $CVMFS_SOURCE_LOCATION
 
 echo "building using make ($CVMFS_CONCURRENT_BUILD_JOBS concurrent jobs)..."
