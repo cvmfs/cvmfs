@@ -820,9 +820,36 @@ cvmfs_reload() {
     return 1
   fi
   local clean_cache; clean_cache=0
+  local cache_directories=
   if [ "x$1" = "x-c" ]; then
     clean_cache=1
     shift
+    local list
+    list=""
+    if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
+       list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+    fi
+    local org shared
+    for org in $list shared
+    do
+      case $org in
+        none)
+        ;;
+        *)
+          . /etc/cvmfs/config.sh # start with fresh repository_... functions
+          cvmfs_readconfig
+          if [ "$org" != "shared" ]; then
+            fqrn=`cvmfs_mkfqrn $org`
+            cvmfs_readconfig $fqrn
+          else
+            fqrn=shared
+          fi
+          cache_directories="${CVMFS_CACHE_BASE}/${fqrn} $cache_directories"
+        ;;
+      esac
+    done
+    . /etc/cvmfs/config.sh # start with fresh repository_... functions
+    cvmfs_readconfig
   elif [ "x$1" != "x" ]; then
     org=$1
     fqrn=$(cvmfs_mkfqrn $org)
@@ -896,7 +923,22 @@ cvmfs_reload() {
   fi
 
   if [ $clean_cache -eq 1 ]; then
-    cvmfs_wipecache
+    for dir in $cache_directories; do
+      echo -n "Wiping out $dir ... "
+      if [ -d "$dir" ]; then
+        rm -rf "$dir" && \
+          mkdir -p "$dir" && \
+          chown $CVMFS_USER "$dir"
+        if [ $? -ne 0 ]; then
+          echo "Failed!"
+          RETVAL=1
+        else
+          echo "OK"
+        fi
+      else
+        echo "OK"
+      fi
+    done
   fi
 
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
@@ -912,7 +954,6 @@ cvmfs_reload() {
 
   return $RETVAL
 }
-
 
 cvmfs_probe() {
   RETVAL=0
@@ -973,59 +1014,6 @@ cvmfs_umount() {
       echo "OK"
     fi
   done
-
-  return $RETVAL
-}
-
-
-cvmfs_wipecache() {
-  if ! cvmfs_readconfig; then
-    echo "Failed to read CernVM-FS configuration"
-    return 1
-  fi
-
-  RETVAL=$?
-  if [ $RETVAL -eq 0 ]; then
-    local list
-    list=""
-
-    if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
-       list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
-    fi
-
-    local org shared
-    for org in $list shared
-    do
-      case $org in
-        none)
-        ;;
-        *)
-          . /etc/cvmfs/config.sh # start with fresh repository_... functions
-          cvmfs_readconfig
-          if [ "$org" != "shared" ]; then
-            fqrn=`cvmfs_mkfqrn $org`
-            cvmfs_readconfig $fqrn
-          else
-            fqrn=shared
-          fi
-          echo -n "Wiping out $CVMFS_CACHE_BASE/$fqrn ... "
-          if [ -d "$CVMFS_CACHE_BASE/$fqrn" ]; then
-            rm -rf "$CVMFS_CACHE_BASE/$fqrn" && \
-              mkdir -p "$CVMFS_CACHE_BASE/$fqrn" && \
-              chown $CVMFS_USER "$CVMFS_CACHE_BASE/$fqrn"
-            if [ $? -ne 0 ]; then
-              echo "Failed!"
-              RETVAL=1
-            else
-              echo "OK"
-            fi
-          else
-            echo "OK"
-          fi
-        ;;
-      esac
-    done
-  fi
 
   return $RETVAL
 }
@@ -1550,7 +1538,7 @@ case "$1" in
       exit 1
     fi
     shift 1
-    cvmfs_umount $@ && cvmfs_wipecache $@
+    cvmfs_reload -c
     RETVAL=$?
     ;;
 
