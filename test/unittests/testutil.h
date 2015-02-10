@@ -1,8 +1,10 @@
 #ifndef CVMFS_UNITTEST_TESTUTIL
 #define CVMFS_UNITTEST_TESTUTIL
 
-#include <sys/types.h>
 #include <ctime>
+#include <sys/types.h>
+
+#include <gtest/gtest.h>
 
 #include "../../cvmfs/upload_facility.h"
 #include "../../cvmfs/hash.h"
