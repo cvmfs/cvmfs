@@ -6,6 +6,8 @@
 # and users.
 #
 
+set -e
+
 if [ $# -lt 1 ]; then
   echo "Usage: $0 <CernVM-FS source directory> [<number of CPU cores>]"
   echo "This script builds CernVM-FS in its current working."
