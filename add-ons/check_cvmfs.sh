@@ -17,7 +17,7 @@
 #    - return immediately if transport endpoint is not connected
 #    - start of ChangeLog
 
-VERSION=1.8
+VERSION=1.9
 
 STATUS_OK=0
 STATUS_WARNING=1     # Check timed out or CernVM-FS resource consumption high or
