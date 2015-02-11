@@ -106,6 +106,10 @@ while getopts "hVvt:nm" opt; do
     ;;
     t)
       TIMEOUT_SECONDS="$(/bin/echo "$OPTARG" | /usr/bin/tr -c -d 0-9)"
+      if [ "x${TIMEOUT_SECONDS}" = "x" ]; then
+        /bin/echo "SERVICE STATUS: Invalid timeout argument: $OPTARG"
+        exit $STATUS_UNKNOWN
+      fi
     ;;
     n)
       OPT_NETWORK_CHECK=1
@@ -305,6 +309,7 @@ do_check &
 PID=$!
 START_TIME=$SECONDS
 while [ $((${SECONDS}-${START_TIME})) -lt ${TIMEOUT_SECONDS} ]; do
+  /bin/sleep 1
   kill -s 0 $PID >/dev/null 2>&1
   if [ $? -ne 0 ]; then
     wait $PID
@@ -312,6 +317,6 @@ while [ $((${SECONDS}-${START_TIME})) -lt ${TIMEOUT_SECONDS} ]; do
   fi
 done
 
-kill -s 9 $PID
+kill -s 9 $PID >/dev/null
 /bin/echo "SERVICE STATUS: timeout after ${TIMEOUT_SECONDS}s"
 exit $STATUS_WARNING
