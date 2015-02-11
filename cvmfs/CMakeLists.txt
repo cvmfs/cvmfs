@@ -235,8 +235,8 @@ if (BUILD_CVMFS)
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug pacparser)
-    add_dependencies (cvmfs_fuse pacparser)
+    add_dependencies (cvmfs_fuse_debug libpacparser)
+    add_dependencies (cvmfs_fuse libpacparser)
   endif (PACPARSER_BUILTIN)
 
   if (SQLITE3_BUILTIN)
@@ -293,7 +293,7 @@ if (BUILD_LIBCVMFS)
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_only pacparser)
+    add_dependencies (cvmfs_only libpacparser)
     set (LIBCVMFS_LIBS ${PACPARSER_ARCHIVE} ${LIBCVMFS_LIBS} )
   endif (PACPARSER_BUILTIN)
 
