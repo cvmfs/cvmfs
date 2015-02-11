@@ -3,7 +3,7 @@ cvmfs_test_name="Reload during overcommitted asetup"
 
 reload_cvmfs() {
   while [ ! -f stop-reload ]; do
-    sudo cvmfs_config reload
+    sudo cvmfs_config reload -c
     sleep 15
   done
 }
