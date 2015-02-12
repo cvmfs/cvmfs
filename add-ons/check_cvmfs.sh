@@ -5,6 +5,7 @@
 #
 # ChangeLog
 # 1.9 - 12.02.2015:
+#    - Add fallback proxies to network checks
 #    - Add -t(imeout) parameter to avoid hanging check.  Defaults to 2 minutes.
 #    - Add -i(node check) parameter to check for inodes overflowing 32bit
 # 1.8:
@@ -197,7 +198,7 @@ do_check() {
     if [ ! -z "$CVMFS_HTTP_PROXY" -a ! -z "$CVMFS_SERVER_URL"  ]; then
       CVMFS_HOSTS=`/bin/echo "$CVMFS_SERVER_URL" | /bin/sed 's/,\|;/ /g' \
          | sed s/@org@/$ORG/g | sed s/@fqrn@/$FQRN/g`
-      CVMFS_PROXIES=`/bin/echo "$CVMFS_HTTP_PROXY" | /bin/sed 's/;\||/ /g'`
+      CVMFS_PROXIES=`/bin/echo "$CVMFS_HTTP_PROXY $CVMFS_FALLBACK_PROXY" | /bin/sed 's/;\||/ /g'`
       CVMFS_REAL_PROXIES=
       for proxy in $CVMFS_PROXIES; do
         if [ "x$proxy" = "xauto" ]; then
