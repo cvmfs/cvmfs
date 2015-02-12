@@ -101,8 +101,8 @@ std::string GetExecutablePath(const std::string &exe_name) {
       continue;
     }
 
-    struct stat statinfo;
-    const int res = stat(real_path, &statinfo);
+    platform_stat64 statinfo;
+    const int res = platform_stat(real_path, &statinfo);
 
     if (res < 0) {
       continue;
