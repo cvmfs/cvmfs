@@ -94,15 +94,15 @@ std::string GetExecutablePath(const std::string &exe_name) {
   const std::vector<std::string>::const_iterator iend = paths.end();
   for (; i != iend; ++i) {
     const std::string candidate_path = *i + "/" + exe_name;
+    char real_path[PATH_MAX];
 
-    char *real_path = realpath(candidate_path.c_str(), NULL);
-    if (NULL == real_path) {
+    const char *rpret = realpath(candidate_path.c_str(), real_path);
+    if (NULL == rpret) {
       continue;
     }
 
     struct stat statinfo;
     const int res = stat(real_path, &statinfo);
-    free(real_path);
 
     if (res < 0) {
       continue;
