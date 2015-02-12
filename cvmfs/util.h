@@ -206,7 +206,6 @@ bool ManagedExec(const std::vector<std::string>  &command_line,
                  const bool                       drop_credentials,
                  const bool                       double_fork = true,
                        pid_t                     *child_pid = NULL);
-std::string GetExecutablePath(const std::string &exe_name);
 
 void SafeSleepMs(const unsigned ms);
 

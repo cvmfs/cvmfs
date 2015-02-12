@@ -47,17 +47,6 @@ TEST(T_Util, IsAbsolutePath) {
 }
 
 
-TEST(T_Util, GetExecutablePath) {
-  EXPECT_NE ("", GetExecutablePath("cat"));
-  EXPECT_NE ("", GetExecutablePath("grep"));
-  EXPECT_NE ("", GetExecutablePath("ls"));
-  EXPECT_EQ ("", GetExecutablePath("foobar1234renem"));
-  EXPECT_EQ ("", GetExecutablePath("test/foo"));
-  EXPECT_EQ ("", GetExecutablePath("../foo/bar"));
-  EXPECT_EQ ("", GetExecutablePath(""));
-}
-
-
 TEST(T_Util, Shuffle) {
   vector<int> v;
   Prng prng;
