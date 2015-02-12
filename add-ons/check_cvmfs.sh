@@ -1,11 +1,12 @@
 #!/bin/bash
 # CernVM-FS check for Nagios
-# Version 1.9, last modified: 11.02.2015
+# Version 1.9, last modified: 12.02.2015
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
-# 1.9 - 11.02.2015:
+# 1.9 - 12.02.2015:
 #    - Add -t(imeout) parameter to avoid hanging check.  Defaults to 2 minutes.
+#    - Add -i(node check) parameter to check for inodes overflowing 32bit
 # 1.8:
 #    - resolve auto proxy
 # 1.7:
@@ -32,13 +33,15 @@ TIMEOUT_SECONDS=120
 
 
 usage() {
-   /bin/echo "Usage:   $0 [-t <seconds>][-m] [-n] <repository name> [expected cvmfs version]"
+   /bin/echo "Usage:   $0 [-t <seconds>][-m] [-n] [-i] <repository name> [expected cvmfs version]"
    /bin/echo "Example: $0 -t 60 -m -n atlas.cern.ch 2.0.4"
    /bin/echo "Options:"
    /bin/echo "  -t  second after which the check times out with a warning (default: ${TIMEOUT_SECONDS})"
    /bin/echo "  -n  run extended network checks"
    /bin/echo "  -m  check memory consumption of the cvmfs2 process"
    /bin/echo "      (less than 50M or 1% of available memory)"
+   /bin/echo "  -i  check if inodes exceed 32bit which can break 32bit programs"
+   /bin/echo "      that use the non-64bit glibc file system interface"
 }
 
 version() {
@@ -86,12 +89,11 @@ get_xattr() {
 }
 
 
-
-
 # Option handling
 OPT_NETWORK_CHECK=0
 OPT_MEMORY_CHECK=0
-while getopts "hVvt:nm" opt; do
+OPT_INODE_CHECK=0
+while getopts "hVvt:nmi" opt; do
   case $opt in
     h)
       help
@@ -116,6 +118,9 @@ while getopts "hVvt:nm" opt; do
     ;;
     m)
       OPT_MEMORY_CHECK=1
+    ;;
+    i)
+      OPT_INODE_CHECK=1
     ;;
     *)
       /bin/echo "SERVICE STATUS: Invalid option: $1"
@@ -181,6 +186,10 @@ do_check() {
       /bin/echo "SERVICE STATUS: failed to read memory consumption"
       exit $STATUS_UNKNOWN
     fi
+  fi
+  INODE_MAX=0
+  if [ $OPT_INODE_CHECK -eq 1 ]; then
+    get_xattr inode_max; INODE_MAX=$XATTR_VALUE
   fi
 
   # Network settings;  TODO: currently configured values required
@@ -291,6 +300,15 @@ do_check() {
     done
   fi
 
+  # Check for inode numbers >32bit
+  if [ $OPT_INODE_CHECK -eq 1 ]; then
+    OVERFLOW=$(/usr/bin/perl -e "$INODE_MAX > 2147483647 ? print 1 : print 0" 2>/dev/null)
+    if [ $OVERFLOW -eq 1 ]; then
+      append_info "inodes exceed 32bit, some 32bit applications might break"
+      RETURN_STATUS=$STATUS_WARNING
+    fi
+  fi
+
   if [ -f "/cvmfs/${REPOSITORY}/.cvmfsdirtab" ]; then
     cat "/cvmfs/${REPOSITORY}/.cvmfsdirtab" > /dev/null 2>&1
     if [ $? -ne 0 ]; then
@@ -304,7 +322,7 @@ do_check() {
 }
 
 
-# Guard the checks by a timeout
+# Guard the check by a timeout
 do_check &
 PID=$!
 START_TIME=$SECONDS
