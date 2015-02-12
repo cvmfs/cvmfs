@@ -30,12 +30,16 @@ TEST(T_ManagedExec, ExecuteBinaryDoubleFork) {
   int fd_stdin, fd_stdout, fd_stderr;
   pid_t child_pid;
 
+  // find gdb in the $PATH of this system
+  const std::string gdb = GetExecutablePath("gdb");
+  ASSERT_NE ("", gdb) << "gdb not found, but needed by this test case";
+
   // spawn detached (double forked) child process
   const bool double_fork = true;
   bool retval = ExecuteBinary(&fd_stdin,
                               &fd_stdout,
                               &fd_stderr,
-                               "gdb",
+                               gdb,
                                std::vector<std::string>(),
                                double_fork,
                               &child_pid);

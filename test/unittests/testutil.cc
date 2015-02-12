@@ -66,6 +66,63 @@ pid_t GetParentPid(const pid_t pid) {
   return parent_pid;
 }
 
+/**
+ * Traverses the $PATH environment variable to find the absolute path of a given
+ * program name. Pretty much what `which` in bash would do.
+ *
+ * Inspired by a solution to this bulletin board question:
+ *  http://www.linuxquestions.org/questions/programming-9/g
+ *         et-full-path-of-a-command-in-c-117965/#post611028
+ *
+ * @param exe_name  the name of the program to search the $PATH for
+ * @return          absolute path to the program or empty string if not found
+ */
+std::string GetExecutablePath(const std::string &exe_name) {
+  std::string result;
+
+  if (exe_name.empty() || exe_name.find('/') != std::string::npos) {
+    return result;
+  }
+
+  const char *searchpath = getenv("PATH");
+  if (NULL == searchpath) {
+    return result;
+  }
+
+  const std::vector<std::string> paths = SplitString(searchpath, ':');
+        std::vector<std::string>::const_iterator i    = paths.begin();
+  const std::vector<std::string>::const_iterator iend = paths.end();
+  for (; i != iend; ++i) {
+    const std::string candidate_path = *i + "/" + exe_name;
+    char real_path[PATH_MAX];
+
+    const char *rpret = realpath(candidate_path.c_str(), real_path);
+    if (NULL == rpret) {
+      continue;
+    }
+
+    platform_stat64 statinfo;
+    const int res = platform_stat(real_path, &statinfo);
+
+    if (res < 0) {
+      continue;
+    }
+
+    if (! S_ISREG(statinfo.st_mode)) {
+      break;
+    }
+
+    if (statinfo.st_mode & S_IXUSR ||
+        statinfo.st_mode & S_IXGRP ||
+        statinfo.st_mode & S_IXOTH) {
+      result = real_path;
+      break;
+    }
+  }
+
+  return result;
+}
+
 time_t t(const int day, const int month, const int year) {
   struct tm time_descriptor;
 
