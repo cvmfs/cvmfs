@@ -1,10 +1,11 @@
 #!/bin/bash
 # CernVM-FS check for Nagios
-# Version 1.9, last modified: 12.02.2015
+# Version 1.9, last modified: 13.02.2015
 # Bugs and comments to Jakob Blomer (jblomer@cern.ch)
 #
 # ChangeLog
-# 1.9 - 12.02.2015:
+# 1.9 - 13.02.2015:
+#    - Use --max-time 3*$connect_timeout option in curl requests
 #    - Add fallback proxies to network checks
 #    - Add -t(imeout) parameter to avoid hanging check.  Defaults to 2 minutes.
 #    - Add -i(node check) parameter to check for inodes overflowing 32bit
@@ -291,7 +292,9 @@ do_check() {
           TIMEOUT=$CVMFS_TIMEOUT_DIRECT
         fi
         URL="${HOST}/.cvmfspublished"
-        $PROXY_ENV /usr/bin/curl -H "Pragma:" -f --connect-timeout $TIMEOUT $URL > \
+        $PROXY_ENV /usr/bin/curl -H "Pragma:" -f \
+          --max-time $((3*${TIMEOUT})) \
+          --connect-timeout $TIMEOUT $URL > \
           /dev/null 2>&1
         if [ $? -ne 0 ]; then
           append_info "offline ($HOST via $PROXY)"
