@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 static_result_dir=src/static
 
 [ -d $static_result_dir ] && rm -fR $static_result_dir
