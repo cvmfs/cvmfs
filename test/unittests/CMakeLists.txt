@@ -54,6 +54,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_download.cc
   t_uuid.cc
   t_object_fetcher.cc
+  t_statistics.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -131,6 +132,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/duplex_cares.h
   ${CVMFS_SOURCE_DIR}/dns.h
   ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/statistics.h
+  ${CVMFS_SOURCE_DIR}/statistics.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})

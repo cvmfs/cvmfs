@@ -52,6 +52,7 @@ set (CVMFS_CLIENT_SOURCES
   shortstring.h
   file_chunk.h file_chunk.cc
   fs_traversal.h
+  statistics.h statistics.cc
 )
 
 
