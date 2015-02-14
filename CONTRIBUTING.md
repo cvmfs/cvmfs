@@ -37,7 +37,7 @@ The code repository contains a style checker which can be invoked like that:
 
 # Testing
 
-If possible, please add tests to any new code.  Preferably add tests as unit tests to the test/unittests folder, using the [Google Test](https://code.google.com/p/googletest/) unit test framework.  For "cross-cutting" changes that touch a few lines in many files in the code base, please add an integration test in the src/test folder.  To do so, create a new subdirectory and start from one of the "main" shell scripts from another test.  Client-side tests have number <500, server-side tests have numbers >500.
+If possible, please add tests to any new code.  Preferably add tests as unit tests to the test/unittests folder, using the [Google Test](https://code.google.com/p/googletest/) unit test framework.  For "cross-cutting" changes that touch a few lines in many files in the code base, please add an integration test in the src/test folder.  To do so, create a new subdirectory and start from one of the "main" shell scripts from another test.  Client-side tests have numbers less than 500, server-side tests have numbers greater than 500.
 
 
 # Documentation
