@@ -35,7 +35,7 @@ class Counter {
   std::string PrintKi() { return StringifyInt(Get() / 1024); }
   std::string PrintM() { return StringifyInt(Get() / (1000 * 1000)); }
   std::string PrintMi() { return StringifyInt(Get() / (1024 * 1024)); }
-  std::string PrintRatio(Counter &divider) {
+  std::string PrintRatio(Counter divider) {
     double enumerator_value = Get();
     double divider_value = divider.Get();
     return StringifyDouble(enumerator_value / divider_value);
