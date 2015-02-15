@@ -52,11 +52,17 @@ class Counter {
  */
 class Statistics : SingleCopy {
  public:
+  enum PrintOptions {
+    kPrintSimple = 0,
+    kPrintHeader
+  };
+
   Statistics();
   ~Statistics();
   Counter *Register(const std::string &name, const std::string &desc);
   Counter *Lookup(const std::string &name);
   std::string LookupDesc(const std::string &name);
+  std::string PrintList(const PrintOptions print_options);
  private:
   struct CounterInfo {
     explicit CounterInfo(const std::string &desc) : desc(desc) { }

@@ -22,12 +22,28 @@ Counter *Statistics::Lookup(const std::string &name) {
 }
 
 
-std::string Statistics::LookupDesc(const std::string &name) {
+string Statistics::LookupDesc(const std::string &name) {
   MutexLockGuard lock_guard(lock_);
   map<string, CounterInfo *>::const_iterator i = counters_.find(name);
   if (i != counters_.end())
     return i->second->desc;
   return "";
+}
+
+
+string Statistics::PrintList(const PrintOptions print_options) {
+  string result;
+  if (print_options == kPrintHeader)
+    result += "Name|Value|Description\n";
+
+  MutexLockGuard lock_guard(lock_);
+  for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
+       iEnd = counters_.end(); i != iEnd; ++i)
+  {
+    result += i->first + "|" + StringifyInt(i->second->counter.Get()) +
+              "|" + i->second->desc + "\n";
+  }
+  return result;
 }
 
 

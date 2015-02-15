@@ -46,6 +46,9 @@ TEST(T_Statistics, Statistics) {
   EXPECT_EQ("a test counter", statistics.LookupDesc("test.counter"));
 
   EXPECT_EQ(NULL, statistics.Lookup("test.unknown"));
+  
+  EXPECT_EQ("test.counter|0|a test counter\n", 
+            statistics.PrintList(Statistics::kPrintSimple));
 }
 
 }  // namespace perf
