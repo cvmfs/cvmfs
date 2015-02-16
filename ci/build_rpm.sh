@@ -38,18 +38,23 @@ for d in $rpm_infra_dirs; do
   mkdir ${CVMFS_RESULT_LOCATION}/${d}
 done
 
+git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
+tarball="cvmfs-${cvmfs_version}.${git_hash}.tar.gz"
+echo "creating source tar ball '$tarball'..."
+create_cvmfs_source_tarball ${CVMFS_SOURCE_LOCATION} \
+                            ${CVMFS_RESULT_LOCATION}/SOURCES/${tarball}
+
 # copy RPM spec file and SELinux module files in place and cd there
+echo "copying RPM package specification and dependencies..."
 cp ${rpm_src_dir}/$spec_file $CVMFS_RESULT_LOCATION
 cp ${rpm_src_dir}/cvmfs.te \
    ${rpm_src_dir}/cvmfs.fc \
    $CVMFS_RESULT_LOCATION/SOURCES
-# cp $tarball $packagedir/SOURCES || exit 5
 cd  $CVMFS_RESULT_LOCATION
 
 # generate the release tag for either a nightly build or a release
 # (for the nightly build this requires some changes in the spec file)
 if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
-  git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
   build_tag="git-${git_hash}"
   nightly_tag="0.${CVMFS_NIGHTLY_BUILD_NUMBER}.${git_hash}git"
 
