@@ -39,7 +39,7 @@ for d in $rpm_infra_dirs; do
 done
 
 git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
-tarball="cvmfs-${cvmfs_version}.${git_hash}.tar.gz"
+tarball="cvmfs-${cvmfs_version}.tar.gz"
 echo "creating source tar ball '$tarball'..."
 create_cvmfs_source_tarball ${CVMFS_SOURCE_LOCATION} \
                             ${CVMFS_RESULT_LOCATION}/SOURCES/${tarball}
@@ -60,8 +60,6 @@ if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
 
   echo "creating nightly build '$nightly_tag'"
   sed -i -e "s/^Release: .*/Release: ${nightly_tag}%{?dist}/" $spec_file
-  sed -i -e "s/\(^Source0: .*\)%{version}/\1${build_tag}/"    $spec_file
-  sed -i -e "s/^%setup -q/%setup -q -n cvmfs-${build_tag}/"   $spec_file
 else
   echo "creating release: $cvmfs_version"
 fi
