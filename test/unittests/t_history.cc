@@ -582,7 +582,7 @@ TYPED_TEST(T_History, RemoveNonExistentTag) {
 }
 
 
-TYPED_TEST(T_History, RemoveMultipleTags) {
+TYPED_TEST(T_History, RemoveMultipleTagsSlow) {
   typedef typename TestFixture::TagVector            TagVector;
   typedef typename TagVector::const_iterator         TagVectorItr;
   typedef typename TagVector::const_reverse_iterator TagVectorRevItr;
@@ -1518,7 +1518,7 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision1) {
 }
 
 
-TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision0) {
+TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision0Slow) {
   if (TestFixture::IsMocked()) {
     // this is only valid for the production code...
     // the mocked history does not deal with legacy formats
@@ -1557,7 +1557,7 @@ TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision0) {
 }
 
 
-TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision1) {
+TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision1Slow) {
   if (TestFixture::IsMocked()) {
     // this is only valid for the production code...
     // the mocked history does not deal with legacy formats

@@ -443,7 +443,7 @@ TEST_F(T_FileProcessing, ProcessBigFile) {
 }
 
 
-TEST_F(T_FileProcessing, ProcessHugeFile) {
+TEST_F(T_FileProcessing, ProcessHugeFileSlow) {
   ExpectedHashStrings hs = GetHugeFileChunkHashes();
   hs.push_back(GetHugeFileBulkHash());
   TestProcessFile(GetHugeFile(), hs);
@@ -455,7 +455,7 @@ TEST_F(T_FileProcessing, ProcessBigFileWithoutChunks) {
 }
 
 
-TEST_F(T_FileProcessing, ProcessMultipleFiles) {
+TEST_F(T_FileProcessing, ProcessMultipleFilesSlow) {
   std::vector<std::string> pathes;
   ExpectedHashStrings hs;
 
@@ -488,7 +488,7 @@ TEST_F(T_FileProcessing, ProcessMultipleFiles) {
 }
 
 
-TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunking) {
+TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunkingSlow) {
   std::vector<std::string> pathes;
   ExpectedHashStrings hs;
 
@@ -517,7 +517,7 @@ TEST_F(T_FileProcessing, ProcessMultipeFilesWithoutChunking) {
 }
 
 
-TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWaves) {
+TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWavesSlow) {
   upload::FileProcessor processor(uploader_, MockSpoolerDefinition());
 
   // first wave...

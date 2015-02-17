@@ -109,7 +109,7 @@ TEST_F(T_FileSandbox, BigFile) {
 }
 
 
-TEST_F(T_FileSandbox, HugeFile) {
+TEST_F(T_FileSandbox, HugeFileSlow) {
   const std::string huge_file = GetHugeFile();
   const int64_t file_size = GetFileSize(huge_file);
 

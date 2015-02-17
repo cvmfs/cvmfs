@@ -56,7 +56,7 @@ class T_ChunkDetectors : public ::testing::Test {
   Prng rng_;
 };
 
-TEST_F(T_ChunkDetectors, StaticOffsetChunkDetector) {
+TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
   const size_t static_chunk_size = 1024;
 
   StaticOffsetDetector static_offset_detector(static_chunk_size);
@@ -160,7 +160,7 @@ TEST_F(T_ChunkDetectors, Xor32) {
 }
 
 
-TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
+TEST_F(T_ChunkDetectors, Xor32ChunkDetectorSlow) {
   const size_t base = 512000;
   const size_t min_chk_size = base;
   const size_t avg_chk_size = base * 2;

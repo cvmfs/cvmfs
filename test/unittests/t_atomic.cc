@@ -211,7 +211,7 @@ TEST_F(T_Atomic, TransactionalAssignment) {
 }
 
 
-TEST_F(T_Atomic, ConcurrentTransactionalAssignments) {
+TEST_F(T_Atomic, ConcurrentTransactionalAssignmentsSlow) {
   const int pthreads = 20;
 
   pthread_t threads32[pthreads];
@@ -253,7 +253,7 @@ TEST_F(T_Atomic, ConcurrentTransactionalAssignments) {
 }
 
 
-TEST_F(T_Atomic, ConcurrentWriteOfAtomicInts) {
+TEST_F(T_Atomic, ConcurrentWriteOfAtomicIntsSlow) {
   const int pthreads = 100;
 
   pthread_t threads32[pthreads];

@@ -256,7 +256,7 @@ TEST_F (T_AsyncReader, FileReadCallback) {
 //
 
 
-TEST_F (T_AsyncReader, ReadHugeFile) {
+TEST_F (T_AsyncReader, ReadHugeFileSlow) {
   TestFile *f = new TestFile(GetHugeFile(), GetHugeFileHash());
 
   const size_t        max_buffer_size = 524288; // will NOT fit in one buffer
@@ -279,7 +279,7 @@ TEST_F (T_AsyncReader, ReadHugeFile) {
 //
 
 
-TEST_F (T_AsyncReader, ReadManyBigFiles) {
+TEST_F (T_AsyncReader, ReadManyBigFilesSlow) {
   const int file_count = 5000;
 
   std::vector<TestFile*> files;
@@ -357,7 +357,7 @@ void *deadlock_test(void *v_files) {
   return (void*)1337;
 }
 
-TEST_F (T_AsyncReader, MultipleWaits) {
+TEST_F (T_AsyncReader, MultipleWaitsSlow) {
   const int file_count = 10000;
   std::vector<TestFile*> files;
   files.reserve(file_count);
