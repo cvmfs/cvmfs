@@ -304,7 +304,7 @@ TEST(T_LruCache, FillCompletely) {
 }
 
 
-TEST(T_LruCache, LeastRecentlyUsedReplacement) {
+TEST(T_LruCache, LeastRecentlyUsedReplacementSlow) {
   LruCache<int, std::string> cache(cache_size, -1, hasher_int);
   EXPECT_TRUE  (cache.IsEmpty());
   EXPECT_FALSE (cache.IsFull());

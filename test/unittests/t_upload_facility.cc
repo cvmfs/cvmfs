@@ -125,7 +125,7 @@ void BufferUploadCompleteCallback_T_Callbacks(const UploaderResults &results) {
 }
 
 
-TEST(T_UploadFacility, Callbacks) {
+TEST(T_UploadFacility, CallbacksSlow) {
   UF_MockUploader *uploader = UF_MockUploader::MockConstruct();
 
   ASSERT_NE (static_cast<UF_MockUploader*>(NULL), uploader);

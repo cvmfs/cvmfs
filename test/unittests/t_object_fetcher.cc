@@ -580,13 +580,13 @@ typedef ::testing::Types<
 TYPED_TEST_CASE(T_ObjectFetcher, ObjectFetcherTypes);
 
 
-TYPED_TEST(T_ObjectFetcher, Initialize) {
+TYPED_TEST(T_ObjectFetcher, InitializeSlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   EXPECT_TRUE (object_fetcher.IsValid());
 }
 
 
-TYPED_TEST(T_ObjectFetcher, FetchManifest) {
+TYPED_TEST(T_ObjectFetcher, FetchManifestSlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
@@ -598,7 +598,7 @@ TYPED_TEST(T_ObjectFetcher, FetchManifest) {
 }
 
 
-TYPED_TEST(T_ObjectFetcher, FetchHistory) {
+TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
@@ -610,7 +610,7 @@ TYPED_TEST(T_ObjectFetcher, FetchHistory) {
 }
 
 
-TYPED_TEST(T_ObjectFetcher, FetchLegacyHistory) {
+TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
@@ -622,7 +622,7 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistory) {
 }
 
 
-TYPED_TEST(T_ObjectFetcher, FetchInvalidHistory) {
+TYPED_TEST(T_ObjectFetcher, FetchInvalidHistorySlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
@@ -633,7 +633,7 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidHistory) {
 }
 
 
-TYPED_TEST(T_ObjectFetcher, FetchCatalog) {
+TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
@@ -646,7 +646,7 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalog) {
 }
 
 
-TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalog) {
+TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalogSlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE (object_fetcher.IsValid());
 
@@ -657,7 +657,7 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalog) {
 }
 
 
-TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFiles) {
+TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFilesSlow) {
   if (! TestFixture::NeedsFilesystemSandbox()) {
     // this is only valid if we are actually creating files...
     return;

@@ -719,7 +719,7 @@ TYPED_TEST(T_Uploaders, UploadEmptyFile) {
 //
 
 
-TYPED_TEST(T_Uploaders, UploadHugeFile) {
+TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
   const std::string huge_file_path = TestFixture::GetHugeFile();
   const std::string dest_name     = "huge_file";
 
@@ -743,7 +743,7 @@ TYPED_TEST(T_Uploaders, UploadHugeFile) {
 //
 
 
-TYPED_TEST(T_Uploaders, UploadManyFiles) {
+TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
   const unsigned int number_of_files = 500;
   typedef std::vector<std::pair<std::string, std::string> > Files;
 
@@ -856,7 +856,7 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
 //
 
 
-TYPED_TEST(T_Uploaders, MultipleStreamedUpload) {
+TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
   const unsigned int  number_of_files        = 100;
   const unsigned int  max_buffers_per_stream = 15;
   const shash::Suffix hash_suffix            = 'K';
