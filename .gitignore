@@ -10,3 +10,5 @@ python/python_cvmfsutils.egg-info/*
 python/MANIFEST
 .project
 .cproject
+.metadata
+.settings

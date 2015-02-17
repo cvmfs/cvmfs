@@ -36,9 +36,10 @@ struct ConfigValue {
 };
 
 map<string, ConfigValue> *config_ = NULL;
+bool fast_parse_ = false;
 
-
-void Init() {
+void Init(bool fast_parse) {
+  fast_parse_ = fast_parse;
   config_ = new map<string, ConfigValue>();
 }
 
@@ -74,10 +75,35 @@ static string EscapeShell(const std::string &raw) {
 }
 
 
-void ParsePath(const string &config_file, const bool external) {
-  LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
+void ParsePathSimple(const string &config_file) {
   int retval;
+  string line;
+  FILE *fconfig = fopen(config_file.c_str(), "r");
+  if (fconfig == NULL)
+	return;
 
+  // Read line by line and extract parameters
+  while (GetLineFile(fconfig, &line)) {
+    line = Trim(line);
+    if (line.empty() || line[0] == '#' || line.find("if ") == 0 || line.find(" ") < string::npos)
+      continue;
+    vector<string> tokens = SplitString(line, '=');
+    if (tokens.size() < 2 || tokens.size() > 2)
+      continue;
+
+    ConfigValue value;
+    value.source = config_file;
+    value.value = Trim(tokens[1]);
+    string parameter = Trim(tokens[0]);
+    (*config_)[parameter] = value;
+    retval = setenv(parameter.c_str(), value.value.c_str(), 1);
+    assert(retval == 0);
+  }
+  fclose(fconfig);
+}
+
+void ParsePathNormal(const string &config_file, const bool external) {
+  int retval;
   int pipe_open[2];
   int pipe_quit[2];
   pid_t pid_child = 0;
@@ -191,6 +217,17 @@ void ParsePath(const string &config_file, const bool external) {
   close(fd_stdout);
   close(fd_stdin);
   fclose(fconfig);
+}
+
+
+
+void ParsePath(const string &config_file, const bool external) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
+  if(fast_parse_) {
+    ParsePathSimple(config_file);
+    } else {
+     ParsePathNormal(config_file, external);
+  }
 }
 
 

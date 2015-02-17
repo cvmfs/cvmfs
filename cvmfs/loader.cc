@@ -55,6 +55,7 @@ struct CvmfsOptions {
   int grab_mountpoint;
   int cvmfs_suid;
   int disable_watchdog;
+  int fast_parse;
 
   // Ignored options
   int ign_netdev;
@@ -83,6 +84,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
   CVMFS_SWITCH("cvmfs_suid",       cvmfs_suid),
   CVMFS_SWITCH("disable_watchdog", disable_watchdog),
+  CVMFS_SWITCH("fast_parse",       fast_parse),
 
   // Ignore these options
   CVMFS_SWITCH("_netdev",          ign_netdev),
@@ -120,6 +122,7 @@ bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
 bool disable_watchdog_ = false;
+bool fast_parse_ = false;
 atomic_int32 blocking_;
 atomic_int64 num_operations_;
 void *library_handle_;
@@ -403,6 +406,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   grab_mountpoint_ = cvmfs_options.grab_mountpoint;
   suid_mode_ = cvmfs_options.cvmfs_suid;
   disable_watchdog_ = cvmfs_options.disable_watchdog;
+  fast_parse_ = cvmfs_options.fast_parse;
 
   return mount_options;
 }
@@ -669,7 +673,7 @@ int main(int argc, char *argv[]) {
   }
 
   string parameter;
-  options::Init();
+  options::Init(fast_parse_);
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
@@ -704,6 +708,7 @@ int main(int argc, char *argv[]) {
   loader_exports_->repository_name = *repository_name_;
   loader_exports_->mount_point = *mount_point_;
   loader_exports_->disable_watchdog = disable_watchdog_;
+  loader_exports_->fast_parse = fast_parse_;
   if (config_files_)
     loader_exports_->config_files = *config_files_;
   else

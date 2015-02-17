@@ -1829,7 +1829,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::backoff_throttle_ = new BackoffThrottle();
 
   // Option parsing
-  options::Init();
+  options::Init(loader_exports->fast_parse);
   if (loader_exports->config_files != "") {
     vector<string> tokens = SplitString(loader_exports->config_files, ':');
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {

@@ -17,7 +17,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace options {
 
-void Init();
+void Init(bool fast_parse = false);
 void Fini();
 
 void ParsePath(const std::string &config_file, const bool external);
