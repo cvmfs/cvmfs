@@ -881,6 +881,36 @@ bool HasPrefix(const string &str, const string &prefix,
 }
 
 
+bool HasSuffix(
+  const std::string &str,
+  const std::string &suffix,
+  const bool ignore_case
+) {
+  unsigned i = str.length();
+  unsigned l = suffix.length();  
+  if (l > i)
+    return false;
+  if (l == 0)
+    return true;
+  // str, suffix cannot be empty
+  i--;
+  l--;
+
+  do {
+    if (ignore_case) {
+      if (toupper(str[i]) != toupper(suffix[l]))
+        return false;
+    } else {
+      if (str[i] != suffix[l])
+        return false;
+    }
+    --i;
+    --l;
+  } while (l > 0);
+  return true;
+}
+
+
 bool IsNumeric(const std::string &str) {
   for (unsigned i = 0; i < str.length(); ++i) {
     if ((str[i] < '0') || (str[i] > '9'))
