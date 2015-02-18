@@ -56,6 +56,7 @@ const unsigned kMaxCommandSize = 512;
 string *cachedir_ = NULL;  /**< Stores the cache directory from cvmfs.
                                 Pipe files will be created here. */
 string *socket_path_ = NULL;  /**< $cache_dir/cvmfs_io */
+OptionsManager *options_manager_ = NULL;
 int socket_fd_;
 pthread_t thread_talk_;
 bool spawned_;
@@ -473,7 +474,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         const string pid_str = StringifyInt(monitor::GetPid()) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "parameters") {
-        Answer(con_fd, options::Dump());
+        Answer(con_fd, options_manager_->Dump());
       } else if (line == "hotpatch history") {
         string history_str =
           StringifyTime(cvmfs::loader_exports_->boot_time, true) +
@@ -510,11 +511,12 @@ static void *MainTalk(void *data __attribute__((unused))) {
 /**
  * Init the socket.
  */
-bool Init(const string &cachedir) {
+bool Init(const string &cachedir, OptionsManager *options_manager) {
   if (initialized_) return true;
   spawned_ = false;
   cachedir_ = new string(cachedir);
   socket_path_ = new string(cachedir + "/cvmfs_io." + *cvmfs::repository_name_);
+  options_manager_ = options_manager;
 
   socket_fd_ = MakeSocket(*socket_path_, 0660);
   if (socket_fd_ == -1)

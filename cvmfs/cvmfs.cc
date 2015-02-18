@@ -183,6 +183,7 @@ lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
 glue::InodeTracker *inode_tracker_ = NULL;
+OptionsManager *options_manager_ = NULL;
 
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
@@ -1865,128 +1866,132 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::backoff_throttle_ = new BackoffThrottle();
 
   // Option parsing
-  options::Init();
+  if (cvmfs::loader_exports_->fast_parse) {
+    cvmfs::options_manager_ = new FastOptionsManager();
+  } else {
+    cvmfs::options_manager_ = new BashOptionsManager();
+  }
   if (loader_exports->config_files != "") {
     vector<string> tokens = SplitString(loader_exports->config_files, ':');
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
-      options::ParsePath(tokens[i], false);
+      cvmfs::options_manager_->ParsePath(tokens[i], false);
     }
   } else {
-    options::ParseDefault(loader_exports->repository_name);
+    cvmfs::options_manager_->ParseDefault(loader_exports->repository_name);
   }
   g_options_ready = true;
   string parameter;
 
   // Logging
-  if (options::GetValue("CVMFS_SYSLOG_LEVEL", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_SYSLOG_LEVEL", &parameter))
     SetLogSyslogLevel(String2Uint64(parameter));
   else
     SetLogSyslogLevel(3);
-  if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
     SetLogSyslogFacility(String2Int64(parameter));
-  if (options::GetValue("CVMFS_USYSLOG", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_USYSLOG", &parameter))
     SetLogMicroSyslog(parameter);
-  if (options::GetValue("CVMFS_DEBUGLOG", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_DEBUGLOG", &parameter))
     SetLogDebugFile(parameter);
   SetLogSyslogPrefix(loader_exports->repository_name);
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s", options::Dump().c_str());
+  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s", cvmfs::options_manager_->Dump().c_str());
 
   // Overwrite default options
-  if (options::GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
     mem_cache_size = String2Uint64(parameter) * 1024*1024;
-  if (options::GetValue("CVMFS_TIMEOUT", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_TIMEOUT", &parameter))
     timeout = String2Uint64(parameter);
-  if (options::GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
     timeout_direct = String2Uint64(parameter);
-  if (options::GetValue("CVMFS_LOW_SPEED_LIMIT", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_LOW_SPEED_LIMIT", &parameter))
     low_speed_limit = String2Uint64(parameter);
-  if (options::GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
     proxy_reset_after = String2Uint64(parameter);
-  if (options::GetValue("CVMFS_HOST_RESET_AFTER", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_HOST_RESET_AFTER", &parameter))
     host_reset_after = String2Uint64(parameter);
-  if (options::GetValue("CVMFS_MAX_RETRIES", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_MAX_RETRIES", &parameter))
     max_retries = String2Uint64(parameter);
-  if (options::GetValue("CVMFS_BACKOFF_INIT", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_BACKOFF_INIT", &parameter))
     backoff_init = String2Uint64(parameter)*1000;
-  if (options::GetValue("CVMFS_BACKOFF_MAX", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_BACKOFF_MAX", &parameter))
     backoff_max = String2Uint64(parameter)*1000;
-  if (options::GetValue("CVMFS_SEND_INFO_HEADER", &parameter) &&
-      options::IsOn(parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_SEND_INFO_HEADER", &parameter) &&
+      cvmfs::options_manager_->IsOn(parameter))
   {
     send_info_header = true;
   }
-  if (options::GetValue("CVMFS_USE_GEOAPI", &parameter) &&
-      options::IsOn(parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_USE_GEOAPI", &parameter) &&
+      cvmfs::options_manager_->IsOn(parameter))
   {
     use_geo_api = true;
   }
-  if (options::GetValue("CVMFS_FOLLOW_REDIRECTS", &parameter) &&
-      options::IsOn(parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_FOLLOW_REDIRECTS", &parameter) &&
+      cvmfs::options_manager_->IsOn(parameter))
   {
     follow_redirects = true;
   }
-  if (options::GetValue("CVMFS_TRACEFILE", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_TRACEFILE", &parameter))
     tracefile = parameter;
-  if (options::GetValue("CVMFS_MAX_TTL", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_MAX_TTL", &parameter))
     max_ttl = String2Uint64(parameter);
-  if (options::GetValue("CVMFS_KCACHE_TIMEOUT", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_KCACHE_TIMEOUT", &parameter))
     kcache_timeout = String2Int64(parameter);
-  if (options::GetValue("CVMFS_QUOTA_LIMIT", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_QUOTA_LIMIT", &parameter))
     quota_limit = String2Int64(parameter) * 1024*1024;
-  if (options::GetValue("CVMFS_HTTP_PROXY", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_HTTP_PROXY", &parameter))
     proxies = parameter;
-  if (options::GetValue("CVMFS_FALLBACK_PROXY", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_FALLBACK_PROXY", &parameter))
     fallback_proxies = parameter;
-  if (options::GetValue("CVMFS_DNS_SERVER", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
-  if (options::GetValue("CVMFS_TRUSTED_CERTS", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;
-  if (options::GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
+  if (cvmfs::options_manager_->GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
     public_keys = parameter;
-  } else if (options::GetValue("CVMFS_KEYS_DIR", &parameter)) {
+  } else if (cvmfs::options_manager_->GetValue("CVMFS_KEYS_DIR", &parameter)) {
     // Collect .pub files from CVMFS_KEYS_DIR
     public_keys = JoinStrings(FindFiles(parameter, ".pub"), ":");
   } else {
     public_keys = JoinStrings(FindFiles("/etc/cvmfs/keys", ".pub"), ":");
   }
-  if (options::GetValue("CVMFS_ROOT_HASH", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_ROOT_HASH", &parameter))
     root_hash = parameter;
-  if (options::GetValue("CVMFS_REPOSITORY_TAG", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_REPOSITORY_TAG", &parameter))
     repository_tag = parameter;
-  if (options::GetValue("CVMFS_REPOSITORY_DATE", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_REPOSITORY_DATE", &parameter))
     repository_date = parameter;
-  if (options::GetValue("CVMFS_NFS_SOURCE", &parameter) &&
-      options::IsOn(parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_NFS_SOURCE", &parameter) &&
+      cvmfs::options_manager_->IsOn(parameter))
   {
     nfs_source = true;
-    if (options::GetValue("CVMFS_NFS_SHARED", &parameter))
+    if (cvmfs::options_manager_->GetValue("CVMFS_NFS_SHARED", &parameter))
     {
       nfs_shared = true;
       nfs_shared_dir = MakeCanonicalPath(parameter);
     }
   }
-  if (options::GetValue("CVMFS_AUTO_UPDATE", &parameter) &&
-      !options::IsOn(parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_AUTO_UPDATE", &parameter) &&
+      !cvmfs::options_manager_->IsOn(parameter))
   {
     cvmfs::fixed_catalog_ = true;
   }
-  if (options::GetValue("CVMFS_HIDE_MAGIC_XATTRS", &parameter) &&
-      options::IsOn(parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_HIDE_MAGIC_XATTRS", &parameter) &&
+      cvmfs::options_manager_->IsOn(parameter))
   {
     cvmfs::hide_magic_xattrs_ = true;
   }
-  if (options::GetValue("CVMFS_SERVER_URL", &parameter)) {
+  if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
     const string org = tokens[0];
     hostname = parameter;
     hostname = ReplaceAll(hostname, "@org@", org);
     hostname = ReplaceAll(hostname, "@fqrn@", loader_exports->repository_name);
   }
-  if (options::GetValue("CVMFS_CACHE_BASE", &parameter)) {
+  if (cvmfs::options_manager_->GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
-    if (options::GetValue("CVMFS_SHARED_CACHE", &parameter) &&
-        options::IsOn(parameter))
+    if (cvmfs::options_manager_->GetValue("CVMFS_SHARED_CACHE", &parameter) &&
+        cvmfs::options_manager_->IsOn(parameter))
     {
       shared_cache = true;
       cachedir = cachedir + "/shared";
@@ -1995,32 +2000,32 @@ static int Init(const loader::LoaderExports *loader_exports) {
       cachedir = cachedir + "/" + loader_exports->repository_name;
     }
   }
-  if (options::GetValue("CVMFS_ALIEN_CACHE", &parameter)) {
+  if (cvmfs::options_manager_->GetValue("CVMFS_ALIEN_CACHE", &parameter)) {
     alien_cache = parameter;
   }
-  if (options::GetValue("CVMFS_UID_MAP", &parameter)) {
-    retval = options::ParseUIntMap(parameter, &uid_map);
+  if (cvmfs::options_manager_->GetValue("CVMFS_UID_MAP", &parameter)) {
+    retval = cvmfs::options_manager_->ParseUIntMap(parameter, &uid_map);
     if (!retval) {
       *g_boot_error = "failed to parse uid map " + parameter;
       return loader::kFailOptions;
     }
   }
-  if (options::GetValue("CVMFS_GID_MAP", &parameter)) {
-    retval = options::ParseUIntMap(parameter, &gid_map);
+  if (cvmfs::options_manager_->GetValue("CVMFS_GID_MAP", &parameter)) {
+    retval = cvmfs::options_manager_->ParseUIntMap(parameter, &gid_map);
     if (!retval) {
       *g_boot_error = "failed to parse gid map " + parameter;
       return loader::kFailOptions;
     }
   }
-  if (options::GetValue("CVMFS_CLAIM_OWNERSHIP", &parameter) &&
-      options::IsOn(parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_CLAIM_OWNERSHIP", &parameter) &&
+      cvmfs::options_manager_->IsOn(parameter))
   {
     g_claim_ownership = true;
   }
-  if (options::GetValue("CVMFS_INITIAL_GENERATION", &parameter)) {
+  if (cvmfs::options_manager_->GetValue("CVMFS_INITIAL_GENERATION", &parameter)) {
     initial_generation = String2Uint64(parameter);
   }
-  if (options::GetValue("CVMFS_PROXY_TEMPLATE", &parameter)) {
+  if (cvmfs::options_manager_->GetValue("CVMFS_PROXY_TEMPLATE", &parameter)) {
     proxy_template = parameter;
   }
 
@@ -2264,7 +2269,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   atomic_init32(&cvmfs::open_dirs_);
 
   // Control & command interface
-  if (!talk::Init(".")) {
+  if (!talk::Init(".", cvmfs::options_manager_)) {
     *g_boot_error = "failed to initialize talk socket (" +
                     StringifyInt(errno) + ")";
     return loader::kFailTalk;
@@ -2531,7 +2536,10 @@ static void Fini() {
   if (g_running_created)
     unlink(("running." + *cvmfs::repository_name_).c_str());
   if (g_fd_lockfile >= 0) UnlockFile(g_fd_lockfile);
-  if (g_options_ready) options::Fini();
+  if (g_options_ready) {
+    delete cvmfs::options_manager_;
+    cvmfs::options_manager_ = NULL;
+  }
 
   delete cvmfs::remount_fence_;
   delete cvmfs::signature_manager_;
@@ -2860,3 +2868,4 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_exports;
   g_cvmfs_exports = NULL;
 }
+
