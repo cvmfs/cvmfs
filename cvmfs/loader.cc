@@ -673,18 +673,23 @@ int main(int argc, char *argv[]) {
   }
 
   string parameter;
-  options::Init(fast_parse_);
+  OptionsManager *options_manager;
+  if (fast_parse_) {
+    options_manager = new FastOptionsManager();
+  } else {
+    options_manager = new BashOptionsManager();
+  }
   if (config_files_) {
     vector<string> tokens = SplitString(*config_files_, ':');
     for (unsigned i = 0, s = tokens.size(); i < s; ++i) {
-      options::ParsePath(tokens[i], false);
+      options_manager->ParsePath(tokens[i], false);
     }
   } else {
-    options::ParseDefault(*repository_name_);
+    options_manager->ParseDefault(*repository_name_);
   }
 
-  if (options::GetValue("CVMFS_MOUNT_RW", &parameter) &&
-      options::IsOn(parameter))
+  if (options_manager->GetValue("CVMFS_MOUNT_RW", &parameter) &&
+      options_manager->IsOn(parameter))
   {
     fuse_opt_add_arg(mount_options, "-orw");
   } else {
@@ -716,29 +721,29 @@ int main(int argc, char *argv[]) {
 
   if (parse_options_only_) {
     LogCvmfs(kLogCvmfs, kLogStdout, "# CernVM-FS parameters:\n%s",
-             options::Dump().c_str());
+             options_manager->Dump().c_str());
     return 0;
   }
 
   // Logging
-  if (options::GetValue("CVMFS_SYSLOG_LEVEL", &parameter))
+  if (options_manager->GetValue("CVMFS_SYSLOG_LEVEL", &parameter))
     SetLogSyslogLevel(String2Uint64(parameter));
   else
     SetLogSyslogLevel(3);
-  if (options::GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
+  if (options_manager->GetValue("CVMFS_SYSLOG_FACILITY", &parameter))
     SetLogSyslogFacility(String2Int64(parameter));
   SetLogSyslogPrefix(*repository_name_);
   // Deferr setting usyslog until credentials are dropped
 
   // Permissions check
-  if (options::GetValue("CVMFS_CHECK_PERMISSIONS", &parameter)) {
-    if (options::IsOn(parameter)) {
+  if (options_manager->GetValue("CVMFS_CHECK_PERMISSIONS", &parameter)) {
+    if (options_manager->IsOn(parameter)) {
       fuse_opt_add_arg(mount_options, "-odefault_permissions");
     }
   }
 
   // Number of file descriptors
-  if (options::GetValue("CVMFS_NFILES", &parameter)) {
+  if (options_manager->GetValue("CVMFS_NFILES", &parameter)) {
     uint64_t nfiles = String2Uint64(parameter);
     struct rlimit rpl;
     memset(&rpl, 0, sizeof(rpl));
@@ -783,7 +788,7 @@ int main(int argc, char *argv[]) {
 
   // Only set usyslog now, otherwise file permissions are wrong
   usyslog_path_ = new string();
-  if (options::GetValue("CVMFS_USYSLOG", &parameter))
+  if (options_manager->GetValue("CVMFS_USYSLOG", &parameter))
     *usyslog_path_ = parameter;
   SetLogMicroSyslog(*usyslog_path_);
 
@@ -798,7 +803,7 @@ int main(int argc, char *argv[]) {
 
   // Initialize the loader socket, connections are not accepted until Spawn()
   socket_path_ = new string("/var/run/cvmfs");
-  if (options::GetValue("CVMFS_RELOAD_SOCKETS", &parameter))
+  if (options_manager->GetValue("CVMFS_RELOAD_SOCKETS", &parameter))
     *socket_path_ = MakeCanonicalPath(parameter);
   *socket_path_ += "/cvmfs." + *repository_name_;
   retval = loader_talk::Init(*socket_path_);
@@ -809,7 +814,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Options are not needed anymore
-  options::Fini();
+  delete options_manager;
+  options_manager = NULL;
 
   // Load and initialize cvmfs library
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
