@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * CernVM-FS is a FUSE module which implements an HTTP read-only filesystem.
  * The original idea is based on GROW-FS.
@@ -1866,7 +1867,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::backoff_throttle_ = new BackoffThrottle();
 
   // Option parsing
-  if (cvmfs::loader_exports_->fast_parse) {
+  if (cvmfs::loader_exports_->simple_options_parsing) {
     cvmfs::options_manager_ = new FastOptionsManager();
   } else {
     cvmfs::options_manager_ = new BashOptionsManager();

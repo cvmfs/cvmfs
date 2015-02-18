@@ -140,7 +140,7 @@ struct LoaderExports {
   LoaderExports() :
     version(2),
     size(sizeof(LoaderExports)), boot_time(0), foreground(false),
-    disable_watchdog(false), fast_parse(false) {}
+    disable_watchdog(false), simple_options_parsing(false) {}
 
   uint32_t version;
   uint32_t size;
@@ -156,7 +156,7 @@ struct LoaderExports {
 
   // added with CernVM-FS 2.1.8 (LoaderExports Version: 2)
   bool disable_watchdog;
-  bool fast_parse;
+  bool simple_options_parsing;
 };
 
 

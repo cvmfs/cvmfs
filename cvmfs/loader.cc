@@ -55,7 +55,7 @@ struct CvmfsOptions {
   int grab_mountpoint;
   int cvmfs_suid;
   int disable_watchdog;
-  int fast_parse;
+  int simple_options_parsing;
 
   // Ignored options
   int ign_netdev;
@@ -84,7 +84,7 @@ static struct fuse_opt cvmfs_array_opts[] = {
   CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
   CVMFS_SWITCH("cvmfs_suid",       cvmfs_suid),
   CVMFS_SWITCH("disable_watchdog", disable_watchdog),
-  CVMFS_SWITCH("fast_parse",       fast_parse),
+  CVMFS_SWITCH("simple_options_parsing",       simple_options_parsing),
 
   // Ignore these options
   CVMFS_SWITCH("_netdev",          ign_netdev),
@@ -122,7 +122,7 @@ bool grab_mountpoint_ = false;
 bool parse_options_only_ = false;
 bool suid_mode_ = false;
 bool disable_watchdog_ = false;
-bool fast_parse_ = false;
+bool simple_options_parsing_ = false;
 atomic_int32 blocking_;
 atomic_int64 num_operations_;
 void *library_handle_;
@@ -406,7 +406,7 @@ static fuse_args *ParseCmdLine(int argc, char *argv[]) {
   grab_mountpoint_ = cvmfs_options.grab_mountpoint;
   suid_mode_ = cvmfs_options.cvmfs_suid;
   disable_watchdog_ = cvmfs_options.disable_watchdog;
-  fast_parse_ = cvmfs_options.fast_parse;
+  simple_options_parsing_ = cvmfs_options.simple_options_parsing;
 
   return mount_options;
 }
@@ -674,7 +674,7 @@ int main(int argc, char *argv[]) {
 
   string parameter;
   OptionsManager *options_manager;
-  if (fast_parse_) {
+  if (simple_options_parsing_) {
     options_manager = new FastOptionsManager();
   } else {
     options_manager = new BashOptionsManager();
@@ -713,7 +713,7 @@ int main(int argc, char *argv[]) {
   loader_exports_->repository_name = *repository_name_;
   loader_exports_->mount_point = *mount_point_;
   loader_exports_->disable_watchdog = disable_watchdog_;
-  loader_exports_->fast_parse = fast_parse_;
+  loader_exports_->simple_options_parsing = simple_options_parsing_;
   if (config_files_)
     loader_exports_->config_files = *config_files_;
   else
