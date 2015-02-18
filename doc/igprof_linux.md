@@ -1,13 +1,13 @@
 ##Notes for IgProf profiler tool in Linux
 
-Due to various clashes between IgProf and some old Linux versions it is necessary to do some previous configuration in order to run IgProf. It looks like the problem is caused when there is a fork during the execution.
+We have found out some issues with IgProf when CernVM-FS forks.
 These are the steps to solve it:
 
 1. Remove the /etc/mtab file
 2. Create a symbolic link in /etc/mtab pointing to /proc/mounts
 3. Execute cvmfs2 with the following options (using the -o flag):
     * disable_watchdog
-    * simple_options_parsing
+    * simple\_options\_parsing
 4. Also, include the -f flag to avoid a fork.
 
 
