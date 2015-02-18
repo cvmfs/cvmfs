@@ -52,6 +52,7 @@ set (CVMFS_CLIENT_SOURCES
   shortstring.h
   file_chunk.h file_chunk.cc
   fs_traversal.h
+  xattr.h xattr.cc
   statistics.h statistics.cc
 )
 
@@ -164,6 +165,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   history_sql.h history_sql.cc
   history_sqlite.h history_sqlite.cc
   letter.h letter.cc
+  xattr.h xattr.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc

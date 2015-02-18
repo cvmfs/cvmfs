@@ -22,6 +22,7 @@
 #include "sql.h"
 #include "util.h"
 #include "catalog_counters.h"
+#include "xattr.h"
 
 namespace swissknife {
   class CommandMigrate;
@@ -115,13 +116,18 @@ class Catalog : public SingleCopy {
   bool OpenDatabase(const std::string &db_path);
 
   bool LookupInode(const inode_t inode,
-                   DirectoryEntry *dirent, shash::Md5 *parent_md5path) const;
+                   DirectoryEntry *dirent, 
+                   shash::Md5 *parent_md5path) const;
   bool LookupMd5Path(const shash::Md5 &md5path, DirectoryEntry *dirent) const;
-  inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const
-  {
+  inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const {
     return LookupMd5Path(shash::Md5(path.GetChars(), path.GetLength()), dirent);
   }
   bool LookupRawSymlink(const PathString &path, LinkString *raw_symlink) const;
+  bool LookupXattrsMd5Path(const shash::Md5 &md5path, XattrList *xattrs) const;
+  bool LookupXattrsPath(const PathString &path, XattrList *xattrs) const {
+    return LookupXattrsMd5Path(
+      shash::Md5(path.GetChars(), path.GetLength()), xattrs);
+  }
 
   bool ListingMd5Path(const shash::Md5 &md5path,
                       DirectoryEntryList *listing) const;
@@ -273,6 +279,7 @@ class Catalog : public SingleCopy {
   SqlNestedCatalogListing  *sql_list_nested_;
   SqlAllChunks             *sql_all_chunks_;
   SqlChunksListing         *sql_chunks_listing_;
+  SqlLookupXattrs          *sql_lookup_xattrs_;
 
   mutable HashVector        referenced_hashes_;
 };  // class Catalog

@@ -98,6 +98,7 @@
 #include "manifest_fetch.h"
 #include "auto_umount.h"
 #include "uuid.h"
+#include "xattr.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -186,6 +187,13 @@ glue::InodeTracker *inode_tracker_ = NULL;
 double kcache_timeout_ = kDefaultKCacheTimeout;
 bool fixed_catalog_ = false;
 bool volatile_repository_ = false;
+/**
+ * If true, synthetic extended attributes (e.g. "user.pid") are excluded from
+ * listing.  They are still retrievable if the attribute key is known.  This
+ * helps if cvmfs is a read-only layer in a union file system stack where the
+ * synthetic attributes should not be copied up.
+ */
+bool hide_magic_xattrs_ = false;
 
 /**
  * in maintenance mode, cache timeout is 0 and catalogs are not reloaded
@@ -1414,10 +1422,17 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   const string attr = name;
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
+  bool retval;
+  XattrList xattrs;
+  if (d.HasXattrs()) {
+    PathString path;
+    retval = GetPathForInode(ino, &path);
+    assert(retval);
+    retval = catalog_manager_->LookupXattrs(path, &xattrs);
+    assert(retval);
+  }
   if (d.IsLink()) {
     PathString path;
-    bool retval = GetPathForInode(ino, &path);
-    assert(retval);
     catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
       catalog::kLookupSole | catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
@@ -1569,8 +1584,10 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(
       inode_generation_info_.inode_generation + catalog_manager_->inode_gauge());
   } else {
-    fuse_reply_err(req, ENOATTR);
-    return;
+    if (!xattrs.Get(attr, &attribute_value)) {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
   }
 
   if (size == 0) {
@@ -1586,11 +1603,20 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
-  LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listxattr on inode: %"PRIu64", size %u",
-           uint64_t(ino), size);
+  LogCvmfs(kLogCvmfs, kLogDebug,
+           "cvmfs_listxattr on inode: %"PRIu64", size %u [hide xattrs %d]",
+           uint64_t(ino), size, hide_magic_xattrs_);
 
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
+  XattrList xattrs;
+  if (d.HasXattrs()) {
+    PathString path;
+    bool retval = GetPathForInode(ino, &path);
+    assert(retval);
+    retval = catalog_manager_->LookupXattrs(path, &xattrs);
+    assert(retval);
+  }
   remount_fence_->Leave();
 
   if (!found) {
@@ -1603,20 +1629,30 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
     "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
     "user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0";
-  string attribute_list(base_list, sizeof(base_list)-1);
-  if (!d.checksum().IsNull()) {
-    const char regular_file_list[] = "user.hash\0user.lhash\0";
-    attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
-  }
-  if (d.IsLink()) {
-    const char symlink_list[] = "xfsroot.rawlink\0user.rawlink\0";
-    attribute_list += string(symlink_list, sizeof(symlink_list)-1);
+  string attribute_list;
+  if (hide_magic_xattrs_) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
+    attribute_list = xattrs.ListKeysPosix("");
+  } else {
+    attribute_list = string(base_list, sizeof(base_list)-1);
+    if (!d.checksum().IsNull()) {
+      const char regular_file_list[] = "user.hash\0user.lhash\0";
+      attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
+    }
+    if (d.IsLink()) {
+      const char symlink_list[] = "xfsroot.rawlink\0user.rawlink\0";
+      attribute_list += string(symlink_list, sizeof(symlink_list)-1);
+    }
+    attribute_list = xattrs.ListKeysPosix(attribute_list);
   }
 
   if (size == 0) {
     fuse_reply_xattr(req, attribute_list.length());
   } else if (size >= attribute_list.length()) {
-    fuse_reply_buf(req, &attribute_list[0], attribute_list.length());
+    if (attribute_list.empty())
+      fuse_reply_buf(req, NULL, 0);
+    else
+      fuse_reply_buf(req, &attribute_list[0], attribute_list.length());
   } else {
     fuse_reply_err(req, ERANGE);
   }
@@ -1934,6 +1970,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       !options::IsOn(parameter))
   {
     cvmfs::fixed_catalog_ = true;
+  }
+  if (options::GetValue("CVMFS_HIDE_MAGIC_XATTRS", &parameter) &&
+      options::IsOn(parameter))
+  {
+    cvmfs::hide_magic_xattrs_ = true;
   }
   if (options::GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');

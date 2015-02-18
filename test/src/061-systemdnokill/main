@@ -1,0 +1,23 @@
+
+cvmfs_test_name="Mark cvmfs to survive systemd process termination on shutdown"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount grid.cern.ch || return 1
+  local pid=$(attr -qg pid /cvmfs/grid.cern.ch)
+  local marker=$(sudo cat /proc/${pid}/cmdline | head -c1)
+  if [ x"$marker" = "x@" ]; then
+    return 10
+  fi
+
+  cvmfs_umount grid.cern.ch || return 2
+  cvmfs_mount grid.cern.ch "CVMFS_SYSTEMD_NOKILL=yes" || return 3
+  pid=$(attr -qg pid /cvmfs/grid.cern.ch)
+  marker=$(sudo cat /proc/${pid}/cmdline | head -c1)
+  if [ x"$marker" != "x@" ]; then
+    return 20
+  fi
+
+  return 0
+}

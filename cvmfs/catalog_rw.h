@@ -1,15 +1,15 @@
 /**
  * This file is part of the CernVM File System
  *
- * The WritableCatalog class is derived from Catalog.
- * It is used by the WritableCatalogManager on the server side.
- *
- * Catalogs are meant to be thread safe.
+ * The WritableCatalog class is derived from Catalog. It is used by the
+ * WritableCatalogManager on the server side.
  *
  * The main functionality is in:
  *  - AddEntry
  *  - UpdateEntry
  *  - RemoveEntry
+ *
+ * Catalogs not thread safe.
  */
 
 #ifndef CVMFS_CATALOG_RW_H_
@@ -17,13 +17,15 @@
 
 #include <stdint.h>
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "catalog.h"
 
+class XattrList;
+
 namespace swissknife {
-  class CommandMigrate;
+class CommandMigrate;
 }
 
 namespace catalog {
@@ -32,11 +34,7 @@ class WritableCatalogManager;
 
 class WritableCatalog : public Catalog {
   friend class WritableCatalogManager;
-  friend class swissknife::CommandMigrate; // needed for catalog migrations
-
- protected:
-  const static double kMaximalFreePageRatio   = 0.20;
-  const static double kMaximalRowIdWasteRatio = 0.25;
+  friend class swissknife::CommandMigrate;  // needed for catalog migrations
 
  public:
   WritableCatalog(const std::string &path,
@@ -58,10 +56,15 @@ class WritableCatalog : public Catalog {
   inline bool IsWritable() const { return true; }
   uint32_t GetMaxLinkId() const;
 
-  void AddEntry(const DirectoryEntry &entry, const std::string &entry_path,
+  void AddEntry(const DirectoryEntry &entry,
+                const XattrList &xattr,
+                const std::string &entry_path,
                 const std::string &parent_path);
   void TouchEntry(const DirectoryEntryBase &entry, const shash::Md5 &path_hash);
-  inline void TouchEntry(const DirectoryEntryBase &entry, const std::string &path) {
+  inline void TouchEntry(
+    const DirectoryEntryBase &entry,
+    const std::string &path)
+  {
     TouchEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
   void RemoveEntry(const std::string &entry_path);
@@ -89,17 +92,27 @@ class WritableCatalog : public Catalog {
   void SetPreviousRevision(const shash::Any &hash);
 
  protected:
+  static const double kMaximalFreePageRatio   = 0.20;
+  static const double kMaximalRowIdWasteRatio = 0.25;
+
   CatalogDatabase::OpenMode DatabaseOpenMode() const {
     return CatalogDatabase::kOpenReadWrite;
   }
 
   void UpdateEntry(const DirectoryEntry &entry, const shash::Md5 &path_hash);
-  inline void UpdateEntry(const DirectoryEntry &entry, const std::string &path) {
+  inline void UpdateEntry(
+    const DirectoryEntry &entry,
+    const std::string &path)
+  {
     UpdateEntry(entry, shash::Md5(shash::AsciiPtr(path)));
   }
 
-  inline void AddEntry(const DirectoryEntry &entry, const std::string &path) {
-    AddEntry(entry, path, GetParentPath(path));
+  inline void AddEntry(
+    const DirectoryEntry &entry,
+    const XattrList &xattrs,
+    const std::string &path) 
+  {
+    AddEntry(entry, xattrs, path, GetParentPath(path));
   }
 
   void InitPreparedStatements();
@@ -135,16 +148,19 @@ class WritableCatalog : public Catalog {
   // Helpers for nested catalog creation and removal
   void MakeTransitionPoint(const std::string &mountpoint);
   void MakeNestedRoot();
-  inline void MoveToNested(const std::string dir_structure_root,
-                           WritableCatalog *new_nested_catalog,
-                           std::vector<std::string> *grand_child_mountpoints) {
+  inline void MoveToNested(
+    const std::string dir_structure_root,
+    WritableCatalog *new_nested_catalog,
+    std::vector<std::string> *grand_child_mountpoints)
+  {
     MoveToNestedRecursively(dir_structure_root,
                             new_nested_catalog,
                             grand_child_mountpoints);
   }
-  void MoveToNestedRecursively(const std::string dir_structure_root,
-                             WritableCatalog *new_nested_catalog,
-                             std::vector<std::string> *grand_child_mountpoints);
+  void MoveToNestedRecursively(
+    const std::string dir_structure_root,
+    WritableCatalog *new_nested_catalog,
+    std::vector<std::string> *grand_child_mountpoints);
   void MoveCatalogsToNested(const std::vector<std::string> &nested_catalogs,
                             WritableCatalog *new_nested_catalog);
   void MoveFileChunksToNested(const std::string  &full_path,

@@ -6,7 +6,7 @@
 
 #include "directory_entry.h"
 
-using namespace catalog;
+namespace catalog {
 
 void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
   if (dirent.IsRegular()) {
@@ -16,13 +16,16 @@ void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
       self.chunked_files     += delta;
       self.chunked_file_size += delta * dirent.size();
     }
-  }
-  else if (dirent.IsLink())
+  } else if (dirent.IsLink()) {
     self.symlinks += delta;
-  else if (dirent.IsDirectory())
+  } else if (dirent.IsDirectory()) {
     self.directories += delta;
-  else
+  } else {
     assert(false);
+  }
+  if (dirent.HasXattrs()) {
+    self.xattrs += delta;
+  }
 }
 
 
@@ -63,3 +66,5 @@ Counters_t Counters::GetSubtreeEntries() const {
 Counters_t Counters::GetAllEntries() const {
   return GetSelfEntries() + GetSubtreeEntries();
 }
+
+}  // namespace catalog

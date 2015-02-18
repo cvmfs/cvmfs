@@ -54,6 +54,8 @@ set (CVMFS_UNITTEST_SOURCES
   t_download.cc
   t_uuid.cc
   t_object_fetcher.cc
+  t_catalog_sql.cc
+  t_xattr.cc
   t_statistics.cc
 
   # test utility functions
@@ -94,6 +96,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/globals.cc
 
   ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.h
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
 
@@ -132,6 +135,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/duplex_cares.h
   ${CVMFS_SOURCE_DIR}/dns.h
   ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/xattr.h
+  ${CVMFS_SOURCE_DIR}/xattr.cc
   ${CVMFS_SOURCE_DIR}/statistics.h
   ${CVMFS_SOURCE_DIR}/statistics.cc
 )

@@ -20,6 +20,7 @@ struct SyncParameters {
     ignore_xdir_hardlinks(false),
     stop_for_catalog_tweaks(false),
     garbage_collectable(false),
+    include_xattrs(false),
     catalog_entry_warn_threshold(500000),
     min_file_chunk_size(4*1024*1024),
     avg_file_chunk_size(8*1024*1024),
@@ -44,6 +45,7 @@ struct SyncParameters {
   bool             ignore_xdir_hardlinks;
   bool             stop_for_catalog_tweaks;
   bool             garbage_collectable;
+  bool             include_xattrs;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
   size_t           avg_file_chunk_size;
@@ -201,6 +203,7 @@ class CommandSync : public Command {
                                           "catalog tweaks"));
     r.push_back(Parameter::Switch   ('g', "repo is garbage collectable"));
     r.push_back(Parameter::Switch   ('p', "enable file chunking"));
+    r.push_back(Parameter::Switch   ('k', "include extended attributes"));
     r.push_back(Parameter::Optional ('z', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional ('a', "desired average chunk size in bytes"));
     r.push_back(Parameter::Optional ('l', "minimal file chunk size in bytes"));
