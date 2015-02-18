@@ -539,18 +539,30 @@ cvmfs_chksetup() {
         num_errors=$(($num_errors+1))
       fi
 
-      # Check Key
-      if [ -z "$CVMFS_PUBLIC_KEY" ]; then
-        echo "Warning: no public key (CVMFS_PUBLIC_KEY) defined for $fqrn"
+      # Check Keys
+      if [ -z "$CVMFS_KEYS_DIR" -a -z "$CVMFS_PUBLIC_KEY" ]; then
+        echo "Warning: no public key (CVMFS_KEYS_DIR or CVMFS_PUBLIC_KEY) defined for $fqrn"
         num_warnings=$(($num_warnings+1))
       else
-        for k in `echo $CVMFS_PUBLIC_KEY | tr ':' " "`
-          do
-            if [ ! -f "$k" ]; then
-              echo "Error: public key $k for $fqrn not accessible"
+        if [ -z "$CVMFS_PUBLIC_KEY" ]; then
+          if [ ! -d "$CVMFS_KEYS_DIR" ]; then
+            echo "Error: public key location $CVMFS_KEYS_DIR is not a directory"
+            num_errors=$(($num_errors+1))
+          else
+            if [ $(find "${CVMFS_KEYS_DIR}" -maxdepth 1 -name '*.pub' | wc -l) -eq 0 ]; then
+              echo "Error: no public keys in $CVMFS_KEYS_DIR"
               num_errors=$(($num_errors+1))
             fi
-          done
+          fi
+        else
+          for k in `echo $CVMFS_PUBLIC_KEY | tr ':' " "`
+            do
+              if [ ! -f "$k" ]; then
+                echo "Error: public key $k for $fqrn not accessible"
+                num_errors=$(($num_errors+1))
+              fi
+            done
+        fi
       fi
 
       # Check for required variables
@@ -570,7 +582,7 @@ cvmfs_chksetup() {
         for server in $server_list
         do
           local proxy_list
-          proxy_list=`echo "$CVMFS_HTTP_PROXY" | sed -e 's/;/ /g' -e 's/|/ /g'`
+          proxy_list=`echo "$CVMFS_HTTP_PROXY $CVMFS_FALLBACK_PROXY" | sed -e 's/;/ /g' -e 's/|/ /g'`
           local first_proxy=
           for proxy in $proxy_list
           do
@@ -821,9 +833,36 @@ cvmfs_reload() {
     return 1
   fi
   local clean_cache; clean_cache=0
+  local cache_directories=
   if [ "x$1" = "x-c" ]; then
     clean_cache=1
     shift
+    local list
+    list=""
+    if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
+       list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+    fi
+    local org shared
+    for org in $list shared
+    do
+      case $org in
+        none)
+        ;;
+        *)
+          . /etc/cvmfs/config.sh # start with fresh repository_... functions
+          cvmfs_readconfig
+          if [ "$org" != "shared" ]; then
+            fqrn=`cvmfs_mkfqrn $org`
+            cvmfs_readconfig $fqrn
+          else
+            fqrn=shared
+          fi
+          cache_directories="${CVMFS_CACHE_BASE}/${fqrn} $cache_directories"
+        ;;
+      esac
+    done
+    . /etc/cvmfs/config.sh # start with fresh repository_... functions
+    cvmfs_readconfig
   elif [ "x$1" != "x" ]; then
     org=$1
     fqrn=$(cvmfs_mkfqrn $org)
@@ -897,7 +936,22 @@ cvmfs_reload() {
   fi
 
   if [ $clean_cache -eq 1 ]; then
-    cvmfs_wipecache
+    for dir in $cache_directories; do
+      echo -n "Wiping out $dir ... "
+      if [ -d "$dir" ]; then
+        rm -rf "$dir" && \
+          mkdir -p "$dir" && \
+          chown $CVMFS_USER "$dir"
+        if [ $? -ne 0 ]; then
+          echo "Failed!"
+          RETVAL=1
+        else
+          echo "OK"
+        fi
+      else
+        echo "OK"
+      fi
+    done
   fi
 
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
@@ -913,7 +967,6 @@ cvmfs_reload() {
 
   return $RETVAL
 }
-
 
 cvmfs_probe() {
   RETVAL=0
@@ -974,59 +1027,6 @@ cvmfs_umount() {
       echo "OK"
     fi
   done
-
-  return $RETVAL
-}
-
-
-cvmfs_wipecache() {
-  if ! cvmfs_readconfig; then
-    echo "Failed to read CernVM-FS configuration"
-    return 1
-  fi
-
-  RETVAL=$?
-  if [ $RETVAL -eq 0 ]; then
-    local list
-    list=""
-
-    if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
-       list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
-    fi
-
-    local org shared
-    for org in $list shared
-    do
-      case $org in
-        none)
-        ;;
-        *)
-          . /etc/cvmfs/config.sh # start with fresh repository_... functions
-          cvmfs_readconfig
-          if [ "$org" != "shared" ]; then
-            fqrn=`cvmfs_mkfqrn $org`
-            cvmfs_readconfig $fqrn
-          else
-            fqrn=shared
-          fi
-          echo -n "Wiping out $CVMFS_CACHE_BASE/$fqrn ... "
-          if [ -d "$CVMFS_CACHE_BASE/$fqrn" ]; then
-            rm -rf "$CVMFS_CACHE_BASE/$fqrn" && \
-              mkdir -p "$CVMFS_CACHE_BASE/$fqrn" && \
-              chown $CVMFS_USER "$CVMFS_CACHE_BASE/$fqrn"
-            if [ $? -ne 0 ]; then
-              echo "Failed!"
-              RETVAL=1
-            else
-              echo "OK"
-            fi
-          else
-            echo "OK"
-          fi
-        ;;
-      esac
-    done
-  fi
 
   return $RETVAL
 }
@@ -1551,7 +1551,7 @@ case "$1" in
       exit 1
     fi
     shift 1
-    cvmfs_umount $@ && cvmfs_wipecache $@
+    cvmfs_reload -c
     RETVAL=$?
     ;;
 

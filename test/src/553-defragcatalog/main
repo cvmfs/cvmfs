@@ -28,6 +28,9 @@ cvmfs_run_test() {
   cp_bin ${repo_dir}/bar || return 5
   cp_bin ${repo_dir}/baz || return 6
 
+  echo "produce a large file in the root catalog"
+  dd if=/dev/urandom of=${repo_dir}/big_file count=50 bs=1MiB || return 6
+
   echo "create a first snapshot of the root catalog"
   publish_repo $CVMFS_TEST_REPO > /dev/null || return 7
 
@@ -43,7 +46,9 @@ cvmfs_run_test() {
   touch ${repo_dir}/baz/.cvmfscatalog || return 10
 
   echo "publish repository (should trigger root catalog defragmatation)"
-  publish_repo $CVMFS_TEST_REPO | grep '/ gets defragmented' || return 11
+  local publish_log_1="publish_1.log"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return 11
+  cat $publish_log_1 | grep '/ gets defragmented'     || return 11
 
   echo "check if root catalog is smaller than before (including safety margin)"
   local second_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')

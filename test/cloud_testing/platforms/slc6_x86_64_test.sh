@@ -35,8 +35,22 @@ sudo service httpd start > /dev/null 2>&1 || die "fail"
 echo "OK"
 
 # create the server's client cache directory in /srv (AUFS kernel deadlock workaround)
-echo -n "creating client cache on extra partition... "
-sudo mkdir /srv/cache || die "fail"
+echo -n "creating client caches on extra partition... "
+sudo mkdir -p /srv/cache/server || die "fail (cache for server test cases)"
+sudo mkdir -p /srv/cache/client || die "fail (cache for client test cases)"
+echo "done"
+
+echo -n "bind mount client cache to /var/lib/cvmfs... "
+if [ ! -d /var/lib/cvmfs ]; then
+  sudo rm -fR   /var/lib/cvmfs || true
+  sudo mkdir -p /var/lib/cvmfs || die "fail (mkdir /var/lib/cvmfs)"
+fi
+sudo mount --bind /srv/cache/client /var/lib/cvmfs || die "fail (cannot bind mount /var/lib/cvmfs)"
+echo "done"
+
+# reset SELinux context
+echo -n "restoring SELinux context for /var/lib/cvmfs... "
+sudo restorecon -R /var/lib/cvmfs || die "fail"
 echo "done"
 
 # running unit test suite
@@ -77,9 +91,13 @@ if [ $s3_retval -eq 0 ]; then
                                  src/542-storagescrubbing                     \
                                  src/543-storagescrubbing_scriptable          \
                                  src/550-livemigration                        \
+                                 src/563-garbagecollectlegacy                 \
+                                 src/568-migratecorruptrepo                   \
                                  src/571-localbackendumask                    \
+                                 src/572-proxyfailover                        \
                                  src/577-garbagecollecthiddenstratum1revision \
-                                 src/579-garbagecollectstratum1legacytag || s3_retval=$?
+                                 src/579-garbagecollectstratum1legacytag      \
+                                 src/583-httpredirects || s3_retval=$?
 
     echo -n "killing FakeS3... "
     sudo kill -2 $fakes3_pid && echo "done" || echo "fail"

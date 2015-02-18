@@ -1,8 +1,10 @@
 #ifndef CVMFS_UNITTEST_TESTUTIL
 #define CVMFS_UNITTEST_TESTUTIL
 
-#include <sys/types.h>
 #include <ctime>
+#include <sys/types.h>
+
+#include <gtest/gtest.h>
 
 #include "../../cvmfs/upload_facility.h"
 #include "../../cvmfs/hash.h"
@@ -12,6 +14,7 @@
 #include "../../cvmfs/object_fetcher.h"
 
 pid_t GetParentPid(const pid_t pid);
+std::string GetExecutablePath(const std::string &exe_name);
 
 time_t t(const int day, const int month, const int year);
 shash::Any h(const std::string &hash,
@@ -296,7 +299,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
               MockCatalog *previous = NULL) :
     parent_(parent), previous_(previous), root_path_(root_path),
     catalog_hash_(catalog_hash), catalog_size_(catalog_size),
-    revision_(revision), last_modified_(last_modified), is_root_(is_root)
+    revision_(revision), last_modified_(last_modified), is_root_(is_root),
+    owns_database_file_(false)
   {
     if (parent != NULL) {
       parent->RegisterChild(this);

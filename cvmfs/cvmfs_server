@@ -727,7 +727,30 @@ is_garbage_collectable() {
 has_auto_garbage_collection_enabled() {
   local name=$1
   load_repo_config $name
-  is_garbage_collectable $name && [ ! -z "$CVMFS_AUTO_GC_TIMESPAN" ]
+  is_garbage_collectable $name && [ x"$CVMFS_AUTO_GC" = x"true" ]
+}
+
+# get the configured (or default) timespan for an automatic garbage
+# collection run.
+#
+# @param name  the name of the repository to be checked
+# @return      the configured CVMFS_AUTO_GC_TIMESPAN or default (3 days ago)
+#              as a timestamp threshold (unix timestamp)
+#              Note: in case of a malformed timespan it might print an error to
+#                     stderr and return a non-zero code
+get_auto_garbage_collection_timespan() {
+  local name=$1
+  local timespan="3 days ago"
+
+  load_repo_config $name
+  if [ ! -z "$CVMFS_AUTO_GC_TIMESPAN" ]; then
+    timespan="$CVMFS_AUTO_GC_TIMESPAN"
+  fi
+
+  if ! date --date "$timespan" +%s 2>/dev/null; then
+    echo "Failed to parse CVMFS_AUTO_GC_TIMESPAN: '$timespan'" >&2
+    return 1
+  fi
 }
 
 # checks if a repository is currently in a transaction
@@ -817,6 +840,33 @@ publish_succeeded() {
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
   rmdir $pub_lock > /dev/null 2>&1
+}
+
+acquire_snapshot_lock() {
+  local name=$1
+  load_repo_config $name
+  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
+  mkdir $snapshot_lock > /dev/null 2>&1 || return 1
+}
+
+wait_and_acquire_snapshot_lock() {
+  local name=$1
+  while ! acquire_snapshot_lock $name; do
+    sleep 10
+  done
+}
+
+release_snapshot_lock() {
+  local name=$1
+  load_repo_config $name
+  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
+  rmdir $snapshot_lock > /dev/null 2>&1
+}
+
+is_snapshotting() {
+  local name=$1
+  load_repo_config $name
+  [ -d ${CVMFS_SPOOL_DIR}/is_snapshotting ]
 }
 
 
@@ -1742,7 +1792,7 @@ EOF
   # append GC specific configuration
   if [ x"$garbage_collectable" = x"true" ]; then
     cat >> $server_conf << EOF
-CVMFS_AUTO_GC_TIMESPAN='3 days ago'
+CVMFS_AUTO_GC=true
 EOF
   fi
 
@@ -2515,7 +2565,7 @@ EOF
   # append GC specific configuration
   if [ $enable_auto_gc != 0 ]; then
     cat >> /etc/cvmfs/repositories.d/${alias_name}/server.conf << EOF
-CVMFS_AUTO_GC_TIMESPAN='3 days ago'
+CVMFS_AUTO_GC=true
 EOF
   fi
 
@@ -3509,6 +3559,7 @@ publish() {
   local retcode=0
   local verbosity=""
   local manual_revision=""
+  local gc_timespan=0
 
   # optional parameter handling
   OPTIND=1
@@ -3582,6 +3633,7 @@ publish() {
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
+    gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
     local revision_number=$($swissknife info -r $stratum0 -v)
     if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
       echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
@@ -3708,15 +3760,13 @@ publish() {
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $name; then
       echo "Running automatic garbage collection"
-      local tst="$(date --date "$CVMFS_AUTO_GC_TIMESPAN" +%s 2>/dev/null)"
-      [ $? -eq 0 ] || { publish_failed $name; die "Cannot parse time stamp '$timestamp_threshold'"; }
       local dry_run=0
       __run_gc $name       \
                $stratum0   \
                $dry_run    \
                $manifest   \
                $trunk_hash \
-               -z $tst || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
+               -z $gc_timespan || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
     fi
 
     # finalizing transaction
@@ -3917,6 +3967,12 @@ gc() {
     preserve_revisions=0
   fi
 
+  # print a warning to scare off people that might not know what they are doing
+  echo
+  echo 'WARNING: `cvmfs_server gc` is an internal command and will be subject to change'
+  echo '         in future versions of CernVM-FS. Please do not use it manually!'
+  echo
+
   if [ $force -eq 0 ] && [ $dry_run -eq 0 ]; then
     echo "YOU ARE ABOUT TO DELETE DATA! Are you sure you want to do the following:"
   fi
@@ -4062,6 +4118,18 @@ __run_gc() {
 ################################################################################
 
 
+__snapshot_cleanup() {
+  local alias_name=$1
+
+  load_repo_config $alias_name
+  local user_shell="$(get_user_shell $alias_name)"
+
+  $user_shell "cvmfs_swissknife remove        \
+                 -r ${CVMFS_UPSTREAM_STORAGE} \
+                 -o .cvmfs_is_snapshotting" || echo "Warning: failed to remove .cvmfs_is_snapshotting"
+  release_snapshot_lock $alias_name         || echo "Warning: failed to release snapshotting lock"
+}
+
 snapshot() {
   local alias_names
   local name
@@ -4074,13 +4142,14 @@ snapshot() {
   local timeout
   local retries
   local retcode=0
-  local dont_wait=
+  local abort_on_conflict=0
+  local gc_timespan=0
 
   OPTIND=1
   while getopts "t" option; do
     case $option in
       t)
-        dont_wait="-s"
+        abort_on_conflict=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -4114,7 +4183,7 @@ snapshot() {
     retries=$CVMFS_HTTP_RETRIES
 
     # more sanity checks
-    is_owner_or_root $alias_name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
+    is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
     if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
         # this might have been missed if add-replica -a was used or
@@ -4125,24 +4194,46 @@ snapshot() {
         update_geodb -l || true
     fi
     [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
+    gc_timespan="$(get_auto_garbage_collection_timespan $alias_name)" || { retcode=1; continue; }
 
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
 
-    local log_level=
-    [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
-    local with_history=
-    if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -q "available"; then
-      with_history="-p"
-    else
-      echo "Initial snapshot"
+    local initial_snapshot=0
+    if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
+      initial_snapshot=1
     fi
 
-    # command to remove the magic file when finished (or aborted)
-    delete_command="cvmfs_swissknife remove \
-                      -r ${upstream} \
-                      -o .cvmfs_is_snapshotting"
-    trap "$delete_command" HUP INT TERM QUIT
+    # check for other snapshots in progress
+    if ! acquire_snapshot_lock $alias_name; then
+      if [ $abort_on_conflict -eq 1 ]; then
+        echo "another snapshot is in progress... aborting"
+        retcode=1
+        continue
+      fi
+
+      if [ $initial_snapshot -eq 1 ]; then
+        echo "an initial snapshot is in progress... aborting"
+        retcode=1
+        continue
+      fi
+
+      echo "waiting for another snapshot to finish..."
+      if ! wait_and_acquire_snapshot_lock $alias_name; then
+        echo "failed to acquire snapshot lock"
+        retcode=1
+        continue
+      fi
+    fi
+
+    # here the lock is already acquired and needs to be cleared in case of abort
+    trap "__snapshot_cleanup $alias_name" EXIT HUP INT TERM
+
+    local log_level=
+    [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
+    if [ $initial_snapshot -eq 1 ]; then
+      echo "Initial snapshot"
+    fi
 
     # put a magic file in the repository root to signal a snapshot in progress
     $user_shell "date > ${spool_dir}/tmp/snapshotting"
@@ -4151,6 +4242,8 @@ snapshot() {
       -o .cvmfs_is_snapshotting"
 
     # do the actual snapshot actions
+    local with_history=""
+    [ $initial_snapshot -ne 1 ] && with_history="-p"
     $user_shell "cvmfs_swissknife pull -m $name \
         -u $stratum0 \
         -r ${upstream} \
@@ -4158,7 +4251,8 @@ snapshot() {
         -k $public_key \
         -n $num_workers \
         -t $timeout \
-        -a $retries $with_history $log_level $dont_wait"
+        -a $retries $with_history $log_level"
+
     $user_shell "date > ${spool_dir}/tmp/last_snapshot"
     $user_shell "cvmfs_swissknife upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot \
@@ -4167,16 +4261,18 @@ snapshot() {
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $alias_name; then
       echo "Running automatic garbage collection"
-      local tst="$(date --date "$CVMFS_AUTO_GC_TIMESPAN" +%s 2>/dev/null)"
-      [ $? -eq 0 ] || die "Cannot parse time stamp '$timestamp_threshold'"
       local dry_run=0
       __run_gc "$alias_name" \
                "$stratum1"   \
                "$dry_run"    \
                ""            \
                ""            \
-               -z $tst || die "Garbage collection failed ($?)"
+               -z $gc_timespan || die "Garbage collection failed ($?)"
     fi
+
+    # all done, clear the trap and run the cleanup manually
+    trap - EXIT HUP INT TERM
+    __snapshot_cleanup $alias_name
 
   done
 

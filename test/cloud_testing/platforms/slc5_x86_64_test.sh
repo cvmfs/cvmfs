@@ -51,8 +51,22 @@ sudo chcon -Rv --type=httpd_sys_content_t /srv > /dev/null || die "fail (chcon)"
 echo "done"
 
 # create the server's client cache directory in /srv (AUFS kernel deadlock workaround)
-echo -n "creating client cache on extra partition... "
-sudo mkdir /srv/cache || die "fail"
+echo -n "creating client caches on extra partition... "
+sudo mkdir -p /srv/cache/server || die "fail (cache for server test cases)"
+sudo mkdir -p /srv/cache/client || die "fail (cache for client test cases)"
+echo "done"
+
+echo -n "bind mount client cache to /var/lib/cvmfs... "
+if [ ! -d /var/lib/cvmfs ]; then
+  sudo rm -fR   /var/lib/cvmfs || true
+  sudo mkdir -p /var/lib/cvmfs || die "fail (mkdir /var/lib/cvmfs)"
+fi
+sudo mount --bind /srv/cache/client /var/lib/cvmfs || die "fail (cannot bind mount /var/lib/cvmfs)"
+echo "done"
+
+# reset SELinux context
+echo -n "restoring SELinux context for /var/lib/cvmfs... "
+sudo restorecon -R /var/lib/cvmfs || die "fail"
 echo "done"
 
 # running unit test suite
@@ -60,7 +74,7 @@ run_unittests --gtest_shuffle || ut_retval=$?
 
 echo "running CernVM-FS test cases..."
 cd ${SOURCE_DIRECTORY}/test
-export CVMFS_TEST_SERVER_CACHE='/srv/cache' &&                         \
+export CVMFS_TEST_SERVER_CACHE='/srv/cache/server' &&                  \
 ./run.sh $TEST_LOGFILE -x src/004-davinci                              \
                           src/007-testjobs                             \
                           src/045-oasis                                \

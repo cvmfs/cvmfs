@@ -33,6 +33,12 @@ Sql::~Sql() {
  */
 bool Sql::Execute() {
   last_error_code_ = sqlite3_step(statement_);
+#ifdef DEBUGMSG
+  if (! Successful()) {
+    LogCvmfs(kLogSql, kLogDebug, "SQL query failed - SQLite: %d - %s",
+             GetLastError(), GetLastErrorMsg().c_str());
+  }
+#endif
   return Successful();
 }
 

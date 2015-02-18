@@ -215,9 +215,9 @@ SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
 }
 
 unsigned SqlCountTags::RetrieveCount() const {
-  uint64_t count = RetrieveInt64(0);
+  int64_t count = RetrieveInt64(0);
   assert(count >= 0);
-  return count;
+  return static_cast<uint64_t>(count);
 }
 
 

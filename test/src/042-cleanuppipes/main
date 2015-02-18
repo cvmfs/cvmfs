@@ -4,7 +4,7 @@ cvmfs_test_name="Cleanup left-over pipes"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount "lhcb.cern.ch" || return 1
+  cvmfs_mount "lhcb.cern.ch" "CVMFS_CONFIG_REPOSITORY=" || return 1
   ls /cvmfs/lhcb.cern.ch || return 2
 
   local cache_dir="$(get_cvmfs_cachedir)"
@@ -21,4 +21,3 @@ cvmfs_run_test() {
 
   return 0
 }
-

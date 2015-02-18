@@ -116,16 +116,19 @@ struct JobInfo {
   JobInfo() { JobInfoInit(); }
   JobInfo(const std::string access_key, const std::string secret_key,
           const std::string hostname,   const std::string bucket,
-          const std::string object_key, const std::string origin_path) :
+          const std::string object_key, void *callback,
+          const std::string origin_path) :
           access_key(access_key), secret_key(secret_key),
           hostname(hostname), bucket(bucket),
           object_key(object_key), origin_path(origin_path) {
     JobInfoInit();
     origin = kOriginPath;
+    this->callback = callback;
   }
   JobInfo(const std::string access_key, const std::string secret_key,
           const std::string hostname,   const std::string bucket,
-          const std::string object_key,
+          const std::string object_key, void *callback,
+          MemoryMappedFile  *mmf,
           const unsigned char *buffer, size_t size) :
           access_key(access_key), secret_key(secret_key),
           hostname(hostname), bucket(bucket),
@@ -134,6 +137,8 @@ struct JobInfo {
     origin = kOriginMem;
     origin_mem.size = size;
     origin_mem.data = buffer;
+    this->callback = callback;
+    this->mmf = mmf;
   }
   void JobInfoInit() {
     curl_handle = NULL;
@@ -145,7 +150,7 @@ struct JobInfo {
     callback = NULL;
     mmf = NULL;
     origin_file = NULL;
-    request = kReqHead;
+    request = kReqPut;
     error_code = kFailOk;
     num_retries = 0;
     backoff_ms = 0;

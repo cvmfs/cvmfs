@@ -46,7 +46,7 @@ produce_files_in_2() {
   # add some files to some of the directories
   cp_bin People/Germans/AlbertEinstein
   cp /etc/passwd People/Americans/BarackObama
-  cp /usr/bin/* People/Russians/MikhailKalashnikov
+  cp_usrbin People/Russians/MikhailKalashnikov
 
   # add a file in the French People Directory
   echo "French Don't Believe in Directories" > People/French/NapoleonBonaparte

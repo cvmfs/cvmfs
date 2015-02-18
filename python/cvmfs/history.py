@@ -33,6 +33,13 @@ class RevisionTag:
 
 class History(DatabaseObject):
     """ Wrapper around CernVM-FS 2.1.x repository history databases """
+
+    @staticmethod
+    def open(history_path):
+        """ Initializes a History Database from a local file path """
+        f = open(history_path)
+        return History(f)
+
     def __init__(self, history_file):
         DatabaseObject.__init__(self, history_file)
         self._read_properties()

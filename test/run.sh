@@ -177,10 +177,17 @@ do
     $CVMFS_TIME_WARNING)
       sudo rm -rf "$workdir" >> $logfile
       report_warning "Time limit exceeded!" >> $logfile
+      tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       echo "Time Warning!"
+      ;;
+    $CVMFS_GENERAL_WARNING)
+      sudo rm -rf "$workdir" >> $logfile
+      report_warning "Test case finished with warnings!" >> $logfile
+      echo "Warning!"
       ;;
     *)
       report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
+      tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       echo "Failed!"
       ;;
   esac

@@ -11,6 +11,6 @@ Architecture: all
 Depends: curl ${misc:Depends}
 Replaces: cvmfs-keys
 Conflicts: cvmfs-keys
-Breaks: cvmfs-keys, cvmfs (< 2.1.20), cvmfs-server (< 2.1.20)
+Breaks: cvmfs-keys, cvmfs (<< 2.1.20), cvmfs-server (<< 2.1.20)
 Provides: cvmfs-config
 Description: CernVM File System CERN Default Configuration and Public Keys

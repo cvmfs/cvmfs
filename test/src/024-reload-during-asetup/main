@@ -2,8 +2,8 @@
 cvmfs_test_name="Reload during overcommitted asetup"
 
 reload_cvmfs() {
-  while true; do
-    sudo cvmfs_config reload
+  while [ ! -f stop-reload ]; do
+    sudo cvmfs_config reload -c
     sleep 15
   done
 }
@@ -67,7 +67,8 @@ cvmfs_run_test() {
   rm -f $pidsfile
 
   # stop the reload cycle, it seemed to work fine...
-  kill -9 $reload_pid
+  touch stop-reload
+  wait $reload_pid
 
   if [ $retval -ne 0 ]; then
     echo "asetup failed with return code: $retval"

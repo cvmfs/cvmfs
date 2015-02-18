@@ -1,7 +1,18 @@
+2.1.21:
+  * Use --max-time curl option in Nagios probe with 3 times connection timeout
+  * Add check for 32bit inode overflow to the Nagios probe (CVM-627)
+  * Add a timeout to the Nagios probe (CVM-683)
+  * Add 'make doc' as a target to build Doxygen documentation (CVM-692)
+  * Add support for custom extended attributes and file capabilities (CVM-734)
+
 2.1.20:
+  * Stop parsing of CernVM specific config files (CVM-614)
+  * Add CVMFS_MAXIMAL_CONCURRENT_WRITES configuration parameters for number of
+    I/O streams during publishing (CVM-703)
+  * Add possibility to use S3 compatible storage in the server (CVM-215)
   * Recover from inconsistent state of mount points in the server (CVM-650)
-  * Add possibility to cancel 'cvmfs_server snapshot' if a concurrent snapshot
-    is in progress (CVM-278)
+  * Concurrent initial snapshots will not wait for each other but all but the
+    first one fail with a non-zero exit code (CVM-278)
   * Add support for geographically ordered fallback proxies (CVM-708)
   * Add support for HTTP redirects through CVMFS_FOLLOW_REDIRECTS (CVM-766)
   * Ensure autofs is running after 'cvmfs_config setup'
@@ -14,7 +25,7 @@
     connections from 100B/s to 1kB/s (CVM-718)
   * Allow cvmfs to claim ownership of files and directories through 
     CVMFS_CLAIM_OWNERSHIP (CVM-678)
-  * Add support for garbage-collected repositories (CVM-583)
+  * Add support for garbage-collected repositories (CVM-583, CVM-760)
   * Add support for automatically ordering Stratum 1 servers according to
     geographic loations (CVM-629, CVM-630)
   * Add 'host probe geo' command to cvmfs_talk
@@ -53,6 +64,7 @@
     dodgy file locking support such as Lustre
   * Change libcvmfs to access /cvmfs instead of /cvmfs/<repo>
   * Add OSG, EGI public keys and config (CVM-641)
+  * Fail gracefully on errors in 'cvmfs_server import' (CVM-635)
   * Allow for setting a revision number using
     'cvmfs_server publish -n' (CVM-633)
   * Work around gcc4.1 compiler bugs
@@ -62,7 +74,8 @@
     (CVM-619)
   * Fix race when autofs unmounts a repository during reload
   * Use file catalogs when processing .cvmfsdirtab (CVM-620)
-  * Compact inflated catalogs on publish
+  * Support negative entries with wild cards in .cvmfsdirtab (CVM-639)
+  * Compact inflated catalogs on publish (CVM-610)
   * Add 'letter' command to cvmfs_swissknife
   * Use tbb 4.3 update 1
   * Use sqlite 3.8.7.4
@@ -70,9 +83,9 @@
   * Use leveldb 1.15
   * Rename cvmfs_server lstags command to list-tags
   * Add extended attribute user.tag
-  * Add CVMFS_REPOSITORY_DATE client parameter
+  * Add CVMFS_REPOSITORY_DATE client parameter (CVM-625)
   * Enable default auto tagging (CVMFS_AUTO_TAG)
-  * Add 'list-catalogs' command to cvmfs_server
+  * Add 'list-catalogs' command to cvmfs_server (CVM-611)
 
 2.1.19:
   * Suppress confusing lsof output in cvmfs_server (CVM-624)

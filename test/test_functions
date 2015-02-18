@@ -198,7 +198,7 @@ cvmfs_clean() {
   sudo sh -c "rm -f /etc/cvmfs/config.d/*"
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET"
 
-  timeout=5
+  timeout=60
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
       return 101
@@ -278,8 +278,10 @@ get_cvmfs_cachedir() {
 
 CVMFS_MEMORY_WARNING_FLAG=0
 CVMFS_TIME_WARNING_FLAG=0
+CVMFS_GENERAL_WARNING_FLAG=0
 CVMFS_MEMORY_WARNING=254
 CVMFS_TIME_WARNING=253
+CVMFS_GENERAL_WARNING=252
 mangle_test_retval() {
   local prior_retval=$1
 
@@ -298,6 +300,11 @@ mangle_test_retval() {
     return $CVMFS_TIME_WARNING
   fi
 
+  # check if the test case produced any other warnings
+  if [ $CVMFS_GENERAL_WARNING_FLAG -ne 0 ]; then
+    return $CVMFS_GENERAL_WARNING
+  fi
+
   # return 0 if all is good
   return 0
 }
@@ -305,6 +312,7 @@ mangle_test_retval() {
 reset_test_warning_flags() {
   CVMFS_MEMORY_WARNING_FLAG=0
   CVMFS_TIME_WARNING_FLAG=0
+  CVMFS_GENERAL_WARNING_FLAG=0
 }
 
 
@@ -971,6 +979,14 @@ get_repo_url() {
   fi
 }
 
+get_object_url() {
+  local repo_name="$1"
+  local object_hash="$2"
+  local repo_url="$(get_repo_url $repo_name)"
+  local object_path="$(echo -n $object_hash | sed -e 's/^\(..\)\(.*\)$/\1\/\2/')"
+  echo "${repo_url}/data/${object_path}"
+}
+
 get_apache_config_filename() {
   local repo_name="$1"
   echo "${repo_name}.conf"
@@ -1114,6 +1130,20 @@ toggle_gc() {
   return 0
 }
 
+# disables the automatic garbage collection of a given repository configuration
+#
+# @param name  the name of the repository to reconfigure
+disable_auto_garbage_collection() {
+  local name="$1"
+  local cfg_file="/etc/cvmfs/repositories.d/${name}/server.conf"
+
+  if cat $cfg_file | grep -q 'CVMFS_AUTO_GC'; then
+    local tmp_cfg="$(mktemp)"
+    cat $cfg_file | sed -e 's/^\(CVMFS_AUTO_GC\)=.*$/\1=false/' > $tmp_cfg || return 1
+    sudo mv -f $tmp_cfg $cfg_file || return 2
+  fi
+}
+
 
 # get the current unix timestamp
 get_timestamp() {
@@ -1132,8 +1162,21 @@ display_timestamp() {
 # @param destination_directory
 cp_bin() {
   local destination_directory="$1"
-  cp -R /bin/* $destination_directory       || return 1
+  sudo cp -R /bin/* $destination_directory  || return 1
   sudo chmod -R a+rw $destination_directory || return 2
+  for f in $(find $destination_directory -type f); do
+    sudo chmod 0444 $f || return 3
+  done
+}
+
+
+# copy all content of /usr/bin/* into a given directory (for server testing purposes)
+#
+# @param destination_directory
+cp_usrbin() {
+  local destination_directory="$1"
+  sudo cp -R /usr/bin/* $destination_directory || return 1
+  sudo chmod -R a+rw $destination_directory    || return 2
   for f in $(find $destination_directory -type f); do
     sudo chmod 0444 $f || return 3
   done

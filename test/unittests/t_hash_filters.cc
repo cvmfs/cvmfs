@@ -323,7 +323,7 @@ TYPED_TEST(T_HashFilter, FillHeterogeneousWithSuffixes) {
 }
 
 
-TYPED_TEST(T_HashFilter, FillManyRandomHashes) {
+TYPED_TEST(T_HashFilter, FillManyRandomHashesSlow) {
   TypeParam filter;
 
   Prng rng;

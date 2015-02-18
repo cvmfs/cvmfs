@@ -4,6 +4,23 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_test.sh
 
+# format additional disks with ext4 and many inodes
+echo -n "formatting new disk partition... "
+disk_to_partition=/dev/vda
+partition=$(get_last_partition_number $disk_to_partition)
+format_partition_ext4 $disk_to_partition$partition || die "fail (formatting partition)"
+echo "done"
+
+# mount additional disk partitions on strategic cvmfs location
+echo -n "mounting new disk partition into cvmfs specific location... "
+mount_partition $disk_to_partition$partition /var/lib/cvmfs || die "fail (mounting /var/lib/cvmfs $?)"
+echo "done"
+
+# reset SELinux context
+echo -n "restoring SELinux context for /var/lib/cvmfs... "
+sudo restorecon -R /var/lib/cvmfs || die "fail"
+echo "done"
+
 ut_retval=0
 it_retval=0
 mg_retval=0

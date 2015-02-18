@@ -15,11 +15,11 @@ message ("Running CMake version ${CMAKE_VERSION}")
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.1.20
+## CVMFS_VERSION 2.1.21
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
 set (CernVM-FS_VERSION_MINOR 1)
-set (CernVM-FS_VERSION_PATCH 20)
+set (CernVM-FS_VERSION_PATCH 21)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #
@@ -80,6 +80,7 @@ option (BUILD_SERVER            "Build writer's end programs"                   
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
+option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
 option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin"                  ON)
@@ -155,10 +156,10 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwi
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
   set (IS_64_BIT FALSE)
   set (CVMFS_INSTALL_LIBDIR "lib")
-  if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "i686")
+  if (NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
-  endif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "i686")
+  endif (NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
 else (CMAKE_SIZEOF_VOID_P EQUAL 4)
   set (IS_64_BIT TRUE)
   if (NOT DEBIAN)
@@ -259,12 +260,12 @@ else (LIBCURL_BUILTIN)
     find_program(CURL_CONFIG_EXEC NAMES curl-config)
     if (CURL_CONFIG_EXEC)
       execute_process(
-	COMMAND ${CURL_CONFIG_EXEC} --features
-	OUTPUT_VARIABLE _libcurl_features
-	ERROR_VARIABLE _libcurl_features_error
-	)
+       COMMAND ${CURL_CONFIG_EXEC} --features
+       OUTPUT_VARIABLE _libcurl_features
+       ERROR_VARIABLE _libcurl_features_error
+       )
       if (NOT ${_libcurl_features} MATCHES AsynchDNS)
-	message(FATAL_ERROR "libcurl was not compiled with c-ares")
+       message(FATAL_ERROR "libcurl was not compiled with c-ares")
       endif (NOT ${_libcurl_features} MATCHES AsynchDNS)
     else (CURL_CONFIG_EXEC)
       message(SEND_ERROR "Command \"${CURL_CONFIG_EXEC} --features\" failed with output:\n${_libcurl_features_error}")
@@ -312,6 +313,7 @@ endif (GOOGLETEST_BUILTIN)
 if (GEOIP_BUILTIN)
   include (${LIBGEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   include (${PYTHON_GEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  add_dependencies (python-geoip libgeoip)
 else (GEOIP_BUILTIN)
   find_package (GeoIP REQUIRED)
   find_package (python-GeoIP REQUIRED)
@@ -404,3 +406,24 @@ install (
 # configure the packaging stuff
 #
 include (CPackLists.txt)
+
+#
+# Generate the documentation using doxygen
+#
+if (BUILD_DOCUMENTATION)
+  message (STATUS "Generating Doxygen configuration ...")
+  set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+  set (DOXYFILE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
+  set (DOXYFILE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/")
+  set (DOXYFILE_LATEX "OFF")
+  execute_process (
+    COMMAND sh -c "cp ${CMAKE_SOURCE_DIR}/doc/Doxyfile.in ${CMAKE_BINARY_DIR}/Doxyfile.in"
+  )
+  execute_process (
+    COMMAND sh -c "/bin/sed -i -e 's/@VERSION@/${CernVM-FS_VERSION_STRING}/g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
+  )
+  execute_process (   
+    COMMAND sh -c "/bin/sed -i -e 's,@SRC_DIR@,${CMAKE_SOURCE_DIR},g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
+  )
+  include (cmake/Modules/UseDoxygen)
+endif (BUILD_DOCUMENTATION)

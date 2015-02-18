@@ -1,4 +1,4 @@
-cvmfs-config-default (1.0-1) lucid; urgency=low
+cvmfs-config-default (1.1-1) lucid; urgency=low
 
   * Initial packaging
   

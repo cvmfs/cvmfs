@@ -7,8 +7,8 @@ unix_timestamp() {
 }
 
 export CVMFS_TEST_580_LAST_PUBLISH=last_publish
-export CVMFS_TEST_580_THRESH_SECONDS=20
-export CVMFS_TEST_580_SECONDS_MARGIN=10
+export CVMFS_TEST_580_THRESH_SECONDS=200
+export CVMFS_TEST_580_SECONDS_MARGIN=50
 
 create_revision() {
   local repo_name=$1
@@ -60,10 +60,7 @@ cvmfs_run_test() {
   root_catalog0="$(get_current_root_catalog $CVMFS_TEST_REPO)C"
 
   echo "disable automatic garbage collection on stratum 0"
-  local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
-  cat $server_conf | grep -v 'CVMFS_AUTO_GC_TIMESPAN' > server_1.conf
-  sudo cp server_1.conf $server_conf || return 1
-  cat $server_conf                   || return 2
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
 
   echo "list named snapshots"
   cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
@@ -92,10 +89,8 @@ cvmfs_run_test() {
 
   echo "configure stratum 1 to automatically delete revisions older than $thresh_seconds seconds"
   local replica_server_conf="/etc/cvmfs/repositories.d/${replica_name}/server.conf"
-  cat $replica_server_conf | grep -q 'CVMFS_AUTO_GC_TIMESPAN' || return 7
-  cat $replica_server_conf | sed -e "s/^\(CVMFS_AUTO_GC_TIMESPAN\)=.*$/\1='$thresh_seconds seconds ago'/" > replica_1.conf
-  sudo cp replica_1.conf $replica_server_conf || return 8
-  cat $replica_server_conf                    || return 9
+  echo "CVMFS_AUTO_GC_TIMESPAN='$thresh_seconds seconds ago'" | sudo tee --append $replica_server_conf || return 8
+  cat $replica_server_conf || return 9
 
   echo "create revision 1 ($(display_timestamp now))"
   root_catalog1="$(create_revision $CVMFS_TEST_REPO)"
@@ -220,9 +215,7 @@ cvmfs_run_test() {
   peek_backend $replica_name    $root_catalog5 || return 67 # trunk
 
   echo "disable automatic garbage collection on stratum 1"
-  cat $replica_server_conf | grep -v 'CVMFS_AUTO_GC_TIMESPAN' > replica_2.conf
-  sudo cp replica_2.conf $replica_server_conf || return 68
-  cat $replica_server_conf                    || return 69
+  disable_auto_garbage_collection $replica_name || return $?
 
   sleep_to_match_threshold
 

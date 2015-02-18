@@ -53,6 +53,39 @@ guess_package_url() {
 }
 
 
+# makes sure that a version is always of the form x.y.z
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  echo "$version_string"
+}
+version_major() { echo $1 | cut --delimiter=. --fields=1; }
+version_minor() { echo $1 | cut --delimiter=. --fields=2; }
+version_patch() { echo $1 | cut --delimiter=. --fields=3; }
+prepend_zeros() { printf %05d "$1"; }
+compare_versions() {
+  local lhs="$(normalize_version $1)"
+  local comparison_operator=$2
+  local rhs="$(normalize_version $3)"
+
+  local lhs1=$(prepend_zeros $(version_major $lhs))
+  local lhs2=$(prepend_zeros $(version_minor $lhs))
+  local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local rhs1=$(prepend_zeros $(version_major $rhs))
+  local rhs2=$(prepend_zeros $(version_minor $rhs))
+  local rhs3=$(prepend_zeros $(version_patch $rhs))
+
+  [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
+}
+version_lower_or_equal() {
+  local testee=$1
+  local compare=$2
+  compare_versions $testee -le $compare
+}
+
+
 has_binary() {
   local binary_name=$1
   which $binary_name > /dev/null 2>&1
@@ -84,7 +117,7 @@ package_version() {
 }
 
 
-get_providing_package() {
+get_providing_packages() {
   local virt_pkg_name=$1
 
   if has_binary yum; then
@@ -123,11 +156,55 @@ is_installed() {
 }
 
 
+yum_install_packages() {
+  local pkg_paths="$1"
+  sudo yum -y install --nogpgcheck $pkg_paths
+}
+
+
+yum_get_package_name() {
+  local rpm_file="$1"
+  echo $(rpm -qp --queryformat '%{NAME}' $rpm_file)
+}
+
+
+yum_get_conflicts() {
+  local rpm_file="$1"
+  local conflicts="$(rpm -qp --queryformat '%{CONFLICTS}' $rpm_file)"
+  if echo "$conflicts" | grep -vq '(none)'; then
+    echo $conflicts
+  fi
+}
+
+
+yum_update_fallback() {
+  local pkg_paths="$1"
+  local to_be_uninstalled=""
+
+  for pkg in $pkg_paths; do
+    local pkg_name="$(yum_get_package_name $pkg)"
+    if is_installed $pkg_name; then
+      to_be_uninstalled="$pkg_name $to_be_uninstalled"
+    fi
+    to_be_uninstalled="$(yum_get_conflicts $pkg) $to_be_uninstalled"
+  done
+
+  if [ ! -z "$to_be_uninstalled" ]; then
+    uninstall_package "$to_be_uninstalled"
+  fi
+  yum_install_packages "$pkg_paths"
+}
+
+
 install_packages() {
   local pkg_paths="$1"
 
   if has_binary yum; then
-    sudo yum -y install --nogpgcheck $pkg_paths
+    if version_lower_or_equal $(installed_package_version 'yum') '3.2.22'; then
+      yum_update_fallback "$pkg_paths"
+    else
+      yum_install_packages "$pkg_paths"
+    fi
   elif has_binary dpkg; then
     sudo dpkg --install $pkg_paths
     sudo apt-get --assume-yes -f install
@@ -138,12 +215,12 @@ install_packages() {
 
 
 uninstall_package() {
-  local pkg_name=$1
+  local pkg_names="$1"
 
   if has_binary yum; then
-    sudo yum -y erase $pkg_name
+    sudo yum -y erase $pkg_names
   elif has_binary apt-get; then
-    sudo apt-get --assume-yes remove $pkg_name
+    sudo apt-get --assume-yes purge $pkg_names
   else
     return 1
   fi

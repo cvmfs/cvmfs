@@ -1629,7 +1629,6 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0user.ndownload\0"
     "user.timeout\0user.timeout_direct\0user.rx\0user.speed\0user.fqrn\0"
     "user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0";
-
   string attribute_list;
   if (hide_magic_xattrs_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");

@@ -2,7 +2,7 @@
 cvmfs_test_name="Change directory to config file being parsed"
 
 create_config_files() {
-  sudo sh -c "echo 'echo \$PWD > /tmp/cvmfs_pwd' > /etc/cvmfs/default.d/50-testcdconf.conf" || return 1
+  sudo sh -c "echo 'echo Working-Dir-\$PWD > /tmp/cvmfs_pwd' > /etc/cvmfs/default.d/50-testcdconf.conf" || return 1
 
   return 0
 }
@@ -16,11 +16,15 @@ cvmfs_run_test() {
   logfile=$1
 
   local retval=0
-  create_config_files || retval=1
+  create_config_files || return 0
 
   cvmfs_mount grid.cern.ch || retval=2
-  if [ "x$(cat /tmp/cvmfs_pwd)" != "x/etc/cvmfs/default.d" ]; then
-    retval=3
+  if [ $retval -eq 0 ]; then
+    if [ "x$(cat /tmp/cvmfs_pwd)" != "xWorking-Dir-/etc/cvmfs/default.d" ]; then
+      echo "/tmp/cvmfs_pwd has wrong content:"
+      cat /tmp/cvmfs_pwd
+      retval=3
+    fi
   fi
 
   cleanup_config_files

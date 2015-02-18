@@ -190,7 +190,7 @@ TEST_F(T_BlockingCounter, IncrementAndWait) {
 //
 
 
-TEST_F(T_BlockingCounter, BecomeZero) {
+TEST_F(T_BlockingCounter, BecomeZeroSlow) {
   T_BlockingCounter::concurrent_state_ = 0;
   EXPECT_EQ (0, T_BlockingCounter::concurrent_state_);
 
@@ -236,7 +236,7 @@ TEST_F(T_BlockingCounter, BecomeZero) {
 //
 
 
-TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZero) {
+TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZeroSlow) {
   T_BlockingCounter::concurrent_state_ = 0;
   EXPECT_EQ (0, T_BlockingCounter::concurrent_state_);
 
@@ -288,7 +288,7 @@ TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZero) {
 //
 
 
-TEST_F(T_BlockingCounter, OrchestrateMultipleWaitingThreads) {
+TEST_F(T_BlockingCounter, OrchestrateMultipleWaitingThreadsSlow) {
   int_counter_ = max_value_;
   EXPECT_EQ (max_value_, int_counter_);
 

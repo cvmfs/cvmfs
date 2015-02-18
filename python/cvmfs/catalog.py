@@ -148,6 +148,12 @@ class CatalogStatistics:
 class Catalog(DatabaseObject):
     """ Wraps the basic functionality of CernVM-FS Catalogs """
 
+    @staticmethod
+    def open(catalog_path):
+        """ Initializes a Catalog from a local file path """
+        f = open(catalog_path)
+        return Catalog(f)
+
     def __init__(self, catalog_file, catalog_hash = ""):
         DatabaseObject.__init__(self, catalog_file)
         self.hash = catalog_hash
