@@ -887,16 +887,17 @@ bool HasSuffix(
   const bool ignore_case
 ) {
   unsigned i = str.length();
-  unsigned l = suffix.length();  
+  unsigned l = suffix.length();
   if (l > i)
     return false;
   if (l == 0)
     return true;
+
   // str, suffix cannot be empty
-  i--;
-  l--;
 
   do {
+    --i;
+    --l;
     if (ignore_case) {
       if (toupper(str[i]) != toupper(suffix[l]))
         return false;
@@ -904,8 +905,6 @@ bool HasSuffix(
       if (str[i] != suffix[l])
         return false;
     }
-    --i;
-    --l;
   } while (l > 0);
   return true;
 }
