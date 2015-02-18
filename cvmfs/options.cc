@@ -28,26 +28,6 @@ using namespace std;  // NOLINT
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-namespace options {
-
-struct ConfigValue {
-  string value;
-  string source;
-};
-
-map<string, ConfigValue> *config_ = NULL;
-
-
-void Init() {
-  config_ = new map<string, ConfigValue>();
-}
-
-
-void Fini() {
-  delete config_;
-  config_ = NULL;
-}
-
 
 static string EscapeShell(const std::string &raw) {
   for (unsigned i = 0, l = raw.length(); i < l; ++i) {
@@ -74,10 +54,38 @@ static string EscapeShell(const std::string &raw) {
 }
 
 
-void ParsePath(const string &config_file, const bool external) {
+void FastOptionsManager::ParsePath(const string &config_file, const bool external) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s", config_file.c_str());
+  int retval;
+  string line;
+  FILE *fconfig = fopen(config_file.c_str(), "r");
+  if (fconfig == NULL)
+	return;
+
+  // Read line by line and extract parameters
+  while (GetLineFile(fconfig, &line)) {
+    line = Trim(line);
+    if (line.empty() || line[0] == '#' || line.find("if ") == 0 || line.find(" ") < string::npos)
+      continue;
+    vector<string> tokens = SplitString(line, '=');
+    if (tokens.size() < 2 || tokens.size() > 2)
+      continue;
+
+    ConfigValue value;
+    value.source = config_file;
+    value.value = Trim(tokens[1]);
+    string parameter = Trim(tokens[0]);
+    config_[parameter] = value;
+    retval = setenv(parameter.c_str(), value.value.c_str(), 1);
+    assert(retval == 0);
+  }
+  fclose(fconfig);
+}
+
+
+void BashOptionsManager::ParsePath(const string &config_file, const bool external) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
   int retval;
-
   int pipe_open[2];
   int pipe_quit[2];
   pid_t pid_child = 0;
@@ -182,7 +190,7 @@ void ParsePath(const string &config_file, const bool external) {
     const string sh_echo = "echo $" + parameter + "\n";
     WritePipe(fd_stdin, sh_echo.data(), sh_echo.length());
     GetLineFd(fd_stdout, &value.value);
-    (*config_)[parameter] = value;
+    config_[parameter] = value;
     retval = setenv(parameter.c_str(), value.value.c_str(), 1);
     assert(retval == 0);
   }
@@ -194,7 +202,7 @@ void ParsePath(const string &config_file, const bool external) {
 }
 
 
-static bool HasConfigRepository(const string &fqrn, string *config_path) {
+bool OptionsManager::HasConfigRepository(const string &fqrn, string *config_path) {
   string cvmfs_mount_dir;
   if (!GetValue("CVMFS_MOUNT_DIR", &cvmfs_mount_dir)) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "CVMFS_MOUNT_DIR missing");
@@ -219,7 +227,7 @@ static bool HasConfigRepository(const string &fqrn, string *config_path) {
 }
 
 
-void ParseDefault(const string &fqrn) {
+void OptionsManager::ParseDefault(const string &fqrn) {
   int retval = setenv("CVMFS_FQRN", fqrn.c_str(), 1);
   assert(retval == 0);
 
@@ -251,20 +259,20 @@ void ParseDefault(const string &fqrn) {
 }
 
 
-void ClearConfig() {
-  config_->clear();
+void OptionsManager::ClearConfig() {
+  config_.clear();
 }
 
 
-bool IsDefined(const std::string &key) {
-  map<string, ConfigValue>::const_iterator iter = config_->find(key);
-  return iter != config_->end();
+bool OptionsManager::IsDefined(const std::string &key) {
+  map<string, ConfigValue>::const_iterator iter = config_.find(key);
+  return iter != config_.end();
 }
 
 
-bool GetValue(const string &key, string *value) {
-  map<string, ConfigValue>::const_iterator iter = config_->find(key);
-  if (iter != config_->end()) {
+bool OptionsManager::GetValue(const string &key, string *value) {
+  map<string, ConfigValue>::const_iterator iter = config_.find(key);
+  if (iter != config_.end()) {
     *value = iter->second.value;
     return true;
   }
@@ -273,9 +281,9 @@ bool GetValue(const string &key, string *value) {
 }
 
 
-bool GetSource(const string &key, string *value) {
-  map<string, ConfigValue>::const_iterator iter = config_->find(key);
-  if (iter != config_->end()) {
+bool OptionsManager::GetSource(const string &key, string *value) {
+  map<string, ConfigValue>::const_iterator iter = config_.find(key);
+  if (iter != config_.end()) {
     *value = iter->second.source;
     return true;
   }
@@ -284,16 +292,16 @@ bool GetSource(const string &key, string *value) {
 }
 
 
-bool IsOn(const std::string &param_value) {
+bool OptionsManager::IsOn(const std::string &param_value) {
   const string uppercase = ToUpper(param_value);
   return ((uppercase == "YES") || (uppercase == "ON") || (uppercase == "1"));
 }
 
 
-vector<string> GetAllKeys() {
+vector<string> OptionsManager::GetAllKeys() {
   vector<string> result;
-  for (map<string, ConfigValue>::const_iterator i = config_->begin(),
-       iEnd = config_->end(); i != iEnd; ++i)
+  for (map<string, ConfigValue>::const_iterator i = config_.begin(),
+       iEnd = config_.end(); i != iEnd; ++i)
   {
     result.push_back(i->first);
   }
@@ -301,7 +309,7 @@ vector<string> GetAllKeys() {
 }
 
 
-string Dump() {
+string OptionsManager::Dump() {
   string result;
   vector<string> keys = GetAllKeys();
   for (unsigned i = 0, l = keys.size(); i < l; ++i) {
@@ -320,7 +328,7 @@ string Dump() {
 }
 
 
-bool ParseUIntMap(const string &path, map<uint64_t, uint64_t> *map) {
+bool OptionsManager::ParseUIntMap(const string &path, map<uint64_t, uint64_t> *map) {
   assert(map);
 
   FILE *fmap = fopen(path.c_str(), "r");
@@ -345,8 +353,6 @@ bool ParseUIntMap(const string &path, map<uint64_t, uint64_t> *map) {
   fclose(fmap);
   return true;
 }
-
-}  // namespace options
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }

@@ -55,6 +55,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_uuid.cc
   t_object_fetcher.cc
   t_statistics.cc
+  t_options.cc
 
   # test utility functions
   testutil.cc testutil.h

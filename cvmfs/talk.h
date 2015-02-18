@@ -7,9 +7,11 @@
 
 #include <string>
 
+class OptionsManager;
+
 namespace talk {
 
-bool Init(const std::string &cachedir);
+bool Init(const std::string &cachedir, OptionsManager *optionsManager);
 void Spawn();
 void Fini();
 

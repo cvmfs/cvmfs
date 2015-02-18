@@ -69,20 +69,20 @@ bool S3Uploader::ParseSpoolerDefinition(
 
   // Parse S3 configuration
   // TODO: separate option handling and sanity checks
-  options::Init();
-  options::ParsePath(config_path, false);
+  OptionsManager *options_manager = new BashOptionsManager();
+  options_manager->ParsePath(config_path, false);
   std::string parameter;
   std::string s3_host;
-  if (!options::GetValue("CVMFS_S3_HOST", &s3_host)) {
+  if (!options_manager->GetValue("CVMFS_S3_HOST", &s3_host)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse CVMFS_S3_HOST from '%s'",
              config_path.c_str());
     return false;
   }
   const std::string kStandardPort = "80";
   std::string s3_port = kStandardPort;
-  options::GetValue("CVMFS_S3_PORT", &s3_port);
+  options_manager->GetValue("CVMFS_S3_PORT", &s3_port);
   int s3_buckets_per_account = 1;
-  if (options::GetValue("CVMFS_S3_BUCKETS_PER_ACCOUNT", &parameter)) {
+  if (options_manager->GetValue("CVMFS_S3_BUCKETS_PER_ACCOUNT", &parameter)) {
     s3_buckets_per_account = String2Uint64(parameter);
     if (s3_buckets_per_account < 1 || s3_buckets_per_account > 100) {
       LogCvmfs(kLogSpooler, kLogStderr,
@@ -95,26 +95,26 @@ bool S3Uploader::ParseSpoolerDefinition(
     }
   }
   std::string s3_access_key;
-  if (!options::GetValue("CVMFS_S3_ACCESS_KEY", &s3_access_key)) {
+  if (!options_manager->GetValue("CVMFS_S3_ACCESS_KEY", &s3_access_key)) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to parse CVMFS_S3_ACCESS_KEY from '%s'.",
              config_path.c_str());
     return false;
   }
   std::string s3_secret_key;
-  if (!options::GetValue("CVMFS_S3_SECRET_KEY", &s3_secret_key)) {
+  if (!options_manager->GetValue("CVMFS_S3_SECRET_KEY", &s3_secret_key)) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to parse CVMFS_S3_SECRET_KEY from '%s'.",
              config_path.c_str());
     return false;
   }
-  if (!options::GetValue("CVMFS_S3_BUCKET", &bucket_body_name_)) {
+  if (!options_manager->GetValue("CVMFS_S3_BUCKET", &bucket_body_name_)) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to parse CVMFS_S3_BUCKET from '%s'.",
              config_path.c_str());
     return false;
   }
-  if (!options::GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS",
+  if (!options_manager->GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS",
                          &parameter)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse "
              "CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS "
@@ -123,7 +123,8 @@ bool S3Uploader::ParseSpoolerDefinition(
     return false;
   }
   max_num_parallel_uploads_ = String2Uint64(parameter);
-  options::Fini();
+  delete options_manager;
+  options_manager = NULL;
 
   std::vector<std::string> s3_access_keys = SplitString(s3_access_key, ':');
   std::vector<std::string> s3_secret_keys = SplitString(s3_secret_key, ':');
