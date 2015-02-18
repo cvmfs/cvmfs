@@ -236,7 +236,7 @@ void *thread_wait_for_decrement(void *arg) {
   return NULL;
 }
 
-TEST_F(T_SynchronizingCounter, WaitForDecrement) {
+TEST_F(T_SynchronizingCounter, WaitForDecrementSlow) {
   const unsigned int n_threads = 5;
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
@@ -309,7 +309,7 @@ void *thread_wait_for_increment(void *arg) {
 //
 
 
-TEST_F(T_SynchronizingCounter, WaitForIncrement) {
+TEST_F(T_SynchronizingCounter, WaitForIncrementSlow) {
   const unsigned int n_threads = 5;
   SynchronizingCounter<int64_t> counter;
   EXPECT_EQ (0, counter);
@@ -377,7 +377,7 @@ void *concurrent_decrement(void *arg) {
 }
 
 
-TEST_F(T_SynchronizingCounter, MultiThreadCounting) {
+TEST_F(T_SynchronizingCounter, MultiThreadCountingSlow) {
   const int thread_count = 10;
   ASSERT_EQ (0, thread_count % 2);
 

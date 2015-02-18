@@ -94,7 +94,7 @@ TEST_F(T_Smallhash, InsertMd5) {
 }
 
 
-TEST_F(T_Smallhash, InsertAndCopyMd5) {
+TEST_F(T_Smallhash, InsertAndCopyMd5Slow) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
     shash::Md5 random_hash;
@@ -163,7 +163,7 @@ TEST_F(T_Smallhash, Lookup) {
 }
 
 
-TEST_F(T_Smallhash, MultihashCycle) {
+TEST_F(T_Smallhash, MultihashCycleSlow) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
     multihash_.Insert(i, i);

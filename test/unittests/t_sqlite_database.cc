@@ -500,7 +500,7 @@ TEST_F(T_SQLite_Wrapper, FailingSchemaUpdate) {
 }
 
 
-TEST_F(T_SQLite_Wrapper, DataAccess) {
+TEST_F(T_SQLite_Wrapper, DataAccessSlow) {
   // This test case might be dependent on SQLite updates
   // if it fails, check if the data compression or memory page behaviour of
   // SQLite changed...
@@ -544,7 +544,7 @@ TEST_F(T_SQLite_Wrapper, DataAccess) {
 }
 
 
-TEST_F(T_SQLite_Wrapper, VacuumDatabase) {
+TEST_F(T_SQLite_Wrapper, VacuumDatabaseSlow) {
   // This test case might be dependent on SQLite updates
   // if it fails, check if the VACUUM behaviour of SQLite changed...
   const std::string dbp = GetDatabaseFilename();
