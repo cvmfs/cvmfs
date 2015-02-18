@@ -13,8 +13,14 @@ class Statistics;
 
 namespace sqlite {
 
+enum VfsOptions {
+  kVfsOptNone = 0,
+  kVfsOptDefault,
+};
+
 bool RegisterVfsRdOnly(const std::string &name,
-                       perf::Statistics *statistics);
+                       perf::Statistics *statistics,
+                       const VfsOptions options);
 bool UnregisterVfsRdOnly(const std::string &vfs_name);
 
 }  // namespace sqlite

@@ -53,6 +53,7 @@ set (CVMFS_CLIENT_SOURCES
   file_chunk.h file_chunk.cc
   fs_traversal.h
   statistics.h statistics.cc
+  sqlitevfs.cc sqlitevfs.h
 )
 
 

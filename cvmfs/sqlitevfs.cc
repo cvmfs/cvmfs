@@ -5,9 +5,13 @@
 #include "sqlitevfs.h"
 
 #include <dlfcn.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -16,6 +20,7 @@
 #include <ctime>
 
 #include "duplex_sqlite3.h"
+#include "platform.h"
 #include "smalloc.h"
 #include "statistics.h"
 
@@ -30,37 +35,222 @@ struct VfsRdOnly {
   perf::Statistics *statistics;
 };
 
+struct VfsRdOnlyFile {
+  sqlite3_file base;  // Base class. Must be first.
+  int fd;
+  uint64_t size;
+};
+
 }  // anonymous namespace
 
 
-static int VfsRdOnlyOpen(
-  sqlite3_vfs *vfs,
-  const char *zName,
-  sqlite3_file *file,
-  int flags,
-  int *pOutFlags)
-{
-  return 0;
+static int VfsRdOnlyClose(sqlite3_file *pFile) {
+  VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
+  int retval = close(p->fd);
+  return (retval == 0) ? SQLITE_OK : SQLITE_IOERR_CLOSE;
 }
 
 
-static int VfsRdOnlyDelete(sqlite3_vfs*, const char *zName, int syncDir) {
-  return 0;
+static int VfsRdOnlyRead(
+  sqlite3_file *pFile,
+  void *zBuf,
+  int iAmt,
+  sqlite_int64 iOfst
+) {
+  VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
+  ssize_t got = pread(p->fd, zBuf, iAmt, iOfst);
+  if (got == iAmt) {
+    return SQLITE_OK;
+  } else if (got < 0) {
+    return SQLITE_IOERR_READ;
+  } else {
+    memset(reinterpret_cast<char *>(zBuf) + got, 0, iAmt - got);
+    return SQLITE_IOERR_SHORT_READ;
+  }
+}
+
+static int VfsRdOnlyWrite(
+  sqlite3_file *pFile __attribute__((unused)),
+  const void *zBuf __attribute__((unused)),
+  int iAmt __attribute__((unused)),
+  sqlite_int64 iOfst __attribute__((unused))
+) {
+   return SQLITE_READONLY;
 }
 
 
-static int VfsRdOnlyAccess(
-  sqlite3_vfs *vfs,
-  const char *zName,
-  int flags,
-  int *pResOut)
+static int VfsRdOnlyTruncate(
+  sqlite3_file *pFile __attribute__((unused)),
+  sqlite_int64 size __attribute__((unused)))
 {
-  return 0;
+  return SQLITE_READONLY;
+}
+
+
+static int VfsRdOnlySync(
+  sqlite3_file *pFile __attribute__((unused)),
+  int flags __attribute__((unused)))
+{
+  return SQLITE_OK;
+}
+
+
+static int VfsRdOnlyFileSize(sqlite3_file *pFile, sqlite_int64 *pSize) {
+  VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
+  *pSize = p->size;
+  return SQLITE_OK;
+}
+
+
+static int VfsRdOnlyLock (
+  sqlite3_file *p __attribute__((unused)),
+  int level __attribute__((unused))
+) {
+  return SQLITE_OK;
+}
+
+
+static int VfsRdOnlyUnlock (
+  sqlite3_file *p __attribute__((unused)),
+  int level __attribute__((unused))
+) {
+  return SQLITE_OK;
+}
+
+
+static int VfsRdOnlyCheckReservedLock(
+  sqlite3_file *p __attribute__((unused)),
+  int *pResOut
+) {
+  *pResOut = 0;
+  return SQLITE_OK;
 }
 
 
 /**
- * Taken from unixFullPathname
+ *  No xFileControl() verbs are implemented by this VFS.
+ */
+static int VfsRdOnlyFileControl(
+  sqlite3_file *p __attribute__((unused)),
+  int op __attribute__((unused)),
+  void *pArg __attribute__((unused))
+) {
+  return SQLITE_NOTFOUND;
+}
+
+
+/**
+ * A good unit of bytes to read at once.
+ */
+static int VfsRdOnlySectorSize(sqlite3_file *p __attribute__ ((unused))) {
+  return 4096;
+}
+
+
+/**
+ * Only relevant for writing.
+ */
+static int VfsRdOnlyDeviceCharacteristics(
+  sqlite3_file *p __attribute__ ((unused)))
+{
+  return 0;
+}
+
+
+static int VfsRdOnlyOpen(
+  sqlite3_vfs *vfs __attribute__((unused)),
+  const char *zName,
+  sqlite3_file *pFile,
+  int flags,
+  int *pOutFlags)
+{
+  static const sqlite3_io_methods io_methods = {
+    1, // iVersion
+    VfsRdOnlyClose,
+    VfsRdOnlyRead,
+    VfsRdOnlyWrite,
+    VfsRdOnlyTruncate,
+    VfsRdOnlySync,
+    VfsRdOnlyFileSize,
+    VfsRdOnlyLock,
+    VfsRdOnlyUnlock,
+    VfsRdOnlyCheckReservedLock,
+    VfsRdOnlyFileControl,
+    VfsRdOnlySectorSize,
+    VfsRdOnlyDeviceCharacteristics
+  };
+
+  VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
+  // Prevent xClose from being called in case of errors
+  p->base.pMethods = NULL;
+
+  if (flags & SQLITE_OPEN_READWRITE)
+    return SQLITE_IOERR;
+  if (flags & SQLITE_OPEN_DELETEONCLOSE)
+    return SQLITE_IOERR;
+  if (flags & SQLITE_OPEN_EXCLUSIVE)
+    return SQLITE_IOERR;
+
+  p->fd = open(zName, O_RDONLY);
+  if (p->fd < 0)
+    return SQLITE_IOERR;
+  platform_stat64 info;
+  int retval = platform_fstat(p->fd, &info);
+  if (retval != 0)
+    return SQLITE_IOERR_FSTAT;
+  p->size = info.st_size;
+  if (pOutFlags)
+    *pOutFlags = flags;
+  p->base.pMethods = &io_methods;
+  return SQLITE_OK;
+}
+
+
+static int VfsRdOnlyDelete(
+  sqlite3_vfs* __attribute__((unused)),
+  const char *zName __attribute__((unused)),
+  int syncDir __attribute__((unused)))
+{
+  return SQLITE_IOERR_DELETE;
+}
+
+
+/**
+ * Cvmfs r/o file catalogs cannot have a write-ahead log or a journal.
+ */
+static int VfsRdOnlyAccess(
+  sqlite3_vfs *vfs __attribute__((unused)),
+  const char *zPath,
+  int flags,
+  int *pResOut)
+{
+  if (flags == SQLITE_ACCESS_READWRITE) {
+    *pResOut = 0;
+    return SQLITE_OK;
+  }
+  if (HasSuffix(zPath, "-wal", false) || HasSuffix(zPath, "-journal", false)) {
+    *pResOut = 0;
+    return SQLITE_OK;
+  }
+
+  int amode = 0;
+  switch( flags ){
+    case SQLITE_ACCESS_EXISTS:
+      amode = F_OK;
+      break;
+    case SQLITE_ACCESS_READ:
+      amode = R_OK;
+      break;
+    default:
+      assert(false);
+  }
+  *pResOut = (access(zPath, amode) == 0);
+  return SQLITE_OK;
+}
+
+
+/**
+ * Since the path is never stored, there is no need to produce a full path.
  */
 int VfsRdOnlyFullPathname(
   sqlite3_vfs *vfs __attribute__((unused)),
@@ -69,16 +259,7 @@ int VfsRdOnlyFullPathname(
   char *zOut)
 {
   zOut[nOut-1] = '\0';
-  if (zPath[0] == '/') {
-    sqlite3_snprintf(nOut, zOut, "%s", zPath);
-  } else {
-    int nCwd;
-    if (getcwd(zOut, nOut-1) == NULL) {
-      return SQLITE_ERROR;
-    }
-    nCwd = (int)strlen(zOut);
-    sqlite3_snprintf(nOut-nCwd, &zOut[nCwd], "/%s", zPath);
-  }
+  sqlite3_snprintf(nOut, zOut, "%s", zPath);
   return SQLITE_OK;
 }
 
@@ -113,7 +294,10 @@ static int VfsRdOnlyRandomness(
 }
 
 
-static int VfsRdOnlySleep(sqlite3_vfs *vfs, int microseconds) {
+static int VfsRdOnlySleep(
+  sqlite3_vfs *vfs __attribute__((unused)),
+  int microseconds)
+{
   struct timeval wait_for;
   wait_for.tv_sec = microseconds / (1000*1000);
   wait_for.tv_usec = microseconds % (1000 * 1000);
@@ -167,9 +351,10 @@ static int VfsRdOnlyGetLastError(
 }
 
 
-bool RegisterVfsReadOnly(
+bool RegisterVfsRdOnly(
   const string &vfs_name,
-  perf::Statistics *statistics)
+  perf::Statistics *statistics,
+  const VfsOptions options)
 {
   sqlite3_vfs *vfs = reinterpret_cast<sqlite3_vfs *>(
     smalloc(sizeof(sqlite3_vfs)));
@@ -177,7 +362,7 @@ bool RegisterVfsReadOnly(
   VfsRdOnly *vfs_rdonly = new VfsRdOnly(statistics);
 
   vfs->iVersion = 2;
-  vfs->szOsFile = 0;
+  vfs->szOsFile = sizeof(VfsRdOnlyFile);
   vfs->mxPathname = PATH_MAX;
   vfs->zName = strdup(vfs_name.c_str());
   vfs->pAppData = vfs_rdonly;
@@ -196,7 +381,7 @@ bool RegisterVfsReadOnly(
   vfs->xCurrentTimeInt64 = VfsRdOnlyCurrentTimeInt64;
   assert(vfs->zName);
 
-  int retval = sqlite3_vfs_register(vfs, 0);
+  int retval = sqlite3_vfs_register(vfs, options == kVfsOptDefault);
   if (retval != SQLITE_OK) {
     free(const_cast<char *>(vfs->zName));
     delete vfs_rdonly;
