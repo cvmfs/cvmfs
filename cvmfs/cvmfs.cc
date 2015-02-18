@@ -2229,7 +2229,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   atomic_init32(&cvmfs::open_dirs_);
 
   // Control & command interface
-  if (!talk::Init(".")) {
+  if (!talk::Init(".", cvmfs::options_manager_)) {
     *g_boot_error = "failed to initialize talk socket (" +
                     StringifyInt(errno) + ")";
     return loader::kFailTalk;
