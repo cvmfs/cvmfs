@@ -57,6 +57,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_catalog_sql.cc
   t_xattr.cc
   t_statistics.cc
+  t_options.cc
 
   # test utility functions
   testutil.cc testutil.h
