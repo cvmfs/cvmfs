@@ -90,6 +90,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "sqlitevfs.h"
 #include "statistics.h"
 #include "talk.h"
 #include "tracer.h"
@@ -2297,6 +2298,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Load initial file catalog
+  sqlite::RegisterVfsRdOnly(cvmfs::statistics_, sqlite::kVfsOptDefault);
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
   cvmfs::inode_annotation_ = new catalog::InodeGenerationAnnotation();
@@ -2526,6 +2528,7 @@ static void Fini() {
   cvmfs::repository_tag_ = NULL;
   cvmfs::mountpoint_= NULL;
 
+  sqlite::UnregisterVfsRdOnly();
   if (sqlite3_temp_directory) {
     sqlite3_free(sqlite3_temp_directory);
     sqlite3_temp_directory = NULL;

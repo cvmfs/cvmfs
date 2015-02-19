@@ -18,10 +18,8 @@ enum VfsOptions {
   kVfsOptDefault,
 };
 
-bool RegisterVfsRdOnly(const std::string &name,
-                       perf::Statistics *statistics,
-                       const VfsOptions options);
-bool UnregisterVfsRdOnly(const std::string &vfs_name);
+bool RegisterVfsRdOnly(perf::Statistics *statistics, const VfsOptions options);
+bool UnregisterVfsRdOnly();
 
 }  // namespace sqlite
 

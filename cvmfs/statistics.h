@@ -45,6 +45,13 @@ class Counter {
   atomic_int64 counter_;
 };
 
+// perf::Func(Counter) is more clear to read in the code
+inline void Dec(class Counter *counter) { counter->Dec(); }
+inline void Inc(class Counter *counter) { counter->Inc(); }
+inline int64_t Xadd(class Counter *counter, const int64_t delta) { 
+  return counter->Xadd(delta);
+}
+
 
 /**
  * A collection of Counter objects with a name and a description.  Counters in

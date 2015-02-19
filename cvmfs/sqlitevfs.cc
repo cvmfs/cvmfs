@@ -30,13 +30,34 @@ namespace sqlite {
 
 namespace {
 
+const string kVfsName = "cvmfs-readonly";
+
 struct VfsRdOnly {
-  explicit VfsRdOnly(perf::Statistics *statistics) : statistics(statistics) { }
-  perf::Statistics *statistics;
+  VfsRdOnly()
+    : n_access(NULL)
+    , no_open(NULL)
+    , n_rand(NULL)
+    , sz_rand(NULL)
+    , n_read(NULL)
+    , sz_read(NULL)
+    , n_sleep(NULL)
+    , sz_sleep(NULL)
+    , n_time(NULL)
+  { }
+  perf::Counter *n_access;
+  perf::Counter *no_open;
+  perf::Counter *n_rand;
+  perf::Counter *sz_rand;
+  perf::Counter *n_read;
+  perf::Counter *sz_read;
+  perf::Counter *n_sleep;
+  perf::Counter *sz_sleep;
+  perf::Counter *n_time;
 };
 
 struct VfsRdOnlyFile {
   sqlite3_file base;  // Base class. Must be first.
+  VfsRdOnly *vfs_rdonly;
   int fd;
   uint64_t size;
 };
@@ -47,7 +68,11 @@ struct VfsRdOnlyFile {
 static int VfsRdOnlyClose(sqlite3_file *pFile) {
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
   int retval = close(p->fd);
-  return (retval == 0) ? SQLITE_OK : SQLITE_IOERR_CLOSE;
+  if (retval == 0) {
+    perf::Dec(p->vfs_rdonly->no_open);
+    return SQLITE_OK;
+  }
+  return SQLITE_IOERR_CLOSE;
 }
 
 
@@ -59,11 +84,14 @@ static int VfsRdOnlyRead(
 ) {
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
   ssize_t got = pread(p->fd, zBuf, iAmt, iOfst);
+  perf::Inc(p->vfs_rdonly->n_read);
   if (got == iAmt) {
+    perf::Xadd(p->vfs_rdonly->sz_read, iAmt);
     return SQLITE_OK;
   } else if (got < 0) {
     return SQLITE_IOERR_READ;
   } else {
+    perf::Xadd(p->vfs_rdonly->sz_read, got);
     memset(reinterpret_cast<char *>(zBuf) + got, 0, iAmt - got);
     return SQLITE_IOERR_SHORT_READ;
   }
@@ -158,7 +186,7 @@ static int VfsRdOnlyDeviceCharacteristics(
 
 
 static int VfsRdOnlyOpen(
-  sqlite3_vfs *vfs __attribute__((unused)),
+  sqlite3_vfs *vfs,
   const char *zName,
   sqlite3_file *pFile,
   int flags,
@@ -201,7 +229,9 @@ static int VfsRdOnlyOpen(
   p->size = info.st_size;
   if (pOutFlags)
     *pOutFlags = flags;
+  p->vfs_rdonly = reinterpret_cast<VfsRdOnly *>(vfs->pAppData);
   p->base.pMethods = &io_methods;
+  perf::Inc(p->vfs_rdonly->no_open);
   return SQLITE_OK;
 }
 
@@ -219,7 +249,7 @@ static int VfsRdOnlyDelete(
  * Cvmfs r/o file catalogs cannot have a write-ahead log or a journal.
  */
 static int VfsRdOnlyAccess(
-  sqlite3_vfs *vfs __attribute__((unused)),
+  sqlite3_vfs *vfs,
   const char *zPath,
   int flags,
   int *pResOut)
@@ -245,6 +275,7 @@ static int VfsRdOnlyAccess(
       assert(false);
   }
   *pResOut = (access(zPath, amode) == 0);
+  perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_access);
   return SQLITE_OK;
 }
 
@@ -268,11 +299,12 @@ int VfsRdOnlyFullPathname(
  * Taken from unixRandomness
  */
 static int VfsRdOnlyRandomness(
-  sqlite3_vfs *vfs __attribute__((unused)),
+  sqlite3_vfs *vfs,
   int nBuf,
   char *zBuf)
 {
   assert((size_t)nBuf >= (sizeof(time_t) + sizeof(int)));
+  perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_rand);
   memset(zBuf, 0, nBuf);
   pid_t randomnessPid = getpid();
   int fd, got;
@@ -290,18 +322,22 @@ static int VfsRdOnlyRandomness(
     } while (got < 0 && errno == EINTR);
     close(fd);
   }
+  perf::Xadd(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->sz_rand, nBuf);
   return nBuf;
 }
 
 
 static int VfsRdOnlySleep(
-  sqlite3_vfs *vfs __attribute__((unused)),
+  sqlite3_vfs *vfs,
   int microseconds)
 {
   struct timeval wait_for;
   wait_for.tv_sec = microseconds / (1000*1000);
   wait_for.tv_usec = microseconds % (1000 * 1000);
   select(0, NULL, NULL, NULL, &wait_for);
+  perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_sleep);
+  perf::Xadd(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->sz_sleep,
+             microseconds);
   return microseconds;
 }
 
@@ -310,7 +346,7 @@ static int VfsRdOnlySleep(
  * Taken from unixCurrentTimeInt64()
  */
 static int VfsRdOnlyCurrentTimeInt64(
-  sqlite3_vfs *vfs __attribute__((unused)),
+  sqlite3_vfs *vfs,
   sqlite3_int64 *piNow)
 {
   static const sqlite3_int64 unixEpoch = 24405875*(sqlite3_int64)8640000;
@@ -318,6 +354,7 @@ static int VfsRdOnlyCurrentTimeInt64(
   struct timeval sNow;
   if (gettimeofday(&sNow, 0) == 0) {
     *piNow = unixEpoch + 1000*(sqlite3_int64)sNow.tv_sec + sNow.tv_usec/1000;
+    perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_time);
   } else {
     rc = SQLITE_ERROR;
   }
@@ -329,11 +366,11 @@ static int VfsRdOnlyCurrentTimeInt64(
  * Taken from unixCurrentTime
  */
 static int VfsRdOnlyCurrentTime(
-  sqlite3_vfs *vfs __attribute__((unused)),
+  sqlite3_vfs *vfs,
   double *prNow)
 {
   sqlite3_int64 i = 0;
-  int rc = VfsRdOnlyCurrentTimeInt64(0, &i);
+  int rc = VfsRdOnlyCurrentTimeInt64(vfs, &i);
   *prNow = i/86400000.0;
   return rc;
 }
@@ -352,19 +389,18 @@ static int VfsRdOnlyGetLastError(
 
 
 bool RegisterVfsRdOnly(
-  const string &vfs_name,
   perf::Statistics *statistics,
   const VfsOptions options)
 {
   sqlite3_vfs *vfs = reinterpret_cast<sqlite3_vfs *>(
     smalloc(sizeof(sqlite3_vfs)));
   memset(vfs, 0, sizeof(sqlite3_vfs));
-  VfsRdOnly *vfs_rdonly = new VfsRdOnly(statistics);
+  VfsRdOnly *vfs_rdonly = new VfsRdOnly();
 
   vfs->iVersion = 2;
   vfs->szOsFile = sizeof(VfsRdOnlyFile);
   vfs->mxPathname = PATH_MAX;
-  vfs->zName = strdup(vfs_name.c_str());
+  vfs->zName = kVfsName.c_str();
   vfs->pAppData = vfs_rdonly;
   vfs->xOpen = VfsRdOnlyOpen;
   vfs->xDelete = VfsRdOnlyDelete;
@@ -388,19 +424,47 @@ bool RegisterVfsRdOnly(
     free(vfs);
     return false;
   }
+
+  vfs_rdonly->n_access =
+    statistics->Register("sqlite.n_access", "overall number of access() calls");
+  assert(vfs_rdonly->n_access);
+  vfs_rdonly->no_open =
+    statistics->Register("sqlite.no_open", "currently open sqlite files");
+  assert(vfs_rdonly->no_open);
+  vfs_rdonly->n_rand =
+    statistics->Register("sqlite.n_rand", "overall number of random() calls");
+  assert(vfs_rdonly->n_rand);
+  vfs_rdonly->sz_rand =
+    statistics->Register("sqlite.sz_rand", "overall number of random bytes");
+  assert(vfs_rdonly->sz_rand);
+  vfs_rdonly->n_read =
+    statistics->Register("sqlite.n_read", "overall number of read() calls");
+  assert(vfs_rdonly->n_read);
+  vfs_rdonly->sz_read =
+    statistics->Register("sqlite.sz_read", "overall bytes read()");
+  assert(vfs_rdonly->sz_read);
+  vfs_rdonly->n_sleep =
+    statistics->Register("sqlite.n_sleep", "overall number of sleep() calls");
+  assert(vfs_rdonly->n_sleep);
+  vfs_rdonly->sz_sleep =
+    statistics->Register("sqlite.sz_sleep", "overall microseconds slept");
+  assert(vfs_rdonly->sz_sleep);
+  vfs_rdonly->n_time =
+    statistics->Register("sqlite.n_time", "overall number of time() calls");
+  assert(vfs_rdonly->n_time);
+
   return true;
 }
 
 
-bool UnregisterVfsRdOnly(const string &vfs_name) {
-  sqlite3_vfs *vfs = sqlite3_vfs_find(vfs_name.c_str());
+bool UnregisterVfsRdOnly() {
+  sqlite3_vfs *vfs = sqlite3_vfs_find(kVfsName.c_str());
   if (vfs == NULL)
     return false;
   int retval = sqlite3_vfs_unregister(vfs);
   if (retval != SQLITE_OK)
     return false;
 
-  free(const_cast<char *>(vfs->zName));
   delete reinterpret_cast<VfsRdOnly *>(vfs->pAppData);
   free(vfs);
   return true;

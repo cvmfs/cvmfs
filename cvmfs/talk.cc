@@ -46,6 +46,7 @@
 #include "options.h"
 #include "cache.h"
 #include "monitor.h"
+#include "statistics.h"
 
 using namespace std;  // NOLINT
 
@@ -458,6 +459,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
         sqlite3_status(SQLITE_STATUS_SCRATCH_SIZE, &current, &highwater, 0);
         result += "  Largest scratch allocation " + StringifyInt(highwater/1024)
                   + " KB\n";
+
+        result += "\nRaw Counters:\n" +
+          cvmfs::statistics_->PrintList(perf::Statistics::kPrintHeader);
 
         Answer(con_fd, result);
       } else if (line == "reset error counters") {
