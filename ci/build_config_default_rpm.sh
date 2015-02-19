@@ -27,18 +27,18 @@ echo "copying the files to be packaged in place..."
 cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/cvmfs-config-default.spec ${CVMFS_RESULT_LOCATION}
 cp ${CVMFS_SOURCE_LOCATION}/packaging/rpm/cvmfs-config-none.spec    ${CVMFS_RESULT_LOCATION}
 
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern.ch.pub                  ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it1.cern.ch.pub         ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it2.cern.ch.pub         ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it3.cern.ch.pub         ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/egi.eu.pub                   ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/keys/opensciencegrid.org.pub      ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/cern.ch.conf             ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/egi.eu.conf              ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/opensciencegrid.org.conf ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/50-cern.conf            ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/60-egi.conf             ${CVMFS_RESULT_LOCATION}
-cp ${CVMFS_SOURCE_LOCATION}/mount/config.d/*.cern.ch.conf           ${CVMFS_RESULT_LOCATION}
+cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern.ch.pub                  ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it1.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it2.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/keys/cern-it3.cern.ch.pub         ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/keys/egi.eu.pub                   ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/keys/opensciencegrid.org.pub      ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/cern.ch.conf             ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/egi.eu.conf              ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/domain.d/opensciencegrid.org.conf ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/50-cern.conf            ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/60-egi.conf             ${CVMFS_RESULT_LOCATION}/SOURCES
+cp ${CVMFS_SOURCE_LOCATION}/mount/config.d/*.cern.ch.conf           ${CVMFS_RESULT_LOCATION}/SOURCES
 
 echo "building RPM packages..."
 rpmbuild --define "%_topdir ${CVMFS_RESULT_LOCATION}"      \
