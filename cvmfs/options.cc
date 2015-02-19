@@ -60,7 +60,7 @@ void FastOptionsManager::ParsePath(const string &config_file,
   string line;
   FILE *fconfig = fopen(config_file.c_str(), "r");
   if (fconfig == NULL)
-	return;
+    return;
 
   // Read line by line and extract parameters
   while (GetLineFile(fconfig, &line)) {
