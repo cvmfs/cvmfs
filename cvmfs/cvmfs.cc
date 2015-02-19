@@ -90,6 +90,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "talk.h"
 #include "tracer.h"
 #include "util.h"
@@ -219,6 +220,7 @@ atomic_int32 open_dirs_; /**< number of currently open directories */
 unsigned max_open_files_; /**< maximum allowed number of open files */
 const int kNumReservedFd = 512;  /**< Number of reserved file descriptors for
                                       internal use */
+perf::Statistics *statistics_ = NULL;
 
 /**
  * Ensures that within a callback all operations take place on the same
@@ -1824,6 +1826,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool follow_redirects = false;
 
   cvmfs::boot_time_ = loader_exports->boot_time;
+  cvmfs::statistics_ = new perf::Statistics();
   cvmfs::backoff_throttle_ = new BackoffThrottle();
 
   // Option parsing
@@ -2544,6 +2547,9 @@ static void Fini() {
 
   delete cvmfs::backoff_throttle_;
   cvmfs::backoff_throttle_ = NULL;
+
+  delete cvmfs::statistics_;
+  cvmfs::statistics_ = NULL;
 }
 
 
