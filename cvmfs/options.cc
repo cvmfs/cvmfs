@@ -16,7 +16,6 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <map>
 
 #include "logging.h"
 #include "sanitizer.h"
@@ -54,7 +53,8 @@ static string EscapeShell(const std::string &raw) {
 }
 
 
-void FastOptionsManager::ParsePath(const string &config_file, const bool external) {
+void FastOptionsManager::ParsePath(const string &config_file,
+                                   const bool external __attribute__((unused))) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s", config_file.c_str());
   int retval;
   string line;
@@ -65,7 +65,7 @@ void FastOptionsManager::ParsePath(const string &config_file, const bool externa
   // Read line by line and extract parameters
   while (GetLineFile(fconfig, &line)) {
     line = Trim(line);
-    if (line.empty() || line[0] == '#' || line.find("if ") == 0 || line.find(" ") < string::npos)
+    if (line.empty() || line[0] == '#' || line.find(" ") < string::npos)
       continue;
     vector<string> tokens = SplitString(line, '=');
     if (tokens.size() < 2 || tokens.size() > 2)
@@ -73,8 +73,8 @@ void FastOptionsManager::ParsePath(const string &config_file, const bool externa
 
     ConfigValue value;
     value.source = config_file;
-    value.value = Trim(tokens[1]);
-    string parameter = Trim(tokens[0]);
+    value.value = tokens[1];
+    string parameter = tokens[0];
     config_[parameter] = value;
     retval = setenv(parameter.c_str(), value.value.c_str(), 1);
     assert(retval == 0);

@@ -78,13 +78,13 @@ enum {
 #define CVMFS_OPT(t, p, v) { t, offsetof(struct CvmfsOptions, p), v }
 #define CVMFS_SWITCH(t, p) { t, offsetof(struct CvmfsOptions, p), 1 }
 static struct fuse_opt cvmfs_array_opts[] = {
-  CVMFS_OPT("config=%s",           config, 0),
-  CVMFS_OPT("uid=%d",              uid, 0),
-  CVMFS_OPT("gid=%d",              gid, 0),
-  CVMFS_SWITCH("grab_mountpoint",  grab_mountpoint),
-  CVMFS_SWITCH("cvmfs_suid",       cvmfs_suid),
-  CVMFS_SWITCH("disable_watchdog", disable_watchdog),
-  CVMFS_SWITCH("simple_options_parsing",       simple_options_parsing),
+  CVMFS_OPT("config=%s",                    config, 0),
+  CVMFS_OPT("uid=%d",                       uid, 0),
+  CVMFS_OPT("gid=%d",                       gid, 0),
+  CVMFS_SWITCH("grab_mountpoint",           grab_mountpoint),
+  CVMFS_SWITCH("cvmfs_suid",                cvmfs_suid),
+  CVMFS_SWITCH("disable_watchdog",          disable_watchdog),
+  CVMFS_SWITCH("simple_options_parsing",    simple_options_parsing),
 
   // Ignore these options
   CVMFS_SWITCH("_netdev",          ign_netdev),

@@ -6,7 +6,7 @@
 #define CVMFS_OPTIONS_H_
 
 #include <stdint.h>
-#include <map>
+
 #include <string>
 #include <vector>
 #include <map>
@@ -15,19 +15,15 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
-struct ConfigValue {
-  std::string value;
-  std::string source;
-};
 
 class OptionsManager {
+ public:
+  struct ConfigValue {
+    std::string value;
+    std::string source;
+  };
 
-protected:
-  bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
-
-public:
-  OptionsManager() :
-    config_(std::map<std::string, ConfigValue>()) {}
+  OptionsManager() {}
   virtual ~OptionsManager() {}
 
   virtual void ParsePath(const std::string &config_file, const bool external) = 0;
@@ -42,27 +38,25 @@ public:
 
   bool ParseUIntMap(const std::string &path, std::map<uint64_t, uint64_t> *map);
 
-protected:
-  std::map<std::string, ConfigValue> config_;
+ protected:
+  bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
 
+ protected:
+  std::map<std::string, ConfigValue> config_;
 };  // class OptionManager
 
 
 
 class FastOptionsManager : public OptionsManager {
-
-public:
+ public:
   void ParsePath(const std::string &config_file, const bool external);
-
 };  // class FastOptionManager
 
 
 
 class BashOptionsManager : public OptionsManager {
-
-public:
+ public:
   void ParsePath(const std::string &config_file, const bool external);
-
 };  // class BashOptionManager
 
 
