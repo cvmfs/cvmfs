@@ -1896,7 +1896,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     SetLogDebugFile(parameter);
   SetLogSyslogPrefix(loader_exports->repository_name);
 
-  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s", cvmfs::options_manager_->Dump().c_str());
+  LogCvmfs(kLogCvmfs, kLogDebug, "Options:\n%s",
+           cvmfs::options_manager_->Dump().c_str());
 
   // Overwrite default options
   if (cvmfs::options_manager_->GetValue("CVMFS_MEMCACHE_SIZE", &parameter))
@@ -2023,7 +2024,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   {
     g_claim_ownership = true;
   }
-  if (cvmfs::options_manager_->GetValue("CVMFS_INITIAL_GENERATION", &parameter)) {
+  if (cvmfs::options_manager_->GetValue("CVMFS_INITIAL_GENERATION",
+                                        &parameter)) {
     initial_generation = String2Uint64(parameter);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_PROXY_TEMPLATE", &parameter)) {

@@ -54,8 +54,9 @@ static string EscapeShell(const std::string &raw) {
 
 
 void FastOptionsManager::ParsePath(const string &config_file,
-                                   const bool external __attribute__((unused))) {
-  LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s", config_file.c_str());
+                                 const bool external __attribute__((unused))) {
+  LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s",
+      config_file.c_str());
   int retval;
   string line;
   FILE *fconfig = fopen(config_file.c_str(), "r");
@@ -83,7 +84,8 @@ void FastOptionsManager::ParsePath(const string &config_file,
 }
 
 
-void BashOptionsManager::ParsePath(const string &config_file, const bool external) {
+void BashOptionsManager::ParsePath(const string &config_file,
+                                   const bool external) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Parsing config file %s", config_file.c_str());
   int retval;
   int pipe_open[2];
@@ -202,7 +204,8 @@ void BashOptionsManager::ParsePath(const string &config_file, const bool externa
 }
 
 
-bool OptionsManager::HasConfigRepository(const string &fqrn, string *config_path) {
+bool OptionsManager::HasConfigRepository(const string &fqrn,
+                                         string *config_path) {
   string cvmfs_mount_dir;
   if (!GetValue("CVMFS_MOUNT_DIR", &cvmfs_mount_dir)) {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr, "CVMFS_MOUNT_DIR missing");
@@ -328,7 +331,8 @@ string OptionsManager::Dump() {
 }
 
 
-bool OptionsManager::ParseUIntMap(const string &path, map<uint64_t, uint64_t> *map) {
+bool OptionsManager::ParseUIntMap(const string &path,
+    map<uint64_t, uint64_t> *map) {
   assert(map);
 
   FILE *fmap = fopen(path.c_str(), "r");
