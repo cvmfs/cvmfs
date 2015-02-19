@@ -40,11 +40,14 @@ cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/50-cern.conf            ${CVMFS_RESU
 cp ${CVMFS_SOURCE_LOCATION}/mount/default.d/60-egi.conf             ${CVMFS_RESULT_LOCATION}/SOURCES
 cp ${CVMFS_SOURCE_LOCATION}/mount/config.d/*.cern.ch.conf           ${CVMFS_RESULT_LOCATION}/SOURCES
 
+echo "switching into the build directory..."
+cd ${CVMFS_RESULT_LOCATION}
+
 echo "building RPM packages..."
-rpmbuild --define "%_topdir ${CVMFS_RESULT_LOCATION}"      \
-         --define "%_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
+rpmbuild --define "%_topdir $(pwd)"      \
+         --define "%_tmppath $(pwd)/TMP" \
          -ba cvmfs-config-default.spec
 
-rpmbuild --define "%_topdir ${CVMFS_RESULT_LOCATION}"      \
-         --define "%_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
+rpmbuild --define "%_topdir $(pwd)"      \
+         --define "%_tmppath $(pwd)/TMP" \
          -ba cvmfs-config-none.spec
