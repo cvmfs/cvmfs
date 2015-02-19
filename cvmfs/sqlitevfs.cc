@@ -1,7 +1,13 @@
 /**
  * This file is part of the CernVM File System.
+ *
+ * An optimized virtual file system layer for the client only.  It expects to
+ * operate on immutable, valid SQlite files.  Hence it can do a few
+ * optimiziations.  Most notably it doesn't need to know about the path of
+ * the SQlite file once opened.  It works purely on the file descriptor.
  */
 
+#include "cvmfs_config.h"
 #include "sqlitevfs.h"
 
 #include <dlfcn.h>
@@ -32,6 +38,9 @@ namespace {
 
 const string kVfsName = "cvmfs-readonly";
 
+/**
+ * The private user data attached to the sqlite_vfs object.
+ */
 struct VfsRdOnly {
   VfsRdOnly()
     : n_access(NULL)
@@ -55,6 +64,9 @@ struct VfsRdOnly {
   perf::Counter *n_time;
 };
 
+/**
+ * This is passed to all operations once a file is opened.
+ */
 struct VfsRdOnlyFile {
   sqlite3_file base;  // Base class. Must be first.
   VfsRdOnly *vfs_rdonly;
@@ -76,6 +88,10 @@ static int VfsRdOnlyClose(sqlite3_file *pFile) {
 }
 
 
+/**
+ * On a short read, the remaining bytes must be zero'ed.
+ * TODO(jblomer): the reads seem to be rather small.  Investigate buffered read.
+ */
 static int VfsRdOnlyRead(
   sqlite3_file *pFile,
   void *zBuf,
@@ -96,6 +112,7 @@ static int VfsRdOnlyRead(
     return SQLITE_IOERR_SHORT_READ;
   }
 }
+
 
 static int VfsRdOnlyWrite(
   sqlite3_file *pFile __attribute__((unused)),
@@ -168,7 +185,7 @@ static int VfsRdOnlyFileControl(
 
 
 /**
- * A good unit of bytes to read at once.
+ * A good unit of bytes to read at once.  But probably only used for writes.
  */
 static int VfsRdOnlySectorSize(sqlite3_file *p __attribute__ ((unused))) {
   return 4096;
@@ -185,6 +202,9 @@ static int VfsRdOnlyDeviceCharacteristics(
 }
 
 
+/**
+ * Supports only read-only opens.
+ */
 static int VfsRdOnlyOpen(
   sqlite3_vfs *vfs,
   const char *zName,
@@ -327,6 +347,9 @@ static int VfsRdOnlyRandomness(
 }
 
 
+/**
+ * Like SafeSleepMs, avoid conflict with the ALARM signal.
+ */
 static int VfsRdOnlySleep(
   sqlite3_vfs *vfs,
   int microseconds)
@@ -388,6 +411,9 @@ static int VfsRdOnlyGetLastError(
 }
 
 
+/**
+ * Can only be registered once.
+ */
 bool RegisterVfsRdOnly(
   perf::Statistics *statistics,
   const VfsOptions options)
@@ -457,6 +483,10 @@ bool RegisterVfsRdOnly(
 }
 
 
+/**
+ * If the file system was the default VFS, another default VFS is selected by
+ * SQlite randomly.
+ */
 bool UnregisterVfsRdOnly() {
   sqlite3_vfs *vfs = sqlite3_vfs_find(kVfsName.c_str());
   if (vfs == NULL)

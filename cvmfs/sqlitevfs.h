@@ -15,7 +15,7 @@ namespace sqlite {
 
 enum VfsOptions {
   kVfsOptNone = 0,
-  kVfsOptDefault,
+  kVfsOptDefault,  // the VFS becomes the default for new database connections.
 };
 
 bool RegisterVfsRdOnly(perf::Statistics *statistics, const VfsOptions options);
