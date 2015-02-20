@@ -22,19 +22,30 @@ CVMFS_RESULT_LOCATION="$2"
 [ ! -d ${CVMFS_SOURCE_LOCATION}/debian ]   || die "source directory seemed to be built before (${CVMFS_SOURCE_LOCATION}/debian exists)"
 [ ! -f ${CVMFS_SOURCE_LOCATION}/Makefile ] || die "source directory seemed to be built before (${CVMFS_SOURCE_LOCATION}/Makefile exists)"
 
-echo "preparing source directory for the build..."
-cp -rv ${CVMFS_SOURCE_LOCATION}/packaging/debian/config-default \
-       ${CVMFS_SOURCE_LOCATION}/debian
-cp -v ${CVMFS_SOURCE_LOCATION}/packaging/debian/config-default/Makefile \
-      ${CVMFS_SOURCE_LOCATION}/Makefile
+# build wrapper for cvmfs-config-* package
+build_config_package() {
+  local config_package="$1"
 
-echo "switching to the source directory..."
-cd ${CVMFS_SOURCE_LOCATION}/debian
+  echo "preparing source directory for the build ($config_package)..."
+  cp -rv ${CVMFS_SOURCE_LOCATION}/packaging/debian/${config_package} \
+         ${CVMFS_SOURCE_LOCATION}/debian
+  cp -v ${CVMFS_SOURCE_LOCATION}/packaging/debian/${config_package}/Makefile \
+        ${CVMFS_SOURCE_LOCATION}/Makefile
 
-echo "running the debian package build..."
-pdebuild --buildresult ${CVMFS_RESULT_LOCATION}
+  echo "switching to the debian source directory..."
+  cd ${CVMFS_SOURCE_LOCATION}/debian
 
-# clean up the source tree
-echo "cleaning up..."
-rm -fR ${CVMFS_SOURCE_LOCATION}/debian
-rm -f  ${CVMFS_SOURCE_LOCATION}/Makefile
+  echo "running the debian package build ($config_package)..."
+  pdebuild --buildresult ${CVMFS_RESULT_LOCATION}
+
+  echo "switching back to the source directory..."
+  cd ${CVMFS_SOURCE_LOCATION}
+
+  echo "cleaning up..."
+  rm -fR ${CVMFS_SOURCE_LOCATION}/debian
+  rm -f  ${CVMFS_SOURCE_LOCATION}/Makefile
+}
+
+echo "build the config packages..."
+build_config_package "config-default"
+build_config_package "config-none"
