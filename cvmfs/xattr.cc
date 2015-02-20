@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cstring>
 
+#include "platform.h"
 #include "smalloc.h"
 #include "util.h"
 
@@ -28,7 +29,7 @@ const uint8_t XattrList::kVersion = 1;
 XattrList *XattrList::CreateFromFile(const std::string &path) {
   // Parse the \0 separated list of extended attribute keys
   char *list;
-  ssize_t sz_list = llistxattr(path.c_str(), NULL, 0);
+  ssize_t sz_list = platform_llistxattr(path.c_str(), NULL, 0);
   if ((sz_list < 0) || (sz_list > 64*1024)) {
     return NULL;
   } else if (sz_list == 0) {
@@ -36,7 +37,7 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
     return new XattrList();
   }
   list = reinterpret_cast<char *>(alloca(sz_list));
-  sz_list = llistxattr(path.c_str(), list, sz_list);
+  sz_list = platform_llistxattr(path.c_str(), list, sz_list);
   if (sz_list < 0) {
     return NULL;
   } else if (sz_list == 0) {
@@ -52,7 +53,8 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
   for (unsigned i = 0; i < keys.size(); ++i) {
     if (keys[i].empty())
       continue;
-    ssize_t sz_value = lgetxattr(path.c_str(), keys[i].c_str(), value, 256);
+    ssize_t sz_value = 
+      platform_lgetxattr(path.c_str(), keys[i].c_str(), value, 256);
     if (sz_value < 0)
       continue;
     result->Set(keys[i], string(value, sz_value));

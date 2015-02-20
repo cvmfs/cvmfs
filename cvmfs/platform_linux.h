@@ -215,6 +215,7 @@ inline int platform_fstat(int filedes, platform_stat64 *buf) {
   return fstat64(filedes, buf);
 }
 
+// TODO(jblomer): the translation from C to C++ should be done elsewhere
 inline bool platform_getxattr(const std::string &path, const std::string &name,
                               std::string *value)
 {
@@ -240,8 +241,9 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
   return true;
 }
 
+// TODO(jblomer): the translation from C to C++ should be done elsewhere
 inline bool platform_setxattr(
-  const std::string &path, 
+  const std::string &path,
   const std::string &name,
   const std::string &value)
 {
@@ -249,6 +251,22 @@ inline bool platform_setxattr(
     path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
   return retval == 0;
 }
+
+
+inline ssize_t platform_lgetxattr(
+  const char *path,
+  const char *name,
+  void *value,
+  size_t size
+) {
+  return lgetxattr(path, name, value, size);
+}
+
+
+inline ssize_t platform_llistxattr(const char *path, char *list, size_t size) {
+  return llistxattr(path, list, size);
+}
+
 
 inline void platform_disable_kcache(int filedes) {
   (void)posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
