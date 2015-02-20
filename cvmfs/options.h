@@ -20,18 +20,10 @@ namespace CVMFS_NAMESPACE_GUARD {
  * and stores the information contained in different config files, keeping
  * the last parsed file that changed each property. It stores the information
  * in a key-value map so that for each variable name the value and last source
- * are stored.
+ * are stored, and makes each property part of the program's environments
  */
 class OptionsManager {
  public:
-  /**
-   * The ConfigValue structure contains a concrete value of a variable, as well
-   * as the source (complete path) of the config file where it was obtained.
-   */
-  struct ConfigValue {
-    std::string value;
-    std::string source;
-  };
 
   OptionsManager() {}
   virtual ~OptionsManager() {}
@@ -46,15 +38,15 @@ class OptionsManager {
    *                     repository. If false the configuration file is in /etc
    */
   virtual void ParsePath(const std::string &config_file,
-      const bool external) = 0;
+                         const bool external) = 0;
 
   /**
-   * Parses the default config files for cvmfs.
+   * Parses the default config files for cvmfs
    */
   void ParseDefault(const std::string &fqrn);
 
   /**
-   * Cleans all information about the variables.
+   * Cleans all information about the variables
    */
   void ClearConfig();
 
@@ -62,7 +54,7 @@ class OptionsManager {
    * Checks if a concrete key (variable) is defined
    *
    * @param   key variable to be checked in the map
-   * @return  true if there is a value for key, false otherwise.
+   * @return  true if there is a value for key, false otherwise
    */
   bool IsDefined(const std::string &key);
 
@@ -89,12 +81,12 @@ class OptionsManager {
    * Checks if a variable contains a boolean value
    *
    * @param   param_value variable to be accessed in the map
-   * @return  true if param has as value "YES", "ON" or "1". False otherwise.
+   * @return  true if param has as value "YES", "ON" or "1". False otherwise
    */
   bool IsOn(const std::string &param_value);
 
   /**
-   * Retrieves a vector containing all stored keys.
+   * Retrieves a vector containing all stored keys
    *
    * @return a vector with all keys contained in the map
    */
@@ -106,24 +98,32 @@ class OptionsManager {
    *
    * "KEY=VALUE    # from SOURCE"
    *
-   * @return a vector containing all key-values in a string format.
+   * @return a vector containing all key-values in a string format
    */
   std::string Dump();
 
   /**
-   * Parse a configuration file whose variables's values are positive integers
+   * Parse a configuration file whose variables' values are positive integers
    *
    * @param  path absolute path to the configuration file
    * @param  map map to store the generated key-value
    * @return true if the file exists, is readable and all values can be parsed
-   *  to integers
+   *         to integers
    */
   bool ParseUIntMap(const std::string &path, std::map<uint64_t, uint64_t> *map);
 
  protected:
+  /**
+    * The ConfigValue structure contains a concrete value of a variable, as well
+    * as the source (complete path) of the config file where it was obtained
+    */
+   struct ConfigValue {
+     std::string value;
+     std::string source;
+   };
+
   bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
 
- protected:
   std::map<std::string, ConfigValue> config_;
 };  // class OptionManager
 
@@ -139,32 +139,26 @@ class OptionsManager {
  *  No comments (#) are allowed.
  *
  *  @note In order to use this parse it is necessary to execute the program
- *  with the "-o simple_options_parsing" flag
+ *        with the "-o simple_options_parsing" flag
  *  @note If using IgProf profiling tool it is necessary to use this parser in
- *  order to avoid a fork.
+ *        order to avoid a fork
  */
-class FastOptionsManager : public OptionsManager {
+class SimpleOptionsParser : public OptionsManager {
  public:
   void ParsePath(const std::string &config_file, const bool external);
-};  // class FastOptionManager
+};  // class SimpleOptionsManager
 
 
 /**
- * Derived class from OptionsManager. This class provides the original an most
+ * Derived class from OptionsManager. This class provides the
  * complete parsing of the configuration files. In order to parse the
  * configuration files it retrieves the "KEY=VALUE" pairs and uses bash for
- * the rest, so that you can execute sightly complex scripts.
- *
- * @note if no "-o simple_options_parsing" flag is passed to the program this
- * class will parse the configuration files by default
- *
- * @note do not use this class if profiling with IgProf. Instead use the
- * FastOptionsManager class
+ * the rest, so that you can execute sightly complex scripts
  */
 class BashOptionsManager : public OptionsManager {
  public:
   void ParsePath(const std::string &config_file, const bool external);
-};  // class BashOptionManager
+};  // class BashOptionsManager
 
 
 

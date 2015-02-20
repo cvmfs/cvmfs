@@ -53,7 +53,7 @@ static string EscapeShell(const std::string &raw) {
 }
 
 
-void FastOptionsManager::ParsePath(const string &config_file,
+void SimpleOptionsParser::ParsePath(const string &config_file,
                                  const bool external __attribute__((unused))) {
   LogCvmfs(kLogCvmfs, kLogDebug, "Fast-parsing config file %s",
       config_file.c_str());

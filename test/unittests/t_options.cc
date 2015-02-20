@@ -44,7 +44,7 @@ class T_Options : public ::testing::Test {
     return 9u;
   }
 
-  unsigned ExpectedValues(const type<FastOptionsManager>  type_specifier) {
+  unsigned ExpectedValues(const type<SimpleOptionsParser>  type_specifier) {
     return 6u;
   }
 
@@ -58,7 +58,7 @@ class T_Options : public ::testing::Test {
   string       config_file_;
 };  // class T_Options
 
-typedef ::testing::Types<BashOptionsManager, FastOptionsManager> OptionsManagers;
+typedef ::testing::Types<BashOptionsManager, SimpleOptionsParser> OptionsManagers;
 TYPED_TEST_CASE(T_Options, OptionsManagers);
 
 

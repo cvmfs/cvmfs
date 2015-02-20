@@ -1868,7 +1868,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   // Option parsing
   if (cvmfs::loader_exports_->version >= 3 &&
       cvmfs::loader_exports_->simple_options_parsing) {
-    cvmfs::options_manager_ = new FastOptionsManager();
+    cvmfs::options_manager_ = new SimpleOptionsParser();
   } else {
     cvmfs::options_manager_ = new BashOptionsManager();
   }

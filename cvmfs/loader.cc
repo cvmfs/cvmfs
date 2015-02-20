@@ -675,7 +675,7 @@ int main(int argc, char *argv[]) {
   string parameter;
   OptionsManager *options_manager;
   if (simple_options_parsing_) {
-    options_manager = new FastOptionsManager();
+    options_manager = new SimpleOptionsParser();
   } else {
     options_manager = new BashOptionsManager();
   }
