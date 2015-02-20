@@ -44,6 +44,7 @@ TEST_F(T_Xattr, CreateFromFile) {
   EXPECT_TRUE(from_file2->Get("user.test", &value));
   EXPECT_EQ("value", value);
 
+#ifndef __APPLE__
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test2", "value2"));
   string long_string = "user." + string(250, 'x');
   string too_long_string = "user." + string(300, 'x');
@@ -58,6 +59,7 @@ TEST_F(T_Xattr, CreateFromFile) {
   EXPECT_EQ("value2", value);
   EXPECT_TRUE(from_file3->Get(long_string, &value));
   EXPECT_EQ(long_string, value);
+#endif
 }
 
 
