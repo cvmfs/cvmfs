@@ -19,16 +19,16 @@ class T_Options : public ::testing::Test {
     ASSERT_TRUE(temp_file != NULL);
     unlink_guard_.Set(config_file_);
     fprintf(temp_file,
-    		"CVMFS_CACHE_BASE=/root/cvmfs_testing/cache\n"
+            "CVMFS_CACHE_BASE=/root/cvmfs_testing/cache\n"
             "CVMFS_RELOAD_SOCKETS=/root/cvmfs_testing/cache\n"
             "CVMFS_SERVER_URL=http://volhcb28:3128/data\n"
-    		"IdontHaveAnEqual\n"
-    		"I=have=twoEquals\n"
-    		"I = and spaces\n"
-    		"value=\n"
+            "IdontHaveAnEqual\n"
+            "I=have=twoEquals\n"
+            "I = and spaces\n"
+            "value=\n"
             "CVMFS_SHARED_CACHE=no\n"
             "CVMFS_HTTP_PROXY=DIRECT\n"
-			"export A=B\n");
+            "export A=B\n");
     int result = fclose(temp_file);
     ASSERT_EQ(0, result);
   }
