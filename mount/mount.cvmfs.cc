@@ -5,25 +5,25 @@
  * Note: meaning of return codes is speficied by mount command.
  */
 
-#include <sys/types.h>
-#include <sys/uio.h>
-#include <unistd.h>
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/types.h>
+#include <sys/uio.h>
 #include <sys/wait.h>
 #ifdef __APPLE__
 #include <sys/sysctl.h>
 #endif
+#include <unistd.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <vector>
 
-#include "util.h"
 #include "options.h"
-#include "sanitizer.h"
 #include "platform.h"
+#include "sanitizer.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -94,7 +94,8 @@ static bool CheckStrictMount(const string &fqrn) {
       options_manager_.IsOn(param_strict_mount))
   {
     string repository_list;
-    bool retval = options_manager_.GetValue("CVMFS_REPOSITORIES", &repository_list);
+    bool retval =
+      options_manager_.GetValue("CVMFS_REPOSITORIES", &repository_list);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_REPOSITORIES missing");
       return false;
@@ -105,7 +106,8 @@ static bool CheckStrictMount(const string &fqrn) {
         return true;
     }
     string config_repository;
-    retval = options_manager_.GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository);
+    retval =
+      options_manager_.GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository);
     if (retval && (config_repository == fqrn))
       return true;
     LogCvmfs(kLogCvmfs, kLogStderr, "Not allowed to mount %s, "

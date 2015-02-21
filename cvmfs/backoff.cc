@@ -9,9 +9,9 @@
 
 #include <ctime>
 
-#include "util.h"
-#include "smalloc.h"
 #include "logging.h"
+#include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
