@@ -35,8 +35,8 @@
 #include <set>
 #include <string>
 
-#include "catalog_rw.h"
 #include "catalog_mgr_ro.h"
+#include "catalog_rw.h"
 #include "upload_spooler_result.h"
 #include "xattr.h"
 
@@ -44,9 +44,11 @@ class XattrList;
 namespace upload {
 class Spooler;
 }
+
 namespace download {
 class DownloadManager;
 }
+
 namespace manifest {
 class Manifest;
 }
@@ -108,7 +110,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
  protected:
   void EnforceSqliteMemLimit() { }
 
-  Catalog* CreateCatalog(const PathString &mountpoint,
+  Catalog *CreateCatalog(const PathString &mountpoint,
                          const shash::Any &catalog_hash,
                          Catalog *parent_catalog);
   void ActivateCatalog(Catalog *catalog);
@@ -128,7 +130,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void GetModifiedCatalogs(WritableCatalogList *result) const {
     const unsigned int number_of_dirty_catalogs =
       GetModifiedCatalogsRecursively(GetRootCatalog(), result);
-    assert (number_of_dirty_catalogs <= result->size());
+    assert(number_of_dirty_catalogs <= result->size());
   }
   int GetModifiedCatalogsRecursively(const Catalog *catalog,
                                      WritableCatalogList *result) const;
@@ -141,7 +143,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   inline void SyncUnlock() { pthread_mutex_unlock(sync_lock_); }
 
   // defined in catalog_mgr_rw.cc
-  const static std::string kCatalogFilename;
+  static const std::string kCatalogFilename;
 
   // private lock of WritableCatalogManager
   pthread_mutex_t *sync_lock_;
