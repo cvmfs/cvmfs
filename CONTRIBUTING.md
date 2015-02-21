@@ -22,7 +22,7 @@ Starting point is [Google C++ style guide](https://google-styleguide.googlecode.
 
 We have the following exceptions/adjustments:
 
-  - We do use `alloca()`.
+  - We do use `alloca()` and variable-length arrays for small allocations in order to decrease memory fragmentation.
   - We use Doxygen comments. In order to not confuse the style guide checker, we use the `/**` form only (e.g. not `///<` but `/**< */`).  If you need structure in the code comments, use [Markdown syntax](http://daringfireball.net/projects/markdown).
   - We do not include the full copyright in each and every file. It's sufficient to add a comment saying that a particular file is part of CernVM-FS.
   - We currently do not include files with project-relative paths.  The vast majority of source files are in ./cvmfs (although that might change).
