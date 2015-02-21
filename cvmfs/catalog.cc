@@ -4,15 +4,16 @@
 
 #include "catalog.h"
 
-#include <cassert>
-#include <algorithm>
 #include <errno.h>
 
-#include "platform.h"
+#include <algorithm>
+#include <cassert>
+
 #include "catalog_mgr.h"
-#include "util.h"
 #include "logging.h"
+#include "platform.h"
 #include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -50,7 +51,7 @@ Catalog::Catalog(const PathString &path,
   catalog_hash_(catalog_hash),
   path_(path),
   volatile_flag_(false),
-  is_root_(parent == NULL && ! is_nested),
+  is_root_(parent == NULL && !is_nested),
   parent_(parent),
   nested_catalog_cache_dirty_(true),
   initialized_(false)
@@ -127,7 +128,7 @@ bool Catalog::InitStandalone(const std::string &database_file) {
 
 
 bool Catalog::ReadCatalogCounters() {
-  assert (database_ != NULL);
+  assert(database_ != NULL);
   bool statistics_loaded;
   if (database().schema_version() <
       CatalogDatabase::kLatestSupportedSchema - CatalogDatabase::kSchemaEpsilon)
@@ -174,8 +175,10 @@ bool Catalog::OpenDatabase(const string &db_path) {
                                     "WHERE key='root_prefix';");
     if (sql_root_prefix.FetchRow()) {
       root_prefix_.Assign(
-        reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0)),
-        strlen(reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0))));
+        reinterpret_cast<const char *>(
+          sql_root_prefix.RetrieveText(0)),
+        strlen(reinterpret_cast<const char *>(
+          sql_root_prefix.RetrieveText(0))));
       LogCvmfs(kLogCatalog, kLogDebug,
                "found root prefix %s in root catalog file %s",
                root_prefix_.c_str(), db_path.c_str());
@@ -192,7 +195,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
     volatile_flag_ = sql_volatile_flag.RetrieveInt(0);
 
   // Read Catalog Counter Statistics
-  if (! ReadCatalogCounters()) {
+  if (!ReadCatalogCounters()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load statistics counters for catalog %s (file %s)",
              path_.c_str(), db_path.c_str());
@@ -404,7 +407,7 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
 
 
 const Catalog::HashVector& Catalog::GetReferencedObjects() const {
-  if (! referenced_hashes_.empty()) {
+  if (!referenced_hashes_.empty()) {
     return referenced_hashes_;
   }
 

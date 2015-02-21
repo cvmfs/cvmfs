@@ -6,26 +6,25 @@
 #define CVMFS_CATALOG_TRAVERSAL_H_
 
 #include <cassert>
+#include <limits>
+#include <set>
 #include <stack>
 #include <string>
-#include <limits>
+#include <vector>
 
 #include "catalog.h"
+#include "compression.h"
+#include "history_sqlite.h"
+#include "logging.h"
+#include "manifest.h"
+#include "object_fetcher.h"
+#include "signature.h"
 #include "util.h"
 #include "util_concurrency.h"
-#include "logging.h"
-#include "compression.h"
-
-#include "manifest.h"
-#include "signature.h"
-#include "history_sqlite.h"
-
-#include "object_fetcher.h"
-
 
 namespace catalog {
-  class Catalog;
-  class WritableCatalog;
+class Catalog;
+class WritableCatalog;
 }
 
 namespace swissknife {
@@ -255,7 +254,7 @@ class CatalogTraversal
    * Constructs a new catalog traversal engine based on the construction
    * parameters described in struct ConstructionParams.
    */
-	CatalogTraversal(const Parameters &params) :
+  explicit CatalogTraversal(const Parameters &params) :
     object_fetcher_(params.object_fetcher),
     no_close_(params.no_close),
     ignore_load_failure_(params.ignore_load_failure),
@@ -264,7 +263,7 @@ class CatalogTraversal
     default_timestamp_threshold_(params.timestamp),
     error_sink_((params.quiet) ? kLogDebug : kLogStderr)
   {
-    assert (object_fetcher_ != NULL);
+    assert(object_fetcher_ != NULL);
   }
 
 
@@ -315,22 +314,24 @@ class CatalogTraversal
    * @param type  breadths or depth first traversal
    * @return      true when catalog traversal successfully finished
    */
-  bool TraverseNamedSnapshots(const TraversalType type = kBreadthFirstTraversal) {
+  bool TraverseNamedSnapshots(
+    const TraversalType type = kBreadthFirstTraversal)
+  {
     typedef std::vector<shash::Any> HashList;
 
     TraversalContext ctx(Parameters::kNoHistory,
                          Parameters::kNoTimestampThreshold,
                          type);
     const UniquePtr<history::History> tag_db(object_fetcher_->FetchHistory());
-    if (! tag_db.IsValid()) {
-      LogCvmfs(kLogCatalogTraversal, kLogDebug, "didn't find a history database "
-                                                "to traverse");
+    if (!tag_db.IsValid()) {
+      LogCvmfs(kLogCatalogTraversal, kLogDebug,
+               "didn't find a history database to traverse");
       return true;
     }
 
     HashList root_hashes;
     bool success = tag_db->GetHashes(&root_hashes);
-    assert (success);
+    assert(success);
 
     // traversing referenced named root hashes in reverse chronological order
     // to make sure that overlapping history traversals don't leave out catalog
@@ -418,21 +419,21 @@ class CatalogTraversal
    * @return      true on successful traversal and false on abort
    */
   bool DoTraverse(TraversalContext &ctx) {
-    assert (ctx.callback_stack.empty());
+    assert(ctx.callback_stack.empty());
 
-    while (! ctx.catalog_stack.empty()) {
+    while (!ctx.catalog_stack.empty()) {
       // Get the top most catalog for the next processing step
       CatalogJob job = Pop(ctx);
 
       // download and open the catalog for processing
-      if (! PrepareCatalog(ctx, job)) {
+      if (!PrepareCatalog(ctx, job)) {
         return false;
       }
 
       // ignored catalogs don't need to be processed anymore but they might
       // release postponed yields
       if (job.ignore) {
-        if (! HandlePostponedYields(ctx, job)) {
+        if (!HandlePostponedYields(ctx, job)) {
           return false;
         }
         continue;
@@ -443,15 +444,15 @@ class CatalogTraversal
       PushReferencedCatalogs(ctx, job);
 
       // notify listeners
-      if (! YieldToListeners(ctx, job)) {
+      if (!YieldToListeners(ctx, job)) {
         return false;
       }
     }
 
     // invariant: after the traversal finshed, there should be no more catalogs
     //            to traverse or to yield!
-    assert (ctx.catalog_stack.empty());
-    assert (ctx.callback_stack.empty());
+    assert(ctx.catalog_stack.empty());
+    assert(ctx.callback_stack.empty());
     return true;
   }
 
@@ -465,9 +466,9 @@ class CatalogTraversal
 
     job.catalog = object_fetcher_->FetchCatalog(job.hash,
                                                 job.path,
-                                                ! job.IsRootCatalog(),
+                                                !job.IsRootCatalog(),
                                                 job.parent);
-    if (! job.catalog) {
+    if (!job.catalog) {
       if (ignore_load_failure_) {
         LogCvmfs(kLogCatalogTraversal, kLogDebug, "ignoring missing catalog %s "
                                                   "(possibly swept before)",
@@ -493,18 +494,18 @@ class CatalogTraversal
 
 
   bool ReopenCatalog(CatalogJob &job) {
-    assert (! job.ignore);
-    assert (job.catalog == NULL);
+    assert(!job.ignore);
+    assert(job.catalog == NULL);
 
     job.catalog = CatalogTN::AttachFreely(job.path,
                                           job.catalog_file_path,
                                           job.hash,
                                           job.parent,
-                                          ! job.IsRootCatalog());
+                                          !job.IsRootCatalog());
 
     if (job.catalog == NULL) {
-      LogCvmfs(kLogCatalogTraversal, error_sink_, "failed to re-open catalog %s",
-               job.hash.ToString().c_str());
+      LogCvmfs(kLogCatalogTraversal, error_sink_,
+               "failed to re-open catalog %s", job.hash.ToString().c_str());
       return false;
     }
 
@@ -514,7 +515,7 @@ class CatalogTraversal
 
   bool CloseCatalog(CatalogJob &job, const bool unlink_db = true) {
     delete job.catalog; job.catalog = NULL;
-    if (! job.catalog_file_path.empty() && unlink_db) {
+    if (!job.catalog_file_path.empty() && unlink_db) {
       const int retval = unlink(job.catalog_file_path.c_str());
       if (retval != 0) {
         LogCvmfs(kLogCatalogTraversal, error_sink_, "Failed to unlink %s - %d",
@@ -537,8 +538,8 @@ class CatalogTraversal
    * @return     true if either history or timestamp threshold are satisfied
    */
   bool IsBelowPruningThresholds(TraversalContext &ctx, const CatalogJob &job) {
-    assert (job.IsRootCatalog());
-    assert (job.catalog != NULL);
+    assert(job.IsRootCatalog());
+    assert(job.catalog != NULL);
 
     const bool h = job.history_depth >= ctx.history_depth;
     assert(ctx.timestamp_threshold >= 0);
@@ -550,38 +551,37 @@ class CatalogTraversal
 
 
   void PushReferencedCatalogs(TraversalContext &ctx, CatalogJob &job) {
-    assert (! job.ignore);
-    assert (job.catalog != NULL);
-    assert (ctx.traversal_type == kBreadthFirstTraversal ||
-            ctx.traversal_type == kDepthFirstTraversal);
+    assert(!job.ignore);
+    assert(job.catalog != NULL);
+    assert(ctx.traversal_type == kBreadthFirstTraversal ||
+           ctx.traversal_type == kDepthFirstTraversal);
 
     // this differs, depending on the traversal strategy.
     //
     // Breadths First Traversal
-    //   Catalogs are traversed from top (root catalog) to bottom (leaf catalogs)
-    //   and from more recent (HEAD revision) to older (historic revisions)
+    //   Catalogs are traversed from top (root catalog) to bottom (leaf
+    //   catalogs) and from more recent (HEAD revision) to older (historic
+    //   revisions)
     //
     // Depth First Traversal
     //   Catalogs are traversed from oldest revision (depends on the configured
     //   maximal history depth) to the HEAD revision and from bottom (leafs) to
     //   top (root catalogs)
     job.referenced_catalogs = (ctx.traversal_type == kBreadthFirstTraversal)
-      ?   PushPreviousRevision(ctx, job)
-        + PushNestedCatalogs  (ctx, job)
-
-      :   PushNestedCatalogs  (ctx, job)
-        + PushPreviousRevision(ctx, job);
+      ? PushPreviousRevision(ctx, job) + PushNestedCatalogs(ctx, job)
+      : PushNestedCatalogs(ctx, job) + PushPreviousRevision(ctx, job);
   }
 
   /**
    * Pushes the previous revision of a (root) catalog.
    * @return  the number of catalogs pushed on the processing stack
    */
-  unsigned int PushPreviousRevision(      TraversalContext  &ctx,
-                                    const CatalogJob        &job)
-  {
+  unsigned int PushPreviousRevision(
+    TraversalContext &ctx,
+    const CatalogJob &job
+  ) {
     // only root catalogs are used for entering a previous revision (graph)
-    if (! job.catalog->IsRoot()) {
+    if (!job.catalog->IsRoot()) {
       return 0;
     }
 
@@ -612,9 +612,10 @@ class CatalogTraversal
    * Pushes all the referenced nested catalogs.
    * @return  the number of catalogs pushed on the processing stack
    */
-  unsigned int PushNestedCatalogs(      TraversalContext  &ctx,
-                                  const CatalogJob        &job)
-  {
+  unsigned int PushNestedCatalogs(
+    TraversalContext &ctx,
+    const CatalogJob &job
+  ) {
     typedef typename CatalogTN::NestedCatalogList NestedCatalogList;
     const NestedCatalogList &nested = job.catalog->ListNestedCatalogs();
     typename NestedCatalogList::const_iterator i    = nested.begin();
@@ -638,10 +639,10 @@ class CatalogTraversal
 
 
   bool YieldToListeners(TraversalContext &ctx, CatalogJob &job) {
-    assert (! job.ignore);
-    assert (job.catalog != NULL);
-    assert (ctx.traversal_type == kBreadthFirstTraversal ||
-            ctx.traversal_type == kDepthFirstTraversal);
+    assert(!job.ignore);
+    assert(job.catalog != NULL);
+    assert(ctx.traversal_type == kBreadthFirstTraversal ||
+          ctx.traversal_type == kDepthFirstTraversal);
 
     // in breadth first search mode, every catalog is simply handed out once
     // it is visited. No extra magic required...
@@ -651,7 +652,7 @@ class CatalogTraversal
 
     // in depth first search mode, catalogs might need to wait until all of
     // their referenced catalogs are yielded (ctx.callback_stack)...
-    assert (ctx.traversal_type == kDepthFirstTraversal);
+    assert(ctx.traversal_type == kDepthFirstTraversal);
     if (job.referenced_catalogs > 0) {
       PostponeYield(ctx, job);
       return true;
@@ -669,18 +670,18 @@ class CatalogTraversal
    * to provide higher level yielding behaviour.
    */
   bool Yield(CatalogJob &job) {
-    assert (! job.ignore);
-    assert (job.catalog != NULL || job.postponed);
+    assert(!job.ignore);
+    assert(job.catalog != NULL || job.postponed);
 
     // catalog was pushed on ctx.callback_stack before, it might need to be re-
     // opened. If CatalogTraversal<> is configured with no_close, it was not
     // closed before, hence does not need a re-open.
-    if (job.postponed && ! no_close_ && ! ReopenCatalog(job)) {
+    if (job.postponed && !no_close_ && !ReopenCatalog(job)) {
       return false;
     }
 
     // hand the catalog out to the user code (see Observable<>)
-    assert (job.catalog != NULL);
+    assert(job.catalog != NULL);
     this->NotifyListeners(job.GetCallbackData());
 
     // skip the catalog closing procedure if asked for
@@ -700,11 +701,11 @@ class CatalogTraversal
    * Note: this is only used for the Depth First Traversal strategy!
    */
   void PostponeYield(TraversalContext &ctx, CatalogJob &job) {
-    assert (job.referenced_catalogs > 0);
+    assert(job.referenced_catalogs > 0);
 
     job.postponed = true;
-    if (! no_close_) {
-      const bool unlink_db = false; // will reopened just before yielding
+    if (!no_close_) {
+      const bool unlink_db = false;  // will reopened just before yielding
       CloseCatalog(job, unlink_db);
     }
     ctx.callback_stack.push(job);
@@ -726,21 +727,21 @@ class CatalogTraversal
       return true;
     }
 
-    assert (ctx.traversal_type == kDepthFirstTraversal);
-    assert (job.referenced_catalogs == 0);
+    assert(ctx.traversal_type == kDepthFirstTraversal);
+    assert(job.referenced_catalogs == 0);
 
     // walk through the callback_stack and yield all catalogs that have no un-
     // yielded referenced_catalogs anymore. Every time a CatalogJob in the
     // callback_stack gets yielded it decrements the referenced_catalogs of the
     // next top of the stack (it's parent CatalogJob waiting for yielding)
     CatalogJobStack &clbs = ctx.callback_stack;
-    while (! clbs.empty()) {
+    while (!clbs.empty()) {
       CatalogJob &postponed_job = clbs.top();
       if (--postponed_job.referenced_catalogs > 0) {
         break;
       }
 
-      if (! Yield(postponed_job)) {
+      if (!Yield(postponed_job)) {
         return false;
       }
       clbs.pop();
@@ -783,7 +784,7 @@ class CatalogTraversal
     // get the manifest of the repository to learn about the entry point or the
     // root catalog of the repository to be traversed
     UniquePtr<manifest::Manifest> manifest(object_fetcher_->FetchManifest());
-    if (! manifest) {
+    if (!manifest) {
       return shash::Any();
     }
 
@@ -815,6 +816,6 @@ template <class ObjectFetcherT>
 const time_t
   CatalogTraversal<ObjectFetcherT>::Parameters::kNoTimestampThreshold = 0;
 
-}
+}  // namespace swissknife
 
-#endif /* CVMFS_CATALOG_TRAVERSAL_H_*/
+#endif  // CVMFS_CATALOG_TRAVERSAL_H_

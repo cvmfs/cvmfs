@@ -3911,7 +3911,7 @@ def CheckBraces(filename, clean_lines, linenum, error):
     # method signature or if/for/while statement.  That is: previous line ends
     # on ) or const (t).
     prevline = GetPreviousNonBlankLine(clean_lines, linenum)[0]
-    if (not Search(r'[,;:}{()t]\s*$', prevline) and
+    if (not Search(r'[,;:}{()t>]\s*$', prevline) and
         not Match(r'\s*#', prevline)):
       error(filename, linenum, 'whitespace/braces', 4,
             '{ should almost always be at the end of the previous line')
