@@ -24,7 +24,7 @@
  * proxies are selected randomly (load-balancing set).
  */
 
-//TODO: MS for time summing
+// TODO(jblomer): MS for time summing
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
@@ -41,9 +41,9 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <cstdio>
 #include <set>
 
 #include "atomic.h"
@@ -165,8 +165,8 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   const string header_line(static_cast<const char *>(ptr), num_bytes);
   JobInfo *info = static_cast<JobInfo *>(info_link);
 
-  //LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: Header callback with line %s",
-  //         header_line.c_str());
+  // LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: Header callback with %s",
+  //          header_line.c_str());
 
   // Check http status codes
   if (HasPrefix(header_line, "HTTP/1.", false)) {
@@ -216,7 +216,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
   if ((info->destination == kDestinationMem) &&
       HasPrefix(header_line, "CONTENT-LENGTH:", true))
   {
-    char *tmp = (char *)alloca(num_bytes+1);
+    char *tmp = reinterpret_cast<char *>(alloca(num_bytes+1));
     uint64_t length = 0;
     sscanf(header_line.c_str(), "%s %"PRIu64, tmp, &length);
     if (length > 0) {
@@ -251,7 +251,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   const size_t num_bytes = size*nmemb;
   JobInfo *info = static_cast<JobInfo *>(info_link);
 
-  //LogCvmfs(kLogDownload, kLogDebug, "Data callback with %d bytes", num_bytes);
+  // LogCvmfs(kLogDownload, kLogDebug, "Data callback,  %d bytes", num_bytes);
 
   if (num_bytes == 0)
     return 0;
@@ -282,8 +282,8 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   } else {
     // Write to file
     if (info->compressed) {
-      //LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
-      //         num_bytes, info->url->c_str());
+      // LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
+      //          num_bytes, info->url->c_str());
       zlib::StreamStates retval =
         zlib::DecompressZStream2File(&info->zstream,
                                      info->destination_file,
@@ -294,8 +294,8 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         info->error_code = kFailBadData;
         return 0;
       } else if (retval == zlib::kStreamIOError) {
-        LogCvmfs(kLogDownload, kLogSyslogErr, "decompressing %s, local IO error",
-                 info->url->c_str());
+        LogCvmfs(kLogDownload, kLogSyslogErr,
+                 "decompressing %s, local IO error", info->url->c_str());
         info->error_code = kFailLocalIO;
         return 0;
       }
@@ -328,8 +328,8 @@ int DownloadManager::CallbackCurlSocket(CURL *easy,
                                         void *userp,
                                         void *socketp)
 {
-  //LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
-  //         "handle %p, socket %d, action %d", easy, s, action);
+  // LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
+  //          "handle %p, socket %d, action %d", easy, s, action);
   DownloadManager *download_mgr = static_cast<DownloadManager *>(userp);
   if (action == CURL_POLL_NONE)
     return 0;
@@ -377,13 +377,13 @@ int DownloadManager::CallbackCurlSocket(CURL *easy,
           (download_mgr->watch_fds_inuse_ < download_mgr->watch_fds_size_/2))
       {
         download_mgr->watch_fds_size_ /= 2;
-        //LogCvmfs(kLogDownload, kLogDebug, "shrinking watch_fds_ (%d)",
-        //         watch_fds_size_);
+        // LogCvmfs(kLogDownload, kLogDebug, "shrinking watch_fds_ (%d)",
+        //          watch_fds_size_);
         download_mgr->watch_fds_ = static_cast<struct pollfd *>(
           srealloc(download_mgr->watch_fds_,
                    download_mgr->watch_fds_size_*sizeof(struct pollfd)));
-        //LogCvmfs(kLogDownload, kLogDebug, "shrinking watch_fds_ done",
-        //         watch_fds_size_);
+        // LogCvmfs(kLogDownload, kLogDebug, "shrinking watch_fds_ done",
+        //          watch_fds_size_);
       }
       break;
     default:
@@ -448,9 +448,6 @@ void *DownloadManager::MainDownload(void *data) {
       download_mgr->watch_fds_[1].revents = 0;
       JobInfo *info;
       ReadPipe(download_mgr->pipe_jobs_[0], &info, sizeof(info));
-      //LogCvmfs(kLogDownload, kLogDebug, "IO thread, got job: url %s, compressed %d, nocache %d, destination %d, file %p, expected hash %p, wait at %d", info->url->c_str(), info->compressed, info->nocache,
-      //         info->destination, info->destination_file, info->expected_hash, info->wait_at[1]);
-
       if (!still_running)
         gettimeofday(&timeval_start, NULL);
       CURL *handle = download_mgr->AcquireCurlHandle();
@@ -461,7 +458,6 @@ void *DownloadManager::MainDownload(void *data) {
                                         CURL_SOCKET_TIMEOUT,
                                         0,
                                         &still_running);
-      //LogCvmfs(kLogDownload, kLogDebug, "socket action returned with %d, still_running %d", retval, still_running);
     }
 
     // Activity on curl sockets
@@ -472,15 +468,17 @@ void *DownloadManager::MainDownload(void *data) {
           ev_bitmask |= CURL_CSELECT_IN;
         if (download_mgr->watch_fds_[i].revents & (POLLOUT | POLLWRBAND))
           ev_bitmask |= CURL_CSELECT_IN;
-        if (download_mgr->watch_fds_[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+        if (download_mgr->watch_fds_[i].revents &
+            (POLLERR | POLLHUP | POLLNVAL))
+        {
           ev_bitmask |= CURL_CSELECT_ERR;
+        }
         download_mgr->watch_fds_[i].revents = 0;
 
         retval = curl_multi_socket_action(download_mgr->curl_multi_,
                                           download_mgr->watch_fds_[i].fd,
                                           ev_bitmask,
                                           &still_running);
-        //LogCvmfs(kLogDownload, kLogDebug, "socket action on socket %d, returned with %d, still_running %d", watch_fds_[i].fd, retval, still_running);
       }
     }
 
@@ -496,7 +494,6 @@ void *DownloadManager::MainDownload(void *data) {
         CURL *easy_handle = curl_msg->easy_handle;
         int curl_error = curl_msg->data.result;
         curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &info);
-        //LogCvmfs(kLogDownload, kLogDebug, "Done message for %s", info->url->c_str());
 
         curl_multi_remove_handle(download_mgr->curl_multi_, easy_handle);
         if (download_mgr->VerifyAndFinalize(curl_error, info)) {
@@ -616,7 +613,7 @@ void HeaderLists::Put(curl_slist *slist) {
 }
 
 
-void HeaderLists::AddBlock(){
+void HeaderLists::AddBlock() {
   curl_slist *new_block = new curl_slist[kBlockSize];
   for (unsigned i = 0; i < kBlockSize; ++i) {
     Put(&new_block[i]);
@@ -665,7 +662,7 @@ CURL *DownloadManager::AcquireCurlHandle() {
     assert(handle != NULL);
 
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1);
-    //curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
+    // curl_easy_setopt(curl_default, CURLOPT_FAILONERROR, 1);
     curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, CallbackCurlHeader);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, CallbackCurlData);
   } else {
@@ -817,14 +814,15 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   } else {
     ProxyInfo proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
     ValidateProxyIpsUnlocked(proxy.url, proxy.host);
-    ProxyInfo *proxy_ptr = &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]);
+    ProxyInfo *proxy_ptr =
+      &((*opt_proxy_groups_)[opt_proxy_groups_current_][0]);
     info->proxy = proxy_ptr->url;
     if (proxy_ptr->host.status() == dns::kFailOk) {
       curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
     } else {
-      // We know it can't work, don't even try to download: TODO
+      // We know it can't work, don't even try to download: TODO(jblomer)
       curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
-      //curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "http://$.");
+      // curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "http://$.");
     }
   }
   curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
@@ -870,8 +868,6 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   pthread_mutex_unlock(lock_options_);
 
   curl_easy_setopt(curl_handle, CURLOPT_URL, EscapeUrl(url).c_str());
-  //LogCvmfs(kLogDownload, kLogDebug, "set url %s for info %p / curl handle %p",
-  //         EscapeUrl((url_prefix + *(info->url))).c_str(), info, curl_handle);
 }
 
 
@@ -1383,7 +1379,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   curl_multi_setopt(curl_multi_, CURLMOPT_MAXCONNECTS, watch_fds_max_);
   curl_multi_setopt(curl_multi_, CURLMOPT_MAX_TOTAL_CONNECTIONS,
                     pool_max_handles_);
-  //curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
+  // curl_multi_setopt(curl_multi_, CURLMOPT_PIPELINING, 1);
 
   prng_.InitLocaltime();
 
@@ -1506,17 +1502,17 @@ Failures DownloadManager::Fetch(JobInfo *info) {
       MakePipe(info->wait_at);
     }
 
-    //LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
-    //         info->wait_at[0], info->wait_at[1]);
+    // LogCvmfs(kLogDownload, kLogDebug, "send job to thread, pipe %d %d",
+    //          info->wait_at[0], info->wait_at[1]);
     WritePipe(pipe_jobs_[1], &info, sizeof(info));
     ReadPipe(info->wait_at[0], &result, sizeof(result));
-    //LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
+    // LogCvmfs(kLogDownload, kLogDebug, "got result %d", result);
   } else {
     pthread_mutex_lock(lock_synchronous_mode_);
     CURL *handle = AcquireCurlHandle();
     InitializeRequest(info, handle);
     SetUrlOptions(info);
-    //curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
+    // curl_easy_setopt(handle, CURLOPT_VERBOSE, 1);
     int retval;
     do {
       retval = curl_easy_perform(handle);
@@ -1653,8 +1649,8 @@ void DownloadManager::SetHostChain(const string &host_list) {
   opt_host_chain_ = new vector<string>(SplitString(host_list, ';'));
   opt_host_chain_rtt_ =
     new vector<int>(opt_host_chain_->size(), kProbeUnprobed);
-  //LogCvmfs(kLogDownload, kLogSyslog, "using host %s",
-  //         (*opt_host_chain_)[0].c_str());
+  // LogCvmfs(kLogDownload, kLogSyslog, "using host %s",
+  //          (*opt_host_chain_)[0].c_str());
   pthread_mutex_unlock(lock_options_);
 }
 
@@ -1714,12 +1710,12 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
         if (opt_proxy_groups_current_ > 0) {
           if (opt_timestamp_backup_proxies_ == 0)
             opt_timestamp_backup_proxies_ = time(NULL);
-          //LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-          //         "switched to (another) backup proxy group");
+          // LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+          //          "switched to (another) backup proxy group");
         } else {
           opt_timestamp_backup_proxies_ = 0;
-          //LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-          //         "switched back to primary proxy group");
+          // LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
+          //          "switched back to primary proxy group");
         }
         opt_timestamp_failover_proxies_ = 0;
       }
@@ -1848,11 +1844,12 @@ void DownloadManager::ProbeHosts() {
       if (info.destination_mem.data)
         free(info.destination_mem.data);
       if (result == kFailOk) {
-        host_rtt[i] = int(DiffTimeSeconds(tv_start, tv_end) * 1000);
+        host_rtt[i] = static_cast<int>(
+          DiffTimeSeconds(tv_start, tv_end) * 1000);
         LogCvmfs(kLogDownload, kLogDebug, "probing host %s had %dms rtt",
                  url.c_str(), host_rtt[i]);
       } else {
-        LogCvmfs(kLogDownload, kLogDebug, "error while probing host %s: %d - %s",
+        LogCvmfs(kLogDownload, kLogDebug, "error while probing host %s: %d %s",
                  url.c_str(), result, Code2Ascii(result));
         host_rtt[i] = INT_MAX;
       }
@@ -1911,7 +1908,7 @@ bool DownloadManager::ProbeGeo() {
     // assumption that load-balanced servers are at the same location
     host_names.push_back(proxy_chain[i][0].host.name());
   }
-  // TODO: fallback proxies should be sorted to for maximum cache reuse.
+  // TODO(dwd): fallback proxies should be sorted to for maximum cache reuse.
   // For WLCG there's no reason to sort fallbacks, they're set by a widely
   // shared config but that can change in a different context.
 
@@ -1980,13 +1977,13 @@ bool DownloadManager::ProbeGeo() {
   for (unsigned i = 0; i < geo_order.size(); ++i) {
     uint64_t orderval = geo_order[i];
     if (orderval < (uint64_t) first_geo_fallback) {
-      //LogCvmfs(kLogCvmfs, kLogSyslog, "this is orderval %u at host index %u",
-      //  orderval, hosti);
+      // LogCvmfs(kLogCvmfs, kLogSyslog, "this is orderval %u at host index %u",
+      //          orderval, hosti);
       (*opt_host_chain_)[hosti++] = host_chain[orderval];
     } else {
-      //LogCvmfs(kLogCvmfs, kLogSyslog,
-      //  "this is orderval %u at proxy index %u, using proxy_chain index %u",
-      //  orderval, proxyi, fallback_group + orderval - first_geo_fallback);
+      // LogCvmfs(kLogCvmfs, kLogSyslog,
+      //   "this is orderval %u at proxy index %u, using proxy_chain index %u",
+      //   orderval, proxyi, fallback_group + orderval - first_geo_fallback);
       (*proxy_groups)[proxyi] = proxy_chain[
             fallback_group + orderval - first_geo_fallback];
       opt_num_proxies_ += (*proxy_groups)[proxyi].size();
@@ -2256,8 +2253,8 @@ void DownloadManager::SetProxyChain(
       int random_index = prng_.Next((*opt_proxy_groups_)[0].size());
       swap((*opt_proxy_groups_)[0][0], (*opt_proxy_groups_)[0][random_index]);
     }
-    //LogCvmfs(kLogDownload, kLogSyslog, "using proxy %s",
-    //         (*opt_proxy_groups_)[0][0].c_str());
+    // LogCvmfs(kLogDownload, kLogSyslog, "using proxy %s",
+    //          (*opt_proxy_groups_)[0][0].c_str());
   }
 
   pthread_mutex_unlock(lock_options_);
@@ -2319,9 +2316,9 @@ void DownloadManager::RebalanceProxiesUnlocked() {
   vector<ProxyInfo> *group = &((*opt_proxy_groups_)[opt_proxy_groups_current_]);
   int select = prng_.Next(group->size());
   swap((*group)[select], (*group)[0]);
-  //LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
-  //         "switching proxy from %s to %s (rebalance)",
-  //         (*group)[select].c_str(), swap.c_str());
+  // LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+  //          "switching proxy from %s to %s (rebalance)",
+  //          (*group)[select].c_str(), swap.c_str());
 }
 
 
@@ -2343,16 +2340,16 @@ void DownloadManager::SwitchProxyGroup() {
     return;
   }
 
-  //string old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
+  // string old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0];
   opt_proxy_groups_current_ = (opt_proxy_groups_current_ + 1) %
   opt_proxy_groups_->size();
   opt_proxy_groups_current_burned_ = 1;
   opt_timestamp_backup_proxies_ = time(NULL);
   opt_timestamp_failover_proxies_ = 0;
-  //LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
-  //         "switching proxy from %s to %s (manual group change)",
-  //         old_proxy.c_str(),
-  //         (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str());
+  // LogCvmfs(kLogDownload, kLogDebug | kLogSyslog,
+  //          "switching proxy from %s to %s (manual group change)",
+  //          old_proxy.c_str(),
+  //          (*opt_proxy_groups_)[opt_proxy_groups_current_][0].c_str());
 
   pthread_mutex_unlock(lock_options_);
 }

@@ -14,14 +14,14 @@
 
 #include <stdint.h>
 
-#include <cstring>
 #include <cassert>
 #include <cstdlib>
-
+#include <cstring>
 #include <string>
+
 #include "logging.h"
-#include "smalloc.h"
 #include "prng.h"
+#include "smalloc.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -43,7 +43,7 @@ enum Algorithms {
 const char kSuffixNone         = 0;
 const char kSuffixCatalog      = 'C';
 const char kSuffixHistory      = 'H';
-const char kSuffixMicroCatalog = 'L'; // currently unused
+const char kSuffixMicroCatalog = 'L';  // currently unused
 const char kSuffixPartial      = 'P';
 const char kSuffixTemporary    = 'T';
 const char kSuffixCertificate  = 'X';
@@ -102,7 +102,7 @@ struct Digest {
 
   class Hex {
    public:
-    Hex(const Digest<digest_size_, algorithm_> *digest) :
+    explicit Hex(const Digest<digest_size_, algorithm_> *digest) :
       digest_(*digest),
       hash_length_(2 * kDigestSizes[digest_.algorithm]),
       algo_id_length_(kAlgorithmIdSizes[digest_.algorithm]) {}
@@ -110,7 +110,7 @@ struct Digest {
     unsigned int length() const { return hash_length_ + algo_id_length_; }
 
     char operator[](const unsigned int position) const {
-      assert (position < length());
+      assert(position < length());
       return (position < hash_length_)
         ? GetHashChar(position)
         : GetAlgorithmIdentifierChar(position);
@@ -118,7 +118,7 @@ struct Digest {
 
    protected:
     char GetHashChar(const unsigned int position) const {
-      assert (position < hash_length_);
+      assert(position < hash_length_);
       const char digit = (position % 2 == 0)
         ? digest_.digest[position / 2] / 16
         : digest_.digest[position / 2] % 16;
@@ -126,7 +126,7 @@ struct Digest {
     }
 
     char GetAlgorithmIdentifierChar(const unsigned int position) const {
-      assert (position >= hash_length_);
+      assert(position >= hash_length_);
       return kAlgorithmIds[digest_.algorithm][position - hash_length_];
     }
 
@@ -182,7 +182,7 @@ struct Digest {
   void Randomize() {
     Prng prng;
     prng.InitLocaltime();
-    Randomize(prng);
+    Randomize(&prng);
   }
 
   /**
@@ -194,7 +194,7 @@ struct Digest {
   void Randomize(const uint64_t seed) {
     Prng prng;
     prng.InitSeed(seed);
-    Randomize(prng);
+    Randomize(&prng);
   }
 
   /**
@@ -203,10 +203,10 @@ struct Digest {
    *
    * @param prng  random number generator object (for external reproducability)
    */
-  void Randomize(Prng &prng) {
+  void Randomize(Prng *prng) {
     const unsigned bytes = GetDigestSize();
     for (unsigned i = 0; i < bytes; ++i) {
-      digest[i] = prng.Next(256);
+      digest[i] = prng->Next(256);
     }
   }
 
@@ -227,7 +227,7 @@ struct Digest {
       result[string_length - 1] = suffix;
     }
 
-    assert (result.length() == string_length);
+    assert(result.length() == string_length);
     return result;
   }
 
@@ -275,7 +275,7 @@ struct Digest {
     const unsigned string_length =   prefix.length()
                                    + hex.length()
                                    + dir_levels
-                                   + 1 // slash between prefix and hash
+                                   + 1  // slash between prefix and hash
                                    + use_suffix;
     // prepend prefix string
     std::string result(prefix);
@@ -295,7 +295,7 @@ struct Digest {
       result[pos++] = hash_suffix;
     }
 
-    assert (pos == string_length);
+    assert(pos == string_length);
     return result;
   }
 
@@ -348,7 +348,7 @@ struct Digest {
 struct Md5 : public Digest<16, kMd5> {
   Md5() : Digest<16, kMd5>() { }
   explicit Md5(const AsciiPtr ascii);
-  explicit Md5(const HexPtr hex) : Digest<16, kMd5>(kMd5, hex) { } ;
+  explicit Md5(const HexPtr hex) : Digest<16, kMd5>(kMd5, hex) { }
   Md5(const char *chars, const unsigned length);
 
   /**
@@ -418,7 +418,7 @@ class ContextPtr {
  private:
   ContextPtr& operator=(const ContextPtr &other) {
     const bool not_implemented = false;
-    assert (not_implemented);
+    assert(not_implemented);
   }
 };
 
@@ -428,18 +428,18 @@ void Update(const unsigned char *buffer, const unsigned buffer_size,
 void Final(ContextPtr &context, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
- void Hmac(const std::string &key,
-	   const unsigned char *buffer, const unsigned buffer_size,
-	   Any *any_digest);
+void Hmac(const std::string &key,
+          const unsigned char *buffer, const unsigned buffer_size,
+          Any *any_digest);
 bool HashFile(const std::string filename, Any *any_digest);
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
 Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);
 
-}  // namespace hash
+}  // namespace shash
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_HASH_H_

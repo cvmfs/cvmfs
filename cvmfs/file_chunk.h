@@ -9,18 +9,18 @@
 #ifndef CVMFS_FILE_CHUNK_H_
 #define CVMFS_FILE_CHUNK_H_
 
-#include <sys/types.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <sys/types.h>
 
-#include <vector>
 #include <string>
+#include <vector>
 
-#include "hash.h"
-#include "bigvector.h"
-#include "smallhash.h"
-#include "shortstring.h"
 #include "atomic.h"
+#include "bigvector.h"
+#include "hash.h"
+#include "shortstring.h"
+#include "smallhash.h"
 
 /**
  * Describes a FileChunk as generated from the FileProcessor in collaboration
@@ -41,9 +41,9 @@ class FileChunk {
   inline size_t            size()         const { return size_; }
 
  protected:
-  shash::Any content_hash_; //!< content hash of the compressed file chunk
-  off_t      offset_;       //!< byte offset in the uncompressed input file
-  size_t     size_;         //!< uncompressed size of the data chunk
+  shash::Any content_hash_;  //!< content hash of the compressed file chunk
+  off_t      offset_;        //!< byte offset in the uncompressed input file
+  size_t     size_;          //!< uncompressed size of the data chunk
 };
 
 typedef BigVector<FileChunk> FileChunkList;
@@ -97,7 +97,7 @@ struct ChunkTables {
   }
 
   static const unsigned kVersion = 2;
-  
+
   int version;
   static const unsigned kNumHandleLocks = 128;
   SmallHashDynamic<uint64_t, ChunkFd> handle2fd;

@@ -307,7 +307,7 @@ class T_GarbageCollector : public ::testing::Test {
     shash::Any effective_clg_hash = catalog_hash;
     effective_clg_hash.suffix = 'C';
     if (effective_clg_hash.IsNull()) {
-      effective_clg_hash.Randomize(dice_);
+      effective_clg_hash.Randomize(&dice_);
     }
 
     // produce the new catalog with references to it's predecessor and parent

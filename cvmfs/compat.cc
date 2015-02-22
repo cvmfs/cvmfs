@@ -2,12 +2,13 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "compat.h"
 
 #include <openssl/md5.h>
 
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 
 using namespace std;  // NOLINT
 
@@ -39,7 +40,7 @@ void MigrateAny(const Any *old_hash, shash::Any *new_hash) {
 //------------------------------------------------------------------------------
 
 
-namespace inode_tracker{
+namespace inode_tracker {
 
 bool InodeContainer::ConstructPath(const uint64_t inode, PathString *path) {
   InodeMap::const_iterator needle = map_.find(inode);
@@ -85,7 +86,7 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 namespace inode_tracker_v2 {
 
 static uint32_t hasher_md5(const shash_v1::Md5 &key) {
-  return (uint32_t) *((uint32_t *)key.digest + 1);
+  return (uint32_t) *((uint32_t *)key.digest + 1);  // NOLINT
 }
 
 static uint32_t hasher_inode(const uint64_t &inode) {
@@ -119,7 +120,7 @@ void Migrate(InodeTracker *old_tracker, glue::InodeTracker *new_tracker) {
 namespace inode_tracker_v3 {
 
 static uint32_t hasher_md5(const shash_v1::Md5 &key) {
-  return (uint32_t) *((uint32_t *)key.digest + 1);
+  return (uint32_t) *((uint32_t *)key.digest + 1);  // NOLINT
 }
 
 static uint32_t hasher_inode(const uint64_t &inode) {

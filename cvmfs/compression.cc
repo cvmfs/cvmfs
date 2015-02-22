@@ -10,20 +10,20 @@
 
 #include "cvmfs_config.h"
 #include "compression.h"
-#include "platform.h"
 
+#include <alloca.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <alloca.h>
 
-#include <cstring>
-#include <cassert>
 #include <algorithm>
+#include <cassert>
+#include <cstring>
 
-#include "logging.h"
 #include "hash.h"
-#include "util.h"
+#include "logging.h"
+#include "platform.h"
 #include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 

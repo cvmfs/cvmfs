@@ -7,16 +7,16 @@
  * This binary does not use the cvmfs infrastructure code to stay lean.
  */
 
-#include <sys/stat.h>
-#include <sys/xattr.h>
+#include <sys/xattr.h>  // NOLINT
+
 #include <dirent.h>
-#include <unistd.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
-
 #include <string>
 
 #include "platform.h"
@@ -160,8 +160,8 @@ static bool ClearWorkingDir() {
 
 static void Usage(const string &exe, FILE *output) {
   fprintf(output,
-    "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|clear_scratch|kill_cvmfs "
-    "fqrn\n"
+    "Usage: %s lock|open|rw_mount|rw_umount|rdonly_mount|rdonly_umount|"
+      "clear_scratch|kill_cvmfs <fqrn>\n"
     "Example: %s rw_umount atlas.cern.ch\n"
     "This binary is typically called by cvmfs_server.\n",
     exe.c_str(), exe.c_str());
