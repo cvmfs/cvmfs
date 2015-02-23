@@ -1,7 +1,7 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
 Version: 1.1
-Release: 1
+Release: 2
 Source0: cern.ch.pub
 Source1: cern-it1.cern.ch.pub
 Source2: cern-it2.cern.ch.pub
@@ -21,7 +21,7 @@ Group: Applications/System
 License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-Provides: cvmfs-config
+Provides: cvmfs-config = %{version}-%{release}
 Obsoletes: cvmfs-keys
 Conflicts: cvmfs-keys
 Obsoletes: cvmfs-init-scripts
@@ -75,6 +75,9 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Mon Feb 23 2015 Jakob Blomer <jblomer@cern.ch> - 1.1-2
+- use versioned provides
+
 * Tue Feb 02 2015 Dave Dykstra <dwd@fnal.gov> - 1.1-1
 - add CVMFS_USE_GEOAPI=yes to egi.eu and opensciencegrid.org
 - fix BNL URL for opensciencegrid.org
