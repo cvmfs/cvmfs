@@ -53,7 +53,7 @@ XattrList *XattrList::CreateFromFile(const std::string &path) {
   for (unsigned i = 0; i < keys.size(); ++i) {
     if (keys[i].empty())
       continue;
-    ssize_t sz_value = 
+    ssize_t sz_value =
       platform_lgetxattr(path.c_str(), keys[i].c_str(), value, 256);
     if (sz_value < 0)
       continue;

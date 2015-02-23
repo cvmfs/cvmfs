@@ -15,37 +15,36 @@
 #include "cvmfs_config.h"
 #include "talk.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/uio.h>
-#include <pthread.h>
-#include <unistd.h>
 #include <errno.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdlib>
-
 #include <string>
 #include <vector>
 
-#include "platform.h"
-#include "tracer.h"
-#include "quota.h"
-#include "cvmfs.h"
-#include "util.h"
-#include "logging.h"
-#include "download.h"
-#include "wpad.h"
-#include "duplex_sqlite3.h"
-#include "shortstring.h"
-#include "lru.h"
-#include "nfs_maps.h"
-#include "loader.h"
-#include "options.h"
 #include "cache.h"
+#include "cvmfs.h"
+#include "download.h"
+#include "duplex_sqlite3.h"
+#include "loader.h"
+#include "logging.h"
+#include "lru.h"
 #include "monitor.h"
+#include "nfs_maps.h"
+#include "options.h"
+#include "platform.h"
+#include "quota.h"
+#include "shortstring.h"
+#include "tracer.h"
+#include "util.h"
+#include "wpad.h"
 
 using namespace std;  // NOLINT
 
@@ -53,8 +52,10 @@ namespace talk {
 
 const unsigned kMaxCommandSize = 512;
 
-string *cachedir_ = NULL;  /**< Stores the cache directory from cvmfs.
-                                Pipe files will be created here. */
+/**
+ * Stores the cache directory from cvmfs.  Pipe files will be created here.
+ */
+string *cachedir_ = NULL;
 string *socket_path_ = NULL;  /**< $cache_dir/cvmfs_io */
 OptionsManager *options_manager_ = NULL;
 int socket_fd_;
@@ -274,7 +275,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
         vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
         unsigned active_group;
         unsigned fallback_group;
-        cvmfs::download_manager_->GetProxyInfo(&proxy_chain, &active_group, &fallback_group);
+        cvmfs::download_manager_->GetProxyInfo(
+          &proxy_chain, &active_group, &fallback_group);
 
         string proxy_str;
         if (proxy_chain.size()) {
@@ -290,7 +292,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
           proxy_str += "Active proxy: [" + StringifyInt(active_group) + "] " +
                        proxy_chain[active_group][0].url + "\n";
           if (fallback_group < proxy_chain.size())
-            proxy_str += "First fallback group: [" + StringifyInt(fallback_group) + "]\n";
+            proxy_str += "First fallback group: [" +
+                         StringifyInt(fallback_group) + "]\n";
         } else {
           proxy_str = "No proxies defined\n";
         }
