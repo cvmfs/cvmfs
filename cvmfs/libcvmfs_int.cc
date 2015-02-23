@@ -444,7 +444,7 @@ void cvmfs_context::AppendStringToList(char const   *str,
   if (*listlen + 1 >= *buflen) {
        size_t newbuflen = (*listlen)*2 + 5;
        *buf = reinterpret_cast<char **>(
-         realloc(*buf, sizeof(char *) * newbuflen);
+         realloc(*buf, sizeof(char *) * newbuflen));
        assert(*buf);
        *buflen = newbuflen;
        assert(*listlen < *buflen);
