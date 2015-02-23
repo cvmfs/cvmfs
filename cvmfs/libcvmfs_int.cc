@@ -1,4 +1,6 @@
 /**
+ * This file is part of the CernVM File System.
+ *
  * CernVM-FS is a FUSE module which implements an HTTP read-only filesystem.
  * The original idea is based on GROW-FS.
  *
@@ -22,66 +24,65 @@
 
 #define ENOATTR ENODATA  /**< instead of including attr/xattr.h */
 
+#include <sys/xattr.h>
 #include "cvmfs_config.h"
+#include "libcvmfs_int.h"
 
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <google/dense_hash_map>
+#include <openssl/crypto.h>
+#include <pthread.h>
 #include <stddef.h>
-#include <sys/types.h>
+#include <stdint.h>
+#include <sys/errno.h>
+#include <sys/file.h>
+#include <sys/mount.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
-#include <sys/wait.h>
-#include <sys/errno.h>
-#include <sys/mount.h>
-#include <sys/file.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <sys/time.h>
-#include <sys/resource.h>
-#include <pthread.h>
-#include <sys/xattr.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-#include <openssl/crypto.h>
-#include <google/dense_hash_map>
-
+#include <cassert>
+#include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <csignal>
 #include <ctime>
-#include <cassert>
-#include <cstdio>
 
-#include <string>
-#include <vector>
-#include <map>
 #include <algorithm>
 #include <functional>
+#include <map>
+#include <string>
+#include <vector>
 
-#include "platform.h"
-#include "murmur.h"
-#include "logging.h"
-#include "tracer.h"
-#include "download.h"
-#include "wpad.h"
-#include "cache.h"
-#include "hash.h"
-#include "monitor.h"
-#include "signature.h"
-#include "quota.h"
-#include "util.h"
 #include "atomic.h"
-#include "lru.h"
-#include "directory_entry.h"
-#include "compression.h"
-#include "duplex_sqlite3.h"
-#include "shortstring.h"
-#include "smalloc.h"
-#include "globals.h"
 #include "backoff.h"
-#include "libcvmfs_int.h"
+#include "cache.h"
+#include "compression.h"
+#include "directory_entry.h"
+#include "download.h"
+#include "duplex_sqlite3.h"
+#include "globals.h"
+#include "hash.h"
+#include "logging.h"
+#include "lru.h"
+#include "monitor.h"
+#include "murmur.h"
+#include "platform.h"
+#include "quota.h"
+#include "shortstring.h"
+#include "signature.h"
+#include "smalloc.h"
+#include "tracer.h"
+#include "util.h"
+#include "wpad.h"
 
 using namespace std;  // NOLINT
 
@@ -94,16 +95,16 @@ namespace cvmfs {
 
 cvmfs_globals* cvmfs_globals::instance = NULL;
 cvmfs_globals* cvmfs_globals::Instance() {
-  assert (cvmfs_globals::instance != NULL);
+  assert(cvmfs_globals::instance != NULL);
   return cvmfs_globals::instance;
 }
 
 int cvmfs_globals::Initialize(const options &opts) {
-  assert (cvmfs_globals::instance == NULL);
+  assert(cvmfs_globals::instance == NULL);
 
   // create singleton instance
   cvmfs_globals::instance = new cvmfs_globals;
-  assert (cvmfs_globals::instance != NULL);
+  assert(cvmfs_globals::instance != NULL);
 
   // setup the globals
   const int retval = cvmfs_globals::instance->Setup(opts);
@@ -120,7 +121,7 @@ void cvmfs_globals::Destroy() {
     delete cvmfs_globals::instance;
     cvmfs_globals::instance = NULL;
   }
-  assert (cvmfs_globals::instance == NULL);
+  assert(cvmfs_globals::instance == NULL);
 }
 
 cvmfs_globals::cvmfs_globals() :
@@ -178,12 +179,12 @@ int cvmfs_globals::Setup(const options &opts) {
 
   // Logging
   SetLogSyslogLevel(opts.log_syslog_level);
-  if (! opts.log_prefix.empty()) {
+  if (!opts.log_prefix.empty()) {
     SetLogSyslogPrefix(opts.log_prefix);
   } else {
     SetLogSyslogPrefix("libcvmfs");
   }
-  if (! opts.log_file.empty()) {
+  if (!opts.log_file.empty()) {
     SetLogDebugFile(opts.log_file);
   }
 
@@ -203,7 +204,7 @@ int cvmfs_globals::Setup(const options &opts) {
   }
 
   // Create cache directory, if necessary
-  if (! MkdirDeep(cache_directory_, 0700)) {
+  if (!MkdirDeep(cache_directory_, 0700)) {
     PrintError("cannot create cache directory " + cache_directory_);
     return -2;
   }
@@ -226,7 +227,7 @@ int cvmfs_globals::Setup(const options &opts) {
 
   // Creates a set of cache directories (256 directories named 00..ff) if not
   // using alien cachdir
-  if (! cache::Init(cache_directory_, opts.alien_cache)) {
+  if (!cache::Init(cache_directory_, opts.alien_cache)) {
     PrintError("Failed to setup cache in " + cache_directory_ +
                ": " + strerror(errno));
     return -5;
@@ -238,8 +239,9 @@ int cvmfs_globals::Setup(const options &opts) {
   const uint64_t quota_limit      = (uint64_t) -1;
   const uint64_t quota_threshold  = 0;
   const bool     rebuild_database = false;
-  if (! quota::Init(cache_directory_, quota_limit, quota_threshold,
-                    rebuild_database)) {
+  if (!quota::Init(cache_directory_, quota_limit, quota_threshold,
+                   rebuild_database))
+  {
     PrintError("Failed to initialize lru cache");
     return -6;
   }
@@ -270,14 +272,15 @@ void cvmfs_globals::CallbackLibcryptoLock(int mode, int type,
   assert(retval == 0);
 }
 
-unsigned long cvmfs_globals::CallbackLibcryptoThreadId() {
+// Type unsigned long required by libcrypto (openssl)
+unsigned long cvmfs_globals::CallbackLibcryptoThreadId() {  // NOLINT
   return platform_gettid();
 }
 
 
 cvmfs_context* cvmfs_context::Create(const options &opts) {
   cvmfs_context *ctx = new cvmfs_context(opts);
-  assert (ctx != NULL);
+  assert(ctx != NULL);
 
   if (ctx->Setup(opts) != 0) {
     delete ctx;
@@ -302,13 +305,12 @@ int cvmfs_context::Setup(const options &opts) {
     download::ResolveProxyDescription(opts.proxies, download_manager_),
     opts.fallback_proxies,
     download::DownloadManager::kSetProxyBoth);
-  //ctx.download_manager_->EnableInfoHeader();
+  // ctx.download_manager_->EnableInfoHeader();
   download_ready_ = true;
 
   signature_manager_ = new signature::SignatureManager();
   signature_manager_->Init();
-  if (! signature_manager_->LoadPublicRsaKeys(opts.pubkey))
-  {
+  if (!signature_manager_->LoadPublicRsaKeys(opts.pubkey)) {
     PrintError("failed to load public key(s)");
     return -1;
   } else {
@@ -318,8 +320,8 @@ int cvmfs_context::Setup(const options &opts) {
   }
   signature_ready_ = true;
 
-  if (! opts.blacklist.empty()) {
-    if (! signature_manager_->LoadBlacklist(opts.blacklist)) {
+  if (!opts.blacklist.empty()) {
+    if (!signature_manager_->LoadBlacklist(opts.blacklist)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "failed to load blacklist");
       return -2;
     }
@@ -330,14 +332,14 @@ int cvmfs_context::Setup(const options &opts) {
                                                signature_manager_,
                                                download_manager_);
   bool clg_mgr_init;
-  if (! opts.root_hash.empty()) {
+  if (!opts.root_hash.empty()) {
     const shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(opts.root_hash),
                                                 shash::kSuffixCatalog);
     clg_mgr_init = catalog_manager_->InitFixed(hash);
   } else {
     clg_mgr_init = catalog_manager_->Init();
   }
-  if (! clg_mgr_init) {
+  if (!clg_mgr_init) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to initialize root file catalog");
     return -1;
   }
@@ -351,7 +353,7 @@ int cvmfs_context::Setup(const options &opts) {
   md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize);
   pathcache_ready_ = true;
 
-  if (! opts.tracefile.empty()) {
+  if (!opts.tracefile.empty()) {
     tracer::Init(8192, 7000, opts.tracefile);
   } else {
     tracer::InitNull();
@@ -411,10 +413,10 @@ cvmfs_context::~cvmfs_context() {
 bool cvmfs_context::GetDirentForPath(const PathString         &path,
                                      catalog::DirectoryEntry  *dirent)
 {
-  if( path.GetLength() == 1 && path.GetChars()[0] == '/' ) {
+  if (path.GetLength() == 1 && path.GetChars()[0] == '/') {
     // root path is expected to be "", not "/"
     PathString p;
-    return GetDirentForPath(p,dirent);
+    return GetDirentForPath(p, dirent);
   }
   shash::Md5 md5path(path.GetChars(), path.GetLength());
   if (md5path_cache_->Lookup(md5path, dirent))
@@ -439,21 +441,21 @@ void cvmfs_context::AppendStringToList(char const   *str,
                                        size_t       *listlen,
                                        size_t       *buflen)
 {
-   if( *listlen + 1 >= *buflen ) {
+  if (*listlen + 1 >= *buflen) {
        size_t newbuflen = (*listlen)*2 + 5;
-       *buf = (char **)realloc(*buf,sizeof(char *)*newbuflen);
-       assert( *buf );
+       *buf = reinterpret_cast<char **>(
+         realloc(*buf, sizeof(char *) * newbuflen);
+       assert(*buf);
        *buflen = newbuflen;
-       assert( *listlen < *buflen );
-   }
-   if( str ) {
-       (*buf)[(*listlen)] = strdup(str);
-       // null-terminate the list
-       (*buf)[++(*listlen)] = NULL;
-   }
-   else {
-       (*buf)[(*listlen)] = NULL;
-   }
+       assert(*listlen < *buflen);
+  }
+  if (str) {
+    (*buf)[(*listlen)] = strdup(str);
+    // null-terminate the list
+    (*buf)[++(*listlen)] = NULL;
+  } else {
+    (*buf)[(*listlen)] = NULL;
+  }
 }
 
 
@@ -494,17 +496,22 @@ int cvmfs_context::Readlink(const char *c_path, char *buf, size_t size) {
     return -EINVAL;
   }
 
-  unsigned len = (dirent.symlink().GetLength() >= size) ? size : dirent.symlink().GetLength()+1;
+  unsigned len = (dirent.symlink().GetLength() >= size) ?
+    size : dirent.symlink().GetLength() + 1;
   strncpy(buf, dirent.symlink().c_str(), len-1);
   buf[len-1] = '\0';
 
   return 0;
 }
 
-int cvmfs_context::ListDirectory(const char *c_path, char ***buf, size_t *buflen) {
+int cvmfs_context::ListDirectory(
+  const char *c_path,
+  char ***buf,
+  size_t *buflen
+) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
 
-  if( c_path[0] == '/' && c_path[1] == '\0' ) {
+  if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
     c_path = "";
   }
@@ -524,17 +531,17 @@ int cvmfs_context::ListDirectory(const char *c_path, char ***buf, size_t *buflen
   }
 
   size_t listlen = 0;
-  AppendStringToList(NULL,buf,&listlen,buflen);
+  AppendStringToList(NULL, buf, &listlen, buflen);
 
   // Build listing
 
   // Add current directory link
-  AppendStringToList(".",buf,&listlen,buflen);
+  AppendStringToList(".", buf, &listlen, buflen);
 
   // Add parent directory link
   catalog::DirectoryEntry p;
   if (d.inode() != catalog_manager_->GetRootInode()) {
-    AppendStringToList("..",buf,&listlen,buflen);
+    AppendStringToList("..", buf, &listlen, buflen);
   }
 
   // Add all names
@@ -570,8 +577,10 @@ int cvmfs_context::Open(const char *c_path) {
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
-    if (atomic_xadd32(&open_files_, 1) <
-        (static_cast<int>(max_open_files_))-kNumReservedFd || max_open_files_==0) {
+    if ((atomic_xadd32(&open_files_, 1) <
+        (static_cast<int>(max_open_files_)) - kNumReservedFd) ||
+        max_open_files_ == 0)
+    {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
       return fd;

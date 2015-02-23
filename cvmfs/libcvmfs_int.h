@@ -8,9 +8,9 @@
 #ifndef CVMFS_LIBCVMFS_INT_H_
 #define CVMFS_LIBCVMFS_INT_H_
 
+#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
-#include <syslog.h>
 
 #include <string>
 #include <vector>
@@ -20,25 +20,23 @@
 #include "util.h"
 
 namespace cache {
-  class CatalogManager;
+class CatalogManager;
 }
 
 namespace signature {
-  class SignatureManager;
+class SignatureManager;
 }
 
 namespace download {
-  class DownloadManager;
+class DownloadManager;
 }
 
 class BackoffThrottle;
 
 namespace cvmfs {
-
-  extern pid_t         pid_;
-  extern std::string  *repository_name_;
-  extern bool          foreground_;
-
+extern pid_t         pid_;
+extern std::string  *repository_name_;
+extern bool          foreground_;
 }
 
 class cvmfs_globals : SingleCopy {
@@ -72,7 +70,8 @@ class cvmfs_globals : SingleCopy {
 
   static void CallbackLibcryptoLock(int mode, int type,
                                     const char *file, int line);
-  static unsigned long CallbackLibcryptoThreadId();
+  // unsigned long type required by libcrypto (openssl)
+  static unsigned long CallbackLibcryptoThreadId();  // NOLINT
 
  private:
   cvmfs_globals();
@@ -140,8 +139,10 @@ class cvmfs_context : SingleCopy {
   catalog::LoadError RemountStart();
 
  protected:
-  cvmfs_context(const options &options); // please use static method Create()
-                                         // for construction
+  /**
+   * use static method Create() for construction
+   */
+  explicit cvmfs_context(const options &options);
   ~cvmfs_context();
 
  private:
@@ -162,10 +163,15 @@ class cvmfs_context : SingleCopy {
 
   std::string mountpoint_;
   std::string cachedir_;
-  std::string relative_cachedir; /* path to cachedir, relative to current working dir */
+  /**
+   * Path to cachedir, relative to current working dir
+   */
+  std::string relative_cachedir;
   std::string tracefile_;
-  std::string repository_name_;  /**< Expected repository name,
-                                         e.g. atlas.cern.ch */
+  /**
+   * Expected repository name, e.g. atlas.cern.ch
+   */
+  std::string repository_name_;
   pid_t pid_;  /**< will be set after deamon() */
   time_t boot_time_;
   cache::CatalogManager *catalog_manager_;
@@ -184,8 +190,10 @@ class cvmfs_context : SingleCopy {
   atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
   atomic_int32 open_dirs_; /**< number of currently open directories */
   unsigned max_open_files_; /**< maximum allowed number of open files */
-  static const int kNumReservedFd = 512;  /**< Number of reserved file
-                                               descriptors for internal use */
+  /**
+   * Number of reserved file descriptors for internal use
+   */
+  static const int kNumReservedFd = 512;
   static const unsigned int kMd5pathCacheSize = 32000;
 
   BackoffThrottle *backoff_throttle_;

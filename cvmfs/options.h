@@ -7,9 +7,9 @@
 
 #include <stdint.h>
 
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -24,7 +24,6 @@ namespace CVMFS_NAMESPACE_GUARD {
  */
 class OptionsManager {
  public:
-
   OptionsManager() {}
   virtual ~OptionsManager() {}
 
@@ -117,10 +116,10 @@ class OptionsManager {
     * The ConfigValue structure contains a concrete value of a variable, as well
     * as the source (complete path) of the config file where it was obtained
     */
-   struct ConfigValue {
-     std::string value;
-     std::string source;
-   };
+  struct ConfigValue {
+    std::string value;
+    std::string source;
+  };
 
   bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
 
@@ -163,7 +162,7 @@ class BashOptionsManager : public OptionsManager {
 
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_OPTIONS_H_

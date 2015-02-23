@@ -3,7 +3,7 @@
  */
 
 #ifndef CVMFS_LIBCVMFS_H_
-#define CVMFS_LIBCVMFS_H_ 1
+#define CVMFS_LIBCVMFS_H_
 
 #define LIBCVMFS_VERSION 2
 
@@ -12,9 +12,8 @@
  * the list in libcvmfs_public_syms.txt.
  */
 
-// needed for size_t
-#include <unistd.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -88,7 +87,10 @@ int cvmfs_close(cvmfs_context *ctx, int fd);
  * @param[in] size, size of buffer
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_readlink(cvmfs_context *ctx, const char *path, char *buf, size_t size);
+int cvmfs_readlink(cvmfs_context *ctx,
+  const char *path,
+  char *buf,
+  size_t size);
 
 /* Get information about a file.  If the file is a symlink,
  * return info about the file it points to, not the symlink itself.
@@ -116,11 +118,16 @@ int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
  * them.  The array (*buf) may be NULL when this function is called.
  *
  * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
- * @param[out] buf, pointer to dynamically allocated NULL-terminated array of strings
+ * @param[out] buf, pointer to dynamically allocated NULL-terminated array of 
+ *             strings
  * @param[in] buflen, pointer to variable containing size of array
  * \return 0 on success, -1 on failure (sets errno)
  */
-int cvmfs_listdir(cvmfs_context *ctx, const char *path,char ***buf,size_t *buflen);
+int cvmfs_listdir(
+  cvmfs_context *ctx,
+  const char *path,
+  char ***buf,
+  size_t *buflen);
 
 #ifdef __cplusplus
 }

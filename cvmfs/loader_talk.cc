@@ -2,19 +2,20 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "loader_talk.h"
 
+#include <errno.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <errno.h>
 
-#include <cstdlib>
 #include <cassert>
+#include <cstdlib>
 
+#include "loader.h"
 #include "logging.h"
 #include "util.h"
-#include "loader.h"
 
 using namespace std;  // NOLINT
 

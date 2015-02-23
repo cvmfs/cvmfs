@@ -8,9 +8,9 @@
 #define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
+#include <fuse/fuse_lowlevel.h>
 #include <stdint.h>
 #include <time.h>
-#include <fuse/fuse_lowlevel.h>
 
 #include <cstring>
 #include <string>
@@ -29,7 +29,7 @@ enum Failures {
   kFailLoaderTalk,
   kFailFuseLoop,
   kFailLoadLibrary,
-  kFailIncompatibleVersions,  // TODO
+  kFailIncompatibleVersions,  // TODO(jblomer)
   kFailCacheDir,
   kFailPeers,
   kFailNfsMaps,

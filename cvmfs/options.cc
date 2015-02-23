@@ -16,6 +16,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 
 #include "logging.h"
 #include "sanitizer.h"
@@ -30,11 +31,11 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 static string EscapeShell(const std::string &raw) {
   for (unsigned i = 0, l = raw.length(); i < l; ++i) {
-    if (not (((raw[i] >= '0') && (raw[i] <= '9')) ||
-             ((raw[i] >= 'A') && (raw[i] <= 'Z')) ||
-             ((raw[i] >= 'a') && (raw[i] <= 'z')) ||
-             (raw[i] == '/') || (raw[i] == ':') || (raw[i] == '.') ||
-             (raw[i] == '_') || (raw[i] == '-') || (raw[i] == ',')))
+    if (!(((raw[i] >= '0') && (raw[i] <= '9')) ||
+          ((raw[i] >= 'A') && (raw[i] <= 'Z')) ||
+          ((raw[i] >= 'a') && (raw[i] <= 'z')) ||
+          (raw[i] == '/') || (raw[i] == ':') || (raw[i] == '.') ||
+          (raw[i] == '_') || (raw[i] == '-') || (raw[i] == ',')))
     {
       goto escape_shell_quote;
     }
@@ -359,5 +360,5 @@ bool OptionsManager::ParseUIntMap(const string &path,
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
