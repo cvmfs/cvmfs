@@ -5,8 +5,8 @@
 #ifndef CVMFS_MANIFEST_FETCH_H_
 #define CVMFS_MANIFEST_FETCH_H_
 
-#include <string>
 #include <cstdlib>
+#include <string>
 
 #include "manifest.h"
 

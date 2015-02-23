@@ -5,15 +5,15 @@
 #include "cvmfs_config.h"
 #include "quota_listener.h"
 
-#include <pthread.h>
 #include <poll.h>
+#include <pthread.h>
 
 #include <cstdlib>
 
-#include "quota.h"
 #include "catalog_mgr.h"
-#include "smalloc.h"
 #include "logging.h"
+#include "quota.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 

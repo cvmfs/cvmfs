@@ -7,8 +7,8 @@
 #ifndef CVMFS_PLATFORM_LINUX_H_
 #define CVMFS_PLATFORM_LINUX_H_
 
-#include <sys/types.h> // contains ssize_t needed inside <attr/xattr.h>
-#include <attr/xattr.h>
+#include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
+#include <attr/xattr.h>  // NOLINT(build/include_alpha)
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -19,8 +19,8 @@
 #include <sys/file.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
-#include <sys/stat.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -286,7 +286,7 @@ inline const char* platform_getexepath() {
   static char buf[PATH_MAX] = {0};
   if (strlen(buf) == 0) {
     int ret = readlink("/proc/self/exe", buf, PATH_MAX);
-    if (ret > 0 && ret < (int)PATH_MAX) {
+    if (ret > 0 && ret < static_cast<int>(PATH_MAX)) {
        buf[ret] = 0;
     }
   }
@@ -294,7 +294,7 @@ inline const char* platform_getexepath() {
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_PLATFORM_LINUX_H_

@@ -11,36 +11,36 @@
 #include "cvmfs_config.h"
 #include "monitor.h"
 
+#include <errno.h>
+#include <execinfo.h>
+#include <pthread.h>
 #include <signal.h>
 #include <sys/resource.h>
+#include <sys/types.h>
 #ifdef __APPLE__
   #include <sys/ucontext.h>
 #else
   #include <ucontext.h>
 #endif
-#include <execinfo.h>
-#include <sys/types.h>
 #include <sys/uio.h>
-#include <unistd.h>
-#include <errno.h>
 #include <sys/wait.h>
-#include <pthread.h>
 #include <time.h>
+#include <unistd.h>
 
-#include <string>
 #include <map>
+#include <string>
+#include <vector>
 
-#include <cstring>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cassert>
-
-#include "platform.h"
-#include "util.h"
-#include "logging.h"
-#include "smalloc.h"
+#include <cstring>
 
 #include "cvmfs.h"
+#include "logging.h"
+#include "platform.h"
+#include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -51,8 +51,10 @@ extern loader::CvmfsExports *g_cvmfs_exports;
 
 namespace monitor {
 
-const unsigned kMinOpenFiles = 8192;  /**< minmum threshold for the maximum
-                                       number of open files */
+/**
+ * Minmum threshold for the maximum number of open files
+ */
+const unsigned kMinOpenFiles = 8192;
 const unsigned kMaxBacktrace = 64;  /**< reported stracktrace depth */
 const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 
@@ -76,7 +78,7 @@ struct CrashData {
 };
 
 struct ControlFlow {
-  enum Flags { // TODO: C++11 (type safe enum)
+  enum Flags {  // TODO(rmeusel): C++11 (type safe enum)
     kProduceStacktrace = 0,
     kQuit,
     kUnknown,
@@ -151,7 +153,7 @@ static void SendTrace(int sig,
   // Do not die before the stack trace was generated
   // kill -SIGQUIT <pid> will finish this
   int counter = 0;
-  while(true) {
+  while (true) {
     SafeSleepMs(100);
     // quit anyway after 30 seconds
     if (++counter == 300) {
@@ -260,7 +262,7 @@ static string GenerateStackTrace(const string &exe_path,
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
-  std::vector<std::string> argv; // TODO: C++11 initializer list...
+  vector<string> argv;  // TODO(jblomer): C++11 initializer list...
   argv.push_back("-q");
   argv.push_back("-n");
   argv.push_back(exe_path);
@@ -280,8 +282,8 @@ static string GenerateStackTrace(const string &exe_path,
   ReadUntilGdbPrompt(fd_stdout);
 
   // Send stacktrace command to gdb
-  const string gdb_cmd = "thread apply all bt\n" // backtrace all threads
-                         "quit\n";               // stop gdb
+  const string gdb_cmd = "thread apply all bt\n"  // backtrace all threads
+                         "quit\n";                // stop gdb
   WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
 
   // Read the stack trace from the stdout of our gdb process
@@ -458,15 +460,15 @@ void Spawn() {
           close(pipe_pid.write_end);
           // Close all unused file descriptors
           // close also usyslog, only get it back if necessary
-          //string usyslog_save = GetLogMicroSyslog();
+          // string usyslog_save = GetLogMicroSyslog();
           string debuglog_save = GetLogDebugFile();
-          //SetLogMicroSyslog("");
+          // SetLogMicroSyslog("");
           SetLogDebugFile("");
           for (int fd = 0; fd < max_fd; fd++) {
             if (fd != pipe_watchdog_->read_end)
               close(fd);
           }
-          //SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
+          // SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
           Watchdog();
           exit(0);
@@ -533,7 +535,7 @@ unsigned GetMaxOpenFiles() {
   static bool     already_done = false;
 
   /* check number of open files (lazy evaluation) */
-  if (! already_done) {
+  if (!already_done) {
     unsigned int soft_limit = 0;
     int hard_limit = 0;
 

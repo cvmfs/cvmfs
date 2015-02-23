@@ -7,22 +7,22 @@
 #ifndef CVMFS_PLATFORM_OSX_H_
 #define CVMFS_PLATFORM_OSX_H_
 
+#include <alloca.h>
+#include <dirent.h>
+#include <fcntl.h>
 #include <libkern/OSAtomic.h>
 #include <mach/mach.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/xattr.h>
-#include <alloca.h>
-#include <signal.h>
 #include <mach-o/dyld.h>
-#include <sys/param.h>
-#include <sys/ucred.h>
+#include <signal.h>
 #include <sys/mount.h>
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <sys/ucred.h>
+#include <sys/xattr.h>
 
-#include <cstring>
 #include <cassert>
 #include <cstdlib>
+#include <cstring>
 
 #include <string>
 #include <vector>
@@ -189,7 +189,7 @@ inline void platform_disable_kcache(int filedes) {
 }
 
 inline int platform_readahead(int filedes) {
-  // TODO: is there a readahead equivalent?
+  // TODO(jblomer): is there a readahead equivalent?
   return 0;
 }
 
@@ -210,7 +210,7 @@ inline const char* platform_getexepath() {
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_PLATFORM_OSX_H_
