@@ -6,8 +6,10 @@
  * contained in the filter or not.
  */
 
-#ifndef CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H
-#define CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H
+#ifndef CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H_
+#define CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H_
+
+#include <set>
 
 #include "../hash.h"
 #include "../smallhash.h"
@@ -54,9 +56,7 @@ class AbstractHashFilter {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 /**
@@ -68,7 +68,7 @@ class SimpleHashFilter : public AbstractHashFilter {
   SimpleHashFilter() : frozen_(false) {}
 
   void Fill(const shash::Any &hash) {
-    assert (! frozen_);
+    assert(!frozen_);
     hashes_.insert(hash);
   }
 
@@ -76,7 +76,7 @@ class SimpleHashFilter : public AbstractHashFilter {
     return hashes_.find(hash) != hashes_.end();
   }
 
-  void   Freeze()      { frozen_ = true;        }
+  void Freeze() { frozen_ = true; }
   size_t Count() const { return hashes_.size(); }
 
  private:
@@ -85,9 +85,7 @@ class SimpleHashFilter : public AbstractHashFilter {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 /**
@@ -98,7 +96,7 @@ class SmallhashFilter : public AbstractHashFilter {
  protected:
   static uint32_t hasher(const shash::Any &key) {
     // Don't start with the first bytes, because == is using them as well
-    return (uint32_t) *((uint32_t *)key.digest + 1);
+    return (uint32_t) *(reinterpret_cast<uint32_t *>(key.digest) + 1);
   }
 
  public:
@@ -110,7 +108,7 @@ class SmallhashFilter : public AbstractHashFilter {
   }
 
   void Fill(const shash::Any &hash) {
-    assert (! frozen_);
+    assert(!frozen_);
     hashmap_.Insert(hash, true);
   }
 
@@ -126,4 +124,4 @@ class SmallhashFilter : public AbstractHashFilter {
   bool                                frozen_;
 };
 
-#endif /* CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H */
+#endif  // CVMFS_GARBAGE_COLLECTION_HASH_FILTER_H_
