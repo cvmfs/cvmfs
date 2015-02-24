@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_PATHSPEC_PATTERN_H_
-#define CVMFS_PATHSPEC_PATTERN_H_
+#ifndef CVMFS_PATHSPEC_PATHSPEC_PATTERN_H_
+#define CVMFS_PATHSPEC_PATHSPEC_PATTERN_H_
 
 #include <string>
 #include <vector>
@@ -48,8 +48,9 @@ class PathspecElementPattern {
     virtual bool IsWildcard()    const { return false; }
     virtual bool IsPlaceholder() const { return false; }
 
-    virtual std::string GenerateRegularExpression(const bool is_relaxed) const = 0;
-    virtual std::string GenerateGlobString()                             const = 0;
+    virtual std::string
+      GenerateRegularExpression(const bool is_relaxed) const = 0;
+    virtual std::string GenerateGlobString() const = 0;
   };
 
   class PlaintextSubPattern : public SubPattern {
@@ -101,7 +102,7 @@ class PathspecElementPattern {
                          const std::string::const_iterator  &end);
   PathspecElementPattern(const PathspecElementPattern& other);
   PathspecElementPattern& operator=(const PathspecElementPattern& other);
-  // TODO: C++11 - move constructor!
+  // TODO(rmeusel): C++11 - move constructor!
   ~PathspecElementPattern();
 
   std::string GenerateRegularExpression(const bool is_relaxed = false) const;
@@ -109,23 +110,22 @@ class PathspecElementPattern {
 
   bool IsValid() const { return valid_; }
 
-  bool operator==(const PathspecElementPattern &other) const;
-  bool operator!=(const PathspecElementPattern &other) const {
-    return ! (*this == other);
+  bool operator== (const PathspecElementPattern &other) const;
+  bool operator!= (const PathspecElementPattern &other) const {
+    return !(*this == other);
   }
 
  protected:
-  void Parse(                  const std::string::const_iterator  &begin,
-                               const std::string::const_iterator  &end);
-  SubPattern* ParsePlaintext(        std::string::const_iterator  &i,
-                               const std::string::const_iterator  &end);
-  SubPattern* ParseSpecialChar(      std::string::const_iterator  &i,
-                               const std::string::const_iterator  &end);
+  void Parse(const std::string::const_iterator &begin,
+             const std::string::const_iterator &end);
+  SubPattern* ParsePlaintext(std::string::const_iterator &i,
+                             const std::string::const_iterator &end);
+  SubPattern* ParseSpecialChar(std::string::const_iterator &i,
+                               const std::string::const_iterator &end);
 
  private:
   bool valid_;
-
   SubPatterns subpatterns_;
 };
 
-#endif  // CVMFS_PATHSPEC_PATTERN_H_
+#endif  // CVMFS_PATHSPEC_PATHSPEC_PATTERN_H_

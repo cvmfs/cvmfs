@@ -2,12 +2,13 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_PATHSPEC_H_
-#define CVMFS_PATHSPEC_H_
+#ifndef CVMFS_PATHSPEC_PATHSPEC_H_
+#define CVMFS_PATHSPEC_PATHSPEC_H_
+
+#include <regex.h>
 
 #include <string>
 #include <vector>
-#include <regex.h>
 
 #include "pathspec_pattern.h"
 
@@ -64,9 +65,9 @@ class Pathspec {
    *
    * @param spec  the pathspec pattern to be parsed
    */
-  Pathspec(const std::string &spec);
+  explicit Pathspec(const std::string &spec);
   Pathspec(const Pathspec &other);
-  // TODO: C++11 move constructor
+  // TODO(rmeusel): C++11 move constructor
   ~Pathspec();
 
   /**
@@ -118,8 +119,8 @@ class Pathspec {
   const std::string& GetGlobString() const;
 
   Pathspec& operator=(const Pathspec &other);
-  bool operator==(const Pathspec &other) const;
-  bool operator!=(const Pathspec &other) const { return ! (*this == other); }
+  bool operator== (const Pathspec &other) const;
+  bool operator!= (const Pathspec &other) const { return !(*this == other); }
 
   static bool IsSpecialChar(const char chr) {
     return (chr == kWildcard || chr == kPlaceholder);
@@ -127,8 +128,8 @@ class Pathspec {
 
  protected:
   void Parse(const std::string &spec);
-  void ParsePathElement(      std::string::const_iterator  &itr,
-                        const std::string::const_iterator  &end);
+  void ParsePathElement(std::string::const_iterator &itr,
+                        const std::string::const_iterator &end);
 
   bool IsPathspecMatching(const std::string &query_path) const;
   bool IsPathspecMatchingRelaxed(const std::string &query_path) const;
@@ -168,4 +169,4 @@ class Pathspec {
   bool absolute_;
 };
 
-#endif  // CVMFS_PATHSPEC_H_
+#endif  // CVMFS_PATHSPEC_PATHSPEC_H_
