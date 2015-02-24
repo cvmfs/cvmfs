@@ -26,14 +26,14 @@
 
 #include <pthread.h>
 
-#include <string>
 #include <map>
-#include <stack>
-#include <vector>
 #include <set>
+#include <stack>
+#include <string>
+#include <vector>
 
-#include "platform.h"
 #include "catalog_mgr_rw.h"
+#include "platform.h"
 #include "swissknife_sync.h"
 #include "sync_item.h"
 #include "xattr.h"
@@ -51,11 +51,11 @@ namespace publish {
  * Assertion: linkcount == HardlinkGroup::hardlinks.size() at the end
  */
 struct HardlinkGroup {
-  HardlinkGroup(SyncItem &item) : master(item) {
+  explicit HardlinkGroup(const SyncItem &item) : master(item) {
     hardlinks[master.GetRelativePath()] = master;
   }
 
-  void AddHardlink(SyncItem &entry) {
+  void AddHardlink(const SyncItem &entry) {
     hardlinks[entry.GetRelativePath()] = entry;
   }
 
@@ -97,13 +97,13 @@ class SyncMediator {
                const SyncParameters *params);
   virtual ~SyncMediator();
 
-  void Add(SyncItem &entry);
-  void Touch(SyncItem &entry);
-  void Remove(SyncItem &entry);
-  void Replace(SyncItem &entry);
+  void Add(const SyncItem &entry);
+  void Touch(const SyncItem &entry);
+  void Remove(const SyncItem &entry);
+  void Replace(const SyncItem &entry);
 
-  void EnterDirectory(SyncItem &entry);
-  void LeaveDirectory(SyncItem &entry);
+  void EnterDirectory(const SyncItem &entry);
+  void LeaveDirectory(const SyncItem &entry);
 
   manifest::Manifest *Commit();
 
@@ -119,23 +119,23 @@ class SyncMediator {
                             const std::string &extra_info) const;
 
   // Called after figuring out the type of a path (file, symlink, dir)
-  void AddFile(SyncItem &entry);
-  void RemoveFile(SyncItem &entry);
+  void AddFile(const SyncItem &entry);
+  void RemoveFile(const SyncItem &entry);
 
-  void AddDirectory(SyncItem &entry);
-  void RemoveDirectory(SyncItem &entry);
-  void TouchDirectory(SyncItem &entry);
+  void AddDirectory(const SyncItem &entry);
+  void RemoveDirectory(const SyncItem &entry);
+  void TouchDirectory(const SyncItem &entry);
 
-  void CreateNestedCatalog(SyncItem &requestFile);
-  void RemoveNestedCatalog(SyncItem &requestFile);
+  void CreateNestedCatalog(const SyncItem &requestFile);
+  void RemoveNestedCatalog(const SyncItem &requestFile);
 
-	// Called by file system traversal
+  // Called by file system traversal
   void EnterAddedDirectoryCallback(const std::string &parent_dir,
                                    const std::string &dir_name);
   void LeaveAddedDirectoryCallback(const std::string &parent_dir,
                                    const std::string &dir_name);
 
-  void AddDirectoryRecursively(SyncItem &entry);
+  void AddDirectoryRecursively(const SyncItem &entry);
   bool AddDirectoryCallback(const std::string &parent_dir,
                             const std::string &dir_name);
   void AddFileCallback(const std::string &parent_dir,
@@ -143,7 +143,7 @@ class SyncMediator {
   void AddSymlinkCallback(const std::string &parent_dir,
                           const std::string &link_name);
 
-  void RemoveDirectoryRecursively(SyncItem &entry);
+  void RemoveDirectoryRecursively(const SyncItem &entry);
   void RemoveFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
   void RemoveSymlinkCallback(const std::string &parent_dir,
@@ -159,15 +159,15 @@ class SyncMediator {
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
 
   // Hardlink handling
-  void CompleteHardlinks(SyncItem &entry);
+  void CompleteHardlinks(const SyncItem &entry);
   HardlinkGroupMap &GetHardlinkMap() { return hardlink_stack_.top(); }
   void LegacyRegularHardlinkCallback(const std::string &parent_dir,
                                      const std::string &file_name);
   void LegacySymlinkHardlinkCallback(const std::string &parent_dir,
                                       const std::string &file_name);
-  void InsertLegacyHardlink(SyncItem &entry);
-  uint64_t GetTemporaryHardlinkGroupNumber(SyncItem &entry) const;
-  void InsertHardlink(SyncItem &entry);
+  void InsertLegacyHardlink(const SyncItem &entry);
+  uint64_t GetTemporaryHardlinkGroupNumber(const SyncItem &entry) const;
+  void InsertHardlink(const SyncItem &entry);
 
   void AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks);
   void AddHardlinkGroup(const HardlinkGroup &group);

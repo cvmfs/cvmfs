@@ -1,24 +1,27 @@
-/*
-This is a simple test program to test the facilities of the
-libcvmfs C (not C++) library, which is used by Parrot and some other
-tools.
+/**
+ * This file is part of the CernVM File System.
+ *
+ * This is a simple test program to test the facilities of the libcvmfs C
+ * (not C++) library, which is used by Parrot and some other tools.
+ *
+ * The goal here is not so much to build the ultimate testing tool, but to
+ * provide a simple build target which can verify that libcvmfs is exporting the
+ * proper set of symbols to be used by a C program.
+ */
 
-The goal here is not so much to build the ultimate testing tool,
-but to provide a simple build target which can verify that libcvmfs
-is exporting the proper set of symbols to be used by a C program.
-*/
+#include "cvmfs_config.h"
+
+#include <errno.h>
+
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <map>
+#include <string>
 
 #include "libcvmfs.h"
-
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <time.h>
-#include <stdlib.h>
-#include <assert.h>
-
-#include <string>
-#include <map>
 
 #define TEST_LINE_MAX 1024
 
@@ -102,7 +105,7 @@ cvmfs_context* cvmfs_test_attach(const char *repo_name)
 	if (i == attached_repos.end()) {
 		const char *repo_options = "repo_name=%s.cern.ch,url=http://cvmfs-stratum-one.cern.ch/opt/%s;http://cernvmfs.gridpp.rl.ac.uk/opt/%s;http://cvmfs.racf.bnl.gov/opt/%s,pubkey=/etc/cvmfs/keys/cern.ch.pub";
 		char options[TEST_LINE_MAX];
-		snprintf(options, TEST_LINE_MAX, repo_options, repo_name, repo_name, 
+		snprintf(options, TEST_LINE_MAX, repo_options, repo_name, repo_name,
              repo_name, repo_name);
 
 		printf("attaching repo with options: %s\n", options);

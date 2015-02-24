@@ -6,6 +6,7 @@
 #define CVMFS_TRACER_H_ 1
 
 #include <string>
+
 #include "atomic.h"
 #include "shortstring.h"
 
@@ -36,7 +37,7 @@ void Flush();
 void inline __attribute__((used)) Trace(const int event, const PathString &path,
                                         const std::string &msg)
 {
-  // TODO: could be done more elegantly by templates
+  // TODO(jblomer): could be done more elegantly by templates
   // (only 1 if when initialized)
   if (active_) TraceInternal(event, path, msg);
 }
