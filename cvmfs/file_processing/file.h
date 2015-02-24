@@ -2,17 +2,16 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef UPLOAD_FILE_PROCESSING_FILE_H
-#define UPLOAD_FILE_PROCESSING_FILE_H
+#ifndef CVMFS_FILE_PROCESSING_FILE_H_
+#define CVMFS_FILE_PROCESSING_FILE_H_
+
+#include <tbb/atomic.h>
 
 #include <string>
 #include <vector>
 
-#include <tbb/atomic.h>
-
-#include "../platform.h"
 #include "../hash.h"
-
+#include "../platform.h"
 #include "char_buffer.h"
 #include "chunk_detector.h"
 #include "file_scrubbing_task.h"
@@ -62,8 +61,8 @@ class File : public AbstractFile {
   void FullyDefineLastChunk();
 
   off_t FindNextCutMark(CharBuffer *buffer) {
-    assert (chunk_detector_ != NULL);
-    assert (might_become_chunked_);
+    assert(chunk_detector_ != NULL);
+    assert(might_become_chunked_);
     return chunk_detector_->FindNextCutMark(buffer);
   }
 
@@ -92,18 +91,30 @@ class File : public AbstractFile {
   void Finalize();
 
  private:
-  const bool                  might_become_chunked_; ///< Result of the chunkedness forecast
-  const shash::Algorithms     hash_algorithm_;       ///< Secure hash algorithm creating content-addressable storage
-  const shash::Suffix         hash_suffix_;          ///< Suffix to be appended to the bulk chunk content hash
+  const bool might_become_chunked_;  ///< Result of the chunkedness forecast
+  /**
+   * Secure hash algorithm creating content-addressable storage
+   */
+  const shash::Algorithms hash_algorithm_;
+  /**
+   * Suffix to be appended to the bulk chunk content hash
+   */
+  const shash::Suffix hash_suffix_;
 
-  ChunkVector                 chunks_;               ///< List of generated Chunks
-  Chunk                      *bulk_chunk_;           ///< Associated bulk Chunk
-  tbb::atomic<unsigned int>   chunks_to_commit_;     ///< Counter of Chunks in flight (synchronization)
+  ChunkVector chunks_;  ///< List of generated Chunks
+  Chunk *bulk_chunk_;  ///< Associated bulk Chunk
+  /**
+   * Counter of Chunks in flight (synchronization)
+   */
+  tbb::atomic<unsigned int> chunks_to_commit_;
 
-  IoDispatcher               *io_dispatcher_;
-  ChunkDetector              *chunk_detector_;       ///< The ChunkDetector to be used for this file
+  IoDispatcher *io_dispatcher_;
+  /**
+   * The ChunkDetector to be used for this file.
+   */
+  ChunkDetector *chunk_detector_;
 };
 
-} // namespace upload
+}  // namespace upload
 
-#endif /* UPLOAD_FILE_PROCESSING_FILE_H */
+#endif  // CVMFS_FILE_PROCESSING_FILE_H_

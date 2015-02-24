@@ -2,15 +2,16 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "chunk_detector.h"
 
 #include <algorithm>
 #include <limits>
 
-using namespace upload;
+namespace upload {
 
 off_t StaticOffsetDetector::FindNextCutMark(CharBuffer *buffer) {
-  assert (buffer->IsInitialized());
+  assert(buffer->IsInitialized());
 
   const off_t beginning = buffer->base_offset();
   const off_t end =
@@ -25,16 +26,15 @@ off_t StaticOffsetDetector::FindNextCutMark(CharBuffer *buffer) {
 }
 
 
-//
-// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-//
+//------------------------------------------------------------------------------
 
 
 
 // this defines the center of the interval where the xor32 rolling checksum is
 // queried. You should never change this number, since it affects the definition
 // of cut marks.
-const int32_t Xor32Detector::magic_number_   = // TODO: C++11 (constexpr (?))
+// TODO(rmeusel): C++11 (constexpr (?))
+const int32_t Xor32Detector::magic_number_   =
   std::numeric_limits<uint32_t>::max() / 2;
 
 
@@ -47,14 +47,14 @@ Xor32Detector::Xor32Detector(const size_t minimal_chunk_size,
   xor32_ptr_(0), xor32_(0),
   threshold_(std::numeric_limits<uint32_t>::max() / average_chunk_size)
 {
-  assert (minimal_chunk_size_ > 0);
-  assert (minimal_chunk_size_ < average_chunk_size_);
-  assert (average_chunk_size_ < maximal_chunk_size_);
+  assert(minimal_chunk_size_ > 0);
+  assert(minimal_chunk_size_ < average_chunk_size_);
+  assert(average_chunk_size_ < maximal_chunk_size_);
 }
 
 
 off_t Xor32Detector::FindNextCutMark(CharBuffer *buffer) {
-  assert (minimal_chunk_size_ >= xor32_influence);
+  assert(minimal_chunk_size_ >= xor32_influence);
   const unsigned char *data = buffer->ptr();
 
   // get the offset where the next xor32 computation needs to be continued
@@ -75,8 +75,8 @@ off_t Xor32Detector::FindNextCutMark(CharBuffer *buffer) {
 
   // get the byte offset in the current buffer
   off_t internal_offset = global_offset - buffer->base_offset();
-  assert (internal_offset >= 0);
-  assert (internal_offset < static_cast<off_t>(buffer->used_bytes()));
+  assert(internal_offset >= 0);
+  assert(internal_offset < static_cast<off_t>(buffer->used_bytes()));
 
   // precompute the xor32 rolling checksum for finding the next cut mark
   // Note: this might be skipped, if the precomputation was already performed
@@ -86,8 +86,8 @@ off_t Xor32Detector::FindNextCutMark(CharBuffer *buffer) {
   const off_t internal_precompute_end =
     std::min(precompute_end - buffer->base_offset(),
              static_cast<off_t>(buffer->used_bytes()));
-  assert (internal_precompute_end - internal_offset <=
-          static_cast<off_t>(xor32_influence));
+  assert(internal_precompute_end - internal_offset <=
+         static_cast<off_t>(xor32_influence));
   for (; internal_offset < internal_precompute_end; ++internal_offset) {
     xor32(data[internal_offset]);
   }
@@ -120,3 +120,4 @@ off_t Xor32Detector::FindNextCutMark(CharBuffer *buffer) {
   }
 }
 
+}  // namespace upload

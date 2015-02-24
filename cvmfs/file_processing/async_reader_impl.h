@@ -2,26 +2,31 @@
  * This file is part of the CernVM File System.
  */
 
-#include "../logging.h"
+#ifndef CVMFS_FILE_PROCESSING_ASYNC_READER_IMPL_H_
+#define CVMFS_FILE_PROCESSING_ASYNC_READER_IMPL_H_
+
+#include <algorithm>
 #include <cerrno>
 
-namespace upload { // TODO: remove this... wrong namespace (for testing)
+#include "../logging.h"
 
+// TODO(remeusel): remove this... wrong namespace (for testing)
+namespace upload {
 
 template <class FileScrubbingTaskT, class FileT>
 bool Reader<FileScrubbingTaskT, FileT>::Initialize() {
-  // TODO: exactly the same Initialize()/TearDown() concept is implemented
-  //       in AbstractUploader. It might be worth to facter out that code into
-  //       an extra template that handles clean thread creation/destruction
-  //       and perhaps the connection of the thread using a tbb::[...]queue
+  // TODO(rmeusel): exactly the same Initialize()/TearDown() concept is
+  // implemented in AbstractUploader. It might be worth to facter out that code
+  // into an extra template that handles clean thread creation/destruction
+  // and perhaps the connection of the thread using a tbb::[...]queue
   tbb::tbb_thread thread(&ThreadProxy<Reader>,
                           this,
                          &Reader<FileScrubbingTaskT, FileT>::ReadThread);
 
-  assert (! read_thread_.joinable());
+  assert(!read_thread_.joinable());
   read_thread_ = thread;
-  assert (read_thread_.joinable());
-  assert (! thread.joinable());
+  assert(read_thread_.joinable());
+  assert(!thread.joinable());
 
   // wait for the thread to call back...
   const bool successful_startup = thread_started_executing_.Get();
@@ -44,7 +49,7 @@ void Reader<FileScrubbingTaskT, FileT>::ReadThread() {
     FileJob job;
     const bool popped_new_job = TryToAcquireNewJob(job);
     if (popped_new_job) {
-      if (! job.terminate) {
+      if (!job.terminate) {
         OpenNewFile(job.file);
       } else {
         EnableDraining();
@@ -101,12 +106,12 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
         break;
       case EACCES:
       case EPERM:
-        LogCvmfs(kLogSpooler, kLogStderr, "File open() failed due to permission "
-                                          "issues. Please check '%s' and retry",
-                                          file->path().c_str());
+        LogCvmfs(kLogSpooler, kLogStderr,
+                 "File open() failed due to permission issues. "
+                 "Please check '%s' and retry", file->path().c_str());
     }
   }
-  assert (fd > 0);
+  assert(fd > 0);
 
   OpenFile open_file;
   open_file.file            = file;
@@ -118,13 +123,13 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::CloseFile(OpenFile &file) {
   const int retval = close(file.file_descriptor);
-  assert (retval == 0);
+  assert(retval == 0);
 }
 
 
 template <class FileScrubbingTaskT, class FileT>
 void Reader<FileScrubbingTaskT, FileT>::FinalizedFile(AbstractFile *file) {
-  assert (file != NULL);
+  assert(file != NULL);
 
   // notify subscribed callbacks for a finalized file
   FileT *concrete_file = static_cast<FileT*>(file);
@@ -137,8 +142,8 @@ void Reader<FileScrubbingTaskT, FileT>::FinalizedFile(AbstractFile *file) {
 template <class FileScrubbingTaskT, class FileT>
 bool Reader<FileScrubbingTaskT, FileT>::
                                 ReadAndScheduleNextBuffer(OpenFile &open_file) {
-  assert (open_file.file != NULL);
-  assert (open_file.file_descriptor > 0);
+  assert(open_file.file != NULL);
+  assert(open_file.file_descriptor > 0);
 
 
   // All asynchronous tasks for a single File need to be processed sequentially,
@@ -197,7 +202,7 @@ bool Reader<FileScrubbingTaskT, FileT>::
   const size_t bytes_read = read(open_file.file_descriptor,
                                  buffer->ptr(),
                                  bytes_to_read);
-  assert (bytes_to_read == bytes_read);
+  assert(bytes_to_read == bytes_read);
   buffer->SetUsedBytes(bytes_read);
   open_file.file_marker += bytes_read;
 
@@ -234,5 +239,6 @@ bool Reader<FileScrubbingTaskT, FileT>::
   return finished_reading;
 }
 
+}  // namespace upload
 
-}
+#endif  // CVMFS_FILE_PROCESSING_ASYNC_READER_IMPL_H_
