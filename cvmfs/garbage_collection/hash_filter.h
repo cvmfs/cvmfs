@@ -96,7 +96,7 @@ class SmallhashFilter : public AbstractHashFilter {
  protected:
   static uint32_t hasher(const shash::Any &key) {
     // Don't start with the first bytes, because == is using them as well
-    return (uint32_t) *(reinterpret_cast<uint32_t *>(key.digest) + 1);
+    return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
   }
 
  public:
