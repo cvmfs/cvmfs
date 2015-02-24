@@ -12,14 +12,15 @@
 
 #include <string>
 
+#include "download.h"
+#include "hash.h"
 #include "logging.h"
 #include "manifest.h"
 #include "util.h"
-#include "hash.h"
-#include "download.h"
 
 using namespace std;  // NOLINT
-using namespace swissknife;  // NOLINT
+
+namespace swissknife {
 
 /**
  * Checks if the given path looks like a remote path
@@ -42,20 +43,19 @@ static bool Exists(const string &repository, const string &file)
   }
 }
 
-swissknife::ParameterList swissknife::CommandInfo::GetParams() {
+ParameterList CommandInfo::GetParams() {
   swissknife::ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory / url"));
-  r.push_back(Parameter::Optional ('l', "log level (0-4, default: 2)"));
-  r.push_back(Parameter::Switch   ('c', "show root catalog hash"));
-  r.push_back(Parameter::Switch   ('n', "show fully qualified repository name"));
-  r.push_back(Parameter::Switch   ('t', "show time stamp"));
-  r.push_back(Parameter::Switch   ('m', "check if repository is marked as "
+  r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
+  r.push_back(Parameter::Switch('c', "show root catalog hash"));
+  r.push_back(Parameter::Switch('n', "show fully qualified repository name"));
+  r.push_back(Parameter::Switch('t', "show time stamp"));
+  r.push_back(Parameter::Switch('m', "check if repository is marked as "
                                         "replication master copy"));
-  r.push_back(Parameter::Switch   ('v', "repository revision number"));
-  r.push_back(Parameter::Switch   ('g', "check if repository is garbage "
+  r.push_back(Parameter::Switch('v', "repository revision number"));
+  r.push_back(Parameter::Switch('g', "check if repository is garbage "
                                         "collectable"));
-  r.push_back(Parameter::Switch   ('h', "print results in human readable form"));
-  // to be extended...
+  r.push_back(Parameter::Switch('h', "print results in human readable form"));
   return r;
 }
 
@@ -74,7 +74,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 
   // Load manifest file
   // Repository can be HTTP address or on local file system
-  // TODO: do this using Manifest::Fetch
+  // TODO(jblomer): do this using Manifest::Fetch
   //       currently this is not possible, since Manifest::Fetch asks for the
   //       repository name... Which we want to figure out with the tool at hand.
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
@@ -164,12 +164,12 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
-int swissknife::CommandVersion::Main(const ArgumentList &args) {
+int CommandVersion::Main(const ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "%s", PACKAGE_VERSION);
   return 0;
 }
+
+}  // namespace swissknife
