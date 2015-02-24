@@ -5,21 +5,21 @@
 #ifndef CVMFS_S3FANOUT_H_
 #define CVMFS_S3FANOUT_H_
 
-#include <semaphore.h>
 #include <poll.h>
+#include <semaphore.h>
 
-#include <vector>
-#include <set>
+#include <climits>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
-#include <climits>
+#include <vector>
 
+#include "dns.h"
 #include "duplex_curl.h"
 #include "prng.h"
-#include "util_concurrency.h"
-#include "dns.h"
 #include "util.h"
+#include "util_concurrency.h"
 
 namespace s3fanout {
 

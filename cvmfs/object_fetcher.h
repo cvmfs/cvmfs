@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef OBJECT_FETCHER_H
-#define OBJECT_FETCHER_H
+#ifndef CVMFS_OBJECT_FETCHER_H_
+#define CVMFS_OBJECT_FETCHER_H_
 
 #include <string>
 
@@ -74,14 +74,14 @@ class AbstractObjectFetcher {
    */
   HistoryTN* FetchHistory(const shash::Any &history_hash = shash::Any()) {
     // retrieve the current HEAD history hash (if nothing else given)
-    shash::Any effective_history_hash = (! history_hash.IsNull())
+    shash::Any effective_history_hash = (!history_hash.IsNull())
             ? history_hash
             : GetHistoryHash();
 
     // download the history hash
     std::string path;
     if (effective_history_hash.IsNull() ||
-        ! Fetch(effective_history_hash, shash::kSuffixHistory, &path)) {
+        !Fetch(effective_history_hash, shash::kSuffixHistory, &path)) {
       return NULL;
     }
 
@@ -108,10 +108,10 @@ class AbstractObjectFetcher {
                           const std::string &catalog_path,
                           const bool         is_nested = false,
                                 CatalogTN   *parent    = NULL) {
-    assert (! catalog_hash.IsNull());
+    assert(!catalog_hash.IsNull());
 
     std::string path;
-    if (! Fetch(catalog_hash, shash::kSuffixCatalog, &path)) {
+    if (!Fetch(catalog_hash, shash::kSuffixCatalog, &path)) {
       return NULL;
     }
 
@@ -130,7 +130,7 @@ class AbstractObjectFetcher {
  public:
   bool HasHistory() {
     shash::Any history_hash = GetHistoryHash();
-    return ! history_hash.IsNull();
+    return !history_hash.IsNull();
   }
 
  protected:
@@ -160,7 +160,7 @@ class AbstractObjectFetcher {
    */
   shash::Any GetHistoryHash() {
     UniquePtr<manifest::Manifest> manifest(FetchManifest());
-    if (! manifest || manifest->history().IsNull()) {
+    if (!manifest || manifest->history().IsNull()) {
       return shash::Any();
     }
 
@@ -206,12 +206,12 @@ class LocalObjectFetcher :
   bool Fetch(const shash::Any    &object_hash,
              const shash::Suffix  hash_suffix,
              std::string         *file_path) {
-    assert (file_path != NULL);
+    assert(file_path != NULL);
     file_path->clear();
 
     // check if the requested file object is available locally
     const std::string source = BuildPath(object_hash, hash_suffix);
-    if (! FileExists(source)) {
+    if (!FileExists(source)) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to locate object %s",
                object_hash.ToString().c_str());
       return false;
@@ -222,14 +222,14 @@ class LocalObjectFetcher :
                                  object_hash.ToStringWithSuffix();
     FILE *f = CreateTempFile(tmp_path, 0600, "w", file_path);
     if (NULL == f) {
-      LogCvmfs(kLogDownload, kLogStderr, "failed to create temp file (errno: %d)",
-               errno);
+      LogCvmfs(kLogDownload, kLogStderr,
+               "failed to create temp file (errno: %d)", errno);
       return false;
     }
 
     // decompress the requested object file
     const bool success = zlib::DecompressPath2File(source, f);
-    if (! success) {
+    if (!success) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
                                         "to '%s' (errno: %d)",
                object_hash.ToString().c_str(), source.c_str(),
@@ -338,8 +338,8 @@ class HttpObjectFetcher :
   bool Fetch(const shash::Any     &object_hash,
              const shash::Suffix   hash_suffix,
              std::string          *object_file) {
-    assert (object_file != NULL);
-    assert (! object_hash.IsNull());
+    assert(object_file != NULL);
+    assert(!object_hash.IsNull());
 
     object_file->clear();
 
@@ -348,8 +348,8 @@ class HttpObjectFetcher :
                                  object_hash.ToStringWithSuffix();
     FILE *f = CreateTempFile(tmp_path, 0600, "w", object_file);
     if (NULL == f) {
-      LogCvmfs(kLogDownload, kLogStderr, "failed to create temp file (errno: %d)",
-               errno);
+      LogCvmfs(kLogDownload, kLogStderr,
+               "failed to create temp file (errno: %d)", errno);
       return false;
     }
 
@@ -360,7 +360,7 @@ class HttpObjectFetcher :
     const bool success = (retval == download::kFailOk);
 
     // error checking
-    if (! success) {
+    if (!success) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
                                         "%s to '%s' (%d - %s)",
                object_hash.ToString().c_str(), object_file->c_str(),
@@ -395,4 +395,4 @@ struct object_fetcher_traits<HttpObjectFetcher<CatalogT, HistoryT> > {
     typedef HistoryT HistoryTN;
 };
 
-#endif /* OBJECT_FETCHER_H */
+#endif  // CVMFS_OBJECT_FETCHER_H_

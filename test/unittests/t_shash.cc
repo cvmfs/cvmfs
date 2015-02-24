@@ -61,17 +61,17 @@ TEST(T_Shash, ToString) {
   prng.InitSeed(1337);
 
   shash::Any hash_md5(shash::kMd5);
-  hash_md5.Randomize(prng);
+  hash_md5.Randomize(&prng);
   ASSERT_FALSE (hash_md5.IsNull());
   EXPECT_EQ    ("583525ddfde0ebe0b3afff68cde4d983", hash_md5.ToString());
 
   shash::Any hash_sha1(shash::kSha1);
-  hash_sha1.Randomize(prng);
+  hash_sha1.Randomize(&prng);
   ASSERT_FALSE (hash_sha1.IsNull());
   EXPECT_EQ    ("efc0075d82e876211b66b4b0b91ce2ec217ee60a", hash_sha1.ToString());
 
   shash::Any hash_rmd160(shash::kRmd160);
-  hash_rmd160.Randomize(prng);
+  hash_rmd160.Randomize(&prng);
   ASSERT_FALSE (hash_rmd160.IsNull());
   EXPECT_EQ    ("850b90946048b2760f4d50ce83249dad6317ef10-rmd160", hash_rmd160.ToString());
 }
@@ -82,21 +82,21 @@ TEST(T_Shash, ToStringWithSuffix) {
   prng.InitSeed(1337);
 
   shash::Any hash_md5(shash::kMd5);
-  hash_md5.Randomize(prng);
+  hash_md5.Randomize(&prng);
   hash_md5.suffix = 'C';
   ASSERT_FALSE (hash_md5.IsNull());
   EXPECT_EQ    ("583525ddfde0ebe0b3afff68cde4d983C", hash_md5.ToStringWithSuffix());
   EXPECT_EQ    ("583525ddfde0ebe0b3afff68cde4d983", hash_md5.ToString());
 
   shash::Any hash_sha1(shash::kSha1);
-  hash_sha1.Randomize(prng);
+  hash_sha1.Randomize(&prng);
   hash_sha1.suffix = 'A';
   ASSERT_FALSE (hash_sha1.IsNull());
   EXPECT_EQ    ("efc0075d82e876211b66b4b0b91ce2ec217ee60aA", hash_sha1.ToStringWithSuffix());
   EXPECT_EQ    ("efc0075d82e876211b66b4b0b91ce2ec217ee60a", hash_sha1.ToString());
 
   shash::Any hash_rmd160(shash::kRmd160);
-  hash_rmd160.Randomize(prng);
+  hash_rmd160.Randomize(&prng);
   hash_rmd160.suffix = 'Q';
   ASSERT_FALSE (hash_rmd160.IsNull());
   EXPECT_EQ    ("850b90946048b2760f4d50ce83249dad6317ef10-rmd160Q", hash_rmd160.ToStringWithSuffix());
@@ -127,7 +127,7 @@ TEST(T_Shash, MakePathExplicit) {
   prng.InitSeed(42);
 
   shash::Any hash_md5(shash::kMd5);
-  hash_md5.Randomize(prng);
+  hash_md5.Randomize(&prng);
   ASSERT_FALSE (hash_md5.IsNull());
   EXPECT_EQ ("/91/3969a1ae06052779065b87eb53cb64",   hash_md5.MakePathExplicit(1, 2));
   EXPECT_EQ ("/913/969/a1ae06052779065b87eb53cb64",  hash_md5.MakePathExplicit(2, 3));
@@ -135,7 +135,7 @@ TEST(T_Shash, MakePathExplicit) {
   EXPECT_EQ ("/9/1/3/969a1ae06052779065b87eb53cb64", hash_md5.MakePathExplicit(3, 1));
 
   shash::Any hash_sha1(shash::kSha1);
-  hash_sha1.Randomize(prng);
+  hash_sha1.Randomize(&prng);
   ASSERT_FALSE (hash_sha1.IsNull());
   EXPECT_EQ ("/c9/116bb5576d69586386887c6a9eeeb569a406a1",   hash_sha1.MakePathExplicit(1, 2));
   EXPECT_EQ ("/c91/16b/b5576d69586386887c6a9eeeb569a406a1",  hash_sha1.MakePathExplicit(2, 3));
@@ -143,7 +143,7 @@ TEST(T_Shash, MakePathExplicit) {
   EXPECT_EQ ("/c/9/1/16bb5576d69586386887c6a9eeeb569a406a1", hash_sha1.MakePathExplicit(3, 1));
 
   shash::Any hash_rmd160(shash::kRmd160);
-  hash_rmd160.Randomize(prng);
+  hash_rmd160.Randomize(&prng);
   ASSERT_FALSE (hash_rmd160.IsNull());
   EXPECT_EQ ("/2e/5beea626f6ddef63d56405371f80732782086f-rmd160",   hash_rmd160.MakePathExplicit(1, 2));
   EXPECT_EQ ("/2e5/bee/a626f6ddef63d56405371f80732782086f-rmd160",  hash_rmd160.MakePathExplicit(2, 3));
@@ -157,7 +157,7 @@ TEST(T_Shash, MakePathExplicitWithPrefix) {
   prng.InitSeed(42);
 
   shash::Any hash_md5(shash::kMd5);
-  hash_md5.Randomize(prng);
+  hash_md5.Randomize(&prng);
   ASSERT_FALSE (hash_md5.IsNull());
   EXPECT_EQ ("dataA/91/3969a1ae06052779065b87eb53cb64",   hash_md5.MakePathExplicit(1, 2, "dataA"));
   EXPECT_EQ ("dataB/913/969/a1ae06052779065b87eb53cb64",  hash_md5.MakePathExplicit(2, 3, "dataB"));
@@ -165,7 +165,7 @@ TEST(T_Shash, MakePathExplicitWithPrefix) {
   EXPECT_EQ ("dataD/9/1/3/969a1ae06052779065b87eb53cb64", hash_md5.MakePathExplicit(3, 1, "dataD"));
 
   shash::Any hash_sha1(shash::kSha1);
-  hash_sha1.Randomize(prng);
+  hash_sha1.Randomize(&prng);
   ASSERT_FALSE (hash_sha1.IsNull());
   EXPECT_EQ ("dataA/c9/116bb5576d69586386887c6a9eeeb569a406a1",   hash_sha1.MakePathExplicit(1, 2, "dataA"));
   EXPECT_EQ ("dataB/c91/16b/b5576d69586386887c6a9eeeb569a406a1",  hash_sha1.MakePathExplicit(2, 3, "dataB"));
@@ -173,7 +173,7 @@ TEST(T_Shash, MakePathExplicitWithPrefix) {
   EXPECT_EQ ("dataD/c/9/1/16bb5576d69586386887c6a9eeeb569a406a1", hash_sha1.MakePathExplicit(3, 1, "dataD"));
 
   shash::Any hash_rmd160(shash::kRmd160);
-  hash_rmd160.Randomize(prng);
+  hash_rmd160.Randomize(&prng);
   ASSERT_FALSE (hash_rmd160.IsNull());
   EXPECT_EQ ("dataA/2e/5beea626f6ddef63d56405371f80732782086f-rmd160",   hash_rmd160.MakePathExplicit(1, 2, "dataA"));
   EXPECT_EQ ("dataB/2e5/bee/a626f6ddef63d56405371f80732782086f-rmd160",  hash_rmd160.MakePathExplicit(2, 3, "dataB"));
@@ -187,7 +187,7 @@ TEST(T_Shash, MakePathDefault) {
   prng.InitSeed(27111987);
 
   shash::Any hash_md5(shash::kMd5);
-  hash_md5.Randomize(prng);
+  hash_md5.Randomize(&prng);
   ASSERT_FALSE (hash_md5.IsNull());
   EXPECT_EQ ("data/95/9a032bcfdd999742a321eb0daeddd5",  hash_md5.MakePath());
   EXPECT_EQ ("dataX/95/9a032bcfdd999742a321eb0daeddd5", hash_md5.MakePath("dataX"));
@@ -195,7 +195,7 @@ TEST(T_Shash, MakePathDefault) {
   EXPECT_EQ ("dataZ/95/9a032bcfdd999742a321eb0daeddd5", hash_md5.MakePath("dataZ"));
 
   shash::Any hash_sha1(shash::kSha1);
-  hash_sha1.Randomize(prng);
+  hash_sha1.Randomize(&prng);
   ASSERT_FALSE (hash_sha1.IsNull());
   EXPECT_EQ ("data/cf/3e56cf3da37ad17cf1f2c2ff5d86497fc29068",  hash_sha1.MakePath());
   EXPECT_EQ ("dataX/cf/3e56cf3da37ad17cf1f2c2ff5d86497fc29068", hash_sha1.MakePath("dataX"));
@@ -203,7 +203,7 @@ TEST(T_Shash, MakePathDefault) {
   EXPECT_EQ ("dataZ/cf/3e56cf3da37ad17cf1f2c2ff5d86497fc29068", hash_sha1.MakePath("dataZ"));
 
   shash::Any hash_rmd160(shash::kRmd160);
-  hash_rmd160.Randomize(prng);
+  hash_rmd160.Randomize(&prng);
   ASSERT_FALSE (hash_rmd160.IsNull());
   EXPECT_EQ ("data/aa/1deda59d5329553580d78fcd0b393157a5d28e-rmd160",  hash_rmd160.MakePath());
   EXPECT_EQ ("dataX/aa/1deda59d5329553580d78fcd0b393157a5d28e-rmd160", hash_rmd160.MakePath("dataX"));
@@ -217,7 +217,7 @@ TEST(T_Shash, HashSuffix) {
   prng.InitSeed(9);
 
   shash::Any hash_md5(shash::kMd5);
-  hash_md5.Randomize(prng);
+  hash_md5.Randomize(&prng);
   hash_md5.suffix = 'A';
   ASSERT_FALSE (hash_md5.IsNull());
   ASSERT_TRUE  (hash_md5.HasSuffix());
@@ -233,7 +233,7 @@ TEST(T_Shash, HashSuffix) {
   EXPECT_EQ ("/2ec/5fe3c17045abdb136a5e6a913e32aC",      hash_md5.MakePathWithSuffix(1, 3, shash::kSuffixCatalog));
 
   shash::Any hash_sha1(shash::kSha1);
-  hash_sha1.Randomize(prng);
+  hash_sha1.Randomize(&prng);
   hash_sha1.suffix = 'B';
   ASSERT_FALSE (hash_sha1.IsNull());
   ASSERT_TRUE  (hash_sha1.HasSuffix());
@@ -249,7 +249,7 @@ TEST(T_Shash, HashSuffix) {
   EXPECT_EQ ("/b75/ae68b53d2fc149b77e504132d37569b7e766bC",      hash_sha1.MakePathWithSuffix(1, 3, shash::kSuffixCatalog));
 
   shash::Any hash_rmd160(shash::kRmd160);
-  hash_rmd160.Randomize(prng);
+  hash_rmd160.Randomize(&prng);
   hash_rmd160.suffix = 'C';
   ASSERT_FALSE (hash_rmd160.IsNull());
   ASSERT_TRUE  (hash_rmd160.HasSuffix());

@@ -63,7 +63,7 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   filename_ = actual_filename;
 
   // Find the entry in the repository
-  StatRdOnly(true); // <== refreshing the stat (filename might have changed)
+  StatRdOnly(true);  // <== refreshing the stat (filename might have changed)
   if (rdonly_stat_.error_code != 0) {
     PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not "
                  "found in repository.");
@@ -125,7 +125,8 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   // inode and parent inode is determined at runtime of client
   dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
   dirent.parent_inode_   = catalog::DirectoryEntry::kInvalidInode;
-  dirent.linkcount_      = this->GetUnionStat().st_nlink; // TODO: is this a good idea here?
+  // TODO(rmeusel): is this a good idea here?
+  dirent.linkcount_      = this->GetUnionStat().st_nlink;
 
   dirent.mode_           = this->GetUnionStat().st_mode;
   dirent.uid_            = this->GetUnionStat().st_uid;
@@ -138,7 +139,8 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
 
   if (this->IsSymlink()) {
     char slnk[PATH_MAX+1];
-		const ssize_t length = readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
+    const ssize_t length =
+      readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
     assert(length >= 0);
     dirent.symlink_.Assign(slnk, length);
   }
@@ -164,4 +166,4 @@ std::string SyncItem::GetScratchPath() const {
   return union_engine_->scratch_path() + relative_path;
 }
 
-}  // namespace sync
+}  // namespace publish

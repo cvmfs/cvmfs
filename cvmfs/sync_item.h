@@ -5,12 +5,13 @@
 #ifndef CVMFS_SYNC_ITEM_H_
 #define CVMFS_SYNC_ITEM_H_
 
-#include <string>
 #include <cstring>
+#include <map>
+#include <string>
 
-#include "platform.h"
-#include "hash.h"
 #include "directory_entry.h"
+#include "hash.h"
+#include "platform.h"
 #include "sync_union.h"
 #include "util.h"
 
@@ -44,7 +45,7 @@ class SyncItem {
    *  @param filename the name of the file ;-)
    *  @param entryType well...
    */
-  SyncItem();  // TODO: Remove
+  SyncItem();  // TODO(rmeusel): Remove
   SyncItem(const std::string &relative_parent_path,
            const std::string &filename,
            const SyncItemType entry_type,
@@ -86,7 +87,7 @@ class SyncItem {
   inline platform_stat64 GetUnionStat() const {
     StatUnion();
     return union_stat_.stat;
-  };
+  }
 
   inline std::string filename() const { return filename_; }
   inline std::string relative_parent_path() const {

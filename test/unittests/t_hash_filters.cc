@@ -25,7 +25,7 @@ class RandomHashGenerator {
   shash::Any operator()() {
     const shash::Algorithms type = static_cast<shash::Algorithms>(rng_.Next(3));
     shash::Any result_hash(type);
-    result_hash.Randomize(rng_);
+    result_hash.Randomize(&rng_);
     return result_hash;
   }
 

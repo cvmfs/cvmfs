@@ -5,10 +5,10 @@
 #ifndef CVMFS_SWISSKNIFE_H_
 #define CVMFS_SWISSKNIFE_H_
 
+#include <cassert>
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
-#include <cassert>
 
 namespace download {
 class DownloadManager;
@@ -52,7 +52,7 @@ class Parameter {
     optional_(opt),
     switch_only_(switch_only)
   {
-    assert (! switch_only_ || optional_); // switches are optional by definition
+    assert(!switch_only_ || optional_);  // switches are optional by definition
   }
 
  private:

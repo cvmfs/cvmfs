@@ -2,16 +2,17 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UPLOAD_FACILITY_
-#define CVMFS_UPLOAD_FACILITY_
+#ifndef CVMFS_UPLOAD_FACILITY_H_
+#define CVMFS_UPLOAD_FACILITY_H_
 
-#include <tbb/tbb_thread.h>
 #include <tbb/concurrent_queue.h>
+#include <tbb/tbb_thread.h>
 
-#include "util.h"
-#include "util_concurrency.h"
+#include <string>
 
 #include "upload_spooler_definition.h"
+#include "util.h"
+#include "util_concurrency.h"
 
 namespace upload {
 
@@ -36,7 +37,7 @@ struct UploaderResults {
     local_path(""),
     buffer(buffer) {}
 
-  UploaderResults(const int return_code) :
+  explicit UploaderResults(const int return_code) :
     type(kChunkCommit),
     return_code(return_code),
     local_path(""),
@@ -107,7 +108,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
  public:
   virtual ~AbstractUploader() {
-    assert (torn_down_ && "Call AbstractUploader::TearDown() before dtor!");
+    assert(torn_down_ && "Call AbstractUploader::TearDown() before dtor!");
   }
 
   /**
@@ -254,7 +255,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
  protected:
-  AbstractUploader(const SpoolerDefinition& spooler_definition);
+  explicit AbstractUploader(const SpoolerDefinition& spooler_definition);
 
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
@@ -306,8 +307,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param job_slot   a reference for an UploadJob slot to be pulled
    * @return           true if a job was successfully popped
    */
-  bool TryToAcquireNewJob(UploadJob &job_slot) {
-    return upload_queue_.try_pop(job_slot);
+  bool TryToAcquireNewJob(UploadJob *job_slot) {
+    return upload_queue_.try_pop(*job_slot);
   }
 
 
@@ -362,14 +363,13 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 struct UploadStreamHandle {
   typedef AbstractUploader::CallbackTN CallbackTN;
 
-  UploadStreamHandle(const CallbackTN *commit_callback) :
+  explicit UploadStreamHandle(const CallbackTN *commit_callback) :
     commit_callback(commit_callback) {}
   virtual ~UploadStreamHandle() {}
 
   const CallbackTN *commit_callback;
 };
 
+}  // namespace upload
 
-}
-
-#endif /* CVMFS_UPLOAD_FACILITY_ */
+#endif  // CVMFS_UPLOAD_FACILITY_H_

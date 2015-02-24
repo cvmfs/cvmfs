@@ -4,8 +4,9 @@
  * Runs a thread using libcurls asynchronous I/O mode to push data to S3
  */
 
-#include <cerrno>
 #include <pthread.h>
+
+#include <cerrno>
 #include <utility>
 
 #include "cvmfs_config.h"
@@ -368,7 +369,6 @@ void S3FanoutManager::ReleaseCurlHandle(JobInfo *info, CURL *handle) const {
   }
 
   pool_handles_inuse_->erase(elem);
-
 }
 
 
@@ -405,21 +405,22 @@ string S3FanoutManager::MkAuthoritzation(const string &access_key,
 }
 
 
-void S3FanoutManager::InitializeDnsSettingsCurl(CURL *handle,
-                                                CURLSH *sharehandle,
-                                                curl_slist *clist) const {
-
+void S3FanoutManager::InitializeDnsSettingsCurl(
+  CURL *handle,
+  CURLSH *sharehandle,
+  curl_slist *clist) const
+{
   CURLcode retval = curl_easy_setopt(handle, CURLOPT_SHARE, sharehandle);
   assert(retval == CURLE_OK);
   retval = curl_easy_setopt(handle, CURLOPT_RESOLVE, clist);
   assert(retval == CURLE_OK);
-
 }
 
 
-int S3FanoutManager::InitializeDnsSettings(CURL *handle,
-                                           std::string host_with_port) const {
-
+int S3FanoutManager::InitializeDnsSettings(
+  CURL *handle,
+  std::string host_with_port) const
+{
   // Use existing handle
   std::map<CURL *, S3FanOutDnsEntry *>::const_iterator it =
       curl_sharehandles_->find(handle);
@@ -516,8 +517,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
   string timestamp;
   CURLcode retval;
   if (info->request == JobInfo::kReqHead ||
-      info->request == JobInfo::kReqDelete) {
-
+      info->request == JobInfo::kReqDelete)
+  {
     retval = curl_easy_setopt(handle, CURLOPT_UPLOAD, 0);
     assert(retval == CURLE_OK);
     retval = curl_easy_setopt(handle, CURLOPT_NOBODY, 1);
@@ -966,7 +967,6 @@ void S3FanoutManager::Fini() {
  * Spawns the I/O worker thread.  No way back except Fini(); Init();
  */
 void S3FanoutManager::Spawn() {
-
   LogCvmfs(kLogS3Fanout, kLogDebug, "S3FanoutManager spawned");
 
   thread_upload_run_ = true;
@@ -1018,7 +1018,6 @@ void S3FanoutManager::SetRetryParameters(const unsigned max_retries,
  * Get completed jobs, so they can be cleaned and deleted properly.
  */
 int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
-
   pthread_mutex_lock(jobs_completed_lock_);
   std::vector<JobInfo*>::iterator             it    = jobs_completed_.begin();
   const std::vector<JobInfo*>::const_iterator itend = jobs_completed_.end();
@@ -1035,7 +1034,6 @@ int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
  * Push new job to be uploaded to the S3 cloud storage.
  */
 int S3FanoutManager::PushNewJob(JobInfo *info) {
-
   sem_wait(&available_jobs_);
 
   pthread_mutex_lock(jobs_todo_lock_);

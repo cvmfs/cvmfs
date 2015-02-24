@@ -13,11 +13,11 @@
 #include <cassert>
 #include <cstdlib>
 
-#include <string>
 #include <set>
+#include <string>
 
-#include "platform.h"
 #include "logging.h"
+#include "platform.h"
 #include "util.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -195,8 +195,8 @@ class FileSystemTraversal {
   }
 
   inline bool Notify(const BoolCallback callback,
-        	           const std::string &parent_path,
-        	           const std::string &entry_name) const
+                     const std::string &parent_path,
+                     const std::string &entry_name) const
   {
     return (callback == NULL) ? true :
       (delegate_->*callback)(GetRelativePath(parent_path),
@@ -204,8 +204,8 @@ class FileSystemTraversal {
   }
 
   inline void Notify(const VoidCallback callback,
-        	           const std::string &parent_path,
-        	           const std::string &entry_name) const
+                     const std::string &parent_path,
+                     const std::string &entry_name) const
   {
     if (callback != NULL) {
       (delegate_->*callback)(GetRelativePath(parent_path),
@@ -215,16 +215,22 @@ class FileSystemTraversal {
 
   std::string GetRelativePath(const std::string &absolute_path) const {
     const unsigned int rel_dir_len = relative_to_directory_.length();
-    if (rel_dir_len >= absolute_path.length()) { return ""; }
-	  else if (rel_dir_len > 1) { return absolute_path.substr(rel_dir_len + 1); }
-	  else if (rel_dir_len == 0){ return absolute_path; }
-	  else if (relative_to_directory_ == "/") { return absolute_path.substr(1); }
-    else return "";
+    if (rel_dir_len >= absolute_path.length()) {
+      return "";
+    } else if (rel_dir_len > 1) {
+      return absolute_path.substr(rel_dir_len + 1);
+    } else if (rel_dir_len == 0) {
+      return absolute_path;
+    } else if (relative_to_directory_ == "/") {
+      return absolute_path.substr(1);
+    } else {
+      return "";
+    }
   }
 };  // FileSystemTraversal
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_FS_TRAVERSAL_H_

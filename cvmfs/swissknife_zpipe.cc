@@ -1,5 +1,7 @@
 /**
- * Slightly adapted for the use within the CernVM File System
+ * This file is part of the CernVM File System.
+ *
+ * Slightly adapted zpipe.c for the use within the CernVM File System
  */
 
 /* zpipe.c: example of proper use of zlib's inflate() and deflate()
@@ -17,8 +19,10 @@
  */
 
 #include <stdio.h>
-#include <string.h>
-#include <assert.h>
+
+#include <cassert>
+#include <cstring>
+
 #include "duplex_zlib.h"
 #include "swissknife_zpipe.h"
 
@@ -191,13 +195,11 @@ int swissknife::CommandZpipe::Main(const swissknife::ArgumentList &args) {
         if (ret != Z_OK)
             zerr(ret);
         return ret;
-    }
-
-    /* do decompression if -d specified */
-    else {
-        ret = inf(stdin, stdout);
-        if (ret != Z_OK)
-            zerr(ret);
-        return ret;
+    } else {
+      /* do decompression if -d specified */
+      ret = inf(stdin, stdout);
+      if (ret != Z_OK)
+        zerr(ret);
+      return ret;
     }
 }

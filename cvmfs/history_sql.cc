@@ -28,7 +28,7 @@ const std::string HistoryDatabase::kFqrnKey = "fqrn";
  * This method creates a new database file and initializes the database schema.
  */
 bool HistoryDatabase::CreateEmptyDatabase() {
-  assert (read_write());
+  assert(read_write());
 
   return CreateTagsTable() &&
          CreateRecycleBinTable();
@@ -36,7 +36,7 @@ bool HistoryDatabase::CreateEmptyDatabase() {
 
 
 bool HistoryDatabase::CreateTagsTable() {
-  assert (read_write());
+  assert(read_write());
   return sqlite::Sql(sqlite_db(),
     "CREATE TABLE tags (name TEXT, hash TEXT, revision INTEGER, "
     "  timestamp INTEGER, channel INTEGER, description TEXT, size INTEGER, "
@@ -45,7 +45,7 @@ bool HistoryDatabase::CreateTagsTable() {
 
 
 bool HistoryDatabase::CreateRecycleBinTable() {
-  assert (read_write());
+  assert(read_write());
   return sqlite::Sql(sqlite_db(),
     "CREATE TABLE recycle_bin (hash TEXT, flags INTEGER, "
     "  CONSTRAINT pk_hash PRIMARY KEY (hash))").Execute();
@@ -53,7 +53,7 @@ bool HistoryDatabase::CreateRecycleBinTable() {
 
 
 bool HistoryDatabase::InsertInitialValues(const std::string &repository_name) {
-  assert (read_write());
+  assert(read_write());
   return this->SetProperty(kFqrnKey, repository_name);
 }
 
@@ -64,14 +64,14 @@ bool HistoryDatabase::ContainsRecycleBin() const {
 
 
 bool HistoryDatabase::CheckSchemaCompatibility() {
-  return ! ((schema_version() < kLatestSupportedSchema - kSchemaEpsilon) ||
-            (schema_version() > kLatestSchema          + kSchemaEpsilon));
+  return !((schema_version() < kLatestSupportedSchema - kSchemaEpsilon) ||
+           (schema_version() > kLatestSchema          + kSchemaEpsilon));
 }
 
 
 bool HistoryDatabase::LiveSchemaUpgradeIfNecessary() {
-  assert (read_write());
-  assert (IsEqualSchema(schema_version(), 1.0));
+  assert(read_write());
+  assert(IsEqualSchema(schema_version(), 1.0));
 
   if (schema_revision() == kLatestSchemaRevision) {
     return true;
@@ -110,7 +110,7 @@ bool HistoryDatabase::UpgradeSchemaRevision_10_2() {
     return true;
   }
 
-  if (! CreateRecycleBinTable()) {
+  if (!CreateRecycleBinTable()) {
     LogCvmfs(kLogHistory, kLogStderr, "failed to upgrade history database");
     return false;
   }
@@ -138,20 +138,19 @@ SqlInsertTag::SqlInsertTag(const HistoryDatabase *database) {
     "INSERT INTO tags (" + db_fields(database) + ")"
     "VALUES (" + db_placeholders + ");";
   const bool success = Init(database->sqlite_db(), stmt);
-  assert (success);
+  assert(success);
 }
 
 
 bool SqlInsertTag::BindTag(const History::Tag &tag) {
-  return (
-    BindText         (1, tag.name)                 &&
-    BindTextTransient(2, tag.root_hash.ToString()) && // temporary from ToString
-    BindInt64        (3, tag.revision)             &&
-    BindInt64        (4, tag.timestamp)            &&
-    BindInt64        (5, tag.channel)              &&
-    BindText         (6, tag.description)          &&
-    BindInt64        (7, tag.size)
-  );
+  return
+    BindText(1, tag.name) &&
+    BindTextTransient(2, tag.root_hash.ToString()) &&  // temporary (ToString)
+    BindInt64(3, tag.revision) &&
+    BindInt64(4, tag.timestamp) &&
+    BindInt64(5, tag.channel) &&
+    BindText(6, tag.description) &&
+    BindInt64(7, tag.size);
 }
 
 
@@ -161,7 +160,7 @@ bool SqlInsertTag::BindTag(const History::Tag &tag) {
 SqlRemoveTag::SqlRemoveTag(const HistoryDatabase *database) {
   const std::string stmt = "DELETE FROM tags WHERE name = :name;";
   const bool success = Init(database->sqlite_db(), stmt);
-  assert (success);
+  assert(success);
 }
 
 bool SqlRemoveTag::BindName(const std::string &name) {
@@ -176,7 +175,7 @@ SqlFindTag::SqlFindTag(const HistoryDatabase *database) {
   const std::string stmt =
     "SELECT " + db_fields(database) + " FROM tags WHERE name = :name LIMIT 1;";
   const bool success = Init(database->sqlite_db(), stmt);
-  assert (success);
+  assert(success);
 }
 
 bool SqlFindTag::BindName(const std::string &name) {
@@ -197,7 +196,7 @@ SqlFindTagByDate::SqlFindTagByDate(const HistoryDatabase *database) {
                             "SELECT " + db_fields(database) + " FROM tags "
                             "WHERE timestamp <= :timestamp "
                             "ORDER BY revision DESC LIMIT 1;");
-  assert (success);
+  assert(success);
 }
 
 bool SqlFindTagByDate::BindTimestamp(const time_t timestamp) {
@@ -211,7 +210,7 @@ bool SqlFindTagByDate::BindTimestamp(const time_t timestamp) {
 SqlCountTags::SqlCountTags(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
                             "SELECT count(*) FROM tags;");
-  assert (success);
+  assert(success);
 }
 
 unsigned SqlCountTags::RetrieveCount() const {
@@ -228,7 +227,7 @@ SqlListTags::SqlListTags(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
                             "SELECT " + db_fields(database) + " FROM tags "
                             "ORDER BY revision DESC;");
-  assert (success);
+  assert(success);
 }
 
 
@@ -241,14 +240,14 @@ SqlGetChannelTips::SqlGetChannelTips(const HistoryDatabase *database) {
                             "  MAX(revision) AS max_rev "
                             "FROM tags "
                             "GROUP BY channel;");
-  assert (success);
+  assert(success);
 }
 
 SqlGetHashes::SqlGetHashes(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
                             "SELECT DISTINCT hash FROM tags "
                             "ORDER BY revision ASC");
-  assert (success);
+  assert(success);
 }
 
 shash::Any SqlGetHashes::RetrieveHash() const {
@@ -264,7 +263,7 @@ SqlRollbackTag::SqlRollbackTag(const HistoryDatabase *database) {
   const bool success = Init(database->sqlite_db(),
                             "DELETE FROM tags WHERE "
                              + rollback_condition + ";");
-  assert (success);
+  assert(success);
 }
 
 
@@ -276,7 +275,7 @@ SqlListRollbackTags::SqlListRollbackTags(const HistoryDatabase *database) {
                             "SELECT " + db_fields(database) + " FROM tags "
                             "WHERE " + rollback_condition + " "
                             "ORDER BY revision DESC;");
-  assert (success);
+  assert(success);
 }
 
 
@@ -293,11 +292,11 @@ bool SqlRecycleBin::CheckSchema(const HistoryDatabase *database) const {
 
 
 SqlRecycleBinInsert::SqlRecycleBinInsert(const HistoryDatabase *database) {
-  assert (CheckSchema(database));
+  assert(CheckSchema(database));
   const bool success = Init(database->sqlite_db(),
                             "INSERT OR IGNORE INTO recycle_bin (hash, flags) "
                             "VALUES (:hash, :flags)");
-  assert (success);
+  assert(success);
 }
 
 
@@ -313,10 +312,10 @@ bool SqlRecycleBinInsert::BindTag(const History::Tag &condemned_tag) {
 
 
 SqlRecycleBinList::SqlRecycleBinList(const HistoryDatabase *database) {
-  assert (CheckSchema(database));
+  assert(CheckSchema(database));
   const bool success = Init(database->sqlite_db(), "SELECT hash, flags "
                                                    "FROM recycle_bin;");
-  assert (success);
+  assert(success);
 }
 
 
@@ -335,9 +334,9 @@ shash::Any SqlRecycleBinList::RetrieveHash() {
 
 
 SqlRecycleBinFlush::SqlRecycleBinFlush(const HistoryDatabase *database) {
-  assert (CheckSchema(database));
+  assert(CheckSchema(database));
   const bool success = Init(database->sqlite_db(), "DELETE FROM recycle_bin;");
-  assert (success);
+  assert(success);
 }
 
 
@@ -345,12 +344,12 @@ SqlRecycleBinFlush::SqlRecycleBinFlush(const HistoryDatabase *database) {
 
 
 SqlRecycleBinRollback::SqlRecycleBinRollback(const HistoryDatabase *database) {
-  assert (CheckSchema(database));
+  assert(CheckSchema(database));
   const bool success = Init(database->sqlite_db(),
                             "INSERT OR IGNORE INTO recycle_bin (hash, flags) "
                             "SELECT hash, :flags "
                             "FROM tags WHERE " + rollback_condition + ";");
-  assert (success);
+  assert(success);
 }
 
 bool SqlRecycleBinRollback::BindFlags() {

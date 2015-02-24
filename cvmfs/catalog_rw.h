@@ -110,7 +110,7 @@ class WritableCatalog : public Catalog {
   inline void AddEntry(
     const DirectoryEntry &entry,
     const XattrList &xattrs,
-    const std::string &path) 
+    const std::string &path)
   {
     AddEntry(entry, xattrs, path, GetParentPath(path));
   }

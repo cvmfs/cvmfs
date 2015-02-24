@@ -5,17 +5,16 @@
 #include "cvmfs_config.h"
 #include "wpad.h"
 
-#include <cstdlib>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 
-#include <vector>
 #include <string>
-
-#include "pacparser.h"
+#include <vector>
 
 #include "download.h"
 #include "logging.h"
+#include "pacparser.h"
 #include "util.h"
 
 using namespace std;  // NOLINT

@@ -81,7 +81,7 @@ void WritableCatalog::Commit() {
 
 
 void WritableCatalog::InitPreparedStatements() {
-  Catalog::InitPreparedStatements(); // polymorphism: up call
+  Catalog::InitPreparedStatements();  // polymorphism: up call
 
   bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
@@ -457,7 +457,7 @@ void WritableCatalog::MoveFileChunksToNested(
   FileChunkList chunks;
   // Moving opaque chunks, we don't care about the hash algorithm
   ListPathChunks(PathString(full_path), shash::kAny, &chunks);
-  assert (chunks.size() > 0);
+  assert(chunks.size() > 0);
 
   for (unsigned i = 0; i < chunks.size(); ++i) {
     new_nested_catalog->AddFileChunk(full_path, *chunks.AtPtr(i));
@@ -678,7 +678,7 @@ void WritableCatalog::CopyToParent() {
 void WritableCatalog::UpdateCounters() {
   const bool retval = delta_counters_.WriteToDatabase(database()) &&
                       ReadCatalogCounters();
-  assert (retval);
+  assert(retval);
 }
 
 
@@ -704,10 +704,10 @@ void WritableCatalog::VacuumDatabaseIfNecessary() {
     LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
              "Note: Catalog at %s gets defragmented (%.2f%% %s)... ",
              (IsRoot()) ? "/" : path().c_str(), ratio * 100.0, reason.c_str());
-    if (! db.Vacuum()) {
+    if (!db.Vacuum()) {
       LogCvmfs(kLogCatalog, kLogStderr, "failed (SQLite: %s)",
                db.GetLastErrorMsg().c_str());
-      assert (false);
+      assert(false);
     }
     LogCvmfs(kLogCatalog, kLogStdout, "done");
   }

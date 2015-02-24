@@ -44,6 +44,7 @@
 // If defined the cache is secured by a posix mutex
 #define LRU_CACHE_THREAD_SAFE
 
+#include <fuse/fuse_lowlevel.h>
 #include <inttypes.h>
 #include <stdint.h>
 
@@ -53,8 +54,6 @@
 #include <functional>
 #include <map>
 #include <string>
-
-#include <fuse/fuse_lowlevel.h>
 
 #include "atomic.h"
 #include "directory_entry.h"
@@ -145,7 +144,7 @@ class LruCache : SingleCopy {
     Value value;
   } CacheEntry;
 
-  //static uint64_t GetEntrySize() { return sizeof(Key) + sizeof(Value); }
+  // static uint64_t GetEntrySize() { return sizeof(Key) + sizeof(Value); }
 
   /**
    * A special purpose memory allocator for the cache entries.
@@ -162,7 +161,7 @@ class LruCache : SingleCopy {
      * Creates a MemoryAllocator to handle a memory pool for objects of type T
      * @param num_slots the number of slots to be allocated for the given datatype T
      */
-    MemoryAllocator(const unsigned int num_slots) {
+    explicit MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
       unsigned int num_bytes_bitmap = num_slots / 8;
       bits_per_block_ = 8 * sizeof(bitmap_[0]);
@@ -235,7 +234,7 @@ class LruCache : SingleCopy {
         unsigned bitmap_block = next_free_slot_ / bits_per_block_;
         while (~bitmap_[bitmap_block] == 0)
           bitmap_block = (bitmap_block + 1) % (num_slots_ / bits_per_block_);
-        // TODO: faster search inside the int
+        // TODO(jblomer): faster search inside the int
         next_free_slot_ = bitmap_block * bits_per_block_;
         while (this->GetBit(next_free_slot_))
           next_free_slot_++;
@@ -388,7 +387,7 @@ class LruCache : SingleCopy {
      * but not deleted.
      */
     virtual void RemoveFromList() = 0;
-  
+
    private:
     // No assignment operator (enforced by linker error)
     ListEntry<T>& operator=(const ListEntry<T> &other);
@@ -399,9 +398,9 @@ class LruCache : SingleCopy {
    */
   template<class T> class ListEntryContent : public ListEntry<T> {
    public:
-    ListEntryContent(T content) {
+    explicit ListEntryContent(T content) {
       content_ = content;
-    };
+    }
 
     inline bool IsListHead() const { return false; }
     inline T content() const { return content_; }
@@ -410,7 +409,7 @@ class LruCache : SingleCopy {
      * See ListEntry base class.
      */
     inline void RemoveFromList() {
-      assert (!this->IsLonely());
+      assert(!this->IsLonely());
 
       // Remove this from list
       this->prev->next = this->next;
@@ -420,6 +419,7 @@ class LruCache : SingleCopy {
       this->next = this;
       this->prev = this;
     }
+
    private:
     T content_;  /**< The data content of this ListEntry */
   };
@@ -431,7 +431,7 @@ class LruCache : SingleCopy {
    */
   template<class T> class ListEntryHead : public ListEntry<T> {
    public:
-    ListEntryHead(ConcreteMemoryAllocator &allocator) :
+    explicit ListEntryHead(ConcreteMemoryAllocator &allocator) :
       allocator_(allocator) {}
 
     virtual ~ListEntryHead() {
@@ -478,7 +478,7 @@ class LruCache : SingleCopy {
      * @return the data object which resided in the first list entry
      */
     inline T PopFront() {
-      assert (!this->IsEmpty());
+      assert(!this->IsEmpty());
       return Pop(this->next);
     }
 
@@ -537,7 +537,7 @@ class LruCache : SingleCopy {
     assert(cache_size > 0);
 
     statistics_.size = cache_size_;
-    //cache_ = Cache(cache_size_);
+    // cache_ = Cache(cache_size_);
     cache_.Init(cache_size_, empty_key, hasher);
     atomic_xadd64(&statistics_.allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
@@ -783,20 +783,20 @@ class LruCache : SingleCopy {
 // Hash functions
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *((uint32_t *)key.digest + 1);
+  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
   return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
 }
-//uint32_t hasher_md5(const shash::Md5 &key);
-//uint32_t hasher_inode(const fuse_ino_t &inode);
+// uint32_t hasher_md5(const shash::Md5 &key);
+// uint32_t hasher_inode(const fuse_ino_t &inode);
 
 
 class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 {
  public:
-  InodeCache(unsigned int cache_size) :
+  explicit InodeCache(unsigned int cache_size) :
     LruCache<fuse_ino_t, catalog::DirectoryEntry>(
       cache_size, fuse_ino_t(-1), hasher_inode)
   {
@@ -827,7 +827,7 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 
 class PathCache : public LruCache<fuse_ino_t, PathString> {
  public:
-  PathCache(unsigned int cache_size) :
+  explicit PathCache(unsigned int cache_size) :
     LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode)
   {
   }
@@ -859,7 +859,7 @@ class Md5PathCache :
   public LruCache<shash::Md5, catalog::DirectoryEntry>
 {
  public:
-  Md5PathCache(unsigned int cache_size) :
+  explicit Md5PathCache(unsigned int cache_size) :
     LruCache<shash::Md5, catalog::DirectoryEntry>(
       cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5)
   {

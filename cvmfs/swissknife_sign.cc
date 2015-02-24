@@ -7,29 +7,27 @@
 #include "cvmfs_config.h"
 #include "swissknife_sign.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <termios.h>
 #include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include <cstdio>
 #include <cstdlib>
-
-#include <iostream>
-#include <sstream>
-#include <string>
+#include <iostream>  // TODO(jblomer): remove
 #include <set>
+#include <string>
 #include <vector>
 
-#include "smalloc.h"
-#include "signature.h"
-#include "hash.h"
-#include "util.h"
 #include "compression.h"
+#include "hash.h"
 #include "logging.h"
-#include "upload.h"
 #include "manifest.h"
+#include "signature.h"
+#include "smalloc.h"
+#include "upload.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -87,7 +85,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       tcgetattr(fileno(stdin), &defrsett);
       newrsett = defrsett;
       newrsett.c_lflag &= ~ECHO;
-      if(tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
+      if (tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
         LogCvmfs(kLogCvmfs, kLogStderr, "terminal failure");
         free(cert_buf);
         return 2;
@@ -126,7 +124,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {
     // Load Manifest
-    // TODO: consider using the unique pointer to come in Github Pull Request 46
+    // TODO(rmeusel): UniquePtr
     manifest::Manifest *manifest = manifest::Manifest::LoadFile(manifest_path);
     if (!manifest) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Failed to parse manifest");

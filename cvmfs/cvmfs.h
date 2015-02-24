@@ -5,17 +5,16 @@
 #ifndef CVMFS_CVMFS_H_
 #define CVMFS_CVMFS_H_
 
+#include <stdint.h>
 #include <time.h>
 #include <unistd.h>
-#include <stdint.h>
 
 #include <string>
 #include <vector>
 
 #include "catalog_mgr.h"
-#include "lru.h"
 #include "loader.h"
-
+#include "lru.h"
 #include "util.h"
 
 namespace download {

@@ -11,20 +11,20 @@
  * If DEBUGMSG is undefined, pure debug messages are compiled into no-ops.
  */
 
-#include "logging_internal.h"
+#include "logging_internal.h"  // NOLINT(build/include)
 
-#include <pthread.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <pthread.h>
 #include <syslog.h>
 #include <time.h>
+#include <unistd.h>
 
-#include <cstdlib>
-#include <cstdio>
 #include <cassert>
-#include <ctime>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <ctime>
 
 #include "platform.h"
 #include "smalloc.h"
@@ -460,5 +460,5 @@ void PrintWarning(const string &message) {
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif

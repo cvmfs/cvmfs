@@ -11,11 +11,14 @@
 #ifndef CVMFS_CATALOG_MGR_RO_H_
 #define CVMFS_CATALOG_MGR_RO_H_
 
+#include <string>
+
 #include "catalog_mgr.h"
 
 namespace download {
 class DownloadManager;
 }
+
 namespace manifest {
 class Manifest;
 }
@@ -24,14 +27,15 @@ namespace catalog {
 
 class SimpleCatalogManager : public AbstractCatalogManager {
  public:
-  SimpleCatalogManager(const shash::Any           &base_hash,
-                       const std::string          &stratum0,
-                       const std::string          &dir_temp,
-                       download::DownloadManager  *download_manager) :
-    base_hash_(base_hash),
-    stratum0_(stratum0),
-    dir_temp_(dir_temp),
-    download_manager_(download_manager) {};
+  SimpleCatalogManager(
+    const shash::Any           &base_hash,
+    const std::string          &stratum0,
+    const std::string          &dir_temp,
+    download::DownloadManager  *download_manager)
+    : base_hash_(base_hash)
+    , stratum0_(stratum0)
+    , dir_temp_(dir_temp)
+    , download_manager_(download_manager) { }
 
  protected:
   virtual LoadError LoadCatalog(const PathString  &mountpoint,

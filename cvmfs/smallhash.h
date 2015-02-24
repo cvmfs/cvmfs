@@ -9,21 +9,20 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
+#include <gtest/gtest_prod.h>
 #include <inttypes.h>
-#include <stdint.h>
 #include <pthread.h>
+#include <stdint.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <new>
-#include <algorithm>
 
-#include <gtest/gtest_prod.h>
-
-#include "smalloc.h"
-#include "prng.h"
 #include "atomic.h"
 #include "murmur.h"
+#include "prng.h"
+#include "smalloc.h"
 
 /**
  * Hash table with linear probing as collision resolution.  Works only for
@@ -32,7 +31,7 @@
  */
 template<class Key, class Value, class Derived>
 class SmallHashBase {
- FRIEND_TEST(T_Smallhash, InsertAndCopyMd5Slow);
+  FRIEND_TEST(T_Smallhash, InsertAndCopyMd5Slow);
 
  public:
   static const double kLoadFactor;  // mainly useless for the dynamic version
@@ -140,8 +139,9 @@ class SmallHashBase {
 
  protected:
   uint32_t ScaleHash(const Key &key) const {
-    double bucket = (double(hasher_(key)) * double(capacity_) /
-                     double((uint32_t)(-1)));
+    double bucket =
+      (static_cast<double>(hasher_(key)) * static_cast<double>(capacity_) /
+      static_cast<double>((uint32_t)(-1)));
     return (uint32_t)bucket % capacity_;
   }
 
@@ -461,8 +461,9 @@ class MultiHash {
  private:
   inline uint8_t SelectHashmap(const Key &key) {
     uint32_t hash = MurmurHash2(&key, sizeof(key), 0x37);
-    double bucket = (double(hash) * double(num_hashmaps_) /
-                    double((uint32_t)(-1)));
+    double bucket =
+      static_cast<double>(hash) * static_cast<double>(num_hashmaps_) /
+      static_cast<double>((uint32_t)(-1));
     return (uint32_t)bucket % num_hashmaps_;
   }
 

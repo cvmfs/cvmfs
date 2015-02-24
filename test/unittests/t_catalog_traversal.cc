@@ -345,7 +345,7 @@ class T_CatalogTraversal : public ::testing::Test {
     shash::Any effective_clg_hash = catalog_hash;
     effective_clg_hash.set_suffix(shash::kSuffixCatalog);
     if (effective_clg_hash.IsNull()) {
-      effective_clg_hash.Randomize(dice_);
+      effective_clg_hash.Randomize(&dice_);
     }
 
     // get catalog tree for current revision

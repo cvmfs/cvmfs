@@ -249,6 +249,7 @@ class HeaderLists {
 class DownloadManager {
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
+
  public:
   struct ProxyInfo {
     ProxyInfo() { }
@@ -328,6 +329,7 @@ class DownloadManager {
   void EnableInfoHeader();
   void EnablePipelining();
   void EnableRedirects();
+
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);

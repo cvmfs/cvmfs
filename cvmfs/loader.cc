@@ -16,32 +16,30 @@
 #include "cvmfs_config.h"
 #include "loader.h"
 
-#include <sys/resource.h>
 #include <dlfcn.h>
-#include <unistd.h>
 #include <errno.h>
-#include <sched.h>
-#include <time.h>
-#include <signal.h>
-#include <stddef.h>
-
-#include <openssl/crypto.h>
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_opt.h>
+#include <openssl/crypto.h>
+#include <sched.h>
+#include <signal.h>
+#include <stddef.h>
+#include <sys/resource.h>
+#include <time.h>
+#include <unistd.h>
 
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <cassert>
-
-#include <vector>
 #include <string>
+#include <vector>
 
-#include "logging.h"
-#include "options.h"
-#include "util.h"
 #include "atomic.h"
 #include "loader_talk.h"
+#include "logging.h"
+#include "options.h"
 #include "sanitizer.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -136,7 +134,8 @@ static void Usage(const string &exename) {
     "Version %s\n"
     "Copyright (c) 2009- CERN, all rights reserved\n\n"
     "Please visit http://cernvm.cern.ch for details.\n\n"
-    "Usage: %s [-h] [-V] [-s] [-f] [-d] [-k] [-o mount options] <repository name> <mount point>\n\n"
+    "Usage: %s [-h] [-V] [-s] [-f] [-d] [-k] [-o mount options] "
+      "<repository name> <mount point>\n\n"
     "CernVM-FS general options:\n"
     "  --help|-h            Print Help output (this)\n"
     "  --version|-V         Print CernVM-FS version\n"
@@ -157,8 +156,7 @@ static void Usage(const string &exename) {
     "  -o allow_other       allow access to other users\n"
     "  -o allow_root        allow access to root\n"
     "  -o nonempty          allow mounts over non-empty directory\n",
-    PACKAGE_VERSION, exename.c_str()
-  );
+    PACKAGE_VERSION, exename.c_str());
 }
 
 
@@ -308,7 +306,11 @@ static void stub_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 }
 
 
-static void stub_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
+static void stub_forget(
+  fuse_req_t req,
+  fuse_ino_t ino,
+  unsigned long nlookup  // NOLINT
+) {
   FileSystemFence();
   atomic_inc64(&num_operations_);
   cvmfs_exports_->cvmfs_operations.forget(req, ino, nlookup);
@@ -441,7 +443,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
   library_name = platform_libname(library_name);
   string error_messages;
 
-  static vector<string> library_paths;  // TODO: C++11 initializer
+  static vector<string> library_paths;  // TODO(rmeusel): C++11 initializer
   if (library_paths.empty()) {
     library_paths.push_back(library_name);
     library_paths.push_back("/usr/lib/"   + library_name);
@@ -450,7 +452,7 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
 
   vector<string>::const_iterator i    = library_paths.begin();
   vector<string>::const_iterator iend = library_paths.end();
-  for (; i != iend; ++i) {  // TODO: C++11 range based for
+  for (; i != iend; ++i) {  // TODO(rmeusel): C++11 range based for
     library_handle_ = dlopen((*i).c_str(), RTLD_NOW | RTLD_LOCAL);
     if (library_handle_ != NULL) {
       break;
@@ -459,15 +461,15 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
     error_messages += string(dlerror()) + "\n";
   }
 
-  if (! library_handle_) {
+  if (!library_handle_) {
     LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
              "failed to load cvmfs library, tried: '%s'\n%s",
              JoinStrings(library_paths, "' '").c_str(), error_messages.c_str());
     return NULL;
   }
 
-  CvmfsExports **exports_ptr =
-    reinterpret_cast<CvmfsExports **>(dlsym(library_handle_, "g_cvmfs_exports"));
+  CvmfsExports **exports_ptr = reinterpret_cast<CvmfsExports **>(
+    dlsym(library_handle_, "g_cvmfs_exports"));
   if (!exports_ptr)
     return NULL;
 
@@ -567,7 +569,7 @@ static void CallbackLibcryptoLock(int mode, int type,
   assert(retval == 0);
 }
 
-static unsigned long CallbackLibcryptoThreadId() {
+static unsigned long CallbackLibcryptoThreadId() {  // NOLINT(runtime/int)
   return platform_gettid();
 }
 
@@ -757,12 +759,12 @@ int main(int argc, char *argv[]) {
         LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                  "Failed to set maximum number of open files, "
                  "insufficient permissions");
-        // TODO detect valgrind and don't fail
+        // TODO(jblomer) detect valgrind and don't fail
         return kFailPermission;
       }
     }
   }
-  
+
   // Protect the process from being killed by systemd
   if (options_manager->GetValue("CVMFS_SYSTEMD_NOKILL", &parameter) &&
       options_manager->IsOn(parameter))
@@ -785,7 +787,7 @@ int main(int argc, char *argv[]) {
   if ((uid_ != 0) || (gid_ != 0)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running with credentials %d:%d",
              uid_, gid_);
-    const bool retrievable = (suid_mode_ || ! disable_watchdog_);
+    const bool retrievable = (suid_mode_ || !disable_watchdog_);
     if (!SwitchCredentials(uid_, gid_, retrievable)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "Failed to drop credentials");
@@ -873,7 +875,7 @@ int main(int argc, char *argv[]) {
 
   // drop credentials
   if (suid_mode_) {
-    const bool retrievable = ! disable_watchdog_;
+    const bool retrievable = !disable_watchdog_;
     if (!SwitchCredentials(uid_, gid_, retrievable)) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "failed to drop permissions after mounting");

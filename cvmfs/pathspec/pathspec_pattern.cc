@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "pathspec_pattern.h"
 
 #include <cassert>
@@ -9,16 +10,16 @@
 #include "pathspec.h"
 
 PathspecElementPattern::PathspecElementPattern(
-                                  const std::string::const_iterator   begin,
-                                  const std::string::const_iterator  &end) :
-  valid_(true)
+  const std::string::const_iterator begin,
+  const std::string::const_iterator &end)
+  : valid_(true)
 {
   Parse(begin, end);
 }
 
 PathspecElementPattern::PathspecElementPattern(
-                                          const PathspecElementPattern& other) :
-  valid_(other.valid_)
+  const PathspecElementPattern& other)
+  : valid_(other.valid_)
 {
   subpatterns_.reserve(other.subpatterns_.size());
   SubPatterns::const_iterator i    = other.subpatterns_.begin();
@@ -94,7 +95,7 @@ PathspecElementPattern::SubPattern* PathspecElementPattern::ParsePlaintext(
         valid_ = false;
       }
     } else {
-      assert (!Pathspec::IsSpecialChar(*i));
+      assert(!Pathspec::IsSpecialChar(*i));
       pattern->AddChar(*i);
     }
 
@@ -105,9 +106,10 @@ PathspecElementPattern::SubPattern* PathspecElementPattern::ParsePlaintext(
 }
 
 PathspecElementPattern::SubPattern* PathspecElementPattern::ParseSpecialChar(
-                                            std::string::const_iterator  &i,
-                                      const std::string::const_iterator  &end) {
-  assert (Pathspec::IsSpecialChar(*i));
+  std::string::const_iterator  &i,
+  const std::string::const_iterator  &end
+) {
+  assert(Pathspec::IsSpecialChar(*i));
   const char chr = *i;
   ++i;
 
@@ -117,7 +119,7 @@ PathspecElementPattern::SubPattern* PathspecElementPattern::ParseSpecialChar(
     case Pathspec::kPlaceholder:
       return new PlaceholderSubPattern();
     default:
-      assert (false && "unrecognized special character");
+      assert(false && "unrecognized special character");
   }
 }
 
@@ -142,7 +144,9 @@ std::string PathspecElementPattern::GenerateGlobString() const {
   return result;
 }
 
-bool PathspecElementPattern::operator==(const PathspecElementPattern &other) const {
+bool PathspecElementPattern::operator== (
+  const PathspecElementPattern &other) const
+{
   if (subpatterns_.size() != other.subpatterns_.size() ||
       IsValid()           != other.IsValid()) {
     return false;
@@ -163,9 +167,7 @@ bool PathspecElementPattern::operator==(const PathspecElementPattern &other) con
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 void PathspecElementPattern::PlaintextSubPattern::AddChar(const char chr) {
@@ -173,8 +175,9 @@ void PathspecElementPattern::PlaintextSubPattern::AddChar(const char chr) {
 }
 
 std::string
-    PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpression(
-                                                  const bool is_relaxed) const {
+  PathspecElementPattern::PlaintextSubPattern::GenerateRegularExpression(
+  const bool is_relaxed) const
+{
   // Note: strict and relaxed regex are the same!
         std::string::const_iterator i    = chars_.begin();
   const std::string::const_iterator iend = chars_.end();
@@ -189,8 +192,10 @@ std::string
 }
 
 
-std::string PathspecElementPattern::PlaintextSubPattern::GenerateGlobString() const {
-        std::string::const_iterator i    = chars_.begin();
+std::string
+  PathspecElementPattern::PlaintextSubPattern::GenerateGlobString() const
+{
+  std::string::const_iterator i = chars_.begin();
   const std::string::const_iterator iend = chars_.end();
   std::string glob_string;
   for (; i != iend; ++i) {
@@ -202,7 +207,9 @@ std::string PathspecElementPattern::PlaintextSubPattern::GenerateGlobString() co
   return glob_string;
 }
 
-bool PathspecElementPattern::PlaintextSubPattern::IsSpecialRegexCharacter(const char chr) const {
+bool PathspecElementPattern::PlaintextSubPattern::IsSpecialRegexCharacter(
+  const char chr) const
+{
   return (chr == '.'  ||
           chr == '\\' ||
           chr == '*'  ||
@@ -218,46 +225,60 @@ bool PathspecElementPattern::PlaintextSubPattern::IsSpecialRegexCharacter(const 
           chr == '+');
 }
 
-bool PathspecElementPattern::PlaintextSubPattern::Compare(const SubPattern *other) const {
-  if (! other->IsPlaintext()) {
+bool PathspecElementPattern::PlaintextSubPattern::Compare(
+  const SubPattern *other) const
+{
+  if (!other->IsPlaintext()) {
     return false;
   }
 
   const PlaintextSubPattern *pt_other =
                                 dynamic_cast<const PlaintextSubPattern*>(other);
-  assert (pt_other != NULL);
+  assert(pt_other != NULL);
   return chars_ == pt_other->chars_;
 }
 
 
 std::string
-    PathspecElementPattern::WildcardSubPattern::GenerateRegularExpression(
-                                                  const bool is_relaxed) const {
+  PathspecElementPattern::WildcardSubPattern::GenerateRegularExpression(
+  const bool is_relaxed) const
+{
   return (is_relaxed)
          ? std::string(".*")
          : std::string("[^") + Pathspec::kSeparator + "]*";
 }
 
-std::string PathspecElementPattern::WildcardSubPattern::GenerateGlobString() const {
+
+std::string
+  PathspecElementPattern::WildcardSubPattern::GenerateGlobString() const
+{
   return "*";
 }
 
-bool PathspecElementPattern::WildcardSubPattern::Compare(const SubPattern *other) const {
+
+bool PathspecElementPattern::WildcardSubPattern::Compare(
+  const SubPattern *other) const
+{
   return other->IsWildcard();
 }
 
 
 std::string
-    PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression(
-                                                  const bool is_relaxed) const {
+  PathspecElementPattern::PlaceholderSubPattern::GenerateRegularExpression(
+  const bool is_relaxed) const
+{
   // Note: strict and relaxed regex are the same!
   return std::string("[^") + Pathspec::kSeparator + "]";
 }
 
-std::string PathspecElementPattern::PlaceholderSubPattern::GenerateGlobString() const {
+std::string
+  PathspecElementPattern::PlaceholderSubPattern::GenerateGlobString() const
+{
   return "?";
 }
 
-bool PathspecElementPattern::PlaceholderSubPattern::Compare(const SubPattern *other) const {
+bool PathspecElementPattern::PlaceholderSubPattern::Compare(
+  const SubPattern *other) const
+{
   return other->IsPlaceholder();
 }

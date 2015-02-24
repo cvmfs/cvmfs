@@ -29,39 +29,38 @@
 #include "cvmfs_config.h"
 #include "cache.h"
 
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
-#include <errno.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <dirent.h>
-#include <inttypes.h>
 
 #include <cassert>
-#include <cstring>
-#include <cstdlib>
 #include <cstdio>
-
+#include <cstdlib>
+#include <cstring>
 #include <map>
 #include <vector>
 
-#include "platform.h"
+#include "atomic.h"
+#include "compression.h"
+#include "cvmfs.h"
 #include "directory_entry.h"
-#include "quota.h"
-#include "util.h"
+#include "download.h"
 #include "hash.h"
 #include "logging.h"
-#include "download.h"
-#include "compression.h"
-#include "smalloc.h"
-#include "signature.h"
-#include "atomic.h"
-#include "shortstring.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#include "cvmfs.h"
+#include "platform.h"
+#include "quota.h"
+#include "shortstring.h"
+#include "signature.h"
+#include "smalloc.h"
+#include "util.h"
 
 #ifndef NFS_SUPER_MAGIC
 #define NFS_SUPER_MAGIC 0x6969
@@ -121,9 +120,11 @@ typedef map< shash::Any, vector<int> * > ThreadQueues;
 string *cache_path_ = NULL;
 bool alien_cache_ = false;
 bool alien_cache_on_nfs_ = false;
-ThreadQueues *queues_download_ = NULL;  /**< maps currently
-  downloaded chunks to an array of writer's ends of a pipe to signal the waiting
-  threads when the download has finished */
+/**
+ * Maps currently downloaded chunks to an array of writer's ends of a pipe to
+ * signal the waiting threads when the download has finished.
+ */
+ThreadQueues *queues_download_ = NULL;
 pthread_mutex_t lock_queues_download_ = PTHREAD_MUTEX_INITIALIZER;
 pthread_key_t thread_local_storage_;
 vector<ThreadLocalStorage *> *tls_blocks_;
@@ -177,7 +178,7 @@ bool Init(const string &cache_path, const bool alien_cache) {
              "Cache directory structure created.");
     struct statfs cache_buf;
     if ((statfs(cache_path.c_str(), &cache_buf) == 0) &&
-	    (cache_buf.f_type == NFS_SUPER_MAGIC))
+        (cache_buf.f_type == NFS_SUPER_MAGIC))
     {
       alien_cache_on_nfs_ = true;
       LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
@@ -265,7 +266,7 @@ int Open(const shash::Any &id) {
 
   if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
-    //platform_disable_kcache(result);
+    // platform_disable_kcache(result);
   } else {
     result = -errno;
     LogCvmfs(kLogCache, kLogDebug, "miss %s (%d)", path.c_str(), result);
@@ -379,9 +380,7 @@ static int AbortTransaction(const string &temp_path) {
  * \return Zero on success, non-zero else.
  */
 
-static int Rename(const char *oldpath,
-	          const char *newpath)
-{
+static int Rename(const char *oldpath, const char *newpath) {
   if (!alien_cache_on_nfs_) {
     return rename(oldpath, newpath);
   }
@@ -499,7 +498,7 @@ static int Fetch(const shash::Any &checksum,
 
   // Try to open from local cache
   if ((fd_return = cache::Open(checksum)) >= 0) {
-    LogCvmfs(kLogCache, kLogDebug, "hit: %s",cvmfs_path.c_str());
+    LogCvmfs(kLogCache, kLogDebug, "hit: %s", cvmfs_path.c_str());
 
     if (cache_mode_ == kCacheReadWrite)
       quota::Touch(checksum);
@@ -593,7 +592,8 @@ static int Fetch(const shash::Any &checksum,
     goto fetch_finalize;
   }
 
-  LogCvmfs(kLogCache, kLogDebug, "miss: %s %s",cvmfs_path.c_str(),url.c_str());
+  LogCvmfs(kLogCache, kLogDebug, "miss: %s %s",
+           cvmfs_path.c_str(), url.c_str());
 
   tls->download_job.url = &url;
   tls->download_job.destination_file = f;
@@ -610,8 +610,8 @@ static int Fetch(const shash::Any &checksum,
     // allow size to be zero if alien cache, because hadoop-fuse-dfs
     //   returns size zero for a while
     if ((platform_fstat(fileno(f), &stat_info) != 0) ||
-          ((stat_info.st_size != (int64_t)size) &&
-	  	(!alien_cache_ || (stat_info.st_size != 0))))
+         ((stat_info.st_size != (int64_t)size) &&
+         (!alien_cache_ || (stat_info.st_size != 0))))
     {
       LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                "size check failure for %s, expected %lu, got %ld",
@@ -654,8 +654,11 @@ static int Fetch(const shash::Any &checksum,
              checksum.ToString().c_str(), tls->download_job.error_code);
   }
   if (fd >= 0) {
-    if (f) fclose(f);
-    else close(fd);
+    if (f) {
+      fclose(f);
+    } else {
+      close(fd);
+    }
     AbortTransaction(temp_path);
   }
 
@@ -730,7 +733,6 @@ CatalogManager::CatalogManager(const string &repo_name,
 {
   LogCvmfs(kLogCache, kLogDebug, "constructing cache catalog manager");
   repo_name_ = repo_name;
-  //ignore_signature_ = ignore_signature;
   signature_manager_ = signature_manager;
   download_manager_ = download_manager;
   offline_mode_ = false;
@@ -758,10 +760,11 @@ bool CatalogManager::InitFixed(const shash::Any &root_hash) {
 }
 
 
-catalog::Catalog *CatalogManager::CreateCatalog(const PathString  &mountpoint,
-                                                const shash::Any  &catalog_hash,
-                                                catalog::Catalog  *parent_catalog)
-{
+catalog::Catalog *CatalogManager::CreateCatalog(
+  const PathString  &mountpoint,
+  const shash::Any  &catalog_hash,
+  catalog::Catalog  *parent_catalog
+) {
   mounted_catalogs_[mountpoint] = loaded_catalogs_[mountpoint];
   loaded_catalogs_.erase(mountpoint);
   return new catalog::Catalog(mountpoint, catalog_hash, parent_catalog);
@@ -797,7 +800,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
     if (FileExists(cache_path)) {
       // on alien cache, if the file exists, just use it
       LogCvmfs(kLogCache, kLogDebug, "found catalog %s in alien cache",
-	       hash.ToString().c_str());
+               hash.ToString().c_str());
       return catalog::kLoadNew;
     }
   } else {
@@ -805,19 +808,19 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
     retval = Rename(cache_path.c_str(), catalog_path->c_str());
     if (retval == 0) {
       LogCvmfs(kLogCache, kLogDebug, "found catalog %s in cache",
-	       hash.ToString().c_str());
+               hash.ToString().c_str());
 
       if (cache_mode_ == kCacheReadWrite) {
-	size = GetFileSize(catalog_path->c_str());
-	pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
-	if (!pin_retval) {
-	  quota::Remove(hash);
-	  unlink(catalog_path->c_str());
-	  LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-		   "failed to pin cached copy of catalog %s (no space)",
-		   hash.ToString().c_str());
-	  return catalog::kLoadNoSpace;
-	}
+        size = GetFileSize(catalog_path->c_str());
+        pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
+        if (!pin_retval) {
+          quota::Remove(hash);
+          unlink(catalog_path->c_str());
+          LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+                   "failed to pin cached copy of catalog %s (no space)",
+                   hash.ToString().c_str());
+          return catalog::kLoadNoSpace;
+        }
       }
       // Pinned, can be safely renamed
       retval = Rename(catalog_path->c_str(), cache_path.c_str());
@@ -967,7 +970,6 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
     LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
              manifest_failure, manifest::Code2Ascii(manifest_failure));
     if (!cache_hash.IsNull()) {
-      // TODO remove code duplication
       if (catalog_path) {
         if (cache_mode_ == kCacheReadWrite) {
           *catalog_path = *cache_path_ + cache_hash.MakePathExplicit(1, 2);

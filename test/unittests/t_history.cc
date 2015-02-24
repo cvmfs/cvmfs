@@ -188,7 +188,7 @@ class T_History : public ::testing::Test {
     result.reserve(count);
     for (unsigned int i = 0; i < count; ++i) {
       shash::Any root_hash(shash::kSha1);
-      root_hash.Randomize(prng_);
+      root_hash.Randomize(&prng_);
 
       History::Tag dummy;
       dummy.name        = "dummy" + StringifyInt(i);
@@ -824,7 +824,7 @@ TYPED_TEST(T_History, GetHashesWithDuplicates) {
   const unsigned int duplicate_frequency = 40;
   const TagVector dummy_tags = TestFixture::GetDummyTags(dummy_count);
   shash::Any dupl_hash(shash::kSha1);
-  dupl_hash.Randomize(this->prng_);
+  dupl_hash.Randomize(&this->prng_);
   ASSERT_TRUE (history->BeginTransaction());
         TagVectorRevItr i    = dummy_tags.rbegin();
   const TagVectorRevItr iend = dummy_tags.rend();

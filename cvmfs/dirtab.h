@@ -6,6 +6,7 @@
 #define CVMFS_DIRTAB_H_
 
 #include <string>
+#include <vector>
 
 #include "pathspec/pathspec.h"
 
@@ -72,7 +73,7 @@ class Dirtab {
   /**
    * Create a Dirtab from a given .cvmfsdirtab file path.
    */
-  Dirtab(const std::string &dirtab_path);
+  explicit Dirtab(const std::string &dirtab_path);
 
   /**
    * Parses the content of a .cvmfsdirtab file. This is called by the filepath-
@@ -117,9 +118,11 @@ class Dirtab {
   void AddRule(const Rule &rule);
 
  private:
-  void SkipWhitespace(      std::string::const_iterator &itr,
-                      const std::string::const_iterator &end) const {
-    for (; itr != end && *itr == ' '; ++itr);
+  void SkipWhitespace(
+    std::string::const_iterator &itr,
+    const std::string::const_iterator &end) const
+  {
+    for (; itr != end && *itr == ' '; ++itr) { }
   }
   bool CheckRuleValidity() const;
 
@@ -129,7 +132,7 @@ class Dirtab {
   Rules negative_rules_;
 };
 
-} // namespace catalog
+}  // namespace catalog
 
 #endif  // CVMFS_DIRTAB_H_
 

@@ -32,14 +32,13 @@
 
 #include <inttypes.h>
 
-#include <string>
 #include <set>
+#include <string>
 
 namespace publish {
 
 class SyncItem;
 class SyncMediator;
-
 
 /**
  * Interface definition of repository synchronization based on
@@ -161,7 +160,7 @@ class SyncUnion {
    * Called to actually process the file entry.
    * @param entry the SyncItem corresponding to the union file to be processed
    */
-  virtual void ProcessFile(SyncItem &entry);
+  virtual void ProcessFile(SyncItem *entry);
 
  private:
 };  // class SyncUnion
@@ -219,7 +218,7 @@ class SyncUnionOverlayfs : public SyncUnion {
                            const std::string &filename);
   std::string UnwindWhiteoutFilename(const std::string &filename) const;
   std::set<std::string> GetIgnoreFilenames() const;
-  virtual void ProcessFile(SyncItem &entry);
+  virtual void ProcessFile(SyncItem *entry);
 
  private:
   bool IsWhiteoutSymlinkPath(const std::string &path) const;

@@ -18,18 +18,18 @@
 
 #include "nfs_shared_maps.h"
 
-#include <stdint.h>
 #include <inttypes.h>
 #include <pthread.h>
+#include <stdint.h>
 
 #include <cassert>
 #include <cstdlib>
 
+#include "atomic.h"
 #include "duplex_sqlite3.h"
 #include "logging.h"
 #include "prng.h"
 #include "util.h"
-#include "atomic.h"
 
 using namespace std;  // NOLINT
 
@@ -281,7 +281,7 @@ bool Init(const string &db_dir, const uint64_t root_inode,
   }
   // Be prepared to wait for up to 1 minute for transactions to complete
   // Being stuck for a long time is far more favorable than failing
-  // TODO: another busy handler.  This one conflicts with SIGALRM
+  // TODO(jblomer): another busy handler.  This one conflicts with SIGALRM
   busy_handler_info_ = new BusyHandlerInfo();
   retval = sqlite3_busy_handler(db_, BusyHandler, busy_handler_info_);
   assert(retval == SQLITE_OK);

@@ -6,9 +6,10 @@
 #define CVMFS_NFS_SHARED_MAPS_H_
 
 #include <string>
+
 #include "hash.h"
-#include "shortstring.h"
 #include "nfs_maps.h"
+#include "shortstring.h"
 
 namespace nfs_shared_maps {
 

@@ -5,22 +5,22 @@
 #ifndef CVMFS_UTIL_H_
 #define CVMFS_UTIL_H_
 
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <time.h>
 #include <fcntl.h>
+#include <gtest/gtest_prod.h>
 #include <pthread.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
-
-#include <gtest/gtest_prod.h>
 
 #include "hash.h"
 #include "murmur.h"
@@ -90,20 +90,20 @@ struct Pipe : public SingleCopy {
     read_end(fd_read), write_end(fd_write) {}
 
   void Close() {
-    close (read_end);
-    close (write_end);
+    close(read_end);
+    close(write_end);
   }
 
   template<typename T>
   bool Write(const T &data) {
-    assert (!IsPointer<T>::value); // TODO: C++11 (replace by static_assert)
+    assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
     const int num_bytes = write(write_end, &data, sizeof(T));
     return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
   }
 
   template<typename T>
   bool Read(T *data) {
-    assert (!IsPointer<T>::value); // TODO: C++11 (replace by static_assert)
+    assert(!IsPointer<T>::value);  // TODO(rmeusel): C++11 static_assert
     int num_bytes = read(read_end, data, sizeof(T));
     return (num_bytes >= 0) && (static_cast<size_t>(num_bytes) == sizeof(T));
   }
@@ -193,19 +193,19 @@ void BlockSignal(int signum);
 void WaitForSignal(int signum);
 void Daemonize();
 bool Shell(int *pipe_stdin, int *pipe_stdout, int *pipe_stderr);
-bool ExecuteBinary(      int                       *fd_stdin,
-                         int                       *fd_stdout,
-                         int                       *fd_stderr,
-                   const std::string               &binary_path,
+bool ExecuteBinary(int *fd_stdin,
+                   int *fd_stdout,
+                   int *fd_stderr,
+                   const std::string &binary_path,
                    const std::vector<std::string>  &argv,
-                   const bool                       double_fork = true,
-                         pid_t                     *child_pid = NULL);
-bool ManagedExec(const std::vector<std::string>  &command_line,
-                 const std::set<int>             &preserve_fildes,
-                 const std::map<int, int>        &map_fildes,
-                 const bool                       drop_credentials,
-                 const bool                       double_fork = true,
-                       pid_t                     *child_pid = NULL);
+                   const bool double_fork = true,
+                   pid_t *child_pid = NULL);
+bool ManagedExec(const std::vector<std::string> &command_line,
+                 const std::set<int> &preserve_fildes,
+                 const std::map<int, int> &map_fildes,
+                 const bool drop_credentials,
+                 const bool double_fork = true,
+                 pid_t *child_pid = NULL);
 
 void SafeSleepMs(const unsigned ms);
 
@@ -270,7 +270,7 @@ template <class T>
 class UniquePtr : SingleCopy {
  public:
   inline UniquePtr() : ref_(NULL) {}
-  inline UniquePtr(T *ref) : ref_(ref) {}
+  inline explicit UniquePtr(T *ref) : ref_(ref) { }
   inline ~UniquePtr()                 { delete ref_; }
 
   inline operator bool() const        { return IsValid(); }
@@ -355,7 +355,7 @@ class StopWatch : SingleCopy {
  */
 class MemoryMappedFile : SingleCopy {
  public:
-  MemoryMappedFile(const std::string &file_path);
+  explicit MemoryMappedFile(const std::string &file_path);
   ~MemoryMappedFile();
 
   bool Map();
@@ -376,9 +376,7 @@ class MemoryMappedFile : SingleCopy {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 /**
@@ -418,7 +416,7 @@ class Callback : public CallbackBase<ParamT> {
  public:
   typedef void (*CallbackFunction)(const ParamT &value);
 
-  Callback(CallbackFunction function) : function_(function) {}
+  explicit Callback(CallbackFunction function) : function_(function) {}
   void operator()(const ParamT &value) const { function_(value); }
 
  private:
@@ -430,7 +428,7 @@ class Callback<void> : public CallbackBase<void> {
  public:
   typedef void (*CallbackFunction)();
 
-  Callback(CallbackFunction function) : function_(function) {}
+  explicit Callback(CallbackFunction function) : function_(function) {}
   void operator()() const { function_(); }
 
  private:
@@ -588,9 +586,11 @@ class Callbackable {
    */
   template <class DelegateT, typename ClosureDataT>
   static CallbackTN* MakeClosure(
-      typename BoundClosure<ParamT, DelegateT, ClosureDataT>::CallbackMethod method,
-      DelegateT           *delegate,
-      const ClosureDataT  &closure_data) {
+    typename BoundClosure<ParamT, DelegateT, ClosureDataT>::
+             CallbackMethod method,
+    DelegateT *delegate,
+    const ClosureDataT &closure_data)
+  {
     return new BoundClosure<ParamT, DelegateT, ClosureDataT>(method,
                                                              delegate,
                                                              closure_data);
@@ -791,20 +791,20 @@ class PolymorphicConstructionImpl {
   typedef std::vector<Factory*> RegisteredPlugins;
 
  public:
-  virtual ~PolymorphicConstructionImpl() {};
+  virtual ~PolymorphicConstructionImpl() { }
 
   static AbstractProductT* Construct(const ParameterT &param) {
     LazilyRegisterPlugins();
 
     // select and initialize the correct plugin at runtime
     // (polymorphic construction)
-    typename RegisteredPlugins::const_iterator i    = registered_plugins_.begin();
+    typename RegisteredPlugins::const_iterator i = registered_plugins_.begin();
     typename RegisteredPlugins::const_iterator iend = registered_plugins_.end();
     for (; i != iend; ++i) {
       if ((*i)->WillHandle(param)) {
         // create and initialize the class that claimed responsibility
         AbstractProductT *product = (*i)->Construct(param);
-        if (! product->Initialize()) {
+        if (!product->Initialize()) {
           delete product;
           continue;
         }
@@ -825,16 +825,16 @@ class PolymorphicConstructionImpl {
     //   currently under construction and therefore _not_ empty but also _not_
     //   fully initialized!
     // See StackOverflow: http://stackoverflow.com/questions/8097439/lazy-initialized-caching-how-do-i-make-it-thread-safe
-    if(atomic_read32(&needs_init_)) {
+    if (atomic_read32(&needs_init_)) {
       pthread_mutex_lock(&init_mutex_);
-      if(atomic_read32(&needs_init_)) {
+      if (atomic_read32(&needs_init_)) {
         AbstractProductT::RegisterPlugins();
         atomic_dec32(&needs_init_);
       }
       pthread_mutex_unlock(&init_mutex_);
     }
 
-    assert (!registered_plugins_.empty());
+    assert(!registered_plugins_.empty());
   }
 
   /**
@@ -859,11 +859,10 @@ class PolymorphicConstructionImpl {
       new AbstractFactoryImpl<ConcreteProductT,
                               AbstractProductT,
                               ParameterT,
-                              InfoT>()
-    );
+                              InfoT>());
   }
 
-  virtual bool Initialize() { return true; };
+  virtual bool Initialize() { return true; }
 
  private:
   /**
@@ -936,18 +935,21 @@ class PolymorphicConstruction<AbstractProductT, ParameterT, void> :
 
 template <class AbstractProductT, typename ParameterT, typename InfoT>
 atomic_int32
-PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::needs_init_ = 1;
+PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::
+  needs_init_ = 1;
 
 template <class AbstractProductT, typename ParameterT, typename InfoT>
 pthread_mutex_t
 PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::init_mutex_ =
                                                       PTHREAD_MUTEX_INITIALIZER;
 
-// init the static member registered_plugins_ inside the PolymorphicConstructionImpl
-// template... whoa, what ugly code :o)
+// init the static member registered_plugins_ inside the
+// PolymorphicConstructionImpl template... whoa, what ugly code :o)
 template <class AbstractProductT, typename ParameterT, typename InfoT>
-typename PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::RegisteredPlugins
-PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::registered_plugins_;
+typename PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::
+  RegisteredPlugins
+PolymorphicConstructionImpl<AbstractProductT, ParameterT, InfoT>::
+  registered_plugins_;
 
 
 /**
@@ -970,8 +972,11 @@ class Buffer {
 
   Buffer() : used_(0), size_(0), buffer_(NULL), initialized_(false) {}
 
-  Buffer(const size_t size) : used_(0), size_(0), buffer_(NULL),
-                              initialized_(false)
+  explicit Buffer(const size_t size)
+    : used_(0)
+    , size_(0)
+    , buffer_(NULL)
+    , initialized_(false)
   {
     Allocate(size);
   }
@@ -981,7 +986,7 @@ class Buffer {
   }
 
   void Allocate(const size_t size) {
-    assert (!IsInitialized());
+    assert(!IsInitialized());
     size_        = size;
     buffer_      = allocator_.allocate(size_bytes());
     initialized_ = true;
@@ -990,32 +995,32 @@ class Buffer {
   bool IsInitialized() const { return initialized_; }
 
   typename A::pointer ptr() {
-    assert (IsInitialized());
+    assert(IsInitialized());
     return buffer_;
   }
   const typename A::pointer ptr() const {
-    assert (IsInitialized());
+    assert(IsInitialized());
     return buffer_;
   }
 
   typename A::pointer free_space_ptr() {
-    assert (IsInitialized());
+    assert(IsInitialized());
     return buffer_ + used();
   }
 
   const typename A::pointer free_space_ptr() const {
-    assert (IsInitialized());
+    assert(IsInitialized());
     return buffer_ + used();
   }
 
   void SetUsed(const size_t items) {
-    assert (items <= size());
+    assert(items <= size());
     used_ = items;
   }
 
   void SetUsedBytes(const size_t bytes) {
-    assert (bytes <= size_bytes());
-    assert (bytes % sizeof(T) == 0);
+    assert(bytes <= size_bytes());
+    assert(bytes % sizeof(T) == 0);
     used_ = bytes / sizeof(T);
   }
 
@@ -1027,7 +1032,7 @@ class Buffer {
   size_t free_bytes()  const { return free() * sizeof(T); }
 
  private:
-  Buffer(const Buffer &other) { assert (false); } // no copy!
+  Buffer(const Buffer &other) { assert(false); }  // no copy!
   Buffer& operator=(const Buffer& other) { assert (false); }
 
   void Deallocate() {
@@ -1050,7 +1055,7 @@ class Buffer {
 };
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_UTIL_H_

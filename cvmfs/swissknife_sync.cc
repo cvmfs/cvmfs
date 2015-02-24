@@ -22,24 +22,23 @@
 #include "swissknife_sync.h"
 
 #include <fcntl.h>
-
-#include <cstdlib>
-#include <cstdio>
 #include <glob.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
-#include "platform.h"
-#include "sync_union.h"
-#include "sync_mediator.h"
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
 #include "dirtab.h"
-#include "util.h"
-#include "logging.h"
 #include "download.h"
+#include "logging.h"
 #include "manifest.h"
+#include "platform.h"
+#include "sync_mediator.h"
+#include "sync_union.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -115,7 +114,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
 
-  // TODO: consider using the unique pointer to come in Github Pull Request 46
+  // TODO(rmeusel): use UniquePtr
   manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(
       dir_temp, volatile_content, garbage_collectable, spooler);
@@ -205,7 +204,7 @@ int swissknife::CommandRemove::Main(const ArgumentList &args) {
   assert(spooler);
   const bool success = spooler->Remove(file_to_delete);
 
-  if (spooler->GetNumberOfErrors() > 0 || ! success) {
+  if (spooler->GetNumberOfErrors() > 0 || !success) {
     LogCvmfs(kLogCatalog, kLogStderr, "failed to delete %s",
              file_to_delete.c_str());
     return 1;
@@ -229,7 +228,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   verbose_                   = (args.find('x') != args.end());
 
   // check if there is a dirtab file
-  if (! FileExists(dirtab_file)) {
+  if (!FileExists(dirtab_file)) {
     LogCvmfs(kLogCatalog, kLogVerboseMsg, "Didn't find a dirtab at '%s'. "
                                           "Skipping...",
              dirtab_file.c_str());
@@ -238,7 +237,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
 
   // parse dirtab file
   catalog::Dirtab dirtab(dirtab_file);
-  if (! dirtab.IsValid()) {
+  if (!dirtab.IsValid()) {
     LogCvmfs(kLogCatalog, kLogStderr, "Invalid or not readable dirtab '%s'",
              dirtab_file.c_str());
     return 1;
@@ -254,9 +253,9 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
                                                 g_download_manager);
   catalog_manager.Init();
 
-  std::vector<std::string> new_nested_catalogs;
-  DetermineNestedCatalogCandidates(dirtab, catalog_manager,
-                                   new_nested_catalogs);
+  vector<string> new_nested_catalogs;
+  DetermineNestedCatalogCandidates(dirtab, &catalog_manager,
+                                   &new_nested_catalogs);
   const bool success = CreateCatalogMarkers(new_nested_catalogs);
 
   return (success) ? 0 : 1;
@@ -265,15 +264,16 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
 
 
 void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
-                    const catalog::Dirtab          &dirtab,
-                    catalog::SimpleCatalogManager  &catalog_manager,
-                    std::vector<std::string>       &nested_catalog_candidates) {
+  const catalog::Dirtab         &dirtab,
+  catalog::SimpleCatalogManager *catalog_manager,
+  vector<string>                *nested_catalog_candidates
+) {
   // find possible new nested catalog locations
   const catalog::Dirtab::Rules &lookup_rules = dirtab.positive_rules();
         catalog::Dirtab::Rules::const_iterator i    = lookup_rules.begin();
   const catalog::Dirtab::Rules::const_iterator iend = lookup_rules.end();
   for (; i != iend; ++i) {
-    assert (! i->is_negation);
+    assert(!i->is_negation);
 
     // run a glob using the current dirtab rule on the current repository state
     const std::string &glob_string = i->pathspec.GetGlobString();
@@ -291,8 +291,7 @@ void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
                                      glob_res.gl_pathv, glob_res.gl_pathc,
                                      catalog_manager,
                                      nested_catalog_candidates);
-    }
-    else if (glob_retval == GLOB_NOMATCH) {
+    } else if (glob_retval == GLOB_NOMATCH) {
       LogCvmfs(kLogCvmfs, kLogStderr, "WARNING: cannot apply pathspec %s",
                                       glob_string.c_str());
     } else {
@@ -306,10 +305,12 @@ void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
 
 
 void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
-                    const catalog::Dirtab &dirtab,
-                    char **paths, const size_t npaths,
-                    catalog::SimpleCatalogManager  &catalog_manager,
-                    std::vector<std::string>       &nested_catalog_candidates) {
+  const catalog::Dirtab &dirtab,
+  char **paths,
+  const size_t npaths,
+  catalog::SimpleCatalogManager  *catalog_manager,
+  std::vector<std::string>       *nested_catalog_candidates
+) {
   // go through the paths produced by glob() and filter them
   for (size_t i = 0; i < npaths; ++i) {
     // process candidate paths
@@ -319,8 +320,8 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     // check if path points to a directory
     platform_stat64 candidate_info;
     const int lstat_retval = platform_lstat(candidate.c_str(), &candidate_info);
-    assert (lstat_retval == 0);
-    if (! S_ISDIR(candidate_info.st_mode)) {
+    assert(lstat_retval == 0);
+    if (!S_ISDIR(candidate_info.st_mode)) {
       continue;
     }
 
@@ -341,21 +342,19 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     // points to a nested catalog transition point. Furthermore it could be
     // a new directory and thus not in any catalog yet.
     catalog::DirectoryEntry dirent;
-    const bool lookup_success = catalog_manager.LookupPath(
-                                                      candidate_rel,
-                                                      catalog::kLookupSole,
-                                                      &dirent);
-    if (! lookup_success) {
+    const bool lookup_success =
+      catalog_manager->LookupPath(candidate_rel, catalog::kLookupSole, &dirent);
+    if (!lookup_success) {
       LogCvmfs(kLogCatalog, kLogDebug, "Didn't find '%s' in catalogs, could "
                                        "be a new directory and nested catalog.",
                                        candidate_rel.c_str());
-      nested_catalog_candidates.push_back(candidate);
-    } else if (! dirent.IsNestedCatalogMountpoint() &&
-               ! dirent.IsNestedCatalogRoot()) {
+      nested_catalog_candidates->push_back(candidate);
+    } else if (!dirent.IsNestedCatalogMountpoint() &&
+               !dirent.IsNestedCatalogRoot()) {
       LogCvmfs(kLogCatalog, kLogDebug, "Found '%s' in catalogs but is not a "
                                        "nested catalog yet.",
                                        candidate_rel.c_str());
-      nested_catalog_candidates.push_back(candidate);
+      nested_catalog_candidates->push_back(candidate);
     } else {
       // check if the nested catalog marker is still there, we might need to
       // recreate the catalog after manual marker removal
@@ -364,16 +363,16 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
       //       Otherwise we would force the cvmfs client behind the union file-
       //       system to (potentially) unncessarily fetch catalogs
       if (DirectoryExists(scratch_dir_ + candidate_rel) &&
-          ! FileExists(union_dir_ + candidate_rel + "/.cvmfscatalog")) {
+          !FileExists(union_dir_ + candidate_rel + "/.cvmfscatalog")) {
         LogCvmfs(kLogCatalog, kLogStderr, "WARNING: '%s' should be a nested "
                                           "catalog according to the dirtab. "
                                           "Recreating...",
                                           candidate_rel.c_str());
-        nested_catalog_candidates.push_back(candidate);
+        nested_catalog_candidates->push_back(candidate);
       } else {
-        LogCvmfs(kLogCatalog, kLogDebug, "Found '%s' in catalogs and it already "
-                                         "is a nested catalog.",
-                                         candidate_rel.c_str());
+        LogCvmfs(kLogCatalog, kLogDebug,
+                 "Found '%s' in catalogs and it already is a nested catalog.",
+                 candidate_rel.c_str());
       }
     }
   }
@@ -381,14 +380,16 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
 
 
 bool swissknife::CommandApplyDirtab::CreateCatalogMarkers(
-                          const std::vector<std::string> &new_nested_catalogs) {
+  const std::vector<std::string> &new_nested_catalogs
+) {
   // go through the new nested catalog paths and create .cvmfscatalog markers
   // where necessary
   bool success = true;
-        std::vector<std::string>::const_iterator k    = new_nested_catalogs.begin();
-  const std::vector<std::string>::const_iterator kend = new_nested_catalogs.end();
+  std::vector<std::string>::const_iterator k = new_nested_catalogs.begin();
+  const std::vector<std::string>::const_iterator kend =
+    new_nested_catalogs.end();
   for (; k != kend; ++k) {
-    assert (! k->empty() && k->size() > union_dir_.size());
+    assert(!k->empty() && k->size() > union_dir_.size());
 
     // was the marker already created by hand?
     const std::string marker_path = *k + "/.cvmfscatalog";
@@ -426,15 +427,16 @@ struct chunk_arg {
 };
 
 bool swissknife::CommandSync::ReadFileChunkingArgs(
-                                          const swissknife::ArgumentList &args,
-                                          SyncParameters &params) {
+  const swissknife::ArgumentList &args,
+  SyncParameters *params
+) {
   typedef std::vector<chunk_arg> ChunkArgs;
 
   // define where to store the value of which file chunk argument
   ChunkArgs chunk_args;
-  chunk_args.push_back(chunk_arg('a', &params.avg_file_chunk_size));
-  chunk_args.push_back(chunk_arg('l', &params.min_file_chunk_size));
-  chunk_args.push_back(chunk_arg('h', &params.max_file_chunk_size));
+  chunk_args.push_back(chunk_arg('a', &params->avg_file_chunk_size));
+  chunk_args.push_back(chunk_arg('l', &params->min_file_chunk_size));
+  chunk_args.push_back(chunk_arg('h', &params->max_file_chunk_size));
 
   // read the arguments
   ChunkArgs::const_iterator i    = chunk_args.begin();
@@ -444,8 +446,10 @@ bool swissknife::CommandSync::ReadFileChunkingArgs(
 
     if (arg != args.end()) {
       size_t arg_value = static_cast<size_t>(String2Uint64(*arg->second));
-      if (arg_value > 0) *i->save_to = arg_value;
-      else return false;
+      if (arg_value > 0)
+        *i->save_to = arg_value;
+      else
+        return false;
     }
   }
 
@@ -489,7 +493,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('p') != args.end()) {
     params.use_file_chunking = true;
-    if (!ReadFileChunkingArgs(args, params)) {
+    if (!ReadFileChunkingArgs(args, &params)) {
       PrintError("Failed to read file chunk size values");
       return 2;
     }
@@ -504,7 +508,8 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   if (args.find('j') != args.end()) {
-    params.catalog_entry_warn_threshold = String2Uint64(*args.find('j')->second);
+    params.catalog_entry_warn_threshold =
+      String2Uint64(*args.find('j')->second);
   }
 
   if (args.find('v') != args.end()) {
@@ -564,7 +569,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   UniquePtr<manifest::Manifest> manifest(mediator.Commit());
 
-  if (! manifest.IsValid()) {
+  if (!manifest.IsValid()) {
     PrintError("something went wrong during sync");
     return 4;
   }

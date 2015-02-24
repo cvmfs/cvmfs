@@ -18,37 +18,37 @@
 #include "cvmfs_config.h"
 #include "quota.h"
 
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdint.h>
+#include <sys/dir.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/dir.h>
 #include <sys/wait.h>
-#include <stdint.h>
-#include <pthread.h>
 #include <unistd.h>
-#include <errno.h>
-#include <inttypes.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <dirent.h>
 
 #include <cassert>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
-#include <string>
-#include <vector>
 #include <map>
 #include <set>
+#include <string>
+#include <vector>
 
-#include "platform.h"
-#include "logging.h"
+#include "cvmfs.h"
 #include "duplex_sqlite3.h"
 #include "hash.h"
-#include "util.h"
-#include "smalloc.h"
-#include "cvmfs.h"
+#include "logging.h"
 #include "monitor.h"
+#include "platform.h"
+#include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -155,16 +155,23 @@ map<shash::Any, uint64_t> *pinned_chunks_ = NULL;
 int fd_lock_cachedb_;
 uint32_t protocol_revision_ = 0;
 
-uint64_t limit_;  /**< If the cache grows above this size,
-                      we clean up until cleanup_threshold. */
+/**
+ * If the cache grows above this size, we clean up until cleanup_threshold.
+ */
+uint64_t limit_;
 uint64_t pinned_;  /**< Size of pinned files (file catalogs). */
-uint64_t cleanup_threshold_;  /**< When cleaning up, stop when size is below
-  cleanup_threshold. This way, the current working set stays in cache. */
+/**
+ * When cleaning up, stop when size is below cleanup_threshold. This way, the
+ * current working set stays in cache.
+ */
+uint64_t cleanup_threshold_;
 uint64_t gauge_;  /**< Current size of cache. */
-uint64_t seq_;  /**< Current access sequence number.  Gets increased on every
-                     access/insert operation. */
+/**
+ * Current access sequence number.  Gets increased on every access/insert operation.
+ */
+uint64_t seq_;
 string *cache_dir_ = NULL;
-/// Maps Md5 over channel id to writeable file descriptor.
+// Maps Md5 over channel id to writeable file descriptor.
 map<shash::Md5, int> *back_channels_ = NULL;
 
 sqlite3 *db_ = NULL;
@@ -279,7 +286,7 @@ static bool DoCleanup(const uint64_t leave_size) {
   if ((limit_ == 0) || (gauge_ <= leave_size))
     return true;
 
-  // TODO transaction
+  // TODO(jbloemr) transaction
   LogCvmfs(kLogQuota, kLogSyslog,
            "cleanup cache until %lu KB are free", leave_size/1024);
   LogCvmfs(kLogQuota, kLogDebug, "gauge %"PRIu64, gauge_);
@@ -317,8 +324,8 @@ static bool DoCleanup(const uint64_t leave_size) {
       if (!result) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
                  "failed to find %s in cache database (%d). "
-                 "Cache database is out of sync.  Restart cvmfs with clean cache.",
-                 hash_str.c_str(), result);
+                 "Cache database is out of sync. "
+                 "Restart cvmfs with clean cache.", hash_str.c_str(), result);
         return false;
       }
     } else {
@@ -879,7 +886,7 @@ bool RebuildDatabase() {
       if (stat((path + "/" + string(d->d_name)).c_str(), &info) == 0) {
         if (!S_ISREG(info.st_mode))
           continue;
-        
+
         string hash = string(hex) + string(d->d_name);
         sqlite3_bind_text(stmt_insert, 1, hash.data(), hash.length(),
                           SQLITE_STATIC);
@@ -916,8 +923,8 @@ bool RebuildDatabase() {
     sqlite3_bind_text(stmt_insert, 1, &hash[0], hash.length(), SQLITE_STATIC);
     sqlite3_bind_int64(stmt_insert, 2, sqlite3_column_int64(stmt_select, 1));
     sqlite3_bind_int64(stmt_insert, 3, seq++);
-    sqlite3_bind_int64(stmt_insert, 4, kFileRegular); // might also be a catalog
-                                                      // (information is lost)
+    // Might also be a catalog (information is lost)
+    sqlite3_bind_int64(stmt_insert, 4, kFileRegular);
 
     if (sqlite3_step(stmt_insert) != SQLITE_DONE) {
       LogCvmfs(kLogQuota, kLogDebug, "could not insert into cache catalog");
@@ -1112,12 +1119,14 @@ init_recover:
                      "FROM cache_catalog WHERE pinned<>2);",
                      -1, &stmt_lru_, NULL);
   sqlite3_prepare_v2(db_,
-                     ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileRegular) +
+                     ("SELECT path FROM cache_catalog WHERE type=" +
+                      StringifyInt(kFileRegular) +
                       ";").c_str(), -1, &stmt_list_, NULL);
   sqlite3_prepare_v2(db_, "SELECT path FROM cache_catalog WHERE pinned<>0;",
                      -1, &stmt_list_pinned_, NULL);
   sqlite3_prepare_v2(db_,
-                     ("SELECT path FROM cache_catalog WHERE type=" + StringifyInt(kFileCatalog) +
+                     ("SELECT path FROM cache_catalog WHERE type=" +
+                      StringifyInt(kFileCatalog) +
                       ";").c_str(), -1, &stmt_list_catalogs_, NULL);
   return true;
 
@@ -1188,7 +1197,8 @@ bool InitShared(const std::string &exe_path, const std::string &cache_dir,
     Nonblock2Block(pipe_lru_[1]);
     UnlockFile(fd_lockfile);
     GetLimits(&limit_, &cleanup_threshold_);
-    LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
+    LogCvmfs(kLogQuota, kLogDebug,
+             "received limit %"PRIu64", threshold %"PRIu64,
              limit_, cleanup_threshold_);
     if (FileExists(*cache_dir_ + "/cachemgr.protocol")) {
       protocol_revision_ = GetProtocolRevision();
@@ -1395,7 +1405,7 @@ int MainCacheManager(int argc, char **argv) {
   const string tmp_dir = *cache_dir_ + "/txn";
   sqlite3_temp_directory =
     static_cast<char *>(sqlite3_malloc(tmp_dir.length() + 1));
-  strcpy(sqlite3_temp_directory, tmp_dir.c_str());
+  snprintf(sqlite3_temp_directory, tmp_dir.length() + 1, "%s", tmp_dir.c_str());
 
   // Cleanup leftover named pipes
   CleanupPipes(*cache_dir_);
@@ -1638,7 +1648,7 @@ void InsertVolatile(const shash::Any &any_hash, const uint64_t size,
   assert(initialized_);
   if (limit_ == 0) return;
   DoInsert(any_hash, size, cvmfs_path, kInsertVolatile);
- }
+}
 
 
 /**

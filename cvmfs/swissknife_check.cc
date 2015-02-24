@@ -9,26 +9,27 @@
 #include "cvmfs_config.h"
 #include "swissknife_check.h"
 
-#include <unistd.h>
 #include <inttypes.h>
+#include <unistd.h>
 
-#include <string>
-#include <queue>
-#include <vector>
 #include <map>
+#include <queue>
+#include <string>
+#include <vector>
 
-#include "logging.h"
-#include "manifest.h"
-#include "file_chunk.h"
-#include "util.h"
 #include "catalog_sql.h"
 #include "compression.h"
-#include "shortstring.h"
 #include "download.h"
+#include "file_chunk.h"
 #include "history_sqlite.h"
+#include "logging.h"
+#include "manifest.h"
+#include "shortstring.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
-using namespace swissknife;
+
+namespace swissknife {
 
 namespace {
 bool check_chunks;
@@ -113,7 +114,7 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
   catalog::Counters::FieldsMap::const_iterator iend = map_a.end();
   for (; i != iend; ++i) {
     catalog::Counters::FieldsMap::const_iterator comp = map_b.find(i->first);
-    assert (comp != map_b.end());
+    assert(comp != map_b.end());
 
     if (*(i->second) != *(comp->second)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
@@ -133,9 +134,9 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
  */
 bool CommandCheck::Exists(const string &file)
 {
-  if (remote_repository == NULL)
+  if (remote_repository == NULL) {
     return FileExists(file);
-  else {
+  } else {
     const string url = *remote_repository + "/" + file;
     download::JobInfo head(&url, false);
     return g_download_manager->Fetch(&head) == download::kFailOk;
@@ -198,8 +199,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     // Check if checksum is not null
     if (entries[i].IsRegular() && entries[i].checksum().IsNull()) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "regular file pointing to zero-hash: '%s'",
-               full_path.c_str());
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "regular file pointing to zero-hash: '%s'", full_path.c_str());
       retval = false;
     }
 
@@ -269,7 +270,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         // check that the nested mountpoint is empty in the current catalog
         catalog::DirectoryEntryList nested_entries;
         if (catalog->ListingPath(full_path, &nested_entries) &&
-            ! nested_entries.empty()) {
+            !nested_entries.empty()) {
           LogCvmfs(kLogCvmfs, kLogStderr, "non-empty nested catalog mountpoint "
                                           "at %s.",
                    full_path.c_str());
@@ -559,7 +560,8 @@ bool CommandCheck::InspectTree(const string &path,
   }
 
   // Check statistics counters
-  computed_counters->self.directories++;  // Additionally account for root directory
+  // Additionally account for root directory
+  computed_counters->self.directories++;
   catalog::Counters compare_counters;
   compare_counters.ApplyDelta(*computed_counters);
   const catalog::Counters stored_counters = catalog->GetCounters();
@@ -601,7 +603,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Load Manifest
-  // TODO: Do this using Manifest::Fetch() in the future
+  // TODO(jblomer): Do this using Manifest::Fetch() in the future
   manifest::Manifest *manifest = NULL;
   if (remote_repository == NULL) {
     if (chdir(repository.c_str()) != 0) {
@@ -662,7 +664,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     }
     history::History *tag_db = history::SqliteHistory::Open(tmp_file);
     if (NULL == tag_db) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open history database %s at %s",
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to open history database %s at %s",
                manifest->history().ToString().c_str(), tmp_file.c_str());
       delete manifest;
       return 1;
@@ -689,3 +692,5 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   delete manifest;
   return retval ? 0 : 1;
 }
+
+}  // namespace swissknife

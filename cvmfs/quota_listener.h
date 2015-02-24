@@ -20,7 +20,7 @@
 #include <string>
 
 namespace catalog {
-  class AbstractCatalogManager;
+class AbstractCatalogManager;
 }
 
 namespace quota {

@@ -5,6 +5,8 @@
 #ifndef CVMFS_LOGGING_H_
 #define CVMFS_LOGGING_H_
 
+#include <string>
+
 // Shared declarations of debug and non-debug logging
 #include "logging_internal.h"
 
@@ -23,7 +25,7 @@ void PrintWarning(const std::string &message);
 void PrintError(const std::string &message);
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_LOGGING_H_
