@@ -8,7 +8,7 @@
 #include "upload_s3.h"
 #include "util.h"
 
-using namespace upload;
+namespace upload {
 
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
@@ -16,10 +16,10 @@ void AbstractUploader::RegisterPlugins() {
 }
 
 
-AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition) :
-  spooler_definition_(spooler_definition),
-  torn_down_(false),
-  jobs_in_flight_(spooler_definition.number_of_concurrent_uploads) {}
+AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition)
+  : spooler_definition_(spooler_definition)
+  , torn_down_(false)
+  , jobs_in_flight_(spooler_definition.number_of_concurrent_uploads) { }
 
 
 bool AbstractUploader::Initialize() {
@@ -33,10 +33,10 @@ bool AbstractUploader::Initialize() {
   // tbb::tbb_thread assignment operator 'moves' the thread handle so _does not_
   // 'copy' the operating system thread construct. The assertions check for this
   // behaviour.
-  assert (! writer_thread_.joinable());
+  assert(!writer_thread_.joinable());
   writer_thread_ = thread;
-  assert (writer_thread_.joinable());
-  assert (! thread.joinable());
+  assert(writer_thread_.joinable());
+  assert(!thread.joinable());
 
   // wait for the thread to call back...
   return thread_started_executing_.Get();
@@ -44,8 +44,8 @@ bool AbstractUploader::Initialize() {
 
 
 void AbstractUploader::TearDown() {
-  assert (! torn_down_);
-  upload_queue_.push(UploadJob()); // Termination signal
+  assert(!torn_down_);
+  upload_queue_.push(UploadJob());  // Termination signal
   writer_thread_.join();
   torn_down_ = true;
 }
@@ -54,3 +54,5 @@ void AbstractUploader::TearDown() {
 void AbstractUploader::WaitForUpload() const {
   jobs_in_flight_.WaitForZero();
 }
+
+}  // namespace upload

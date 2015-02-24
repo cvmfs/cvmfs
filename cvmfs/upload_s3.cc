@@ -5,14 +5,15 @@
 #include "upload_s3.h"
 
 #include <errno.h>
-#include <unistd.h>
+#include <inttypes.h>
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #include <sched.h>
 #endif
+#include <unistd.h>
 
-#include <vector>
+#include <sstream>  // TODO(jblomer): remove me
 #include <string>
-#include <sstream>  // TODO: remove me
+#include <vector>
 
 #include "compression.h"
 #include "file_processing/char_buffer.h"
@@ -21,7 +22,7 @@
 #include "s3fanout.h"
 #include "util.h"
 
-using namespace upload;
+namespace upload {
 
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
     : AbstractUploader(spooler_definition),
@@ -68,7 +69,7 @@ bool S3Uploader::ParseSpoolerDefinition(
   }
 
   // Parse S3 configuration
-  // TODO: separate option handling and sanity checks
+  // TODO(sheikkila): separate option handling and sanity checks
   OptionsManager *options_manager = new BashOptionsManager();
   options_manager->ParsePath(config_path, false);
   std::string parameter;
@@ -171,7 +172,7 @@ void S3Uploader::WorkerThread() {
     UploadJob job;
 
     // Try to get new job
-    bool newjob = TryToAcquireNewJob(job);
+    bool newjob = TryToAcquireNewJob(&job);
     if (newjob) {
       switch (job.type) {
         case UploadJob::Upload:
@@ -316,7 +317,8 @@ int S3Uploader::SelectBucket(const std::string &rem_filename) const {
   }
 
   // Calculate number based on the filename
-  unsigned long xt = 0, x = 0;
+  uint64_t xt = 0;
+  uint64_t x = 0;
   while (hex_filename.length() > cutlength) {
     std::stringstream ss;
     ss.clear();
@@ -340,10 +342,11 @@ int S3Uploader::SelectBucket(const std::string &rem_filename) const {
 }
 
 
-void S3Uploader::FileUpload(const std::string &local_path,
-                            const std::string &remote_path,
-                            const CallbackTN  *callback) {
-
+void S3Uploader::FileUpload(
+  const std::string &local_path,
+  const std::string &remote_path,
+  const CallbackTN  *callback
+) {
   // Choose S3 account and bucket based on the target
   std::string access_key, secret_key, bucket_name;
   const std::string mangled_filename = repository_alias_ + "/" + remote_path;
@@ -375,7 +378,6 @@ void S3Uploader::FileUpload(const std::string &local_path,
 
 
 bool S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
-
   LogCvmfs(kLogS3Fanout, kLogDebug,
            "Uploading from %s:\n"
            "--> Object: '%s'\n"
@@ -524,8 +526,8 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle   *handle,
                                 static_cast<void const*>(
                                     handle->commit_callback)),
                             mmf,
-                            reinterpret_cast<unsigned char*>(mmf->buffer()),
-                            static_cast<long unsigned int>(mmf->size()));
+                            reinterpret_cast<unsigned char *>(mmf->buffer()),
+                            static_cast<size_t>(mmf->size()));
   assert(info != NULL);
 
   const bool retval2 = UploadJobInfo(info);
@@ -580,3 +582,5 @@ bool S3Uploader::Peek(const std::string& path) const {
   delete info;
   return retme;
 }
+
+}  // namespace upload

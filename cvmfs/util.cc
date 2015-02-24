@@ -32,10 +32,10 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <map>
 #include <set>
 #include <string>
@@ -158,7 +158,7 @@ NameString GetFileName(const PathString &path) {
 
 
 bool IsAbsolutePath(const std::string &path) {
-  return (! path.empty() && path[0] == '/');
+  return (!path.empty() && path[0] == '/');
 }
 
 
@@ -245,7 +245,7 @@ int ConnectSocket(const string &path) {
   if (connect(socket_fd, (struct sockaddr *)&sock_addr,
               sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
-    //LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
+    // LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
     close(socket_fd);
     return -1;
   }
@@ -763,8 +763,9 @@ string StringifyTime(const time_t seconds, const bool utc) {
    */
   std::string RfcTimestamp() {
     const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
-			    "Aug", "Sep", "Oct", "Nov", "Dec"};
-    const char *day_of_week[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+      "Aug", "Sep", "Oct", "Nov", "Dec"};
+    const char *day_of_week[] =
+      {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
     struct tm timestamp;
     time_t now = time(NULL);
@@ -772,10 +773,10 @@ string StringifyTime(const time_t seconds, const bool utc) {
 
     char buffer[30];
     snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
-	     day_of_week[timestamp.tm_wday], timestamp.tm_mday,
-	     months[timestamp.tm_mon], timestamp.tm_year + 1900,
-	     timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
-	     timestamp.tm_zone);
+      day_of_week[timestamp.tm_wday], timestamp.tm_mday,
+      months[timestamp.tm_mon], timestamp.tm_year + 1900,
+      timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
+      timestamp.tm_zone);
     return string(buffer);
   }
 
@@ -1146,14 +1147,15 @@ void Daemonize() {
 }
 
 
-bool ExecuteBinary(      int                       *fd_stdin,
-                         int                       *fd_stdout,
-                         int                       *fd_stderr,
-                   const std::string               &binary_path,
-                   const std::vector<std::string>  &argv,
-                   const bool                       double_fork,
-                         pid_t                     *child_pid)
-{
+bool ExecuteBinary(
+  int *fd_stdin,
+  int *fd_stdout,
+  int *fd_stderr,
+  const std::string &binary_path,
+  const std::vector<std::string> &argv,
+  const bool double_fork,
+  pid_t *child_pid
+) {
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -1206,7 +1208,7 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
                        vector<string>(), double_fork);
 }
 
-struct ForkFailures { // TODO: C++11 (type safe enum)
+struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
   enum Names {
     kSendPid,
     kUnknown,
@@ -1369,14 +1371,16 @@ bool ManagedExec(const vector<string>  &command_line,
   close(pipe_fork.read_end);
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
            command_line[0].c_str(),
-           (int)buf_child_pid);
+           static_cast<int>(buf_child_pid));
   return true;
 }
 
+
 // -----------------------------------------------------------------------------
 
+
 void StopWatch::Start() {
-  assert (!running_);
+  assert(!running_);
 
   gettimeofday(&start_, NULL);
   running_ = true;
@@ -1384,7 +1388,7 @@ void StopWatch::Start() {
 
 
 void StopWatch::Stop() {
-  assert (running_);
+  assert(running_);
 
   gettimeofday(&end_, NULL);
   running_ = false;
@@ -1399,7 +1403,7 @@ void StopWatch::Reset() {
 
 
 double StopWatch::GetTime() const {
-  assert (!running_);
+  assert(!running_);
 
   return DiffTimeSeconds(start_, end_);
 }
@@ -1516,7 +1520,7 @@ MemoryMappedFile::~MemoryMappedFile() {
 }
 
 bool MemoryMappedFile::Map() {
-  assert (!mapped_);
+  assert(!mapped_);
 
   // open the file
   int fd;
@@ -1562,7 +1566,7 @@ bool MemoryMappedFile::Map() {
 }
 
 void MemoryMappedFile::Unmap() {
-  assert (mapped_);
+  assert(mapped_);
 
   if (mapped_file_ == NULL) {
     return;
@@ -1574,7 +1578,7 @@ void MemoryMappedFile::Unmap() {
   {
     LogCvmfs(kLogUtility, kLogStderr, "failed to unmap %s", file_path_.c_str());
     const bool munmap_failed = false;
-    assert (munmap_failed);
+    assert(munmap_failed);
   }
 
   // reset (resettable) data
@@ -1585,7 +1589,6 @@ void MemoryMappedFile::Unmap() {
   LogCvmfs(kLogUtility, kLogVerboseMsg, "munmap'ed %s", file_path_.c_str());
 }
 
-
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif

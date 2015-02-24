@@ -4,13 +4,13 @@
 
 #include "upload_spooler_definition.h"
 
-#include <vector>
 #include <tbb/task_scheduler_init.h>
+#include <vector>
 
 #include "logging.h"
 #include "util.h"
 
-using namespace upload;
+namespace upload {
 
 SpoolerDefinition::SpoolerDefinition(
                       const std::string&       definition_string,
@@ -49,7 +49,7 @@ SpoolerDefinition::SpoolerDefinition(
   } else if (upstream[0] == "S3") {
     driver_type = S3;
   } else if (upstream[0] == "mock") {
-    driver_type = Mock; // for unit testing purpose only!
+    driver_type = Mock;  // for unit testing purpose only!
   } else {
     driver_type = Unknown;
     LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
@@ -62,3 +62,5 @@ SpoolerDefinition::SpoolerDefinition(
   spooler_configuration = upstream[2];
   valid_ = true;
 }
+
+}  // namespace upload

@@ -8,19 +8,19 @@
 #include "swissknife.h"
 
 #include <map>
-#include <vector>
 #include <string>
+#include <vector>
 
+#include "atomic.h"
+#include "catalog.h"
+#include "catalog_traversal.h"
 #include "hash.h"
+#include "upload.h"
 #include "util.h"
 #include "util_concurrency.h"
-#include "catalog_traversal.h"
-#include "catalog.h"
-#include "upload.h"
-#include "atomic.h"
 
 namespace catalog {
-  class WritableCatalog;
+class WritableCatalog;
 }
 
 namespace swissknife {
@@ -28,8 +28,12 @@ namespace swissknife {
 class CommandMigrate : public Command {
  protected:
   struct CatalogStatistics {
-    CatalogStatistics() : max_row_id(0), entry_count(0), hardlink_group_count(0),
-      aggregated_linkcounts(0), migration_time(0.0) {}
+    CatalogStatistics()
+      : max_row_id(0)
+      , entry_count(0)
+      , hardlink_group_count(0)
+      , aggregated_linkcounts(0)
+      , migration_time(0.0) { }
     unsigned int max_row_id;
     unsigned int entry_count;
 
@@ -56,10 +60,10 @@ class CommandMigrate : public Command {
   struct PendingCatalog;
   typedef std::vector<PendingCatalog *> PendingCatalogList;
   struct PendingCatalog {
-    PendingCatalog(const catalog::Catalog *old_catalog = NULL) :
+    explicit PendingCatalog(const catalog::Catalog *old_catalog = NULL) :
       success(false),
       old_catalog(old_catalog),
-      new_catalog(NULL) {}
+      new_catalog(NULL) { }
     virtual ~PendingCatalog();
 
     inline const std::string root_path() const {
@@ -102,7 +106,7 @@ class CommandMigrate : public Command {
     };
 
    public:
-    AbstractMigrationWorker(const worker_context *context);
+    explicit AbstractMigrationWorker(const worker_context *context);
     virtual ~AbstractMigrationWorker();
 
     void operator()(const expected_data &data);
@@ -110,9 +114,9 @@ class CommandMigrate : public Command {
    protected:
     bool RunMigration(PendingCatalog *data) const { return false; }
 
-    bool UpdateNestedCatalogReferences (PendingCatalog *data) const;
-    bool CleanupNestedCatalogs         (PendingCatalog *data) const;
-    bool CollectAndAggregateStatistics (PendingCatalog *data) const;
+    bool UpdateNestedCatalogReferences(PendingCatalog *data) const;
+    bool CleanupNestedCatalogs(PendingCatalog *data) const;
+    bool CollectAndAggregateStatistics(PendingCatalog *data) const;
 
    protected:
     const std::string  temporary_directory_;
@@ -121,23 +125,27 @@ class CommandMigrate : public Command {
     StopWatch          migration_stopwatch_;
   };
 
-  class MigrationWorker_20x : public AbstractMigrationWorker<MigrationWorker_20x> {
+  class MigrationWorker_20x :
+    public AbstractMigrationWorker<MigrationWorker_20x>
+  {
     friend class AbstractMigrationWorker<MigrationWorker_20x>;
 
    public:
-    struct worker_context : AbstractMigrationWorker<MigrationWorker_20x>::worker_context {
+    struct worker_context :
+      AbstractMigrationWorker<MigrationWorker_20x>::worker_context
+    {
       worker_context(const std::string  &temporary_directory,
                      const bool          collect_catalog_statistics,
                      const bool          fix_nested_catalog_transitions,
                      const bool          analyze_file_linkcounts,
                      const uid_t         uid,
-                     const gid_t         gid) :
-        AbstractMigrationWorker<MigrationWorker_20x>::worker_context(temporary_directory,
-                                                                     collect_catalog_statistics),
-        fix_nested_catalog_transitions(fix_nested_catalog_transitions),
-        analyze_file_linkcounts(analyze_file_linkcounts),
-        uid(uid),
-        gid(gid) {}
+                     const gid_t         gid)
+        : AbstractMigrationWorker<MigrationWorker_20x>::worker_context(
+            temporary_directory, collect_catalog_statistics)
+        , fix_nested_catalog_transitions(fix_nested_catalog_transitions)
+        , analyze_file_linkcounts(analyze_file_linkcounts)
+        , uid(uid)
+        , gid(gid) { }
       const bool  fix_nested_catalog_transitions;
       const bool  analyze_file_linkcounts;
       const uid_t uid;
@@ -145,24 +153,24 @@ class CommandMigrate : public Command {
     };
 
    public:
-    MigrationWorker_20x(const worker_context *context);
+    explicit MigrationWorker_20x(const worker_context *context);
 
    protected:
     bool RunMigration(PendingCatalog *data) const;
 
-    bool CreateNewEmptyCatalog            (PendingCatalog *data) const;
-    bool CheckDatabaseSchemaCompatibility (PendingCatalog *data) const;
-    bool AttachOldCatalogDatabase         (PendingCatalog *data) const;
-    bool StartDatabaseTransaction         (PendingCatalog *data) const;
-    bool MigrateFileMetadata              (PendingCatalog *data) const;
-    bool AnalyzeFileLinkcounts            (PendingCatalog *data) const;
-    bool RemoveDanglingNestedMountpoints  (PendingCatalog *data) const;
-    bool MigrateNestedCatalogMountPoints  (PendingCatalog *data) const;
-    bool FixNestedCatalogTransitionPoints (PendingCatalog *data) const;
-    bool GenerateCatalogStatistics        (PendingCatalog *data) const;
-    bool FindRootEntryInformation         (PendingCatalog *data) const;
-    bool CommitDatabaseTransaction        (PendingCatalog *data) const;
-    bool DetachOldCatalogDatabase         (PendingCatalog *data) const;
+    bool CreateNewEmptyCatalog(PendingCatalog *data) const;
+    bool CheckDatabaseSchemaCompatibility(PendingCatalog *data) const;
+    bool AttachOldCatalogDatabase(PendingCatalog *data) const;
+    bool StartDatabaseTransaction(PendingCatalog *data) const;
+    bool MigrateFileMetadata(PendingCatalog *data) const;
+    bool AnalyzeFileLinkcounts(PendingCatalog *data) const;
+    bool RemoveDanglingNestedMountpoints(PendingCatalog *data) const;
+    bool MigrateNestedCatalogMountPoints(PendingCatalog *data) const;
+    bool FixNestedCatalogTransitionPoints(PendingCatalog *data) const;
+    bool GenerateCatalogStatistics(PendingCatalog *data) const;
+    bool FindRootEntryInformation(PendingCatalog *data) const;
+    bool CommitDatabaseTransaction(PendingCatalog *data) const;
+    bool DetachOldCatalogDatabase(PendingCatalog *data) const;
 
    private:
     const bool  fix_nested_catalog_transitions_;
@@ -171,39 +179,42 @@ class CommandMigrate : public Command {
     const gid_t gid_;
   };
 
-  class MigrationWorker_217 : public AbstractMigrationWorker<MigrationWorker_217> {
+  class MigrationWorker_217 :
+    public AbstractMigrationWorker<MigrationWorker_217>
+  {
     friend class AbstractMigrationWorker<MigrationWorker_217>;
 
    public:
-    MigrationWorker_217(const worker_context *context);
+    explicit MigrationWorker_217(const worker_context *context);
 
    protected:
     bool RunMigration(PendingCatalog *data) const;
 
-    bool CheckDatabaseSchemaCompatibility (PendingCatalog *data) const;
-    bool StartDatabaseTransaction         (PendingCatalog *data) const;
-    bool GenerateNewStatisticsCounters    (PendingCatalog *data) const;
-    bool UpdateCatalogSchema              (PendingCatalog *data) const;
-    bool CommitDatabaseTransaction        (PendingCatalog *data) const;
+    bool CheckDatabaseSchemaCompatibility(PendingCatalog *data) const;
+    bool StartDatabaseTransaction(PendingCatalog *data) const;
+    bool GenerateNewStatisticsCounters(PendingCatalog *data) const;
+    bool UpdateCatalogSchema(PendingCatalog *data) const;
+    bool CommitDatabaseTransaction(PendingCatalog *data) const;
 
-    catalog::WritableCatalog* GetWritable(const catalog::Catalog *catalog) const;
+    catalog::WritableCatalog*
+      GetWritable(const catalog::Catalog *catalog) const;
   };
 
  public:
   CommandMigrate();
-  ~CommandMigrate() { };
-  std::string GetName() { return "migrate"; };
+  ~CommandMigrate() { }
+  std::string GetName() { return "migrate"; }
   std::string GetDescription() {
     return "CernVM-FS catalog repository migration \n"
       "This command migrates the whole catalog structure of a given repository";
-  };
+  }
   ParameterList GetParams();
 
   int Main(const ArgumentList &args);
 
   static void FixNestedCatalogTransitionPoint(
-                          catalog::DirectoryEntry &mountpoint,
-                    const catalog::DirectoryEntry &nested_root);
+    const catalog::DirectoryEntry &nested_root,
+    catalog::DirectoryEntry *mountpoint);
   static const catalog::DirectoryEntry& GetNestedCatalogMarkerDirent();
 
  protected:
@@ -219,16 +230,17 @@ class CommandMigrate : public Command {
     return traversal.Traverse();
   }
 
-  void CatalogCallback(const CatalogTraversalData<catalog::WritableCatalog> &data);
+  void CatalogCallback(
+    const CatalogTraversalData<catalog::WritableCatalog> &data);
   void MigrationCallback(PendingCatalog *const &data);
   void UploadCallback(const upload::SpoolerResult &result);
 
   template <class MigratorT>
-  bool DoMigrationAndCommit(typename MigratorT::worker_context  &context,
-                            const std::string                   &manifest_path);
+  bool DoMigrationAndCommit(const std::string                   &manifest_path,
+                            typename MigratorT::worker_context  *context);
 
   template <class MigratorT>
-  void ConvertCatalogsRecursively(PendingCatalog *catalog, MigratorT &migrator);
+  void ConvertCatalogsRecursively(PendingCatalog *catalog, MigratorT *migrator);
   bool RaiseFileDescriptorLimit() const;
   bool ConfigureSQLite() const;
   void AnalyzeCatalogStatistics() const;

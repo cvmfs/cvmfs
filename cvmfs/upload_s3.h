@@ -6,11 +6,11 @@
 #define CVMFS_UPLOAD_S3_H_
 
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
-#include "upload_facility.h"
 #include "s3fanout.h"
+#include "upload_facility.h"
 
 namespace upload {
 
