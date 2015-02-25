@@ -554,7 +554,7 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     // MD5 content hash
     if (info->origin == kOriginMem) {
       retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
-                                info->origin_mem.size);
+                                static_cast<curl_off_t>(info->origin_mem.size));
       assert(retval == CURLE_OK);
       shash::HashMem(info->origin_mem.data,
                      info->origin_mem.size,
@@ -570,7 +570,8 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
       info->origin_file = fopen(info->origin_path.c_str(), "r");
       if (info->origin_file == NULL)
         return kFailLocalIO;
-      retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE, file_size);
+      retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
+                                static_cast<curl_off_t>(file_size));
       assert(retval == CURLE_OK);
     }
     LogCvmfs(kLogS3Fanout, kLogDebug, "content hash: %s",
