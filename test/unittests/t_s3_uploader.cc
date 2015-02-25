@@ -3,30 +3,29 @@
  */
 
 #include <gtest/gtest.h>
-#include <unistd.h>
-#include <string>
-#include <sstream>
-#include <tbb/atomic.h>
 
-#include "../../cvmfs/atomic.h"
-#include "../../cvmfs/util.h"
-#include "../../cvmfs/upload_spooler_definition.h"
-#include "../../cvmfs/upload_s3.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/file_processing/char_buffer.h"
-
-#include <iostream>
-#include <fstream>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <tbb/atomic.h>
+#include <unistd.h>
 
-#include "testutil.h"
-#include "c_file_sandbox.h"
-
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
+#include <fstream>  // TODO(jblomer): remove me
+#include <iostream>  // TODO(jblomer): remove me
+#include <sstream>  // TODO(jblomer): remove me
+#include <string>
 
-using namespace upload;
+#include "../../cvmfs/atomic.h"
+#include "../../cvmfs/file_processing/char_buffer.h"
+#include "../../cvmfs/hash.h"
+#include "../../cvmfs/upload_s3.h"
+#include "../../cvmfs/upload_spooler_definition.h"
+#include "../../cvmfs/util.h"
+#include "c_file_sandbox.h"
+#include "testutil.h"
+
+namespace upload {
 
 /**
  * Port of S3 mockup server
@@ -399,18 +398,20 @@ class T_S3Uploader : public FileSandbox {
     return result;
   }
 
-  void FreeBuffers(Buffers &buffers) const {
-    Buffers::iterator       i    = buffers.begin();
-    Buffers::const_iterator iend = buffers.end();
+  void FreeBuffers(Buffers *buffers) const {
+    Buffers::iterator       i    = buffers->begin();
+    Buffers::const_iterator iend = buffers->end();
     for (; i != iend; ++i) {
       delete (*i);
     }
-    buffers.clear();
+    buffers->clear();
   }
 
-  BufferStreams MakeRandomizedBufferStreams(const unsigned int stream_count,
-                                            const unsigned int max_buffers_per_stream,
-                                            const          int rng_seed) const {
+  BufferStreams MakeRandomizedBufferStreams(
+    const unsigned int stream_count,
+    const unsigned int max_buffers_per_stream,
+    const int rng_seed) const
+  {
     BufferStreams streams;
 
     Prng rng;
@@ -426,13 +427,13 @@ class T_S3Uploader : public FileSandbox {
     return streams;
   }
 
-  void FreeBufferStreams(BufferStreams &streams) const {
-    BufferStreams::iterator       i    = streams.begin();
-    BufferStreams::const_iterator iend = streams.end();
+  void FreeBufferStreams(BufferStreams *streams) const {
+    BufferStreams::iterator       i    = streams->begin();
+    BufferStreams::const_iterator iend = streams->end();
     for (; i != iend; ++i) {
       FreeBuffers(i->first);
     }
-    streams.clear();
+    streams->clear();
   }
 
   bool CheckFile(const std::string &remote_path) const {
@@ -474,7 +475,7 @@ class T_S3Uploader : public FileSandbox {
  private:
   std::string ByteToHex(const unsigned char byte) {
     char hex[3];
-    sprintf(hex, "%02x", byte);
+    snprintf(hex, sizeof(hex), "%02x", byte);
     return std::string(hex);
   }
 
@@ -518,23 +519,15 @@ class T_S3Uploader : public FileSandbox {
 atomic_int64 T_S3Uploader::gSeed = 0;
 
 const std::string T_S3Uploader::sandbox_path = "/tmp/cvmfs_ut_s3uploader";
-const std::string T_S3Uploader::tmp_dir      = T_S3Uploader::sandbox_path + "/tmp";
-const std::string T_S3Uploader::dest_dir     = T_S3Uploader::sandbox_path + "/dest";
+const std::string T_S3Uploader::tmp_dir =
+  T_S3Uploader::sandbox_path + "/tmp";
+const std::string T_S3Uploader::dest_dir = T_S3Uploader::sandbox_path + "/dest";
 
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_S3Uploader, Initialize) {
   // nothing to do here... initialization runs completely in the fixture!
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_S3Uploader, SimpleFileUpload) {
@@ -550,11 +543,6 @@ TEST_F(T_S3Uploader, SimpleFileUpload) {
   EXPECT_EQ(1u, delegate_.simple_upload_invocations);
   CompareFileContents(big_file_path, AbsoluteDestinationPath(dest_name));
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_S3Uploader, PeekIntoStorage) {
@@ -577,11 +565,6 @@ TEST_F(T_S3Uploader, PeekIntoStorage) {
   const bool file_doesnt_exist = uploader_->Peek("alien");
   EXPECT_FALSE(file_doesnt_exist);
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_S3Uploader, RemoveFromStorage) {
@@ -610,11 +593,6 @@ TEST_F(T_S3Uploader, RemoveFromStorage) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 TEST_F(T_S3Uploader, UploadEmptyFile) {
   const std::string empty_file_path = GetEmptyFile();
   const std::string dest_name     = "empty_file";
@@ -632,11 +610,6 @@ TEST_F(T_S3Uploader, UploadEmptyFile) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 TEST_F(T_S3Uploader, UploadHugeFile) {
   const std::string huge_file_path = GetHugeFile();
   const std::string dest_name     = "huge_file";
@@ -651,11 +624,6 @@ TEST_F(T_S3Uploader, UploadHugeFile) {
   EXPECT_EQ(1u, delegate_.simple_upload_invocations);
   CompareFileContents(huge_file_path, AbsoluteDestinationPath(dest_name));
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_S3Uploader, UploadManyFiles) {
@@ -700,11 +668,6 @@ TEST_F(T_S3Uploader, UploadManyFiles) {
     CompareFileContents(i->first, AbsoluteDestinationPath(i->second));
   }
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_S3Uploader, SingleStreamedUpload) {
@@ -752,13 +715,8 @@ TEST_F(T_S3Uploader, SingleStreamedUpload) {
   EXPECT_TRUE(CheckFile(dest));
   CompareBuffersAndFileContents(buffers, AbsoluteDestinationPath(dest));
 
-  FreeBuffers(buffers);
+  FreeBuffers(&buffers);
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_S3Uploader, MultipleStreamedUpload) {
@@ -829,5 +787,7 @@ TEST_F(T_S3Uploader, MultipleStreamedUpload) {
     CompareBuffersAndFileContents(k->first, AbsoluteDestinationPath(dest));
   }
 
-  FreeBufferStreams(streams);
+  FreeBufferStreams(&streams);
 }
+
+}  // namespace upload
