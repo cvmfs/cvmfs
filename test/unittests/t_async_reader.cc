@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
 #include <openssl/sha.h>
@@ -24,7 +28,7 @@ class TestFile : public upload::AbstractFile {
     read_offset_(0)
   {
     const int sha1_retval = SHA1_Init(&sha1_context_);
-    assert (sha1_retval == 1);
+    assert(sha1_retval == 1);
   }
 
   unsigned char* sha1_digest()       { return sha1_digest_; }
@@ -41,7 +45,7 @@ class TestFile : public upload::AbstractFile {
 
   void CheckHash() const {
     const shash::Any computed_hash = GetHash();
-    EXPECT_EQ (expected_hash_, computed_hash)
+    EXPECT_EQ(expected_hash_, computed_hash)
       << "content hashes do not fit!" << std::endl
       << "expected: " << expected_hash_.ToString() << std::endl
       << "computed: " << computed_hash.ToString();
@@ -89,12 +93,12 @@ class DummyFileScrubbingTask :
     sha_retcode = SHA1_Update(file->sha1_context(),
                               buffer->ptr(),
                               buffer->used_bytes());
-    EXPECT_EQ (1, sha_retcode) << "Error during SHA1 update";
+    EXPECT_EQ(1, sha_retcode) << "Error during SHA1 update";
 
     if (IsLast()) {
       sha_retcode = SHA1_Final(file->sha1_digest(),
                                file->sha1_context());
-      EXPECT_EQ (1, sha_retcode) << "Error during SHA1 finalization";
+      EXPECT_EQ(1, sha_retcode) << "Error during SHA1 finalization";
     }
   }
 
@@ -102,7 +106,7 @@ class DummyFileScrubbingTask :
     file->IncreaseReadOffset(buffer->used_bytes());
 
     if (IsLast()) {
-      EXPECT_EQ (file->size(), static_cast<size_t>(file->read_offset()))
+      EXPECT_EQ(file->size(), static_cast<size_t>(file->read_offset()))
         << "File size and bytes read differ";
     }
   }
@@ -244,7 +248,7 @@ TEST_F (T_AsyncReader, FileReadCallback) {
 
   reader.Wait();
 
-  EXPECT_EQ (file_count, g_FileReadCallback_Callback_calls)
+  EXPECT_EQ(file_count, g_FileReadCallback_Callback_calls)
     << "number of callback invocation does not match";
 
   reader.TearDown();
@@ -370,21 +374,21 @@ TEST_F (T_AsyncReader, MultipleWaitsSlow) {
                                   NULL,
                                  &deadlock_test,
                                   static_cast<void*>(&files));
-  ASSERT_EQ (0, res);
+  ASSERT_EQ(0, res);
 
   unsigned int timeout = 10;
   while (pthread_kill(thread, 0) != ESRCH && timeout > 0) {
     sleep(1);
     --timeout;
   }
-  EXPECT_LT (0u, timeout) << "Timeout expired (possible Deadlock!)";
+  EXPECT_LT(0u, timeout) << "Timeout expired (possible Deadlock!)";
   if (timeout == 0) {
     pthread_cancel(thread);
   } else {
     void *return_value;
     const int join_res = pthread_join(thread, &return_value);
-    ASSERT_EQ (0, join_res);
-    EXPECT_EQ ((void*)1337, return_value);
+    ASSERT_EQ(0, join_res);
+    EXPECT_EQ((void*)1337, return_value);
   }
 }
 

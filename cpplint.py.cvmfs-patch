@@ -5,7 +5,7 @@
  # - Lua headers.
  _THIRD_PARTY_HEADERS_PATTERN = re.compile(
 -    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h)$')
-+    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config.h)$')
++    r'^(?:[^/]*[A-Z][^/]*\.h|lua\.h|lauxlib\.h|lualib\.h|cvmfs_config\.h|sys/xattr\.h|gtest/gtest\.h)$')
  
  
  # Assertion macros.  These are defined in base/logging.h and

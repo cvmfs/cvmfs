@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 #include <string>
 #include <map>
@@ -32,13 +36,13 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
   void Upload(upload::UploadStreamHandle  *abstract_handle,
               upload::CharBuffer          *buffer,
               const CallbackTN            *callback = NULL) {
-    assert (AbstractMockUploader<GC_MockUploader>::not_implemented);
+    assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *abstract_handle,
                               const shash::Any            content_hash,
                               const std::string           hash_suffix) {
-    assert (AbstractMockUploader<GC_MockUploader>::not_implemented);
+    assert(AbstractMockUploader<GC_MockUploader>::not_implemented);
   }
 
   bool Remove(const shash::Any &hash_to_delete) {
@@ -75,7 +79,7 @@ class T_GarbageCollector : public ::testing::Test {
   void TearDown() {
     MockCatalog::Reset();
     MockHistory::Reset();
-    EXPECT_EQ (0u, MockCatalog::instances);
+    EXPECT_EQ(0u, MockCatalog::instances);
   }
 
   GcConfiguration GetStandardGarbageCollectorConfiguration() {
@@ -278,17 +282,17 @@ class T_GarbageCollector : public ::testing::Test {
     MockHistory::RegisterObject(MockHistory::root_hash, history);
 
     history->BeginTransaction();
-    ASSERT_TRUE (history->Insert(history::History::Tag(
+    ASSERT_TRUE(history->Insert(history::History::Tag(
                                      "Revision2", c[mp(2,"00")]->hash(),
                                      1337, 2, t(27,11,1987),
                                      history::History::kChannelProd,
                                      "this is rev 2")));
-    ASSERT_TRUE (history->Insert(history::History::Tag(
+    ASSERT_TRUE(history->Insert(history::History::Tag(
                                      "Revision4", c[mp(4,"00")]->hash(),
                                      42, 4, t(11, 9,2001),
                                      history::History::kChannelProd,
                                      "this is revision 4")));
-    ASSERT_TRUE (history->Insert(history::History::Tag(
+    ASSERT_TRUE(history->Insert(history::History::Tag(
                                      "Revision5", c[mp(5,"00")]->hash(),
                                      7, 5, t(10, 7,2014),
                                      history::History::kChannelTrunk,
@@ -335,7 +339,7 @@ class T_GarbageCollector : public ::testing::Test {
   MockCatalog* GetCatalog(const unsigned int   revision,
                           const std::string   &clg_index) {
     RevisionMap::const_iterator i = catalogs_.find(mp(revision, clg_index));
-    assert (i != catalogs_.end());
+    assert(i != catalogs_.end());
     return i->second;
   }
 
@@ -346,7 +350,7 @@ class T_GarbageCollector : public ::testing::Test {
 
  private:
   void CheckEmpty(const std::string &str) const {
-    ASSERT_FALSE (str.empty());
+    ASSERT_FALSE(str.empty());
   }
 
  protected:
@@ -363,8 +367,8 @@ const std::string T_GarbageCollector::fqrn = "test.cern.ch";
 TEST_F(T_GarbageCollector, InitializeGarbageCollector) {
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
   MyGarbageCollector gc(config);
-  EXPECT_EQ (0u, gc.preserved_catalog_count());
-  EXPECT_EQ (0u, gc.condemned_catalog_count());
+  EXPECT_EQ(0u, gc.preserved_catalog_count());
+  EXPECT_EQ(0u, gc.condemned_catalog_count());
 }
 
 
@@ -375,10 +379,10 @@ TEST_F(T_GarbageCollector, KeepEverything) {
   MyGarbageCollector gc(config);
   const bool gc1 = gc.Collect();
 
-  EXPECT_TRUE (gc1);
-  EXPECT_EQ (16u, gc.preserved_catalog_count());
-  EXPECT_EQ ( 0u, gc.condemned_catalog_count());
-  EXPECT_EQ ( 0u, gc.condemned_objects_count());
+  EXPECT_TRUE(gc1);
+  EXPECT_EQ(16u, gc.preserved_catalog_count());
+  EXPECT_EQ( 0u, gc.condemned_catalog_count());
+  EXPECT_EQ( 0u, gc.condemned_objects_count());
 }
 
 
@@ -388,64 +392,64 @@ TEST_F(T_GarbageCollector, KeepLastRevision) {
 
   MyGarbageCollector gc(config);
   const bool gc1 = gc.Collect();
-  EXPECT_TRUE (gc1);
-  EXPECT_EQ (11u, gc.preserved_catalog_count());
-  EXPECT_EQ ( 5u, gc.condemned_catalog_count());
+  EXPECT_TRUE(gc1);
+  EXPECT_EQ(11u, gc.preserved_catalog_count());
+  EXPECT_EQ( 5u, gc.condemned_catalog_count());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
-  EXPECT_FALSE (upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
-  EXPECT_FALSE (upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
-  EXPECT_FALSE (upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
-  EXPECT_FALSE (upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
-  EXPECT_FALSE (upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
-  EXPECT_FALSE (upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
-  EXPECT_FALSE (upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
-  EXPECT_FALSE (upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
-  EXPECT_FALSE (upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
-  EXPECT_FALSE (upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
-  EXPECT_FALSE (upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
-  EXPECT_FALSE (upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
-  EXPECT_FALSE (upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
-  EXPECT_FALSE (upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
-  EXPECT_FALSE (upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
-  EXPECT_FALSE (upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
-  EXPECT_FALSE (upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
-  EXPECT_FALSE (upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
-  EXPECT_FALSE (upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
-  EXPECT_FALSE (upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
-  EXPECT_FALSE (upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
-  EXPECT_FALSE (upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
+  EXPECT_FALSE(upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
+  EXPECT_FALSE(upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
+  EXPECT_FALSE(upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
+  EXPECT_FALSE(upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+  EXPECT_FALSE(upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
+  EXPECT_FALSE(upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
+  EXPECT_FALSE(upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
+  EXPECT_FALSE(upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
+  EXPECT_FALSE(upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
+  EXPECT_FALSE(upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
+  EXPECT_FALSE(upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
+  EXPECT_FALSE(upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
+  EXPECT_FALSE(upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
+  EXPECT_FALSE(upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
+  EXPECT_FALSE(upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
+  EXPECT_FALSE(upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
+  EXPECT_FALSE(upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
+  EXPECT_FALSE(upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5, "20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4, "20")]->hash()));
 
-  EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
-  EXPECT_TRUE  (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
-  EXPECT_TRUE  (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
-  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
-  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE(upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_TRUE(upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"11")]->hash()));
 
-  EXPECT_EQ (11u, upl->deleted_hashes.size());
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
 
   // TODO: Once history handling is complete, one could delete a named snapshot
   //       and check if it is gone after another collection run...
@@ -458,72 +462,72 @@ TEST_F(T_GarbageCollector, KeepLastThreeRevisions) {
 
   MyGarbageCollector gc(config);
   const bool gc1 = gc.Collect();
-  EXPECT_TRUE (gc1);
-  EXPECT_EQ (14u, gc.preserved_catalog_count());
-  EXPECT_EQ ( 2u, gc.condemned_catalog_count());
+  EXPECT_TRUE(gc1);
+  EXPECT_EQ(14u, gc.preserved_catalog_count());
+  EXPECT_EQ( 2u, gc.condemned_catalog_count());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
-  EXPECT_FALSE (upl->HasDeleted(h("c05b6c2319608d2dd03c0d19dba586682772b953")));
-  EXPECT_FALSE (upl->HasDeleted(h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1")));
-  EXPECT_FALSE (upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
-  EXPECT_FALSE (upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
-  EXPECT_FALSE (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
-  EXPECT_FALSE (upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
-  EXPECT_FALSE (upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
-  EXPECT_FALSE (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
-  EXPECT_FALSE (upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
-  EXPECT_FALSE (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
-  EXPECT_FALSE (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
-  EXPECT_FALSE (upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
-  EXPECT_FALSE (upl->HasDeleted(h("8d02b1f7ca8e6f925e308994da4248b6309293ba")));
-  EXPECT_FALSE (upl->HasDeleted(h("6eebfa4eb98dfa5657afeb0e15361f31288ad339")));
-  EXPECT_FALSE (upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
-  EXPECT_FALSE (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
-  EXPECT_FALSE (upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
-  EXPECT_FALSE (upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb")));
-  EXPECT_FALSE (upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7")));
-  EXPECT_FALSE (upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4")));
-  EXPECT_FALSE (upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e")));
-  EXPECT_FALSE (upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b")));
-  EXPECT_FALSE (upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
-  EXPECT_FALSE (upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
-  EXPECT_FALSE (upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
-  EXPECT_FALSE (upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
-  EXPECT_FALSE (upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
-  EXPECT_FALSE (upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
-  EXPECT_FALSE (upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
-  EXPECT_FALSE (upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
-  EXPECT_FALSE (upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
-  EXPECT_FALSE (upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
-  EXPECT_FALSE (upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
-  EXPECT_FALSE (upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
-  EXPECT_FALSE (upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
-  EXPECT_FALSE (upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
-  EXPECT_FALSE (upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
-  EXPECT_FALSE (upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(h("c05b6c2319608d2dd03c0d19dba586682772b953")));
+  EXPECT_FALSE(upl->HasDeleted(h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1")));
+  EXPECT_FALSE(upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
+  EXPECT_FALSE(upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
+  EXPECT_FALSE(upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_FALSE(upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
+  EXPECT_FALSE(upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
+  EXPECT_FALSE(upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
+  EXPECT_FALSE(upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_FALSE(upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_FALSE(upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
+  EXPECT_FALSE(upl->HasDeleted(h("8d02b1f7ca8e6f925e308994da4248b6309293ba")));
+  EXPECT_FALSE(upl->HasDeleted(h("6eebfa4eb98dfa5657afeb0e15361f31288ad339")));
+  EXPECT_FALSE(upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
+  EXPECT_FALSE(upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+  EXPECT_FALSE(upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
+  EXPECT_FALSE(upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7")));
+  EXPECT_FALSE(upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4")));
+  EXPECT_FALSE(upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e")));
+  EXPECT_FALSE(upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b")));
+  EXPECT_FALSE(upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
+  EXPECT_FALSE(upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
+  EXPECT_FALSE(upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
+  EXPECT_FALSE(upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
+  EXPECT_FALSE(upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
+  EXPECT_FALSE(upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
+  EXPECT_FALSE(upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
+  EXPECT_FALSE(upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
+  EXPECT_FALSE(upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
+  EXPECT_FALSE(upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"11")]->hash()));
 
-  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
-  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
-  EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
 
-  EXPECT_EQ (5u, upl->deleted_hashes.size());
+  EXPECT_EQ(5u, upl->deleted_hashes.size());
 }
 
 
@@ -533,41 +537,41 @@ TEST_F(T_GarbageCollector, KeepOnlyNamedSnapshots) {
 
   MyGarbageCollector gc(config);
   const bool gc1 = gc.Collect();
-  EXPECT_TRUE (gc1);
-  EXPECT_EQ (11u, gc.preserved_catalog_count());
-  EXPECT_EQ ( 5u, gc.condemned_catalog_count());
+  EXPECT_TRUE(gc1);
+  EXPECT_EQ(11u, gc.preserved_catalog_count());
+  EXPECT_EQ( 5u, gc.condemned_catalog_count());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash())); // 1,"11" == 2,"11"
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
-  EXPECT_FALSE (upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(1,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"11")]->hash())); // 1,"11" == 2,"11"
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
+  EXPECT_FALSE(upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
 
-  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
-  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
-  EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
-  EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
-  EXPECT_TRUE  (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
-  EXPECT_TRUE  (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
+  EXPECT_TRUE(upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE(upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_TRUE(upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"11")]->hash()));
 
-  EXPECT_EQ (11u, upl->deleted_hashes.size());
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
 }
 
 
@@ -587,22 +591,22 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   deleted_catalogs.insert(c[mp(3,"11")]->hash());
   MockCatalog::s_deleted_objects = &deleted_catalogs;
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
 
   const bool gc1 = gc.Collect();
-  EXPECT_TRUE (gc1);
-  EXPECT_EQ (11u, gc.preserved_catalog_count());
-  EXPECT_EQ ( 0u, gc.condemned_catalog_count());
+  EXPECT_TRUE(gc1);
+  EXPECT_EQ(11u, gc.preserved_catalog_count());
+  EXPECT_EQ( 0u, gc.condemned_catalog_count());
 }
 
 
@@ -619,15 +623,15 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
 
   history::History *history = MockHistory::Get(MockHistory::root_hash);;
   ASSERT_NE   (static_cast<history::History*>(NULL), history);
-  ASSERT_TRUE (history->Remove("Revision2")); // remove all named snapshots to
-  ASSERT_TRUE (history->Remove("Revision4")); // allow to delete every catalog
-  ASSERT_TRUE (history->Remove("Revision5")); // revision
+  ASSERT_TRUE(history->Remove("Revision2")); // remove all named snapshots to
+  ASSERT_TRUE(history->Remove("Revision4")); // allow to delete every catalog
+  ASSERT_TRUE(history->Remove("Revision5")); // revision
 
   const bool gc1 = gc.Collect();
-  EXPECT_TRUE (gc1);
+  EXPECT_TRUE(gc1);
 
-  EXPECT_EQ (8u, gc.preserved_catalog_count());
-  EXPECT_EQ (7u, gc.condemned_catalog_count()); // Note: should be 8 but (3,"10")
+  EXPECT_EQ(8u, gc.preserved_catalog_count());
+  EXPECT_EQ(7u, gc.condemned_catalog_count()); // Note: should be 8 but (3,"10")
                                                 //       was already gone!
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
@@ -643,68 +647,68 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
   EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
 
   // deleted by the garbage collection run
-  EXPECT_TRUE (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_TRUE (upl->HasDeleted(c[mp(1,"11")]->hash()));
-  EXPECT_TRUE (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_TRUE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_TRUE (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_TRUE (upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"11")]->hash()));
 
   // was gone before (hence not deleted by GC)
   // Note: (3,"00") and (3,"11") are from the same revision and got properly
   //       swept by the garbage collection run (see above)
   EXPECT_FALSE(upl->HasDeleted(c[mp(3,"10")]->hash()));
 
-  EXPECT_FALSE (upl->HasDeleted(h("c05b6c2319608d2dd03c0d19dba586682772b953")));
-  EXPECT_FALSE (upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
-  EXPECT_FALSE (upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
-  EXPECT_FALSE (upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
-  EXPECT_FALSE (upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
-  EXPECT_FALSE (upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
-  EXPECT_FALSE (upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
-  EXPECT_FALSE (upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
-  EXPECT_FALSE (upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
-  EXPECT_FALSE (upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb")));
-  EXPECT_FALSE (upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7")));
-  EXPECT_FALSE (upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4")));
-  EXPECT_FALSE (upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e")));
-  EXPECT_FALSE (upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b")));
-  EXPECT_FALSE (upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
-  EXPECT_FALSE (upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
-  EXPECT_FALSE (upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
-  EXPECT_FALSE (upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
-  EXPECT_FALSE (upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
-  EXPECT_FALSE (upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
-  EXPECT_FALSE (upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
-  EXPECT_FALSE (upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
-  EXPECT_FALSE (upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
-  EXPECT_FALSE (upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
-  EXPECT_FALSE (upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
-  EXPECT_FALSE (upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
-  EXPECT_FALSE (upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
-  EXPECT_FALSE (upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
-  EXPECT_FALSE (upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
-  EXPECT_FALSE (upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
+  EXPECT_FALSE(upl->HasDeleted(h("c05b6c2319608d2dd03c0d19dba586682772b953")));
+  EXPECT_FALSE(upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
+  EXPECT_FALSE(upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
+  EXPECT_FALSE(upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
+  EXPECT_FALSE(upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
+  EXPECT_FALSE(upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
+  EXPECT_FALSE(upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
+  EXPECT_FALSE(upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
+  EXPECT_FALSE(upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7")));
+  EXPECT_FALSE(upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4")));
+  EXPECT_FALSE(upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e")));
+  EXPECT_FALSE(upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b")));
+  EXPECT_FALSE(upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
+  EXPECT_FALSE(upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
+  EXPECT_FALSE(upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
+  EXPECT_FALSE(upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
+  EXPECT_FALSE(upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
+  EXPECT_FALSE(upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
+  EXPECT_FALSE(upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
+  EXPECT_FALSE(upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
+  EXPECT_FALSE(upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
+  EXPECT_FALSE(upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
 
   // those are only referenced in (3,"10") and should be deleted.
   // However, (3, "10") was gone before GC ran and couldn't be located anymore!
-  EXPECT_FALSE (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
-  EXPECT_FALSE (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_FALSE(upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_FALSE(upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
 
-  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
-  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
-  EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
-  EXPECT_TRUE  (upl->HasDeleted(h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1")));
-  EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
-  EXPECT_TRUE  (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
-  EXPECT_TRUE  (upl->HasDeleted(h("8d02b1f7ca8e6f925e308994da4248b6309293ba")));
-  EXPECT_TRUE  (upl->HasDeleted(h("6eebfa4eb98dfa5657afeb0e15361f31288ad339")));
-  EXPECT_TRUE  (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
-  EXPECT_TRUE  (upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
-  EXPECT_TRUE  (upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
+  EXPECT_TRUE(upl->HasDeleted(h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1")));
+  EXPECT_TRUE(upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE(upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
+  EXPECT_TRUE(upl->HasDeleted(h("8d02b1f7ca8e6f925e308994da4248b6309293ba")));
+  EXPECT_TRUE(upl->HasDeleted(h("6eebfa4eb98dfa5657afeb0e15361f31288ad339")));
+  EXPECT_TRUE(upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+  EXPECT_TRUE(upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
+  EXPECT_TRUE(upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
 
-  EXPECT_EQ (18u, upl->deleted_hashes.size());
+  EXPECT_EQ(18u, upl->deleted_hashes.size());
 }
 
 
@@ -720,63 +724,63 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
   MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
   const bool gc1 = gc.Collect();
-  EXPECT_TRUE (gc1);
+  EXPECT_TRUE(gc1);
 
-  EXPECT_EQ (11u, gc.preserved_catalog_count());
-  EXPECT_EQ ( 5u, gc.condemned_catalog_count());
+  EXPECT_EQ(11u, gc.preserved_catalog_count());
+  EXPECT_EQ( 5u, gc.condemned_catalog_count());
 
-  EXPECT_FALSE (upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
-  EXPECT_FALSE (upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
-  EXPECT_FALSE (upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
-  EXPECT_FALSE (upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
-  EXPECT_FALSE (upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
-  EXPECT_FALSE (upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
-  EXPECT_FALSE (upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
-  EXPECT_FALSE (upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
-  EXPECT_FALSE (upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
-  EXPECT_FALSE (upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
-  EXPECT_FALSE (upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
-  EXPECT_FALSE (upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
-  EXPECT_FALSE (upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
-  EXPECT_FALSE (upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
-  EXPECT_FALSE (upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
-  EXPECT_FALSE (upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
-  EXPECT_FALSE (upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
-  EXPECT_FALSE (upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
-  EXPECT_FALSE (upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
-  EXPECT_FALSE (upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
-  EXPECT_FALSE (upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
-  EXPECT_FALSE (upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
+  EXPECT_FALSE(upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
+  EXPECT_FALSE(upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
+  EXPECT_FALSE(upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943")));
+  EXPECT_FALSE(upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+  EXPECT_FALSE(upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
+  EXPECT_FALSE(upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71")));
+  EXPECT_FALSE(upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710")));
+  EXPECT_FALSE(upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
+  EXPECT_FALSE(upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
+  EXPECT_FALSE(upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
+  EXPECT_FALSE(upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
+  EXPECT_FALSE(upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
+  EXPECT_FALSE(upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
+  EXPECT_FALSE(upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
+  EXPECT_FALSE(upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
+  EXPECT_FALSE(upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
+  EXPECT_FALSE(upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
+  EXPECT_FALSE(upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5, "20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2, "11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4, "20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5, "20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4, "00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4, "10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4, "11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4, "20")]->hash()));
 
-  EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
-  EXPECT_TRUE  (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
-  EXPECT_TRUE  (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
-  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
-  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE(upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_TRUE(upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"11")]->hash()));
 
-  EXPECT_EQ (11u, upl->deleted_hashes.size());
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
 }
 
 
@@ -786,177 +790,177 @@ TEST_F(T_GarbageCollector, KeepRevisionsBasedOnTimestamp) {
   config.keep_history_depth     = GcConfiguration::kFullHistory;
 
   MyGarbageCollector gc1(config);
-  EXPECT_TRUE (gc1.Collect());
-  EXPECT_EQ (14u, gc1.preserved_catalog_count());
-  EXPECT_EQ ( 2u, gc1.condemned_catalog_count());
+  EXPECT_TRUE(gc1.Collect());
+  EXPECT_EQ(14u, gc1.preserved_catalog_count());
+  EXPECT_EQ( 2u, gc1.condemned_catalog_count());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash())); // same as mp(1,"11")
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(3,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"11")]->hash())); // same as mp(1,"11")
+  EXPECT_FALSE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
 
-  EXPECT_TRUE (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE (upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
 
-  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
-  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
-  EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
 
-  EXPECT_EQ (5u, upl->deleted_hashes.size());
+  EXPECT_EQ(5u, upl->deleted_hashes.size());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   config.keep_history_timestamp = t(24, 12, 2004); // just at rev 3
   MyGarbageCollector gc2(config);
-  EXPECT_TRUE (gc2.Collect());
+  EXPECT_TRUE(gc2.Collect());
 
-  EXPECT_EQ ( 5u, upl->deleted_hashes.size());
-  EXPECT_EQ (14u, gc2.preserved_catalog_count());
-  EXPECT_EQ ( 2u, gc2.condemned_catalog_count());
+  EXPECT_EQ( 5u, upl->deleted_hashes.size());
+  EXPECT_EQ(14u, gc2.preserved_catalog_count());
+  EXPECT_EQ( 2u, gc2.condemned_catalog_count());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   config.keep_history_timestamp = t(24, 12, 2004) + 1; // just after rev 3
   MyGarbageCollector gc3(config);
-  EXPECT_TRUE (gc3.Collect());
+  EXPECT_TRUE(gc3.Collect());
 
-  EXPECT_EQ (14u, gc3.preserved_catalog_count());
-  EXPECT_EQ ( 2u, gc3.condemned_catalog_count());
+  EXPECT_EQ(14u, gc3.preserved_catalog_count());
+  EXPECT_EQ( 2u, gc3.condemned_catalog_count());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   config.keep_history_timestamp = t(25, 12, 2004) + 1; // just after rev 4
   MyGarbageCollector gc4(config);
-  EXPECT_TRUE (gc4.Collect());
+  EXPECT_TRUE(gc4.Collect());
 
-  EXPECT_EQ (11u, gc4.preserved_catalog_count());
-  EXPECT_EQ (5u, gc4.condemned_catalog_count());
-  EXPECT_EQ (11u, upl->deleted_hashes.size());
+  EXPECT_EQ(11u, gc4.preserved_catalog_count());
+  EXPECT_EQ(5u, gc4.condemned_catalog_count());
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
 
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"11")]->hash()));
 
-  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
-  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
-  EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
-  EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
-  EXPECT_TRUE  (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
-  EXPECT_TRUE  (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
+  EXPECT_TRUE(upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE(upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_TRUE(upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"20")]->hash()));
 
-  EXPECT_FALSE (upl->HasDeleted(h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1")));
-  EXPECT_FALSE (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
-  EXPECT_FALSE (upl->HasDeleted(h("8d02b1f7ca8e6f925e308994da4248b6309293ba", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("6eebfa4eb98dfa5657afeb0e15361f31288ad339", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+  EXPECT_FALSE(upl->HasDeleted(h("2d8f9f90d6914eb52fed7a0548dd1fbcbea281f1")));
+  EXPECT_FALSE(upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
+  EXPECT_FALSE(upl->HasDeleted(h("8d02b1f7ca8e6f925e308994da4248b6309293ba", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("6eebfa4eb98dfa5657afeb0e15361f31288ad339", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
 
-  EXPECT_FALSE (upl->HasDeleted(h("c05b6c2319608d2dd03c0d19dba586682772b953")));
-  EXPECT_FALSE (upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
-  EXPECT_FALSE (upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
-  EXPECT_FALSE (upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
-  EXPECT_FALSE (upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
-  EXPECT_FALSE (upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
-  EXPECT_FALSE (upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
-  EXPECT_FALSE (upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
-  EXPECT_FALSE (upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
-  EXPECT_FALSE (upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
-  EXPECT_FALSE (upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
-  EXPECT_FALSE (upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
-  EXPECT_FALSE (upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
-  EXPECT_FALSE (upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
+  EXPECT_FALSE(upl->HasDeleted(h("c05b6c2319608d2dd03c0d19dba586682772b953")));
+  EXPECT_FALSE(upl->HasDeleted(h("d2068490d25c1bd4ef2f3d3a0568a76046466860")));
+  EXPECT_FALSE(upl->HasDeleted(h("283144632474a0e553e3b61c1f272257942e7a61")));
+  EXPECT_FALSE(upl->HasDeleted(h("213bec88ed6729219d94fc9281893ba93fca2a02")));
+  EXPECT_FALSE(upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("7d4d0ec225ebe13839d71c0dc0982567cc810402")));
+  EXPECT_FALSE(upl->HasDeleted(h("bb5a7bbe8410f0268a9b12285b6f1fd26e038023")));
+  EXPECT_FALSE(upl->HasDeleted(h("59b63e8478fb7fc02c54a85767c7116573907364")));
+  EXPECT_FALSE(upl->HasDeleted(h("09fd3486d370013d859651eb164ec71a3a09f5cb")));
+  EXPECT_FALSE(upl->HasDeleted(h("e0862f1d936037eb0c2be7ccf289f5dbf469244b")));
+  EXPECT_FALSE(upl->HasDeleted(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("8031b9ad81b52cd772db9b1b12d38994fdd9dbe4")));
+  EXPECT_FALSE(upl->HasDeleted(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc")));
+  EXPECT_FALSE(upl->HasDeleted(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7")));
+  EXPECT_FALSE(upl->HasDeleted(h("0aceb47a362df1522a69217736617493bef07d5a")));
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
 
-  EXPECT_FALSE (upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
-  EXPECT_FALSE (upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
-  EXPECT_FALSE (upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
-  EXPECT_FALSE (upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
-  EXPECT_FALSE (upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
-  EXPECT_FALSE (upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
-  EXPECT_FALSE (upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
-  EXPECT_FALSE (upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
-  EXPECT_FALSE (upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710", 'P')));
-  EXPECT_FALSE (upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("b52945d780f8cc16711d4e670d82499dad99032d")));
+  EXPECT_FALSE(upl->HasDeleted(h("d650d325d59ea9ca754f9b37293cd08d0b12584c")));
+  EXPECT_FALSE(upl->HasDeleted(h("4083d30ba1f72e1dfad4cdbfc60ea3c38bfa600d")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("8967a86ddf51d89aaad5ad0b7f29bdfc7f7aef2a")));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("50c44954ab4348a6a3772ee5bd30ab7a1494c692")));
+  EXPECT_FALSE(upl->HasDeleted(h("c308c87d518c86130d9b9d34723b2a7d4e232ce9")));
+  EXPECT_FALSE(upl->HasDeleted(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31")));
+  EXPECT_FALSE(upl->HasDeleted(h("a727b47d99fba5fe196400a3c7bc1738172dff71", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("80b59550342b6f5141b42e5b2d58ce453f12d710", 'P')));
+  EXPECT_FALSE(upl->HasDeleted(h("372e393bb9f5c33440f842b47b8f6aa3ed4f2943", 'P')));
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   history::History *history = MockHistory::Get(MockHistory::root_hash);;
   ASSERT_NE   (static_cast<history::History*>(NULL), history);
-  ASSERT_TRUE (history->Remove("Revision4")); // make Revision4 deletable
+  ASSERT_TRUE(history->Remove("Revision4")); // make Revision4 deletable
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   config.keep_history_timestamp = t(26, 12, 2004) - 1; // just before rev 5
   MyGarbageCollector gc5(config);
-  EXPECT_TRUE (gc5.Collect());
+  EXPECT_TRUE(gc5.Collect());
 
-  EXPECT_EQ (11u, gc5.preserved_catalog_count());
-  EXPECT_EQ (5u, gc5.condemned_catalog_count());
-  EXPECT_EQ (11u, upl->deleted_hashes.size());
+  EXPECT_EQ(11u, gc5.preserved_catalog_count());
+  EXPECT_EQ(5u, gc5.condemned_catalog_count());
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   config.keep_history_timestamp = t(26, 12, 2004); // just at rev 5
   MyGarbageCollector gc6(config);
-  EXPECT_TRUE (gc6.Collect());
+  EXPECT_TRUE(gc6.Collect());
 
-  EXPECT_EQ (11u, gc6.preserved_catalog_count());
-  EXPECT_EQ (5u, gc6.condemned_catalog_count());
-  EXPECT_EQ (11u, upl->deleted_hashes.size());
+  EXPECT_EQ(11u, gc6.preserved_catalog_count());
+  EXPECT_EQ(5u, gc6.condemned_catalog_count());
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   config.keep_history_timestamp = t(26, 12, 2004) + 1; // just after rev 5
   MyGarbageCollector gc7(config);
-  EXPECT_TRUE (gc7.Collect());
+  EXPECT_TRUE(gc7.Collect());
 
-  EXPECT_EQ (7u, gc7.preserved_catalog_count());
-  EXPECT_EQ (9u, gc7.condemned_catalog_count());
-  EXPECT_EQ (29u, upl->deleted_hashes.size());
+  EXPECT_EQ(7u, gc7.preserved_catalog_count());
+  EXPECT_EQ(9u, gc7.condemned_catalog_count());
+  EXPECT_EQ(29u, upl->deleted_hashes.size());
 
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(4,"20")]->hash()));
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"11")]->hash()));
 }
 
 
@@ -969,33 +973,33 @@ TEST_F(T_GarbageCollector, KeepOnlyFutureRevisions) {
   // remove all named snapshots (GC can potentially delete everything)
   history::History *history = MockHistory::Get(MockHistory::root_hash);;
   ASSERT_NE   (static_cast<history::History*>(NULL), history);
-  ASSERT_TRUE (history->Remove("Revision2"));
-  ASSERT_TRUE (history->Remove("Revision4"));
-  ASSERT_TRUE (history->Remove("Revision5"));
+  ASSERT_TRUE(history->Remove("Revision2"));
+  ASSERT_TRUE(history->Remove("Revision4"));
+  ASSERT_TRUE(history->Remove("Revision5"));
 
   MyGarbageCollector gc1(config);
-  EXPECT_TRUE (gc1.Collect());
+  EXPECT_TRUE(gc1.Collect());
 
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
   RevisionMap     &c   = catalogs_;
 
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"11")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"11")]->hash())); // same as mp(1,"11")
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(4,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash())); // timestamp threshold indicates
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash())); // that everything should be
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash())); // deleted. However, the latest
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash())); // revision will always stay!
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(2,"11")]->hash())); // same as mp(1,"11")
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash())); // timestamp threshold indicates
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash())); // that everything should be
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash())); // deleted. However, the latest
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash())); // revision will always stay!
 }
 
 
@@ -1011,69 +1015,69 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 
   // run a first garbage collection (leaving only named snapshots)
   MyGarbageCollector gc1(config);
-  EXPECT_TRUE (gc1.Collect());
+  EXPECT_TRUE(gc1.Collect());
 
-  EXPECT_EQ (11u, gc1.preserved_catalog_count());
-  EXPECT_EQ ( 5u, gc1.condemned_catalog_count());
+  EXPECT_EQ(11u, gc1.preserved_catalog_count());
+  EXPECT_EQ( 5u, gc1.condemned_catalog_count());
 
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(1,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(2,"11")]->hash())); // 1,"11" == 2,"11"
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
-  EXPECT_FALSE (upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
-  EXPECT_FALSE (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
-  EXPECT_FALSE (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(1,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(2,"11")]->hash())); // 1,"11" == 2,"11"
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(h("915614a7871a0ffc50abde2885a35545023a6a64")));
+  EXPECT_FALSE(upl->HasDeleted(h("c4cbd93ce625b1829a99eeef415f7237ea5d1f02")));
+  EXPECT_FALSE(upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
+  EXPECT_FALSE(upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
 
-  EXPECT_TRUE  (upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
-  EXPECT_TRUE  (upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
-  EXPECT_TRUE  (upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
-  EXPECT_TRUE  (upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
-  EXPECT_TRUE  (upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
-  EXPECT_TRUE  (upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(1,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"10")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(3,"11")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(h("20c2e6328f943003254693a66434ff01ebba26f0")));
+  EXPECT_TRUE(upl->HasDeleted(h("219d1ca4c958bd615822f8c125701e73ce379428")));
+  EXPECT_TRUE(upl->HasDeleted(h("1e94ba5dfe746a7e4e55b62bad21666bc9770ce9")));
+  EXPECT_TRUE(upl->HasDeleted(h("2e87adef242bc67cb66fcd61238ad808a7b44aab")));
+  EXPECT_TRUE(upl->HasDeleted(h("3bf4854891899670727fc8e9c6e454f7e4058454")));
+  EXPECT_TRUE(upl->HasDeleted(h("12ea064b069d98cb9da09219568ff2f8dd7d0a7e")));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(1,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"10")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(3,"11")]->hash()));
 
-  EXPECT_EQ (11u, upl->deleted_hashes.size());
+  EXPECT_EQ(11u, upl->deleted_hashes.size());
 
   // delete named tag to produce a catalog revision that is not referenced by
   // standard CVMFS data structures
   history::History *history = MockHistory::Get(MockHistory::root_hash);
   ASSERT_NE   (static_cast<history::History*>(NULL), history);
-  ASSERT_TRUE (history->Remove("Revision2"));
-  EXPECT_EQ (2u, history->GetNumberOfTags());
+  ASSERT_TRUE(history->Remove("Revision2"));
+  EXPECT_EQ(2u, history->GetNumberOfTags());
 
   // run a second GarbageCollection to remove revision 2
   MyGarbageCollector gc2(config);
-  EXPECT_TRUE (gc2.Collect());
+  EXPECT_TRUE(gc2.Collect());
 
-  EXPECT_EQ (8u, gc2.preserved_catalog_count());
-  EXPECT_EQ (3u, gc2.condemned_catalog_count());
+  EXPECT_EQ(8u, gc2.preserved_catalog_count());
+  EXPECT_EQ(3u, gc2.condemned_catalog_count());
 
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"00")]->hash()));
-  EXPECT_TRUE  (upl->HasDeleted(c[mp(2,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(4,"20")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"00")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"10")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"11")]->hash()));
-  EXPECT_FALSE (upl->HasDeleted(c[mp(5,"20")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(2,"00")]->hash()));
+  EXPECT_TRUE(upl->HasDeleted(c[mp(2,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(4,"20")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"00")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"10")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"11")]->hash()));
+  EXPECT_FALSE(upl->HasDeleted(c[mp(5,"20")]->hash()));
 
-  EXPECT_TRUE (upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
-  EXPECT_TRUE (upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
+  EXPECT_TRUE(upl->HasDeleted(h("380fe86b4cc68164afd5578eb21a32ab397e6d13")));
+  EXPECT_TRUE(upl->HasDeleted(h("1a9ef17ae3597bf61d8229dc2bf6ec12ebb42d44")));
 }
 
 
@@ -1091,27 +1095,27 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 //   MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
 //   const bool gc1 = gc.Collect();
-//   EXPECT_TRUE (gc1);
+//   EXPECT_TRUE(gc1);
 
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(5, "00")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(5, "10")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(5, "11")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(5, "20")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(4, "00")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(4, "10")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(4, "11")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(4, "20")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(2, "00")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(2, "10")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(2, "11")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "00")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "10")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "11")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "20")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(4, "00")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(4, "10")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(4, "11")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(4, "20")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(2, "00")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(2, "10")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(2, "11")]->hash()));
 
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "00")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "10")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "11")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "00")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "10")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(3, "00")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(3, "10")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(3, "11")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(1, "00")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(1, "10")]->hash()));
 
-//   EXPECT_EQ (11u, gc.preserved_catalog_count());
+//   EXPECT_EQ(11u, gc.preserved_catalog_count());
 
 //   // + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + -
 
@@ -1140,25 +1144,25 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
 
 //   MyGarbageCollector new_gc(config);
 //   const bool gc2 = new_gc.Collect();
-//   EXPECT_TRUE (gc2);
+//   EXPECT_TRUE(gc2);
 
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(5, "00")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(5, "10")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(5, "11")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(5, "20")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(4, "00")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(4, "10")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(4, "11")]->hash()));
-//   EXPECT_FALSE (upl->HasDeleted(c[mp(4, "20")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "00")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "10")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "11")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(5, "20")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(4, "00")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(4, "10")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(4, "11")]->hash()));
+//   EXPECT_FALSE(upl->HasDeleted(c[mp(4, "20")]->hash()));
 
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "00")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "10")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(3, "11")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "00")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "10")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(2, "11")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "00")]->hash()));
-//   EXPECT_TRUE  (upl->HasDeleted(c[mp(1, "10")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(3, "00")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(3, "10")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(3, "11")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(2, "00")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(2, "10")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(2, "11")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(1, "00")]->hash()));
+//   EXPECT_TRUE(upl->HasDeleted(c[mp(1, "10")]->hash()));
 
-//   EXPECT_EQ (8u, new_gc.preserved_catalog_count());
+//   EXPECT_EQ(8u, new_gc.preserved_catalog_count());
 // }

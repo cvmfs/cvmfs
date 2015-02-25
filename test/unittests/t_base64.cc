@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
 #include <pthread.h>
@@ -18,22 +22,22 @@ class T_Base64 : public ::testing::Test {
 
 TEST_F(T_Base64, Basics) {
   enc = Base64("Man");
-  EXPECT_EQ (enc, "TWFu");
+  EXPECT_EQ(enc, "TWFu");
 
   enc = Base64("any carnal pleasure.");
-  EXPECT_EQ (enc, "YW55IGNhcm5hbCBwbGVhc3VyZS4=");
+  EXPECT_EQ(enc, "YW55IGNhcm5hbCBwbGVhc3VyZS4=");
 
   enc = Base64("any carnal pleasure");
-  EXPECT_EQ (enc, "YW55IGNhcm5hbCBwbGVhc3VyZQ==");
+  EXPECT_EQ(enc, "YW55IGNhcm5hbCBwbGVhc3VyZQ==");
 
   enc = Base64("any carnal pleasur");
-  EXPECT_EQ (enc, "YW55IGNhcm5hbCBwbGVhc3Vy");
+  EXPECT_EQ(enc, "YW55IGNhcm5hbCBwbGVhc3Vy");
 
   enc = Base64("any carnal pleasu");
-  EXPECT_EQ (enc, "YW55IGNhcm5hbCBwbGVhc3U=");
+  EXPECT_EQ(enc, "YW55IGNhcm5hbCBwbGVhc3U=");
 
   enc = Base64("any carnal pleas");
-  EXPECT_EQ (enc, "YW55IGNhcm5hbCBwbGVhcw==");
+  EXPECT_EQ(enc, "YW55IGNhcm5hbCBwbGVhcw==");
 }
 
 
@@ -43,7 +47,7 @@ TEST_F(T_Base64, MoreBasics) {
     "other animals, which is a lust of the mind, that by a perseverance of delight "
     "in the continued and indefatigable generation of knowledge, exceeds the short "
     "vehemence of any carnal pleasure.");
-  EXPECT_EQ (enc,
+  EXPECT_EQ(enc,
     "TWFuIGlzIGRpc3Rpbmd1aXNoZWQsIG5vdCBvbmx5IGJ5IGhpcyByZWFzb24sIGJ1dCBieSB0aGlz"
     "IHNpbmd1bGFyIHBhc3Npb24gZnJvbSBvdGhlciBhbmltYWxzLCB3aGljaCBpcyBhIGx1c3Qgb2Yg"
     "dGhlIG1pbmQsIHRoYXQgYnkgYSBwZXJzZXZlcmFuY2Ugb2YgZGVsaWdodCBpbiB0aGUgY29udGlu"

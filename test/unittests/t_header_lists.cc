@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "gtest/gtest.h"
 
 #include "../../cvmfs/download.h"

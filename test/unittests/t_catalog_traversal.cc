@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 #include <string>
 #include <map>
@@ -53,13 +57,13 @@ class T_CatalogTraversal : public ::testing::Test {
   void SetUp() {
     dice_.InitLocaltime();
     SetupDummyCatalogs();
-    EXPECT_EQ (initial_catalog_instances, MockCatalog::instances);
+    EXPECT_EQ(initial_catalog_instances, MockCatalog::instances);
   }
 
   void TearDown() {
     MockCatalog::Reset();
     MockHistory::Reset();
-    EXPECT_EQ (0u, MockCatalog::instances);
+    EXPECT_EQ(0u, MockCatalog::instances);
   }
 
   TraversalParams GetBasicTraversalParams() {
@@ -72,7 +76,7 @@ class T_CatalogTraversal : public ::testing::Test {
                             const CatalogIdentifiers &observed,
                             const bool                check_counts = true) {
     if (check_counts) {
-      EXPECT_EQ (expected.size(), observed.size());
+      EXPECT_EQ(expected.size(), observed.size());
     }
     typedef CatalogIdentifiers::const_iterator itr;
 
@@ -90,17 +94,17 @@ class T_CatalogTraversal : public ::testing::Test {
         }
       }
 
-      EXPECT_TRUE (found) << "didn't find catalog: " << i->second << " "
+      EXPECT_TRUE(found) << "didn't find catalog: " << i->second << " "
                           << "(revision: " << i->first << ")";
     }
   }
 
   void CheckCatalogSequence(const CatalogIdentifiers &expected,
                             const CatalogIdentifiers &observed) {
-    ASSERT_EQ (expected.size(), observed.size());
+    ASSERT_EQ(expected.size(), observed.size());
 
     for (unsigned int _i = 0; _i < expected.size(); ++_i) {
-      EXPECT_EQ (expected[_i], observed[_i])
+      EXPECT_EQ(expected[_i], observed[_i])
         << "traversing order changed (idx: " << _i << ")" << std::endl
         << "found:    "
         << observed[_i].first << " " << observed[_i].second << std::endl
@@ -126,33 +130,33 @@ class T_CatalogTraversal : public ::testing::Test {
 
   shash::Any GetRootHash(const unsigned int revision) const {
     RootCatalogMap::const_iterator i = root_catalogs_.find(revision);
-    assert (i != root_catalogs_.end());
+    assert(i != root_catalogs_.end());
     return i->second.catalog_hash;
   }
 
   time_t GetRootTimestamp(const unsigned int revision) const {
     RootCatalogMap::const_iterator i = root_catalogs_.find(revision);
-    assert (i != root_catalogs_.end());
+    assert(i != root_catalogs_.end());
     return i->second.timestamp;
   }
 
  private:
   void CheckEmpty(const std::string &str) const {
-    ASSERT_FALSE (str.empty());
+    ASSERT_FALSE(str.empty());
   }
 
   CatalogPathMap& GetCatalogTree(const unsigned int revision) {
     RevisionMap::iterator rev_itr = revisions_.find(revision);
-    assert (rev_itr != revisions_.end());
+    assert(rev_itr != revisions_.end());
     return rev_itr->second;
   }
 
   MockCatalog* GetRevisionHead(const unsigned int revision) {
     CatalogPathMap &catalogs = GetCatalogTree(revision);
     CatalogPathMap::iterator catalogs_itr = catalogs.find("");
-    assert (catalogs_itr != catalogs.end());
-    assert (catalogs_itr->second->revision() == revision);
-    assert (catalogs_itr->second->IsRoot());
+    assert(catalogs_itr != catalogs.end());
+    assert(catalogs_itr->second->revision() == revision);
+    assert(catalogs_itr->second->IsRoot());
     return catalogs_itr->second;
   }
 
@@ -160,9 +164,9 @@ class T_CatalogTraversal : public ::testing::Test {
                              const unsigned int   revision) {
     CatalogPathMap &catalogs = GetCatalogTree(revision);
     CatalogPathMap::iterator catalogs_itr = catalogs.find(root_path);
-    assert (catalogs_itr != catalogs.end());
-    assert (catalogs_itr->second->revision()  == revision);
-    assert (catalogs_itr->second->root_path() == root_path);
+    assert(catalogs_itr != catalogs.end());
+    assert(catalogs_itr->second->revision()  == revision);
+    assert(catalogs_itr->second->root_path() == root_path);
     return catalogs_itr->second;
   }
 
@@ -225,15 +229,15 @@ class T_CatalogTraversal : public ::testing::Test {
     MockHistory::RegisterObject(MockHistory::root_hash, history);
 
     history->BeginTransaction();
-    EXPECT_TRUE (history->Insert(history::History::Tag(
+    EXPECT_TRUE(history->Insert(history::History::Tag(
                                  "Revision2", root_catalogs[2].catalog_hash, 1337,
                                  2, root_catalogs[2].timestamp, history::History::kChannelProd,
                                  "this is revision 2")));
-    EXPECT_TRUE (history->Insert(history::History::Tag(
+    EXPECT_TRUE(history->Insert(history::History::Tag(
                                  "Revision5", root_catalogs[5].catalog_hash, 42,
                                  5, root_catalogs[5].timestamp, history::History::kChannelProd,
                                  "this is revision 5")));
-    EXPECT_TRUE (history->Insert(history::History::Tag(
+    EXPECT_TRUE(history->Insert(history::History::Tag(
                                  "Revision6", root_catalogs[6].catalog_hash, 7,
                                  6, root_catalogs[6].timestamp, history::History::kChannelTrunk,
                                  "this is revision 6 - the newest!")));
@@ -243,7 +247,7 @@ class T_CatalogTraversal : public ::testing::Test {
   void MakeRevision(const unsigned int revision) {
     // sanity checks
     RevisionMap::const_iterator rev_itr = revisions_.find(revision);
-    ASSERT_EQ (revisions_.end(), rev_itr);
+    ASSERT_EQ(revisions_.end(), rev_itr);
     ASSERT_LE (1u, revision);
     ASSERT_GE (max_revision, revision);
 
@@ -355,7 +359,7 @@ class T_CatalogTraversal : public ::testing::Test {
     MockCatalog *previous_catalog = NULL;
     if (revision > 1) {
       RevisionMap::iterator prev_rev_itr = revisions_.find(revision - 1);
-      assert (prev_rev_itr != revisions_.end());
+      assert(prev_rev_itr != revisions_.end());
       CatalogPathMap::iterator prev_clg_itr =
         prev_rev_itr->second.find(root_path);
       if (prev_clg_itr != prev_rev_itr->second.end()) {
@@ -415,13 +419,13 @@ void SimpleTraversalCallback(const MockedCatalogTraversal::CallbackDataTN &data)
 
 TEST_F(T_CatalogTraversal, SimpleTraversal) {
   SimpleTraversal_visited_catalogs.clear();
-  EXPECT_EQ (0u, SimpleTraversal_visited_catalogs.size());
+  EXPECT_EQ(0u, SimpleTraversal_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&SimpleTraversalCallback);
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(6, ""));
@@ -465,16 +469,16 @@ void SimpleTraversalNoCloseCallback(
 
 TEST_F(T_CatalogTraversal, SimpleTraversalNoClose) {
   SimpleTraversalNoCloseCallback_visited_catalogs.clear();
-  EXPECT_EQ (0u, SimpleTraversalNoCloseCallback_visited_catalogs.size());
+  EXPECT_EQ(0u, SimpleTraversalNoCloseCallback_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.no_close = true;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&SimpleTraversalNoCloseCallback);
   bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
-  EXPECT_EQ (21u + initial_catalog_instances, MockCatalog::instances);
+  EXPECT_EQ(21u + initial_catalog_instances, MockCatalog::instances);
 
   std::vector<MockCatalog*>::const_iterator i, iend;
   for (i    = SimpleTraversalNoCloseCallback_visited_catalogs.begin(),
@@ -501,14 +505,14 @@ void ZeroLevelHistoryTraversalCallback(
 
 TEST_F(T_CatalogTraversal, ZeroLevelHistoryTraversal) {
   ZeroLevelHistoryTraversal_visited_catalogs.clear();
-  EXPECT_EQ (0u, ZeroLevelHistoryTraversal_visited_catalogs.size());
+  EXPECT_EQ(0u, ZeroLevelHistoryTraversal_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history = 0;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&ZeroLevelHistoryTraversalCallback);
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(6, ""));
@@ -552,14 +556,14 @@ void FirstLevelHistoryTraversalCallback(
 
 TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversal) {
   FirstLevelHistoryTraversal_visited_catalogs.clear();
-  EXPECT_EQ (0u, FirstLevelHistoryTraversal_visited_catalogs.size());
+  EXPECT_EQ(0u, FirstLevelHistoryTraversal_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history = 1;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FirstLevelHistoryTraversalCallback);
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(6, ""));
@@ -631,7 +635,7 @@ void FirstLevelHistoryTraversalNoCloseCallback(
 
 TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
   FirstLevelHistoryTraversalNoClose_visited_catalogs.clear();
-  EXPECT_EQ (0u, FirstLevelHistoryTraversalNoClose_visited_catalogs.size());
+  EXPECT_EQ(0u, FirstLevelHistoryTraversalNoClose_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history  = 1;
@@ -639,9 +643,9 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FirstLevelHistoryTraversalNoCloseCallback);
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
-  EXPECT_EQ (49u + initial_catalog_instances, MockCatalog::instances);
+  EXPECT_EQ(49u + initial_catalog_instances, MockCatalog::instances);
 
   std::vector<MockCatalog*>::const_iterator i, iend;
   for (i    = FirstLevelHistoryTraversalNoClose_visited_catalogs.begin(),
@@ -667,14 +671,14 @@ void SecondLevelHistoryTraversalCallback(
 
 TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversal) {
   SecondLevelHistoryTraversal_visited_catalogs.clear();
-  EXPECT_EQ (0u, SecondLevelHistoryTraversal_visited_catalogs.size());
+  EXPECT_EQ(0u, SecondLevelHistoryTraversal_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history = 2;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&SecondLevelHistoryTraversalCallback);
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(6, ""));
@@ -771,14 +775,14 @@ void FullHistoryTraversalCallback(
 
 TEST_F(T_CatalogTraversal, FullHistoryTraversal) {
   FullHistoryTraversal_visited_catalogs.clear();
-  EXPECT_EQ (0u, FullHistoryTraversal_visited_catalogs.size());
+  EXPECT_EQ(0u, FullHistoryTraversal_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history = TraversalParams::kFullHistory;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullHistoryTraversalCallback);
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(6, ""));
@@ -901,7 +905,7 @@ void SecondLevelHistoryTraversalNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversalNoRepeat) {
   SecondLevelHistoryTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, SecondLevelHistoryTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, SecondLevelHistoryTraversalNoRepeat_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history           = 2;
@@ -909,7 +913,7 @@ TEST_F(T_CatalogTraversal, SecondLevelHistoryTraversalNoRepeat) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&SecondLevelHistoryTraversalNoRepeatCallback);
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(6, ""));
@@ -962,7 +966,7 @@ void FullHistoryTraversalNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, FullHistoryTraversalNoRepeat) {
   FullHistoryTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, FullHistoryTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, FullHistoryTraversalNoRepeat_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history           = TraversalParams::kFullHistory;
@@ -970,7 +974,7 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversalNoRepeat) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullHistoryTraversalNoRepeatCallback);
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(6, ""));
@@ -1016,7 +1020,7 @@ TEST_F(T_CatalogTraversal, FullHistoryTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(1, ""));
 
-  EXPECT_EQ (initial_catalog_instances, FullHistoryTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(initial_catalog_instances, FullHistoryTraversalNoRepeat_visited_catalogs.size());
 
   CheckVisitedCatalogs(catalogs, FullHistoryTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, FullHistoryTraversalNoRepeat_visited_catalogs);
@@ -1037,7 +1041,7 @@ void MultiTraversalCallback(
 
 TEST_F(T_CatalogTraversal, MultiTraversal) {
   MultiTraversal_visited_catalogs.clear();
-  EXPECT_EQ (0u, MultiTraversal_visited_catalogs.size());
+  EXPECT_EQ(0u, MultiTraversal_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1046,7 +1050,7 @@ TEST_F(T_CatalogTraversal, MultiTraversal) {
   traverse.RegisterListener(&MultiTraversalCallback);
 
   const bool t1 = traverse.Traverse(GetRootHash(6));
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -1073,7 +1077,7 @@ TEST_F(T_CatalogTraversal, MultiTraversal) {
   CheckCatalogSequence(catalogs, MultiTraversal_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -1104,7 +1108,7 @@ TEST_F(T_CatalogTraversal, MultiTraversal) {
   CheckCatalogSequence(catalogs, MultiTraversal_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
-  EXPECT_TRUE (t3);
+  EXPECT_TRUE(t3);
 
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -1133,7 +1137,7 @@ void MultiTraversalNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, MultiTraversalNoRepeat) {
   MultiTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, MultiTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, MultiTraversalNoRepeat_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1143,7 +1147,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalNoRepeat) {
   traverse.RegisterListener(&MultiTraversalNoRepeatCallback);
 
   const bool t1 = traverse.Traverse(GetRootHash(6));
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -1170,7 +1174,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalNoRepeat) {
   CheckCatalogSequence(catalogs, MultiTraversalNoRepeat_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -1184,7 +1188,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalNoRepeat) {
   CheckCatalogSequence(catalogs, MultiTraversalNoRepeat_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
-  EXPECT_TRUE (t3);
+  EXPECT_TRUE(t3);
 
   catalogs.push_back(std::make_pair(2, ""));
   CheckVisitedCatalogs(catalogs, MultiTraversalNoRepeat_visited_catalogs);
@@ -1206,7 +1210,7 @@ void MultiTraversalFirstLevelHistoryCallback(
 
 TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   MultiTraversalFirstLevelHistory_visited_catalogs.clear();
-  EXPECT_EQ (0u, MultiTraversalFirstLevelHistory_visited_catalogs.size());
+  EXPECT_EQ(0u, MultiTraversalFirstLevelHistory_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1216,7 +1220,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   traverse.RegisterListener(&MultiTraversalFirstLevelHistoryCallback);
 
   const bool t1 = traverse.Traverse(GetRootHash(6));
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -1271,7 +1275,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistory_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -1319,7 +1323,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistory) {
   CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistory_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
-  EXPECT_TRUE (t3);
+  EXPECT_TRUE(t3);
 
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -1349,7 +1353,7 @@ void MultiTraversalFirstLevelHistoryNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
   MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1360,7 +1364,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
   traverse.RegisterListener(&MultiTraversalFirstLevelHistoryNoRepeatCallback);
 
   const bool t1 = traverse.Traverse(GetRootHash(6));
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -1395,7 +1399,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
   CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(3, ""));
@@ -1412,7 +1416,7 @@ TEST_F(T_CatalogTraversal, MultiTraversalFirstLevelHistoryNoRepeat) {
   CheckCatalogSequence(catalogs, MultiTraversalFirstLevelHistoryNoRepeat_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
-  EXPECT_TRUE (t3);
+  EXPECT_TRUE(t3);
 
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(1, ""));
@@ -1435,7 +1439,7 @@ void EmptyTraversePrunedCallback(
 
 TEST_F(T_CatalogTraversal, EmptyTraversePruned) {
   EmptyTraversePruned_visited_catalogs.clear();
-  EXPECT_EQ (0u, EmptyTraversePruned_visited_catalogs.size());
+  EXPECT_EQ(0u, EmptyTraversePruned_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1445,8 +1449,8 @@ TEST_F(T_CatalogTraversal, EmptyTraversePruned) {
   traverse.RegisterListener(&EmptyTraversePrunedCallback);
   const bool t1 = traverse.TraversePruned();
 
-  EXPECT_FALSE (t1);
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_FALSE(t1);
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
   CheckVisitedCatalogs(catalogs, EmptyTraversePruned_visited_catalogs);
 }
 
@@ -1465,7 +1469,7 @@ void TraversePrunedAfterSimpleTraversalCallback(
 
 TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
   TraversePrunedAfterSimpleTraversal_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraversePrunedAfterSimpleTraversal_visited_catalogs.size());
+  EXPECT_EQ(0u, TraversePrunedAfterSimpleTraversal_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1475,7 +1479,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
   traverse.RegisterListener(&TraversePrunedAfterSimpleTraversalCallback);
 
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -1501,10 +1505,10 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSimpleTraversal_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterSimpleTraversal_visited_catalogs);
-  EXPECT_EQ (1u, traverse.pruned_revision_count());
+  EXPECT_EQ(1u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned();
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(5, ""));
   catalogs.push_back(std::make_pair(4, "/00/12"));
@@ -1588,7 +1592,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversal) {
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSimpleTraversal_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterSimpleTraversal_visited_catalogs);
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
 }
 
 
@@ -1606,7 +1610,7 @@ void TraversePrunedAfterSimpleTraversalNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversalNoRepeat) {
   TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1617,7 +1621,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversalNoRepeat) {
   traverse.RegisterListener(&TraversePrunedAfterSimpleTraversalNoRepeatCallback);
 
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -1643,10 +1647,10 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversalNoRepeat) {
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs);
-  EXPECT_EQ (1u, traverse.pruned_revision_count());
+  EXPECT_EQ(1u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned();
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(5, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -1672,7 +1676,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSimpleTraversalNoRepeat) {
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterSimpleTraversalNoRepeat_visited_catalogs);
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
 }
 
 
@@ -1690,7 +1694,7 @@ void TraversePrunedAfterSecondLevelHistoryTraversalNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat) {
   TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1701,7 +1705,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSecondLevelHistoryTraversalNoRepea
   traverse.RegisterListener(&TraversePrunedAfterSecondLevelHistoryTraversalNoRepeatCallback);
 
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -1736,10 +1740,10 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSecondLevelHistoryTraversalNoRepea
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs);
-  EXPECT_EQ (1u, traverse.pruned_revision_count());
+  EXPECT_EQ(1u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned();
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(3, ""));
   catalogs.push_back(std::make_pair(3, "/00/11"));
@@ -1756,7 +1760,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterSecondLevelHistoryTraversalNoRepea
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterSecondLevelHistoryTraversalNoRepeat_visited_catalogs);
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
 }
 
 
@@ -1774,7 +1778,7 @@ void TraversePrunedAfterMultiTraversalNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
   TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1785,7 +1789,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
   traverse.RegisterListener(&TraversePrunedAfterMultiTraversalNoRepeatCallback);
 
   const bool t1 = traverse.Traverse(GetRootHash(6));
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -1812,7 +1816,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
   CheckCatalogSequence(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -1826,16 +1830,16 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
   CheckCatalogSequence(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
-  EXPECT_TRUE (t3);
+  EXPECT_TRUE(t3);
 
   catalogs.push_back(std::make_pair(2, ""));
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
 
   const bool t4 = traverse.TraversePruned();
-  EXPECT_TRUE (t4);
+  EXPECT_TRUE(t4);
 
   catalogs.push_back(std::make_pair(1, ""));
   catalogs.push_back(std::make_pair(3, ""));
@@ -1850,8 +1854,8 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterMultiTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
   catalogs.push_back(std::make_pair(5, ""));
 
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
-  EXPECT_EQ (initial_catalog_instances, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
+  EXPECT_EQ(initial_catalog_instances, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 }
@@ -1871,7 +1875,7 @@ void TraverseRepositoryTagListCallback(
 
 TEST_F(T_CatalogTraversal, TraverseRepositoryTagList) {
   TraverseRepositoryTagList_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraverseRepositoryTagList_visited_catalogs.size());
+  EXPECT_EQ(0u, TraverseRepositoryTagList_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1880,7 +1884,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagList) {
   traverse.RegisterListener(&TraverseRepositoryTagListCallback);
 
   const bool t1 = traverse.TraverseNamedSnapshots();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(2, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -1959,7 +1963,7 @@ void TraverseRepositoryTagListSecondHistoryLevelCallback(
 
 TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
   TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs.size());
+  EXPECT_EQ(0u, TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -1969,7 +1973,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
   traverse.RegisterListener(&TraverseRepositoryTagListSecondHistoryLevelCallback);
 
   const bool t1 = traverse.TraverseNamedSnapshots();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(2, ""));                // Revision 2
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -2031,7 +2035,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevel) {
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs);
   CheckCatalogSequence(catalogs, TraverseRepositoryTagListSecondHistoryLevel_visited_catalogs);
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
 }
 
 
@@ -2049,7 +2053,7 @@ void TraverseRepositoryTagListSecondHistoryLevelNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) {
   TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -2060,7 +2064,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) 
   traverse.RegisterListener(&TraverseRepositoryTagListSecondHistoryLevelNoRepeatCallback);
 
   const bool t1 = traverse.TraverseNamedSnapshots();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(2, ""));                // Revision 2
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -2095,7 +2099,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListSecondHistoryLevelNoRepeat) 
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraverseRepositoryTagListSecondHistoryLevelNoRepeat_visited_catalogs);
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
 }
 
 
@@ -2113,7 +2117,7 @@ void TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat) {
   TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -2124,7 +2128,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
   traverse.RegisterListener(&TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeatCallback);
 
   const bool t1 = traverse.TraverseNamedSnapshots();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(2, ""));                // Revision 2
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -2159,10 +2163,10 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs);
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned();
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(3, ""));
@@ -2179,7 +2183,7 @@ TEST_F(T_CatalogTraversal, TraverseRepositoryTagListFirstLevelHistoryTraversePru
 
   CheckVisitedCatalogs(catalogs, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraverseRepositoryTagListFirstLevelHistoryTraversePrunedNoRepeat_visited_catalogs);
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
 }
 
 
@@ -2197,7 +2201,7 @@ void TraverseUntilUnavailableRevisionNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
   TraverseUntilUnavailableRevisionNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraverseUntilUnavailableRevisionNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TraverseUntilUnavailableRevisionNoRepeat_visited_catalogs.size());
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(1));
@@ -2216,7 +2220,7 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
   traverse.RegisterListener(&TraverseUntilUnavailableRevisionNoRepeatCallback);
 
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -2266,10 +2270,10 @@ void UnavailableNestedNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
   UnavailableNestedNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, UnavailableNestedNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, UnavailableNestedNoRepeat_visited_catalogs.size());
 
   MockCatalog* doomed_nested_catalog = GetCatalog(2, "/00/10/20");
-  ASSERT_NE (static_cast<MockCatalog*>(NULL), doomed_nested_catalog);
+  ASSERT_NE(static_cast<MockCatalog*>(NULL), doomed_nested_catalog);
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(doomed_nested_catalog->hash());
@@ -2286,7 +2290,7 @@ TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
   traverse.RegisterListener(&UnavailableNestedNoRepeatCallback);
 
   const bool t1 = traverse.Traverse();
-  EXPECT_FALSE (t1);
+  EXPECT_FALSE(t1);
 
   // the doomed catalog is part of revision 5, thus, all catalog of revision 6
   // should still be hit (+ a couple more from revision 5)
@@ -2343,10 +2347,10 @@ void IgnoreUnavailableNestedNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, IgnoreUnavailableNestedNoRepeat) {
   IgnoreUnavailableNestedNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, IgnoreUnavailableNestedNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, IgnoreUnavailableNestedNoRepeat_visited_catalogs.size());
 
   MockCatalog* doomed_nested_catalog = GetCatalog(2, "/00/10/20");
-  ASSERT_NE (static_cast<MockCatalog*>(NULL), doomed_nested_catalog);
+  ASSERT_NE(static_cast<MockCatalog*>(NULL), doomed_nested_catalog);
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(doomed_nested_catalog->hash());
@@ -2363,7 +2367,7 @@ TEST_F(T_CatalogTraversal, IgnoreUnavailableNestedNoRepeat) {
   traverse.RegisterListener(&IgnoreUnavailableNestedNoRepeatCallback);
 
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -2427,7 +2431,7 @@ void DepthFirstSearchFullHistoryTraversalNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, DepthFirstSearchFullHistoryTraversalNoRepeat) {
   DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history           = TraversalParams::kFullHistory;
@@ -2435,7 +2439,7 @@ TEST_F(T_CatalogTraversal, DepthFirstSearchFullHistoryTraversalNoRepeat) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&DepthFirstSearchFullHistoryTraversalNoRepeatCallback);
   const bool t1 = traverse.Traverse(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
 
@@ -2482,7 +2486,7 @@ TEST_F(T_CatalogTraversal, DepthFirstSearchFullHistoryTraversalNoRepeat) {
   catalogs.push_back(std::make_pair(5, ""));
   catalogs.push_back(std::make_pair(6, ""));
 
-  EXPECT_EQ (initial_catalog_instances, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(initial_catalog_instances, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs.size());
 
   CheckVisitedCatalogs(catalogs, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, DepthFirstSearchFullHistoryTraversalNoRepeat_visited_catalogs);
@@ -2503,14 +2507,14 @@ void FullHistoryDepthFirstTraversalCallback(
 
 TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversal) {
   FullHistoryDepthFirstTraversal_visited_catalogs.clear();
-  EXPECT_EQ (0u, FullHistoryDepthFirstTraversal_visited_catalogs.size());
+  EXPECT_EQ(0u, FullHistoryDepthFirstTraversal_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history = TraversalParams::kFullHistory;
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullHistoryDepthFirstTraversalCallback);
   const bool t1 = traverse.Traverse(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
 
@@ -2634,7 +2638,7 @@ void DepthFirstTraversePrunedAfterMultiTraversalNoRepeatCallback(
 
 TEST_F(T_CatalogTraversal, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat) {
   DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -2645,7 +2649,7 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat) 
   traverse.RegisterListener(&DepthFirstTraversePrunedAfterMultiTraversalNoRepeatCallback);
 
   const bool t1 = traverse.Traverse(GetRootHash(6));
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(6, ""));
   catalogs.push_back(std::make_pair(5, "/00/13"));
@@ -2671,7 +2675,7 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat) 
   CheckVisitedCatalogs(catalogs, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
   const bool t2 = traverse.Traverse(GetRootHash(4));
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -2684,15 +2688,15 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat) 
   CheckVisitedCatalogs(catalogs, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
   const bool t3 = traverse.Traverse(GetRootHash(2));
-  EXPECT_TRUE (t3);
+  EXPECT_TRUE(t3);
 
   catalogs.push_back(std::make_pair(2, ""));
   CheckVisitedCatalogs(catalogs, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
 
   const bool t4 = traverse.TraversePruned(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t4);
+  EXPECT_TRUE(t4);
 
   catalogs.push_back(std::make_pair(5, ""));
   catalogs.push_back(std::make_pair(3, ""));
@@ -2707,8 +2711,8 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat) 
   catalogs.push_back(std::make_pair(3, "/00/11/22/33"));
   catalogs.push_back(std::make_pair(1, ""));
 
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
-  EXPECT_EQ (initial_catalog_instances, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
+  EXPECT_EQ(initial_catalog_instances, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs.size());
   CheckVisitedCatalogs(catalogs, DepthFirstTraversePrunedAfterMultiTraversalNoRepeat_visited_catalogs);
 }
 
@@ -2727,7 +2731,7 @@ void DepthFirstTraversalSequenceCallback(
 
 TEST_F(T_CatalogTraversal, DepthFirstTraversalSequence) {
   DepthFirstTraversalSequence_visited_catalogs.clear();
-  EXPECT_EQ (0u, DepthFirstTraversalSequence_visited_catalogs.size());
+  EXPECT_EQ(0u, DepthFirstTraversalSequence_visited_catalogs.size());
 
   CatalogIdentifiers catalogs;
 
@@ -2737,7 +2741,7 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversalSequence) {
   traverse.RegisterListener(&DepthFirstTraversalSequenceCallback);
 
   const bool t1 = traverse.Traverse(GetRootHash(2), MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
   catalogs.push_back(std::make_pair(2, "/00/10/20/32"));
@@ -2748,7 +2752,7 @@ TEST_F(T_CatalogTraversal, DepthFirstTraversalSequence) {
   catalogs.push_back(std::make_pair(2, "/00/10"));
   catalogs.push_back(std::make_pair(2, ""));
 
-  EXPECT_EQ (1u, traverse.pruned_revision_count());
+  EXPECT_EQ(1u, traverse.pruned_revision_count());
   CheckVisitedCatalogs(catalogs, DepthFirstTraversalSequence_visited_catalogs);
   CheckCatalogSequence(catalogs, DepthFirstTraversalSequence_visited_catalogs);
 }
@@ -2768,7 +2772,7 @@ void FullHistoryDepthFirstTraversalUnavailableAncestorCallback(
 
 TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
   FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs.clear();
-  EXPECT_EQ (0u, FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs.size());
+  EXPECT_EQ(0u, FullHistoryDepthFirstTraversalUnavailableAncestor_visited_catalogs.size());
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(2));
@@ -2780,7 +2784,7 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FullHistoryDepthFirstTraversalUnavailableAncestorCallback);
   const bool t1 = traverse.Traverse(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
@@ -2889,7 +2893,7 @@ void FullTraversalRootCatalogDetectionCallback(
                              const MockedCatalogTraversal::CallbackDataTN &data) {
   const bool should_be_root = (data.catalog->path().ToString() == "" ||
                                data.tree_level                 == 0);
-  EXPECT_EQ (should_be_root, data.catalog->IsRoot());
+  EXPECT_EQ(should_be_root, data.catalog->IsRoot());
 }
 
 TEST_F(T_CatalogTraversal, FullTraversalRootCatalogDetection) {
@@ -2899,7 +2903,7 @@ TEST_F(T_CatalogTraversal, FullTraversalRootCatalogDetection) {
   traverse.RegisterListener(&FullTraversalRootCatalogDetectionCallback);
 
   const bool t1 = traverse.Traverse();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 }
 
 
@@ -2917,7 +2921,7 @@ void TimestampThresholdCallback(
 
 TEST_F(T_CatalogTraversal, TimestampThreshold) {
   TimestampThreshold_visited_catalogs.clear();
-  EXPECT_EQ (0u, TimestampThreshold_visited_catalogs.size());
+  EXPECT_EQ(0u, TimestampThreshold_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history             = TraversalParams::kFullHistory;
@@ -2925,7 +2929,7 @@ TEST_F(T_CatalogTraversal, TimestampThreshold) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdCallback);
   const bool t1 = traverse.Traverse(MockedCatalogTraversal::kBreadthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
 
@@ -2999,7 +3003,7 @@ void FutureTimestampThresholdCallback(
 TEST_F(T_CatalogTraversal, FutureTimestampThreshold) {
   // Note: future in a sense of: younger than newest mocked revision!
   FutureTimestampThreshold_visited_catalogs.clear();
-  EXPECT_EQ (0u, FutureTimestampThreshold_visited_catalogs.size());
+  EXPECT_EQ(0u, FutureTimestampThreshold_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history             = TraversalParams::kFullHistory;
@@ -3007,7 +3011,7 @@ TEST_F(T_CatalogTraversal, FutureTimestampThreshold) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&FutureTimestampThresholdCallback);
   const bool t1 = traverse.Traverse(MockedCatalogTraversal::kBreadthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(6, ""));
@@ -3052,14 +3056,14 @@ void TimestampThresholdAndNamedSnapshotsCallback(
 TEST_F(T_CatalogTraversal, TimestampThresholdAndNamedSnapshots) {
   // Note: future in a sense of: younger than newest mocked revision!
   TimestampThresholdAndNamedSnapshots_visited_catalogs.clear();
-  EXPECT_EQ (0u, TimestampThresholdAndNamedSnapshots_visited_catalogs.size());
+  EXPECT_EQ(0u, TimestampThresholdAndNamedSnapshots_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.timestamp = t(6, 6, 2010); // no effect on NamedSnapshotTraversal()
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdAndNamedSnapshotsCallback);
   const bool t1 = traverse.TraverseNamedSnapshots(MockedCatalogTraversal::kBreadthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
 
@@ -3123,7 +3127,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdAndNamedSnapshots) {
 
   CheckVisitedCatalogs(catalogs, TimestampThresholdAndNamedSnapshots_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdAndNamedSnapshots_visited_catalogs);
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
 }
 
 
@@ -3142,7 +3146,7 @@ void TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterH
 TEST_F(T_CatalogTraversal, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat) {
   // Note: future in a sense of: younger than newest mocked revision!
   TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.timestamp         = t(6, 6, 2008); // no effect on NamedSnapshotTraversal()
@@ -3188,19 +3192,19 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterTimestampThresholdHistoryDepthAndN
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
-  EXPECT_EQ (1u, traverse.pruned_revision_count());
+  EXPECT_EQ(1u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraverseNamedSnapshots();
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(2, ""));
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
-  EXPECT_EQ (2u, traverse.pruned_revision_count());
+  EXPECT_EQ(2u, traverse.pruned_revision_count());
 
   const bool t3 = traverse.TraversePruned(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t3);
+  EXPECT_TRUE(t3);
 
   catalogs.push_back(std::make_pair(1, ""));
   catalogs.push_back(std::make_pair(3, "/00/11/24"));
@@ -3216,7 +3220,7 @@ TEST_F(T_CatalogTraversal, TraversePrunedAfterTimestampThresholdHistoryDepthAndN
 
   CheckVisitedCatalogs(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TraversePrunedAfterTimestampThresholdHistoryDepthAndNamedSnapshotsAndAfterHeadTraversalNoRepeat_visited_catalogs);
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
 }
 
 
@@ -3234,7 +3238,7 @@ void TimestampThresholdDepthFirstCallback(
 
 TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirst) {
   TimestampThresholdDepthFirst_visited_catalogs.clear();
-  EXPECT_EQ (0u, TimestampThresholdDepthFirst_visited_catalogs.size());
+  EXPECT_EQ(0u, TimestampThresholdDepthFirst_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history             = TraversalParams::kFullHistory;
@@ -3242,7 +3246,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirst) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdDepthFirstCallback);
   const bool t1 = traverse.Traverse(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(4, "/00/12/27"));
@@ -3314,7 +3318,7 @@ void TimestampThresholdDepthFirstAndTraversePrunedCallback(
 
 TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirstAndTraversePruned) {
   TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs.clear();
-  EXPECT_EQ (0u, TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs.size());
+  EXPECT_EQ(0u, TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.history             = TraversalParams::kFullHistory;
@@ -3322,7 +3326,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirstAndTraversePruned) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdDepthFirstAndTraversePrunedCallback);
   const bool t1 = traverse.Traverse(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(4, "/00/12/27"));
@@ -3377,10 +3381,10 @@ TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirstAndTraversePruned) {
 
   CheckVisitedCatalogs(catalogs, TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs);
-  EXPECT_EQ (1u, traverse.pruned_revision_count());
+  EXPECT_EQ(1u, traverse.pruned_revision_count());
 
   const bool t2 = traverse.TraversePruned(MockedCatalogTraversal::kBreadthFirstTraversal);
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(4, ""));
   catalogs.push_back(std::make_pair(2, "/00/10"));
@@ -3436,7 +3440,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdDepthFirstAndTraversePruned) {
 
   CheckVisitedCatalogs(catalogs, TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdDepthFirstAndTraversePruned_visited_catalogs);
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
 }
 
 
@@ -3455,7 +3459,7 @@ void TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeatCallback(
 TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnapshotsNoRepeat) {
   // Note: future in a sense of: younger than newest mocked revision!
   TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs.size());
 
   TraversalParams params = GetBasicTraversalParams();
   params.timestamp         = t(6, 6, 2003); // no effect on TraverseNamedSnapshots()
@@ -3464,7 +3468,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnaps
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeatCallback);
   const bool t1 = traverse.TraverseNamedSnapshots(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
@@ -3500,7 +3504,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthDepthFirstAndNamedSnaps
 
   CheckVisitedCatalogs(catalogs, TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdHistoryDepthAndNamedSnapshotsDepthFirstNoRepeat_visited_catalogs);
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
 }
 
 
@@ -3519,7 +3523,7 @@ void TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepe
 TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeat) {
   // Note: future in a sense of: younger than newest mocked revision!
   TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeat_visited_catalogs.size());
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
@@ -3533,7 +3537,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatCallback);
   const bool t1 = traverse.TraverseNamedSnapshots(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
@@ -3587,7 +3591,7 @@ void TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepe
 TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned) {
   // Note: future in a sense of: younger than newest mocked revision!
   TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs.clear();
-  EXPECT_EQ (0u, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs.size());
+  EXPECT_EQ(0u, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs.size());
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
@@ -3601,7 +3605,7 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePrunedCallback);
   const bool t1 = traverse.TraverseNamedSnapshots(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   catalogs.push_back(std::make_pair(2, "/00/10/21"));
@@ -3635,17 +3639,17 @@ TEST_F(T_CatalogTraversal, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRe
   catalogs.push_back(std::make_pair(5, ""));
   catalogs.push_back(std::make_pair(6, ""));
 
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
   CheckVisitedCatalogs(catalogs, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs);
 
   const bool t2 = traverse.TraversePruned(MockedCatalogTraversal::kDepthFirstTraversal);
-  EXPECT_TRUE (t2);
+  EXPECT_TRUE(t2);
 
   catalogs.push_back(std::make_pair(1, ""));
   // revision 3 is unreachable as revision 4 is not available...
 
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
   CheckVisitedCatalogs(catalogs, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs);
   CheckCatalogSequence(catalogs, TimestampThresholdHistoryDepthNamedSnapshotsDeletedRevisionDepthFirstNoRepeatTraversePruned_visited_catalogs);
 }
@@ -3666,7 +3670,7 @@ void NamedSnapshotTraversalWithTimestampThresholdNoRepeatCallback(
 TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat) {
   // Note: future in a sense of: younger than newest mocked revision!
   NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs.clear();
-  EXPECT_EQ (0u, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs.size());
+  EXPECT_EQ(0u, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs.size());
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
@@ -3678,7 +3682,7 @@ TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat)
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&NamedSnapshotTraversalWithTimestampThresholdNoRepeatCallback);
   const bool t1 = traverse.TraverseNamedSnapshots();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
 
@@ -3713,7 +3717,7 @@ TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat)
   catalogs.push_back(std::make_pair(5, "/00/13/28"));
   catalogs.push_back(std::make_pair(6, ""));
 
-  EXPECT_EQ (3u, traverse.pruned_revision_count());
+  EXPECT_EQ(3u, traverse.pruned_revision_count());
 
   CheckVisitedCatalogs(catalogs, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs);
   CheckCatalogSequence(catalogs, NamedSnapshotTraversalWithTimestampThresholdNoRepeat_visited_catalogs);
@@ -3734,7 +3738,7 @@ void TraverseNamedSnapshotsWithoutHistoryCallback(
 
 TEST_F(T_CatalogTraversal, TraverseNamedSnapshotsWithoutHistory) {
   TraverseNamedSnapshotsWithoutHistory_visited_catalogs.clear();
-  EXPECT_EQ (0u, TraverseNamedSnapshotsWithoutHistory_visited_catalogs.size());
+  EXPECT_EQ(0u, TraverseNamedSnapshotsWithoutHistory_visited_catalogs.size());
 
   std::set<shash::Any> deleted_history;
   deleted_history.insert(MockHistory::root_hash);
@@ -3744,12 +3748,12 @@ TEST_F(T_CatalogTraversal, TraverseNamedSnapshotsWithoutHistory) {
   MockedCatalogTraversal traverse(params);
   traverse.RegisterListener(&TraverseNamedSnapshotsWithoutHistoryCallback);
   const bool t1 = traverse.TraverseNamedSnapshots();
-  EXPECT_TRUE (t1);
+  EXPECT_TRUE(t1);
 
   CatalogIdentifiers catalogs;
   // nothing to be traversed
 
-  EXPECT_EQ (0u, traverse.pruned_revision_count());
+  EXPECT_EQ(0u, traverse.pruned_revision_count());
   CheckVisitedCatalogs(catalogs, TraverseNamedSnapshotsWithoutHistory_visited_catalogs);
   CheckCatalogSequence(catalogs, TraverseNamedSnapshotsWithoutHistory_visited_catalogs);
 }

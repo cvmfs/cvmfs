@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 #include <string>
 #include <vector>
@@ -72,7 +76,7 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
     {
       RecomputeContentHash(handle->data, handle->nbytes);
 
-      EXPECT_EQ (recomputed_content_hash, computed_content_hash)
+      EXPECT_EQ(recomputed_content_hash, computed_content_hash)
         << "returned content hash differs from recomputed content hash";
     }
 
@@ -81,14 +85,14 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
       int sha1_retval;
 
       sha1_retval = SHA1_Init(&sha_context);
-      ASSERT_EQ (1, sha1_retval) << "failed to initalize SHA1 context";
+      ASSERT_EQ(1, sha1_retval) << "failed to initalize SHA1 context";
 
       sha1_retval = SHA1_Update(&sha_context, data, nbytes);
-      ASSERT_EQ (1, sha1_retval) << "failed to compute SHA1 checksum";
+      ASSERT_EQ(1, sha1_retval) << "failed to compute SHA1 checksum";
 
       unsigned char sha1_digest_[SHA_DIGEST_LENGTH];
       sha1_retval = SHA1_Final(sha1_digest_, &sha_context);
-      ASSERT_EQ (1, sha1_retval) << "failed to finalize SHA1 checksum";
+      ASSERT_EQ(1, sha1_retval) << "failed to finalize SHA1 checksum";
 
       recomputed_content_hash = shash::Any(shash::kSha1,
                                            sha1_digest_,
@@ -120,7 +124,7 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
               upload::CharBuffer          *buffer,
               const CallbackTN            *callback = NULL) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
-    assert (local_handle != NULL);
+    assert(local_handle != NULL);
     local_handle->Append(buffer);
 
     Respond(callback, upload::UploaderResults(0, buffer));
@@ -130,7 +134,7 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
                               const shash::Any            content_hash,
                               const shash::Suffix         hash_suffix) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
-    assert (local_handle != NULL);
+    assert(local_handle != NULL);
 
     // summarize the results produced by the FileProcessor
     results_.push_back(Result(local_handle, content_hash, hash_suffix));
@@ -163,7 +167,7 @@ class T_FileProcessing : public FileSandbox {
   void SetUp() {
     CreateSandbox(FP_MockUploader::sandbox_tmp_dir);
     uploader_ = FP_MockUploader::MockConstruct();
-    ASSERT_NE (static_cast<FP_MockUploader*>(NULL), uploader_);
+    ASSERT_NE(static_cast<FP_MockUploader*>(NULL), uploader_);
   }
 
   void TearDown() {
@@ -364,7 +368,7 @@ class T_FileProcessing : public FileSandbox {
 
   void CheckHashes(const FP_MockUploader::Results &results,
                    const ExpectedHashStrings   &reference_hash_strings) const {
-    EXPECT_EQ (reference_hash_strings.size(), results.size())
+    EXPECT_EQ(reference_hash_strings.size(), results.size())
       << "number of generated chunks did not match";
 
     // convert hash strings into shash::Any structs
@@ -389,13 +393,13 @@ class T_FileProcessing : public FileSandbox {
       ExpectedHashes::const_iterator kend = reference_hashes.end();
       for (; k != kend; ++k) {
         if (k->first == j->computed_content_hash) {
-          EXPECT_EQ (k->second, j->hash_suffix) << "hash suffix does not fit";
+          EXPECT_EQ(k->second, j->hash_suffix) << "hash suffix does not fit";
           found = true;
           break;
         }
       }
 
-      EXPECT_TRUE (found)
+      EXPECT_TRUE(found)
         << "did not find generated hash "
         << j->computed_content_hash.ToString() << " "
         << "in the provided reference hashes";
@@ -414,8 +418,8 @@ class T_FileProcessing : public FileSandbox {
 
 TEST_F(T_FileProcessing, UploaderInitialized) {
   sleep(1);
-  ASSERT_NE (static_cast<FP_MockUploader*>(NULL), uploader_);
-  ASSERT_TRUE (uploader_->worker_thread_running);
+  ASSERT_NE(static_cast<FP_MockUploader*>(NULL), uploader_);
+  ASSERT_TRUE(uploader_->worker_thread_running);
 }
 
 
@@ -554,7 +558,7 @@ TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWavesSlow) {
 
 struct CallbackTest {
   static void CallbackFn(const upload::SpoolerResult &result) {
-    EXPECT_EQ (0,  result.return_code);
+    EXPECT_EQ(0,  result.return_code);
 
     result_content_hash = result.content_hash;
     result_local_path   = result.local_path;
@@ -579,9 +583,9 @@ TEST_F(T_FileProcessing, ProcessingCallbackForSmallFile) {
   shash::Any expected_content_hash(
     shash::kSha1,
     shash::HexPtr(GetSmallFileBulkHash().first));
-  EXPECT_EQ (expected_content_hash, CallbackTest::result_content_hash);
-  EXPECT_EQ (GetSmallFile(),        CallbackTest::result_local_path);
-  EXPECT_EQ (0u,                    CallbackTest::result_chunk_list.size());
+  EXPECT_EQ(expected_content_hash, CallbackTest::result_content_hash);
+  EXPECT_EQ(GetSmallFile(),        CallbackTest::result_local_path);
+  EXPECT_EQ(0u,                    CallbackTest::result_chunk_list.size());
 }
 
 
@@ -596,7 +600,7 @@ TEST_F(T_FileProcessing, ProcessingCallbackForBigFile) {
     shash::kSha1,
     shash::HexPtr(GetBigFileBulkHash().first));
   const size_t number_of_chunks = GetBigFileChunkHashes().size();
-  EXPECT_EQ (expected_content_hash, CallbackTest::result_content_hash);
-  EXPECT_EQ (GetBigFile(),          CallbackTest::result_local_path);
-  EXPECT_EQ (number_of_chunks,      CallbackTest::result_chunk_list.size());
+  EXPECT_EQ(expected_content_hash, CallbackTest::result_content_hash);
+  EXPECT_EQ(GetBigFile(),          CallbackTest::result_local_path);
+  EXPECT_EQ(number_of_chunks,      CallbackTest::result_chunk_list.size());
 }

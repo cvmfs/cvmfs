@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 #include <pthread.h>
 #include <tbb/tbb_thread.h>
@@ -10,7 +14,10 @@ using namespace std;  // NOLINT
 
 class ThreadDummy {
  public:
-  ThreadDummy(int canary_value) : result_value(0), value_(canary_value) {}
+  explicit ThreadDummy(int canary_value)
+    : result_value(0)
+    , value_(canary_value)
+  { }
 
   void OtherThread() {
     result_value = value_;
@@ -32,18 +39,18 @@ TEST(T_Util, ThreadProxy) {
                          &ThreadDummy::OtherThread);
   thread.join();
 
-  EXPECT_EQ (canary, dummy.result_value);
+  EXPECT_EQ(canary, dummy.result_value);
 }
 
 
 TEST(T_Util, IsAbsolutePath) {
   const bool empty = IsAbsolutePath("");
-  EXPECT_FALSE (empty) << "empty path string treated as absolute";
+  EXPECT_FALSE(empty) << "empty path string treated as absolute";
 
   const bool relative = IsAbsolutePath("foo.bar");
-  EXPECT_FALSE (relative) << "relative path treated as absolute";
+  EXPECT_FALSE(relative) << "relative path treated as absolute";
   const bool absolute = IsAbsolutePath("/tmp/foo.bar");
-  EXPECT_TRUE (absolute) << "absolute path not recognized";
+  EXPECT_TRUE(absolute) << "absolute path not recognized";
 }
 
 
@@ -137,14 +144,14 @@ TEST(T_Util, String2Uint64) {
 
 
 TEST(T_Util, IsHttpUrl) {
-  EXPECT_TRUE  (IsHttpUrl("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
-  EXPECT_TRUE  (IsHttpUrl("http://"));
-  EXPECT_TRUE  (IsHttpUrl("http://foobar"));
-  EXPECT_TRUE  (IsHttpUrl("HTTP://www.google.com"));
-  EXPECT_TRUE  (IsHttpUrl("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
-  EXPECT_FALSE (IsHttpUrl("http:/foobar"));
-  EXPECT_FALSE (IsHttpUrl("http"));
-  EXPECT_FALSE (IsHttpUrl("/srv/cvmfs/cms.cern.ch"));
-  EXPECT_FALSE (IsHttpUrl("srv/cvmfs/cms.cern.ch"));
-  EXPECT_FALSE (IsHttpUrl("http//foobar"));
+  EXPECT_TRUE(IsHttpUrl("http://cvmfs-stratum-one.cern.ch/cvmfs/cms.cern.ch"));
+  EXPECT_TRUE(IsHttpUrl("http://"));
+  EXPECT_TRUE(IsHttpUrl("http://foobar"));
+  EXPECT_TRUE(IsHttpUrl("HTTP://www.google.com"));
+  EXPECT_TRUE(IsHttpUrl("HTtP://cvmfs-stratum-zero.cern.ch/ot/atlas"));
+  EXPECT_FALSE(IsHttpUrl("http:/foobar"));
+  EXPECT_FALSE(IsHttpUrl("http"));
+  EXPECT_FALSE(IsHttpUrl("/srv/cvmfs/cms.cern.ch"));
+  EXPECT_FALSE(IsHttpUrl("srv/cvmfs/cms.cern.ch"));
+  EXPECT_FALSE(IsHttpUrl("http//foobar"));
 }

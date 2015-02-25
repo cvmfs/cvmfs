@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
 #include "testutil.h"
@@ -49,9 +53,9 @@ class T_CatalogCounters : public ::testing::Test {
 
 TEST_F(T_CatalogCounters, CounterInitialization) {
   Counters counters;
-  EXPECT_EQ (Counters_t(0), counters.GetSelfEntries());
-  EXPECT_EQ (Counters_t(0), counters.GetSubtreeEntries());
-  EXPECT_EQ (Counters_t(0), counters.GetAllEntries());
+  EXPECT_EQ(Counters_t(0), counters.GetSelfEntries());
+  EXPECT_EQ(Counters_t(0), counters.GetSubtreeEntries());
+  EXPECT_EQ(Counters_t(0), counters.GetAllEntries());
 }
 
 
@@ -59,10 +63,10 @@ TEST_F(T_CatalogCounters, DeltaInitialization) {
   DeltaCounters d_counters;;
 
   // just checking a random sample here...
-  EXPECT_EQ (DeltaCounters_t(0), d_counters.self.regular_files);
-  EXPECT_EQ (DeltaCounters_t(0), d_counters.self.nested_catalogs);
-  EXPECT_EQ (DeltaCounters_t(0), d_counters.subtree.chunked_files);
-  EXPECT_EQ (DeltaCounters_t(0), d_counters.subtree.symlinks);
+  EXPECT_EQ(DeltaCounters_t(0), d_counters.self.regular_files);
+  EXPECT_EQ(DeltaCounters_t(0), d_counters.self.nested_catalogs);
+  EXPECT_EQ(DeltaCounters_t(0), d_counters.subtree.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(0), d_counters.subtree.symlinks);
 }
 
 
@@ -88,10 +92,10 @@ TEST_F(T_CatalogCounters, DeltaBasicIncrement) {
   d_counters.Increment(chunked_file);
   d_counters.Increment(chunked_file);
 
-  EXPECT_EQ (DeltaCounters_t(5), d_counters.self.regular_files);
-  EXPECT_EQ (DeltaCounters_t(2), d_counters.self.directories);
-  EXPECT_EQ (DeltaCounters_t(3), d_counters.self.symlinks);
-  EXPECT_EQ (DeltaCounters_t(2), d_counters.self.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(5), d_counters.self.regular_files);
+  EXPECT_EQ(DeltaCounters_t(2), d_counters.self.directories);
+  EXPECT_EQ(DeltaCounters_t(3), d_counters.self.symlinks);
+  EXPECT_EQ(DeltaCounters_t(2), d_counters.self.chunked_files);
 }
 
 
@@ -125,10 +129,10 @@ TEST_F(T_CatalogCounters, DeltaBasicDecrement) {
   d_counters.Decrement(chunked_file);
   d_counters.Decrement(chunked_file);
 
-  EXPECT_EQ (DeltaCounters_t(1),  d_counters.self.regular_files);
-  EXPECT_EQ (DeltaCounters_t(3),  d_counters.self.directories);
-  EXPECT_EQ (DeltaCounters_t(4),  d_counters.self.symlinks);
-  EXPECT_EQ (DeltaCounters_t(-3), d_counters.self.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(1),  d_counters.self.regular_files);
+  EXPECT_EQ(DeltaCounters_t(3),  d_counters.self.directories);
+  EXPECT_EQ(DeltaCounters_t(4),  d_counters.self.symlinks);
+  EXPECT_EQ(DeltaCounters_t(-3), d_counters.self.chunked_files);
 }
 
 
@@ -156,34 +160,34 @@ TEST_F(T_CatalogCounters, FieldsCombinations) {
 
   a.Add(b);
 
-  EXPECT_EQ (3,  a.regular_files);
-  EXPECT_EQ (19, a.symlinks);
-  EXPECT_EQ (7,  a.directories);
-  EXPECT_EQ (23, a.nested_catalogs);
-  EXPECT_EQ (11, a.chunked_files);
-  EXPECT_EQ (15, a.file_chunks);
+  EXPECT_EQ(3,  a.regular_files);
+  EXPECT_EQ(19, a.symlinks);
+  EXPECT_EQ(7,  a.directories);
+  EXPECT_EQ(23, a.nested_catalogs);
+  EXPECT_EQ(11, a.chunked_files);
+  EXPECT_EQ(15, a.file_chunks);
 
   c.Add(a);
   c.Subtract(b);
 
-  EXPECT_EQ (2,  c.regular_files);
-  EXPECT_EQ (18, c.symlinks);
-  EXPECT_EQ (6,  c.directories);
-  EXPECT_EQ (22, c.nested_catalogs);
-  EXPECT_EQ (10, c.chunked_files);
-  EXPECT_EQ (14, c.file_chunks);
+  EXPECT_EQ(2,  c.regular_files);
+  EXPECT_EQ(18, c.symlinks);
+  EXPECT_EQ(6,  c.directories);
+  EXPECT_EQ(22, c.nested_catalogs);
+  EXPECT_EQ(10, c.chunked_files);
+  EXPECT_EQ(14, c.file_chunks);
 
   d.Add(c);
   d.Add(c);
   d.Subtract(b);
   d.Subtract(d);
 
-  EXPECT_EQ (0, d.regular_files);
-  EXPECT_EQ (0, d.symlinks);
-  EXPECT_EQ (0, d.directories);
-  EXPECT_EQ (0, d.nested_catalogs);
-  EXPECT_EQ (0, d.chunked_files);
-  EXPECT_EQ (0, d.file_chunks);
+  EXPECT_EQ(0, d.regular_files);
+  EXPECT_EQ(0, d.symlinks);
+  EXPECT_EQ(0, d.directories);
+  EXPECT_EQ(0, d.nested_catalogs);
+  EXPECT_EQ(0, d.chunked_files);
+  EXPECT_EQ(0, d.file_chunks);
 }
 
 
@@ -201,28 +205,28 @@ TEST_F(T_CatalogCounters, DeltaPopulateToParent) {
 
   d_child.PopulateToParent(d_parent);
 
-  EXPECT_EQ (DeltaCounters_t(102), d_parent.self.regular_files);
-  EXPECT_EQ (DeltaCounters_t(10),  d_parent.self.symlinks);
-  EXPECT_EQ (DeltaCounters_t(7),   d_parent.self.directories);
-  EXPECT_EQ (DeltaCounters_t(2),   d_parent.self.nested_catalogs);
-  EXPECT_EQ (DeltaCounters_t(5),   d_parent.self.chunked_files);
-  EXPECT_EQ (DeltaCounters_t(42),  d_parent.self.file_chunks);
+  EXPECT_EQ(DeltaCounters_t(102), d_parent.self.regular_files);
+  EXPECT_EQ(DeltaCounters_t(10),  d_parent.self.symlinks);
+  EXPECT_EQ(DeltaCounters_t(7),   d_parent.self.directories);
+  EXPECT_EQ(DeltaCounters_t(2),   d_parent.self.nested_catalogs);
+  EXPECT_EQ(DeltaCounters_t(5),   d_parent.self.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(42),  d_parent.self.file_chunks);
 
-  EXPECT_EQ (DeltaCounters_t(0),   d_parent.subtree.regular_files);   // self (10) + subtree (12)
-  EXPECT_EQ (DeltaCounters_t(23),  d_parent.subtree.symlinks);
-  EXPECT_EQ (DeltaCounters_t(105), d_parent.subtree.directories);
-  EXPECT_EQ (DeltaCounters_t(-1),  d_parent.subtree.nested_catalogs);
-  EXPECT_EQ (DeltaCounters_t(-6),  d_parent.subtree.chunked_files);   // self (3)  + subtree (-4)
-  EXPECT_EQ (DeltaCounters_t(-15), d_parent.subtree.file_chunks); // dito...
+  EXPECT_EQ(DeltaCounters_t(0),   d_parent.subtree.regular_files);   // self (10) + subtree (12)
+  EXPECT_EQ(DeltaCounters_t(23),  d_parent.subtree.symlinks);
+  EXPECT_EQ(DeltaCounters_t(105), d_parent.subtree.directories);
+  EXPECT_EQ(DeltaCounters_t(-1),  d_parent.subtree.nested_catalogs);
+  EXPECT_EQ(DeltaCounters_t(-6),  d_parent.subtree.chunked_files);   // self (3)  + subtree (-4)
+  EXPECT_EQ(DeltaCounters_t(-15), d_parent.subtree.file_chunks); // dito...
 }
 
 
 TEST_F(T_CatalogCounters, CountersBasic) {
   Counters counters = GetFilledCounters();
 
-  EXPECT_EQ (Counters_t(171), counters.GetSelfEntries());
-  EXPECT_EQ (Counters_t(254), counters.GetSubtreeEntries());
-  EXPECT_EQ (Counters_t(425), counters.GetAllEntries());
+  EXPECT_EQ(Counters_t(171), counters.GetSelfEntries());
+  EXPECT_EQ(Counters_t(254), counters.GetSubtreeEntries());
+  EXPECT_EQ(Counters_t(425), counters.GetAllEntries());
 }
 
 
@@ -232,19 +236,19 @@ TEST_F(T_CatalogCounters, ApplyDeltaToCounters) {
 
   c.ApplyDelta(d);
 
-  EXPECT_EQ (Counters_t(254),  c.self.regular_files);
-  EXPECT_EQ (Counters_t(17),   c.self.symlinks);
-  EXPECT_EQ (Counters_t(19),   c.self.directories);
-  EXPECT_EQ (Counters_t(6),    c.self.nested_catalogs);
-  EXPECT_EQ (Counters_t(105),  c.self.chunked_files);
-  EXPECT_EQ (Counters_t(1379), c.self.file_chunks);
+  EXPECT_EQ(Counters_t(254),  c.self.regular_files);
+  EXPECT_EQ(Counters_t(17),   c.self.symlinks);
+  EXPECT_EQ(Counters_t(19),   c.self.directories);
+  EXPECT_EQ(Counters_t(6),    c.self.nested_catalogs);
+  EXPECT_EQ(Counters_t(105),  c.self.chunked_files);
+  EXPECT_EQ(Counters_t(1379), c.self.file_chunks);
 
-  EXPECT_EQ (Counters_t(60),   c.subtree.regular_files);
-  EXPECT_EQ (Counters_t(123),  c.subtree.symlinks);
-  EXPECT_EQ (Counters_t(172),  c.subtree.directories);
-  EXPECT_EQ (Counters_t(1),    c.subtree.nested_catalogs);
-  EXPECT_EQ (Counters_t(18),   c.subtree.chunked_files);
-  EXPECT_EQ (Counters_t(43),   c.subtree.file_chunks);
+  EXPECT_EQ(Counters_t(60),   c.subtree.regular_files);
+  EXPECT_EQ(Counters_t(123),  c.subtree.symlinks);
+  EXPECT_EQ(Counters_t(172),  c.subtree.directories);
+  EXPECT_EQ(Counters_t(1),    c.subtree.nested_catalogs);
+  EXPECT_EQ(Counters_t(18),   c.subtree.chunked_files);
+  EXPECT_EQ(Counters_t(43),   c.subtree.file_chunks);
 }
 
 
@@ -254,19 +258,19 @@ TEST_F(T_CatalogCounters, MergeIntoParent) {
 
   c_child.MergeIntoParent(d_parent);
 
-  EXPECT_EQ (DeltaCounters_t(254),   d_parent.self.regular_files);
-  EXPECT_EQ (DeltaCounters_t(17),    d_parent.self.symlinks);
-  EXPECT_EQ (DeltaCounters_t(19),    d_parent.self.directories);
-  EXPECT_EQ (DeltaCounters_t(6),     d_parent.self.nested_catalogs);
-  EXPECT_EQ (DeltaCounters_t(105),   d_parent.self.chunked_files);
-  EXPECT_EQ (DeltaCounters_t(1379),  d_parent.self.file_chunks);
+  EXPECT_EQ(DeltaCounters_t(254),   d_parent.self.regular_files);
+  EXPECT_EQ(DeltaCounters_t(17),    d_parent.self.symlinks);
+  EXPECT_EQ(DeltaCounters_t(19),    d_parent.self.directories);
+  EXPECT_EQ(DeltaCounters_t(6),     d_parent.self.nested_catalogs);
+  EXPECT_EQ(DeltaCounters_t(105),   d_parent.self.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(1379),  d_parent.self.file_chunks);
 
-  EXPECT_EQ (DeltaCounters_t(-174),  d_parent.subtree.regular_files);
-  EXPECT_EQ (DeltaCounters_t(16),    d_parent.subtree.symlinks);
-  EXPECT_EQ (DeltaCounters_t(88),    d_parent.subtree.directories);
-  EXPECT_EQ (DeltaCounters_t(-5),    d_parent.subtree.nested_catalogs);
-  EXPECT_EQ (DeltaCounters_t(-105),  d_parent.subtree.chunked_files);
-  EXPECT_EQ (DeltaCounters_t(-1369), d_parent.subtree.file_chunks);
+  EXPECT_EQ(DeltaCounters_t(-174),  d_parent.subtree.regular_files);
+  EXPECT_EQ(DeltaCounters_t(16),    d_parent.subtree.symlinks);
+  EXPECT_EQ(DeltaCounters_t(88),    d_parent.subtree.directories);
+  EXPECT_EQ(DeltaCounters_t(-5),    d_parent.subtree.nested_catalogs);
+  EXPECT_EQ(DeltaCounters_t(-105),  d_parent.subtree.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(-1369), d_parent.subtree.file_chunks);
 }
 
 
@@ -276,19 +280,19 @@ TEST_F(T_CatalogCounters, AddAsSubtree) {
 
   c_child.AddAsSubtree(d_parent);
 
-  EXPECT_EQ (DeltaCounters_t(102),  d_parent.self.regular_files);
-  EXPECT_EQ (DeltaCounters_t(10),   d_parent.self.symlinks);
-  EXPECT_EQ (DeltaCounters_t(7),    d_parent.self.directories);
-  EXPECT_EQ (DeltaCounters_t(2),    d_parent.self.nested_catalogs);
-  EXPECT_EQ (DeltaCounters_t(5),    d_parent.self.chunked_files);
-  EXPECT_EQ (DeltaCounters_t(42),   d_parent.self.file_chunks);
+  EXPECT_EQ(DeltaCounters_t(102),  d_parent.self.regular_files);
+  EXPECT_EQ(DeltaCounters_t(10),   d_parent.self.symlinks);
+  EXPECT_EQ(DeltaCounters_t(7),    d_parent.self.directories);
+  EXPECT_EQ(DeltaCounters_t(2),    d_parent.self.nested_catalogs);
+  EXPECT_EQ(DeltaCounters_t(5),    d_parent.self.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(42),   d_parent.self.file_chunks);
 
-  EXPECT_EQ (DeltaCounters_t(212),  d_parent.subtree.regular_files);
-  EXPECT_EQ (DeltaCounters_t(130),  d_parent.subtree.symlinks);
-  EXPECT_EQ (DeltaCounters_t(184),  d_parent.subtree.directories);
-  EXPECT_EQ (DeltaCounters_t(5),    d_parent.subtree.nested_catalogs);
-  EXPECT_EQ (DeltaCounters_t(118),  d_parent.subtree.chunked_files);
-  EXPECT_EQ (DeltaCounters_t(1380), d_parent.subtree.file_chunks);
+  EXPECT_EQ(DeltaCounters_t(212),  d_parent.subtree.regular_files);
+  EXPECT_EQ(DeltaCounters_t(130),  d_parent.subtree.symlinks);
+  EXPECT_EQ(DeltaCounters_t(184),  d_parent.subtree.directories);
+  EXPECT_EQ(DeltaCounters_t(5),    d_parent.subtree.nested_catalogs);
+  EXPECT_EQ(DeltaCounters_t(118),  d_parent.subtree.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(1380), d_parent.subtree.file_chunks);
 }
 
 
@@ -308,54 +312,54 @@ TEST_F(T_CatalogCounters, FieldsMap) {
   d_counters.Increment(regular_file);
 
   map = d_counters.GetFieldsMap();
-  EXPECT_EQ (DeltaCounters_t(3), *map["self_regular"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_regular"]);
+  EXPECT_EQ(DeltaCounters_t(3), *map["self_regular"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_regular"]);
 
   d_counters.Increment(directory);
   d_counters.Increment(directory);
 
   map = d_counters.GetFieldsMap();
-  EXPECT_EQ (DeltaCounters_t(3), *map["self_regular"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_regular"]);
-  EXPECT_EQ (DeltaCounters_t(2), *map["self_dir"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_dir"]);
+  EXPECT_EQ(DeltaCounters_t(3), *map["self_regular"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_regular"]);
+  EXPECT_EQ(DeltaCounters_t(2), *map["self_dir"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_dir"]);
 
   d_counters.Increment(symlink);
   d_counters.Increment(symlink);
   d_counters.Increment(symlink);
 
   map = d_counters.GetFieldsMap();
-  EXPECT_EQ (DeltaCounters_t(3), *map["self_regular"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_regular"]);
-  EXPECT_EQ (DeltaCounters_t(2), *map["self_dir"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_dir"]);
-  EXPECT_EQ (DeltaCounters_t(3), *map["self_symlink"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_symlink"]);
+  EXPECT_EQ(DeltaCounters_t(3), *map["self_regular"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_regular"]);
+  EXPECT_EQ(DeltaCounters_t(2), *map["self_dir"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_dir"]);
+  EXPECT_EQ(DeltaCounters_t(3), *map["self_symlink"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_symlink"]);
 
   d_counters.Increment(chunked_file);
   d_counters.Increment(chunked_file);
 
   map = d_counters.GetFieldsMap();
-  EXPECT_EQ (DeltaCounters_t(5), *map["self_regular"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_regular"]);
-  EXPECT_EQ (DeltaCounters_t(2), *map["self_dir"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_dir"]);
-  EXPECT_EQ (DeltaCounters_t(3), *map["self_symlink"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_symlink"]);
-  EXPECT_EQ (DeltaCounters_t(2), *map["self_chunked"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["subtree_chunked"]);
+  EXPECT_EQ(DeltaCounters_t(5), *map["self_regular"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_regular"]);
+  EXPECT_EQ(DeltaCounters_t(2), *map["self_dir"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_dir"]);
+  EXPECT_EQ(DeltaCounters_t(3), *map["self_symlink"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_symlink"]);
+  EXPECT_EQ(DeltaCounters_t(2), *map["self_chunked"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_chunked"]);
 
   d_counters.PopulateToParent(d_parent);
 
   map = d_parent.GetFieldsMap();
-  EXPECT_EQ (DeltaCounters_t(0), *map["self_regular"]);
-  EXPECT_EQ (DeltaCounters_t(5), *map["subtree_regular"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["self_dir"]);
-  EXPECT_EQ (DeltaCounters_t(2), *map["subtree_dir"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["self_symlink"]);
-  EXPECT_EQ (DeltaCounters_t(3), *map["subtree_symlink"]);
-  EXPECT_EQ (DeltaCounters_t(0), *map["self_chunked"]);
-  EXPECT_EQ (DeltaCounters_t(2), *map["subtree_chunked"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["self_regular"]);
+  EXPECT_EQ(DeltaCounters_t(5), *map["subtree_regular"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["self_dir"]);
+  EXPECT_EQ(DeltaCounters_t(2), *map["subtree_dir"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["self_symlink"]);
+  EXPECT_EQ(DeltaCounters_t(3), *map["subtree_symlink"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["self_chunked"]);
+  EXPECT_EQ(DeltaCounters_t(2), *map["subtree_chunked"]);
 }
 
 }

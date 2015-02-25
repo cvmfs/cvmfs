@@ -1,27 +1,33 @@
-#include <gtest/gtest.h>
-#include <unistd.h>
-#include <string>
-#include <sstream>
-#include <tbb/atomic.h>
+/**
+ * This file is part of the CernVM File System.
+ */
 
-#include "../../cvmfs/upload_facility.h"
+#include <gtest/gtest.h>
+
+#include <tbb/atomic.h>
+#include <unistd.h>
+
+#include <sstream>  // TODO(jblomer): remove me
+#include <string>
+
 #include "../../cvmfs/atomic.h"
-#include "../../cvmfs/util.h"
-#include "../../cvmfs/upload_spooler_definition.h"
+#include "../../cvmfs/file_processing/char_buffer.h"
+#include "../../cvmfs/hash.h"
+#include "../../cvmfs/upload_facility.h"
 #include "../../cvmfs/upload_local.h"
 #include "../../cvmfs/upload_s3.h"
-#include "../../cvmfs/hash.h"
-#include "../../cvmfs/file_processing/char_buffer.h"
+#include "../../cvmfs/upload_spooler_definition.h"
+#include "../../cvmfs/util.h"
+#include "c_file_sandbox.h"
+#include "testutil.h"
 
-#include "./testutil.h"
-#include "./c_file_sandbox.h"
-
-using namespace upload;
 
 /**
  * Port of S3 mockup server
  */
 #define CVMFS_S3_TEST_MOCKUP_SERVER_PORT 8082
+
+namespace upload {
 
 class UploadCallbacks {
  public:
@@ -67,7 +73,6 @@ class UploadCallbacks {
 
 template <class UploadersT>
 class T_Uploaders : public FileSandbox {
-
  private:
   static const std::string sandbox_path;
   static const std::string dest_dir;
@@ -569,7 +574,6 @@ class T_Uploaders : public FileSandbox {
 
     shash::Final(ctx, hash);
   }
-
 };
 
 template <class UploadersT>
@@ -590,9 +594,8 @@ const std::string T_Uploaders<UploadersT>::dest_dir =
 typedef testing::Types<S3Uploader, LocalUploader> UploadTypes;
 TYPED_TEST_CASE(T_Uploaders, UploadTypes);
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+
+//------------------------------------------------------------------------------
 
 
 TYPED_TEST(T_Uploaders, Initialize) {
@@ -600,9 +603,7 @@ TYPED_TEST(T_Uploaders, Initialize) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 TYPED_TEST(T_Uploaders, SimpleFileUpload) {
@@ -625,9 +626,7 @@ TYPED_TEST(T_Uploaders, SimpleFileUpload) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 TYPED_TEST(T_Uploaders, PeekIntoStorage) {
@@ -655,9 +654,7 @@ TYPED_TEST(T_Uploaders, PeekIntoStorage) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 TYPED_TEST(T_Uploaders, RemoveFromStorage) {
@@ -714,9 +711,7 @@ TYPED_TEST(T_Uploaders, UploadEmptyFile) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
@@ -738,9 +733,7 @@ TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
@@ -791,9 +784,7 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
@@ -851,9 +842,7 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
@@ -930,3 +919,5 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
 
   TestFixture::FreeBufferStreams(&streams);
 }
+
+}  // namespace upload

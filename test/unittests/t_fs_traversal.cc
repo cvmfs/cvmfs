@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
 #include <stdlib.h>
@@ -49,28 +53,28 @@ class T_FsTraversal : public ::testing::Test {
 
       switch (type_to_check) {
         case Directory:
-          EXPECT_TRUE (enter_dir)     << path;
-          EXPECT_TRUE (leave_dir)     << path;
-          EXPECT_TRUE (dir_prefix)    << path;
-          EXPECT_TRUE (dir_postfix)   << path;
+          EXPECT_TRUE(enter_dir)     << path;
+          EXPECT_TRUE(leave_dir)     << path;
+          EXPECT_TRUE(dir_prefix)    << path;
+          EXPECT_TRUE(dir_postfix)   << path;
           break;
         case RootDirectory:
-          EXPECT_TRUE (enter_dir)     << path;
-          EXPECT_TRUE (leave_dir)     << path;
+          EXPECT_TRUE(enter_dir)     << path;
+          EXPECT_TRUE(leave_dir)     << path;
           EXPECT_FALSE(dir_prefix)    << path;
           EXPECT_FALSE(dir_postfix)   << path;
           break;
         case NonTraversedDirectory:
-          EXPECT_TRUE (dir_prefix)    << path;
-          EXPECT_TRUE (dir_postfix)   << path;
+          EXPECT_TRUE(dir_prefix)    << path;
+          EXPECT_TRUE(dir_postfix)   << path;
           EXPECT_FALSE(enter_dir)     << path;
           EXPECT_FALSE(leave_dir)     << path;
           break;
         case File:
-          EXPECT_TRUE (file_found)    << path;
+          EXPECT_TRUE(file_found)    << path;
           break;
         case Symlink:
-          EXPECT_TRUE (symlink_found) << path;
+          EXPECT_TRUE(symlink_found) << path;
           break;
         case Untouched:
           EXPECT_FALSE(enter_dir)     << path;
@@ -107,7 +111,7 @@ class T_FsTraversal : public ::testing::Test {
     char *tmp_file =
       strdupa((tmp_path_ + "/cvmfs_T_FsTraversal_testbed_XXXXXX").c_str());
     char *testbed_path = mkdtemp(tmp_file);
-    ASSERT_NE (static_cast<char*>(NULL), testbed_path);
+    ASSERT_NE(static_cast<char*>(NULL), testbed_path);
     testbed_path_ = std::string(testbed_path);
 
     // save the root entry (the testbed) into the reference list
@@ -123,7 +127,7 @@ class T_FsTraversal : public ::testing::Test {
                       &T_FsTraversal::delete_entry,
                       50,
                       FTW_DEPTH | FTW_PHYS);
-    EXPECT_EQ (0, retval) << "Failed to delete testbed directory";
+    EXPECT_EQ(0, retval) << "Failed to delete testbed directory";
   }
 
   static int delete_entry(const char         *path,
@@ -169,16 +173,16 @@ class T_FsTraversal : public ::testing::Test {
   void MakeDirectory(const std::string &relative_path) {
     const std::string path = testbed_path_ + "/" + relative_path;
     const int retval = mkdir(path.c_str(), 0755);
-    ASSERT_EQ (0, retval) << path << "errno: " << errno;
+    ASSERT_EQ(0, retval) << path << "errno: " << errno;
     reference_[relative_path] = Checklist(relative_path, Checklist::Directory);
   }
 
   void MakeFile(const std::string &relative_path) {
     const std::string path = testbed_path_ + "/" + relative_path;
     FILE *file = fopen(path.c_str(), "w+");
-    ASSERT_NE (static_cast<FILE*>(NULL), file);
+    ASSERT_NE(static_cast<FILE*>(NULL), file);
     const int retval = fclose(file);
-    ASSERT_EQ (0, retval);
+    ASSERT_EQ(0, retval);
     reference_[relative_path] = Checklist(relative_path, Checklist::File);
   }
 
@@ -186,7 +190,7 @@ class T_FsTraversal : public ::testing::Test {
                    const std::string &link_destination) {
     const std::string path = testbed_path_ + "/" + relative_path;
     const int retval = symlink(link_destination.c_str(), path.c_str());
-    ASSERT_EQ (0, retval) << "errno: " << errno;
+    ASSERT_EQ(0, retval) << "errno: " << errno;
     reference_[relative_path] = Checklist(relative_path, Checklist::Symlink);
   }
 
