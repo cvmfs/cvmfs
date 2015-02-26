@@ -3,24 +3,22 @@
  */
 
 #include <gtest/gtest.h>
-#include <string>
-#include <vector>
-#include <cerrno>
 
 #include <openssl/sha.h>
 
-#include <iostream>
+#include <cerrno>
+#include <string>
+#include <vector>
 
-#include "../../cvmfs/util.h"
-#include "../../cvmfs/upload_spooler_result.h"
-#include "../../cvmfs/file_processing/file_processor.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
-
+#include "../../cvmfs/file_processing/file_processor.h"
+#include "../../cvmfs/upload_spooler_result.h"
+#include "../../cvmfs/util.h"
 #include "c_file_sandbox.h"
 #include "testutil.h"
 
 struct MockStreamHandle : public upload::UploadStreamHandle {
-  MockStreamHandle(const CallbackTN *commit_callback) :
+  explicit MockStreamHandle(const CallbackTN *commit_callback) :
     UploadStreamHandle(commit_callback),
     data(NULL), nbytes(0), marker(0) {}
 
@@ -106,8 +104,9 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
   typedef std::vector<Result> Results;
 
  public:
-  FP_MockUploader(const upload::SpoolerDefinition &spooler_definition) :
-    AbstractMockUploader<FP_MockUploader>(spooler_definition) {}
+  explicit FP_MockUploader(const upload::SpoolerDefinition &spooler_definition)
+    : AbstractMockUploader<FP_MockUploader>(spooler_definition)
+  {}
 
   const Results& results() const { return results_; }
 
@@ -322,8 +321,8 @@ class T_FileProcessing : public FileSandbox {
   }
 
   template <class VectorT>
-  void AppendVectorToVector(VectorT &vector, const VectorT &appendee) const {
-    vector.insert(vector.end(), appendee.begin(), appendee.end());
+  void AppendVectorToVector(const VectorT &appendee, VectorT *vector) const {
+    vector->insert(vector->end(), appendee.begin(), appendee.end());
   }
 
   void TestProcessFile(const std::string        &file_path,
@@ -379,8 +378,7 @@ class T_FileProcessing : public FileSandbox {
     for (; i != iend; ++i) {
       reference_hashes.push_back(
         std::make_pair(shash::Any(shash::kSha1, shash::HexPtr(i->first)),
-                       i->second)
-      );
+                       i->second));
     }
 
     // check if we can find the computed hashes in the expected hashes
@@ -471,22 +469,22 @@ TEST_F(T_FileProcessing, ProcessMultipleFilesSlow) {
 
   pathes.push_back(GetBigFile());
   hs.push_back(GetBigFileBulkHash());
-  AppendVectorToVector(hs, GetBigFileChunkHashes());
+  AppendVectorToVector(GetBigFileChunkHashes(), &hs);
 
   pathes.push_back(GetHugeFile());
   hs.push_back(GetHugeFileBulkHash());
-  AppendVectorToVector(hs, GetHugeFileChunkHashes());
+  AppendVectorToVector(GetHugeFileChunkHashes(), &hs);
 
   pathes.push_back(GetHugeFile());
   hs.push_back(GetHugeFileBulkHash());
-  AppendVectorToVector(hs, GetHugeFileChunkHashes());
+  AppendVectorToVector(GetHugeFileChunkHashes(), &hs);
 
   pathes.push_back(GetSmallFile());
   hs.push_back(GetSmallFileBulkHash());
 
   pathes.push_back(GetBigFile());
   hs.push_back(GetBigFileBulkHash());
-  AppendVectorToVector(hs, GetBigFileChunkHashes());
+  AppendVectorToVector(GetBigFileChunkHashes(), &hs);
 
   TestProcessFiles(pathes, hs);
 }
@@ -541,7 +539,7 @@ TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWavesSlow) {
   hs.push_back(GetEmptyFileBulkHash());
   hs.push_back(GetSmallFileBulkHash());
   hs.push_back(GetBigFileBulkHash());
-  AppendVectorToVector(hs, GetBigFileChunkHashes());
+  AppendVectorToVector(GetBigFileChunkHashes(), &hs);
   hs.push_back(GetHugeFileBulkHash(shash::kSuffixCatalog));
   processor.WaitForProcessing();
   CheckHashes(uploader_->results(), hs);
@@ -551,7 +549,8 @@ TEST_F(T_FileProcessing, ProcessMultipleFilesInSeparateWavesSlow) {
   // third wave...
   processor.Process(GetSmallFile(), true, shash::kSuffixCertificate);
   processor.WaitForProcessing();
-  CheckHash(uploader_->results(), GetSmallFileBulkHash(shash::kSuffixCertificate));
+  CheckHash(uploader_->results(),
+            GetSmallFileBulkHash(shash::kSuffixCertificate));
   uploader_->ClearResults();
 }
 

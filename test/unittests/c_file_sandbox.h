@@ -2,19 +2,22 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UTEST_FILE_SANDBOX_H
-#define CVMFS_UTEST_FILE_SANDBOX_H
+#ifndef TEST_UNITTESTS_C_FILE_SANDBOX_H_
+#define TEST_UNITTESTS_C_FILE_SANDBOX_H_
 
-#include "../../cvmfs/util.h"
+#include <string>
+#include <utility>
+
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/prng.h"
+#include "../../cvmfs/util.h"
 
 class FileSandbox : public ::testing::Test {
  public:
   typedef std::pair<std::string, shash::Suffix> ExpectedHashString;
 
  public:
-  FileSandbox(const std::string &sandbox_path) :
+  explicit FileSandbox(const std::string &sandbox_path) :
     sandbox_path_(sandbox_path) {}
 
  protected:
@@ -39,8 +42,8 @@ class FileSandbox : public ::testing::Test {
   }
 
   template <class VectorT>
-  void AppendVectorToVector(VectorT &vector, const VectorT &appendee) const {
-    vector.insert(vector.end(), appendee.begin(), appendee.end());
+  void AppendVectorToVector(const VectorT &appendee, VectorT *vector) const {
+    vector->insert(vector->end(), appendee.begin(), appendee.end());
   }
 
   void CreateSandbox(const std::string &sandbox_tmp_dir = "") {
@@ -67,9 +70,9 @@ class FileSandbox : public ::testing::Test {
     ASSERT_TRUE(retval) << "failed to remove sandbox";
   }
 
-  void CreateRandomBuffer(char *buffer, const size_t nbytes, Prng &rng) {
+  void CreateRandomBuffer(const size_t nbytes, char *buffer, Prng *rng) {
     for (size_t i = 0; i < nbytes; ++i) {
-      buffer[i] = rng.Next(256);
+      buffer[i] = rng->Next(256);
     }
   }
 
@@ -94,7 +97,7 @@ class FileSandbox : public ::testing::Test {
     for (size_t i = 0; i < file_size_kb; ++i) {
       typedef char buffer_type;
       buffer_type buffer[kb];
-      CreateRandomBuffer(buffer, kb, rng);
+      CreateRandomBuffer(kb, buffer, &rng);
       const size_t written = fwrite(buffer, sizeof(buffer_type), kb, file);
       ASSERT_EQ(written, kb * sizeof(buffer_type))
         << "failed to write to tmp (errno: " << errno << ")";
@@ -114,4 +117,4 @@ class FileSandbox : public ::testing::Test {
   std::string       huge_file_;
 };
 
-#endif /* CVMFS_UTEST_FILE_SANDBOX_H */
+#endif  // TEST_UNITTESTS_C_FILE_SANDBOX_H_

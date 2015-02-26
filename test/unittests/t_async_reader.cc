@@ -5,16 +5,15 @@
 #include <gtest/gtest.h>
 
 #include <openssl/sha.h>
-
-#include <cassert>
 #include <pthread.h>
 #include <unistd.h>
 
-#include "../../cvmfs/util.h"
+#include <cassert>
+
+#include "../../cvmfs/file_processing/async_reader.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
 #include "../../cvmfs/file_processing/file_scrubbing_task.h"
-#include "../../cvmfs/file_processing/async_reader.h"
-
+#include "../../cvmfs/util.h"
 #include "c_file_sandbox.h"
 
 namespace upload {
@@ -153,12 +152,7 @@ class T_AsyncReader : public FileSandbox {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, Initialize) {
+TEST_F(T_AsyncReader, Initialize) {
   const size_t        max_buffer_size = 4096;
   const unsigned int  max_buffers_in_flight = 10;
 
@@ -168,12 +162,7 @@ TEST_F (T_AsyncReader, Initialize) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, ReadEmptyFile) {
+TEST_F(T_AsyncReader, ReadEmptyFile) {
   const size_t        max_buffer_size = 4096;
   const unsigned int  max_buffers_in_flight = 10;
 
@@ -190,16 +179,11 @@ TEST_F (T_AsyncReader, ReadEmptyFile) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, ReadSmallFile) {
+TEST_F(T_AsyncReader, ReadSmallFile) {
   TestFile *f = new TestFile(GetSmallFile(), GetSmallFileHash());
 
-  const size_t        max_buffer_size = f->size() * 3; // will fit in one buffer
-  const unsigned int  max_buffers_in_flight = 10;
+  const size_t max_buffer_size = f->size() * 3;  // will fit in one buffer
+  const unsigned int max_buffers_in_flight = 10;
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
   reader.Initialize();
@@ -213,18 +197,13 @@ TEST_F (T_AsyncReader, ReadSmallFile) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 unsigned int g_FileReadCallback_Callback_calls = 0;
-void FileReadCallback_Callback(TestFile* const& file) {
+static void FileReadCallback_Callback(TestFile* const& file) {
   file->CheckHash();
   ++g_FileReadCallback_Callback_calls;
 }
 
-TEST_F (T_AsyncReader, FileReadCallback) {
+TEST_F(T_AsyncReader, FileReadCallback) {
   const unsigned int file_count = 5;
 
   std::vector<TestFile*> files;
@@ -255,16 +234,11 @@ TEST_F (T_AsyncReader, FileReadCallback) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, ReadHugeFileSlow) {
+TEST_F(T_AsyncReader, ReadHugeFileSlow) {
   TestFile *f = new TestFile(GetHugeFile(), GetHugeFileHash());
 
-  const size_t        max_buffer_size = 524288; // will NOT fit in one buffer
-  const unsigned int  max_buffers_in_flight = 10;
+  const size_t max_buffer_size = 524288;  // will NOT fit in one buffer
+  const unsigned int max_buffers_in_flight = 10;
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
   reader.Initialize();
@@ -278,12 +252,7 @@ TEST_F (T_AsyncReader, ReadHugeFileSlow) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, ReadManyBigFilesSlow) {
+TEST_F(T_AsyncReader, ReadManyBigFilesSlow) {
   const int file_count = 5000;
 
   std::vector<TestFile*> files;
@@ -293,7 +262,7 @@ TEST_F (T_AsyncReader, ReadManyBigFilesSlow) {
   }
 
   const size_t        max_buffer_size = 524288;
-  const unsigned int  max_buffers_in_flight = 5; // less buffers than files
+  const unsigned int  max_buffers_in_flight = 5;  // less buffers than files
   MyReader reader(max_buffer_size, max_buffers_in_flight);
   reader.Initialize();
 
@@ -315,16 +284,12 @@ TEST_F (T_AsyncReader, ReadManyBigFilesSlow) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 void *deadlock_test(void *v_files) {
-  std::vector<TestFile*> &files = *static_cast<std::vector<TestFile*>*>(v_files);
+  std::vector<TestFile*> &files =
+    *static_cast<std::vector<TestFile *> *>(v_files);
 
   const size_t        max_buffer_size = 524288;
-  const unsigned int  max_buffers_in_flight = 5; // less buffers than files
+  const unsigned int  max_buffers_in_flight = 5;  // less buffers than files
   T_AsyncReader::MyReader reader(max_buffer_size, max_buffers_in_flight);
   reader.Initialize();
 
@@ -358,10 +323,10 @@ void *deadlock_test(void *v_files) {
 
   reader.TearDown();
 
-  return (void*)1337;
+  return reinterpret_cast<void *>(1337);
 }
 
-TEST_F (T_AsyncReader, MultipleWaitsSlow) {
+TEST_F(T_AsyncReader, MultipleWaitsSlow) {
   const int file_count = 10000;
   std::vector<TestFile*> files;
   files.reserve(file_count);
@@ -392,4 +357,4 @@ TEST_F (T_AsyncReader, MultipleWaitsSlow) {
   }
 }
 
-}
+}  // namespace upload

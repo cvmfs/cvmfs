@@ -10,7 +10,6 @@
 
 namespace catalog {
 
-
 class T_CatalogCounters : public ::testing::Test {
  protected:
   DeltaCounters GetFilledDeltaCounters() const {
@@ -212,12 +211,14 @@ TEST_F(T_CatalogCounters, DeltaPopulateToParent) {
   EXPECT_EQ(DeltaCounters_t(5),   d_parent.self.chunked_files);
   EXPECT_EQ(DeltaCounters_t(42),  d_parent.self.file_chunks);
 
-  EXPECT_EQ(DeltaCounters_t(0),   d_parent.subtree.regular_files);   // self (10) + subtree (12)
+  // self (10) + subtree (12)
+  EXPECT_EQ(DeltaCounters_t(0),   d_parent.subtree.regular_files);
   EXPECT_EQ(DeltaCounters_t(23),  d_parent.subtree.symlinks);
   EXPECT_EQ(DeltaCounters_t(105), d_parent.subtree.directories);
   EXPECT_EQ(DeltaCounters_t(-1),  d_parent.subtree.nested_catalogs);
-  EXPECT_EQ(DeltaCounters_t(-6),  d_parent.subtree.chunked_files);   // self (3)  + subtree (-4)
-  EXPECT_EQ(DeltaCounters_t(-15), d_parent.subtree.file_chunks); // dito...
+  // self (3)  + subtree (-4)
+  EXPECT_EQ(DeltaCounters_t(-6),  d_parent.subtree.chunked_files);
+  EXPECT_EQ(DeltaCounters_t(-15), d_parent.subtree.file_chunks);  // dito...
 }
 
 
@@ -362,4 +363,4 @@ TEST_F(T_CatalogCounters, FieldsMap) {
   EXPECT_EQ(DeltaCounters_t(2), *map["subtree_chunked"]);
 }
 
-}
+}  // namespace catalog

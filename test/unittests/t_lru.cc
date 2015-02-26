@@ -6,7 +6,7 @@
 
 #include "../../cvmfs/lru.h"
 
-using namespace lru;
+using lru::LruCache;
 
 static inline uint32_t hasher_int(const int &value) {
   return value;

@@ -3,6 +3,7 @@
  */
 
 #include <gtest/gtest.h>
+
 #include <string>
 
 #include "../../cvmfs/pathspec/pathspec.h"
@@ -443,18 +444,19 @@ TEST(T_Pathspec, GetGlobString) {
   const std::string s8  = "foo/bar$";
   const std::string s9  = "/moep+test/foo";
   const std::string s10 = "moep\\\\atest/foo";
-  const std::string s10a= "moep\\atest/foo"; // escaped escapes are not rebuilt!
+  // escaped escapes are not rebuilt!
+  const std::string s10a = "moep\\atest/foo";
   const std::string s11 = "/moep+/foo\\?/bar\\*/t[e]st/hallo.welt";
 
-  const Pathspec p1 (s1 );
-  const Pathspec p2 (s2 );
-  const Pathspec p3 (s3 );
-  const Pathspec p4 (s4 );
-  const Pathspec p5 (s5 );
-  const Pathspec p6 (s6 );
-  const Pathspec p7 (s7 );
-  const Pathspec p8 (s8 );
-  const Pathspec p9 (s9 );
+  const Pathspec p1(s1);
+  const Pathspec p2(s2);
+  const Pathspec p3(s3);
+  const Pathspec p4(s4);
+  const Pathspec p5(s5);
+  const Pathspec p6(s6);
+  const Pathspec p7(s7);
+  const Pathspec p8(s8);
+  const Pathspec p9(s9);
   const Pathspec p10(s10);
   const Pathspec p11(s11);
 

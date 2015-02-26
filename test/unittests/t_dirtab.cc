@@ -3,6 +3,7 @@
  */
 
 #include <gtest/gtest.h>
+
 #include <string>
 
 #include "../../cvmfs/dirtab.h"

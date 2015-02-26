@@ -3,10 +3,11 @@
  */
 
 #include <gtest/gtest.h>
+
 #include <vector>
 
-#include "../../cvmfs/file_processing/chunk_detector.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
+#include "../../cvmfs/file_processing/chunk_detector.h"
 #include "../../cvmfs/prng.h"
 
 namespace upload {
@@ -101,7 +102,7 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
 
 
 TEST_F(T_ChunkDetectors, Xor32) {
-  Xor32Detector xor32_detector(1, 2, 4); // chunk sizes are not important here!
+  Xor32Detector xor32_detector(1, 2, 4);  // chunk sizes are not important here!
 
   // table of test data:
   //   <input value> , <expected xor32 value>
@@ -200,10 +201,10 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetectorSlow) {
   };
 
   std::vector<size_t> buffer_sizes;
-  buffer_sizes.push_back(102400);   // 100kB
-  buffer_sizes.push_back(base);     // same as minimal chunk size
-  buffer_sizes.push_back(base * 2); // same as average chunk size
-  buffer_sizes.push_back(10485760); // 10MB
+  buffer_sizes.push_back(102400);    // 100kB
+  buffer_sizes.push_back(base);      // same as minimal chunk size
+  buffer_sizes.push_back(base * 2);  // same as average chunk size
+  buffer_sizes.push_back(10485760);  // 10MB
 
   std::vector<size_t>::const_iterator i    = buffer_sizes.begin();
   std::vector<size_t>::const_iterator iend = buffer_sizes.end();
@@ -254,4 +255,4 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetectorSlow) {
   }
 }
 
-} // namespace
+}  // namespace upload

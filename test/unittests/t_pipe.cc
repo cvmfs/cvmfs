@@ -12,8 +12,8 @@ class T_Pipe : public ::testing::Test {
     const int fd_read_flags  = fcntl(pipe.read_end,  F_GETFD);
     const int fd_write_flags = fcntl(pipe.write_end, F_GETFD);
 
-    ASSERT_GE (fd_read_flags,  0) << "Failed to create pipe (read end)";
-    ASSERT_GE (fd_write_flags, 0) << "Failed to create pipe (write end)";
+    ASSERT_GE(fd_read_flags,  0) << "Failed to create pipe (read end)";
+    ASSERT_GE(fd_write_flags, 0) << "Failed to create pipe (write end)";
   }
 
 
@@ -68,7 +68,7 @@ TEST_F(T_Pipe, WriteTemplate) {
   retval = pipe.Write(integer);   EXPECT_TRUE(retval);
   retval = pipe.Write(character); EXPECT_TRUE(retval);
   retval = pipe.Write(foobar);    EXPECT_TRUE(retval);
-  EXPECT_DEATH (pipe.Write(&foobar), "");
+  EXPECT_DEATH(pipe.Write(&foobar), "");
 }
 
 

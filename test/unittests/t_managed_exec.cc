@@ -4,9 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include "testutil.h"
-
 #include "../../cvmfs/util.h"
+#include "testutil.h"
 
 
 TEST(T_ManagedExec, RunShell) {

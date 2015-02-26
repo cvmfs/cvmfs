@@ -3,17 +3,18 @@
  */
 
 #include <gtest/gtest.h>
-#include <string>
-#include <map>
 
-#include "testutil.h"
+#include <map>
+#include <string>
 
 #include "../../cvmfs/compression.h"
 #include "../../cvmfs/history_sqlite.h"
 #include "../../cvmfs/prng.h"
 #include "../../cvmfs/util.h"
+#include "testutil.h"
 
-using namespace history;
+using history::History;
+using history::SqliteHistory;
 
 template <class HistoryT>
 class T_History : public ::testing::Test {
@@ -95,8 +96,10 @@ class T_History : public ::testing::Test {
     return OpenMockHistory(filename, false);
   }
 
-  History* OpenWritableHistory(const type<history::SqliteHistory>  type_specifier,
-                               const std::string                  &filename) {
+  History* OpenWritableHistory(
+    const type<history::SqliteHistory> type_specifier,
+    const std::string &filename
+  ) {
     return SqliteHistory::OpenWritable(filename);
   }
 
@@ -227,7 +230,7 @@ class T_History : public ::testing::Test {
                    reinterpret_cast<void**>(&unpacked),
                    &unpacked_size)) << "failed to decompress";
     WriteFile(dest, std::string(unpacked, unpacked_size));
-    free (unpacked);
+    free(unpacked);
   }
 
   void WriteFile(const std::string &path, const std::string &content) const {
@@ -432,7 +435,7 @@ TYPED_TEST(T_History, InsertAndFindTag) {
 
   History::Tag tag;
   ASSERT_TRUE(history->GetByName(dummy.name, &tag));
-  TestFixture::CompareTags (dummy, tag);
+  TestFixture::CompareTags(dummy, tag);
 
   TestFixture::CloseHistory(history);
 }
@@ -449,7 +452,7 @@ TYPED_TEST(T_History, InsertReopenAndFindTag) {
 
   History::Tag tag1;
   ASSERT_TRUE(history1->GetByName(dummy.name, &tag1));
-  TestFixture::CompareTags (dummy, tag1);
+  TestFixture::CompareTags(dummy, tag1);
   TestFixture::CloseHistory(history1);
 
   History *history2 = TestFixture::OpenHistory(hp);
@@ -459,7 +462,7 @@ TYPED_TEST(T_History, InsertReopenAndFindTag) {
 
   History::Tag tag2;
   ASSERT_TRUE(history2->GetByName(dummy.name, &tag2));
-  TestFixture::CompareTags (dummy, tag2);
+  TestFixture::CompareTags(dummy, tag2);
   TestFixture::CloseHistory(history2);
 }
 
@@ -725,16 +728,24 @@ TYPED_TEST(T_History, GetChannelTips) {
   EXPECT_EQ(TestFixture::fqrn, history1->fqrn());
 
   history1->BeginTransaction();
-  const History::Tag trunk_tip = TF::GetDummyTag("zap", 4, History::kChannelTrunk);
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("foo",  1, History::kChannelTrunk)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("bar",  2, History::kChannelTrunk)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("baz",  3, History::kChannelTrunk)));
+  const History::Tag trunk_tip =
+    TF::GetDummyTag("zap", 4, History::kChannelTrunk);
+  ASSERT_TRUE(history1->Insert(
+    TF::GetDummyTag("foo", 1, History::kChannelTrunk)));
+  ASSERT_TRUE(history1->Insert(
+    TF::GetDummyTag("bar", 2, History::kChannelTrunk)));
+  ASSERT_TRUE(history1->Insert(
+    TF::GetDummyTag("baz", 3, History::kChannelTrunk)));
   ASSERT_TRUE(history1->Insert(trunk_tip));
 
-  const History::Tag test_tip = TF::GetDummyTag("yolo",   6, History::kChannelTest);
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep",   3, History::kChannelTest)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("lol",    4, History::kChannelTest)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("cheers", 5, History::kChannelTest)));
+  const History::Tag test_tip =
+    TF::GetDummyTag("yolo",   6, History::kChannelTest);
+  ASSERT_TRUE(history1->Insert(
+    TF::GetDummyTag("moep", 3, History::kChannelTest)));
+  ASSERT_TRUE(history1->Insert(
+    TF::GetDummyTag("lol", 4, History::kChannelTest)));
+  ASSERT_TRUE(history1->Insert(
+    TF::GetDummyTag("cheers", 5, History::kChannelTest)));
   ASSERT_TRUE(history1->Insert(test_tip));
   history1->CommitTransaction();
 
@@ -742,15 +753,18 @@ TYPED_TEST(T_History, GetChannelTips) {
   ASSERT_TRUE(history1->Tips(&tags));
   EXPECT_EQ(2u, tags.size());
 
-  TagVector expected; // TODO: C++11 initializer lists
+  TagVector expected;  // TODO(rmeusel): C++11 initializer lists
   expected.push_back(trunk_tip);
   expected.push_back(test_tip);
   EXPECT_TRUE(TestFixture::CheckListing(tags, expected));
 
   history1->BeginTransaction();
-  const History::Tag prod_tip = TF::GetDummyTag("prod", 10, History::kChannelProd);
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("vers", 3, History::kChannelProd)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("bug",  6, History::kChannelProd)));
+  const History::Tag prod_tip =
+    TF::GetDummyTag("prod", 10, History::kChannelProd);
+  ASSERT_TRUE(history1->Insert(
+    TF::GetDummyTag("vers", 3, History::kChannelProd)));
+  ASSERT_TRUE(history1->Insert(
+    TF::GetDummyTag("bug",  6, History::kChannelProd)));
   ASSERT_TRUE(history1->Insert(prod_tip));
   history1->CommitTransaction();
 
@@ -906,7 +920,7 @@ TYPED_TEST(T_History, GetTagByDate) {
   const time_t ts0411 = 1415126511;
 
   History::Tag tag;
-  EXPECT_FALSE(history->GetByDate(ts2510, &tag)); // No revision yet
+  EXPECT_FALSE(history->GetByDate(ts2510, &tag));  // No revision yet
 
   EXPECT_TRUE(history->GetByDate(ts3110, &tag));
   TestFixture::CompareTags(t3110, tag);
@@ -937,7 +951,7 @@ TYPED_TEST(T_History, RollbackToOldTag) {
   ASSERT_TRUE(history1->Insert(TF::GetDummyTag("foo",            1, c_test)));
   ASSERT_TRUE(history1->Insert(TF::GetDummyTag("bar",            2, c_test)));
   ASSERT_TRUE(history1->Insert(TF::GetDummyTag("first_release",  3, c_prod)));
-  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep",           4, c_test))); // <--
+  ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep",           4, c_test)));
   ASSERT_TRUE(history1->Insert(TF::GetDummyTag("moep_duplicate", 4, c_test)));
   ASSERT_TRUE(history1->Insert(TF::GetDummyTag("lol",            5, c_test)));
   ASSERT_TRUE(history1->Insert(TF::GetDummyTag("second_release", 6, c_prod)));
@@ -960,7 +974,7 @@ TYPED_TEST(T_History, RollbackToOldTag) {
   TagVector gone;
   EXPECT_TRUE(history2->ListTagsAffectedByRollback("moep", &gone));
   ASSERT_EQ(4u, gone.size());
-  if (gone[0].name == "also_rofl") { // order of rev 8 tags is undefined
+  if (gone[0].name == "also_rofl") {  // order of rev 8 tags is undefined
     EXPECT_EQ("also_rofl", gone[0].name); EXPECT_EQ(8u, gone[0].revision);
     EXPECT_EQ("rofl",      gone[1].name); EXPECT_EQ(8u, gone[1].revision);
   } else {
@@ -1056,7 +1070,7 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
   TagVector gone;
   EXPECT_TRUE(history1->ListTagsAffectedByRollback("moep",  &gone));
   ASSERT_EQ(4u, gone.size());
-  if (gone[0].name == "also_rofl") { // order of rev 8 tags is undefined
+  if (gone[0].name == "also_rofl") {  // order of rev 8 tags is undefined
     EXPECT_EQ("also_rofl", gone[0].name); EXPECT_EQ(8u, gone[0].revision);
     EXPECT_EQ("rofl",      gone[1].name); EXPECT_EQ(8u, gone[1].revision);
   } else {
@@ -1080,7 +1094,7 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
   gone.clear();
   EXPECT_TRUE(history1->ListTagsAffectedByRollback("bar", &gone));
   ASSERT_EQ(7u, gone.size());
-  if (gone[0].name == "also_rofl") { // undefined order for same revision
+  if (gone[0].name == "also_rofl") {  // undefined order for same revision
     EXPECT_EQ("also_rofl",      gone[0].name); EXPECT_EQ(8u, gone[0].revision);
     EXPECT_EQ("rofl",           gone[1].name); EXPECT_EQ(8u, gone[1].revision);
   } else {
@@ -1088,7 +1102,7 @@ TYPED_TEST(T_History, ListTagsAffectedByRollback) {
     EXPECT_EQ("also_rofl",      gone[1].name); EXPECT_EQ(8u, gone[1].revision);
   }
   EXPECT_EQ("lol",            gone[2].name); EXPECT_EQ(5u, gone[2].revision);
-  if (gone[3].name == "moep_duplicate") { // undefined order of same revision
+  if (gone[3].name == "moep_duplicate") {  // undefined order of same revision
     EXPECT_EQ("moep_duplicate", gone[3].name); EXPECT_EQ(4u, gone[3].revision);
     EXPECT_EQ("moep",           gone[4].name); EXPECT_EQ(4u, gone[4].revision);
   } else {
@@ -1116,24 +1130,30 @@ TYPED_TEST(T_History, RecycleBinForRemovedTags) {
   ASSERT_TRUE(history1->BeginTransaction());
   History::Tag dummy_foo;
   dummy_foo.name      = "foo";
-  dummy_foo.root_hash = shash::MkFromHexPtr(shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
-                                            shash::kSuffixCatalog);
+  dummy_foo.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
+      shash::kSuffixCatalog);
   dummy_foo.revision  = 1;
   dummy_foo.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_foo));
 
   History::Tag dummy_bar;
   dummy_bar.name      = "bar";
-  dummy_bar.root_hash = shash::MkFromHexPtr(shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
-                                            shash::kSuffixCatalog);
+  dummy_bar.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
+      shash::kSuffixCatalog);
   dummy_bar.revision  = 2;
   dummy_bar.channel   = History::kChannelProd;
   ASSERT_TRUE(history1->Insert(dummy_bar));
 
   History::Tag dummy_baz;
   dummy_baz.name      = "baz";
-  dummy_baz.root_hash = shash::MkFromHexPtr(shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
-                                            shash::kSuffixCatalog);
+  dummy_baz.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
+      shash::kSuffixCatalog);
   dummy_baz.revision  = 3;
   dummy_baz.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_baz));
@@ -1208,24 +1228,30 @@ TYPED_TEST(T_History, EmptyRecycleBin) {
   ASSERT_TRUE(history1->BeginTransaction());
   History::Tag dummy_foo;
   dummy_foo.name      = "foo";
-  dummy_foo.root_hash = shash::MkFromHexPtr(shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
-                                            shash::kSuffixCatalog);
+  dummy_foo.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
+      shash::kSuffixCatalog);
   dummy_foo.revision  = 1;
   dummy_foo.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_foo));
 
   History::Tag dummy_bar;
   dummy_bar.name      = "bar";
-  dummy_bar.root_hash = shash::MkFromHexPtr(shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
-                                            shash::kSuffixCatalog);
+  dummy_bar.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
+      shash::kSuffixCatalog);
   dummy_bar.revision  = 2;
   dummy_bar.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_bar));
 
   History::Tag dummy_baz;
   dummy_baz.name      = "baz";
-  dummy_baz.root_hash = shash::MkFromHexPtr(shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
-                                            shash::kSuffixCatalog);
+  dummy_baz.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
+      shash::kSuffixCatalog);
   dummy_baz.revision  = 3;
   dummy_baz.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_baz));
@@ -1295,24 +1321,30 @@ TYPED_TEST(T_History, RollbackAndRecycleBin) {
   ASSERT_TRUE(history1->BeginTransaction());
   History::Tag dummy_foo;
   dummy_foo.name      = "foo";
-  dummy_foo.root_hash = shash::MkFromHexPtr(shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
-                                            shash::kSuffixCatalog);
+  dummy_foo.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("5207a527a4fee2d655c67415aa1979f1d2753f96"),
+      shash::kSuffixCatalog);
   dummy_foo.revision  = 1;
   dummy_foo.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_foo));
 
   History::Tag dummy_bar;
   dummy_bar.name      = "bar";
-  dummy_bar.root_hash = shash::MkFromHexPtr(shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
-                                            shash::kSuffixCatalog);
+  dummy_bar.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("19552496e1e5c63aefaf5d4e05a8c248a1d82663"),
+      shash::kSuffixCatalog);
   dummy_bar.revision  = 2;
   dummy_bar.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_bar));
 
   History::Tag dummy_baz;
   dummy_baz.name      = "baz";
-  dummy_baz.root_hash = shash::MkFromHexPtr(shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
-                                            shash::kSuffixCatalog);
+  dummy_baz.root_hash =
+    shash::MkFromHexPtr(
+      shash::HexPtr("400b66c2002e89629dd098918677e818e3688011"),
+      shash::kSuffixCatalog);
   dummy_baz.revision  = 3;
   dummy_baz.channel   = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_baz));
@@ -1390,11 +1422,13 @@ TYPED_TEST(T_History, RecycleBinWithHeterogeneousHashes) {
   ASSERT_TRUE(history1->Insert(dummy_bar));
 
   History::Tag dummy_baz;
-  shash::Any root_hash_suf(shash::kSha1); root_hash_suf.Randomize(9); root_hash_suf.suffix = shash::kSuffixCatalog;
-  dummy_baz.name      = "baz";
+  shash::Any root_hash_suf(shash::kSha1);
+  root_hash_suf.Randomize(9);
+  root_hash_suf.suffix = shash::kSuffixCatalog;
+  dummy_baz.name = "baz";
   dummy_baz.root_hash = root_hash_suf;
-  dummy_baz.revision  = 3;
-  dummy_baz.channel   = History::kChannelTest;
+  dummy_baz.revision = 3;
+  dummy_baz.channel = History::kChannelTest;
   ASSERT_TRUE(history1->Insert(dummy_baz));
   EXPECT_TRUE(history1->CommitTransaction());
 
@@ -1512,8 +1546,8 @@ TYPED_TEST(T_History, ReadLegacyVersion1Revision1) {
   std::vector<History::Tag> tags;
   ASSERT_TRUE(history->List(&tags));
   EXPECT_EQ(2u, tags.size());
-  EXPECT_TRUE( (tags[0].name == "trunk" && tags[1].name == "trunk-previous") ||
-                (tags[1].name == "trunk" && tags[0].name == "trunk-previous"));
+  EXPECT_TRUE((tags[0].name == "trunk" && tags[1].name == "trunk-previous") ||
+              (tags[1].name == "trunk" && tags[0].name == "trunk-previous"));
 
   std::vector<shash::Any> recycled_hashes;
   EXPECT_FALSE(history->ListRecycleBin(&recycled_hashes));
@@ -1539,7 +1573,7 @@ TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision0Slow) {
 
   History::Tag tag;
   ASSERT_TRUE(history->GetByName(dummy.name, &tag));
-  TestFixture::CompareTags (dummy, tag);
+  TestFixture::CompareTags(dummy, tag);
 
   std::vector<shash::Any> recycled_hashes;
   ASSERT_TRUE(history->ListRecycleBin(&recycled_hashes));
@@ -1578,7 +1612,7 @@ TYPED_TEST(T_History, UpgradeAndWriteLegacyVersion1Revision1Slow) {
 
   History::Tag tag;
   ASSERT_TRUE(history->GetByName(dummy.name, &tag));
-  TestFixture::CompareTags (dummy, tag);
+  TestFixture::CompareTags(dummy, tag);
 
   std::vector<shash::Any> recycled_hashes;
   ASSERT_TRUE(history->ListRecycleBin(&recycled_hashes));

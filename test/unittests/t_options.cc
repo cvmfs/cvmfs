@@ -57,7 +57,8 @@ class T_Options : public ::testing::Test {
   string       config_file_;
 };  // class T_Options
 
-typedef ::testing::Types<BashOptionsManager, SimpleOptionsParser> OptionsManagers;
+typedef ::testing::Types<BashOptionsManager, SimpleOptionsParser>
+  OptionsManagers;
 TYPED_TEST_CASE(T_Options, OptionsManagers);
 
 

@@ -2,21 +2,20 @@
  * This file is part of the CernVM File System.
  */
 
+#include <gtest/gtest.h>
+
 #include <cerrno>
 #include <cstdio>
 #include <ctime>
-#include <sstream>
-
-#include <gtest/gtest.h>
+#include <string>
 
 #include "../../cvmfs/catalog_sql.h"
 #include "../../cvmfs/compression.h"
 #include "../../cvmfs/history_sqlite.h"
 #include "../../cvmfs/util.h"
-
 #include "testutil.h"
 
-using namespace history;
+using namespace std;  // NOLINT
 
 template <class ObjectFetcherT>
 class T_ObjectFetcher : public ::testing::Test {
@@ -201,11 +200,11 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void Sign(const shash::Any              hash,
-            signature::SignatureManager  &signature_manager,
+            signature::SignatureManager  *signature_manager,
             std::string                  *signature) const {
     unsigned char *sig;
     unsigned sig_size;
-    ASSERT_TRUE(signature_manager.Sign(
+    ASSERT_TRUE(signature_manager->Sign(
                   reinterpret_cast<const unsigned char *>(
                     hash.ToString().data()),
                     hash.GetHexSize(),
@@ -236,7 +235,7 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void SignString(std::string                  *str,
-                  signature::SignatureManager  &signature_manager,
+                  signature::SignatureManager  *signature_manager,
                   const bool                    rsa = false) const {
     shash::Any hash = h("0000000000000000000000000000000000000000");
     shash::HashMem(
@@ -274,18 +273,18 @@ class T_ObjectFetcher : public ::testing::Test {
     ASSERT_TRUE(signature_manager.LoadPrivateKeyPath(private_key_path, ""));
 
     std::string manifest_string = manifest->ExportString();
-    SignString(&manifest_string, signature_manager);
+    SignString(&manifest_string, &signature_manager);
     WriteFile(manifest_path, manifest_string);
 
     signature_manager.Fini();
   }
 
   void WriteWhitelist() {
-    std::stringstream whitelist;
-    whitelist << MakeWhitelistTimestamp(time(0)) << std::endl;
-    whitelist << "E" << MakeWhitelistTimestamp(time(0) + 30 /*days*/ *24*60*60)
-              << std::endl;
-    whitelist << "N" << fqrn << std::endl;
+    string whitelist;
+    whitelist += MakeWhitelistTimestamp(time(0)) + "\n";
+    whitelist += "E" + MakeWhitelistTimestamp(time(0) + 30 /*days*/ *24*60*60)
+              + "\n";
+    whitelist += "N" + fqrn + "\n";
 
     signature::SignatureManager signature_manager;
     signature_manager.Init();
@@ -293,29 +292,28 @@ class T_ObjectFetcher : public ::testing::Test {
     ASSERT_TRUE(signature_manager.LoadCertificatePath(certificate_path));
     ASSERT_TRUE(signature_manager.LoadPrivateKeyPath(master_key_path, ""));
 
-    whitelist << signature_manager.FingerprintCertificate(shash::kSha1)
-              << std::endl;
-    std::string whitelist_string = whitelist.str();
-
-    SignString(&whitelist_string, signature_manager, true);
-    WriteFile(whitelist_path, whitelist_string);
+    whitelist += signature_manager.FingerprintCertificate(shash::kSha1)
+              + "\n";
+    SignString(&whitelist, &signature_manager, true);
+    WriteFile(whitelist_path, whitelist);
 
     signature_manager.Fini();
   }
 
   std::string MakeWhitelistTimestamp(const time_t timestamp) const {
-    struct tm* ti = localtime(&timestamp);
+    struct tm ti;
+    localtime_r(&timestamp, &ti);
 
-    std::stringstream ss;
-    ss << std::setfill('0')
-       << std::setw(4) << ti->tm_year + 1900
-       << std::setw(2) << ti->tm_mon  + 1
-       << std::setw(2) << ti->tm_mday
-       << std::setw(2) << ti->tm_hour
-       << std::setw(2) << ti->tm_min
-       << std::setw(2) << ti->tm_sec;
+    char result[15];
+    snprintf(result, sizeof(result), "%04d%02d%02d%02d%02d%02d",
+             ti.tm_year + 1900,
+             ti.tm_mon + 1,
+             ti.tm_mday,
+             ti.tm_hour,
+             ti.tm_min,
+             ti.tm_sec);
 
-    return ss.str();
+    return string(result);
   }
 
   void InitializeExternalManagers() {
@@ -333,15 +331,19 @@ class T_ObjectFetcher : public ::testing::Test {
     return GetObjectFetcher(type<ObjectFetcherT>());
   }
 
-  void CreateHistory(      shash::Any  *content_hash,
-                     const shash::Any  &previous_revision = shash::Any()) {
+  void CreateHistory(
+    shash::Any *content_hash,
+    const shash::Any &previous_revision = shash::Any()
+  ) {
     return CreateHistory(type<ObjectFetcherT>(),
                          content_hash,
                          previous_revision);
   }
 
-  void CreateCatalog(      shash::Any   *content_hash,
-                     const std::string  &root_path) {
+  void CreateCatalog(
+    shash::Any *content_hash,
+    const std::string &root_path
+  ) {
     return CreateCatalog(type<ObjectFetcherT>(),
                          content_hash,
                          root_path);
@@ -378,7 +380,8 @@ class T_ObjectFetcher : public ::testing::Test {
   //          explicit-specialization-of-template-class-member-function
   template <typename T> struct type {};
 
-  ObjectFetcherT* GetObjectFetcher(const type<LocalObjectFetcher<> > type_spec) {
+  ObjectFetcherT* GetObjectFetcher(const type<LocalObjectFetcher<> > type_spec)
+  {
     return new LocalObjectFetcher<>(backend_storage, temp_directory);
   }
 
@@ -406,8 +409,10 @@ class T_ObjectFetcher : public ::testing::Test {
     CreateSandboxHistory(content_hash, previous_revision);
   }
 
-  void CreateSandboxHistory(      shash::Any  *content_hash,
-                            const shash::Any  &previous_revision) {
+  void CreateSandboxHistory(
+    shash::Any *content_hash,
+    const shash::Any &previous_revision
+  ) {
     const std::string tmp_path = CreateTempPath(sandbox + "/history", 0700);
     ASSERT_FALSE(tmp_path.empty()) << "failed to create tmp in: " << sandbox;
 
@@ -454,19 +459,21 @@ class T_ObjectFetcher : public ::testing::Test {
     CreateSandboxCatalog(content_hash, root_path);
   }
 
-  void CreateSandboxCatalog(      shash::Any   *content_hash,
-                            const std::string  &root_path) {
+  void CreateSandboxCatalog(
+    shash::Any *content_hash,
+    const std::string &root_path
+  ) {
     const std::string tmp_path = CreateTempPath(sandbox + "/catalog", 0700);
     ASSERT_FALSE(tmp_path.empty()) << "failed to create tmp in: " << sandbox;
 
-    // TODO: WritableCatalog::Create()
+    // TODO(rmeusel): WritableCatalog::Create()
     const bool volatile_content = false;
     catalog::CatalogDatabase *catalog_db =
                                      catalog::CatalogDatabase::Create(tmp_path);
     ASSERT_NE(static_cast<catalog::CatalogDatabase*>(NULL), catalog_db) <<
       "failed to create new catalog database in: " << tmp_path;
 
-    catalog::DirectoryEntry root_entry; // mocked root entry...
+    catalog::DirectoryEntry root_entry;  // mocked root entry...
     const bool success = catalog_db->InsertInitialValues(root_path,
                                                          volatile_content,
                                                          root_entry) &&
@@ -506,9 +513,15 @@ class T_ObjectFetcher : public ::testing::Test {
       " (errno: " << errno << ")";
   }
 
-  bool NeedsFilesystemSandbox(const type<LocalObjectFetcher<> > type_spec) { return true;  }
-  bool NeedsFilesystemSandbox(const type<HttpObjectFetcher<> >  type_spec) { return true;  }
-  bool NeedsFilesystemSandbox(const type<MockObjectFetcher>     type_spec) { return false; }
+  bool NeedsFilesystemSandbox(const type<LocalObjectFetcher<> > type_spec) {
+    return true;
+  }
+  bool NeedsFilesystemSandbox(const type<HttpObjectFetcher<> > type_spec) {
+    return true;
+  }
+  bool NeedsFilesystemSandbox(const type<MockObjectFetcher> type_spec) {
+    return false;
+  }
 
  private:
   download::DownloadManager    download_manager_;
@@ -608,7 +621,8 @@ TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
 
   EXPECT_TRUE(object_fetcher->HasHistory());
 
-  UniquePtr<typename TypeParam::HistoryTN> history(object_fetcher->FetchHistory());
+  UniquePtr<typename TypeParam::HistoryTN>
+    history(object_fetcher->FetchHistory());
   ASSERT_TRUE(history.IsValid());
   EXPECT_EQ(TestFixture::previous_history_hash, history->previous_revision());
 }
@@ -621,7 +635,8 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
   UniquePtr<typename TypeParam::HistoryTN> history(
               object_fetcher->FetchHistory(TestFixture::previous_history_hash));
   ASSERT_TRUE(history.IsValid())
-    << "didn't find: " << TestFixture::previous_history_hash.ToStringWithSuffix();
+    << "didn't find: "
+    << TestFixture::previous_history_hash.ToStringWithSuffix();
   EXPECT_TRUE(history->previous_revision().IsNull());
 }
 
@@ -691,7 +706,8 @@ TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFilesSlow) {
   EXPECT_LT(files, listing.size());
   files = listing.size();
 
-  UniquePtr<typename TypeParam::HistoryTN> history(object_fetcher->FetchHistory());
+  UniquePtr<typename TypeParam::HistoryTN>
+    history(object_fetcher->FetchHistory());
   ASSERT_TRUE(history.IsValid());
 
   TestFixture::ListDirectory(TestFixture::temp_directory, &listing);

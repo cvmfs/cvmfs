@@ -3,13 +3,13 @@
  */
 
 #include <gtest/gtest.h>
+
 #include <string>
 
-#include "c_file_sandbox.h"
-
-#include "../../cvmfs/util.h"
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/prng.h"
+#include "../../cvmfs/util.h"
+#include "c_file_sandbox.h"
 
 
 class T_FileSandbox : public FileSandbox {
@@ -43,7 +43,8 @@ class T_FileSandbox : public FileSandbox {
    * googletest requires functions that have ASSERTs inside to return void, thus
    * we do a wrapper of the wrapper of the wrapper here :o)
    */
-  void HashFileInternal(const std::string &file_path, shash::Any *digest) const {
+  void HashFileInternal(const std::string &file_path, shash::Any *digest) const
+  {
     const bool retval = shash::HashFile(file_path, digest);
     ASSERT_TRUE(retval) << "failed to hash file: " << file_path;
   }
@@ -51,10 +52,6 @@ class T_FileSandbox : public FileSandbox {
 
 const std::string T_FileSandbox::sandbox_path = "/tmp/cvmfs_ut_filesandbox";
 
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 TEST_F(T_FileSandbox, SandboxCreation) {
   EXPECT_TRUE(DirectoryExists(T_FileSandbox::sandbox_path));
@@ -66,12 +63,12 @@ TEST_F(T_FileSandbox, CreateRandomBufferMethod) {
   rng.InitSeed(27);
 
   const uint64_t buffer_size = 10 * 1024 * 1024;
-  char *buffer = (char*)malloc(buffer_size);
+  char *buffer = reinterpret_cast<char *>(malloc(buffer_size));
   ASSERT_NE(static_cast<char*>(NULL), buffer);
   memset(buffer, 0, buffer_size);
 
   // count number of zero-bytes in the random buffer as 'checksum'
-  CreateRandomBuffer(buffer, buffer_size, rng);
+  CreateRandomBuffer(buffer_size, buffer, &rng);
   uint32_t zeros = 0;
   for (uint64_t i = 0; i < buffer_size; ++i) {
     if (buffer[i] == 0) {

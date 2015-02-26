@@ -3,6 +3,7 @@
  */
 
 #include <gtest/gtest.h>
+
 #include <pthread.h>
 #include <unistd.h>
 
@@ -89,20 +90,10 @@ class T_BlockingCounter : public ::testing::Test {
 int T_BlockingCounter::concurrent_state_ = 0;
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 TEST_F(T_BlockingCounter, Initialize) {
-  EXPECT_EQ(  0, int_counter_);
+  EXPECT_EQ(0, int_counter_);
   EXPECT_EQ(100, int_counter_.maximal_value());
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_BlockingCounter, Increment) {
@@ -119,21 +110,11 @@ TEST_F(T_BlockingCounter, Increment) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 TEST_F(T_BlockingCounter, Assignment) {
   const int val = max_value_ / 2;
   int_counter_ = val;
   EXPECT_EQ(val, int_counter_);
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_BlockingCounter, Decrement) {
@@ -151,11 +132,6 @@ TEST_F(T_BlockingCounter, Decrement) {
   int_counter_.Decrement();
   EXPECT_EQ(val - 3, int_counter_);
 }
-
-
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
 
 
 TEST_F(T_BlockingCounter, IncrementAndWait) {
@@ -189,11 +165,6 @@ TEST_F(T_BlockingCounter, IncrementAndWait) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 TEST_F(T_BlockingCounter, BecomeZeroSlow) {
   T_BlockingCounter::concurrent_state_ = 0;
   EXPECT_EQ(0, T_BlockingCounter::concurrent_state_);
@@ -207,23 +178,23 @@ TEST_F(T_BlockingCounter, BecomeZeroSlow) {
   ASSERT_EQ(0, res);
 
   sleep(1);
-  EXPECT_EQ(1,  T_BlockingCounter::concurrent_state_) << "Waited, even though "
-                                                       << "counter was zero!";
+  EXPECT_EQ(1,  T_BlockingCounter::concurrent_state_) <<
+    "Waited, even though counter was zero!";
   EXPECT_NE(0, int_counter_);
 
   int_counter_ = 1;
   --int_counter_;
   EXPECT_EQ(0, int_counter_);
   sleep(1);
-  EXPECT_EQ(2,  T_BlockingCounter::concurrent_state_) << "Thread did not wake "
-                                                       << "up for zero counter!";
+  EXPECT_EQ(2,  T_BlockingCounter::concurrent_state_) <<
+    "Thread did not wake up for zero counter!";
   EXPECT_NE(0, int_counter_);
 
   int_counter_ = 0;
   EXPECT_EQ(0, int_counter_);
   sleep(1);
-  EXPECT_EQ(3,  T_BlockingCounter::concurrent_state_) << "Thread didn't wake up "
-                                                       << "for zero'ed counter!";
+  EXPECT_EQ(3, T_BlockingCounter::concurrent_state_) <<
+    "Thread didn't wake up for zero'ed counter!";
 
   const int killed = pthread_kill(thread, 0);
   EXPECT_EQ(ESRCH, killed) << "Thread did not exit properly";
@@ -235,11 +206,6 @@ TEST_F(T_BlockingCounter, BecomeZeroSlow) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZeroSlow) {
   T_BlockingCounter::concurrent_state_ = 0;
   EXPECT_EQ(0, T_BlockingCounter::concurrent_state_);
@@ -248,10 +214,9 @@ TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZeroSlow) {
   EXPECT_EQ(max_value_, int_counter_);
 
   pthread_t thread;
-  const int res = pthread_create(&thread,
-                                  NULL,
-                                 &T_BlockingCounter::concurrent_increment_zero_wait,
-                                  static_cast<void*>(&int_counter_));
+  const int res = pthread_create(
+    &thread, NULL, &T_BlockingCounter::concurrent_increment_zero_wait,
+    static_cast<void*>(&int_counter_));
   ASSERT_EQ(0, res);
 
   sleep(1);
@@ -269,7 +234,7 @@ TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZeroSlow) {
     if (decr_state == 0) --int_counter_;
     if (decr_state == 1) int_counter_--;
     if (decr_state == 2) int_counter_.Decrement();
-    if (decr_state == 3) int_counter_ = int_counter_ - 1; // not thread safe!
+    if (decr_state == 3) int_counter_ = int_counter_ - 1;  // not thread safe!
     ++decr_state;
     decr_state = decr_state % 4;
   }
@@ -287,26 +252,20 @@ TEST_F(T_BlockingCounter, BlockOnIncrementAndWaitForZeroSlow) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 TEST_F(T_BlockingCounter, OrchestrateMultipleWaitingThreadsSlow) {
   int_counter_ = max_value_;
   EXPECT_EQ(max_value_, int_counter_);
 
   const int thread_count = 10;
-  ASSERT_LE (5, thread_count);
+  ASSERT_LE(5, thread_count);
   pthread_t     threads[thread_count];
   thread_state  states[thread_count];
 
   for (int i = 0; i < thread_count; ++i) {
     states[i].counter = &int_counter_;
-    const int ret = pthread_create(&threads[i],
-                                    NULL,
-                                   &T_BlockingCounter::concurrent_orchestrate_thread,
-                                    static_cast<void*>(&states[i]));
+    const int ret = pthread_create(
+      &threads[i], NULL, &T_BlockingCounter::concurrent_orchestrate_thread,
+      static_cast<void*>(&states[i]));
     ASSERT_EQ(0, ret);
   }
   sleep(1);

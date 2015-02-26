@@ -69,7 +69,8 @@ TEST(T_Callbacks, BoundClosure) {
   EXPECT_EQ(-1, delegate.callback_result);
 
   closure(1337);
-  EXPECT_EQ(closure_data_item, closure_data.data); // didn't change (closure captured copy)
+  // didn't change (closure captured copy)
+  EXPECT_EQ(closure_data_item, closure_data.data);
   EXPECT_EQ(closure_data_item + 1337, delegate.callback_result);
 }
 
@@ -113,15 +114,13 @@ TEST(T_Callbacks, VoidBoundClosure) {
   EXPECT_EQ(closure_data_item, closure_data.data);
   EXPECT_EQ(-1, delegate.callback_result);
 
-  closure();
-  EXPECT_EQ(closure_data_item, closure_data.data); // didn't change (closure captured copy)
+  closure();  // didn't change (closure captured copy)
+  EXPECT_EQ(closure_data_item, closure_data.data);
   EXPECT_EQ(closure_data_item, delegate.callback_result);
 }
 
 
-//
-// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-//
+//------------------------------------------------------------------------------
 
 
 class DummyCallbackable : public Callbackable<int> {
@@ -197,7 +196,8 @@ TEST(T_Callbacks, CallbackableBoundClosure) {
 
   (*callback)(1337);
 
-  EXPECT_EQ(closure_data_item, closure_data.data); // didn't change (closure captured copy)
+  // didn't change (closure captured copy)
+  EXPECT_EQ(closure_data_item, closure_data.data);
   EXPECT_EQ(1337 + closure_data_item, callbackable.callback_result);
 }
 
@@ -242,14 +242,16 @@ TEST(T_Callbacks, CallbackableVoidBoundClosure) {
   ASSERT_EQ(closure_data_item, closure_data.data);
 
   DummyCallbackableVoid::CallbackTN *callback =
-    DummyCallbackableVoid::MakeClosure(&DummyCallbackableVoid::CallbackClosureMd,
-                                       &callbackable,
-                                        closure_data);
+    DummyCallbackableVoid::MakeClosure(
+      &DummyCallbackableVoid::CallbackClosureMd,
+      &callbackable,
+      closure_data);
   EXPECT_EQ(closure_data_item, closure_data.data);
   EXPECT_EQ(-1, callbackable.callback_result);
 
   (*callback)();
 
-  EXPECT_EQ(closure_data_item, closure_data.data); // didn't change (closure captured copy)
+  // didn't change (closure captured copy)
+  EXPECT_EQ(closure_data_item, closure_data.data);
   EXPECT_EQ(closure_data_item, callbackable.callback_result);
 }

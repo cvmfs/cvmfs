@@ -249,7 +249,7 @@ class T_CatalogTraversal : public ::testing::Test {
     RevisionMap::const_iterator rev_itr = revisions_.find(revision);
     ASSERT_EQ(revisions_.end(), rev_itr);
     ASSERT_LE (1u, revision);
-    ASSERT_GE (max_revision, revision);
+    ASSERT_GE(max_revision, revision);
 
     // create map for new catalog tree
     revisions_[revision] = CatalogPathMap();
