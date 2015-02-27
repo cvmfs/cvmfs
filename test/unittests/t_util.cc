@@ -43,6 +43,24 @@ TEST(T_Util, ThreadProxy) {
 }
 
 
+TEST(T_Util, GetUidOf) {
+  uid_t uid;
+  gid_t gid;
+  EXPECT_TRUE(GetUidOf("root", &uid, &gid));
+  EXPECT_EQ(0U, uid);
+  EXPECT_EQ(0U, gid);
+  EXPECT_FALSE(GetUidOf("no-such-user", &uid, &gid));
+}
+
+
+TEST(T_Util, GetGidOf) {
+  gid_t gid;
+  EXPECT_TRUE(GetGidOf("root", &gid));
+  EXPECT_EQ(0U, gid);
+  EXPECT_FALSE(GetGidOf("no-such-group", &gid));
+}
+
+
 TEST(T_Util, IsAbsolutePath) {
   const bool empty = IsAbsolutePath("");
   EXPECT_FALSE(empty) << "empty path string treated as absolute";

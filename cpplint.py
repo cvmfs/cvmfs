@@ -3930,12 +3930,12 @@ def CheckBraces(filename, clean_lines, linenum, error):
     # find the ( after the if
     pos = line.find('else if')
     pos = line.find('(', pos)
-    if pos > 0:
-      (endline, _, endpos) = CloseExpression(clean_lines, linenum, pos)
-      brace_on_right = endline[endpos:].find('{') != -1
-      if brace_on_left != brace_on_right:    # must be brace after if
-        error(filename, linenum, 'readability/braces', 5,
-              'If an else has a brace on one side, it should have it on both')
+    #if pos > 0:
+    #  (endline, _, endpos) = CloseExpression(clean_lines, linenum, pos)
+    #  brace_on_right = endline[endpos:].find('{') != -1
+    #  if brace_on_left != brace_on_right:    # must be brace after if
+    #    error(filename, linenum, 'readability/braces', 5,
+    #          'If an else has a brace on one side, it should have it on both')
   elif Search(r'}\s*else[^{]*$', line) or Match(r'[^}]*else\s*{', line):
     error(filename, linenum, 'readability/braces', 5,
           'If an else has a brace on one side, it should have it on both')

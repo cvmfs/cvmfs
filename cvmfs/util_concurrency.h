@@ -104,7 +104,6 @@ class RAII : SingleCopy {
 template <typename LockableT>
 class LockGuard : public RAII<LockableT> {
  public:
-  inline explicit LockGuard(LockableT &object) : RAII<LockableT>(object) {}
   inline explicit LockGuard(LockableT *object) : RAII<LockableT>(object) {}
 };
 

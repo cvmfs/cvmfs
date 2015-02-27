@@ -377,7 +377,7 @@ void WritableCatalogManager::AddChunkedFile(
  * @return true on success, false otherwise
  */
 void WritableCatalogManager::AddHardlinkGroup(
-  DirectoryEntryBaseList &entries,
+  const DirectoryEntryBaseList &entries,
   const XattrList        &xattrs,
   const std::string &parent_directory)
 {
@@ -412,7 +412,7 @@ void WritableCatalogManager::AddHardlinkGroup(
   assert(new_group_id > 0);
 
   // Add the file entries to the catalog
-  for (DirectoryEntryBaseList::iterator i = entries.begin(),
+  for (DirectoryEntryBaseList::const_iterator i = entries.begin(),
        iEnd = entries.end(); i != iEnd; ++i)
   {
     string file_path = parent_path + "/";
@@ -584,7 +584,7 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
     retval = FindCatalog(i->path.ToString(), &grand_catalog);
     assert(retval);
     const Counters &grand_counters = grand_catalog->GetCounters();
-    grand_counters.AddAsSubtree(fix_subtree_counters);
+    grand_counters.AddAsSubtree(&fix_subtree_counters);
   }
   DeltaCounters save_counters = wr_new_catalog->delta_counters_;
   wr_new_catalog->delta_counters_ = fix_subtree_counters;
@@ -783,7 +783,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   catalog->UpdateCounters();
   if (catalog->parent()) {
     catalog->delta_counters_.PopulateToParent(
-      catalog->GetWritableParent()->delta_counters_);
+      &catalog->GetWritableParent()->delta_counters_);
   }
   catalog->delta_counters_.SetZero();
 

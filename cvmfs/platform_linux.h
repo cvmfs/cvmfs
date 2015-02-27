@@ -152,7 +152,7 @@ inline int platform_spinlock_trylock(platform_spinlock *lock) {
 /**
  * pthread_self() is not necessarily an unsigned long.
  */
-inline unsigned long platform_gettid() {
+inline pthread_t platform_gettid() {
   return pthread_self();
 }
 

@@ -202,7 +202,7 @@ TEST_F(T_CatalogCounters, DeltaPopulateToParent) {
   d_child.subtree.chunked_files = -4;
   d_child.subtree.file_chunks   = 4;
 
-  d_child.PopulateToParent(d_parent);
+  d_child.PopulateToParent(&d_parent);
 
   EXPECT_EQ(DeltaCounters_t(102), d_parent.self.regular_files);
   EXPECT_EQ(DeltaCounters_t(10),  d_parent.self.symlinks);
@@ -257,7 +257,7 @@ TEST_F(T_CatalogCounters, MergeIntoParent) {
   Counters      c_child  = GetFilledCounters();
   DeltaCounters d_parent = GetFilledDeltaCounters();
 
-  c_child.MergeIntoParent(d_parent);
+  c_child.MergeIntoParent(&d_parent);
 
   EXPECT_EQ(DeltaCounters_t(254),   d_parent.self.regular_files);
   EXPECT_EQ(DeltaCounters_t(17),    d_parent.self.symlinks);
@@ -279,7 +279,7 @@ TEST_F(T_CatalogCounters, AddAsSubtree) {
   Counters      c_child  = GetFilledCounters();
   DeltaCounters d_parent = GetFilledDeltaCounters();
 
-  c_child.AddAsSubtree(d_parent);
+  c_child.AddAsSubtree(&d_parent);
 
   EXPECT_EQ(DeltaCounters_t(102),  d_parent.self.regular_files);
   EXPECT_EQ(DeltaCounters_t(10),   d_parent.self.symlinks);
@@ -350,7 +350,7 @@ TEST_F(T_CatalogCounters, FieldsMap) {
   EXPECT_EQ(DeltaCounters_t(2), *map["self_chunked"]);
   EXPECT_EQ(DeltaCounters_t(0), *map["subtree_chunked"]);
 
-  d_counters.PopulateToParent(d_parent);
+  d_counters.PopulateToParent(&d_parent);
 
   map = d_parent.GetFieldsMap();
   EXPECT_EQ(DeltaCounters_t(0), *map["self_regular"]);

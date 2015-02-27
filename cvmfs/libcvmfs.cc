@@ -6,11 +6,13 @@
  */
 
 #define _FILE_OFFSET_BITS 64
+#define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
 #include "libcvmfs.h"
 
 #include <errno.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <sys/stat.h>
 
@@ -47,10 +49,10 @@ int set_option(char const *name, char const *value, unsigned *var) {
   return 0;
 }
 
-int set_option(char const *name, char const *value, unsigned long *var) {
-  unsigned long v = 0;
+int set_option(char const *name, char const *value, uint64_t *var) {
+  uint64_t v = 0;
   int end = 0;
-  int rc = sscanf(value, "%lu%n", &v, &end);
+  int rc = sscanf(value, "%"PRIu64"%n", &v, &end);
   if (rc != 1 || value[end] != '\0') {
     fprintf(stderr, "Invalid unsigned long integer value for %s=%s\n",
             name, value);
@@ -252,7 +254,8 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
   }
 
 /* Path to root of repository.  Used to resolve absolute symlinks. */
-static string mountpoint;
+// TODO(jblomer): this is currently unused!
+// static string mountpoint;
 
 /* Expand symlinks in all levels of a path.  Also, expand ".." and
  * ".".  This also has the side-effect of ensuring that
@@ -260,21 +263,22 @@ static string mountpoint;
  * ensure proper loading of nested catalogs before the child is
  * accessed.
  */
-static int expand_path(cvmfs_context *ctx,
-                       char const    *path,
-                       string        &expanded_path,
-                       int            depth = 0)
+static int expand_path(
+  const int depth,
+  cvmfs_context *ctx,
+  char const *path,
+  string *expanded_path)
 {
   string p_path = GetParentPath(path);
   string fname = GetFileName(path);
   int rc;
 
   if (fname == "..") {
-    rc = expand_path(ctx, p_path.c_str(), expanded_path, depth);
+    rc = expand_path(depth, ctx, p_path.c_str(), expanded_path);
     if (rc != 0) {
       return -1;
     }
-    if (expanded_path == "/") {
+    if (*expanded_path == "/") {
       // attempt to access parent path of the root of the repository
       LogCvmfs(kLogCvmfs, kLogDebug,
                "libcvmfs cannot resolve symlinks to paths outside of the repo: "
@@ -282,22 +286,22 @@ static int expand_path(cvmfs_context *ctx,
       errno = ENOENT;
       return -1;
     }
-    expanded_path = GetParentPath(expanded_path);
-    if (expanded_path == "") {
-      expanded_path = "/";
+    *expanded_path = GetParentPath(*expanded_path);
+    if (*expanded_path == "") {
+      *expanded_path = "/";
     }
     return 0;
   }
 
   string buf;
   if (p_path != "") {
-    rc = expand_path(ctx, p_path.c_str(), buf, depth);
+    rc = expand_path(depth, ctx, p_path.c_str(), &buf);
     if (rc != 0) {
       return -1;
     }
 
     if (fname == ".") {
-      expanded_path = buf;
+      *expanded_path = buf;
       return 0;
     }
   }
@@ -315,7 +319,7 @@ static int expand_path(cvmfs_context *ctx,
   }
 
   if (!S_ISLNK(st.st_mode)) {
-    expanded_path = buf;
+    *expanded_path = buf;
     return 0;
   }
 
@@ -343,7 +347,8 @@ static int expand_path(cvmfs_context *ctx,
   if (ln_buf[0] == '/') {
     // symlink is absolute path
     // convert /cvmfs/repo/blah --> /blah
-    size_t len = ::mountpoint.length();
+    // TODO(jblomer): this is broken, mountpoint is never set
+    /*size_t len = ::mountpoint.length();
     if (strncmp(ln_buf, ::mountpoint.c_str(), len) == 0 &&
         (ln_buf[len] == '/' || ln_buf[len] == '\0'))
     {
@@ -358,7 +363,7 @@ static int expand_path(cvmfs_context *ctx,
       errno = ENOENT;
       free(ln_buf);
       return -1;
-    }
+    }*/
   } else {
     // symlink is relative path
     buf = GetParentPath(buf);
@@ -370,29 +375,29 @@ static int expand_path(cvmfs_context *ctx,
   // In case the symlink references other symlinks or contains ".."
   // or "."  we must now call expand_path on the result.
 
-  return expand_path(ctx, buf.c_str(), expanded_path, depth + 1);
+  return expand_path(depth + 1, ctx, buf.c_str(), expanded_path);
 }
 
 /* Like expand_path(), but do not expand the final element of the path. */
-static int expand_ppath(cvmfs_context  *ctx,
-                        char const     *path,
-                        string         &expanded_path)
+static int expand_ppath(cvmfs_context *ctx,
+                        const char *path,
+                        string *expanded_path)
 {
   string p_path = GetParentPath(path);
   string fname = GetFileName(path);
 
   if (p_path == "") {
-    expanded_path = path;
+    *expanded_path = path;
     return 0;
   }
 
-  int rc = expand_path(ctx, p_path.c_str(), expanded_path);
+  int rc = expand_path(0, ctx, p_path.c_str(), expanded_path);
   if (rc != 0) {
     return rc;
   }
 
-  expanded_path += "/";
-  expanded_path += fname;
+  (*expanded_path) += "/";
+  (*expanded_path) += fname;
 
   return 0;
 }
@@ -400,7 +405,7 @@ static int expand_ppath(cvmfs_context  *ctx,
 int cvmfs_open(cvmfs_context *ctx, const char *path) {
   string lpath;
   int rc;
-  rc = expand_path(ctx, path, lpath);
+  rc = expand_path(0, ctx, path, &lpath);
   if (rc < 0) {
     return -1;
   }
@@ -432,7 +437,7 @@ int cvmfs_readlink(
 ) {
   string lpath;
   int rc;
-  rc = expand_ppath(ctx, path, lpath);
+  rc = expand_ppath(ctx, path, &lpath);
   if (rc < 0) {
     return -1;
   }
@@ -449,7 +454,7 @@ int cvmfs_readlink(
 int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st) {
   string lpath;
   int rc;
-  rc = expand_path(ctx, path, lpath);
+  rc = expand_path(0, ctx, path, &lpath);
   if (rc < 0) {
     return -1;
   }
@@ -466,7 +471,7 @@ int cvmfs_stat(cvmfs_context *ctx, const char *path, struct stat *st) {
 int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st) {
   string lpath;
   int rc;
-  rc = expand_ppath(ctx, path, lpath);
+  rc = expand_ppath(ctx, path, &lpath);
   if (rc < 0) {
     return -1;
   }
@@ -488,7 +493,7 @@ int cvmfs_listdir(
 ) {
   string lpath;
   int rc;
-  rc = expand_path(ctx, path, lpath);
+  rc = expand_path(0, ctx, path, &lpath);
   if (rc < 0) {
     return -1;
   }

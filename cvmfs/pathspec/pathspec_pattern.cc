@@ -62,8 +62,8 @@ void PathspecElementPattern::Parse(const std::string::const_iterator  &begin,
   std::string::const_iterator i = begin;
   while (i != end) {
     SubPattern* next = (Pathspec::IsSpecialChar(*i))
-                       ? ParseSpecialChar(i, end)
-                       : ParsePlaintext(i, end);
+                       ? ParseSpecialChar(end, &i)
+                       : ParsePlaintext(end, &i);
     if (next->IsEmpty()) {
       valid_ = false;
       delete next;
@@ -75,43 +75,44 @@ void PathspecElementPattern::Parse(const std::string::const_iterator  &begin,
 
 
 PathspecElementPattern::SubPattern* PathspecElementPattern::ParsePlaintext(
-                                            std::string::const_iterator  &i,
-                                      const std::string::const_iterator  &end) {
+  const std::string::const_iterator &end,
+  std::string::const_iterator *i
+) {
   PlaintextSubPattern *pattern = new PlaintextSubPattern();
   bool next_is_escaped = false;
 
-  while (i < end) {
-    if (Pathspec::IsSpecialChar(*i) && !next_is_escaped) {
+  while (*i < end) {
+    if (Pathspec::IsSpecialChar(**i) && !next_is_escaped) {
       break;
     }
 
-    if (*i == Pathspec::kEscaper && !next_is_escaped) {
+    if (**i == Pathspec::kEscaper && !next_is_escaped) {
       next_is_escaped = true;
     } else if (next_is_escaped) {
-      if (Pathspec::IsSpecialChar(*i) || *i == Pathspec::kEscaper) {
-        pattern->AddChar(*i);
+      if (Pathspec::IsSpecialChar(**i) || **i == Pathspec::kEscaper) {
+        pattern->AddChar(**i);
         next_is_escaped = false;
       } else {
         valid_ = false;
       }
     } else {
-      assert(!Pathspec::IsSpecialChar(*i));
-      pattern->AddChar(*i);
+      assert(!Pathspec::IsSpecialChar(**i));
+      pattern->AddChar(**i);
     }
 
-    ++i;
+    ++(*i);
   }
 
   return pattern;
 }
 
 PathspecElementPattern::SubPattern* PathspecElementPattern::ParseSpecialChar(
-  std::string::const_iterator  &i,
-  const std::string::const_iterator  &end
+  const std::string::const_iterator &end,
+  std::string::const_iterator *i
 ) {
-  assert(Pathspec::IsSpecialChar(*i));
-  const char chr = *i;
-  ++i;
+  assert(Pathspec::IsSpecialChar(**i));
+  const char chr = **i;
+  ++(*i);
 
   switch (chr) {
     case Pathspec::kWildcard:

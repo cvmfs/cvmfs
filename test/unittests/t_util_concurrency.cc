@@ -29,7 +29,7 @@ TEST(T_UtilConcurrency, ArbitraryLockGurad) {
   ASSERT_FALSE(locker.locked);
 
   {
-    LockGuard<DummyLocker> lock(locker);
+    LockGuard<DummyLocker> lock(&locker);
     EXPECT_TRUE(locker.locked) << "LockGuard didn't lock";
   }
 
@@ -150,7 +150,7 @@ TEST(T_UtilConcurrency, Lockable) {
   int retcode = 0;
 
   {
-    LockGuard<DummyLockable> lock(lockable);
+    LockGuard<DummyLockable> lock(&lockable);
 
     retcode = lockable.TryLock();
     EXPECT_EQ(EBUSY, retcode) << "Lockable didn't lock";

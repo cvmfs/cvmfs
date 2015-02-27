@@ -630,15 +630,14 @@ SqlDirentTouch::SqlDirentTouch(const CatalogDatabase &database) {
 
 bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
   return (
-    BindHashBlob(1, entry.checksum_)                                       &&
-    BindInt64   (2, entry.size_)                                           &&
-    BindInt     (3, entry.mode_)                                           &&
-    BindInt64   (4, entry.mtime_)                                          &&
-    BindText    (5, entry.name_.GetChars(),    entry.name_.GetLength())    &&
-    BindText    (6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
-    BindInt64   (7, entry.uid_)                                            &&
-    BindInt64   (8, entry.gid_)
-  );  // NOLINT
+    BindHashBlob(1, entry.checksum_) &&
+    BindInt64(2, entry.size_) &&
+    BindInt(3, entry.mode_) &&
+    BindInt64(4, entry.mtime_) &&
+    BindText(5, entry.name_.GetChars(),    entry.name_.GetLength()) &&
+    BindText(6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
+    BindInt64(7, entry.uid_) &&
+    BindInt64(8, entry.gid_));
 }
 
 

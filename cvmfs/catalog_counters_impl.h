@@ -2,6 +2,9 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_CATALOG_COUNTERS_IMPL_H_
+#define CVMFS_CATALOG_COUNTERS_IMPL_H_
+
 #include "catalog_sql.h"
 
 namespace catalog {
@@ -11,8 +14,8 @@ typename TreeCountersBase<FieldT>::FieldsMap
     TreeCountersBase<FieldT>::GetFieldsMap() const
 {
   FieldsMap map;
-  self.FillFieldsMap(map, "self_");
-  subtree.FillFieldsMap(map, "subtree_");
+  self.FillFieldsMap("self_", &map);
+  subtree.FillFieldsMap("subtree_", &map);
   return map;
 }
 
@@ -111,3 +114,5 @@ void TreeCountersBase<FieldT>::SetZero() {
 }
 
 }  // namespace catalog
+
+#endif  // CVMFS_CATALOG_COUNTERS_IMPL_H_

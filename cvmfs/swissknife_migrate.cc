@@ -328,7 +328,7 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
 
   // Save the processed catalog in the pending map
   {
-    LockGuard<PendingCatalogMap> guard(pending_catalogs_);
+    LockGuard<PendingCatalogMap> guard(&pending_catalogs_);
     assert(pending_catalogs_.find(path) == pending_catalogs_.end());
     pending_catalogs_[path] = data;
   }
@@ -370,7 +370,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
     // Find the catalog path in the pending catalogs and remove it from the list
     PendingCatalog *catalog;
     {
-      LockGuard<PendingCatalogMap> guard(pending_catalogs_);
+      LockGuard<PendingCatalogMap> guard(&pending_catalogs_);
       PendingCatalogMap::iterator i = pending_catalogs_.find(path);
       assert(i != pending_catalogs_.end());
       catalog = const_cast<PendingCatalog*>(i->second);
@@ -1345,7 +1345,7 @@ bool CommandMigrate::MigrationWorker_20x::GenerateCatalogStatistics(
   for (; i != iend; ++i) {
     const PendingCatalog *nested_catalog = *i;
     const catalog::DeltaCounters &s = nested_catalog->nested_statistics.Get();
-    s.PopulateToParent(stats_counters);
+    s.PopulateToParent(&stats_counters);
   }
 
   // Count various directory entry types in the catalog to fill up the catalog
@@ -1529,7 +1529,7 @@ bool CommandMigrate::MigrationWorker_217::GenerateNewStatisticsCounters
   for (; i != iend; ++i) {
     const PendingCatalog *nested_catalog = *i;
     const catalog::DeltaCounters &s = nested_catalog->nested_statistics.Get();
-    s.PopulateToParent(stats_counters);
+    s.PopulateToParent(&stats_counters);
   }
 
   // Count various directory entry types in the catalog to fill up the catalog

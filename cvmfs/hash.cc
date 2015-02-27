@@ -102,7 +102,7 @@ unsigned GetContextSize(const Algorithms algorithm) {
   }
 }
 
-void Init(ContextPtr &context) {
+void Init(ContextPtr context) {
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -122,7 +122,7 @@ void Init(ContextPtr &context) {
 }
 
 void Update(const unsigned char *buffer, const unsigned buffer_length,
-            ContextPtr &context)
+            ContextPtr context)
 {
   switch (context.algorithm) {
     case kMd5:
@@ -145,7 +145,7 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
   }
 }
 
-void Final(ContextPtr &context, Any *any_digest) {
+void Final(ContextPtr context, Any *any_digest) {
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));

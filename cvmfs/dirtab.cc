@@ -75,13 +75,13 @@ bool Dirtab::ParseLine(const std::string &line) {
   bool negation = false;
 
   // parse preamble
-  SkipWhitespace(itr, iend);
+  SkipWhitespace(iend, &itr);
   if (*itr == Dirtab::kCommentMarker) {
     return true;
   } else if (*itr == Dirtab::kNegationMarker) {
     negation = true;
     ++itr;
-    SkipWhitespace(itr, iend);
+    SkipWhitespace(iend, &itr);
   }
 
   // extract and parse pathspec

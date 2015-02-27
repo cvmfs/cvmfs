@@ -89,7 +89,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void RemoveDirectory(const std::string &directory_path);
 
   // Hardlink group handling
-  void AddHardlinkGroup(DirectoryEntryBaseList &entries,
+  void AddHardlinkGroup(const DirectoryEntryBaseList &entries,
                         const XattrList &xattrs,
                         const std::string &parent_directory);
   void ShrinkHardlinkGroup(const std::string &remove_path);

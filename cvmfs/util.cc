@@ -648,8 +648,10 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
  * Name -> UID from passwd database
  */
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
-  struct passwd *result;
-  result = getpwnam(username.c_str());
+  char buf[16*1024];
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  getpwnam_r(username.c_str(), &pwd, buf, sizeof(buf), &result);
   if (result == NULL)
     return false;
   *uid = result->pw_uid;
@@ -662,8 +664,10 @@ bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
  * Name -> GID from groups database
  */
 bool GetGidOf(const std::string &groupname, gid_t *gid) {
+  char buf[16*1024];
+  struct group grp;
   struct group *result;
-  result = getgrnam(groupname.c_str());
+  getgrnam_r(groupname.c_str(), &grp, buf, sizeof(buf), &result);
   if (result == NULL)
     return false;
   *gid = result->gr_gid;

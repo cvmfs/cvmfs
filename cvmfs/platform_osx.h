@@ -85,7 +85,7 @@ inline int platform_spinlock_trylock(platform_spinlock *lock) {
 /**
  * pthread_self() is not necessarily an unsigned long.
  */
-inline unsigned long platform_gettid() {
+inline pthread_t platform_gettid() {
   return mach_thread_self();
 }
 
@@ -196,8 +196,8 @@ inline int platform_readahead(int filedes) {
 /**
  * strdupa does not exist on OSX
  */
-#define strdupa(s) strcpy(reinterpret_cast<char *> \
-  (alloca(strlen((s)) + 1)), (s))
+#define strdupa(s) strcpy(/* NOLINT(runtime/printf) */\
+  reinterpret_cast<char *>(alloca(strlen((s)) + 1)), (s))
 
 
 inline std::string platform_libname(const std::string &base_name) {

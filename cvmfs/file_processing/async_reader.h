@@ -152,11 +152,11 @@ class Reader : public AbstractReader,
    */
   void EnableDraining() { draining_ = true; }
 
-  bool TryToAcquireNewJob(FileJob &next_job);
+  bool TryToAcquireNewJob(FileJob *next_job);
   void OpenNewFile(FileT          *file);
-  void CloseFile(OpenFile         &file);
+  void CloseFile(OpenFile         *file);
 
-  bool ReadAndScheduleNextBuffer(OpenFile &open_file);
+  bool ReadAndScheduleNextBuffer(OpenFile *open_file);
 
   void FinalizedFile(AbstractFile *file);
 
