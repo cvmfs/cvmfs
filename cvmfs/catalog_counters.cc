@@ -29,9 +29,9 @@ void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
 }
 
 
-void DeltaCounters::PopulateToParent(DeltaCounters &parent) const {
-  parent.subtree.Add(self);
-  parent.subtree.Add(subtree);
+void DeltaCounters::PopulateToParent(DeltaCounters *parent) const {
+  parent->subtree.Add(self);
+  parent->subtree.Add(subtree);
 }
 
 
@@ -41,15 +41,15 @@ void Counters::ApplyDelta(const DeltaCounters &delta) {
 }
 
 
-void Counters::AddAsSubtree(DeltaCounters &delta) const {
-  delta.subtree.Add(self);
-  delta.subtree.Add(subtree);
+void Counters::AddAsSubtree(DeltaCounters *delta) const {
+  delta->subtree.Add(self);
+  delta->subtree.Add(subtree);
 }
 
 
-void Counters::MergeIntoParent(DeltaCounters &parent_delta) const {
-  parent_delta.self.Add(self);
-  parent_delta.subtree.Subtract(self);
+void Counters::MergeIntoParent(DeltaCounters *parent_delta) const {
+  parent_delta->self.Add(self);
+  parent_delta->subtree.Subtract(self);
 }
 
 

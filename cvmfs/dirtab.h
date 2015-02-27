@@ -119,10 +119,10 @@ class Dirtab {
 
  private:
   void SkipWhitespace(
-    std::string::const_iterator &itr,
-    const std::string::const_iterator &end) const
+    const std::string::const_iterator &end,
+    std::string::const_iterator *itr) const
   {
-    for (; itr != end && *itr == ' '; ++itr) { }
+    for (; *itr != end && **itr == ' '; ++(*itr)) { }
   }
   bool CheckRuleValidity() const;
 

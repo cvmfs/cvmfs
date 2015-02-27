@@ -431,7 +431,7 @@ class LruCache : SingleCopy {
    */
   template<class T> class ListEntryHead : public ListEntry<T> {
    public:
-    explicit ListEntryHead(ConcreteMemoryAllocator &allocator) :
+    explicit ListEntryHead(ConcreteMemoryAllocator *allocator) :
       allocator_(allocator) {}
 
     virtual ~ListEntryHead() {
@@ -449,7 +449,7 @@ class LruCache : SingleCopy {
       while (!entry->IsListHead()) {
         delete_me = entry;
         entry = entry->next;
-        allocator_.Destruct(static_cast<ConcreteListEntryContent*>(delete_me));
+        allocator_->Destruct(static_cast<ConcreteListEntryContent*>(delete_me));
       }
 
       // Reset the list to lonely
@@ -467,7 +467,7 @@ class LruCache : SingleCopy {
      */
     inline ListEntryContent<T>* PushBack(T content) {
       ListEntryContent<T> *new_entry =
-                             allocator_.Construct(ListEntryContent<T>(content));
+        allocator_->Construct(ListEntryContent<T>(content));
       this->InsertAsPredecessor(new_entry);
       return new_entry;
     }
@@ -512,12 +512,13 @@ class LruCache : SingleCopy {
       ListEntryContent<T> *popped = (ListEntryContent<T> *)popped_entry;
       popped->RemoveFromList();
       T result = popped->content();
-      allocator_.Destruct(static_cast<ConcreteListEntryContent*>(popped_entry));
+      allocator_->Destruct(static_cast<ConcreteListEntryContent*>(
+        popped_entry));
       return result;
     }
 
    private:
-    ConcreteMemoryAllocator &allocator_;
+    ConcreteMemoryAllocator *allocator_;
   };
 
  public:  // LruCache
@@ -532,7 +533,7 @@ class LruCache : SingleCopy {
     cache_gauge_(0),
     cache_size_(cache_size),
     allocator_(cache_size),
-    lru_list_(allocator_)
+    lru_list_(&allocator_)
   {
     assert(cache_size > 0);
 
@@ -579,7 +580,7 @@ class LruCache : SingleCopy {
     CacheEntry entry;
 
     // Check if we have to update an existent entry
-    if (this->DoLookup(key, entry)) {
+    if (this->DoLookup(key, &entry)) {
       atomic_inc64(&statistics_.num_update);
       entry.value = value;
       cache_.Insert(key, entry);
@@ -619,7 +620,7 @@ class LruCache : SingleCopy {
     }
 
     CacheEntry entry;
-    if (DoLookup(key, entry)) {
+    if (DoLookup(key, &entry)) {
       // Hit
       atomic_inc64(&statistics_.num_hit);
       Touch(entry);
@@ -647,7 +648,7 @@ class LruCache : SingleCopy {
     }
 
     CacheEntry entry;
-    if (this->DoLookup(key, entry)) {
+    if (this->DoLookup(key, &entry)) {
       found = true;
       atomic_inc64(&statistics_.num_forget);
 
@@ -714,8 +715,8 @@ class LruCache : SingleCopy {
    *  @param entry a pointer to the entry structure
    *  @return true on successful lookup, false otherwise
    */
-  inline bool DoLookup(const Key &key, CacheEntry &entry) {
-    return cache_.Lookup(key, &entry);
+  inline bool DoLookup(const Key &key, CacheEntry *entry) {
+    return cache_.Lookup(key, entry);
   }
 
   /**

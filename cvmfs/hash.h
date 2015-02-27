@@ -405,27 +405,12 @@ class ContextPtr {
 
   explicit ContextPtr(const Algorithms a) :
     algorithm(a), buffer(NULL), size(GetContextSize(a)) {}
-
-  /**
-   * Produces a duplicated ContextPtr
-   * Warning: Since the buffer handling is up to the user, the actual context
-   *          buffer is _not_ copied by this copy constructor and needs to be
-   *          dealt with by the caller! (i.e. memcpy'ed from old to new)
-   */
-  explicit ContextPtr(const ContextPtr &other) :
-    algorithm(other.algorithm), buffer(NULL), size(other.size) {}
-
- private:
-  ContextPtr& operator=(const ContextPtr &other) {
-    const bool not_implemented = false;
-    assert(not_implemented);
-  }
 };
 
-void Init(ContextPtr &context);
+void Init(ContextPtr context);
 void Update(const unsigned char *buffer, const unsigned buffer_size,
-            ContextPtr &context);
-void Final(ContextPtr &context, Any *any_digest);
+            ContextPtr context);
+void Final(ContextPtr context, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
 void Hmac(const std::string &key,

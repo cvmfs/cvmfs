@@ -118,10 +118,10 @@ class PathspecElementPattern {
  protected:
   void Parse(const std::string::const_iterator &begin,
              const std::string::const_iterator &end);
-  SubPattern* ParsePlaintext(std::string::const_iterator &i,
-                             const std::string::const_iterator &end);
-  SubPattern* ParseSpecialChar(std::string::const_iterator &i,
-                               const std::string::const_iterator &end);
+  SubPattern* ParsePlaintext(const std::string::const_iterator &end,
+                             std::string::const_iterator *i);
+  SubPattern* ParseSpecialChar(const std::string::const_iterator &end,
+                               std::string::const_iterator *i);
 
  private:
   bool valid_;

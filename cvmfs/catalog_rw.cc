@@ -579,10 +579,10 @@ void WritableCatalog::MergeIntoParent() {
   CopyCatalogsToParent();
 
   // Fix counters in parent
-  delta_counters_.PopulateToParent(parent->delta_counters_);
+  delta_counters_.PopulateToParent(&parent->delta_counters_);
   Counters &counters = GetCounters();
   counters.ApplyDelta(delta_counters_);
-  counters.MergeIntoParent(parent->delta_counters_);
+  counters.MergeIntoParent(&parent->delta_counters_);
 
   // Remove the nested catalog reference for this nested catalog.
   // From now on this catalog will be dangling!

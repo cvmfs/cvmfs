@@ -555,7 +555,7 @@ bool CommandCheck::InspectTree(const string &path,
       if (!InspectTree(i->path.ToString(), i->hash, i->size,
                        &nested_transition_point, &nested_counters))
         retval = false;
-      nested_counters.PopulateToParent(*computed_counters);
+      nested_counters.PopulateToParent(computed_counters);
     }
   }
 

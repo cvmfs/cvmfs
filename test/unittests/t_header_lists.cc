@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "gtest/gtest.h"
 
 #include "../../cvmfs/download.h"
@@ -29,7 +33,8 @@ TEST_F(T_HeaderLists, Intrinsics) {
     header_lists->GetList("Some: Header");
   EXPECT_EQ(header_lists->blocks_.size(), 1U);
 
-  header_lists->PutList(&(header_lists->blocks_[0][header_lists->kBlockSize-1]));
+  header_lists->PutList(
+    &(header_lists->blocks_[0][header_lists->kBlockSize-1]));
   header_lists->GetList("Some: Header");
   EXPECT_EQ(header_lists->blocks_.size(), 1U);
 

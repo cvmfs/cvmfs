@@ -82,19 +82,20 @@ void Pathspec::Parse(const std::string &spec) {
       ++itr;
       continue;
     }
-    ParsePathElement(itr, end);
+    ParsePathElement(end, &itr);
   }
 }
 
-void Pathspec::ParsePathElement(std::string::const_iterator  &itr,
-                                const std::string::const_iterator  &end)
-{
+void Pathspec::ParsePathElement(
+  const std::string::const_iterator &end,
+  std::string::const_iterator  *itr
+) {
   // find the end of the current pattern element (next directory boundary)
-  const std::string::const_iterator begin_element = itr;
-  while (itr != end && *itr != kSeparator) {
-    ++itr;
+  const std::string::const_iterator begin_element = *itr;
+  while (*itr != end && **itr != kSeparator) {
+    ++(*itr);
   }
-  const std::string::const_iterator end_element = itr;
+  const std::string::const_iterator end_element = *itr;
 
   // create a PathspecElementPattern out of this directory description
   patterns_.push_back(PathspecElementPattern(begin_element, end_element));

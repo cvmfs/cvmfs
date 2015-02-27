@@ -549,7 +549,7 @@ Failures Reload(const int fd_progress, const bool stop_and_go) {
 }  // namespace loader
 
 
-using namespace loader;
+using namespace loader;  // NOLINT(build/namespaces)
 
 // Making OpenSSL (libcrypto) thread-safe
 pthread_mutex_t *gLibcryptoLocks;

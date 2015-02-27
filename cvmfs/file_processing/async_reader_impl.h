@@ -47,7 +47,7 @@ void Reader<FileScrubbingTaskT, FileT>::ReadThread() {
     // -> if the queue is empty, just continue on the work currently in flight
     // -> if the popped value is NULL, the drainout is initiated
     FileJob job;
-    const bool popped_new_job = TryToAcquireNewJob(job);
+    const bool popped_new_job = TryToAcquireNewJob(&job);
     if (popped_new_job) {
       if (!job.terminate) {
         OpenNewFile(job.file);
@@ -61,11 +61,11 @@ void Reader<FileScrubbingTaskT, FileT>::ReadThread() {
     typename OpenFileList::iterator       i    = open_files_.begin();
     typename OpenFileList::const_iterator iend = open_files_.end();
     for (; i != iend; ++i) {
-      const bool finished_reading = ReadAndScheduleNextBuffer(*i);
+      const bool finished_reading = ReadAndScheduleNextBuffer(&(*i));
       if (finished_reading) {
         OpenFile file = *i;
         i = open_files_.erase(i);
-        CloseFile(file);
+        CloseFile(&file);
       }
     }
   }
@@ -73,21 +73,21 @@ void Reader<FileScrubbingTaskT, FileT>::ReadThread() {
 
 
 template <class FileScrubbingTaskT, class FileT>
-bool Reader<FileScrubbingTaskT, FileT>::TryToAcquireNewJob(FileJob &next_job) {
-  // in draining mode we only process files that are already open
+bool Reader<FileScrubbingTaskT, FileT>::TryToAcquireNewJob(FileJob *next_job) {
+  // In draining mode we only process files that are already open
   if (draining_) {
     return false;
   }
 
   bool popped = false;
 
-  // if we have no more work, we allow the thread to block otherwise we just
+  // If we have no more work, we allow the thread to block otherwise we just
   // acquire what we can get and continue working
   if (open_files_.empty()) {
-    queue_.pop(next_job);
+    queue_.pop(*next_job);
     popped = true;
   } else {
-    popped = queue_.try_pop(next_job);
+    popped = queue_.try_pop(*next_job);
   }
 
   return popped;
@@ -121,8 +121,8 @@ void Reader<FileScrubbingTaskT, FileT>::OpenNewFile(FileT *file) {
 
 
 template <class FileScrubbingTaskT, class FileT>
-void Reader<FileScrubbingTaskT, FileT>::CloseFile(OpenFile &file) {
-  const int retval = close(file.file_descriptor);
+void Reader<FileScrubbingTaskT, FileT>::CloseFile(OpenFile *file) {
+  const int retval = close(file->file_descriptor);
   assert(retval == 0);
 }
 
@@ -141,9 +141,10 @@ void Reader<FileScrubbingTaskT, FileT>::FinalizedFile(AbstractFile *file) {
 
 template <class FileScrubbingTaskT, class FileT>
 bool Reader<FileScrubbingTaskT, FileT>::
-                                ReadAndScheduleNextBuffer(OpenFile &open_file) {
-  assert(open_file.file != NULL);
-  assert(open_file.file_descriptor > 0);
+  ReadAndScheduleNextBuffer(OpenFile *open_file)
+{
+  assert(open_file->file != NULL);
+  assert(open_file->file_descriptor > 0);
 
 
   // All asynchronous tasks for a single File need to be processed sequentially,
@@ -190,31 +191,31 @@ bool Reader<FileScrubbingTaskT, FileT>::
 
   // figure out how many bytes need to be read in this step and create a
   // CharBuffer to accomodate these bytes
-  const size_t file_size     = open_file.file->size();
+  const size_t file_size     = open_file->file->size();
   const size_t bytes_to_read =
-    std::min(file_size - static_cast<size_t>(open_file.file_marker),
+    std::min(file_size - static_cast<size_t>(open_file->file_marker),
              max_buffer_size_);
   CharBuffer *buffer = CreateBuffer(bytes_to_read);
-  buffer->SetBaseOffset(open_file.file_marker);
+  buffer->SetBaseOffset(open_file->file_marker);
 
   // read the next data Block into the just created CharBuffer and check if
   // everything worked as expected
-  const size_t bytes_read = read(open_file.file_descriptor,
+  const size_t bytes_read = read(open_file->file_descriptor,
                                  buffer->ptr(),
                                  bytes_to_read);
   assert(bytes_to_read == bytes_read);
   buffer->SetUsedBytes(bytes_read);
-  open_file.file_marker += bytes_read;
+  open_file->file_marker += bytes_read;
 
   // check if the file has been fully read
   const bool finished_reading =
-    (static_cast<size_t>(open_file.file_marker) == file_size);
+    (static_cast<size_t>(open_file->file_marker) == file_size);
 
   // create an asynchronous task (FileScrubbingTaskT) to process the data chunk,
   // together with a synchronization task that ensures the correct execution
   // order of the FileScrubbingTasks
   FileScrubbingTaskT *new_task =
-    new(tbb::task::allocate_root()) FileScrubbingTaskT(open_file.file,
+    new(tbb::task::allocate_root()) FileScrubbingTaskT(open_file->file,
                                                        buffer,
                                                        finished_reading,
                                                        this);
@@ -223,17 +224,17 @@ bool Reader<FileScrubbingTaskT, FileT>::
 
   // decorate the predecessor task (i-1) with it's successor (i) and allow the
   // predecessor to be scheduled by TBB (task::enqueue)
-  if (open_file.previous_task != NULL) {
-    open_file.previous_task->SetNext(new_task);
-    tbb::task::enqueue(*open_file.previous_sync_task);
+  if (open_file->previous_task != NULL) {
+    open_file->previous_task->SetNext(new_task);
+    tbb::task::enqueue(*open_file->previous_sync_task);
   }
 
-  open_file.previous_task      = new_task;
-  open_file.previous_sync_task = sync_task;
+  open_file->previous_task      = new_task;
+  open_file->previous_sync_task = sync_task;
 
   // make sure that the last chunk is processed
   if (finished_reading) {
-    tbb::task::enqueue(*open_file.previous_sync_task);
+    tbb::task::enqueue(*open_file->previous_sync_task);
   }
 
   return finished_reading;

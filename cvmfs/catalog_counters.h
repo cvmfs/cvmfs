@@ -73,16 +73,16 @@ class TreeCountersBase {
       xattrs            += factor * other.xattrs;
     }
 
-    void FillFieldsMap(FieldsMap &map, const std::string &prefix) const {
-      map[prefix + "regular"]      = &regular_files;
-      map[prefix + "symlink"]      = &symlinks;
-      map[prefix + "dir"]          = &directories;
-      map[prefix + "nested"]       = &nested_catalogs;
-      map[prefix + "chunked"]      = &chunked_files;
-      map[prefix + "chunks"]       = &file_chunks;
-      map[prefix + "file_size"]    = &file_size;
-      map[prefix + "chunked_size"] = &chunked_file_size;
-      map[prefix + "xattr"]        = &xattrs;
+    void FillFieldsMap(const std::string &prefix, FieldsMap *map) const {
+      (*map)[prefix + "regular"]      = &regular_files;
+      (*map)[prefix + "symlink"]      = &symlinks;
+      (*map)[prefix + "dir"]          = &directories;
+      (*map)[prefix + "nested"]       = &nested_catalogs;
+      (*map)[prefix + "chunked"]      = &chunked_files;
+      (*map)[prefix + "chunks"]       = &file_chunks;
+      (*map)[prefix + "file_size"]    = &file_size;
+      (*map)[prefix + "chunked_size"] = &chunked_file_size;
+      (*map)[prefix + "xattr"]        = &xattrs;
     }
 
     FieldT regular_files;
@@ -118,7 +118,7 @@ class DeltaCounters : public TreeCountersBase<DeltaCounters_t> {
   friend class Counters;
 
  public:
-  void PopulateToParent(DeltaCounters &parent) const;
+  void PopulateToParent(DeltaCounters *parent) const;
   void Increment(const DirectoryEntry &dirent) { ApplyDelta(dirent,  1); }
   void Decrement(const DirectoryEntry &dirent) { ApplyDelta(dirent, -1); }
 
@@ -131,8 +131,8 @@ typedef uint64_t Counters_t;
 class Counters : public TreeCountersBase<Counters_t> {
  public:
   void ApplyDelta(const DeltaCounters &delta);
-  void AddAsSubtree(DeltaCounters &delta) const;
-  void MergeIntoParent(DeltaCounters &parent_delta) const;
+  void AddAsSubtree(DeltaCounters *delta) const;
+  void MergeIntoParent(DeltaCounters *parent_delta) const;
   Counters_t GetSelfEntries() const;
   Counters_t GetSubtreeEntries() const;
   Counters_t GetAllEntries() const;

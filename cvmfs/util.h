@@ -457,9 +457,6 @@ class BoundCallback : public CallbackBase<ParamT> {
   BoundCallback(CallbackMethod method, DelegateT *delegate) :
     delegate_(delegate),
     method_(method) {}
-  BoundCallback(CallbackMethod method, DelegateT &delegate) :
-    delegate_(&delegate),
-    method_(method) {}
 
   void operator()(const ParamT &value) const { (delegate_->*method_)(value); }
 
@@ -475,8 +472,6 @@ class BoundCallback<void, DelegateT> : public CallbackBase<void> {
 
   BoundCallback(CallbackMethod method, DelegateT *delegate) :
     delegate_(delegate), method_(method) {}
-  BoundCallback(CallbackMethod method, DelegateT &delegate) :
-    delegate_(&delegate), method_(method) {}
 
   void operator()() const { (delegate_->*method_)(); }
 
@@ -512,12 +507,6 @@ class BoundClosure : public CallbackBase<ParamT> {
     delegate_(delegate),
     method_(method),
     closure_data_(data) {}
-  BoundClosure(CallbackMethod  method,
-               DelegateT      &delegate,
-               ClosureDataT    data) :
-    delegate_(&delegate),
-    method_(method),
-    closure_data_(data) {}
 
   void operator()(const ParamT &value) const {
     (delegate_->*method_)(value, closure_data_);
@@ -539,10 +528,6 @@ class BoundClosure<void, DelegateT, ClosureDataT> : public CallbackBase<void> {
                DelegateT      *delegate,
                ClosureDataT    data) :
     delegate_(delegate), method_(method), closure_data_(data) {}
-  BoundClosure(CallbackMethod  method,
-               DelegateT      &delegate,
-               ClosureDataT    data) :
-    delegate_(&delegate), method_(method), closure_data_(data) {}
 
   void operator()() const { (delegate_->*method_)(closure_data_); }
 

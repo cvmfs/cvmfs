@@ -128,8 +128,8 @@ class Pathspec {
 
  protected:
   void Parse(const std::string &spec);
-  void ParsePathElement(std::string::const_iterator &itr,
-                        const std::string::const_iterator &end);
+  void ParsePathElement(const std::string::const_iterator &end,
+                        std::string::const_iterator *itr);
 
   bool IsPathspecMatching(const std::string &query_path) const;
   bool IsPathspecMatchingRelaxed(const std::string &query_path) const;

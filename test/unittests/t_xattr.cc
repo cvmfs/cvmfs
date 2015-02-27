@@ -155,7 +155,7 @@ TEST_F(T_Xattr, ListKeysPosix) {
   XattrList empty;
   EXPECT_EQ("", empty.ListKeysPosix(""));
   const char expect1[] = "user.a\0user.b\0keya\0";
-  EXPECT_EQ(string(expect1, sizeof(expect1)-1), 
+  EXPECT_EQ(string(expect1, sizeof(expect1)-1),
             empty.ListKeysPosix(existing_list));
   const char expect2[] = "empty_key\0keya\0keyb\0";
   EXPECT_EQ(string(expect2, sizeof(expect2)-1),

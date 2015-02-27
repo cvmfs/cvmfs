@@ -60,8 +60,8 @@ typename GarbageCollector<CatalogTraversalT, HashFilterT>::TraversalParameters
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
   const GarbageCollector<CatalogTraversalT, HashFilterT>::
-    TraversalCallbackDataTN &data)
-{
+    TraversalCallbackDataTN &data  // NOLINT(runtime/references)
+) {
   ++preserved_catalogs_;
 
   if (configuration_.verbose) {
@@ -88,8 +88,8 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
   const GarbageCollector<CatalogTraversalT, HashFilterT>::
-    TraversalCallbackDataTN &data)
-{
+    TraversalCallbackDataTN &data  // NOLINT(runtime/references)
+) {
   ++condemned_catalogs_;
 
   if (configuration_.verbose) {

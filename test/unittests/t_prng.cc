@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/prng.h"
@@ -31,7 +35,7 @@ TEST_F(T_Prng, FullRange) {
   for (unsigned i = 0; i < buf_size; ++i) {
     uint32_t random_number = prng_->Next(rnd_range);
     validation[random_number] = 1;
-    //printf("%d\n", random_number);
+    // printf("%d\n", random_number);
   }
   uint32_t test = 0;
   for (unsigned i = 0; i < rnd_range; ++i) {
@@ -47,7 +51,7 @@ TEST_F(T_Prng, FullRangeTimeseed) {
   for (unsigned i = 0; i < buf_size; ++i) {
     uint32_t random_number = prng_->Next(rnd_range);
     validation[random_number] = 1;
-    //printf("%d\n", random_number);
+    // printf("%d\n", random_number);
   }
   uint32_t test = 0;
   for (unsigned i = 0; i < rnd_range; ++i) {
