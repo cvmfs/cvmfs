@@ -85,7 +85,7 @@ inline int platform_spinlock_trylock(platform_spinlock *lock) {
 /**
  * pthread_self() is not necessarily an unsigned long.
  */
-inline pthread_t platform_gettid() {
+inline thread_port_t platform_gettid() {
   return mach_thread_self();
 }
 
