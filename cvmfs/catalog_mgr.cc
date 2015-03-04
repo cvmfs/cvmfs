@@ -4,14 +4,17 @@
 
 #define __STDC_FORMAT_MACROS
 
+#include "cvmfs_config.h"
 #include "catalog_mgr.h"
 
 #include <inttypes.h>
+
 #include <cassert>
 
 #include "logging.h"
-#include "smalloc.h"
 #include "shortstring.h"
+#include "smalloc.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -245,7 +248,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
 
   // Look for parent entry
   if ((options & kLookupFull) == kLookupFull) {
-    assert (dirent != NULL);
+    assert(dirent != NULL);
 
     DirectoryEntry parent;
     PathString parent_path = GetParentPath(path);
@@ -281,6 +284,38 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   // Includes both: ENOENT and not found due to I/O error
   atomic_inc64(&statistics_.num_lookup_path_negative);
   return false;
+}
+
+
+bool AbstractCatalogManager::LookupXattrs(
+  const PathString &path,
+  XattrList *xattrs)
+{
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Find catalog, possibly load nested
+  Catalog *best_fit = FindCatalog(path);
+  Catalog *catalog = best_fit;
+  if (MountSubtree(path, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(path);
+    result = MountSubtree(path, best_fit, &catalog);
+    // DowngradeLock(); TODO
+    if (!result) {
+      Unlock();
+      return false;
+    }
+  }
+
+  atomic_inc64(&statistics_.num_lookup_xattrs);
+  result = catalog->LookupXattrsPath(path, xattrs);
+
+  Unlock();
+  return result;
 }
 
 
@@ -463,7 +498,7 @@ InodeRange AbstractCatalogManager::AcquireInodes(uint64_t size) {
  * @param chunk the InodeChunk to be freed
  */
 void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
-  // TODO currently inodes are only released on remount
+  // TODO(jblomer) currently inodes are only released on remount
 }
 
 
@@ -474,7 +509,7 @@ void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
  * @return the catalog which is best fitting at the given path
  */
 Catalog* AbstractCatalogManager::FindCatalog(const PathString &path) const {
-  assert (catalogs_.size() > 0);
+  assert(catalogs_.size() > 0);
 
   // Start at the root catalog and successively go down the catalog tree
   Catalog *best_fit = GetRootCatalog();
@@ -578,10 +613,8 @@ Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
 
   string     catalog_path;
   shash::Any catalog_hash;
-  const LoadError retval = LoadCatalog( mountpoint,
-                                        hash,
-                                       &catalog_path,
-                                       &catalog_hash);
+  const LoadError retval =
+    LoadCatalog(mountpoint, hash, &catalog_path, &catalog_hash);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
              mountpoint.c_str(), retval, Code2Ascii(retval));
@@ -714,7 +747,6 @@ string AbstractCatalogManager::PrintHierarchyRecursively(const Catalog *catalog,
     string(catalog->path().GetChars(), catalog->path().GetLength()) + "\n";
 
   CatalogList children = catalog->GetChildren();
-  CatalogList::const_iterator i,iend;
   for (CatalogList::const_iterator i = children.begin(), iEnd = children.end();
        i != iEnd; ++i)
   {
@@ -730,8 +762,8 @@ void AbstractCatalogManager::EnforceSqliteMemLimit() {
     static_cast<char *>(pthread_getspecific(pkey_sqlitemem_));
   if (mem_enforced == NULL) {
     sqlite3_soft_heap_limit(kSqliteMemPerThread);
-    pthread_setspecific(pkey_sqlitemem_, (char *)(1));
+    pthread_setspecific(pkey_sqlitemem_, reinterpret_cast<char *>(1));
   }
 }
 
-}
+}  // namespace catalog

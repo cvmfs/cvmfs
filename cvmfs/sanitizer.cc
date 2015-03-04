@@ -97,5 +97,5 @@ bool InputSanitizer::IsValid(const std::string &input) const {
 }  // namespace sanitizer
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif

@@ -2,7 +2,12 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
+#define CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
+
 #include <limits>
+#include <string>
+#include <vector>
 
 #include "../logging.h"
 
@@ -32,7 +37,7 @@ GarbageCollector<CatalogTraversalT, HashFilterT>::GarbageCollector(
   , condemned_catalogs_(0)
   , condemned_objects_(0)
 {
-  assert (configuration_.uploader != NULL);
+  assert(configuration_.uploader != NULL);
 }
 
 
@@ -47,15 +52,16 @@ typename GarbageCollector<CatalogTraversalT, HashFilterT>::TraversalParameters
   params.timestamp           = config.keep_history_timestamp;
   params.no_repeat_history   = true;
   params.ignore_load_failure = true;
-  params.quiet               = ! config.verbose;
+  params.quiet               = !config.verbose;
   return params;
 }
 
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
- const GarbageCollector<CatalogTraversalT,
-                        HashFilterT>::TraversalCallbackDataTN &data) {
+  const GarbageCollector<CatalogTraversalT, HashFilterT>::
+    TraversalCallbackDataTN &data  // NOLINT(runtime/references)
+) {
   ++preserved_catalogs_;
 
   if (configuration_.verbose) {
@@ -81,8 +87,9 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
- const GarbageCollector<CatalogTraversalT,
-                        HashFilterT>::TraversalCallbackDataTN &data) {
+  const GarbageCollector<CatalogTraversalT, HashFilterT>::
+    TraversalCallbackDataTN &data  // NOLINT(runtime/references)
+) {
   ++condemned_catalogs_;
 
   if (configuration_.verbose) {
@@ -109,10 +116,10 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
 
 template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::CheckAndSweep(
-                                                       const shash::Any &hash) {
-  if (! hash_filter_.Contains(hash)) {
+  const shash::Any &hash)
+{
+  if (!hash_filter_.Contains(hash))
     Sweep(hash);
-  }
 }
 
 
@@ -143,10 +150,11 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::Collect() {
 
 
 template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTree() {
-  if (configuration_.verbose) {
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::
+  AnalyzePreservedCatalogTree()
+{
+  if (configuration_.verbose)
     LogCvmfs(kLogGc, kLogStdout, "Preserving data objects in latest revision");
-  }
 
   typename CatalogTraversalT::CallbackTN *callback =
     traversal_.RegisterListener(
@@ -162,9 +170,10 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::AnalyzePreservedCatalogTr
 
 
 template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions() {
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions()
+{
   const bool keeps_revisions = (preserved_catalog_count() > 0);
-  if (! keeps_revisions && configuration_.verbose) {
+  if (!keeps_revisions && configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStderr, "This would delete everything! Abort.");
   }
 
@@ -173,7 +182,9 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions()
 
 
 template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree() {
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::
+SweepCondemnedCatalogTree()
+{
   if (configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStdout, "Sweeping Condemned Catalog Graphs");
   }
@@ -201,7 +212,8 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepCondemnedCatalogTree
 
 
 template <class CatalogTraversalT, class HashFilterT>
-bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions() {
+bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions()
+{
   if (configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStdout, "Sweeping Historic Snapshots");
   }
@@ -210,7 +222,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions() 
 
   // find the content hash for the current HEAD history database
   UniquePtr<HistoryTN> history(fetcher->FetchHistory());
-  if (! history.IsValid()) {
+  if (!history.IsValid()) {
     if (configuration_.verbose) {
       LogCvmfs(kLogGc, kLogStdout, "No history found");
     }
@@ -222,10 +234,10 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions() 
        &GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects,
         this);
 
-   // list the recycle bin of the current HEAD history database for sweeping
+  // List the recycle bin of the current HEAD history database for sweeping
   typedef std::vector<shash::Any> Hashes;
   Hashes recycled_snapshots;
-  if (! history->ListRecycleBin(&recycled_snapshots)) {
+  if (!history->ListRecycleBin(&recycled_snapshots)) {
     return false;
   }
 
@@ -233,7 +245,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::SweepHistoricRevisions() 
         Hashes::const_iterator i    = recycled_snapshots.begin();
   const Hashes::const_iterator iend = recycled_snapshots.end();
   for (; i != iend; ++i) {
-    if (! traversal_.Traverse(*i, CatalogTraversalT::kDepthFirstTraversal)) {
+    if (!traversal_.Traverse(*i, CatalogTraversalT::kDepthFirstTraversal)) {
       return false;
     }
   }
@@ -255,12 +267,13 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
   tree_indent += "\u251C\u2500 ";
 
   const std::string hash_string = catalog->hash().ToString();
-  const std::string path        = (catalog->path().IsEmpty())
-                                          ? "/"
-                                          : catalog->path().ToString();
+  const std::string path =
+    (catalog->path().IsEmpty()) ? "/" : catalog->path().ToString();
 
   LogCvmfs(kLogGc, kLogStdout, "%s%s %s",
     tree_indent.c_str(),
     hash_string.c_str(),
     path.c_str());
 }
+
+#endif  // CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_

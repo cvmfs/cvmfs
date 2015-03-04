@@ -11,32 +11,32 @@
 #include "cvmfs_config.h"
 #include "swissknife_pull.h"
 
+#include <inttypes.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <inttypes.h>
 
+#include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
-#include <cstring>
-#include <cstdlib>
-
-#include "upload.h"
-#include "logging.h"
+#include "atomic.h"
+#include "catalog.h"
 #include "download.h"
-#include "util.h"
+#include "hash.h"
+#include "history_sqlite.h"
+#include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
 #include "signature.h"
-#include "catalog.h"
 #include "smalloc.h"
-#include "hash.h"
-#include "atomic.h"
-#include "history_sqlite.h"
+#include "upload.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
-using namespace swissknife;  // NOLINT
+
+namespace swissknife {
 
 namespace {
 
@@ -45,7 +45,6 @@ struct ChunkJob {
   shash::Algorithms hash_algorithm;
   unsigned char digest[shash::kMaxDigestSize];
 };
-
 
 static void SpoolerOnUpload(const upload::SpoolerResult &result) {
   unlink(result.local_path.c_str());
@@ -57,7 +56,6 @@ static void SpoolerOnUpload(const upload::SpoolerResult &result) {
     abort();
   }
 }
-
 
 string              *stratum0_url = NULL;
 string              *temp_dir = NULL;
@@ -75,7 +73,7 @@ atomic_int64         chunk_queue;
 bool                 preload_cache = false;
 string              *preload_cachedir = NULL;
 
-}
+}  // anonymous namespace
 
 
 static bool Peek(const string &remote_path, const char suffix)
@@ -331,7 +329,8 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   delete catalog;
   unlink(file_catalog.c_str());
   WaitForStorage();
-  Store(file_catalog_vanilla, "data" + catalog_hash.MakePathExplicit(1, 2), 'C');
+  Store(file_catalog_vanilla, "data" + catalog_hash.MakePathExplicit(1, 2),
+        'C');
   return true;
 
  pull_cleanup:
@@ -405,7 +404,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
   g_download_manager->Init(num_parallel+1, true);
-  //download::ActivatePipelining();
+  // download::ActivatePipelining();
   unsigned current_group;
   vector< vector<download::DownloadManager::ProxyInfo> > proxies;
   g_download_manager->GetProxyInfo(&proxies, &current_group, NULL);
@@ -498,7 +497,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     retval = tag_db->List(&historic_tags);
     delete tag_db;
     unlink(history_db_path.c_str());
-    if (! retval) {
+    if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to read history database (%s)",
                history_db_path.c_str());
       goto fini;
@@ -576,7 +575,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       assert(retval);
     } else {
       // pkcs#7 structure contains content + certificate + signature
-      // So there is no race with whitelist and pkcs7 signature being out of sync
+      // So there is no race with whitelist and pkcs7 signature being out of
+      // sync
       if (ensemble.whitelist_pkcs7_buf) {
         StoreBuffer(ensemble.whitelist_pkcs7_buf, ensemble.whitelist_pkcs7_size,
                     ".cvmfswhitelist.pkcs7", 0, false);
@@ -603,3 +603,5 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   delete spooler;
   return result;
 }
+
+}  // namespace swissknife

@@ -5,32 +5,34 @@
 #ifndef CVMFS_SWISSKNIFE_INFO_H_
 #define CVMFS_SWISSKNIFE_INFO_H_
 
+#include <string>
+
 #include "swissknife.h"
 
 namespace swissknife {
 
 class CommandInfo : public Command {
  public:
-  ~CommandInfo() { };
+  ~CommandInfo() { }
   std::string GetName() { return "info"; }
   std::string GetDescription() {
     return "CernVM File System repository information retrieval\n"
       "This command reads the content of a .cvmfspublished file and exposes it "
       "to the user.";
-  };
+  }
   ParameterList GetParams();
   int Main(const ArgumentList &args);
 };
 
 class CommandVersion : public Command {
  public:
-  ~CommandVersion() {};
+  ~CommandVersion() { }
   std::string GetName()        { return "version";                         }
   std::string GetDescription() { return "Prints the version of CernVM-FS"; }
   ParameterList GetParams()    { return ParameterList();                   }
   int Main(const ArgumentList &args);
 };
 
-}
+}  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_INFO_H_

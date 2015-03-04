@@ -6,6 +6,7 @@
 #define CVMFS_BACKOFF_H_
 
 #include <pthread.h>
+
 #include "prng.h"
 #include "util.h"
 
@@ -18,7 +19,10 @@ class BackoffThrottle : public SingleCopy {
  public:
   static const unsigned kDefaultInitDelay = 32;  /**< 32ms */
   static const unsigned kDefaultMaxDelay = 2000; /**< Maximum 2 seconds */
-  static const unsigned kDefaultResetAfter = 10000; /**< Clear memory after 10s */
+  /**
+   * Clear memory after 10s
+   */
+  static const unsigned kDefaultResetAfter = 10000;
 
   BackoffThrottle() {
     Init(kDefaultInitDelay, kDefaultMaxDelay, kDefaultResetAfter);
@@ -32,6 +36,7 @@ class BackoffThrottle : public SingleCopy {
   ~BackoffThrottle();
   void Throttle();
   void Reset();
+
  private:
   void Init(const unsigned init_delay_ms,
             const unsigned max_delay_ms,

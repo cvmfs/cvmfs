@@ -29,7 +29,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_buffer.cc
   t_chunk_detectors.cc
   t_upload_facility.cc
-  t_local_uploader.cc
+  t_uploaders.cc
   t_file_processing.cc
   t_async_reader.cc
   t_test_utils.cc
@@ -54,7 +54,10 @@ set (CVMFS_UNITTEST_SOURCES
   t_download.cc
   t_uuid.cc
   t_object_fetcher.cc
+  t_catalog_sql.cc
+  t_xattr.cc
   t_statistics.cc
+  t_options.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -94,6 +97,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/globals.cc
 
   ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.h
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
 
@@ -132,6 +136,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/duplex_cares.h
   ${CVMFS_SOURCE_DIR}/dns.h
   ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/xattr.h
+  ${CVMFS_SOURCE_DIR}/xattr.cc
   ${CVMFS_SOURCE_DIR}/statistics.h
   ${CVMFS_SOURCE_DIR}/statistics.cc
 )

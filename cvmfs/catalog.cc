@@ -4,15 +4,16 @@
 
 #include "catalog.h"
 
-#include <cassert>
-#include <algorithm>
 #include <errno.h>
 
-#include "platform.h"
+#include <algorithm>
+#include <cassert>
+
 #include "catalog_mgr.h"
-#include "util.h"
 #include "logging.h"
+#include "platform.h"
 #include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -50,7 +51,7 @@ Catalog::Catalog(const PathString &path,
   catalog_hash_(catalog_hash),
   path_(path),
   volatile_flag_(false),
-  is_root_(parent == NULL && ! is_nested),
+  is_root_(parent == NULL && !is_nested),
   parent_(parent),
   nested_catalog_cache_dirty_(true),
   initialized_(false)
@@ -71,6 +72,7 @@ Catalog::Catalog(const PathString &path,
   sql_list_nested_ = NULL;
   sql_all_chunks_ = NULL;
   sql_chunks_listing_ = NULL;
+  sql_lookup_xattrs_ = NULL;
 }
 
 
@@ -96,10 +98,12 @@ void Catalog::InitPreparedStatements() {
   sql_list_nested_     = new SqlNestedCatalogListing(database());
   sql_all_chunks_      = new SqlAllChunks(database());
   sql_chunks_listing_  = new SqlChunksListing(database());
+  sql_lookup_xattrs_   = new SqlLookupXattrs(database());
 }
 
 
 void Catalog::FinalizePreparedStatements() {
+  delete sql_lookup_xattrs_;
   delete sql_chunks_listing_;
   delete sql_all_chunks_;
   delete sql_listing_;
@@ -124,12 +128,19 @@ bool Catalog::InitStandalone(const std::string &database_file) {
 
 
 bool Catalog::ReadCatalogCounters() {
-  assert (database_ != NULL);
-  const bool statistics_loaded =
-    (database().schema_version() < CatalogDatabase::kLatestSupportedSchema -
-                                   CatalogDatabase::kSchemaEpsilon)
-      ? counters_.ReadFromDatabase(database(), LegacyMode::kLegacy)
-      : counters_.ReadFromDatabase(database());
+  assert(database_ != NULL);
+  bool statistics_loaded;
+  if (database().schema_version() <
+      CatalogDatabase::kLatestSupportedSchema - CatalogDatabase::kSchemaEpsilon)
+  {
+    statistics_loaded =
+      counters_.ReadFromDatabase(database(), LegacyMode::kLegacy);
+  } else if (database().schema_revision() < 2) {
+    statistics_loaded =
+      counters_.ReadFromDatabase(database(), LegacyMode::kNoXattrs);
+  } else {
+    statistics_loaded = counters_.ReadFromDatabase(database());
+  }
   return statistics_loaded;
 }
 
@@ -164,8 +175,10 @@ bool Catalog::OpenDatabase(const string &db_path) {
                                     "WHERE key='root_prefix';");
     if (sql_root_prefix.FetchRow()) {
       root_prefix_.Assign(
-        reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0)),
-        strlen(reinterpret_cast<const char *>(sql_root_prefix.RetrieveText(0))));
+        reinterpret_cast<const char *>(
+          sql_root_prefix.RetrieveText(0)),
+        strlen(reinterpret_cast<const char *>(
+          sql_root_prefix.RetrieveText(0))));
       LogCvmfs(kLogCatalog, kLogDebug,
                "found root prefix %s in root catalog file %s",
                root_prefix_.c_str(), db_path.c_str());
@@ -182,7 +195,7 @@ bool Catalog::OpenDatabase(const string &db_path) {
     volatile_flag_ = sql_volatile_flag.RetrieveInt(0);
 
   // Read Catalog Counter Statistics
-  if (! ReadCatalogCounters()) {
+  if (!ReadCatalogCounters()) {
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load statistics counters for catalog %s (file %s)",
              path_.c_str(), db_path.c_str());
@@ -277,6 +290,25 @@ bool Catalog::LookupRawSymlink(const PathString &path,
   if (result)
     raw_symlink->Assign(dirent.symlink());
   return result;
+}
+
+
+bool Catalog::LookupXattrsMd5Path(
+  const shash::Md5 &md5path,
+  XattrList *xattrs) const
+{
+  assert(IsInitialized());
+
+  pthread_mutex_lock(lock_);
+  sql_lookup_xattrs_->BindPathHash(md5path);
+  bool found = sql_lookup_xattrs_->FetchRow();
+  if (found && (xattrs != NULL)) {
+    *xattrs = sql_lookup_xattrs_->GetXattrs();
+  }
+  sql_lookup_xattrs_->Reset();
+  pthread_mutex_unlock(lock_);
+
+  return found;
 }
 
 
@@ -375,7 +407,7 @@ bool Catalog::ListMd5PathChunks(const shash::Md5  &md5path,
 
 
 const Catalog::HashVector& Catalog::GetReferencedObjects() const {
-  if (! referenced_hashes_.empty()) {
+  if (!referenced_hashes_.empty()) {
     return referenced_hashes_;
   }
 

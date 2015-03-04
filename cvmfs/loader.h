@@ -8,9 +8,9 @@
 #define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
+#include <fuse/fuse_lowlevel.h>
 #include <stdint.h>
 #include <time.h>
-#include <fuse/fuse_lowlevel.h>
 
 #include <cstring>
 #include <string>
@@ -29,7 +29,7 @@ enum Failures {
   kFailLoaderTalk,
   kFailFuseLoop,
   kFailLoadLibrary,
-  kFailIncompatibleVersions,  // TODO
+  kFailIncompatibleVersions,  // TODO(jblomer)
   kFailCacheDir,
   kFailPeers,
   kFailNfsMaps,
@@ -134,13 +134,14 @@ typedef std::vector<LoadEvent *> EventList;
  * Note: Do not forget to check the version of LoaderExports in cvmfs.cc when
  *       using fields that were not present in version 1
  *
- * CernVM-FS 2.1.8 --> Version 2
+ * CernVM-FS 2.1.8  --> Version 2
+ * CernVM-FS 2.1.21 --> Version 3
  */
 struct LoaderExports {
   LoaderExports() :
-    version(2),
+    version(3),
     size(sizeof(LoaderExports)), boot_time(0), foreground(false),
-    disable_watchdog(false) {}
+    disable_watchdog(false), simple_options_parsing(false) {}
 
   uint32_t version;
   uint32_t size;
@@ -156,6 +157,9 @@ struct LoaderExports {
 
   // added with CernVM-FS 2.1.8 (LoaderExports Version: 2)
   bool disable_watchdog;
+
+  // added with CernVM-FS 2.1.21 (LoaderExports Version: 3)
+  bool simple_options_parsing;
 };
 
 

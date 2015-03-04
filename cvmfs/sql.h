@@ -6,6 +6,7 @@
 #define CVMFS_SQL_H_
 
 #include <string>
+
 #include "duplex_sqlite3.h"
 #include "util.h"
 
@@ -64,48 +65,16 @@ class Sql;
  * @param DerivedT  the name of the inheriting Database implementation class
  *                  (Curiously Recurring Template Pattern)
  *
- * TODO: C++11 Move Constructors to allow for stack allocated databases
+ * TODO(rmeusel): C++11 Move Constructors to allow for stack allocated databases
  */
 template <class DerivedT>
 class Database : SingleCopy {
- private:
-
-  /**
-   * This wraps the opaque SQLite database object along with a file unlink guard
-   * to control the life time of the database connection and the database file
-   * in an RAII fashion.
-   */
-  struct DatabaseRaiiWrapper {
-    DatabaseRaiiWrapper(const std::string   &filename,
-                        Database<DerivedT>  *delegate)
-      : sqlite_db(NULL)
-      , db_file_guard(filename, UnlinkGuard::kDisabled)
-      , delegate_(delegate) {}
-    ~DatabaseRaiiWrapper();
-
-    sqlite3*           database() const { return sqlite_db;            }
-    const std::string& filename() const { return db_file_guard.path(); }
-
-    void TakeFileOwnership() { db_file_guard.Enable();           }
-    void DropFileOwnership() { db_file_guard.Disable();          }
-    bool OwnsFile() const    { return db_file_guard.IsEnabled(); }
-
-    sqlite3             *sqlite_db;
-    UnlinkGuard          db_file_guard;
-    Database<DerivedT>  *delegate_;
-  };
-
  public:
   enum OpenMode {
     kOpenReadOnly,
     kOpenReadWrite,
   };
 
- private:
-  static const std::string kSchemaVersionKey;
-  static const std::string kSchemaRevisionKey;
-
- public:
   static const float kSchemaEpsilon;  // floats get imprecise in SQlite
 
   /**
@@ -234,6 +203,34 @@ class Database : SingleCopy {
   void set_schema_revision(const unsigned rev) { schema_revision_ = rev; }
 
  private:
+  /**
+   * This wraps the opaque SQLite database object along with a file unlink guard
+   * to control the life time of the database connection and the database file
+   * in an RAII fashion.
+   */
+  struct DatabaseRaiiWrapper {
+    DatabaseRaiiWrapper(const std::string   &filename,
+                        Database<DerivedT>  *delegate)
+      : sqlite_db(NULL)
+      , db_file_guard(filename, UnlinkGuard::kDisabled)
+      , delegate_(delegate) {}
+    ~DatabaseRaiiWrapper();
+
+    sqlite3*           database() const { return sqlite_db;            }
+    const std::string& filename() const { return db_file_guard.path(); }
+
+    void TakeFileOwnership() { db_file_guard.Enable();           }
+    void DropFileOwnership() { db_file_guard.Disable();          }
+    bool OwnsFile() const    { return db_file_guard.IsEnabled(); }
+
+    sqlite3             *sqlite_db;
+    UnlinkGuard          db_file_guard;
+    Database<DerivedT>  *delegate_;
+  };
+
+  static const std::string kSchemaVersionKey;
+  static const std::string kSchemaRevisionKey;
+
   DatabaseRaiiWrapper database_;
 
   const bool          read_write_;
@@ -287,6 +284,11 @@ class Sql {
   bool BindBlob(const int index, const void* value, const int size) {
     last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
                                          SQLITE_STATIC);
+    return Successful();
+  }
+  bool BindBlobTransient(const int index, const void* value, const int size) {
+    last_error_code_ = sqlite3_bind_blob(statement_, index, value, size,
+                                         SQLITE_TRANSIENT);
     return Successful();
   }
   bool BindDouble(const int index, const double value) {

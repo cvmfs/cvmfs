@@ -16,23 +16,23 @@
 
 #define __STDC_FORMAT_MACROS
 
+#include "cvmfs_config.h"
 #include "nfs_maps.h"
 
-#include <stdint.h>
 #include <inttypes.h>
 #include <pthread.h>
+#include <stdint.h>
 
 #include <cassert>
 #include <cstdlib>
 
-#include "leveldb/db.h"
 #include "leveldb/cache.h"
-#include "leveldb/filter_policy.h"
+#include "leveldb/db.h"
 #include "leveldb/env.h"
-
+#include "leveldb/filter_policy.h"
 #include "logging.h"
-#include "util.h"
 #include "nfs_shared_maps.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 

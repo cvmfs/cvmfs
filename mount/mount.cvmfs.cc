@@ -5,27 +5,29 @@
  * Note: meaning of return codes is speficied by mount command.
  */
 
-#include <sys/types.h>
-#include <sys/uio.h>
-#include <unistd.h>
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/types.h>
+#include <sys/uio.h>
 #include <sys/wait.h>
 #ifdef __APPLE__
 #include <sys/sysctl.h>
 #endif
+#include <unistd.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <vector>
 
-#include "util.h"
 #include "options.h"
-#include "sanitizer.h"
 #include "platform.h"
+#include "sanitizer.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
+
+BashOptionsManager options_manager_;
 
 static void Usage(int output_dest) {
   LogCvmfs(kLogCvmfs, output_dest,
@@ -51,7 +53,7 @@ static string MkFqrn(const string &repository) {
   const string::size_type idx = repository.find_last_of('.');
   if (idx == string::npos) {
     string domain;
-    bool retval = options::GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
+    bool retval = options_manager_.GetValue("CVMFS_DEFAULT_DOMAIN", &domain);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                "CVMFS_DEFAULT_DOMAIN missing");
@@ -88,11 +90,12 @@ static bool CheckFuse() {
 
 static bool CheckStrictMount(const string &fqrn) {
   string param_strict_mount;
-  if (options::GetValue("CVMFS_STRICT_MOUNT", &param_strict_mount) &&
-      options::IsOn(param_strict_mount))
+  if (options_manager_.GetValue("CVMFS_STRICT_MOUNT", &param_strict_mount) &&
+      options_manager_.IsOn(param_strict_mount))
   {
     string repository_list;
-    bool retval = options::GetValue("CVMFS_REPOSITORIES", &repository_list);
+    bool retval =
+      options_manager_.GetValue("CVMFS_REPOSITORIES", &repository_list);
     if (!retval) {
       LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_REPOSITORIES missing");
       return false;
@@ -103,7 +106,8 @@ static bool CheckStrictMount(const string &fqrn) {
         return true;
     }
     string config_repository;
-    retval = options::GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository);
+    retval =
+      options_manager_.GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository);
     if (retval && (config_repository == fqrn))
       return true;
     LogCvmfs(kLogCvmfs, kLogStderr, "Not allowed to mount %s, "
@@ -116,7 +120,7 @@ static bool CheckStrictMount(const string &fqrn) {
 
 static bool CheckProxy() {
   string param;
-  int retval = options::GetValue("CVMFS_HTTP_PROXY", &param);
+  int retval = options_manager_.GetValue("CVMFS_HTTP_PROXY", &param);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_HTTP_PROXY required");
     return false;
@@ -150,14 +154,14 @@ static bool CheckConcurrentMount(const string &fqrn, const string &cachedir) {
 
 static bool GetCacheDir(const string &fqrn, string *cachedir) {
   string param;
-  int retval = options::GetValue("CVMFS_CACHE_BASE", &param);
+  int retval = options_manager_.GetValue("CVMFS_CACHE_BASE", &param);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_CACHE_BASE required");
     return false;
   }
   *cachedir = MakeCanonicalPath(param);
-  if (options::GetValue("CVMFS_SHARED_CACHE", &param) &&
-      options::IsOn(param))
+  if (options_manager_.GetValue("CVMFS_SHARED_CACHE", &param) &&
+      options_manager_.IsOn(param))
   {
     *cachedir = *cachedir + "/shared";
   } else {
@@ -169,7 +173,7 @@ static bool GetCacheDir(const string &fqrn, string *cachedir) {
 
 static bool WaitForReload(const std::string &mountpoint) {
   string param;
-  int retval = options::GetValue("CVMFS_RELOAD_SOCKETS", &param);
+  int retval = options_manager_.GetValue("CVMFS_RELOAD_SOCKETS", &param);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_RELOAD_SOCKETS required");
     return false;
@@ -198,7 +202,7 @@ static bool WaitForReload(const std::string &mountpoint) {
 
 static bool GetCvmfsUser(string *cvmfs_user) {
   string param;
-  int retval = options::GetValue("CVMFS_USER", &param);
+  int retval = options_manager_.GetValue("CVMFS_USER", &param);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "CVMFS_USER required");
     return false;
@@ -252,10 +256,9 @@ int main(int argc, char **argv) {
   }
   string mountpoint = argv[optind+1];
 
-  options::Init();
-  options::ParseDefault("");
+  options_manager_.ParseDefault("");
   const string fqrn = MkFqrn(device);
-  options::ParseDefault(fqrn);
+  options_manager_.ParseDefault(fqrn);
 
   int retval;
   int sysret;
@@ -323,7 +326,7 @@ int main(int argc, char **argv) {
   // Set maximum number of files
 #ifdef __APPLE__
   string param;
-  if (options::GetValue("CVMFS_NFILES", &param)) {
+  if (options_manager_.GetValue("CVMFS_NFILES", &param)) {
     sanitizer::IntegerSanitizer integer_sanitizer;
     if (!integer_sanitizer.IsValid(param)) {
       LogCvmfs(kLogCvmfs, kLogStderr, "Invalid CVMFS_NFILES: %s",
@@ -376,10 +379,10 @@ int main(int argc, char **argv) {
   AddMountOption("grab_mountpoint", &mount_options);
   AddMountOption("uid=" + StringifyInt(uid_cvmfs), &mount_options);
   AddMountOption("gid=" + StringifyInt(gid_cvmfs), &mount_options);
-  if (options::IsDefined("CVMFS_DEBUGLOG"))
+  if (options_manager_.IsDefined("CVMFS_DEBUGLOG"))
     AddMountOption("debug", &mount_options);
 
-  const string cvmfs_binary = "/usr/bin/cvmfs2";;
+  const string cvmfs_binary = "/usr/bin/cvmfs2";
 
   // Dry run early exit
   if (dry_run) {

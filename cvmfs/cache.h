@@ -5,20 +5,20 @@
 #ifndef CVMFS_CACHE_H_
 #define CVMFS_CACHE_H_
 
-#include <sys/types.h>
 #include <stdint.h>
+#include <sys/types.h>
 
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
-#include "catalog_mgr.h"
-#include "signature.h"
-#include "file_chunk.h"
-#include "shortstring.h"
 #include "atomic.h"
-#include "manifest_fetch.h"
 #include "backoff.h"
+#include "catalog_mgr.h"
+#include "file_chunk.h"
+#include "manifest_fetch.h"
+#include "shortstring.h"
+#include "signature.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -131,7 +131,7 @@ class ManifestEnsemble : public manifest::ManifestEnsemble {
   }
   void FetchCertificate(const shash::Any &hash);
  private:
-   cache::CatalogManager *catalog_mgr_;
+  cache::CatalogManager *catalog_mgr_;
 };
 
 }  // namespace cache

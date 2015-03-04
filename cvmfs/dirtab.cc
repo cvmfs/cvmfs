@@ -10,13 +10,13 @@
 
 #include "util.h"
 
-using namespace catalog;
+namespace catalog {
 
 Dirtab::Dirtab() : valid_(true) {}
 
 
 Dirtab::Dirtab(const std::string &dirtab_path) {
-  if (! FileExists(dirtab_path)) {
+  if (!FileExists(dirtab_path)) {
     LogCvmfs(kLogCatalog, kLogStderr, "Cannot find dirtab at '%s'",
              dirtab_path.c_str());
     valid_ = false;
@@ -43,8 +43,8 @@ bool Dirtab::Parse(const std::string &dirtab) {
   while (line_offset < static_cast<off_t>(dirtab.size())) {
     std::string line = GetLineMem(dirtab.c_str() + line_offset,
                                   dirtab.size() - line_offset);
-    line_offset += line.size() + 1; // +1 == skipped \n
-    if (! ParseLine(line)) {
+    line_offset += line.size() + 1;  // +1 == skipped \n
+    if (!ParseLine(line)) {
       valid_ = false;
     }
   }
@@ -57,7 +57,7 @@ bool Dirtab::Parse(FILE *dirtab_file) {
   valid_ = true;
   std::string line;
   while (GetLineFile(dirtab_file, &line)) {
-    if (! ParseLine(line)) {
+    if (!ParseLine(line)) {
       valid_ = false;
     }
   }
@@ -75,13 +75,13 @@ bool Dirtab::ParseLine(const std::string &line) {
   bool negation = false;
 
   // parse preamble
-  SkipWhitespace(itr, iend);
+  SkipWhitespace(iend, &itr);
   if (*itr == Dirtab::kCommentMarker) {
     return true;
   } else if (*itr == Dirtab::kNegationMarker) {
     negation = true;
     ++itr;
-    SkipWhitespace(itr, iend);
+    SkipWhitespace(iend, &itr);
   }
 
   // extract and parse pathspec
@@ -119,11 +119,11 @@ bool Dirtab::CheckRuleValidity() const {
         Rules::const_iterator p    = positive_rules_.begin();
   const Rules::const_iterator pend = positive_rules_.end();
   for (; p != pend; ++p) {
-    assert (! p->is_negation);
+    assert(!p->is_negation);
           Rules::const_iterator n    = negative_rules_.begin();
     const Rules::const_iterator nend = negative_rules_.end();
     for (; n != nend; ++n) {
-      assert (n->is_negation);
+      assert(n->is_negation);
       if (p->pathspec == n->pathspec) {
         return false;
       }
@@ -140,14 +140,14 @@ bool Dirtab::IsMatching(const std::string &path) const {
         Rules::const_iterator p    = positive_rules_.begin();
   const Rules::const_iterator pend = positive_rules_.end();
   for (; p != pend; ++p) {
-    assert (! p->is_negation);
+    assert(!p->is_negation);
     if (p->pathspec.IsMatching(path)) {
       has_positive_match = true;
       break;
     }
   }
 
-  return has_positive_match && ! IsOpposing(path);
+  return has_positive_match && !IsOpposing(path);
 }
 
 
@@ -155,7 +155,7 @@ bool Dirtab::IsOpposing(const std::string &path) const {
         Rules::const_iterator n    = negative_rules_.begin();
   const Rules::const_iterator nend = negative_rules_.end();
   for (; n != nend; ++n) {
-    assert (n->is_negation);
+    assert(n->is_negation);
     if (n->pathspec.IsMatchingRelaxed(path)) {
       return true;
     }
@@ -163,3 +163,5 @@ bool Dirtab::IsOpposing(const std::string &path) const {
 
   return false;
 }
+
+}  // namespace catalog

@@ -2,12 +2,13 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "util_concurrency.h"
 
 #include <unistd.h>
 
 #ifdef CVMFS_NAMESPACE_GUARD
-using namespace CVMFS_NAMESPACE_GUARD;
+namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
 unsigned int GetNumberOfCpuCores() {
@@ -23,3 +24,7 @@ unsigned int GetNumberOfCpuCores() {
 
   return static_cast<unsigned int>(numCPU);
 }
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}  // namespace CVMFS_NAMESPACE_GUARD
+#endif

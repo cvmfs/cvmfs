@@ -12,9 +12,9 @@
 #include <vector>
 
 #include "hash.h"
-#include "util.h"
-#include "history_sql.h"
 #include "history.h"
+#include "history_sql.h"
+#include "util.h"
 
 namespace history {
 
@@ -24,12 +24,11 @@ namespace history {
  * to store those tags in an SQLite file.
  */
 class SqliteHistory : public History {
-
  protected:
   static const std::string kPreviousRevisionKey;
 
  public:
-  virtual ~SqliteHistory() {};
+  virtual ~SqliteHistory() { }
 
   /**
    * Opens an available history database file in read-only mode and returns
@@ -173,6 +172,6 @@ class SqliteHistory : public History {
   UniquePtr<SqlRecycleBinRollback>  recycle_rollback_;
 };
 
-} /* namespace history */
+}  // namespace history
 
-#endif
+#endif  // CVMFS_HISTORY_SQLITE_H_

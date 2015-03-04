@@ -17,21 +17,20 @@
 #include <openssl/pkcs7.h>
 #include <openssl/x509v3.h>
 
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
-#include <cctype>
 #include <cassert>
-
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
-#include "platform.h"
-#include "logging.h"
-#include "hash.h"
-#include "util.h"
-#include "smalloc.h"
 #include "compression.h"
+#include "hash.h"
+#include "logging.h"
+#include "platform.h"
+#include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -76,7 +75,7 @@ void SignatureManager::InitX509Store() {
   x509_store_ = X509_STORE_new();
   assert(x509_store_ != NULL);
 
-  unsigned long verify_flags =
+  unsigned long verify_flags =  // NOLINT(runtime/int)
     X509_V_FLAG_CRL_CHECK |
     X509_V_FLAG_CRL_CHECK_ALL;
 #if OPENSSL_VERSION_NUMBER < 0x00908000L
@@ -561,7 +560,8 @@ bool SignatureManager::Verify(const unsigned char *buffer,
   if (EVP_VerifyInit(&ctx, EVP_sha1()) &&
       EVP_VerifyUpdate(&ctx, buffer, buffer_size) &&
 #if OPENSSL_VERSION_NUMBER < 0x00908000L
-      EVP_VerifyFinal(&ctx, const_cast<unsigned char *>(signature), signature_size,
+      EVP_VerifyFinal(&ctx,
+                      const_cast<unsigned char *>(signature), signature_size,
                       X509_get_pubkey(certificate_))
 #else
       EVP_VerifyFinal(&ctx, signature, signature_size,

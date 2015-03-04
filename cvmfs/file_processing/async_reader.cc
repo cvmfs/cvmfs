@@ -2,10 +2,10 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "async_reader.h"
 
-using namespace upload;
-
+namespace upload {
 
 CharBuffer* AbstractReader::CreateBuffer(const size_t size) {
   ++buffers_in_flight_counter_;
@@ -19,3 +19,4 @@ void AbstractReader::ReleaseBuffer(CharBuffer *buffer) {
   --buffers_in_flight_counter_;
 }
 
+}  // namespace upload

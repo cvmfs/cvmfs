@@ -30,7 +30,7 @@ class InputSanitizer {
   // whitelist is of the form "az AZ _ - 09"
   // Any other format will abort the program
   explicit InputSanitizer(const std::string &whitelist);
-  virtual ~InputSanitizer() { };
+  virtual ~InputSanitizer() { }
 
   std::string Filter(const std::string &input) const;
   bool IsValid(const std::string &input) const;
@@ -43,29 +43,28 @@ class InputSanitizer {
 
 class AlphaNumSanitizer : public InputSanitizer {
  public:
-  AlphaNumSanitizer() : InputSanitizer("az AZ 09") { };
-  virtual ~AlphaNumSanitizer() { };
+  AlphaNumSanitizer() : InputSanitizer("az AZ 09") { }
+  virtual ~AlphaNumSanitizer() { }
 };
 
 
 class RepositorySanitizer : public InputSanitizer {
  public:
-  RepositorySanitizer() : InputSanitizer("az AZ 09 - _ .") { };
-  virtual ~RepositorySanitizer() { };
+  RepositorySanitizer() : InputSanitizer("az AZ 09 - _ .") { }
+  virtual ~RepositorySanitizer() { }
 };
 
 
 class IntegerSanitizer : public InputSanitizer {
  public:
-  IntegerSanitizer() : InputSanitizer("09") { };
-  virtual ~IntegerSanitizer() { };
+  IntegerSanitizer() : InputSanitizer("09") { }
+  virtual ~IntegerSanitizer() { }
 };
 
 }  // namespace sanitizer
 
-
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_SANITIZER_H_

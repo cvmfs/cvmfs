@@ -36,7 +36,7 @@ Uuid *Uuid::Create(const string &store_path) {
       return NULL;
     int written = fprintf(f, "%s\n", uuid_str.c_str());
     fclose(f);
-    if (written != int(uuid_str.length() + 1))
+    if (written != static_cast<int>(uuid_str.length() + 1))
       return NULL;
     return uuid.Release();
   }

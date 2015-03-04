@@ -741,7 +741,7 @@ CaresResolver *CaresResolver::Create(
         abort();
     }
     iter = iter->next;
-  };
+  }
   ares_free_data(addresses);
   resolver->system_resolvers_ = resolver->resolvers_;
 
@@ -881,7 +881,7 @@ bool CaresResolver::SetSearchDomains(const vector<string> &domains) {
     ares_channelhead.domains = NULL;
   }
 
-  ares_channelhead.ndomains = int(domains.size());
+  ares_channelhead.ndomains = static_cast<int>(domains.size());
   if (ares_channelhead.ndomains > 0) {
     ares_channelhead.domains = reinterpret_cast<char **>(
       smalloc(ares_channelhead.ndomains * sizeof(char *)));
@@ -1122,14 +1122,14 @@ void HostfileResolver::ParseHostFile() {
             entry.ipv4_addresses.push_back(address);
           else
             if (!ipv4_only()) entry.ipv6_addresses.push_back(address);
-          //printf("ADD %s -> %s\n", token.c_str(), address.c_str());
+          // printf("ADD %s -> %s\n", token.c_str(), address.c_str());
           host_map_[token] = entry;
         } else {
           if (IsIpv4Address(address))
             iter->second.ipv4_addresses.push_back(address);
           else
             if (!ipv4_only()) iter->second.ipv6_addresses.push_back(address);
-          //printf("PUSHING %s -> %s\n", token.c_str(), address.c_str());
+          // printf("PUSHING %s -> %s\n", token.c_str(), address.c_str());
         }
       }
     }  // Current line
@@ -1144,7 +1144,7 @@ bool HostfileResolver::SetSearchDomains(const vector<string> &domains) {
 
 
 void HostfileResolver::SetSystemSearchDomains() {
-  // TODO
+  // TODO(jblomer)
   assert(false);
 }
 
@@ -1217,7 +1217,8 @@ void NormalResolver::SetSystemResolvers() {
 
 void NormalResolver::SetSystemSearchDomains() {
   cares_resolver_->SetSystemSearchDomains();
-  bool retval = hostfile_resolver_->SetSearchDomains(cares_resolver_->domains());
+  bool retval =
+    hostfile_resolver_->SetSearchDomains(cares_resolver_->domains());
   assert(retval);
 }
 

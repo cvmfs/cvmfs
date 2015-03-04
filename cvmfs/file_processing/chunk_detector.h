@@ -2,13 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef UPLOAD_FILE_PROCESSING_CHUNK_DETECTOR_H
-#define UPLOAD_FILE_PROCESSING_CHUNK_DETECTOR_H
+#ifndef CVMFS_FILE_PROCESSING_CHUNK_DETECTOR_H_
+#define CVMFS_FILE_PROCESSING_CHUNK_DETECTOR_H_
+
+#include <gtest/gtest_prod.h>
+#include <sys/types.h>
 
 #include <algorithm>
+#include <utility>
 #include <vector>
-#include <sys/types.h>
-#include <gtest/gtest_prod.h>
 
 #include "char_buffer.h"
 
@@ -21,7 +23,7 @@ namespace upload {
 class ChunkDetector {
  public:
   ChunkDetector() : last_cut_(0) {}
-  virtual ~ChunkDetector() {};
+  virtual ~ChunkDetector() { }
   virtual off_t FindNextCutMark(CharBuffer *buffer) = 0;
 
   virtual bool MightFindChunks(const size_t size) const = 0;
@@ -55,7 +57,7 @@ class ChunkDetector {
  */
 class StaticOffsetDetector : public ChunkDetector {
  public:
-  StaticOffsetDetector(const size_t static_chunk_size) :
+  explicit StaticOffsetDetector(const size_t static_chunk_size) :
     chunk_size_(static_chunk_size) {}
 
   bool MightFindChunks(const size_t size) const { return size > chunk_size_; }
@@ -137,6 +139,6 @@ class Xor32Detector : public ChunkDetector {
   const int32_t threshold_;
 };
 
-} // namespace upload
+}  // namespace upload
 
-#endif /* UPLOAD_FILE_PROCESSING_CHUNK_DETECTOR_H */
+#endif  // CVMFS_FILE_PROCESSING_CHUNK_DETECTOR_H_

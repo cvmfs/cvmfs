@@ -1,29 +1,28 @@
-#ifndef CVMFS_ASYNC_READER_H
-#define CVMFS_ASYNC_READER_H
-
-
 /**
  * This file is part of the CernVM File System.
  */
+
+#ifndef CVMFS_FILE_PROCESSING_ASYNC_READER_H_
+#define CVMFS_FILE_PROCESSING_ASYNC_READER_H_
 
 #include <tbb/concurrent_queue.h>
 #include <tbb/task.h>
 #include <tbb/tbb_thread.h>
 
 #include <list>
-
 #include <string>
 
-#include "char_buffer.h"
 #include "../util_concurrency.h"
+#include "char_buffer.h"
 
-namespace upload { // TODO: remove this... wrong namespace (for testing)
+// TODO(rmeusel): remove this... wrong namespace (for testing)
+namespace upload {
 
 class AbstractFile;
 
 class AbstractReader {
  public:
-  AbstractReader(const unsigned int max_buffers_in_flight) :
+  explicit AbstractReader(const unsigned int max_buffers_in_flight) :
     buffers_in_flight_counter_(max_buffers_in_flight)
   {}
 
@@ -79,17 +78,23 @@ class Reader : public AbstractReader,
       file(NULL), file_descriptor(0), file_marker(0), previous_task(NULL),
       previous_sync_task(NULL) {}
 
-    FileT               *file;               ///< reference to the associated File structure
-    int                  file_descriptor;    ///< open file descriptor of the file
-    off_t                file_marker;        ///< current position of file read-in
+    FileT *file;  ///< reference to the associated File structure
+    int file_descriptor;  ///< open file descriptor of the file
+    off_t file_marker;  ///< current position of file read-in
 
-    FileScrubbingTaskT  *previous_task;      ///< previously scheduled TBB task (for synchronization)
-    tbb::task           *previous_sync_task; ///< previously scheduled TBB task (for synchronization)
+    /**
+     * Previously scheduled TBB task (for synchronization)
+     */
+    FileScrubbingTaskT *previous_task;
+    /**
+     * Previously scheduled TBB task (for synchronization)
+     */
+    tbb::task *previous_sync_task;
   };
   typedef std::list<OpenFile> OpenFileList;
 
   struct FileJob {
-    FileJob(FileT *file) : file(file), terminate(false) {}
+    explicit FileJob(FileT *file) : file(file), terminate(false) {}
     FileJob() : file(NULL), terminate(true) {}
 
     FileT *file;
@@ -107,14 +112,14 @@ class Reader : public AbstractReader,
     running_(false) {}
 
   virtual ~Reader() {
-    assert (! running_);
+    assert(!running_);
   }
 
   bool Initialize();
   void TearDown() { Terminate(); }
 
   void ScheduleRead(FileT *file) {
-    assert (running_);
+    assert(running_);
     ++files_in_flight_counter_;
     queue_.push(FileJob(file));
   }
@@ -139,7 +144,7 @@ class Reader : public AbstractReader,
   void ReadThread();
 
   /** Checks if there is still data to be worked on */
-  bool HasData() const { return ! draining_ || open_files_.size() > 0; }
+  bool HasData() const { return !draining_ || open_files_.size() > 0; }
 
   /**
    * When all Files have been scheduled from the outside, we enable the draining
@@ -147,17 +152,17 @@ class Reader : public AbstractReader,
    */
   void EnableDraining() { draining_ = true; }
 
-  bool TryToAcquireNewJob(FileJob &next_job);
+  bool TryToAcquireNewJob(FileJob *next_job);
   void OpenNewFile(FileT          *file);
-  void CloseFile(OpenFile         &file);
+  void CloseFile(OpenFile         *file);
 
-  bool ReadAndScheduleNextBuffer(OpenFile &open_file);
+  bool ReadAndScheduleNextBuffer(OpenFile *open_file);
 
   void FinalizedFile(AbstractFile *file);
 
  private:
-  JobQueue                        queue_;           ///< reference to the JobQueue (see IoDispatcher)
-  const size_t                    max_buffer_size_; ///< size of data Blocks to read-in
+  JobQueue queue_;  ///< reference to the JobQueue (see IoDispatcher)
+  const size_t max_buffer_size_;  ///< size of data Blocks to read-in
 
   bool                            draining_;
   OpenFileList                    open_files_;
@@ -169,8 +174,8 @@ class Reader : public AbstractReader,
   bool                            running_;
 };
 
-}
+}  // namespace upload
 
 #include "async_reader_impl.h"
 
-#endif /* CVMFS_ASYNC_READER_H */
+#endif  // CVMFS_FILE_PROCESSING_ASYNC_READER_H_

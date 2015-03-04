@@ -5,14 +5,15 @@
 #include "upload_s3.h"
 
 #include <errno.h>
-#include <unistd.h>
+#include <inttypes.h>
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #include <sched.h>
 #endif
+#include <unistd.h>
 
-#include <vector>
+#include <sstream>  // TODO(jblomer): remove me
 #include <string>
-#include <sstream>  // TODO: remove me
+#include <vector>
 
 #include "compression.h"
 #include "file_processing/char_buffer.h"
@@ -21,7 +22,7 @@
 #include "s3fanout.h"
 #include "util.h"
 
-using namespace upload;
+namespace upload {
 
 S3Uploader::S3Uploader(const SpoolerDefinition &spooler_definition)
     : AbstractUploader(spooler_definition),
@@ -68,21 +69,21 @@ bool S3Uploader::ParseSpoolerDefinition(
   }
 
   // Parse S3 configuration
-  // TODO: separate option handling and sanity checks
-  options::Init();
-  options::ParsePath(config_path, false);
+  // TODO(sheikkila): separate option handling and sanity checks
+  OptionsManager *options_manager = new BashOptionsManager();
+  options_manager->ParsePath(config_path, false);
   std::string parameter;
   std::string s3_host;
-  if (!options::GetValue("CVMFS_S3_HOST", &s3_host)) {
+  if (!options_manager->GetValue("CVMFS_S3_HOST", &s3_host)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse CVMFS_S3_HOST from '%s'",
              config_path.c_str());
     return false;
   }
   const std::string kStandardPort = "80";
   std::string s3_port = kStandardPort;
-  options::GetValue("CVMFS_S3_PORT", &s3_port);
+  options_manager->GetValue("CVMFS_S3_PORT", &s3_port);
   int s3_buckets_per_account = 1;
-  if (options::GetValue("CVMFS_S3_BUCKETS_PER_ACCOUNT", &parameter)) {
+  if (options_manager->GetValue("CVMFS_S3_BUCKETS_PER_ACCOUNT", &parameter)) {
     s3_buckets_per_account = String2Uint64(parameter);
     if (s3_buckets_per_account < 1 || s3_buckets_per_account > 100) {
       LogCvmfs(kLogSpooler, kLogStderr,
@@ -95,26 +96,26 @@ bool S3Uploader::ParseSpoolerDefinition(
     }
   }
   std::string s3_access_key;
-  if (!options::GetValue("CVMFS_S3_ACCESS_KEY", &s3_access_key)) {
+  if (!options_manager->GetValue("CVMFS_S3_ACCESS_KEY", &s3_access_key)) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to parse CVMFS_S3_ACCESS_KEY from '%s'.",
              config_path.c_str());
     return false;
   }
   std::string s3_secret_key;
-  if (!options::GetValue("CVMFS_S3_SECRET_KEY", &s3_secret_key)) {
+  if (!options_manager->GetValue("CVMFS_S3_SECRET_KEY", &s3_secret_key)) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to parse CVMFS_S3_SECRET_KEY from '%s'.",
              config_path.c_str());
     return false;
   }
-  if (!options::GetValue("CVMFS_S3_BUCKET", &bucket_body_name_)) {
+  if (!options_manager->GetValue("CVMFS_S3_BUCKET", &bucket_body_name_)) {
     LogCvmfs(kLogSpooler, kLogStderr,
              "Failed to parse CVMFS_S3_BUCKET from '%s'.",
              config_path.c_str());
     return false;
   }
-  if (!options::GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS",
+  if (!options_manager->GetValue("CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS",
                          &parameter)) {
     LogCvmfs(kLogSpooler, kLogStderr, "Failed to parse "
              "CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS "
@@ -123,7 +124,8 @@ bool S3Uploader::ParseSpoolerDefinition(
     return false;
   }
   max_num_parallel_uploads_ = String2Uint64(parameter);
-  options::Fini();
+  delete options_manager;
+  options_manager = NULL;
 
   std::vector<std::string> s3_access_keys = SplitString(s3_access_key, ':');
   std::vector<std::string> s3_secret_keys = SplitString(s3_secret_key, ':');
@@ -170,7 +172,7 @@ void S3Uploader::WorkerThread() {
     UploadJob job;
 
     // Try to get new job
-    bool newjob = TryToAcquireNewJob(job);
+    bool newjob = TryToAcquireNewJob(&job);
     if (newjob) {
       switch (job.type) {
         case UploadJob::Upload:
@@ -194,34 +196,32 @@ void S3Uploader::WorkerThread() {
       }
     }
 
-    // Get and clean completed jobs
+    // Get and report completed jobs
     std::vector<s3fanout::JobInfo *> jobs;
     jobs.clear();
     s3fanout_mgr_.PopCompletedJobs(&jobs);
     std::vector<s3fanout::JobInfo*>::iterator             it    = jobs.begin();
     const std::vector<s3fanout::JobInfo*>::const_iterator itend = jobs.end();
     for (; it != itend; ++it) {
-      // Report and clean completed jobs
+      // Report completed job
       s3fanout::JobInfo *info = *it;
-      if (info->error_code == s3fanout::kFailOk) {
-        if (info->origin == s3fanout::kOriginMem) {
-          Respond(static_cast<CallbackTN*>(info->callback),
-          UploaderResults(0));
-        } else {
-          Respond(static_cast<CallbackTN*>(info->callback),
-                  UploaderResults(0, info->mmf->file_path()));
-        }
-      } else {
+      int reply_code = 0;
+      if (info->error_code != s3fanout::kFailOk) {
         LogCvmfs(kLogS3Fanout, kLogStderr, "Upload job for '%s' failed. "
                                            "(error code: %d - %s)",
-                 info->origin_path.c_str(), info->error_code,
+                 info->object_key.c_str(), info->error_code,
                  s3fanout::Code2Ascii(info->error_code));
-
-        Respond(static_cast<CallbackTN*>(info->callback),
-                UploaderResults(99, info->mmf->file_path()));
+        reply_code = 99;
       }
-      info->mmf->Unmap();
-      delete info->mmf;
+      if (info->origin == s3fanout::kOriginMem) {
+        Respond(static_cast<CallbackTN*>(info->callback),
+                UploaderResults(reply_code));
+      } else {
+        Respond(static_cast<CallbackTN*>(info->callback),
+                UploaderResults(reply_code, info->origin_path));
+      }
+      assert(info->mmf == NULL);
+      assert(info->origin_file == NULL);
     }
 #ifdef _POSIX_PRIORITY_SCHEDULING
     sched_yield();
@@ -290,6 +290,7 @@ std::string S3Uploader::GetBucketName(unsigned int use_bucket) const {
   return ss.str();
 }
 
+
 /**
  * Chooses a bucket according to filename. The bucket is chosen by
  * taking a modulo of a number that is calculated as a sum from a
@@ -316,7 +317,8 @@ int S3Uploader::SelectBucket(const std::string &rem_filename) const {
   }
 
   // Calculate number based on the filename
-  unsigned long xt = 0, x = 0;
+  uint64_t xt = 0;
+  uint64_t x = 0;
   while (hex_filename.length() > cutlength) {
     std::stringstream ss;
     ss.clear();
@@ -340,24 +342,33 @@ int S3Uploader::SelectBucket(const std::string &rem_filename) const {
 }
 
 
-void S3Uploader::FileUpload(const std::string &local_path,
-                            const std::string &remote_path,
-                            const CallbackTN  *callback) {
-  // Check that we can read the given file
-  MemoryMappedFile *mmf = new MemoryMappedFile(local_path);
-  if (!mmf->Map()) {
-    LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload %s",
-             local_path.c_str());
-    delete mmf;
-    atomic_inc32(&copy_errors_);
-    Respond(callback, UploaderResults(100, local_path));
-    return;
-  }
+void S3Uploader::FileUpload(
+  const std::string &local_path,
+  const std::string &remote_path,
+  const CallbackTN  *callback
+) {
+  // Choose S3 account and bucket based on the target
+  std::string access_key, secret_key, bucket_name;
+  const std::string mangled_filename = repository_alias_ + "/" + remote_path;
+  GetKeysAndBucket(mangled_filename, &access_key, &secret_key, &bucket_name);
 
-  // Try to upload the file
-  const bool retval = UploadFile(remote_path,
-                                 reinterpret_cast<char*>(mmf->buffer()),
-                                 mmf->size(), callback, mmf);
+  s3fanout::JobInfo *info =
+      new s3fanout::JobInfo(access_key,
+                            secret_key,
+                            full_host_name_,
+                            bucket_name,
+                            mangled_filename,
+                            const_cast<void*>(
+                                static_cast<void const*>(callback)),
+                            local_path);
+#ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
+  if (remote_path.substr(0, 1) != ".") {
+    info->request = s3fanout::JobInfo::kReqHead;
+  }
+#endif
+
+  // Upload job
+  const bool retval = UploadJobInfo(info);
   assert(retval);
 
   LogCvmfs(kLogS3Fanout, kLogDebug,
@@ -366,59 +377,20 @@ void S3Uploader::FileUpload(const std::string &local_path,
 }
 
 
-/**
- * Request file to be uploaded to S3. Non-blocking request, i.e. does
- * not wait for completion.
- *
- * @param filename The name to be used for storing in S3
- * @param buff Data to be stored
- * @param size_of_file Size of the data to be stored
- * @param callback Callback that is called when upload is completed
- * @param mmf Memory mapped file (if one is used)
- * @return 0 if all is ok
- */
-bool S3Uploader::UploadFile(const std::string &filename,
-                            char              *buff,
-                            unsigned long     size_of_file,
-                            const CallbackTN  *callback,
-                            MemoryMappedFile  *mmf)
-{
-  // Choose S3 account and bucket based on the filename
-  std::string access_key, secret_key, bucket_name;
-  const std::string mangled_filename = repository_alias_ + "/" + filename;
-  GetKeysAndBucket(mangled_filename, &access_key, &secret_key, &bucket_name);
-
-  s3fanout::JobInfo *info = new s3fanout::JobInfo(access_key,
-                                                  secret_key,
-                                                  full_host_name_,
-                                                  bucket_name,
-                                                  mangled_filename,
-                                                  (unsigned char*)buff,
-                                                  size_of_file);
-  info->request        = s3fanout::JobInfo::kReqPut;
-#ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
-  if (filename.substr(0, 1) != ".") {
-    info->request        = s3fanout::JobInfo::kReqHead;
-  }
-#endif
-  info->origin_mem.pos = 0;
-  info->callback       = const_cast<void*>(static_cast<void const*>(callback));
-  info->mmf            = mmf;
-
+bool S3Uploader::UploadJobInfo(s3fanout::JobInfo *info) {
   LogCvmfs(kLogS3Fanout, kLogDebug,
-           "Uploading file:\n"
-           "--> File:        '%s'\n"
-           "--> Hostname:    '%s'\n"
-           "--> Bucket:      '%s'\n"
-           "--> File size:   '%d'\n",
-           mangled_filename.c_str(),
-           full_host_name_.c_str(),
-           bucket_name.c_str(),
-           mmf->size());
+           "Uploading from %s:\n"
+           "--> Object: '%s'\n"
+           "--> Bucket: '%s'\n"
+           "--> Host:   '%s'\n",
+           info->origin_mem.data != NULL ? "buffer" : "file",
+           info->object_key.c_str(),
+           info->hostname.c_str(),
+           info->bucket.c_str());
 
   if (s3fanout_mgr_.PushNewJob(info) != 0) {
-    LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload file: %s" ,
-             mangled_filename.data());
+    LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to upload object: %s" ,
+             info->object_key.c_str());
     return false;
   }
 
@@ -539,13 +511,27 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle   *handle,
   std::string final_path("data" +
                          content_hash.MakePathWithSuffix(1, 2, hash_suffix));
 
-  // Request upload
-  const CallbackTN *callback = handle->commit_callback;
-  const bool retval_b = UploadFile(final_path,
-                                   reinterpret_cast<char*>(mmf->buffer()),
-                                   static_cast<long unsigned int>(mmf->size()),
-                                   callback, mmf);
-  assert(retval_b);
+  // Choose S3 account and bucket based on the filename
+  std::string access_key, secret_key, bucket_name;
+  const std::string mangled_filename = repository_alias_ + "/" + final_path;
+  GetKeysAndBucket(mangled_filename, &access_key, &secret_key, &bucket_name);
+
+  s3fanout::JobInfo *info =
+      new s3fanout::JobInfo(access_key,
+                            secret_key,
+                            full_host_name_,
+                            bucket_name,
+                            mangled_filename,
+                            const_cast<void*>(
+                                static_cast<void const*>(
+                                    handle->commit_callback)),
+                            mmf,
+                            reinterpret_cast<unsigned char *>(mmf->buffer()),
+                            static_cast<size_t>(mmf->size()));
+  assert(info != NULL);
+
+  const bool retval2 = UploadJobInfo(info);
+  assert(retval2);
 
   LogCvmfs(kLogS3Fanout, kLogDebug,
            "Uploading from stream finished: %s",
@@ -567,6 +553,8 @@ s3fanout::JobInfo *S3Uploader::CreateJobInfo(const std::string& path) const {
                                full_host_name_,
                                bucket_name,
                                path,
+                               NULL,
+                               NULL,
                                NULL,
                                0);
 }
@@ -594,3 +582,5 @@ bool S3Uploader::Peek(const std::string& path) const {
   delete info;
   return retme;
 }
+
+}  // namespace upload
