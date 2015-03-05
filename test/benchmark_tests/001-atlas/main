@@ -1,0 +1,35 @@
+
+cvmfs_test_name="ATLAS benchmark"
+
+export ATLAS_LOCAL_ROOT_BASE="/cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase"
+
+
+cvmfs_run_test() {
+  logfile=$1
+  FQRN=atlas.cern.ch
+  COMMAND='source ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh
+          asetup 19.0.0'
+
+  mkdir -p /cvmfs/sft.cern.ch
+  mount -t cvmfs sft.cern.ch /cvmfs/sft.cern.ch &> /dev/null
+
+  setup_benchmark_environment $(pwd)
+
+  # use or not warm cache
+  if [ "$CVMFS_OPT_WARM_CACHE" == "yes" ]; then
+    echo "Starting initial execution"
+    create_warm_cache
+  else
+    echo "Using cold cache"
+  fi
+
+  # start the iterations
+  run_benchmark
+
+  # collect the results
+  collect_benchmark_results
+
+  umount sft.cern.ch &> /dev/null
+
+  return 0
+}

@@ -1,0 +1,28 @@
+
+cvmfs_test_name="LHCB benchmark"
+
+
+cvmfs_run_test() {
+  logfile=$1
+  FQRN=lhcb.cern.ch
+  COMMAND='source /cvmfs/lhcb.cern.ch/etc/login.sh
+          . SetupProject.sh Panoramix'
+
+  setup_benchmark_environment $(pwd)
+
+  # use or not warm cache
+  if [ "$CVMFS_OPT_WARM_CACHE" == "yes" ]; then
+    echo "Starting initial execution"
+    create_warm_cache
+  else
+    echo "Using cold cache"
+  fi
+
+  # start the iterations
+  run_benchmark
+
+  # collect the results
+  collect_benchmark_results
+
+  return 0
+}
