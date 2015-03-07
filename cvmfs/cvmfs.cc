@@ -2042,7 +2042,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (cvmfs::options_manager_->GetValue("CVMFS_PROXY_TEMPLATE", &parameter)) {
     proxy_template = parameter;
   }
-  
+
   cvmfs::statistics_ = new perf::Statistics();
 
   // Fill cvmfs option variables from configuration
