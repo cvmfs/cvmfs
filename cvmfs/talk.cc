@@ -42,6 +42,7 @@
 #include "platform.h"
 #include "quota.h"
 #include "shortstring.h"
+#include "statistics.h"
 #include "tracer.h"
 #include "util.h"
 #include "wpad.h"
@@ -462,6 +463,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
         sqlite3_status(SQLITE_STATUS_SCRATCH_SIZE, &current, &highwater, 0);
         result += "  Largest scratch allocation " + StringifyInt(highwater/1024)
                   + " KB\n";
+
+        result += "\nRaw Counters:\n" +
+          cvmfs::statistics_->PrintList(perf::Statistics::kPrintHeader);
 
         Answer(con_fd, result);
       } else if (line == "reset error counters") {

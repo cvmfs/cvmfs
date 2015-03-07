@@ -20,6 +20,10 @@
 namespace download {
 class DownloadManager;
 }
+namespace perf {
+class Statistics;
+}
+
 
 namespace cvmfs {
 
@@ -31,6 +35,7 @@ extern download::DownloadManager *download_manager_;
 extern int max_cache_timeout_;
 extern bool foreground_;
 extern bool nfs_maps_;
+extern perf::Statistics *statistics_;
 
 bool Evict(const std::string &path);
 bool Pin(const std::string &path);

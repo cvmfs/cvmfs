@@ -167,6 +167,8 @@ int HexDigit2Int(const char digit);
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
+bool HasSuffix(const std::string &str, const std::string &suffix,
+               const bool ignore_case);
 bool IsNumeric(const std::string &str);
 
 std::vector<std::string> SplitString(const std::string &str,

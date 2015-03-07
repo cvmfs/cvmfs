@@ -72,6 +72,18 @@ TEST(T_Util, IsAbsolutePath) {
 }
 
 
+TEST(T_Util, HasSuffix) {
+  EXPECT_TRUE(HasSuffix("abc-foo", "-foo", false));
+  EXPECT_FALSE(HasSuffix("abc-foo", "-FOO", false));
+  EXPECT_TRUE(HasSuffix("abc-foo", "-FOO", true));
+  EXPECT_TRUE(HasSuffix("", "", false));
+  EXPECT_TRUE(HasSuffix("abc", "", false));
+  EXPECT_TRUE(HasSuffix("-foo", "-foo", false));
+  EXPECT_FALSE(HasSuffix("abc+foo", "-foo", false));
+  EXPECT_FALSE(HasSuffix("foo", "-foo", false));
+}
+
+
 TEST(T_Util, Shuffle) {
   vector<int> v;
   Prng prng;

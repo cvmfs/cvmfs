@@ -92,6 +92,8 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "sqlitevfs.h"
+#include "statistics.h"
 #include "talk.h"
 #include "tracer.h"
 #include "util.h"
@@ -220,6 +222,7 @@ uint64_t next_directory_handle_ = 0;
 // contains inode to chunklist and handle to fd maps
 ChunkTables *chunk_tables_;
 
+perf::Statistics *statistics_;
 atomic_int64 num_fs_open_;
 atomic_int64 num_fs_dir_open_;
 atomic_int64 num_fs_lookup_;
@@ -2040,6 +2043,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     proxy_template = parameter;
   }
 
+  cvmfs::statistics_ = new perf::Statistics();
+
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
   cvmfs::cachedir_ = new string(cachedir);
@@ -2353,6 +2358,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   // Load initial file catalog
+  retval =
+    sqlite::RegisterVfsRdOnly(cvmfs::statistics_, sqlite::kVfsOptDefault);
+  assert(retval);
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
   cvmfs::inode_annotation_ = new catalog::InodeGenerationAnnotation();
@@ -2586,6 +2594,7 @@ static void Fini() {
   cvmfs::repository_tag_ = NULL;
   cvmfs::mountpoint_ = NULL;
 
+  sqlite::UnregisterVfsRdOnly();
   if (sqlite3_temp_directory) {
     sqlite3_free(sqlite3_temp_directory);
     sqlite3_temp_directory = NULL;
@@ -2607,6 +2616,8 @@ static void Fini() {
 
   delete cvmfs::backoff_throttle_;
   cvmfs::backoff_throttle_ = NULL;
+  delete cvmfs::statistics_;
+  cvmfs::statistics_ = NULL;
 }
 
 
@@ -2890,4 +2901,3 @@ static void __attribute__((destructor)) LibraryExit() {
   delete g_cvmfs_exports;
   g_cvmfs_exports = NULL;
 }
-

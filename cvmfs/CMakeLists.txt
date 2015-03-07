@@ -54,6 +54,7 @@ set (CVMFS_CLIENT_SOURCES
   fs_traversal.h
   xattr.h xattr.cc
   statistics.h statistics.cc
+  sqlitevfs.cc sqlitevfs.h
 )
 
 
