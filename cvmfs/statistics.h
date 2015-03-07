@@ -48,7 +48,7 @@ class Counter {
 // perf::Func(Counter) is more clear to read in the code
 inline void Dec(class Counter *counter) { counter->Dec(); }
 inline void Inc(class Counter *counter) { counter->Inc(); }
-inline int64_t Xadd(class Counter *counter, const int64_t delta) { 
+inline int64_t Xadd(class Counter *counter, const int64_t delta) {
   return counter->Xadd(delta);
 }
 

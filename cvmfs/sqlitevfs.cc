@@ -36,7 +36,7 @@ namespace sqlite {
 
 namespace {
 
-const string kVfsName = "cvmfs-readonly";
+const char *kVfsName = "cvmfs-readonly";
 
 /**
  * The private user data attached to the sqlite_vfs object.
@@ -118,9 +118,9 @@ static int VfsRdOnlyWrite(
   sqlite3_file *pFile __attribute__((unused)),
   const void *zBuf __attribute__((unused)),
   int iAmt __attribute__((unused)),
-  sqlite_int64 iOfst __attribute__((unused))
-) {
-   return SQLITE_READONLY;
+  sqlite_int64 iOfst __attribute__((unused)))
+{
+  return SQLITE_READONLY;
 }
 
 
@@ -147,7 +147,7 @@ static int VfsRdOnlyFileSize(sqlite3_file *pFile, sqlite_int64 *pSize) {
 }
 
 
-static int VfsRdOnlyLock (
+static int VfsRdOnlyLock(
   sqlite3_file *p __attribute__((unused)),
   int level __attribute__((unused))
 ) {
@@ -155,7 +155,7 @@ static int VfsRdOnlyLock (
 }
 
 
-static int VfsRdOnlyUnlock (
+static int VfsRdOnlyUnlock(
   sqlite3_file *p __attribute__((unused)),
   int level __attribute__((unused))
 ) {
@@ -187,7 +187,7 @@ static int VfsRdOnlyFileControl(
 /**
  * A good unit of bytes to read at once.  But probably only used for writes.
  */
-static int VfsRdOnlySectorSize(sqlite3_file *p __attribute__ ((unused))) {
+static int VfsRdOnlySectorSize(sqlite3_file *p __attribute__((unused))) {
   return 4096;
 }
 
@@ -196,7 +196,7 @@ static int VfsRdOnlySectorSize(sqlite3_file *p __attribute__ ((unused))) {
  * Only relevant for writing.
  */
 static int VfsRdOnlyDeviceCharacteristics(
-  sqlite3_file *p __attribute__ ((unused)))
+  sqlite3_file *p __attribute__((unused)))
 {
   return 0;
 }
@@ -213,7 +213,7 @@ static int VfsRdOnlyOpen(
   int *pOutFlags)
 {
   static const sqlite3_io_methods io_methods = {
-    1, // iVersion
+    1,  // iVersion
     VfsRdOnlyClose,
     VfsRdOnlyRead,
     VfsRdOnlyWrite,
@@ -284,7 +284,7 @@ static int VfsRdOnlyAccess(
   }
 
   int amode = 0;
-  switch( flags ){
+  switch (flags) {
     case SQLITE_ACCESS_EXISTS:
       amode = F_OK;
       break;
@@ -426,7 +426,7 @@ bool RegisterVfsRdOnly(
   vfs->iVersion = 2;
   vfs->szOsFile = sizeof(VfsRdOnlyFile);
   vfs->mxPathname = PATH_MAX;
-  vfs->zName = kVfsName.c_str();
+  vfs->zName = kVfsName;
   vfs->pAppData = vfs_rdonly;
   vfs->xOpen = VfsRdOnlyOpen;
   vfs->xDelete = VfsRdOnlyDelete;
@@ -488,7 +488,7 @@ bool RegisterVfsRdOnly(
  * SQlite randomly.
  */
 bool UnregisterVfsRdOnly() {
-  sqlite3_vfs *vfs = sqlite3_vfs_find(kVfsName.c_str());
+  sqlite3_vfs *vfs = sqlite3_vfs_find(kVfsName);
   if (vfs == NULL)
     return false;
   int retval = sqlite3_vfs_unregister(vfs);
