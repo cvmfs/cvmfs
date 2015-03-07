@@ -453,31 +453,22 @@ bool RegisterVfsRdOnly(
 
   vfs_rdonly->n_access =
     statistics->Register("sqlite.n_access", "overall number of access() calls");
-  assert(vfs_rdonly->n_access);
   vfs_rdonly->no_open =
     statistics->Register("sqlite.no_open", "currently open sqlite files");
-  assert(vfs_rdonly->no_open);
   vfs_rdonly->n_rand =
     statistics->Register("sqlite.n_rand", "overall number of random() calls");
-  assert(vfs_rdonly->n_rand);
   vfs_rdonly->sz_rand =
     statistics->Register("sqlite.sz_rand", "overall number of random bytes");
-  assert(vfs_rdonly->sz_rand);
   vfs_rdonly->n_read =
     statistics->Register("sqlite.n_read", "overall number of read() calls");
-  assert(vfs_rdonly->n_read);
   vfs_rdonly->sz_read =
     statistics->Register("sqlite.sz_read", "overall bytes read()");
-  assert(vfs_rdonly->sz_read);
   vfs_rdonly->n_sleep =
     statistics->Register("sqlite.n_sleep", "overall number of sleep() calls");
-  assert(vfs_rdonly->n_sleep);
   vfs_rdonly->sz_sleep =
     statistics->Register("sqlite.sz_sleep", "overall microseconds slept");
-  assert(vfs_rdonly->sz_sleep);
   vfs_rdonly->n_time =
     statistics->Register("sqlite.n_time", "overall number of time() calls");
-  assert(vfs_rdonly->n_time);
 
   return true;
 }
