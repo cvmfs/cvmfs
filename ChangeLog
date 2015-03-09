@@ -1,3 +1,15 @@
+2.1.21:
+  * Use --max-time curl option in Nagios probe with 3 times connection timeout
+  * Add check for 32bit inode overflow to the Nagios probe (CVM-627)
+  * Add a timeout to the Nagios probe (CVM-683)
+  * Add 'make doc' as a target to build Doxygen documentation (CVM-692)
+  * Add CVMFS_SYSTEMD_NOKILL parameter to make cvmfs act as a systemd
+    recognized low-level storage provider
+  * Add CVMFS_HIDE_XATTRS client parameter to prevent synthetic extended 
+    attributes from being listing
+  * Add support for custom extended attributes and file capabilities through
+    server parameter CVMFS_INCLUDE_XATTRS (CVM-734)
+
 2.1.20:
   * Stop parsing of CernVM specific config files (CVM-614)
   * Add CVMFS_MAXIMAL_CONCURRENT_WRITES configuration parameters for number of

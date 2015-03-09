@@ -7,11 +7,10 @@
 
 #include <pthread.h>
 
-#include <queue>
-#include <vector>
-#include <set>
-
 #include <cassert>
+#include <queue>
+#include <set>
+#include <vector>
 
 #include "atomic.h"
 #include "util.h"
@@ -38,8 +37,8 @@ class Lockable : SingleCopy {
  protected:
   Lockable() {
     const int retval = pthread_mutex_init(&mutex_, NULL);
-    assert (retval == 0);
-  };
+    assert(retval == 0);
+  }
 
  private:
   mutable pthread_mutex_t mutex_;
@@ -78,8 +77,8 @@ struct _RAII_Polymorphism {
 template <typename T, _RAII_Polymorphism::T P = _RAII_Polymorphism::None>
 class RAII : SingleCopy {
  public:
-  inline RAII(T &object) : ref_(object)  { Enter(); }
-  inline RAII(T *object) : ref_(*object) { Enter(); }
+  inline explicit RAII(T &object) : ref_(object)  { Enter(); }
+  inline explicit RAII(T *object) : ref_(*object) { Enter(); }
   inline ~RAII()                         { Leave(); }
 
  protected:
@@ -105,8 +104,7 @@ class RAII : SingleCopy {
 template <typename LockableT>
 class LockGuard : public RAII<LockableT> {
  public:
-  inline LockGuard(LockableT &object) : RAII<LockableT>(object) {}
-  inline LockGuard(LockableT *object) : RAII<LockableT>(object) {}
+  inline explicit LockGuard(LockableT *object) : RAII<LockableT>(object) {}
 };
 
 
@@ -214,10 +212,11 @@ class SynchronizingCounter : SingleCopy {
   SynchronizingCounter() :
     value_(T(0)), maximal_value_(T(0)) { Initialize(); }
 
-  SynchronizingCounter(const T maximal_value) :
-    value_(T(0)), maximal_value_(maximal_value)
+  explicit SynchronizingCounter(const T maximal_value)
+    : value_(T(0))
+    , maximal_value_(maximal_value)
   {
-    assert (maximal_value > T(0));
+    assert(maximal_value > T(0));
     Initialize();
   }
 
@@ -241,7 +240,7 @@ class SynchronizingCounter : SingleCopy {
     while (value_ != T(0)) {
       pthread_cond_wait(&became_zero_, &mutex_);
     }
-    assert (value_ == T(0));
+    assert(value_ == T(0));
   }
 
   bool HasMaximalValue() const { return maximal_value_ != T(0); }
@@ -378,7 +377,7 @@ class Observable : public Callbackable<ParamT>,
   void UnregisterListeners();
 
  protected:
-  Observable(); // don't instantiate this as a stand alone object
+  Observable();  // don't instantiate this as a stand alone object
 
   void RegisterListener(CallbackPtr callback_object);
 
@@ -501,9 +500,18 @@ template <class WorkerT>
 class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  public:
   // these data types must be defined by the worker class
-  typedef typename WorkerT::expected_data  expected_data_t;  //!< input data type
-  typedef typename WorkerT::returned_data  returned_data_t;  //!< output data type
-  typedef typename WorkerT::worker_context worker_context_t; //!< common context type
+  /**
+   * Input data type
+   */
+  typedef typename WorkerT::expected_data  expected_data_t;
+  /**
+   * Output data type
+   */
+  typedef typename WorkerT::returned_data  returned_data_t;
+  /**
+   * Common context type
+   */
+  typedef typename WorkerT::worker_context worker_context_t;
 
  protected:
   typedef std::vector<pthread_t>           WorkerThreads;
@@ -521,8 +529,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
     Job() :
       data(),
       is_death_sentence(true) {}
-    const DataT  data;              //!< job payload
-    const bool   is_death_sentence; //!< death sentence flag
+    const DataT  data;               //!< job payload
+    const bool   is_death_sentence;  //!< death sentence flag
   };
   typedef Job<expected_data_t> WorkerJob;
   typedef Job<returned_data_t> CallbackJob;
@@ -535,7 +543,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * spawned.
    */
   struct RunBinding {
-    RunBinding(ConcurrentWorkers<WorkerT> *delegate) :
+    explicit RunBinding(ConcurrentWorkers<WorkerT> *delegate) :
       delegate(delegate) {}
     ConcurrentWorkers<WorkerT> *delegate;       //!< delegate to the Concurrent-
                                                 //!<  Workers master
@@ -546,8 +554,10 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
                      const worker_context_t     *worker_context) :
       RunBinding(delegate),
       worker_context(worker_context) {}
-    const worker_context_t     *worker_context; //!< WorkerT defined context ob-
-                                                //!<  jects for worker init.
+    /**
+     * WorkerT defined context objects for worker init.
+     */
+    const worker_context_t     *worker_context;
   };
 
  public:
@@ -620,7 +630,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @param data  the data to be returned back to the user
    */
-  inline void JobSuccessful(const returned_data_t& data) { JobDone(data, true); }
+  inline void JobSuccessful(const returned_data_t& data) {
+    JobDone(data, true);
+  }
 
   /**
    * Defines a job as failed.
@@ -700,11 +712,12 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
  private:
   // general configuration
-  const size_t             number_of_workers_;    //!< number of concurrent
-                                                  //!<  worker threads
-  const worker_context_t  *worker_context_;       //!< the WorkerT defined context
-  const WorkerRunBinding   thread_context_;       //!< the thread context passed
-                                                  //!<  to newly spawned threads
+  const size_t number_of_workers_;  //!< number of concurrent worker threads
+  const worker_context_t *worker_context_;  //!< the WorkerT defined context
+  /**
+   * The thread context passed to newly spawned threads
+   */
+  WorkerRunBinding thread_context_;
 
   // status information
   bool                     initialized_;
@@ -805,8 +818,8 @@ class ConcurrentWorker : SingleCopy {
    *
    * @param data  the data to be processed.
    */
-  //void operator()(const expected_data &data); // do the actual job of the
-                                                // worker
+  // void operator()(const expected_data &data); // do the actual job of the
+                                                 // worker
 
  protected:
   ConcurrentWorker() : master_(NULL) {}
@@ -829,9 +842,9 @@ class ConcurrentWorker : SingleCopy {
 };
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #include "util_concurrency_impl.h"
 
-#endif /* CVMFS_UTIL_CONCURRENCY_H_ */
+#endif  // CVMFS_UTIL_CONCURRENCY_H_

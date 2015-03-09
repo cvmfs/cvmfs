@@ -2,7 +2,9 @@
  * This file is part of the CernVM file system.
  */
 
+#include "cvmfs_config.h"
 #include "sql.h"
+
 #include "logging.h"
 #include "util.h"
 
@@ -34,7 +36,7 @@ Sql::~Sql() {
 bool Sql::Execute() {
   last_error_code_ = sqlite3_step(statement_);
 #ifdef DEBUGMSG
-  if (! Successful()) {
+  if (!Successful()) {
     LogCvmfs(kLogSql, kLogDebug, "SQL query failed - SQLite: %d - %s",
              GetLastError(), GetLastErrorMsg().c_str());
   }
@@ -78,7 +80,7 @@ std::string Sql::DebugResultTable() {
     // retrieve the data fields for each row
     for (unsigned int col = 0; col < cols; ++col) {
       const int type = sqlite3_column_type(statement_, col);
-      switch(type) {
+      switch (type) {
         case SQLITE_INTEGER:
           line += StringifyInt(RetrieveInt64(col));
           break;
@@ -86,7 +88,7 @@ std::string Sql::DebugResultTable() {
           line += StringifyDouble(RetrieveDouble(col));
           break;
         case SQLITE_TEXT:
-          line += (char*)RetrieveText(col);
+          line += reinterpret_cast<const char *>(RetrieveText(col));
           break;
         case SQLITE_BLOB:
           line += "[BLOB data]";
@@ -120,16 +122,16 @@ bool Sql::Reset() {
 
 
 bool Sql::Init(const sqlite3 *database, const std::string &statement) {
-  last_error_code_ = sqlite3_prepare_v2((sqlite3*)database,
+  last_error_code_ = sqlite3_prepare_v2(const_cast<sqlite3 *>(database),
                                         statement.c_str(),
-                                        -1, // parse until null termination
+                                        -1,  // parse until null termination
                                         &statement_,
                                         NULL);
 
   if (!Successful()) {
     LogCvmfs(kLogSql, kLogDebug, "failed to prepare statement '%s' (%d: %s)",
              statement.c_str(), GetLastError(),
-             sqlite3_errmsg((sqlite3*)database));
+             sqlite3_errmsg(const_cast<sqlite3 *>(database)));
     return false;
   }
 

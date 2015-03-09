@@ -1,15 +1,19 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include "gtest/gtest.h"
 
 #include <unistd.h>
 
-#include "../../cvmfs/dns.h"
-#include "../../cvmfs/util.h"
-
 #include <algorithm>
 #include <cassert>
-#include <ctime>
 #include <cstdio>
+#include <ctime>
 #include <string>
+
+#include "../../cvmfs/dns.h"
+#include "../../cvmfs/util.h"
 
 using namespace std;  // NOLINT
 
@@ -30,7 +34,7 @@ class T_Dns : public ::testing::Test {
     hostfile_resolver = HostfileResolver::Create(hostfile, false);
     ASSERT_TRUE(hostfile_resolver);
   }
-  
+
   virtual void TearDown() {
     int retval = unsetenv("HOST_ALIASES");
     ASSERT_EQ(0, retval);
@@ -64,8 +68,8 @@ class T_Dns : public ::testing::Test {
 
 class DummyResolver : public Resolver {
  public:
-  DummyResolver() : Resolver(false /* ipv4 only */, 0 /* retries */, 2000) { };
-  ~DummyResolver() { };
+  DummyResolver() : Resolver(false /* ipv4 only */, 0 /* retries */, 2000) { }
+  ~DummyResolver() { }
 
   virtual bool SetResolvers(const std::vector<std::string> &resolvers) {
     return false;
@@ -636,9 +640,9 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
         nameservers.push_back("[" + tokens[1] + "]:53");
       else
         nameservers.push_back(tokens[1] + ":53");
-    }
-    else if (tokens[0] == "search")
+    } else if (tokens[0] == "search") {
       domains.push_back(tokens[1]);
+    }
   }
   fclose(f);
 

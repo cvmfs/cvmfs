@@ -26,4 +26,4 @@ class Uuid {
 
 }  // namespace cvmfs
 
-#endif  // CVMFS_UTIL_H_
+#endif  // CVMFS_UUID_H_

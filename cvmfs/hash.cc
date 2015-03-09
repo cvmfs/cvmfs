@@ -7,8 +7,8 @@
 
 #include <alloca.h>
 #include <openssl/md5.h>
-#include <openssl/sha.h>
 #include <openssl/ripemd.h>
+#include <openssl/sha.h>
 
 #include <cstdio>
 
@@ -75,7 +75,7 @@ Any MkFromHexPtr(const HexPtr hex, const char suffix) {
     result = Any(kMd5, hex);
   if (length == 2*kDigestSizes[kSha1])
     result = Any(kSha1, hex);
-  // TODO compare -rmd160
+  // TODO(jblomer) compare -rmd160
   if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]))
     result = Any(kRmd160, hex);
 
@@ -102,7 +102,7 @@ unsigned GetContextSize(const Algorithms algorithm) {
   }
 }
 
-void Init(ContextPtr &context) {
+void Init(ContextPtr context) {
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -122,7 +122,7 @@ void Init(ContextPtr &context) {
 }
 
 void Update(const unsigned char *buffer, const unsigned buffer_length,
-            ContextPtr &context)
+            ContextPtr context)
 {
   switch (context.algorithm) {
     case kMd5:
@@ -145,7 +145,7 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
   }
 }
 
-void Final(ContextPtr &context, Any *any_digest) {
+void Final(ContextPtr context, Any *any_digest) {
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -182,10 +182,12 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 }
 
 
-  void Hmac(const string &key,
-	    const unsigned char *buffer, const unsigned buffer_size,
-	    Any *any_digest)
-{
+void Hmac(
+  const string &key,
+  const unsigned char *buffer,
+  const unsigned buffer_size,
+  Any *any_digest
+) {
     Algorithms algorithm = any_digest->algorithm;
     assert(algorithm != kAny);
 
@@ -195,11 +197,11 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
     if (key.length() > block_size) {
       Any hash_key(algorithm);
       HashMem(reinterpret_cast<const unsigned char *>(key.data()),
-	      key.length(), &hash_key);
+              key.length(), &hash_key);
       memcpy(key_block, hash_key.digest, kDigestSizes[algorithm]);
     } else {
       if (key.length() > 0)
-	memcpy(key_block, key.data(), key.length());
+        memcpy(key_block, key.data(), key.length());
     }
 
     unsigned char pad_block[block_size];
@@ -290,8 +292,8 @@ void Md5::ToIntPair(uint64_t *lo, uint64_t *hi) const {
   memcpy(hi, digest+8, 8);
 }
 
-}  // namespace hash
+}  // namespace shash
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif

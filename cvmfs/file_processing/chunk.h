@@ -2,25 +2,23 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef UPLOAD_FILE_PROCESSING_CHUNK_H
-#define UPLOAD_FILE_PROCESSING_CHUNK_H
+#ifndef CVMFS_FILE_PROCESSING_CHUNK_H_
+#define CVMFS_FILE_PROCESSING_CHUNK_H_
 
 #include <sys/types.h>
-#include <string>
-#include <vector>
-#include <cassert>
-
-#include <zlib.h>
-
 #include <tbb/atomic.h>
 
-#include "char_buffer.h"
+#include <cassert>
+#include <string>
+#include <vector>
+
+#include "../duplex_zlib.h"
 #include "../hash.h"
+#include "char_buffer.h"
 
 namespace upload {
 
 struct UploadStreamHandle;
-
 class IoDispatcher;
 class File;
 
@@ -79,32 +77,34 @@ class Chunk {
    * file chunking is made. (See protected member FlushDeferredWrites())
    */
   void EnableDeferredWrite() {
-    assert (! HasUploadStreamHandle());
+    assert(!HasUploadStreamHandle());
     deferred_write_ = true;
   }
 
-  File*             file()                   const { return file_;             }
-  off_t             offset()                 const { return file_offset_;      }
-  size_t            size()                   const { return chunk_size_;       }
-  void          set_size(const size_t size) {
+  File* file() const { return file_; }
+  off_t offset() const { return file_offset_; }
+  size_t size() const { return chunk_size_; }
+  void set_size(const size_t size) {
     chunk_size_       = size;
     is_fully_defined_ = true;
   }
 
-  shash::ContextPtr& content_hash_context() { return content_hash_context_;     }
-  const shash::Any&  content_hash() const   { return content_hash_;             }
+  shash::ContextPtr& content_hash_context() { return content_hash_context_; }
+  const shash::Any&  content_hash() const { return content_hash_; }
   shash::Suffix      hash_suffix() const;
-  z_stream&          zlib_context()                 { return zlib_context_;     }
+  z_stream&          zlib_context() { return zlib_context_; }
 
-  UploadStreamHandle* upload_stream_handle() const { return upload_stream_handle_; }
+  UploadStreamHandle* upload_stream_handle() const {
+    return upload_stream_handle_;
+  }
   void set_upload_stream_handle(UploadStreamHandle* ush) {
-    assert (! HasUploadStreamHandle());
+    assert(!HasUploadStreamHandle());
     upload_stream_handle_ = ush;
   }
 
-  size_t         bytes_written()          const { return bytes_written_;      }
-  size_t         compressed_size()        const { return compressed_size_;    }
-  void       add_bytes_written(const size_t new_bytes) {
+  size_t bytes_written() const { return bytes_written_; }
+  size_t compressed_size() const { return compressed_size_; }
+  void add_bytes_written(const size_t new_bytes) {
     bytes_written_ += new_bytes;
   }
 
@@ -118,18 +118,23 @@ class Chunk {
   Chunk& operator=(const Chunk &other);  // don't copy assign
 
  private:
-  File                    *file_;              ///< This is a chunk of File
-  off_t                    file_offset_;       ///< Offset in the associated File
-  size_t                   chunk_size_;        ///< Size of the chunk
-                                               ///< Note: might not be defined from
-                                               ///<       from the beginning
+  File *file_;  ///< This is a chunk of File
+  off_t file_offset_;  ///< Offset in the associated File
+  /**
+   * Size of the chunk
+   * Note: might not be defined from from the beginning
+   */
+  size_t chunk_size_;
+
   tbb::atomic<bool>        done_;
   bool                     is_bulk_chunk_;
   bool                     is_fully_defined_;
 
   bool                     deferred_write_;
-  std::vector<CharBuffer*> deferred_buffers_;  ///< Buffers stored for a deferred write
-                                               ///< (see EnableDeferredWrite())
+  /**
+   * Buffers stored for a deferred write (see EnableDeferredWrite())
+   */
+  std::vector<CharBuffer*> deferred_buffers_;
 
   z_stream                 zlib_context_;
   bool                     zlib_initialized_;
@@ -138,14 +143,23 @@ class Chunk {
   shash::Any               content_hash_;
   bool                     content_hash_initialized_;
 
-  UploadStreamHandle      *upload_stream_handle_;   ///< opaque handle for streamed upload
-  CharBuffer              *current_deflate_buffer_; ///< current deflate destination buffer
-  size_t                   bytes_written_;          ///< bytes already uploaded (compressed)
-  tbb::atomic<size_t>      compressed_size_;        ///< size of the compressed data
+  /**
+   * Opaque handle for streamed upload
+   */
+  UploadStreamHandle      *upload_stream_handle_;
+  /**
+   * Current deflate destination buffer
+   */
+  CharBuffer              *current_deflate_buffer_;
+  /**
+   * Bytes already uploaded (compressed).
+   */
+  size_t                   bytes_written_;
+  tbb::atomic<size_t>      compressed_size_;  ///< size of the compressed data
 };
 
 typedef std::vector<Chunk*> ChunkVector;
 
-}
+}  // namespace upload
 
-#endif /* UPLOAD_FILE_PROCESSING_CHUNK_H */
+#endif  // CVMFS_FILE_PROCESSING_CHUNK_H_

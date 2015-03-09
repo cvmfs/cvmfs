@@ -1,8 +1,13 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
+
 #include <vector>
 
-#include "../../cvmfs/file_processing/chunk_detector.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
+#include "../../cvmfs/file_processing/chunk_detector.h"
 #include "../../cvmfs/prng.h"
 
 namespace upload {
@@ -56,30 +61,30 @@ class T_ChunkDetectors : public ::testing::Test {
   Prng rng_;
 };
 
-TEST_F(T_ChunkDetectors, StaticOffsetChunkDetector) {
+TEST_F(T_ChunkDetectors, StaticOffsetChunkDetectorSlow) {
   const size_t static_chunk_size = 1024;
 
   StaticOffsetDetector static_offset_detector(static_chunk_size);
-  EXPECT_FALSE (static_offset_detector.MightFindChunks(static_chunk_size));
-  EXPECT_TRUE  (static_offset_detector.MightFindChunks(static_chunk_size + 1));
+  EXPECT_FALSE(static_offset_detector.MightFindChunks(static_chunk_size));
+  EXPECT_TRUE(static_offset_detector.MightFindChunks(static_chunk_size + 1));
 
   CharBuffer buffer(static_chunk_size);
   buffer.SetUsedBytes(static_chunk_size / 2);
 
   off_t next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
-  EXPECT_EQ (0, next_cut_mark);
+  EXPECT_EQ(0, next_cut_mark);
 
   buffer.SetBaseOffset(buffer.used_bytes());
   next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
-  EXPECT_EQ (0, next_cut_mark);
+  EXPECT_EQ(0, next_cut_mark);
 
   buffer.SetBaseOffset(buffer.used_bytes() * 2);
   next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
-  EXPECT_EQ (static_cast<off_t>(static_chunk_size), next_cut_mark);
+  EXPECT_EQ(static_cast<off_t>(static_chunk_size), next_cut_mark);
 
   buffer.SetBaseOffset(buffer.used_bytes() * 3);
   next_cut_mark = static_offset_detector.FindNextCutMark(&buffer);
-  EXPECT_EQ (0, next_cut_mark);
+  EXPECT_EQ(0, next_cut_mark);
 
   CreateBuffers(1048576);
 
@@ -89,7 +94,7 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetector) {
   Buffers::const_iterator iend = buffers_.end();
   for (; i != iend; ++i) {
     while ((next_cut = static_offset_detector.FindNextCutMark(*i)) != 0) {
-      EXPECT_EQ (static_cast<off_t>(static_chunk_size) * runs, next_cut);
+      EXPECT_EQ(static_cast<off_t>(static_chunk_size) * runs, next_cut);
       ++runs;
     }
   }
@@ -97,7 +102,7 @@ TEST_F(T_ChunkDetectors, StaticOffsetChunkDetector) {
 
 
 TEST_F(T_ChunkDetectors, Xor32) {
-  Xor32Detector xor32_detector(1, 2, 4); // chunk sizes are not important here!
+  Xor32Detector xor32_detector(1, 2, 4);  // chunk sizes are not important here!
 
   // table of test data:
   //   <input value> , <expected xor32 value>
@@ -155,12 +160,12 @@ TEST_F(T_ChunkDetectors, Xor32) {
 
   for (unsigned int i = 0; i < value_count; i+=2) {
     xor32_detector.xor32(static_cast<unsigned char>(values[i]));
-    EXPECT_EQ (values[i+1], xor32_detector.xor32_);
+    EXPECT_EQ(values[i+1], xor32_detector.xor32_);
   }
 }
 
 
-TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
+TEST_F(T_ChunkDetectors, Xor32ChunkDetectorSlow) {
   const size_t base = 512000;
   const size_t min_chk_size = base;
   const size_t avg_chk_size = base * 2;
@@ -169,12 +174,12 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
                                        avg_chk_size,
                                        max_chk_size);
 
-  EXPECT_FALSE (xor32_detector.MightFindChunks(0));
-  EXPECT_FALSE (xor32_detector.MightFindChunks(base));
-  EXPECT_TRUE  (xor32_detector.MightFindChunks(base + 1));
-  EXPECT_TRUE  (xor32_detector.MightFindChunks(base * 2));
-  EXPECT_TRUE  (xor32_detector.MightFindChunks(base * 3));
-  EXPECT_TRUE  (xor32_detector.MightFindChunks(base * 3 + 1));
+  EXPECT_FALSE(xor32_detector.MightFindChunks(0));
+  EXPECT_FALSE(xor32_detector.MightFindChunks(base));
+  EXPECT_TRUE(xor32_detector.MightFindChunks(base + 1));
+  EXPECT_TRUE(xor32_detector.MightFindChunks(base * 2));
+  EXPECT_TRUE(xor32_detector.MightFindChunks(base * 3));
+  EXPECT_TRUE(xor32_detector.MightFindChunks(base * 3 + 1));
 
   // expected cut marks
   const off_t expected[] = {
@@ -196,10 +201,10 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
   };
 
   std::vector<size_t> buffer_sizes;
-  buffer_sizes.push_back(102400);   // 100kB
-  buffer_sizes.push_back(base);     // same as minimal chunk size
-  buffer_sizes.push_back(base * 2); // same as average chunk size
-  buffer_sizes.push_back(10485760); // 10MB
+  buffer_sizes.push_back(102400);    // 100kB
+  buffer_sizes.push_back(base);      // same as minimal chunk size
+  buffer_sizes.push_back(base * 2);  // same as average chunk size
+  buffer_sizes.push_back(10485760);  // 10MB
 
   std::vector<size_t>::const_iterator i    = buffer_sizes.begin();
   std::vector<size_t>::const_iterator iend = buffer_sizes.end();
@@ -217,19 +222,19 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
     Buffers::const_iterator j    = buffers_.begin();
     Buffers::const_iterator jend = buffers_.end();
 
-    for (; ! fail && j != jend; ++j) {
+    for (; !fail && j != jend; ++j) {
       while ((next_cut = detector.FindNextCutMark(*j)) != 0) {
         // check that the chunk size lies in the legal boundaries
         size_t chunk_size = next_cut - last_cut;
         if (max_chk_size < chunk_size) {
-          EXPECT_GE (max_chk_size, chunk_size)
+          EXPECT_GE(max_chk_size, chunk_size)
             << "too large chunk with buffer size " << *i << " bytes...";
           fail = true;
           break;
         }
 
         if (min_chk_size > chunk_size) {
-          EXPECT_LE (min_chk_size, chunk_size)
+          EXPECT_LE(min_chk_size, chunk_size)
             << "too small chunk with buffer size " << *i << " bytes...";
           fail = true;
           break;
@@ -250,4 +255,4 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetector) {
   }
 }
 
-} // namespace
+}  // namespace upload

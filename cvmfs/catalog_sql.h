@@ -23,13 +23,14 @@
 #include <inttypes.h>
 
 #include <string>
-#include <sstream>
 
-#include "hash.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
+#include "hash.h"
 #include "shortstring.h"
 #include "sql.h"
+
+class XattrList;
 
 namespace catalog {
 
@@ -37,7 +38,8 @@ class Catalog;
 
 /**
  * Content-addressable chunks can be entire files, micro catalogs (ending L) or
- * pieces of large files (ending P)
+ * pieces of large files (ending P).  Micro catalogs are currently not
+ * implemented.
  */
 enum ChunkTypes {
   kChunkFile = 0,
@@ -50,7 +52,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
  public:
   static const float kLatestSchema;
   static const float kLatestSupportedSchema;  // + 1.X catalogs (r/o)
-  // backwards-compatible schema changes
+  // Backwards-compatible schema changes
   static const unsigned kLatestSchemaRevision;
 
   bool CreateEmptyDatabase();
@@ -66,11 +68,11 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   double GetRowIdWasteRatio() const;
 
  protected:
-  // TODO: C++11 - constructor inheritance
+  // TODO(rmeusel): C++11 - constructor inheritance
   friend class sqlite::Database<CatalogDatabase>;
   CatalogDatabase(const std::string  &filename,
-                  const OpenMode      open_mode) :
-    sqlite::Database<CatalogDatabase>(filename, open_mode) {}
+                  const OpenMode      open_mode)
+    : sqlite::Database<CatalogDatabase>(filename, open_mode) { }
 };
 
 
@@ -94,13 +96,12 @@ class Sql : public sqlite::Sql {
   virtual ~Sql() { /* Done by super class */ }
 
   /**
-   * Wrapper for retrieving MD5 hashes.
+   * Wrapper for retrieving MD5-ified path names.
    * @param idx_high offset of most significant bits in database query
    * @param idx_low offset of least significant bits in database query
    * @result the retrieved MD5 hash
    */
-  inline shash::Md5 RetrieveMd5(const int idx_high, const int idx_low) const
-  {
+  inline shash::Md5 RetrieveMd5(const int idx_high, const int idx_low) const {
     return shash::Md5(RetrieveInt64(idx_high), RetrieveInt64(idx_low));
   }
 
@@ -108,13 +109,14 @@ class Sql : public sqlite::Sql {
    * Wrapper for retrieving a cryptographic hash from a blob field.
    */
   inline shash::Any RetrieveHashBlob(
-              const int                idx_column,
-              const shash::Algorithms  hash_algo,
-              const char               hash_suffix = shash::kSuffixNone) const {
+    const int                idx_column,
+    const shash::Algorithms  hash_algo,
+    const char               hash_suffix = shash::kSuffixNone) const
+  {
     const int byte_count = RetrieveBytes(idx_column);
     if (byte_count > 0) {
-      const unsigned char *buffer =
-                   static_cast<const unsigned char *>(RetrieveBlob(idx_column));
+      const unsigned char *buffer = static_cast<const unsigned char *>(
+        RetrieveBlob(idx_column));
       return shash::Any(hash_algo, buffer, byte_count, hash_suffix);
     }
     return shash::Any(hash_algo);
@@ -124,15 +126,16 @@ class Sql : public sqlite::Sql {
    * Wrapper for retrieving a cryptographic hash from a text field.
    */
   inline shash::Any RetrieveHashHex(
-                            const int  idx_column,
-                            const char hash_suffix = shash::kSuffixNone) const {
-    const std::string hash_string = std::string(
-      reinterpret_cast<const char *>(RetrieveText(idx_column)));
+    const int  idx_column,
+    const char hash_suffix = shash::kSuffixNone) const
+  {
+    const std::string hash_string = std::string(reinterpret_cast<const char *>(
+      RetrieveText(idx_column)));
     return shash::MkFromHexPtr(shash::HexPtr(hash_string), hash_suffix);
   }
 
   /**
-   * Wrapper for binding a MD5 hash.
+   * Wrapper for binding a MD5-ified path name.
    * @param idx_high offset of most significant bits in database query
    * @param idx_low offset of least significant bits in database query
    * @param hash the hash to bind in the query
@@ -177,29 +180,28 @@ class SqlDirent : public Sql {
  public:
   // Definition of bit positions for the flags field of a DirectoryEntry
   // All other bit positions are unused
-  const static int kFlagDir                 = 1;
+  static const int kFlagDir                 = 1;
   // Link in the parent catalog
-  const static int kFlagDirNestedMountpoint = 2;
+  static const int kFlagDirNestedMountpoint = 2;
   // Link in the child catalog
-  const static int kFlagDirNestedRoot       = 32;
-  const static int kFlagFile                = 4;
-  const static int kFlagLink                = 8;
-  const static int kFlagFileStat            = 16;  // currently unused
-  const static int kFlagFileChunk           = 64;
-
+  static const int kFlagDirNestedRoot       = 32;
+  static const int kFlagFile                = 4;
+  static const int kFlagLink                = 8;
+  static const int kFlagFileStat            = 16;  // currently unused
+  static const int kFlagFileChunk           = 64;
   // as of 2^8: 3 bit for hashes
-  // 0: SHA-1
-  // 1: RIPEMD-160
-  // ... corresponds to shash::algorithms with offset in order to support
-  // future hashes
-  const static int kFlagPosHash             = 8;
+  //   - 0: SHA-1
+  //   - 1: RIPEMD-160
+  // Corresponds to shash::algorithms with offset in order to support future
+  // hashes
+  static const int kFlagPosHash             = 8;
 
  protected:
   /**
-   *  take the meta data from the DirectoryEntry and transform it
-   *  into a valid flags field ready to be saved in the database
-   *  @param entry the DirectoryEntry to encode
-   *  @return an integer containing the bitmap of the flags field
+   * Take the meta data from the DirectoryEntry and transform it
+   * into a valid flags field ready to be saved in the database.
+   * @param entry the DirectoryEntry to encode
+   * @return an integer containing the bitmap of the flags field
    */
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
   void StoreHashAlgorithm(const shash::Algorithms algo, unsigned *flags) const;
@@ -207,8 +209,8 @@ class SqlDirent : public Sql {
 
   /**
    * The hardlink information (hardlink group ID and linkcount) is saved in one
-   * uint_64t field in the CVMFS Catalogs. Therefore we need to do some minor
-   * bitshifting in these helper methods.
+   * uint_64t field in the CVMFS Catalogs. Therefore we need to do bitshifting
+   * in these helper methods.
    */
   uint32_t Hardlinks2Linkcount(const uint64_t hardlinks) const;
   uint32_t Hardlinks2HardlinkGroup(const uint64_t hardlinks) const;
@@ -216,10 +218,9 @@ class SqlDirent : public Sql {
                          const uint32_t linkcount) const;
 
   /**
-   *  replaces place holder variables in a symbolic link by actual
-   *  path elements
-   *  @param raw_symlink the raw symlink path (may) containing place holders
-   *  @return the expanded symlink
+   * Replaces place holder variables in a symbolic link by actual path elements.
+   * @param raw_symlink the raw symlink path (may) containing place holders
+   * @return the expanded symlink
    */
   void ExpandSymlink(LinkString *raw_symlink) const;
 };
@@ -230,11 +231,11 @@ class SqlDirent : public Sql {
 
 class SqlDirentWrite : public SqlDirent {
  public:
-   /**
-    * To bind an entire DirectoryEntry
-    * @param entry the DirectoryEntry to bind in the SQL statement
-    * @return true on success, false otherwise
-    */
+  /**
+   * To bind an entire DirectoryEntry
+   * @param entry the DirectoryEntry to bind in the SQL statement
+   * @return true on success, false otherwise
+   */
   virtual bool BindDirent(const DirectoryEntry &entry) = 0;
 
  protected:
@@ -257,7 +258,7 @@ class SqlDirentWrite : public SqlDirent {
 
 class SqlListContentHashes : public SqlDirent {
  public:
-  SqlListContentHashes(const CatalogDatabase &database);
+  explicit SqlListContentHashes(const CatalogDatabase &database);
   shash::Any GetHash() const;
 };
 
@@ -268,15 +269,16 @@ class SqlListContentHashes : public SqlDirent {
 class SqlLookup : public SqlDirent {
  protected:
   /**
-   * There are several lookup statements which all share a list of
-   * elements to load
+   * There are several lookup statements which all share a list of elements to
+   * load.
    * @return a list of sql fields to query for DirectoryEntry
    */
-  std::string GetFieldsToSelect(const float schema_version) const;
+  std::string GetFieldsToSelect(const float schema_version,
+                                const unsigned schema_revision) const;
 
  public:
   /**
-   * Retrieves a DirectoryEntry from a freshly performed SqlLookup statement
+   * Retrieves a DirectoryEntry from a freshly performed SqlLookup statement.
    * @param catalog the catalog in which the DirectoryEntry resides
    * @return the retrieved DirectoryEntry
    */
@@ -304,7 +306,7 @@ class SqlLookup : public SqlDirent {
 
 class SqlListing : public SqlLookup {
  public:
-  SqlListing(const CatalogDatabase &database);
+  explicit SqlListing(const CatalogDatabase &database);
   bool BindPathHash(const struct shash::Md5 &hash);
 };
 
@@ -314,7 +316,7 @@ class SqlListing : public SqlLookup {
 
 class SqlLookupPathHash : public SqlLookup {
  public:
-  SqlLookupPathHash(const CatalogDatabase &database);
+  explicit SqlLookupPathHash(const CatalogDatabase &database);
   bool BindPathHash(const struct shash::Md5 &hash);
 };
 
@@ -324,7 +326,7 @@ class SqlLookupPathHash : public SqlLookup {
 
 class SqlLookupInode : public SqlLookup {
  public:
-  SqlLookupInode(const CatalogDatabase &database);
+  explicit SqlLookupInode(const CatalogDatabase &database);
   bool BindRowId(const uint64_t inode);
 };
 
@@ -334,13 +336,15 @@ class SqlLookupInode : public SqlLookup {
 
 /**
  * Filesystem like _touch_ of a DirectoryEntry. Only file system specific meta
- * data will be modified. All CVMFS-specific administrative data stays unchanged.
- * NOTE: This is not a subclass of SqlDirent since it works on DirectoryEntryBase
- *       objects, which are restricted to file system meta data.
+ * data will be modified.  All CVMFS-specific administrative data stays
+ * unchanged.
+ * NOTE: This is not a subclass of SqlDirent since it works on
+ *       DirectoryEntryBase objects, which are restricted to file system meta
+ *       data.
  */
 class SqlDirentTouch : public Sql {
  public:
-  SqlDirentTouch(const CatalogDatabase &database);
+  explicit SqlDirentTouch(const CatalogDatabase &database);
 
   bool BindDirentBase(const DirectoryEntryBase &entry);
   bool BindPathHash(const shash::Md5 &hash);
@@ -352,7 +356,7 @@ class SqlDirentTouch : public Sql {
 
 class SqlNestedCatalogLookup : public Sql {
  public:
-  SqlNestedCatalogLookup(const CatalogDatabase &database);
+  explicit SqlNestedCatalogLookup(const CatalogDatabase &database);
   bool BindSearchPath(const PathString &path);
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
@@ -364,7 +368,7 @@ class SqlNestedCatalogLookup : public Sql {
 
 class SqlNestedCatalogListing : public Sql {
  public:
-  SqlNestedCatalogListing(const CatalogDatabase &database);
+  explicit SqlNestedCatalogListing(const CatalogDatabase &database);
   PathString GetMountpoint() const;
   shash::Any GetContentHash() const;
   uint64_t GetSize() const;
@@ -376,10 +380,12 @@ class SqlNestedCatalogListing : public Sql {
 
 class SqlDirentInsert : public SqlDirentWrite {
  public:
-  SqlDirentInsert(const CatalogDatabase &database);
+  explicit SqlDirentInsert(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   bool BindParentPathHash(const shash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
+  bool BindXattr(const XattrList &xattrs);
+  bool BindXattrEmpty();
 };
 
 
@@ -388,7 +394,7 @@ class SqlDirentInsert : public SqlDirentWrite {
 
 class SqlDirentUpdate : public SqlDirentWrite {
  public:
-  SqlDirentUpdate(const CatalogDatabase &database);
+  explicit SqlDirentUpdate(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   bool BindDirent(const DirectoryEntry &entry);
 };
@@ -399,7 +405,7 @@ class SqlDirentUpdate : public SqlDirentWrite {
 
 class SqlDirentUnlink : public Sql {
  public:
-  SqlDirentUnlink(const CatalogDatabase &database);
+  explicit SqlDirentUnlink(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
 };
 
@@ -412,7 +418,7 @@ class SqlDirentUnlink : public Sql {
  */
 class SqlIncLinkcount : public Sql {
  public:
-  SqlIncLinkcount(const CatalogDatabase &database);
+  explicit SqlIncLinkcount(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   bool BindDelta(const int delta);
 };
@@ -423,7 +429,7 @@ class SqlIncLinkcount : public Sql {
 
 class SqlChunkInsert : public Sql {
  public:
-  SqlChunkInsert(const CatalogDatabase &database);
+  explicit SqlChunkInsert(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   bool BindFileChunk(const FileChunk &chunk);
 };
@@ -434,7 +440,7 @@ class SqlChunkInsert : public Sql {
 
 class SqlChunksRemove : public Sql {
  public:
-  SqlChunksRemove(const CatalogDatabase &database);
+  explicit SqlChunksRemove(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
 };
 
@@ -444,7 +450,7 @@ class SqlChunksRemove : public Sql {
 
 class SqlChunksListing : public Sql {
  public:
-  SqlChunksListing(const CatalogDatabase &database);
+  explicit SqlChunksListing(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   FileChunk GetFileChunk(const shash::Algorithms interpret_hash_as) const;
 };
@@ -455,7 +461,7 @@ class SqlChunksListing : public Sql {
 
 class SqlChunksCount : public Sql {
  public:
-  SqlChunksCount(const CatalogDatabase &database);
+  explicit SqlChunksCount(const CatalogDatabase &database);
   bool BindPathHash(const shash::Md5 &hash);
   int GetChunkCount() const;
 };
@@ -466,7 +472,7 @@ class SqlChunksCount : public Sql {
 
 class SqlMaxHardlinkGroup : public Sql {
  public:
-  SqlMaxHardlinkGroup(const CatalogDatabase &database);
+  explicit SqlMaxHardlinkGroup(const CatalogDatabase &database);
   uint32_t GetMaxGroupId() const;
 };
 
@@ -476,7 +482,7 @@ class SqlMaxHardlinkGroup : public Sql {
 
 class SqlGetCounter : public Sql {
  public:
-  SqlGetCounter(const CatalogDatabase &database);
+  explicit SqlGetCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
   uint64_t GetCounter() const;
  private:
@@ -489,7 +495,7 @@ class SqlGetCounter : public Sql {
 
 class SqlUpdateCounter : public Sql {
  public:
-  SqlUpdateCounter(const CatalogDatabase &database);
+  explicit SqlUpdateCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
   bool BindDelta(const int64_t delta);
 };
@@ -500,7 +506,7 @@ class SqlUpdateCounter : public Sql {
 
 class SqlCreateCounter : public Sql {
  public:
-  SqlCreateCounter(const CatalogDatabase &database);
+  explicit SqlCreateCounter(const CatalogDatabase &database);
   bool BindCounter(const std::string &counter);
   bool BindInitialValue(const int64_t value);
 };
@@ -511,10 +517,21 @@ class SqlCreateCounter : public Sql {
 
 class SqlAllChunks : public Sql {
  public:
-  SqlAllChunks(const CatalogDatabase &database);
+  explicit SqlAllChunks(const CatalogDatabase &database);
   bool Open();
   bool Next(shash::Any *hash, ChunkTypes *type);
   bool Close();
+};
+
+
+//------------------------------------------------------------------------------
+
+
+class SqlLookupXattrs : public Sql {
+ public:
+  explicit SqlLookupXattrs(const CatalogDatabase &database);
+  bool BindPathHash(const shash::Md5 &hash);
+  XattrList GetXattrs();
 };
 
 }  // namespace catalog

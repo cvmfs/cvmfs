@@ -2,8 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_VJSON_JSON_DOCUMENT_H_
-#define CVMFS_VJSON_JSON_DOCUMENT_H_
+#ifndef CVMFS_JSON_DOCUMENT_H_
+#define CVMFS_JSON_DOCUMENT_H_
 
 #include "json.h"
 #include "util.h"
@@ -31,4 +31,4 @@ class JsonDocument : SingleCopy {
   JSON            *root_;
 };
 
-#endif /* CVMFS_VJSON_JSON_DOCUMENT_H_ */
+#endif  // CVMFS_JSON_DOCUMENT_H_

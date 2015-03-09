@@ -11,19 +11,21 @@
 
 #include <inttypes.h>
 #include <pthread.h>
-#include <cassert>
 
-#include <vector>
+#include <cassert>
 #include <map>
 #include <string>
+#include <vector>
 
+#include "atomic.h"
 #include "catalog.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
-#include "atomic.h"
-#include "util.h"
 #include "logging.h"
+#include "util.h"
+
+class XattrList;
 
 namespace catalog {
 
@@ -68,6 +70,7 @@ struct Statistics {
   atomic_int64 num_lookup_inode;
   atomic_int64 num_lookup_path;
   atomic_int64 num_lookup_path_negative;
+  atomic_int64 num_lookup_xattrs;
   atomic_int64 num_listing;
   atomic_int64 num_nested_listing;
 
@@ -75,6 +78,7 @@ struct Statistics {
     atomic_init64(&num_lookup_inode);
     atomic_init64(&num_lookup_path);
     atomic_init64(&num_lookup_path_negative);
+    atomic_init64(&num_lookup_xattrs);
     atomic_init64(&num_listing);
     atomic_init64(&num_nested_listing);
   }
@@ -88,6 +92,9 @@ struct Statistics {
       "lookup(path-negative): " +
         StringifyInt(atomic_read64(&num_lookup_path_negative)) +
       "    " +
+      "lookup(xattrs): " +
+        StringifyInt(atomic_read64(&num_lookup_xattrs)) +
+      "    " +
       "listing: " + StringifyInt(atomic_read64(&num_listing)) +
       "    " +
       "listing nested catalogs: " +
@@ -98,8 +105,8 @@ struct Statistics {
 
 class InodeGenerationAnnotation : public InodeAnnotation {
  public:
-  InodeGenerationAnnotation() { inode_offset_ = 0; };
-  ~InodeGenerationAnnotation() { };
+  InodeGenerationAnnotation() { inode_offset_ = 0; }
+  ~InodeGenerationAnnotation() { }
   bool ValidInode(const uint64_t inode) {
     return inode >= inode_offset_;
   }
@@ -114,7 +121,7 @@ class InodeGenerationAnnotation : public InodeAnnotation {
     LogCvmfs(kLogCatalog, kLogDebug, "set inode generation to %lu",
              inode_offset_);
   }
-  inode_t GetGeneration() { return inode_offset_; };
+  inode_t GetGeneration() { return inode_offset_; }
 
  private:
   uint64_t inode_offset_;
@@ -149,7 +156,7 @@ class RemountListener {
  */
 class AbstractCatalogManager : public SingleCopy {
  public:
-  const static inode_t kInodeOffset = 255;
+  static const inode_t kInodeOffset = 255;
   AbstractCatalogManager();
   virtual ~AbstractCatalogManager();
 
@@ -158,8 +165,9 @@ class AbstractCatalogManager : public SingleCopy {
   LoadError Remount(const bool dry_run);
   void DetachNested();
 
-  //bool LookupInode(const inode_t inode, const LookupOptions options,
-  //                 DirectoryEntry *entry);
+  //  Not needed anymore since there are the glue buffers
+  //  bool LookupInode(const inode_t inode, const LookupOptions options,
+  //                   DirectoryEntry *entry);
   bool LookupPath(const PathString &path, const LookupOptions options,
                   DirectoryEntry *entry);
   bool LookupPath(const std::string &path, const LookupOptions options,
@@ -169,6 +177,8 @@ class AbstractCatalogManager : public SingleCopy {
     p.Assign(&path[0], path.length());
     return LookupPath(p, options, entry);
   }
+  bool LookupXattrs(const PathString &path, XattrList *xattrs);
+
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
     PathString p;
@@ -227,8 +237,8 @@ class AbstractCatalogManager : public SingleCopy {
                                 const shash::Any &hash,
                                 std::string  *catalog_path,
                                 shash::Any   *catalog_hash) = 0;
-  virtual void UnloadCatalog(const Catalog *catalog) { };
-  virtual void ActivateCatalog(Catalog *catalog) { };
+  virtual void UnloadCatalog(const Catalog *catalog) { }
+  virtual void ActivateCatalog(Catalog *catalog) { }
 
   /**
    * Create a new Catalog object.
@@ -284,7 +294,10 @@ class AbstractCatalogManager : public SingleCopy {
   int inode_watermark_status_;  /**< 0: OK, 1: > 32bit */
   uint64_t inode_gauge_;  /**< highest issued inode */
   uint64_t revision_cache_;
-  uint64_t incarnation_;  /**< counts how often the inodes have been invalidated */
+  /**
+   * Counts how often the inodes have been invalidated.
+   */
+  uint64_t incarnation_;
   InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
@@ -293,7 +306,8 @@ class AbstractCatalogManager : public SingleCopy {
   OwnerMap uid_map_;
   OwnerMap gid_map_;
 
-  //Catalog *Inode2Catalog(const inode_t inode);
+  // Not needed anymore since there are the glue buffers
+  // Catalog *Inode2Catalog(const inode_t inode);
   std::string PrintHierarchyRecursively(const Catalog *catalog,
                                         const int level) const;
 

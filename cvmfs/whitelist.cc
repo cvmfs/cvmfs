@@ -5,11 +5,10 @@
 #include "cvmfs_config.h"
 #include "whitelist.h"
 
-#include "time.h"
+#include <algorithm>
 #include <cassert>
 #include <cstring>
-
-#include <algorithm>
+#include <ctime>
 
 #include "download.h"
 #include "logging.h"

@@ -6,9 +6,10 @@
 #define CVMFS_LETTER_H_
 
 #include <string>
+
 #include "hash.h"
 
-namespace signature{
+namespace signature {
 class SignatureManager;
 }
 

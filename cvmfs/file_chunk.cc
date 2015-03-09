@@ -2,6 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "file_chunk.h"
 
 #include <cassert>
@@ -86,7 +87,8 @@ void ChunkTables::CopyFrom(const ChunkTables &other) {
 
 pthread_mutex_t *ChunkTables::Handle2Lock(const uint64_t handle) const {
   const uint32_t hash = hasher_uint64t(handle);
-  const double bucket = double(hash) * double(kNumHandleLocks) /
-                        double((uint32_t)(-1));
+  const double bucket =
+    static_cast<double>(hash) * static_cast<double>(kNumHandleLocks) /
+    static_cast<double>((uint32_t)(-1));
   return handle_locks.At((uint32_t)bucket % kNumHandleLocks);
 }

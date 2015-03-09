@@ -7,13 +7,13 @@
 #ifndef CVMFS_COMPAT_H_
 #define CVMFS_COMPAT_H_
 
-#include <stdint.h>
+#include <google/sparse_hash_map>
 #include <pthread.h>
 #include <sched.h>
+#include <stdint.h>
 
 #include <cassert>
-
-#include <google/sparse_hash_map>
+#include <string>
 
 #include "atomic.h"
 #include "bigvector.h"
@@ -146,7 +146,7 @@ void MigrateAny(const Any *old_hash, shash::Any *new_hash);
 //------------------------------------------------------------------------------
 
 
-namespace inode_tracker{
+namespace inode_tracker {
 
 struct Dirent {
   Dirent() { parent_inode = 0; }
@@ -162,7 +162,7 @@ struct Dirent {
 
 
 class InodeContainer {
-public:
+ public:
   typedef google::sparse_hash_map<uint64_t, Dirent,
           hash_murmur<uint64_t> >
           InodeMap;
@@ -188,8 +188,8 @@ public:
     return map_.find(inode) != map_.end();
   }
   inline size_t Size() { return map_.size(); }
-//private:
-  std::string DebugPrint() { assert(false); return ""; };
+// private:
+  std::string DebugPrint() { assert(false); return ""; }
   InodeMap map_;
 };
 
@@ -198,7 +198,7 @@ public:
  * Tracks inode reference counters as given by Fuse.
  */
 class InodeTracker {
-public:
+ public:
   struct Statistics {
     Statistics() {
       assert(false);
@@ -232,7 +232,7 @@ public:
   void VfsPut(const uint64_t inode, const uint32_t by) { assert(false); }
   bool Find(const uint64_t inode, PathString *path) { assert(false); }
 
-//private:
+// private:
   static const unsigned kVersion = 1;
 
   void InitLock() { assert(false); }
@@ -262,7 +262,7 @@ namespace inode_tracker_v2 {
 
 template<class Key, class Value, class Derived>
 class SmallHashBase {
-public:
+ public:
   static const double kLoadFactor;  // mainly useless for the dynamic version
   static const double kThresholdGrow;  // only used for resizable version
   static const double kThresholdShrink;  // only used for resizable version
@@ -306,10 +306,10 @@ public:
     assert(false);
   }
 
-public:
+// private:
   uint32_t ScaleHash(const Key &key) const {
-    double bucket = (double(hasher_(key)) * double(capacity_) /
-                     double((uint32_t)(-1)));
+    double bucket = (double(hasher_(key)) * double(capacity_) /  // NOLINT
+                     double((uint32_t)(-1)));  // NOLINT
     return (uint32_t)bucket % capacity_;
   }
   void InitMemory() { assert(false); }
@@ -356,7 +356,7 @@ class SmallHashDynamic :
 public SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> >
 {
   friend class SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> >;
-public:
+ public:
   typedef SmallHashBase< Key, Value, SmallHashDynamic<Key, Value> > Base;
   static const double kThresholdGrow;
   static const double kThresholdShrink;
@@ -377,7 +377,7 @@ public:
   uint32_t capacity() const { return Base::capacity_; }
   uint32_t size() const { return Base::size_; }
   uint32_t num_migrates() const { assert(false); }
-protected:
+ protected:
   void SetThresholds() {
     assert(false);
   }
@@ -385,7 +385,7 @@ protected:
   void Shrink() { assert(false); }
   void ResetCapacity() { assert(false); }
 
-private:
+ private:
   void Migrate(const uint32_t new_capacity) {
     assert(false);
   }
@@ -399,7 +399,7 @@ private:
 
 
 class PathMap {
-public:
+ public:
   PathMap() {
     assert(false);
   }
@@ -423,7 +423,8 @@ public:
     assert(false);
   }
   void Clear() { assert(false); }
- public:
+
+// private:
   struct PathInfo {
     PathInfo() { inode = 0; }
     PathInfo(const uint64_t i, const PathString &p) { inode = i; path = p; }
@@ -434,7 +435,7 @@ public:
 };
 
 class InodeMap {
-public:
+ public:
   InodeMap() {
     assert(false);
   }
@@ -449,13 +450,13 @@ public:
     assert(false);
   }
   void Clear() { assert(false); }
- public:
+// private:
   SmallHashDynamic<uint64_t, shash_v1::Md5> map_;
 };
 
 
 class InodeReferences {
-public:
+ public:
   InodeReferences() {
     assert(false);
   }
@@ -466,12 +467,12 @@ public:
     assert(false);
   }
   void Clear() { assert(false); }
- public:
+// private:
   SmallHashDynamic<uint64_t, uint32_t> map_;
 };
 
 class InodeTracker {
-public:
+ public:
   struct Statistics {
     Statistics() { assert(false); }
     std::string Print() { assert(false); }
@@ -490,7 +491,7 @@ public:
   ~InodeTracker() {
     pthread_mutex_destroy(lock_);
     free(lock_);
-  };
+  }
   void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
   {
     assert(false);
@@ -502,16 +503,16 @@ public:
     assert(false);
   }
   bool FindPath(const uint64_t inode, PathString *path) {
-    //Lock();
+    // Lock();
     shash_v1::Md5 md5path;
     bool found = inode_map_.LookupMd5Path(inode, &md5path);
     if (found) {
       found = path_map_.LookupPath(md5path, path);
       assert(found);
     }
-    //Unlock();
-    //if (found) atomic_inc64(&statistics_.num_hits_path);
-    //else atomic_inc64(&statistics_.num_misses_path);
+    // Unlock();
+    // if (found) atomic_inc64(&statistics_.num_hits_path);
+    // else atomic_inc64(&statistics_.num_misses_path);
     return found;
   }
 
@@ -566,7 +567,7 @@ class StringRef {
 class StringHeap : public SingleCopy {
  public:
   StringHeap() { assert(false); }
-  StringHeap(const uint32_t minimum_size) { assert(false); }
+  explicit StringHeap(const uint32_t minimum_size) { assert(false); }
   void Init(const uint32_t minimum_size) { assert(false); }
 
   ~StringHeap() {
@@ -626,7 +627,7 @@ class PathStore {
   void Erase(const shash_v1::Md5 &md5path) { assert(false); }
   void Clear() { assert(false); }
 
- //private:
+// private:
   struct PathInfo {
     PathInfo() {
       refcnt = 1;
@@ -664,7 +665,7 @@ class PathMap {
 };
 
 class InodeMap {
-public:
+ public:
   InodeMap() {
     assert(false);
   }
@@ -679,13 +680,13 @@ public:
     assert(false);
   }
   void Clear() { assert(false); }
- public:
+// private:
   SmallHashDynamic<uint64_t, shash_v1::Md5> map_;
 };
 
 
 class InodeReferences {
-public:
+ public:
   InodeReferences() {
     assert(false);
   }
@@ -696,12 +697,12 @@ public:
     assert(false);
   }
   void Clear() { assert(false); }
- public:
+// private:
   SmallHashDynamic<uint64_t, uint32_t> map_;
 };
 
 class InodeTracker {
-public:
+ public:
   struct Statistics {
     Statistics() { assert(false); }
     std::string Print() { assert(false); }
@@ -720,7 +721,7 @@ public:
   ~InodeTracker() {
     pthread_mutex_destroy(lock_);
     free(lock_);
-  };
+  }
   void VfsGetBy(const uint64_t inode, const uint32_t by, const PathString &path)
   {
     assert(false);
@@ -732,16 +733,16 @@ public:
     assert(false);
   }
   bool FindPath(const uint64_t inode, PathString *path) {
-    //Lock();
+    // Lock();
     shash_v1::Md5 md5path;
     bool found = inode_map_.LookupMd5Path(inode, &md5path);
     if (found) {
       found = path_map_.LookupPath(md5path, path);
       assert(found);
     }
-    //Unlock();
-    //if (found) atomic_inc64(&statistics_.num_hits_path);
-    //else atomic_inc64(&statistics_.num_misses_path);
+    // Unlock();
+    // if (found) atomic_inc64(&statistics_.num_hits_path);
+    // else atomic_inc64(&statistics_.num_misses_path);
     return found;
   }
 
@@ -749,7 +750,7 @@ public:
     assert(false);
   }
 
- public:
+// private:
   static const unsigned kVersion = 3;
 
   void InitLock() { assert(false); }
@@ -781,10 +782,11 @@ class FileChunk {
   inline const shash_v1::Any& content_hash() const { return content_hash_; }
   inline off_t offset() const { return offset_; }
   inline size_t size() const { return size_; }
- //protected:
-  shash_v1::Any content_hash_; //!< content hash of the compressed file chunk
-  off_t offset_;               //!< byte offset in the uncompressed input file
-  size_t size_;                //!< uncompressed size of the data chunk
+
+// protected:
+  shash_v1::Any content_hash_;  //!< content hash of the compressed file chunk
+  off_t offset_;                //!< byte offset in the uncompressed input file
+  size_t size_;                 //!< uncompressed size of the data chunk
 };
 
 struct FileChunkReflist {

@@ -4,13 +4,16 @@
 
 #define __STDC_FORMAT_MACROS
 
+#include "cvmfs_config.h"
 #include "swissknife_scrub.h"
+
 #include "fs_traversal.h"
 #include "logging.h"
 #include "smalloc.h"
 
-using namespace swissknife;
 using namespace std;  // NOLINT
+
+namespace swissknife {
 
 const size_t      kHashSubtreeLength = 2;
 const std::string kTxnDirectoryName  = "txn";
@@ -31,13 +34,13 @@ CommandScrub::StoredFile::StoredFile(const std::string &path,
 void CommandScrub::StoredFile::Update(const unsigned char *data,
                                       const size_t nbytes)
 {
-  assert (! hash_done_);
+  assert(!hash_done_);
   shash::Update(data, nbytes, hash_context_);
 }
 
 
 void CommandScrub::StoredFile::Finalize() {
-  assert (! hash_done_);
+  assert(!hash_done_);
   shash::Final(hash_context_, &content_hash_);
   free(hash_context_.buffer);
   hash_context_.buffer = NULL;
@@ -63,12 +66,12 @@ tbb::task* CommandScrub::StoredFileScrubbingTask::execute() {
 swissknife::ParameterList CommandScrub::GetParams() {
   swissknife::ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory"));
-  r.push_back(Parameter::Switch   ('m', "machine readable output"));
+  r.push_back(Parameter::Switch('m', "machine readable output"));
   return r;
 }
 
 
- const char* CommandScrub::Alerts::ToString(const CommandScrub::Alerts::Type t) {
+const char* CommandScrub::Alerts::ToString(const CommandScrub::Alerts::Type t) {
   switch (t) {
     case Alerts::kUnexpectedFile:
       return "unexpected regular file";
@@ -93,7 +96,7 @@ swissknife::ParameterList CommandScrub::GetParams() {
 void CommandScrub::FileCallback(const std::string &relative_path,
                                 const std::string &file_name)
 {
-  assert (! file_name.empty());
+  assert(!file_name.empty());
 
   if (relative_path.empty()) {
     PrintAlert(Alerts::kUnexpectedFile, repo_path_ + "/" + file_name);
@@ -112,12 +115,12 @@ void CommandScrub::FileCallback(const std::string &relative_path,
     return;
   }
 
-  if (! shash::HexPtr(hash_string).IsValid()) {
+  if (!shash::HexPtr(hash_string).IsValid()) {
     PrintAlert(Alerts::kMalformedHash, full_path, hash_string);
     return;
   }
 
-  assert (reader_ != NULL);
+  assert(reader_ != NULL);
   reader_->ScheduleRead(new StoredFile(full_path, hash_string));
 }
 
@@ -133,9 +136,9 @@ void CommandScrub::DirCallback(const std::string &relative_path,
   }
 
   // Check CAS hash subdirectory name length
-  if (! dir_name.empty()                      &&
-        dir_name.size() != kHashSubtreeLength &&
-        dir_name        != kTxnDirectoryName)
+  if (!dir_name.empty()                      &&
+       dir_name.size() != kHashSubtreeLength &&
+       dir_name        != kTxnDirectoryName)
   {
     PrintAlert(Alerts::kMalformedCasSubdir, full_path);
   }
@@ -170,11 +173,11 @@ std::string CommandScrub::CheckPathAndExtractHash(
     has_object_modifier = true;
   }
   if (has_object_modifier   &&
-      last_character != 'H' && // history
-      last_character != 'C' && // catalog
-      last_character != 'P' && // partial
-      last_character != 'X' && // certificate
-      last_character != 'L')   // micro catalogs (currently only reserved)
+      last_character != 'H' &&  // history
+      last_character != 'C' &&  // catalog
+      last_character != 'P' &&  // partial
+      last_character != 'X' &&  // certificate
+      last_character != 'L')    // micro catalogs (currently only reserved)
   {
     PrintAlert(Alerts::kUnexpectedModifier, full_path);
     return "";
@@ -194,7 +197,7 @@ int CommandScrub::Main(const swissknife::ArgumentList &args) {
 
   // initialize alert printer mutex
   const bool mutex_init = (pthread_mutex_init(&alerts_mutex_, NULL) == 0);
-  assert (mutex_init);
+  assert(mutex_init);
 
   // initialize asynchronous reader
   const size_t       max_buffer_size     = 512 * 1024;
@@ -259,3 +262,5 @@ CommandScrub::~CommandScrub() {
 
   pthread_mutex_destroy(&alerts_mutex_);
 }
+
+}  // namespace swissknife

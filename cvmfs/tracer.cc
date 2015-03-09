@@ -25,15 +25,14 @@
 #include <pthread.h>
 #include <sys/time.h>
 
-#include <cstdlib>
-#include <cstdio>
 #include <cassert>
 #include <cerrno>
-
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 
-#include "util.h"
 #include "atomic.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -41,13 +40,17 @@ namespace tracer {
 
 /**
  * Contents of a trace line.
- * \todo memory alignment
+ * TODO(jblomer): memory alignment
  */
 struct BufferEntry {
-  timeval time_stamp;  /**< This is currently with milliseconds precision
-                            (using gettimeofday). */
-  int code;  /*< arbitrary code, negative codes are reserved for internal
-                 use. */
+  /**
+   * This is currently with milliseconds precision (using gettimeofday).
+   */
+  timeval time_stamp;
+  /**
+   * arbitrary code, negative codes are reserved for internal use.
+   */
+  int code;
   PathString path;  /**< The path that is subject to the trace */
   std::string msg;
 };
@@ -70,18 +73,25 @@ bool active_ = false;
 std::string filename_;
 int buffer_size_;
 int flush_threshold_;
-atomic_int32 seq_no_;  /**< Starts with 0 and gets incremented by each call to
-                        trace. Contains the first non-used sequence number. */
-atomic_int32 flushed_;  /**< Starts with 0 and gets incremented by the flush
-                         thread.  Points to the first non-flushed message.
-                         flushed <= seq_no holds. */
+/**
+ * Starts with 0 and gets incremented by each call to trace.  Contains the first
+ * non-used sequence number.
+ */
+atomic_int32 seq_no_;
+/**
+ * Starts with 0 and gets incremented by the flush thread.  Points to the first
+ * non-flushed message. flushed <= seq_no holds.
+ */
+atomic_int32 flushed_;
 atomic_int32 terminate_flush_thread_;
 atomic_int32 flush_immediately_;
 BufferEntry *ring_buffer_;
-atomic_int32 *commit_buffer_;  /**< Has the same size as the ring buffer.  If a
-                                message is actually copied to the ring buffer
-                                memory, the respective flag is set to 1.
-                                Flags are reset to 0 by the flush thread. */
+/**
+ * Has the same size as the ring buffer.  If a message is actually copied to the
+ * ring buffer memory, the respective flag is set to 1.  Flags are reset to 0 by
+ * the flush thread.
+ */
+atomic_int32 *commit_buffer_;
 pthread_t thread_flush_;
 pthread_cond_t sig_flush_;
 pthread_cond_t sig_continue_trace_;
@@ -146,8 +156,9 @@ static void *MainFlush(void *data) {
   do {
     while ((atomic_read32(start_data->terminate) == 0) &&
            (atomic_read32(start_data->flush_immediately) == 0) &&
-           (atomic_read32(start_data->seq_no) - atomic_read32(start_data->flushed)
-             <= start_data->threshold))
+           (atomic_read32(start_data->seq_no) -
+              atomic_read32(start_data->flushed)
+              <= start_data->threshold))
     {
       GetTimespecRel(2000, &timeout);
       retval = pthread_cond_timedwait(start_data->sig_flush,

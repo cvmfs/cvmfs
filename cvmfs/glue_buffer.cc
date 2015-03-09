@@ -7,27 +7,16 @@
 #include "cvmfs_config.h"
 #include "glue_buffer.h"
 
-#include <inttypes.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <limits.h>
-#include <errno.h>
-#ifdef __APPLE__
-#include <sys/types.h>
-#include <sys/sysctl.h>
-#include <libproc.h>
-#endif
-
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <cassert>
 
-#include <vector>
 #include <string>
+#include <vector>
 
+#include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
-#include "logging.h"
 #include "util.h"
 
 using namespace std;  // NOLINT

@@ -2,6 +2,7 @@
  * This file is part of the CernVM file system.
  */
 
+#include "cvmfs_config.h"
 #include "catalog_mgr_ro.h"
 
 #include "compression.h"
@@ -54,12 +55,12 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
 }
 
 
-Catalog* SimpleCatalogManager::CreateCatalog(const PathString  &mountpoint,
-                                             const shash::Any  &catalog_hash,
-                                             Catalog           *parent_catalog) {
+Catalog* SimpleCatalogManager::CreateCatalog(
+  const PathString  &mountpoint,
+  const shash::Any  &catalog_hash,
+  Catalog           *parent_catalog
+) {
   return new Catalog(mountpoint, catalog_hash, parent_catalog);
 }
 
-
-
-} // namespace catalog
+}  // namespace catalog

@@ -1,25 +1,27 @@
-#include "testutil.h"
-
-#include <fstream>
-#include <sstream>
-#include <algorithm>
+/**
+ * This file is part of the CernVM File System.
+ */
 
 #include <gtest/gtest.h>
-
-#include "../../cvmfs/manifest.h"
-
 #ifdef __APPLE__
   #include <sys/sysctl.h>
 #endif
 
+#include <algorithm>
+#include <fstream>  // TODO(jblomer): remove me
+#include <sstream>  // TODO(jblomer): remove me
 
-void SkipWhitespace(std::istringstream &iss) {
-  while (iss.good()) {
-    const char next = iss.peek();
+#include "../../cvmfs/manifest.h"
+#include "testutil.h"
+
+
+static void SkipWhitespace(std::istringstream *iss) {
+  while (iss->good()) {
+    const char next = iss->peek();
     if (next != ' ' && next != '\t') {
       break;
     }
-    iss.get();
+    iss->get();
   }
 }
 
@@ -53,7 +55,7 @@ pid_t GetParentPid(const pid_t pid) {
     if (line.compare(0, ppid_label.size(), ppid_label) == 0) {
       const std::string s_ppid = line.substr(ppid_label.size());
       std::istringstream iss_ppid(s_ppid);
-      SkipWhitespace(iss_ppid);
+      SkipWhitespace(&iss_ppid);
       int i_ppid = 0; iss_ppid >> i_ppid;
       if (i_ppid > 0) {
         parent_pid = static_cast<pid_t>(i_ppid);
@@ -64,6 +66,63 @@ pid_t GetParentPid(const pid_t pid) {
 #endif
 
   return parent_pid;
+}
+
+/**
+ * Traverses the $PATH environment variable to find the absolute path of a given
+ * program name. Pretty much what `which` in bash would do.
+ *
+ * Inspired by a solution to this bulletin board question:
+ *  http://www.linuxquestions.org/questions/programming-9/g
+ *         et-full-path-of-a-command-in-c-117965/#post611028
+ *
+ * @param exe_name  the name of the program to search the $PATH for
+ * @return          absolute path to the program or empty string if not found
+ */
+std::string GetExecutablePath(const std::string &exe_name) {
+  std::string result;
+
+  if (exe_name.empty() || exe_name.find('/') != std::string::npos) {
+    return result;
+  }
+
+  const char *searchpath = getenv("PATH");
+  if (NULL == searchpath) {
+    return result;
+  }
+
+  const std::vector<std::string> paths = SplitString(searchpath, ':');
+        std::vector<std::string>::const_iterator i    = paths.begin();
+  const std::vector<std::string>::const_iterator iend = paths.end();
+  for (; i != iend; ++i) {
+    const std::string candidate_path = *i + "/" + exe_name;
+    char real_path[PATH_MAX];
+
+    const char *rpret = realpath(candidate_path.c_str(), real_path);
+    if (NULL == rpret) {
+      continue;
+    }
+
+    platform_stat64 statinfo;
+    const int res = platform_stat(real_path, &statinfo);
+
+    if (res < 0) {
+      continue;
+    }
+
+    if (!S_ISREG(statinfo.st_mode)) {
+      break;
+    }
+
+    if (statinfo.st_mode & S_IXUSR ||
+        statinfo.st_mode & S_IXGRP ||
+        statinfo.st_mode & S_IXOTH) {
+      result = real_path;
+      break;
+    }
+  }
+
+  return result;
 }
 
 time_t t(const int day, const int month, const int year) {
@@ -78,7 +137,7 @@ time_t t(const int day, const int month, const int year) {
   time_descriptor.tm_isdst = 0;
 
   const time_t result = mktime(&time_descriptor);
-  assert (result >= 0);
+  assert(result >= 0);
   return result;
 }
 
@@ -116,20 +175,19 @@ DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
   return dirent;
 }
 
-} /* namespace catalog */
+}  // namespace catalog
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 unsigned int MockCatalog::instances = 0;
 
-const std::string MockCatalog::rhs       = "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
-const shash::Any  MockCatalog::root_hash = shash::Any(shash::kSha1,
-                                                      shash::HexPtr(MockCatalog::rhs),
-                                                      shash::kSuffixCatalog);
+const std::string MockCatalog::rhs =
+  "f9d87ae2cc46be52b324335ff05fae4c1a7c4dd4";
+const shash::Any MockCatalog::root_hash =
+  shash::Any(shash::kSha1, shash::HexPtr(MockCatalog::rhs),
+             shash::kSuffixCatalog);
 
 void MockCatalog::ResetGlobalState() {
   MockCatalog::instances = 0;
@@ -146,7 +204,7 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
     return NULL;
   }
 
-  assert (catalog->IsRoot() || is_not_root);
+  assert(catalog->IsRoot() || is_not_root);
   MockCatalog *new_catalog = catalog->Clone();
   new_catalog->set_parent(parent);
   return new_catalog;
@@ -200,9 +258,7 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
@@ -218,22 +274,21 @@ manifest::Manifest* MockObjectFetcher::FetchManifest() {
 bool MockObjectFetcher::Fetch(const shash::Any    &object_hash,
                               const shash::Suffix  hash_suffix,
                               std::string         *file_path) {
-  assert (file_path != NULL);
+  assert(file_path != NULL);
   *file_path = object_hash.ToString();
   return true;
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
-unsigned int      MockHistory::instances = 0;
-const std::string MockHistory::rhs       = "b46091c745a1ffef707dd7eabec852fb8679cf28";
-const shash::Any  MockHistory::root_hash = shash::Any(shash::kSha1,
-                                                      shash::HexPtr(MockHistory::rhs),
-                                                      shash::kSuffixHistory);
+unsigned int MockHistory::instances = 0;
+const std::string MockHistory::rhs =
+  "b46091c745a1ffef707dd7eabec852fb8679cf28";
+const shash::Any  MockHistory::root_hash =
+  shash::Any(shash::kSha1, shash::HexPtr(MockHistory::rhs),
+             shash::kSuffixHistory);
 
 void MockHistory::ResetGlobalState() {
   MockHistory::instances = 0;
@@ -300,7 +355,7 @@ bool MockHistory::Insert(const Tag &tag) {
 
 bool MockHistory::Remove(const std::string &name) {
   Tag tag;
-  if (! GetByName(name, &tag)) {
+  if (!GetByName(name, &tag)) {
     return true;
   }
 
@@ -324,7 +379,7 @@ bool MockHistory::GetByName(const std::string &name, Tag *tag) const {
 bool MockHistory::GetByDate(const time_t timestamp, Tag *tag) const {
   typedef std::vector<Tag> Tags;
   Tags tags;
-  if (! List(&tags)) {
+  if (!List(&tags)) {
     return false;
   }
 
@@ -371,7 +426,7 @@ bool MockHistory::EmptyRecycleBin() {
 
 bool MockHistory::Rollback(const Tag &updated_target_tag) {
   std::vector<Tag> affected_tags;
-  if (! ListTagsAffectedByRollback(updated_target_tag.name, &affected_tags)) {
+  if (!ListTagsAffectedByRollback(updated_target_tag.name, &affected_tags)) {
     return false;
   }
 
@@ -384,13 +439,13 @@ bool MockHistory::Rollback(const Tag &updated_target_tag) {
 bool MockHistory:: ListTagsAffectedByRollback(const std::string  &tag_name,
                                               std::vector<Tag>   *tags) const {
   History::Tag target_tag;
-  if (! GetByName(tag_name, &target_tag)) {
+  if (!GetByName(tag_name, &target_tag)) {
     return false;
   }
 
   GetTags(tags);
 
-  // TODO: C++11 use std::copy_if (that was forgotten to be put into C++98 -.-)
+  // TODO(rmeusel): C++11 use std::copy_if
   RollbackPredicate pred(target_tag, true /* inverse */);
   std::vector<Tag>::iterator last = std::remove_copy_if(tags->begin(),
                                                         tags->end(),

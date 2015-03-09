@@ -7,17 +7,16 @@
 
 #include <stdint.h>
 
-#include <ctime>
 #include <cstdio>
+#include <ctime>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "gtest/gtest_prod.h"
-
 #include "atomic.h"
 #include "duplex_cares.h"
+#include "gtest/gtest_prod.h"
 #include "util.h"
 
 namespace dns {
@@ -98,8 +97,12 @@ class Host {
   int64_t id() const { return id_; }
   bool HasIpv4() const { return !ipv4_addresses_.empty(); }
   bool HasIpv6() const { return !ipv6_addresses_.empty(); }
-  const std::set<std::string> &ipv4_addresses() const { return ipv4_addresses_; }
-  const std::set<std::string> &ipv6_addresses() const { return ipv6_addresses_; }
+  const std::set<std::string> &ipv4_addresses() const {
+    return ipv4_addresses_;
+  }
+  const std::set<std::string> &ipv6_addresses() const {
+    return ipv6_addresses_;
+  }
   const std::string &name() const { return name_; }
   Failures status() const { return status_; }
 
@@ -290,13 +293,14 @@ class HostfileResolver : public Resolver {
   virtual ~HostfileResolver();
 
   virtual bool SetResolvers(const std::vector<std::string> &resolvers) {
-    return true; };
+    return true;
+  }
   virtual bool SetSearchDomains(const std::vector<std::string> &domains);
-  virtual void SetSystemResolvers() { };
+  virtual void SetSystemResolvers() { }
   virtual void SetSystemSearchDomains();
 
  protected:
-  HostfileResolver(const bool ipv4_only);
+  explicit HostfileResolver(const bool ipv4_only);
   virtual void DoResolve(const std::vector<std::string> &names,
                          const std::vector<bool> &skip,
                          std::vector<std::vector<std::string> > *ipv4_addresses,
@@ -333,6 +337,7 @@ class HostfileResolver : public Resolver {
  */
 class NormalResolver : public Resolver {
   FRIEND_TEST(T_Dns, NormalResolverConstruct);
+
  public:
   static NormalResolver *Create(const bool ipv4_only,
                                 const unsigned retries,

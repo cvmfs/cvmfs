@@ -236,7 +236,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       tcgetattr(fileno(stdin), &defrsett);
       newrsett = defrsett;
       newrsett.c_lflag &= ~ECHO;
-      if(tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
+      if (tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
         LogCvmfs(kLogCvmfs, kLogStderr, "terminal failure");
         return 2;
       }

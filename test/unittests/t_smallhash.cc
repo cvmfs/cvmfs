@@ -1,13 +1,17 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
+#include <inttypes.h>
 #include <pthread.h>
 
 #include <limits>
 
-#include "../../cvmfs/smallhash.h"
-#include "../../cvmfs/murmur.h"
-
 #include "../../cvmfs/hash.h"
+#include "../../cvmfs/murmur.h"
+#include "../../cvmfs/smallhash.h"
 
 static uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);
@@ -15,7 +19,7 @@ static uint32_t hasher_int(const int &key) {
 
 static uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *((uint32_t *)key.digest + 1);
+  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 class T_Smallhash : public ::testing::Test {
@@ -29,7 +33,7 @@ class T_Smallhash : public ::testing::Test {
     unsigned num_hashmaps = kNumHashmaps;
     EXPECT_EQ(num_hashmaps, multihash_.num_hashmaps());
 
-    srand (time(NULL));
+    srand(time(NULL));
   }
 
   uint32_t GetMultiSize() {
@@ -42,7 +46,7 @@ class T_Smallhash : public ::testing::Test {
   }
 
   static void *tf_insert(void *data) {
-    int ID = (long)data;
+    int ID = reinterpret_cast<uint64_t>(data);
 
     unsigned chunk = kNumElements/kNumThreads;
     for (unsigned i = chunk*ID; i < chunk*ID+chunk; ++i) {
@@ -52,7 +56,7 @@ class T_Smallhash : public ::testing::Test {
   }
 
   static void *tf_erase(void *data) {
-    int ID = (long)data;
+    int ID = reinterpret_cast<uint64_t>(data);
 
     unsigned chunk = kNumElements/kNumThreads;
     for (unsigned i = chunk*ID; i < chunk*ID+chunk; ++i) {
@@ -94,7 +98,7 @@ TEST_F(T_Smallhash, InsertMd5) {
 }
 
 
-TEST_F(T_Smallhash, InsertAndCopyMd5) {
+TEST_F(T_Smallhash, InsertAndCopyMd5Slow) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
     shash::Md5 random_hash;
@@ -163,7 +167,7 @@ TEST_F(T_Smallhash, Lookup) {
 }
 
 
-TEST_F(T_Smallhash, MultihashCycle) {
+TEST_F(T_Smallhash, MultihashCycleSlow) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
     multihash_.Insert(i, i);

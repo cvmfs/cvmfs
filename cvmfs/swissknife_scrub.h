@@ -7,8 +7,8 @@
 
 #include "swissknife.h"
 
-#include <string>
 #include <cassert>
+#include <string>
 
 #include "file_processing/async_reader.h"
 #include "file_processing/file.h"
@@ -27,7 +27,7 @@ class CommandScrub : public Command {
       kMalformedHash,
       kMalformedCasSubdir,
       kContentHashMismatch,
-      kNumberOfErrorTypes // This should _always_ stay the last entry!
+      kNumberOfErrorTypes  // This should _always_ stay the last entry!
     };
 
     static const char* ToString(const Type t);
@@ -74,14 +74,14 @@ class CommandScrub : public Command {
  public:
   CommandScrub() : machine_readable_output_(false),
                    reader_(NULL),
-                   alerts_(0) {}
+                   alerts_(0) { }
   ~CommandScrub();
   std::string GetName() { return "scrub"; }
   std::string GetDescription() {
     return "CernVM File System repository file storage checker. Finds silent "
            "disk corruptions by recomputing all file content checksums in the "
            "backend file storage.";
-  };
+  }
   ParameterList GetParams();
   int Main(const ArgumentList &args);
 
@@ -120,6 +120,6 @@ class CommandScrub : public Command {
   mutable pthread_mutex_t       alerts_mutex_;
 };
 
-}
+}  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_SCRUB_H_

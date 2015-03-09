@@ -9,3 +9,9 @@ python/dist/*
 python/python_cvmfsutils.egg-info/*
 python/MANIFEST
 
+# Eclipse-related files
+.project
+.cproject
+.metadata
+.settings
+RemoteSystemsTempFiles/

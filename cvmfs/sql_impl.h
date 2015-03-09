@@ -2,15 +2,19 @@
  * This file is part of the CernVM file system.
  */
 
-#include <fcntl.h>
-#include <cerrno>
-#include <cassert>
+#ifndef CVMFS_SQL_IMPL_H_
+#define CVMFS_SQL_IMPL_H_
 
-#include "platform.h"
+#include <fcntl.h>
+
+#include <cassert>
+#include <cerrno>
+#include <string>
+
 #include "logging.h"
+#include "platform.h"
 
 namespace sqlite {
-
 
 template <class DerivedT>
 Database<DerivedT>::Database(const std::string  &filename,
@@ -25,7 +29,7 @@ template <class DerivedT>
 DerivedT* Database<DerivedT>::Create(const std::string &filename) {
   UniquePtr<DerivedT> database(new DerivedT(filename, kOpenReadWrite));
 
-  if (! database.IsValid()) {
+  if (!database.IsValid()) {
     LogCvmfs(kLogSql, kLogDebug, "Failed to create new database object");
     return NULL;
   }
@@ -35,27 +39,27 @@ DerivedT* Database<DerivedT>::Create(const std::string &filename) {
 
   const int open_flags = SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_READWRITE |
                          SQLITE_OPEN_CREATE;
-  if (! database->OpenDatabase(open_flags)) {
+  if (!database->OpenDatabase(open_flags)) {
     LogCvmfs(kLogSql, kLogDebug, "Failed to create new database file");
     return NULL;
   }
 
-  if (! database->CreatePropertiesTable()) {
+  if (!database->CreatePropertiesTable()) {
     database->PrintSqlError("Failed to create common properties table");
     return NULL;
   }
 
-  if (! database->CreateEmptyDatabase()) {
+  if (!database->CreateEmptyDatabase()) {
     database->PrintSqlError("Failed to create empty database");
     return NULL;
   }
 
-  if (! database->PrepareCommonQueries()) {
+  if (!database->PrepareCommonQueries()) {
     database->PrintSqlError("Failed to initialize properties queries");
     return NULL;
   }
 
-  if (! database->StoreSchemaRevision()) {
+  if (!database->StoreSchemaRevision()) {
     database->PrintSqlError("Failed to store initial schema revision");
     return NULL;
   }
@@ -69,13 +73,14 @@ DerivedT* Database<DerivedT>::Open(const std::string  &filename,
                                    const OpenMode      open_mode) {
   UniquePtr<DerivedT> database(new DerivedT(filename, open_mode));
 
-  if (! database.IsValid()) {
-    LogCvmfs(kLogSql, kLogDebug, "Failed to open database file '%s' - errno: %d",
+  if (!database.IsValid()) {
+    LogCvmfs(kLogSql, kLogDebug,
+             "Failed to open database file '%s' - errno: %d",
              filename.c_str(), errno);
     return NULL;
   }
 
-  if (! database->Initialize()) {
+  if (!database->Initialize()) {
     return NULL;
   }
 
@@ -93,7 +98,7 @@ bool Database<DerivedT>::Initialize() {
     Configure()         &&
     FileReadAhead()     &&
     PrepareCommonQueries();
-  if (! successful) {
+  if (!successful) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open database file '%s'",
                                  filename().c_str());
     return false;
@@ -104,14 +109,14 @@ bool Database<DerivedT>::Initialize() {
                                "and revision %u",
                                schema_version_, schema_revision_);
 
-  if (! static_cast<DerivedT*>(this)->CheckSchemaCompatibility()) {
+  if (!static_cast<DerivedT*>(this)->CheckSchemaCompatibility()) {
     LogCvmfs(kLogSql, kLogDebug, "schema version %f not supported (%s)",
              schema_version_, filename().c_str());
     return false;
   }
 
   if (read_write_ &&
-      ! static_cast<DerivedT*>(this)->LiveSchemaUpgradeIfNecessary()) {
+      !static_cast<DerivedT*>(this)->LiveSchemaUpgradeIfNecessary()) {
     LogCvmfs(kLogSql, kLogDebug, "failed tp upgrade schema revision");
     return false;
   }
@@ -133,7 +138,7 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
   }
 
   const int retval = sqlite3_extended_result_codes(sqlite_db(), 1);
-  assert (SQLITE_OK == retval);
+  assert(SQLITE_OK == retval);
 
   return true;
 }
@@ -146,9 +151,10 @@ Database<DerivedT>::DatabaseRaiiWrapper::~DatabaseRaiiWrapper() {
              filename().c_str());
     const int result = sqlite3_close(sqlite_db);
     if (result != SQLITE_OK) {
-      LogCvmfs(kLogSql, kLogDebug, "failed to close SQLite database '%s' "
-                                   "(%d - %s)",
-               filename().c_str(), result, delegate_->GetLastErrorMsg().c_str());
+      LogCvmfs(kLogSql, kLogDebug,
+               "failed to close SQLite database '%s' (%d - %s)",
+               filename().c_str(), result,
+               delegate_->GetLastErrorMsg().c_str());
     }
     sqlite_db = NULL;
   }
@@ -170,7 +176,7 @@ bool Database<DerivedT>::Configure() {
 template <class DerivedT>
 bool Database<DerivedT>::FileReadAhead() {
   // Read-ahead into file system buffers
-  // TODO: mmap, re-readahead
+  // TODO(jblomer): mmap, re-readahead
   int fd_readahead = open(filename().c_str(), O_RDONLY);
   if (fd_readahead < 0) {
     LogCvmfs(kLogSql, kLogDebug, "failed to open %s for read-ahead (%d)",
@@ -250,10 +256,10 @@ bool Database<DerivedT>::CreatePropertiesTable() {
 
 template <class DerivedT>
 bool Database<DerivedT>::HasProperty(const std::string &key) const {
-  assert (has_property_);
+  assert(has_property_);
   const bool retval = has_property_->BindText(1, key) &&
                       has_property_->FetchRow();
-  assert (retval);
+  assert(retval);
   const bool result = has_property_->RetrieveInt64(0) > 0;
   has_property_->Reset();
   return result;
@@ -262,10 +268,10 @@ bool Database<DerivedT>::HasProperty(const std::string &key) const {
 template <class DerivedT>
 template <typename T>
 T Database<DerivedT>::GetProperty(const std::string &key) const {
-  assert (get_property_);
+  assert(get_property_);
   const bool retval = get_property_->BindText(1, key) &&
                       get_property_->FetchRow();
-  assert (retval);
+  assert(retval);
   const T result = get_property_->Retrieve<T>(0);
   get_property_->Reset();
   return result;
@@ -275,7 +281,7 @@ template <class DerivedT>
 template <typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key,
                                      const T            value) {
-  assert (set_property_);
+  assert(set_property_);
   return set_property_->BindText(1, key) &&
          set_property_->Bind(2, value)   &&
          set_property_->Execute()        &&
@@ -310,23 +316,23 @@ void Database<DerivedT>::DropFileOwnership() {
 template <class DerivedT>
 double Database<DerivedT>::GetFreePageRatio() const {
   Sql free_page_count_query(this->sqlite_db(), "PRAGMA freelist_count;");
-  Sql page_count_query     (this->sqlite_db(), "PRAGMA page_count;");
+  Sql page_count_query(this->sqlite_db(), "PRAGMA page_count;");
 
   const bool retval = page_count_query.FetchRow() &&
                       free_page_count_query.FetchRow();
-  assert (retval);
+  assert(retval);
 
   int64_t pages      = page_count_query.RetrieveInt64(0);
   int64_t free_pages = free_page_count_query.RetrieveInt64(0);
-  assert (pages > 0);
+  assert(pages > 0);
 
-  return ((double)free_pages) / ((double)pages);
+  return (static_cast<double>(free_pages) / static_cast<double>(pages));
 }
 
 
 template <class DerivedT>
 bool Database<DerivedT>::Vacuum() const {
-  assert (read_write_);
+  assert(read_write_);
   return static_cast<const DerivedT*>(this)->CompactDatabase() &&
          Sql(this->sqlite_db(), "VACUUM;").Execute();
 }
@@ -412,4 +418,6 @@ inline double Sql::Retrieve(const int index) {
   return this->RetrieveDouble(index);
 }
 
-}
+}  // namespace sqlite
+
+#endif  // CVMFS_SQL_IMPL_H_

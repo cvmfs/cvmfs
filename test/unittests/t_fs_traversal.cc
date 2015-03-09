@@ -1,15 +1,18 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
+#include <errno.h>
+#include <ftw.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <ftw.h>
-#include <errno.h>
 
 #include <string>
-#include <sstream>
 
 #include "../../cvmfs/fs_traversal.h"
 
@@ -49,28 +52,28 @@ class T_FsTraversal : public ::testing::Test {
 
       switch (type_to_check) {
         case Directory:
-          EXPECT_TRUE (enter_dir)     << path;
-          EXPECT_TRUE (leave_dir)     << path;
-          EXPECT_TRUE (dir_prefix)    << path;
-          EXPECT_TRUE (dir_postfix)   << path;
+          EXPECT_TRUE(enter_dir)     << path;
+          EXPECT_TRUE(leave_dir)     << path;
+          EXPECT_TRUE(dir_prefix)    << path;
+          EXPECT_TRUE(dir_postfix)   << path;
           break;
         case RootDirectory:
-          EXPECT_TRUE (enter_dir)     << path;
-          EXPECT_TRUE (leave_dir)     << path;
+          EXPECT_TRUE(enter_dir)     << path;
+          EXPECT_TRUE(leave_dir)     << path;
           EXPECT_FALSE(dir_prefix)    << path;
           EXPECT_FALSE(dir_postfix)   << path;
           break;
         case NonTraversedDirectory:
-          EXPECT_TRUE (dir_prefix)    << path;
-          EXPECT_TRUE (dir_postfix)   << path;
+          EXPECT_TRUE(dir_prefix)    << path;
+          EXPECT_TRUE(dir_postfix)   << path;
           EXPECT_FALSE(enter_dir)     << path;
           EXPECT_FALSE(leave_dir)     << path;
           break;
         case File:
-          EXPECT_TRUE (file_found)    << path;
+          EXPECT_TRUE(file_found)    << path;
           break;
         case Symlink:
-          EXPECT_TRUE (symlink_found) << path;
+          EXPECT_TRUE(symlink_found) << path;
           break;
         case Untouched:
           EXPECT_FALSE(enter_dir)     << path;
@@ -100,14 +103,14 @@ class T_FsTraversal : public ::testing::Test {
   typedef std::map<std::string, Checklist> ChecklistMap;
 
  protected:
-  T_FsTraversal() : tmp_path_("/tmp") {};
+  T_FsTraversal() : tmp_path_("/tmp") {}
 
   virtual void SetUp() {
     // create a testbed directory
     char *tmp_file =
       strdupa((tmp_path_ + "/cvmfs_T_FsTraversal_testbed_XXXXXX").c_str());
     char *testbed_path = mkdtemp(tmp_file);
-    ASSERT_NE (static_cast<char*>(NULL), testbed_path);
+    ASSERT_NE(static_cast<char*>(NULL), testbed_path);
     testbed_path_ = std::string(testbed_path);
 
     // save the root entry (the testbed) into the reference list
@@ -123,7 +126,7 @@ class T_FsTraversal : public ::testing::Test {
                       &T_FsTraversal::delete_entry,
                       50,
                       FTW_DEPTH | FTW_PHYS);
-    EXPECT_EQ (0, retval) << "Failed to delete testbed directory";
+    EXPECT_EQ(0, retval) << "Failed to delete testbed directory";
   }
 
   static int delete_entry(const char         *path,
@@ -154,14 +157,16 @@ class T_FsTraversal : public ::testing::Test {
 
 
   template<class DelegateT>
-  void RegisterDelegate(FileSystemTraversal<DelegateT>  &traverse,
-                        DelegateT                       &delegate) {
-    traverse.fn_enter_dir       = &DelegateT::EnterDir;
-    traverse.fn_leave_dir       = &DelegateT::LeaveDir;
-    traverse.fn_new_file        = &DelegateT::File;
-    traverse.fn_new_symlink     = &DelegateT::Symlink;
-    traverse.fn_new_dir_prefix  = &DelegateT::DirPrefix;
-    traverse.fn_new_dir_postfix = &DelegateT::DirPostfix;
+  void RegisterDelegate(
+    const DelegateT &delegate,
+    FileSystemTraversal<DelegateT> *traverse
+  ) {
+    traverse->fn_enter_dir       = &DelegateT::EnterDir;
+    traverse->fn_leave_dir       = &DelegateT::LeaveDir;
+    traverse->fn_new_file        = &DelegateT::File;
+    traverse->fn_new_symlink     = &DelegateT::Symlink;
+    traverse->fn_new_dir_prefix  = &DelegateT::DirPrefix;
+    traverse->fn_new_dir_postfix = &DelegateT::DirPostfix;
   }
 
 
@@ -169,16 +174,16 @@ class T_FsTraversal : public ::testing::Test {
   void MakeDirectory(const std::string &relative_path) {
     const std::string path = testbed_path_ + "/" + relative_path;
     const int retval = mkdir(path.c_str(), 0755);
-    ASSERT_EQ (0, retval) << path << "errno: " << errno;
+    ASSERT_EQ(0, retval) << path << "errno: " << errno;
     reference_[relative_path] = Checklist(relative_path, Checklist::Directory);
   }
 
   void MakeFile(const std::string &relative_path) {
     const std::string path = testbed_path_ + "/" + relative_path;
     FILE *file = fopen(path.c_str(), "w+");
-    ASSERT_NE (static_cast<FILE*>(NULL), file);
+    ASSERT_NE(static_cast<FILE*>(NULL), file);
     const int retval = fclose(file);
-    ASSERT_EQ (0, retval);
+    ASSERT_EQ(0, retval);
     reference_[relative_path] = Checklist(relative_path, Checklist::File);
   }
 
@@ -186,74 +191,74 @@ class T_FsTraversal : public ::testing::Test {
                    const std::string &link_destination) {
     const std::string path = testbed_path_ + "/" + relative_path;
     const int retval = symlink(link_destination.c_str(), path.c_str());
-    ASSERT_EQ (0, retval) << "errno: " << errno;
+    ASSERT_EQ(0, retval) << "errno: " << errno;
     reference_[relative_path] = Checklist(relative_path, Checklist::Symlink);
   }
 
   void GenerateReferenceDirectoryStructure() {
-    MakeDirectory( "a"                     );
-    MakeDirectory( "a/a"                   );
-    MakeFile     ( "a/a/foo"               );
-    MakeFile     ( "a/a/bar"               );
-    MakeDirectory( "a/b"                   );
-    MakeFile     ( "a/b/foo"               );
-    MakeFile     ( "a/b/bar"               );
-    MakeDirectory( "a/c"                   );
-    MakeDirectory( "a/c/a"                 );
-    MakeFile     ( "a/c/a/foo"             );
-    MakeFile     ( "a/c/a/bar"             );
-    MakeFile     ( "a/c/a/baz"             );
-    MakeDirectory( "a/c/b"                 );
-    MakeDirectory( "a/c/c"                 );
-    MakeDirectory( "a/c/d"                 );
-    MakeFile     ( "a/c/foo"               );
-    MakeFile     ( "a/c/bar"               );
-    MakeFile     ( "a/c/baz"               );
-    MakeSymlink  ( "a/c/lnk", "baz"        );
-    MakeDirectory( "a/d"                   );
-    MakeDirectory( "b"                     );
-    MakeDirectory( "b/a"                   );
-    MakeDirectory( "b/b"                   );
-    MakeDirectory( "b/b/a"                 );
-    MakeDirectory( "b/b/a/a"               );
-    MakeDirectory( "b/b/a/b"               );
-    MakeDirectory( "b/b/a/c"               );
-    MakeDirectory( "b/b/a/c/a"             );
-    MakeDirectory( "b/b/a/c/b"             );
-    MakeDirectory( "b/b/a/c/c"             );
-    MakeFile     ( "b/b/a/c/c/foo"         );
-    MakeFile     ( "b/b/a/c/c/bar"         );
-    MakeFile     ( "b/b/a/c/c/baz"         );
-    MakeSymlink  ( "b/b/a/c/c/2b", "../b"  );
-    MakeDirectory( "b/b/a/c/d"             );
-    MakeDirectory( "b/b/a/c/e"             );
-    MakeDirectory( "b/b/a/d"               );
-    MakeDirectory( "b/b/a/d/a"             );
-    MakeDirectory( "b/b/a/d/b"             );
-    MakeDirectory( "b/b/a/d/c"             );
-    MakeDirectory( "b/b/a/d/d"             );
-    MakeDirectory( "b/b/a/d/e"             );
-    MakeDirectory( "b/b/b"                 );
-    MakeDirectory( "b/b/b/e"               );
-    MakeDirectory( "b/b/c"                 );
-    MakeDirectory( "b/c"                   );
-    MakeDirectory( "b/d"                   );
-    MakeDirectory( "b/e"                   );
-    MakeDirectory( "c"                     );
-    MakeDirectory( "c/a"                   );
-    MakeFile     ( "c/a/foo"               );
-    MakeSymlink  ( "c/a/bfoo", "../b/foo"  );
-    MakeDirectory( "c/b"                   );
-    MakeFile     ( "c/b/foo"               );
-    MakeDirectory( "c/c"                   );
-    MakeFile     ( "c/c/foo"               );
-    MakeDirectory( "c/d"                   );
-    MakeFile     ( "c/d/foo"               );
-    MakeDirectory( "c/e"                   );
-    MakeFile     ( "c/e/foo"               );
-    MakeDirectory( "c/f"                   );
-    MakeFile     ( "c/f/foo"               );
-    MakeFile     ( "c/foo"                 );
+    MakeDirectory("a");
+    MakeDirectory("a/a");
+    MakeFile("a/a/foo");
+    MakeFile("a/a/bar");
+    MakeDirectory("a/b");
+    MakeFile("a/b/foo");
+    MakeFile("a/b/bar");
+    MakeDirectory("a/c");
+    MakeDirectory("a/c/a");
+    MakeFile("a/c/a/foo");
+    MakeFile("a/c/a/bar");
+    MakeFile("a/c/a/baz");
+    MakeDirectory("a/c/b");
+    MakeDirectory("a/c/c");
+    MakeDirectory("a/c/d");
+    MakeFile("a/c/foo");
+    MakeFile("a/c/bar");
+    MakeFile("a/c/baz");
+    MakeSymlink("a/c/lnk", "baz");
+    MakeDirectory("a/d");
+    MakeDirectory("b");
+    MakeDirectory("b/a");
+    MakeDirectory("b/b");
+    MakeDirectory("b/b/a");
+    MakeDirectory("b/b/a/a");
+    MakeDirectory("b/b/a/b");
+    MakeDirectory("b/b/a/c");
+    MakeDirectory("b/b/a/c/a");
+    MakeDirectory("b/b/a/c/b");
+    MakeDirectory("b/b/a/c/c");
+    MakeFile("b/b/a/c/c/foo");
+    MakeFile("b/b/a/c/c/bar");
+    MakeFile("b/b/a/c/c/baz");
+    MakeSymlink("b/b/a/c/c/2b", "../b");
+    MakeDirectory("b/b/a/c/d");
+    MakeDirectory("b/b/a/c/e");
+    MakeDirectory("b/b/a/d");
+    MakeDirectory("b/b/a/d/a");
+    MakeDirectory("b/b/a/d/b");
+    MakeDirectory("b/b/a/d/c");
+    MakeDirectory("b/b/a/d/d");
+    MakeDirectory("b/b/a/d/e");
+    MakeDirectory("b/b/b");
+    MakeDirectory("b/b/b/e");
+    MakeDirectory("b/b/c");
+    MakeDirectory("b/c");
+    MakeDirectory("b/d");
+    MakeDirectory("b/e");
+    MakeDirectory("c");
+    MakeDirectory("c/a");
+    MakeFile("c/a/foo");
+    MakeSymlink("c/a/bfoo", "../b/foo");
+    MakeDirectory("c/b");
+    MakeFile("c/b/foo");
+    MakeDirectory("c/c");
+    MakeFile("c/c/foo");
+    MakeDirectory("c/d");
+    MakeFile("c/d/foo");
+    MakeDirectory("c/e");
+    MakeFile("c/e/foo");
+    MakeDirectory("c/f");
+    MakeFile("c/f/foo");
+    MakeFile("c/foo");
   }
 
  protected:
@@ -264,15 +269,13 @@ class T_FsTraversal : public ::testing::Test {
 };
 
 
-#include <iostream>
-
 class BaseTraversalDelegate {
  public:
   typedef T_FsTraversal::Checklist    Checklist;
   typedef T_FsTraversal::ChecklistMap ChecklistMap;
 
  public:
-  BaseTraversalDelegate(ChecklistMap &reference) :
+  explicit BaseTraversalDelegate(const ChecklistMap &reference) :
     reference_(reference) {}
 
   virtual ~BaseTraversalDelegate() { }
@@ -371,9 +374,7 @@ class BaseTraversalDelegate {
   inline const Checklist& __GetChecklist(const std::string &path) const {
     ChecklistMap::const_iterator checklist = reference_.find(path);
     if (reference_.end() == checklist) {
-      std::stringstream ss;
-      ss << "Did not find traversed path '" << path << "'";
-      fail(ss.str());
+      fail("Did not find traversed path '" + path + "'");
     }
     return checklist->second;
   }
@@ -392,7 +393,7 @@ TEST_F(T_FsTraversal, FullTraversal) {
   FileSystemTraversal<BaseTraversalDelegate> traverse(&delegate,
                                                        testbed_path_,
                                                        true);
-  RegisterDelegate(traverse, delegate);
+  RegisterDelegate(delegate, &traverse);
 
   traverse.Recurse(testbed_path_);
   delegate.Check();
@@ -406,7 +407,7 @@ TEST_F(T_FsTraversal, FullTraversal) {
 
 class RootTraversalDelegate : public BaseTraversalDelegate {
  public:
-  RootTraversalDelegate(ChecklistMap &reference) :
+  explicit RootTraversalDelegate(const ChecklistMap &reference) :
     BaseTraversalDelegate(reference) {}
 
   void Check() const {
@@ -431,7 +432,7 @@ TEST_F(T_FsTraversal, RootTraversal) {
   FileSystemTraversal<RootTraversalDelegate> traverse(&delegate,
                                                        testbed_path_,
                                                        false);
-  RegisterDelegate(traverse, delegate);
+  RegisterDelegate(delegate, &traverse);
 
   traverse.Recurse(testbed_path_);
   delegate.Check();
@@ -445,7 +446,7 @@ TEST_F(T_FsTraversal, RootTraversal) {
 
 class IgnoringTraversalDelegate : public BaseTraversalDelegate {
  public:
-  IgnoringTraversalDelegate(ChecklistMap &reference) :
+  explicit IgnoringTraversalDelegate(const ChecklistMap &reference) :
     BaseTraversalDelegate(reference) {}
 
   void Check() const {
@@ -496,7 +497,7 @@ TEST_F(T_FsTraversal, IgnoringTraversal) {
   FileSystemTraversal<IgnoringTraversalDelegate> traverse(&delegate,
                                                            testbed_path_,
                                                            true);
-  RegisterDelegate(traverse, delegate);
+  RegisterDelegate(delegate, &traverse);
   traverse.fn_ignore_file = &IgnoringTraversalDelegate::IgnoreFilePredicate;
 
   traverse.Recurse(testbed_path_);
@@ -511,7 +512,7 @@ TEST_F(T_FsTraversal, IgnoringTraversal) {
 
 class SteeringTraversalDelegate : public BaseTraversalDelegate {
  public:
-  SteeringTraversalDelegate(ChecklistMap &reference) :
+  explicit SteeringTraversalDelegate(const ChecklistMap &reference) :
     BaseTraversalDelegate(reference) {}
 
 
@@ -566,7 +567,7 @@ TEST_F(T_FsTraversal, SteeredTraversal) {
                                                       &delegate,
                                                        testbed_path_,
                                                        true);
-  RegisterDelegate(traverse, delegate);
+  RegisterDelegate(delegate, &traverse);
 
   traverse.Recurse(testbed_path_);
   delegate.Check();

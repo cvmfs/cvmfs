@@ -2,10 +2,11 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UPLOAD_SPOOLER_DEFINITION_
-#define CVMFS_UPLOAD_SPOOLER_DEFINITION_
+#ifndef CVMFS_UPLOAD_SPOOLER_DEFINITION_H_
+#define CVMFS_UPLOAD_SPOOLER_DEFINITION_H_
 
 #include <string>
+
 #include "hash.h"
 
 namespace upload {
@@ -34,19 +35,23 @@ struct SpoolerDefinition {
    * @param definition_string   the spooler definition string to be inter-
    *                            preted by the constructor
    */
-  explicit SpoolerDefinition(const std::string       &definition_string,
-                             const shash::Algorithms  hash_algorithm,
-                             const bool               use_file_chunking   = false,
-                             const size_t             min_file_chunk_size = 0,
-                             const size_t             avg_file_chunk_size = 0,
-                             const size_t             max_file_chunk_size = 0);
+  explicit SpoolerDefinition(
+    const std::string       &definition_string,
+    const shash::Algorithms  hash_algorithm,
+    const bool               use_file_chunking   = false,
+    const size_t             min_file_chunk_size = 0,
+    const size_t             avg_file_chunk_size = 0,
+    const size_t             max_file_chunk_size = 0);
   bool IsValid() const { return valid_; }
 
-  DriverType  driver_type;           //!< the type of the spooler driver
-  std::string temporary_path;        //!< scratch space for the FileProcessor
-  std::string spooler_configuration; //!< a driver specific spooler
-                                     //!<  configuration string
-                                     //!<  (interpreted by the concrete spooler)
+  DriverType  driver_type;            //!< the type of the spooler driver
+  std::string temporary_path;         //!< scratch space for the FileProcessor
+  /**
+   * A driver specific spooler configuration string (interpreted by the concrete
+   * spooler)
+   */
+  std::string spooler_configuration;
+
   shash::Algorithms  hash_algorithm;
   bool               use_file_chunking;
   size_t             min_file_chunk_size;
@@ -59,6 +64,6 @@ struct SpoolerDefinition {
   bool valid_;
 };
 
-}
+}  // namespace upload
 
-#endif /* CVMFS_UPLOAD_SPOOLER_DEFINITION_ */
+#endif  // CVMFS_UPLOAD_SPOOLER_DEFINITION_H_

@@ -2,27 +2,30 @@
  * This file is part of the CernVM file system.
  */
 
+#include "cvmfs_config.h"
 #include "catalog_sql.h"
 
 #include <cstdlib>
 #include <cstring>
-#include <cstdlib>
 
 #include "catalog.h"
+#include "globals.h"
 #include "logging.h"
 #include "util.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
 namespace catalog {
 
-// Changelog
 const float CatalogDatabase::kLatestSchema = 2.5;
-const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X catalogs (r/o)
+const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 // ChangeLog
 //   0 --> 1: add size column to nested catalog table,
 //            add schema_revision property
-const unsigned CatalogDatabase::kLatestSchemaRevision = 1;
+//   1 --> 2: add xattr column to catalog table
+//            add self_xattrs and subtree_xattrs statistics counters
+const unsigned CatalogDatabase::kLatestSchemaRevision = 2;
 
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
@@ -34,24 +37,44 @@ bool CatalogDatabase::CheckSchemaCompatibility() {
 
 
 bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
-  assert (read_write());
+  assert(read_write());
 
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
 
     Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
-    if (! sql_upgrade.Execute()) {
+    if (!sql_upgrade.Execute()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
       return false;
     }
 
     set_schema_revision(1);
-    if (! StoreSchemaRevision()) {
+    if (!StoreSchemaRevision()) {
       LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
       return false;
     }
-  } else {
-    LogCvmfs(kLogCatalog, kLogDebug, "schema revision is up to date.");
+  }
+
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
+
+    Sql sql_upgrade1(*this, "ALTER TABLE catalog ADD xattr BLOB;");
+    Sql sql_upgrade2(*this,
+      "INSERT INTO statistics (counter, value) VALUES ('self_xattr', 0);");
+    Sql sql_upgrade3(*this,
+      "INSERT INTO statistics (counter, value) VALUES ('subtree_xattr', 0);");
+    if (!sql_upgrade1.Execute() || !sql_upgrade2.Execute() ||
+        !sql_upgrade3.Execute())
+    {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade catalogs (1 --> 2)");
+      return false;
+    }
+
+    set_schema_revision(2);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+      return false;
+    }
   }
 
   return true;
@@ -59,7 +82,7 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
 
 
 bool CatalogDatabase::CreateEmptyDatabase() {
-  assert (read_write());
+  assert(read_write());
 
   // generate the catalog table and index structure
   const bool retval =
@@ -68,6 +91,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "(md5path_1 INTEGER, md5path_2 INTEGER, parent_1 INTEGER, parent_2 INTEGER,"
     " hardlinks INTEGER, hash BLOB, size INTEGER, mode INTEGER, mtime INTEGER,"
     " flags INTEGER, name TEXT, symlink TEXT, uid INTEGER, gid INTEGER, "
+    " xattr BLOB, "
     " CONSTRAINT pk_catalog PRIMARY KEY (md5path_1, md5path_2));").Execute()  &&
   Sql(*this,
     "CREATE INDEX idx_catalog_parent "
@@ -86,7 +110,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
     "CREATE TABLE statistics (counter TEXT, value INTEGER, "
     "CONSTRAINT pk_statistics PRIMARY KEY (counter));")           .Execute();
 
-  if (! retval) {
+  if (!retval) {
     PrintSqlError("failed to create catalog database tables.");
   }
 
@@ -94,52 +118,54 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 }
 
 
-bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
-                                          const bool            volatile_content,
-                                          const DirectoryEntry &root_entry) {
-  assert (read_write());
+bool CatalogDatabase::InsertInitialValues(
+  const std::string    &root_path,
+  const bool            volatile_content,
+  const DirectoryEntry &root_entry)
+{
+  assert(read_write());
   bool retval = false;
 
   // Path hashes
   shash::Md5 root_path_hash = shash::Md5(shash::AsciiPtr(root_path));
-  shash::Md5 root_parent_hash =
-                    (root_path == "")
-                      ? shash::Md5()
-                      : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
+  shash::Md5 root_parent_hash = (root_path == "")
+    ? shash::Md5()
+    : shash::Md5(shash::AsciiPtr(GetParentPath(root_path)));
 
-  // start initial filling transaction
+  // Start initial filling transaction
   retval = Sql(*this, "BEGIN;").Execute();
   if (!retval) {
     PrintSqlError("failed to enter initial filling transaction");
     return false;
   }
 
-  // insert initial values to properties
-  if (! this->SetProperty("revision", 0)) {
-    PrintSqlError("failed to insert default initial values into the newly created "
-                  "catalog tables.");
+  // Insert initial values to properties
+  if (!this->SetProperty("revision", 0)) {
+    PrintSqlError(
+      "failed to insert default initial values into the newly created "
+      "catalog tables.");
     return false;
   }
 
   if (volatile_content) {
-    if (! this->SetProperty("volatile", 1)) {
+    if (!this->SetProperty("volatile", 1)) {
       PrintSqlError("failed to insert volatile flag into the newly created "
                     "catalog tables.");
       return false;
     }
   }
 
-  // create initial statistics counters
+  // Create initial statistics counters
   catalog::Counters counters;
 
-  // insert root entry (when given)
+  // Insert root entry (when given)
   if (!root_entry.IsNegative()) {
     SqlDirentInsert sql_insert(*this);
     retval = sql_insert.BindPathHash(root_path_hash)         &&
              sql_insert.BindParentPathHash(root_parent_hash) &&
              sql_insert.BindDirent(root_entry)               &&
              sql_insert.Execute();
-    if (! retval) {
+    if (!retval) {
       PrintSqlError("failed to insert root entry into newly created catalog.");
       return false;
     }
@@ -148,21 +174,22 @@ bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
     counters.self.directories = 1;
   }
 
-  // save initial statistics counters
+  // Save initial statistics counters
   if (!counters.InsertIntoDatabase(*this)) {
     PrintSqlError("failed to insert initial catalog statistics counters.");
     return false;
   }
 
-  // insert root path (when given)
-  if (! root_path.empty()) {
-    if (! this->SetProperty("root_prefix", root_path)) {
-      PrintSqlError("failed to store root prefix in the newly created catalog.");
+  // Insert root path (when given)
+  if (!root_path.empty()) {
+    if (!this->SetProperty("root_prefix", root_path)) {
+      PrintSqlError(
+        "failed to store root prefix in the newly created catalog.");
       return false;
     }
   }
 
-  // commit initial filling transaction
+  // Commit initial filling transaction
   retval = Sql(*this, "COMMIT;").Execute();
   if (!retval) {
     PrintSqlError("failed to commit initial filling transaction");
@@ -175,9 +202,10 @@ bool CatalogDatabase::InsertInitialValues(const std::string    &root_path,
 
 double CatalogDatabase::GetRowIdWasteRatio() const {
   Sql rowid_waste_ratio_query(*this,
-   "SELECT 1.0 - CAST(COUNT(*) AS DOUBLE) / MAX(rowid) AS ratio FROM catalog;");
+    "SELECT 1.0 - CAST(COUNT(*) AS DOUBLE) / MAX(rowid) "
+    "AS ratio FROM catalog;");
   const bool retval = rowid_waste_ratio_query.FetchRow();
-  assert (retval);
+  assert(retval);
 
   return rowid_waste_ratio_query.RetrieveDouble(0);
 }
@@ -203,7 +231,7 @@ double CatalogDatabase::GetRowIdWasteRatio() const {
  * See: http://www.sqlite.org/lang_vacuum.html
  */
 bool CatalogDatabase::CompactDatabase() const {
-  assert (read_write());
+  assert(read_write());
 
   return Sql(*this, "PRAGMA foreign_keys = OFF;").Execute() &&
          BeginTransaction()                                 &&
@@ -247,12 +275,14 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   return database_flags;
 }
 
+
 void SqlDirent::StoreHashAlgorithm(const shash::Algorithms algo,
                                    unsigned *flags) const
 {
   // Md5 unusable for content hashes
   *flags |= (algo - 1) << kFlagPosHash;
 }
+
 
 shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
   unsigned in_flags = ((7 << kFlagPosHash) & flags) >> kFlagPosHash;
@@ -262,16 +292,20 @@ shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
   return static_cast<shash::Algorithms>(in_flags);
 }
 
+
 uint32_t SqlDirent::Hardlinks2Linkcount(const uint64_t hardlinks) const {
   return (hardlinks << 32) >> 32;
 }
+
 
 uint32_t SqlDirent::Hardlinks2HardlinkGroup(const uint64_t hardlinks) const {
   return hardlinks >> 32;
 }
 
+
 uint64_t SqlDirent::MakeHardlinks(const uint32_t hardlink_group,
-                                  const uint32_t linkcount) const {
+                                  const uint32_t linkcount) const
+{
   return (static_cast<uint64_t>(hardlink_group) << 32) | linkcount;
 }
 
@@ -368,7 +402,7 @@ bool SqlDirentWrite::BindDirentFields(const int hash_idx,
     BindInt(flags_idx, CreateDatabaseFlags(entry)) &&
     BindText(name_idx, entry.name_.GetChars(), entry.name_.GetLength()) &&
     BindText(symlink_idx, entry.symlink_.GetChars(), entry.symlink_.GetLength())
-  );
+  );  // NOLINT
 }
 
 
@@ -394,7 +428,7 @@ SqlListContentHashes::SqlListContentHashes(const CatalogDatabase &database) {
       "  WHERE length(catalog.hash) > 0;";
 
   const bool successful_init = Init(database.sqlite_db(), statement);
-  assert (successful_init);
+  assert(successful_init);
 }
 
 
@@ -413,7 +447,10 @@ shash::Any SqlListContentHashes::GetHash() const {
 //------------------------------------------------------------------------------
 
 
-string SqlLookup::GetFieldsToSelect(const float schema_version) const {
+string SqlLookup::GetFieldsToSelect(
+  const float schema_version,
+  const unsigned schema_revision) const
+{
   if (schema_version < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     return "catalog.hash, catalog.inode, catalog.size, catalog.mode, "
         //           0              1             2             3
@@ -423,16 +460,25 @@ string SqlLookup::GetFieldsToSelect(const float schema_version) const {
         //              8                  9                 10
            "catalog.parent_2, catalog.rowid";
         //             11              12
-  } else {
-    return "catalog.hash, catalog.hardlinks, catalog.size, catalog.mode, "
-        //           0                1               2             3
-           "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
-        //            4              5             6               7
-           "catalog.md5path_1, catalog.md5path_2, catalog.parent_1, "
-        //              8                  9                 10
-           "catalog.parent_2, catalog.rowid, catalog.uid, catalog.gid";
-        //             11               12            13           14
   }
+
+  string fields =
+    "catalog.hash, catalog.hardlinks, catalog.size, catalog.mode, "
+    //          0                1               2             3
+    "catalog.mtime, catalog.flags, catalog.name, catalog.symlink, "
+    //           4              5             6               7
+    "catalog.md5path_1, catalog.md5path_2, catalog.parent_1, "
+    //              8                  9                 10
+    "catalog.parent_2, catalog.rowid, catalog.uid, catalog.gid, ";
+    //            11              12           13           14
+
+  // Field 15: has extended attributes?
+  if (schema_revision < 2) {
+    fields += "0";  // Generally no xattrs
+  } else {
+    fields += "catalog.xattr IS NOT NULL";
+  }
+  return fields;
 }
 
 
@@ -455,50 +501,52 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   DirectoryEntry result;
 
   const unsigned database_flags = RetrieveInt(5);
-  //result.generation_ = catalog->GetGeneration();
   result.is_nested_catalog_root_ = (database_flags & kFlagDirNestedRoot);
   result.is_nested_catalog_mountpoint_ =
     (database_flags & kFlagDirNestedMountpoint);
   const char *name = reinterpret_cast<const char *>(RetrieveText(6));
   const char *symlink = reinterpret_cast<const char *>(RetrieveText(7));
 
-  // must be set later by a second catalog lookup
+  // Must be set later by a second catalog lookup
   result.parent_inode_ = DirectoryEntry::kInvalidInode;
 
-  // retrieve the hardlink information from the hardlinks database field
+  // Retrieve the hardlink information from the hardlinks database field
   if (catalog->schema() < 2.1 - CatalogDatabase::kSchemaEpsilon) {
     result.linkcount_       = 1;
     result.hardlink_group_  = 0;
     result.inode_           = catalog->GetMangledInode(RetrieveInt64(12), 0);
+    result.is_chunked_file_ = false;
+    result.has_xattrs_      = false;
+    result.checksum_        = RetrieveHashBlob(0, shash::kSha1);
     result.uid_             = g_uid;
     result.gid_             = g_gid;
-    result.is_chunked_file_ = false;
-    result.checksum_        = RetrieveHashBlob(0, shash::kSha1);
   } else {
     const uint64_t hardlinks = RetrieveInt64(1);
     result.linkcount_        = Hardlinks2Linkcount(hardlinks);
     result.hardlink_group_   = Hardlinks2HardlinkGroup(hardlinks);
     result.inode_            = catalog->GetMangledInode(RetrieveInt64(12),
                                                         result.hardlink_group_);
+    result.is_chunked_file_  = (database_flags & kFlagFileChunk);
+    result.has_xattrs_       = RetrieveInt(15) != 0;
+    result.checksum_         =
+      RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
+
     if (g_claim_ownership) {
       result.uid_             = g_uid;
       result.gid_             = g_gid;
     } else {
       result.uid_              = RetrieveInt64(13);
       result.gid_              = RetrieveInt64(14);
-    }
-    result.is_chunked_file_  = (database_flags & kFlagFileChunk);
-    result.checksum_         =
-      RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
-    if (catalog->uid_map_) {
-      OwnerMap::const_iterator i = catalog->uid_map_->find(result.uid_);
-      if (i != catalog->uid_map_->end())
-        result.uid_ = i->second;
-    }
-    if (catalog->gid_map_) {
-      OwnerMap::const_iterator i = catalog->gid_map_->find(result.gid_);
-      if (i != catalog->gid_map_->end())
-        result.gid_ = i->second;
+      if (catalog->uid_map_) {
+        OwnerMap::const_iterator i = catalog->uid_map_->find(result.uid_);
+        if (i != catalog->uid_map_->end())
+          result.uid_ = i->second;
+      }
+      if (catalog->gid_map_) {
+        OwnerMap::const_iterator i = catalog->gid_map_->find(result.gid_);
+        if (i != catalog->gid_map_->end())
+          result.gid_ = i->second;
+      }
     }
   }
 
@@ -519,8 +567,9 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
 
 SqlListing::SqlListing(const CatalogDatabase &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
-    "WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
+    "SELECT " +
+    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
+    " FROM catalog WHERE (parent_1 = :p_1) AND (parent_2 = :p_2);";
   Init(database.sqlite_db(), statement);
 }
 
@@ -535,8 +584,9 @@ bool SqlListing::BindPathHash(const struct shash::Md5 &hash) {
 
 SqlLookupPathHash::SqlLookupPathHash(const CatalogDatabase &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
-    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+    "SELECT " +
+    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
+    " FROM catalog WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
   Init(database.sqlite_db(), statement);
 }
 
@@ -550,8 +600,9 @@ bool SqlLookupPathHash::BindPathHash(const struct shash::Md5 &hash) {
 
 SqlLookupInode::SqlLookupInode(const CatalogDatabase &database) {
   const string statement =
-    "SELECT " + GetFieldsToSelect(database.schema_version()) + " FROM catalog "
-    "WHERE rowid = :rowid;";
+    "SELECT " +
+    GetFieldsToSelect(database.schema_version(), database.schema_revision()) +
+    " FROM catalog WHERE rowid = :rowid;";
   Init(database.sqlite_db(), statement);
 }
 
@@ -579,15 +630,14 @@ SqlDirentTouch::SqlDirentTouch(const CatalogDatabase &database) {
 
 bool SqlDirentTouch::BindDirentBase(const DirectoryEntryBase &entry) {
   return (
-    BindHashBlob(1, entry.checksum_)                                       &&
-    BindInt64   (2, entry.size_)                                           &&
-    BindInt     (3, entry.mode_)                                           &&
-    BindInt64   (4, entry.mtime_)                                          &&
-    BindText    (5, entry.name_.GetChars(),    entry.name_.GetLength())    &&
-    BindText    (6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
-    BindInt64   (7, entry.uid_)                                            &&
-    BindInt64   (8, entry.gid_)
-  );
+    BindHashBlob(1, entry.checksum_) &&
+    BindInt64(2, entry.size_) &&
+    BindInt(3, entry.mode_) &&
+    BindInt64(4, entry.mtime_) &&
+    BindText(5, entry.name_.GetChars(),    entry.name_.GetLength()) &&
+    BindText(6, entry.symlink_.GetChars(), entry.symlink_.GetLength()) &&
+    BindInt64(7, entry.uid_) &&
+    BindInt64(8, entry.gid_));
 }
 
 
@@ -636,7 +686,8 @@ uint64_t SqlNestedCatalogLookup::GetSize() const {
 
 
 SqlNestedCatalogListing::SqlNestedCatalogListing(
-                                              const CatalogDatabase &database) {
+  const CatalogDatabase &database)
+{
   if (database.IsEqualSchema(database.schema_version(), 2.5) &&
       (database.schema_revision() >= 1))
   {
@@ -674,10 +725,10 @@ SqlDirentInsert::SqlDirentInsert(const CatalogDatabase &database) {
   const string statement = "INSERT INTO catalog "
     "(md5path_1, md5path_2, parent_1, parent_2, hash, hardlinks, size, mode,"
     //    1           2         3         4       5       6        7     8
-    "mtime, flags, name, symlink, uid, gid) "
-    // 9,     10    11     12     13   14
+    "mtime, flags, name, symlink, uid, gid, xattr) "
+    // 9,     10    11     12     13   14   15
     "VALUES (:md5_1, :md5_2, :p_1, :p_2, :hash, :links, :size, :mode, :mtime,"
-    " :flags, :name, :symlink, :uid, :gid);";
+    " :flags, :name, :symlink, :uid, :gid, :xattr);";
   Init(database.sqlite_db(), statement);
 }
 
@@ -694,6 +745,21 @@ bool SqlDirentInsert::BindParentPathHash(const shash::Md5 &hash) {
 
 bool SqlDirentInsert::BindDirent(const DirectoryEntry &entry) {
   return BindDirentFields(5, 6, 7, 8, 9, 10, 11, 12, 13, 14, entry);
+}
+
+
+bool SqlDirentInsert::BindXattr(const XattrList &xattrs) {
+  unsigned char *packed_xattrs;
+  unsigned size;
+  xattrs.Serialize(&packed_xattrs, &size);
+  if (packed_xattrs == NULL)
+    return BindNull(15);
+  return BindBlobTransient(15, packed_xattrs, size);
+}
+
+
+bool SqlDirentInsert::BindXattrEmpty() {
+  return BindNull(15);
 }
 
 
@@ -831,9 +897,10 @@ bool SqlChunksListing::BindPathHash(const shash::Md5 &hash) {
 FileChunk SqlChunksListing::GetFileChunk(
   const shash::Algorithms interpret_hash_as) const
 {
-  return FileChunk(RetrieveHashBlob(2, interpret_hash_as, shash::kSuffixPartial),
-                   RetrieveInt64(0),
-                   RetrieveInt64(1));
+  return FileChunk(
+    RetrieveHashBlob(2, interpret_hash_as, shash::kSuffixPartial),
+    RetrieveInt64(0),
+    RetrieveInt64(1));
 }
 
 
@@ -984,6 +1051,39 @@ bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
 
 bool SqlAllChunks::Close() {
   return Reset();
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SqlLookupXattrs::SqlLookupXattrs(const CatalogDatabase &database) {
+  const string statement =
+    "SELECT xattr FROM catalog "
+    "WHERE (md5path_1 = :md5_1) AND (md5path_2 = :md5_2);";
+  Init(database.sqlite_db(), statement);
+}
+
+
+bool SqlLookupXattrs::BindPathHash(const shash::Md5 &hash) {
+  return BindMd5(1, 2, hash);
+}
+
+
+XattrList SqlLookupXattrs::GetXattrs() {
+  const unsigned char *packed_xattrs =
+    reinterpret_cast<const unsigned char *>(RetrieveBlob(0));
+  if (packed_xattrs == NULL)
+    return XattrList();
+
+  int size = RetrieveBytes(0);
+  assert(size >= 0);
+  UniquePtr<XattrList> xattrs(XattrList::Deserialize(packed_xattrs, size));
+  if (!xattrs.IsValid()) {
+    LogCvmfs(kLogCatalog, kLogDebug, "corrupted xattr data");
+    return XattrList();
+  }
+  return *xattrs;
 }
 
 }  // namespace catalog

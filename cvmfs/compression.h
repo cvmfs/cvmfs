@@ -5,16 +5,16 @@
 #ifndef CVMFS_COMPRESSION_H_
 #define CVMFS_COMPRESSION_H_
 
-#include <stdio.h>
-#include <stdint.h>
 #include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
 
 #include <string>
 
 #include "duplex_zlib.h"
 
 namespace shash {
-  struct Any;
+struct Any;
 }
 
 bool CopyPath2Path(const std::string &src, const std::string &dest);

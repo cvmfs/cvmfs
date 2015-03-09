@@ -29,12 +29,13 @@
  * abstract from the actual hash filtering method to be used.
  */
 
-#ifndef CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_H
-#define CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_H
+#ifndef CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_H_
+#define CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_H_
 
-#include "hash_filter.h"
+#include <vector>
 
 #include "../upload_facility.h"
+#include "hash_filter.h"
 
 template<class CatalogTraversalT, class HashFilterT>
 class GarbageCollector {
@@ -70,7 +71,7 @@ class GarbageCollector {
   };
 
  public:
-  GarbageCollector(const Configuration &configuration);
+  explicit GarbageCollector(const Configuration &configuration);
 
   bool Collect();
 
@@ -83,7 +84,7 @@ class GarbageCollector {
                                             const Configuration &configuration);
 
   void PreserveDataObjects(const TraversalCallbackDataTN &data);
-  void SweepDataObjects   (const TraversalCallbackDataTN &data);
+  void SweepDataObjects(const TraversalCallbackDataTN &data);
 
   bool AnalyzePreservedCatalogTree();
   bool CheckPreservedRevisions();
@@ -109,4 +110,4 @@ class GarbageCollector {
 
 #include "garbage_collector_impl.h"
 
-#endif /* CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_H */
+#endif  // CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_H_
