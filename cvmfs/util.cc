@@ -83,6 +83,22 @@ const signed char db64_table[] =
 
 static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+namespace {
+
+/**
+ * Used for cas  insensitive HasSuffix
+ */
+struct IgnoreCaseComperator {
+  IgnoreCaseComperator() { }
+  bool operator() (const std::string::value_type a,
+                   const std::string::value_type b) const
+  {
+    return std::tolower(a) == std::tolower(b);
+  }
+};
+
+}  // anonymous namespace
+
 /**
  * Removes a trailing "/" from a path.
  */
@@ -889,29 +905,13 @@ bool HasPrefix(const string &str, const string &prefix,
 bool HasSuffix(
   const std::string &str,
   const std::string &suffix,
-  const bool ignore_case
-) {
-  unsigned i = str.length();
-  unsigned l = suffix.length();
-  if (l > i)
-    return false;
-  if (l == 0)
-    return true;
-
-  // str, suffix cannot be empty
-
-  do {
-    --i;
-    --l;
-    if (ignore_case) {
-      if (toupper(str[i]) != toupper(suffix[l]))
-        return false;
-    } else {
-      if (str[i] != suffix[l])
-        return false;
-    }
-  } while (l > 0);
-  return true;
+  const bool ignore_case)
+{
+  if (suffix.size() > str.size()) return false;
+  const IgnoreCaseComperator icmp;
+  return (ignore_case)
+    ? std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(), icmp)
+    : std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
 }
 
 
