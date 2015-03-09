@@ -28,6 +28,7 @@ CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
 CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}
 CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
 
+# This OPT variables are for the benchmark options under the benchmark_tests folder
 CVMFS_OPT_WARM_CACHE=${CVMFS_OPT_WARM_CACHE:=yes}
 CVMFS_OPT_ITERATIONS=${CVMFS_OPT_ITERATIONS:=1}
 CVMFS_OPT_TEST_TYPE=${CVMFS_OPT_TEST_TYPE:=callgrind} # callgrind / memcheck
@@ -1192,11 +1193,10 @@ cp_usrbin() {
 # waits until cvmfs is mounted
 wait_fqrn_mount() {
   local waits=0
-  while ! mount | grep "/cvmfs/${FQRN}" > /dev/null; do
+  while ! mount | grep "/cvmfs/${FQRN}" > /dev/null 2>&1; do
     waits=$(( waits + 1 ))
     if [ "$waits" -ge 10 ]; then
-      echo "${FQRN} could not be mounted (not superuser?)"
-      exit -1
+      die "${FQRN} could not be mounted (not superuser?)"
     fi
     sleep 1
   done
@@ -1205,10 +1205,13 @@ wait_fqrn_mount() {
 
 # runs the command once in order to get a warm cache
 create_warm_cache() {
+  local workspace=$1
   cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &> /dev/null &
   wait_fqrn_mount
-  echo -e $COMMAND | bash &> /dev/null
+
+  bash -c "cvmfs_run_benchmark" > /dev/null 2>&1
   umount /cvmfs/$FQRN
+  return 0
 }
 
 
@@ -1253,15 +1256,14 @@ setup_benchmark_environment() {
   mkdir -p $CVMFS_OPT_OUTPUT_DIR/$FQRN
   mkdir -p $workspace/cache
 
-  # stopping automount
-  service autofs stop &> /dev/null
-
   # create a cvmfs.conf file or use a custom one
   if [ -z $CVMFS_OPT_CONFIG_FILE ]; then
     create_default_cvmfs_config $workspace
   else
     cp -f $CVMFS_OPT_CONFIG_FILE $workspace
   fi
+
+  return 0
 }
 
 
@@ -1269,6 +1271,14 @@ setup_benchmark_environment() {
 run_benchmark() {
   local count=$CVMFS_OPT_ITERATIONS
   set_valgrind_options
+
+  # use or not warm cache
+  if [ "$CVMFS_OPT_WARM_CACHE" = "yes" ]; then
+    echo "Starting initial execution"
+    create_warm_cache $workspace
+  else
+    echo "Using cold cache"
+  fi
 
   echo "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
   echo "Running valgrind with the following parameters: $OPTIONS"
@@ -1280,7 +1290,7 @@ run_benchmark() {
   local iteration=1
   while (( count > 0 )); do
     echo "Starting iteration ${iteration}"
-    echo -e $COMMAND | bash &> /dev/null
+    cvmfs_run_benchmark
     count=$(( count - 1 ))
     iteration=$(( iteration + 1 ))
   done
@@ -1295,6 +1305,8 @@ run_benchmark() {
 # collects the files and pastes them into $CVMFS_OPT_OUTPUT_DIR/$FQRN
 collect_benchmark_results() {
   local benchmark_output_dir="$CVMFS_OPT_OUTPUT_DIR/$FQRN"
+  local workspace=$workdir
   rm -rf $benchmark_output_dir/*
-  cp  -rf $FQRN.*.log callgrind.out.* $FQRN.memcheck.xml cvmfs.conf $benchmark_output_dir &>/dev/null
+  cp  -rf $workdir/$FQRN.*.log $workdir/callgrind.out.* $workdir/$FQRN.memcheck.xml $workdir/cvmfs.conf $benchmark_output_dir > /dev/null 2>&1
+  echo "Test results copied into $benchmark_output_dir" >> $logfile
 }

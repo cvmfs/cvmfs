@@ -104,6 +104,11 @@ setup_environment() {
     fi
   fi
 
+  # if the test is a benchmark we have to configure the environment
+  if [ "$cvmfs_benchmark" = "yes" ]; then
+    setup_benchmark_environment $workdir
+  fi
+
   # reset the test warning flags
   reset_test_warning_flags
 
@@ -161,6 +166,11 @@ do
          retval=\$(mangle_test_retval \$retval) && \
          exit \$retval" >> $logfile 2>&1
   RETVAL=$?
+
+  # if the test is a benchmark we have to collect the results before removing the folder
+  if [ "$cvmfs_benchmark" = "yes" ]; then
+    collect_benchmark_results
+  fi
 
   # check the final test result
   case $RETVAL in

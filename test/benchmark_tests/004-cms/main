@@ -1,28 +1,23 @@
 
 cvmfs_test_name="CMS benchmark"
+cvmfs_test_autofs_on_startup=false
+cvmfs_benchmark="yes"
 
+FQRN=cms.cern.ch
+
+
+cvmfs_run_benchmark() {
+  . /cvmfs/cms.cern.ch/cmsset_default.sh
+  /cvmfs/cms.cern.ch/common/scramv1 project CMSSW CMSSW_7_0_0 # receives a warning
+  cd CMSSW_7_0_0
+  eval `scramv1 runtime -sh`
+  #/cvmfs/cms.cern.ch/slc6_amd64_gcc481/cms/cmssw/CMSSW_7_0_0/bin/slc6_amd64_gcc481/cmsShow # launches a GUI
+}
 
 cvmfs_run_test() {
   logfile=$1
-  FQRN=cms.cern.ch
-  COMMAND='. /cvmfs/cms.cern.ch/cmsset_default.sh
-          scramv1 project CMSSW CMSSW_7_0_0'
 
-  setup_benchmark_environment $(pwd)
-
-  # use or not warm cache
-  if [ "$CVMFS_OPT_WARM_CACHE" == "yes" ]; then
-    echo "Starting initial execution"
-    create_warm_cache
-  else
-    echo "Using cold cache"
-  fi
-
-  # start the iterations
   run_benchmark
-
-  # collect the results
-  collect_benchmark_results
 
   return 0
 }
