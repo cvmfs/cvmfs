@@ -90,7 +90,7 @@ cvmfs_config_usage() {
  echo "  umount"
  echo "  wipecache"
  echo "  bugreport"
- echo "  regularcheck"
+ echo "  fsck"
 }
 
 
@@ -1118,7 +1118,7 @@ cvmfs_bugreport() {
    echo "JIRA bug report to https://sft.its.cern.ch/jira/browse/CVM"
 }
 
-cvmfs_regularcheck() {
+cvmfs_fsck() {
   
   if ! cvmfs_readconfig; then
     echo "Failed to read CernVM-FS configuration"
@@ -1126,14 +1126,17 @@ cvmfs_regularcheck() {
   fi
 
   local repo_list
+  repo_list=""
   if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
     repo_list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
   fi
 
+  local cache_dir
+  cache_dir=$CVMFS_CACHE_BASE
   local repo
   for repo in $repo_list
   do
-     sudo /usr/bin/cvmfs_fsck ${CVMFS_CACHE_BASE}/${repo}
+     sudo /usr/bin/cvmfs_fsck ${cache_dir}/${repo}
   done
 }
 
@@ -1585,13 +1588,13 @@ case "$1" in
      RETVAL=$?
      ;;
      
-  regularcheck)
-    if [`id -u` -ne 0]; then
+  fsck)
+    if [ `id -u` -ne 0 ]; then
       echo "root privileges required"
       exit 1
     fi
     shift 1
-    cvmfs_regularcheck
+    cvmfs_fsck
     RETVAL=$?
     ;;
 
