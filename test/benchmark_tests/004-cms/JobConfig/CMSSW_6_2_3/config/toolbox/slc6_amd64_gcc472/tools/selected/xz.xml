@@ -1,0 +1,10 @@
+  <tool name="xz" version="5.0.3-cms">
+    <info url="http://tukaani.org/xz/"/>
+    <lib name="lzma"/>
+    <client>
+      <environment name="XZ_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/xz/5.0.3-cms"/>
+      <environment name="LIBDIR" default="$XZ_BASE/lib"/>
+      <environment name="INCLUDE" default="$XZ_BASE/include"/>
+    </client>
+    <runtime name="PATH" value="$XZ_BASE/bin" type="path"/>
+  </tool>

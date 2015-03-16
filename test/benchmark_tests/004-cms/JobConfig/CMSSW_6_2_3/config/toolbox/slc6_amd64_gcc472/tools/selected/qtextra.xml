@@ -1,0 +1,9 @@
+<tool name="qtextra" version="4.8.1-cms">
+  <info url="http://qt-project.org"/>
+  <lib name="QtScript"/>
+  <client>
+    <environment name="QTEXTRA_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/qt/4.8.1-cms"/>
+    <environment name="INCLUDE" default="$QTEXTRA_BASE/include/QtScript"/>
+  </client>
+  <use name="qtbase"/>
+</tool>

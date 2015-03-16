@@ -1,0 +1,13 @@
+<tool name="boost_python" version="1.51.0-cms5">
+  <info url="http://www.boost.org"/>
+  <lib name="boost_python"/>
+  <client>
+    <environment name="BOOST_PYTHON_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/boost/1.51.0-cms5"/>
+    <environment name="PYSTE_EXEC" default="$BOOST_PYTHON_BASE/lib/python2.7/site-packages/Pyste/pyste.py"/>
+    <environment name="LIBDIR" default="$BOOST_PYTHON_BASE/lib"/>
+    <environment name="INCLUDE" default="$BOOST_PYTHON_BASE/include"/>
+  </client>
+  <use name="elementtree"/>
+  <use name="gccxml"/>
+  <use name="python"/>
+</tool>

@@ -1,0 +1,10 @@
+<tool name="libpng" version="1.2.46-cms2">
+  <info url="http://www.libpng.org/"/>
+  <lib name="png"/>
+  <client>
+    <environment name="LIBPNG_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/libpng/1.2.46-cms2"/>
+    <environment name="LIBDIR" default="$LIBPNG_BASE/lib"/>
+    <environment name="INCLUDE" default="$LIBPNG_BASE/include"/>
+  </client>
+  <use name="zlib"/>
+</tool>

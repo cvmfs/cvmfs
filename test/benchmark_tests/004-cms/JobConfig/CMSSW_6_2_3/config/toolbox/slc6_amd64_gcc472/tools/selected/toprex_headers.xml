@@ -1,0 +1,6 @@
+<tool name="toprex_headers" version="4.23-cms2">
+  <client>
+    <environment name="TOPREX_HEADERS_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/toprex/4.23-cms2"/>
+    <environment name="INCLUDE" default="$TOPREX_HEADERS_BASE/include"/>
+  </client>
+</tool>

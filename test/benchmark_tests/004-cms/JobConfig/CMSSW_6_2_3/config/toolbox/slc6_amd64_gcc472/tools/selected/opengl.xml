@@ -1,0 +1,6 @@
+  <tool name="opengl" version="XFree4.2">
+    <lib name="GL"/>
+    <lib name="GLU"/>
+    <use name="x11"/>
+    <environment name="ORACLE_ADMINDIR" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/cms/oracle-env/29-cms/etc"/>
+  </tool>

@@ -1,0 +1,7 @@
+<storage-mapping>
+ <!-- For the Tier-0 to read /store/streamer and /store/t0streamer data from the T0STREAMER pool with xrootd. -->
+  <lfn-to-pfn path-match="/+store/streamer/(.*)" protocol="override"
+   result="root://castorcms//castor/cern.ch/cms/store/streamer/$1?svcClass=t0streamer&amp;stageHost=castorcms"/>
+  <lfn-to-pfn path-match="/+store/t0streamer/(.*)" protocol="override"
+   result="root://castorcms//castor/cern.ch/cms/store/t0streamer/$1?svcClass=t0streamer&amp;stageHost=castorcms"/>
+</storage-mapping>

@@ -1,0 +1,8 @@
+<tool name="py2-lint" version="0.25.1-cms5">
+  <client>
+    <environment name="PY2_LINT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/py2-lint/0.25.1-cms5"/>
+  </client>
+  <runtime name="PATH" value="$PY2_LINT_BASE/bin" type="path"/>
+  <runtime name="PYTHONPATH" value="$PY2_LINT_BASE/lib/python2.7/site-packages" type="path"/>
+  <use name="python"/>
+</tool>

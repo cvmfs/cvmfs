@@ -33,7 +33,8 @@ CVMFS_OPT_WARM_CACHE=${CVMFS_OPT_WARM_CACHE:=yes}
 CVMFS_OPT_ITERATIONS=${CVMFS_OPT_ITERATIONS:=1}
 CVMFS_OPT_TEST_TYPE=${CVMFS_OPT_TEST_TYPE:=callgrind} # callgrind / memcheck
 CVMFS_OPT_CONFIG_FILE=${CVMFS_OPT_CONFIG_FILE:=}
-CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=~/cvmfs_benchmarks}
+CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=/tmp/cvmfs_benchmarks}
+CVMFS_OPT_RAMCACHE=${CVMFS_OPT_RAMCACHE:=/var/lib/cvmfs/benchmark}
 
 die() {
   echo -e $1 >&2
@@ -249,7 +250,12 @@ cvmfs_umount() {
   repositories=$1
 
   for r in $(echo $repositories | tr , " "); do
-    sudo umount /cvmfs/$r || return 100
+    sudo umount /cvmfs/$r
+    local result=$?
+    if [ $result -ne 0 ]; then
+      lsof /cvmfs/$r
+      return 200
+    fi
 
     timeout=5
     while cat /proc/mounts | grep -q " /cvmfs/$r "; do
@@ -1176,7 +1182,6 @@ cp_bin() {
   done
 }
 
-
 # copy all content of /usr/bin/* into a given directory (for server testing purposes)
 #
 # @param destination_directory
@@ -1190,13 +1195,20 @@ cp_usrbin() {
 }
 
 
+# prints a benchmark log message
+benchmark_log() {
+  local log_message=$1
+  echo "===========    ${log_message}"
+}
+
+
 # waits until cvmfs is mounted
 wait_fqrn_mount() {
   local waits=0
-  while ! mount | grep "/cvmfs/${FQRN}" > /dev/null 2>&1; do
+  while ! mount | grep -q "/cvmfs/${FQRN}"; do
     waits=$(( waits + 1 ))
     if [ "$waits" -ge 10 ]; then
-      die "${FQRN} could not be mounted (not superuser?)"
+      die "${FQRN} could not be mounted"
     fi
     sleep 1
   done
@@ -1206,11 +1218,11 @@ wait_fqrn_mount() {
 # runs the command once in order to get a warm cache
 create_warm_cache() {
   local workspace=$1
-  cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &> /dev/null &
+  cvmfs2 -d -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN > /dev/null 2>&1 &
   wait_fqrn_mount
 
-  bash -c "cvmfs_run_benchmark" > /dev/null 2>&1
-  umount /cvmfs/$FQRN
+  cvmfs_run_benchmark 2>&1
+  cvmfs_umount $FQRN
   return 0
 }
 
@@ -1220,12 +1232,21 @@ create_warm_cache() {
 # @param destination_file  absolute path of the directory
 create_default_cvmfs_config() {
   local destination_directory="$1"
-  echo 'CVMFS_CACHE_BASE=/root/cvmfs_testing/cache
-CVMFS_RELOAD_SOCKETS=/root/cvmfs_testing/cache
+  local config_file=$destination_directory/cvmfs.conf
+  local test_folder=$( cd $(dirname $0) ; pwd -P )
+
+  cat > $config_file << EOF
+CVMFS_CACHE_BASE=${CVMFS_OPT_RAMCACHE}
+CVMFS_RELOAD_SOCKETS=${CVMFS_OPT_RAMCACHE}
 CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@
 CVMFS_SHARED_CACHE=no
-CVMFS_HTTP_PROXY=http://ca-proxy.cern.ch:3128
-CVMFS_AUTO_UPDATE=false' > $destination_directory/cvmfs.conf
+CVMFS_HTTP_PROXY=${CVMFS_TEST_PROXY}
+CVMFS_AUTO_UPDATE=false
+CMS_LOCAL_SITE=${test_folder}/benchmark_tests/004-cms
+CVMFS_QUOTA_LIMIT=-1
+
+EOF
+
 }
 
 
@@ -1256,6 +1277,27 @@ setup_benchmark_environment() {
   mkdir -p $CVMFS_OPT_OUTPUT_DIR/$FQRN
   mkdir -p $workspace/cache
 
+  # cleaning the cache
+  rm -rf ${CVMFS_OPT_RAMCACHE}/${FQRN}/*
+
+  # mtab trick
+  if [ ! -h /etc/mtab ]; then
+    mv /etc/mtab /etc/mtab.save
+    ln -s /proc/mounts /etc/mtab
+  fi
+
+  # check that the cache directory exists, is empty and is correctly labeled for SElinux
+  if [ ! -d $CVMFS_OPT_RAMCACHE ]; then
+    mkdir -p $CVMFS_OPT_RAMCACHE
+    has_selinux
+    selinux=$?
+    if [ "$selinux" -eq 0 ]; then
+      chcon -Rv --type=cvmfs_cache_t $CVMFS_OPT_RAMCACHE
+    fi
+  else
+    rm -rf $CVMFS_OPT_RAMCACHE/*
+  fi
+
   # create a cvmfs.conf file or use a custom one
   if [ -z $CVMFS_OPT_CONFIG_FILE ]; then
     create_default_cvmfs_config $workspace
@@ -1267,38 +1309,71 @@ setup_benchmark_environment() {
 }
 
 
+# creates a system.info file file with information about the environment
+create_info_file() {
+  cat > system.info << EOF
+- Operating system:
+$(uname -a)
+
+
+- CernVM-FS version:
+$(cvmfs2 --version)
+
+
+- cvmfs2 executable md5:
+$(md5sum $(which cvmfs2))
+
+
+- CernVM-FS talk:
+$(cvmfs_talk -p ${CVMFS_OPT_RAMCACHE}/${FQRN}/cvmfs_io.${FQRN} -i ${FQRN} internal affairs)
+
+EOF
+
+}
+
+
 # runs a benchmark $CVMFS_OPT_ITERATIONS times
 run_benchmark() {
   local count=$CVMFS_OPT_ITERATIONS
   set_valgrind_options
 
   # use or not warm cache
-  if [ "$CVMFS_OPT_WARM_CACHE" = "yes" ]; then
-    echo "Starting initial execution"
+  if [ x"$CVMFS_OPT_WARM_CACHE" = x"yes" ]; then
+    benchmark_log "Starting initial execution"
     create_warm_cache $workspace
   else
-    echo "Using cold cache"
+    benchmark_log "Using cold cache"
   fi
 
-  echo "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
-  echo "Running valgrind with the following parameters: $OPTIONS"
-  echo "Launching the job $count times"
+  benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
+  benchmark_log "Running valgrind with the following parameters: $OPTIONS"
+  benchmark_log "Launching the job $count times"
   valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
   PID=$!
   wait_fqrn_mount
 
   local iteration=1
-  while (( count > 0 )); do
-    echo "Starting iteration ${iteration}"
+  local code=0
+  while (( count > 0 && code == 0 )); do
+    benchmark_log "Starting iteration ${iteration}"
     cvmfs_run_benchmark
+    code=$?
     count=$(( count - 1 ))
     iteration=$(( iteration + 1 ))
   done
 
-  echo "Iterations finished. Unmounting cvmfs"
+  if [ "$code" -eq 0 ]; then
+    benchmark_log "Collecting information about the tests..."
+    create_info_file
+  else
+    benchmark_log "Problem executing the tests. Aborting"
+    benchmark_log $(lsof /cvmfs/${FQRN})
+  fi
 
-  umount /cvmfs/$FQRN
+  benchmark_log "Iterations finished. Unmounting cvmfs"
+  cvmfs_umount $FQRN
   wait $PID
+  return $code
 }
 
 
@@ -1307,6 +1382,6 @@ collect_benchmark_results() {
   local benchmark_output_dir="$CVMFS_OPT_OUTPUT_DIR/$FQRN"
   local workspace=$workdir
   rm -rf $benchmark_output_dir/*
-  cp  -rf $workdir/$FQRN.*.log $workdir/callgrind.out.* $workdir/$FQRN.memcheck.xml $workdir/cvmfs.conf $benchmark_output_dir > /dev/null 2>&1
-  echo "Test results copied into $benchmark_output_dir" >> $logfile
+  cp  -rf $workdir/system.info $workdir/$FQRN.*.log $workdir/callgrind.out.* $workdir/$FQRN.memcheck.xml $workdir/cvmfs.conf $benchmark_output_dir > /dev/null 2>&1
+  benchmark_log "Test results copied into $benchmark_output_dir" >> $logfile
 }

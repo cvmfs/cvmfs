@@ -1,0 +1,9 @@
+<tool name="xerces-c" version="2.8.0-cms">
+  <info url="http://xml.apache.org/xerces-c/"/>
+  <lib name="xerces-c"/>
+  <client>
+    <environment name="XERCES_C_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/xerces-c/2.8.0-cms"/>
+    <environment name="INCLUDE" default="$XERCES_C_BASE/include"/>
+    <environment name="LIBDIR" default="$XERCES_C_BASE/lib"/>
+  </client>
+</tool>

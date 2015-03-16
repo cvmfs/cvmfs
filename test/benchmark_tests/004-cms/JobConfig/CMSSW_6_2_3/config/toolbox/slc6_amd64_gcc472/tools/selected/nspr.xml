@@ -1,0 +1,10 @@
+  <tool name="nspr" version="4.8.9-cms">
+    <lib name="nspr4"/>
+    <lib name="plc4"/>
+    <lib name="plds4"/>
+    <client>
+      <environment name="NSPR_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/nspr/4.8.9-cms"/>
+      <environment name="INCLUDE" default="$NSPR_BASE/include"/>
+      <environment name="LIBDIR" default="$NSPR_BASE/lib"/>
+    </client>
+  </tool>

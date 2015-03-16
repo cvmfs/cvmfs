@@ -1,0 +1,3 @@
+  <tool name="x11" version="R6">
+    <use name="sockets"/>
+  </tool>

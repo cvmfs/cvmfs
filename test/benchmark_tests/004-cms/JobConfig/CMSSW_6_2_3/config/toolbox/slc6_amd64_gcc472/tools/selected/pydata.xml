@@ -1,0 +1,9 @@
+<tool name="pydata" version="426-cms">
+  <client>
+    <environment name="PYDATA_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/pythia6/426-cms"/>
+  </client>
+  <architecture name="slc.*|fc.*">
+    <flags LDFLAGS="$(PYDATA_BASE)/lib/pydata.o"/>
+  </architecture>
+  <flags NO_RECURSIVE_EXPORT="1"/>
+</tool>

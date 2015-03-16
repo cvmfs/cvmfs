@@ -1,0 +1,9 @@
+<tool name="tbb" version="41_20120718oss-cms">
+  <info url="http://threadingbuildingblocks.org"/>
+  <lib name="tbb"/>
+  <client>
+    <environment name="TBB_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/tbb/41_20120718oss-cms"/>
+    <environment name="LIBDIR" default="$TBB_BASE/lib"/>
+    <environment name="INCLUDE" default="$TBB_BASE/include"/>
+  </client>
+</tool>

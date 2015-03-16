@@ -1,0 +1,11 @@
+<tool name="python" version="2.7.3-cms5">
+  <lib name="python2.7"/>
+  <client>
+    <environment name="PYTHON_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/python/2.7.3-cms5"/>
+    <environment name="LIBDIR" default="$PYTHON_BASE/lib"/>
+    <environment name="INCLUDE" default="$PYTHON_BASE/include/python2.7"/>
+    <environment name="PYTHON_COMPILE" default="$PYTHON_BASE/lib/python2.7/compileall.py"/>
+  </client>
+  <runtime name="PATH" value="$PYTHON_BASE/bin" type="path"/>
+  <use name="sockets"/>
+</tool>

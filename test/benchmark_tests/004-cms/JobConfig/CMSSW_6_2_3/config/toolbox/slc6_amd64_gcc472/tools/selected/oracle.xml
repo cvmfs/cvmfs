@@ -1,0 +1,14 @@
+<tool name="oracle" version="11.2.0.3.0__10.2.0.4.0-cms">
+  <lib name="clntsh"/>
+  
+  <client>
+    <environment name="ORACLE_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/oracle/11.2.0.3.0__10.2.0.4.0-cms"/>
+    <environment name="ORACLE_ADMINDIR" value="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/cms/oracle-env/29-cms/etc"/>
+    <environment name="LIBDIR" value="$ORACLE_BASE/lib"/>
+    <environment name="BINDIR" value="$ORACLE_BASE/bin"/>
+    <environment name="INCLUDE" value="$ORACLE_BASE/include"/>
+  </client>
+  <runtime name="PATH" value="$BINDIR" type="path"/>
+  <runtime name="TNS_ADMIN" default="$ORACLE_ADMINDIR"/>
+  <use name="sockets"/>
+</tool>

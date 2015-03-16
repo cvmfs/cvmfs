@@ -1,0 +1,9 @@
+<tool name="bz2lib" version="1.0.5-cms">
+  <info url="http://sources.redhat.com/bzip2/"/>
+  <lib name="bz2"/>
+  <client>
+    <environment name="BZ2LIB_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/bz2lib/1.0.5-cms"/>
+    <environment name="LIBDIR"       default="$BZ2LIB_BASE/lib"/>
+    <environment name="INCLUDE"      default="$BZ2LIB_BASE/include"/>
+  </client>
+</tool>

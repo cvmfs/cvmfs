@@ -1,0 +1,12 @@
+  <tool name="gcc-f77compiler" version="4.7.2-cms" type="compiler">
+    <lib name="gfortran"/>
+    <lib name="m"/>
+    <client>
+      <environment name="GCC_F77COMPILER_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/gcc/4.7.2-cms"/>
+      <environment name="FC" default="$GCC_F77COMPILER_BASE/bin/gfortran"/>
+      
+    </client>
+    <flags FFLAGS="-fno-second-underscore -Wunused -Wuninitialized -O2  -cpp "/>
+    <flags FOPTIMISEDFLAGS="-O2   "/>
+    <flags FSHAREDOBJECTFLAGS="-fPIC   "/>
+  </tool>

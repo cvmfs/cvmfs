@@ -1,0 +1,10 @@
+<tool name="expat" version="2.0.1-cms">
+  <lib name="expat"/>
+  <client>
+    <environment name="EXPAT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/expat/2.0.1-cms"/>
+    <environment name="LIBDIR" default="$EXPAT_BASE/lib"/>
+    <environment name="INCLUDE" default="$EXPAT_BASE/include"/>
+    <environment name="BINDIR" default="$EXPAT_BASE/bin"/>
+  </client>
+  <runtime name="PATH" value="$BINDIR" type="path"/>
+</tool>

@@ -1,0 +1,10 @@
+<tool name="xrootd" version="3.2.4-cms4">
+  <lib name="XrdUtils"/>
+  <lib name="XrdClient"/>
+  <client>
+    <environment name="XROOTD_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/xrootd/3.2.4-cms4"/>
+    <environment name="INCLUDE" default="$XROOTD_BASE/include/xrootd"/>
+    <environment name="LIBDIR" default="$XROOTD_BASE/lib"/>
+  </client>
+  <runtime name="PATH" value="$XROOTD_BASE/bin" type="path"/>
+</tool>

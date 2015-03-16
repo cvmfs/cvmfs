@@ -1,0 +1,8 @@
+<tool name="py2-ipython" version="0.10-cms5">
+  <client>
+    <environment name="PY2_IPYTHON_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/py2-ipython/0.10-cms5"/>
+  </client>
+  <runtime name="PATH" value="$PY2_IPYTHON_BASE/bin" type="path"/>
+  <runtime name="PYTHONPATH" value="$PY2_IPYTHON_BASE/lib/python2.7/site-packages" type="path"/>
+  <use name="python"/>
+</tool>

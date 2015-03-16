@@ -1,0 +1,10 @@
+  <tool name="cyrus-sasl" version="2.1.25-cms2">
+    <lib name="libsasl2"/>
+    <client>
+      <environment name="CYRUS_SASL_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/cyrus-sasl/2.1.25-cms2"/>
+      <environment name="INCLUDE" default="$CYRUS_SASL_BASE/include"/>
+      <environment name="LIBDIR" default="$CYRUS_SASL_BASE/lib"/>
+    </client>
+    <use name="openssl"/>
+    <use name="nss"/>
+  </tool>

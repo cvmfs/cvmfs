@@ -1,0 +1,10 @@
+<tool name="py2-matplotlib" version="1.0.1-cms7">
+  <client>
+    <environment name="PY2_MATPLOTLIB_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/py2-matplotlib/1.0.1-cms7"/>
+  </client>
+  <runtime name="PYTHONPATH" value="$PY2_MATPLOTLIB_BASE/lib/python2.7/site-packages" type="path"/>
+  <use name="python"/>
+  <use name="zlib"/>
+  <use name="libpng"/>
+  <use name="py2-numpy"/>
+</tool>

@@ -1,0 +1,8 @@
+<tool name="fftw3" version="3.3.2-cms">
+  <lib name="fftw3"/>
+  <client>
+    <environment name="FFTW3_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/fftw3/3.3.2-cms"/>
+    <environment name="INCLUDE" default="$FFTW3_BASE/include"/>
+    <environment name="LIBDIR" default="$FFTW3_BASE/lib"/>
+  </client>
+</tool>

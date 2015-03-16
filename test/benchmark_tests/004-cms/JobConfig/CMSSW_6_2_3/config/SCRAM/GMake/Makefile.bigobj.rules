@@ -1,0 +1,115 @@
+ALL_BIGOBJS := 
+LD_UNIT_FLAGS               := -z muldefs
+ifndef LD_UNIT
+LD_UNIT                     := -r -m elf_x86_64
+endif
+define BigObjectsPaths
+$(foreach x,$(1),$(if $(strip $(filter $(x),$(ALL_lib_PRODUCTS))),$(SCRAMSTORENAME_OBJS)/$(x).$(BIGLIB_OBJEXT),externals/$(SCRAM_ARCH)/objs/$(x).$(BIGLIB_OBJEXT)))
+endef
+
+define big_obj
+  @$(startlog_$(2))$(CMD_echo) ">> Building big object file $@" &&\
+  $(VERB_ECHO) $(CMD_ld) $(LD_UNIT) $(LD_UNIT_FLAGS) -o $@ $(3) &&\
+  (            $(CMD_ld) $(LD_UNIT) $(LD_UNIT_FLAGS) -o $@ $(3) || ($(call delete_build_prod,$(4)) && exit 1)) &&\
+  $(call copy_bigobj_to_main_productstore,$(4)) $(endlog_$(2)) &&\
+  if [ "X$(5)" = "Xyes" ] ; then $(call processMMDData,$1,$2,$@.dep,$(foreach d,$($(1)_objs:.$(OBJEXT)=.d),$d)) ; fi
+endef
+###############################################################################################
+ALL_SUB_PRODUCTS               := Capabilities TestCapabilities Edm Rivet Test TestEdm TestRivet
+SUBPROD_OBJS_Edm               := PLUGINSedm BINARYedm LIBRARYedm
+SUBPROD_OBJS_Capabilities      := PLUGINSedmcap BINARYedmcap LIBRARYedmcap
+SUBPROD_OBJS_Rivet             := PLUGINSrivet BINARYrivet LIBRARYrivet
+SUBPROD_OBJS_Test              := TEST
+SUBPROD_OBJS_TestEdm           := TESTedm
+SUBPROD_OBJS_TestCapabilities  := TESTedmcap
+SUBPROD_OBJS_TestRivet         := TESTrivet
+
+define BigProductObjs
+$(1)$(2)_bigobjs := $$(strip $$(foreach t,$$(SUBPROD_OBJS_$(2)),$$(foreach o,$$($(1)_bigobjs),$$(if $$(strip $$(filter $$t,$$($$(o)_prodtype))),$$o,))))
+$(1)_bigobjs     := $$(strip $$(filter-out $$($(1)$(2)_bigobjs),$$($(1)_bigobjs)))
+endef
+
+define BigProductPostObjs
+ifneq ($$(strip $$($(1)$(2)_bigobjs)),)
+$(1)$(2)_hasobjs := $(1)$(2)
+$$(foreach o,$$($(1)$(2)_bigobjs),$$(eval $$(o)_bigprod := $(1)$(2)))
+$(1)$(2)_libcheck:= $$(sort $($(1)_libcheck) $$(foreach o,$$($(1)$(2)_bigobjs),$$($$(o)_libcheck)))
+endif
+endef
+
+#safename
+define BigProductInit
+$$(foreach x,$(ALL_SUB_PRODUCTS),$$(eval $$(call BigProductObjs,$1,$$(x))))
+$$(if $$(strip $($(1)_SHARED_LIB_OBJS)),$$(eval $(1)Edm_bigobjs += $$(filter-out $($(1)_SHARED_LIB_OBJS),$$($(1)_bigobjs)))$$(eval $(1)_bigobjs := $($(1)_SHARED_LIB_OBJS)))
+$$(foreach x,$(ALL_SUB_PRODUCTS),$$(eval $$(call BigProductPostObjs,$1,$$(x))))
+ifneq ($$(strip $$($(1)_bigobjs)),)
+$(1)_hasobjs := $(1)
+$(1)_libcheck:= $$(sort $($(1)_libcheck) $$(foreach o,$$($(1)_bigobjs),$$($$(o)_libcheck)))
+endif
+$$(foreach o,$$($(1)Edm_bigobjs),$$(eval $$(o)_BUILDRULES:=_edm))
+endef
+
+#safename,Product,type,plugin_type,path,safepath
+define BigSubProduct
+ifneq ($$(strip $$($(1)$(2)_hasobjs)),)
+$(1)$(2)_LOC_USE     += $$(sort $$(foreach o,$$($(1)$(2)_bigobjs),$$(filter-out $(ALL_PACKAGES),$$($$(o)_LOC_USE))))
+$(1)$(2)_LOC_LIB     += $$(sort $$(foreach o,$$($(1)$(2)_bigobjs),$$(foreach l,$$($$(o)_LOC_LIB),$$($$(l)_bigprod)) $$(filter-out $$(ALL_lib_PRODUCTS),$$($$(o)_LOC_LIB))))
+ifneq ($(strip $3),)
+$(1)$(2)_xlib := $(patsubst %Capabilities,%,$(1)$(2))
+$$($(1)$(2)_xlib)_PRE_INIT_FUNC += $$(eval $$(call $(3)Plugin,$(1)$(2),$$($(1)$(2)_xlib),$(SCRAMSTORENAME_LIB),$4))
+ifneq ($(strip $(filter %Capabilities,$2)),)
+ALL_lib_PRODUCTS += $(1)$(2)
+$(WORKINGDIR)/$4/$$($(1)$(2)_xlib)/ri.cc: $$(foreach o,$$($(1)$(2)_bigobjs),$$($$(o)_dict))
+	@[ -d $$(@D) ] || $(CMD_mkdir) -p $$(@D)
+	@($(CMD_echo) 'static  const char* clnames[] = {' ;\
+	  $(CMD_cat) $$^ ;\
+	  $(CMD_echo) '};' ;\
+	  $(CMD_echo) 'extern "C" void SEAL_CAPABILITIES (const char**& names, int& n )' ;\
+	  $(CMD_echo) '{names = clnames;n = sizeof(clnames)/sizeof(char*);}') > $$@
+$(WORKINGDIR)/$4/$$($(1)$(2)_xlib)/$(1)$(2).$(OBJEXT): $(WORKINGDIR)/$4/$$($(1)$(2)_xlib)/ri.cc
+	$$(call compile_cxx_capabilities,$(1),$(1))
+$$($(1)$(2)_xlib)_PRE_INIT_FUNC += $$(eval $$(call LCGDictLibRule,$$($(1)$(2)_xlib),$(SCRAMSTORENAME_LIB),Capabilities,,$(WORKINGDIR)/$4/$$($(1)$(2)_xlib),$(WORKINGDIR)/$4/$$($(1)$(2)_xlib)/$(1)$(2).$(OBJEXT)))
+$5 += all_$(1)$(2)
+all_$(1)$(2): $(1)$(2)
+	@:
+$(1)$(2): $(WORKINGDIR)/$4/$$($(1)$(2)_xlib)/$(MODULE_PREFIX)$(1)$(2).$(SHAREDSUFFIX)
+	@:
+endif
+endif
+ifeq ($(strip $(filter %Capabilities,$2)),)
+$$(eval $$(call ProductCommonVars,$(1)$(2),,,$($(1)_BuildFile)))
+$$(eval $$(call Library,$(1)$(2),$4,$5,,,$(SCRAMSTORENAME_LIB),))
+endif
+endif
+endef
+
+#safename,path,safepath
+define BigProduct
+$(1)_EX_INCLUDE += $($(1)_LOC_INCLUDE)
+ifneq ($$(strip $$($(1)_hasobjs)),)
+$(1)_bigobjs   := $$(foreach v,$$(shell echo $$(foreach o,$$($(1)_bigobjs),$$($$(o)_ORDER)$(colon)$$(o))| tr ' ' '\n' | sort -r),$$(lastword $$(subst $$(colon),$$(space),$$(v))))
+$(1)_EX_LIB      += $(1)
+$(1)_LOC_USE     += $$(sort $$(foreach o,$$($(1)_bigobjs),$$(filter-out $(1) $(ALL_PACKAGES),$$($$(o)_LOC_USE))))
+$(1)_LOC_LIB     += $$(sort $$(foreach o,$$($(1)_bigobjs),$$(filter-out $$(ALL_lib_PRODUCTS),$$($$(o)_LOC_LIB))))
+endif
+$(1)_EX_USE := $$($(1)_LOC_USE)
+$$(foreach x,$(ALL_SUB_PRODUCTS),\
+           $$(eval $$(call BigSubProduct,$1,$$(x),$$(if $$(strip $$(filter %Capabilities %Edm,$$(x))),edm,$$(if $$(strip $$(filter %Rivet,$$(x))),rivet,)),$2,$3)))
+ifneq ($$(strip $$($(1)_hasobjs)),)
+$$(eval $$(call Library,$1,$2,$3,,,$(SCRAMSTORENAME_LIB),))
+else
+$(WORKINGDIR)/cache/prod/lib$(1): $(call libdeps,$1)
+	@$(CMD_touch) $$@
+endif
+$$(eval $$(call CommonProductRules,$3,$2,BIGPRODUCT))
+endef
+###############################################################################
+define BigObject
+ifeq ($(strip $(BIGOBJS)),yes)
+$(2)_objprefix := $(if $(strip $(filter edmX,$($(2)_plugintype)X)),plugin,lib)
+all_$(1) += $($(1)_objdir)/$$($(2)_objprefix)$(2).$(BIGLIB_OBJEXT)
+ALL_BIGOBJS += $($(1)_objdir)/$$($(2)_objprefix)$(2).$(BIGLIB_OBJEXT)
+$($(1)_objdir)/$$($(2)_objprefix)$(2).$(BIGLIB_OBJEXT): $(3)
+	$$(call big_obj,$(2),$(1),$(3),$(SCRAMSTORENAME_OBJS))
+endif
+endef

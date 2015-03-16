@@ -1,0 +1,42 @@
+<tool name="SELF" version="SELF">
+ <client>
+  <environment name="LIBDIR"        value="$LOCALTOP/lib/$SCRAM_ARCH"/>
+  <environment name="LIBDIR"        value="$LOCALTOP/external/$SCRAM_ARCH/lib" handler="warn"/>
+  <environment name="INCLUDE"       value="$LOCALTOP/src"/>
+  <environment name="INCLUDE"       value="$LOCALTOP/include/LCG"              handler="warn"/>
+  <flags SKIP_TOOLS_SYMLINK="cxxcompiler      ccompiler      f77compiler"/>
+  <flags SKIP_TOOLS_SYMLINK="gcc-cxxcompiler  gcc-ccompiler  gcc-f77compiler"/>
+  <flags SKIP_TOOLS_SYMLINK="llvm-cxxcompiler llvm-ccompiler llvm-f77compiler"/>
+  <flags SKIP_TOOLS_SYMLINK="llvm-analyzer-cxxcompiler llvm-analyzer-ccompiler"/>
+  <flags SKIP_TOOLS_SYMLINK="icc-cxxcompiler  icc-ccompiler  icc-f77compiler"/>
+  <flags SKIP_TOOLS_SYMLINK="x11"/>
+  <flags SKIP_TOOLS_SYMLINK="dpm"/>
+  <flags EXTERNAL_SYMLINK="PATH"/>
+  <flags EXTERNAL_SYMLINK="LIBDIR"/>
+  <flags EXTERNAL_SYMLINK="CMSSW_SEARCH_PATH"/>
+  <flags NO_EXTERNAL_RUNTIME="LD_LIBRARY_PATH"/>
+  <flags NO_EXTERNAL_RUNTIME="PATH"/>
+  <flags NO_EXTERNAL_RUNTIME="CMSSW_SEARCH_PATH"/>
+  <flags SYMLINK_DEPTH_CMSSW_SEARCH_PATH="2"/>
+  <flags LLVM_ANALYZER="llvm-analyzer"/>
+  <flags OVERRIDABLE_FLAGS="CPPDEFINES CXXFLAGS FFLAGS CFLAGS CPPFLAGS LDFLAGS"/>
+  <architecture name="_mic_">
+    <flags DEFAULT_COMPILER="icc"/>
+  </architecture>
+ </client>
+ <runtime name="CMSSW_BASE"            value="$LOCALTOP"/>
+ <runtime name="CMSSW_RELEASE_BASE"    value="$RELEASETOP"/>
+ <runtime name="LOCALRT"               value="$LOCALTOP"/>
+ <runtime name="CMSSW_VERSION"         value="$SCRAM_PROJECTVERSION"/>
+ <runtime name="LD_LIBRARY_PATH"       value="$LOCALTOP/lib/$SCRAM_ARCH"             type="path"/>
+ <runtime name="LD_LIBRARY_PATH"       value="$LOCALTOP/external/$SCRAM_ARCH/lib"    type="path" handler="warn"/>
+ <runtime name="PATH"                  value="$LOCALTOP/bin/$SCRAM_ARCH"             type="path"/>
+ <runtime name="PATH"                  value="$LOCALTOP/external/$SCRAM_ARCH/bin"    type="path" handler="warn"/>
+ <runtime name="PYTHONPATH"            value="$LOCALTOP/python"                      type="path"/>
+ <runtime name="PYTHONPATH"            value="$LOCALTOP/lib/$SCRAM_ARCH"             type="path"/>
+ <runtime name="CMSSW_SEARCH_PATH"     value="$LOCALTOP/src"                         type="path" handler="warn"/>
+ <runtime name="CMSSW_SEARCH_PATH"     value="$LOCALTOP/external/$SCRAM_ARCH/data"   type="path" handler="warn"/>
+ <runtime name="RIVET_ANALYSIS_PATH"   value="$LOCALTOP/lib/$SCRAM_ARCH"             type="path"/>
+ <runtime name="LANG"                  value="C"/>
+ <runtime name="TEST_SRTOPT_PATH"      value="$LOCALTOP/test/$SCRAM_ARCH"            type="path"/>
+</tool>

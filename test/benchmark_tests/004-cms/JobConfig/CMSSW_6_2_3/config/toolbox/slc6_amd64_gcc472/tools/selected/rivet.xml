@@ -1,0 +1,12 @@
+<tool name="rivet" version="1.8.2-cms9">
+<lib name="Rivet"/>
+<client>
+<environment name="RIVET_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/rivet/1.8.2-cms9"/>
+<environment name="LIBDIR" default="$RIVET_BASE/lib"/>
+<environment name="INCLUDE" default="$RIVET_BASE/include"/>
+</client>
+<runtime name="PATH" value="$RIVET_BASE/bin" type="path"/>
+<runtime name="PYTHONPATH" value="$RIVET_BASE/lib/python2.7/site-packages" type="path"/>
+<runtime name="RIVET_ANALYSIS_PATH" value="$RIVET_BASE/lib" type="path"/>
+<runtime name="PDFPATH" default="$RIVET_BASE/share" type="path"/>
+</tool>

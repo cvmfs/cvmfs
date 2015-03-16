@@ -1,0 +1,6 @@
+<tool name="photos_headers" version="215.5-cms">
+  <client>
+    <environment name="PHOTOS_HEADERS_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/photos/215.5-cms"/>
+    <environment name="INCLUDE" default="$PHOTOS_HEADERS_BASE/include"/>
+  </client>
+</tool>

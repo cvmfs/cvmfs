@@ -1,0 +1,12 @@
+<tool name="charybdis" version="1.003-cms5">
+  <info url="http://www.ippp.dur.ac.uk/montecarlo/leshouches/generators/charybdis/"/>
+  <lib name="charybdis"/>
+  <client>
+    <environment name="CHARYBDIS_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/charybdis/1.003-cms5"/>
+    <environment name="LIBDIR" default="$CHARYBDIS_BASE/lib"/>
+    <environment name="INCLUDE" default="$CHARYBDIS_BASE/include"/>
+  </client>
+  <use name="f77compiler"/>
+  <use name="herwig"/>
+  <use name="pythia6"/>
+</tool>

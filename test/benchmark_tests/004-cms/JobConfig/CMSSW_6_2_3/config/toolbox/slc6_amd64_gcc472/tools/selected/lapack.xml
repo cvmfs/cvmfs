@@ -1,0 +1,6 @@
+<tool name="lapack" version="3.3.1-cms4">
+  <client>
+    <environment name="LAPACK_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/lapack/3.3.1-cms4"/>
+    <environment name="LIBDIR" default="$LAPACK_BASE/lib"/>
+  </client>
+</tool>

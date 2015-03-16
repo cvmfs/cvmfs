@@ -1,0 +1,9 @@
+<tool name="Hector" version="1_3_4-cms19">
+  <info url="http://www.fynu.ucl.ac.be/themes/he/ggamma/hector/"/>
+  <lib name="Hector"/>
+  <client>
+    <environment name="HECTOR_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/hector/1_3_4-cms19"/>
+    <environment name="LIBDIR" default="$HECTOR_BASE/lib"/>
+    <environment name="INCLUDE" default="$HECTOR_BASE/include"/>
+  </client>
+</tool>

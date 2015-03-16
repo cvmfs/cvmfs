@@ -1,0 +1,6 @@
+<tool name="gmake" version="3.81-cms">
+  <client>
+    <environment name="MAKE_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/gmake/3.81-cms"/>
+  </client>
+  <runtime name="PATH" value="$MAKE_BASE/bin" type="path"/>
+</tool>

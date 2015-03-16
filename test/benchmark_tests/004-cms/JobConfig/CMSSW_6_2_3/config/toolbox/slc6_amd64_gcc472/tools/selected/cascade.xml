@@ -1,0 +1,20 @@
+<tool name="cascade" version="2.2.04-cms5">
+  <architecture name="slc[^_]*_[^_]*_gcc4[0-3]">
+    <lib name="cascade2"/>
+    <lib name="bases"/>
+    <lib name="mycern"/>
+  </architecture>
+  <architecture name="slc[^_]*_[^_]*_gcc4[4-9]">
+    <lib name="cascade_merged"/>
+  </architecture>
+  <architecture name="osx">
+    <lib name="cascade_merged"/>
+  </architecture>
+  <client>
+    <environment name="CASCADE_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/cascade/2.2.04-cms5"/>
+    <environment name="LIBDIR" default="$CASCADE_BASE/lib"/>
+  </client>
+  <runtime name="CASCADE_PDFPATH" value="$CASCADE_BASE/share"/>
+  <use name="f77compiler"/>
+  <use name="cascade_headers"/>
+</tool>

@@ -1,0 +1,11 @@
+<tool name="jemalloc" version="2.2.2-cms">
+  <architecture name="slc">
+  <lib name="jemalloc"/>
+  </architecture>
+  <client>
+    <environment name="JEMALLOC_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/jemalloc/2.2.2-cms"/>
+    <environment name="LIBDIR"        default="$JEMALLOC_BASE/lib"/>
+    <environment name="INCLUDE"        default="$JEMALLOC_BASE/include"/>
+  </client>
+  <runtime name="MALLOC_CONF" value="lg_chunk:18,lg_dirty_mult:4"/>
+</tool>

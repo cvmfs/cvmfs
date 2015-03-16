@@ -1,0 +1,7 @@
+<tool name="professor" version="1.0.0-cms19">
+<client>
+<environment name="PROFESSOR_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/professor/1.0.0-cms19"/>
+</client>
+<runtime name="PATH" value="$PROFESSOR_BASE/bin" type="path"/>
+<runtime name="PYTHONPATH" value="$PROFESSOR_BASE/lib/python2.7/site-packages" type="path"/>
+</tool>

@@ -1,0 +1,8 @@
+<tool name="libhepml" version="0.2.1-cms">
+  <lib name="hepml"/>
+  <client>
+    <environment name="LIBHEPML_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/libhepml/0.2.1-cms"/>
+    <environment name="LIBDIR" default="$LIBHEPML_BASE/lib"/>
+    <environment name="INCLUDE" default="$LIBHEPML_BASE/interface"/>
+  </client>
+</tool>

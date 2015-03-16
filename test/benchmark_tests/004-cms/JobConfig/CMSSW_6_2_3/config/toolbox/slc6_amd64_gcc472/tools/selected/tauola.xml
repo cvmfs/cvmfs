@@ -1,0 +1,13 @@
+<tool name="tauola" version="27.121.5-cms2">
+  <lib name="pretauola"/>
+  <lib name="tauola"/>
+  <client>
+    <environment name="TAUOLA_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/tauola/27.121.5-cms2"/>
+    <environment name="LIBDIR" default="$TAUOLA_BASE/lib"/>
+  </client>
+  <architecture name="slc5_amd64_gcc434">
+  <use name="pythia6"/>
+  </architecture>
+  <use name="f77compiler"/>
+  <use name="tauola_headers"/>
+</tool>

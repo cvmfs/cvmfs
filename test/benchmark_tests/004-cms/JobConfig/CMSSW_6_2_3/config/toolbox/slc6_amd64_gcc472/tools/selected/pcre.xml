@@ -1,0 +1,9 @@
+<tool name="pcre" version="7.9-cms">
+  <info url="http://www.pcre.org"/>
+  <lib name="pcre"/>
+  <client>
+    <environment name="PCRE_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/pcre/7.9-cms"/>
+    <environment name="LIBDIR" default="$PCRE_BASE/lib"/>
+    <environment name="INCLUDE" default="$PCRE_BASE/include"/>
+  </client>
+</tool>

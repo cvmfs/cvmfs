@@ -1,0 +1,14 @@
+<tool name="qt" version="4.8.1-cms">
+  <info url="http://qt-project.org"/>
+  <lib name="QtOpenGL"/>
+  <lib name="QtGui"/>
+  <client>
+    <environment name="QT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/qt/4.8.1-cms"/>
+    <environment name="INCLUDE" default="$QT_BASE/include/QtOpenGL"/>
+    <environment name="INCLUDE" default="$QT_BASE/include/QtGui"/>
+  </client>
+  <use name="qtbase"/>
+  <use name="qt3support"/>
+  <use name="X11"/>
+  <use name="opengl"/>
+</tool>

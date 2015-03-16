@@ -1,0 +1,7 @@
+  <tool name="icc-ccompiler" version="composer_xe_2013.2.146" type="compiler">
+    <use name="gcc-ccompiler"/>
+    <client>
+      <environment name="ICC_CCOMPILER_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/icc/composer_xe_2013.2.146/installation" handler="warn"/>
+      <environment name="CC" value="$ICC_CCOMPILER_BASE/bin/intel64/icc" handler="warn"/>
+    </client>
+  </tool>

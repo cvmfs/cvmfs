@@ -1,0 +1,11 @@
+<tool name="git" version="1.8.3.1-cms">
+  <info url="http://git-scm.com"/>
+  <client>
+    <environment name="GIT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/git/1.8.3.1-cms"/>
+  </client>
+  <runtime name="PATH" value="$GIT_BASE/bin" type="path"/>
+  <runtime name="PATH" value="$GIT_BASE/libexec/git-core" type="path"/>
+  <runtime name="GIT_TEMPLATE_DIR" value="$GIT_BASE/share/git-core/templates" type="path"/>
+  <runtime name="GIT_SSL_CAINFO" value="$GIT_BASE/share/ssl/certs/ca-bundle.crt" type="path"/>
+  <runtime name="PERL5LIB" value="$GIT_BASE/share/perl5" type="path"/>
+</tool>

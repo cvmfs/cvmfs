@@ -1,0 +1,8 @@
+<tool name="mimetic" version="0.9.6-cms">
+  <lib name="mimetic"/>
+  <client>
+    <environment name="MIMETIC_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/mimetic/0.9.6-cms"/>
+    <environment name="LIBDIR" default="$MIMETIC_BASE/lib"/>
+    <environment name="INCLUDE" default="$MIMETIC_BASE/include"/>
+  </client>
+</tool>

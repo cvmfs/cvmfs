@@ -1,0 +1,10 @@
+<tool name="qt3support" version="4.8.1-cms">
+  <info url="http://qt-project.org"/>
+  <lib name="Qt3Support"/>
+  <client>
+    <environment name="QT3SUPPORT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/qt/4.8.1-cms"/>
+    <environment name="INCLUDE" default="$QT3SUPPORT_BASE/include/Qt3Support"/>
+  </client>
+  <flags cppdefines="QT3_SUPPORT"/>
+  <use name="qtbase"/>
+</tool>

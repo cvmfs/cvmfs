@@ -1,0 +1,10 @@
+<tool name="sqlite" version="3.7.10-cms">
+  <lib name="sqlite3"/>
+  <client>
+    <environment name="SQLITE_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/sqlite/3.7.10-cms"/>
+    <environment name="LIBDIR" default="$SQLITE_BASE/lib"/>
+    <environment name="BINDIR" default="$SQLITE_BASE/bin"/>
+    <environment name="INCLUDE" default="$SQLITE_BASE/include"/>
+  </client>
+  <runtime name="PATH" value="$BINDIR" type="path"/>
+</tool>

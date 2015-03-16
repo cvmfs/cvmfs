@@ -1,0 +1,8 @@
+  <tool name="gcc-ccompiler" version="4.7.2-cms" type="compiler">
+    <client>
+      <environment name="GCC_CCOMPILER_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/gcc/4.7.2-cms"/>
+      <environment name="CC" value="$GCC_CCOMPILER_BASE/bin/gcc"/>
+    </client>
+    <flags CSHAREDOBJECTFLAGS="-fPIC   "/>
+    <flags CFLAGS="-O2 -pthread   "/>
+  </tool>

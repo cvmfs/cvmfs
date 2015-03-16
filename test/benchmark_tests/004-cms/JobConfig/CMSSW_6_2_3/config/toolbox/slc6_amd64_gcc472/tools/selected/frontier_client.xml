@@ -1,0 +1,12 @@
+<tool name="frontier_client" version="2.8.8">
+  <lib name="frontier_client"/>
+  <client>
+    <environment name="FRONTIER_CLIENT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/frontier_client/2.8.8"/>
+    <environment name="INCLUDE" default="$FRONTIER_CLIENT_BASE/include"/>
+    <environment name="LIBDIR" default="$FRONTIER_CLIENT_BASE/lib"/>
+  </client>
+  <runtime name="FRONTIER_CLIENT" value="$FRONTIER_CLIENT_BASE/"/>
+  <use name="zlib"/>
+  <use name="openssl"/>
+  <use name="expat"/>
+</tool>

@@ -1,0 +1,11 @@
+<tool name="libungif" version="4.1.4-cms">
+  <info url="http://sourceforge.net/projects/libungif"/>
+  <lib name="ungif"/>
+  <client>
+    <environment name="LIBUNGIF_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/libungif/4.1.4-cms"/>
+    <environment name="LIBDIR" default="$LIBUNGIF_BASE/lib"/>
+    <environment name="INCLUDE" default="$LIBUNGIF_BASE/include"/>
+  </client>
+  <use name="libjpg"/>
+  <use name="zlib"/>
+</tool>

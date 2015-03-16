@@ -1,0 +1,9 @@
+<tool name="libjpg" version="8b-cms">
+  <info url="http://www.ijg.org/"/>
+  <lib name="jpeg"/>
+  <client>
+    <environment name="LIBJPEG_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/libjpg/8b-cms"/>
+    <environment name="LIBDIR" default="$LIBJPEG_BASE/lib"/>
+    <environment name="INCLUDE" default="$LIBJPEG_BASE/include"/>
+  </client>
+</tool>

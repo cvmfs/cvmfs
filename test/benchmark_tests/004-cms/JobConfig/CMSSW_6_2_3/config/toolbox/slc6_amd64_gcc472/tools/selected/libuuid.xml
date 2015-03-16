@@ -1,0 +1,9 @@
+<tool name="libuuid" version="2.22.2-cms2">
+  <lib name="uuid"/>
+  <client>
+    <environment name="LIBUUID_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/libuuid/2.22.2-cms2"/>
+    <environment name="LIBDIR" default="$LIBUUID_BASE/lib64"/>
+    <environment name="INCLUDE" default="$LIBUUID_BASE/include"/>
+  </client>
+  <use name="sockets"/>
+</tool>

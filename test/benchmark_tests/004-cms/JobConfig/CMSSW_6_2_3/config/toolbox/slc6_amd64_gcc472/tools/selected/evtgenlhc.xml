@@ -1,0 +1,9 @@
+<tool name="evtgenlhc" version="9.1-cms5">
+  <lib name="evtgenlhc"/>
+  <client>
+    <environment name="EVTGENLHC_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/evtgenlhc/9.1-cms5"/>
+    <environment name="LIBDIR" default="$EVTGENLHC_BASE/lib"/>
+    <environment name="INCLUDE" default="$EVTGENLHC_BASE"/>
+  </client>
+  <use name="clhep"/>
+</tool>

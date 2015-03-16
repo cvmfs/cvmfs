@@ -1,0 +1,8 @@
+<tool name="valgrind" version="3.8.0-cms">
+  <client>
+    <environment name="VALGRIND_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/valgrind/3.8.0-cms"/>
+    <environment name="INCLUDE" default="$VALGRIND_BASE/include"/>
+  </client>
+  <runtime name="PATH" value="$VALGRIND_BASE/bin" type="path"/>
+  <runtime name="VALGRIND_LIB" value="$VALGRIND_BASE/lib/valgrind"/>
+</tool>

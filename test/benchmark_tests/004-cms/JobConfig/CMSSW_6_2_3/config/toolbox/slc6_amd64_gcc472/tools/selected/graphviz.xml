@@ -1,0 +1,11 @@
+<tool name="graphviz" version="2.16.1-cms2">
+  <info url="http://www.research.att.com/sw/tools/graphviz/"/>
+  <client>
+    <environment name="GRAPHVIZ_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/graphviz/2.16.1-cms2"/>
+  </client>
+  <runtime name="PATH" value="$GRAPHVIZ_BASE/bin" type="path"/>
+  <use name="expat"/>
+  <use name="zlib"/>
+  <use name="libjpg"/>
+  <use name="libpng"/>
+</tool>

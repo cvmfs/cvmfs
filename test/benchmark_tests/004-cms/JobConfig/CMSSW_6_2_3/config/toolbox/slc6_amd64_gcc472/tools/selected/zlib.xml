@@ -1,0 +1,8 @@
+<tool name="zlib" version="1.2.7">
+  <lib name="z"/>
+  <client>
+    <environment name="ZLIB_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/zlib/1.2.7"/>
+    <environment name="INCLUDE" default="$ZLIB_BASE/include"/>
+    <environment name="LIBDIR" default="$ZLIB_BASE/lib"/>
+  </client>
+</tool>

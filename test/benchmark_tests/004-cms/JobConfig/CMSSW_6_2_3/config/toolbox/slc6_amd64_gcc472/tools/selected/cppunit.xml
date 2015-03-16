@@ -1,0 +1,9 @@
+<tool name="cppunit" version="1.12.1-cms">
+  <lib name="cppunit"/>
+  <client>
+    <environment name="CPPUNIT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/cppunit/1.12.1-cms"/>
+    <environment name="LIBDIR" default="$CPPUNIT_BASE/lib"/>
+    <environment name="INCLUDE" default="$CPPUNIT_BASE/include"/>
+  </client>
+  <use name="sockets"/>
+</tool>

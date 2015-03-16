@@ -1,0 +1,9 @@
+<tool name="meschach" version="1.2.pCMS1-cms">
+  <info url="http://www.meschach.com"/>
+  <lib name="meschach"/>
+  <client>
+    <environment name="MESCHACH_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/meschach/1.2.pCMS1-cms"/>
+    <environment name="LIBDIR" default="$MESCHACH_BASE/lib"/>
+    <environment name="INCLUDE" default="$MESCHACH_BASE/include"/>
+  </client>
+</tool>

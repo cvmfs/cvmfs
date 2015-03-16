@@ -1,0 +1,15 @@
+<tool name="pythia8" version="175-cms2">
+  <lib name="pythia8"/>
+  <lib name="hepmcinterface"/>
+  <client>
+    <environment name="PYTHIA8_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/pythia8/175-cms2"/>
+    <environment name="LIBDIR" default="$PYTHIA8_BASE/lib"/>
+    <environment name="INCLUDE" default="$PYTHIA8_BASE/include"/>
+  </client>
+  <runtime name="PYTHIA8DATA" value="$PYTHIA8_BASE/xmldoc"/>
+  <use name="cxxcompiler"/>
+  <use name="hepmc"/>
+  <use name="pythia6"/>
+  <use name="clhep"/>
+  <use name="lhapdf"/>
+</tool>

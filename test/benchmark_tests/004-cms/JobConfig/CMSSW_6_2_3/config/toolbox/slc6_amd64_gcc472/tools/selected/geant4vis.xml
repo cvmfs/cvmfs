@@ -1,0 +1,14 @@
+<tool name="geant4vis" version="9.6.p02">
+  <info url="http://geant4.web.cern.ch/geant4/"/>
+  <lib name="G4FR"/>
+  <lib name="G4modeling"/>
+  <lib name="G4RayTracer"/>
+  <lib name="G4Tree"/>
+  <lib name="G4visHepRep"/>
+  <lib name="G4vis_management"/>
+  <lib name="G4visXXX"/>
+  <lib name="G4VRML"/>
+  <lib name="G4GMocren"/>
+  <lib name="G4zlib"/>
+  <use name="geant4core"/>
+</tool>

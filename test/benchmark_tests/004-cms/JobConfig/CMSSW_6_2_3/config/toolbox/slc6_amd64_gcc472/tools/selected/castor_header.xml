@@ -1,0 +1,7 @@
+<tool name="castor_header" version="2.1.13.9-cms2">
+  <client>
+    <environment name="CASTOR_HEADER_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/castor/2.1.13.9-cms2"/>
+    <environment name="INCLUDE" default="$CASTOR_HEADER_BASE/include"/>
+    <environment name="INCLUDE" default="$CASTOR_HEADER_BASE/include/shift"/>
+  </client>
+</tool>

@@ -1,0 +1,9 @@
+<tool name="toprex" version="4.23-cms2">
+  <lib name="toprex"/>
+  <client>
+    <environment name="TOPREX_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/toprex/4.23-cms2"/>
+    <environment name="LIBDIR" default="$TOPREX_BASE/lib"/>
+  </client>
+  <use name="toprex_headers"/>
+  <use name="f77compiler"/>
+</tool>

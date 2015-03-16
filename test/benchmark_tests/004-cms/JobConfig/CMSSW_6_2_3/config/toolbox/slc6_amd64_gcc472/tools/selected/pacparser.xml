@@ -1,0 +1,10 @@
+<tool name="pacparser" version="1.3.1">
+  <info url="http://code.google.com/p/pacparser/"/>
+  <lib name="pacparser"/>
+  <client>
+    <environment name="PACPARSER_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/pacparser/1.3.1"/>
+    <environment name="LIBDIR" default="$PACPARSER_BASE/lib"/>
+    <environment name="INCLUDE" default="$PACPARSER_BASE/include"/>
+  </client>
+  <runtime name="PATH" value="$PACPARSER_BASE/bin" type="path"/>
+</tool>

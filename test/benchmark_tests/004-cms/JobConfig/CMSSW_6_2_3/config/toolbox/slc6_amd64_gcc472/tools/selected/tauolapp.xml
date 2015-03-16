@@ -1,0 +1,11 @@
+<tool name="tauolapp" version="1.0.5-cms3">
+  <lib name="TauolaCxxInterface"/>
+  <lib name="TauolaFortran"/>
+  <client>
+    <environment name="TAUOLAPP_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/tauolapp/1.0.5-cms3"/>
+    <environment name="LIBDIR" default="$TAUOLAPP_BASE/lib"/>
+    <environment name="INCLUDE" default="$TAUOLAPP_BASE/include"/>
+  </client>
+  <use name="hepmc"/>
+  <use name="f77compiler"/>
+</tool>

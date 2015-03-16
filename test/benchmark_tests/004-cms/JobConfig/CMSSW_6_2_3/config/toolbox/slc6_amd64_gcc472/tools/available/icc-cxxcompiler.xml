@@ -1,0 +1,31 @@
+  <tool name="icc-cxxcompiler" version="composer_xe_2013.2.146" type="compiler">
+    <use name="gcc-cxxcompiler"/>
+    <client>
+      <environment name="ICC_CXXCOMPILER_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/icc/composer_xe_2013.2.146/installation" handler="warn"/>
+      <environment name="CXX" value="$ICC_CXXCOMPILER_BASE/bin/intel64/icpc" handler="warn"/>
+    </client>
+    # drop flags not supported by llvm
+    # -Wno-non-template-friend removed since it's not supported, yet, by llvm.
+    <flags REM_CXXFLAGS="-Wno-non-template-friend"/>
+    <flags REM_CXXFLAGS="-Werror=format-contains-nul"/>
+    <flags REM_CXXFLAGS="-Wno-vla"/>
+    <flags REM_CXXFLAGS="-Wstrict-overflow"/>
+    <flags REM_CXXFLAGS="-Wno-strict-overflow"/>
+    <flags REM_CXXFLAGS="-fipa-pta"/>
+    <flags REM_CXXFLAGS="-felide-constructors"/>
+    <flags REM_CXXFLAGS="-fdiagnostics-show-option"/>
+    <flags REM_CXXFLAGS="-Wno-non-template-friend"/>
+    <flags REM_CXXFLAGS="-Werror=format-contains-nul"/>
+    <flags REM_CXXFLAGS="-Wunknown-pragmas"/>
+    <flags REM_CXXFLAGS="-ftree-vectorize"/>
+    <flags REM_CXXFLAGS="-Wno-unused-local-typedefs"/>
+    <flags REM_CXXFLAGS="-std=c++0x"/>
+    <flags REM_LDFLAGS="-Wl,--icf=all"/>
+    <flags CXXFLAGS="-Wno-unknown-pragmas"/>
+    <flags CXXFLAGS="-axSSE3"/>
+    <flags CXXFLAGS="-std=c++11"/>
+    <runtime name="LD_LIBRARY_PATH" value="$ICC_CXXCOMPILER_BASE/compiler/lib/intel64" type="path" handler="warn"/>
+    <runtime name="PATH" value="$ICC_CXXCOMPILER_BASE/bin/intel64" type="path" handler="warn"/>
+    <runtime name="COMPILER_RUNTIME_OBJECTS" value="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/gcc/4.7.2-cms" handler="warn"/>
+    <runtime name="INTEL_LICENSE_FILE" value="28518@lxlic01.cern.ch,28518@lxlic02.cern.ch,28518@lxlic03.cern.ch:$ICC_CXXCOMPILER_BASE/licenses:/opt/intel/licenses" handler="warn"/>
+  </tool>

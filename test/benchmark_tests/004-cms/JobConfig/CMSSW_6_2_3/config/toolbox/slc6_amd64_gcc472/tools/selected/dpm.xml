@@ -1,0 +1,8 @@
+<tool name="dpm" version="1.8.0.1-cms">
+  <lib name="dpm"/>
+  <client>
+    <environment name="DPM_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/dpm/1.8.0.1-cms"/>
+    <environment name="INCLUDE" default="$DPM_BASE/include"/>
+    <environment name="LIBDIR" default="$DPM_BASE/lib"/>
+  </client>
+</tool>

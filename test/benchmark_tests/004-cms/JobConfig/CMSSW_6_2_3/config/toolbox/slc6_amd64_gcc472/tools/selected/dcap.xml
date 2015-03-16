@@ -1,0 +1,8 @@
+<tool name="dcap" version="2.47.5.0-cms2">
+  <lib name="dcap"/>
+  <client>
+    <environment name="DCAP_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/dcap/2.47.5.0-cms2"/>
+    <environment name="LIBDIR" default="$DCAP_BASE/lib"/>
+    <environment name="INCLUDE" default="$DCAP_BASE/include"/>
+  </client>
+</tool>

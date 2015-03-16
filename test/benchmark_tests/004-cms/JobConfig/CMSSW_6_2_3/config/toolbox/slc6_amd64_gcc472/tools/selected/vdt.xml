@@ -1,0 +1,8 @@
+<tool name="vdt" version="v0.3.2-cms">
+  <lib name="vdt"/>
+  <client>
+    <environment name="VDT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/cms/vdt/v0.3.2-cms"/>
+    <environment name="LIBDIR" default="$VDT_BASE/lib"/>
+    <environment name="INCLUDE" default="$VDT_BASE/include"/>
+  </client>
+</tool>

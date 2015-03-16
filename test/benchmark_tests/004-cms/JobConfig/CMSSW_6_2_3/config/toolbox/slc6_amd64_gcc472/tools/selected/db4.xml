@@ -1,0 +1,10 @@
+<tool name="db4" version="4.4.20-cms">
+  <lib name="db"/>
+  <client>
+    <environment name="DB4_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/db4/4.4.20-cms"/>
+    <environment name="LIBDIR" default="$DB4_BASE/lib"/>
+    <environment name="INCLUDE" default="$DB4_BASE/include"/>
+    <environment name="BINDIR" default="$DB4_BASE/bin"/>
+  </client>
+  <runtime name="PATH" value="$BINDIR" type="path"/>
+</tool>

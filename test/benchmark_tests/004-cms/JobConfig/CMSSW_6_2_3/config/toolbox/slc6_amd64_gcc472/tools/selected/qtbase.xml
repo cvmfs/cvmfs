@@ -1,0 +1,19 @@
+<tool name="qtbase" version="4.8.1-cms">
+  <info url="http://qt-project.org"/>
+  <lib name="QtCore"/>
+  <lib name="QtXml"/>
+  <client>
+    <environment name="QTBASE_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/qt/4.8.1-cms"/>
+    <environment name="LIBDIR" default="$QTBASE_BASE/lib"/>
+    <environment name="INCLUDE" default="$QTBASE_BASE/include"/>
+    <environment name="INCLUDE" default="$QTBASE_BASE/include/Qt"/>
+    <environment name="INCLUDE" default="$QTBASE_BASE/include/QtCore"/>
+    <environment name="INCLUDE" default="$QTBASE_BASE/include/QtXml"/>
+  </client>
+  <flags cppdefines="QT_ALTERNATE_QTSMANIP QT_CLEAN_NAMESPACE QT_THREAD_SUPPORT"/>
+  <runtime name="PATH" value="$QTBASE_BASE/bin" type="path"/>
+  <runtime name="QTDIR" value="$QTBASE_BASE" type="path"/>
+  <runtime name="QTINC" value="$QTBASE_BASE/include" type="path"/>
+  <runtime name="QTLIB" value="$QTBASE_BASE/lib" type="path"/>
+  <use name="zlib"/>
+</tool>

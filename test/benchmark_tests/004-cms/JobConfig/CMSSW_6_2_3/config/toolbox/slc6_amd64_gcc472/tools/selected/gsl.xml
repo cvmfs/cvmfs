@@ -1,0 +1,10 @@
+<tool name="gsl" version="1.10-cms">
+  <info url="http://www.gnu.org/software/gsl/gsl.html"/>
+  <lib name="gsl"/>
+  <lib name="gslcblas"/>
+  <client>
+    <environment name="GSL_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/gsl/1.10-cms"/>
+    <environment name="LIBDIR" default="$GSL_BASE/lib"/>
+    <environment name="INCLUDE" default="$GSL_BASE/include"/>
+  </client>
+</tool>

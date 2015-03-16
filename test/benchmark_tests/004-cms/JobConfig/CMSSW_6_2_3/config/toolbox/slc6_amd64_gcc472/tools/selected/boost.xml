@@ -1,0 +1,13 @@
+<tool name="boost" version="1.51.0-cms5">
+  <info url="http://www.boost.org"/>
+  <lib name="boost_thread"/>
+  <lib name="boost_signals"/>
+  <lib name="boost_date_time"/>
+  <client>
+    <environment name="BOOST_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/boost/1.51.0-cms5"/>
+    <environment name="LIBDIR" default="$BOOST_BASE/lib"/>
+    <environment name="INCLUDE" default="$BOOST_BASE/include"/>
+  </client>
+  <runtime name="CMSSW_FWLITE_INCLUDE_PATH" value="$BOOST_BASE/include" type="path"/>
+  <use name="sockets"/>
+</tool>

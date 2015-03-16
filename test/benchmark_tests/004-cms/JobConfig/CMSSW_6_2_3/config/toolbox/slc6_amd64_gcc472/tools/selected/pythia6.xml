@@ -1,0 +1,11 @@
+<tool name="pythia6" version="426-cms">
+  <lib name="pythia6"/>
+  <lib name="pythia6_dummy"/>
+  <lib name="pythia6_pdfdummy"/>
+  <client>
+    <environment name="PYTHIA6_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/pythia6/426-cms"/>
+    <environment name="LIBDIR" default="$PYTHIA6_BASE/lib"/>
+  </client>
+  <use name="pythia6_headers"/>
+  <use name="f77compiler"/>
+</tool>

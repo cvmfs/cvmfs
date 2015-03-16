@@ -1,0 +1,58 @@
+- Operating system:
+Linux cvm-molina.cern.ch 3.10.64-85.cernvm.x86_64 #1 SMP Fri Jan 9 09:53:29 CET 2015 x86_64 x86_64 x86_64 GNU/Linux
+
+
+- CernVM-FS version:
+CernVM-FS version 2.1.21
+
+
+- cvmfs2 executable md5:
+efb9ebe1eb63ab21162b094ff1940a7f  /usr/bin/cvmfs2
+
+
+- CernVM-FS talk:
+Inode Generation:
+  init-catalog-revision: 758  current-catalog-revision: 758  incarnation: 0  inode generation: 0
+File System Call Statistics:
+  lookup(all): 4199  lookup(negative): 2527  stat(): 6285  open(): 2931  diropen(): 465  read(): 19348  readlink(): 182  forget(): 0
+File Catalog Memory Cache:
+  inode cache:   size: 5568  hits: 9422  misses: 441  inserts(all): 441  inserts(negative): 0  collisions: 20  collisions(max): 2  updates: 0  replacements: 0  forgets: 0  drops: 0  allocated: 1624 KB
+  path cache:    size: 5568  hits: 7105  misses: 490  inserts(all): 477  inserts(negative): 0  collisions: 24  collisions(max): 2  updates: 0  replacements: 0  forgets: 0  drops: 0  allocated: 1856 KB
+  md5path cache: size: 39232  hits: 7366  misses: 1975  inserts(all): 1975  inserts(negative): 1021  collisions: 40  collisions(max): 2  updates: 0  replacements: 0  forgets: 0  drops: 0  allocated: 12877 KB
+  inode tracker: inserts: 492  removes: 0  references: 1672  hits(inode): 9341  hits(path): 917  misses(path): 0
+File Catalogs:
+  lookup(inode): 0    lookup(path-all): 2428    lookup(path-negative): 1021    lookup(xattrs): 0    listing: 465    listing nested catalogs: 1624
+Certificate cache:
+  hits: 0    misses: 1
+Path Strings:
+  instances: 90182  overflows: 0
+Name Strings:
+  instances: 129269  overflows: 797
+Symlink Strings:
+  instances: 113440  overflows: 446
+
+Cache Mode: read-write
+Drainout Mode: no
+Maintenance Mode: no
+
+Network Statistics:
+Transferred Bytes: 132517434
+Transfer duration: 29 s
+Number of requests: 326
+Number of retries: 0
+Number of proxy failovers: 0
+Number of host failovers: 0
+Backup proxy group: Primary
+Backup host: Primary
+
+SQlite Statistics:
+  Number of allocations 1585
+  General purpose allocator 348 KB / 353 KB
+  Largest malloc 8192 Bytes
+  Page cache allocations 1558 / 1558
+  Page cache overflows 0 KB / 0 KB
+  Largest page cache allocation 1272 Bytes
+  Scratch allocations 0 / 0
+  Scratch overflows 0 / 0
+  Largest scratch allocation 0 KB
+

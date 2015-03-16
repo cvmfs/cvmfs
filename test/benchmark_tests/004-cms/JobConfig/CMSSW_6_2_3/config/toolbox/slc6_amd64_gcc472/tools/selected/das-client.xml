@@ -1,0 +1,8 @@
+<tool name="das-client" version="1.11.7">
+  <client>
+    <environment name="DAS_CLIENT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/cms/das-client/1.11.7"/>
+  </client>
+  <runtime name="PATH"       value="$DAS_CLIENT_BASE/bin" type="path"/>
+  <runtime name="PYTHONPATH" value="$DAS_CLIENT_BASE/bin" type="path"/>
+  <use name="python"/>
+</tool>

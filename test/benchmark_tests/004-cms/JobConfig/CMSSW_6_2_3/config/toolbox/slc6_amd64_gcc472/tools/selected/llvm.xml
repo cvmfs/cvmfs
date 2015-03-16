@@ -1,0 +1,13 @@
+  <tool name="llvm" version="3.2-cms2">
+    <lib name="clang"/>
+    <client>
+      <environment name="LLVM_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/llvm/3.2-cms2"/>
+      <environment name="LIBDIR" default="$LLVM_BASE/lib"/>
+      <environment name="INCLUDE" default="$LLVM_BASE/include"/>
+    </client>
+    <flags LDFLAGS="-Wl,-undefined -Wl,suppress"/>
+    <flags CXXFLAGS="-D_DEBUG -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS"/>
+    <flags CXXFLAGS="-D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -O3 "/>
+    <flags CXXFLAGS="-fomit-frame-pointer -fPIC -Wno-enum-compare "/>
+    <flags CXXFLAGS="-Wno-strict-aliasing -fno-rtti"/>
+  </tool>
