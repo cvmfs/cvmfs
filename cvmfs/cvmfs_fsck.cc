@@ -332,7 +332,7 @@ int main(int argc, char **argv) {
            atomic_read32(&g_num_files));
 
   if (atomic_read32(&g_num_tmp_catalog) > 0)
-    LogCvmfs(kLogCvmfs, kLogStdout, "Temorary file catalogs were found.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Temporary file catalogs were found.");
 
   if (atomic_read32(&g_force_rebuild)) {
     if (unlink("cachedb") == 0) {
