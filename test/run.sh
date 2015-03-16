@@ -105,7 +105,7 @@ setup_environment() {
   fi
 
   # if the test is a benchmark we have to configure the environment
-  if [ "$cvmfs_benchmark" = "yes" ]; then
+  if [ x"$cvmfs_benchmark" = x"yes" ]; then
     setup_benchmark_environment $workdir
   fi
 
@@ -168,8 +168,10 @@ do
   RETVAL=$?
 
   # if the test is a benchmark we have to collect the results before removing the folder
-  if [ "$cvmfs_benchmark" = "yes" ]; then
+  if [ x"$cvmfs_benchmark" = x"yes" ]; then
     collect_benchmark_results
+    umount /cvmfs/$FQRN > /dev/null 2>&1
+    umount -l /cvmfs/$FQRN > /dev/null 2>&1
   fi
 
   # check the final test result
@@ -216,3 +218,4 @@ echo "Failures: $num_failures"
 echo ""
 
 exit $num_failures
+
