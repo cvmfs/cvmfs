@@ -1,4 +1,0 @@
-<tool name="lhapdfwrap" version="5.8.5-cms5">
-  <lib name="LHAPDFWrap"/>
-  <use name="lhapdf"/>
-</tool>

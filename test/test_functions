@@ -1207,7 +1207,7 @@ wait_fqrn_mount() {
   local waits=0
   while ! mount | grep -q "/cvmfs/${FQRN}"; do
     waits=$(( waits + 1 ))
-    if [ "$waits" -ge 10 ]; then
+    if [ "$waits" -ge 15 ]; then
       die "${FQRN} could not be mounted"
     fi
     sleep 1
@@ -1218,7 +1218,7 @@ wait_fqrn_mount() {
 # runs the command once in order to get a warm cache
 create_warm_cache() {
   local workspace=$1
-  cvmfs2 -d -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN > /dev/null 2>&1 &
+  cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 & #> /dev/null 2>&1 &
   wait_fqrn_mount
 
   cvmfs_run_benchmark 2>&1

@@ -1,7 +1,0 @@
-<tool name="py2-pycurl" version="7.19.0-cms7">
-  <client>
-    <environment name="PY2_PYCURL_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/py2-pycurl/7.19.0-cms7"/>
-  </client>
-  <runtime name="PYTHONPATH" value="$PY2_PYCURL_BASE/lib/python2.7/site-packages" type="path"/>
-  <use name="python"/>
-</tool>

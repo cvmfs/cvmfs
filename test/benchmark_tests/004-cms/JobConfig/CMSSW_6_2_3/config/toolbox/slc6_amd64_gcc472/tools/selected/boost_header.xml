@@ -1,7 +1,0 @@
-<tool name="boost_header" version="1.51.0-cms5">
-  <info url="http://www.boost.org"/>
-  <client>
-    <environment name="BOOSTHEADER_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/boost/1.51.0-cms5"/>
-    <environment name="INCLUDE" default="$BOOSTHEADER_BASE/include"/>
-  </client>
-</tool>

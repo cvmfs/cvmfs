@@ -1,6 +1,0 @@
-<tool name="cascade_headers" version="2.2.04-cms5">
-  <client>
-    <environment name="CASCADE_HEADERS_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/cascade/2.2.04-cms5"/>
-    <environment name="INCLUDE" default="$CASCADE_HEADERS_BASE/include"/>
-  </client>
-</tool>

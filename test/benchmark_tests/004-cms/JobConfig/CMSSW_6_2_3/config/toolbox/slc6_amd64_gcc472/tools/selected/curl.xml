@@ -1,9 +1,0 @@
-<tool name="curl" version="7.28.0-cms3">
-  <lib name="curl"/>
-  <client>
-    <environment name="CURL_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/curl/7.28.0-cms3"/>
-    <environment name="INCLUDE"      default="$CURL_BASE/include"/>
-    <environment name="LIBDIR"       default="$CURL_BASE/lib"/>
-  </client>
-  <runtime name="PATH" value="$CURL_BASE/bin" type="path"/>
-</tool>

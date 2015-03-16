@@ -1,8 +1,0 @@
-<tool name="roofit" version="5.34.07-cms">
-  <info url="http://root.cern.ch/root/"/>
-  <lib name="RooFit"/>
-  <use name="roofitcore"/>
-  <use name="rootcore"/>
-  <use name="rootmath"/>
-  <use name="roothistmatrix"/>
-</tool>

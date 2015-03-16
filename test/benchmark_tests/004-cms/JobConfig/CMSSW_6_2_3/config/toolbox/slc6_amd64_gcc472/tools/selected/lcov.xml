@@ -1,7 +1,0 @@
-<tool name="lcov" version="1.9-cms">
-  <info url="http://ltp.sourceforge.net/coverage/lcov.php"/>
-  <client>
-    <environment name="LCOV_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/lcov/1.9-cms"/>
-  </client>
-  <runtime name="PATH" value="$LCOV_BASE/bin" type="path"/>
-</tool>

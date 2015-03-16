@@ -1,6 +1,0 @@
-<tool name="jimmy_headers" version="4.2-cms6">
-  <client>
-    <environment name="JIMMY_HEADERS_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/jimmy/4.2-cms6"/>
-    <environment name="INCLUDE" default="$JIMMY_HEADERS_BASE/include"/>
-  </client>
-</tool>

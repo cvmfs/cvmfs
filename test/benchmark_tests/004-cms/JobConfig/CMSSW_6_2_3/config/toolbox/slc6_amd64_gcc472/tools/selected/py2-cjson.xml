@@ -1,7 +1,0 @@
-<tool name="py2-cjson" version="1.0.5-cms5">
-  <client>
-    <environment name="PY2_CJSON_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/py2-cjson/1.0.5-cms5"/>
-  </client>
-  <runtime name="PYTHONPATH" value="$PY2_CJSON_BASE/lib/python2.7/site-packages" type="path"/>
-  <use name="python"/>
-</tool>

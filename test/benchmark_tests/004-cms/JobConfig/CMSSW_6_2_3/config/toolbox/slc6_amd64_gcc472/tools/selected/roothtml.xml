@@ -1,5 +1,0 @@
-<tool name="roothtml" version="5.34.07-cms">
-  <info url="http://root.cern.ch/root/"/>
-  <lib name="Html"/>
-  <use name="rootgpad"/>
-</tool>

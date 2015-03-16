@@ -1,8 +1,0 @@
-<tool name="gdbm" version="1.10-cms">
-  <lib name="gdbm"/>
-  <client>
-    <environment name="GDBM_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/gdbm/1.10-cms"/>
-    <environment name="LIBDIR" default="$GDBM_BASE/lib"/>
-    <environment name="INCLUDE" default="$GDBM_BASE/include"/>
-  </client>
-</tool>

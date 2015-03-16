@@ -1,6 +1,0 @@
-  <tool name="sockets" version="1.0">
-    <lib name="nsl"/>
-    <lib name="crypt"/>
-    <lib name="dl"/>
-    <lib name="rt"/>
-  </tool>

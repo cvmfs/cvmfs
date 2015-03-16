@@ -1,7 +1,0 @@
-<tool name="cvs2git" version="5419-cms">
-  <client>
-    <environment name="CVS2GIT_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/cvs2git/5419-cms"/>
-  </client>
-  <runtime name="PYTHONPATH" value="$CVS2GIT_BASE/lib" type="path"/>
-  <runtime name="PATH" value="$CVS2GIT_BASE/bin" type="path"/>
-</tool>

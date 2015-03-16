@@ -1,6 +1,0 @@
-  <tool name="distcc-f77compiler" version="3.2rc1-cms3" type="compiler">
-    <use name="gcc-f77compiler"/>
-    <client>
-      <environment name="FC" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/distcc/3.2rc1-cms3/bin/gfortran"/>
-    </client>
-  </tool>

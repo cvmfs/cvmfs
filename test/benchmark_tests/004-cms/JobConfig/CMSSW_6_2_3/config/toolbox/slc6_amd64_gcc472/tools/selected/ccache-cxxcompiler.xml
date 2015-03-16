@@ -1,7 +1,0 @@
-  <tool name="ccache-cxxcompiler" version="" type="compiler">
-    <use name="gcc-cxxcompiler"/>
-    <client>
-      <environment name="CXX" value="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/ccache/3.1.8-cms/bin/c++"/>
-      <environment name="BUILDENV_CCACHE_BASEDIR" value="$LOCALTOP" handler="warn"/>
-    </client>
-  </tool>

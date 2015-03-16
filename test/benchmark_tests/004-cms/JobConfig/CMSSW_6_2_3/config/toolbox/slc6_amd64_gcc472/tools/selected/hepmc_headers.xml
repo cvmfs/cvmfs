@@ -1,6 +1,0 @@
-<tool name="hepmc_headers" version="2.06.07-cms3">
-  <client>
-    <environment name="HEPMC_HEADERS_BASE" default="/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/hepmc/2.06.07-cms3"/>
-    <environment name="INCLUDE" default="$HEPMC_HEADERS_BASE/include"/>
-  </client>
-</tool>
