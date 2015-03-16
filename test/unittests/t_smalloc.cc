@@ -1,7 +1,12 @@
+/**
+ * This file is part of the CernVM File System.
+ */
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/smalloc.h"
+
 #include <cassert>
+
 #define SIZE_MAX 18446744073709551615UL
 
 TEST(smalloc, simpleTest) {
