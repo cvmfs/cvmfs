@@ -170,8 +170,7 @@ do
   # if the test is a benchmark we have to collect the results before removing the folder
   if [ x"$cvmfs_benchmark" = x"yes" ]; then
     collect_benchmark_results
-    umount /cvmfs/$FQRN > /dev/null 2>&1
-    umount -l /cvmfs/$FQRN > /dev/null 2>&1
+    cvmfs_umount $FQRN > /dev/null 2>&1
   fi
 
   # check the final test result
