@@ -1,0 +1,35 @@
+
+cvmfs_test_name="ALICE benchmark"
+cvmfs_test_autofs_on_startup=false
+cvmfs_benchmark="yes"
+
+FQRN=alice.cern.ch
+
+
+cvmfs_run_benchmark() {
+  set -e
+  local original_dir=$(pwd)
+  source /cvmfs/alice.cern.ch/etc/login.sh
+  eval `alienv printenv AliRoot/v5-05-Rev-30`
+  cd $test_location/ppbench
+  aliroot -b -q sim.C
+  aliroot -q -b rec.C
+  aliroot -b -q ${ALICE_ROOT}/STEER/CheckESD.C
+  rm -rf *.root *.dat *.log fort* hlt hough raw* recraw/*.root recraw/*.log GRP QAImageSim0.ps QAImageRec0.ps
+  cd $original_dir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  test_location=$2
+
+  sudo mkdir -p /cvmfs/alice-ocdb.cern.ch
+  sudo mount -t cvmfs alice-ocdb.cern.ch /cvmfs/alice-ocdb.cern.ch
+
+  run_benchmark
+  local return_code=$?
+
+  cvmfs_umount alice-ocdb.cern.ch
+
+  return $return_code
+}

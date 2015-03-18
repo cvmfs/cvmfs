@@ -1,0 +1,24 @@
+
+cvmfs_test_name="LHCB benchmark"
+cvmfs_test_autofs_on_startup=false
+cvmfs_benchmark="yes"
+
+FQRN=lhcb.cern.ch
+
+
+cvmfs_run_benchmark() {
+  set -e
+  source /cvmfs/lhcb.cern.ch/etc/login.sh
+  . SetupProject.sh Brunel v45r1 --use PRConfig
+  gaudirun.py $test_location/PRTEST-COLLISION10-1evts.py
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  test_location=$2
+
+  run_benchmark
+  local return_code=$?
+
+  return $return_code
+}
