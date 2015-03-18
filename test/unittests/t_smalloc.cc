@@ -6,16 +6,17 @@
 
 #include "../../cvmfs/smalloc.h"
 
-/** Tests for smalloc
+/**
+ * Tests for smalloc
  *
- *  According to the specifications, malloc(0) will return either
- *  "a null pointer or a unique pointer that can be successfully
- *  passed to free()", so we cannot test it properly.
- *  Due to our 'smalloc' implementation we cannot test it on 0, too.
- *  
- *  Also we cannot properly test 'smalloc' on the largest size of 
- *  memory that it could handle.
- *  It depends on the platform that cvmfs is working on.
+ * According to the specifications, malloc(0) will return either
+ * "a null pointer or a unique pointer that can be successfully
+ * passed to free()", so we cannot test it properly.
+ * Due to our 'smalloc' implementation we cannot test it on 0, too.
+ * 
+ * Also we cannot properly test 'smalloc' on the largest size of 
+ * memory that it could handle.
+ * It depends on the platform that cvmfs is working on.
  */
 
 TEST(T_Smalloc, SmallSizeAllocation) {
@@ -30,7 +31,8 @@ TEST(T_Smalloc, LargeSizeAllocation) {
   free(p);
 }
 
-/** Can't be tested here because of assertions in smalloc implementation
+/**
+ * Can't be tested here because of assertions in smalloc implementation
  *
  * TEST(T_Smalloc, NegativeSizeAllocation) {
  *   EXPECT_TRUE(NULL == smalloc(-sizeof(int)));
@@ -62,7 +64,8 @@ TEST(T_Srealloc, ReallocationOfNullPtr) {
   free(p);
 }
 
-/** Can't be tested here because of assertions in srealloc implementation
+/**
+ * Can't be tested here because of assertions in srealloc implementation
  *
  * TEST(T_Srealloc, ZeroSizeReallocation) {
  *   void* p = smalloc(sizeof(int));
@@ -99,7 +102,8 @@ TEST(T_Smmap, Mmapping) {
 }
 
 
-/** Tests for smunmap
+/**
+ * Tests for smunmap
  *
- *  There's nothing we can test now.
+ * There's nothing we can test now.
  */
