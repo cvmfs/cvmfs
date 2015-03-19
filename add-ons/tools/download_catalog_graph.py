@@ -40,7 +40,7 @@ while True:
     for catalog in MerkleCatalogTreeIterator(repo, root_clg, visited_hashes):
         if catalog.is_root():
             print "Downloading revision" , catalog.revision , "..."
-        catalog.save_to(dest + "/" + catalog.hash)
+        catalog.save_to(dest + "/" + catalog.hash + "C")
         repo.close_catalog(catalog)
 
     if next_root_clg != None:
