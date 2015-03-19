@@ -38,6 +38,9 @@ class CompressedObject:
     def get_compressed_file(self):
         return self.compressed_file_
 
+    def get_uncompressed_file(self):
+        return self.file_
+
     def _decompress(self):
         """ Unzip a file to a temporary referenced by self.file_ """
         self.file_ = tempfile.NamedTemporaryFile('w+b')
