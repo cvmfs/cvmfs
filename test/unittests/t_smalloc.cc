@@ -16,25 +16,25 @@ class T_Smalloc : public ::testing::Test {
 };
  
 TEST_F(T_Smalloc, Basics) {
- void *mem = smalloc(1024);//allocating 1kB of memory
- EXPECT_FALSE(mem==NULL); //successful allocation
- EXPECT_EQ(NULL, smalloc(BIGNO)); //failed allocation,
+ void *mem = smalloc(1024);
+ EXPECT_FALSE(mem==NULL); 
+ EXPECT_EQ(NULL, smalloc(BIGNO));
  free(mem);
 }
  
 TEST_F(T_Srealloc, Basics) {
- void *mem =smalloc(1024); //allocate memory
- EXPECT_FALSE(p==NULL); //successful allocation of memory
- mem = srealloc(mem, 512); //reallocate memory
- EXPECT_FALSE(mem==NULL); //successful reallocation of memory
+ void *mem =smalloc(1024); 
+ EXPECT_FALSE(p==NULL); 
+ mem = srealloc(mem, 512);
+ EXPECT_FALSE(mem==NULL); 
  free(mem);
 }
  
 TEST_F(T_Scalloc, Basics) {
  size_t size=128; 
  int *mem=static_cast<int*>(scalloc(4, sizeof(int));
- EXPECT_FALSE(mem==NULL);//succcesful allocation of 4 elements of size equal to int
- EXPECT_TRUE(NULL==smalloc(-2,BIGNO));//failed allocation, overflow and negative items
- EXPECT_TRUE(NULL==smalloc((rand()%10)*BIGNO , (rand()%5)*BIGNO);//failed allocation, overflow
+ EXPECT_FALSE(mem==NULL);
+ EXPECT_TRUE(NULL==smalloc(-2,BIGNO));
+ EXPECT_TRUE(NULL==smalloc((rand()%10)*BIGNO , (rand()%5)*BIGNO);
  free(mem);
 }
