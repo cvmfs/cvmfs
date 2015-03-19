@@ -2,7 +2,6 @@
 
 import cvmfs
 import sys
-import shutil
 
 class MerkleCatalogTreeIterator(cvmfs.CatalogTreeIterator):
     def __init__(self, repository, root_catalog, visited_hashes = set()):
@@ -41,7 +40,7 @@ while True:
     for catalog in MerkleCatalogTreeIterator(repo, root_clg, visited_hashes):
         if catalog.is_root():
             print "Downloading revision" , catalog.revision , "..."
-        shutil.copyfile(catalog.get_compressed_file().name, dest + "/" + catalog.hash)
+        catalog.save_to(dest + "/" + catalog.hash)
         repo.close_catalog(catalog)
 
     if next_root_clg != None:
