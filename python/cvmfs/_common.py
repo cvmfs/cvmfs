@@ -100,7 +100,7 @@ class FileObject(CompressedObject):
         CompressedObject.__init__(self, compressed_file)
 
     def file(self):
-        return self.file_
+        return self.get_uncompressed_file()
 
 def _binary_buffer_to_hex_string(binbuf):
     return "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,binbuf)))
