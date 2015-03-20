@@ -1,40 +1,51 @@
 /**
  * This file is part of the CernVM File System.
  */
-#include <gtest/gtest.h>
- 
-#include <stdlib.h>
- 
+
+#include "gtest/gtest.h"
+
 #include "../../cvmfs/smalloc.h"
- 
-#define BIGNO 98489748654818644685
- 
-class T_Smalloc : public ::testing::Test {
- protected:
-  virtual void SetUp() {
+
+TEST(T_Smalloc, 1byteAllocation) {
+  void *mem = smalloc(1);
+  EXPECT_TRUE(NULL != mem);
+  free(mem);
+}
+
+TEST(T_Smalloc, 2gBAllocation) {
+  void* mem = smalloc(2147483648);
+  EXPECT_TRUE(NULL != mem);
+  free(mem);
+}
+
+TEST(T_Smalloc, ZeroAllocation) {
+  void* mem = smalloc(0);
+  EXPECT_TRUE(NULL != mem);
+  free(mem);
+}
+
+TEST(T_Srealloc, GrowNULL) {
+  void* mem = NULL;
+  mem = srealloc(mem, 512);
+  EXPECT_TRUE(NULL != mem);
+  free(mem);
+}
+
+TEST(T_Srealloc, reAlloc) {
+  void* mem = smalloc(1024);
+  EXPECT_TRUE(NULL != mem);
+  mem = srealloc(mem, 2048);
+  EXPECT_TRUE(NULL != mem);
+  mem = srealloc(mem, 512);
+  EXPECT_TRUE(NULL != mem);
+  free(mem);
+}
+
+TEST(T_Scalloc, calloc) {
+  int* mem = static_cast<int*>(scalloc(16, 32));
+  ASSERT_TRUE(NULL != mem);
+  for (const int* ptr = mem; ptr < mem+16; ptr++) {
+    EXPECT_EQ(0, *ptr);
   }
-};
- 
-TEST_F(T_Smalloc, Basics) {
- void *mem = smalloc(1024);//allocating 1kB of memory
- EXPECT_FALSE(mem==NULL); //successful allocation
- EXPECT_EQ(NULL, smalloc(BIGNO)); //failed allocation,
- free(mem);
-}
- 
-TEST_F(T_Srealloc, Basics) {
- void *mem =smalloc(1024); //allocate memory
- EXPECT_FALSE(p==NULL); //successful allocation of memory
- mem = srealloc(mem, 512); //reallocate memory
- EXPECT_FALSE(mem==NULL); //successful reallocation of memory
- free(mem);
-}
- 
-TEST_F(T_Scalloc, Basics) {
- size_t size=128; 
- int *mem=static_cast<int*>(scalloc(4, sizeof(int));
- EXPECT_FALSE(mem==NULL);//succcesful allocation of 4 elements of size equal to int
- EXPECT_TRUE(NULL==smalloc(-2,BIGNO));//failed allocation, overflow and negative items
- EXPECT_TRUE(NULL==smalloc((rand()%10)*BIGNO , (rand()%5)*BIGNO);//failed allocation, overflow
- free(mem);
+  free(mem);
 }

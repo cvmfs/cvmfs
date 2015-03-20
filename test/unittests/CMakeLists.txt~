@@ -14,6 +14,7 @@ set (CVMFS_UNITTEST_SOURCES
   main.cc
 
   # unit test files
+  t_smalloc.cc
   t_atomic.cc
   t_smallhash.cc
   t_bigvector.cc
