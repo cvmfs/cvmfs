@@ -5,10 +5,9 @@
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/smalloc.h"
-//#include "../../cvmfs/util.h"
 
 // Debug switcher
-#define SMALLOC_DEBUG_
+//#define SMALLOC_DEBUG_
 
 // Test smalloc
 TEST(T_Smalloc, Smalloc) {
@@ -83,8 +82,22 @@ TEST(T_Smalloc, Scalloc) {
 	}
 }
 
-TEST(T_Smalloc, Smmap) {
+//Test smmap and smunmap
+TEST(T_Smalloc, SmmapAndSunmap) {
+  for (unsigned int size = sizeof(size_t) * 2u; size <= 1024u * 1024u; size = size + 4096u) {
+#ifdef SMALLOC_DEBUG_
+		printf("size is %u.\n", size);
+#endif
+		size_t pages = ((size + 2 * sizeof(size_t)) + 4095) / 4096; 
+		void *mem = smmap(size);
+		EXPECT_FALSE(mem == NULL);
+		unsigned char *area = static_cast<unsigned char *>(mem);
+		area = area - sizeof(size_t);
+		size_t _pages = *(reinterpret_cast<size_t *>(area));
+    EXPECT_EQ(_pages, pages);
+		area = area - sizeof(size_t);
+    EXPECT_EQ(*(reinterpret_cast<size_t *>(area)), kMemMarker);
+		smunmap(mem);
+	}
 }
 
-TEST(T_Smalloc, Smunmap) {
-}
