@@ -82,7 +82,7 @@ TEST(T_Smalloc, Scalloc) {
 #endif
     int *mem = static_cast<int *>(scalloc(num, size));
     EXPECT_FALSE(mem == NULL);
-    for (const int *tmp = mem; tmp < mem + num; tmp++) {
+    for (const int *tmp = mem; tmp < num * size; tmp++) {
       EXPECT_EQ(*tmp, 0);
     }
     free(mem);
