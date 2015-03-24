@@ -739,9 +739,9 @@ CatalogManager::CatalogManager(const string &repo_name,
   download_manager_ = download_manager;
   offline_mode_ = false;
   loaded_inodes_ = all_inodes_ = 0;
-  certificate_hits_ = statistics->Register("cache.n_certificate_hits",
+  n_certificate_hits_ = statistics->Register("cache.n_certificate_hits",
       "Number of certificate hits");
-  certificate_misses_ = statistics->Register("cache.n_certificate_misses",
+  n_certificate_misses_ = statistics->Register("cache.n_certificate_misses",
       "Number of certificate misses");
 }
 
@@ -1088,9 +1088,9 @@ void ManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   bool retval = Open2Mem(hash, &cert_buf, &size);
   cert_size = size;
   if (retval)
-    perf::Inc(catalog_mgr_->certificate_hits_);
+    perf::Inc(catalog_mgr_->n_certificate_hits_);
   else
-    perf::Inc(catalog_mgr_->certificate_misses_);
+    perf::Inc(catalog_mgr_->n_certificate_misses_);
 }
 
 }  // namespace cache

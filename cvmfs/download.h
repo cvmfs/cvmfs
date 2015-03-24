@@ -85,25 +85,25 @@ inline const char *Code2Ascii(const Failures error) {
 
 
 struct Counters {
-  perf::Counter *transferred_bytes;
-  perf::Counter *transfer_time;  // measured in miliseconds
-  perf::Counter *num_requests;
-  perf::Counter *num_retries;
-  perf::Counter *num_proxy_failover;
-  perf::Counter *num_host_failover;
+  perf::Counter *no_transferred_bytes;
+  perf::Counter *sz_transfer_time;  // measured in miliseconds
+  perf::Counter *n_num_requests;
+  perf::Counter *n_num_retries;
+  perf::Counter *n_proxy_failover;
+  perf::Counter *n_host_failover;
 
   explicit Counters(perf::Statistics *statistics) {
-    transferred_bytes = statistics->Register("download.no_transferred_bytes",
+    no_transferred_bytes = statistics->Register("download.no_transferred_bytes",
         "Number of transferred bytes");
-    transfer_time = statistics->Register("download.no_transfer_time",
+    sz_transfer_time = statistics->Register("download.sz_transfer_time",
         "Transfer time (miliseconds)");
-    num_requests = statistics->Register("download.n_num_requests",
+    n_num_requests = statistics->Register("download.n_num_requests",
         "Number of requests");
-    num_retries = statistics->Register("download.n_num_retries",
+    n_num_retries = statistics->Register("download.n_num_retries",
         "Number of retries");
-    num_proxy_failover = statistics->Register("download.n_num_proxy_failover",
+    n_proxy_failover = statistics->Register("download.n_num_proxy_failover",
         "Number of proxy failovers");
-    num_host_failover = statistics->Register("download.n_num_host_failover",
+    n_host_failover = statistics->Register("download.n_num_host_failover",
         "Number of host failovers");
   }
 
