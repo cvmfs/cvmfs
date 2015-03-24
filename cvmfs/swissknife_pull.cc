@@ -403,7 +403,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   atomic_init64(&overall_chunks);
   atomic_init64(&overall_new);
   atomic_init64(&chunk_queue);
-  g_download_manager->Init(num_parallel+1, true);
+  g_download_manager->Init(num_parallel+1, true, g_statistics);
   // download::ActivatePipelining();
   unsigned current_group;
   vector< vector<download::DownloadManager::ProxyInfo> > proxies;
@@ -555,9 +555,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (!retval)
     goto fini;
 
-  if (g_download_manager->GetStatistics().num_retries > 0) {
+  if (g_download_manager->GetCounters().num_retries > 0) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Overall number of retries: %"PRId64,
-             g_download_manager->GetStatistics().num_retries);
+             g_download_manager->GetCounters().num_retries);
   }
 
   // Upload manifest ensemble

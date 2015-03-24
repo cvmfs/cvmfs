@@ -23,6 +23,7 @@
 #include "duplex_curl.h"
 #include "hash.h"
 #include "prng.h"
+#include "statistics.h"
 
 
 namespace download {
@@ -83,25 +84,31 @@ inline const char *Code2Ascii(const Failures error) {
 }
 
 
-struct Statistics {
-  double transferred_bytes;
-  double transfer_time;
-  uint64_t num_requests;
-  uint64_t num_retries;
-  uint64_t num_proxy_failover;
-  uint64_t num_host_failover;
+struct Counters {
+  perf::Counter *transferred_bytes;
+  perf::Counter *transfer_time; // measured in miliseconds
+  perf::Counter *num_requests;
+  perf::Counter *num_retries;
+  perf::Counter *num_proxy_failover;
+  perf::Counter *num_host_failover;
 
-  Statistics() {
-    transferred_bytes = 0.0;
-    transfer_time = 0.0;
-    num_requests = 0;
-    num_retries = 0;
-    num_proxy_failover = 0;
-    num_host_failover = 0;
+  Counters(perf::Statistics *statistics) {
+    transferred_bytes = statistics->Register("download.no_transferred_bytes",
+        "Number of transferred bytes");
+    transfer_time = statistics->Register("download.no_transfer_time",
+        "Transfer time (miliseconds)");
+    num_requests = statistics->Register("download.n_num_requests",
+        "Number of requests");
+    num_retries = statistics->Register("download.n_num_retries",
+        "Number of retries");
+    num_proxy_failover = statistics->Register("download.n_num_proxy_failover",
+        "Number of proxy failovers");
+    num_host_failover = statistics->Register("download.n_num_host_failover",
+        "Number of host failovers");
   }
 
   std::string Print() const;
-};  // Statistics
+};  // Counters
 
 
 /**
@@ -291,7 +298,8 @@ class DownloadManager {
   DownloadManager();
   ~DownloadManager();
 
-  void Init(const unsigned max_pool_handles, const bool use_system_proxy);
+  void Init(const unsigned max_pool_handles,const bool use_system_proxy,
+      perf::Statistics * statistics);
   void Fini();
   void Spawn();
   Failures Fetch(JobInfo *info);
@@ -301,7 +309,7 @@ class DownloadManager {
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
-  const Statistics &GetStatistics();
+  const Counters &GetCounters();
   void SetHostChain(const std::string &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
@@ -462,7 +470,7 @@ class DownloadManager {
 
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
-  Statistics *statistics_;
+  Counters *counters_;
 };  // DownloadManager
 
 }  // namespace download

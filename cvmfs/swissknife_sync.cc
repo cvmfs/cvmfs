@@ -246,7 +246,7 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
            dirtab.RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
-  g_download_manager->Init(1, true);
+  g_download_manager->Init(1, true, g_statistics);
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
@@ -539,7 +539,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (NULL == params.spooler)
     return 3;
 
-  g_download_manager->Init(1, true);
+  g_download_manager->Init(1, true, g_statistics);
 
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,

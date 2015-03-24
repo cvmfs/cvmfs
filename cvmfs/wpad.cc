@@ -226,7 +226,7 @@ static void AltCvmfsLogger(const LogSource source, const int mask,
 }
 
 
-int MainResolveProxyDescription(int argc, char **argv) {
+int MainResolveProxyDescription(int argc, char **argv, perf::Statistics *statistics) {
   SetAltLogFunc(AltCvmfsLogger);
   if (argc < 4) {
     LogCvmfs(kLogDownload, kLogStderr, "arguments missing");
@@ -236,7 +236,7 @@ int MainResolveProxyDescription(int argc, char **argv) {
   string host_list = argv[3];
 
   DownloadManager download_manager;
-  download_manager.Init(1, false);
+  download_manager.Init(1, false, statistics);
   download_manager.SetHostChain(host_list);
   string resolved_proxies = ResolveProxyDescription(proxy_configuration,
                                                     &download_manager);

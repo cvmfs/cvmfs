@@ -7,6 +7,10 @@
 
 #include <string>
 
+namespace perf {
+class Statistics;
+}
+
 namespace download {
 
 class DownloadManager;
@@ -23,7 +27,7 @@ std::string AutoProxy(DownloadManager *download_manager);
 std::string ResolveProxyDescription(const std::string &cvmfs_proxies,
                                     DownloadManager *download_manager);
 
-int MainResolveProxyDescription(int argc, char **argv);
+int MainResolveProxyDescription(int argc, char **argv, perf::Statistics *statistics);
 
 }  // namespace download
 
