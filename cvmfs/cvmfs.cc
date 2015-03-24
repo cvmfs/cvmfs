@@ -339,12 +339,12 @@ static bool UseWatchdog() {
 }
 
 
-void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
-                      lru::Statistics *md5path_stats)
+void GetLruStatistics(lru::Counters *inode_stats, lru::Counters *path_stats,
+                      lru::Counters *md5path_stats)
 {
-  *inode_stats = inode_cache_->statistics();
-  *path_stats = path_cache_->statistics();
-  *md5path_stats = md5path_cache_->statistics();
+  *inode_stats = inode_cache_->counters();
+  *path_stats = path_cache_->counters();
+  *md5path_stats = md5path_cache_->counters();
 }
 
 
@@ -2092,10 +2092,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
     mem_cache_size / static_cast<unsigned>(memcache_unit_size);
   // Number of cache entries must be a multiple of 64
   const unsigned mask_64 = ~((1 << 6) - 1);
-  cvmfs::inode_cache_ = new lru::InodeCache(memcache_num_units & mask_64);
-  cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
+  cvmfs::inode_cache_ = new lru::InodeCache(memcache_num_units & mask_64,
+      cvmfs::statistics_);
+  cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64,
+      cvmfs::statistics_);
   cvmfs::md5path_cache_ =
-    new lru::Md5PathCache((memcache_num_units*7) & mask_64);
+      new lru::Md5PathCache((memcache_num_units*7) & mask_64,
+          cvmfs::statistics_);
   cvmfs::inode_tracker_ = new glue::InodeTracker();
 
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();

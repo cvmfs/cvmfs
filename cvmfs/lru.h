@@ -64,6 +64,7 @@
 #include "shortstring.h"
 #include "smallhash.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "util.h"
 
 namespace lru {
@@ -71,49 +72,48 @@ namespace lru {
 /**
  * Counting of cache operations.
  */
-struct Statistics {
-  int64_t size;
-  atomic_int64 num_hit;
-  atomic_int64 num_miss;
-  atomic_int64 num_insert;
-  atomic_int64 num_insert_negative;
+struct Counters {
+  perf::Counter *size;
+  perf::Counter *num_hit;
+  perf::Counter *num_miss;
+  perf::Counter *num_insert;
+  perf::Counter *num_insert_negative;
   uint64_t num_collisions;
   uint32_t max_collisions;
-  atomic_int64 num_update;
-  atomic_int64 num_replace;
-  atomic_int64 num_forget;
-  atomic_int64 num_drop;
-  atomic_int64 allocated;
+  perf::Counter *num_update;
+  perf::Counter *num_replace;
+  perf::Counter *num_forget;
+  perf::Counter *num_drop;
+  perf::Counter *allocated;
 
-  Statistics() {
-    size = 0;
+  Counters(perf::Statistics *statistics) {
+    size = statistics->Register("", "");
     num_collisions = 0;
     max_collisions = 0;
-    atomic_init64(&num_hit);
-    atomic_init64(&num_miss);
-    atomic_init64(&num_insert);
-    atomic_init64(&num_insert_negative);
-    atomic_init64(&num_update);
-    atomic_init64(&num_replace);
-    atomic_init64(&num_forget);
-    atomic_init64(&num_drop);
-    atomic_init64(&allocated);
+    num_hit = statistics->Register("", "");
+    num_miss = statistics->Register("", "");
+    num_insert = statistics->Register("", "");
+    num_insert_negative = statistics->Register("", "");
+    num_update = statistics->Register("", "");
+    num_replace = statistics->Register("", "");
+    num_forget = statistics->Register("", "");
+    num_drop = statistics->Register("", "");
+    allocated = statistics->Register("", "");
   }
 
   std::string Print() {
-    return "size: " + StringifyInt(size) + "  " +
-      "hits: " + StringifyInt(atomic_read64(&num_hit)) + "  " +
-      "misses: " + StringifyInt(atomic_read64(&num_miss)) + "  " +
-      "inserts(all): " + StringifyInt(atomic_read64(&num_insert)) + "  " +
-      "inserts(negative): " + StringifyInt(atomic_read64(&num_insert_negative))
-        + "  " +
+    return "size: " + size->Print() + "  " +
+      "hits: " + num_hit->Print() + "  " +
+      "misses: " + num_miss->Print() + "  " +
+      "inserts(all): " + num_insert->Print() + "  " +
+      "inserts(negative): " + num_insert_negative->Print() + "  " +
       "collisions: " + StringifyInt(num_collisions) + "  " +
       "collisions(max): " + StringifyInt(max_collisions) + "  " +
-      "updates: " + StringifyInt(atomic_read64(&num_update)) + "  " +
-      "replacements: " + StringifyInt(atomic_read64(&num_replace)) + "  " +
-      "forgets: " + StringifyInt(atomic_read64(&num_forget)) + "  " +
-      "drops: " + StringifyInt(atomic_read64(&num_drop)) + "  " +
-      "allocated: " + StringifyInt(atomic_read64(&allocated) / 1024) + " KB\n";
+      "updates: " + num_update->Print() + "  " +
+      "replacements: " + num_replace->Print() + "  " +
+      "forgets: " + num_forget->Print() + "  " +
+      "drops: " + num_drop->Print() + "  " +
+      "allocated: " + allocated->PrintKi() + " KB\n";
   }
 };
 
@@ -528,19 +528,21 @@ class LruCache : SingleCopy {
    */
   LruCache(const unsigned   cache_size,
            const Key       &empty_key,
-           uint32_t (*hasher)(const Key &key)) :
+           uint32_t (*hasher)(const Key &key),
+           perf::Statistics *statistics) :
     pause_(false),
     cache_gauge_(0),
     cache_size_(cache_size),
     allocator_(cache_size),
-    lru_list_(&allocator_)
+    lru_list_(&allocator_),
+    counters_(statistics)
   {
     assert(cache_size > 0);
 
-    statistics_.size = cache_size_;
+    counters_.size->Set(cache_size_);
     // cache_ = Cache(cache_size_);
     cache_.Init(cache_size_, empty_key, hasher);
-    atomic_xadd64(&statistics_.allocated, allocator_.bytes_allocated() +
+    perf::Xadd(counters_.allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
 
 #ifdef LRU_CACHE_THREAD_SAFE
@@ -581,7 +583,7 @@ class LruCache : SingleCopy {
 
     // Check if we have to update an existent entry
     if (this->DoLookup(key, &entry)) {
-      atomic_inc64(&statistics_.num_update);
+      perf::Inc(counters_.num_update);
       entry.value = value;
       cache_.Insert(key, entry);
       this->Touch(entry);
@@ -589,7 +591,7 @@ class LruCache : SingleCopy {
       return false;
     }
 
-    atomic_inc64(&statistics_.num_insert);
+    perf::Inc(counters_.num_insert);
     // Check if we have to make some space in the cache a
     if (this->IsFull())
       this->DeleteOldest();
@@ -622,12 +624,12 @@ class LruCache : SingleCopy {
     CacheEntry entry;
     if (DoLookup(key, &entry)) {
       // Hit
-      atomic_inc64(&statistics_.num_hit);
+      perf::Inc(counters_.num_hit);
       Touch(entry);
       *value = entry.value;
       found = true;
     } else {
-      atomic_inc64(&statistics_.num_miss);
+      perf::Inc(counters_.num_miss);
     }
 
     Unlock();
@@ -650,7 +652,7 @@ class LruCache : SingleCopy {
     CacheEntry entry;
     if (this->DoLookup(key, &entry)) {
       found = true;
-      atomic_inc64(&statistics_.num_forget);
+      perf::Inc(counters_.num_forget);
 
       entry.list_entry->RemoveFromList();
       allocator_.Destruct(entry.list_entry);
@@ -673,9 +675,9 @@ class LruCache : SingleCopy {
     cache_gauge_ = 0;
     lru_list_.clear();
     cache_.Clear();
-    atomic_inc64(&statistics_.num_drop);
-    atomic_init64(&statistics_.allocated);
-    atomic_xadd64(&statistics_.allocated, allocator_.bytes_allocated() +
+    perf::Inc(counters_.num_drop);
+    counters_.allocated->Set(0);
+    perf::Xadd(counters_.allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
 
     this->Unlock();
@@ -696,16 +698,16 @@ class LruCache : SingleCopy {
   inline bool IsFull() const { return cache_gauge_ >= cache_size_; }
   inline bool IsEmpty() const { return cache_gauge_ == 0; }
 
-  Statistics statistics() {
+  Counters counters() {
     Lock();
-    cache_.GetCollisionStats(&statistics_.num_collisions,
-                             &statistics_.max_collisions);
+    cache_.GetCollisionStats(&counters_.num_collisions,
+                             &counters_.max_collisions);
     Unlock();
-    return statistics_;
+    return counters_;
   }
 
  protected:
-  Statistics statistics_;
+  Counters counters_;
 
  private:
   /**
@@ -735,7 +737,7 @@ class LruCache : SingleCopy {
   inline void DeleteOldest() {
     assert(!this->IsEmpty());
 
-    atomic_inc64(&statistics_.num_replace);
+    perf::Inc(counters_.num_replace);
     Key delete_me = lru_list_.PopFront();
     cache_.Erase(delete_me);
 
@@ -797,9 +799,9 @@ static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
 class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 {
  public:
-  explicit InodeCache(unsigned int cache_size) :
+  explicit InodeCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<fuse_ino_t, catalog::DirectoryEntry>(
-      cache_size, fuse_ino_t(-1), hasher_inode)
+      cache_size, fuse_ino_t(-1), hasher_inode, statistics)
   {
   }
 
@@ -828,8 +830,9 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 
 class PathCache : public LruCache<fuse_ino_t, PathString> {
  public:
-  explicit PathCache(unsigned int cache_size) :
-    LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode)
+  explicit PathCache(unsigned int cache_size, perf::Statistics *statistics) :
+    LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode,
+        statistics)
   {
   }
 
@@ -860,9 +863,9 @@ class Md5PathCache :
   public LruCache<shash::Md5, catalog::DirectoryEntry>
 {
  public:
-  explicit Md5PathCache(unsigned int cache_size) :
+  explicit Md5PathCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<shash::Md5, catalog::DirectoryEntry>(
-      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5)
+      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5, statistics)
   {
     dirent_negative_ = catalog::DirectoryEntry(catalog::kDirentNegative);
   }
@@ -878,7 +881,7 @@ class Md5PathCache :
   bool InsertNegative(const shash::Md5 &hash) {
     const bool result = Insert(hash, dirent_negative_);
     if (result)
-      atomic_inc64(&statistics_.num_insert_negative);
+      perf::Inc(counters_.num_insert_negative);
     return result;
   }
 

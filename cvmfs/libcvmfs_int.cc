@@ -353,7 +353,8 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
            "CernVM-FS: linking %s to repository %s",
            opts.mountpoint.c_str(), repository_name_.c_str());
 
-  md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize);
+  md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize,
+      statistics);
   pathcache_ready_ = true;
 
   if (!opts.tracefile.empty()) {
