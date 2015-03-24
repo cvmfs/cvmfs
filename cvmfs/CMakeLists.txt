@@ -117,6 +117,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   object_fetcher.h
+  statistics.cc statistics.h
 
   file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
   file_processing/char_buffer.h

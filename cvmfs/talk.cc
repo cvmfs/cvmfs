@@ -413,7 +413,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         }
 
         result += "\nNetwork Statistics:\n";
-        result += cvmfs::download_manager_->GetStatistics().Print();
+        result += cvmfs::download_manager_->GetCounters().Print();
         unsigned proxy_reset_delay, host_reset_delay;
         time_t proxy_timestamp_failover, host_timestamp_failover;
         cvmfs::download_manager_->GetProxyBackupInfo(&proxy_reset_delay,
