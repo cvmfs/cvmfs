@@ -55,6 +55,7 @@ set (CVMFS_CLIENT_SOURCES
   xattr.h xattr.cc
   statistics.h statistics.cc
   sqlitevfs.cc sqlitevfs.h
+  fetch.cc fetch.h
 )
 
 

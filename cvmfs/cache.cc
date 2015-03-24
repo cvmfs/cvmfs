@@ -241,8 +241,10 @@ int PosixCacheManager::CommitTxn(void *txn) {
   LogCvmfs(kLogCache, kLogDebug, "commit %s %s",
            transaction->final_path.c_str(), transaction->tmp_path.c_str());
 
-  Flush(transaction);
+  result = Flush(transaction);
   close(transaction->fd);
+  if (result < 0)
+    return result;
   if (alien_cache_) {
     int retval = chmod(transaction->tmp_path.c_str(), 0660);
     assert(retval == 0);
@@ -266,9 +268,11 @@ int PosixCacheManager::Flush(Transaction *transaction) {
     write(transaction->fd, transaction->buffer, transaction->buf_pos);
   if (written < 0)
     return -errno;
-  transaction->buf_pos -= written;
-  if (static_cast<unsigned>(written) != sizeof(transaction->buf_pos))
+  if (static_cast<unsigned>(written) != transaction->buf_pos) {
+    transaction->buf_pos -= written;
     return -EIO;
+  }
+  transaction->buf_pos = 0;
   return 0;
 }
 
@@ -304,7 +308,9 @@ int PosixCacheManager::Open(const shash::Any &id) {
 
 int PosixCacheManager::OpenFromTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  Flush(transaction);
+  int retval = Flush(transaction);
+  if (retval < 0)
+    return retval;
   int fd_rdonly = open(transaction->tmp_path.c_str(), O_RDONLY);
   if (fd_rdonly == -1)
     return -errno;
@@ -348,10 +354,7 @@ int PosixCacheManager::Reset(void *txn) {
 }
 
 
-int PosixCacheManager::StartTxn(
-  const shash::Any &id,
-  void *txn)
-{
+int PosixCacheManager::StartTxn(const shash::Any &id, void *txn) {
   Transaction *transaction = new (txn) Transaction(GetPathInCache(id));
   const unsigned temp_path_len = txn_template_path_.length();
 
