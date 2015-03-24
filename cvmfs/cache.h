@@ -19,6 +19,7 @@
 #include "manifest_fetch.h"
 #include "shortstring.h"
 #include "signature.h"
+#include "util.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -39,6 +40,117 @@ enum CacheModes {
   kCacheReadWrite = 0,
   kCacheReadOnly,
 };
+
+
+/**
+ * The Cache Manager provides (virtual) file descriptors to content-addressable
+ * objects in the cache.  The implementation can use a POSIX file system or
+ * other means such as a key-value store.  A file descriptor must remain
+ * readable until closed, no matter if it is removed from the backend storage
+ * or not (POSIX semantics).
+ *
+ * Writing into the cache is streamed and transactional: a file descriptor must
+ * be acquired from StartTxn and the object is only visible in the cache after
+ * CommitTxn.  The state of the transaction is carried in an opque transaction
+ * objects, which needs to be provided by the caller.  The size of the object is
+ * returned by SizeOfTxn.  This way, users of derived classes can take care of
+ * the storage allocation (e.g. on the stack), while the derived class
+ * determines the contents of the transaction object.  For race-free read access
+ * to objects that are just being written to the cache, the OpenFromTxn routine
+ * is used just before the transaction is committed.
+ *
+ * The integer return values can be negative and, in this case, represent a
+ * -errno failure code.
+ */
+class CacheManager : SingleCopy {
+ public:
+  virtual ~CacheManager() { };
+  virtual int Open(const shash::Any &id) = 0;
+  virtual int64_t GetSize(int fd) = 0;
+  virtual int Close(int fd) = 0;
+  virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset) = 0;
+
+  virtual uint16_t SizeOfTxn() = 0;
+  virtual int StartTxn(const shash::Any &id, void *txn) = 0;
+  virtual int64_t Write(const void *buf, uint64_t sz, void *txn) = 0;
+  virtual int Reset(void *txn) = 0;
+  virtual int AbortTxn(void *txn) = 0;
+  virtual int OpenFromTxn(void *txn) = 0;
+  virtual int CommitTxn(void *txn) = 0;
+
+  bool Open2Mem(const shash::Any &id, unsigned char **buffer, uint64_t *size);
+  bool CommitFromMem(const shash::Any &id,
+                     const unsigned char *buffer,
+                     const uint64_t size);
+
+  virtual void TearDown2ReadOnly() = 0;
+  bool cache_mode() const { return cache_mode_; }
+
+ protected:
+  CacheManager() : cache_mode_(kCacheReadWrite) { }
+
+  CacheModes cache_mode_;
+};
+
+
+/**
+ * Cache manger implementation using a file system (cache directory) as a
+ * backing storage.
+ */
+class PosixCacheManager : public CacheManager {
+ public:
+  static PosixCacheManager *Create(const std::string &cache_path,
+                                   const bool alien_cache);
+  virtual	~PosixCacheManager() { };
+
+  virtual int Open(const shash::Any &id);
+  virtual int64_t GetSize(int fd);
+  virtual int Close(int fd);
+  virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
+
+  virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
+  virtual int StartTxn(const shash::Any &id, void *txn);
+  virtual int64_t Write(const void *buf, uint64_t size, void *txn);
+  virtual int Reset(void *txn);
+  virtual int OpenFromTxn(void *txn);
+  virtual int AbortTxn(void *txn);
+  virtual int CommitTxn(void *txn);
+
+  virtual void TearDown2ReadOnly();
+
+ private:
+  struct Transaction {
+    Transaction(const std::string &final_path)
+      : buf_pos(0)
+      , fd(-1)
+      , tmp_path()
+      , final_path(final_path)
+    { }
+
+    unsigned char buffer[4096];
+    unsigned buf_pos;
+ 	  int fd;
+    std::string tmp_path;
+    std::string final_path;
+  };
+
+  PosixCacheManager(const std::string &cache_path, const bool alien_cache)
+    : cache_path_(cache_path)
+    , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
+    , alien_cache_(alien_cache)
+    , alien_cache_on_nfs_(false)
+  { }
+
+  std::string GetPathInCache(const shash::Any &id);
+  int Rename(const char *oldpath, const char *newpath);
+  int Flush(Transaction *transaction);
+
+  std::string cache_path_;
+  std::string txn_template_path_;
+  bool alien_cache_;
+  bool alien_cache_on_nfs_;
+};
+
 
 bool Init(const std::string &cache_path, const bool alien_cache);
 void Fini();

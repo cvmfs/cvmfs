@@ -39,6 +39,7 @@
 #include <sys/statfs.h>
 #endif
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -72,8 +73,9 @@ namespace cache {
 
 uint64_t kBigFile = 25*1024*1024;  // As of 25M, a file is considered "big file"
 
+
 /**
- * A CallQuard object can be placed at the beginning of a function.  It counts
+ * A CallGuard object can be placed at the beginning of a function.  It counts
  * the number of so-annotated functions that are in flight.  The Drainout() call
  * will wait until all functions that have been called so far are finished.
  *
@@ -104,6 +106,298 @@ class CallGuard {
 };
 atomic_int32 CallGuard::num_inflight_calls_ = 0;
 atomic_int32 CallGuard::global_drainout_ = 0;
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Tries to open a file and copies its contents into a newly malloc'd
+ * memory area.  User of the function has to free buffer (if successful).
+ *
+ * @param[in] id content hash of the catalog entry.
+ * @param[out] buffer Contents of the file
+ * @param[out] size Size of the file
+ * \return True if successful, false otherwise.
+ */
+bool CacheManager::Open2Mem(
+  const shash::Any &id,
+  unsigned char **buffer,
+  uint64_t *size)
+{
+  *size = 0;
+  *buffer = NULL;
+
+  int fd = this->Open(id);
+  if (fd < 0)
+    return false;
+
+  int64_t s = this->GetSize(fd);
+  assert(s >= 0);
+  *size = static_cast<uint64_t>(s);
+
+  int64_t retval = 0;
+  if (*size > 0) {
+    *buffer = static_cast<unsigned char *>(smalloc(*size));
+    retval = this->Pread(fd, *buffer, *size, 0);
+  } else {
+    *buffer = NULL;
+  }
+
+  this->Close(fd);
+  if ((retval < 0) || (static_cast<uint64_t>(retval) != *size)) {
+    free(*buffer);
+    *buffer = NULL;
+    *size = 0;
+    return false;
+  }
+  return true;
+}
+
+
+/**
+ * Commits the memory blob buffer to the given chunk id.  No checking!
+ * The hash and the memory blob need to match.
+ */
+bool CacheManager::CommitFromMem(
+  const shash::Any &id,
+  const unsigned char *buffer,
+  const uint64_t size)
+{
+  void *txn = alloca(this->SizeOfTxn());
+  int fd = this->StartTxn(id, txn);
+  if (fd < 0)
+    return false;
+  int64_t retval = this->Write(buffer, size, txn);
+  if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
+		this->AbortTxn(txn);
+    return false;
+  }
+  retval = this->CommitTxn(txn);
+  return retval == 0;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+int PosixCacheManager::AbortTxn(void *txn) {
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  LogCvmfs(kLogCache, kLogDebug, "abort %s", transaction->tmp_path.c_str());
+  close(transaction->fd);
+  int result = unlink(transaction->tmp_path.c_str());
+  if (result == -1)
+    return -errno;
+  transaction->~Transaction();
+  return 0;
+}
+
+
+int PosixCacheManager::Close(int fd) {
+  return close(fd);
+}
+
+
+PosixCacheManager *PosixCacheManager::Create(
+  const string &cache_path,
+  const bool alien_cache)
+{
+  UniquePtr<PosixCacheManager> cache_manager(
+    new PosixCacheManager(cache_path, alien_cache));
+  assert(cache_manager.IsValid());
+
+  if (cache_manager->alien_cache_) {
+    if (!MakeCacheDirectories(cache_path, 0770)) {
+      return NULL;
+    }
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "Cache directory structure created.");
+    struct statfs cache_buf;
+    if ((statfs(cache_path.c_str(), &cache_buf) == 0) &&
+        (cache_buf.f_type == NFS_SUPER_MAGIC))
+    {
+      cache_manager->alien_cache_on_nfs_ = true;
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
+             "Alien cache is on NFS.");
+    }
+  } else {
+    if (!MakeCacheDirectories(cache_path, 0700))
+      return NULL;
+  }
+
+  if (FileExists(cache_path + "/cvmfscatalog.cache")) {
+    LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr,
+             "Not mounting on cvmfs 2.0.X cache");
+    return NULL;
+  }
+
+  return cache_manager.Release();
+}
+
+
+int PosixCacheManager::CommitTxn(void *txn) {
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  int result;
+  LogCvmfs(kLogCache, kLogDebug, "commit %s %s",
+           transaction->final_path.c_str(), transaction->tmp_path.c_str());
+
+  Flush(transaction);
+  close(transaction->fd);
+  if (alien_cache_) {
+    int retval = chmod(transaction->tmp_path.c_str(), 0660);
+    assert(retval == 0);
+  }
+  result =
+    Rename(transaction->tmp_path.c_str(), transaction->final_path.c_str());
+  if (result < 0) {
+    result = -errno;
+    LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
+    unlink(transaction->tmp_path.c_str());
+  }
+  transaction->~Transaction();
+  return result;
+}
+
+
+int PosixCacheManager::Flush(Transaction *transaction) {
+  if (transaction->buf_pos == 0)
+    return 0;
+  int written =
+    write(transaction->fd, transaction->buffer, transaction->buf_pos);
+  if (written < 0)
+    return -errno;
+  transaction->buf_pos -= written;
+  if (static_cast<unsigned>(written) != sizeof(transaction->buf_pos))
+    return -EIO;
+  return 0;
+}
+
+
+inline string PosixCacheManager::GetPathInCache(const shash::Any &id) {
+  return cache_path_ + id.MakePathExplicit(1, 2);
+}
+
+
+int64_t PosixCacheManager::GetSize(int fd) {
+  platform_stat64 info;
+  int retval = platform_fstat(fd, &info);
+  if (retval != 0)
+    return -errno;
+  return info.st_size;
+}
+
+
+int PosixCacheManager::Open(const shash::Any &id) {
+  const string path = GetPathInCache(id);
+  int result = open(path.c_str(), O_RDONLY);
+
+  if (result >= 0) {
+    LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
+    // platform_disable_kcache(result);
+  } else {
+    result = -errno;
+    LogCvmfs(kLogCache, kLogDebug, "miss %s (%d)", path.c_str(), result);
+  }
+  return result;
+}
+
+
+int PosixCacheManager::OpenFromTxn(void *txn) {
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  Flush(transaction);
+  int fd_rdonly = open(transaction->tmp_path.c_str(), O_RDONLY);
+  if (fd_rdonly == -1)
+    return -errno;
+  return fd_rdonly;
+}
+
+
+int64_t PosixCacheManager::Pread(
+  int fd,
+  void *buf,
+  uint64_t size,
+  uint64_t offset)
+{
+  return pread(fd, buf, size, offset);
+}
+
+
+int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
+  if (!alien_cache_on_nfs_) {
+    return rename(oldpath, newpath);
+  }
+
+  int result = link(oldpath, newpath);
+  if (result < 0) {
+    if (errno == EEXIST)
+      LogCvmfs(kLogCache, kLogDebug, "%s already existed, ignoring", newpath);
+    else
+      return result;
+  }
+  return unlink(oldpath);
+}
+
+
+int PosixCacheManager::Reset(void *txn) {
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  transaction->buf_pos = 0;
+  int retval = ftruncate(transaction->fd, 0);
+  if (retval < 0)
+    return -errno;
+  return 0;
+}
+
+
+int PosixCacheManager::StartTxn(
+  const shash::Any &id,
+  void *txn)
+{
+  Transaction *transaction = new (txn) Transaction(GetPathInCache(id));
+  const unsigned temp_path_len = txn_template_path_.length();
+
+  char template_path[temp_path_len + 1];
+  memcpy(template_path, &txn_template_path_[0], temp_path_len);
+  template_path[temp_path_len] = '\0';
+  transaction->fd = mkstemp(template_path);
+  if (transaction->fd == -1) {
+    transaction->~Transaction();
+    return -errno;
+  }
+
+  LogCvmfs(kLogCache, kLogDebug, "start transaction on %s has result %d",
+           template_path, transaction->fd);
+  transaction->tmp_path = template_path;
+  return transaction->fd;
+}
+
+
+void PosixCacheManager::TearDown2ReadOnly() {
+
+}
+
+
+int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  uint64_t written = 0;
+  while (written < size) {
+    if (transaction->buf_pos == sizeof(transaction->buffer)) {
+      int retval = Flush(transaction);
+      if (retval != 0)
+        return retval;
+    }
+    uint64_t remaining = size - written;
+    uint64_t space_in_buffer =
+      sizeof(transaction->buffer) - transaction->buf_pos;
+    uint64_t batch_size = std::min(remaining, space_in_buffer);
+    memcpy(transaction->buffer + transaction->buf_pos, buf, batch_size);
+    transaction->buf_pos += batch_size;
+    written += batch_size;
+  }
+  return written;
+}
+
+
+//------------------------------------------------------------------------------
 
 
 /**
@@ -224,8 +518,9 @@ CacheModes GetCacheMode() {
 void TearDown2ReadOnly() {
   cache_mode_ = kCacheReadOnly;
   CallGuard::Drainout();
-  quota::Fini();
-  unlink(("running." + *cvmfs::repository_name_).c_str());
+  // TODO-QUOTAMGR
+  //  quota::Fini();
+  //  unlink(("running." + *cvmfs::repository_name_).c_str());
   LogCvmfs(kLogCache, kLogSyslog, "switch to read-only cache mode");
   SetLogMicroSyslog("");
 }
@@ -431,11 +726,12 @@ static int CommitTransaction(const string &final_path,
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(temp_path.c_str());
   } else {
-    if (volatile_content) {
+    // TODO-QUOTAMGR
+    /*if (volatile_content) {
       quota::InsertVolatile(hash, size, cvmfs_path);
     } else {
       quota::Insert(hash, size, cvmfs_path);
-    }
+    }*/
   }
 
   return result;
@@ -500,26 +796,30 @@ static int Fetch(const shash::Any &checksum,
   if ((fd_return = cache::Open(checksum)) >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit: %s", cvmfs_path.c_str());
 
-    if (cache_mode_ == kCacheReadWrite)
-      quota::Touch(checksum);
+    // TODO-QUOTAMGR
+    //if (cache_mode_ == kCacheReadWrite)
+    //  quota::Touch(checksum);
     return fd_return;
   }
 
   if (cache_mode_ == kCacheReadOnly)
     return -EROFS;
 
-  if (size > quota::GetMaxFileSize()) {
+  // TODO-QUOTAMGR
+  /*if (size > quota::GetMaxFileSize()) {
     LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64" "
                                    "requested but only %"PRIu64" bytes free)",
              size, quota::GetMaxFileSize());
     return -ENOSPC;
-  }
+  }*/
 
   // Opportunitically clean up cache for large files
+  // TODO-QUOTAMGR
+  /*
   if ((size >= kBigFile) && (quota::GetCapacity() > 0)) {
     assert(quota::GetCapacity() >= size);
     quota::Cleanup(quota::GetCapacity() - size);
-  }
+  }*/
 
   // Initialize TLS
   ThreadLocalStorage *tls = static_cast<ThreadLocalStorage *>(
@@ -557,7 +857,8 @@ static int Fetch(const shash::Any &checksum,
     fd_return = cache::Open(checksum);
     if (fd_return >= 0) {
       pthread_mutex_unlock(&lock_queues_download_);
-      quota::Touch(checksum);
+      // TODO-QUOTAMGR
+      //quota::Touch(checksum);
       return fd_return;
     }
 
@@ -812,6 +1113,8 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
 
       if (cache_mode_ == kCacheReadWrite) {
         size = GetFileSize(catalog_path->c_str());
+        //TODO-QUOTAMGR
+        /*
         pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
         if (!pin_retval) {
           quota::Remove(hash);
@@ -821,6 +1124,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
                    hash.ToString().c_str());
           return catalog::kLoadNoSpace;
         }
+        */
       }
       // Pinned, can be safely renamed
       retval = Rename(catalog_path->c_str(), cache_path.c_str());
@@ -859,7 +1163,9 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
     return catalog::kLoadFail;
   }
 
+  //TODO-QUOTAMGR
   size = GetFileSize(temp_path.c_str());
+  /*
   if (uint64_t(size) > quota::GetMaxFileSize()) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "failed to load catalog %s (too big)",
@@ -867,9 +1173,12 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
     AbortTransaction(temp_path);
     backoff_throttle_.Throttle();
     return catalog::kLoadNoSpace;
-  }
+  }*/
 
   // Instead of commit, manually rename and pin, otherwise there is a race
+  //TODO-QUOTAMGR
+  pin_retval =0;
+  /*
   pin_retval = quota::Pin(hash, uint64_t(size), cvmfs_path, true);
   if (!pin_retval) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
@@ -877,13 +1186,14 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
     AbortTransaction(temp_path);
     backoff_throttle_.Throttle();
     return catalog::kLoadNoSpace;
-  }
+  }*/
 
   retval = chmod(temp_path.c_str(), 0660);
   assert(retval == 0);
   retval = Rename(temp_path.c_str(), catalog_path->c_str());
   if (retval != 0) {
-    quota::Remove(hash);
+    //TODO-QUOTAMGR
+    //quota::Remove(hash);
     backoff_throttle_.Throttle();
     return catalog::kLoadFail;
   }
@@ -973,6 +1283,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
       if (catalog_path) {
         if (cache_mode_ == kCacheReadWrite) {
           *catalog_path = *cache_path_ + cache_hash.MakePathExplicit(1, 2);
+          //TODO-QUOTAMGR
+          /*
           int64_t size = GetFileSize(*catalog_path);
           retval = quota::Pin(cache_hash, uint64_t(size),
                               cvmfs_path, true);
@@ -980,7 +1292,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
             LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                      "failed to pin cached root catalog (no space)");
             return catalog::kLoadFail;
-          }
+          }*/
         }
         loaded_catalogs_[mountpoint] = cache_hash;
         *catalog_hash = cache_hash;
@@ -1003,6 +1315,8 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
       *catalog_path = *cache_path_ + cache_hash.MakePathExplicit(1, 2);
       // quota::Pin is only effective on first load, afterwards it is a NOP
       if (cache_mode_ == kCacheReadWrite) {
+        //TODO-QUOTAMGR
+        /*
         int64_t size = GetFileSize(*catalog_path);
         retval = quota::Pin(cache_hash, uint64_t(size),
                             cvmfs_path, true);
@@ -1010,7 +1324,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
           LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
                    "failed to pin cached root catalog (no space)");
           return catalog::kLoadNoSpace;
-        }
+        }*/
       }
       loaded_catalogs_[mountpoint] = cache_hash;
       *catalog_hash = cache_hash;
@@ -1056,8 +1370,11 @@ void CatalogManager::UnloadCatalog(const catalog::Catalog *catalog) {
     mounted_catalogs_.find(catalog->path());
   assert(iter != mounted_catalogs_.end());
 
+  // TODO-QUOTAMGR
+  /*
   if (cache_mode_ == kCacheReadWrite)
     quota::Unpin(iter->second);
+  */
 
   mounted_catalogs_.erase(iter);
   const catalog::Counters &counters = catalog->GetCounters();
@@ -1072,7 +1389,8 @@ CatalogManager::~CatalogManager() {
     for (map<PathString, shash::Any>::iterator i = mounted_catalogs_.begin(),
          iend = mounted_catalogs_.end(); i != iend; ++i)
     {
-      quota::Unpin(i->second);
+      //TODO-QUOTAMGR
+      //quota::Unpin(i->second);
     }
   }
   mounted_catalogs_.clear();

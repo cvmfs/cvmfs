@@ -58,6 +58,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_xattr.cc
   t_statistics.cc
   t_options.cc
+  t_cache.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -140,6 +141,13 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc
   ${CVMFS_SOURCE_DIR}/statistics.h
   ${CVMFS_SOURCE_DIR}/statistics.cc
+
+  ${CVMFS_SOURCE_DIR}/catalog_mgr.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
+  ${CVMFS_SOURCE_DIR}/backoff.h
+  ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
