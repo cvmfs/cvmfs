@@ -23,19 +23,10 @@
 #include "duplex_curl.h"
 #include "hash.h"
 #include "prng.h"
+#include "sink.h"
 
 
 namespace download {
-
-/**
- * Where to store downloaded data.
- */
-enum Destination {
-  kDestinationMem = 1,
-  kDestinationFile,
-  kDestinationPath,
-  kDestinationNone
-};  // Destination
 
 /**
  * Possible return values.
@@ -83,6 +74,18 @@ inline const char *Code2Ascii(const Failures error) {
 }
 
 
+/**
+ * Where to store downloaded data.
+ */
+enum Destination {
+  kDestinationMem = 1,
+  kDestinationFile,
+  kDestinationPath,
+  kDestinationSink,
+  kDestinationNone
+};  // Destination
+
+
 struct Statistics {
   double transferred_bytes;
   double transfer_time;
@@ -121,6 +124,7 @@ struct JobInfo {
   } destination_mem;
   FILE *destination_file;
   const std::string *destination_path;
+  cvmfs::Sink *destination_sink;
   const shash::Any *expected_hash;
   const std::string *extra_info;
 
@@ -136,6 +140,7 @@ struct JobInfo {
     destination_mem.data = NULL;
     destination_file = NULL;
     destination_path = NULL;
+    destination_sink = NULL;
     expected_hash = NULL;
     extra_info = NULL;
 
@@ -182,6 +187,17 @@ struct JobInfo {
     compressed = c;
     probe_hosts = ph;
     destination = kDestinationMem;
+    expected_hash = h;
+  }
+  JobInfo(const std::string *u, const bool c, const bool ph,
+          cvmfs::Sink *s, const shash::Any *h)
+  {
+    Init();
+    url = u;
+    compressed = c;
+    probe_hosts = ph;
+    destination = kDestinationSink;
+    destination_sink = s;
     expected_hash = h;
   }
   JobInfo(const std::string *u, const bool ph) {

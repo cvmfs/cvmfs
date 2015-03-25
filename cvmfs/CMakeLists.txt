@@ -56,6 +56,7 @@ set (CVMFS_CLIENT_SOURCES
   statistics.h statistics.cc
   sqlitevfs.cc sqlitevfs.h
   fetch.cc fetch.h
+  sink.h
 )
 
 

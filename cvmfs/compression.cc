@@ -158,8 +158,52 @@ void DecompressFini(z_stream *strm) {
 }
 
 
-StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
-                                    const int64_t size)
+StreamStates DecompressZStream2Sink(
+  const void *buf,
+  const int64_t size,
+  z_stream *strm,
+  cvmfs::Sink *sink)
+{
+  unsigned char out[kZChunk];
+  int z_ret;
+  int64_t pos = 0;
+
+  do {
+    strm->avail_in = (kZChunk > (size-pos)) ? size-pos : kZChunk;
+    strm->next_in = ((unsigned char *)buf)+pos;
+
+    // Run inflate() on input until output buffer not full
+    do {
+      strm->avail_out = kZChunk;
+      strm->next_out = out;
+      z_ret = inflate(strm, Z_NO_FLUSH);
+      switch (z_ret) {
+        case Z_NEED_DICT:
+          z_ret = Z_DATA_ERROR;  // and fall through
+        case Z_STREAM_ERROR:
+        case Z_DATA_ERROR:
+          return kStreamDataError;
+        case Z_MEM_ERROR:
+          return kStreamIOError;
+      }
+      size_t have = kZChunk - strm->avail_out;
+      int64_t written = sink->Write(out, have);
+      if ((written < 0) || (static_cast<uint64_t>(written) != have))
+        return kStreamIOError;
+    } while (strm->avail_out == 0);
+
+    pos += kZChunk;
+  } while (pos < size);
+
+  return (z_ret == Z_STREAM_END ? kStreamEnd : kStreamContinue);
+}
+
+
+StreamStates DecompressZStream2File(
+  const void *buf,
+  const int64_t size,
+  z_stream *strm,
+  FILE *f)
 {
   unsigned char out[kZChunk];
   int z_ret;
@@ -504,7 +548,7 @@ bool DecompressFile2File(FILE *fsrc, FILE *fdest) {
   DecompressInit(&strm);
 
   while ((have = fread(buf, 1, kBufferSize, fsrc)) > 0) {
-    stream_state = DecompressZStream2File(&strm, fdest, buf, have);
+    stream_state = DecompressZStream2File(buf, have, &strm, fdest);
     if ((stream_state == kStreamDataError) || (stream_state == kStreamIOError))
       goto decompress_file2file_final;
   }
