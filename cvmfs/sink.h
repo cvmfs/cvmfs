@@ -20,7 +20,6 @@ namespace cvmfs {
  */
 class Sink {
  public:
-  Sink(void *user_data) : user_data_(user_data) { };
   virtual ~Sink() { }
   /**
    * Appends data to the sink, returns the number of bytes written or -errno.
@@ -30,9 +29,6 @@ class Sink {
    * Truncate all written data and start over at position zero.
    */
   virtual int Reset() = 0;
-
- protected:
-  void *user_data_;
 };
 
 }  // namespace cvmfs
