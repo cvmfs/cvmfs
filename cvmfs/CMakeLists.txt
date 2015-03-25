@@ -15,6 +15,7 @@ set (CVMFS_LOADER_SOURCES
   globals.h globals.cc
   loader_talk.h loader_talk.cc
   loader.h loader.cc
+  statistics.h statistics.cc
 )
 
 set (CVMFS_CLIENT_SOURCES
@@ -99,6 +100,7 @@ set (CVMFS_FSCK_SOURCES
   prng.h
   hash.cc hash.h
   util.cc util.h
+  statistics.h statistics.cc
   cvmfs_fsck.cc)
 
 set (CVMFS_SWISSKNIFE_SOURCES

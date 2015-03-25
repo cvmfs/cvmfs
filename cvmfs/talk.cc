@@ -360,9 +360,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "internal affairs") {
         int current;
         int highwater;
-        lru::Statistics inode_stats;
-        lru::Statistics path_stats;
-        lru::Statistics md5path_stats;
+        lru::Counters inode_stats(cvmfs::statistics_);
+        lru::Counters path_stats(cvmfs::statistics_);
+        lru::Counters md5path_stats(cvmfs::statistics_);
         catalog::Statistics catalog_stats;
         string result;
 

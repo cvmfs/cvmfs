@@ -5,6 +5,7 @@ set (CVMFS_MOUNT_SOURCES
   ../cvmfs/logging.h ../cvmfs/logging_internal.h ../cvmfs/logging.cc
   ../cvmfs/options.h ../cvmfs/options.cc
   ../cvmfs/sanitizer.h ../cvmfs/sanitizer.cc
+  ../cvmfs/statistics.h ../cvmfs/statistics.cc
   mount.cvmfs.cc
 )
 

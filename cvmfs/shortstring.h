@@ -14,6 +14,7 @@
 #include <string>
 
 #include "atomic.h"
+#include "statistics.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
@@ -27,18 +28,18 @@ template<unsigned char StackSize, char Type>
 class ShortString {
  public:
   ShortString() : long_string_(NULL), length_(0) {
-    atomic_inc64(&num_instances_);
+    perf::Inc(n_num_instances_);
   }
   ShortString(const ShortString &other) : long_string_(NULL) {
-    atomic_inc64(&num_instances_);
+    perf::Inc(n_num_instances_);
     Assign(other);
   }
   ShortString(const char *chars, const unsigned length) : long_string_(NULL) {
-    atomic_inc64(&num_instances_);
+    perf::Inc(n_num_instances_);
     Assign(chars, length);
   }
   explicit ShortString(const std::string &std_string) : long_string_(NULL) {
-    atomic_inc64(&num_instances_);
+    perf::Inc(n_num_instances_);
     Assign(std_string.data(), std_string.length());
   }
 
@@ -54,7 +55,7 @@ class ShortString {
     delete long_string_;
     long_string_ = NULL;
     if (length > StackSize) {
-      atomic_inc64(&num_overflows_);
+      perf::Inc(n_num_overflows_);
       long_string_ = new std::string(chars, length);
     } else {
       if (length)
@@ -75,7 +76,7 @@ class ShortString {
 
     const unsigned new_length = this->length_ + length;
     if (new_length > StackSize) {
-      atomic_inc64(&num_overflows_);
+      perf::Inc(n_num_overflows_);
       long_string_ = new std::string();
       long_string_->reserve(new_length);
       long_string_->assign(stack_, length_);
@@ -175,15 +176,34 @@ class ShortString {
     return ShortString(this->GetChars() + start_at, length-start_at);
   }
 
-  static uint64_t num_instances() { return atomic_read64(&num_instances_); }
-  static uint64_t num_overflows() { return atomic_read64(&num_overflows_); }
+  static void RegisterCounters(perf::Statistics *statistics) {
+    if (StackSize == kDefaultMaxPath && Type == 0) {
+        n_num_instances_ = statistics->Register("pathstring.n_num_instances",
+            "Number of  instances");
+        n_num_overflows_ = statistics->Register("pathstring.n_num_overflows",
+            "Number of overflows");
+    } else if (StackSize == kDefaultMaxName && Type == 1) {
+        n_num_instances_ = statistics->Register("namestring.n_num_instances",
+            "Number of  instances");
+        n_num_overflows_ = statistics->Register("namestring.n_num_overflows",
+            "Number of overflows");
+    } else if (StackSize == kDefaultMaxLink && Type == 2) {
+        n_num_instances_ = statistics->Register("linkstring.n_num_instances",
+            "Number of  instances");
+        n_num_overflows_ = statistics->Register("linkstring.n_num_overflows",
+            "Number of overflows");
+    }
+  }
+
+  static uint64_t num_instances() { return n_num_instances_->Get(); }
+  static uint64_t num_overflows() { return n_num_overflows_->Get(); }
 
  private:
   std::string *long_string_;
   char stack_[StackSize+1];  // +1 to add a final '\0' if necessary
   unsigned char length_;
-  static atomic_int64 num_overflows_;
-  static atomic_int64 num_instances_;
+  static perf::Counter *n_num_overflows_;
+  static perf::Counter *n_num_instances_;
 };  // class ShortString
 
 typedef ShortString<kDefaultMaxPath, 0> PathString;
@@ -191,9 +211,9 @@ typedef ShortString<kDefaultMaxName, 1> NameString;
 typedef ShortString<kDefaultMaxLink, 2> LinkString;
 
 template<unsigned char StackSize, char Type>
-atomic_int64 ShortString<StackSize, Type>::num_overflows_ = 0;
+perf::Counter *ShortString<StackSize, Type>::n_num_overflows_ = NULL;
 template<unsigned char StackSize, char Type>
-atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
+perf::Counter *ShortString<StackSize, Type>::n_num_instances_ = NULL;
 
 #ifdef CVMFS_NAMESPACE_GUARD
 }  // namespace CVMFS_NAMESPACE_GUARD
