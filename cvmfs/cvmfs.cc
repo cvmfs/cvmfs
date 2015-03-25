@@ -2044,6 +2044,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   cvmfs::statistics_ = new perf::Statistics();
 
+  // at this point it's mandatory to register all static counters
+  PathString::RegisterCounters(cvmfs::statistics_);
+  NameString::RegisterCounters(cvmfs::statistics_);
+  LinkString::RegisterCounters(cvmfs::statistics_);
+
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
   cvmfs::cachedir_ = new string(cachedir);

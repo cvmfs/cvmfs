@@ -530,12 +530,12 @@ class LruCache : SingleCopy {
            const Key       &empty_key,
            uint32_t (*hasher)(const Key &key),
            perf::Statistics *statistics) :
+    counters_(statistics),
     pause_(false),
     cache_gauge_(0),
     cache_size_(cache_size),
     allocator_(cache_size),
-    lru_list_(&allocator_),
-    counters_(statistics)
+    lru_list_(&allocator_)
   {
     assert(cache_size > 0);
 

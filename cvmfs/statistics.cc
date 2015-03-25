@@ -7,11 +7,39 @@
 #include <cassert>
 
 #include "smalloc.h"
+#include "util.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 namespace perf {
+
+Counter::Counter() { atomic_init64(&counter_); }
+void Counter::Inc() { atomic_inc64(&counter_); }
+void Counter::Dec() { atomic_dec64(&counter_); }
+int64_t Counter::Get() { return atomic_read64(&counter_); }
+void Counter::Set(const int64_t val) { atomic_write64(&counter_, val); }
+int64_t Counter::Xadd(const int64_t delta) {
+  return atomic_xadd64(&counter_, delta);
+}
+
+std::string Counter::Print() { return StringifyInt(Get()); }
+std::string Counter::PrintK() { return StringifyInt(Get() / 1000); }
+std::string Counter::PrintKi() { return StringifyInt(Get() / 1024); }
+std::string Counter::PrintM() { return StringifyInt(Get() / (1000 * 1000)); }
+std::string Counter::PrintMi() { return StringifyInt(Get() / (1024 * 1024)); }
+std::string Counter::PrintRatio(Counter divider) {
+  double enumerator_value = Get();
+  double divider_value = divider.Get();
+  return StringifyDouble(enumerator_value / divider_value);
+}
+
+
+//-----------------------------------------------------------------------------
 
 Counter *Statistics::Lookup(const std::string &name) {
   MutexLockGuard lock_guard(lock_);
@@ -75,3 +103,8 @@ Statistics::~Statistics() {
 }
 
 }  // namespace perf
+
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}  // namespace CVMFS_NAMESPACE_GUARD
+#endif

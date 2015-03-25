@@ -12,7 +12,11 @@
 #include <string>
 
 #include "atomic.h"
-#include "util.h"
+
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 
 namespace perf {
 
@@ -21,25 +25,19 @@ namespace perf {
  */
 class Counter {
  public:
-  Counter() { atomic_init64(&counter_); }
-  inline void Inc() { atomic_inc64(&counter_); }
-  inline void Dec() { atomic_dec64(&counter_); }
-  inline int64_t Get() { return atomic_read64(&counter_); }
-  inline void Set(const int64_t val) { atomic_write64(&counter_, val); }
-  inline int64_t Xadd(const int64_t delta) {
-    return atomic_xadd64(&counter_, delta);
-  }
+  Counter();
+  void Inc();
+  void Dec();
+  int64_t Get();
+  void Set(const int64_t val);
+  int64_t Xadd(const int64_t delta);
 
-  std::string Print() { return StringifyInt(Get()); }
-  std::string PrintK() { return StringifyInt(Get() / 1000); }
-  std::string PrintKi() { return StringifyInt(Get() / 1024); }
-  std::string PrintM() { return StringifyInt(Get() / (1000 * 1000)); }
-  std::string PrintMi() { return StringifyInt(Get() / (1024 * 1024)); }
-  std::string PrintRatio(Counter divider) {
-    double enumerator_value = Get();
-    double divider_value = divider.Get();
-    return StringifyDouble(enumerator_value / divider_value);
-  }
+  std::string Print();
+  std::string PrintK();
+  std::string PrintKi();
+  std::string PrintM();
+  std::string PrintMi();
+  std::string PrintRatio(Counter divider);
 
  private:
   atomic_int64 counter_;
@@ -52,12 +50,11 @@ inline int64_t Xadd(class Counter *counter, const int64_t delta) {
   return counter->Xadd(delta);
 }
 
-
 /**
  * A collection of Counter objects with a name and a description.  Counters in
  * a Statistics class have a name and a description.  Thread-safe.
  */
-class Statistics : SingleCopy {
+class Statistics {
  public:
   enum PrintOptions {
     kPrintSimple = 0,
@@ -71,6 +68,8 @@ class Statistics : SingleCopy {
   std::string LookupDesc(const std::string &name);
   std::string PrintList(const PrintOptions print_options);
  private:
+  Statistics(const Statistics &other);
+  Statistics& operator=(const Statistics &other);
   struct CounterInfo {
     explicit CounterInfo(const std::string &desc) : desc(desc) { }
     Counter counter;
@@ -81,5 +80,9 @@ class Statistics : SingleCopy {
 };
 
 }  // namespace perf
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}  // namespace CVMFS_NAMESPACE_GUARD
+#endif
 
 #endif  // CVMFS_STATISTICS_H_
