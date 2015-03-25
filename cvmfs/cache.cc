@@ -181,9 +181,15 @@ bool CacheManager::CommitFromMem(
 //------------------------------------------------------------------------------
 
 
-int PosixCacheManager::AbortTxn(void *txn) {
+int PosixCacheManager::AbortTxn(void *txn, const string &dump_path) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   LogCvmfs(kLogCache, kLogDebug, "abort %s", transaction->tmp_path.c_str());
+  if (dump_path != "") {
+    LogCvmfs(kLogCache, kLogDebug, "dumping transaction to %s",
+             dump_path.c_str());
+    Flush(transaction);
+    CopyPath2Path(transaction->tmp_path, dump_path);
+  }
   close(transaction->fd);
   int result = unlink(transaction->tmp_path.c_str());
   if (result == -1)

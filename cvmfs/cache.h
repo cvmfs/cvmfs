@@ -74,7 +74,7 @@ class CacheManager : SingleCopy {
   virtual int StartTxn(const shash::Any &id, void *txn) = 0;
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) = 0;
   virtual int Reset(void *txn) = 0;
-  virtual int AbortTxn(void *txn) = 0;
+  virtual int AbortTxn(void *txn, const std::string &dump_path = "") = 0;
   virtual int OpenFromTxn(void *txn) = 0;
   virtual int CommitTxn(void *txn) = 0;
 
@@ -84,12 +84,17 @@ class CacheManager : SingleCopy {
                      const uint64_t size);
 
   virtual void TearDown2ReadOnly() = 0;
-  bool cache_mode() const { return cache_mode_; }
+  CacheModes cache_mode() const { return cache_mode_; }
+  bool reports_correct_filesize() const { return reports_correct_filesize_; }
 
  protected:
-  CacheManager() : cache_mode_(kCacheReadWrite) { }
+  CacheManager()
+    : cache_mode_(kCacheReadWrite)
+    , reports_correct_filesize_(true)
+  { }
 
   CacheModes cache_mode_;
+  bool reports_correct_filesize_;
 };
 
 
@@ -113,7 +118,7 @@ class PosixCacheManager : public CacheManager {
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
   virtual int Reset(void *txn);
   virtual int OpenFromTxn(void *txn);
-  virtual int AbortTxn(void *txn);
+  virtual int AbortTxn(void *txn, const std::string &dump_path = "");
   virtual int CommitTxn(void *txn);
 
   virtual void TearDown2ReadOnly();
