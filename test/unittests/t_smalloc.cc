@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 #include "../../cvmfs/smalloc.h"
 
@@ -49,3 +49,14 @@ TEST(T_Scalloc, calloc) {
   }
   free(mem);
 }
+
+TEST(T_Smmap, map_alloc) {
+  size_t size = 1024;
+  char* mem = static_cast<char*>(smmap(size));
+  char* pg = mem - 2*sizeof(size_t);
+  EXPECT_TRUE(MAP_FAILED != mem);
+  EXPECT_TRUE(*(reinterpret_cast<size_t*>(pg))==0xaaaaaaaa);
+  size_t pages = ((size + 2 * sizeof(size_t)) + 4095) / 4096;
+  EXPECT_TRUE(*(reinterpret_cast<size_t*>(pg) + 1)==pages);
+}
+
