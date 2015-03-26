@@ -74,46 +74,48 @@ namespace lru {
  */
 struct Counters {
   perf::Counter *size;
-  perf::Counter *num_hit;
-  perf::Counter *num_miss;
-  perf::Counter *num_insert;
-  perf::Counter *num_insert_negative;
+  perf::Counter *n_hit;
+  perf::Counter *n_miss;
+  perf::Counter *n_insert;
+  perf::Counter *n_insert_negative;
   uint64_t num_collisions;
   uint32_t max_collisions;
-  perf::Counter *num_update;
-  perf::Counter *num_replace;
-  perf::Counter *num_forget;
-  perf::Counter *num_drop;
-  perf::Counter *allocated;
+  perf::Counter *n_update;
+  perf::Counter *n_replace;
+  perf::Counter *n_forget;
+  perf::Counter *n_drop;
+  perf::Counter *sz_allocated;
 
   explicit Counters(perf::Statistics *statistics) {
-    size = statistics->Register("", "");
+    size = statistics->Register("lru.no_size", "Size");
     num_collisions = 0;
     max_collisions = 0;
-    num_hit = statistics->Register("", "");
-    num_miss = statistics->Register("", "");
-    num_insert = statistics->Register("", "");
-    num_insert_negative = statistics->Register("", "");
-    num_update = statistics->Register("", "");
-    num_replace = statistics->Register("", "");
-    num_forget = statistics->Register("", "");
-    num_drop = statistics->Register("", "");
-    allocated = statistics->Register("", "");
+    n_hit = statistics->Register("lru.n_hit", "Number of hits");
+    n_miss = statistics->Register("lru.n_miss", "Number of misses");
+    n_insert = statistics->Register("lru.n_insert", "Number of inserts");
+    n_insert_negative = statistics->Register("lru.n_insert_negative",
+        "Number of negative inserts");
+    n_update = statistics->Register("lru.n_update", "Number of updates");
+    n_replace = statistics->Register("lru.n_replace", "Number of replaces");
+    n_forget = statistics->Register("lru.n_forget", "Number of forgets");
+    n_drop = statistics->Register("lru.n_drop", "Number of drops");
+    sz_allocated = statistics->Register("lru.sz_allocated",
+        "Number of allocated bytes");
   }
 
   std::string Print() {
     return "size: " + size->Print() + "  " +
-      "hits: " + num_hit->Print() + "  " +
-      "misses: " + num_miss->Print() + "  " +
-      "inserts(all): " + num_insert->Print() + "  " +
-      "inserts(negative): " + num_insert_negative->Print() + "  " +
+      "hits: " + n_hit->Print() + "  " +
+      "misses: " + n_miss->Print() + "  " +
+      "inserts(all): " + n_insert->Print() + "  " +
+      "inserts(negative): " + n_insert_negative->Print() + "  " +
       "collisions: " + StringifyInt(num_collisions) + "  " +
       "collisions(max): " + StringifyInt(max_collisions) + "  " +
-      "updates: " + num_update->Print() + "  " +
-      "replacements: " + num_replace->Print() + "  " +
-      "forgets: " + num_forget->Print() + "  " +
-      "drops: " + num_drop->Print() + "  " +
-      "allocated: " + allocated->PrintKi() + " KB\n";
+      "updates: " + n_update->Print() + "  " +
+      "replacements: " + n_replace->Print() + "  " +
+      "forgets: " + n_forget->Print() + "  " +
+      "drops: " + n_drop->Print() + "  " +
+      "allocated: " + sz_allocated->PrintKi() + " KB\n";
   }
 };
 
@@ -542,7 +544,7 @@ class LruCache : SingleCopy {
     counters_.size->Set(cache_size_);
     // cache_ = Cache(cache_size_);
     cache_.Init(cache_size_, empty_key, hasher);
-    perf::Xadd(counters_.allocated, allocator_.bytes_allocated() +
+    perf::Xadd(counters_.sz_allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
 
 #ifdef LRU_CACHE_THREAD_SAFE
@@ -583,7 +585,7 @@ class LruCache : SingleCopy {
 
     // Check if we have to update an existent entry
     if (this->DoLookup(key, &entry)) {
-      perf::Inc(counters_.num_update);
+      perf::Inc(counters_.n_update);
       entry.value = value;
       cache_.Insert(key, entry);
       this->Touch(entry);
@@ -591,7 +593,7 @@ class LruCache : SingleCopy {
       return false;
     }
 
-    perf::Inc(counters_.num_insert);
+    perf::Inc(counters_.n_insert);
     // Check if we have to make some space in the cache a
     if (this->IsFull())
       this->DeleteOldest();
@@ -624,12 +626,12 @@ class LruCache : SingleCopy {
     CacheEntry entry;
     if (DoLookup(key, &entry)) {
       // Hit
-      perf::Inc(counters_.num_hit);
+      perf::Inc(counters_.n_hit);
       Touch(entry);
       *value = entry.value;
       found = true;
     } else {
-      perf::Inc(counters_.num_miss);
+      perf::Inc(counters_.n_miss);
     }
 
     Unlock();
@@ -652,7 +654,7 @@ class LruCache : SingleCopy {
     CacheEntry entry;
     if (this->DoLookup(key, &entry)) {
       found = true;
-      perf::Inc(counters_.num_forget);
+      perf::Inc(counters_.n_forget);
 
       entry.list_entry->RemoveFromList();
       allocator_.Destruct(entry.list_entry);
@@ -675,9 +677,9 @@ class LruCache : SingleCopy {
     cache_gauge_ = 0;
     lru_list_.clear();
     cache_.Clear();
-    perf::Inc(counters_.num_drop);
-    counters_.allocated->Set(0);
-    perf::Xadd(counters_.allocated, allocator_.bytes_allocated() +
+    perf::Inc(counters_.n_drop);
+    counters_.sz_allocated->Set(0);
+    perf::Xadd(counters_.sz_allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
 
     this->Unlock();
@@ -737,7 +739,7 @@ class LruCache : SingleCopy {
   inline void DeleteOldest() {
     assert(!this->IsEmpty());
 
-    perf::Inc(counters_.num_replace);
+    perf::Inc(counters_.n_replace);
     Key delete_me = lru_list_.PopFront();
     cache_.Erase(delete_me);
 
@@ -881,7 +883,7 @@ class Md5PathCache :
   bool InsertNegative(const shash::Md5 &hash) {
     const bool result = Insert(hash, dirent_negative_);
     if (result)
-      perf::Inc(counters_.num_insert_negative);
+      perf::Inc(counters_.n_insert_negative);
     return result;
   }
 
