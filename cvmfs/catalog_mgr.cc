@@ -14,6 +14,7 @@
 #include "logging.h"
 #include "shortstring.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "xattr.h"
 
 using namespace std;  // NOLINT
@@ -21,7 +22,8 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 
-AbstractCatalogManager::AbstractCatalogManager() {
+AbstractCatalogManager::AbstractCatalogManager(perf::Statistics *statistics) :
+  statistics_(statistics){
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
   revision_cache_ = 0;
@@ -185,7 +187,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   Catalog *best_fit = FindCatalog(path);
   assert(best_fit != NULL);
 
-  atomic_inc64(&statistics_.num_lookup_path);
+  perf::Inc(statistics_.num_lookup_path);
   LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in catalog: '%s'",
            path.c_str(), best_fit->path().c_str());
   bool found = best_fit->LookupPath(path, dirent);
@@ -199,7 +201,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
     // Check again to avoid race
     best_fit = FindCatalog(path);
     assert(best_fit != NULL);
-    atomic_inc64(&statistics_.num_lookup_path);
+    perf::Inc(statistics_.num_lookup_path);
     found = best_fit->LookupPath(path, dirent);
 
     if (!found) {
@@ -217,7 +219,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
       }
 
       if (nested_catalog != best_fit) {
-        atomic_inc64(&statistics_.num_lookup_path);
+        perf::Inc(statistics_.num_lookup_path);
         found = nested_catalog->LookupPath(path, dirent);
         if (!found) {
           LogCvmfs(kLogCatalog, kLogDebug,
@@ -282,7 +284,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
  lookup_path_notfound:
   Unlock();
   // Includes both: ENOENT and not found due to I/O error
-  atomic_inc64(&statistics_.num_lookup_path_negative);
+  perf::Inc(statistics_.num_lookup_path_negative);
   return false;
 }
 
@@ -311,7 +313,7 @@ bool AbstractCatalogManager::LookupXattrs(
     }
   }
 
-  atomic_inc64(&statistics_.num_lookup_xattrs);
+  perf::Inc(statistics_.num_lookup_xattrs);
   result = catalog->LookupXattrsPath(path, xattrs);
 
   Unlock();
@@ -348,7 +350,7 @@ bool AbstractCatalogManager::Listing(const PathString &path,
     }
   }
 
-  atomic_inc64(&statistics_.num_listing);
+  perf::Inc(statistics_.num_listing);
   result = catalog->ListingPath(path, listing);
 
   Unlock();
@@ -385,7 +387,7 @@ bool AbstractCatalogManager::ListingStat(const PathString &path,
     }
   }
 
-  atomic_inc64(&statistics_.num_listing);
+  perf::Inc(statistics_.num_listing);
   result = catalog->ListingPathStat(path, listing);
 
   Unlock();
@@ -564,7 +566,7 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
   // Try to find path as a super string of nested catalog mount points
   PathString path_slash(path);
   path_slash.Append("/", 1);
-  atomic_inc64(&statistics_.num_nested_listing);
+  perf::Inc(statistics_.num_nested_listing);
   const Catalog::NestedCatalogList& nested_catalogs =
     parent->ListNestedCatalogs();
   for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),

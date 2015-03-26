@@ -732,7 +732,7 @@ CatalogManager::CatalogManager(const string &repo_name,
                                signature::SignatureManager *signature_manager,
                                download::DownloadManager *download_manager,
                                perf::Statistics *statistics)
-{
+                             : AbstractCatalogManager(statistics) {
   LogCvmfs(kLogCache, kLogDebug, "constructing cache catalog manager");
   repo_name_ = repo_name;
   signature_manager_ = signature_manager;

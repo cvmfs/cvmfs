@@ -363,7 +363,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         lru::Counters inode_stats(cvmfs::statistics_);
         lru::Counters path_stats(cvmfs::statistics_);
         lru::Counters md5path_stats(cvmfs::statistics_);
-        catalog::Statistics catalog_stats;
+        catalog::Statistics catalog_stats(cvmfs::statistics_);
         string result;
 
         result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
