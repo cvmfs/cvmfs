@@ -86,21 +86,27 @@ struct Counters {
   perf::Counter *n_drop;
   perf::Counter *sz_allocated;
 
-  explicit Counters(perf::Statistics *statistics) {
-    size = statistics->Register("lru.no_size", "Size");
+  Counters(perf::Statistics *statistics, const std::string &name) {
+    size = statistics->Register(name + ".no_size", "Size for " + name);
     num_collisions = 0;
     max_collisions = 0;
-    n_hit = statistics->Register("lru.n_hit", "Number of hits");
-    n_miss = statistics->Register("lru.n_miss", "Number of misses");
-    n_insert = statistics->Register("lru.n_insert", "Number of inserts");
-    n_insert_negative = statistics->Register("lru.n_insert_negative",
-        "Number of negative inserts");
-    n_update = statistics->Register("lru.n_update", "Number of updates");
-    n_replace = statistics->Register("lru.n_replace", "Number of replaces");
-    n_forget = statistics->Register("lru.n_forget", "Number of forgets");
-    n_drop = statistics->Register("lru.n_drop", "Number of drops");
-    sz_allocated = statistics->Register("lru.sz_allocated",
-        "Number of allocated bytes");
+    n_hit = statistics->Register(name + ".n_hit", "Number of hits for " + name);
+    n_miss = statistics->Register(name + ".n_miss",
+        "Number of misses for " + name);
+    n_insert = statistics->Register(name + ".n_insert",
+        "Number of inserts for " + name);
+    n_insert_negative = statistics->Register(name + ".n_insert_negative",
+        "Number of negative inserts for " + name);
+    n_update = statistics->Register(name + ".n_update",
+        "Number of updates for " + name);
+    n_replace = statistics->Register(name + ".n_replace",
+        "Number of replaces for " + name);
+    n_forget = statistics->Register(name + ".n_forget",
+        "Number of forgets for " + name);
+    n_drop = statistics->Register(name + ".n_drop",
+        "Number of drops for " + name);
+    sz_allocated = statistics->Register(name + ".sz_allocated",
+        "Number of allocated bytes for " + name);
   }
 
   std::string Print() {
@@ -531,8 +537,9 @@ class LruCache : SingleCopy {
   LruCache(const unsigned   cache_size,
            const Key       &empty_key,
            uint32_t (*hasher)(const Key &key),
-           perf::Statistics *statistics) :
-    counters_(statistics),
+           perf::Statistics *statistics,
+           const std::string &name) :
+    counters_(statistics, name),
     pause_(false),
     cache_gauge_(0),
     cache_size_(cache_size),
@@ -803,7 +810,7 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
  public:
   explicit InodeCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<fuse_ino_t, catalog::DirectoryEntry>(
-      cache_size, fuse_ino_t(-1), hasher_inode, statistics)
+      cache_size, fuse_ino_t(-1), hasher_inode, statistics, "inode_cache")
   {
   }
 
@@ -834,7 +841,7 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
  public:
   explicit PathCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode,
-        statistics)
+        statistics, "path_cache")
   {
   }
 
@@ -867,7 +874,8 @@ class Md5PathCache :
  public:
   explicit Md5PathCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<shash::Md5, catalog::DirectoryEntry>(
-      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5, statistics)
+      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5, statistics,
+      "md5_path_cache")
   {
     dirent_negative_ = catalog::DirectoryEntry(catalog::kDirentNegative);
   }
