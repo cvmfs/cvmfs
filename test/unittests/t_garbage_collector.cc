@@ -14,6 +14,8 @@
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/manifest.h"
 #include "../../cvmfs/prng.h"
+#include "../../cvmfs/shortstring.h"
+#include "../../cvmfs/statistics.h"
 #include "testutil.h"
 
 using swissknife::CatalogTraversal;
@@ -74,6 +76,7 @@ class T_GarbageCollector : public ::testing::Test {
 
  protected:
   void SetUp() {
+    InitializeStaticCounters(&statistics_);
     dice_.InitLocaltime();
     SetupDummyCatalogs();
   }
@@ -458,6 +461,7 @@ class T_GarbageCollector : public ::testing::Test {
   RevisionMap                  catalogs_;
 
  private:
+  perf::Statistics   statistics_;
   Prng               dice_;
   MockObjectFetcher  object_fetcher_;
 };
