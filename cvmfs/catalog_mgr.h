@@ -68,30 +68,37 @@ inline const char *Code2Ascii(const LoadError error) {
 
 
 struct Statistics {
-  perf::Counter *num_lookup_inode;
-  perf::Counter *num_lookup_path;
-  perf::Counter *num_lookup_path_negative;
-  perf::Counter *num_lookup_xattrs;
-  perf::Counter *num_listing;
-  perf::Counter *num_nested_listing;
+  perf::Counter *n_lookup_inode;
+  perf::Counter *n_lookup_path;
+  perf::Counter *n_lookup_path_negative;
+  perf::Counter *n_lookup_xattrs;
+  perf::Counter *n_listing;
+  perf::Counter *n_nested_listing;
 
   explicit Statistics(perf::Statistics *statistics) {
-    num_lookup_inode = statistics->Register("catalog_mgr.n_", "");
-    num_lookup_path = statistics->Register("catalog_mgr.n_", "");;
-    num_lookup_path_negative = statistics->Register("catalog_mgr.n_", "");;
-    num_lookup_xattrs = statistics->Register("catalog_mgr.n_", "");;
-    num_listing = statistics->Register("catalog_mgr.n_", "");;
-    num_nested_listing = statistics->Register("catalog_mgr.n_", "");;
+    n_lookup_inode = statistics->Register("catalog_mgr.n_lookup_inode",
+        "Number of inode lookups");
+    n_lookup_path = statistics->Register("catalog_mgr.n_lookup_path",
+        "Number of path lookups");
+    n_lookup_path_negative = statistics->Register(
+        "catalog_mgr.n_lookup_path_negative",
+        "Number of negative path lookups");
+    n_lookup_xattrs = statistics->Register("catalog_mgr.n_lookup_xattrs",
+        "Number of xattrs lookups");
+    n_listing = statistics->Register("catalog_mgr.n_listing",
+        "Number of listing");
+    n_nested_listing = statistics->Register("catalog_mgr.n_nested_listing",
+        "Number of nested listing");
   }
 
   std::string Print() {
     return
-      "lookup(inode): " + num_lookup_inode->Print() + "    " +
-      "lookup(path-all): " + num_lookup_path->Print() + "    " +
-      "lookup(path-negative): " + num_lookup_path_negative->Print() + "    " +
-      "lookup(xattrs): " + num_lookup_xattrs->Print() + "    " +
-      "listing: " + num_listing->Print() + "    " +
-      "listing nested catalogs: " + num_nested_listing->Print() + "\n";
+      "lookup(inode): " + n_lookup_inode->Print() + "    " +
+      "lookup(path-all): " + n_lookup_path->Print() + "    " +
+      "lookup(path-negative): " + n_lookup_path_negative->Print() + "    " +
+      "lookup(xattrs): " + n_lookup_xattrs->Print() + "    " +
+      "listing: " + n_listing->Print() + "    " +
+      "listing nested catalogs: " + n_nested_listing->Print() + "\n";
   }
 };
 
