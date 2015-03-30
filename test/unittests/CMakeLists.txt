@@ -157,8 +157,10 @@ set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 #
 include_directories (${INCLUDE_DIRECTORIES})
 
-add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
-add_dependencies (${PROJECT_TEST_NAME} googletest)
+if (BUILD_UNITTESTS)
+  add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
+  add_dependencies (${PROJECT_TEST_NAME} googletest)
+endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
@@ -168,26 +170,23 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # add optional dependencies
 #
-if (LIBCURL_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
-endif (LIBCURL_BUILTIN)
+if (BUILD_UNITTESTS)
+  if (LIBCURL_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
+  endif (LIBCURL_BUILTIN)
 
-if (SQLITE3_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} sqlite3)
-endif (SQLITE3_BUILTIN)
+  if (SQLITE3_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} sqlite3)
+  endif (SQLITE3_BUILTIN)
 
-if (ZLIB_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} zlib)
-endif (ZLIB_BUILTIN)
+  if (ZLIB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} zlib)
+  endif (ZLIB_BUILTIN)
 
-if (TBB_PRIVATE_LIB)
-  add_dependencies (${PROJECT_TEST_NAME} libtbb)
-endif (TBB_PRIVATE_LIB)
-
-if (LIBCURL_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
-endif (LIBCURL_BUILTIN)
-
+  if (TBB_PRIVATE_LIB)
+    add_dependencies (${PROJECT_TEST_NAME} libtbb)
+  endif (TBB_PRIVATE_LIB)
+endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
   if (LIBCURL_BUILTIN)
@@ -205,16 +204,14 @@ if (BUILD_UNITTESTS_DEBUG)
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
-
-  if (LIBCURL_BUILTIN)
-    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libcares libcurl)
-  endif (LIBCURL_BUILTIN)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
 # set build flags
 #
-set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+if (BUILD_UNITTESTS)
+  set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
+endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
   set_target_properties (${PROJECT_TEST_DEBUG_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
@@ -226,7 +223,10 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
                              pthread dl)
-target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
+
+if (BUILD_UNITTESTS)
+  target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
+endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
   target_link_libraries (${PROJECT_TEST_DEBUG_NAME} ${UNITTEST_LINK_LIBRARIES})
@@ -254,4 +254,6 @@ endif (INSTALL_UNITTESTS_DEBUG)
 #
 # Integrate the test running into CMake
 #
-add_test (NAME unittests COMMAND ${PROJECT_TEST_NAME})
+if (BUILD_UNITTESTS)
+  add_test (NAME unittests COMMAND ${PROJECT_TEST_NAME})
+endif (BUILD_UNITTESTS)
