@@ -86,19 +86,9 @@ struct Statistics {
     n_lookup_xattrs = statistics->Register("catalog_mgr.n_lookup_xattrs",
         "Number of xattrs lookups");
     n_listing = statistics->Register("catalog_mgr.n_listing",
-        "Number of listing");
+        "Number of listings");
     n_nested_listing = statistics->Register("catalog_mgr.n_nested_listing",
-        "Number of nested listing");
-  }
-
-  std::string Print() {
-    return
-      "lookup(inode): " + n_lookup_inode->Print() + "    " +
-      "lookup(path-all): " + n_lookup_path->Print() + "    " +
-      "lookup(path-negative): " + n_lookup_path_negative->Print() + "    " +
-      "lookup(xattrs): " + n_lookup_xattrs->Print() + "    " +
-      "listing: " + n_listing->Print() + "    " +
-      "listing nested catalogs: " + n_nested_listing->Print() + "\n";
+        "Number of listings of nested catalogs");
   }
 };
 
