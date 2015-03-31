@@ -1501,11 +1501,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.maxfd") {
     attribute_value = StringifyInt(max_open_files_ - kNumReservedFd);
   } else if (attr == "user.usedfd") {
-    attribute_value = no_open_files_->Print();
+    attribute_value = no_open_files_->ToString();
   } else if (attr == "user.useddirp") {
-    attribute_value = no_open_dirs_->Print();
+    attribute_value = no_open_dirs_->ToString();
   } else if (attr == "user.nioerr") {
-    attribute_value = n_io_error_->Print();
+    attribute_value = n_io_error_->ToString();
   } else if (attr == "user.proxy") {
     vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
     unsigned current_group;
@@ -1547,9 +1547,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     const int num_catalogs = catalog_manager_->GetNumCatalogs();
     attribute_value = StringifyInt(num_catalogs);
   } else if (attr == "user.nopen") {
-    attribute_value = n_fs_open_->Print();
+    attribute_value = n_fs_open_->ToString();
   } else if (attr == "user.ndiropen") {
-    attribute_value = n_fs_dir_open_->Print();
+    attribute_value = n_fs_dir_open_->ToString();
   } else if (attr == "user.ndownload") {
     attribute_value = StringifyInt(cache::GetNumDownloads());
   } else if (attr == "user.timeout") {
@@ -1561,11 +1561,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
-    int64_t rx = download_manager_->GetCounters().no_transferred_bytes->Get();
+    int64_t rx = cvmfs::statistics_->Lookup("n_transfered_bytes")->Get();
     attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
-    int64_t rx = download_manager_->GetCounters().no_transferred_bytes->Get();
-    int64_t time = download_manager_->GetCounters().sz_transfer_time->Get();
+    int64_t rx = cvmfs::statistics_->Lookup("n_transfered_bytes")->Get();
+    int64_t time = cvmfs::statistics_->Lookup("sz_transfer_time")->Get();
     if (time == 0)
       attribute_value = "n/a";
     else
@@ -2095,9 +2095,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   // Runtime counters
   cvmfs::n_fs_open_ = cvmfs::statistics_->Register("cvmfs.n_fs_open",
-      "Number of opened files");
+      "Overall number of file open operations");
   cvmfs::n_fs_dir_open_ = cvmfs::statistics_->Register("cvmfs.n_fs_dir_open",
-      "Number of opened directories");
+      "Overall number of directory open operations");
   cvmfs::n_fs_lookup_ = cvmfs::statistics_->Register("cvmfs.n_fs_lookup",
       "Number of lookups");
   cvmfs::n_fs_lookup_negative_ = cvmfs::statistics_->Register(
@@ -2109,7 +2109,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::n_fs_readlink_ = cvmfs::statistics_->Register("cvmfs.n_fs_readlink",
       "Number of links read");
   cvmfs::n_fs_forget_ = cvmfs::statistics_->Register("cvmfs.n_fs_forget",
-      "Number of forgets");
+      "Number of inode forgets");
   cvmfs::n_io_error_ = cvmfs::statistics_->Register("cvmfs.n_io_error",
       "Number of I/O errors");
 
@@ -2280,9 +2280,9 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
   cvmfs::no_open_files_ = cvmfs::statistics_->Register("cvmfs.no_open_files",
-      "Total number of opened files");
+      "Number of currently opened files");
   cvmfs::no_open_dirs_ = cvmfs::statistics_->Register("cvmfs.no_open_dirs",
-      "Total number of opened directories");
+      "Number of currently opened directories");
 
   // Control & command interface
   if (!talk::Init(".", cvmfs::options_manager_)) {
@@ -2628,8 +2628,7 @@ static int AltProcessFlavor(int argc, char **argv) {
     return quota::MainCacheManager(argc, argv);
   }
   if (strcmp(argv[1], "__wpad__") == 0) {
-    return download::MainResolveProxyDescription(argc, argv,
-        cvmfs::statistics_);
+    return download::MainResolveProxyDescription(argc, argv);
   }
   return 1;
 }

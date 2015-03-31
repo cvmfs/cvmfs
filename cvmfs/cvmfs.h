@@ -46,8 +46,6 @@ std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes
 void SetMaxTTL(const unsigned value);  // in minutes
 void ResetErrorCounters();
-void GetLruStatistics(lru::Counters *inode_stats, lru::Counters *path_stats,
-                      lru::Counters *md5path_stats);
 std::string PrintInodeTrackerStatistics();
 std::string PrintInodeGeneration();
 catalog::Statistics GetCatalogStatistics();
