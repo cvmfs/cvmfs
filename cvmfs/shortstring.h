@@ -28,18 +28,18 @@ template<unsigned char StackSize, char Type>
 class ShortString {
  public:
   ShortString() : long_string_(NULL), length_(0) {
-    perf::Inc(n_instances_);
+    perf::TryInc(n_instances_);
   }
   ShortString(const ShortString &other) : long_string_(NULL) {
-    perf::Inc(n_instances_);
+    perf::TryInc(n_instances_);
     Assign(other);
   }
   ShortString(const char *chars, const unsigned length) : long_string_(NULL) {
-    perf::Inc(n_instances_);
+    perf::TryInc(n_instances_);
     Assign(chars, length);
   }
   explicit ShortString(const std::string &std_string) : long_string_(NULL) {
-    perf::Inc(n_instances_);
+    perf::TryInc(n_instances_);
     Assign(std_string.data(), std_string.length());
   }
 
@@ -55,7 +55,7 @@ class ShortString {
     delete long_string_;
     long_string_ = NULL;
     if (length > StackSize) {
-      perf::Inc(n_overflows_);
+      perf::TryInc(n_overflows_);
       long_string_ = new std::string(chars, length);
     } else {
       if (length)
@@ -76,7 +76,7 @@ class ShortString {
 
     const unsigned new_length = this->length_ + length;
     if (new_length > StackSize) {
-      perf::Inc(n_overflows_);
+      perf::TryInc(n_overflows_);
       long_string_ = new std::string();
       long_string_->reserve(new_length);
       long_string_->assign(stack_, length_);
@@ -177,17 +177,17 @@ class ShortString {
   }
 
   static void RegisterCounters(perf::Statistics *statistics) {
-    if (StackSize == kDefaultMaxPath && Type == 0) {
+    if (Type == 0) {
         n_instances_ = statistics->Register("pathstring.n_instances",
             "Number of  instances");
         n_overflows_ = statistics->Register("pathstring.n_overflows",
             "Number of overflows");
-    } else if (StackSize == kDefaultMaxName && Type == 1) {
+    } else if (Type == 1) {
         n_instances_ = statistics->Register("namestring.n_instances",
             "Number of  instances");
         n_overflows_ = statistics->Register("namestring.n_overflows",
             "Number of overflows");
-    } else if (StackSize == kDefaultMaxLink && Type == 2) {
+    } else if (Type == 2) {
         n_instances_ = statistics->Register("linkstring.n_instances",
             "Number of  instances");
         n_overflows_ = statistics->Register("linkstring.n_overflows",
