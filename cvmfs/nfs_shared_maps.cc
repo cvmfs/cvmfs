@@ -213,17 +213,6 @@ bool GetPath(const uint64_t inode, PathString *path) {
 }
 
 
-string GetStatistics() {
-  string result = "Total number of issued inodes: " +
-      n_dbstat_added_->Print() + "\n";
-  result += "Last inode issued: " + no_dbstat_seq_->Print() + "\n";
-  result += "inode --> path hits: " + n_dbstat_path_found_->Print() + "\n";
-  result += "path --> inode hits: " + n_dbstat_inode_found_->Print() + "\n";
-
-  return result;
-}
-
-
 static int BusyHandler(void *data, int attempt) {
   BusyHandlerInfo *handler_info = static_cast<BusyHandlerInfo *>(data);
   // Reset the accumulated time if this is the start of a new request

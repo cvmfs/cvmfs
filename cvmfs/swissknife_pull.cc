@@ -555,11 +555,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   if (!retval)
     goto fini;
 
-  if (g_download_manager->GetCounters().n_num_retries > 0) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "Overall number of retries: %"PRId64,
-             g_download_manager->GetCounters().n_num_retries);
-  }
-
   // Upload manifest ensemble
   {
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading manifest ensemble");
