@@ -15,6 +15,7 @@
 #include "download.h"
 #include "logging.h"
 #include "pacparser.h"
+#include "statistics.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
@@ -226,18 +227,18 @@ static void AltCvmfsLogger(const LogSource source, const int mask,
 }
 
 
-int MainResolveProxyDescription(int argc, char **argv,
-    perf::Statistics *statistics) {
+int MainResolveProxyDescription(int argc, char **argv) {
   SetAltLogFunc(AltCvmfsLogger);
   if (argc < 4) {
     LogCvmfs(kLogDownload, kLogStderr, "arguments missing");
     return 1;
   }
+  perf::Statistics statistics;
   string proxy_configuration = argv[2];
   string host_list = argv[3];
 
   DownloadManager download_manager;
-  download_manager.Init(1, false, statistics);
+  download_manager.Init(1, false, &statistics);
   download_manager.SetHostChain(host_list);
   string resolved_proxies = ResolveProxyDescription(proxy_configuration,
                                                     &download_manager);
