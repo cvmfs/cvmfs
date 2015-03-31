@@ -25,12 +25,12 @@ namespace perf {
  */
 class Counter {
  public:
-  Counter();
-  void Inc();
-  void Dec();
-  int64_t Get();
-  void Set(const int64_t val);
-  int64_t Xadd(const int64_t delta);
+  Counter() { atomic_init64(&counter_); }
+  void Inc() { atomic_inc64(&counter_); }
+  void Dec() { atomic_dec64(&counter_); }
+  int64_t Get() { return atomic_read64(&counter_); }
+  void Set(const int64_t val) { atomic_write64(&counter_, val); }
+  int64_t Xadd(const int64_t delta) { return atomic_xadd64(&counter_, delta); }
 
   std::string Print();
   std::string PrintK();

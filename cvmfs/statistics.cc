@@ -18,15 +18,6 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace perf {
 
-Counter::Counter() { atomic_init64(&counter_); }
-void Counter::Inc() { atomic_inc64(&counter_); }
-void Counter::Dec() { atomic_dec64(&counter_); }
-int64_t Counter::Get() { return atomic_read64(&counter_); }
-void Counter::Set(const int64_t val) { atomic_write64(&counter_, val); }
-int64_t Counter::Xadd(const int64_t delta) {
-  return atomic_xadd64(&counter_, delta);
-}
-
 std::string Counter::ToString() { return StringifyInt(Get()); }
 std::string Counter::Print() { return StringifyInt(Get()); }
 std::string Counter::PrintK() { return StringifyInt(Get() / 1000); }
@@ -69,7 +60,7 @@ string Statistics::PrintList(const PrintOptions print_options) {
   for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
        iEnd = counters_.end(); i != iEnd; ++i)
   {
-    result += i->first + "|" + i->second->counter.Print() +
+    result += i->first + "|" + i->second->counter.ToString() +
               "|" + i->second->desc + "\n";
   }
   return result;
