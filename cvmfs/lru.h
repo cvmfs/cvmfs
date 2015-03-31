@@ -73,7 +73,7 @@ namespace lru {
  * Counting of cache operations.
  */
 struct Counters {
-  perf::Counter *size;
+  perf::Counter *sz_size;
   perf::Counter *n_hit;
   perf::Counter *n_miss;
   perf::Counter *n_insert;
@@ -87,7 +87,7 @@ struct Counters {
   perf::Counter *sz_allocated;
 
   Counters(perf::Statistics *statistics, const std::string &name) {
-    size = statistics->Register(name + ".no_size", "Size for " + name);
+    sz_size = statistics->Register(name + ".sz_size", "Size for " + name);
     num_collisions = 0;
     max_collisions = 0;
     n_hit = statistics->Register(name + ".n_hit", "Number of hits for " + name);
@@ -107,21 +107,6 @@ struct Counters {
         "Number of drops for " + name);
     sz_allocated = statistics->Register(name + ".sz_allocated",
         "Number of allocated bytes for " + name);
-  }
-
-  std::string Print() {
-    return "size: " + size->Print() + "  " +
-      "hits: " + n_hit->Print() + "  " +
-      "misses: " + n_miss->Print() + "  " +
-      "inserts(all): " + n_insert->Print() + "  " +
-      "inserts(negative): " + n_insert_negative->Print() + "  " +
-      "collisions: " + StringifyInt(num_collisions) + "  " +
-      "collisions(max): " + StringifyInt(max_collisions) + "  " +
-      "updates: " + n_update->Print() + "  " +
-      "replacements: " + n_replace->Print() + "  " +
-      "forgets: " + n_forget->Print() + "  " +
-      "drops: " + n_drop->Print() + "  " +
-      "allocated: " + sz_allocated->PrintKi() + " KB\n";
   }
 };
 
@@ -548,7 +533,7 @@ class LruCache : SingleCopy {
   {
     assert(cache_size > 0);
 
-    counters_.size->Set(cache_size_);
+    counters_.sz_size->Set(cache_size_);
     // cache_ = Cache(cache_size_);
     cache_.Init(cache_size_, empty_key, hasher);
     perf::Xadd(counters_.sz_allocated, allocator_.bytes_allocated() +
