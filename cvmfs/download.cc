@@ -489,7 +489,7 @@ void *DownloadManager::MainDownload(void *data) {
                                             &msgs_in_queue)))
     {
       if (curl_msg->msg == CURLMSG_DONE) {
-        perf::Inc(download_mgr->counters_->n_num_requests);
+        perf::Inc(download_mgr->counters_->n_requests);
         JobInfo *info;
         CURL *easy_handle = curl_msg->easy_handle;
         int curl_error = curl_msg->data.result;
@@ -955,7 +955,7 @@ void DownloadManager::UpdateStatistics(CURL *handle) {
   double val;
 
   if (curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val) == CURLE_OK)
-    perf::Xadd(counters_->no_transferred_bytes, val);
+    perf::Xadd(counters_->sz_transferred_bytes, val);
 }
 
 
@@ -987,7 +987,7 @@ void DownloadManager::Backoff(JobInfo *info) {
   pthread_mutex_unlock(lock_options_);
 
   info->num_retries++;
-  perf::Inc(counters_->n_num_retries);
+  perf::Inc(counters_->n_retries);
   if (info->backoff_ms == 0) {
     info->backoff_ms = prng_.Next(backoff_init_ms + 1);  // Must be != 0
   } else {
@@ -1517,7 +1517,7 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     int retval;
     do {
       retval = curl_easy_perform(handle);
-      perf::Inc(counters_->n_num_requests);
+      perf::Inc(counters_->n_requests);
       double elapsed;
       if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &elapsed) == CURLE_OK)
         perf::Xadd(counters_->sz_transfer_time, (int64_t)(elapsed * 1000));
@@ -1621,11 +1621,6 @@ void DownloadManager::GetTimeout(unsigned *seconds_proxy,
   *seconds_proxy = opt_timeout_proxy_;
   *seconds_direct = opt_timeout_direct_;
   pthread_mutex_unlock(lock_options_);
-}
-
-
-const Counters &DownloadManager::GetCounters() {
-  return *counters_;
 }
 
 
@@ -2432,20 +2427,6 @@ void DownloadManager::EnablePipelining() {
 
 void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
-}
-
-
-//------------------------------------------------------------------------------
-
-
-string Counters::Print() const {
-  return
-  "Transferred Bytes: " + no_transferred_bytes->Print() + "\n" +
-  "Transfer duration: " + sz_transfer_time->Print() + " ms\n" +
-  "Number of requests: " + n_num_requests->Print() + "\n" +
-  "Number of retries: " + n_num_retries->Print() + "\n" +
-  "Number of proxy failovers: " + n_proxy_failover->Print() + "\n" +
-  "Number of host failovers: " + n_host_failover->Print() + "\n";
 }
 
 }  // namespace download

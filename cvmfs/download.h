@@ -85,29 +85,27 @@ inline const char *Code2Ascii(const Failures error) {
 
 
 struct Counters {
-  perf::Counter *no_transferred_bytes;
+  perf::Counter *sz_transferred_bytes;
   perf::Counter *sz_transfer_time;  // measured in miliseconds
-  perf::Counter *n_num_requests;
-  perf::Counter *n_num_retries;
+  perf::Counter *n_requests;
+  perf::Counter *n_retries;
   perf::Counter *n_proxy_failover;
   perf::Counter *n_host_failover;
 
   explicit Counters(perf::Statistics *statistics) {
-    no_transferred_bytes = statistics->Register("download.no_transferred_bytes",
+    sz_transferred_bytes = statistics->Register("download.sz_transferred_bytes",
         "Number of transferred bytes");
     sz_transfer_time = statistics->Register("download.sz_transfer_time",
         "Transfer time (miliseconds)");
-    n_num_requests = statistics->Register("download.n_num_requests",
+    n_requests = statistics->Register("download.n_requests",
         "Number of requests");
-    n_num_retries = statistics->Register("download.n_num_retries",
+    n_retries = statistics->Register("download.n_retries",
         "Number of retries");
     n_proxy_failover = statistics->Register("download.n_num_proxy_failover",
         "Number of proxy failovers");
     n_host_failover = statistics->Register("download.n_num_host_failover",
         "Number of host failovers");
   }
-
-  std::string Print() const;
 };  // Counters
 
 
@@ -309,7 +307,6 @@ class DownloadManager {
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
-  const Counters &GetCounters();
   void SetHostChain(const std::string &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
