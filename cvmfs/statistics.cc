@@ -27,6 +27,7 @@ int64_t Counter::Xadd(const int64_t delta) {
   return atomic_xadd64(&counter_, delta);
 }
 
+std::string Counter::ToString() { return StringifyInt(Get()); }
 std::string Counter::Print() { return StringifyInt(Get()); }
 std::string Counter::PrintK() { return StringifyInt(Get() / 1000); }
 std::string Counter::PrintKi() { return StringifyInt(Get() / 1024); }
