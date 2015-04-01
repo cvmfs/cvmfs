@@ -454,7 +454,8 @@ check_aufs() {
 #
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
-  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs
+  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
+  /sbin/modprobe -q overlay   || test -d /sys/module/overlay
 }
 
 
