@@ -1,4 +1,5 @@
 2.1.21:
+  * Disable Geo-API for atlas nightlies
   * Add benchmarks to the integration tests
   * Use --max-time curl option in Nagios probe with 3 times connection timeout
   * Add check for 32bit inode overflow to the Nagios probe (CVM-627)
