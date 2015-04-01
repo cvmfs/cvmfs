@@ -488,6 +488,17 @@ check_apache() {
   [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null
 }
 
+reload_apache() {
+  echo -n "Reloading Apache... "
+  ${SERVICE_BIN} ${APACHE_SERVICE} reload > /dev/null
+  echo "done"
+}
+
+restart_apache() {
+  echo -n "Restarting Apache... "
+  ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null
+  echo "done"
+}
 
 # checks if wsgi apache module is installed and enabled
 check_wsgi_module() {
@@ -516,6 +527,93 @@ The required package is called ${APACHE_WSGI_MODPKG}."
 get_apache_version() {
   ${APACHE_BIN} -v | head -n1 | \
     sed 's/^Server version: Apache\/\([0-9]\.[0-9]\.[0-9][0-9]*\).*$/\1/'
+}
+
+
+# figure out apache config file mode
+#
+# @return   apache config mode (stdout) (see globals below)
+APACHE_CONF_MODE_OLD=1 # *.conf goes to ${APACHE_CONF}/conf.d
+APACHE_CONF_MODE_NEW=2 # *.conf goes to ${APACHE_CONF}/conf-available
+get_apache_conf_mode() {
+  local minor_apache_version=$(version_minor "$(get_apache_version)")
+  if [ $minor_apache_version -ge 4 ] || [ -d /etc/${APACHE_CONF}/conf-available ]; then
+    echo $APACHE_CONF_MODE_NEW
+  else
+    echo $APACHE_CONF_MODE_OLD
+  fi
+}
+
+
+# find location of apache configuration files
+#
+# @return   the location of apache configuration files (stdout)
+get_apache_conf_path() {
+  local res_path="/etc/${APACHE_CONF}"
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "${res_path}/conf-available"
+  else
+    echo "${res_path}/conf.d"
+  fi
+}
+
+
+# returns the apache configuration string for 'allow from all'
+# Note: this is necessary, since apache 2.4.x formulates that different
+#
+# @return   a configuration snippet to allow s'th from all hosts (stdout)
+get_compatible_apache_allow_from_all_config() {
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    echo "Require all granted"
+  else
+    local nl='
+'
+    echo "Order allow,deny${nl}    Allow from all"
+  fi
+}
+
+
+# writes apache configuration file
+# This figures out where to put the apache configuration file depending
+# on the running apache version
+# Note: Configuration file content is expected to come through stdin
+#
+# @param   file_name  the name of the apache config file (no path!)
+# @return             0 on succes
+create_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)"
+
+  # create (or append) the conf file
+  cat - >> ${conf_path}/${file_name} || return 1
+
+  # the new apache requires the enable the config afterwards
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    a2enconf $file_name > /dev/null || return 2
+  fi
+
+  return 0
+}
+
+
+# removes apache config files dependent on the apache version in place
+# Note: As of apache 2.4.x `a2disconf` needs to be called before removal
+#
+# @param   file_name  the name of the conf file to be removed (no path!)
+# @return  0 on successful removal
+remove_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)/${file_name}"
+
+  # disable configuration on newer apache versions
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
+    a2disconf $file_name > /dev/null 2>&1 || return 1
+  fi
+
+  # remove configuration file
+  rm -f $conf_path
 }
 
 
@@ -565,49 +663,6 @@ count_wr_fds() {
     if echo "$line" | grep -qe '^\a[wu]$'; then cnt=$(( $cnt + 1 )); fi
   done
   echo $cnt
-}
-
-
-# figure out apache config file mode
-#
-# @return   apache config mode (stdout) (see globals below)
-APACHE_CONF_MODE_OLD=1 # *.conf goes to ${APACHE_CONF}/conf.d
-APACHE_CONF_MODE_NEW=2 # *.conf goes to ${APACHE_CONF}/conf-available
-get_apache_conf_mode() {
-  local minor_apache_version=$(version_minor "$(get_apache_version)")
-  if [ $minor_apache_version -ge 4 ] || [ -d /etc/${APACHE_CONF}/conf-available ]; then
-    echo $APACHE_CONF_MODE_NEW
-  else
-    echo $APACHE_CONF_MODE_OLD
-  fi
-}
-
-
-# find location of apache configuration files
-#
-# @return   the location of apache configuration files (stdout)
-get_apache_conf_path() {
-  local res_path="/etc/${APACHE_CONF}"
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    echo "${res_path}/conf-available"
-  else
-    echo "${res_path}/conf.d"
-  fi
-}
-
-
-# returns the apache configuration string for 'allow from all'
-# Note: this is necessary, since apache 2.4.x formulates that different
-#
-# @return   a configuration snippet to allow s'th from all hosts (stdout)
-get_compatible_apache_allow_from_all_config() {
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    echo "Require all granted"
-  else
-    local nl='
-'
-    echo "Order allow,deny${nl}    Allow from all"
-  fi
 }
 
 
@@ -1526,18 +1581,6 @@ mangle_s3_stratum0_url() {
   echo "${s3_stratum0_url}${repo_name}"
 }
 
-reload_apache() {
-  echo -n "Reloading Apache... "
-  ${SERVICE_BIN} ${APACHE_SERVICE} reload > /dev/null
-  echo "done"
-}
-
-restart_apache() {
-  echo -n "Restarting Apache... "
-  ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null
-  echo "done"
-}
-
 
 # lowers restrictions of hardlink creation if needed
 # allows AUFS to properly whiteout files without root privileges
@@ -1695,49 +1738,6 @@ migrate_legacy_dirtab() {
   rm -f "$tmp_dirtab"                                          || return 5
 }
 
-
-# writes apache configuration file
-# This figures out where to put the apache configuration file depending
-# on the running apache version
-# Note: Configuration file content is expected to come through stdin
-#
-# @param   file_name  the name of the apache config file (no path!)
-# @return             0 on succes
-create_apache_config_file() {
-  local file_name=$1
-  local conf_path
-  conf_path="$(get_apache_conf_path)"
-
-  # create (or append) the conf file
-  cat - >> ${conf_path}/${file_name} || return 1
-
-  # the new apache requires the enable the config afterwards
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    a2enconf $file_name > /dev/null || return 2
-  fi
-
-  return 0
-}
-
-
-# removes apache config files dependent on the apache version in place
-# Note: As of apache 2.4.x `a2disconf` needs to be called before removal
-#
-# @param   file_name  the name of the conf file to be removed (no path!)
-# @return  0 on successful removal
-remove_apache_config_file() {
-  local file_name=$1
-  local conf_path
-  conf_path="$(get_apache_conf_path)/${file_name}"
-
-  # disable configuration on newer apache versions
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    a2disconf $file_name > /dev/null 2>&1 || return 1
-  fi
-
-  # remove configuration file
-  rm -f $conf_path
-}
 
 # sends wsgi configuration to stdout
 #
