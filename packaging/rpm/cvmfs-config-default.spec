@@ -1,7 +1,7 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.1
-Release: 2
+Version: 1.2
+Release: 1
 Source0: cern.ch.pub
 Source1: cern-it1.cern.ch.pub
 Source2: cern-it2.cern.ch.pub
@@ -75,6 +75,9 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Wed Apr 01 2015 Jakob Blomer <jblomer@cern.ch> - 1.2-1
+- Disable Geo-API for ATLAS nightlies
+
 * Mon Feb 23 2015 Jakob Blomer <jblomer@cern.ch> - 1.1-2
 - use versioned provides
 
