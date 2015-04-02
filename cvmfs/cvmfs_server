@@ -216,7 +216,8 @@ Supported Commands:
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                [-c file ownership (UID:GID)] [-k path to keys] [-g chown backend]
+                [-f union filesystem type] [-c file ownership (UID:GID)]
+                [-k path to keys] [-g chown backend]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
@@ -2710,10 +2711,11 @@ import() {
   local show_statistics=0
   local replicable=0
   local chown_backend=0
+  local unionfs=
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmg" option; do
+  while getopts "w:o:c:u:k:lsmgf:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2742,6 +2744,9 @@ import() {
       g)
         chown_backend=1
       ;;
+      f)
+        unionfs=$OPTARG
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command import: Unrecognized option: $1"
@@ -2757,13 +2762,12 @@ import() {
   # default values
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
+  [ x"$unionfs"  = x ] && unionfs="$(get_available_union_fs)"
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
   is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
-  # import from 2.0 -> 2.1 only supports aufs, not overlayfs
-  check_aufs                        || die "aufs kernel module missing"
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
   check_apache                      || die "Apache must be installed and running"
@@ -2771,6 +2775,13 @@ import() {
   lower_hardlink_restrictions
   ensure_enabled_apache_modules
   [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"
+
+  if [ $unionfs = "overlayfs" ]; then
+    check_overlayfs                 || die "overlayfs kernel module missing"
+    echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
+  else
+    check_aufs                      || die "aufs kernel module missing"
+  fi
 
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
@@ -2793,7 +2804,7 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs sha1 true false || die "fail!"
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs sha1 true false || die "fail!"
   echo "done"
 
   # import the old repository security keys
