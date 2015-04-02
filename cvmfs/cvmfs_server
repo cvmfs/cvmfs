@@ -464,6 +464,19 @@ check_overlayfs() {
   /sbin/modprobe -q overlay   || test -d /sys/module/overlay
 }
 
+# check if at least one of the supported union file systems is available
+# currently AUFS get preference over OverlayFS if both are available
+#
+# @return   0 if at least one was found (name through stdout); abort otherwise
+get_available_union_fs() {
+  if check_aufs; then
+    echo "aufs"
+  elif check_overlayfs; then
+    echo "overlayfs"
+  else
+    die "neither AUFS nor OverlayFS detected on the system!"
+  fi
+}
 
 # gets the system file system name of the overlayfs
 # apparently this differs from version to version... sigh!
@@ -2336,7 +2349,7 @@ mkfs() {
   name=$(get_repository_name $1)
 
   # default values
-  [ x"$unionfs"   = x"" ] && unionfs=aufs
+  [ x"$unionfs"   = x"" ] && unionfs="$(get_available_union_fs)"
   [ x"$hash_algo" = x"" ] && hash_algo=sha1
 
   # upstream generation (defaults to local upstream)
