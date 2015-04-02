@@ -1951,7 +1951,6 @@ remove_repository_storage() {
 
 setup_and_mount_new_repository() {
   local name=$1
-  local unionfs=$2
 
   # get repository information
   load_repo_config $name
@@ -1960,7 +1959,7 @@ setup_and_mount_new_repository() {
   local ofs_workdir="${CVMFS_SPOOL_DIR}/ofs_workdir"
 
   local selinux_context=""
-  if [ $unionfs = "overlayfs" ]; then
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
     local overlayfs_name="$(get_overlayfs_name)"
     echo -n "($overlayfs_name) "
     if has_selinux && try_mount_remount_cycle_overlayfs; then
@@ -2439,7 +2438,7 @@ mkfs() {
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name $unionfs || die "fail"
+  setup_and_mount_new_repository $name || die "fail"
   echo "done"
 
   if [ $replicable -eq 1 ]; then
@@ -2833,7 +2832,7 @@ import() {
 
   # do final setup
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name aufs || die "fail!"
+  setup_and_mount_new_repository $name || die "fail!"
   echo "done"
 
   # the .cvmfsdirtab semantics might need an update
