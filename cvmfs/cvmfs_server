@@ -1891,7 +1891,9 @@ create_spool_area_for_new_repository() {
   local ofs_workdir="${spool_dir}/ofs_workdir"
 
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir || return 1
-  [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ] && mkdir -p $ofs_workdir || return 2
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    mkdir -p $ofs_workdir || return 2
+  fi
   chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
 }
 
