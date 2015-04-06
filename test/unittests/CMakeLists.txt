@@ -27,6 +27,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_managed_exec.cc
   t_prng.cc
   t_buffer.cc
+  t_smalloc.cc
   t_chunk_detectors.cc
   t_upload_facility.cc
   t_uploaders.cc
