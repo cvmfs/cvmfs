@@ -386,6 +386,7 @@ fi
 %files unittests
 %defattr(-,root,root)
 %{_bindir}/cvmfs_unittests
+%doc COPYING AUTHORS README ChangeLog
 
 %changelog
 * Wed Jan 07 2015 Jakob Blomer <jblomer@cern.ch> - 2.1.20
