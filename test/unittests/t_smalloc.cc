@@ -80,9 +80,9 @@ TEST(T_Smalloc, Scalloc) {
     printf("size is %u.\n", size);
     printf("num is %u.\n", num);
 #endif
-    int *mem = static_cast<int *>(scalloc(num, size));
+    int *mem = static_cast<int *>(scalloc(num, sizeof(int)));
     EXPECT_FALSE(mem == NULL);
-    for (const int *tmp = mem; tmp < num * size; tmp++) {
+    for (const int *tmp = mem; tmp < mem +  num; tmp++) {
       EXPECT_EQ(*tmp, 0);
     }
     free(mem);
