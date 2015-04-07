@@ -76,3 +76,14 @@ $package_maker --doc $pmdoc       \
                --verbose          \
                --root-volume-only \
                --out $output_package || die "Package creation failed!"
+cd ${CVMFS_RESULT_LOCATION}
+
+# generating package map section for specific platform
+if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
+  echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
+  generate_package_map "$CVMFS_CI_PLATFORM_LABEL"                            \
+                       "$(basename $(find . -regex '.*cvmfs-[0-9].*\.pkg'))" \
+                       ""                                                    \
+                       ""                                                    \
+                       ""
+fi
