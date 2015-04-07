@@ -1,4 +1,6 @@
 2.1.21:
+  * Let 'cvmfs_config chksetup' find the Fuse library in /usr/lib/$platform
+    (CVM-802)
   * Disable Geo-API for atlas nightlies
   * Add benchmarks to the integration tests
   * Use --max-time curl option in Nagios probe with 3 times connection timeout
