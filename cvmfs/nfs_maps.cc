@@ -255,9 +255,6 @@ bool GetPath(const uint64_t inode, PathString *path) {
 
 
 string GetStatistics() {
-  if (use_shared_db_)
-    return nfs_shared_maps::GetStatistics();
-
   string result = "Total number of issued inodes: " +
                   StringifyInt(seq_-root_inode_) + "\n";
 
