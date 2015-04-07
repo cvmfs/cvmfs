@@ -92,6 +92,7 @@ struct JobInfo {
   enum RequestType {
     kReqHead = 0,
     kReqPut,
+    kReqPutNoCache,
     kReqDelete,
   };
 
