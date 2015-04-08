@@ -1,4 +1,5 @@
 2.1.21:
+  * Fix crash in 'cvmfs_swissknife dirtab' if .cvmfsdirtab contains /*
   * Let 'cvmfs_config chksetup' find the Fuse library in /usr/lib/$platform
     (CVM-802)
   * Disable Geo-API for atlas nightlies
