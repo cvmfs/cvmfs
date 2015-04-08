@@ -46,11 +46,6 @@ std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes
 void SetMaxTTL(const unsigned value);  // in minutes
 void ResetErrorCounters();
-std::string PrintInodeTrackerStatistics();
-std::string PrintInodeGeneration();
-catalog::Statistics GetCatalogStatistics();
-std::string GetCertificateStats();
-std::string GetFsStats();
 
 }  // namespace cvmfs
 

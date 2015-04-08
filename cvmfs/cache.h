@@ -81,10 +81,6 @@ class CatalogManager : public catalog::AbstractCatalogManager {
     Unlock();
     return result;
   }
-  std::string GetCertificateStats() {
-    return "hits: " + n_certificate_hits_->Print() + "    " +
-    "misses: " + n_certificate_misses_->Print() + "\n";
-  }
   bool offline_mode() const { return offline_mode_; }
   uint64_t all_inodes() const { return all_inodes_; }
   uint64_t loaded_inodes() const { return loaded_inodes_; }

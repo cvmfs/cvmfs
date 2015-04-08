@@ -345,27 +345,6 @@ static bool UseWatchdog() {
 }
 
 
-string PrintInodeTrackerStatistics() {
-  return inode_tracker_->GetStatistics().Print() + "\n";
-}
-
-
-std::string PrintInodeGeneration() {
-  return "init-catalog-revision: " +
-    StringifyInt(inode_generation_info_.initial_revision) + "  " +
-    "current-catalog-revision: " +
-    StringifyInt(catalog_manager_->GetRevision()) + "  " +
-    "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "  " +
-    "inode generation: " + StringifyInt(inode_generation_info_.inode_generation)
-    + "\n";
-}
-
-
-catalog::Statistics GetCatalogStatistics() {
-  return catalog_manager_->statistics();
-}
-
-
 static void AlarmReload(int signal __attribute__((unused)),
                         siginfo_t *siginfo __attribute__((unused)),
                         void *context __attribute__((unused)))

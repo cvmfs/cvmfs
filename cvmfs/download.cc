@@ -2362,32 +2362,12 @@ void DownloadManager::SetProxyGroupResetDelay(const unsigned seconds) {
 }
 
 
-void DownloadManager::GetProxyBackupInfo(unsigned *reset_delay,
-                                         time_t *timestamp_failover)
-{
-  pthread_mutex_lock(lock_options_);
-  *reset_delay = opt_proxy_groups_reset_after_;
-  *timestamp_failover = opt_timestamp_backup_proxies_;
-  pthread_mutex_unlock(lock_options_);
-}
-
-
 void DownloadManager::SetHostResetDelay(const unsigned seconds)
 {
   pthread_mutex_lock(lock_options_);
   opt_host_reset_after_ = seconds;
   if (opt_host_reset_after_ == 0)
     opt_timestamp_backup_host_ = 0;
-  pthread_mutex_unlock(lock_options_);
-}
-
-
-void DownloadManager::GetHostBackupInfo(unsigned *reset_delay,
-                                        time_t *timestamp_failover)
-{
-  pthread_mutex_lock(lock_options_);
-  *reset_delay = opt_host_reset_after_;
-  *timestamp_failover = opt_timestamp_backup_host_;
   pthread_mutex_unlock(lock_options_);
 }
 
