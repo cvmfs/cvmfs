@@ -1,4 +1,7 @@
 2.1.21:
+  * Automatically pick a union file system when creating a repository
+  * Fix several CentOS7 issues in the cvmfs_server script (CVM-737)
+  * Adjust to upstream OverlayFS changes
   * Fix crash in 'cvmfs_swissknife dirtab' if .cvmfsdirtab contains /*
   * Let 'cvmfs_config chksetup' find the Fuse library in /usr/lib/$platform
     (CVM-802)
