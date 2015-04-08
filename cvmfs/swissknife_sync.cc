@@ -326,7 +326,7 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     }
 
     // check if the path is a meta-directory (. or ..)
-    assert (candidate_rel.size() >= 2);
+    assert(candidate_rel.size() >= 2);
     if (candidate_rel.substr(candidate_rel.size() - 2) == "/." ||
         candidate_rel.substr(candidate_rel.size() - 3) == "/..") {
       continue;
