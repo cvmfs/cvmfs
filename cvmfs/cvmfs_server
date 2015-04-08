@@ -454,7 +454,22 @@ check_aufs() {
 #
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
-  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs
+  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
+  /sbin/modprobe -q overlay   || test -d /sys/module/overlay
+}
+
+
+# gets the system file system name of the overlayfs
+# apparently this differs from version to version... sigh!
+get_overlayfs_name() {
+  check_overlayfs || die "overlayfs is not installed!"
+  if /sbin/modprobe -q overlayfs || [ -d /sys/module/overlayfs ]; then
+    echo "overlayfs"
+  elif /sbin/modprobe -q overlay || [ -d /sys/module/overlay ]; then
+    echo "overlay"
+  else
+    die "cannot determine overlayfs name"
+  fi
 }
 
 
@@ -932,13 +947,15 @@ try_mount_remount_cycle_aufs() {
 # @returns  0 if the whole cycle worked as expected
 try_mount_remount_cycle_overlayfs() {
   local tmpdir
+  local overlayfs_name
   tmpdir=$(mktemp -d)
-  mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
-  mount -t overlayfs \
-    -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
-    try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
-  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
+  overlayfs_name="$(get_overlayfs_name)"
+  mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c ${tmpdir}/d
+  mount -t $overlayfs_name \
+    -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,workdir=${tmpdir}/c,ro,context=system_u:object_r:default_t:s0 \
+    try_remount_overlayfs ${tmpdir}/d  > /dev/null 2>&1 || return 1
+  mount -o remount,rw ${tmpdir}/d > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
+  mount -o remount,ro ${tmpdir}/d > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
   _cleanup_tmrc $tmpdir
   return 0
 }
@@ -1871,8 +1888,12 @@ create_spool_area_for_new_repository() {
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
+  local ofs_workdir="${spool_dir}/ofs_workdir"
 
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir || return 1
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    mkdir -p $ofs_workdir || return 2
+  fi
   chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
 }
 
@@ -1932,29 +1953,30 @@ remove_repository_storage() {
 
 setup_and_mount_new_repository() {
   local name=$1
-  local unionfs=$2
 
   # get repository information
   load_repo_config $name
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  local ofs_workdir="${CVMFS_SPOOL_DIR}/ofs_workdir"
 
   local selinux_context=""
-  if [ $unionfs = "overlayfs" ]; then
-      echo -n "(overlayfs) "
-      if has_selinux && try_mount_remount_cycle_overlayfs; then
-        selinux_context=",context=\"system_u:object_r:default_t:s0\""
-      fi
-      cat >> /etc/fstab << EOF
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    local overlayfs_name="$(get_overlayfs_name)"
+    echo -n "($overlayfs_name) "
+    if has_selinux && try_mount_remount_cycle_overlayfs; then
+      selinux_context=",context=\"system_u:object_r:default_t:s0\""
+    fi
+    cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
-overlayfs_$name /cvmfs/$name overlayfs upperdir=${scratch_dir},lowerdir=${rdonly_dir},ro$selinux_context 0 0 # added by CernVM-FS for $name
+${overlayfs_name}_$name /cvmfs/$name $overlayfs_name upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=${ofs_workdir},ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   else
-      echo -n "(aufs) "
-      if has_selinux && try_mount_remount_cycle_aufs; then
-        selinux_context=",context=\"system_u:object_r:default_t:s0\""
-      fi
-      cat >> /etc/fstab << EOF
+    echo -n "(aufs) "
+    if has_selinux && try_mount_remount_cycle_aufs; then
+      selinux_context=",context=\"system_u:object_r:default_t:s0\""
+    fi
+    cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
@@ -2418,7 +2440,7 @@ mkfs() {
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name $unionfs || die "fail"
+  setup_and_mount_new_repository $name || die "fail"
   echo "done"
 
   if [ $replicable -eq 1 ]; then
@@ -2812,7 +2834,7 @@ import() {
 
   # do final setup
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name aufs || die "fail!"
+  setup_and_mount_new_repository $name || die "fail!"
   echo "done"
 
   # the .cvmfsdirtab semantics might need an update
