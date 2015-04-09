@@ -179,12 +179,8 @@ autofs_check() {
 # @return        0 on success
 autofs_switch() {
   autofs_check
-  service_should_switch $1 $?
-  if [ $? -eq 0 ]; then
+  if service_should_switch $1 $?; then
     service_switch autofs $1
-    return $?
-  else
-    return 0
   fi
 }
 
@@ -194,12 +190,8 @@ autofs_switch() {
 # @return        0 on success
 apache_switch() {
   service_request $APACHE_SERVICE status > /dev/null 2>&1
-  service_should_switch $1 $?
-  if [ $? -eq 0 ]; then
+  if service_should_switch $1 $?; then
     service_switch $APACHE_SERVICE $1
-    return $?
-  else
-    return 0 # already in correct state
   fi
 }
 
