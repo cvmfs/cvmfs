@@ -21,7 +21,7 @@ CVMFS_TEST_REPO_MORE=${CVMFS_TEST_REPO_MORE:=test-more.cern.ch}
 CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
 CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing
 
-CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=aufs} # union filesystem type to test
+CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
@@ -421,6 +421,7 @@ create_repo() {
   echo "Creating new repository $repo..."
   local s3_config=""
   local stratum0=""
+  local unionfs=""
   if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
     echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG"
@@ -429,11 +430,15 @@ create_repo() {
     echo "  Stratum0: $CVMFS_TEST_STRATUM0"
     stratum0=" -w $CVMFS_TEST_STRATUM0"
   fi
+  if [ x"$CVMFS_TEST_UNIONFS" != x"" ]; then
+    echo "  UnionFS: $CVMFS_TEST_UNIONFS"
+    unionfs=" -f $CVMFS_TEST_UNIONFS"
+  fi
   sudo cvmfs_server mkfs -o $uid -m                \
-                         -f ${CVMFS_TEST_UNIONFS}  \
                          -a ${CVMFS_TEST_HASHALGO} \
                          $s3_config                \
                          $stratum0                 \
+                         $unionfs                  \
                          $extra_options $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
