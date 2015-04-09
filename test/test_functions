@@ -43,13 +43,23 @@ die() {
 }
 
 
-# find the service binary
-if [ -x /sbin/service ]; then
-  service_binary="/sbin/service"
-else
-  # Ubuntu
-  service_binary="/usr/sbin/service"
+# Find the service binary (or detect systemd)
+SERVICE_BIN="false"
+if ! pidof systemd > /dev/null 2>&1 || [ $(pidof systemd) -ne 1 ]; then
+  if [ -x /sbin/service ]; then
+    SERVICE_BIN="/sbin/service"
+  elif [ -x /usr/sbin/service ]; then
+    SERVICE_BIN="/usr/sbin/service" # Ubuntu
+  elif [ -x /sbin/rc-service ]; then
+    SERVICE_BIN="/sbin/rc-service" # OpenRC
+  else
+    die "Neither systemd nor service binary detected"
+  fi
 fi
+
+is_systemd() {
+  [ x"$SERVICE_BIN" = x"false" ]
+}
 
 # find the name of the httpd service
 
