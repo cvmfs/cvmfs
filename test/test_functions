@@ -43,13 +43,23 @@ die() {
 }
 
 
-# find the service binary
-if [ -x /sbin/service ]; then
-  service_binary="/sbin/service"
-else
-  # Ubuntu
-  service_binary="/usr/sbin/service"
+# Find the service binary (or detect systemd)
+SERVICE_BIN="false"
+if ! pidof systemd > /dev/null 2>&1 || [ $(pidof systemd) -ne 1 ]; then
+  if [ -x /sbin/service ]; then
+    SERVICE_BIN="/sbin/service"
+  elif [ -x /usr/sbin/service ]; then
+    SERVICE_BIN="/usr/sbin/service" # Ubuntu
+  elif [ -x /sbin/rc-service ]; then
+    SERVICE_BIN="/sbin/rc-service" # OpenRC
+  else
+    die "Neither systemd nor service binary detected"
+  fi
 fi
+
+is_systemd() {
+  [ x"$SERVICE_BIN" = x"false" ]
+}
 
 # find the name of the httpd service
 
@@ -96,6 +106,16 @@ compare_versions() {
   [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
 }
 
+service_request() {
+  local service_name=$1
+  local request_verb=$2
+  if is_systemd; then
+    sudo systemctl $request_verb $service_name
+  else
+    sudo $SERVICE_BIN $service_name $request_verb
+  fi
+}
+
 # ensures that a generic service is running
 # @param service  the name of the service
 # @param state    the desired state of the service (on|off)
@@ -104,19 +124,18 @@ service_switch() {
   local service_name=$1
   local state=$2
 
-  # switch it on or off, if necessary
   case $state in
     on)
       echo "starting $service_name..."
-      sudo $service_binary $service_name start || return 100
+      service_request $service_name start || return 100
       ;;
     off)
       echo "stopping $service_name..."
-      sudo $service_binary $service_name stop || return 101
+      service_request $service_name stop || return 101
       ;;
     restart)
       echo "restarting $service_name..."
-      sudo $service_binary $service_name restart || return 102
+      service_request $service_name restart || return 102
       ;;
     *)
       echo "unrecognized state switching for $service_name"
@@ -160,12 +179,8 @@ autofs_check() {
 # @return        0 on success
 autofs_switch() {
   autofs_check
-  service_should_switch $1 $?
-  if [ $? -eq 0 ]; then
+  if service_should_switch $1 $?; then
     service_switch autofs $1
-    return $?
-  else
-    return 0
   fi
 }
 
@@ -174,13 +189,9 @@ autofs_switch() {
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 apache_switch() {
-  sudo $service_binary $APACHE_SERVICE status > /dev/null 2>&1
-  service_should_switch $1 $?
-  if [ $? -eq 0 ]; then
+  service_request $APACHE_SERVICE status > /dev/null 2>&1
+  if service_should_switch $1 $?; then
     service_switch $APACHE_SERVICE $1
-    return $?
-  else
-    return 0 # already in correct state
   fi
 }
 
