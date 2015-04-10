@@ -16,7 +16,7 @@ Description: CernVM File System
  HTTP File System for Distributing Software to CernVM.
 
 Package: cvmfs-server
-Architecture: amd64
+Architecture: i386 amd64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
 Depends: cvmfs (= ${source:Version}), insserv, initscripts, bash, coreutils, grep, sed, sudo, psmisc, curl, gzip, attr, openssl, apache2
 Conflicts: cvmfs-server (< 2.1)
