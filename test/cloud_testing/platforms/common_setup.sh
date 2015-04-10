@@ -12,9 +12,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #  CONFIG_PACKAGES       location of the CernVM-FS config packages
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
 #  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
-#  TEST_LOGFILE          location of the test logfile to be used
-#  UNITTEST_LOGFILE      location of the unit test logfile to be used
-#  MIGRATIONTEST_LOGFILE location of the migration test logfile to be used
+#  LOG_DIRECTORY         location of the test log files to be created
 #
 
 SERVER_PACKAGE=""
@@ -22,12 +20,10 @@ CLIENT_PACKAGE=""
 UNITTEST_PACKAGE=""
 CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
-TEST_LOGFILE=""
-UNITTEST_LOGFILE=""
-MIGRATIONTEST_LOGFILE=""
+LOG_DIRECTORY=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:k:t:g:l:u:m:" option; do
+while getopts "s:c:k:t:g:l:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
@@ -45,13 +41,7 @@ while getopts "s:c:k:t:g:l:u:m:" option; do
       UNITTEST_PACKAGE=$OPTARG
       ;;
     l)
-      TEST_LOGFILE=$OPTARG
-      ;;
-    u)
-      UNITTEST_LOGFILE=$OPTARG
-      ;;
-    m)
-      MIGRATIONTEST_LOGFILE=$OPTARG
+      LOG_DIRECTORY=$OPTARG
       ;;
     ?)
       shift $(($OPTIND-2))
@@ -66,9 +56,7 @@ if [ "x$SERVER_PACKAGE"        = "x" ] ||
    [ "x$CONFIG_PACKAGES"       = "x" ] ||
    [ "x$SOURCE_DIRECTORY"      = "x" ] ||
    [ "x$UNITTEST_PACKAGE"      = "x" ] ||
-   [ "x$TEST_LOGFILE"          = "x" ] ||
-   [ "x$UNITTEST_LOGFILE"      = "x" ] ||
-   [ "x$MIGRATIONTEST_LOGFILE" = "x" ]; then
+   [ "x$LOG_DIRECTORY"         = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
