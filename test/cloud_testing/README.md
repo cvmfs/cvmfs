@@ -12,16 +12,17 @@ builds.
  + ----------------------------------
  | Participating Scripts
 
-There are several scripts, that steer the process of automated cloud testing:
+There are several scripts, that steer the process of automated cloud testing.
+Have a look into the cernvm/ci-scripts repository on GitHub:
 
-  -> steering/run.sh
+  -> cvmfs/cloud_testing/run.sh
    This script is invoked by the user (or the continuous integration system) and
    steers the whole process of creation, configuration, usage and destruction of
    various virtual machine platforms.
    A user provides run.sh with information about the desired test platform as
    well as the CernVM-FS packages to be tested on this platform.
 
-  -> steering/remote_setup.sh
+  -> cvmfs/cloud_testing/remote_setup.sh
    The remote_setup.sh script is transferred to a fresh virtual machine and exe-
    cuted. It takes care of some environment preparations on the test platform.
    These include the creation of a test workspace, a test user account (by de-
@@ -30,13 +31,13 @@ There are several scripts, that steer the process of automated cloud testing:
    Eventually remote_setup.sh will invoke a platform specific setup script that
    takes care of platform specific configurations (see platforms/*).
 
-  -> steering/remote_run.sh
+  -> cvmfs/cloud_testing/remote_run.sh
    After run.sh successfully executed remote_setup.sh on the virtual machine it
    will transfer and run remote_run.sh which takes care of the actual test exe-
    cution. remote_run.sh will do some general sanity checks and then run a plat-
    form specific script (see platforms/*).
 
-  -> steering/instance_handler.py
+  -> cvmfs/cloud_testing/instance_handler.py
    This python script steers the creation and destruction of virtual machines on
    CERN's in-house cloud platform.
 
@@ -49,8 +50,8 @@ take care of configuration and running of the CernVM-FS test suite.
 Setup scripts must install and configure all needed dependencies including the 
 subset of provided CernVM-FS packages needed for the test on their platform. Not
 all platforms are suitable for server test-cases, for example. Furthermore they
-are allowed to reboot the entire machine as their last action, steering/run.sh
-will take care of re-establishing the connection.
+are allowed to reboot the entire machine as their last action, run.sh will take
+care of re-establishing the connection.
 
 The platform specific run scripts eventually invoke CernVM-FS's test cases suit-
 able for their platform. Usually they first run the unit-tests followed by the
@@ -62,9 +63,9 @@ integration tests.
 
 All scripts exclusively write to pre-defined log files, that can be downloaded
 by the test steering script after the test run has finished. Thus, all outputted
-information can be extracted after the test-run. Additionally steering/run.sh
-will not destruct the virtual machine in case of test failures for further post-
-mortem analysis by hand.
+information can be extracted after the test-run. Additionally run.sh will not
+destruct the virtual machine in case of test failures for further post-mortem
+analysis by hand.
 
  -> $setup_log
   This should contain the outputs of the setup process steered by the remote
