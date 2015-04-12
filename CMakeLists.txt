@@ -388,10 +388,10 @@ endif (INSTALL_MOUNT_SCRIPTS)
 #
 # compile the unit tests
 #
-if (BUILD_UNITTESTS)
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   enable_testing ()
   add_subdirectory (test/unittests)
-endif (BUILD_UNITTESTS)
+endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 #
 # Documentation

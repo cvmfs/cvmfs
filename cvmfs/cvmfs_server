@@ -45,36 +45,42 @@ publish_after_hook() { :; }
 
 [ -f /etc/cvmfs/cvmfs_server_hooks.sh ] && . /etc/cvmfs/cvmfs_server_hooks.sh
 
-# Find out about Apache's name and configuration Directory depending on the Distribution
-if which httpd2 >/dev/null 2>&1; then #SLES/OpenSuSE
-  APACHE_SERVICE="apache2"
-  APACHE_CONF=${APACHE_SERVICE}
-  APACHE_BIN=$(which httpd2)
-  APACHE_CTL=$APACHE_BIN
+# Find out how to deal with Apache
+# (binary name, configuration directory, CLI, WSGI module name, ...)
+if which httpd2 > /dev/null 2>&1; then # SLES/OpenSuSE
+  APACHE_CONF="apache2"
+  APACHE_BIN="$(which httpd2)"
+  APACHE_CTL="$APACHE_BIN"
   APACHE_WSGI_MODPKG="apache2-mod_wsgi"
-elif which apache2 >/dev/null 2>&1; then # Debian based
-  APACHE_SERVICE="apache2"
-  APACHE_CONF=${APACHE_SERVICE}
-  APACHE_BIN=$(which apache2)
-  APACHE_CTL=$(which apache2ctl)
+elif which apache2 > /dev/null 2>&1; then # Debian based
+  APACHE_CONF="apache2"
+  APACHE_BIN="$(which apache2)"
+  APACHE_CTL="$(which apachectl)"
   APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
-else
-  APACHE_SERVICE="httpd" # EL based
-  APACHE_CONF=${APACHE_SERVICE}
+else # RedHat based
+  APACHE_CONF="httpd"
   APACHE_BIN="/usr/sbin/httpd"
-  APACHE_CTL=$APACHE_BIN
+  APACHE_CTL="$APACHE_BIN"
   APACHE_WSGI_MODPKG="mod_wsgi"
 fi
 
-# Find the service binary
-if [ -x /sbin/service ]; then
-  SERVICE_BIN="/sbin/service"
-elif [ -x /usr/sbin/service ]; then
-  SERVICE_BIN="/usr/sbin/service" # Ubuntu
-elif [ -x /sbin/rc-service ]; then
-  SERVICE_BIN="/sbin/rc-service" # OpenRC
+# Find the service binary (or detect systemd)
+SERVICE_BIN="false"
+if ! pidof systemd > /dev/null 2>&1 || [ $(pidof systemd) -ne 1 ]; then
+  if [ -x /sbin/service ]; then
+    SERVICE_BIN="/sbin/service"
+  elif [ -x /usr/sbin/service ]; then
+    SERVICE_BIN="/usr/sbin/service" # Ubuntu
+  elif [ -x /sbin/rc-service ]; then
+    SERVICE_BIN="/sbin/rc-service" # OpenRC
+  else
+    die "Neither systemd nor service binary detected"
+  fi
 fi
-[ -z "$SERVICE_BIN" ] && die "Could not locate 'service' utility"
+
+is_systemd() {
+  [ x"$SERVICE_BIN" = x"false" ]
+}
 
 # Find the fuser binary
 if [ -x /sbin/fuser ]; then
@@ -210,7 +216,8 @@ Supported Commands:
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                [-c file ownership (UID:GID)] [-k path to keys] [-g chown backend]
+                [-f union filesystem type] [-c file ownership (UID:GID)]
+                [-k path to keys] [-g chown backend]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
@@ -454,7 +461,35 @@ check_aufs() {
 #
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
-  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs
+  /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
+  /sbin/modprobe -q overlay   || test -d /sys/module/overlay
+}
+
+# check if at least one of the supported union file systems is available
+# currently AUFS get preference over OverlayFS if both are available
+#
+# @return   0 if at least one was found (name through stdout); abort otherwise
+get_available_union_fs() {
+  if check_aufs; then
+    echo "aufs"
+  elif check_overlayfs; then
+    echo "overlayfs"
+  else
+    die "neither AUFS nor OverlayFS detected on the system!"
+  fi
+}
+
+# gets the system file system name of the overlayfs
+# apparently this differs from version to version... sigh!
+get_overlayfs_name() {
+  check_overlayfs || die "overlayfs is not installed!"
+  if /sbin/modprobe -q overlayfs || [ -d /sys/module/overlayfs ]; then
+    echo "overlayfs"
+  elif /sbin/modprobe -q overlay || [ -d /sys/module/overlay ]; then
+    echo "overlay"
+  else
+    die "cannot determine overlayfs name"
+  fi
 }
 
 
@@ -465,20 +500,45 @@ check_autofs_on_cvmfs() {
   cat /proc/mounts | grep -q "^/etc/auto.cvmfs /cvmfs "
 }
 
+request_apache_service() {
+  local request_verb="$1"
+  if is_systemd; then
+    /bin/systemctl $request_verb ${APACHE_CONF}
+  else
+    $SERVICE_BIN $APACHE_CONF $request_verb
+  fi
+}
 
 # checks if apache is installed and running
 #
 # @return  0 if apache is installed and running
 check_apache() {
-  [ -d /etc/${APACHE_CONF} ] && ${SERVICE_BIN} ${APACHE_SERVICE} status >/dev/null
+  [ -d /etc/${APACHE_CONF} ] && request_apache_service status > /dev/null
 }
 
+reload_apache() {
+  echo -n "Reloading Apache... "
+  request_apache_service reload > /dev/null || die "fail"
+  echo "done"
+}
+
+restart_apache() {
+  echo -n "Restarting Apache... "
+  request_apache_service restart > /dev/null || die "fail"
+  echo "done"
+}
+
+check_apache_module() {
+  local module_name="$1"
+  ${APACHE_CTL} -M 2>&1 | grep -q "$module_name"
+}
 
 # checks if wsgi apache module is installed and enabled
 check_wsgi_module() {
-  if ${APACHE_CTL} -M 2>&1 | grep -q wsgi_module; then
+  if check_apache_module "wsgi_module"; then
     return 0
   fi
+
   echo "The apache wsgi module must be installed and enabled.
 The required package is called ${APACHE_WSGI_MODPKG}."
   if [ -f /etc/redhat-release ]; then
@@ -497,10 +557,92 @@ The required package is called ${APACHE_WSGI_MODPKG}."
 }
 
 
-# retrieves the apache version string "2.x.xx"
+# retrieves the apache version string
 get_apache_version() {
-  ${APACHE_BIN} -v | head -n1 | \
-    sed 's/^Server version: Apache\/\([0-9]\.[0-9]\.[0-9][0-9]*\).*$/\1/'
+  ${APACHE_BIN} -v | head -n1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+'
+}
+
+# figure out apache config file mode
+#
+# @return   apache config mode (stdout) (see globals below)
+APACHE_CONF_MODE_CONFD=1     # *.conf goes to ${APACHE_CONF}/conf.d
+APACHE_CONF_MODE_CONFAVAIL=2 # *.conf goes to ${APACHE_CONF}/conf-available
+get_apache_conf_mode() {
+  [ -d /etc/${APACHE_CONF}/conf-available ] && echo $APACHE_CONF_MODE_CONFAVAIL \
+                                            || echo $APACHE_CONF_MODE_CONFD
+}
+
+
+# find location of apache configuration files
+#
+# @return   the location of apache configuration files (stdout)
+get_apache_conf_path() {
+  local res_path="/etc/${APACHE_CONF}"
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
+    echo "${res_path}/conf-available"
+  else
+    echo "${res_path}/conf.d"
+  fi
+}
+
+
+# returns the apache configuration string for 'allow from all'
+# Note: this is necessary, since apache 2.4.x formulates that different
+#
+# @return   a configuration snippet to allow s'th from all hosts (stdout)
+get_compatible_apache_allow_from_all_config() {
+  local minor_apache_version=$(version_minor "$(get_apache_version)")
+  if [ $minor_apache_version -ge 4 ]; then
+    echo "Require all granted"
+  else
+    local nl='
+'
+    echo "Order allow,deny${nl}    Allow from all"
+  fi
+}
+
+
+# writes apache configuration file
+# This figures out where to put the apache configuration file depending
+# on the running apache version
+# Note: Configuration file content is expected to come through stdin
+#
+# @param   file_name  the name of the apache config file (no path!)
+# @return             0 on succes
+create_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)"
+
+  # create (or append) the conf file
+  cat - >> ${conf_path}/${file_name} || return 1
+
+  # the new apache requires the enable the config afterwards
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
+    a2enconf $file_name > /dev/null || return 2
+  fi
+
+  return 0
+}
+
+
+# removes apache config files dependent on the apache version in place
+# Note: As of apache 2.4.x `a2disconf` needs to be called before removal
+#
+# @param   file_name  the name of the conf file to be removed (no path!)
+# @return  0 on successful removal
+remove_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)/${file_name}"
+
+  # disable configuration on newer apache versions
+  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
+    a2disconf $file_name > /dev/null 2>&1 || return 1
+  fi
+
+  # remove configuration file
+  rm -f $conf_path
 }
 
 
@@ -550,49 +692,6 @@ count_wr_fds() {
     if echo "$line" | grep -qe '^\a[wu]$'; then cnt=$(( $cnt + 1 )); fi
   done
   echo $cnt
-}
-
-
-# figure out apache config file mode
-#
-# @return   apache config mode (stdout) (see globals below)
-APACHE_CONF_MODE_OLD=1 # *.conf goes to ${APACHE_CONF}/conf.d
-APACHE_CONF_MODE_NEW=2 # *.conf goes to ${APACHE_CONF}/conf-available
-get_apache_conf_mode() {
-  local minor_apache_version=$(version_minor "$(get_apache_version)")
-  if [ $minor_apache_version -ge 4 ] || [ -d /etc/${APACHE_CONF}/conf-available ]; then
-    echo $APACHE_CONF_MODE_NEW
-  else
-    echo $APACHE_CONF_MODE_OLD
-  fi
-}
-
-
-# find location of apache configuration files
-#
-# @return   the location of apache configuration files (stdout)
-get_apache_conf_path() {
-  local res_path="/etc/${APACHE_CONF}"
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    echo "${res_path}/conf-available"
-  else
-    echo "${res_path}/conf.d"
-  fi
-}
-
-
-# returns the apache configuration string for 'allow from all'
-# Note: this is necessary, since apache 2.4.x formulates that different
-#
-# @return   a configuration snippet to allow s'th from all hosts (stdout)
-get_compatible_apache_allow_from_all_config() {
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    echo "Require all granted"
-  else
-    local nl='
-'
-    echo "Order allow,deny${nl}    Allow from all"
-  fi
 }
 
 
@@ -881,7 +980,9 @@ check_user() {
 
 
 has_selinux() {
-  [ -f /selinux/enforce ] && [ $(cat /selinux/enforce) -ne 0 ]
+  which sestatus   > /dev/null 2>&1 && \
+  which getenforce > /dev/null 2>&1 && \
+  getenforce | grep -qi "enforc" || return 1
 }
 
 
@@ -932,13 +1033,15 @@ try_mount_remount_cycle_aufs() {
 # @returns  0 if the whole cycle worked as expected
 try_mount_remount_cycle_overlayfs() {
   local tmpdir
+  local overlayfs_name
   tmpdir=$(mktemp -d)
-  mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c
-  mount -t overlayfs \
-    -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,ro,context=system_u:object_r:default_t:s0 \
-    try_remount_overlayfs ${tmpdir}/c  > /dev/null 2>&1 || return 1
-  mount -o remount,rw ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
-  mount -o remount,ro ${tmpdir}/c > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
+  overlayfs_name="$(get_overlayfs_name)"
+  mkdir ${tmpdir}/a ${tmpdir}/b ${tmpdir}/c ${tmpdir}/d
+  mount -t $overlayfs_name \
+    -o upperdir=${tmpdir}/b,lowerdir=${tmpdir}/a,workdir=${tmpdir}/c,ro,context=system_u:object_r:default_t:s0 \
+    try_remount_overlayfs ${tmpdir}/d  > /dev/null 2>&1 || return 1
+  mount -o remount,rw ${tmpdir}/d > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 2; }
+  mount -o remount,ro ${tmpdir}/d > /dev/null 2>&1 || { _cleanup_tmrc $tmpdir; return 3; }
   _cleanup_tmrc $tmpdir
   return 0
 }
@@ -1509,18 +1612,6 @@ mangle_s3_stratum0_url() {
   echo "${s3_stratum0_url}${repo_name}"
 }
 
-reload_apache() {
-  echo -n "Reloading Apache... "
-  ${SERVICE_BIN} ${APACHE_SERVICE} reload > /dev/null
-  echo "done"
-}
-
-restart_apache() {
-  echo -n "Restarting Apache... "
-  ${SERVICE_BIN} ${APACHE_SERVICE} restart > /dev/null
-  echo "done"
-}
-
 
 # lowers restrictions of hardlink creation if needed
 # allows AUFS to properly whiteout files without root privileges
@@ -1679,49 +1770,6 @@ migrate_legacy_dirtab() {
 }
 
 
-# writes apache configuration file
-# This figures out where to put the apache configuration file depending
-# on the running apache version
-# Note: Configuration file content is expected to come through stdin
-#
-# @param   file_name  the name of the apache config file (no path!)
-# @return             0 on succes
-create_apache_config_file() {
-  local file_name=$1
-  local conf_path
-  conf_path="$(get_apache_conf_path)"
-
-  # create (or append) the conf file
-  cat - >> ${conf_path}/${file_name} || return 1
-
-  # the new apache requires the enable the config afterwards
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    a2enconf $file_name > /dev/null || return 2
-  fi
-
-  return 0
-}
-
-
-# removes apache config files dependent on the apache version in place
-# Note: As of apache 2.4.x `a2disconf` needs to be called before removal
-#
-# @param   file_name  the name of the conf file to be removed (no path!)
-# @return  0 on successful removal
-remove_apache_config_file() {
-  local file_name=$1
-  local conf_path
-  conf_path="$(get_apache_conf_path)/${file_name}"
-
-  # disable configuration on newer apache versions
-  if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_NEW" ]; then
-    a2disconf $file_name > /dev/null 2>&1 || return 1
-  fi
-
-  # remove configuration file
-  rm -f $conf_path
-}
-
 # sends wsgi configuration to stdout
 #
 # @param name        the name of the repository
@@ -1871,8 +1919,12 @@ create_spool_area_for_new_repository() {
   local rdonly_dir="${spool_dir}/rdonly"
   local temp_dir="${spool_dir}/tmp"
   local cache_dir="${spool_dir}/cache"
+  local ofs_workdir="${spool_dir}/ofs_workdir"
 
   mkdir -p /cvmfs/$name $scratch_dir $rdonly_dir $temp_dir $cache_dir || return 1
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    mkdir -p $ofs_workdir || return 2
+  fi
   chown -R $CVMFS_USER /cvmfs/$name/ $spool_dir/
 }
 
@@ -1932,29 +1984,30 @@ remove_repository_storage() {
 
 setup_and_mount_new_repository() {
   local name=$1
-  local unionfs=$2
 
   # get repository information
   load_repo_config $name
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  local ofs_workdir="${CVMFS_SPOOL_DIR}/ofs_workdir"
 
   local selinux_context=""
-  if [ $unionfs = "overlayfs" ]; then
-      echo -n "(overlayfs) "
-      if has_selinux && try_mount_remount_cycle_overlayfs; then
-        selinux_context=",context=\"system_u:object_r:default_t:s0\""
-      fi
-      cat >> /etc/fstab << EOF
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    local overlayfs_name="$(get_overlayfs_name)"
+    echo -n "($overlayfs_name) "
+    if has_selinux && try_mount_remount_cycle_overlayfs; then
+      selinux_context=",context=\"system_u:object_r:default_t:s0\""
+    fi
+    cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
-overlayfs_$name /cvmfs/$name overlayfs upperdir=${scratch_dir},lowerdir=${rdonly_dir},ro$selinux_context 0 0 # added by CernVM-FS for $name
+${overlayfs_name}_$name /cvmfs/$name $overlayfs_name upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=${ofs_workdir},ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   else
-      echo -n "(aufs) "
-      if has_selinux && try_mount_remount_cycle_aufs; then
-        selinux_context=",context=\"system_u:object_r:default_t:s0\""
-      fi
-      cat >> /etc/fstab << EOF
+    echo -n "(aufs) "
+    if has_selinux && try_mount_remount_cycle_aufs; then
+      selinux_context=",context=\"system_u:object_r:default_t:s0\""
+    fi
+    cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
 aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
@@ -2297,7 +2350,7 @@ mkfs() {
   name=$(get_repository_name $1)
 
   # default values
-  [ x"$unionfs"   = x"" ] && unionfs=aufs
+  [ x"$unionfs"   = x"" ] && unionfs="$(get_available_union_fs)"
   [ x"$hash_algo" = x"" ] && hash_algo=sha1
 
   # upstream generation (defaults to local upstream)
@@ -2418,7 +2471,7 @@ mkfs() {
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name $unionfs || die "fail"
+  setup_and_mount_new_repository $name || die "fail"
   echo "done"
 
   if [ $replicable -eq 1 ]; then
@@ -2658,10 +2711,11 @@ import() {
   local show_statistics=0
   local replicable=0
   local chown_backend=0
+  local unionfs=
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmg" option; do
+  while getopts "w:o:c:u:k:lsmgf:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2690,6 +2744,9 @@ import() {
       g)
         chown_backend=1
       ;;
+      f)
+        unionfs=$OPTARG
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command import: Unrecognized option: $1"
@@ -2705,13 +2762,12 @@ import() {
   # default values
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
+  [ x"$unionfs"  = x ] && unionfs="$(get_available_union_fs)"
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
   is_root                           || die "Only root can create a new repository"
   check_upstream_validity $upstream
-  # import from 2.0 -> 2.1 only supports aufs, not overlayfs
-  check_aufs                        || die "aufs kernel module missing"
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
   check_apache                      || die "Apache must be installed and running"
@@ -2719,6 +2775,13 @@ import() {
   lower_hardlink_restrictions
   ensure_enabled_apache_modules
   [ x"$keys_location" = "x" ] && die "Please provide the location of the repository security keys (-k)"
+
+  if [ $unionfs = "overlayfs" ]; then
+    check_overlayfs                 || die "overlayfs kernel module missing"
+    echo "Warning: CernVM-FS filesystems using overlayfs may not enforce hard link semantics during publishing."
+  else
+    check_aufs                      || die "aufs kernel module missing"
+  fi
 
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
@@ -2741,7 +2804,7 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user aufs sha1 true false || die "fail!"
+  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs sha1 true false || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -2812,7 +2875,7 @@ import() {
 
   # do final setup
   echo -n "Mounting CernVM-FS Storage... "
-  setup_and_mount_new_repository $name aufs || die "fail!"
+  setup_and_mount_new_repository $name || die "fail!"
   echo "done"
 
   # the .cvmfsdirtab semantics might need an update

@@ -209,7 +209,13 @@ cvmfs_chksetup() {
   fi
   for library in $cvmfs_libs
   do
-    if ! test -f /usr/lib/$library && ! test -f /usr/lib64/$library; then
+    foundlib=0
+    for libdir in /usr/lib /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/lib/i386-linux-gnu; do
+      if test -f ${libdir}/${library}; then
+        foundlib=1
+      fi
+    done
+    if [ $foundlib -eq 0 ]; then
       echo "Error: $library not found"
       num_errors=$(($num_errors+1))
     fi

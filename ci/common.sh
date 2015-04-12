@@ -57,3 +57,19 @@ create_cvmfs_source_tarball() {
 
   return $retval
 }
+
+generate_package_map() {
+  local platform="$1"
+  local client="$2"
+  local server="$3"
+  local unittests="$4"
+  local config="$5"
+
+  cat > pkgmap.${platform} << EOF
+[$platform]
+client=$client
+server=$server
+unittests=$unittests
+config=$config
+EOF
+}

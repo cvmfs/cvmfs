@@ -104,6 +104,11 @@ setup_environment() {
     fi
   fi
 
+  # if the test is a benchmark we have to configure the environment
+  if [ x"$cvmfs_benchmark" = x"yes" ]; then
+    setup_benchmark_environment $workdir
+  fi
+
   # reset the test warning flags
   reset_test_warning_flags
 
@@ -162,6 +167,12 @@ do
          exit \$retval" >> $logfile 2>&1
   RETVAL=$?
 
+  # if the test is a benchmark we have to collect the results before removing the folder
+  if [ x"$cvmfs_benchmark" = x"yes" ]; then
+    collect_benchmark_results
+    cvmfs_umount $FQRN > /dev/null 2>&1
+  fi
+
   # check the final test result
   case $RETVAL in
     0)
@@ -206,3 +217,4 @@ echo "Failures: $num_failures"
 echo ""
 
 exit $num_failures
+
