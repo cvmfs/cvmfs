@@ -12,6 +12,8 @@
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
+CVMFS_TEST_SUITE_NAME=${CVMFS_TEST_SUITE_NAME:=Integration Tests}
+CVMFS_TEST_CLASS_NAME=${CVMFS_TEST_CLASS_NAME:=IntegrationTests}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
 CVMFS_TEST_SYSLOG_FACILITY=${CVMFS_TEST_SYSLOG_FACILITY:=5}
 CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
@@ -1473,4 +1475,75 @@ collect_benchmark_results() {
   fi
   cp  -rf $workdir/system.info $workdir/$FQRN.*.log $workdir/callgrind.out.* $workdir/$FQRN.memcheck.xml $workdir/cvmfs.conf $benchmark_output_dir > /dev/null 2>&1
   benchmark_log "Test results copied into $benchmark_output_dir" >> $logfile
+}
+
+
+#
+#  XUnit XML generation helper functions
+#
+
+xunit_preamble() {
+  local xml_file="$1"
+  local scratchdir="$2"
+
+  local num_tests="$(cat ${scratchdir}/num_tests)"
+  local num_fails="$(cat ${scratchdir}/num_failures)"
+  local num_skips="$(cat ${scratchdir}/num_skipped)"
+  local t_start="$(cat ${scratchdir}/starttime)"
+  local t_elapsed="$(cat ${scratchdir}/elapsed)"
+
+  cat > $xml_file << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
+  <testsuite name="$CVMFS_TEST_SUITE_NAME" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
+EOF
+}
+
+xunit_testcase() {
+  local xml_file="$1"
+  local test_scratchdir="$2"
+
+  local test_name="$(cat ${test_scratchdir}/name)"
+  local test_number="$(cat ${test_scratchdir}/number)"
+  local t_elapsed="$(cat ${test_scratchdir}/elapsed)"
+
+  if [ -f ${test_scratchdir}/skipped ]; then
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="notrun" time="0.000" classname="$CVMFS_TEST_CLASS_NAME" />
+EOF
+  elif [ -f ${test_scratchdir}/success ]; then
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME" />
+EOF
+  elif [ -f ${test_scratchdir}/failure ]; then
+    local retval="$(cat ${test_scratchdir}/retval)"
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME">
+      <failure message="Failed with Retval $retval" type="">
+      <![CDATA[$(cat ${test_scratchdir}/test.log)]]>
+      </failure>
+    </testcase>
+EOF
+  else
+    echo "Warning: unknown test state for '$test_name'"
+  fi
+}
+
+xunit_epilogue() {
+  local xml_file="$1"
+  cat >> $xml_file << EOF
+  </testsuite>
+</testsuites>
+EOF
+}
+
+export_xunit_xml() {
+  local xml_file="$1"
+  local scratchdir="$2"
+
+  xunit_preamble "$xml_file" "$scratchdir"
+  for testcase in $(find $scratchdir -mindepth 1 -maxdepth 1 -type d); do
+    xunit_testcase "$xml_file" "$testcase"
+  done
+  xunit_epilogue "$xml_file"
 }
