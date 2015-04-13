@@ -21,11 +21,14 @@ date >> $logfile
 # read command line paramters
 shift
 test_exclusions=0
-while getopts "x" option; do
+xml_output=""
+while getopts "xo:" option; do
   case $option in
     x)
-      echo "foo"
       test_exclusions=1
+    ;;
+    o)
+      xml_output="$OPTARG"
     ;;
     ?)
       usage
@@ -33,7 +36,7 @@ while getopts "x" option; do
     ;;
   esac
 done
-shift
+shift $(( $OPTIND - 1 ))
 
 # configure the test set to run
 exclusions=""
@@ -269,6 +272,11 @@ echo "$num_skipped"            > ${scratch_basedir}/num_skipped
 echo "$num_passed"             > ${scratch_basedir}/num_passed
 echo "$num_warnings"           > ${scratch_basedir}/num_warnings
 echo "$num_failures"           > ${scratch_basedir}/num_failures
+
+# export xunit XML
+if [ ! -z "$xml_output" ]; then
+  export_xunit_xml "$xml_output" $scratch_basedir
+fi
 
 # remove runtime information
 rm -rf $scratch_basedir
