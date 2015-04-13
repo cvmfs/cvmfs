@@ -22,10 +22,13 @@
 #include "libcvmfs_int.h"
 #include "logging.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
 
+
+perf::Statistics statistics_;
 
 int set_option(char const *name, char const *value, bool *var) {
   if (*value != '\0') {
@@ -534,6 +537,9 @@ void cvmfs_detach_repo(cvmfs_context *ctx) {
 }
 
 int cvmfs_init(char const *options) {
+  PathString::RegisterCounters(&statistics_);
+  NameString::RegisterCounters(&statistics_);
+  LinkString::RegisterCounters(&statistics_);
   global_options opts;
   int parse_result = opts.parse_options(options);
   if (parse_result != 0) {

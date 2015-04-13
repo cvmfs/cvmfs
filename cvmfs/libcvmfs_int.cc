@@ -73,6 +73,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "lru.h"
+#include "libcvmfs.h"
 #include "monitor.h"
 #include "murmur.h"
 #include "platform.h"
@@ -280,11 +281,10 @@ unsigned long cvmfs_globals::CallbackLibcryptoThreadId() {  // NOLINT
 
 
 cvmfs_context* cvmfs_context::Create(const options &opts) {
-  perf::Statistics statistics;
   cvmfs_context *ctx = new cvmfs_context(opts);
   assert(ctx != NULL);
 
-  if (ctx->Setup(opts, &statistics) != 0) {
+  if (ctx->Setup(opts, &statistics_) != 0) {
     delete ctx;
     ctx = NULL;
   }

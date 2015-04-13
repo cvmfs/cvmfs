@@ -15,11 +15,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "statistics.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct cvmfs_context;
+extern perf::Statistics statistics_;
 
 /**
  * Initialize global CVMFS library structures
