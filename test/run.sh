@@ -158,14 +158,17 @@ do
   fi
 
   # run the test
+  test_logfile="${workdir}/test-$(basename $workdir).log"
+  echo "temporary log: $test_logfile" >> $logfile
   sh -c ". ./test_functions                     && \
          . $t/main                              && \
          cd $workdir                            && \
          cvmfs_run_test $logfile $(pwd)/${t}    && \
          retval=\$?                             && \
          retval=\$(mangle_test_retval \$retval) && \
-         exit \$retval" >> $logfile 2>&1
+         exit \$retval" >> $test_logfile 2>&1
   RETVAL=$?
+  cat $test_logfile >> $logfile
 
   # if the test is a benchmark we have to collect the results before removing the folder
   if [ x"$cvmfs_benchmark" = x"yes" ]; then
