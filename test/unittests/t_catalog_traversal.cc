@@ -407,8 +407,7 @@ const std::string T_CatalogTraversal::fqrn    = "test.cern.ch";
 
 
 TEST_F(T_CatalogTraversal, Initialize) {
-  TraversalParams params = GetBasicTraversalParams() =
-    GetBasicTraversalParams();
+  TraversalParams params = GetBasicTraversalParams();
   MockedCatalogTraversal traverse(params);
 }
 
