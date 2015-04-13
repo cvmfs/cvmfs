@@ -844,13 +844,34 @@ load_repo_config() {
 }
 
 
-# runs the given command and measures the time it took to execute
+get_millisecond_epoch() {
+  echo $(( $(date +%s%N) / 1000000 ))
+}
+
+
+milliseconds_to_seconds() {
+  local milliseconds="$1"
+
+  # add a zero padding if necessary
+  while [ $(echo -n "$milliseconds" | wc -c) -lt 4 ]; do
+    milliseconds="0$milliseconds"
+  done
+
+  # insert a decimal point to make seconds
+  digits=$(echo -n "$milliseconds" | wc -c)
+  echo -n "$milliseconds" | head -c $(( $digits - 3 ))
+  echo -n "."
+  echo -n "$milliseconds" | tail -c 3
+}
+
+
+# runs the given command and measures the execution time in milliseconds
 stop_watch() {
-  begin=$(date +%s)
+  begin=$(get_millisecond_epoch)
   cmd="$@"
   $cmd
   res=$?
-  end=$(date +%s)
+  end=$(get_millisecond_epoch)
   echo $((end - begin))
   return $res
 }
