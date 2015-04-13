@@ -159,6 +159,7 @@ do
 
   # run the test
   test_logfile="${workdir}/test-$(basename $workdir).log"
+  test_start=$(get_millisecond_epoch)
   echo "temporary log: $test_logfile" >> $logfile
   sh -c ". ./test_functions                     && \
          . $t/main                              && \
@@ -168,7 +169,10 @@ do
          retval=\$(mangle_test_retval \$retval) && \
          exit \$retval" >> $test_logfile 2>&1
   RETVAL=$?
+  test_end=$(get_millisecond_epoch)
+  test_time_elapsed=$(( ( $test_end - $test_start ) ))
   cat $test_logfile >> $logfile
+  echo "execution took $(milliseconds_to_seconds $test_time_elapsed) seconds" >> $logfile
 
   # if the test is a benchmark we have to collect the results before removing the folder
   if [ x"$cvmfs_benchmark" = x"yes" ]; then
