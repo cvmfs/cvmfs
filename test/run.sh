@@ -118,6 +118,8 @@ setup_environment() {
 # source common functions used in the test cases
 . ./test_functions
 
+testsuite_start="$(get_millisecond_epoch)"
+
 # run the tests
 for t in $testsuite
 do
@@ -211,9 +213,12 @@ do
   esac
 done
 
+testsuite_end="$(get_millisecond_epoch)"
+testsuite_time_elapsed=$(( $testsuite_end - $testsuite_start ))
+
 # print final status information
 date >> $logfile
-echo "Finished test suite" >> $logfile
+echo "Finished test suite in $(milliseconds_to_human_readable $testsuite_time_elapsed)" >> $logfile
 
 echo ""
 echo "Tests:    $num_tests"
@@ -222,6 +227,7 @@ echo "Passed:   $num_passed"
 echo "Warnings: $num_warnings"
 echo "Failures: $num_failures"
 echo ""
+echo "took $(milliseconds_to_human_readable $testsuite_time_elapsed)"
 
 exit $num_failures
 
