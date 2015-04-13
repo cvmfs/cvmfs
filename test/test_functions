@@ -849,6 +849,11 @@ get_millisecond_epoch() {
 }
 
 
+get_iso8601_timestamp() {
+  date -u +'%Y-%m-%dT%H:%M:%SZ'
+}
+
+
 milliseconds_to_seconds() {
   local milliseconds="$1"
 
