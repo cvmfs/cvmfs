@@ -18,20 +18,38 @@ fi
 echo "Start test suite for cvmfs $(cvmfs2 --version)" > $logfile
 date >> $logfile
 
-# configure the test set to run
+# read command line paramters
 shift
+test_exclusions=0
+while getopts "x" option; do
+  case $option in
+    x)
+      echo "foo"
+      test_exclusions=1
+    ;;
+    ?)
+      usage
+      exit 1
+    ;;
+  esac
+done
+shift
+
+# configure the test set to run
 exclusions=""
-if [ x$1 = "x-x" ]; then
-  shift
+testsuite=""
+if [ $test_exclusions -ne 0 ]; then
   exclusions=$@
 else
   testsuite=$@
 fi
+
 exclusions="$exclusions $CVMFS_TEST_EXCLUDE"
 if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
 
+# start running the tests
 TEST_ROOT=$(readlink -f $(dirname $0))
 export TEST_ROOT
 
