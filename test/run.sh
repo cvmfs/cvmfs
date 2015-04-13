@@ -120,6 +120,15 @@ setup_environment() {
 
 testsuite_start="$(get_millisecond_epoch)"
 
+workdir_basedir="${CVMFS_TEST_SCRATCH}/workdir"
+scratch_basedir="${CVMFS_TEST_SCRATCH}/scratch"
+if [ -d $scratch_basedir ]; then
+  rm -fR $scratch_basedir
+  mkdir -p $scratch_basedir
+fi
+
+get_iso8601_timestamp > ${scratch_basedir}/starttime
+
 # run the tests
 for t in $testsuite
 do
@@ -134,33 +143,46 @@ do
   done
 
   # source the test code
-  workdir="${CVMFS_TEST_SCRATCH}/workdir/$t"
+  workdir="${workdir_basedir}/$(basename $t)"
+  scratchdir="${scratch_basedir}/$(basename $t)"
+  test_logfile="${scratchdir}/test.log"
+
+  if ! mkdir -p $scratchdir; then
+    report_failure "failed to create $scratchdir" >> $logfile
+    continue
+  fi
+
   cvmfs_test_autofs_on_startup=true # might be overwritten by some tests
   if ! . $t/main; then
-    report_failure "failed to source $t/main" >> $logfile
+    report_failure "failed to source $t/main" >> $test_logfile
+    echo "101" > ${scratchdir}/retval
     continue
   fi
 
   # write some status info to the screen
-  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $(basename $t | head -c3))" >> $logfile
+  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $(basename $t | head -c3))" >> $test_logfile
   echo -n "Testing ${cvmfs_test_name}... "
+  echo "$cvmfs_test_name"          > ${scratchdir}/name
+  echo "$(basename $t | head -c3)" > ${scratchdir}/number
 
   # check if test should be skipped
   if contains "$exclusions" $t; then
-    report_skipped "test case was marked to be skipped" >> $logfile
+    report_skipped "test case was marked to be skipped" >> $test_logfile
     echo "Skipped"
+    touch ${scratchdir}/skipped
+    echo "0.000" > ${scratchdir}/elapsed
     continue
   fi
 
   # configure the environment for the test
-  if ! setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1; then
-    report_failure "failed to setup environment" >> $logfile
+  if ! setup_environment $cvmfs_test_autofs_on_startup $workdir >> $test_logfile 2>&1; then
+    report_failure "failed to setup environment" >> $test_logfile
     echo "Failed! (setup)"
+    echo "102" > ${scratchdir}/retval
     continue
   fi
 
   # run the test
-  test_logfile="${workdir}/test-$(basename $workdir).log"
   test_start=$(get_millisecond_epoch)
   echo "temporary log: $test_logfile" >> $logfile
   sh -c ". ./test_functions                     && \
@@ -175,6 +197,8 @@ do
   test_time_elapsed=$(( ( $test_end - $test_start ) ))
   cat $test_logfile >> $logfile
   echo "execution took $(milliseconds_to_seconds $test_time_elapsed) seconds" >> $logfile
+  echo "$test_time_elapsed" > ${scratchdir}/elapsed
+  echo "$RETVAL"            > ${scratchdir}/retval
 
   # if the test is a benchmark we have to collect the results before removing the folder
   if [ x"$cvmfs_benchmark" = x"yes" ]; then
@@ -187,27 +211,32 @@ do
     0)
       sudo rm -rf "$workdir" >> $logfile
       report_passed "Test passed" >> $logfile
+      touch ${scratchdir}/success
       echo "OK"
       ;;
     $CVMFS_MEMORY_WARNING)
       sudo rm -rf "$workdir" >> $logfile
       report_warning "Memory limit exceeded!" >> $logfile
+      touch ${scratchdir}/memorywarning
       echo "Memory Warning!"
       ;;
     $CVMFS_TIME_WARNING)
       sudo rm -rf "$workdir" >> $logfile
       report_warning "Time limit exceeded!" >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
+      touch ${scratchdir}/timewarning
       echo "Time Warning!"
       ;;
     $CVMFS_GENERAL_WARNING)
       sudo rm -rf "$workdir" >> $logfile
       report_warning "Test case finished with warnings!" >> $logfile
+      touch ${scratchdir}/generalwarning
       echo "Warning!"
       ;;
     *)
       report_failure "Testcase failed with RETVAL $RETVAL" $workdir >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
+      touch ${scratchdir}/failure
       echo "Failed!"
       ;;
   esac
@@ -215,6 +244,16 @@ done
 
 testsuite_end="$(get_millisecond_epoch)"
 testsuite_time_elapsed=$(( $testsuite_end - $testsuite_start ))
+
+echo "$testsuite_time_elapsed" > ${scratch_basedir}/elapsed
+echo "$num_tests"              > ${scratch_basedir}/num_tests
+echo "$num_skipped"            > ${scratch_basedir}/num_skipped
+echo "$num_passed"             > ${scratch_basedir}/num_passed
+echo "$num_warnings"           > ${scratch_basedir}/num_warnings
+echo "$num_failures"           > ${scratch_basedir}/num_failures
+
+# remove runtime information
+rm -rf $scratch_basedir
 
 # print final status information
 date >> $logfile
