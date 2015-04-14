@@ -191,7 +191,6 @@ do
     report_skipped "test case was marked to be skipped" >> $logfile
     echo "Skipped"
     touch ${scratchdir}/skipped
-    echo "0.000" > ${scratchdir}/elapsed
     continue
   fi
 
