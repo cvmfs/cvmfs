@@ -83,6 +83,8 @@ FAKE_S3_LOGFILE="${LOG_DIRECTORY}/fake_s3.log"
 UNITTEST_LOGFILE="${LOG_DIRECTORY}/unittest.log"
 MIGRATIONTEST_LOGFILE="${LOG_DIRECTORY}/migrationtest.log"
 
+XUNIT_OUTPUT_SUFFIX=".xunit.xml"
+
 # check that the script is running under the correct user account
 if [ $(id --user --name) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
