@@ -38,16 +38,17 @@ while getopts "xo:" option; do
 done
 shift $(( $OPTIND - 1 ))
 
-# configure the test set to run
-exclusions=""
-testsuite=""
+# configure the exclusion list of tests
+exclusions="$CVMFS_TEST_EXCLUDE"
 if [ $test_exclusions -ne 0 ]; then
-  exclusions=$@
-else
-  testsuite=$@
+  while [ $# -ne 0 ] && [ x"$1" != x"--" ]; do
+    exclusions="$exclusions $1"
+    shift
+  done
+  shift # get rid of '--'
 fi
 
-exclusions="$exclusions $CVMFS_TEST_EXCLUDE"
+testsuite="$@"
 if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
