@@ -77,7 +77,8 @@ if [ x$SOURCE_DIRECTORY      = "x" ] ||
   exit 100
 fi
 
-TEST_LOGFILE="${LOG_DIRECTORY}/test.log"
+CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client.log"
+SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server.log"
 TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
 FAKE_S3_LOGFILE="${LOG_DIRECTORY}/fake_s3.log"
 UNITTEST_LOGFILE="${LOG_DIRECTORY}/unittest.log"
