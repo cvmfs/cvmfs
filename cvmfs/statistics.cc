@@ -69,7 +69,9 @@ string Statistics::PrintList(const PrintOptions print_options) {
 
 Counter *Statistics::Register(const string &name, const string &desc) {
   MutexLockGuard lock_guard(lock_);
-  assert(counters_.find(name) == counters_.end());
+  if (counters_.find(name) != counters_.end()){
+    return &counters_[name]->counter;
+  }
   CounterInfo *counter_info = new CounterInfo(desc);
   counters_[name] = counter_info;
   return &counter_info->counter;
