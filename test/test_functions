@@ -1502,10 +1502,14 @@ EOF
 xunit_testcase() {
   local xml_file="$1"
   local test_scratchdir="$2"
+  local logfile="$3"
 
   local test_name="$(cat ${test_scratchdir}/name)"
   local test_number="$(cat ${test_scratchdir}/number)"
   local t_elapsed="$(cat ${test_scratchdir}/elapsed)"
+  local log_begin=$(cat ${test_scratchdir}/log_begin)
+  local log_end=$(cat ${test_scratchdir}/log_end)
+  local log_length=$(( $log_end - $log_begin ))
 
   if [ -f ${test_scratchdir}/skipped ]; then
     cat >> $xml_file << EOF
@@ -1520,7 +1524,7 @@ EOF
     cat >> $xml_file << EOF
     <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME">
       <failure message="Failed with Retval $retval" type="">
-      <![CDATA[$(cat ${test_scratchdir}/test.log)]]>
+      <![CDATA[$(head -n $log_end $logfile | tail -n $log_length)]]>
       </failure>
     </testcase>
 EOF
@@ -1540,10 +1544,11 @@ EOF
 export_xunit_xml() {
   local xml_file="$1"
   local scratchdir="$2"
+  local logfile="$3"
 
   xunit_preamble "$xml_file" "$scratchdir"
   for testcase in $(find $scratchdir -mindepth 1 -maxdepth 1 -type d); do
-    xunit_testcase "$xml_file" "$testcase"
+    xunit_testcase "$xml_file" "$testcase" "$logfile"
   done
   xunit_epilogue "$xml_file"
 }

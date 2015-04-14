@@ -170,6 +170,8 @@ do
     continue
   fi
 
+  wc -l < $logfile > ${scratchdir}/log_begin
+
   cvmfs_test_autofs_on_startup=true # might be overwritten by some tests
   if ! . $t/main; then
     report_failure "failed to source $t/main" >> $logfile
@@ -256,6 +258,8 @@ do
       echo "Failed!"
       ;;
   esac
+
+  wc -l < $logfile > ${scratchdir}/log_end
 done
 
 testsuite_end="$(get_millisecond_epoch)"
@@ -270,11 +274,11 @@ echo "$num_failures"           > ${scratch_basedir}/num_failures
 
 # export xunit XML
 if [ ! -z "$xml_output" ]; then
-  export_xunit_xml "$xml_output" $scratch_basedir
+  export_xunit_xml "$xml_output" $scratch_basedir $logfile
 fi
 
 # remove runtime information
-rm -rf $scratch_basedir
+# rm -rf $scratch_basedir
 
 # print final status information
 date >> $logfile
