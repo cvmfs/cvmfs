@@ -1,7 +1,7 @@
 #!/bin/sh
 
 usage() {
-  echo "$0 <logfile> [<test list> | -x <exclusion list>]"
+  echo "$0 <logfile> [-o xUnit XML output] [-x <exclusion list> --] [test list]"
 }
 
 export LC_ALL=C
