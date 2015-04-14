@@ -164,7 +164,6 @@ do
   # source the test code
   workdir="${workdir_basedir}/$(basename $t)"
   scratchdir="${scratch_basedir}/$(basename $t)"
-  test_logfile="${scratchdir}/test.log"
 
   if ! mkdir -p $scratchdir; then
     report_failure "failed to create $scratchdir" >> $logfile
@@ -173,20 +172,20 @@ do
 
   cvmfs_test_autofs_on_startup=true # might be overwritten by some tests
   if ! . $t/main; then
-    report_failure "failed to source $t/main" >> $test_logfile
+    report_failure "failed to source $t/main" >> $logfile
     echo "101" > ${scratchdir}/retval
     continue
   fi
 
   # write some status info to the screen
-  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $(basename $t | head -c3))" >> $test_logfile
+  echo "-- Testing ${cvmfs_test_name} ($(date) / test number $(basename $t | head -c3))" >> $logfile
   echo -n "Testing ${cvmfs_test_name}... "
   echo "$cvmfs_test_name"          > ${scratchdir}/name
   echo "$(basename $t | head -c3)" > ${scratchdir}/number
 
   # check if test should be skipped
   if contains "$exclusions" $t; then
-    report_skipped "test case was marked to be skipped" >> $test_logfile
+    report_skipped "test case was marked to be skipped" >> $logfile
     echo "Skipped"
     touch ${scratchdir}/skipped
     echo "0.000" > ${scratchdir}/elapsed
@@ -194,8 +193,8 @@ do
   fi
 
   # configure the environment for the test
-  if ! setup_environment $cvmfs_test_autofs_on_startup $workdir >> $test_logfile 2>&1; then
-    report_failure "failed to setup environment" >> $test_logfile
+  if ! setup_environment $cvmfs_test_autofs_on_startup $workdir >> $logfile 2>&1; then
+    report_failure "failed to setup environment" >> $logfile
     echo "Failed! (setup)"
     echo "102" > ${scratchdir}/retval
     continue
@@ -203,18 +202,16 @@ do
 
   # run the test
   test_start=$(get_millisecond_epoch)
-  echo "temporary log: $test_logfile" >> $logfile
   sh -c ". ./test_functions                     && \
          . $t/main                              && \
          cd $workdir                            && \
          cvmfs_run_test $logfile $(pwd)/${t}    && \
          retval=\$?                             && \
          retval=\$(mangle_test_retval \$retval) && \
-         exit \$retval" >> $test_logfile 2>&1
+         exit \$retval" >> $logfile 2>&1
   RETVAL=$?
   test_end=$(get_millisecond_epoch)
   test_time_elapsed=$(( ( $test_end - $test_start ) ))
-  cat $test_logfile >> $logfile
   echo "execution took $(milliseconds_to_seconds $test_time_elapsed) seconds" >> $logfile
   echo "$test_time_elapsed" > ${scratchdir}/elapsed
   echo "$RETVAL"            > ${scratchdir}/retval
