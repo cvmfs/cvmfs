@@ -12,6 +12,8 @@
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
+CVMFS_TEST_SUITE_NAME=${CVMFS_TEST_SUITE_NAME:=Integration Tests}
+CVMFS_TEST_CLASS_NAME=${CVMFS_TEST_CLASS_NAME:=IntegrationTests}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
 CVMFS_TEST_SYSLOG_FACILITY=${CVMFS_TEST_SYSLOG_FACILITY:=5}
 CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
@@ -202,7 +204,7 @@ contains() {
 
   for elem in $haystack
   do
-    if [ $(readlink --canonicalize $elem) = $(readlink --canonicalize $needle) ]; then
+    if [ $(basename $elem) = $(basename $needle) ]; then
       return 0
     fi
   done
@@ -844,13 +846,70 @@ load_repo_config() {
 }
 
 
-# runs the given command and measures the time it took to execute
+get_millisecond_epoch() {
+  echo $(( $(date +%s%N) / 1000000 ))
+}
+
+
+get_iso8601_timestamp() {
+  date -u +'%Y-%m-%dT%H:%M:%SZ'
+}
+
+
+milliseconds_to_seconds() {
+  local milliseconds="$1"
+
+  # add a zero padding if necessary
+  while [ $(echo -n "$milliseconds" | wc -c) -lt 4 ]; do
+    milliseconds="0$milliseconds"
+  done
+
+  # insert a decimal point to make seconds
+  digits=$(echo -n "$milliseconds" | wc -c)
+  echo -n "$milliseconds" | head -c $(( $digits - 3 ))
+  echo -n "."
+  echo -n "$milliseconds" | tail -c 3
+}
+
+
+milliseconds_to_human_readable() {
+  local milliseconds="$1"
+  local scratch=$milliseconds
+
+  local seconds=1000
+  local minutes=$(( $seconds * 60 ))
+  local hours=$(( $minutes * 60))
+  local days=$(( $hours * 24 ))
+
+  local o_days=$(( $scratch / $days ))
+  if [ $o_days -gt 0 ]; then
+    echo -n "$o_days days "
+    scratch=$(( $scratch % $days ))
+  fi
+
+  local o_hours=$(( $scratch / $hours ))
+  if [ $o_days -gt 0 ] || [ $o_hours -gt 0 ]; then
+    echo -n "$o_hours hours "
+    scratch=$(( $scratch % $hours ))
+  fi
+
+  local o_minutes=$(( $scratch / $minutes ))
+  if [ $o_days -gt 0 ] || [ $o_hours -gt 0 ] || [ $o_minutes -gt 0 ]; then
+    echo -n "$o_minutes minutes "
+    scratch=$(( $scratch % $minutes ))
+  fi
+
+  echo "$(milliseconds_to_seconds $scratch) seconds"
+}
+
+
+# runs the given command and measures the execution time in milliseconds
 stop_watch() {
-  begin=$(date +%s)
+  begin=$(get_millisecond_epoch)
   cmd="$@"
   $cmd
   res=$?
-  end=$(date +%s)
+  end=$(get_millisecond_epoch)
   echo $((end - begin))
   return $res
 }
@@ -1416,4 +1475,80 @@ collect_benchmark_results() {
   fi
   cp  -rf $workdir/system.info $workdir/$FQRN.*.log $workdir/callgrind.out.* $workdir/$FQRN.memcheck.xml $workdir/cvmfs.conf $benchmark_output_dir > /dev/null 2>&1
   benchmark_log "Test results copied into $benchmark_output_dir" >> $logfile
+}
+
+
+#
+#  XUnit XML generation helper functions
+#
+
+xunit_preamble() {
+  local xml_file="$1"
+  local scratchdir="$2"
+
+  local num_tests="$(cat ${scratchdir}/num_tests)"
+  local num_fails="$(cat ${scratchdir}/num_failures)"
+  local num_skips="$(cat ${scratchdir}/num_skipped)"
+  local t_start="$(cat ${scratchdir}/starttime)"
+  local t_elapsed="$(cat ${scratchdir}/elapsed)"
+
+  cat > $xml_file << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
+  <testsuite name="$CVMFS_TEST_SUITE_NAME" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
+EOF
+}
+
+xunit_testcase() {
+  local xml_file="$1"
+  local test_scratchdir="$2"
+  local logfile="$3"
+
+  local test_name="$(cat ${test_scratchdir}/name)"
+  local test_number="$(cat ${test_scratchdir}/number)"
+  local t_elapsed="$(cat ${test_scratchdir}/elapsed)"
+  local log_begin=$(cat ${test_scratchdir}/log_begin)
+  local log_end=$(cat ${test_scratchdir}/log_end)
+  local log_length=$(( $log_end - $log_begin ))
+
+  if [ -f ${test_scratchdir}/skipped ]; then
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="notrun" time="0.000" classname="$CVMFS_TEST_CLASS_NAME" />
+EOF
+  elif [ -f ${test_scratchdir}/success ]; then
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME" />
+EOF
+  elif [ -f ${test_scratchdir}/failure ]; then
+    local retval="$(cat ${test_scratchdir}/retval)"
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME">
+      <failure message="Failed with Retval $retval" type="">
+      <![CDATA[$(head -n $log_end $logfile | tail -n $log_length)]]>
+      </failure>
+    </testcase>
+EOF
+  else
+    echo "Warning: unknown test state for '$test_name'"
+  fi
+}
+
+xunit_epilogue() {
+  local xml_file="$1"
+  cat >> $xml_file << EOF
+  </testsuite>
+</testsuites>
+EOF
+}
+
+export_xunit_xml() {
+  local xml_file="$1"
+  local scratchdir="$2"
+  local logfile="$3"
+
+  xunit_preamble "$xml_file" "$scratchdir"
+  for testcase in $(find $scratchdir -mindepth 1 -maxdepth 1 -type d); do
+    xunit_testcase "$xml_file" "$testcase" "$logfile"
+  done
+  xunit_epilogue "$xml_file"
 }
