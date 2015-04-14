@@ -143,10 +143,8 @@ testsuite_start="$(get_millisecond_epoch)"
 
 workdir_basedir="${CVMFS_TEST_SCRATCH}/workdir"
 scratch_basedir="${CVMFS_TEST_SCRATCH}/scratch"
-if [ -d $scratch_basedir ]; then
-  rm -fR $scratch_basedir
-  mkdir -p $scratch_basedir
-fi
+[ ! -d $scratch_basedir ] || rm -fR $scratch_basedir
+mkdir -p $scratch_basedir
 
 get_iso8601_timestamp > ${scratch_basedir}/starttime
 
