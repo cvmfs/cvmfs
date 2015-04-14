@@ -40,8 +40,10 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                               || retval=1
 
 
-# TODO: enable this as soon as 2.1.20 is released
-echo "skipping CernVM-FS migration test case (no EL7 package for 2.1.19)"
-#./run.sh $MIGRATIONTEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/001-hotpatch                   \
+                                || retval=1
 
 exit $retval
