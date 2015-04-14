@@ -39,7 +39,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 echo "running CernVM-FS migration test cases..."
 CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
 ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                   migration_tests/001-hotpatch                   \
+                                   migration_tests/*                              \
                                 || retval=1
 
 exit $retval
