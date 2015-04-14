@@ -1,7 +1,7 @@
 #!/bin/sh
 
 usage() {
-  echo "$0 <logfile> [<test list> | -x <exclusion list>]"
+  echo "$0 <logfile> [-o xUnit XML output] [-x <exclusion list> --] [test list]"
 }
 
 export LC_ALL=C
@@ -38,16 +38,17 @@ while getopts "xo:" option; do
 done
 shift $(( $OPTIND - 1 ))
 
-# configure the test set to run
-exclusions=""
-testsuite=""
+# configure the exclusion list of tests
+exclusions="$CVMFS_TEST_EXCLUDE"
 if [ $test_exclusions -ne 0 ]; then
-  exclusions=$@
-else
-  testsuite=$@
+  while [ $# -ne 0 ] && [ x"$1" != x"--" ]; do
+    exclusions="$exclusions $1"
+    shift
+  done
+  shift # get rid of '--'
 fi
 
-exclusions="$exclusions $CVMFS_TEST_EXCLUDE"
+testsuite="$@"
 if [ -z "$testsuite" ]; then
   testsuite=$(find src -mindepth 1 -maxdepth 1 -type d | sort)
 fi
@@ -190,7 +191,6 @@ do
     report_skipped "test case was marked to be skipped" >> $logfile
     echo "Skipped"
     touch ${scratchdir}/skipped
-    echo "0.000" > ${scratchdir}/elapsed
     continue
   fi
 
