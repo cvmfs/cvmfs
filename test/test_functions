@@ -204,7 +204,7 @@ contains() {
 
   for elem in $haystack
   do
-    if [ $(readlink --canonicalize $elem) = $(readlink --canonicalize $needle) ]; then
+    if [ $(basename $elem) = $(basename $needle) ]; then
       return 0
     fi
   done
