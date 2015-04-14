@@ -1506,20 +1506,28 @@ xunit_testcase() {
 
   local test_name="$(cat ${test_scratchdir}/name)"
   local test_number="$(cat ${test_scratchdir}/number)"
-  local t_elapsed="$(cat ${test_scratchdir}/elapsed)"
-  local log_begin=$(cat ${test_scratchdir}/log_begin)
-  local log_end=$(cat ${test_scratchdir}/log_end)
-  local log_length=$(( $log_end - $log_begin ))
 
   if [ -f ${test_scratchdir}/skipped ]; then
     cat >> $xml_file << EOF
     <testcase name="$test_name" status="notrun" time="0.000" classname="$CVMFS_TEST_CLASS_NAME" />
 EOF
-  elif [ -f ${test_scratchdir}/success ]; then
+    return 0
+  fi
+
+  local t_elapsed=$(cat ${test_scratchdir}/elapsed)
+
+  if [ -f ${test_scratchdir}/success ]; then
     cat >> $xml_file << EOF
     <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME" />
 EOF
-  elif [ -f ${test_scratchdir}/failure ]; then
+    return 0
+  fi
+
+  local log_begin=$(cat ${test_scratchdir}/log_begin)
+  local log_end=$(cat ${test_scratchdir}/log_end)
+  local log_length=$(( $log_end - $log_begin ))
+
+  if [ -f ${test_scratchdir}/failure ]; then
     local retval="$(cat ${test_scratchdir}/retval)"
     cat >> $xml_file << EOF
     <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME">
@@ -1528,8 +1536,7 @@ EOF
       </failure>
     </testcase>
 EOF
-  else
-    echo "Warning: unknown test state for '$test_name'"
+    return 0
   fi
 }
 
