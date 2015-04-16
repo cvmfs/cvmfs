@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include <algorithm>
+
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/platform.h"
@@ -18,6 +20,23 @@ class T_Xattr : public ::testing::Test {
     default_list.Set("empty_key", "");
   }
 
+  unsigned int CountAttributesInFile(const std::string &path) const {
+    ssize_t sz_list = platform_llistxattr(path.c_str(), NULL, 0);
+    if (sz_list <= 0) {
+      return 0;
+    }
+
+    char *list = reinterpret_cast<char *>(malloc(sz_list));
+    sz_list = platform_llistxattr(path.c_str(), list, sz_list);
+    if (sz_list <= 0) {
+      return 0;
+    }
+
+    const std::string attrs(list, sz_list);
+    free(list);
+    return std::count(attrs.begin(), attrs.end(), '\0');
+  }
+
   XattrList default_list;
 };
 
@@ -27,20 +46,22 @@ TEST_F(T_Xattr, CreateFromFile) {
 
   // Create extended attributes
   string tmp_path;
-  FILE *f = CreateTempFile("/tmp/cvmfs-test", 0600, "w", &tmp_path);
+  FILE *f = CreateTempFile("/tmp/cvmfs_ut_xattr", 0600, "w", &tmp_path);
   ASSERT_TRUE(f != NULL);
   fclose(f);
   UnlinkGuard unlink_guard(tmp_path);
 
+  const unsigned int default_attrs = CountAttributesInFile(tmp_path);
+
   UniquePtr<XattrList> from_file1(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file1.IsValid());
-  ASSERT_TRUE(from_file1->IsEmpty());
+  EXPECT_EQ(default_attrs, from_file1->ListKeys().size());
 
   string value;
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"));
   UniquePtr<XattrList> from_file2(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file2.IsValid());
-  EXPECT_EQ(1U, from_file2->ListKeys().size());
+  EXPECT_EQ(default_attrs + 1, from_file2->ListKeys().size());
   EXPECT_TRUE(from_file2->Get("user.test", &value));
   EXPECT_EQ("value", value);
 
@@ -52,7 +73,7 @@ TEST_F(T_Xattr, CreateFromFile) {
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test3", too_long_string));
   UniquePtr<XattrList> from_file3(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file3.IsValid());
-  EXPECT_EQ(3U, from_file3->ListKeys().size());
+  EXPECT_EQ(default_attrs + 3, from_file3->ListKeys().size());
   EXPECT_TRUE(from_file3->Get("user.test", &value));
   EXPECT_EQ("value", value);
   EXPECT_TRUE(from_file3->Get("user.test2", &value));
