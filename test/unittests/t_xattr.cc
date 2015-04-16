@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include <algorithm>
+
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/platform.h"
@@ -16,6 +18,23 @@ class T_Xattr : public ::testing::Test {
     default_list.Set("keya", "valuea");
     default_list.Set("keyb", "valueb");
     default_list.Set("empty_key", "");
+  }
+
+  unsigned int CountAttributesInFile(const std::string &path) const {
+    ssize_t sz_list = platform_llistxattr(path.c_str(), NULL, 0);
+    if (sz_list <= 0) {
+      return 0;
+    }
+
+    char *list = reinterpret_cast<char *>(malloc(sz_list));
+    sz_list = platform_llistxattr(path.c_str(), list, sz_list);
+    if (sz_list <= 0) {
+      return 0;
+    }
+
+    const std::string attrs(list, sz_list);
+    free(list);
+    return std::count(attrs.begin(), attrs.end(), '\0');
   }
 
   XattrList default_list;
