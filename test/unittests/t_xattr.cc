@@ -51,15 +51,17 @@ TEST_F(T_Xattr, CreateFromFile) {
   fclose(f);
   UnlinkGuard unlink_guard(tmp_path);
 
+  const unsigned int default_attrs = CountAttributesInFile(tmp_path);
+
   UniquePtr<XattrList> from_file1(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file1.IsValid());
-  ASSERT_TRUE(from_file1->IsEmpty());
+  EXPECT_EQ(default_attrs, from_file1->ListKeys().size());
 
   string value;
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"));
   UniquePtr<XattrList> from_file2(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file2.IsValid());
-  EXPECT_EQ(1U, from_file2->ListKeys().size());
+  EXPECT_EQ(default_attrs + 1, from_file2->ListKeys().size());
   EXPECT_TRUE(from_file2->Get("user.test", &value));
   EXPECT_EQ("value", value);
 
@@ -71,7 +73,7 @@ TEST_F(T_Xattr, CreateFromFile) {
   ASSERT_TRUE(platform_setxattr(tmp_path, "user.test3", too_long_string));
   UniquePtr<XattrList> from_file3(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file3.IsValid());
-  EXPECT_EQ(3U, from_file3->ListKeys().size());
+  EXPECT_EQ(default_attrs + 3, from_file3->ListKeys().size());
   EXPECT_TRUE(from_file3->Get("user.test", &value));
   EXPECT_EQ("value", value);
   EXPECT_TRUE(from_file3->Get("user.test2", &value));
