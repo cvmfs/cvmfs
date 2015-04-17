@@ -4,6 +4,16 @@
 script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
 
+# look for the ephemeral storage mount point
+dev="\/dev\/vdb" # mind the escape!
+ephemeral=$(sed -e "s/^$dev \(\/[^ ]*\) .*$/\1/;tx;d;:x" /proc/mounts)
+[ ! -z $ephemeral ] || die "no ephemeral storage found on $dev"
+
+# configure the ephemeral storage
+custom_cache_dir="${ephemeral}/cvmfs_server_cache"
+sudo chmod a+w "$ephemeral" || die "couldn't chmod storage at $ephemeral"
+mkdir "$custom_cache_dir"   || die "couldn't create cache dir $custom_cache_dir"
+
 retval = 0
 
 # allow apache access to the mounted server file system
@@ -34,6 +44,7 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 
 
 echo "running CernVM-FS server test cases..."
+CVMFS_TEST_SERVER_CACHE="$custom_cache_dir"                                   \
 CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 ./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                                  src/5*                                       \
