@@ -47,6 +47,7 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
     LogCvmfs(kLogCatalog, kLogStderr,
              "failed to load %s from Stratum 0 (%d - %s)", url.c_str(),
              retval, download::Code2Ascii(retval));
+    unlink(catalog_path->c_str());
     assert(false);
   }
 
