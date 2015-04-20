@@ -1,0 +1,264 @@
+
+cvmfs_test_name="Server Hooks"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_587_HOOK_FILE=
+cleanup() {
+  if [ -f $CVMFS_TEST_587_HOOK_FILE ]; then
+    echo -n "removing ${CVMFS_TEST_587_HOOK_FILE}... "
+    sudo rm -f $CVMFS_TEST_587_HOOK_FILE
+    echo "done"
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "load repository configuration"
+  load_repo_config $CVMFS_TEST_REPO
+
+  # ============================================================================
+
+  echo "creating a logs directory for server hook messages"
+  local hook_dir="$(pwd)/hooks_log"
+  local hook_file=/etc/cvmfs/cvmfs_server_hooks.sh
+  mkdir $hook_dir || return 1
+
+  echo "check that $hook_dir is empty"
+  [ $(ls $hook_dir | wc -l) -eq 0 ] || return 2
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "place a file inside the repository"
+  echo "hook me up!" > /cvmfs/${CVMFS_TEST_REPO}/hook_me_up_1 || return 3
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  echo "create a server hooks file with some global code"
+  CVMFS_TEST_587_HOOK_FILE="$hook_file"
+  trap cleanup EXIT HUP INT TERM
+  sudo tee $hook_file << EOF
+echo "sourced \$0 at \$(date +%s) as \$(id -u) (\$(id -un))" >> ${hook_dir}/sourced
+EOF
+
+  echo "create transaction hooks"
+  sudo tee --append $hook_file << EOF
+transaction_before_hook() {
+  local repo_name="\$1"
+  echo "transaction_before_hook \$repo_name" >  ${hook_dir}/transaction_before_hook
+  ls -l $CVMFS_SPOOL_DIR                     >> ${hook_dir}/transaction_before_hook
+  echo "USER: \$(id -u) (\$(id -un))"        >> ${hook_dir}/transaction_before_hook
+  id
+}
+
+transaction_after_hook() {
+  local repo_name="\$1"
+  echo "transaction_after_hook \$repo_name" >  ${hook_dir}/transaction_after_hook
+  ls -l $CVMFS_SPOOL_DIR                    >> ${hook_dir}/transaction_after_hook
+  echo "USER: \$(id -u) (\$(id -un))"       >> ${hook_dir}/transaction_after_hook
+}
+EOF
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "place a file inside the repository"
+  echo "hook me up!" > /cvmfs/${CVMFS_TEST_REPO}/hook_me_up_2 || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  echo "check the generic source sentinel"
+  local user_string="$(id -u $CVMFS_TEST_USER) ($(id -un $CVMFS_TEST_USER))"
+  [ -f ${hook_dir}/sourced ]                                         || return 5
+  [ $(cat ${hook_dir}/sourced | grep "$user_string" | wc -l) -eq 3 ] || return 6
+
+  echo "check the transaction hooks"
+  [ -f ${hook_dir}/transaction_before_hook ] && \
+  [ -f ${hook_dir}/transaction_after_hook  ] || return 7
+
+  echo "check the contents of the hooks"
+  cat ${hook_dir}/transaction_before_hook | grep -q  "transaction_before_hook" || return 8
+  cat ${hook_dir}/transaction_before_hook | grep -q  "$CVMFS_TEST_REPO"        || return 9
+  cat ${hook_dir}/transaction_before_hook | grep -qv "in_transaction"          || return 10
+  cat ${hook_dir}/transaction_before_hook | grep -q  "$user_string"            || return 11
+
+  cat ${hook_dir}/transaction_after_hook  | grep -q "transaction_after_hook"  || return 12
+  cat ${hook_dir}/transaction_after_hook  | grep -q "$CVMFS_TEST_REPO"        || return 13
+  cat ${hook_dir}/transaction_after_hook  | grep -q "in_transaction"          || return 14
+  cat ${hook_dir}/transaction_after_hook  | grep -q "$user_string"            || return 15
+
+  # ============================================================================
+
+  echo "clearing hooks directory"
+  rm -fR ${hook_dir} || return 16
+  mkdir  ${hook_dir} || return 17
+
+  echo "check that $hook_dir is empty"
+  [ $(ls $hook_dir | wc -l) -eq 0 ] || return 18
+
+  # ============================================================================
+
+  echo "create publishing hooks"
+  sudo tee --append $hook_file << EOF
+publish_before_hook() {
+  local repo_name="\$1"
+  echo "publish_before_hook \$repo_name" >  ${hook_dir}/publish_before_hook
+  ls -l $CVMFS_SPOOL_DIR                 >> ${hook_dir}/publish_before_hook
+  cat /proc/mounts                       >> ${hook_dir}/publish_before_hook
+  echo "USER: \$(id -u) (\$(id -un))"    >> ${hook_dir}/publish_before_hook
+}
+
+publish_after_hook() {
+  local repo_name="\$1"
+  echo "publish_after_hook \$repo_name" >  ${hook_dir}/publish_after_hook
+  ls -l $CVMFS_SPOOL_DIR                >> ${hook_dir}/publish_after_hook
+  cat /proc/mounts                      >> ${hook_dir}/publish_after_hook
+  echo "USER: \$(id -u) (\$(id -un))"   >> ${hook_dir}/publish_after_hook
+}
+EOF
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "place a file inside the repository"
+  echo "hook me up!" > /cvmfs/${CVMFS_TEST_REPO}/hook_me_up_3 || return 19
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  echo "check the generic source sentinel"
+  [ -f ${hook_dir}/sourced ]                                         || return 20
+  [ $(cat ${hook_dir}/sourced | grep "$user_string" | wc -l) -eq 3 ] || return 21
+
+  echo "check the transaction hooks"
+  [ -f ${hook_dir}/transaction_before_hook ] && \
+  [ -f ${hook_dir}/transaction_after_hook  ] || return 22
+
+  echo "check the publishing hooks"
+  [ -f ${hook_dir}/publish_before_hook ] && \
+  [ -f ${hook_dir}/publish_after_hook  ] || return 23
+
+  echo "check the contents of the publishing hooks"
+  cat ${hook_dir}/publish_before_hook | grep -q  "publish_before_hook"         || return 24
+  cat ${hook_dir}/publish_before_hook | grep -q  "$CVMFS_TEST_REPO"            || return 25
+  cat ${hook_dir}/publish_before_hook | grep -q  "in_transaction"              || return 26
+  cat ${hook_dir}/publish_before_hook | grep -qv "is_publishing"               || return 27
+  cat ${hook_dir}/publish_before_hook | grep -q  "/cvmfs/$CVMFS_TEST_REPO.*rw" || return 28
+  cat ${hook_dir}/publish_before_hook | grep -q  "$user_string"                || return 29
+
+  cat ${hook_dir}/publish_after_hook  | grep -q  "publish_after_hook"          || return 30
+  cat ${hook_dir}/publish_after_hook  | grep -q  "$CVMFS_TEST_REPO"            || return 31
+  cat ${hook_dir}/publish_after_hook  | grep -qv "in_transaction"              || return 32
+  cat ${hook_dir}/publish_after_hook  | grep -qv "is_publishing"               || return 33
+  cat ${hook_dir}/publish_after_hook  | grep -q  "/cvmfs/$CVMFS_TEST_REPO.*ro" || return 34
+  cat ${hook_dir}/publish_after_hook  | grep -q  "$user_string"                || return 35
+
+  # ============================================================================
+
+  echo "clearing hooks directory"
+  rm -fR ${hook_dir} || return 36
+  mkdir  ${hook_dir} || return 37
+
+  echo "check that $hook_dir is empty"
+  [ $(ls $hook_dir | wc -l) -eq 0 ] || return 38
+
+  # ============================================================================
+
+  echo "create abort hooks"
+  sudo tee --append $hook_file << EOF
+abort_before_hook() {
+  local repo_name="\$1"
+  echo "abort_before_hook \$repo_name" >  ${hook_dir}/abort_before_hook
+  ls -l $CVMFS_SPOOL_DIR               >> ${hook_dir}/abort_before_hook
+  ls -l /cvmfs/$CVMFS_TEST_REPO        >> ${hook_dir}/abort_before_hook
+  cat /proc/mounts                     >> ${hook_dir}/abort_before_hook
+  echo "USER: \$(id -u) (\$(id -un))"  >> ${hook_dir}/abort_before_hook
+}
+
+abort_after_hook() {
+  local repo_name="\$1"
+  echo "abort_after_hook \$repo_name" >  ${hook_dir}/abort_after_hook
+  ls -l $CVMFS_SPOOL_DIR              >> ${hook_dir}/abort_after_hook
+  ls -l /cvmfs/$CVMFS_TEST_REPO       >> ${hook_dir}/abort_after_hook
+  cat /proc/mounts                    >> ${hook_dir}/abort_after_hook
+  echo "USER: \$(id -u) (\$(id -un))" >> ${hook_dir}/abort_after_hook
+}
+EOF
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "place a file inside the repository"
+  echo "hook me up!" > /cvmfs/${CVMFS_TEST_REPO}/will_be_aborted || return 39
+
+  echo "abort CVMFS snapshot"
+  abort_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  echo "check the generic source sentinel"
+  [ -f ${hook_dir}/sourced ]                                         || return 40
+  [ $(cat ${hook_dir}/sourced | grep "$user_string" | wc -l) -eq 3 ] || return 41
+
+  echo "check the transaction hooks"
+  [ -f ${hook_dir}/transaction_before_hook ] && \
+  [ -f ${hook_dir}/transaction_after_hook  ] || return 42
+
+  echo "check that the publishing hooks are not there"
+  [ ! -f ${hook_dir}/publish_before_hook ] && \
+  [ ! -f ${hook_dir}/publish_after_hook  ] || return 43
+
+  echo "check the abort hooks"
+  [ -f ${hook_dir}/abort_before_hook ] && \
+  [ -f ${hook_dir}/abort_after_hook  ] || return 44
+
+  echo "check the contents of the abort hooks"
+  cat ${hook_dir}/abort_before_hook | grep -q  "abort_before_hook"           || return 45
+  cat ${hook_dir}/abort_before_hook | grep -q  "$CVMFS_TEST_REPO"            || return 46
+  cat ${hook_dir}/abort_before_hook | grep -q  "in_transaction"              || return 47
+  cat ${hook_dir}/abort_before_hook | grep -qv "is_publishing"               || return 48
+  cat ${hook_dir}/abort_before_hook | grep -q  "/cvmfs/$CVMFS_TEST_REPO.*rw" || return 49
+  cat ${hook_dir}/abort_before_hook | grep -q  "will_be_aborted"             || return 50
+  cat ${hook_dir}/abort_before_hook | grep -q  "$user_string"                || return 51
+
+  cat ${hook_dir}/abort_after_hook  | grep -q  "abort_after_hook"            || return 52
+  cat ${hook_dir}/abort_after_hook  | grep -q  "$CVMFS_TEST_REPO"            || return 53
+  cat ${hook_dir}/abort_after_hook  | grep -qv "in_transaction"              || return 54
+  cat ${hook_dir}/abort_after_hook  | grep -q  "/cvmfs/$CVMFS_TEST_REPO.*ro" || return 55
+  cat ${hook_dir}/abort_after_hook  | grep -qv "will_be_aborted"             || return 56
+  cat ${hook_dir}/abort_after_hook  | grep -q  "$user_string"                || return 57
+
+  return 0
+}
