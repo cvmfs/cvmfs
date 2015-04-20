@@ -52,6 +52,7 @@ Catalog::Catalog(const PathString &path,
   path_(path),
   volatile_flag_(false),
   is_root_(parent == NULL && !is_nested),
+  managed_database_(false),
   parent_(parent),
   nested_catalog_cache_dirty_(true),
   initialized_(false)
@@ -157,6 +158,11 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
 
   InitPreparedStatements();
+
+  // Set the database file ownership if requested
+  if (managed_database_) {
+    database_->TakeFileOwnership();
+  }
 
   // Find out the maximum row id of this database file
   Sql sql_max_row_id(database(), "SELECT MAX(rowid) FROM catalog;");
@@ -422,20 +428,18 @@ const Catalog::HashVector& Catalog::GetReferencedObjects() const {
 
 
 void Catalog::TakeDatabaseFileOwnership() {
-  if (NULL == database_) {
-    return;
+  managed_database_ = true;
+  if (NULL != database_) {
+    database_->TakeFileOwnership();
   }
-
-  database_->TakeFileOwnership();
 }
 
 
 void Catalog::DropDatabaseFileOwnership() {
-  if (NULL == database_) {
-    return;
+  managed_database_ = false;
+  if (NULL != database_) {
+    database_->DropFileOwnership();
   }
-
-  database_->DropFileOwnership();
 }
 
 
