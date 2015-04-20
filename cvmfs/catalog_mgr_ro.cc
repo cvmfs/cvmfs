@@ -60,7 +60,12 @@ Catalog* SimpleCatalogManager::CreateCatalog(
   const shash::Any  &catalog_hash,
   Catalog           *parent_catalog
 ) {
-  return new Catalog(mountpoint, catalog_hash, parent_catalog);
+  Catalog *new_catalog = new Catalog(mountpoint, catalog_hash, parent_catalog);
+  if (manage_catalog_files_) {
+    new_catalog->TakeDatabaseFileOwnership();
+  }
+
+  return new_catalog;
 }
 
 }  // namespace catalog
