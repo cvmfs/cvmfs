@@ -2,11 +2,19 @@
 cvmfs_test_name="Server Hooks"
 cvmfs_test_autofs_on_startup=false
 
+CVMFS_TEST_587_FILE=/etc/cvmfs/cvmfs_server_hooks.sh
 CVMFS_TEST_587_HOOK_FILE=
+CVMFS_TEST_587_HOOK_FILE_BACKUP=
 cleanup() {
-  if [ -f $CVMFS_TEST_587_HOOK_FILE ]; then
+  if [ ! -z $CVMFS_TEST_587_HOOK_FILE ] && [ -f $CVMFS_TEST_587_HOOK_FILE ]; then
     echo -n "removing ${CVMFS_TEST_587_HOOK_FILE}... "
     sudo rm -f $CVMFS_TEST_587_HOOK_FILE
+    echo "done"
+  fi
+
+  if [ ! -z $CVMFS_TEST_587_HOOK_FILE_BACKUP ]; then
+    echo -n "moving the backed up $CVMFS_TEST_587_FILE file back... "
+    sudo cp $CVMFS_TEST_587_HOOK_FILE_BACKUP $CVMFS_TEST_587_FILE
     echo "done"
   fi
 }
@@ -15,6 +23,19 @@ cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
+  echo "creating a logs directory for server hook messages"
+  local hook_dir="$(pwd)/hooks_log"
+  local hook_file=$CVMFS_TEST_587_FILE
+  mkdir $hook_dir || return 1
+
+  if [ -f $hook_file ]; then
+    echo -n "backing up $hook_file ... "
+    CVMFS_TEST_587_HOOK_FILE_BACKUP="$(pwd)/cvmfs_server_hooks.sh.backup"
+    cp $hook_file $CVMFS_TEST_587_HOOK_FILE_BACKUP || return 100
+    sudo rm -f $hook_file                          || return 101
+    echo "done"
+  fi
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
@@ -22,11 +43,6 @@ cvmfs_run_test() {
   load_repo_config $CVMFS_TEST_REPO
 
   # ============================================================================
-
-  echo "creating a logs directory for server hook messages"
-  local hook_dir="$(pwd)/hooks_log"
-  local hook_file=/etc/cvmfs/cvmfs_server_hooks.sh
-  mkdir $hook_dir || return 1
 
   echo "check that $hook_dir is empty"
   [ $(ls $hook_dir | wc -l) -eq 0 ] || return 2
