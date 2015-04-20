@@ -63,9 +63,9 @@ class SimpleCatalogManager : public AbstractCatalogManager {
   }
 
  private:
-  shash::Any                 base_hash_;
-  std::string                stratum0_;
-  std::string                dir_temp_;
+  shash::Any                  base_hash_;
+  std::string                 stratum0_;
+  std::string                 dir_temp_;
   download::DownloadManager  *download_manager_;
   const bool                  manage_catalog_files_;
 };  // class SimpleCatalogManager
