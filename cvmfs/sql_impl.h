@@ -147,8 +147,9 @@ bool Database<DerivedT>::OpenDatabase(const int flags) {
 template <class DerivedT>
 Database<DerivedT>::DatabaseRaiiWrapper::~DatabaseRaiiWrapper() {
   if (NULL != sqlite_db) {
-    LogCvmfs(kLogSql, kLogDebug, "closing SQLite database '%s'",
-             filename().c_str());
+    LogCvmfs(kLogSql, kLogDebug, "closing SQLite database '%s' (unlink: %s)",
+             filename().c_str(),
+             (db_file_guard.IsEnabled() ? "yes" : "no"));
     const int result = sqlite3_close(sqlite_db);
     if (result != SQLITE_OK) {
       LogCvmfs(kLogSql, kLogDebug,
