@@ -18,7 +18,7 @@ echo "done"
 
 # update packages installed on the system
 echo "updating installed RPM packages (including kernel)..."
-yum -y update || die "fail (yum update)"
+sudo yum -y update || die "fail (yum update)"
 
 # custom kernel packages (figures out the newest installed kernel, downloads and
 #                         installs the associated patched aufs version of it)
