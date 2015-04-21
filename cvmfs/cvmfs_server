@@ -103,6 +103,15 @@ CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD=500000
 ################################################################################
 
 
+__swissknife_cmd() {
+  echo "cvmfs_swissknife"
+}
+
+__swissknife() {
+  $(__swissknife_cmd) $@
+}
+
+
 cvmfs_mkfqrn() {
    local repo=$1
 
