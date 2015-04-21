@@ -229,9 +229,8 @@ Supported Commands:
                 [-k path to keys] [-g chown backend]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
-  publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
+  publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
                 [-a tag name] [-c tag channel] [-m tag description]
-                [-n manual revision number] [-v be verbose]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -3638,7 +3637,6 @@ publish() {
   local spool_dir
   local stratum0
   local upstream
-  local debug=0
   local tweaks_option=
   local tag_name=
   local tag_channel=00
@@ -3650,15 +3648,9 @@ publish() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:c:m:vn:" option
+  while getopts "pa:c:m:vn:" option
   do
     case $option in
-      d)
-        debug=1
-      ;;
-      D)
-        debug=2
-      ;;
       p)
         tweaks_option="-d"
       ;;
