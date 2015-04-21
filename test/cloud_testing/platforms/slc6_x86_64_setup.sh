@@ -16,6 +16,10 @@ create_partition $disk_to_partition $partition_size || die "fail (creating parti
 create_partition $disk_to_partition $partition_size || die "fail (creating partition 2)"
 echo "done"
 
+# update packages installed on the system
+echo "updating installed RPM packages (including kernel)..."
+yum -y update || die "fail (yum update)"
+
 # custom kernel packages (figures out the newest installed kernel, downloads and
 #                         installs the associated patched aufs version of it)
 knl_version=$(rpm -qa --last | grep -e '^kernel-[0-9]' | head -n 1 | sed -e 's/^kernel-\(.*\)\.x86_64.*$/\1/')
