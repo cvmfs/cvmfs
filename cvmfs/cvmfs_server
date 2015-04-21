@@ -3711,8 +3711,6 @@ publish() {
     upstream=$CVMFS_UPSTREAM_STORAGE
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
-    local swissknife="cvmfs_swissknife"
-
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
@@ -3721,7 +3719,7 @@ publish() {
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
-    local revision_number=$($swissknife info -r $stratum0 -v $(get_follow_http_redirects_flag))
+    local revision_number=$(__swissknife info -r $stratum0 -v $(get_follow_http_redirects_flag))
     if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
       echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
       retcode=1
@@ -3734,52 +3732,36 @@ publish() {
       echo "Using auto tag '$tag_name'"
     fi
 
-    # enable the debug mode?
-    if [ $debug -ne 0 ]
-    then
-      if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
-        case $debug in
-          1)
-            # in case something breaks we are provided with a GDB prompt.
-            swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
-          ;;
-          2)
-            # attach gdb and provide a prompt WITHOUT actual running the program
-            swissknife="gdb --quiet --args cvmfs_swissknife_debug"
-          ;;
-        esac
-      else
-        echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
-      fi
-    fi
 
     # prepare the commands to be used for the publishing later
     local user_shell="$(get_user_shell $name)"
 
     local base_hash=$(get_mounted_root_hash $name)
     local manifest="${spool_dir}/tmp/manifest"
-    local dirtab_command="$swissknife dirtab $verbosity \
-      -d /cvmfs/${name}/.cvmfsdirtab                    \
-      -b $base_hash                                     \
-      -w $stratum0                                      \
-      -t ${spool_dir}/tmp                               \
-      -u /cvmfs/${name}                                 \
-      -s ${spool_dir}/scratch"
+    local dirtab_command="$(__swissknife_cmd dbg) dirtab \
+      -d /cvmfs/${name}/.cvmfsdirtab                     \
+      -b $base_hash                                      \
+      -w $stratum0                                       \
+      -t ${spool_dir}/tmp                                \
+      -u /cvmfs/${name}                                  \
+      -s ${spool_dir}/scratch                            \
+      $verbosity"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-    local sync_command="$swissknife sync $verbosity -u /cvmfs/$name \
-      -s ${spool_dir}/scratch \
-      -c ${spool_dir}/rdonly \
-      -t ${spool_dir}/tmp \
-      -b $base_hash \
-      -r ${upstream} \
-      -w $stratum0 \
-      -o $manifest \
-      -e $hash_algorithm \
-      $(get_follow_http_redirects_flag) \
-      $log_level $tweaks_option"
+    local sync_command="$(__swissknife_cmd dbg) sync \
+      -u /cvmfs/$name                                \
+      -s ${spool_dir}/scratch                        \
+      -c ${spool_dir}/rdonly                         \
+      -t ${spool_dir}/tmp                            \
+      -b $base_hash                                  \
+      -r ${upstream}                                 \
+      -w $stratum0                                   \
+      -o $manifest                                   \
+      -e $hash_algorithm                             \
+      $(get_follow_http_redirects_flag)              \
+      $log_level $tweaks_option $verbosity"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi
@@ -3807,16 +3789,16 @@ publish() {
     if [ "x$CVMFS_MAXIMAL_CONCURRENT_WRITES" != "x" ]; then
       sync_command="$sync_command -q $CVMFS_MAXIMAL_CONCURRENT_WRITES"
     fi
-    local tag_command="$swissknife tag_create \
-      -r $upstream                            \
-      -w $stratum0                            \
-      -t ${spool_dir}/tmp                     \
-      -m $manifest                            \
-      -p /etc/cvmfs/keys/${name}.pub          \
-      -f $name                                \
-      -b $base_hash                           \
-      -e $hash_algorithm                      \
-      $(get_follow_http_redirects_flag)       \
+    local tag_command="$(__swissknife_cmd dbg) tag_create \
+      -r $upstream                                        \
+      -w $stratum0                                        \
+      -t ${spool_dir}/tmp                                 \
+      -m $manifest                                        \
+      -p /etc/cvmfs/keys/${name}.pub                      \
+      -f $name                                            \
+      -b $base_hash                                       \
+      -e $hash_algorithm                                  \
+      $(get_follow_http_redirects_flag)                   \
       -x" # -x enables magic undo tag handling
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
