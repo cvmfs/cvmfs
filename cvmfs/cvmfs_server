@@ -96,15 +96,41 @@ CVMFS_DEFAULT_AVG_CHUNK_SIZE=8388608
 CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD=500000
 
+CVMFS_SERVER_DEBUG=${CVMFS_SERVER_DEBUG:=0}
+CVMFS_SERVER_SWISSKNIFE="cvmfs_swissknife"
+CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
+
 ################################################################################
 #                                                                              #
 #                              Utility Functions                               #
 #                                                                              #
 ################################################################################
 
+# enable the debug mode?
+if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
+  if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
+    case $CVMFS_SERVER_DEBUG in
+      1)
+        # in case something breaks we are provided with a GDB prompt.
+        CVMFS_SERVER_SWISSKNIFE_DEBUG="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
+      ;;
+      2)
+        # attach gdb and provide a prompt WITHOUT actual running the program
+        CVMFS_SERVER_SWISSKNIFE_DEBUG="gdb --quiet --args cvmfs_swissknife_debug"
+      ;;
+    esac
+  else
+    echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
+  fi
+fi
 
 __swissknife_cmd() {
-  echo "cvmfs_swissknife"
+  local might_be_debugging="$1"
+  if [ ! -z $might_be_debugging ]; then
+    echo "$CVMFS_SERVER_SWISSKNIFE_DEBUG"
+  else
+    echo "$CVMFS_SERVER_SWISSKNIFE"
+  fi
 }
 
 __swissknife() {
