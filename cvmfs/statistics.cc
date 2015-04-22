@@ -7,11 +7,31 @@
 #include <cassert>
 
 #include "smalloc.h"
+#include "util.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
+#ifdef CVMFS_NAMESPACE_GUARD
+namespace CVMFS_NAMESPACE_GUARD {
+#endif
+
 namespace perf {
+
+std::string Counter::ToString() { return StringifyInt(Get()); }
+std::string Counter::Print() { return StringifyInt(Get()); }
+std::string Counter::PrintK() { return StringifyInt(Get() / 1000); }
+std::string Counter::PrintKi() { return StringifyInt(Get() / 1024); }
+std::string Counter::PrintM() { return StringifyInt(Get() / (1000 * 1000)); }
+std::string Counter::PrintMi() { return StringifyInt(Get() / (1024 * 1024)); }
+std::string Counter::PrintRatio(Counter divider) {
+  double enumerator_value = Get();
+  double divider_value = divider.Get();
+  return StringifyDouble(enumerator_value / divider_value);
+}
+
+
+//-----------------------------------------------------------------------------
 
 Counter *Statistics::Lookup(const std::string &name) {
   MutexLockGuard lock_guard(lock_);
@@ -40,7 +60,7 @@ string Statistics::PrintList(const PrintOptions print_options) {
   for (map<string, CounterInfo *>::const_iterator i = counters_.begin(),
        iEnd = counters_.end(); i != iEnd; ++i)
   {
-    result += i->first + "|" + StringifyInt(i->second->counter.Get()) +
+    result += i->first + "|" + i->second->counter.ToString() +
               "|" + i->second->desc + "\n";
   }
   return result;
@@ -75,3 +95,8 @@ Statistics::~Statistics() {
 }
 
 }  // namespace perf
+
+
+#ifdef CVMFS_NAMESPACE_GUARD
+}  // namespace CVMFS_NAMESPACE_GUARD
+#endif
