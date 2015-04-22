@@ -35,6 +35,7 @@ namespace swissknife {
 vector<Command *> command_list;
 download::DownloadManager *g_download_manager;
 signature::SignatureManager *g_signature_manager;
+perf::Statistics *g_statistics;
 
 void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
@@ -76,6 +77,7 @@ void Usage() {
 int main(int argc, char **argv) {
   swissknife::g_download_manager = new download::DownloadManager();
   swissknife::g_signature_manager = new signature::SignatureManager();
+  swissknife::g_statistics = new perf::Statistics();
 
   swissknife::command_list.push_back(new swissknife::CommandCreate());
   swissknife::command_list.push_back(new swissknife::CommandUpload());
@@ -160,6 +162,7 @@ int main(int argc, char **argv) {
 
   delete swissknife::g_signature_manager;
   delete swissknife::g_download_manager;
+  delete swissknife::g_statistics;
   swissknife::Usage();
   return 1;
 }

@@ -26,9 +26,11 @@
 #include <cstdlib>
 
 #include "atomic.h"
+#include "cvmfs.h"
 #include "duplex_sqlite3.h"
 #include "logging.h"
 #include "prng.h"
+#include "statistics.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
@@ -65,10 +67,10 @@ sqlite3_stmt *stmt_get_inode_ = NULL;
 sqlite3_stmt *stmt_add_ = NULL;
 
 // Statistics to keep
-atomic_int64 dbstat_seq_;
-atomic_int64 dbstat_added_;
-atomic_int64 dbstat_path_found_;
-atomic_int64 dbstat_inode_found_;
+perf::Counter *no_dbstat_seq_;
+perf::Counter *n_dbstat_added_;
+perf::Counter *n_dbstat_path_found_;
+perf::Counter *n_dbstat_inode_found_;
 
 struct BusyHandlerInfo {
   BusyHandlerInfo() {
@@ -137,8 +139,8 @@ static uint64_t IssueInode(const PathString &path) {
   }
   inode = sqlite3_last_insert_rowid(db_);
   sqlite3_reset(stmt_add_);
-  dbstat_seq_ = inode;
-  atomic_inc64(&dbstat_added_);
+  no_dbstat_seq_->Set(inode);
+  perf::Inc(n_dbstat_added_);
   return inode;
 }
 
@@ -155,7 +157,7 @@ uint64_t RetryGetInode(const PathString &path, int attempt) {
   pthread_mutex_lock(&lock_);
   inode = FindInode(path);
   if (inode) {
-    atomic_inc64(&dbstat_path_found_);
+    perf::Inc(n_dbstat_path_found_);
     pthread_mutex_unlock(&lock_);
     return inode;
   }
@@ -206,22 +208,8 @@ bool GetPath(const uint64_t inode, PathString *path) {
   path->Assign(raw_path, strlen(raw_path));
   sqlite3_reset(stmt_get_path_);
   pthread_mutex_unlock(&lock_);
-  atomic_inc64(&dbstat_inode_found_);
+  perf::Inc(n_dbstat_inode_found_);
   return true;
-}
-
-
-string GetStatistics() {
-  string result = "Total number of issued inodes: " +
-                  StringifyInt(atomic_read64(&dbstat_added_)) + "\n";
-  result += "Last inode issued: " +
-            StringifyInt(atomic_read64(&dbstat_seq_)) + "\n";
-  result += "inode --> path hits: " +
-            StringifyInt(atomic_read64(&dbstat_path_found_)) + "\n";
-  result += "path --> inode hits: " +
-            StringifyInt(atomic_read64(&dbstat_inode_found_)) + "\n";
-
-  return result;
 }
 
 
@@ -255,10 +243,14 @@ bool Init(const string &db_dir, const uint64_t root_inode,
   assert(root_inode > 0);
   string db_path = db_dir + "/inode_maps.db";
 
-  atomic_init64(&dbstat_seq_);
-  atomic_init64(&dbstat_added_);
-  atomic_init64(&dbstat_path_found_);
-  atomic_init64(&dbstat_inode_found_);
+  no_dbstat_seq_ = cvmfs::statistics_->Register(
+      "nfs_shared_maps.no_dbstat_seq", "Last inode issued");
+  n_dbstat_added_ = cvmfs::statistics_->Register(
+      "nfs_shared_maps.n_dbstat_added", "Total number of issued nodes");
+  n_dbstat_path_found_ = cvmfs::statistics_->Register(
+      "nfs_shared_maps.n_dbstat_path_found", "inode --> path hits");
+  n_dbstat_inode_found_ = cvmfs::statistics_->Register(
+      "nfs_shared_maps.n_dbstat_inode_found", "path --> inode hits");
 
   sqlite3_stmt *stmt;
   if (rebuild) {

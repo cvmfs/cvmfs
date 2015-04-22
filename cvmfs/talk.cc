@@ -360,35 +360,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "internal affairs") {
         int current;
         int highwater;
-        lru::Statistics inode_stats;
-        lru::Statistics path_stats;
-        lru::Statistics md5path_stats;
-        catalog::Statistics catalog_stats;
         string result;
-
-        result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
-        result += "File System Call Statistics:\n  " + cvmfs::GetFsStats();
-
-        cvmfs::GetLruStatistics(&inode_stats, &path_stats, &md5path_stats);
-        result += "File Catalog Memory Cache:\n" +
-                  string("  inode cache:   ") + inode_stats.Print() +
-                  string("  path cache:    ") + path_stats.Print() +
-                  string("  md5path cache: ") + md5path_stats.Print();
-        result += string("  inode tracker: ") +
-                  cvmfs::PrintInodeTrackerStatistics();
-
-        result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
-        result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();
-
-        result += "Path Strings:\n  instances: " +
-          StringifyInt(PathString::num_instances()) + "  overflows: " +
-          StringifyInt(PathString::num_overflows()) + "\n";
-        result += "Name Strings:\n  instances: " +
-          StringifyInt(NameString::num_instances()) + "  overflows: " +
-          StringifyInt(NameString::num_overflows()) + "\n";
-        result += "Symlink Strings:\n  instances: " +
-          StringifyInt(LinkString::num_instances()) + "  overflows: " +
-          StringifyInt(LinkString::num_overflows()) + "\n";
 
         result += "\nCache Mode: ";
         switch (cache::GetCacheMode()) {
@@ -411,22 +383,6 @@ static void *MainTalk(void *data __attribute__((unused))) {
           result += "\nNFS Map Statistics:\n";
           result += nfs_maps::GetStatistics();
         }
-
-        result += "\nNetwork Statistics:\n";
-        result += cvmfs::download_manager_->GetStatistics().Print();
-        unsigned proxy_reset_delay, host_reset_delay;
-        time_t proxy_timestamp_failover, host_timestamp_failover;
-        cvmfs::download_manager_->GetProxyBackupInfo(&proxy_reset_delay,
-                                                     &proxy_timestamp_failover);
-        cvmfs::download_manager_->GetHostBackupInfo(&host_reset_delay,
-                                                    &host_timestamp_failover);
-        result += "Backup proxy group: " + ((proxy_timestamp_failover > 0) ?
-          ("Backup since " + StringifyTime(proxy_timestamp_failover, true)) :
-          "Primary") + "\n";
-        result += "Backup host: " + ((host_timestamp_failover > 0) ?
-          ("Backup since " + StringifyTime(host_timestamp_failover, true)) :
-          "Primary");
-        result += "\n\n";
 
         result += "SQlite Statistics:\n";
         sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);

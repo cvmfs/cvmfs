@@ -31,6 +31,10 @@ namespace download {
 class DownloadManager;
 }
 
+namespace perf {
+class Statistics;
+}
+
 class BackoffThrottle;
 
 namespace cvmfs {
@@ -146,7 +150,7 @@ class cvmfs_context : SingleCopy {
   ~cvmfs_context();
 
  private:
-  int Setup(const options &opts);
+  int Setup(const options &opts, perf::Statistics *statistics);
 
   void InitRuntimeCounters();
 

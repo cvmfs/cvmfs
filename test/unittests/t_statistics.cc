@@ -45,7 +45,7 @@ TEST(T_Statistics, Statistics) {
   ASSERT_TRUE(counter != NULL);
   EXPECT_EQ(0, counter->Get());
 
-  ASSERT_DEATH(statistics.Register("test.counter", "Name Clash"), ".*");
+  ASSERT_EQ(statistics.Register("test.counter", "Name Clash"), counter);
   EXPECT_EQ(0, statistics.Lookup("test.counter")->Get());
   EXPECT_EQ("a test counter", statistics.LookupDesc("test.counter"));
 

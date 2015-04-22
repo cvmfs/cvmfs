@@ -114,7 +114,7 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
   env->history_path.Set(CreateTempPath(tmp_path + "/history", 0600));
 
   // initialize the (swissknife global) download manager
-  g_download_manager->Init(1, true);
+  g_download_manager->Init(1, true, g_statistics);
 
   // open the (yet unsigned) manifest file if it is there, otherwise load the
   // latest manifest from the server

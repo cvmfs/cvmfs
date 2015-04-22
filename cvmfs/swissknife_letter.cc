@@ -137,7 +137,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     }
 
     download::DownloadManager download_manager;
-    download_manager.Init(2, false);
+    download_manager.Init(2, false, g_statistics);
     whitelist::Whitelist whitelist(fqrn, &download_manager, &signature_manager);
     retval_wl = whitelist.Load(repository_url);
     if (retval_wl != whitelist::kFailOk) {

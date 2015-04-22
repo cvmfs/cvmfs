@@ -12,6 +12,8 @@
 #include <sstream>  // TODO(jblomer): remove me
 
 #include "../../cvmfs/manifest.h"
+#include "../../cvmfs/shortstring.h"
+#include "../../cvmfs/statistics.h"
 #include "testutil.h"
 
 
@@ -67,6 +69,14 @@ pid_t GetParentPid(const pid_t pid) {
 
   return parent_pid;
 }
+
+
+void InitializeStaticCounters(perf::Statistics *statistics) {
+  PathString::RegisterCounters(statistics);
+  NameString::RegisterCounters(statistics);
+  LinkString::RegisterCounters(statistics);
+}
+
 
 /**
  * Traverses the $PATH environment variable to find the absolute path of a given

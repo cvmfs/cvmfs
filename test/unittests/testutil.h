@@ -22,8 +22,13 @@
 #include "../../cvmfs/upload_facility.h"
 #include "../../cvmfs/util.h"
 
+namespace perf {
+class Statistics;
+}
+
 pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);
+void InitializeStaticCounters(perf::Statistics *statistics);
 
 time_t t(const int day, const int month, const int year);
 shash::Any h(const std::string &hash,

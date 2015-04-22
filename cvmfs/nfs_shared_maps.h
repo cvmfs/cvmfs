@@ -21,8 +21,6 @@ void Spawn();
 uint64_t GetInode(const PathString &path);
 bool GetPath(const uint64_t inode, PathString *path);
 
-std::string GetStatistics();
-
 }  // namespace nfs_shared_maps
 
 #endif  // CVMFS_NFS_SHARED_MAPS_H_

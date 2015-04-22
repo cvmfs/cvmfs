@@ -73,6 +73,7 @@
 #include "hash.h"
 #include "logging.h"
 #include "lru.h"
+#include "libcvmfs.h"
 #include "monitor.h"
 #include "murmur.h"
 #include "platform.h"
@@ -80,6 +81,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "tracer.h"
 #include "util.h"
 #include "wpad.h"
@@ -282,7 +284,7 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
   cvmfs_context *ctx = new cvmfs_context(opts);
   assert(ctx != NULL);
 
-  if (ctx->Setup(opts) != 0) {
+  if (ctx->Setup(opts, &statistics_) != 0) {
     delete ctx;
     ctx = NULL;
   }
@@ -294,10 +296,10 @@ void cvmfs_context::Destroy(cvmfs_context *ctx) {
   delete ctx;
 }
 
-int cvmfs_context::Setup(const options &opts) {
+int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   // Network initialization
   download_manager_ = new download::DownloadManager();
-  download_manager_->Init(16, false);
+  download_manager_->Init(16, false, statistics);
   download_manager_->SetHostChain(opts.url);
   download_manager_->SetTimeout(opts.timeout,
                                 opts.timeout_direct);
@@ -330,7 +332,8 @@ int cvmfs_context::Setup(const options &opts) {
   // Load initial file catalog
   catalog_manager_ = new cache::CatalogManager(repository_name_,
                                                signature_manager_,
-                                               download_manager_);
+                                               download_manager_,
+                                               statistics);
   bool clg_mgr_init;
   if (!opts.root_hash.empty()) {
     const shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(opts.root_hash),
@@ -350,7 +353,8 @@ int cvmfs_context::Setup(const options &opts) {
            "CernVM-FS: linking %s to repository %s",
            opts.mountpoint.c_str(), repository_name_.c_str());
 
-  md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize);
+  md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize,
+      statistics);
   pathcache_ready_ = true;
 
   if (!opts.tracefile.empty()) {
