@@ -1054,7 +1054,7 @@ get_item() {
   local noproxy="$2"
 
   if [ x"$noproxy" != x"" ]; then
-    unset http_proxy && curl "$url" 2>/dev/null
+    unset http_proxy && curl -L "$url" 2>/dev/null
   else
     curl "$url" 2>/dev/null
   fi
