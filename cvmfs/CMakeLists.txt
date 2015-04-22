@@ -15,6 +15,7 @@ set (CVMFS_LOADER_SOURCES
   globals.h globals.cc
   loader_talk.h loader_talk.cc
   loader.h loader.cc
+  statistics.h statistics.cc
 )
 
 set (CVMFS_CLIENT_SOURCES
@@ -99,6 +100,7 @@ set (CVMFS_FSCK_SOURCES
   prng.h
   hash.cc hash.h
   util.cc util.h
+  statistics.h statistics.cc
   cvmfs_fsck.cc)
 
 set (CVMFS_SWISSKNIFE_SOURCES
@@ -117,6 +119,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   object_fetcher.h
+  statistics.cc statistics.h
 
   file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
   file_processing/char_buffer.h
