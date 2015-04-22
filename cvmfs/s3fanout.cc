@@ -597,6 +597,12 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     info->http_headers =
         curl_slist_append(info->http_headers,
                           "Content-Type: binary/octet-stream");
+
+    if (info->request == JobInfo::kReqPutNoCache) {
+      std::string cache_control = "Cache-Control: no-cache";
+      info->http_headers =
+          curl_slist_append(info->http_headers, cache_control.c_str());
+    }
   }
 
   // Common headers
@@ -775,7 +781,8 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     try_again = CanRetry(info);
   }
   if (try_again) {
-    if (info->request == JobInfo::kReqPut) {
+    if (info->request == JobInfo::kReqPut ||
+        info->request == JobInfo::kReqPutNoCache) {
       LogCvmfs(kLogDownload, kLogDebug, "Trying again to upload %s",
                info->object_key.c_str());
       // Reset origin

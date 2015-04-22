@@ -361,11 +361,14 @@ void S3Uploader::FileUpload(
                             const_cast<void*>(
                                 static_cast<void const*>(callback)),
                             local_path);
+
+  if (remote_path.compare(0, 6, ".cvmfs") == 0) {
+    info->request = s3fanout::JobInfo::kReqPutNoCache;
+  } else {
 #ifndef S3_UPLOAD_OBJECTS_EVEN_IF_THEY_EXIST
-  if (remote_path.substr(0, 1) != ".") {
     info->request = s3fanout::JobInfo::kReqHead;
-  }
 #endif
+  }
 
   // Upload job
   const bool retval = UploadJobInfo(info);
