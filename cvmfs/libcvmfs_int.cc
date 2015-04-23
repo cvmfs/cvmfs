@@ -284,7 +284,8 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
   cvmfs_context *ctx = new cvmfs_context(opts);
   assert(ctx != NULL);
 
-  if (ctx->Setup(opts, &statistics_) != 0) {
+  perf::Statistics *statistics = new perf::Statistics(); // provisional
+  if (ctx->Setup(opts, statistics) != 0) {
     delete ctx;
     ctx = NULL;
   }
