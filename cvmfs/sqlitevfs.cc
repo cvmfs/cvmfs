@@ -29,6 +29,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "statistics.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
