@@ -16,11 +16,15 @@ class DownloadManager;
 namespace signature {
 class SignatureManager;
 }
+namespace perf {
+class Statistics;
+}
 
 namespace swissknife {
 
 extern download::DownloadManager *g_download_manager;
 extern signature::SignatureManager *g_signature_manager;
+extern perf::Statistics *g_statistics;
 
 void Usage();
 

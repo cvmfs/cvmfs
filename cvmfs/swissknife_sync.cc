@@ -246,11 +246,12 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
            dirtab.RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
-  g_download_manager->Init(1, true);
+  g_download_manager->Init(1, true, g_statistics);
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
-                                                g_download_manager);
+                                                g_download_manager,
+                                                g_statistics);
   catalog_manager.Init();
 
   vector<string> new_nested_catalogs;
@@ -326,9 +327,8 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     }
 
     // check if the path is a meta-directory (. or ..)
-    assert(candidate_rel.size() >= 2);
-    if (candidate_rel.substr(candidate_rel.size() - 2) == "/." ||
-        candidate_rel.substr(candidate_rel.size() - 3) == "/..") {
+    if (candidate_rel.substr(candidate_rel.size() - 3) == "/.." ||
+        candidate_rel.substr(candidate_rel.size() - 2) == "/.") {
       continue;
     }
 
@@ -540,12 +540,13 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (NULL == params.spooler)
     return 3;
 
-  g_download_manager->Init(1, true);
+  g_download_manager->Init(1, true, g_statistics);
 
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, g_download_manager,
-                    params.catalog_entry_warn_threshold);
+                    params.catalog_entry_warn_threshold,
+                    g_statistics);
   catalog_manager.Init();
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
