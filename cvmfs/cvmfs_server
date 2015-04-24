@@ -899,7 +899,7 @@ close_transaction() {
     cvmfs_suid_helper rdonly_umount $name
   fi
   cvmfs_suid_helper clear_scratch $name
-  rm -rf "${tmp_dir}/*"
+  [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
   cvmfs_suid_helper rdonly_mount $name > /dev/null
   cvmfs_suid_helper rw_mount $name
   rmdir "$tx_lock"

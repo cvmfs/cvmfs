@@ -247,10 +247,12 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
 
   // initialize catalog infrastructure
   g_download_manager->Init(1, true);
+  const bool auto_manage_catalog_files = true;
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
-                                                g_download_manager);
+                                                g_download_manager,
+                                                auto_manage_catalog_files);
   catalog_manager.Init();
 
   vector<string> new_nested_catalogs;
