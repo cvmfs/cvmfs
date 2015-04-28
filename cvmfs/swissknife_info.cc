@@ -80,7 +80,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   //       Possible Fix: Allow for a Manifest::Fetch with an empty name.
   manifest::Manifest *manifest = NULL;
   if (IsRemote(repository)) {
-    g_download_manager->Init(1, true);
+    g_download_manager->Init(1, true, g_statistics);
 
     const string url = repository + "/.cvmfspublished";
     download::JobInfo download_manifest(&url, false, false, NULL);

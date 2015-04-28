@@ -23,6 +23,10 @@ namespace manifest {
 class Manifest;
 }
 
+namespace perf {
+class Statistics;
+}
+
 namespace catalog {
 
 class SimpleCatalogManager : public AbstractCatalogManager {
@@ -32,8 +36,10 @@ class SimpleCatalogManager : public AbstractCatalogManager {
     const std::string          &stratum0,
     const std::string          &dir_temp,
     download::DownloadManager  *download_manager,
+    perf::Statistics           *statistics,
     const bool                  manage_catalog_files = false)
-    : base_hash_(base_hash)
+    : AbstractCatalogManager(statistics)
+    , base_hash_(base_hash)
     , stratum0_(stratum0)
     , dir_temp_(dir_temp)
     , download_manager_(download_manager)
@@ -63,11 +69,11 @@ class SimpleCatalogManager : public AbstractCatalogManager {
   }
 
  private:
-  shash::Any                  base_hash_;
-  std::string                 stratum0_;
-  std::string                 dir_temp_;
-  download::DownloadManager  *download_manager_;
-  const bool                  manage_catalog_files_;
+  shash::Any                 base_hash_;
+  std::string                stratum0_;
+  std::string                dir_temp_;
+  download::DownloadManager *download_manager_;
+  const bool                 manage_catalog_files_;
 };  // class SimpleCatalogManager
 
 }  // namespace catalog

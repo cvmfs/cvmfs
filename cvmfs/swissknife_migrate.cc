@@ -132,7 +132,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
     download::DownloadManager   download_manager;
     signature::SignatureManager signature_manager;
-    download_manager.Init(1, true);
+    download_manager.Init(1, true, g_statistics);
     signature_manager.Init();
     if (!signature_manager.LoadPublicRsaKeys(repo_keys)) {
       LogCvmfs(kLogCatalog, kLogStderr, "Failed to load public key(s)");

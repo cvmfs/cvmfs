@@ -22,10 +22,10 @@
 #include "libcvmfs_int.h"
 #include "logging.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
-
 
 int set_option(char const *name, char const *value, bool *var) {
   if (*value != '\0') {

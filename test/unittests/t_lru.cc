@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/lru.h"
+#include "../../cvmfs/statistics.h"
 
 using lru::LruCache;
 
@@ -13,17 +14,22 @@ static inline uint32_t hasher_int(const int &value) {
 }
 
 static const unsigned cache_size = 1024;
+const std::string name = "lru_cache";
 
 
 TEST(T_LruCache, Initialize) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 }
 
 
 TEST(T_LruCache, Insert) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -43,7 +49,9 @@ TEST(T_LruCache, Insert) {
 
 
 TEST(T_LruCache, Drop) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -93,7 +101,9 @@ TEST(T_LruCache, Drop) {
 
 
 TEST(T_LruCache, Lookup) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -154,7 +164,9 @@ TEST(T_LruCache, Lookup) {
 
 
 TEST(T_LruCache, Update) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -217,7 +229,9 @@ TEST(T_LruCache, Update) {
 
 
 TEST(T_LruCache, Forget) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -282,7 +296,9 @@ TEST(T_LruCache, Forget) {
 
 
 TEST(T_LruCache, FillCompletely) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -309,7 +325,9 @@ TEST(T_LruCache, FillCompletely) {
 
 
 TEST(T_LruCache, LeastRecentlyUsedReplacementSlow) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 
@@ -373,7 +391,9 @@ TEST(T_LruCache, LeastRecentlyUsedReplacementSlow) {
 
 
 TEST(T_LruCache, PauseAndResume) {
-  LruCache<int, std::string> cache(cache_size, -1, hasher_int);
+  perf::Statistics statistics;
+  LruCache<int, std::string> cache(cache_size, -1, hasher_int,
+      &statistics, name);
   EXPECT_TRUE(cache.IsEmpty());
   EXPECT_FALSE(cache.IsFull());
 

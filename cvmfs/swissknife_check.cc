@@ -597,7 +597,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   // Repository can be HTTP address or on local file system
   if (repository.substr(0, 7) == "http://") {
     remote_repository = new string(repository);
-    g_download_manager->Init(1, true);
+    g_download_manager->Init(1, true, g_statistics);
   } else {
     remote_repository = NULL;
   }

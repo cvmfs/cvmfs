@@ -12,6 +12,8 @@
 #include "../../cvmfs/catalog_sql.h"
 #include "../../cvmfs/compression.h"
 #include "../../cvmfs/history_sqlite.h"
+#include "../../cvmfs/shortstring.h"
+#include "../../cvmfs/statistics.h"
 #include "../../cvmfs/util.h"
 #include "testutil.h"
 
@@ -317,7 +319,7 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
   void InitializeExternalManagers() {
-    download_manager_.Init(1, true);
+    download_manager_.Init(1, true, &statistics_);
     signature_manager_.Init();
     ASSERT_TRUE(signature_manager_.LoadPublicRsaKeys(public_key_path));
   }
@@ -524,6 +526,7 @@ class T_ObjectFetcher : public ::testing::Test {
   }
 
  private:
+  perf::Statistics             statistics_;
   download::DownloadManager    download_manager_;
   signature::SignatureManager  signature_manager_;
 };

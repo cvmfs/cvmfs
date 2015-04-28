@@ -31,6 +31,10 @@ namespace download {
 class DownloadManager;
 }
 
+namespace perf {
+class Statistics;
+}
+
 class BackoffThrottle;
 
 namespace cvmfs {
@@ -138,6 +142,8 @@ class cvmfs_context : SingleCopy {
 
   catalog::LoadError RemountStart();
 
+  perf::Statistics *statistics() const { return statistics_; }
+
  protected:
   /**
    * use static method Create() for construction
@@ -146,7 +152,7 @@ class cvmfs_context : SingleCopy {
   ~cvmfs_context();
 
  private:
-  int Setup(const options &opts);
+  int Setup(const options &opts, perf::Statistics *statistics);
 
   void InitRuntimeCounters();
 
@@ -159,6 +165,8 @@ class cvmfs_context : SingleCopy {
                         catalog::DirectoryEntry  *dirent);
 
  private:
+  perf::Statistics *statistics_;
+
   const options cfg_;
 
   std::string mountpoint_;

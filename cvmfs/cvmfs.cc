@@ -222,18 +222,24 @@ uint64_t next_directory_handle_ = 0;
 // contains inode to chunklist and handle to fd maps
 ChunkTables *chunk_tables_;
 
-perf::Statistics *statistics_;
-atomic_int64 num_fs_open_;
-atomic_int64 num_fs_dir_open_;
-atomic_int64 num_fs_lookup_;
-atomic_int64 num_fs_lookup_negative_;
-atomic_int64 num_fs_stat_;
-atomic_int64 num_fs_read_;
-atomic_int64 num_fs_readlink_;
-atomic_int64 num_fs_forget_;
-atomic_int32 num_io_error_;
-atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
-atomic_int32 open_dirs_; /**< number of currently open directories */
+perf::Statistics *statistics_ = NULL;
+perf::Counter *n_fs_open_ = NULL;
+perf::Counter *n_fs_dir_open_ = NULL;
+perf::Counter *n_fs_lookup_ = NULL;
+perf::Counter *n_fs_lookup_negative_ = NULL;
+perf::Counter *n_fs_stat_ = NULL;
+perf::Counter *n_fs_read_ = NULL;
+perf::Counter *n_fs_readlink_ = NULL;
+perf::Counter *n_fs_forget_ = NULL;
+perf::Counter *n_io_error_ = NULL;
+/**
+ *  number of currently open files by Fuse calls
+ */
+perf::Counter *no_open_files_ = NULL;
+/**
+ * number of currently open directories
+ */
+perf::Counter *no_open_dirs_ = NULL;
 unsigned max_open_files_; /**< maximum allowed number of open files */
 /**
  * Number of reserved file descriptors for internal use
@@ -324,7 +330,7 @@ std::string GetOpenCatalogs() {
 
 
 void ResetErrorCounters() {
-  atomic_init32(&num_io_error_);
+  n_io_error_->Set(0);
 }
 
 
@@ -336,52 +342,6 @@ static bool UseWatchdog() {
   }
 
   return !loader_exports_->disable_watchdog;
-}
-
-
-void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
-                      lru::Statistics *md5path_stats)
-{
-  *inode_stats = inode_cache_->statistics();
-  *path_stats = path_cache_->statistics();
-  *md5path_stats = md5path_cache_->statistics();
-}
-
-
-string PrintInodeTrackerStatistics() {
-  return inode_tracker_->GetStatistics().Print() + "\n";
-}
-
-
-std::string PrintInodeGeneration() {
-  return "init-catalog-revision: " +
-    StringifyInt(inode_generation_info_.initial_revision) + "  " +
-    "current-catalog-revision: " +
-    StringifyInt(catalog_manager_->GetRevision()) + "  " +
-    "incarnation: " + StringifyInt(inode_generation_info_.incarnation) + "  " +
-    "inode generation: " + StringifyInt(inode_generation_info_.inode_generation)
-    + "\n";
-}
-
-
-catalog::Statistics GetCatalogStatistics() {
-  return catalog_manager_->statistics();
-}
-
-string GetCertificateStats() {
-  return catalog_manager_->GetCertificateStats();
-}
-
-string GetFsStats() {
-  return "lookup(all): " + StringifyInt(atomic_read64(&num_fs_lookup_)) + "  " +
-    "lookup(negative): " + StringifyInt(atomic_read64(&num_fs_lookup_negative_))
-      + "  " +
-    "stat(): " + StringifyInt(atomic_read64(&num_fs_stat_)) + "  " +
-    "open(): " + StringifyInt(atomic_read64(&num_fs_open_)) + "  " +
-    "diropen(): " + StringifyInt(atomic_read64(&num_fs_dir_open_)) + "  " +
-    "read(): " + StringifyInt(atomic_read64(&num_fs_read_)) + "  " +
-    "readlink(): " + StringifyInt(atomic_read64(&num_fs_readlink_)) + "  " +
-    "forget(): " + StringifyInt(atomic_read64(&num_fs_forget_)) + "\n";
 }
 
 
@@ -631,7 +591,7 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
  * We do check catalog TTL here (and reload, if necessary).
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
-  atomic_inc64(&num_fs_lookup_);
+  perf::Inc(n_fs_lookup_);
   RemountCheck();
 
   remount_fence_->Enter();
@@ -702,7 +662,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
  lookup_reply_negative:
   remount_fence_->Leave();
-  atomic_inc64(&num_fs_lookup_negative_);
+  perf::Inc(n_fs_lookup_negative_);
   result.ino = 0;
   fuse_reply_entry(req, &result);
   return;
@@ -721,7 +681,7 @@ static void cvmfs_forget(
   fuse_ino_t ino,
   unsigned long nlookup  // NOLINT
 ) {
-  atomic_inc64(&cvmfs::num_fs_forget_);
+  perf::Inc(cvmfs::n_fs_forget_);
 
   // The libfuse high-level library does the same
   if (ino == FUSE_ROOT_ID) {
@@ -760,7 +720,7 @@ static void ReplyNegative(const catalog::DirectoryEntry &dirent,
 static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
-  atomic_inc64(&num_fs_stat_);
+  perf::Inc(n_fs_stat_);
   RemountCheck();
 
   remount_fence_->Enter();
@@ -787,7 +747,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  * Reads a symlink from the catalog.  Environment variables are expanded.
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
-  atomic_inc64(&num_fs_readlink_);
+  perf::Inc(n_fs_readlink_);
 
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
@@ -938,8 +898,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   fi->fh = next_directory_handle_;
   ++next_directory_handle_;
   pthread_mutex_unlock(&lock_directory_handles_);
-  atomic_inc64(&num_fs_dir_open_);
-  atomic_inc32(&open_dirs_);
+  perf::Inc(n_fs_dir_open_);
+  perf::Inc(no_open_dirs_);
 
   fuse_reply_open(req, fi);
 }
@@ -967,7 +927,7 @@ static void cvmfs_releasedir(fuse_req_t req, fuse_ino_t ino,
       free(iter_handle->second.buffer);
     directory_handles_->erase(iter_handle);
     pthread_mutex_unlock(&lock_directory_handles_);
-    atomic_dec32(&open_dirs_);
+    perf::Dec(no_open_dirs_);
   } else {
     pthread_mutex_unlock(&lock_directory_handles_);
     reply = EINVAL;
@@ -1070,7 +1030,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  atomic_inc64(&num_fs_open_);  // Count actual open / fetch operations
+  perf::Inc(n_fs_open_);  // Count actual open / fetch operations
 
   if (!dirent.IsChunkedFile()) {
     remount_fence_->Leave();
@@ -1079,10 +1039,10 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
              "chunked file %s opened (download delayed to read() call)",
              path.c_str());
 
-    if (atomic_xadd32(&open_files_, 1) >=
+    if (perf::Xadd(no_open_files_, 1) >=
         (static_cast<int>(max_open_files_))-kNumReservedFd)
     {
-      atomic_dec32(&open_files_);
+      perf::Dec(no_open_files_);
       remount_fence_->Leave();
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
@@ -1143,7 +1103,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                           volatile_repository_, download_manager_);
 
   if (fd >= 0) {
-    if (atomic_xadd32(&open_files_, 1) <
+    if (perf::Xadd(no_open_files_, 1) <
         (static_cast<int>(max_open_files_))-kNumReservedFd) {
       LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
                path.c_str(), fd);
@@ -1161,7 +1121,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       fuse_reply_open(req, fi);
       return;
     } else {
-      if (close(fd) == 0) atomic_dec32(&open_files_);
+      if (close(fd) == 0) perf::Dec(no_open_files_);
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
       fuse_reply_err(req, EMFILE);
       return;
@@ -1180,7 +1140,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   backoff_throttle_->Throttle();
 
-  atomic_inc32(&num_io_error_);
+  perf::Inc(n_io_error_);
   fuse_reply_err(req, -fd);
 }
 
@@ -1194,7 +1154,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_read inode: %"PRIu64" reading %d bytes from offset %d fd %d",
            uint64_t(catalog_manager_->MangleInode(ino)), size, off, fi->fh);
-  atomic_inc64(&num_fs_read_);
+  perf::Inc(n_fs_read_);
 
   // Get data chunk (<=128k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
@@ -1359,10 +1319,10 @@ static void cvmfs_release(fuse_req_t req, fuse_ino_t ino,
 
     if (chunk_fd.fd != -1)
       close(chunk_fd.fd);
-    atomic_dec32(&open_files_);
+    perf::Dec(no_open_files_);
   } else {
     if (close(fd) == 0) {
-      atomic_dec32(&open_files_);
+      perf::Dec(no_open_files_);
     }
   }
   fuse_reply_err(req, 0);
@@ -1520,11 +1480,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   } else if (attr == "user.maxfd") {
     attribute_value = StringifyInt(max_open_files_ - kNumReservedFd);
   } else if (attr == "user.usedfd") {
-    attribute_value = StringifyInt(atomic_read32(&open_files_));
+    attribute_value = no_open_files_->ToString();
   } else if (attr == "user.useddirp") {
-    attribute_value = StringifyInt(atomic_read32(&open_dirs_));
+    attribute_value = no_open_dirs_->ToString();
   } else if (attr == "user.nioerr") {
-    attribute_value = StringifyInt(atomic_read32(&num_io_error_));
+    attribute_value = n_io_error_->ToString();
   } else if (attr == "user.proxy") {
     vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
     unsigned current_group;
@@ -1566,9 +1526,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     const int num_catalogs = catalog_manager_->GetNumCatalogs();
     attribute_value = StringifyInt(num_catalogs);
   } else if (attr == "user.nopen") {
-    attribute_value = StringifyInt(atomic_read64(&num_fs_open_));
+    attribute_value = n_fs_open_->ToString();
   } else if (attr == "user.ndiropen") {
-    attribute_value = StringifyInt(atomic_read64(&num_fs_dir_open_));
+    attribute_value = n_fs_dir_open_->ToString();
   } else if (attr == "user.ndownload") {
     attribute_value = StringifyInt(cache::GetNumDownloads());
   } else if (attr == "user.timeout") {
@@ -1580,11 +1540,11 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
-    int64_t rx = uint64_t(download_manager_->GetStatistics().transferred_bytes);
+    int64_t rx = cvmfs::statistics_->Lookup("n_transfered_bytes")->Get();
     attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
-    int64_t rx = uint64_t(download_manager_->GetStatistics().transferred_bytes);
-    int64_t time = uint64_t(download_manager_->GetStatistics().transfer_time);
+    int64_t rx = cvmfs::statistics_->Lookup("n_transfered_bytes")->Get();
+    int64_t time = cvmfs::statistics_->Lookup("sz_transfer_time")->Get();
     if (time == 0)
       attribute_value = "n/a";
     else
@@ -2093,10 +2053,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
     mem_cache_size / static_cast<unsigned>(memcache_unit_size);
   // Number of cache entries must be a multiple of 64
   const unsigned mask_64 = ~((1 << 6) - 1);
-  cvmfs::inode_cache_ = new lru::InodeCache(memcache_num_units & mask_64);
-  cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64);
+  cvmfs::inode_cache_ = new lru::InodeCache(memcache_num_units & mask_64,
+      cvmfs::statistics_);
+  cvmfs::path_cache_ = new lru::PathCache(memcache_num_units & mask_64,
+      cvmfs::statistics_);
   cvmfs::md5path_cache_ =
-    new lru::Md5PathCache((memcache_num_units*7) & mask_64);
+    new lru::Md5PathCache((memcache_num_units*7) & mask_64,
+        cvmfs::statistics_);
   cvmfs::inode_tracker_ = new glue::InodeTracker();
 
   cvmfs::directory_handles_ = new cvmfs::DirectoryHandles();
@@ -2105,15 +2068,24 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::chunk_tables_ = new ChunkTables();
 
   // Runtime counters
-  atomic_init64(&cvmfs::num_fs_open_);
-  atomic_init64(&cvmfs::num_fs_dir_open_);
-  atomic_init64(&cvmfs::num_fs_lookup_);
-  atomic_init64(&cvmfs::num_fs_lookup_negative_);
-  atomic_init64(&cvmfs::num_fs_stat_);
-  atomic_init64(&cvmfs::num_fs_read_);
-  atomic_init64(&cvmfs::num_fs_readlink_);
-  atomic_init64(&cvmfs::num_fs_forget_);
-  atomic_init32(&cvmfs::num_io_error_);
+  cvmfs::n_fs_open_ = cvmfs::statistics_->Register("cvmfs.n_fs_open",
+      "Overall number of file open operations");
+  cvmfs::n_fs_dir_open_ = cvmfs::statistics_->Register("cvmfs.n_fs_dir_open",
+      "Overall number of directory open operations");
+  cvmfs::n_fs_lookup_ = cvmfs::statistics_->Register("cvmfs.n_fs_lookup",
+      "Number of lookups");
+  cvmfs::n_fs_lookup_negative_ = cvmfs::statistics_->Register(
+      "cvmfs.n_fs_lookup_negative", "Number of negative lookups");
+  cvmfs::n_fs_stat_ = cvmfs::statistics_->Register("cvmfs.n_fs_stat",
+      "Number of stats");
+  cvmfs::n_fs_read_ = cvmfs::statistics_->Register("cvmfs.n_fs_read",
+      "Number of files read");
+  cvmfs::n_fs_readlink_ = cvmfs::statistics_->Register("cvmfs.n_fs_readlink",
+      "Number of links read");
+  cvmfs::n_fs_forget_ = cvmfs::statistics_->Register("cvmfs.n_fs_forget",
+      "Number of inode forgets");
+  cvmfs::n_io_error_ = cvmfs::statistics_->Register("cvmfs.n_io_error",
+      "Number of I/O errors");
 
   // Create cache directory, if necessary
   if (!MkdirDeep(*cvmfs::cachedir_, 0700)) {
@@ -2281,8 +2253,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     g_monitor_ready = true;
   }
   cvmfs::max_open_files_ = monitor::GetMaxOpenFiles();
-  atomic_init32(&cvmfs::open_files_);
-  atomic_init32(&cvmfs::open_dirs_);
+  cvmfs::no_open_files_ = cvmfs::statistics_->Register("cvmfs.no_open_files",
+      "Number of currently opened files");
+  cvmfs::no_open_dirs_ = cvmfs::statistics_->Register("cvmfs.no_open_dirs",
+      "Number of currently opened directories");
 
   // Control & command interface
   if (!talk::Init(".", cvmfs::options_manager_)) {
@@ -2301,7 +2275,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   // Network initialization
   cvmfs::download_manager_ = new download::DownloadManager();
-  cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false);
+  cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false,
+      cvmfs::statistics_);
   cvmfs::download_manager_->SetHostChain(hostname);
   if (!dns_server.empty()) {
     cvmfs::download_manager_->SetDnsServer(dns_server);
@@ -2368,7 +2343,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::catalog_manager_ =
     new cache::CatalogManager(*cvmfs::repository_name_,
                               cvmfs::signature_manager_,
-                              cvmfs::download_manager_);
+                              cvmfs::download_manager_,
+                              cvmfs::statistics_);
   if (!nfs_source) {
     cvmfs::catalog_manager_->SetInodeAnnotation(cvmfs::inode_annotation_);
   }
@@ -2705,7 +2681,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
 
   msg_progress = "Saving open files counter\n";
   SendMsg2Socket(fd_progress, msg_progress);
-  uint32_t *saved_num_fd = new uint32_t(cvmfs::open_files_);
+  uint32_t *saved_num_fd = new uint32_t(cvmfs::no_open_files_->Get());
   loader::SavedState *state_num_fd = new loader::SavedState();
   state_num_fd->state_id = loader::kStateOpenFilesCounter;
   state_num_fd->state = saved_num_fd;
@@ -2725,7 +2701,7 @@ static bool RestoreState(const int fd_progress,
       cvmfs::DirectoryHandles *saved_handles =
         (cvmfs::DirectoryHandles *)saved_states[i]->state;
       cvmfs::directory_handles_ = new cvmfs::DirectoryHandles(*saved_handles);
-      cvmfs::open_dirs_ = cvmfs::directory_handles_->size();
+      cvmfs::no_open_dirs_->Set(cvmfs::directory_handles_->size());
       cvmfs::DirectoryHandles::const_iterator i =
         cvmfs::directory_handles_->begin();
       for (; i != cvmfs::directory_handles_->end(); ++i) {
@@ -2811,8 +2787,8 @@ static bool RestoreState(const int fd_progress,
 
     if (saved_states[i]->state_id == loader::kStateOpenFilesCounter) {
       SendMsg2Socket(fd_progress, "Restoring open files counter... ");
-      cvmfs::open_files_ = *(reinterpret_cast<uint32_t *>(
-        saved_states[i]->state));
+      cvmfs::no_open_files_->Set(*(reinterpret_cast<uint32_t *>(
+        saved_states[i]->state)));
       SendMsg2Socket(fd_progress, " done\n");
     }
   }
