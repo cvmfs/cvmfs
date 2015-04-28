@@ -142,6 +142,8 @@ class cvmfs_context : SingleCopy {
 
   catalog::LoadError RemountStart();
 
+  perf::Statistics *statistics() const { return statistics_; }
+
  protected:
   /**
    * use static method Create() for construction
@@ -163,6 +165,8 @@ class cvmfs_context : SingleCopy {
                         catalog::DirectoryEntry  *dirent);
 
  private:
+  perf::Statistics *statistics_;
+
   const options cfg_;
 
   std::string mountpoint_;

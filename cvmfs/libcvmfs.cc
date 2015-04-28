@@ -27,9 +27,6 @@
 
 using namespace std;  // NOLINT
 
-
-perf::Statistics statistics_;
-
 int set_option(char const *name, char const *value, bool *var) {
   if (*value != '\0') {
     fprintf(stderr, "Option %s=%s contains a value when none was expected.\n",

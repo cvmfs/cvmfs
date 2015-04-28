@@ -71,9 +71,9 @@
 #include "duplex_sqlite3.h"
 #include "globals.h"
 #include "hash.h"
+#include "libcvmfs.h"
 #include "logging.h"
 #include "lru.h"
-#include "libcvmfs.h"
 #include "monitor.h"
 #include "murmur.h"
 #include "platform.h"
@@ -284,7 +284,7 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
   cvmfs_context *ctx = new cvmfs_context(opts);
   assert(ctx != NULL);
 
-  perf::Statistics *statistics = new perf::Statistics(); // provisional
+  perf::Statistics *statistics = new perf::Statistics();
   if (ctx->Setup(opts, statistics) != 0) {
     delete ctx;
     ctx = NULL;
@@ -294,10 +294,14 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
 }
 
 void cvmfs_context::Destroy(cvmfs_context *ctx) {
+  perf::Statistics *statistics = ctx->statistics();
   delete ctx;
+  delete statistics;
 }
 
 int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
+  statistics_ = statistics;
+
   // Network initialization
   download_manager_ = new download::DownloadManager();
   download_manager_->Init(16, false, statistics);

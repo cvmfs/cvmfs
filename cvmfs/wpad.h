@@ -7,7 +7,6 @@
 
 #include <string>
 
-
 namespace download {
 
 class DownloadManager;
