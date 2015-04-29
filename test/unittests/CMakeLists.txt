@@ -204,6 +204,8 @@ if (BUILD_UNITTESTS_DEBUG)
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
+  
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha2)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -224,6 +226,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
+                             ${SHA2_ARCHIVE}
                              pthread dl)
 
 if (BUILD_UNITTESTS)

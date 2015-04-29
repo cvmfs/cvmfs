@@ -49,7 +49,7 @@ bool HexPtr::IsValid() const {
         if (*c != kAlgorithmIds[j][i-hex_length])
           break;
       }
-      if (i == l)
+      if ((i == l) && (l == hex_length + algo_id_length))
         return true;
       i = hex_length;
       c = str->data() + i;
@@ -65,6 +65,8 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
     return kSha1;
   if (algorithm_option == "rmd160")
     return kRmd160;
+  if (algorithm_option == "sha256")
+    return kSha256;
   return kAny;
 }
 
@@ -77,9 +79,11 @@ Any MkFromHexPtr(const HexPtr hex, const char suffix) {
     result = Any(kMd5, hex);
   if (length == 2*kDigestSizes[kSha1])
     result = Any(kSha1, hex);
-  // TODO(jblomer) compare -rmd160
+  // TODO(jblomer) compare -rmd160, -sha256
   if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]))
     result = Any(kRmd160, hex);
+  if ((length == 2*kDigestSizes[kSha256] + kAlgorithmIdSizes[kSha256]))
+    result = Any(kSha256, hex);
 
   result.suffix = suffix;
   return result;
@@ -97,6 +101,8 @@ unsigned GetContextSize(const Algorithms algorithm) {
       return sizeof(SHA_CTX);
     case kRmd160:
       return sizeof(RIPEMD160_CTX);
+    case kSha256:
+      return sizeof(sha256_ctx);
     default:
       LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
                "context for unspecified hash. Aborting...");
@@ -117,6 +123,10 @@ void Init(ContextPtr context) {
     case kRmd160:
       assert(context.size == sizeof(RIPEMD160_CTX));
       RIPEMD160_Init(reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
+      break;
+    case kSha256:
+      assert(context.size == sizeof(sha256_ctx));
+      sha256_init(reinterpret_cast<sha256_ctx *>(context.buffer));
       break;
     default:
       abort();  // Undefined hash
@@ -142,6 +152,11 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
       RIPEMD160_Update(reinterpret_cast<RIPEMD160_CTX *>(context.buffer),
                        buffer, buffer_length);
       break;
+    case kSha256:
+      assert(context.size == sizeof(sha256_ctx));
+      sha256_update(reinterpret_cast<sha256_ctx *>(context.buffer),
+                    buffer, buffer_length);
+      break;
     default:
       abort();  // Undefined hash
   }
@@ -163,6 +178,11 @@ void Final(ContextPtr context, Any *any_digest) {
       assert(context.size == sizeof(RIPEMD160_CTX));
       RIPEMD160_Final(any_digest->digest,
                       reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
+      break;
+    case kSha256:
+      assert(context.size == sizeof(sha256_ctx));
+      sha256_final(reinterpret_cast<sha256_ctx *>(context.buffer),
+                   any_digest->digest);
       break;
     default:
       abort();  // Undefined hash

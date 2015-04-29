@@ -283,7 +283,7 @@ if (BUILD_CVMFS)
   # link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
   set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA2_ARCHIVE} pthread dl)
 
-  target_link_libraries (cvmfs2           ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES} ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
+  target_link_libraries (cvmfs2           ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES} ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA2_ARCHIVE} pthread dl)
   target_link_libraries (cvmfs_fuse_debug ${CVMFS2_DEBUG_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fuse       ${CVMFS2_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${SHA2_ARCHIVE} pthread)
@@ -320,8 +320,9 @@ if (BUILD_LIBCVMFS)
   if (SPARSEHASH_BUILTIN)
     add_dependencies (cvmfs_only sparsehash)
   endif (SPARSEHASH_BUILTIN)
-  
+
   add_dependencies (cvmfs_only libsha2)
+  set (LIBCVMFS_LIBS ${SHA2_ARCHIVE} ${LIBCVMFS_LIBS})
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 
@@ -379,7 +380,7 @@ if (BUILD_SERVER)
   if (TBB_PRIVATE_LIB)
     add_dependencies (cvmfs_swissknife libtbb)
   endif (TBB_PRIVATE_LIB)
-  
+
   add_dependencies (cvmfs_swissknife libsha2)
 
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
@@ -405,7 +406,7 @@ if (BUILD_SERVER)
     if (TBB_PRIVATE_LIB)
       add_dependencies (cvmfs_swissknife_debug libtbb)
     endif (TBB_PRIVATE_LIB)
-    
+
     add_dependencies (cvmfs_swissknife_debug libsha2)
 
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")

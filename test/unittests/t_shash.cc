@@ -44,6 +44,22 @@ TEST(T_Shash, VerifyHex) {
   EXPECT_EQ(shash::HexPtr(
     "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-rmd1600").IsValid(),
     false);
+
+  EXPECT_EQ(shash::HexPtr(
+    "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc-sha256").IsValid(),
+    false);
+  EXPECT_EQ(shash::HexPtr(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855").
+      IsValid(), false);
+  EXPECT_EQ(shash::HexPtr(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855-sha224").
+      IsValid(), false);
+  EXPECT_EQ(shash::HexPtr(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855-rmd160").
+      IsValid(), false);
+  EXPECT_EQ(shash::HexPtr(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855-sha256").
+      IsValid(), true);
 }
 
 
@@ -60,6 +76,12 @@ TEST(T_Shash, IsNull) {
   ASSERT_TRUE(hash_rmd160.IsNull());
   EXPECT_EQ("0000000000000000000000000000000000000000-rmd160",
             hash_rmd160.ToString());
+
+  const shash::Any hash_sha256(shash::kSha256);
+  ASSERT_TRUE(hash_sha256.IsNull());
+  EXPECT_EQ(
+    "0000000000000000000000000000000000000000000000000000000000000000-sha256",
+    hash_sha256.ToString());
 }
 
 
@@ -82,6 +104,13 @@ TEST(T_Shash, ToString) {
   ASSERT_FALSE(hash_rmd160.IsNull());
   EXPECT_EQ("850b90946048b2760f4d50ce83249dad6317ef10-rmd160",
             hash_rmd160.ToString());
+
+  shash::Any hash_sha256(shash::kSha256);
+  hash_sha256.Randomize(&prng);
+  ASSERT_FALSE(hash_sha256.IsNull());
+  EXPECT_EQ(
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a595d878162130f7486f8a5aa-sha256",
+    hash_sha256.ToString());
 }
 
 
