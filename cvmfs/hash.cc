@@ -12,6 +12,8 @@
 
 #include <cstdio>
 
+#include "sha2.h"
+
 using namespace std;  // NOLINT
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -20,7 +22,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
-const char *kAlgorithmIds[] = {"", "", "-rmd160", ""};
+const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", ""};
 
 
 bool HexPtr::IsValid() const {
