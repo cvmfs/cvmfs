@@ -213,6 +213,13 @@ struct Digest {
   bool HasSuffix() const { return suffix != kSuffixNone; }
   void set_suffix(const Suffix s) { suffix = s; }
 
+  /**
+   * Generates a hexified repesentation of the digest including the identifier
+   * string for newly added hashes.
+   *
+   * @param with_suffix  append the hash suffix (C,H,X, ...) to the result
+   * @return             a string representation of the digest
+   */
   std::string ToString(const bool with_suffix = false) const {
     Hex hex(this);
     const bool     use_suffix  = with_suffix && HasSuffix();
@@ -231,24 +238,49 @@ struct Digest {
     return result;
   }
 
+  /**
+   * Convenience method to generate a string representation of the digest.
+   * See Digest<>::ToString() for details
+   *
+   * @return  a string representation including the hash suffix of the digest
+   */
   std::string ToStringWithSuffix() const {
     return ToString(true);
   }
 
+  /**
+   * Generate the standard relative path from the hexified digest to be used in
+   * CAS areas or cache directories. Throughout the entire system we use one
+   * directory level (first to hex digest characters) for namespace splitting.
+   * Note: This method appends the internal hash suffix to the path.
+   *
+   * @return  a relative path representation of the digest including the suffix
+   */
   std::string MakePath() const {
     return MakePathExplicit(1, 2, suffix);
   }
 
+  /**
+   * Produces a relative path representation of the digest without appending the
+   * hash suffix. See Digest<>::MakePath() for more details.
+   *
+   * @return  a relative path representation of the digest without the suffix
+   */
   std::string MakePathWithoutSuffix() const {
     return MakePathExplicit(1, 2, kSuffixNone);
   }
 
   /**
-   * Create a path string from the hex notation of the digest.
-   * Note: This method takes an explicit suffix. This is a crutch to allow for
-   *       MakePathWithSuffix() until MakePathExplicit() is replaced by the more
-   *       convenient MakePath() everywhere in the code. Then this method will
-   *       use the member variable suffix by default.
+   * Generates an arbitrary path representation of the digest. Both number of
+   * directory levels and the hash-digits per level can be customized. Further-
+   * more an arbitrary hash suffix can be provided.
+   * Note: This method is mainly meant for internal usage but stays public for
+   *       historical reasons.
+   *
+   * @param dir_levels        the number of namespace splitting directory levels
+   * @param digits_per_level  each directory level's number of hex-digits
+   * @param hash_suffix       the hash suffix character to be appended
+   * @return                  a relative path representation of the digest
    */
   std::string MakePathExplicit(const unsigned dir_levels,
                                const unsigned digits_per_level,
