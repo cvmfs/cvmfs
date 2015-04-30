@@ -235,26 +235,12 @@ struct Digest {
     return ToString(true);
   }
 
-  std::string MakePath(const std::string &prefix = "data") const {
-    return MakePathExplicit(1, 2, prefix, shash::kSuffixNone);
+  std::string MakePath() const {
+    return MakePathExplicit2(1, 2, suffix);
   }
 
-  /**
-   * Note: This is a crutch method until we replace MakePathExplicit() anywhere
-   *       with MakePath() which will handle this suffix magic internally.
-   */
-  std::string MakePathWithSuffix(const unsigned   dir_levels,
-                                 const unsigned   digits_per_level,
-                                 const Suffix     hash_suffix) const {
-    const std::string no_prefix = "";
-    return MakePathExplicit(dir_levels,
-                            digits_per_level,
-                            no_prefix,
-                            hash_suffix);
-  }
-
-  std::string MakePathWithSuffix(const std::string &prefix = "data") const {
-    return MakePathExplicit(1, 2, prefix, suffix);
+  std::string MakePathWithoutSuffix() const {
+    return MakePathExplicit2(1, 2, kSuffixNone);
   }
 
   /**
@@ -264,25 +250,21 @@ struct Digest {
    *       convenient MakePath() everywhere in the code. Then this method will
    *       use the member variable suffix by default.
    */
-  std::string MakePathExplicit(
+  std::string MakePathExplicit2(
                           const unsigned      dir_levels,
                           const unsigned      digits_per_level,
-                          const std::string  &prefix = "",
                           const Suffix        hash_suffix = kSuffixNone) const {
     Hex hex(this);
     const bool use_suffix = (hash_suffix != kSuffixNone);
 
-    const unsigned string_length =   prefix.length()
-                                   + hex.length()
+    const unsigned string_length =   hex.length()
                                    + dir_levels
-                                   + 1  // slash between prefix and hash
                                    + use_suffix;
-    // prepend prefix string
-    std::string result(prefix);
+    std::string result;
     result.resize(string_length);
 
     // build hexified hash and path delimiters
-    unsigned pos = prefix.length();
+    unsigned pos = 0;
     for (unsigned i = 0; i < hex.length(); ++i) {
       if ((i % digits_per_level == 0) && (i / digits_per_level <= dir_levels)) {
         result[pos++] = '/';
