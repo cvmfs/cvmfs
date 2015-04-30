@@ -227,7 +227,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *                        object is a successful deletion as well!)
    */
   virtual bool Remove(const shash::Any &hash_to_delete) {
-    return Remove(hash_to_delete.MakePathWithSuffix("data"));
+    return Remove("data/" + hash_to_delete.MakePath());
   }
 
 

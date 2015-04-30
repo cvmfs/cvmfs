@@ -236,11 +236,11 @@ struct Digest {
   }
 
   std::string MakePath() const {
-    return MakePathExplicit2(1, 2, suffix);
+    return MakePathExplicit(1, 2, suffix);
   }
 
   std::string MakePathWithoutSuffix() const {
-    return MakePathExplicit2(1, 2, kSuffixNone);
+    return MakePathExplicit(1, 2, kSuffixNone);
   }
 
   /**
@@ -250,8 +250,7 @@ struct Digest {
    *       convenient MakePath() everywhere in the code. Then this method will
    *       use the member variable suffix by default.
    */
-  std::string MakePathExplicit2(
-                               const unsigned dir_levels,
+  std::string MakePathExplicit(const unsigned dir_levels,
                                const unsigned digits_per_level,
                                const Suffix   hash_suffix = kSuffixNone) const {
     Hex hex(this);

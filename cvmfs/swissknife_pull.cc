@@ -76,25 +76,21 @@ string              *preload_cachedir = NULL;
 }  // anonymous namespace
 
 
-static bool Peek(const string &remote_path, const char suffix)
-{
+static bool Peek(const string &remote_path) {
   if (preload_cache) {
     // Strip "data"
+    // TODO: Fix that! It's ugly and error prone!
     return FileExists(*preload_cachedir + remote_path.substr(4));
   } else {
-    string real_remote_path = remote_path;
-    if (suffix != 0)
-      real_remote_path.push_back(suffix);
-    return spooler->Peek(real_remote_path);
+    return spooler->Peek(remote_path);
   }
 }
 
 
-static void Store(const string &local_path, const string &remote_path,
-                  const char suffix)
-{
+static void Store(const string &local_path, const string &remote_path) {
   if (preload_cache) {
     // Strip "data"
+    // TODO: Fix that! taking assumptions on the path? Wut?!
     const string dest_path = *preload_cachedir + remote_path.substr(4);
     string tmp_dest;
     FILE *fdest = CreateTempFile(dest_path, 0660, "w", &tmp_dest);
@@ -113,18 +109,13 @@ static void Store(const string &local_path, const string &remote_path,
     assert(retval == 0);
     unlink(local_path.c_str());
   } else {
-    string real_remote_path = remote_path;
-    if (suffix != 0)
-      real_remote_path.push_back(suffix);
-    spooler->Upload(local_path, real_remote_path);
+    spooler->Upload(local_path, remote_path);
   }
 }
 
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
-                        const std::string dest_path, const char suffix,
-                        const bool compress)
-{
+                        const std::string dest_path, const bool compress) {
   string tmp_file;
   FILE *ftmp = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w", &tmp_file);
   assert(ftmp);
@@ -137,7 +128,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   }
   assert(retval);
   fclose(ftmp);
-  Store(tmp_file, dest_path, suffix);
+  Store(tmp_file, dest_path);
 }
 
 
@@ -159,9 +150,9 @@ static void *MainWorker(void *data) {
                           shash::kDigestSizes[next_chunk.hash_algorithm]);
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
-    string chunk_path = "data" + chunk_hash.MakePathExplicit(1, 2);
+    string chunk_path = "data/" + chunk_hash.MakePath();
 
-    if (!Peek(chunk_path, next_chunk.type)) {
+    if (!Peek(chunk_path)) {
       string tmp_file;
       FILE *fchunk = CreateTempFile(*temp_dir + "/cvmfs", 0600, "w",
                                     &tmp_file);
@@ -185,7 +176,7 @@ static void *MainWorker(void *data) {
         attempts++;
       } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
-      Store(tmp_file, chunk_path, next_chunk.type);
+      Store(tmp_file, chunk_path);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -199,9 +190,10 @@ static void *MainWorker(void *data) {
 static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   int retval;
   download::Failures dl_retval;
+  assert (shash::kSuffixCatalog == catalog_hash.suffix);
 
   // Check if the catalog already exists
-  if (Peek("data" + catalog_hash.MakePathExplicit(1, 2), 'C')) {
+  if (Peek("data/" + catalog_hash.MakePath())) {
     LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog up to date");
     return true;
   }
@@ -229,8 +221,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
     unlink(file_catalog.c_str());
     return false;
   }
-  const string url_catalog = *stratum0_url + "/data" +
-                             catalog_hash.MakePathExplicit(1, 2) + "C";
+  const string url_catalog = *stratum0_url + "/data/" + catalog_hash.MakePath();
   download::JobInfo download_catalog(&url_catalog, false, false,
                                      fcatalog_vanilla, &catalog_hash);
   dl_retval = g_download_manager->Fetch(&download_catalog);
@@ -329,8 +320,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   delete catalog;
   unlink(file_catalog.c_str());
   WaitForStorage();
-  Store(file_catalog_vanilla, "data" + catalog_hash.MakePathExplicit(1, 2),
-        'C');
+  Store(file_catalog_vanilla, "data/" + catalog_hash.MakePath());
   return true;
 
  pull_cleanup:
@@ -472,8 +462,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Fetch tag list
   if (!ensemble.manifest->history().IsNull()) {
     shash::Any history_hash = ensemble.manifest->history();
-    const string history_url = *stratum0_url + "/data" +
-      history_hash.MakePathExplicit(1, 2) + "H";
+    const string history_url = *stratum0_url + "/data/" + history_hash.MakePath();
     const string history_path = *temp_dir + "/" + history_hash.ToString();
     download::JobInfo download_history(&history_url, false, false,
                                        &history_path,
@@ -506,7 +495,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Found %u named snapshots",
              historic_tags.size());
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading history database");
-    Store(history_path, "data" + history_hash.MakePathExplicit(1, 2), 'H');
+    Store(history_path, "data/" + history_hash.MakePath());
     WaitForStorage();
     unlink(history_path.c_str());
   }
@@ -560,10 +549,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Uploading manifest ensemble");
     WaitForStorage();
     const string certificate_path =
-      "data" + ensemble.manifest->certificate().MakePathExplicit(1, 2);
-    if (!Peek(certificate_path, 'X')) {
-      StoreBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path,
-                  'X', true);
+      "data/" + ensemble.manifest->certificate().MakePath();
+    if (!Peek(certificate_path)) {
+      StoreBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path, true);
     }
     if (preload_cache) {
       bool retval = ensemble.manifest->ExportChecksum(*preload_cachedir, 0660);
@@ -574,12 +562,12 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       // sync
       if (ensemble.whitelist_pkcs7_buf) {
         StoreBuffer(ensemble.whitelist_pkcs7_buf, ensemble.whitelist_pkcs7_size,
-                    ".cvmfswhitelist.pkcs7", 0, false);
+                    ".cvmfswhitelist.pkcs7", false);
       }
       StoreBuffer(ensemble.whitelist_buf, ensemble.whitelist_size,
-                  ".cvmfswhitelist", 0, false);
+                  ".cvmfswhitelist", false);
       StoreBuffer(ensemble.raw_manifest_buf, ensemble.raw_manifest_size,
-                  ".cvmfspublished", 0, false);
+                  ".cvmfspublished", false);
     }
   }
 
