@@ -7,6 +7,7 @@
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/prng.h"
 
+
 TEST(T_Shash, TestVectors) {
   shash::Any md5(shash::kMd5);
   shash::Any sha1(shash::kSha1);
