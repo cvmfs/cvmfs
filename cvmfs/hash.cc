@@ -204,53 +204,59 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 }
 
 
+void HashString(const std::string &content, Any *any_digest) {
+  HashMem(reinterpret_cast<const unsigned char *>(content.data()),
+          content.length(), any_digest);
+}
+
+
 void Hmac(
   const string &key,
   const unsigned char *buffer,
   const unsigned buffer_size,
   Any *any_digest
 ) {
-    Algorithms algorithm = any_digest->algorithm;
-    assert(algorithm != kAny);
+  Algorithms algorithm = any_digest->algorithm;
+  assert(algorithm != kAny);
 
-    const unsigned block_size = kBlockSizes[algorithm];
-    unsigned char key_block[block_size];
-    memset(key_block, 0, block_size);
-    if (key.length() > block_size) {
-      Any hash_key(algorithm);
-      HashMem(reinterpret_cast<const unsigned char *>(key.data()),
-              key.length(), &hash_key);
-      memcpy(key_block, hash_key.digest, kDigestSizes[algorithm]);
-    } else {
-      if (key.length() > 0)
-        memcpy(key_block, key.data(), key.length());
-    }
-
-    unsigned char pad_block[block_size];
-    // Inner hash
-    Any hash_inner(algorithm);
-    ContextPtr context_inner(algorithm);
-    context_inner.buffer = alloca(context_inner.size);
-    Init(context_inner);
-    for (unsigned i = 0; i < block_size; ++i)
-      pad_block[i] = key_block[i] ^ 0x36;
-    Update(pad_block, block_size, context_inner);
-    Update(buffer, buffer_size, context_inner);
-    Final(context_inner, &hash_inner);
-
-    // Outer hash
-    ContextPtr context_outer(algorithm);
-    context_outer.buffer = alloca(context_outer.size);
-    Init(context_outer);
-    for (unsigned i = 0; i < block_size; ++i)
-      pad_block[i] = key_block[i] ^ 0x5c;
-    Update(pad_block, block_size, context_outer);
-    Update(hash_inner.digest, kDigestSizes[algorithm], context_outer);
-
-    Final(context_outer, any_digest);
+  const unsigned block_size = kBlockSizes[algorithm];
+  unsigned char key_block[block_size];
+  memset(key_block, 0, block_size);
+  if (key.length() > block_size) {
+    Any hash_key(algorithm);
+    HashMem(reinterpret_cast<const unsigned char *>(key.data()),
+            key.length(), &hash_key);
+    memcpy(key_block, hash_key.digest, kDigestSizes[algorithm]);
+  } else {
+    if (key.length() > 0)
+      memcpy(key_block, key.data(), key.length());
   }
 
-bool HashFile(const std::string filename, Any *any_digest) {
+  unsigned char pad_block[block_size];
+  // Inner hash
+  Any hash_inner(algorithm);
+  ContextPtr context_inner(algorithm);
+  context_inner.buffer = alloca(context_inner.size);
+  Init(context_inner);
+  for (unsigned i = 0; i < block_size; ++i)
+    pad_block[i] = key_block[i] ^ 0x36;
+  Update(pad_block, block_size, context_inner);
+  Update(buffer, buffer_size, context_inner);
+  Final(context_inner, &hash_inner);
+
+  // Outer hash
+  ContextPtr context_outer(algorithm);
+  context_outer.buffer = alloca(context_outer.size);
+  Init(context_outer);
+  for (unsigned i = 0; i < block_size; ++i)
+    pad_block[i] = key_block[i] ^ 0x5c;
+  Update(pad_block, block_size, context_outer);
+  Update(hash_inner.digest, kDigestSizes[algorithm], context_outer);
+
+  Final(context_outer, any_digest);
+}
+
+bool HashFile(const std::string &filename, Any *any_digest) {
   FILE *file = fopen(filename.c_str(), "r");
   if (file == NULL)
     return false;

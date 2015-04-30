@@ -7,6 +7,37 @@
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/prng.h"
 
+TEST(T_Shash, TestVectors) {
+  shash::Any md5(shash::kMd5);
+  shash::Any sha1(shash::kSha1);
+  shash::Any rmd160(shash::kRmd160);
+  shash::Any sha256(shash::kSha256);
+
+  HashString("", &md5);
+  HashString("", &sha1);
+  HashString("", &rmd160);
+  HashString("", &sha256);
+  EXPECT_EQ("d41d8cd98f00b204e9800998ecf8427e", md5.ToString());
+  EXPECT_EQ("da39a3ee5e6b4b0d3255bfef95601890afd80709", sha1.ToString());
+  EXPECT_EQ(
+    "9c1185a5c5e9fc54612808977ee8f548b2258d31-rmd160", rmd160.ToString());
+  EXPECT_EQ(
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855-sha256",
+    sha256.ToString());
+
+  HashString("The quick brown fox jumps over the lazy dog", &md5);
+  HashString("The quick brown fox jumps over the lazy dog", &sha1);
+  HashString("The quick brown fox jumps over the lazy dog", &rmd160);
+  HashString("The quick brown fox jumps over the lazy dog", &sha256);
+  EXPECT_EQ("9e107d9d372bb6826bd81d3542a419d6", md5.ToString());
+  EXPECT_EQ("2fd4e1c67a2d28fced849ee1bb76e7391b93eb12", sha1.ToString());
+  EXPECT_EQ(
+    "37f332f68db77bd9d7edd4969571ad671cf9dd3b-rmd160", rmd160.ToString());
+  EXPECT_EQ(
+    "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592-sha256",
+    sha256.ToString());
+}
+
 
 TEST(T_Shash, VerifyHex) {
   EXPECT_EQ(shash::HexPtr("").IsValid(), false);
@@ -141,6 +172,17 @@ TEST(T_Shash, ToStringWithSuffix) {
             hash_rmd160.ToStringWithSuffix());
   EXPECT_EQ("850b90946048b2760f4d50ce83249dad6317ef10-rmd160",
             hash_rmd160.ToString());
+
+  shash::Any hash_sha256(shash::kSha256);
+  hash_sha256.Randomize(&prng);
+  hash_sha256.suffix = 'L';
+  ASSERT_FALSE(hash_sha256.IsNull());
+  EXPECT_EQ(
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a595d878162130f7486f8a5aa-sha256L",
+    hash_sha256.ToStringWithSuffix());
+  EXPECT_EQ(
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a595d878162130f7486f8a5aa-sha256",
+    hash_sha256.ToString());
 }
 
 
@@ -168,6 +210,14 @@ TEST(T_Shash, InitializeAnyWithSuffix) {
             hash_rmd160.ToStringWithSuffix());
   EXPECT_EQ("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0-rmd160",
             hash_rmd160.ToString());
+
+  shash::Any hash_sha256(shash::kSha256, shash::HexPtr(
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a595d878162130f7486f8a5aa"), 'Q');
+  ASSERT_FALSE(hash_sha256.IsNull());
+  EXPECT_EQ(hash_sha256.ToStringWithSuffix(),
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a595d878162130f7486f8a5aa-sha256Q");
+  EXPECT_EQ(hash_sha256.ToString(),
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a595d878162130f7486f8a5aa-sha256");
 }
 
 
@@ -210,6 +260,14 @@ TEST(T_Shash, MakePathExplicit) {
             hash_rmd160.MakePathExplicit(0, 3));
   EXPECT_EQ("/2/e/5/beea626f6ddef63d56405371f80732782086f-rmd160",
             hash_rmd160.MakePathExplicit(3, 1));
+
+  shash::Any hash_sha256(shash::kSha256);
+  hash_sha256.Randomize(&prng);
+  ASSERT_FALSE(hash_sha256.IsNull());
+  EXPECT_EQ(hash_sha256.MakePathExplicit(1, 2),
+   "/51/c00c437200dac16a2efcf04234ddde05e1665519a85df98572985bbd9881e3-sha256");
+  EXPECT_EQ(hash_sha256.MakePathExplicit(1, 3),
+   "/51c/00c437200dac16a2efcf04234ddde05e1665519a85df98572985bbd9881e3-sha256");
 }
 
 
@@ -252,6 +310,13 @@ TEST(T_Shash, MakePathExplicitWithPrefix) {
             hash_rmd160.MakePathExplicit(0, 3, "dataC"));
   EXPECT_EQ("dataD/2/e/5/beea626f6ddef63d56405371f80732782086f-rmd160",
             hash_rmd160.MakePathExplicit(3, 1, "dataD"));
+
+  shash::Any hash_sha256(shash::kSha256);
+  hash_sha256.Randomize(&prng);
+  ASSERT_FALSE(hash_sha256.IsNull());
+  EXPECT_EQ(hash_sha256.MakePathExplicit(1, 2, "D"),
+    "D/51/c00c437200dac16a2efcf04234ddde05e1665519a85df98572985bbd9881e3"
+    "-sha256");
 }
 
 
@@ -293,6 +358,13 @@ TEST(T_Shash, MakePathDefault) {
             hash_rmd160.MakePath("dataY"));
   EXPECT_EQ("dataZ/aa/1deda59d5329553580d78fcd0b393157a5d28e-rmd160",
             hash_rmd160.MakePath("dataZ"));
+
+  shash::Any hash_sha256(shash::kSha256);
+  hash_sha256.Randomize(&prng);
+  ASSERT_FALSE(hash_sha256.IsNull());
+  EXPECT_EQ(hash_sha256.MakePath(),
+    "data/01/52bb2ee41313d8d63b9274230f90379adf92017d479810ac4f796a28925527"
+    "-sha256");
 }
 
 
@@ -521,6 +593,14 @@ TEST(T_Shash, Equality) {
   EXPECT_NE(hash_rmd_9, hash_rmd_3); EXPECT_NE(hash_rmd_9, hash_rmd_4);
   EXPECT_NE(hash_rmd_9, hash_rmd_5); EXPECT_NE(hash_rmd_9, hash_rmd_6);
   EXPECT_NE(hash_rmd_9, hash_rmd_7); EXPECT_NE(hash_rmd_9, hash_rmd_8);
+
+  shash::Sha256 sha256_null;
+  shash::Sha256 sha256_random;  sha256_random.Randomize(42);
+  EXPECT_EQ(sha256_random, sha256_random);
+  EXPECT_NE(sha256_random, sha256_null);
+  shash::Any hash_sha256_1(shash::kSha256);
+  shash::Any hash_sha256_2(shash::kSha256);
+  EXPECT_EQ(hash_sha256_1, hash_sha256_2);
 }
 
 
@@ -539,6 +619,9 @@ static shash::Any sha1(const std::string &hash, const char suffix = 0) {
 }
 static shash::Any rmd160(const std::string &hash, const char suffix = 0) {
   return make_hash<shash::kRmd160>(hash, suffix);
+}
+static shash::Any sha256(const std::string &hash, const char suffix = 0) {
+  return make_hash<shash::kSha256>(hash, suffix);
 }
 
 
@@ -604,6 +687,14 @@ TEST(T_Shash, LowerThan) {
             rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'));
   EXPECT_EQ(rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'),
             rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'));
+
+  EXPECT_LT(
+    sha256("0000000000000000000000000000000000000000000000000000000000000000"),
+    sha256("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
+  EXPECT_EQ(sha256(
+    "0000000000000000000000000000000000000000000000000000000000000000", 'A'),
+    sha256(
+    "0000000000000000000000000000000000000000000000000000000000000000", 'B'));
 }
 
 
@@ -668,4 +759,8 @@ TEST(T_Shash, GreaterThan) {
             rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'C'));
   EXPECT_EQ(rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'D'),
             rmd160("980b67db08d3b02d87de6ac05bad34e725fe00f5", 'A'));
+
+  EXPECT_GT(
+    sha256("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+    sha256("0000000000000000000000000000000000000000000000000000000000000000"));
 }
