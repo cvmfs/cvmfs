@@ -251,22 +251,22 @@ struct Digest {
    *       use the member variable suffix by default.
    */
   std::string MakePathExplicit2(
-                          const unsigned      dir_levels,
-                          const unsigned      digits_per_level,
-                          const Suffix        hash_suffix = kSuffixNone) const {
+                               const unsigned dir_levels,
+                               const unsigned digits_per_level,
+                               const Suffix   hash_suffix = kSuffixNone) const {
     Hex hex(this);
-    const bool use_suffix = (hash_suffix != kSuffixNone);
 
-    const unsigned string_length =   hex.length()
-                                   + dir_levels
-                                   + use_suffix;
+    // figure out how big the output string needs to be
+    const bool use_suffix = (hash_suffix != kSuffixNone);
+    const unsigned string_length = hex.length() + dir_levels + use_suffix;
     std::string result;
     result.resize(string_length);
 
     // build hexified hash and path delimiters
+    unsigned i   = 0;
     unsigned pos = 0;
-    for (unsigned i = 0; i < hex.length(); ++i) {
-      if ((i % digits_per_level == 0) && (i / digits_per_level <= dir_levels)) {
+    for (; i < hex.length(); ++i) {
+      if (i > 0 && (i % digits_per_level == 0) && (i / digits_per_level <= dir_levels)) {
         result[pos++] = '/';
       }
       result[pos++] = hex[i];
@@ -277,6 +277,7 @@ struct Digest {
       result[pos++] = hash_suffix;
     }
 
+    assert(i   == hex.length());
     assert(pos == string_length);
     return result;
   }
