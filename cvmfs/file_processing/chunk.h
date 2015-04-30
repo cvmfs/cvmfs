@@ -52,7 +52,7 @@ class Chunk {
   void Finalize();
   void ScheduleCommit();
   Chunk* CopyAsBulkChunk(const size_t file_size);
-  void SetAsBulkChunk() { is_bulk_chunk_ = true; }
+  void SetAsBulkChunk();
 
   /**
    * Provides the ChunkProcessingTask with memory for the data compression. The
