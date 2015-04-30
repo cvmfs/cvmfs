@@ -831,8 +831,7 @@ TYPED_TEST(T_Uploaders, SingleStreamedUpload) {
   EXPECT_EQ(1u,
             this->delegate_.streamed_upload_complete_invocations);
 
-  const std::string dest = "data" +
-                           content_hash.MakePathExplicit(1, 2) + hash_suffix;
+  const std::string dest = "data/" + content_hash.MakePath();
   EXPECT_TRUE(TestFixture::CheckFile(dest));
   TestFixture::CompareBuffersAndFileContents(
       buffers,
@@ -877,7 +876,7 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
   typename TestFixture::BufferStreams::iterator j    = active_streams.begin();
   unsigned int number_of_buffers                     = 0;
   while (!active_streams.empty()) {
-    typename TestFixture::Buffers       &buffers        = j->first;
+    typename TestFixture::Buffers             &buffers        = j->first;
     const typename TestFixture::StreamHandle  &current_handle = j->second;
 
     if (!buffers.empty()) {
@@ -892,8 +891,8 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
       buffers.erase(buffers.begin());
     } else {
       this->uploader_->ScheduleCommit(current_handle.handle,
-                                current_handle.content_hash,
-                                hash_suffix);
+                                      current_handle.content_hash,
+                                      hash_suffix);
       j = active_streams.erase(j);
     }
   }
@@ -909,8 +908,7 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
   typename TestFixture::BufferStreams::const_iterator kend = streams.end();
   for (; k != kend; ++k) {
     const shash::Any &content_hash = k->second.content_hash;
-    const std::string dest =
-        "data" + content_hash.MakePathWithSuffix(1, 2, hash_suffix);
+    const std::string dest = "data/" + content_hash.MakePath();
     EXPECT_TRUE(TestFixture::CheckFile(dest));
     TestFixture::CompareBuffersAndFileContents(
         k->first,

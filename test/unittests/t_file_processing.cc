@@ -366,7 +366,8 @@ class T_FileProcessing : public FileSandbox {
   }
 
   void CheckHashes(const FP_MockUploader::Results &results,
-                   const ExpectedHashStrings   &reference_hash_strings) const {
+                   const ExpectedHashStrings      &reference_hash_strings) const
+  {
     EXPECT_EQ(reference_hash_strings.size(), results.size())
       << "number of generated chunks did not match";
 

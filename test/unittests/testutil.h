@@ -553,10 +553,7 @@ struct object_fetcher_traits<MockObjectFetcher> {
 class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
  public:
   manifest::Manifest* FetchManifest();
-
-  bool Fetch(const shash::Any    &object_hash,
-             const shash::Suffix  hash_suffix,
-             std::string         *file_path);
+  bool Fetch(const shash::Any &object_hash, std::string *file_path);
 };
 
 

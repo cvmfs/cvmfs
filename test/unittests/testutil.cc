@@ -271,9 +271,8 @@ manifest::Manifest* MockObjectFetcher::FetchManifest() {
   return manifest;
 }
 
-bool MockObjectFetcher::Fetch(const shash::Any    &object_hash,
-                              const shash::Suffix  hash_suffix,
-                              std::string         *file_path) {
+bool MockObjectFetcher::Fetch(const shash::Any &object_hash,
+                              std::string      *file_path) {
   assert(file_path != NULL);
   *file_path = object_hash.ToString();
   return true;
