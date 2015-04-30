@@ -1540,13 +1540,13 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
-    int64_t rx = 
+    int64_t rx =
       cvmfs::statistics_->Lookup("download.sz_transferred_bytes")->Get();
     attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
-    int64_t rx = 
+    int64_t rx =
       cvmfs::statistics_->Lookup("download.sz_transferred_bytes")->Get();
-    int64_t time = 
+    int64_t time =
       cvmfs::statistics_->Lookup("download.sz_transfer_time")->Get();
     if (time == 0)
       attribute_value = "n/a";
@@ -2667,7 +2667,7 @@ static bool SaveState(const int fd_progress, loader::StateList *saved_states) {
   SendMsg2Socket(fd_progress, msg_progress);
   ChunkTables *saved_chunk_tables = new ChunkTables(*cvmfs::chunk_tables_);
   loader::SavedState *state_chunk_tables = new loader::SavedState();
-  state_chunk_tables->state_id = loader::kStateOpenFilesV2;
+  state_chunk_tables->state_id = loader::kStateOpenFilesV3;
   state_chunk_tables->state = saved_chunk_tables;
   saved_states->push_back(state_chunk_tables);
 
@@ -2753,7 +2753,7 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFiles) {
-      SendMsg2Socket(fd_progress, "Migrating chunk tables (v1 to v2)... ");
+      SendMsg2Socket(fd_progress, "Migrating chunk tables (v1 to v3)... ");
       compat::chunk_tables::ChunkTables *saved_chunk_tables =
         (compat::chunk_tables::ChunkTables *)saved_states[i]->state;
       compat::chunk_tables::Migrate(saved_chunk_tables, cvmfs::chunk_tables_);
@@ -2762,6 +2762,16 @@ static bool RestoreState(const int fd_progress,
     }
 
     if (saved_states[i]->state_id == loader::kStateOpenFilesV2) {
+      SendMsg2Socket(fd_progress, "Migrating chunk tables (v2 to v3)... ");
+      compat::chunk_tables_v2::ChunkTables *saved_chunk_tables =
+        (compat::chunk_tables_v2::ChunkTables *)saved_states[i]->state;
+      compat::chunk_tables_v2::Migrate(saved_chunk_tables,
+                                       cvmfs::chunk_tables_);
+      SendMsg2Socket(fd_progress,
+        StringifyInt(cvmfs::chunk_tables_->handle2fd.size()) + " handles\n");
+    }
+
+    if (saved_states[i]->state_id == loader::kStateOpenFilesV3) {
       SendMsg2Socket(fd_progress, "Restoring chunk tables... ");
       delete cvmfs::chunk_tables_;
       ChunkTables *saved_chunk_tables = reinterpret_cast<ChunkTables *>(
@@ -2841,6 +2851,11 @@ static void FreeSavedState(const int fd_progress,
           saved_states[i]->state);
         break;
       case loader::kStateOpenFilesV2:
+        SendMsg2Socket(fd_progress, "Releasing chunk tables (version 2)\n");
+        delete static_cast<compat::chunk_tables_v2::ChunkTables *>(
+          saved_states[i]->state);
+        break;
+      case loader::kStateOpenFilesV3:
         SendMsg2Socket(fd_progress, "Releasing chunk tables\n");
         delete static_cast<ChunkTables *>(saved_states[i]->state);
         break;
