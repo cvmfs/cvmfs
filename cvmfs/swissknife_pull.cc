@@ -79,7 +79,7 @@ string              *preload_cachedir = NULL;
 static bool Peek(const string &remote_path) {
   if (preload_cache) {
     // Strip "data"
-    // TODO: Fix that! It's ugly and error prone!
+    // TODO(rene): Fix that! It's ugly and error prone!
     return FileExists(*preload_cachedir + remote_path.substr(4));
   } else {
     return spooler->Peek(remote_path);
@@ -90,7 +90,7 @@ static bool Peek(const string &remote_path) {
 static void Store(const string &local_path, const string &remote_path) {
   if (preload_cache) {
     // Strip "data"
-    // TODO: Fix that! taking assumptions on the path? Wut?!
+    // TODO(rene): Fix that! taking assumptions on the path? Wut?!
     const string dest_path = *preload_cachedir + remote_path.substr(4);
     string tmp_dest;
     FILE *fdest = CreateTempFile(dest_path, 0660, "w", &tmp_dest);
@@ -190,7 +190,7 @@ static void *MainWorker(void *data) {
 static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   int retval;
   download::Failures dl_retval;
-  assert (shash::kSuffixCatalog == catalog_hash.suffix);
+  assert(shash::kSuffixCatalog == catalog_hash.suffix);
 
   // Check if the catalog already exists
   if (Peek("data/" + catalog_hash.MakePath())) {
@@ -462,7 +462,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   // Fetch tag list
   if (!ensemble.manifest->history().IsNull()) {
     shash::Any history_hash = ensemble.manifest->history();
-    const string history_url = *stratum0_url + "/data/" + history_hash.MakePath();
+    const string history_url = *stratum0_url + "/data/"
+                                             + history_hash.MakePath();
     const string history_path = *temp_dir + "/" + history_hash.ToString();
     download::JobInfo download_history(&history_url, false, false,
                                        &history_path,
@@ -551,7 +552,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     const string certificate_path =
       "data/" + ensemble.manifest->certificate().MakePath();
     if (!Peek(certificate_path)) {
-      StoreBuffer(ensemble.cert_buf, ensemble.cert_size, certificate_path, true);
+      StoreBuffer(ensemble.cert_buf,
+                  ensemble.cert_size,
+                  certificate_path, true);
     }
     if (preload_cache) {
       bool retval = ensemble.manifest->ExportChecksum(*preload_cachedir, 0660);

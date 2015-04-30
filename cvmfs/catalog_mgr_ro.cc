@@ -27,7 +27,7 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
                                             shash::Any        *catalog_hash)
 {
   shash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
-  assert (shash::kSuffixCatalog == effective_hash.suffix);
+  assert(shash::kSuffixCatalog == effective_hash.suffix);
   const string url = stratum0_ + "/data/" + effective_hash.MakePath();
   FILE *fcatalog = CreateTempFile(dir_temp_ + "/catalog", 0666, "w",
                                   catalog_path);

@@ -788,7 +788,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
                                                   const string &cvmfs_path,
                                                   std::string *catalog_path)
 {
-  assert (hash.suffix == shash::kSuffixCatalog);
+  assert(hash.suffix == shash::kSuffixCatalog);
 
   CallGuard call_guard;
   int64_t size;

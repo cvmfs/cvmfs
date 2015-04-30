@@ -468,7 +468,7 @@ catalog::Catalog* CommandTag::GetCatalog(const std::string  &repository_url,
                                          const shash::Any   &catalog_hash,
                                          const std::string   catalog_path,
                                          const bool          read_write) const {
-  assert (shash::kSuffixCatalog == catalog_hash.suffix);
+  assert(shash::kSuffixCatalog == catalog_hash.suffix);
   if (!FetchObject(repository_url, catalog_hash, catalog_path)) {
     return NULL;
   }

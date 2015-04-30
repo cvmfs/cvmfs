@@ -297,7 +297,8 @@ struct Digest {
     unsigned i   = 0;
     unsigned pos = 0;
     for (; i < hex.length(); ++i) {
-      if (i > 0 && (i % digits_per_level == 0) && (i / digits_per_level <= dir_levels)) {
+      if (i > 0 && (i % digits_per_level == 0)
+                && (i / digits_per_level <= dir_levels)) {
         result[pos++] = '/';
       }
       result[pos++] = hex[i];

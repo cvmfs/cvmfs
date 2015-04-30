@@ -77,8 +77,8 @@ class AbstractObjectFetcher {
     shash::Any effective_history_hash = (!history_hash.IsNull())
             ? history_hash
             : GetHistoryHash();
-    assert (history_hash.suffix == shash::kSuffixHistory ||
-            history_hash.IsNull());
+    assert(history_hash.suffix == shash::kSuffixHistory ||
+           history_hash.IsNull());
 
     // download the history hash
     std::string path;
