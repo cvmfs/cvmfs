@@ -10,7 +10,7 @@ cvmfs_run_benchmark() {
   set -e
   export ATLAS_LOCAL_ROOT_BASE=/cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase
   source ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh
-  . ${ATLAS_LOCAL_ROOT_BASE}/x86_64/AtlasSetup/V00-04-09/AtlasSetup/scripts/asetup.sh 19.0.0
+  . ${ATLAS_LOCAL_ROOT_BASE}/x86_64/AtlasSetup/current/AtlasSetup/scripts/asetup.sh 19.0.0
   /cvmfs/atlas.cern.ch/repo/sw/software/x86_64-slc6-gcc47-opt/19.0.0/AtlasCore/19.0.0/InstallArea/share/bin/athena.py AthExHelloWorld/HelloWorldOptions.py
 }
 
