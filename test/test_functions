@@ -32,6 +32,8 @@ CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
 
 # These OPT variables are for the benchmark options under the benchmarks folder
 CVMFS_OPT_WARM_CACHE=${CVMFS_OPT_WARM_CACHE:=yes}
+CVMFS_OPT_TALK_STATISTICS=${CVMFS_OPT_TALK_STATISTICS:=yes}
+CVMFS_OPT_VALGRIND=${CVMFS_OPT_VALGRIND:=yes}
 CVMFS_OPT_ITERATIONS=${CVMFS_OPT_ITERATIONS:=1}
 CVMFS_OPT_TEST_TYPE=${CVMFS_OPT_TEST_TYPE:=callgrind} # callgrind / memcheck
 CVMFS_OPT_CONFIG_FILE=${CVMFS_OPT_CONFIG_FILE:=}
@@ -1283,7 +1285,7 @@ wait_fqrn_mount() {
   local waits=0
   while ! mount | grep -q "/cvmfs/${FQRN}"; do
     waits=$(( waits + 1 ))
-    if [ "$waits" -ge 60 ]; then
+    if [ "$waits" -ge 120 ]; then
       die "${FQRN} could not be mounted"
     fi
     sleep 1
@@ -1291,15 +1293,14 @@ wait_fqrn_mount() {
 }
 
 
-# runs the command once in order to get a warm cache
-create_warm_cache() {
-  local workspace=$1
+# runs the command once, mounting and unmounting the repository
+single_execution() {
   cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 & #> /dev/null 2>&1 &
   wait_fqrn_mount
-
-  cvmfs_run_benchmark 2>&1
+  ( cvmfs_run_benchmark )
+  local code=$?
   cvmfs_umount $FQRN
-  return 0
+  return $code
 }
 
 
@@ -1320,7 +1321,7 @@ CVMFS_HTTP_PROXY=${CVMFS_TEST_PROXY}
 CVMFS_AUTO_UPDATE=false
 CMS_LOCAL_SITE=${test_folder}/benchmarks/004-cms
 CVMFS_QUOTA_LIMIT=-1
-
+CVMFS_KEYS_DIR=/etc/cvmfs/keys/cern.ch
 EOF
 
 }
@@ -1413,49 +1414,109 @@ EOF
 
 }
 
+# creates a statistics file
+create_statistics_file() {
+  local iteration=$1
+  local total_time=$2
+  local statistics_file="${FQRN}_${iteration}.data"
+  benchmark_log "creating the statistics file ${statistics_file} calling cvmfs_talk"
+  cat >$statistics_file << EOF
+# repo=$FQRN
+# iterations=$CVMFS_OPT_ITERATIONS
+# warm_cache=$CVMFS_OPT_WARM_CACHE
 
-# runs a benchmark $CVMFS_OPT_ITERATIONS times
-run_benchmark() {
-  local count=$CVMFS_OPT_ITERATIONS
-  set_valgrind_options
+EOF
 
-  # use or not warm cache
-  if [ x"$CVMFS_OPT_WARM_CACHE" = x"yes" ]; then
-    benchmark_log "Starting initial execution"
-    create_warm_cache $workspace
-  else
-    benchmark_log "Using cold cache"
+  benchmark_log "Executing cvmfs_talk"
+  cvmfs_talk -p "$CVMFS_OPT_CACHEDIR"/$FQRN/cvmfs_io.$FQRN internal affairs | grep \| | tail -n +2 >> $statistics_file
+  echo "global.sz_total_time|$total_time|Total execution time (seconds)" >> $statistics_file # of only one iteration without valgrind!
+}
+
+
+# executes the statistics loop
+execute_statistics_loop() {
+  local code=0
+  local iteration=1
+  local PID=0
+
+  while (( iteration <= $CVMFS_OPT_ITERATIONS && code == 0 )); do
+    local start_time=$(date +%s)
+    cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
+    PID=$!
+    wait_fqrn_mount
+    ( cvmfs_run_benchmark )
+    code=$?
+    local end_time=$(date +%s)
+    local total_time=$(( end_time - start_time )) # in seconds
+    create_statistics_file $iteration $total_time
+    cvmfs_umount $FQRN
+    wait $PID
+    iteration=$(( iteration + 1 ))
+  done
+
+  if [ "$code" -ne 0 ]; then
+    benchmark_log "Problem executing the tests. Aborting"
+    benchmark_log $(lsof /cvmfs/${FQRN})
   fi
 
-  benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
-  benchmark_log "Running valgrind with the following parameters: $OPTIONS"
-  benchmark_log "Launching the job $count times"
-  valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
-  PID=$!
-  wait_fqrn_mount
+  return $code
+}
 
+
+# executes the main valgrind's loop
+execute_benchmark_loop() {
   local iteration=1
   local code=0
+  local count=$CVMFS_OPT_ITERATIONS
+
   while (( count > 0 && code == 0 )); do
     benchmark_log "Starting iteration ${iteration}"
-    cvmfs_run_benchmark
+    ( cvmfs_run_benchmark )
     code=$?
     count=$(( count - 1 ))
     iteration=$(( iteration + 1 ))
   done
 
-  if [ "$code" -eq 0 ]; then
-    benchmark_log "Collecting information about the tests..."
-    create_info_file
-  else
+  if [ "$code" -ne 0 ]; then
     benchmark_log "Problem executing the tests. Aborting"
     benchmark_log $(lsof /cvmfs/${FQRN})
+    exit 100
+  fi
+}
+
+
+# runs a benchmark $CVMFS_OPT_ITERATIONS times
+run_benchmark() {
+  local statistics_file="$FQRN.data"
+  set_valgrind_options
+
+  # use or not warm cache
+  if [ x"$CVMFS_OPT_WARM_CACHE" = x"yes" ]; then
+    benchmark_log "Starting initial execution"
+    single_execution
+  else
+    benchmark_log "Using cold cache"
   fi
 
-  benchmark_log "Iterations finished. Unmounting cvmfs"
-  cvmfs_umount $FQRN
-  wait $PID
-  return $code
+  # run the statistics collection mode
+  if [ x"$CVMFS_OPT_TALK_STATISTICS" = x"yes" ]; then
+    benchmark_log "Executing the statistics collection"
+    execute_statistics_loop
+  fi
+
+  if [ x"$CVMFS_OPT_VALGRIND" = x"yes" ]; then
+    benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
+    benchmark_log "Running valgrind with the following parameters: $OPTIONS"
+    benchmark_log "Launching the job $CVMFS_OPT_ITERATIONS times"
+    valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
+    PID=$!
+    wait_fqrn_mount
+    execute_benchmark_loop
+    create_info_file
+    benchmark_log "Iterations finished. Unmounting cvmfs"
+    cvmfs_umount $FQRN
+    wait $PID
+  fi
 }
 
 
@@ -1469,11 +1530,10 @@ collect_benchmark_results() {
   fi
 
   # collect the results
-  local workspace=$workdir
   if [ -d "$benchmark_output_dir" ] && [ "x$benchmark_output_dir" != x ]; then
     rm -rf "$benchmark_output_dir"/*
   fi
-  cp  -rf $workdir/system.info $workdir/$FQRN.*.log $workdir/callgrind.out.* $workdir/$FQRN.memcheck.xml $workdir/cvmfs.conf $benchmark_output_dir > /dev/null 2>&1
+  cp  -rf $workdir/system.info $workdir/$FQRN.*.log $workdir/callgrind.out.* $workdir/$FQRN.memcheck.xml $workdir/cvmfs.conf $workdir/*.data $benchmark_output_dir > /dev/null 2>&1
   benchmark_log "Test results copied into $benchmark_output_dir" >> $logfile
 }
 
