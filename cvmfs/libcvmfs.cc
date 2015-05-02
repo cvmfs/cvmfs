@@ -113,6 +113,7 @@ struct cvmfs_repo_options : public cvmfs_context::options {
 struct cvmfs_global_options : public cvmfs_globals::options {
   int set_option(char const *name, char const *value) {
     CVMFS_OPT(cache_directory);
+    CVMFS_OPT(lock_directory);
     CVMFS_OPT(change_to_cache_directory);
     CVMFS_OPT(alien_cache);
     CVMFS_OPT(log_syslog_level);
@@ -208,6 +209,7 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
 
             "global options are:\n"
             " cache_directory=DIR        Where to store disk cache\n"
+            " lock_directory=DIR         Where to store the per-instance locks (should be unique for alien cache)\n"
             " change_to_cache_directory  Performs a cd to the cache directory (performance tweak)\n"
             " alien_cache                Treat cache directory as alien cache\n"
             " log_syslog_level=LEVEL     Sets the level used for syslog to DEBUG (1), INFO (2), or NOTICE (3).\n"
