@@ -148,6 +148,10 @@ cvmfs_globals::~cvmfs_globals() {
 int cvmfs_globals::Setup(const options &opts) {
   // Fill cvmfs option variables from arguments
   cache_directory_ = opts.cache_directory;
+  lock_directory_ = opts.lock_directory;
+  if (!lock_directory_.size()) {
+    lock_directory_ = cache_directory_;
+  }
   uid_ = getuid();
   gid_ = getgid();
   options_ready_ = true;
@@ -208,6 +212,12 @@ int cvmfs_globals::Setup(const options &opts) {
     return -2;
   }
 
+  // Create cache directory, if necessary
+  if (! MkdirDeep(lock_directory_, 0700)) {
+    PrintError("cannot create lock directory " + lock_directory_);
+    return -2;
+  }
+
   // Try to jump to cache directory.  This tests, if it is accassible.
   // Also, it brings speed later on.
   if (opts.change_to_cache_directory &&
@@ -217,7 +227,7 @@ int cvmfs_globals::Setup(const options &opts) {
   }
 
   // Create lock file and running sentinel
-  fd_lockfile_ = LockFile(cache_directory_ + "/lock.libcvmfs");
+  fd_lockfile_ = LockFile(lock_directory_ + "/lock.libcvmfs");
   if (fd_lockfile_ < 0) {
     PrintError("could not acquire lock (" + StringifyInt(errno) + ")");
     return -4;
@@ -235,10 +245,10 @@ int cvmfs_globals::Setup(const options &opts) {
 
   // Init quota / managed cache
   LogCvmfs(kLogCvmfs, kLogDebug, "unlimited cache size");
-  const uint64_t quota_limit      = (uint64_t) -1;
+  const uint64_t quota_limit      = (uint64_t) 0;
   const uint64_t quota_threshold  = 0;
   const bool     rebuild_database = false;
-  if (! quota::Init(cache_directory_, quota_limit, quota_threshold,
+  if (! quota::Init(lock_directory_, quota_limit, quota_threshold,
                     rebuild_database)) {
     PrintError("Failed to initialize lru cache");
     return -6;

@@ -50,6 +50,7 @@ class cvmfs_globals : SingleCopy {
                 max_open_files(0) {}
 
     std::string    cache_directory;
+    std::string    lock_directory;
     bool           change_to_cache_directory;
     bool           alien_cache;
 
@@ -83,6 +84,7 @@ class cvmfs_globals : SingleCopy {
 
  private:
   std::string       cache_directory_;
+  std::string       lock_directory_;
   uid_t             uid_;
   gid_t             gid_;
 
