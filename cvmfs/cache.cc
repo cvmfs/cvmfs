@@ -971,25 +971,23 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
   if (manifest_failure != manifest::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
              manifest_failure, manifest::Code2Ascii(manifest_failure));
-    if (!cache_hash.IsNull()) {
-      if (catalog_path) {
-        if (cache_mode_ == kCacheReadWrite) {
-          *catalog_path = *cache_path_ + "/" + cache_hash.MakePathWithoutSuffix();
-          int64_t size = GetFileSize(*catalog_path);
-          retval = quota::Pin(cache_hash, uint64_t(size),
-                              cvmfs_path, true);
-          if (!retval) {
-            LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-                     "failed to pin cached root catalog (no space)");
-            return catalog::kLoadFail;
-          }
+    if (!cache_hash.IsNull() && catalog_path) {
+      if (cache_mode_ == kCacheReadWrite) {
+        *catalog_path = *cache_path_ + "/" + cache_hash.MakePathWithoutSuffix();
+        int64_t size = GetFileSize(*catalog_path);
+        retval = quota::Pin(cache_hash, uint64_t(size),
+                            cvmfs_path, true);
+        if (!retval) {
+          LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+                   "failed to pin cached root catalog (no space)");
+          return catalog::kLoadFail;
         }
-        loaded_catalogs_[mountpoint] = cache_hash;
-        *catalog_hash = cache_hash;
-        offline_mode_ = true;
-
-        return catalog::kLoadUp2Date;
       }
+      loaded_catalogs_[mountpoint] = cache_hash;
+      *catalog_hash = cache_hash;
+      offline_mode_ = true;
+
+      return catalog::kLoadUp2Date;
     }
     return catalog::kLoadFail;
   }
