@@ -362,15 +362,19 @@ static void *MainTalk(void *data __attribute__((unused))) {
         int highwater;
         string result;
 
-        result += "Path Strings:\n  instances: " +
-          StringifyInt(PathString::num_instances()) + "  overflows: " +
-          StringifyInt(PathString::num_overflows()) + "\n";
-        result += "Name Strings:\n  instances: " +
-          StringifyInt(NameString::num_instances()) + "  overflows: " +
-          StringifyInt(NameString::num_overflows()) + "\n";
-        result += "Symlink Strings:\n  instances: " +
-          StringifyInt(LinkString::num_instances()) + "  overflows: " +
-          StringifyInt(LinkString::num_overflows()) + "\n";
+        // manually setting the values of the ShortString counters
+        cvmfs::statistics_->Lookup("pathstring.n_instances")->
+            Set(PathString::num_instances());
+        cvmfs::statistics_->Lookup("pathstring.n_overflows")->
+            Set(PathString::num_overflows());
+        cvmfs::statistics_->Lookup("namestring.n_instances")->
+            Set(NameString::num_instances());
+        cvmfs::statistics_->Lookup("namestring.n_overflows")->
+            Set(NameString::num_overflows());
+        cvmfs::statistics_->Lookup("linkstring.n_instances")->
+            Set(LinkString::num_instances());
+        cvmfs::statistics_->Lookup("linkstring.n_overflows")->
+            Set(LinkString::num_overflows());
 
         result += "\nCache Mode: ";
         switch (cache::GetCacheMode()) {
