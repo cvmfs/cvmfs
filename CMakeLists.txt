@@ -68,6 +68,85 @@ if (CMAKE_CXX_COMPILER MATCHES ".*clang")
 endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
 #
+# figure out if we are on a 64bit system
+#
+if (CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set (IS_64_BIT FALSE)
+else (CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set (IS_64_BIT TRUE)
+endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
+
+#
+# check if we are compiling on ARM
+#
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+  set (ARM TRUE)
+else (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+  set (ARM FALSE)
+endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+
+#
+# define the installation location of the shared library files
+# Note: We do not support multi-arch on Debian systems for the time being and
+#       hence cannot use GNUInstallDirs as this would assume multi-arch.
+#       (https://wiki.debian.org/Multiarch)
+#
+if (MACOSX)
+  set (CMAKE_INSTALL_LIBDIR "lib")
+else (MACOSX) # --> Linux
+  if (DEBIAN)
+    set (CMAKE_INSTALL_LIBDIR "lib")
+  else (DEBIAN) # --> RedHat, Fedora, CentOS, SuSE
+    if (IS_64_BIT)
+      set (CMAKE_INSTALL_LIBDIR "lib64")
+    else (IS_64_BIT) # --> 32 Bit
+      set (CMAKE_INSTALL_LIBDIR "lib")
+    endif (IS_64_BIT)
+  endif (DEBIAN)
+endif (MACOSX)
+message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
+
+#
+# Workaround for Debian packaging debhelper trying to pass -D_FORTIFY_SOURCE=2
+# through CPPFLAGS that is not officially supported by CMake. Hence, debhelper
+# appends CPPFLAGS to CFLAGS which breaks the build of the c-ares external.
+# This filters out flags that scares c-ares's ./configure script.
+#
+set (TMP_C_FLAGS "${CFLAGS} ${CMAKE_C_FLAGS}")
+unset (CFLAGS)
+unset (CMAKE_C_FLAGS)
+unset (ENV{CFLAGS})
+set (LDFLAGS $ENV{LDFLAGS})
+separate_arguments (TMP_C_FLAGS)
+foreach (CMPLR_FLAG ${TMP_C_FLAGS})
+  if (${CMPLR_FLAG} MATCHES ^-[DIU].*)
+    message ("Moving ${CMPLR_FLAG} from CFLAGS into CPPFLAGS")
+    set (CPPFLAGS "${CPPFLAGS} ${CMPLR_FLAG}")
+  elseif (${CMPLR_FLAG} MATCHES ^-[Ll].*)
+    message ("Moving ${CMPLR_FLAG} from CFLAGS into LDFLAGS")
+    set (LDFLAGS "${LDFLAGS} ${CMPLR_FLAG}")
+    set (CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} ${CMPLR_FLAG}")
+  else (${CMPLR_FLAG} MATCHES ^-[DUILl].*)
+    set (CFLAGS "${CFLAGS} ${CMPLR_FLAG}")
+  endif (${CMPLR_FLAG} MATCHES ^-[DIU].*)
+endforeach (CMPLR_FLAG)
+set (ENV{CPPFLAGS}   "${CPPFLAGS}")
+set (CMAKE_C_FLAGS   "${CFLAGS}")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CPPFLAGS}")
+set (ENV{CFLAGS}     "${CFLAGS}")
+set (ENV{LDFLAGS}    "${LDFLAGS}")
+
+#
+# set name of fuse library (-losxfuse for osxfuse)
+#
+if (MACOSX)
+  set(LIBFUSE osxfuse)
+else (MACOSX)
+  set(LIBFUSE fuse)
+endif(MACOSX)
+
+
+#
 # provide some options to the user
 #
 option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
@@ -95,15 +174,6 @@ option (LEVELDB_BUILTIN         "Don't use system leveldb"                      
 option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
-
-#
-# set name of fuse library (-losxfuse for osxfuse)
-#
-if (MACOSX)
-  set(LIBFUSE osxfuse)
-else (MACOSX)
-  set(LIBFUSE fuse)
-endif(MACOSX)
 
 #
 # define where to find the external dependencies
@@ -153,32 +223,15 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 
-if (CMAKE_SIZEOF_VOID_P EQUAL 4)
-  set (IS_64_BIT FALSE)
-  set (CVMFS_INSTALL_LIBDIR "lib")
-  if (NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
-  endif (NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
-else (CMAKE_SIZEOF_VOID_P EQUAL 4)
-  set (IS_64_BIT TRUE)
-  if (NOT DEBIAN)
-    set (CVMFS_INSTALL_LIBDIR "lib64")
-  else (NOT DEBIAN)
-    set (CVMFS_INSTALL_LIBDIR "lib")
-  endif (NOT DEBIAN)
-endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
-
-include (GNUInstallDirs OPTIONAL)
-if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-  message (WARNING " Did not find default library path for this system. Guessing '${CVMFS_INSTALL_LIBDIR}' ...")
-  set (CMAKE_INSTALL_LIBDIR ${CVMFS_INSTALL_LIBDIR})
-endif (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-
 if (NOT USING_CLANG)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
   set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
 endif (NOT USING_CLANG)
+
+if (NOT ARM AND NOT IS_64_BIT)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
+endif (NOT ARM AND NOT IS_64_BIT)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
