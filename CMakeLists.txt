@@ -68,6 +68,24 @@ if (CMAKE_CXX_COMPILER MATCHES ".*clang")
 endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
 #
+# figure out if we are on a 64bit system
+#
+if (CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set (IS_64_BIT FALSE)
+else (CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set (IS_64_BIT TRUE)
+endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
+
+#
+# check if we are compiling on ARM
+#
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+  set (ARM TRUE)
+else (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+  set (ARM FALSE)
+endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+
+#
 # provide some options to the user
 #
 option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
