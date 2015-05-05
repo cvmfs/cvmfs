@@ -86,6 +86,27 @@ else (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
 endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
 
 #
+# define the installation location of the shared library files
+# Note: We do not support multi-arch on Debian systems for the time being and
+#       hence cannot use GNUInstallDirs as this would assume multi-arch.
+#       (https://wiki.debian.org/Multiarch)
+#
+if (MACOSX)
+  set (CMAKE_INSTALL_LIBDIR "lib")
+else (MACOSX) # --> Linux
+  if (DEBIAN)
+    set (CMAKE_INSTALL_LIBDIR "lib")
+  else (DEBIAN) # --> RedHat, Fedora, CentOS, SuSE
+    if (IS_64_BIT)
+      set (CMAKE_INSTALL_LIBDIR "lib64")
+    else (IS_64_BIT) # --> 32 Bit
+      set (CMAKE_INSTALL_LIBDIR "lib")
+    endif (IS_64_BIT)
+  endif (DEBIAN)
+endif (MACOSX)
+message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
+
+#
 # provide some options to the user
 #
 option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
@@ -201,32 +222,15 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 
-if (CMAKE_SIZEOF_VOID_P EQUAL 4)
-  set (IS_64_BIT FALSE)
-  set (CVMFS_INSTALL_LIBDIR "lib")
-  if (NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
-  endif (NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
-else (CMAKE_SIZEOF_VOID_P EQUAL 4)
-  set (IS_64_BIT TRUE)
-  if (NOT DEBIAN)
-    set (CVMFS_INSTALL_LIBDIR "lib64")
-  else (NOT DEBIAN)
-    set (CVMFS_INSTALL_LIBDIR "lib")
-  endif (NOT DEBIAN)
-endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
-
-include (GNUInstallDirs OPTIONAL)
-if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-  message (WARNING " Did not find default library path for this system. Guessing '${CVMFS_INSTALL_LIBDIR}' ...")
-  set (CMAKE_INSTALL_LIBDIR ${CVMFS_INSTALL_LIBDIR})
-endif (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-
 if (NOT USING_CLANG)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
   set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
 endif (NOT USING_CLANG)
+
+if (NOT ARM AND NOT IS_64_BIT)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
+endif (NOT ARM AND NOT IS_64_BIT)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
