@@ -1,4 +1,4 @@
-2.1.21:
+2.2.0:
   * Disable caching for mutable objects in S3 backend (CVM-808)
   * Automatically pick a union file system when creating a repository
   * Fix several CentOS7 issues in the cvmfs_server script (CVM-737)
