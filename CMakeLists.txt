@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 2.6.3)
+cmake_minimum_required (VERSION 2.6.2)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -113,9 +113,9 @@ message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
 # This filters out flags that scares c-ares's ./configure script.
 #
 set (TMP_C_FLAGS "${CFLAGS} ${CMAKE_C_FLAGS}")
-unset (CFLAGS)
-unset (CMAKE_C_FLAGS)
-unset (ENV{CFLAGS})
+set (CFLAGS        "") # this should better be `unset()` but CMake 2.6.2 doesn't
+set (ENV{CFLAGS}   "") # support it. Should be changed as soon as SLES 11 brings
+set (CMAKE_C_FLAGS "") # an update for CMake or we drop support for the platform
 set (LDFLAGS $ENV{LDFLAGS})
 separate_arguments (TMP_C_FLAGS)
 foreach (CMPLR_FLAG ${TMP_C_FLAGS})
