@@ -695,7 +695,6 @@ void DownloadManager::ReleaseCurlHandle(CURL *handle) {
  */
 void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   // Initialize internal download state
-  EnableRedirects();
   info->curl_handle = handle;
   info->error_code = kFailOk;
   info->nocache = false;
