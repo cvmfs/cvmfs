@@ -2,7 +2,7 @@ Source: cvmfs
 Section: utils
 Priority: extra
 Maintainer: Jakob Blomer <jblomer@cern.ch>
-Build-Depends: debhelper (>= 9), autotools-dev, cmake, libssl-dev, make, gcc, g++, libfuse-dev, pkg-config, libattr1-dev, patch, python-dev, unzip, uuid-dev
+Build-Depends: debhelper (>= 9), autotools-dev, cmake, libssl-dev, make, gcc, g++, libfuse-dev, pkg-config, libattr1-dev, patch, python-dev, unzip, uuid-dev, libc6-dev
 Standards-Version: 3.9.3.1
 Homepage: http://cernvm.cern.ch/portal/filesystem
 
