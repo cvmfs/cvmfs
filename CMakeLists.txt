@@ -107,35 +107,6 @@ endif (MACOSX)
 message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
 
 #
-# provide some options to the user
-#
-option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
-if (MACOSX)
-  option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               OFF)
-else ()
-  option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               ON)
-endif()
-option (BUILD_SERVER            "Build writer's end programs"                                      ON)
-option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
-option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
-option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
-option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
-option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
-option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
-option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin"                  ON)
-option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
-option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
-option (SQLITE3_BUILTIN         "Don't use system SQLite3"                                         ON)
-option (LIBCURL_BUILTIN         "Don't use system libcurl"                                         ON)
-option (PACPARSER_BUILTIN       "Don't use system installation of pacparser"                       ON)
-option (ZLIB_BUILTIN            "Don't use system zlib"                                            ON)
-option (SPARSEHASH_BUILTIN      "Don't use system installation of google sparse hash"              ON)
-option (LEVELDB_BUILTIN         "Don't use system leveldb"                                         ON)
-option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
-option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
-option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
-
-#
 # Workaround for Debian packaging debhelper trying to pass -D_FORTIFY_SOURCE=2
 # through CPPFLAGS that is not officially supported by CMake. Hence, debhelper
 # appends CPPFLAGS to CFLAGS which breaks the build of the c-ares external.
@@ -173,6 +144,36 @@ if (MACOSX)
 else (MACOSX)
   set(LIBFUSE fuse)
 endif(MACOSX)
+
+
+#
+# provide some options to the user
+#
+option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
+if (MACOSX)
+  option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               OFF)
+else ()
+  option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               ON)
+endif()
+option (BUILD_SERVER            "Build writer's end programs"                                      ON)
+option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
+option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
+option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
+option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
+option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
+option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
+option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin"                  ON)
+option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
+option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
+option (SQLITE3_BUILTIN         "Don't use system SQLite3"                                         ON)
+option (LIBCURL_BUILTIN         "Don't use system libcurl"                                         ON)
+option (PACPARSER_BUILTIN       "Don't use system installation of pacparser"                       ON)
+option (ZLIB_BUILTIN            "Don't use system zlib"                                            ON)
+option (SPARSEHASH_BUILTIN      "Don't use system installation of google sparse hash"              ON)
+option (LEVELDB_BUILTIN         "Don't use system leveldb"                                         ON)
+option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
+option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
+option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
 
 #
 # define where to find the external dependencies
