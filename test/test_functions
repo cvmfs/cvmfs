@@ -41,6 +41,13 @@ CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=/tmp/cvmfs_benchmarks}
 CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=/var/lib/cvmfs/benchmark}
 CVMFS_OPT_MTAB_MODIFIED="false"
 
+
+if [ -f /.dockerinit ]; then
+  CVMFS_TEST_DOCKER=yes
+else
+  CVMFS_TEST_DOCKER=no
+fi
+
 die() {
   echo -e $1 >&2
   exit 1
