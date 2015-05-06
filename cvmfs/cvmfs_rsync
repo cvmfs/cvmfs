@@ -1,7 +1,11 @@
 #!/bin/bash
 # Rsync directories into cvmfs.
 
+<<<<<<< HEAD
 ME=cvmfs_rsync
+=======
+ME=cvmfsrsync
+>>>>>>> 5215150... add cvmfs_rsync script to cvmfs-server package
 
 usage()
 {
