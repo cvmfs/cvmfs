@@ -40,23 +40,23 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   assert(read_write());
 
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (0 --> 1)");
 
     Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
     if (!sql_upgrade.Execute()) {
-      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade nested_catalogs");
       return false;
     }
 
     set_schema_revision(1);
     if (!StoreSchemaRevision()) {
-      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
     }
   }
 
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (1 --> 2)");
 
     Sql sql_upgrade1(*this, "ALTER TABLE catalog ADD xattr BLOB;");
     Sql sql_upgrade2(*this,
@@ -66,13 +66,13 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     if (!sql_upgrade1.Execute() || !sql_upgrade2.Execute() ||
         !sql_upgrade3.Execute())
     {
-      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade catalogs (1 --> 2)");
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (1 --> 2)");
       return false;
     }
 
     set_schema_revision(2);
     if (!StoreSchemaRevision()) {
-      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
     }
   }
