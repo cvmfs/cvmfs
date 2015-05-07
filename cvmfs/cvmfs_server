@@ -827,10 +827,10 @@ is_master_replica() {
   local name=$1
   local is_master_replica
 
-  load_repo_config $name
   if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
     is_master_replica=$(__swissknife info -r $name -m $(get_follow_http_redirects_flag) 2>/dev/null)
   else
+    load_repo_config $name
     is_stratum0 $name || return 1
     is_master_replica=$(__swissknife info -r $CVMFS_STRATUM0 -m $(get_follow_http_redirects_flag) 2>/dev/null)
   fi
