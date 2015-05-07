@@ -203,6 +203,18 @@ class CommandMigrate : public Command {
       GetWritable(const catalog::Catalog *catalog) const;
   };
 
+  class ChownMigrationWorker :
+    public AbstractMigrationWorker<ChownMigrationWorker>
+  {
+    friend class AbstractMigrationWorker<ChownMigrationWorker>;
+
+   public:
+    explicit ChownMigrationWorker(const worker_context *context);
+
+   protected:
+    bool RunMigration(PendingCatalog *data) const;
+  };
+
  public:
   CommandMigrate();
   ~CommandMigrate() { }
