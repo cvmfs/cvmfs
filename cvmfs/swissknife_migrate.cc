@@ -627,6 +627,12 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
 }
 
 
+/**
+ * Those values _must_ reflect the schema version in catalog_sql.h so that a
+ * legacy catalog migration generates always the latest catalog revision.
+ * This is a deliberately duplicated piece of information to ensure that always
+ * both the catalog management and migration classes get updated.
+ */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
 const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 2;
 
@@ -643,6 +649,8 @@ CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
 bool CommandMigrate::MigrationWorker_20x::RunMigration(PendingCatalog *data)
   const
 {
+  // double-check that we are generating compatible catalogs to the actual
+  // catalog management classes
   assert(kSchema         == catalog::CatalogDatabase::kLatestSupportedSchema);
   assert(kSchemaRevision == catalog::CatalogDatabase::kLatestSchemaRevision);
 

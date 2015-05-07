@@ -18,6 +18,12 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+/**
+ * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+ * Always remember to update the legacy catalog migration classes to produce a
+ * compatible catalog structure when updating the schema revisions here!
+ * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+ */
 const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 // ChangeLog
