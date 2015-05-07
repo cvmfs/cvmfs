@@ -11,6 +11,8 @@
  */
 
 #define LIBCVMFS_VERSION 2
+#define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
+#define LIBCVMFS_VERSION_MINOR 2
 // Revision Changelog
 // 13: revision introduced
 #define LIBCVMFS_REVISION 13
