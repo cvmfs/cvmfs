@@ -78,8 +78,9 @@ cvmfs_run_test() {
   monitor_pid=$!
   echo "monitor's PID: $monitor_pid"
 
-  echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log="publish.log"
+  echo "creating CVMFS snapshot (log: $publish_log)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log 2>&1 || return $?
 
   echo "waiting for the monitor to stop"
   wait $monitor_pid || return $?
