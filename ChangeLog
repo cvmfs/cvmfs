@@ -1,4 +1,5 @@
 2.2.0:
+  * Follow HTTP redirects in S3 backend
   * Change versioning scheme to MAJOR.MINOR.PATCH
   * Disable caching for mutable objects in S3 backend (CVM-808)
   * Automatically pick a union file system when creating a repository
