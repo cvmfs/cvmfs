@@ -112,7 +112,7 @@ struct cvmfs_repo_options : public cvmfs_context::options {
       mountpoint.resize(mountpoint.length()-1);
     }
 
-    return 0;
+    return LIBCVMFS_FAIL_OK;
   }
 };
 
@@ -121,18 +121,46 @@ struct cvmfs_global_options : public cvmfs_globals::options {
     CVMFS_OPT(alien_cache);
     CVMFS_OPT(alien_cachedir);
     CVMFS_OPT(cache_directory);
+    CVMFS_OPT(lock_directory);
     CVMFS_OPT(change_to_cache_directory);
+    CVMFS_OPT(logfile);
     CVMFS_OPT(log_file);
     CVMFS_OPT(log_prefix);
     CVMFS_OPT(log_syslog_level);
+    CVMFS_OPT(syslog_level);
     CVMFS_OPT(max_open_files);
+    CVMFS_OPT(nofiles);
+    CVMFS_OPT(quota_limit);
+    CVMFS_OPT(quota_threshold);
+    CVMFS_OPT(rebuild_cachedb);
 
     fprintf(stderr, "Unknown global option: %s\n", name);
-    return -1;
+    return LIBCVMFS_FAIL_BADOPT;
   }
 
   int verify_sanity() {
-    return 0;
+    // Alias handling
+    if ((nofiles >= 0) && (max_open_files != 0) && (nofiles != max_open_files))
+      return LIBCVMFS_FAIL_BADOPT;
+    if (nofiles >= 0)
+      max_open_files = nofiles;
+
+    if ((syslog_level >= 0) && (log_syslog_level != 0) &&
+        (syslog_level != log_syslog_level))
+    {
+      return LIBCVMFS_FAIL_BADOPT;
+    }
+    if (syslog_level >= 0)
+      log_syslog_level = syslog_level;
+    if (log_syslog_level < 0)
+      log_syslog_level = 3;
+
+    if ((logfile != "") && (log_file != "") && (log_file != logfile))
+      return LIBCVMFS_FAIL_BADOPT;
+    if (logfile != "")
+      log_file = logfile;
+
+    return LIBCVMFS_FAIL_OK;
   }
 };
 
@@ -193,12 +221,12 @@ struct cvmfs_options : public DerivedT {
 typedef cvmfs_options<cvmfs_repo_options>   repo_options;
 typedef cvmfs_options<cvmfs_global_options> global_options;
 
-  /**
-   * Display the usage message.
-   */
-  static void usage() {
-    struct cvmfs_repo_options defaults;
-    fprintf(stderr,
+/**
+ * Display the usage message.
+ */
+static void usage() {
+  struct cvmfs_repo_options defaults;
+  fprintf(stderr,
   "CernVM-FS version %s\n"
   "Copyright (c) 2009- CERN\n"
   "All rights reserved\n\n"
@@ -217,15 +245,15 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
   " change_to_cache_directory  Performs a cd to the cache directory "
                                "(performance tweak)\n"
   " alien_cache                Treat cache directory as alien cache\n"
-  " alien_cachedir             Explicitly set an alien cache directory\n"
-  " log_syslog_level=LEVEL     Sets the level used for syslog to "
+  " alien_cachedir=DIR         Explicitly set an alien cache directory\n"
+  " (log_)syslog_level=LEVEL   Sets the level used for syslog to "
                                "DEBUG (1), INFO (2), or NOTICE (3).\n"
   "                            Default is NOTICE.\n"
   " log_prefix                 String to use as a log prefix in syslog\n"
-  " log_file                   Logs all messages to FILE instead of "
+  " log_file/logfile           Logs all messages to FILE instead of "
                                "stderr and daemonizes.\n"
   "                            Makes only sense for the debug version\n"
-  " max_open_files             Set the maximum number of open files "
+  " nofiles/max_open_files     Set the maximum number of open files "
                                "for CernVM-FS process (soft limit)\n\n"
 
   "repository specific options are:"
@@ -253,7 +281,7 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
   " blacklist=FILE             Local blacklist for invalid certificates. "
                                "Has precedence over the whitelist.\n",
   PACKAGE_VERSION, defaults.timeout, defaults.timeout_direct);
-  }
+}
 
 /* Path to root of repository.  Used to resolve absolute symlinks. */
 // TODO(jblomer): this is currently unused!

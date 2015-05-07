@@ -9,7 +9,6 @@
  * NOTE: when adding or removing public symbols, you must also update
  * the list in libcvmfs_public_syms.txt.
  */
-
 #define LIBCVMFS_VERSION 2
 #define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
 #define LIBCVMFS_VERSION_MINOR 2
@@ -21,6 +20,36 @@
 #include <unistd.h>
 
 #include "statistics.h"
+
+#define LIBCVMFS_FAIL_OK         0
+/**
+ * Could not increase the number of open files limit
+ */
+#define LIBCVMFS_FAIL_NOFILES   -1
+/**
+ * Could not create the cache directory
+ */
+#define LIBCVMFS_FAIL_MKCACHE   -2
+/**
+ * Could not change into the cache directory
+ */
+#define LIBCVMFS_FAIL_OPENCACHE -3
+/**
+ * Could not acquire lock file (flock)
+ */
+#define LIBCVMFS_FAIL_LOCKFILE  -4
+/**
+ * Could not create cache directory skeleton
+ */
+#define LIBCVMFS_FAIL_INITCACHE -5
+/**
+ * Could not initialize quota manager
+ */
+#define LIBCVMFS_FAIL_INITQUOTA -6
+/**
+ * Unknown option
+ */
+#define LIBCVMFS_FAIL_BADOPT    -7
 
 #ifdef __cplusplus
 extern "C" {

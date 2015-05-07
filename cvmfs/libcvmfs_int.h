@@ -50,21 +50,37 @@ class cvmfs_globals : SingleCopy {
  public:
   // Common options for all repositories
   struct options {
-    options() : change_to_cache_directory(false),
-                alien_cache(false),
-                log_syslog_level(LOG_ALERT),
-                max_open_files(0) {}
+    options()
+      : change_to_cache_directory(false)
+      , alien_cache(false)
+      , syslog_level(-1)
+      , log_syslog_level(-1)
+      , nofiles(-1)
+      , max_open_files(0)
+      , quota_limit(0)
+      , quota_threshold(0)
+      , rebuild_cachedb(0)
+    { }
 
     std::string    cache_directory;
     std::string    alien_cachedir;
+    std::string    lock_directory;
     bool           change_to_cache_directory;
     bool           alien_cache;
 
+    int            syslog_level;
     int            log_syslog_level;
     std::string    log_prefix;
+    std::string    logfile;
     std::string    log_file;
 
-    int            max_open_files;
+    int            nofiles;
+    int            max_open_files;  // Alias of nofiles
+
+    // Currently ignored
+    unsigned long  quota_limit;
+    unsigned long  quota_threshold;
+    bool rebuild_cachedb;
   };
 
   static int            Initialize(const options &opts);
@@ -87,6 +103,7 @@ class cvmfs_globals : SingleCopy {
   static cvmfs_globals *instance;
 
   std::string       cache_directory_;
+  std::string       lock_directory_;
   uid_t             uid_;
   gid_t             gid_;
   int               fd_lockfile_;
