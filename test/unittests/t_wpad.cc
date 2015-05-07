@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../../cvmfs/libcvmfs.h"
+#include "../../cvmfs/wpad.h"
 
 using namespace std;  // NOLINT
 
@@ -12,7 +12,6 @@ class T_Wpad : public ::testing::Test {
  protected:
   virtual void SetUp() {
   }
-
 
   virtual void TearDown() {
   }
