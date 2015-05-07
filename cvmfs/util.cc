@@ -590,6 +590,18 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
 
 
 /**
+ * Create a directory with a unique name.
+ */
+string CreateTempDir(const std::string &path_prefix, const int mode) {
+  char *tmp_dir = strdupa((path_prefix + ".XXXXXX").c_str());
+  tmp_dir = mkdtemp(tmp_dir);
+  if (tmp_dir == NULL)
+    return "";
+  return string(tmp_dir);
+}
+
+
+/**
  * Helper class that provides callback funtions for the file system traversal.
  */
 class RemoveTreeHelper {
