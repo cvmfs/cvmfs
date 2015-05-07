@@ -43,8 +43,12 @@ extern std::string  *repository_name_;
 extern bool          foreground_;
 }
 
+/**
+ * A singleton managing the cvmfs resources for all attached repositories.
+ */
 class cvmfs_globals : SingleCopy {
  public:
+  // Common options for all repositories
   struct options {
     options() : change_to_cache_directory(false),
                 alien_cache(false),
@@ -52,6 +56,7 @@ class cvmfs_globals : SingleCopy {
                 max_open_files(0) {}
 
     std::string    cache_directory;
+    std::string    alien_cachedir;
     bool           change_to_cache_directory;
     bool           alien_cache;
 
@@ -62,7 +67,6 @@ class cvmfs_globals : SingleCopy {
     int            max_open_files;
   };
 
- public:
   static int            Initialize(const options &opts);
   static void           Destroy();
   static cvmfs_globals* Instance();
@@ -71,7 +75,6 @@ class cvmfs_globals : SingleCopy {
 
  protected:
   int Setup(const options &opts);
-
   static void CallbackLibcryptoLock(int mode, int type,
                                     const char *file, int line);
   // unsigned long type required by libcrypto (openssl)
@@ -81,27 +84,25 @@ class cvmfs_globals : SingleCopy {
   cvmfs_globals();
   ~cvmfs_globals();
 
- private:
   static cvmfs_globals *instance;
 
- private:
   std::string       cache_directory_;
   uid_t             uid_;
   gid_t             gid_;
-
   int               fd_lockfile_;
   pthread_mutex_t  *libcrypto_locks_;
-
   void             *sqlite_scratch;
   void             *sqlite_page_cache;
-
- private:
   bool options_ready_;
   bool lock_created_;
   bool cache_ready_;
   bool quota_ready_;
 };
 
+
+/**
+ * Encapsulates state and manager objects for a single attached repository.
+ */
 class cvmfs_context : SingleCopy {
  public:
   struct options {

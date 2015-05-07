@@ -85,18 +85,18 @@ int set_option(char const *name, char const *value, string *var) {
 
 struct cvmfs_repo_options : public cvmfs_context::options {
   int set_option(char const *name, char const *value) {
-    CVMFS_OPT(url);
+    CVMFS_OPT(allow_unsigned);
+    CVMFS_OPT(blacklist);
+    CVMFS_OPT(deep_mount);  // deprecated
+    CVMFS_OPT(fallback_proxies);
+    CVMFS_OPT(mountpoint);
+    CVMFS_OPT(proxies);
+    CVMFS_OPT(pubkey);
+    CVMFS_OPT(repo_name);
     CVMFS_OPT(timeout);
     CVMFS_OPT(timeout_direct);
-    CVMFS_OPT(proxies);
-    CVMFS_OPT(fallback_proxies);
     CVMFS_OPT(tracefile);
-    CVMFS_OPT(allow_unsigned);
-    CVMFS_OPT(pubkey);
-    CVMFS_OPT(deep_mount);
-    CVMFS_OPT(repo_name);
-    CVMFS_OPT(mountpoint);
-    CVMFS_OPT(blacklist);
+    CVMFS_OPT(url);
 
     fprintf(stderr, "Unknown repo option: %s\n", name);
     return -1;
@@ -118,12 +118,13 @@ struct cvmfs_repo_options : public cvmfs_context::options {
 
 struct cvmfs_global_options : public cvmfs_globals::options {
   int set_option(char const *name, char const *value) {
+    CVMFS_OPT(alien_cache);
+    CVMFS_OPT(alien_cachedir);
     CVMFS_OPT(cache_directory);
     CVMFS_OPT(change_to_cache_directory);
-    CVMFS_OPT(alien_cache);
-    CVMFS_OPT(log_syslog_level);
-    CVMFS_OPT(log_prefix);
     CVMFS_OPT(log_file);
+    CVMFS_OPT(log_prefix);
+    CVMFS_OPT(log_syslog_level);
     CVMFS_OPT(max_open_files);
 
     fprintf(stderr, "Unknown global option: %s\n", name);
@@ -216,6 +217,7 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
   " change_to_cache_directory  Performs a cd to the cache directory "
                                "(performance tweak)\n"
   " alien_cache                Treat cache directory as alien cache\n"
+  " alien_cachedir             Explicitly set an alien cache directory\n"
   " log_syslog_level=LEVEL     Sets the level used for syslog to "
                                "DEBUG (1), INFO (2), or NOTICE (3).\n"
   "                            Default is NOTICE.\n"
