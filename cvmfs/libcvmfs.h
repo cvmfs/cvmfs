@@ -5,12 +5,15 @@
 #ifndef CVMFS_LIBCVMFS_H_
 #define CVMFS_LIBCVMFS_H_
 
-#define LIBCVMFS_VERSION 2
-
 /*
  * NOTE: when adding or removing public symbols, you must also update
  * the list in libcvmfs_public_syms.txt.
  */
+
+#define LIBCVMFS_VERSION 2
+// Revision Changelog
+// 13: revision introduced
+#define LIBCVMFS_REVISION 13
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -121,7 +124,7 @@ int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
  * them.  The array (*buf) may be NULL when this function is called.
  *
  * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
- * @param[out] buf, pointer to dynamically allocated NULL-terminated array of 
+ * @param[out] buf, pointer to dynamically allocated NULL-terminated array of
  *             strings
  * @param[in] buflen, pointer to variable containing size of array
  * \return 0 on success, -1 on failure (sets errno)
