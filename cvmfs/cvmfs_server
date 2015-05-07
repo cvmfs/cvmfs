@@ -2292,7 +2292,7 @@ alterfs() {
 # Parse redirects configuration into redirect flag.
 # Assumes that config is loaded already, i.e. load_repo_config().
 get_follow_http_redirects_flag() {
-  if [ x"$CVMFS_FOLLOW_REDIRECTS" == x"yes" ]; then
+  if [ x"$CVMFS_FOLLOW_REDIRECTS" = x"yes" ]; then
     echo "-L"
   fi
 }
