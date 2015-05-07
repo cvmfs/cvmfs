@@ -59,6 +59,8 @@ set (CVMFS_UNITTEST_SOURCES
   t_statistics.cc
   t_options.cc
   t_libcvmfs.cc
+  t_backoff.cc
+  t_wpad.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -202,7 +204,7 @@ if (BUILD_UNITTESTS)
   if (ZLIB_BUILTIN)
     add_dependencies (${PROJECT_TEST_NAME} zlib)
   endif (ZLIB_BUILTIN)
-  
+
   if (PACPARSER_BUILTIN)
     add_dependencies (${PROJECT_TEST_NAME} libpacparser)
   endif (PACPARSER_BUILTIN)
@@ -224,7 +226,7 @@ if (BUILD_UNITTESTS_DEBUG)
   if (ZLIB_BUILTIN)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} zlib)
   endif (ZLIB_BUILTIN)
-  
+
   if (PACPARSER_BUILTIN)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libpacparser)
   endif (PACPARSER_BUILTIN)
