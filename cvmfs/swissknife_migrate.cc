@@ -627,6 +627,10 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
 }
 
 
+const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 2;
+
+
 CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
   const worker_context *context)
   : AbstractMigrationWorker<MigrationWorker_20x>(context)
@@ -639,6 +643,9 @@ CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
 bool CommandMigrate::MigrationWorker_20x::RunMigration(PendingCatalog *data)
   const
 {
+  assert(kSchema         == catalog::CatalogDatabase::kLatestSupportedSchema);
+  assert(kSchemaRevision == catalog::CatalogDatabase::kLatestSchemaRevision);
+
   return CreateNewEmptyCatalog(data) &&
          CheckDatabaseSchemaCompatibility(data) &&
          AttachOldCatalogDatabase(data) &&
