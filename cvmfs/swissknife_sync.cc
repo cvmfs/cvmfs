@@ -248,6 +248,10 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   // initialize catalog infrastructure
   g_download_manager->Init(1, true, g_statistics);
   const bool auto_manage_catalog_files = true;
+  const bool follow_redirects = (args.count('L') > 0);
+  if (follow_redirects) {
+    g_download_manager->EnableRedirects();
+  }
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
@@ -544,7 +548,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
 
   g_download_manager->Init(1, true, g_statistics);
-
+  const bool follow_redirects = (args.count('L') > 0);
+  if (follow_redirects) {
+    g_download_manager->EnableRedirects();
+  }
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, g_download_manager,

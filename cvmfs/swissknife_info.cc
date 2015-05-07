@@ -56,6 +56,7 @@ ParameterList CommandInfo::GetParams() {
   r.push_back(Parameter::Switch('g', "check if repository is garbage "
                                         "collectable"));
   r.push_back(Parameter::Switch('h', "print results in human readable form"));
+  r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
   return r;
 }
 
@@ -81,6 +82,11 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   manifest::Manifest *manifest = NULL;
   if (IsRemote(repository)) {
     g_download_manager->Init(1, true, g_statistics);
+
+    const bool follow_redirects = args.count('L') > 0;
+    if (follow_redirects) {
+      g_download_manager->EnableRedirects();
+    }
 
     const string url = repository + "/.cvmfspublished";
     download::JobInfo download_manifest(&url, false, false, NULL);

@@ -65,6 +65,7 @@ enum LogSource {
   kLogHistory,
   kLogUnionFs,
   kLogPathspec,
+  kLogUploadS3,
   kLogS3Fanout,
   kLogGc,
   kLogDns
