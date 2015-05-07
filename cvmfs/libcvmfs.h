@@ -25,7 +25,6 @@ extern "C" {
 #endif
 
 struct cvmfs_context;
-extern perf::Statistics statistics_;
 
 /**
  * Initialize global CVMFS library structures
