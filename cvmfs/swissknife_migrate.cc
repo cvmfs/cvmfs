@@ -1808,7 +1808,7 @@ bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
 
         std::vector<gid_t>::const_iterator j    = data->assigned_gids.begin();
   const std::vector<gid_t>::const_iterator jend = data->assigned_gids.end();
-  for (; j != jend; ++i) {
+  for (; j != jend; ++j) {
     const bool success = update_gid.Bind(1, *j)               &&
                          update_gid.Bind(2, gid_map_.Map(*i)) &&
                          update_gid.Execute()                 &&
