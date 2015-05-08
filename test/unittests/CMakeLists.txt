@@ -58,6 +58,9 @@ set (CVMFS_UNITTEST_SOURCES
   t_xattr.cc
   t_statistics.cc
   t_options.cc
+  t_libcvmfs.cc
+  t_backoff.cc
+  t_wpad.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -140,6 +143,25 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/xattr.cc
   ${CVMFS_SOURCE_DIR}/statistics.h
   ${CVMFS_SOURCE_DIR}/statistics.cc
+
+  ${CVMFS_SOURCE_DIR}/cache.h
+  ${CVMFS_SOURCE_DIR}/cache.cc
+  ${CVMFS_SOURCE_DIR}/quota.h
+  ${CVMFS_SOURCE_DIR}/quota.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr.h
+  ${CVMFS_SOURCE_DIR}/backoff.h
+  ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/monitor.h
+  ${CVMFS_SOURCE_DIR}/monitor.cc
+  ${CVMFS_SOURCE_DIR}/tracer.cc
+  ${CVMFS_SOURCE_DIR}/tracer.h
+  ${CVMFS_SOURCE_DIR}/wpad.h
+  ${CVMFS_SOURCE_DIR}/wpad.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs.h
+  ${CVMFS_SOURCE_DIR}/libcvmfs.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
+  ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
@@ -147,7 +169,7 @@ set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 #
 # Compiler and Linker Flags for unit tests
 #
-set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -D_FILE_OFFSET_BITS=64")
+set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64")
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -fprofile-arcs -ftest-coverage -fPIC -O0 -DDEBUGMSG -g")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS} -fprofile-arcs -lgcov -coverage")
@@ -183,6 +205,10 @@ if (BUILD_UNITTESTS)
     add_dependencies (${PROJECT_TEST_NAME} zlib)
   endif (ZLIB_BUILTIN)
 
+  if (PACPARSER_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libpacparser)
+  endif (PACPARSER_BUILTIN)
+
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
@@ -200,6 +226,10 @@ if (BUILD_UNITTESTS_DEBUG)
   if (ZLIB_BUILTIN)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} zlib)
   endif (ZLIB_BUILTIN)
+
+  if (PACPARSER_BUILTIN)
+    add_dependencies (${PROJECT_TEST_DEBUG_NAME} libpacparser)
+  endif (PACPARSER_BUILTIN)
 
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
@@ -224,7 +254,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             pthread dl)
+                             ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} pthread dl)
 
 if (BUILD_UNITTESTS)
   target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})

@@ -12,6 +12,10 @@ echo "Current version: $VERSION"
 VERSION="$(echo $VERSION | cut -d. -f1).${NEW_MINOR}.${NEW_PATCH}"
 echo "New version: $VERSION"
 
+echo "Patching libcvmfs"
+sed -i -e "s/^#define LIBCVMFS_VERSION_MINOR \(.*\)/#define LIBCVMFS_VERSION_MINOR $NEW_MINOR/" cvmfs/libcvmfs.h
+grep VERSION cvmfs/libcvmfs.h
+
 echo "Patching CMakeLists.txt"
 sed -i -e "s/^## CVMFS_VERSION \(.*\)/## CVMFS_VERSION $VERSION/" CMakeLists.txt
 sed -i -e "s/^set (CernVM-FS_VERSION_MINOR \(.*\)/set (CernVM-FS_VERSION_MINOR $NEW_MINOR)/" CMakeLists.txt
