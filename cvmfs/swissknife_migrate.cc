@@ -1654,4 +1654,20 @@ catalog::WritableCatalog* CommandMigrate::MigrationWorker_217::GetWritable(
     catalog));
 }
 
+
+//------------------------------------------------------------------------------
+
+
+CommandMigrate::ChownMigrationWorker::ChownMigrationWorker(
+                                                const worker_context *context)
+  : AbstractMigrationWorker<ChownMigrationWorker>(context)
+{
+
+}
+
+bool CommandMigrate::ChownMigrationWorker::RunMigration(
+                                                   PendingCatalog *data) const {
+  return true;
+}
+
 }  // namespace swissknife

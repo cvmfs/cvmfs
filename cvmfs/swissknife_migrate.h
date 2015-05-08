@@ -207,6 +207,21 @@ class CommandMigrate : public Command {
     public AbstractMigrationWorker<ChownMigrationWorker>
   {
     friend class AbstractMigrationWorker<ChownMigrationWorker>;
+   public:
+    struct worker_context :
+      AbstractMigrationWorker<ChownMigrationWorker>::worker_context
+    {
+      worker_context(const std::string  &temporary_directory,
+                     const bool          collect_catalog_statistics,
+                     const uid_t         uid,
+                     const gid_t         gid)
+        : AbstractMigrationWorker<ChownMigrationWorker>::worker_context(
+            temporary_directory, collect_catalog_statistics)
+        , uid(uid)
+        , gid(gid) { }
+      const uid_t uid;
+      const gid_t gid;
+    };
 
    public:
     explicit ChownMigrationWorker(const worker_context *context);
