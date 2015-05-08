@@ -160,8 +160,8 @@ struct cvmfs_global_options : public cvmfs_globals::options {
       return LIBCVMFS_FAIL_BADOPT;
     if (logfile != "")
       log_file = logfile;
-    
-    if ((cachedir != "") && (cache_directory != "") && 
+
+    if ((cachedir != "") && (cache_directory != "") &&
         (cache_directory != cachedir))
     {
       return LIBCVMFS_FAIL_BADOPT;
