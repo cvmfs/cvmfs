@@ -46,6 +46,8 @@ ParameterList CommandMigrate::GetParams() {
     "group id to be used for this repository"));
   r.push_back(Parameter::Optional('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional('k', "repository master key(s)"));
+  r.push_back(Parameter::Optional('i', "UID map for chown"));
+  r.push_back(Parameter::Optional('j', "GID map for chown"));
   r.push_back(Parameter::Switch('f', "fix nested catalog transition points"));
   r.push_back(Parameter::Switch('l', "disable linkcount analysis of files"));
   r.push_back(Parameter::Switch('s',
@@ -95,6 +97,12 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                              "";
   const std::string &repo_keys          = (args.count('k') > 0)      ?
                                              *args.find('k')->second :
+                                             "";
+  const std::string &uid_map_path       = (args.count('i') > 0)      ?
+                                             *args.find('i')->second :
+                                             "";
+  const std::string &gid_map_path       = (args.count('j') > 0)      ?
+                                             *args.find('j')->second :
                                              "";
   const bool fix_transition_points      = (args.count('f') > 0);
   const bool analyze_file_linkcounts    = (args.count('l') == 0);
@@ -193,14 +201,16 @@ int CommandMigrate::Main(const ArgumentList &args) {
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_217>(manifest_path, &context);
   } else if (migration_base == "chown") {
-    if (!ReadUidAndGid(uid, gid)) {
+    UidMap uid_map;
+    GidMap gid_map;
+    if (!ReadPersonaMaps(uid_map_path, gid_map_path, uid_map, gid_map)) {
+      Error("Failed to read UID and/or GID map");
       return 1;
     }
-
     ChownMigrationWorker::worker_context context(temporary_directory_,
                                                  collect_catalog_statistics,
-                                                 uid_,
-                                                 gid_);
+                                                 uid_map,
+                                                 gid_map);
     migration_succeeded =
       DoMigrationAndCommit<ChownMigrationWorker>(manifest_path, &context);
   } else {
@@ -239,6 +249,35 @@ bool CommandMigrate::ReadPersona(const std::string &uid,
 
   uid_ = String2Int64(uid);
   gid_ = String2Int64(gid);
+  return true;
+}
+
+
+
+bool CommandMigrate::ReadPersonaMaps(const std::string &uid_map_path,
+                                     const std::string &gid_map_path,
+                                           UidMap      &uid_map,
+                                           GidMap      &gid_map) const {
+  if (!uid_map.Read(uid_map_path) || !uid_map.IsValid()) {
+    Error("Failed to read UID map");
+    return false;
+  }
+
+  if (!gid_map.Read(gid_map_path) || !gid_map.IsValid()) {
+    Error("Failed to read GID map");
+    return false;
+  }
+
+  if (uid_map.RuleCount() == 0 && !uid_map.HasDefault()) {
+    Error("UID map appears to be empty");
+    return false;
+  }
+
+  if (gid_map.RuleCount() == 0 && !gid_map.HasDefault()) {
+    Error("GID map appears to be empty");
+    return false;
+  }
+
   return true;
 }
 
@@ -1672,7 +1711,9 @@ catalog::WritableCatalog* CommandMigrate::MigrationWorker_217::GetWritable(
 CommandMigrate::ChownMigrationWorker::ChownMigrationWorker(
                                                 const worker_context *context)
   : AbstractMigrationWorker<ChownMigrationWorker>(context)
-{
+  , uid_map_(context->uid_map)
+  , gid_map_(context->gid_map)
+{}
 
 }
 
