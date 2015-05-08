@@ -1727,8 +1727,10 @@ bool CommandMigrate::ChownMigrationWorker::ListAssignedPersonas(
                                                    PendingCatalog *data) const {
   assert(data->assigned_uids.empty());
   assert(data->assigned_gids.empty());
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
 
-  const catalog::CatalogDatabase &catalog_db = data->new_catalog->database();
+  const catalog::CatalogDatabase &catalog_db = data->old_catalog->database();
   catalog::Sql get_uids(catalog_db, "SELECT DISTINCT uid FROM catalog;");
   while (get_uids.FetchRow()) {
     data->assigned_uids.push_back(get_uids.RetrieveInt(0));
@@ -1741,6 +1743,7 @@ bool CommandMigrate::ChownMigrationWorker::ListAssignedPersonas(
 
   return true;
 }
+
 
 bool CommandMigrate::ChownMigrationWorker::CheckAssignedPersonas(
                                                    PendingCatalog *data) const {
@@ -1772,14 +1775,17 @@ bool CommandMigrate::ChownMigrationWorker::CheckAssignedPersonas(
   return true;
 }
 
+
 bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
                                                    PendingCatalog *data) const {
   assert(uid_map_.RuleCount() > 0 || uid_map_.HasDefault());
   assert(gid_map_.RuleCount() > 0 || gid_map_.HasDefault());
   assert(!data->assigned_uids.empty());
   assert(!data->assigned_gids.empty());
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
 
-  const catalog::CatalogDatabase &db = data->new_catalog->database();
+  const catalog::CatalogDatabase &db=GetWritable(data->old_catalog)->database();
   catalog::Sql update_uid(db, "UPDATE catalog SET uid = :new WHERE uid = :old");
   catalog::Sql update_gid(db, "UPDATE catalog SET gid = :new WHERE gid = :old");
 
