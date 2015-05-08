@@ -58,6 +58,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_xattr.cc
   t_statistics.cc
   t_options.cc
+  t_smalloc.cc
 
   # test utility functions
   testutil.cc testutil.h
