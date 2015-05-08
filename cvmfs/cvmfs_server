@@ -96,11 +96,46 @@ CVMFS_DEFAULT_AVG_CHUNK_SIZE=8388608
 CVMFS_DEFAULT_MAX_CHUNK_SIZE=16777216
 CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD=500000
 
+CVMFS_SERVER_DEBUG=${CVMFS_SERVER_DEBUG:=0}
+CVMFS_SERVER_SWISSKNIFE="cvmfs_swissknife"
+CVMFS_SERVER_SWISSKNIFE_DEBUG=$CVMFS_SERVER_SWISSKNIFE
+
 ################################################################################
 #                                                                              #
 #                              Utility Functions                               #
 #                                                                              #
 ################################################################################
+
+# enable the debug mode?
+if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
+  if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
+    case $CVMFS_SERVER_DEBUG in
+      1)
+        # in case something breaks we are provided with a GDB prompt.
+        CVMFS_SERVER_SWISSKNIFE_DEBUG="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
+      ;;
+      2)
+        # attach gdb and provide a prompt WITHOUT actual running the program
+        CVMFS_SERVER_SWISSKNIFE_DEBUG="gdb --quiet --args cvmfs_swissknife_debug"
+      ;;
+    esac
+  else
+    echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
+  fi
+fi
+
+__swissknife_cmd() {
+  local might_be_debugging="$1"
+  if [ ! -z $might_be_debugging ]; then
+    echo "$CVMFS_SERVER_SWISSKNIFE_DEBUG"
+  else
+    echo "$CVMFS_SERVER_SWISSKNIFE"
+  fi
+}
+
+__swissknife() {
+  $(__swissknife_cmd) $@
+}
 
 
 cvmfs_mkfqrn() {
@@ -139,13 +174,13 @@ is_subcommand() {
 # returns the version string of the current cvmfs installation
 cvmfs_version_string() {
   local version_string
-  if ! cvmfs_swissknife version > /dev/null 2>&1; then
+  if ! __swissknife version > /dev/null 2>&1; then
     # Fallback: for CernVM-FS versions before 2.1.7
     # this is just a security measure... it should never happen, since this
     # function was introduced with CernVM-FS 2.1.7
-    version_string=$(cvmfs_swissknife --version | sed -n '2{p;q}' | awk '{print $2}')
+    version_string=$(__swissknife --version | sed -n '2{p;q}' | awk '{print $2}')
   else
-    version_string=$(cvmfs_swissknife --version)
+    version_string=$(__swissknife --version)
   fi
   echo $version_string
 }
@@ -220,9 +255,8 @@ Supported Commands:
                 [-k path to keys] [-g chown backend]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
-  publish       [-d debug mode | -D blocking debug mode] [-p pause for tweaks]
+  publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
                 [-a tag name] [-c tag channel] [-m tag description]
-                [-n manual revision number] [-v be verbose]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -795,10 +829,10 @@ is_master_replica() {
 
   load_repo_config $name
   if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
-    is_master_replica=$(cvmfs_swissknife info -r $name -m $(get_follow_http_redirects_flag) 2>/dev/null)
+    is_master_replica=$(__swissknife info -r $name -m $(get_follow_http_redirects_flag) 2>/dev/null)
   else
     is_stratum0 $name || return 1
-    is_master_replica=$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -m $(get_follow_http_redirects_flag) 2>/dev/null)
+    is_master_replica=$(__swissknife info -r $CVMFS_STRATUM0 -m $(get_follow_http_redirects_flag) 2>/dev/null)
   fi
 
   [ "x$is_master_replica" = "xtrue" ]
@@ -815,7 +849,7 @@ is_garbage_collectable() {
   if is_stratum0 $name; then
     [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]
   else
-    [ x"$(cvmfs_swissknife info -r $CVMFS_STRATUM1 -g $(get_follow_http_redirects_flag))" = x"yes" ]
+    [ x"$(__swissknife info -r $CVMFS_STRATUM1 -g $(get_follow_http_redirects_flag))" = x"yes" ]
   fi
 }
 
@@ -1477,7 +1511,7 @@ create_whitelist() {
   chown $user $whitelist
 
   rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
-  cvmfs_swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
+  __swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
   rm -f $whitelist
   echo "done"
 }
@@ -1537,12 +1571,12 @@ sign_manifest() {
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
 
-  $user_shell "cvmfs_swissknife sign \
-    -c /etc/cvmfs/keys/${name}.crt \
-    -k /etc/cvmfs/keys/${name}.key \
-    -n $name \
-    -m $unsigned_manifest \
-    -t ${CVMFS_SPOOL_DIR}/tmp \
+  $user_shell "$(__swissknife_cmd) sign \
+    -c /etc/cvmfs/keys/${name}.crt      \
+    -k /etc/cvmfs/keys/${name}.key      \
+    -n $name                            \
+    -m $unsigned_manifest               \
+    -t ${CVMFS_SPOOL_DIR}/tmp           \
     -r $CVMFS_UPSTREAM_STORAGE" > /dev/null
 }
 
@@ -1739,8 +1773,7 @@ get_published_root_hash() {
   local repository_name=$1
 
   load_repo_config $repository_name
-
-  cvmfs_swissknife info -r $CVMFS_STRATUM0 -c $(get_follow_http_redirects_flag)
+  __swissknife info -r $CVMFS_STRATUM0 -c $(get_follow_http_redirects_flag)
 }
 
 
@@ -1754,7 +1787,7 @@ check_tag_existence() {
   local tag="$2"
 
   load_repo_config $repository_name
-  cvmfs_swissknife tag_info                   \
+  __swissknife tag_info                       \
     -w $CVMFS_STRATUM0                        \
     -t ${CVMFS_SPOOL_DIR}/tmp                 \
     -p /etc/cvmfs/keys/${repository_name}.pub \
@@ -2267,7 +2300,7 @@ alterfs() {
   local success=1
   if is_master_replica $name && [ $master_replica -eq 0 ]; then
     echo -n "Disallowing Replication of this Repository... "
-    cvmfs_swissknife remove -o ".cvmfs_master_replica" -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
+    __swissknife remove -o ".cvmfs_master_replica" -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
     if [ $success -ne 1 ]; then
       echo "fail!"
       return 1
@@ -2278,7 +2311,7 @@ alterfs() {
     echo -n "Allowing Replication of this Repository... "
     local master_replica="${temp_dir}/.cvmfs_master_replica"
     touch $master_replica
-    cvmfs_swissknife upload -i $master_replica -o $(basename $master_replica) -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
+    __swissknife upload -i $master_replica -o $(basename $master_replica) -r $CVMFS_UPSTREAM_STORAGE > /dev/null || success=0
     if [ $success -ne 1 ]; then
       echo "fail!"
       return 1
@@ -2472,10 +2505,10 @@ mkfs() {
     echo -n "(repository flagged volatile)... "
   fi
   local user_shell="$(get_user_shell $name)"
-  local create_cmd="cvmfs_swissknife create \
-    -t $temp_dir                            \
-    -r $upstream                            \
-    -a $hash_algo $volatile_opt             \
+  local create_cmd="$(__swissknife_cmd) create \
+    -t $temp_dir                               \
+    -r $upstream                               \
+    -a $hash_algo $volatile_opt                \
     -o ${temp_dir}/new_manifest"
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
@@ -2557,7 +2590,8 @@ add_replica() {
   public_key=$2
 
   # get the name of the repository pointed to by $stratum0
-  name=$(cvmfs_swissknife info -L -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
+  name=$(__swissknife info -L -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
+  name=$(__swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
   if [ x$alias_name = x"" ]; then
     alias_name=$name
   else
@@ -2865,17 +2899,17 @@ import() {
     IMPORT_DESASTER_MANIFEST_BACKUP="${storage_location}/.cvmfspublished.bak"
     cp ${storage_location}/.cvmfspublished \
        $IMPORT_DESASTER_MANIFEST_BACKUP || die "fail! (cannot backup .cvmfspublished)"
-    cvmfs_swissknife migrate \
-      -v "2.0.x" \
-      -r $storage_location \
-      -n $name \
-      -u $upstream \
-      -t $temp_dir \
+    __swissknife migrate               \
+      -v "2.0.x"                       \
+      -r $storage_location             \
+      -n $name                         \
+      -u $upstream                     \
+      -t $temp_dir                     \
       -k "/etc/cvmfs/keys/$public_key" \
-      -o $new_manifest \
-      -p $cvmfs_uid \
-      -g $cvmfs_gid \
-      -f \
+      -o $new_manifest                 \
+      -p $cvmfs_uid                    \
+      -g $cvmfs_gid                    \
+      -f                               \
       $statistics_flag              || die "fail! (migration)"
     chown $cvmfs_user $new_manifest || die "fail! (chown manifest)"
 
@@ -3091,7 +3125,7 @@ list_catalogs() {
   check_repository_compatibility
 
   # do it!
-  cvmfs_swissknife lsrepo     \
+  __swissknife lsrepo         \
     -r $CVMFS_STRATUM0        \
     -n $CVMFS_REPOSITORY_NAME \
     -k $CVMFS_PUBLIC_KEY      \
@@ -3229,12 +3263,12 @@ tag() {
 
   # tag listing does not need an open repository transaction
   if [ $action_list -eq 1 ] || [ $actions -eq 0 ]; then
-    local tag_list_command="cvmfs_swissknife tag_list    \
-      -w $CVMFS_STRATUM0                                 \
-      -t ${CVMFS_SPOOL_DIR}/tmp                          \
-      -p /etc/cvmfs/keys/${name}.pub                     \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
-      -f $name                                           \
+    local tag_list_command="$(__swissknife_cmd dbg) tag_list \
+      -w $CVMFS_STRATUM0                                     \
+      -t ${CVMFS_SPOOL_DIR}/tmp                              \
+      -p /etc/cvmfs/keys/${name}.pub                         \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs     \
+      -f $name                                               \
       -b $base_hash"
     if [ $machine_readable -ne 0 ]; then
       tag_list_command="$tag_list_command -x"
@@ -3245,12 +3279,12 @@ tag() {
 
   # tag inspection does not need to open a repository transaction
   if [ $action_inspect -eq 1 ]; then
-    local tag_inspect_command="cvmfs_swissknife tag_info \
-      -w $CVMFS_STRATUM0                                 \
-      -t ${CVMFS_SPOOL_DIR}/tmp                          \
-      -p /etc/cvmfs/keys/${name}.pub                     \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
-      -f $name                                           \
+    local tag_inspect_command="$(__swissknife_cmd dbg) tag_info \
+      -w $CVMFS_STRATUM0                                        \
+      -t ${CVMFS_SPOOL_DIR}/tmp                                 \
+      -p /etc/cvmfs/keys/${name}.pub                            \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs        \
+      -f $name                                                  \
       -n $tag_name"
     if [ $machine_readable -ne 0 ]; then
       tag_inspect_command="$tag_inspect_command -x"
@@ -3273,17 +3307,17 @@ tag() {
   # adds (or moves) a tag in the database
   if [ $action_add -eq 1 ]; then
     local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
-    local tag_create_command="cvmfs_swissknife tag_create \
-      -w $CVMFS_STRATUM0                                  \
-      -t ${CVMFS_SPOOL_DIR}/tmp                           \
-      -p /etc/cvmfs/keys/${name}.pub                      \
-      -z /etc/cvmfs/repositories.d/${name}/trusted_certs  \
-      -f $name                                            \
-      -r $CVMFS_UPSTREAM_STORAGE                          \
-      -m $new_manifest                                    \
-      -b $base_hash                                       \
-      -e $hash_algorithm                                  \
-      $(get_follow_http_redirects_flag)                   \
+    local tag_create_command="$(__swissknife_cmd dbg) tag_create \
+      -w $CVMFS_STRATUM0                                         \
+      -t ${CVMFS_SPOOL_DIR}/tmp                                  \
+      -p /etc/cvmfs/keys/${name}.pub                             \
+      -z /etc/cvmfs/repositories.d/${name}/trusted_certs         \
+      -f $name                                                   \
+      -r $CVMFS_UPSTREAM_STORAGE                                 \
+      -m $new_manifest                                           \
+      -b $base_hash                                              \
+      -e $hash_algorithm                                         \
+      $(get_follow_http_redirects_flag)                          \
       -a $tag_name"
     if [ ! -z "$add_tag_channel" ]; then
       tag_create_command="$tag_create_command -c $add_tag_channel"
@@ -3312,7 +3346,7 @@ tag() {
     fi
 
     local new_manifest="${CVMFS_SPOOL_DIR}/tmp/manifest"
-    $user_shell "cvmfs_swissknife tag_remove             \
+    $user_shell "$(__swissknife_cmd dbg) tag_remove      \
       -w $CVMFS_STRATUM0                                 \
       -t ${CVMFS_SPOOL_DIR}/tmp                          \
       -p /etc/cvmfs/keys/${name}.pub                     \
@@ -3401,7 +3435,7 @@ check() {
       echo
       echo "Checking Storage Integrity of $name ... (may take a while)"
       storage_dir=$(get_upstream_config $upstream)
-      cvmfs_swissknife scrub -r ${storage_dir}/data || die "FAIL!"
+      __swissknife scrub -r ${storage_dir}/data || die "FAIL!"
     fi
   fi
 
@@ -3409,7 +3443,7 @@ check() {
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying Catalog Integrity of $name ..."
-  cvmfs_swissknife check $tag $check_chunks_param $log_level_param -r $stratum0
+  __swissknife check $tag $check_chunks_param $log_level_param -r $stratum0
 }
 
 
@@ -3629,7 +3663,6 @@ publish() {
   local spool_dir
   local stratum0
   local upstream
-  local debug=0
   local tweaks_option=
   local tag_name=
   local tag_channel=00
@@ -3641,15 +3674,9 @@ publish() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "dDpa:c:m:vn:" option
+  while getopts "pa:c:m:vn:" option
   do
     case $option in
-      d)
-        debug=1
-      ;;
-      D)
-        debug=2
-      ;;
       p)
         tweaks_option="-d"
       ;;
@@ -3702,8 +3729,6 @@ publish() {
     upstream=$CVMFS_UPSTREAM_STORAGE
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
-    local swissknife="cvmfs_swissknife"
-
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
@@ -3712,7 +3737,7 @@ publish() {
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
-    local revision_number=$($swissknife info -r $stratum0 -v $(get_follow_http_redirects_flag))
+    local revision_number=$(__swissknife info -r $stratum0 -v $(get_follow_http_redirects_flag))
     if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
       echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
       retcode=1
@@ -3725,52 +3750,36 @@ publish() {
       echo "Using auto tag '$tag_name'"
     fi
 
-    # enable the debug mode?
-    if [ $debug -ne 0 ]
-    then
-      if [ -f /usr/bin/cvmfs_swissknife_debug ]; then
-        case $debug in
-          1)
-            # in case something breaks we are provided with a GDB prompt.
-            swissknife="gdb --quiet --eval-command=run --eval-command=quit --args cvmfs_swissknife_debug"
-          ;;
-          2)
-            # attach gdb and provide a prompt WITHOUT actual running the program
-            swissknife="gdb --quiet --args cvmfs_swissknife_debug"
-          ;;
-        esac
-      else
-        echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
-      fi
-    fi
 
     # prepare the commands to be used for the publishing later
     local user_shell="$(get_user_shell $name)"
 
     local base_hash=$(get_mounted_root_hash $name)
     local manifest="${spool_dir}/tmp/manifest"
-    local dirtab_command="$swissknife dirtab $verbosity \
-      -d /cvmfs/${name}/.cvmfsdirtab                    \
-      -b $base_hash                                     \
-      -w $stratum0                                      \
-      -t ${spool_dir}/tmp                               \
-      -u /cvmfs/${name}                                 \
-      -s ${spool_dir}/scratch"
+    local dirtab_command="$(__swissknife_cmd dbg) dirtab \
+      -d /cvmfs/${name}/.cvmfsdirtab                     \
+      -b $base_hash                                      \
+      -w $stratum0                                       \
+      -t ${spool_dir}/tmp                                \
+      -u /cvmfs/${name}                                  \
+      -s ${spool_dir}/scratch                            \
+      $verbosity"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-z $CVMFS_LOG_LEVEL"
 
-    local sync_command="$swissknife sync $verbosity -u /cvmfs/$name \
-      -s ${spool_dir}/scratch \
-      -c ${spool_dir}/rdonly \
-      -t ${spool_dir}/tmp \
-      -b $base_hash \
-      -r ${upstream} \
-      -w $stratum0 \
-      -o $manifest \
-      -e $hash_algorithm \
-      $(get_follow_http_redirects_flag) \
-      $log_level $tweaks_option"
+    local sync_command="$(__swissknife_cmd dbg) sync \
+      -u /cvmfs/$name                                \
+      -s ${spool_dir}/scratch                        \
+      -c ${spool_dir}/rdonly                         \
+      -t ${spool_dir}/tmp                            \
+      -b $base_hash                                  \
+      -r ${upstream}                                 \
+      -w $stratum0                                   \
+      -o $manifest                                   \
+      -e $hash_algorithm                             \
+      $(get_follow_http_redirects_flag)              \
+      $log_level $tweaks_option $verbosity"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi
@@ -3798,16 +3807,16 @@ publish() {
     if [ "x$CVMFS_MAXIMAL_CONCURRENT_WRITES" != "x" ]; then
       sync_command="$sync_command -q $CVMFS_MAXIMAL_CONCURRENT_WRITES"
     fi
-    local tag_command="$swissknife tag_create \
-      -r $upstream                            \
-      -w $stratum0                            \
-      -t ${spool_dir}/tmp                     \
-      -m $manifest                            \
-      -p /etc/cvmfs/keys/${name}.pub          \
-      -f $name                                \
-      -b $base_hash                           \
-      -e $hash_algorithm                      \
-      $(get_follow_http_redirects_flag)       \
+    local tag_command="$(__swissknife_cmd dbg) tag_create \
+      -r $upstream                                        \
+      -w $stratum0                                        \
+      -t ${spool_dir}/tmp                                 \
+      -m $manifest                                        \
+      -p /etc/cvmfs/keys/${name}.pub                      \
+      -f $name                                            \
+      -b $base_hash                                       \
+      -e $hash_algorithm                                  \
+      $(get_follow_http_redirects_flag)                   \
       -x" # -x enables magic undo tag handling
     if [ ! -z "$tag_name" ]; then
       tag_command="$tag_command -a $tag_name"
@@ -3961,15 +3970,15 @@ rollback() {
   local base_hash=$(get_mounted_root_hash $name)
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
 
-  local rollback_command="cvmfs_swissknife tag_rollback \
-    -w $stratum0                                        \
-    -t ${spool_dir}/tmp                                 \
-    -p /etc/cvmfs/keys/${name}.pub                      \
-    -z /etc/cvmfs/repositories.d/${name}/trusted_certs  \
-    -f $name                                            \
-    -r $upstream                                        \
-    -m ${spool_dir}/tmp/manifest                        \
-    -b $base_hash                                       \
+  local rollback_command="$(__swissknife_cmd dbg) tag_rollback \
+    -w $stratum0                                               \
+    -t ${spool_dir}/tmp                                        \
+    -p /etc/cvmfs/keys/${name}.pub                             \
+    -z /etc/cvmfs/repositories.d/${name}/trusted_certs         \
+    -f $name                                                   \
+    -r $upstream                                               \
+    -m ${spool_dir}/tmp/manifest                               \
+    -b $base_hash                                              \
     -e $hash_algorithm"
   if [ ! -z "$target_tag" ]; then
     rollback_command="$rollback_command -n $target_tag"
@@ -4090,7 +4099,7 @@ gc() {
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
     is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
 
-    local head_timestamp="$(cvmfs_swissknife info -r $CVMFS_STRATUM0 -t $(get_follow_http_redirects_flag))"
+    local head_timestamp="$(__swissknife info -r $CVMFS_STRATUM0 -t $(get_follow_http_redirects_flag))"
     [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
 
     # figure out the URL of the repository
@@ -4169,24 +4178,25 @@ __run_gc() {
 
   # do it!
   local user_shell="$(get_user_shell $name)"
-  local gc_command="cvmfs_swissknife gc -r $repository_url         \
-                                        -u $CVMFS_UPSTREAM_STORAGE \
-                                        -n $CVMFS_REPOSITORY_NAME  \
-                                        -k $CVMFS_PUBLIC_KEY       \
-                                        -t ${CVMFS_SPOOL_DIR}/tmp/ \
-                                        $additional_switches"
+  local gc_command="$(__swissknife_cmd dbg) gc                         \
+                                            -r $repository_url         \
+                                            -u $CVMFS_UPSTREAM_STORAGE \
+                                            -n $CVMFS_REPOSITORY_NAME  \
+                                            -k $CVMFS_PUBLIC_KEY       \
+                                            -t ${CVMFS_SPOOL_DIR}/tmp/ \
+                                            $additional_switches"
   $user_shell "$gc_command" || return 6
 
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
   if is_stratum0 $name && [ $dry_run -eq 0 ]; then
-    tag_command="cvmfs_swissknife tag_empty_bin \
-      -r $CVMFS_UPSTREAM_STORAGE                \
-      -w $CVMFS_STRATUM0                        \
-      -t ${CVMFS_SPOOL_DIR}/tmp                 \
-      -m $manifest                              \
-      -p /etc/cvmfs/keys/${name}.pub            \
-      -f $name                                  \
-      -b $base_hash                             \
+    tag_command="$(__swissknife_cmd dbg) tag_empty_bin \
+      -r $CVMFS_UPSTREAM_STORAGE                       \
+      -w $CVMFS_STRATUM0                               \
+      -t ${CVMFS_SPOOL_DIR}/tmp                        \
+      -m $manifest                                     \
+      -p /etc/cvmfs/keys/${name}.pub                   \
+      -f $name                                         \
+      -b $base_hash                                    \
       -e $hash_algorithm"
     $user_shell "$tag_command" || return 7
   fi
@@ -4204,7 +4214,7 @@ __snapshot_cleanup() {
   load_repo_config $alias_name
   local user_shell="$(get_user_shell $alias_name)"
 
-  $user_shell "cvmfs_swissknife remove        \
+  $user_shell "$(__swissknife_cmd) remove     \
                  -r ${CVMFS_UPSTREAM_STORAGE} \
                  -o .cvmfs_is_snapshotting" || echo "Warning: failed to remove .cvmfs_is_snapshotting"
   release_snapshot_lock $alias_name         || echo "Warning: failed to release snapshotting lock"
@@ -4280,7 +4290,7 @@ snapshot() {
     local user_shell="$(get_user_shell $alias_name)"
 
     local initial_snapshot=0
-    if $user_shell "cvmfs_swissknife peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
+    if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
       initial_snapshot=1
     fi
 
@@ -4317,25 +4327,25 @@ snapshot() {
 
     # put a magic file in the repository root to signal a snapshot in progress
     $user_shell "date > ${spool_dir}/tmp/snapshotting"
-    $user_shell "cvmfs_swissknife upload -r ${upstream} \
+    $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
       -i ${spool_dir}/tmp/snapshotting \
       -o .cvmfs_is_snapshotting"
 
     # do the actual snapshot actions
     local with_history=""
     [ $initial_snapshot -ne 1 ] && with_history="-p"
-    $user_shell "cvmfs_swissknife pull -m $name \
-        -u $stratum0 \
-        -r ${upstream} \
-        -x ${spool_dir}/tmp \
-        -k $public_key \
-        -n $num_workers \
-        -t $timeout \
+    $user_shell "$(__swissknife_cmd dbg) pull -m $name \
+        -u $stratum0                                   \
+        -r ${upstream}                                 \
+        -x ${spool_dir}/tmp                            \
+        -k $public_key                                 \
+        -n $num_workers                                \
+        -t $timeout                                    \
         -a $retries $with_history $log_level"
 
     $user_shell "date > ${spool_dir}/tmp/last_snapshot"
-    $user_shell "cvmfs_swissknife upload -r ${upstream} \
-      -i ${spool_dir}/tmp/last_snapshot \
+    $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
+      -i ${spool_dir}/tmp/last_snapshot                    \
       -o .cvmfs_last_snapshot"
 
     # run the automatic garbage collection (if configured)
@@ -4465,14 +4475,14 @@ migrate_2_1_7() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local new_manifest="${temp_dir}/new_manifest"
 
-  cvmfs_swissknife migrate \
-    -v "2.1.7" \
-    -r ${CVMFS_STRATUM0} \
-    -n $name \
-    -u ${CVMFS_UPSTREAM_STORAGE} \
-    -t $temp_dir \
-    -o $new_manifest \
-    -k /etc/cvmfs/keys/$name.pub \
+  __swissknife migrate                                 \
+    -v "2.1.7"                                         \
+    -r ${CVMFS_STRATUM0}                               \
+    -n $name                                           \
+    -u ${CVMFS_UPSTREAM_STORAGE}                       \
+    -t $temp_dir                                       \
+    -o $new_manifest                                   \
+    -k /etc/cvmfs/keys/$name.pub                       \
     -z /etc/cvmfs/repositories.d/${name}/trusted_certs \
     -s || die "fail! (migrating catalogs)"
   chown ${CVMFS_USER} $new_manifest
