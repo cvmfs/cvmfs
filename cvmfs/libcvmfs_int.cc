@@ -238,10 +238,13 @@ int cvmfs_globals::Setup(const options &opts) {
   }
   // Try to jump to cache directory.  This tests, if it is accessible.
   // Also, it brings speed later on.
-  if (opts.change_to_cache_directory &&
-      chdir(cache_directory_.c_str()) != 0) {
-    PrintError("cache directory " + cache_directory_ + " is unavailable");
-    return LIBCVMFS_FAIL_OPENCACHE;
+  if (opts.change_to_cache_directory) {
+    if (opts.alien_cachedir != "")
+      MkdirDeep(opts.alien_cachedir, 0770);
+    if (chdir(cache_directory_.c_str()) != 0) {
+      PrintError("cache directory " + cache_directory_ + " is unavailable");
+      return LIBCVMFS_FAIL_OPENCACHE;
+    }
   }
   // Creates a set of cache directories (256 directories named 00..ff) if not
   // using alien cachdir

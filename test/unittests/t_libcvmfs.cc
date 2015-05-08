@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <unistd.h>
+
 #include <cstdio>
 #include <string>
 
@@ -25,6 +27,7 @@ class T_Libcvmfs : public ::testing::Test {
     ASSERT_NE("", tmp_path_);
     opt_cache_ = "quota_limit=0,quota_threshold=0,rebuild_cachedb,"
                  "cache_directory=" + tmp_path_;
+    alien_path_ = tmp_path_ + "/alien";
 
     fdevnull_ = fopen("/dev/null", "w");
     ASSERT_FALSE(fdevnull_ == NULL);
@@ -38,6 +41,7 @@ class T_Libcvmfs : public ::testing::Test {
   }
 
   string tmp_path_;
+  string alien_path_;
   string opt_cache_;
   FILE *fdevnull_;
 };
@@ -66,6 +70,67 @@ TEST_F(T_Libcvmfs, InitFailures) {
 
   retval = cvmfs_init("");
   ASSERT_EQ(LIBCVMFS_FAIL_MKCACHE, retval);
+}
+
+
+TEST_F(T_Libcvmfs, InitConcurrent) {
+  // Align with Parrot use
+  string default_opts =
+    "max_open_files=500,change_to_cache_directory,log_prefix=libcvmfs";
+
+  string opt_var1_p1 = default_opts +
+    ",cache_directory=" + tmp_path_ + "/p1,alien_cachedir=" + alien_path_;
+  string opt_var1_p2 = default_opts +
+    ",cache_directory=" + tmp_path_ + "/p2,alien_cachedir=" + alien_path_;
+  string opt_var2_p1 = default_opts +
+    ",alien_cache,cache_directory=" + alien_path_ +
+    ",lock_directory=" + tmp_path_ + "/p1";
+  string opt_var2_p2 = default_opts +
+    ",alien_cache,cache_directory=" + alien_path_ +
+    ",lock_directory=" + tmp_path_ + "/p2";
+
+  int pipe_c2p[2];
+  int pipe_p2c[2];
+  MakePipe(pipe_c2p);
+  MakePipe(pipe_p2c);
+  int retval;
+  pid_t child_pid = fork();
+  switch (child_pid) {
+    case 0:
+      retval = cvmfs_init(opt_var1_p1.c_str());
+      WritePipe(pipe_c2p[1], &retval, sizeof(retval));
+      ReadPipe(pipe_p2c[0], &retval, sizeof(retval));
+      cvmfs_fini();
+
+      retval = cvmfs_init(opt_var2_p1.c_str());
+      WritePipe(pipe_c2p[1], &retval, sizeof(retval));
+      ReadPipe(pipe_p2c[0], &retval, sizeof(retval));
+      exit(0);
+    default:
+      // Parent
+      ASSERT_GT(child_pid, 0);
+
+      ReadPipe(pipe_c2p[0], &retval, sizeof(retval));
+      EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
+      retval = cvmfs_init(opt_var1_p2.c_str());
+      EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
+      WritePipe(pipe_p2c[1], &retval, sizeof(retval));
+      cvmfs_fini();
+      
+      ReadPipe(pipe_c2p[0], &retval, sizeof(retval));
+      EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
+      retval = cvmfs_init(opt_var2_p2.c_str());
+      EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
+      WritePipe(pipe_p2c[1], &retval, sizeof(retval));
+      cvmfs_fini();
+
+      int status;
+      waitpid(child_pid, &status, 0);
+      EXPECT_TRUE(WIFEXITED(status));
+      EXPECT_EQ(0, WEXITSTATUS(status));
+  }
+  ClosePipe(pipe_p2c);
+  ClosePipe(pipe_c2p);
 }
 
 
