@@ -170,7 +170,7 @@ TEST_F(T_Libcvmfs, OptionAliases) {
     cvmfs_init((opt_cache_ + ",cachedir=/abc").c_str());
   stderr = save_stderr;
   ASSERT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
-  
+
   retval =
     cvmfs_init((opt_cache_ + ",cachedir=" + tmp_path_).c_str());
   stderr = save_stderr;
