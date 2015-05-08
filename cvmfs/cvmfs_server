@@ -821,16 +821,16 @@ is_stratum1() {
 
 # checks if a given repository is replicable
 #
-# @param name   the repository name to be checked
+# @param name   the repository name or URL to be checked
 # @return       0 if it is a stratum0 repository and replicable
 is_master_replica() {
   local name=$1
   local is_master_replica
 
-  load_repo_config $name
   if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
-    is_master_replica=$(__swissknife info -r $name -m $(get_follow_http_redirects_flag) 2>/dev/null)
+    is_master_replica=$(__swissknife info -L -r $name -m  2>/dev/null)
   else
+    load_repo_config $name
     is_stratum0 $name || return 1
     is_master_replica=$(__swissknife info -r $CVMFS_STRATUM0 -m $(get_follow_http_redirects_flag) 2>/dev/null)
   fi
