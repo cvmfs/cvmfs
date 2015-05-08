@@ -19,8 +19,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "statistics.h"
-
 #define LIBCVMFS_FAIL_OK         0
 /**
  * Could not increase the number of open files limit
