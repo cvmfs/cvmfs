@@ -167,17 +167,9 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Do the actual migration step
   bool migration_succeeded = false;
   if (migration_base == "2.0.x") {
-    if (uid.empty()) {
-      Error("Please provide a user ID");
+    if (!ReadPersona(uid, gid)) {
       return 1;
     }
-    if (gid.empty()) {
-      Error("Please provide a group ID");
-      return 1;
-    }
-
-    uid_ = String2Int64(uid);
-    gid_ = String2Int64(gid);
 
     // Generate and upload a nested catalog marker
     if (!GenerateNestedCatalogMarkerChunk()) {
@@ -220,6 +212,23 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration succeeded");
   return 0;
+}
+
+
+bool CommandMigrate::ReadPersona(const std::string &uid,
+                                   const std::string &gid) {
+  if (uid.empty()) {
+    Error("Please provide a user ID");
+    return false;
+  }
+  if (gid.empty()) {
+    Error("Please provide a group ID");
+    return false;
+  }
+
+  uid_ = String2Int64(uid);
+  gid_ = String2Int64(gid);
+  return true;
 }
 
 

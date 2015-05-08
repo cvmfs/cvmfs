@@ -259,6 +259,7 @@ class CommandMigrate : public Command {
   bool RaiseFileDescriptorLimit() const;
   bool ConfigureSQLite() const;
   void AnalyzeCatalogStatistics() const;
+  bool ReadPersona(const std::string &uid, const std::string &gid);
 
   bool GenerateNestedCatalogMarkerChunk();
   void CreateNestedCatalogMarkerDirent(const shash::Any &content_hash);
