@@ -121,6 +121,7 @@ struct cvmfs_global_options : public cvmfs_globals::options {
     CVMFS_OPT(alien_cache);
     CVMFS_OPT(alien_cachedir);
     CVMFS_OPT(cache_directory);
+    CVMFS_OPT(cachedir);
     CVMFS_OPT(lock_directory);
     CVMFS_OPT(change_to_cache_directory);
     CVMFS_OPT(logfile);
@@ -159,6 +160,14 @@ struct cvmfs_global_options : public cvmfs_globals::options {
       return LIBCVMFS_FAIL_BADOPT;
     if (logfile != "")
       log_file = logfile;
+    
+    if ((cachedir != "") && (cache_directory != "") && 
+        (cache_directory != cachedir))
+    {
+      return LIBCVMFS_FAIL_BADOPT;
+    }
+    if (cachedir != "")
+      cache_directory = cachedir;
 
     return LIBCVMFS_FAIL_OK;
   }
@@ -241,7 +250,7 @@ static void usage() {
   "  cvmfs_attach_repo() expects repository specific options\n"
 
   "global options are:\n"
-  " cache_directory=DIR        Where to store disk cache\n"
+  " cache_directory/cachedir=DIR Where to store disk cache\n"
   " change_to_cache_directory  Performs a cd to the cache directory "
                                "(performance tweak)\n"
   " alien_cache                Treat cache directory as alien cache\n"

@@ -63,6 +63,7 @@ class cvmfs_globals : SingleCopy {
     { }
 
     std::string    cache_directory;
+    std::string    cachedir;  // Alias of cache_directory
     std::string    alien_cachedir;
     std::string    lock_directory;
     bool           change_to_cache_directory;
@@ -189,10 +190,6 @@ class cvmfs_context : SingleCopy {
 
   std::string mountpoint_;
   std::string cachedir_;
-  /**
-   * Path to cachedir, relative to current working dir
-   */
-  std::string relative_cachedir;
   std::string tracefile_;
   /**
    * Expected repository name, e.g. atlas.cern.ch

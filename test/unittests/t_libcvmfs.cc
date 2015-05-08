@@ -164,4 +164,16 @@ TEST_F(T_Libcvmfs, OptionAliases) {
     cvmfs_init((opt_cache_ + ",log_file=abc,logfile=efg").c_str());
   stderr = save_stderr;
   ASSERT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+
+  stderr = fdevnull_;
+  retval =
+    cvmfs_init((opt_cache_ + ",cachedir=/abc").c_str());
+  stderr = save_stderr;
+  ASSERT_EQ(LIBCVMFS_FAIL_BADOPT, retval);
+  
+  retval =
+    cvmfs_init((opt_cache_ + ",cachedir=" + tmp_path_).c_str());
+  stderr = save_stderr;
+  EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
+  cvmfs_fini();
 }
