@@ -78,8 +78,8 @@ class cvmfs_globals : SingleCopy {
     int            max_open_files;  // Alias of nofiles
 
     // Currently ignored
-    unsigned long  quota_limit;
-    unsigned long  quota_threshold;
+    unsigned quota_limit;
+    unsigned quota_threshold;
     bool rebuild_cachedb;
   };
 

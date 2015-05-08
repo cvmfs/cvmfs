@@ -116,7 +116,7 @@ TEST_F(T_Libcvmfs, InitConcurrent) {
       EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
       WritePipe(pipe_p2c[1], &retval, sizeof(retval));
       cvmfs_fini();
-      
+
       ReadPipe(pipe_c2p[0], &retval, sizeof(retval));
       EXPECT_EQ(LIBCVMFS_FAIL_OK, retval);
       retval = cvmfs_init(opt_var2_p2.c_str());

@@ -131,7 +131,7 @@ cvmfs_globals::~cvmfs_globals() {
     quota::Fini();
   }
 
-  // TODO: cleanup crypto
+  // TODO(jblomer): cleanup crypto
   sqlite3_shutdown();
 }
 
@@ -248,8 +248,8 @@ int cvmfs_globals::Setup(const options &opts) {
   }
   // Creates a set of cache directories (256 directories named 00..ff) if not
   // using alien cachdir
-  if (!cache::Init(cache_directory_, 
-                   opts.alien_cache || opts.alien_cachedir != "")) 
+  if (!cache::Init(cache_directory_,
+                   opts.alien_cache || opts.alien_cachedir != ""))
   {
     PrintError("Failed to setup cache in " + cache_directory_ +
                ": " + strerror(errno));
