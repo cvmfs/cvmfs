@@ -696,6 +696,15 @@ const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
 const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 2;
 
 
+template<class DerivedT>
+catalog::WritableCatalog*
+CommandMigrate::AbstractMigrationWorker<DerivedT>::GetWritable(
+                                        const catalog::Catalog *catalog) const {
+  return dynamic_cast<catalog::WritableCatalog*>(const_cast<catalog::Catalog*>(
+    catalog));
+}
+
+
 CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
   const worker_context *context)
   : AbstractMigrationWorker<MigrationWorker_20x>(context)
@@ -1694,14 +1703,6 @@ bool CommandMigrate::MigrationWorker_217::CommitDatabaseTransaction
   assert(!data->HasNew());
   GetWritable(data->old_catalog)->Commit();
   return true;
-}
-
-
-catalog::WritableCatalog* CommandMigrate::MigrationWorker_217::GetWritable(
-  const catalog::Catalog *catalog) const
-{
-  return dynamic_cast<catalog::WritableCatalog*>(const_cast<catalog::Catalog*>(
-    catalog));
 }
 
 

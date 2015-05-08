@@ -122,6 +122,9 @@ class CommandMigrate : public Command {
     bool CleanupNestedCatalogs(PendingCatalog *data) const;
     bool CollectAndAggregateStatistics(PendingCatalog *data) const;
 
+    catalog::WritableCatalog*
+      GetWritable(const catalog::Catalog *catalog) const;
+
    protected:
     const std::string  temporary_directory_;
     const bool         collect_catalog_statistics_;
@@ -202,9 +205,6 @@ class CommandMigrate : public Command {
     bool GenerateNewStatisticsCounters(PendingCatalog *data) const;
     bool UpdateCatalogSchema(PendingCatalog *data) const;
     bool CommitDatabaseTransaction(PendingCatalog *data) const;
-
-    catalog::WritableCatalog*
-      GetWritable(const catalog::Catalog *catalog) const;
   };
 
   class ChownMigrationWorker :
