@@ -61,6 +61,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_libcvmfs.cc
   t_backoff.cc
   t_wpad.cc
+  t_smalloc.cc
 
   # test utility functions
   testutil.cc testutil.h
