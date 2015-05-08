@@ -131,7 +131,11 @@ cvmfs_globals::~cvmfs_globals() {
     quota::Fini();
   }
 
-  // TODO(jblomer): cleanup crypto
+  CRYPTO_set_locking_callback(NULL);
+  for (int i = 0; i < CRYPTO_num_locks(); ++i)
+    pthread_mutex_destroy(&(libcrypto_locks_[i]));
+  OPENSSL_free(libcrypto_locks_);
+
   sqlite3_shutdown();
 }
 
