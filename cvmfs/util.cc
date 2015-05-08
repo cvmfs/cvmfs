@@ -790,27 +790,27 @@ string StringifyTime(const time_t seconds, const bool utc) {
 }
 
 
-  /**
-   * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
-   */
-  std::string RfcTimestamp() {
-    const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
-      "Aug", "Sep", "Oct", "Nov", "Dec"};
-    const char *day_of_week[] =
-      {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+/**
+ * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
+ */
+std::string RfcTimestamp() {
+  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
+    "Aug", "Sep", "Oct", "Nov", "Dec"};
+  const char *day_of_week[] =
+    {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
-    struct tm timestamp;
-    time_t now = time(NULL);
-    gmtime_r(&now, &timestamp);
+  struct tm timestamp;
+  time_t now = time(NULL);
+  gmtime_r(&now, &timestamp);
 
-    char buffer[30];
-    snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
-      day_of_week[timestamp.tm_wday], timestamp.tm_mday,
-      months[timestamp.tm_mon], timestamp.tm_year + 1900,
-      timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
-      timestamp.tm_zone);
-    return string(buffer);
-  }
+  char buffer[30];
+  snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
+    day_of_week[timestamp.tm_wday], timestamp.tm_mday,
+    months[timestamp.tm_mon], timestamp.tm_year + 1900,
+    timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
+    timestamp.tm_zone);
+  return string(buffer);
+}
 
 string StringifyTimeval(const timeval value) {
   char buffer[64];
