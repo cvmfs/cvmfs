@@ -873,7 +873,7 @@ bool CommandMigrate::MigrationWorker_20x::MigrateFileMetadata(
     "         flags, name, symlink, "
     "         :uid, "
     "         :gid, "
-    "         NULL " // set empty xattr BLOB (default)
+    "         NULL "  // set empty xattr BLOB (default)
     "  FROM old.catalog "
     "  LEFT JOIN hardlinks "
     "    ON catalog.inode = hardlinks.inode "
