@@ -159,7 +159,7 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
-    skeleton migrate list-catalogs update-geodb gc"
+    skeleton migrate list-catalogs update-geodb gc catalog-chown"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -4618,6 +4618,89 @@ migrate() {
   done
 
   return $retcode
+}
+
+
+################################################################################
+
+
+catalog_chown() {
+  local names
+  local uid_map
+  local gid_map
+
+  OPTIND=1
+  while getopts "u:g:" option; do
+    case $option in
+      u)
+        uid_map=$OPTARG
+      ;;
+      g)
+        gid_map=$OPTARG
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command catalog-chown: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+   # get repository names
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $@)
+  check_repository_existence "$name"
+
+  # sanity checks
+  [ x"$uid_map" != x"" ] && [ -f $uid_map ] || die "UID map file not found (-u)"
+  [ x"$gid_map" != x"" ] && [ -f $gid_map ] || die "GID map file not found (-g)"
+
+  load_repo_config $name
+
+  # more sanity checks
+  is_stratum0 $name       || die "This is not a stratum 0 repository"
+  is_root $name           || die "Permission denied: Only root can do that"
+  is_in_transaction $name && die "Repository is already in a transaction"
+  health_check $name
+
+  # all following commands need an open repository transaction and are supposed
+  # to commit or abort it after performing the catalog chmod.
+  echo "Opening repository transaction"
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open repository transaction"
+
+  # run the catalog level chmod operation
+  echo "Starting catalog chown"
+
+  local tmp_dir=${CVMFS_SPOOL_DIR}/tmp
+  local manifest=${tmp_dir}/manifest
+  cvmfs_swissknife migrate     \
+    -v "chown"                 \
+    -r $CVMFS_STRATUM0         \
+    -n $name                   \
+    -u $CVMFS_UPSTREAM_STORAGE \
+    -t $tmp_dir                \
+    -k $CVMFS_PUBLIC_KEY       \
+    -o $manifest               \
+    -i $uid_map                \
+    -j $gid_map                \
+    -s || die "fail"
+
+  local trunk_hash=$(grep "^C" $manifest | tr -d C)
+
+  # finalizing transaction
+  echo "Flushing file system buffers"
+  sync
+
+  # committing newly created revision
+  echo "Signing new manifest"
+  sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
+  set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
+
+  # remount the repository
+  close_transaction $name
+
+  return
 }
 
 
