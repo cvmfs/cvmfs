@@ -1796,8 +1796,8 @@ bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
         std::vector<uid_t>::const_iterator i    = data->assigned_uids.begin();
   const std::vector<uid_t>::const_iterator iend = data->assigned_uids.end();
   for (; i != iend; ++i) {
-    const bool success = update_uid.Bind(1, *i)               &&
-                         update_uid.Bind(2, uid_map_.Map(*i)) &&
+    const bool success = update_uid.Bind(1, uid_map_.Map(*i)) &&
+                         update_uid.Bind(2, *i)               &&
                          update_uid.Execute()                 &&
                          update_uid.Reset();
     if (!success) {
@@ -1809,8 +1809,8 @@ bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
         std::vector<gid_t>::const_iterator j    = data->assigned_gids.begin();
   const std::vector<gid_t>::const_iterator jend = data->assigned_gids.end();
   for (; j != jend; ++j) {
-    const bool success = update_gid.Bind(1, *j)               &&
-                         update_gid.Bind(2, gid_map_.Map(*i)) &&
+    const bool success = update_gid.Bind(1, gid_map_.Map(*i)) &&
+                         update_gid.Bind(2, *j)               &&
                          update_gid.Execute()                 &&
                          update_gid.Reset();
     if (!success) {
