@@ -308,9 +308,9 @@ class CommandMigrate : public Command {
   std::string                     nested_catalog_marker_tmp_path_;
   static catalog::DirectoryEntry  nested_catalog_marker_;
 
-  catalog::Catalog const*                        root_catalog_;
-  UniquePtr<upload::Spooler>                     spooler_;
-  PendingCatalogMap                              pending_catalogs_;
+  catalog::Catalog const*     root_catalog_;
+  UniquePtr<upload::Spooler>  spooler_;
+  PendingCatalogMap           pending_catalogs_;
 
   StopWatch  catalog_loading_stopwatch_;
   StopWatch  migration_stopwatch_;
