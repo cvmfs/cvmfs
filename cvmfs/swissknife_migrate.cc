@@ -1715,11 +1715,104 @@ CommandMigrate::ChownMigrationWorker::ChownMigrationWorker(
   , gid_map_(context->gid_map)
 {}
 
-}
-
 bool CommandMigrate::ChownMigrationWorker::RunMigration(
                                                    PendingCatalog *data) const {
+  return ListAssignedPersonas(data)  &&
+         CheckAssignedPersonas(data) &&
+         ApplyPersonaMappings(data);
+}
+
+bool CommandMigrate::ChownMigrationWorker::ListAssignedPersonas(
+                                                   PendingCatalog *data) const {
+  assert(data->assigned_uids.empty());
+  assert(data->assigned_gids.empty());
+
+  const catalog::CatalogDatabase &catalog_db = data->new_catalog->database();
+  catalog::Sql get_uids(catalog_db, "SELECT DISTINCT uid FROM catalog;");
+  while (get_uids.FetchRow()) {
+    data->assigned_uids.push_back(get_uids.RetrieveInt(0));
+  }
+
+  catalog::Sql get_gids(catalog_db, "SELECT DISTINCT gid FROM catalog;");
+  while (get_gids.FetchRow()) {
+    data->assigned_gids.push_back(get_gids.RetrieveInt(0));
+  }
+
   return true;
+}
+
+bool CommandMigrate::ChownMigrationWorker::CheckAssignedPersonas(
+                                                   PendingCatalog *data) const {
+  assert(!data->assigned_uids.empty());
+  assert(!data->assigned_gids.empty());
+
+  if (!uid_map_.HasDefault()) {
+          std::vector<uid_t>::const_iterator i    = data->assigned_uids.begin();
+    const std::vector<uid_t>::const_iterator iend = data->assigned_uids.end();
+    for (; i != iend; ++i) {
+      if (!uid_map_.Contains(*i)) {
+        Error("No default or mapping found for UID " + StringifyInt(*i), data);
+        return false;
+      }
+    }
+  }
+
+  if (!gid_map_.HasDefault()) {
+          std::vector<uid_t>::const_iterator i    = data->assigned_gids.begin();
+    const std::vector<uid_t>::const_iterator iend = data->assigned_gids.end();
+    for (; i != iend; ++i) {
+      if (!gid_map_.Contains(*i)) {
+        Error("No default or mapping found for GID " + StringifyInt(*i), data);
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
+                                                   PendingCatalog *data) const {
+  assert(uid_map_.RuleCount() > 0 || uid_map_.HasDefault());
+  assert(gid_map_.RuleCount() > 0 || gid_map_.HasDefault());
+  assert(!data->assigned_uids.empty());
+  assert(!data->assigned_gids.empty());
+
+  const catalog::CatalogDatabase &db = data->new_catalog->database();
+  catalog::Sql update_uid(db, "UPDATE catalog SET uid = :new WHERE uid = :old");
+  catalog::Sql update_gid(db, "UPDATE catalog SET gid = :new WHERE gid = :old");
+
+  if (!db.BeginTransaction()) {
+    return false;
+  }
+
+        std::vector<uid_t>::const_iterator i    = data->assigned_uids.begin();
+  const std::vector<uid_t>::const_iterator iend = data->assigned_uids.end();
+  for (; i != iend; ++i) {
+    const bool success = update_uid.Bind(1, *i)               &&
+                         update_uid.Bind(2, uid_map_.Map(*i)) &&
+                         update_uid.Execute()                 &&
+                         update_uid.Reset();
+    if (!success) {
+      Error("Failed to update UIDs", update_uid, data);
+      return false;
+    }
+  }
+
+        std::vector<gid_t>::const_iterator j    = data->assigned_gids.begin();
+  const std::vector<gid_t>::const_iterator jend = data->assigned_gids.end();
+  for (; j != jend; ++i) {
+    const bool success = update_gid.Bind(1, *j)               &&
+                         update_gid.Bind(2, gid_map_.Map(*i)) &&
+                         update_gid.Execute()                 &&
+                         update_gid.Reset();
+    if (!success) {
+      Error("Failed to update GIDs", update_gid, data);
+      return false;
+    }
+  }
+
+  return db.CommitTransaction();
 }
 
 }  // namespace swissknife

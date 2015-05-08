@@ -233,6 +233,10 @@ class CommandMigrate : public Command {
    protected:
     bool RunMigration(PendingCatalog *data) const;
 
+    bool ListAssignedPersonas(PendingCatalog *data) const;
+    bool CheckAssignedPersonas(PendingCatalog *data) const;
+    bool ApplyPersonaMappings(PendingCatalog *data) const;
+
    private:
     const UidMap &uid_map_;
     const GidMap &gid_map_;
