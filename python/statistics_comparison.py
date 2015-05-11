@@ -1,25 +1,21 @@
 import argparse
-import threading
 
 from docker import Client
 from parser import Parser
 
 
-class GitHubRepository:
-    def __init__(self, user, branch):
-        self.user = user
+class GitRepository:
+    def __init__(self, url, branch, name):
+        self.url = url
         self.branch = branch
-
-    def url(self):
-        return "https://github.com/" + self.user + "/cvmfs"
+        self.name = name
 
 
 class DockerExecutor:
-    def __init__(self, repository, socket_url, api_version, name):
+    def __init__(self, repository, socket_url, api_version):
         self.repo = repository
         self.socket_url = socket_url
         self.api_version = api_version
-        self.name = name
 
     def run(self):
         client = Client(base_url=self.socket_url, version=self.api_version)
@@ -38,18 +34,19 @@ class DockerExecutor:
               "export CVMFS_OPT_WARM_CACHE=no && " + \
               "cd /workdir/cvmfs/build && " + \
               "git reset --hard && " + \
-              "git remote add " + repo.user + " " + repo.url() + " && " + \
+              "git remote add " + repo.name + " " + repo.url + " && " + \
               "git remote update && " + \
-              "git fetch " + repo.user + " && " + \
-              "git checkout -b test " + repo.user + "/" + repo.branch + " && " + \
+              "git fetch " + repo.name + " && " + \
+              "git checkout -b test " + repo.name + "/" + repo.branch + " && " + \
               "cmake .. && " + \
               "make install && " + \
               "cd /workdir/cvmfs/test && " + \
               "./run.sh /tmp/benchmarks.log benchmarks/001-atlas/ && " + \
               "cp /tmp/cvmfs_benchmarks/atlas.cern.ch/atlas.cern.ch_1.data /tmp/" + \
-              self.name + ".data\' > /tmp/run.log"
+              repo.name + ".data\' > /tmp/run.log"
 
-        print("Executing benchmarks for the repository \"" + self.name + "\"")
+        print("Executing benchmarks for the repository \"" + self.repo.url +
+              "\"")
         container_id = client.create_container(image="moliholy/slc6:cvmfs-test",
                                                volumes=volumes,
                                                hostname="cvmfs-test",
@@ -74,9 +71,9 @@ def parse_args():
     argparser.add_argument("--docker_api_version",
                            default="1.17",
                            required=False, type=str,
-                           help="Docer API version (default 1.17)")
+                           help="Docker API version (default 1.17)")
     argparser.add_argument("--original_repo",
-                           default="cvmfs",
+                           default="https://github.com/cvmfs/cvmfs.git",
                            required=False, type=str,
                            help="Original repository to compare to")
     argparser.add_argument("--original_branch",
@@ -93,24 +90,24 @@ def parse_args():
 
 def main():
     args = parse_args()
-    origin = GitHubRepository(args.original_repo, args.original_branch)
-    external = GitHubRepository(args.external_repo, args.external_branch)
+    origin = GitRepository(args.original_repo, args.original_branch, "original")
+    external = GitRepository(args.external_repo, args.external_branch,
+                             "external")
 
     # download firstly the image
     print("Downloading the image " + image + ":" + tag)
     c = Client(base_url=args.socket_url, version=args.docker_api_version)
     c.pull(repository=image, tag=tag)
 
-    # it creates two threads
     origin_exec = DockerExecutor(origin, args.socket_url,
-                                 args.docker_api_version, origin.user)
+                                 args.docker_api_version)
     external_exec = DockerExecutor(external, args.socket_url,
-                                   args.docker_api_version, external.user)
+                                   args.docker_api_version)
     origin_exec.run()
-    origin_parser = Parser("/tmp/" + origin.user + ".data")
+    origin_parser = Parser("/tmp/" + origin.name + ".data")
 
     external_exec.run()
-    external_parser = Parser("/tmp/" + external.user + ".data")
+    external_parser = Parser("/tmp/" + external.name + ".data")
 
     Parser.to_csv_comparison(origin_parser, external_parser,
                              "/tmp/comparison.csv")
