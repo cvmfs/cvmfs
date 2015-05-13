@@ -772,21 +772,15 @@ string StringifyDouble(const double value) {
  * Converts seconds since UTC 0 into something readable
  */
 string StringifyTime(const time_t seconds, const bool utc) {
-  struct tm timestamp;
+  char buf[32];
+  struct tm ts;
   if (utc) {
-    localtime_r(&seconds, &timestamp);
+    localtime_r(&seconds, &ts);
   } else {
-    gmtime_r(&seconds, &timestamp);
+    gmtime_r(&seconds, &ts);
   }
-
-  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
-    "Aug", "Sep", "Oct", "Nov", "Dec"};
-  char buffer[21];
-  snprintf(buffer, sizeof(buffer), "%d %s %d %02d:%02d:%02d", timestamp.tm_mday,
-           months[timestamp.tm_mon], timestamp.tm_year + 1900,
-           timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec);
-
-  return string(buffer);
+  strftime(buf, sizeof(buf), "%d %b %Y %H:%M:%S", &ts);
+  return string(buf);
 }
 
 
