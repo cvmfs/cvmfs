@@ -38,7 +38,7 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     if (header_line[i] == '2') {
       return num_bytes;
     } else {
-      LogCvmfs(kLogDownload, kLogDebug, "http status error code: %s",
+      LogCvmfs(kLogS3Fanout, kLogDebug, "http status error code: %s",
                header_line.c_str());
       if (header_line.length() < i+3) {
         info->error_code = kFailOther;
@@ -95,7 +95,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     size_t read_bytes = fread(ptr, 1, num_bytes, info->origin_file);
     if (read_bytes != num_bytes) {
       if (ferror(info->origin_file) != 0) {
-        LogCvmfs(kLogS3Fanout, kLogDebug, "local I/O error reading %s",
+        LogCvmfs(kLogS3Fanout, kLogStderr, "local I/O error reading %s",
                  info->origin_path.c_str());
         return CURL_READFUNC_ABORT;
       }
@@ -116,7 +116,7 @@ int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(userp);
   int ajobs = 0;
   sem_getvalue(&s3fanout_mgr->available_jobs_, &ajobs);
-  LogCvmfs(kLogDownload, kLogDebug, "CallbackCurlSocket called with easy "
+  LogCvmfs(kLogS3Fanout, kLogDebug, "CallbackCurlSocket called with easy "
            "handle %p, socket %d, action %d, up %d, "
            "sp %d, fds_inuse %d, jobs %d",
            easy, s, action, userp,
@@ -230,11 +230,11 @@ void *S3FanoutManager::MainUpload(void *data) {
                                         0,
                                         &still_running);
       if (retval != CURLM_OK) {
-        LogCvmfs(kLogS3Fanout, kLogDebug, "Error, timeout due to: %d", retval);
+        LogCvmfs(kLogS3Fanout, kLogStderr, "Error, timeout due to: %d", retval);
         assert(retval == CURLM_OK);
       }
     } else if (retval < 0) {
-      LogCvmfs(kLogS3Fanout, kLogDebug, "Error, event poll failed: %d", errno);
+      LogCvmfs(kLogS3Fanout, kLogStderr, "Error, event poll failed: %d", errno);
       assert(retval >= 0);
     }
 
@@ -482,7 +482,7 @@ int S3FanoutManager::InitializeDnsSettings(
     sharehandles_->insert(dnse);
   }
   if (dnse == NULL) {
-    LogCvmfs(kLogS3Fanout, kLogDebug | kLogSyslogErr,
+    LogCvmfs(kLogS3Fanout, kLogStderr | kLogSyslogErr,
              "Error: DNS resolve failed for address '%s'.",
              remote_host.c_str());
     assert(dnse != NULL);
@@ -636,6 +636,9 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
     retval = curl_easy_setopt(handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
     assert(retval == CURLE_OK);
   }
+  // Follow HTTP redirects
+  retval = curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
+  assert(retval == CURLE_OK);
 
   return kFailOk;
 }
@@ -748,7 +751,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       // Error set by callback
       break;
     default:
-      LogCvmfs(kLogS3Fanout, kLogDebug | kLogSyslogErr,
+      LogCvmfs(kLogS3Fanout, kLogStderr | kLogSyslogErr,
                "unexpected curl error (%d) while trying to upload %s",
                curl_error, info->object_key.c_str());
       info->error_code = kFailOther;
@@ -783,7 +786,7 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   if (try_again) {
     if (info->request == JobInfo::kReqPut ||
         info->request == JobInfo::kReqPutNoCache) {
-      LogCvmfs(kLogDownload, kLogDebug, "Trying again to upload %s",
+      LogCvmfs(kLogS3Fanout, kLogDebug, "Trying again to upload %s",
                info->object_key.c_str());
       // Reset origin
       if (info->origin == kOriginMem)

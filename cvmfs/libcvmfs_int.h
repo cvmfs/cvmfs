@@ -43,26 +43,47 @@ extern std::string  *repository_name_;
 extern bool          foreground_;
 }
 
+/**
+ * A singleton managing the cvmfs resources for all attached repositories.
+ */
 class cvmfs_globals : SingleCopy {
  public:
+  // Common options for all repositories
   struct options {
-    options() : change_to_cache_directory(false),
-                alien_cache(false),
-                log_syslog_level(LOG_ALERT),
-                max_open_files(0) {}
+    options()
+      : change_to_cache_directory(false)
+      , alien_cache(false)
+      , syslog_level(-1)
+      , log_syslog_level(-1)
+      , nofiles(-1)
+      , max_open_files(0)
+      , quota_limit(0)
+      , quota_threshold(0)
+      , rebuild_cachedb(0)
+    { }
 
     std::string    cache_directory;
+    std::string    cachedir;  // Alias of cache_directory
+    std::string    alien_cachedir;
+    std::string    lock_directory;
     bool           change_to_cache_directory;
     bool           alien_cache;
 
+    int            syslog_level;
     int            log_syslog_level;
     std::string    log_prefix;
+    std::string    logfile;
     std::string    log_file;
 
-    int            max_open_files;
+    int            nofiles;
+    int            max_open_files;  // Alias of nofiles
+
+    // Currently ignored
+    unsigned quota_limit;
+    unsigned quota_threshold;
+    bool rebuild_cachedb;
   };
 
- public:
   static int            Initialize(const options &opts);
   static void           Destroy();
   static cvmfs_globals* Instance();
@@ -71,7 +92,6 @@ class cvmfs_globals : SingleCopy {
 
  protected:
   int Setup(const options &opts);
-
   static void CallbackLibcryptoLock(int mode, int type,
                                     const char *file, int line);
   // unsigned long type required by libcrypto (openssl)
@@ -81,27 +101,26 @@ class cvmfs_globals : SingleCopy {
   cvmfs_globals();
   ~cvmfs_globals();
 
- private:
   static cvmfs_globals *instance;
 
- private:
   std::string       cache_directory_;
+  std::string       lock_directory_;
   uid_t             uid_;
   gid_t             gid_;
-
   int               fd_lockfile_;
   pthread_mutex_t  *libcrypto_locks_;
-
   void             *sqlite_scratch;
   void             *sqlite_page_cache;
-
- private:
   bool options_ready_;
   bool lock_created_;
   bool cache_ready_;
   bool quota_ready_;
 };
 
+
+/**
+ * Encapsulates state and manager objects for a single attached repository.
+ */
 class cvmfs_context : SingleCopy {
  public:
   struct options {
@@ -171,10 +190,6 @@ class cvmfs_context : SingleCopy {
 
   std::string mountpoint_;
   std::string cachedir_;
-  /**
-   * Path to cachedir, relative to current working dir
-   */
-  std::string relative_cachedir;
   std::string tracefile_;
   /**
    * Expected repository name, e.g. atlas.cern.ch

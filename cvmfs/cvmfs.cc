@@ -2008,6 +2008,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
 
   cvmfs::statistics_ = new perf::Statistics();
 
+  // register the ShortString's static counters
+  cvmfs::statistics_->Register("pathstring.n_instances", "Number of instances");
+  cvmfs::statistics_->Register("pathstring.n_overflows", "Number of overflows");
+  cvmfs::statistics_->Register("namestring.n_instances", "Number of instances");
+  cvmfs::statistics_->Register("namestring.n_overflows", "Number of overflows");
+  cvmfs::statistics_->Register("linkstring.n_instances", "Number of instances");
+  cvmfs::statistics_->Register("linkstring.n_overflows", "Number of overflows");
+
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
   cvmfs::cachedir_ = new string(cachedir);
