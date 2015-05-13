@@ -772,15 +772,14 @@ string StringifyDouble(const double value) {
  * Converts seconds since UTC 0 into something readable
  */
 string StringifyTime(const time_t seconds, const bool utc) {
-  time_t now = time(NULL);
-  char buf[80];
+  char buf[32];
   struct tm ts;
   if (utc) {
-    ts = *localtime(&now);
+    localtime_r(&seconds, &ts);
   } else {
-    ts = *gmtime(&now);
+    gmtime_r(&seconds, &ts);
   }
-  strftime(buf, sizeof(buf), "%d %h %Y %H:%M:%S", &ts);
+  strftime(buf, sizeof(buf), "%d %b %Y %H:%M:%S", &ts);
   return string(buf);
 }
 
