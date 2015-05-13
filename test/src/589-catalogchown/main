@@ -1,0 +1,464 @@
+cvmfs_test_name="Map UID and GID in Repository on Catalog Level"
+cvmfs_test_autofs_on_startup=false
+
+id_exists() {
+  local id_type=$1
+  local needle_id=$2
+
+  local id_offset=$( [ x"$id_type" = x"uid" ] && echo "3" || echo "4" )
+  cat /etc/passwd                                 | \
+  awk "{split(\$0,a,\":\"); print a[$id_offset]}" | \
+  grep -qe "^${needle_id}\$"
+}
+
+find_next_free_id() {
+  local id_type=$1
+  local next_id=$2
+
+  while [ $next_id -lt 3000 ]; do
+    next_id=$(( $next_id + 1 ))
+    id_exists "$id_type" $next_id || { echo $next_id; return 0; }
+  done
+
+  return 1
+}
+
+find_next_free_uid() {
+  local start_from=${1:-300}
+  find_next_free_id "uid" $start_from
+}
+
+find_next_free_gid() {
+  local start_from=${1:-300}
+  find_next_free_id "gid" $start_from
+}
+
+create_file() {
+  local path=$1
+  local uid=$2
+  local gid=$3
+
+  echo "owned by $uid : $gid" > $path || return 1
+  sudo chown ${uid}:${gid}      $path || return 2
+}
+
+check_file() {
+  local path=$1
+  local uid=$2
+  local gid=$3
+
+  local persona="$(stat --format='%u:%g' $path)"
+  [ x"$persona" = x"${uid}:${gid}" ]
+}
+
+produce_files_in_1() {
+  local working_dir=$1
+  local uid_1=$2
+  local uid_2=$3
+  local uid_3=$4
+  local gid_1=$5
+  local gid_2=$6
+  local gid_3=$7
+
+  pushdir $working_dir
+
+  mkdir foo
+  mkdir bar
+  mkdir baz
+
+  create_file foo/owned_by_root $(id -ru root) $(id -rg root)
+  create_file foo/owned_by_id1  $uid_1         $gid_1
+  create_file foo/owned_by_id2  $uid_2         $gid_2
+  create_file foo/owned_by_id3  $uid_3         $gid_3
+
+  create_file bar/owned_by_root $(id -ru root) $(id -rg root)
+  create_file bar/owned_by_id1  $uid_1         $gid_1
+  create_file bar/owned_by_id2  $uid_2         $gid_2
+  create_file bar/owned_by_id3  $uid_3         $gid_3
+
+  create_file baz/owned_by_root $(id -ru root) $(id -rg root)
+  create_file baz/owned_by_id1  $uid_1         $gid_1
+  create_file baz/owned_by_id2  $uid_2         $gid_2
+  create_file baz/owned_by_id3  $uid_3         $gid_3
+
+  touch foo/.cvmfscatalog
+  touch baz/.cvmfscatalog
+
+  sudo chown ${uid_1}:${gid_1} foo
+  sudo chown ${uid_2}:${gid_3} bar # <<== Note: the UID/GID switch
+  sudo chown ${uid_3}:${gid_2} baz # <<==       here as well
+
+  sudo chmod -R 777 . # to make it deletable by everyone (including the test executor)
+
+  popdir
+}
+
+check_file_permissions_1() {
+  local working_dir=$1
+  local uid_1=$2
+  local uid_2=$3
+  local uid_3=$4
+  local gid_1=$5
+  local gid_2=$6
+  local gid_3=$7
+
+  pushdir $working_dir
+
+  check_file foo/owned_by_root $(id -ru root) $(id -rg root) || return 1
+  check_file foo/owned_by_id1  $uid_1         $gid_1         || return 2
+  check_file foo/owned_by_id2  $uid_2         $gid_2         || return 3
+  check_file foo/owned_by_id3  $uid_3         $gid_3         || return 4
+
+  check_file bar/owned_by_root $(id -ru root) $(id -rg root) || return 5
+  check_file bar/owned_by_id1  $uid_1         $gid_1         || return 6
+  check_file bar/owned_by_id2  $uid_2         $gid_2         || return 7
+  check_file bar/owned_by_id3  $uid_3         $gid_3         || return 8
+
+  check_file baz/owned_by_root $(id -ru root) $(id -rg root) || return 9
+  check_file baz/owned_by_id1  $uid_1         $gid_1         || return 10
+  check_file baz/owned_by_id2  $uid_2         $gid_2         || return 11
+  check_file baz/owned_by_id3  $uid_3         $gid_3         || return 12
+
+  check_file foo ${uid_1} ${gid_1}                           || return 13
+  check_file bar ${uid_2} ${gid_3}                           || return 14
+  check_file baz ${uid_3} ${gid_2}                           || return 15
+
+  popdir
+}
+
+apply_uid_gid_map_1_to() {
+  local working_dir=$1
+  local uid_1=$2
+  local uid_2=$3
+  local uid_3=$4
+  local gid_1=$5
+  local gid_2=$6
+  local gid_3=$7
+
+  local ctu=$(id -ru $CVMFS_TEST_USER)
+  local ctg=$(id -rg $CVMFS_TEST_USER)
+
+  pushdir $working_dir
+
+  sudo chown ${ctu}:${ctg}     foo/owned_by_root  || return 1
+  sudo chown ${uid_2}:${gid_3} foo/owned_by_id1   || return 2
+  sudo chown ${uid_1}:${ctg}   foo/owned_by_id2   || return 3
+  sudo chown ${ctu}:${gid_1}   foo/owned_by_id3   || return 4
+
+  sudo chown ${ctu}:${ctg}     bar/owned_by_root  || return 5
+  sudo chown ${uid_2}:${gid_3} bar/owned_by_id1   || return 6
+  sudo chown ${uid_1}:${ctg}   bar/owned_by_id2   || return 7
+  sudo chown ${ctu}:${gid_1}   bar/owned_by_id3   || return 8
+
+  sudo chown ${ctu}:${ctg}     baz/owned_by_root  || return 9
+  sudo chown ${uid_2}:${gid_3} baz/owned_by_id1   || return 10
+  sudo chown ${uid_1}:${ctg}   baz/owned_by_id2   || return 11
+  sudo chown ${ctu}:${gid_1}   baz/owned_by_id3   || return 12
+
+  sudo chown ${uid_2}:${gid_3} foo                || return 13
+  sudo chown ${uid_1}:${gid_1} bar                || return 14
+  sudo chown ${ctu}:${ctg}     baz                || return 15
+
+  popdir
+}
+
+check_file_permissions_2() {
+  local working_dir=$1
+  local uid_1=$2
+  local uid_2=$3
+  local uid_3=$4
+  local gid_1=$5
+  local gid_2=$6
+  local gid_3=$7
+
+  local ctu=$(id -ru $CVMFS_TEST_USER)
+  local ctg=$(id -rg $CVMFS_TEST_USER)
+
+  pushdir $working_dir
+
+  check_file foo/owned_by_root $ctu    $ctg   || return 1
+  check_file foo/owned_by_id1  $uid_2  $gid_3 || return 2
+  check_file foo/owned_by_id2  $uid_1  $ctg   || return 3
+  check_file foo/owned_by_id3  $ctu    $gid_1 || return 4
+
+  check_file bar/owned_by_root $ctu    $ctg   || return 5
+  check_file bar/owned_by_id1  $uid_2  $gid_3 || return 6
+  check_file bar/owned_by_id2  $uid_1  $ctg   || return 7
+  check_file bar/owned_by_id3  $ctu    $gid_1 || return 8
+
+  check_file baz/owned_by_root $ctu    $ctg   || return 9
+  check_file baz/owned_by_id1  $uid_2  $gid_3 || return 10
+  check_file baz/owned_by_id2  $uid_1  $ctg   || return 11
+  check_file baz/owned_by_id3  $ctu    $gid_1 || return 12
+
+  check_file foo $uid_2 $gid_3                || return 13
+  check_file bar $uid_1 $gid_1                || return 14
+  check_file baz $ctu   $ctg                  || return 15
+
+  popdir
+}
+
+apply_uid_gid_map_2_to() {
+  local working_dir=$1
+  local uid_1=$2
+  local uid_2=$3
+  local uid_3=$4
+  local gid_1=$5
+  local gid_2=$6
+  local gid_3=$7
+
+  local ctu=$(id -ru $CVMFS_TEST_USER)
+  local ctg=$(id -rg $CVMFS_TEST_USER)
+
+  pushdir $working_dir
+
+  sudo chown ${ctu}:${ctg}   foo/owned_by_root  || return 1
+  sudo chown ${ctu}:${gid_3} foo/owned_by_id1   || return 2
+  sudo chown ${ctu}:${ctg}   foo/owned_by_id2   || return 3
+  sudo chown ${ctu}:${ctg}   foo/owned_by_id3   || return 4
+
+  sudo chown ${ctu}:${ctg}   bar/owned_by_root  || return 5
+  sudo chown ${ctu}:${gid_3} bar/owned_by_id1   || return 6
+  sudo chown ${ctu}:${ctg}   bar/owned_by_id2   || return 7
+  sudo chown ${ctu}:${ctg}   bar/owned_by_id3   || return 8
+
+  sudo chown ${ctu}:${ctg}   baz/owned_by_root  || return 9
+  sudo chown ${ctu}:${gid_3} baz/owned_by_id1   || return 10
+  sudo chown ${ctu}:${ctg}   baz/owned_by_id2   || return 11
+  sudo chown ${ctu}:${ctg}   baz/owned_by_id3   || return 12
+
+  sudo chown ${ctu}:${gid_3} foo                || return 13
+  sudo chown ${ctu}:${ctg}   bar                || return 14
+  sudo chown ${ctu}:${ctg}   baz                || return 15
+
+  popdir
+}
+
+check_file_permissions_3() {
+  local working_dir=$1
+  local uid_1=$2
+  local uid_2=$3
+  local uid_3=$4
+  local gid_1=$5
+  local gid_2=$6
+  local gid_3=$7
+
+  local ctu=$(id -ru $CVMFS_TEST_USER)
+  local ctg=$(id -rg $CVMFS_TEST_USER)
+
+  pushdir $working_dir
+
+  check_file foo/owned_by_root $ctu  $ctg   || return 1
+  check_file foo/owned_by_id1  $ctu  $gid_3 || return 2
+  check_file foo/owned_by_id2  $ctu  $ctg   || return 3
+  check_file foo/owned_by_id3  $ctu  $ctg   || return 4
+
+  check_file bar/owned_by_root $ctu  $ctg   || return 5
+  check_file bar/owned_by_id1  $ctu  $gid_3 || return 6
+  check_file bar/owned_by_id2  $ctu  $ctg   || return 7
+  check_file bar/owned_by_id3  $ctu  $ctg   || return 8
+
+  check_file baz/owned_by_root $ctu  $ctg   || return 9
+  check_file baz/owned_by_id1  $ctu  $gid_3 || return 10
+  check_file baz/owned_by_id2  $ctu  $ctg   || return 11
+  check_file baz/owned_by_id3  $ctu  $ctg   || return 12
+
+  check_file foo $ctu $gid_3                || return 13
+  check_file bar $ctu $ctg                  || return 14
+  check_file baz $ctu $ctg                  || return 15
+
+  popdir
+}
+
+produce_files_in_2() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -f foo/.cvmfscatalog
+  rm -f baz/.cvmfscatalog
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local fd_logfile="file_descriptors.log"
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "creating some dummy UIDs and GIDs"
+  local uid_1=$(find_next_free_uid 300)
+  local uid_2=$(find_next_free_uid $uid_1)
+  local uid_3=$(find_next_free_uid $uid_2)
+  local gid_1=$(find_next_free_gid 400)
+  local gid_2=$(find_next_free_gid $gid_1)
+  local gid_3=$(find_next_free_gid $gid_2)
+
+    echo "generate UID and GID mapping files"
+  local uid_map_1="uid_1.map"
+  local gid_map_1="gid_1.map"
+  local uid_map_2="uid_2.map"
+  local gid_map_2="gid_2.map"
+  local uid_map_x="uid_broken.map"
+  local gid_map_x="gid_broken.map"
+  cat > $uid_map_1 << EOF
+# map root to $CVMFS_TEST_USER
+$(id -ru root)  $(id -ru $CVMFS_TEST_USER)
+
+# swap UID1 and UID2
+$uid_1  $uid_2
+$uid_2 $uid_1
+
+# map everything else to $CVMFS_TEST_USER
+*   $(id -ru $CVMFS_TEST_USER)
+EOF
+
+  cat > $gid_map_1 << EOF
+# map root-group to ${CVMFS_TEST_USER}'s group
+$(id -rg root)  $(id -rg $CVMFS_TEST_USER)
+
+# swap GID1 and GID3
+$gid_1  $gid_3
+$gid_3 $gid_1
+
+# map everything else to ${CVMFS_TEST_USER}'s group
+* $(id -rg $CVMFS_TEST_USER)
+EOF
+
+  cat > $uid_map_2 << EOF
+# map everything to $CVMFS_TEST_USER
+* $(id -ru $CVMFS_TEST_USER)
+EOF
+
+  cat > $gid_map_2 << EOF
+# map $gid_1 to ${CVMFS_TEST_USER}'s group
+$gid_1  $(id -rg $CVMFS_TEST_USER)
+EOF
+
+  cat > $uid_map_x << EOF
+# this map file is broken (no rules at all)
+EOF
+
+  cat > $gid_map_x << EOF
+# this map file is broken (bogus rule)
+1337 *
+EOF
+
+  echo "$uid_map_1 looks like this:"
+  echo "-----------------------"
+  cat $uid_map_1
+  echo "-----------------------"
+
+  echo ""
+
+  echo "$gid_map_1 looks like this:"
+  echo "-----------------------"
+  cat $gid_map_1
+  echo "-----------------------"
+
+  echo "$uid_map_2 looks like this:"
+  echo "-----------------------"
+  cat $uid_map_2
+  echo "-----------------------"
+
+  echo "$gid_map_2 looks like this:"
+  echo "-----------------------"
+  cat $gid_map_2
+  echo "-----------------------"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "create some directories and files"
+  produce_files_in_1 $repo_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return 1
+
+  echo "create some directories and files"
+  produce_files_in_1 $reference_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return 2
+
+  echo "publish repository"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check if the file permissions are properly set (repo)"
+  check_file_permissions_1 $repo_dir      $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+
+  echo "check if the file permissions are properly set (reference)"
+  check_file_permissions_1 $reference_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  echo "run the chown on catalog level"
+  sudo cvmfs_server catalog-chown -u $uid_map_1 -g $gid_map_1 $CVMFS_TEST_REPO || return 3
+
+  echo "apply the same UID and GID changes to the reference directory"
+  apply_uid_gid_map_1_to $reference_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return 4
+
+  echo "check if the file permissions are properly set (reference)"
+  check_file_permissions_2 $reference_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+
+  echo "compare_directories"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check if the file permissions are properly set (repo)"
+  check_file_permissions_2 $repo_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "remove the nested catalogs"
+  produce_files_in_2 $repo_dir || return 5
+
+  echo "remove the nested catalog markers in the reference dir as well"
+  produce_files_in_2 $reference_dir || return 6
+
+  echo "publish repository (without any nested catalogs)"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  # ============================================================================
+
+  echo "run the chown on catalog level again"
+  sudo cvmfs_server catalog-chown -u $uid_map_2 -g $gid_map_2 $CVMFS_TEST_REPO || return 7
+
+  echo "apply the same UID and GID changes to the reference directory"
+  apply_uid_gid_map_2_to $reference_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return 8
+
+  echo "check if the file permissions are properly set (reference)"
+  check_file_permissions_3 $reference_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+
+  echo "compare_directories"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check if the file permissions are properly set (repo)"
+  check_file_permissions_3 $repo_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  echo "try to apply a broken map files"
+  sudo cvmfs_server catalog-chown -u $uid_map_x -g $gid_map_1 $CVMFS_TEST_REPO && return 9
+  sudo cvmfs_server catalog-chown -u $uid_map_1 -g $gid_map_x $CVMFS_TEST_REPO && return 10
+
+  return 0
+}
