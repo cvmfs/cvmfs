@@ -45,6 +45,7 @@ class FileSystemTraversal {
   VoidCallback fn_leave_dir;
   VoidCallback fn_new_file;
   VoidCallback fn_new_symlink;
+  VoidCallback fn_new_socket;
 
   /**
    * Optional callback for all files during recursion to decide
@@ -182,6 +183,10 @@ class FileSystemTraversal {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing symlink %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_symlink, path, dit->d_name);
+      } else if(S_ISSOCK(info.st_mode)){
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing socket %s/%s",
+                 path.c_str(), dit->d_name);
+        Notify(fn_new_socket, path, dit->d_name);
       } else {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "unknown file type %s/%s",
                  path.c_str(), dit->d_name);
