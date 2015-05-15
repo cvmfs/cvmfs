@@ -53,14 +53,35 @@ class T_UidMap : public ::testing::Test {
     return path;
   }
 
-  std::string GetInvalidFile() {
+  std::string GetInvalidFile1() {
     const std::string invalid_file =
       "# comment\n"  // comment
       "42 3\n"       // ordinary rule
-      "1\n"          // invalid rule     <---
+      "1 *\n"        // invalid rule (non-numeric map result)    <---
       "\n"           // empty line
       "# comment\n"  // comment
       "*   1337\n";  // default value
+
+    const std::string path = CreateTempPath(sandbox + "/invalid", 0600);
+    WriteFile(path, invalid_file);
+    return path;
+  }
+
+  std::string GetInvalidFile2() {
+    const std::string invalid_file =
+      "# comment\n"  // comment
+      "12 4\n"       // ordinary rule
+      "1\n";         // invalid rule (no map result) <---
+
+    const std::string path = CreateTempPath(sandbox + "/invalid", 0600);
+    WriteFile(path, invalid_file);
+    return path;
+  }
+
+  std::string GetInvalidFile3() {
+    const std::string invalid_file =
+      "# empty file\n"  // comment
+      "foo 14";         // invalid rule (non-numeric ID value) <---
 
     const std::string path = CreateTempPath(sandbox + "/invalid", 0600);
     WriteFile(path, invalid_file);
@@ -170,9 +191,20 @@ TYPED_TEST(T_UidMap, ReadFromFile) {
 }
 
 
-TYPED_TEST(T_UidMap, ReadFromCorruptFile) {
-  TypeParam map;
-  const std::string path = TestFixture::GetInvalidFile();
-  ASSERT_FALSE(map.Read(path));
-  EXPECT_FALSE(map.IsValid());
+TYPED_TEST(T_UidMap, ReadFromCorruptFiles) {
+  TypeParam map1;
+  TypeParam map2;
+  TypeParam map3;
+  const std::string path1 = TestFixture::GetInvalidFile1();
+  const std::string path2 = TestFixture::GetInvalidFile2();
+  const std::string path3 = TestFixture::GetInvalidFile3();
+
+  ASSERT_FALSE(map1.Read(path1));
+  EXPECT_FALSE(map1.IsValid());
+
+  ASSERT_FALSE(map2.Read(path2));
+  EXPECT_FALSE(map2.IsValid());
+
+  ASSERT_FALSE(map3.Read(path3));
+  EXPECT_FALSE(map3.IsValid());
 }
