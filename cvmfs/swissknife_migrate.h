@@ -288,8 +288,8 @@ class CommandMigrate : public Command {
   bool ReadPersona(const std::string &uid, const std::string &gid);
   bool ReadPersonaMaps(const std::string &uid_map_path,
                        const std::string &gid_map_path,
-                             UidMap      &uid_map,
-                             GidMap      &gid_map) const;
+                             UidMap      *uid_map,
+                             GidMap      *gid_map) const;
 
   bool GenerateNestedCatalogMarkerChunk();
   void CreateNestedCatalogMarkerDirent(const shash::Any &content_hash);

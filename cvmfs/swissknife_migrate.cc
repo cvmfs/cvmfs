@@ -203,7 +203,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   } else if (migration_base == "chown") {
     UidMap uid_map;
     GidMap gid_map;
-    if (!ReadPersonaMaps(uid_map_path, gid_map_path, uid_map, gid_map)) {
+    if (!ReadPersonaMaps(uid_map_path, gid_map_path, &uid_map, &gid_map)) {
       Error("Failed to read UID and/or GID map");
       return 1;
     }
@@ -256,24 +256,24 @@ bool CommandMigrate::ReadPersona(const std::string &uid,
 
 bool CommandMigrate::ReadPersonaMaps(const std::string &uid_map_path,
                                      const std::string &gid_map_path,
-                                           UidMap      &uid_map,
-                                           GidMap      &gid_map) const {
-  if (!uid_map.Read(uid_map_path) || !uid_map.IsValid()) {
+                                           UidMap      *uid_map,
+                                           GidMap      *gid_map) const {
+  if (!uid_map->Read(uid_map_path) || !uid_map->IsValid()) {
     Error("Failed to read UID map");
     return false;
   }
 
-  if (!gid_map.Read(gid_map_path) || !gid_map.IsValid()) {
+  if (!gid_map->Read(gid_map_path) || !gid_map->IsValid()) {
     Error("Failed to read GID map");
     return false;
   }
 
-  if (uid_map.RuleCount() == 0 && !uid_map.HasDefault()) {
+  if (uid_map->RuleCount() == 0 && !uid_map->HasDefault()) {
     Error("UID map appears to be empty");
     return false;
   }
 
-  if (gid_map.RuleCount() == 0 && !gid_map.HasDefault()) {
+  if (gid_map->RuleCount() == 0 && !gid_map->HasDefault()) {
     Error("GID map appears to be empty");
     return false;
   }
@@ -1727,20 +1727,21 @@ bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
   assert(data->old_catalog != NULL);
   assert(data->new_catalog == NULL);
 
-  const catalog::CatalogDatabase &db=GetWritable(data->old_catalog)->database();
+  const catalog::CatalogDatabase &db =
+                                     GetWritable(data->old_catalog)->database();
 
   if (!db.BeginTransaction()) {
     return false;
   }
 
   catalog::Sql uid_sql(db, uid_map_statement_);
-  if (! uid_sql.Execute()) {
+  if (!uid_sql.Execute()) {
     Error("Failed to update UIDs", uid_sql, data);
     return false;
   }
 
   catalog::Sql gid_sql(db, gid_map_statement_);
-  if (! gid_sql.Execute()) {
+  if (!gid_sql.Execute()) {
     Error("Failed to update GIDs", gid_sql, data);
     return false;
   }
@@ -1763,8 +1764,9 @@ std::string CommandMigrate::ChownMigrationWorker::GenerateMappingStatement(
   } else {
     // apply multiple ID mappings (UPDATE clause with CASE statement)
     stmt += "CASE " + column + " ";
-          typename MapT::map_type::const_iterator i    = map.GetRuleMap().begin();
-    const typename MapT::map_type::const_iterator iend = map.GetRuleMap().end();
+    typedef typename MapT::map_type::const_iterator map_iterator;
+          map_iterator i    = map.GetRuleMap().begin();
+    const map_iterator iend = map.GetRuleMap().end();
     for (; i != iend; ++i) {
       stmt += "WHEN " + StringifyInt(i->first) +
              " THEN " + StringifyInt(i->second) + " ";

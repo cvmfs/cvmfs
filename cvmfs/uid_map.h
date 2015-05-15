@@ -5,10 +5,12 @@
 #ifndef CVMFS_UID_MAP_H_
 #define CVMFS_UID_MAP_H_
 
+#include <sys/types.h>
+
 #include <cerrno>
 #include <map>
+#include <string>
 #include <vector>
-#include <sys/types.h>
 
 #include "util.h"
 
@@ -37,12 +39,12 @@ class IntegerMap {
   }
 
   bool Contains(const T k) const {
-    assert (IsValid());
+    assert(IsValid());
     return map_.find(k) != map_.end();
   }
 
   T Map(const T k) const {
-    assert (IsValid());
+    assert(IsValid());
     typename map_type::const_iterator i = map_.find(k);
     if (i != map_.end()) {
       return i->second;
@@ -79,7 +81,7 @@ class IntegerMap {
       }
 
       std::vector<std::string> components = SplitString(line, ' ');
-      FilterEmptyStrings(components);
+      FilterEmptyStrings(&components);
       if (components.size() != 2    ||
           !IsNumeric(components[1]) ||
           (components[0] != "*" && !IsNumeric(components[0]))) {
@@ -103,11 +105,11 @@ class IntegerMap {
     return true;
   }
 
-  void FilterEmptyStrings(std::vector<std::string> &vec) const {
-          std::vector<std::string>::iterator       i    = vec.begin();
-    const std::vector<std::string>::const_iterator iend = vec.end();
+  void FilterEmptyStrings(std::vector<std::string> *vec) const {
+          std::vector<std::string>::iterator       i    = vec->begin();
+    const std::vector<std::string>::const_iterator iend = vec->end();
     for (; i != iend ;) {
-      i = (i->empty()) ? vec.erase(i) : i + 1;
+      i = (i->empty()) ? vec->erase(i) : i + 1;
     }
   }
 
@@ -122,4 +124,4 @@ class IntegerMap {
 typedef IntegerMap<uid_t> UidMap;
 typedef IntegerMap<gid_t> GidMap;
 
-#endif // CVMFS_UTIL_H_
+#endif  // CVMFS_UID_MAP_H_
