@@ -80,7 +80,9 @@ class IntegerMap {
 
       std::vector<std::string> components = SplitString(line, ' ');
       FilterEmptyStrings(components);
-      if (components.size() != 2) {
+      if (components.size() != 2    ||
+          !IsNumeric(components[1]) ||
+          (components[0] != "*" && !IsNumeric(components[0]))) {
         fclose(fmap);
         LogCvmfs(kLogUtility, kLogDebug, "failed to read line %d in %s",
                  line_number, path.c_str());
