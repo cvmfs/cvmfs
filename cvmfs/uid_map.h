@@ -14,6 +14,32 @@
 
 #include "util.h"
 
+/**
+ * This reads a mapping file of (roughly) the following format:
+ * +-------------------------------------------------------------+
+ * | user_id.map                                                 |
+ * | ~~~~~~~~~~~                                                 |
+ * |                                                             |
+ * | # map UIDs 137 and 138 to 1000 (I am a comment by the way)  |
+ * | 137  1000                                                   |
+ * | 138  1000                                                   |
+ * |                                                             |
+ * | # swap two UIDs                                             |
+ * | 101  5                                                      |
+ * | 5    101                                                    |
+ * |                                                             |
+ * | # map everything else to root (wildcard)                    |
+ * | * 0                                                         |
+ * +-------------------------------------------------------------+
+ *
+ * These files are intended for the definition of UID and GID mappings both on
+ * the client and the server side of CernVM-FS.
+ *
+ * The class takes care of managing these mappings and can be initialised via
+ * a file read from disk or programmatically through the class's public API.
+ * When reading from a file, simple consistency checks are performed to ensure
+ * proper functionality.
+ */
 template <typename T>
 class IntegerMap {
  public:
@@ -27,22 +53,52 @@ class IntegerMap {
     , has_default_value_(false)
     , default_value_(T(0)) {}
 
+  /**
+   * Define a mapping from k to v
+   * @param k  map the given value to v
+   * @param v  the value given in k is mapped to this
+   **/
   void Set(const T k, const T v) { map_[k] = v; }
+
+  /**
+   * Sets a default (or fallback) value to be used if no other mapping rule fits
+   * Note: A previously defined default value is overwritten.
+   * @param v  the value to be used as a fallback in Map()
+   */
   void SetDefault(const T v) {
     has_default_value_ = true;
     default_value_     = v;
   }
 
+  /**
+   * Reads mapping rules from a provided file path. The file format is discussed
+   * in the class description above.
+   * Note: If a read failure occurs the IntegerMap<> is declared invalid and
+   *       must not be used anymore.
+   *
+   * @param path  the file path to be read
+   * @return      true if the file was successfully read
+   */
   bool Read(const std::string &path) {
     valid_ = ReadFromFile(path);
     return IsValid();
   }
 
+  /**
+   * Checks if a mapping rule for a given value is available
+   * @param k  the value to be checked
+   * @return   true if a mapping rule for k exists
+   */
   bool Contains(const T k) const {
     assert(IsValid());
     return map_.find(k) != map_.end();
   }
 
+  /**
+   * Applies the mapping rules inside this IntegerMap<> to the given value.
+   * @param k  the value to be mapped
+   * @return   the result of the mapping rule application (might be the default)
+   */
   T Map(const T k) const {
     assert(IsValid());
     typename map_type::const_iterator i = map_.find(k);
