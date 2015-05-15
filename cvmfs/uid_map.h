@@ -57,6 +57,9 @@ class IntegerMap {
   bool   HasDefault() const { return has_default_value_; }
   size_t RuleCount()  const { return map_.size();        }
 
+  T GetDefault() const { assert(has_default_value_); return default_value_; }
+  const map_type& GetRuleMap() const { return map_; }
+
  protected:
   bool ReadFromFile(const std::string &path) {
     FILE *fmap = fopen(path.c_str(), "r");
