@@ -86,9 +86,6 @@ class CommandMigrate : public Command {
 
     Future<shash::Any>                new_catalog_hash;
     Future<size_t>                    new_catalog_size;
-
-    std::vector<uid_t>                assigned_uids;
-    std::vector<gid_t>                assigned_gids;
   };
 
   class PendingCatalogMap : public std::map<std::string, const PendingCatalog*>,
@@ -232,14 +229,16 @@ class CommandMigrate : public Command {
 
    protected:
     bool RunMigration(PendingCatalog *data) const;
-
-    bool ListAssignedPersonas(PendingCatalog *data) const;
-    bool CheckAssignedPersonas(PendingCatalog *data) const;
     bool ApplyPersonaMappings(PendingCatalog *data) const;
 
    private:
-    const UidMap &uid_map_;
-    const GidMap &gid_map_;
+    template <class MapT>
+    std::string GenerateMappingStatement(const MapT         &map,
+                                         const std::string  &column) const;
+
+   private:
+    const std::string uid_map_statement_;
+    const std::string gid_map_statement_;
   };
 
  public:
