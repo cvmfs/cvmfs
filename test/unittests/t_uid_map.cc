@@ -106,6 +106,7 @@ TYPED_TEST(T_UidMap, SetDefault) {
   EXPECT_TRUE(map.IsValid());
   EXPECT_TRUE(map.HasDefault());
   EXPECT_EQ(0u, map.RuleCount());
+  EXPECT_EQ(42u, map.GetDefault());
 }
 
 
@@ -153,6 +154,7 @@ TYPED_TEST(T_UidMap, ReadFromFile) {
   EXPECT_TRUE(map.IsValid());
   EXPECT_EQ(2u, map.RuleCount());
   EXPECT_TRUE(map.HasDefault());
+  EXPECT_EQ(1337u, map.GetDefault());
 
   EXPECT_TRUE(map.Contains(TestFixture::k(42)));
   EXPECT_TRUE(map.Contains(TestFixture::k(1)));
