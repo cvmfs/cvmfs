@@ -1421,10 +1421,13 @@ EOF
 
 }
 
+
 # creates a statistics file
 create_statistics_file() {
   local iteration=$1
   local total_time=$2
+  local memory_median=$3
+  local memory_max=$4
   local statistics_file="${FQRN}_${iteration}.data"
   benchmark_log "creating the statistics file ${statistics_file} calling cvmfs_talk"
   cat >$statistics_file << EOF
@@ -1437,6 +1440,36 @@ EOF
   benchmark_log "Executing cvmfs_talk"
   cvmfs_talk -p "$CVMFS_OPT_CACHEDIR"/$FQRN/cvmfs_io.$FQRN internal affairs | grep \| | tail -n +2 >> $statistics_file
   echo "global.sz_total_time|$total_time|Total execution time (seconds)" >> $statistics_file # of only one iteration without valgrind!
+  echo "global.sz_memory_median|$memory_median|Median memory consumption (KB)" >> $statistics_file
+  echo "global.sz_memory_max|$memory_max|Maximum memory consumption (KB)" >> $statistics_file
+}
+
+
+# collects data during the run
+statistics_daemon() {
+  local dump_file=$1
+  local PID=$2
+  touch $dump_file
+  while [ -f /proc/${PID}/smaps ]; do
+    # memory in KB
+    echo 0 $(awk '/Rss/ {print "+", $2}' /proc/${PID}/smaps) | bc >> $dump_file
+    sleep 2
+  done
+}
+
+
+# collects the median of a file
+collect_median() {
+  local file=$1
+  local num_lines=$(cat $file | wc -l)
+  local median_pos=$(( num_lines / 2 ))
+  echo $(sort $file | sed "${median_pos}q;d")
+}
+
+
+# collects the maximum of a file
+collect_maximum() {
+  echo $(sort $1 | tail -n 1)
 }
 
 
@@ -1445,17 +1478,25 @@ execute_statistics_loop() {
   local code=0
   local iteration=1
   local PID=0
+  local daemon=0
+  local memory_file="memory.stat"
 
   while (( iteration <= $CVMFS_OPT_ITERATIONS && code == 0 )); do
     local start_time=$(date +%s)
+
     cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
     PID=$!
     wait_fqrn_mount
+    statistics_daemon $memory_file $PID &
+    daemon=$!
     ( cvmfs_run_benchmark )
     code=$?
     local end_time=$(date +%s)
     local total_time=$(( end_time - start_time )) # in seconds
-    create_statistics_file $iteration $total_time
+
+    local memory_median=$(collect_median $memory_file)
+    local memory_max=$(collect_maximum $memory_file)
+    create_statistics_file $iteration $total_time $memory_median $memory_max
     cvmfs_umount $FQRN
     wait $PID
     iteration=$(( iteration + 1 ))
