@@ -33,6 +33,7 @@ class DockerExecutor:
               "export CVMFS_OPT_ITERATIONS=1 && " + \
               "export CVMFS_OPT_WARM_CACHE=no && " + \
               "cd /workdir/cvmfs/build && " + \
+              "rm -rf * && " + \
               "git reset --hard && " + \
               "git remote add " + repo.name + " " + repo.url + " && " + \
               "git remote update && " + \
@@ -46,8 +47,8 @@ class DockerExecutor:
               repo.name + ".data\' > /tmp/run.log"
 
         print("Executing benchmarks for the repository \"" + self.repo.url +
-              "\"")
-        container_id = client.create_container(image="moliholy/slc6:cvmfs-test",
+              "\"" + " in the branch \"" + self.repo.branch + "\"")
+        container_id = client.create_container(image=image + ":" + tag,
                                                volumes=volumes,
                                                hostname="cvmfs-test",
                                                tty=True,
