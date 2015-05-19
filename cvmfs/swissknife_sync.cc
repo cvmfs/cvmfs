@@ -285,6 +285,12 @@ void swissknife::CommandApplyDirtab::DetermineNestedCatalogCandidates(
     // run a glob using the current dirtab rule on the current repository state
     const std::string &glob_string = i->pathspec.GetGlobString();
     const std::string &glob_string_abs = union_dir_ + glob_string;
+#ifndef GLOB_ONLYDIR
+#define GLOB_ONLYDIR 0
+#endif
+#ifndef GLOB_PERIOD
+#define GLOB_PERIOD 0
+#endif
     const int glob_flags  = GLOB_ONLYDIR | GLOB_NOSORT | GLOB_PERIOD;
     glob_t    glob_res;
     const int glob_retval = glob(glob_string_abs.c_str(), glob_flags,
