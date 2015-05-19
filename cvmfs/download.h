@@ -101,9 +101,9 @@ struct Counters {
         "Number of requests");
     n_retries = statistics->Register("download.n_retries",
         "Number of retries");
-    n_proxy_failover = statistics->Register("download.n_num_proxy_failover",
+    n_proxy_failover = statistics->Register("download.n_proxy_failover",
         "Number of proxy failovers");
-    n_host_failover = statistics->Register("download.n_num_host_failover",
+    n_host_failover = statistics->Register("download.n_host_failover",
         "Number of host failovers");
   }
 };  // Counters

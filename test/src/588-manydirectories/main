@@ -1,0 +1,95 @@
+cvmfs_test_name="Publish Many Directories"
+cvmfs_test_autofs_on_startup=false
+
+create_many_directories() {
+  local working_dir=$1
+  local start=${2:-1}
+  local no_dir=${3:-12}
+  local depth=${4:-4}
+  local i=0
+  local prev_wd="$(pwd)"
+
+  [ $depth -gt 0 ] || return 0
+
+  cd $working_dir
+  while [ $i -lt $no_dir ]; do
+    mkdir $i                                                      || return 11
+    if [ $start -eq 1 ]; then
+      touch $i/.cvmfscatalog                                      || return 12
+    fi
+    echo "$depth - $i" | sha1sum > $i/foobar                      || return 13
+    create_many_directories $(pwd)/$i 0 $no_dir $(( $depth - 1 )) || return $?
+    i=$(( $i + 1 ))
+  done
+  cd $prev_wd
+}
+
+monitor_open_fds() {
+  local logfile="$1"
+  local process_name="cvmfs_swissknife sync"
+  local timeout=
+  local pid=
+
+  # first we need to wait until the `cvmfs_swissknife publish` process pops up
+  timeout=$(( $(date +%s) + 10 ))
+  while [ $(date +%s) -lt $timeout ] && [ x"$pid" = x"" ]; do
+    pid="$(ps aux | grep "$process_name" | \
+                    grep -v ' grep '     | \
+                    grep -v ' sh -c '    | \
+                    tail -n1 | awk '{print $2}')"
+  done
+  [ x"$pid" != x"" ] || { echo "failed to find $process_name"; return 101; }
+
+  # now we monitor the number of FDs and CPU/memory usage for this process
+  echo "found process $process_name under PID $pid"
+  echo "attached to $process_name with PID $pid" > $logfile
+  while true; do
+    local open_fds=0
+    open_fds=$(( $(lsof -p $pid 2>/dev/null | wc -l) - 1 ))
+    cpu_mem=$(ps -p $pid -o %cpu,rss | tail -n1)
+    [ $open_fds -gt 0 ] || break # way out...
+    echo "$(get_millisecond_epoch) $open_fds $cpu_mem" >> $logfile
+  done
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local fd_logfile="file_descriptors.log"
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting many directories in the new repository"
+  create_many_directories $repo_dir || return $?
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  create_many_directories $reference_dir || return $?
+
+  echo "start monitoring the file descriptors for \`cvmfs_swissknife sync\`"
+  monitor_open_fds "$fd_logfile" &
+  monitor_pid=$!
+  echo "monitor's PID: $monitor_pid"
+
+  local publish_log="publish.log"
+  echo "creating CVMFS snapshot (log: $publish_log)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log 2>&1 || return $?
+
+  echo "waiting for the monitor to stop"
+  wait $monitor_pid || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}

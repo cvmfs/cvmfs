@@ -1540,11 +1540,14 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
   } else if (attr == "user.rx") {
-    int64_t rx = cvmfs::statistics_->Lookup("n_transfered_bytes")->Get();
+    int64_t rx =
+      cvmfs::statistics_->Lookup("download.sz_transferred_bytes")->Get();
     attribute_value = StringifyInt(rx/1024);
   } else if (attr == "user.speed") {
-    int64_t rx = cvmfs::statistics_->Lookup("n_transfered_bytes")->Get();
-    int64_t time = cvmfs::statistics_->Lookup("sz_transfer_time")->Get();
+    int64_t rx =
+      cvmfs::statistics_->Lookup("download.sz_transferred_bytes")->Get();
+    int64_t time =
+      cvmfs::statistics_->Lookup("download.sz_transfer_time")->Get();
     if (time == 0)
       attribute_value = "n/a";
     else
@@ -2004,6 +2007,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
 
   cvmfs::statistics_ = new perf::Statistics();
+
+  // register the ShortString's static counters
+  cvmfs::statistics_->Register("pathstring.n_instances", "Number of instances");
+  cvmfs::statistics_->Register("pathstring.n_overflows", "Number of overflows");
+  cvmfs::statistics_->Register("namestring.n_instances", "Number of instances");
+  cvmfs::statistics_->Register("namestring.n_overflows", "Number of overflows");
+  cvmfs::statistics_->Register("linkstring.n_instances", "Number of instances");
+  cvmfs::statistics_->Register("linkstring.n_overflows", "Number of overflows");
 
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;

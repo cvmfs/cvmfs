@@ -200,6 +200,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('n', "create new repository"));
     r.push_back(Parameter::Switch('x', "print change set"));
     r.push_back(Parameter::Switch('y', "dry run"));
+    r.push_back(Parameter::Switch('L', "enable HTTP redirects"));
     r.push_back(Parameter::Switch('m', "create micro catalogs"));
     r.push_back(Parameter::Switch('i', "ignore x-directory hardlinks"));
     r.push_back(Parameter::Switch('d', "pause publishing to allow for "

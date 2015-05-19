@@ -3,6 +3,8 @@
  */
 
 #include <gtest/gtest.h>
+
+#include <fcntl.h>
 #include <pthread.h>
 #include <tbb/tbb_thread.h>
 
@@ -81,6 +83,28 @@ TEST(T_Util, HasSuffix) {
   EXPECT_TRUE(HasSuffix("-foo", "-foo", false));
   EXPECT_FALSE(HasSuffix("abc+foo", "-foo", false));
   EXPECT_FALSE(HasSuffix("foo", "-foo", false));
+}
+
+
+TEST(T_Util, RemoveTree) {
+  string tmp_path_ = CreateTempDir("/tmp/cvmfs_test", 0700);
+  ASSERT_NE("", tmp_path_);
+  ASSERT_TRUE(DirectoryExists(tmp_path_));
+  EXPECT_TRUE(RemoveTree(tmp_path_));
+  EXPECT_FALSE(DirectoryExists(tmp_path_));
+
+  tmp_path_ = CreateTempDir("/tmp/cvmfs_test", 0700);
+  ASSERT_NE("", tmp_path_);
+  EXPECT_TRUE(MkdirDeep(tmp_path_ + "/subdir", 0700));
+  int fd = open((tmp_path_ + "/subdir/file").c_str(),
+                O_CREAT | O_TRUNC | O_WRONLY, 0600);
+  EXPECT_GE(fd, 0);
+  if (fd >= 0)
+    close(fd);
+  EXPECT_TRUE(RemoveTree(tmp_path_));
+  EXPECT_FALSE(DirectoryExists(tmp_path_));
+
+  EXPECT_TRUE(RemoveTree(tmp_path_));
 }
 
 
