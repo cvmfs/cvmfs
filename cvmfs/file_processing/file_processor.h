@@ -63,7 +63,7 @@ namespace upload {
 class AbstractUploader;
 class IoDispatcher;
 class File;
-class SpoolerDefinition;
+struct SpoolerDefinition;
 
 /**
  * This is the outer most wrapper class that should be used by the Spooler.
