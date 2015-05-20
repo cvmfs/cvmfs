@@ -23,8 +23,8 @@ class WritableCatalog;
 }
 
 namespace upload {
-class SpoolerDefinition;
-class SpoolerResult;
+struct SpoolerDefinition;
+struct SpoolerResult;
 class Spooler;
 }
 
