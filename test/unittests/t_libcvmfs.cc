@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <string>
 
+#include "../../cvmfs/duplex_sqlite3.h"
 #include "../../cvmfs/libcvmfs.h"
 #include "../../cvmfs/util.h"
 
@@ -22,6 +23,11 @@ static void cvmfs_log_ignore(const char *msg) {
 class T_Libcvmfs : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    if (first_test) {
+      sqlite3_shutdown();
+      first_test = false;
+    }
+
     cvmfs_set_log_fn(cvmfs_log_ignore);
     tmp_path_ = CreateTempDir("/tmp/cvmfs_test", 0700);
     ASSERT_NE("", tmp_path_);
@@ -40,11 +46,20 @@ class T_Libcvmfs : public ::testing::Test {
     cvmfs_set_log_fn(NULL);
   }
 
+  // Other tests might have initialized sqlite3.  This cannot happen in real
+  // use because sqlite3 is statically linked with the library.  This static
+  // variable is used to de-initialize sqlite once, so that proper shutdown
+  // within the library can still be tested in the tests following the first
+  // one.
+  static bool first_test;
+
   string tmp_path_;
   string alien_path_;
   string opt_cache_;
   FILE *fdevnull_;
 };
+
+bool T_Libcvmfs::first_test = true;
 
 
 TEST_F(T_Libcvmfs, Init) {
