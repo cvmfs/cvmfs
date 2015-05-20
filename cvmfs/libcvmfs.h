@@ -14,7 +14,8 @@
 #define LIBCVMFS_VERSION_MINOR 1
 // Revision Changelog
 // 13: revision introduced
-#define LIBCVMFS_REVISION 13
+// 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
+#define LIBCVMFS_REVISION 14
 
 #include <sys/stat.h>
 #include <unistd.h>
