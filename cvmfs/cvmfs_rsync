@@ -1,7 +1,7 @@
 #!/bin/bash
 # Rsync directories into cvmfs.
 
-ME=cvmfsrsync
+ME=cvmfs_rsync
 
 usage()
 {
