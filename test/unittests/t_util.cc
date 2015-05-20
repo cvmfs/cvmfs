@@ -5,17 +5,18 @@
 #include <gtest/gtest.h>
 
 #include <fcntl.h>
-#include <limits>
+#include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <tbb/tbb_thread.h>
-#include <ctime>
 #include <unistd.h>
+
+#include <ctime>
+#include <limits>
 #include <vector>
 
-#include "../../cvmfs/util.h"
 #include "../../cvmfs/shortstring.h"
+#include "../../cvmfs/util.h"
 
 using namespace std;  // NOLINT
 
@@ -38,7 +39,7 @@ class ThreadDummy {
 
 
 class T_Util : public ::testing::Test {
-protected:
+ protected:
   virtual void SetUp() {
     const bool retval = MkdirDeep(sandbox, 0700);
     ASSERT_TRUE(retval) << "failed to create sandbox";
@@ -49,7 +50,7 @@ protected:
     ASSERT_TRUE(retval) << "failed to remove sandbox";
   }
 
-protected:
+ protected:
   static void WriteBuffer(int fd) {
     sleep(1);
     write(fd, to_write.c_str(), to_write.length());
@@ -64,17 +65,17 @@ protected:
     return complete_path;
   }
 
-  static void LockFileTest(const string &filename, int &retval) {
-    retval = LockFile(filename);
+  static void LockFileTest(const string &filename, int *retval) {
+    *retval = LockFile(filename);
   }
 
   static string GetTimeString(time_t seconds, const bool utc) {
     char buf[32];
     struct tm ts;
-    if(utc) {
-      ts = *localtime(&seconds);
+    if (utc) {
+      localtime_r(&seconds, &ts);
     } else {
-      ts = *gmtime(&seconds);
+      gmtime_r(&seconds, &ts);
     }
     strftime(buf, sizeof(buf), "%d %b %Y %H:%M:%S", &ts);
     return string(buf);
@@ -83,16 +84,23 @@ protected:
   static string GetRfcTimeString() {
     time_t now = time(NULL);
     char buf[32];
-    struct tm ts = *gmtime(&now);
+    struct tm ts;
+    gmtime_r(&now, &ts);
     strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", &ts);
     return string(buf);
   }
 
-  timeval CreateTimeval(long tv_sec, long tv_usec) {
+  static timeval CreateTimeval(int64_t tv_sec, int64_t tv_usec) {
     timeval t;
     t.tv_sec = tv_sec;
     t.tv_usec = tv_usec;
     return t;
+  }
+
+  static void SendSignal(int signal) {
+    BlockSignal(signal);
+    sleep(1);
+    kill(getpid(), signal);
   }
 
   static const string sandbox;
@@ -480,7 +488,7 @@ TEST_F(T_Util, Mutex) {
 
 TEST_F(T_Util, SwitchCredentials) {
   // if I am root
-  if(getuid() == 0) {
+  if (getuid() == 0) {
     SwitchCredentials(1, 1, true);
     EXPECT_EQ(1u, geteuid());
     EXPECT_EQ(1u, getegid());
@@ -567,7 +575,7 @@ TEST_F(T_Util, LockFile) {
   EXPECT_EQ(-1, LockFile("/fakepath/fakefile.txt"));
   EXPECT_LE(0, fd = LockFile(filename));
 
-  tbb::tbb_thread thread(LockFileTest, filename, retval);
+  tbb::tbb_thread thread(LockFileTest, filename, &retval);
   sleep(2);
   close(fd);  // releases the lock
   thread.join();
@@ -586,7 +594,7 @@ TEST_F(T_Util, UnlockFile) {
   EXPECT_LE(0, fd1);
   EXPECT_EQ(-2, TryLockFile(filename));
   UnlockFile(fd1);
-  EXPECT_LE(0, fd2 = TryLockFile(filename));  //can be locked again
+  EXPECT_LE(0, fd2 = TryLockFile(filename));  // can be locked again
   close(fd1);
   close(fd2);
 }
@@ -627,7 +635,7 @@ TEST_F(T_Util, FindFiles) {
   vector<string> result;
   string files[] = { "file1.txt", "file2.txt", "file3.conf" };
   const unsigned size = 3;
-  for(unsigned i = 0; i < size; ++i)
+  for (unsigned i = 0; i < size; ++i)
     CreateFileWithContent(files[i], files[i]);
 
   result = FindFiles("/fakepath/fakedir", "");
@@ -635,7 +643,7 @@ TEST_F(T_Util, FindFiles) {
 
   result = FindFiles(sandbox, "");  // find them all
   EXPECT_EQ(size + 2, result.size());  // FindFiles includes . and ..
-  for(unsigned i = 0; i < size; ++i)
+  for (unsigned i = 0; i < size; ++i)
     EXPECT_EQ(sandbox + "/" + files[i], result[i + 2]);  // they are sorted
 
   result = FindFiles(sandbox, ".fake");
@@ -948,5 +956,204 @@ TEST_F(T_Util, GetLineFd) {
 }
 
 TEST_F(T_Util, Trim) {
+  EXPECT_EQ("", Trim(""));
+  EXPECT_EQ("hello", Trim("  hello"));
+  EXPECT_EQ("hello", Trim("        hello    "));
+  EXPECT_EQ("he llo how are you", Trim("    he llo how are you   "));
+  EXPECT_EQ("hell o", Trim("  hell o"));
+}
 
+TEST_F(T_Util, ToUpper) {
+  EXPECT_EQ("", ToUpper(""));
+  EXPECT_EQ("HELLO", ToUpper("hello"));
+  EXPECT_EQ("HELLO", ToUpper("Hello"));
+  EXPECT_EQ("HELLO HOW ARE YOU?", ToUpper("hElLo HOW are yOu?"));
+  EXPECT_EQ(" 123 ", ToUpper(" 123 "));
+  EXPECT_EQ("HELLO123 456", ToUpper("hEllo123 456"));
+}
+
+TEST_F(T_Util, ReplaceAll) {
+  EXPECT_EQ("atlas.cern.ch", ReplaceAll("@repo@.cern.ch", "@repo@", "atlas"));
+  EXPECT_EQ("aa", ReplaceAll("a@remove@a", "@remove@", ""));
+  EXPECT_EQ("mystring", ReplaceAll("mystring", "", ""));
+  EXPECT_EQ("??? ???my?string???", ReplaceAll("... ...my.string...", ".", "?"));
+  EXPECT_EQ("it's for REPLACED or for @not-replace@",
+      ReplaceAll("it's for @replace@ or for @not-replace@", "@replace@",
+          "REPLACED"));
+}
+
+TEST_F(T_Util, BlockSignal) {
+  EXPECT_DEATH(kill(getpid(), SIGUSR1), ".*");
+  BlockSignal(SIGUSR1);
+  kill(getpid(), SIGUSR1);  // it doesn't crash after blocking
+  EXPECT_DEATH(BlockSignal(-2000), ".*");
+}
+
+TEST_F(T_Util, WaitForSignal) {
+  tbb::tbb_thread signal_sender(SendSignal, SIGUSR1);
+  WaitForSignal(SIGUSR1);
+  signal_sender.join();
+}
+
+TEST_F(T_Util, Daemonize) {
+  int pid;
+  int statloc;
+  int child_pid;
+  int pipe_pid[2];
+  MakePipe(pipe_pid);
+  if ((pid = fork()) == 0) {
+    Daemonize();
+    child_pid = getpid();
+    WritePipe(pipe_pid[1], &child_pid, sizeof(int));
+    _exit(0);
+  } else {
+    waitpid(pid, &statloc, 0);
+    ReadPipe(pipe_pid[0], &child_pid, sizeof(int));
+    EXPECT_NE(getpid(), child_pid);
+    ClosePipe(pipe_pid);
+  }
+}
+
+TEST_F(T_Util, ExecuteBinary) {
+  int fd_stdin;
+  int fd_stdout;
+  int fd_stderr;
+  char buffer[20];
+  bool result;
+  string message = "CVMFS";
+  vector<string> argv;
+  argv.push_back(message);
+  pid_t gdb_pid = 0;
+
+  result = ExecuteBinary(
+      &fd_stdin,
+      &fd_stdout,
+      &fd_stderr,
+      "/bin/echo",
+      argv,
+      false,
+      &gdb_pid);
+  EXPECT_TRUE(result);
+  read(fd_stdout, buffer, message.size());
+  string response(buffer);
+  EXPECT_EQ(message, response);
+}
+
+TEST_F(T_Util, Shell) {
+  int fd_stdin;
+  int fd_stdout;
+  int fd_stderr;
+  const int buffer_size = 100;
+  char buffer[buffer_size];
+
+  EXPECT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
+  string path = sandbox + "/" + "newfolder";
+  string command = "mkdir -p " + path +  " && cd " + path + " && pwd\n";
+  WritePipe(fd_stdin, command.c_str(), command.length());
+  ReadPipe(fd_stdout, buffer, path.length());
+  string result(buffer);
+
+  EXPECT_EQ(path, result);
+  close(fd_stdin);
+  close(fd_stdout);
+  close(fd_stderr);
+}
+
+TEST_F(T_Util, ManagedExec) {
+  bool success;
+  pid_t pid;
+  int fd_stdout[2];
+  int fd_stdin[2];
+  char *buffer = static_cast<char*>(calloc(100, sizeof(char)));
+  MakePipe(fd_stdout);
+  MakePipe(fd_stdin);
+  string message = "CVMFS";
+  vector<string> command_line;
+  command_line.push_back("/bin/echo");
+  command_line.push_back(message);
+
+  set<int> preserve_filedes;
+  preserve_filedes.insert(1);
+
+  map<int, int> fd_map;
+  fd_map[fd_stdout[1]] = 1;
+
+  success = ManagedExec(command_line, preserve_filedes, fd_map, true, true,
+      &pid);
+  ASSERT_TRUE(success);
+  close(fd_stdout[1]);
+  read(fd_stdout[0], buffer, message.length());
+  string result(buffer);
+  ASSERT_EQ(message, result);
+  close(fd_stdout[0]);
+  free(buffer);
+}
+
+TEST_F(T_Util, StopWatch) {
+  StopWatch sw;
+  ASSERT_DEATH(sw.Stop(), ".*");
+  sw.Start();
+  ASSERT_DEATH(sw.Start(), ".*");
+  sw.Stop();
+  ASSERT_LT(0.0, sw.GetTime());
+  ASSERT_DEATH(sw.Stop(), ".*");
+  sw.Reset();
+  ASSERT_EQ(0.0, sw.GetTime());
+}
+
+TEST_F(T_Util, SafeSleepMs) {
+  StopWatch sw;
+  unsigned time = 1000;
+  sw.Start();
+  SafeSleepMs(time);
+  sw.Stop();
+  ASSERT_LE(static_cast<double>(time / 1000), sw.GetTime());
+}
+
+TEST_F(T_Util, Base64) {
+  string original =
+      "Man is distinguished, not only by his reason, but by this singular "
+      "passion from other animals, which is a lust of the mind, that by a "
+      "perseverance of delight in the continued and indefatigable generation of"
+      " knowledge, exceeds the short vehemence of any carnal pleasure.";
+  string b64 =
+      "TWFuIGlzIGRpc3Rpbmd1aXNoZWQsIG5vdCBvbmx5IGJ5IGhpcyByZWFzb24sIGJ1dCBieSB0"
+      "aGlzIHNpbmd1bGFyIHBhc3Npb24gZnJvbSBvdGhlciBhbmltYWxzLCB3aGljaCBpcyBhIGx1"
+      "c3Qgb2YgdGhlIG1pbmQsIHRoYXQgYnkgYSBwZXJzZXZlcmFuY2Ugb2YgZGVsaWdodCBpbiB0"
+      "aGUgY29udGludWVkIGFuZCBpbmRlZmF0aWdhYmxlIGdlbmVyYXRpb24gb2Yga25vd2xlZGdl"
+      "LCBleGNlZWRzIHRoZSBzaG9ydCB2ZWhlbWVuY2Ugb2YgYW55IGNhcm5hbCBwbGVh"
+      "c3VyZS4=";
+
+  EXPECT_EQ(b64, Base64(original));
+}
+
+TEST_F(T_Util, Debase64) {
+  string decoded;
+  string original =
+      "Man is distinguished, not only by his reason, but by this singular "
+      "passion from other animals, which is a lust of the mind, that by a "
+      "perseverance of delight in the continued and indefatigable generation of"
+      " knowledge, exceeds the short vehemence of any carnal pleasure.";
+  string b64 =
+      "TWFuIGlzIGRpc3Rpbmd1aXNoZWQsIG5vdCBvbmx5IGJ5IGhpcyByZWFzb24sIGJ1dCBieSB0"
+      "aGlzIHNpbmd1bGFyIHBhc3Npb24gZnJvbSBvdGhlciBhbmltYWxzLCB3aGljaCBpcyBhIGx1"
+      "c3Qgb2YgdGhlIG1pbmQsIHRoYXQgYnkgYSBwZXJzZXZlcmFuY2Ugb2YgZGVsaWdodCBpbiB0"
+      "aGUgY29udGludWVkIGFuZCBpbmRlZmF0aWdhYmxlIGdlbmVyYXRpb24gb2Yga25vd2xlZGdl"
+      "LCBleGNlZWRzIHRoZSBzaG9ydCB2ZWhlbWVuY2Ugb2YgYW55IGNhcm5hbCBwbGVh"
+      "c3VyZS4=";
+
+  EXPECT_TRUE(Debase64(b64, &decoded));
+  EXPECT_EQ(original, decoded);
+}
+
+TEST_F(T_Util, MemoryMappedFile) {
+  string filepath = CreateFileWithContent("mappedfile.txt",
+      "some dummy content\n");
+  MemoryMappedFile mf(filepath);
+
+  EXPECT_FALSE(mf.IsMapped());
+  EXPECT_DEATH(mf.Unmap(), ".*");
+  ASSERT_TRUE(mf.Map());
+  EXPECT_TRUE(mf.IsMapped());
+  mf.Unmap();
 }

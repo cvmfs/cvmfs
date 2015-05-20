@@ -1095,6 +1095,9 @@ string ReplaceAll(const string &haystack, const string &needle,
   string result(haystack);
   size_t pos = 0;
   const unsigned needle_size = needle.size();
+  if(needle == "")
+    return result;
+
   while ((pos = result.find(needle, pos)) != string::npos)
     result.replace(pos, needle_size, replace_by);
   return result;
