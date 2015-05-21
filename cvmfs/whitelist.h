@@ -38,6 +38,8 @@ enum Failures {
   kFailBadCaChain,
   kFailNotListed,
   kFailBlacklisted,
+
+  kFailNumEntries
 };
 
 

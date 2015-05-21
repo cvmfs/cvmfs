@@ -34,6 +34,8 @@ enum Failures {
   kFailNoAddress,     ///< Resolver returned a positive reply but without IPs
   kFailNotYetResolved,
   kFailOther,
+
+  kFailNumEntries
 };
 
 

@@ -23,6 +23,8 @@ enum Failures {
   kFailBadSignature,
   kFailBadCertificate,
   kFailNameMismatch,
+
+  kFailNumEntries
 };
 
 inline const char *Code2Ascii(const Failures error) {

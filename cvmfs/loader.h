@@ -45,6 +45,8 @@ enum Failures {
   kFailDoubleMount,
   kFailHistory,
   kFailWpad,
+
+  kFailNumEntries
 };
 
 inline const char *Code2Ascii(const Failures error) {

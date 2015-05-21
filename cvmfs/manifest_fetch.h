@@ -36,6 +36,8 @@ enum Failures {
   kFailBadWhitelist,
   kFailInvalidCertificate,
   kFailUnknown,
+
+  kFailNumEntries
 };
 
 inline const char *Code2Ascii(const Failures error) {

@@ -50,6 +50,8 @@ enum LoadError {
   kLoadUp2Date,
   kLoadNoSpace,
   kLoadFail,
+
+  kLoadNumEntries
 };
 
 inline const char *Code2Ascii(const LoadError error) {

@@ -44,6 +44,8 @@ enum Failures {
   kFailNotFound,
   kFailServiceUnavailable,
   kFailOther,
+
+  kFailNumEntries
 };  // Failures
 
 

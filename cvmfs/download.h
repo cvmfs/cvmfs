@@ -57,6 +57,8 @@ enum Failures {
   kFailBadData,
   kFailTooBig,
   kFailOther,
+
+  kFailNumEntries
 };  // Failures
 
 
