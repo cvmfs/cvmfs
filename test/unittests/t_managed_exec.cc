@@ -9,6 +9,17 @@
 
 
 class T_ManagedExec : public ::testing::Test {
+ protected:
+  std::string GetDebugger() const {
+    // check if we have a GDB installed
+    const std::string gdb = GetExecutablePath("gdb");
+    if (!gdb.empty()) {
+      return gdb;
+    }
+
+    // maybe we are on a recent OS X and we find LLDB?
+    return GetExecutablePath("lldb");
+  }
 };
 
 
