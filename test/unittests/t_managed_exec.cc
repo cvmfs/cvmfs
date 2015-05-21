@@ -8,7 +8,11 @@
 #include "testutil.h"
 
 
-TEST(T_ManagedExec, RunShell) {
+class T_ManagedExec : public ::testing::Test {
+};
+
+
+TEST_F(T_ManagedExec, RunShell) {
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
@@ -29,7 +33,7 @@ TEST(T_ManagedExec, RunShell) {
 }
 
 
-TEST(T_ManagedExec, ExecuteBinaryDoubleFork) {
+TEST_F(T_ManagedExec, ExecuteBinaryDoubleFork) {
   int fd_stdin, fd_stdout, fd_stderr;
   pid_t child_pid;
 
@@ -73,7 +77,7 @@ TEST(T_ManagedExec, ExecuteBinaryDoubleFork) {
 }
 
 
-TEST(T_ManagedExec, ExecuteBinaryAsChild) {
+TEST_F(T_ManagedExec, ExecuteBinaryAsChild) {
   int fd_stdin, fd_stdout, fd_stderr;
   pid_t child_pid;
   pid_t my_pid = getpid();
