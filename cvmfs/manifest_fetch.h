@@ -41,11 +41,7 @@ enum Failures {
 };
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 11;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "failed to download";
   texts[2] = "incomplete manifest";
@@ -57,7 +53,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[8] = "bad whitelist";
   texts[9] = "invalid certificate";
   texts[10] = "unknown error";
-
+  texts[11] = "no text";
   return texts[error];
 }
 

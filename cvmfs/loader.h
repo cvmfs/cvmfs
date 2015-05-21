@@ -50,11 +50,7 @@ enum Failures {
 };
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 24;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "unknown error";
   texts[2] = "illegal options";
@@ -79,7 +75,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[21] = "double mount";
   texts[22] = "history init failure";
   texts[23] = "proxy auto-discovery failed";
-
+  texts[24] = "no text";
   return texts[error];
 }
 

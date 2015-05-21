@@ -55,16 +55,12 @@ enum LoadError {
 };
 
 inline const char *Code2Ascii(const LoadError error) {
-  const int kNumElems = 4;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kLoadNumEntries + 1];
   texts[0] = "loaded new catalog";
   texts[1] = "catalog was up to date";
   texts[2] = "not enough space to load catalog";
   texts[3] = "failed to load catalog";
-
+  texts[4] = "no text";
   return texts[error];
 }
 

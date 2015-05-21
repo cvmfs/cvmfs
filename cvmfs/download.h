@@ -63,11 +63,7 @@ enum Failures {
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 13;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "local I/O failure";
   texts[2] = "malformed URL";
@@ -81,7 +77,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[10] = "corrupted data received";
   texts[11] = "resource too big to download";
   texts[12] = "unknown network error";
-
+  texts[13] = "no text";
   return texts[error];
 }
 

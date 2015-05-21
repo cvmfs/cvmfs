@@ -40,11 +40,7 @@ enum Failures {
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 9;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "invalid resolver addresses";
   texts[2] = "DNS query timeout";
@@ -54,7 +50,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[6] = "no IP address for host";
   texts[7] = "internal error, not yet resolved";
   texts[8] = "unknown name resolving error";
-
+  texts[9] = "no text";
   return texts[error];
 }
 
