@@ -44,15 +44,13 @@ enum Failures {
   kFailNotFound,
   kFailServiceUnavailable,
   kFailOther,
+
+  kFailNumEntries
 };  // Failures
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 9;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "S3: OK";
   texts[1] = "S3: local I/O failure";
   texts[2] = "S3: malformed URL (bad request)";
@@ -62,7 +60,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[6] = "S3: not found";
   texts[7] = "S3: service not available";
   texts[8] = "S3: unknown network error";
-
+  texts[9] = "no text";
   return texts[error];
 }
 

@@ -54,7 +54,7 @@
 extern "C" {
 #endif
 
-struct cvmfs_context;
+class cvmfs_context;
 
 /**
  * Initialize global CVMFS library structures
