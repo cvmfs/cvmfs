@@ -93,12 +93,16 @@ TEST_F(T_ManagedExec, ExecuteBinaryAsChild) {
   pid_t child_pid;
   pid_t my_pid = getpid();
 
+  // find gdb in the $PATH of this system
+  const std::string gdb = GetDebugger();
+  ASSERT_NE("", gdb) << "no debugger found, but needed by this test case";
+
   // spawn a child process (not double forked)
   const bool double_fork = false;
   bool retval = ExecuteBinary(&fd_stdin,
                               &fd_stdout,
                               &fd_stderr,
-                               "gdb",
+                               gdb,
                                std::vector<std::string>(),
                                double_fork,
                               &child_pid);
