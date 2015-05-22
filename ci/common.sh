@@ -16,6 +16,11 @@ get_cvmfs_git_revision() {
   echo "$(cd $source_directory; git rev-parse HEAD | head -c16)"
 }
 
+get_repository_root() {
+  local script_location=$(cd "$(dirname "$0")"; pwd)
+  echo $(cd "${script_location}/.."; pwd)
+}
+
 create_cvmfs_source_tarball() {
   local source_directory="$1"
   local destination_path="$2"
