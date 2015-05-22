@@ -1,4 +1,6 @@
 2.2.0:
+  * Add CVMFS_MAX_IPADDR_PER_PROXY parameter to avoid very long fail-over
+    chains
   * Fix initialization of quota manager in libcvmfs (regression)
   * Fix cleanup of global state in libcvmfs
   * Use "unix-none" sqlite vfs in libcvmfs
