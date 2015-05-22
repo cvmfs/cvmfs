@@ -326,6 +326,7 @@ class DownloadManager {
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
+  void SetMaxIpaddrPerProxy(unsigned limit);
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnablePipelining();
