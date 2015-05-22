@@ -1,4 +1,6 @@
 2.2.0:
+  * Fix resolving absolute symlinks into the same repository in libcvmfs
+    (regression)
   * Add CVMFS_MAX_IPADDR_PER_PROXY parameter to avoid very long fail-over
     chains
   * Fix initialization of quota manager in libcvmfs (regression)
