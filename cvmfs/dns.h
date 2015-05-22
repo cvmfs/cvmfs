@@ -243,7 +243,7 @@ class Resolver : SingleCopy {
    * throttle_ randomly picked IPs are returned.
    */
   unsigned throttle_;
-  
+
   /**
    * Required for picking IP addresses in throttle_
    */
