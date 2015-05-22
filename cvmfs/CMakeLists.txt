@@ -489,12 +489,6 @@ if (BUILD_SERVER)
     PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
-  install (
-    FILES      cvmfs_rsync
-    DESTINATION    bin
-    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-  )
-
   install(
     FILES      webapi/cvmfs-api.wsgi
     DESTINATION    "/var/www/wsgi-scripts"
