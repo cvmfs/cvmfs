@@ -17,6 +17,7 @@
 #include "atomic.h"
 #include "duplex_cares.h"
 #include "gtest/gtest_prod.h"
+#include "prng.h"
 #include "util.h"
 
 namespace dns {
@@ -188,6 +189,8 @@ class Resolver : SingleCopy {
   const std::vector<std::string> &resolvers() const { return resolvers_; }
   unsigned retries() const { return retries_; }
   unsigned timeout_ms() const { return timeout_ms_; }
+  void set_throttle(const unsigned throttle) { throttle_ = throttle; }
+  unsigned throttle() const { return throttle_; }
 
  protected:
   /**
@@ -233,6 +236,18 @@ class Resolver : SingleCopy {
    * Timeout in milliseconds for DNS queries.  Zero means no timeout.
    */
   unsigned timeout_ms_;
+
+  /**
+   * Limit number of resolved IP addresses.  If throttle_ is 0 it has no effect.
+   * Otherwise, if more than thottle_ IPs are registered for a host, only
+   * throttle_ randomly picked IPs are returned.
+   */
+  unsigned throttle_;
+  
+  /**
+   * Required for picking IP addresses in throttle_
+   */
+  Prng prng_;
 };
 
 
