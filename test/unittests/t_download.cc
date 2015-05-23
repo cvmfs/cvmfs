@@ -11,6 +11,7 @@
 #include "../../cvmfs/compression.h"
 #include "../../cvmfs/download.h"
 #include "../../cvmfs/hash.h"
+#include "../../cvmfs/statistics.h"
 #include "../../cvmfs/util.h"
 #include "../../cvmfs/prng.h"
 #include "../../cvmfs/sink.h"
@@ -22,7 +23,8 @@ namespace download {
 class T_Download : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    download_mgr.Init(8, false /* use_system_proxy */);
+    download_mgr.Init(8, false, /* use_system_proxy */
+        &statistics);
     ffoo = CreateTempFile("/tmp/cvmfstest", 0600, "w+", &foo_path);
     assert(ffoo);
     foo_url = "file://" + foo_path;
@@ -34,6 +36,7 @@ class T_Download : public ::testing::Test {
     unlink(foo_path.c_str());
   }
 
+  perf::Statistics statistics;
   DownloadManager download_mgr;
   FILE *ffoo;
   string foo_path;

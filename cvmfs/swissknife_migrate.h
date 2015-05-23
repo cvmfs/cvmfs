@@ -129,6 +129,9 @@ class CommandMigrate : public Command {
     public AbstractMigrationWorker<MigrationWorker_20x>
   {
     friend class AbstractMigrationWorker<MigrationWorker_20x>;
+   protected:
+    static const float    kSchema;
+    static const unsigned kSchemaRevision;
 
    public:
     struct worker_context :

@@ -21,7 +21,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.21
+Version: 2.2.0
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -386,6 +386,7 @@ fi
 %files unittests
 %defattr(-,root,root)
 %{_bindir}/cvmfs_unittests
+%doc COPYING AUTHORS README ChangeLog
 
 %changelog
 * Wed Jan 07 2015 Jakob Blomer <jblomer@cern.ch> - 2.1.20

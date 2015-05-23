@@ -1,22 +1,6 @@
 /**
  * This file is part of the CernVM File System.
  *
- * CernVM-FS is a FUSE module which implements an HTTP read-only filesystem.
- * The original idea is based on GROW-FS.
- *
- * CernVM-FS shows a remote HTTP directory as local file system.  The client
- * sees all available files.  On first access, a file is downloaded and
- * cached locally.  All downloaded pieces are verified by a cryptographic hash.
- *
- * To do so, a directory hive has to be transformed into a CVMFS2
- * "repository".  This can be done by the CernVM-FS server tools.
- *
- * This preparation of directories is transparent to web servers and
- * web proxies.  They just serve static content, i.e. arbitrary files.
- * Any HTTP server should do the job.  We use Apache + Squid.  Serving
- * files from the memory of a web proxy brings a significant performance
- * improvement.
- *
  * This is the internal implementation of libcvmfs, not to be exposed
  * to the code using the library.  This code is based heavily on the
  * fuse module cvmfs.cc.
@@ -71,6 +55,7 @@
 #include "duplex_sqlite3.h"
 #include "globals.h"
 #include "hash.h"
+#include "libcvmfs.h"
 #include "logging.h"
 #include "lru.h"
 #include "monitor.h"
@@ -80,6 +65,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "tracer.h"
 #include "util.h"
 #include "wpad.h"
@@ -144,18 +130,29 @@ cvmfs_globals::~cvmfs_globals() {
   if (quota_ready_) {
     quota::Fini();
   }
+
+  CRYPTO_set_locking_callback(NULL);
+  for (int i = 0; i < CRYPTO_num_locks(); ++i)
+    pthread_mutex_destroy(&(libcrypto_locks_[i]));
+  OPENSSL_free(libcrypto_locks_);
+
+  sqlite3_shutdown();
 }
 
 int cvmfs_globals::Setup(const options &opts) {
   // Fill cvmfs option variables from arguments
   cache_directory_ = opts.cache_directory;
+  lock_directory_ = opts.lock_directory;
+  if (!lock_directory_.size()) {
+    lock_directory_ = cache_directory_;
+  }
   uid_ = getuid();
   gid_ = getgid();
   options_ready_ = true;
 
   int retval;
 
-  // Tune SQlite3 memory
+  // Tune SQlite3
   sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   sqlite_page_cache = smalloc(1280*3275);  // 4MB
   retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, sqlite_scratch, 8192, 16);
@@ -165,6 +162,8 @@ int cvmfs_globals::Setup(const options &opts) {
   assert(retval == SQLITE_OK);
   // 4 KB
   retval = sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128);
+  assert(retval == SQLITE_OK);
+  retval = sqlite3_vfs_register(sqlite3_vfs_find("unix-none"), 1);
   assert(retval == SQLITE_OK);
 
   // Libcrypto
@@ -199,58 +198,72 @@ int cvmfs_globals::Setup(const options &opts) {
     if (setrlimit(RLIMIT_NOFILE, &rpl) != 0) {
       PrintError("Failed to set maximum number of open files, "
                  "insufficient permissions");
-      return -1;
+      return LIBCVMFS_FAIL_NOFILES;
     }
   }
 
   // Create cache directory, if necessary
   if (!MkdirDeep(cache_directory_, 0700)) {
     PrintError("cannot create cache directory " + cache_directory_);
-    return -2;
+    return LIBCVMFS_FAIL_MKCACHE;
   }
 
-  // Try to jump to cache directory.  This tests, if it is accassible.
-  // Also, it brings speed later on.
-  if (opts.change_to_cache_directory &&
-      chdir(cache_directory_.c_str()) != 0) {
-    PrintError("cache directory " + cache_directory_ + " is unavailable");
-    return -3;
+  // Create lock directory, if necessary
+  if (!MkdirDeep(lock_directory_, 0700)) {
+    PrintError("cannot create lock directory " + lock_directory_);
+    return LIBCVMFS_FAIL_MKCACHE;
   }
 
-  // Create lock file and running sentinel
-  fd_lockfile_ = LockFile(cache_directory_ + "/lock.libcvmfs");
+  // Create lock file protecting non-alien cache from concurrent access
+  fd_lockfile_ = LockFile(lock_directory_ + "/lock.libcvmfs");
   if (fd_lockfile_ < 0) {
     PrintError("could not acquire lock (" + StringifyInt(errno) + ")");
-    return -4;
+    return LIBCVMFS_FAIL_LOCKFILE;
   }
   lock_created_ = true;
 
-  // Creates a set of cache directories (256 directories named 00..ff) if not
-  // using alien cachdir
-  if (!cache::Init(cache_directory_, opts.alien_cache)) {
-    PrintError("Failed to setup cache in " + cache_directory_ +
-               ": " + strerror(errno));
-    return -5;
-  }
-  cache_ready_ = true;
-
-  // Init quota / managed cache
-  LogCvmfs(kLogCvmfs, kLogDebug, "unlimited cache size");
-  const uint64_t quota_limit      = (uint64_t) -1;
+  // Init quota / managed cache (currently unused)
+  LogCvmfs(kLogCvmfs, kLogDebug, "unlimited cache size, unmanaged cache");
+  const uint64_t quota_limit      = 0;
   const uint64_t quota_threshold  = 0;
   const bool     rebuild_database = false;
-  if (!quota::Init(cache_directory_, quota_limit, quota_threshold,
+  // Initialization of the quota manager takes a file lock
+  if (!quota::Init(lock_directory_, quota_limit, quota_threshold,
                    rebuild_database))
   {
     PrintError("Failed to initialize lru cache");
-    return -6;
+    return LIBCVMFS_FAIL_INITQUOTA;
   }
   quota::Spawn();
   quota_ready_ = true;
 
+  if (opts.alien_cachedir != "") {
+    cache_directory_ = opts.alien_cachedir;
+  }
+  // Try to jump to cache directory.  This tests, if it is accessible.
+  // Also, it brings speed later on.
+  if (opts.change_to_cache_directory) {
+    if (opts.alien_cachedir != "")
+      MkdirDeep(opts.alien_cachedir, 0770);
+    if (chdir(cache_directory_.c_str()) != 0) {
+      PrintError("cache directory " + cache_directory_ + " is unavailable");
+      return LIBCVMFS_FAIL_OPENCACHE;
+    }
+  }
+  // Creates a set of cache directories (256 directories named 00..ff) if not
+  // using alien cachdir
+  if (!cache::Init(cache_directory_,
+                   opts.alien_cache || opts.alien_cachedir != ""))
+  {
+    PrintError("Failed to setup cache in " + cache_directory_ +
+               ": " + strerror(errno));
+    return LIBCVMFS_FAIL_INITCACHE;
+  }
+  cache_ready_ = true;
+
   cvmfs::pid_ = getpid();
 
-  return 0;
+  return LIBCVMFS_FAIL_OK;
 }
 
 void cvmfs_globals::CallbackLibcryptoLock(int mode, int type,
@@ -282,7 +295,8 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
   cvmfs_context *ctx = new cvmfs_context(opts);
   assert(ctx != NULL);
 
-  if (ctx->Setup(opts) != 0) {
+  perf::Statistics *statistics = new perf::Statistics();
+  if (ctx->Setup(opts, statistics) != 0) {
     delete ctx;
     ctx = NULL;
   }
@@ -291,13 +305,17 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
 }
 
 void cvmfs_context::Destroy(cvmfs_context *ctx) {
+  perf::Statistics *statistics = ctx->statistics();
   delete ctx;
+  delete statistics;
 }
 
-int cvmfs_context::Setup(const options &opts) {
+int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
+  statistics_ = statistics;
+
   // Network initialization
   download_manager_ = new download::DownloadManager();
-  download_manager_->Init(16, false);
+  download_manager_->Init(16, false, statistics);
   download_manager_->SetHostChain(opts.url);
   download_manager_->SetTimeout(opts.timeout,
                                 opts.timeout_direct);
@@ -330,7 +348,8 @@ int cvmfs_context::Setup(const options &opts) {
   // Load initial file catalog
   catalog_manager_ = new cache::CatalogManager(repository_name_,
                                                signature_manager_,
-                                               download_manager_);
+                                               download_manager_,
+                                               statistics);
   bool clg_mgr_init;
   if (!opts.root_hash.empty()) {
     const shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(opts.root_hash),
@@ -350,7 +369,8 @@ int cvmfs_context::Setup(const options &opts) {
            "CernVM-FS: linking %s to repository %s",
            opts.mountpoint.c_str(), repository_name_.c_str());
 
-  md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize);
+  md5path_cache_ = new lru::Md5PathCache(cvmfs_context::kMd5pathCacheSize,
+      statistics);
   pathcache_ready_ = true;
 
   if (!opts.tracefile.empty()) {

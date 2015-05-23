@@ -61,6 +61,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "util.h"
 
 #ifndef NFS_SUPER_MAGIC
@@ -1039,16 +1040,19 @@ int64_t GetNumDownloads() {
 
 CatalogManager::CatalogManager(const string &repo_name,
                                signature::SignatureManager *signature_manager,
-                               download::DownloadManager *download_manager)
-{
+                               download::DownloadManager *download_manager,
+                               perf::Statistics *statistics)
+                             : AbstractCatalogManager(statistics) {
   LogCvmfs(kLogCache, kLogDebug, "constructing cache catalog manager");
   repo_name_ = repo_name;
   signature_manager_ = signature_manager;
   download_manager_ = download_manager;
   offline_mode_ = false;
   loaded_inodes_ = all_inodes_ = 0;
-  atomic_init32(&certificate_hits_);
-  atomic_init32(&certificate_misses_);
+  n_certificate_hits_ = statistics->Register("cache.n_certificate_hits",
+      "Number of certificate hits");
+  n_certificate_misses_ = statistics->Register("cache.n_certificate_misses",
+      "Number of certificate misses");
 }
 
 
@@ -1411,9 +1415,9 @@ void ManifestEnsemble::FetchCertificate(const shash::Any &hash) {
   bool retval = Open2Mem(hash, &cert_buf, &size);
   cert_size = size;
   if (retval)
-    atomic_inc32(&catalog_mgr_->certificate_hits_);
+    perf::Inc(catalog_mgr_->n_certificate_hits_);
   else
-    atomic_inc32(&catalog_mgr_->certificate_misses_);
+    perf::Inc(catalog_mgr_->n_certificate_misses_);
 }
 
 }  // namespace cache

@@ -246,11 +246,18 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
            dirtab.RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
-  g_download_manager->Init(1, true);
+  g_download_manager->Init(1, true, g_statistics);
+  const bool auto_manage_catalog_files = true;
+  const bool follow_redirects = (args.count('L') > 0);
+  if (follow_redirects) {
+    g_download_manager->EnableRedirects();
+  }
   catalog::SimpleCatalogManager catalog_manager(base_hash,
                                                 stratum0,
                                                 dir_temp,
-                                                g_download_manager);
+                                                g_download_manager,
+                                                g_statistics,
+                                                auto_manage_catalog_files);
   catalog_manager.Init();
 
   vector<string> new_nested_catalogs;
@@ -326,8 +333,9 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     }
 
     // check if the path is a meta-directory (. or ..)
-    if (candidate_rel.substr(candidate_rel.size() - 3) == "/.." ||
-        candidate_rel.substr(candidate_rel.size() - 2) == "/.") {
+    assert(candidate_rel.size() >= 2);
+    if (candidate_rel.substr(candidate_rel.size() - 2) == "/." ||
+        candidate_rel.substr(candidate_rel.size() - 3) == "/..") {
       continue;
     }
 
@@ -539,12 +547,16 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (NULL == params.spooler)
     return 3;
 
-  g_download_manager->Init(1, true);
-
+  g_download_manager->Init(1, true, g_statistics);
+  const bool follow_redirects = (args.count('L') > 0);
+  if (follow_redirects) {
+    g_download_manager->EnableRedirects();
+  }
   catalog::WritableCatalogManager
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, g_download_manager,
-                    params.catalog_entry_warn_threshold);
+                    params.catalog_entry_warn_threshold,
+                    g_statistics);
   catalog_manager.Init();
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;

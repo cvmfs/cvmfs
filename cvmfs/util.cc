@@ -83,6 +83,22 @@ const signed char db64_table[] =
 
 static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+namespace {
+
+/**
+ * Used for cas  insensitive HasSuffix
+ */
+struct IgnoreCaseComperator {
+  IgnoreCaseComperator() { }
+  bool operator() (const std::string::value_type a,
+                   const std::string::value_type b) const
+  {
+    return std::tolower(a) == std::tolower(b);
+  }
+};
+
+}  // anonymous namespace
+
 /**
  * Removes a trailing "/" from a path.
  */
@@ -574,6 +590,18 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
 
 
 /**
+ * Create a directory with a unique name.
+ */
+string CreateTempDir(const std::string &path_prefix, const int mode) {
+  char *tmp_dir = strdupa((path_prefix + ".XXXXXX").c_str());
+  tmp_dir = mkdtemp(tmp_dir);
+  if (tmp_dir == NULL)
+    return "";
+  return string(tmp_dir);
+}
+
+
+/**
  * Helper class that provides callback funtions for the file system traversal.
  */
 class RemoveTreeHelper {
@@ -764,27 +792,27 @@ string StringifyTime(const time_t seconds, const bool utc) {
 }
 
 
-  /**
-   * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
-   */
-  std::string RfcTimestamp() {
-    const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
-      "Aug", "Sep", "Oct", "Nov", "Dec"};
-    const char *day_of_week[] =
-      {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+/**
+ * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
+ */
+std::string RfcTimestamp() {
+  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
+    "Aug", "Sep", "Oct", "Nov", "Dec"};
+  const char *day_of_week[] =
+    {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
-    struct tm timestamp;
-    time_t now = time(NULL);
-    gmtime_r(&now, &timestamp);
+  struct tm timestamp;
+  time_t now = time(NULL);
+  gmtime_r(&now, &timestamp);
 
-    char buffer[30];
-    snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
-      day_of_week[timestamp.tm_wday], timestamp.tm_mday,
-      months[timestamp.tm_mon], timestamp.tm_year + 1900,
-      timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
-      timestamp.tm_zone);
-    return string(buffer);
-  }
+  char buffer[30];
+  snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
+    day_of_week[timestamp.tm_wday], timestamp.tm_mday,
+    months[timestamp.tm_mon], timestamp.tm_year + 1900,
+    timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
+    timestamp.tm_zone);
+  return string(buffer);
+}
 
 string StringifyTimeval(const timeval value) {
   char buffer[64];
@@ -891,29 +919,13 @@ bool HasPrefix(const string &str, const string &prefix,
 bool HasSuffix(
   const std::string &str,
   const std::string &suffix,
-  const bool ignore_case
-) {
-  unsigned i = str.length();
-  unsigned l = suffix.length();
-  if (l > i)
-    return false;
-  if (l == 0)
-    return true;
-
-  // str, suffix cannot be empty
-
-  do {
-    --i;
-    --l;
-    if (ignore_case) {
-      if (toupper(str[i]) != toupper(suffix[l]))
-        return false;
-    } else {
-      if (str[i] != suffix[l])
-        return false;
-    }
-  } while (l > 0);
-  return true;
+  const bool ignore_case)
+{
+  if (suffix.size() > str.size()) return false;
+  const IgnoreCaseComperator icmp;
+  return (ignore_case)
+    ? std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(), icmp)
+    : std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
 }
 
 

@@ -161,6 +161,9 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  echo "load repository configuration"
+  load_repo_config $CVMFS_TEST_REPO
+
   # ============================================================================
 
   echo "starting transaction to edit repository"
@@ -177,6 +180,9 @@ cvmfs_run_test() {
 
   echo "check if eventually the right catalogs are present in the repository (1)"
   check_catalog_presence_1 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
 
   # ============================================================================
 
@@ -195,6 +201,9 @@ cvmfs_run_test() {
 
   echo "check if eventually the right catalogs are present in the repository (2)"
   check_catalog_presence_2 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 51
 
   # ============================================================================
 
@@ -223,6 +232,9 @@ cvmfs_run_test() {
   echo "check if eventually the right catalogs are present in the repository (4)"
   check_catalog_presence_4 $CVMFS_TEST_REPO || return $?
 
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 52
+
   # ============================================================================
 
   echo "starting transaction to edit repository"
@@ -245,6 +257,9 @@ cvmfs_run_test() {
 
   echo "check if eventually the right catalogs are present in the repository (5)"
   check_catalog_presence_5 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 53
 
   return 0
 }

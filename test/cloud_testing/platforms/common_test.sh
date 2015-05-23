@@ -10,11 +10,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #    SOURCE_DIRECTORY      location of the CernVM-FS sources
 #    SERVER_PACKAGE        location of the CernVM-FS server package to test
 #    CLIENT_PACKAGE        location of the CernVM-FS client package to test
-#    TEST_LOGFILE          location of the test logfile to be used
-#    TEST_S3_LOGFILE       location of the test logfile for S3 tests to be used
-#    FAKE_S3_LOGFILE       location of the FakeS3 server's output to be used
-#    UNITTEST_LOGFILE      location of the unit test logfile to be used
-#    MIGRATIONTEST_LOGFILE location of the migration test logfile to be used
+#    LOG_DIRECTORY         location of the test log files to be created
 #
 # Additionally the following configuration variables will be defined:
 #    FAKE_S3_PORT          network port to communicate with FakeS3
@@ -27,11 +23,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 SOURCE_DIRECTORY=""
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
-TEST_LOGFILE=""
-TEST_S3_LOGFILE=""
-FAKE_S3_LOGFILE=""
-UNITTEST_LOGFILE=""
-MIGRATIONTEST_LOGFILE=""
+LOG_DIRECTORY=""
 
 FAKE_S3_PORT=13337
 FAKE_S3_STORAGE=/srv/fakes3
@@ -48,18 +40,14 @@ usage() {
   echo " -t <cvmfs source tree>     CernVM-FS source tree location"
   echo " -s <cvmfs server package>  CernVM-FS server package to be tested"
   echo " -c <cvmfs client package>  CernVM-FS client package to be tested"
-  echo " -l <test logfile>          logfile to write test results into"
-  echo " -i <S3 test logfile>       logfile to write S3 server test results into"
-  echo " -j <FakeS3 logfile>        logfile to write FakeS3 server output into"
-  echo " -u <unittest logfile>      logfile to write unittest outputs into"
-  echo " -m <migrationtest logfile> logfile to write migration test outputs"
+  echo " -l <test log directory>    destination for log file generation"
 
   exit 1
 }
 
 
 # parse script parameters (same for all platforms)
-while getopts "t:s:c:l:i:j:u:m:" option; do
+while getopts "t:s:c:l:" option; do
   case $option in
     t)
       SOURCE_DIRECTORY=$OPTARG
@@ -71,19 +59,7 @@ while getopts "t:s:c:l:i:j:u:m:" option; do
       CLIENT_PACKAGE=$OPTARG
       ;;
     l)
-      TEST_LOGFILE=$OPTARG
-      ;;
-    i)
-      TEST_S3_LOGFILE=$OPTARG
-      ;;
-    j)
-      FAKE_S3_LOGFILE=$OPTARG
-      ;;
-    u)
-      UNITTEST_LOGFILE=$OPTARG
-      ;;
-    m)
-      MIGRATIONTEST_LOGFILE=$OPTARG
+      LOG_DIRECTORY=$OPTARG
       ;;
     ?)
       shift $(($OPTIND-2))
@@ -94,16 +70,21 @@ done
 
 # check that all mandatory parameters are set
 if [ x$SOURCE_DIRECTORY      = "x" ] ||
-   [ x$TEST_LOGFILE          = "x" ] ||
-   [ x$TEST_S3_LOGFILE       = "x" ] ||
-   [ x$FAKE_S3_LOGFILE       = "x" ] ||
-   [ x$UNITTEST_LOGFILE      = "x" ] ||
-   [ x$MIGRATIONTEST_LOGFILE = "x" ] ||
+   [ x$LOG_DIRECTORY         = "x" ] ||
    [ x$SERVER_PACKAGE        = "x" ] ||
    [ x$CLIENT_PACKAGE        = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
+
+CLIENT_TEST_LOGFILE="${LOG_DIRECTORY}/test_client.log"
+SERVER_TEST_LOGFILE="${LOG_DIRECTORY}/test_server.log"
+TEST_S3_LOGFILE="${LOG_DIRECTORY}/test_s3.log"
+FAKE_S3_LOGFILE="${LOG_DIRECTORY}/fake_s3.log"
+UNITTEST_LOGFILE="${LOG_DIRECTORY}/unittest.log"
+MIGRATIONTEST_LOGFILE="${LOG_DIRECTORY}/migrationtest.log"
+
+XUNIT_OUTPUT_SUFFIX=".xunit.xml"
 
 # check that the script is running under the correct user account
 if [ $(id --user --name) != "sftnight" ]; then
@@ -151,7 +132,8 @@ check_result() {
 
 run_unittests() {
   echo -n "running CernVM-FS unit tests... "
-  cvmfs_unittests $@ >> $UNITTEST_LOGFILE 2>&1
+  local xml_output="${UNITTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}"
+  cvmfs_unittests --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
   local ut_retval=$?
   check_result $ut_retval
 

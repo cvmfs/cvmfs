@@ -20,6 +20,7 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "util.h"
+#include "statistics.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -185,7 +186,8 @@ class CatalogManager : public catalog::AbstractCatalogManager {
  public:
   CatalogManager(const std::string &repo_name,
                  signature::SignatureManager *signature_manager,
-                 download::DownloadManager *download_manager);
+                 download::DownloadManager *download_manager,
+                 perf::Statistics *statistics);
   virtual ~CatalogManager();
 
   bool InitFixed(const shash::Any &root_hash);
@@ -195,10 +197,6 @@ class CatalogManager : public catalog::AbstractCatalogManager {
     shash::Any result = mounted_catalogs_[PathString("", 0)];
     Unlock();
     return result;
-  }
-  std::string GetCertificateStats() {
-    return "hits: " + StringifyInt(atomic_read32(&certificate_hits_)) + "    " +
-    "misses: " + StringifyInt(atomic_read32(&certificate_misses_)) + "\n";
   }
   bool offline_mode() const { return offline_mode_; }
   uint64_t all_inodes() const { return all_inodes_; }
@@ -230,8 +228,8 @@ class CatalogManager : public catalog::AbstractCatalogManager {
   signature::SignatureManager *signature_manager_;
   download::DownloadManager *download_manager_;
   bool offline_mode_;  /**< cached copy used because there is no network */
-  atomic_int32 certificate_hits_;
-  atomic_int32 certificate_misses_;
+  perf::Counter *n_certificate_hits_;
+  perf::Counter *n_certificate_misses_;
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;
   BackoffThrottle backoff_throttle_;

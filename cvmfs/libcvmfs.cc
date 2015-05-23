@@ -22,10 +22,10 @@
 #include "libcvmfs_int.h"
 #include "logging.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
-
 
 int set_option(char const *name, char const *value, bool *var) {
   if (*value != '\0') {
@@ -85,18 +85,18 @@ int set_option(char const *name, char const *value, string *var) {
 
 struct cvmfs_repo_options : public cvmfs_context::options {
   int set_option(char const *name, char const *value) {
-    CVMFS_OPT(url);
+    CVMFS_OPT(allow_unsigned);
+    CVMFS_OPT(blacklist);
+    CVMFS_OPT(deep_mount);  // deprecated
+    CVMFS_OPT(fallback_proxies);
+    CVMFS_OPT(mountpoint);
+    CVMFS_OPT(proxies);
+    CVMFS_OPT(pubkey);
+    CVMFS_OPT(repo_name);
     CVMFS_OPT(timeout);
     CVMFS_OPT(timeout_direct);
-    CVMFS_OPT(proxies);
-    CVMFS_OPT(fallback_proxies);
     CVMFS_OPT(tracefile);
-    CVMFS_OPT(allow_unsigned);
-    CVMFS_OPT(pubkey);
-    CVMFS_OPT(deep_mount);
-    CVMFS_OPT(repo_name);
-    CVMFS_OPT(mountpoint);
-    CVMFS_OPT(blacklist);
+    CVMFS_OPT(url);
 
     fprintf(stderr, "Unknown repo option: %s\n", name);
     return -1;
@@ -112,26 +112,64 @@ struct cvmfs_repo_options : public cvmfs_context::options {
       mountpoint.resize(mountpoint.length()-1);
     }
 
-    return 0;
+    return LIBCVMFS_FAIL_OK;
   }
 };
 
 struct cvmfs_global_options : public cvmfs_globals::options {
   int set_option(char const *name, char const *value) {
-    CVMFS_OPT(cache_directory);
-    CVMFS_OPT(change_to_cache_directory);
     CVMFS_OPT(alien_cache);
-    CVMFS_OPT(log_syslog_level);
-    CVMFS_OPT(log_prefix);
+    CVMFS_OPT(alien_cachedir);
+    CVMFS_OPT(cache_directory);
+    CVMFS_OPT(cachedir);
+    CVMFS_OPT(lock_directory);
+    CVMFS_OPT(change_to_cache_directory);
+    CVMFS_OPT(logfile);
     CVMFS_OPT(log_file);
+    CVMFS_OPT(log_prefix);
+    CVMFS_OPT(log_syslog_level);
+    CVMFS_OPT(syslog_level);
     CVMFS_OPT(max_open_files);
+    CVMFS_OPT(nofiles);
+    CVMFS_OPT(quota_limit);
+    CVMFS_OPT(quota_threshold);
+    CVMFS_OPT(rebuild_cachedb);
 
     fprintf(stderr, "Unknown global option: %s\n", name);
-    return -1;
+    return LIBCVMFS_FAIL_BADOPT;
   }
 
   int verify_sanity() {
-    return 0;
+    // Alias handling
+    if ((nofiles >= 0) && (max_open_files != 0) && (nofiles != max_open_files))
+      return LIBCVMFS_FAIL_BADOPT;
+    if (nofiles >= 0)
+      max_open_files = nofiles;
+
+    if ((syslog_level >= 0) && (log_syslog_level != 0) &&
+        (syslog_level != log_syslog_level))
+    {
+      return LIBCVMFS_FAIL_BADOPT;
+    }
+    if (syslog_level >= 0)
+      log_syslog_level = syslog_level;
+    if (log_syslog_level < 0)
+      log_syslog_level = 3;
+
+    if ((logfile != "") && (log_file != "") && (log_file != logfile))
+      return LIBCVMFS_FAIL_BADOPT;
+    if (logfile != "")
+      log_file = logfile;
+
+    if ((cachedir != "") && (cache_directory != "") &&
+        (cache_directory != cachedir))
+    {
+      return LIBCVMFS_FAIL_BADOPT;
+    }
+    if (cachedir != "")
+      cache_directory = cachedir;
+
+    return LIBCVMFS_FAIL_OK;
   }
 };
 
@@ -192,12 +230,12 @@ struct cvmfs_options : public DerivedT {
 typedef cvmfs_options<cvmfs_repo_options>   repo_options;
 typedef cvmfs_options<cvmfs_global_options> global_options;
 
-  /**
-   * Display the usage message.
-   */
-  static void usage() {
-    struct cvmfs_repo_options defaults;
-    fprintf(stderr,
+/**
+ * Display the usage message.
+ */
+static void usage() {
+  struct cvmfs_repo_options defaults;
+  fprintf(stderr,
   "CernVM-FS version %s\n"
   "Copyright (c) 2009- CERN\n"
   "All rights reserved\n\n"
@@ -212,18 +250,19 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
   "  cvmfs_attach_repo() expects repository specific options\n"
 
   "global options are:\n"
-  " cache_directory=DIR        Where to store disk cache\n"
+  " cache_directory/cachedir=DIR Where to store disk cache\n"
   " change_to_cache_directory  Performs a cd to the cache directory "
                                "(performance tweak)\n"
   " alien_cache                Treat cache directory as alien cache\n"
-  " log_syslog_level=LEVEL     Sets the level used for syslog to "
+  " alien_cachedir=DIR         Explicitly set an alien cache directory\n"
+  " (log_)syslog_level=LEVEL   Sets the level used for syslog to "
                                "DEBUG (1), INFO (2), or NOTICE (3).\n"
   "                            Default is NOTICE.\n"
   " log_prefix                 String to use as a log prefix in syslog\n"
-  " log_file                   Logs all messages to FILE instead of "
+  " log_file/logfile           Logs all messages to FILE instead of "
                                "stderr and daemonizes.\n"
   "                            Makes only sense for the debug version\n"
-  " max_open_files             Set the maximum number of open files "
+  " nofiles/max_open_files     Set the maximum number of open files "
                                "for CernVM-FS process (soft limit)\n\n"
 
   "repository specific options are:"
@@ -251,11 +290,7 @@ typedef cvmfs_options<cvmfs_global_options> global_options;
   " blacklist=FILE             Local blacklist for invalid certificates. "
                                "Has precedence over the whitelist.\n",
   PACKAGE_VERSION, defaults.timeout, defaults.timeout_direct);
-  }
-
-/* Path to root of repository.  Used to resolve absolute symlinks. */
-// TODO(jblomer): this is currently unused!
-// static string mountpoint;
+}
 
 /* Expand symlinks in all levels of a path.  Also, expand ".." and
  * ".".  This also has the side-effect of ensuring that
@@ -333,23 +368,20 @@ static int expand_path(
 
   // expand symbolic link
 
-  char *ln_buf = reinterpret_cast<char *>(smalloc(st.st_size+2));
+  char *ln_buf = reinterpret_cast<char *>(alloca(st.st_size+2));
   if (!ln_buf) {
     errno = ENOMEM;
     return -1;
   }
   rc = ctx->Readlink(buf.c_str(), ln_buf, st.st_size + 2);
   if (rc != 0) {
-    free(ln_buf);
     errno = -rc;
     return -1;
   }
   if (ln_buf[0] == '/') {
-    // symlink is absolute path
-    // convert /cvmfs/repo/blah --> /blah
-    // TODO(jblomer): this is broken, mountpoint is never set
-    /*size_t len = ::mountpoint.length();
-    if (strncmp(ln_buf, ::mountpoint.c_str(), len) == 0 &&
+    // symlink is absolute path, strip /cvmfs/$repo
+    unsigned len = ctx->mountpoint().length();
+    if (strncmp(ln_buf, ctx->mountpoint().c_str(), len) == 0 &&
         (ln_buf[len] == '/' || ln_buf[len] == '\0'))
     {
       buf = ln_buf+len;
@@ -359,18 +391,18 @@ static int expand_path(
     } else {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "libcvmfs can't resolve symlinks to paths outside of the repo: "
-               "%s --> %s (mountpoint=%s)", path, ln_buf, ::mountpoint.c_str());
+               "%s --> %s (mountpoint=%s)",
+               path, ln_buf, ctx->mountpoint().c_str());
       errno = ENOENT;
       free(ln_buf);
       return -1;
-    }*/
+    }
   } else {
     // symlink is relative path
     buf = GetParentPath(buf);
     buf += "/";
     buf += ln_buf;
   }
-  free(ln_buf);
 
   // In case the symlink references other symlinks or contains ".."
   // or "."  we must now call expand_path on the result.

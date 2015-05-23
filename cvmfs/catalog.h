@@ -163,7 +163,7 @@ class Catalog : public SingleCopy {
   void TakeDatabaseFileOwnership();
   void DropDatabaseFileOwnership();
   bool OwnsDatabaseFile() const {
-    return NULL != database_ && database_->OwnsFile();
+    return ((database_ != NULL) && database_->OwnsFile()) || managed_database_;
   }
 
   uint64_t GetTTL() const;
@@ -256,6 +256,7 @@ class Catalog : public SingleCopy {
   PathString path_;
   bool volatile_flag_;
   const bool is_root_;
+  bool managed_database_;
 
   Catalog *parent_;
   NestedCatalogMap children_;

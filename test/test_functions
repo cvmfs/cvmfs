@@ -12,6 +12,8 @@
 CVMFS_TEST_DEBUGLOG=${CVMFS_TEST_DEBUGLOG:=}
 CVMFS_TEST_PROXY=${CVMFS_TEST_PROXY:=http://ca-proxy.cern.ch:3128}
 CVMFS_TEST_SCRATCH=${CVMFS_TEST_SCRATCH:=/tmp/cvmfs-test}
+CVMFS_TEST_SUITE_NAME=${CVMFS_TEST_SUITE_NAME:=Integration Tests}
+CVMFS_TEST_CLASS_NAME=${CVMFS_TEST_CLASS_NAME:=IntegrationTests}
 CVMFS_TEST_EXCLUDE=${CVMFS_TEST_EXCLUDE:=}
 CVMFS_TEST_SYSLOG_FACILITY=${CVMFS_TEST_SYSLOG_FACILITY:=5}
 CVMFS_TEST_SYSLOG_TARGET=${CVMFS_TEST_SYSLOG_TARGET:=/var/log/cvmfs-testing.log}
@@ -21,12 +23,30 @@ CVMFS_TEST_REPO_MORE=${CVMFS_TEST_REPO_MORE:=test-more.cern.ch}
 CVMFS_TEST_USER=${CVMFS_TEST_USER:=sftnight}   # user and group are used to over-
 CVMFS_TEST_GROUP=${CVMFS_TEST_GROUP:=sftnight} # write the owner of files for testing
 
-CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=aufs} # union filesystem type to test
+CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
 CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}
 CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
+
+# These OPT variables are for the benchmark options under the benchmarks folder
+CVMFS_OPT_WARM_CACHE=${CVMFS_OPT_WARM_CACHE:=yes}
+CVMFS_OPT_TALK_STATISTICS=${CVMFS_OPT_TALK_STATISTICS:=yes}
+CVMFS_OPT_VALGRIND=${CVMFS_OPT_VALGRIND:=yes}
+CVMFS_OPT_ITERATIONS=${CVMFS_OPT_ITERATIONS:=1}
+CVMFS_OPT_TEST_TYPE=${CVMFS_OPT_TEST_TYPE:=callgrind} # callgrind / memcheck
+CVMFS_OPT_CONFIG_FILE=${CVMFS_OPT_CONFIG_FILE:=}
+CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=/tmp/cvmfs_benchmarks}
+CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=/var/lib/cvmfs/benchmark}
+CVMFS_OPT_MTAB_MODIFIED="false"
+
+
+if [ -f /.dockerinit ]; then
+  CVMFS_TEST_DOCKER=yes
+else
+  CVMFS_TEST_DOCKER=no
+fi
 
 die() {
   echo -e $1 >&2
@@ -34,13 +54,23 @@ die() {
 }
 
 
-# find the service binary
-if [ -x /sbin/service ]; then
-  service_binary="/sbin/service"
-else
-  # Ubuntu
-  service_binary="/usr/sbin/service"
+# Find the service binary (or detect systemd)
+SERVICE_BIN="false"
+if ! pidof systemd > /dev/null 2>&1 || [ $(pidof systemd) -ne 1 ]; then
+  if [ -x /sbin/service ]; then
+    SERVICE_BIN="/sbin/service"
+  elif [ -x /usr/sbin/service ]; then
+    SERVICE_BIN="/usr/sbin/service" # Ubuntu
+  elif [ -x /sbin/rc-service ]; then
+    SERVICE_BIN="/sbin/rc-service" # OpenRC
+  else
+    die "Neither systemd nor service binary detected"
+  fi
 fi
+
+is_systemd() {
+  [ x"$SERVICE_BIN" = x"false" ]
+}
 
 # find the name of the httpd service
 
@@ -87,6 +117,16 @@ compare_versions() {
   [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
 }
 
+service_request() {
+  local service_name=$1
+  local request_verb=$2
+  if is_systemd; then
+    sudo systemctl $request_verb $service_name
+  else
+    sudo $SERVICE_BIN $service_name $request_verb
+  fi
+}
+
 # ensures that a generic service is running
 # @param service  the name of the service
 # @param state    the desired state of the service (on|off)
@@ -95,19 +135,18 @@ service_switch() {
   local service_name=$1
   local state=$2
 
-  # switch it on or off, if necessary
   case $state in
     on)
       echo "starting $service_name..."
-      sudo $service_binary $service_name start || return 100
+      service_request $service_name start || return 100
       ;;
     off)
       echo "stopping $service_name..."
-      sudo $service_binary $service_name stop || return 101
+      service_request $service_name stop || return 101
       ;;
     restart)
       echo "restarting $service_name..."
-      sudo $service_binary $service_name restart || return 102
+      service_request $service_name restart || return 102
       ;;
     *)
       echo "unrecognized state switching for $service_name"
@@ -151,12 +190,8 @@ autofs_check() {
 # @return        0 on success
 autofs_switch() {
   autofs_check
-  service_should_switch $1 $?
-  if [ $? -eq 0 ]; then
+  if service_should_switch $1 $?; then
     service_switch autofs $1
-    return $?
-  else
-    return 0
   fi
 }
 
@@ -165,13 +200,9 @@ autofs_switch() {
 # @param state   the desired state of autofs (on|off)
 # @return        0 on success
 apache_switch() {
-  sudo $service_binary $APACHE_SERVICE status > /dev/null 2>&1
-  service_should_switch $1 $?
-  if [ $? -eq 0 ]; then
+  service_request $APACHE_SERVICE status > /dev/null 2>&1
+  if service_should_switch $1 $?; then
     service_switch $APACHE_SERVICE $1
-    return $?
-  else
-    return 0 # already in correct state
   fi
 }
 
@@ -182,7 +213,7 @@ contains() {
 
   for elem in $haystack
   do
-    if [ $(readlink --canonicalize $elem) = $(readlink --canonicalize $needle) ]; then
+    if [ $(basename $elem) = $(basename $needle) ]; then
       return 0
     fi
   done
@@ -242,7 +273,12 @@ cvmfs_umount() {
   repositories=$1
 
   for r in $(echo $repositories | tr , " "); do
-    sudo umount /cvmfs/$r || return 100
+    sudo umount /cvmfs/$r
+    local result=$?
+    if [ $result -ne 0 ]; then
+      lsof /cvmfs/$r
+      return 200
+    fi
 
     timeout=5
     while cat /proc/mounts | grep -q " /cvmfs/$r "; do
@@ -396,6 +432,7 @@ create_repo() {
   echo "Creating new repository $repo..."
   local s3_config=""
   local stratum0=""
+  local unionfs=""
   if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
     echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG"
@@ -404,11 +441,15 @@ create_repo() {
     echo "  Stratum0: $CVMFS_TEST_STRATUM0"
     stratum0=" -w $CVMFS_TEST_STRATUM0"
   fi
+  if [ x"$CVMFS_TEST_UNIONFS" != x"" ]; then
+    echo "  UnionFS: $CVMFS_TEST_UNIONFS"
+    unionfs=" -f $CVMFS_TEST_UNIONFS"
+  fi
   sudo cvmfs_server mkfs -o $uid -m                \
-                         -f ${CVMFS_TEST_UNIONFS}  \
                          -a ${CVMFS_TEST_HASHALGO} \
                          $s3_config                \
                          $stratum0                 \
+                         $unionfs                  \
                          $extra_options $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
@@ -814,13 +855,70 @@ load_repo_config() {
 }
 
 
-# runs the given command and measures the time it took to execute
+get_millisecond_epoch() {
+  echo $(( $(date +%s%N) / 1000000 ))
+}
+
+
+get_iso8601_timestamp() {
+  date -u +'%Y-%m-%dT%H:%M:%SZ'
+}
+
+
+milliseconds_to_seconds() {
+  local milliseconds="$1"
+
+  # add a zero padding if necessary
+  while [ $(echo -n "$milliseconds" | wc -c) -lt 4 ]; do
+    milliseconds="0$milliseconds"
+  done
+
+  # insert a decimal point to make seconds
+  digits=$(echo -n "$milliseconds" | wc -c)
+  echo -n "$milliseconds" | head -c $(( $digits - 3 ))
+  echo -n "."
+  echo -n "$milliseconds" | tail -c 3
+}
+
+
+milliseconds_to_human_readable() {
+  local milliseconds="$1"
+  local scratch=$milliseconds
+
+  local seconds=1000
+  local minutes=$(( $seconds * 60 ))
+  local hours=$(( $minutes * 60))
+  local days=$(( $hours * 24 ))
+
+  local o_days=$(( $scratch / $days ))
+  if [ $o_days -gt 0 ]; then
+    echo -n "$o_days days "
+    scratch=$(( $scratch % $days ))
+  fi
+
+  local o_hours=$(( $scratch / $hours ))
+  if [ $o_days -gt 0 ] || [ $o_hours -gt 0 ]; then
+    echo -n "$o_hours hours "
+    scratch=$(( $scratch % $hours ))
+  fi
+
+  local o_minutes=$(( $scratch / $minutes ))
+  if [ $o_days -gt 0 ] || [ $o_hours -gt 0 ] || [ $o_minutes -gt 0 ]; then
+    echo -n "$o_minutes minutes "
+    scratch=$(( $scratch % $minutes ))
+  fi
+
+  echo "$(milliseconds_to_seconds $scratch) seconds"
+}
+
+
+# runs the given command and measures the execution time in milliseconds
 stop_watch() {
-  begin=$(date +%s)
+  begin=$(get_millisecond_epoch)
   cmd="$@"
   $cmd
   res=$?
-  end=$(date +%s)
+  end=$(get_millisecond_epoch)
   echo $((end - begin))
   return $res
 }
@@ -1169,7 +1267,6 @@ cp_bin() {
   done
 }
 
-
 # copy all content of /usr/bin/* into a given directory (for server testing purposes)
 #
 # @param destination_directory
@@ -1180,4 +1277,396 @@ cp_usrbin() {
   for f in $(find $destination_directory -type f); do
     sudo chmod 0444 $f || return 3
   done
+}
+
+
+# prints a benchmark log message
+benchmark_log() {
+  local log_message=$1
+  echo "===========    ${log_message}"
+}
+
+
+# waits until cvmfs is mounted
+wait_fqrn_mount() {
+  local waits=0
+  while ! mount | grep -q "/cvmfs/${FQRN}"; do
+    waits=$(( waits + 1 ))
+    if [ "$waits" -ge 120 ]; then
+      die "${FQRN} could not be mounted"
+    fi
+    sleep 1
+  done
+}
+
+
+# runs the command once, mounting and unmounting the repository
+single_execution() {
+  cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 & #> /dev/null 2>&1 &
+  wait_fqrn_mount
+  ( cvmfs_run_benchmark )
+  local code=$?
+  cvmfs_umount $FQRN
+  return $code
+}
+
+
+# creates the default cvmfs.conf file for normal testing
+#
+# @param destination_file  absolute path of the directory
+create_default_cvmfs_config() {
+  local destination_directory="$1"
+  local config_file=$destination_directory/cvmfs.conf
+  local test_folder=$( cd $(dirname $0) ; pwd -P )
+
+  cat > $config_file << EOF
+CVMFS_CACHE_BASE=${CVMFS_OPT_CACHEDIR}
+CVMFS_RELOAD_SOCKETS=${CVMFS_OPT_CACHEDIR}
+CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@
+CVMFS_SHARED_CACHE=no
+CVMFS_HTTP_PROXY=${CVMFS_TEST_PROXY}
+CVMFS_AUTO_UPDATE=false
+CMS_LOCAL_SITE=${test_folder}/benchmarks/004-cms
+CVMFS_QUOTA_LIMIT=-1
+CVMFS_KEYS_DIR=/etc/cvmfs/keys/cern.ch
+EOF
+
+}
+
+
+# sets the valgrind options depending on the test type
+#
+# @param test_type  concrete test to execute
+set_valgrind_options() {
+  local CVMFS_OPT_CALLGRIND="--tool=callgrind --dump-before=fuse_session_loop_mt --dump-after=fuse_session_loop_mt --dsymutil=yes --log-file=${FQRN}.callgrind.log -v"
+  local CVMFS_OPT_MEMCHECK="--tool=memcheck --xml=yes --xml-file=${FQRN}.memcheck.xml --trace-children=yes --child-silent-after-fork=yes --leak-check=yes --log-file=${FQRN}.memcheck.log -v"
+  OPTIONS=""
+  case $CVMFS_OPT_TEST_TYPE in
+    callgrind)
+      OPTIONS=$CVMFS_OPT_CALLGRIND
+    ;;
+    memcheck)
+      OPTIONS=$CVMFS_OPT_MEMCHECK
+    ;;
+  esac
+}
+
+
+# creates the environment to run the benchmark
+#
+# @param workspace  absolute path to the directory where the benchmark will put the files in
+setup_benchmark_environment() {
+  local workspace="$1"
+  mkdir -p /cvmfs/$FQRN
+  mkdir -p "$CVMFS_OPT_OUTPUT_DIR/$FQRN"
+  mkdir -p $workspace/cache
+
+  # cleaning the cache
+  local cachedir="${CVMFS_OPT_CACHEDIR}/${FQRN}"
+  if [ -d "$cachedir" ] && [ "x$cachedir" != x ]; then
+    rm -rf $cachedir/*
+  fi
+
+  # mtab trick
+  if [ ! -h /etc/mtab ]; then
+    mv /etc/mtab /etc/mtab.save
+    ln -s /proc/mounts /etc/mtab
+    CVMFS_OPT_MTAB_MODIFIED="true"
+  fi
+
+  # check that the cache directory exists, is empty and is correctly labeled for SElinux
+  if [ ! -d "$CVMFS_OPT_CACHEDIR" ]; then
+    mkdir -p "$CVMFS_OPT_CACHEDIR"
+    has_selinux
+    selinux=$?
+    if [ "$selinux" -eq 0 ]; then
+      chcon -Rv --type=cvmfs_cache_t $CVMFS_OPT_CACHEDIR
+    fi
+  else
+    if [ x"$CVMFS_OPT_CACHEDIR" != x ]; then
+      rm -rf "$CVMFS_OPT_CACHEDIR"/*
+    fi
+  fi
+
+  # create a cvmfs.conf file or use a custom one
+  if [ -z "$CVMFS_OPT_CONFIG_FILE" ]; then
+    create_default_cvmfs_config $workspace
+  else
+    cp -f "$CVMFS_OPT_CONFIG_FILE" $workspace
+  fi
+
+  return 0
+}
+
+
+# creates a system.info file file with information about the environment
+create_info_file() {
+  cat > system.info << EOF
+- Operating system:
+$(uname -a)
+
+
+- CernVM-FS version:
+$(cvmfs2 --version)
+
+
+- cvmfs2 executable md5:
+$(md5sum $(which cvmfs2))
+
+
+- CernVM-FS talk:
+$(cvmfs_talk -p ${CVMFS_OPT_CACHEDIR}/${FQRN}/cvmfs_io.${FQRN} -i ${FQRN} internal affairs)
+
+EOF
+
+}
+
+
+# creates a statistics file
+create_statistics_file() {
+  local iteration=$1
+  local total_time=$2
+  local memory_median=$3
+  local memory_max=$4
+  local statistics_file="${FQRN}_${iteration}.data"
+  benchmark_log "creating the statistics file ${statistics_file} calling cvmfs_talk"
+  cat >$statistics_file << EOF
+# repo=$FQRN
+# iterations=$CVMFS_OPT_ITERATIONS
+# warm_cache=$CVMFS_OPT_WARM_CACHE
+
+EOF
+
+  benchmark_log "Executing cvmfs_talk"
+  cvmfs_talk -p "$CVMFS_OPT_CACHEDIR"/$FQRN/cvmfs_io.$FQRN internal affairs | grep \| | tail -n +2 >> $statistics_file
+  echo "global.sz_total_time|$total_time|Total execution time (seconds)" >> $statistics_file # of only one iteration without valgrind!
+  echo "global.sz_memory_median|$memory_median|Median memory consumption (KB)" >> $statistics_file
+  echo "global.sz_memory_max|$memory_max|Maximum memory consumption (KB)" >> $statistics_file
+}
+
+
+# collects data during the run
+statistics_daemon() {
+  local dump_file=$1
+  local PID=$2
+  touch $dump_file
+  while [ -f /proc/${PID}/smaps ]; do
+    # memory in KB
+    echo 0 $(awk '/Rss/ {print "+", $2}' /proc/${PID}/smaps) | bc >> $dump_file
+    sleep 2
+  done
+}
+
+
+# collects the median of a file
+collect_median() {
+  local file=$1
+  local num_lines=$(cat $file | wc -l)
+  local median_pos=$(( num_lines / 2 ))
+  echo $(sort $file | sed "${median_pos}q;d")
+}
+
+
+# collects the maximum of a file
+collect_maximum() {
+  echo $(sort $1 | tail -n 1)
+}
+
+
+# executes the statistics loop
+execute_statistics_loop() {
+  local code=0
+  local iteration=1
+  local PID=0
+  local daemon=0
+  local memory_file="memory.stat"
+
+  while (( iteration <= $CVMFS_OPT_ITERATIONS && code == 0 )); do
+    local start_time=$(date +%s)
+
+    cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
+    PID=$!
+    wait_fqrn_mount
+    statistics_daemon $memory_file $PID &
+    daemon=$!
+    ( cvmfs_run_benchmark )
+    code=$?
+    local end_time=$(date +%s)
+    local total_time=$(( end_time - start_time )) # in seconds
+
+    local memory_median=$(collect_median $memory_file)
+    local memory_max=$(collect_maximum $memory_file)
+    create_statistics_file $iteration $total_time $memory_median $memory_max
+    cvmfs_umount $FQRN
+    wait $PID
+    iteration=$(( iteration + 1 ))
+  done
+
+  if [ "$code" -ne 0 ]; then
+    benchmark_log "Problem executing the tests. Aborting"
+    benchmark_log $(lsof /cvmfs/${FQRN})
+  fi
+
+  return $code
+}
+
+
+# executes the main valgrind's loop
+execute_benchmark_loop() {
+  local iteration=1
+  local code=0
+  local count=$CVMFS_OPT_ITERATIONS
+
+  while (( count > 0 && code == 0 )); do
+    benchmark_log "Starting iteration ${iteration}"
+    ( cvmfs_run_benchmark )
+    code=$?
+    count=$(( count - 1 ))
+    iteration=$(( iteration + 1 ))
+  done
+
+  if [ "$code" -ne 0 ]; then
+    benchmark_log "Problem executing the tests. Aborting"
+    benchmark_log $(lsof /cvmfs/${FQRN})
+    exit 100
+  fi
+}
+
+
+# runs a benchmark $CVMFS_OPT_ITERATIONS times
+run_benchmark() {
+  local statistics_file="$FQRN.data"
+  set_valgrind_options
+
+  # use or not warm cache
+  if [ x"$CVMFS_OPT_WARM_CACHE" = x"yes" ]; then
+    benchmark_log "Starting initial execution"
+    single_execution
+  else
+    benchmark_log "Using cold cache"
+  fi
+
+  # run the statistics collection mode
+  if [ x"$CVMFS_OPT_TALK_STATISTICS" = x"yes" ]; then
+    benchmark_log "Executing the statistics collection"
+    execute_statistics_loop
+  fi
+
+  if [ x"$CVMFS_OPT_VALGRIND" = x"yes" ]; then
+    benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
+    benchmark_log "Running valgrind with the following parameters: $OPTIONS"
+    benchmark_log "Launching the job $CVMFS_OPT_ITERATIONS times"
+    valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
+    PID=$!
+    wait_fqrn_mount
+    execute_benchmark_loop
+    create_info_file
+    benchmark_log "Iterations finished. Unmounting cvmfs"
+    cvmfs_umount $FQRN
+    wait $PID
+  fi
+}
+
+
+# collects the files and pastes them into $CVMFS_OPT_OUTPUT_DIR/$FQRN
+collect_benchmark_results() {
+  local benchmark_output_dir="$CVMFS_OPT_OUTPUT_DIR/$FQRN"
+
+  # undo the mtab trick
+  if [ x"$CVMFS_OPT_MTAB_MODIFIED" = x"true" ]; then
+    mv /etc/mtab.save /etc/mtab
+  fi
+
+  # collect the results
+  if [ -d "$benchmark_output_dir" ] && [ "x$benchmark_output_dir" != x ]; then
+    rm -rf "$benchmark_output_dir"/*
+  fi
+  cp  -rf $workdir/system.info $workdir/$FQRN.*.log $workdir/callgrind.out.* $workdir/$FQRN.memcheck.xml $workdir/cvmfs.conf $workdir/*.data $benchmark_output_dir > /dev/null 2>&1
+  benchmark_log "Test results copied into $benchmark_output_dir" >> $logfile
+}
+
+
+#
+#  XUnit XML generation helper functions
+#
+
+xunit_preamble() {
+  local xml_file="$1"
+  local scratchdir="$2"
+
+  local num_tests="$(cat ${scratchdir}/num_tests)"
+  local num_fails="$(cat ${scratchdir}/num_failures)"
+  local num_skips="$(cat ${scratchdir}/num_skipped)"
+  local t_start="$(cat ${scratchdir}/starttime)"
+  local t_elapsed="$(cat ${scratchdir}/elapsed)"
+
+  cat > $xml_file << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" timestamp="$t_start" time="$(milliseconds_to_seconds $t_elapsed)" name="CVMFS Test Runner">
+  <testsuite name="$CVMFS_TEST_SUITE_NAME" tests="$num_tests" failures="$num_fails" disabled="$num_skips" errors="0" time="$(milliseconds_to_seconds $t_elapsed)">
+EOF
+}
+
+xunit_testcase() {
+  local xml_file="$1"
+  local test_scratchdir="$2"
+  local logfile="$3"
+
+  local test_name="$(cat ${test_scratchdir}/name)"
+  local test_number="$(cat ${test_scratchdir}/number)"
+
+  # check if the test was skipped
+  if [ -f ${test_scratchdir}/skipped ]; then
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="notrun" time="0.000" classname="$CVMFS_TEST_CLASS_NAME" />
+EOF
+    return 0
+  fi
+
+  local t_elapsed=$(cat ${test_scratchdir}/elapsed)
+
+  # check if the test was a success
+  if [ -f ${test_scratchdir}/success ]; then
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME" />
+EOF
+    return 0
+  fi
+
+  local log_begin=$(cat ${test_scratchdir}/log_begin)
+  local log_end=$(cat ${test_scratchdir}/log_end)
+  local log_length=$(( $log_end - $log_begin ))
+
+  # check if the test has failed
+  if [ -f ${test_scratchdir}/failure ]; then
+    local retval="$(cat ${test_scratchdir}/retval)"
+    cat >> $xml_file << EOF
+    <testcase name="$test_name" status="run" time="$(milliseconds_to_seconds $t_elapsed)" classname="$CVMFS_TEST_CLASS_NAME">
+      <failure message="Failed with Retval $retval" type="">
+      <![CDATA[$(head -n $log_end $logfile | tail -n $log_length)]]>
+      </failure>
+    </testcase>
+EOF
+    return 0
+  fi
+}
+
+xunit_epilogue() {
+  local xml_file="$1"
+  cat >> $xml_file << EOF
+  </testsuite>
+</testsuites>
+EOF
+}
+
+export_xunit_xml() {
+  local xml_file="$1"
+  local scratchdir="$2"
+  local logfile="$3"
+
+  xunit_preamble "$xml_file" "$scratchdir"
+  for testcase in $(find $scratchdir -mindepth 1 -maxdepth 1 -type d); do
+    xunit_testcase "$xml_file" "$testcase" "$logfile"
+  done
+  xunit_epilogue "$xml_file"
 }

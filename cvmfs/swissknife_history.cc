@@ -39,6 +39,7 @@ void CommandTag::InsertCommonParameters(ParameterList *r) {
   r->push_back(Parameter::Optional('b', "mounted repository base hash"));
   r->push_back(Parameter::Optional(
     'e', "hash algorithm to use (default SHA1)"));
+  r->push_back(Parameter::Switch('L', "follow HTTP redirects"));
 }
 
 
@@ -114,8 +115,11 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
   env->history_path.Set(CreateTempPath(tmp_path + "/history", 0600));
 
   // initialize the (swissknife global) download manager
-  g_download_manager->Init(1, true);
-
+  g_download_manager->Init(1, true, g_statistics);
+  const bool follow_redirects = (args.count('L') > 0);
+  if (follow_redirects) {
+    g_download_manager->EnableRedirects();
+  }
   // open the (yet unsigned) manifest file if it is there, otherwise load the
   // latest manifest from the server
   env->manifest = (FileExists(env->manifest_path.path()))

@@ -16,6 +16,11 @@ get_cvmfs_git_revision() {
   echo "$(cd $source_directory; git rev-parse HEAD | head -c16)"
 }
 
+get_repository_root() {
+  local script_location=$(cd "$(dirname "$0")"; pwd)
+  echo $(cd "${script_location}/.."; pwd)
+}
+
 create_cvmfs_source_tarball() {
   local source_directory="$1"
   local destination_path="$2"
@@ -56,4 +61,20 @@ create_cvmfs_source_tarball() {
   cd "$prev_dir"
 
   return $retval
+}
+
+generate_package_map() {
+  local platform="$1"
+  local client="$2"
+  local server="$3"
+  local unittests="$4"
+  local config="$5"
+
+  cat > pkgmap.${platform} << EOF
+[$platform]
+client=$client
+server=$server
+unittests=$unittests
+config=$config
+EOF
 }

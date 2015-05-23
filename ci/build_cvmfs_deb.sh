@@ -19,6 +19,8 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
+CVMFS_CONFIG_PACKAGE="cvmfs-config-default_1.1-1_all.deb"
+
 # sanity checks
 [ ! -d ${CVMFS_SOURCE_LOCATION}/debian ] || die "source directory seemed to be built before (${CVMFS_SOURCE_LOCATION}/debian exists)"
 
@@ -45,6 +47,17 @@ echo "do the build..."
 dch -v $cvmfs_version -M "bumped upstream version number"
 cd debian
 pdebuild --buildresult $CVMFS_RESULT_LOCATION
+cd ${CVMFS_RESULT_LOCATION}
+
+# generating package map section for specific platform
+if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
+  echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
+  generate_package_map "$CVMFS_CI_PLATFORM_LABEL"                           \
+                       "$(basename $(find . -name 'cvmfs_*.deb'))"          \
+                       "$(basename $(find . -name 'cvmfs-server*.deb'))"    \
+                       "$(basename $(find . -name 'cvmfs-unittests*.deb'))" \
+                       "$CVMFS_CONFIG_PACKAGE"
+fi
 
 # clean up the source tree
 echo "cleaning up..."

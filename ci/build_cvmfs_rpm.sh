@@ -19,6 +19,8 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
+CVMFS_CONFIG_PACKAGE="cvmfs-config-default-1.2-1.noarch.rpm"
+
 rpm_infra_dirs="BUILD RPMS SOURCES SRPMS TMP"
 rpm_src_dir="${CVMFS_SOURCE_LOCATION}/packaging/rpm"
 spec_file="cvmfs-universal.spec"
@@ -68,3 +70,14 @@ echo "building..."
 rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
          --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
          -ba $spec_file
+
+# generating package map section for specific platform
+if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
+  echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
+  generate_package_map                                                        \
+    "$CVMFS_CI_PLATFORM_LABEL"                                                \
+    "$(basename $(find . -regex '.*cvmfs-[0-9].*\.rpm' ! -name '*.src.rpm'))" \
+    "$(basename $(find . -regex '.*cvmfs-server-[0-9].*\.rpm'))"              \
+    "$(basename $(find . -regex '.*cvmfs-unittests-[0-9].*\.rpm'))"           \
+    "$CVMFS_CONFIG_PACKAGE"
+fi

@@ -49,6 +49,12 @@ cvmfs_run_test() {
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
   ls -lisa /cvmfs/${legacy_repo_name} || return 5
 
+  echo "load repository configuration"
+  load_repo_config $CVMFS_TEST_REPO
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
   # check if the migrated and imported catalogs are sane
   echo "check migrated catalogs and data chunks"
   check_repository $legacy_repo_name || return 6
@@ -72,6 +78,9 @@ cvmfs_run_test() {
   # check if still everything is fine
   echo "check catalogs again"
   check_repository $legacy_repo_name || return 7
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
 
   # see if the files ended up in the catalog
   echo "check created files"

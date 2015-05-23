@@ -53,6 +53,10 @@ namespace manifest {
 class Manifest;
 }
 
+namespace perf {
+class Statistics;
+}
+
 namespace catalog {
 
 class WritableCatalogManager : public SimpleCatalogManager {
@@ -62,7 +66,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          const std::string &dir_temp,
                          upload::Spooler   *spooler,
                          download::DownloadManager *download_manager,
-                         uint64_t catalog_entry_warn_threshold);
+                         uint64_t catalog_entry_warn_threshold,
+                         perf::Statistics *statistics);
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,

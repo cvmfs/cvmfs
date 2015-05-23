@@ -23,6 +23,7 @@
 #include "file_chunk.h"
 #include "hash.h"
 #include "logging.h"
+#include "statistics.h"
 #include "util.h"
 
 class XattrList;
@@ -49,56 +50,43 @@ enum LoadError {
   kLoadUp2Date,
   kLoadNoSpace,
   kLoadFail,
+
+  kLoadNumEntries
 };
 
 inline const char *Code2Ascii(const LoadError error) {
-  const int kNumElems = 4;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kLoadNumEntries + 1];
   texts[0] = "loaded new catalog";
   texts[1] = "catalog was up to date";
   texts[2] = "not enough space to load catalog";
   texts[3] = "failed to load catalog";
-
+  texts[4] = "no text";
   return texts[error];
 }
 
 
 struct Statistics {
-  atomic_int64 num_lookup_inode;
-  atomic_int64 num_lookup_path;
-  atomic_int64 num_lookup_path_negative;
-  atomic_int64 num_lookup_xattrs;
-  atomic_int64 num_listing;
-  atomic_int64 num_nested_listing;
+  perf::Counter *n_lookup_inode;
+  perf::Counter *n_lookup_path;
+  perf::Counter *n_lookup_path_negative;
+  perf::Counter *n_lookup_xattrs;
+  perf::Counter *n_listing;
+  perf::Counter *n_nested_listing;
 
-  Statistics() {
-    atomic_init64(&num_lookup_inode);
-    atomic_init64(&num_lookup_path);
-    atomic_init64(&num_lookup_path_negative);
-    atomic_init64(&num_lookup_xattrs);
-    atomic_init64(&num_listing);
-    atomic_init64(&num_nested_listing);
-  }
-
-  std::string Print() {
-    return
-      "lookup(inode): " + StringifyInt(atomic_read64(&num_lookup_inode)) +
-      "    " +
-      "lookup(path-all): " + StringifyInt(atomic_read64(&num_lookup_path)) +
-      "    " +
-      "lookup(path-negative): " +
-        StringifyInt(atomic_read64(&num_lookup_path_negative)) +
-      "    " +
-      "lookup(xattrs): " +
-        StringifyInt(atomic_read64(&num_lookup_xattrs)) +
-      "    " +
-      "listing: " + StringifyInt(atomic_read64(&num_listing)) +
-      "    " +
-      "listing nested catalogs: " +
-        StringifyInt(atomic_read64(&num_nested_listing)) + "\n";
+  explicit Statistics(perf::Statistics *statistics) {
+    n_lookup_inode = statistics->Register("catalog_mgr.n_lookup_inode",
+        "Number of inode lookups");
+    n_lookup_path = statistics->Register("catalog_mgr.n_lookup_path",
+        "Number of path lookups");
+    n_lookup_path_negative = statistics->Register(
+        "catalog_mgr.n_lookup_path_negative",
+        "Number of negative path lookups");
+    n_lookup_xattrs = statistics->Register("catalog_mgr.n_lookup_xattrs",
+        "Number of xattrs lookups");
+    n_listing = statistics->Register("catalog_mgr.n_listing",
+        "Number of listings");
+    n_nested_listing = statistics->Register("catalog_mgr.n_nested_listing",
+        "Number of listings of nested catalogs");
   }
 };
 
@@ -157,7 +145,7 @@ class RemountListener {
 class AbstractCatalogManager : public SingleCopy {
  public:
   static const inode_t kInodeOffset = 255;
-  AbstractCatalogManager();
+  explicit AbstractCatalogManager(perf::Statistics *statistics);
   virtual ~AbstractCatalogManager();
 
   void SetInodeAnnotation(InodeAnnotation *new_annotation);

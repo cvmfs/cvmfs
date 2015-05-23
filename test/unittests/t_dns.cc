@@ -134,6 +134,19 @@ class DummyResolver : public Resolver {
         continue;
       } else if (names[i] == "empty") {
         // No IP addresses returned
+      } else  if (names[i] == "many") {
+        (*ipv4_addresses)[i].push_back("127.0.0.1");
+        (*ipv4_addresses)[i].push_back("127.0.0.2");
+        (*ipv4_addresses)[i].push_back("127.0.0.3");
+        (*ipv4_addresses)[i].push_back("127.0.0.4");
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:0001");
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:0002");
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:0003");
+        (*ipv6_addresses)[i].push_back(
+          "0000:0000:0000:0000:0000:0000:0000:0004");
       }
       (*failures)[i] = kFailOk;
     }
@@ -501,6 +514,22 @@ TEST_F(T_Dns, ResolverEmpty) {
   DummyResolver resolver;
   Host host = resolver.Resolve("");
   EXPECT_EQ(host.status(), kFailInvalidHost);
+}
+
+
+TEST_F(T_Dns, ResolverMany) {
+  DummyResolver resolver;
+
+  Host host = resolver.Resolve("many");
+  EXPECT_TRUE(host.IsValid());
+  EXPECT_EQ(4U, host.ipv4_addresses().size());
+  EXPECT_EQ(4U, host.ipv6_addresses().size());
+
+  resolver.set_throttle(2);
+  Host host2 = resolver.Resolve("many");
+  EXPECT_TRUE(host2.IsValid());
+  EXPECT_EQ(2U, host2.ipv4_addresses().size());
+  EXPECT_EQ(2U, host2.ipv6_addresses().size());
 }
 
 

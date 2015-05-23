@@ -5,21 +5,56 @@
 #ifndef CVMFS_LIBCVMFS_H_
 #define CVMFS_LIBCVMFS_H_
 
-#define LIBCVMFS_VERSION 2
-
 /*
  * NOTE: when adding or removing public symbols, you must also update
  * the list in libcvmfs_public_syms.txt.
  */
+#define LIBCVMFS_VERSION 2
+#define LIBCVMFS_VERSION_MAJOR LIBCVMFS_VERSION
+#define LIBCVMFS_VERSION_MINOR 1
+// Revision Changelog
+// 13: revision introduced
+// 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
+#define LIBCVMFS_REVISION 14
 
 #include <sys/stat.h>
 #include <unistd.h>
+
+#define LIBCVMFS_FAIL_OK         0
+/**
+ * Could not increase the number of open files limit
+ */
+#define LIBCVMFS_FAIL_NOFILES   -1
+/**
+ * Could not create the cache directory
+ */
+#define LIBCVMFS_FAIL_MKCACHE   -2
+/**
+ * Could not change into the cache directory
+ */
+#define LIBCVMFS_FAIL_OPENCACHE -3
+/**
+ * Could not acquire lock file (flock)
+ */
+#define LIBCVMFS_FAIL_LOCKFILE  -4
+/**
+ * Could not create cache directory skeleton
+ */
+#define LIBCVMFS_FAIL_INITCACHE -5
+/**
+ * Could not initialize quota manager
+ */
+#define LIBCVMFS_FAIL_INITQUOTA -6
+/**
+ * Unknown option
+ */
+#define LIBCVMFS_FAIL_BADOPT    -7
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct cvmfs_context;
+class cvmfs_context;
 
 /**
  * Initialize global CVMFS library structures
@@ -118,7 +153,7 @@ int cvmfs_lstat(cvmfs_context *ctx, const char *path, struct stat *st);
  * them.  The array (*buf) may be NULL when this function is called.
  *
  * @param[in] path, path of directory (e.g. /dir, not /cvmfs/repo/dir)
- * @param[out] buf, pointer to dynamically allocated NULL-terminated array of 
+ * @param[out] buf, pointer to dynamically allocated NULL-terminated array of
  *             strings
  * @param[in] buflen, pointer to variable containing size of array
  * \return 0 on success, -1 on failure (sets errno)

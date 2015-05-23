@@ -448,8 +448,8 @@ void *DownloadManager::MainDownload(void *data) {
     } else {
       timeout = -1;
       gettimeofday(&timeval_stop, NULL);
-      download_mgr->statistics_->transfer_time +=
-        DiffTimeSeconds(timeval_start, timeval_stop);
+      perf::Xadd(download_mgr->counters_->sz_transfer_time,
+        1000 * DiffTimeSeconds(timeval_start, timeval_stop));
     }
     int retval = poll(download_mgr->watch_fds_, download_mgr->watch_fds_inuse_,
                       timeout);
@@ -515,7 +515,7 @@ void *DownloadManager::MainDownload(void *data) {
                                             &msgs_in_queue)))
     {
       if (curl_msg->msg == CURLMSG_DONE) {
-        download_mgr->statistics_->num_requests++;
+        perf::Inc(download_mgr->counters_->n_requests);
         JobInfo *info;
         CURL *easy_handle = curl_msg->easy_handle;
         int curl_error = curl_msg->data.result;
@@ -981,7 +981,7 @@ void DownloadManager::UpdateStatistics(CURL *handle) {
   double val;
 
   if (curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val) == CURLE_OK)
-    statistics_->transferred_bytes += val;
+    perf::Xadd(counters_->sz_transferred_bytes, val);
 }
 
 
@@ -1013,7 +1013,7 @@ void DownloadManager::Backoff(JobInfo *info) {
   pthread_mutex_unlock(lock_options_);
 
   info->num_retries++;
-  statistics_->num_retries++;
+  perf::Inc(counters_->n_retries);
   if (info->backoff_ms == 0) {
     info->backoff_ms = prng_.Next(backoff_init_ms + 1);  // Must be != 0
   } else {
@@ -1338,7 +1338,7 @@ DownloadManager::DownloadManager() {
   opt_timestamp_backup_host_ = 0;
   opt_host_reset_after_ = 0;
 
-  statistics_ = NULL;
+  counters_ = NULL;
 }
 
 
@@ -1380,7 +1380,8 @@ void DownloadManager::FiniHeaders() {
 
 
 void DownloadManager::Init(const unsigned max_pool_handles,
-                           const bool use_system_proxy)
+                           const bool use_system_proxy,
+                           perf::Statistics *statistics)
 {
   atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);
@@ -1398,7 +1399,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   opt_num_proxies_ = 0;
   opt_host_chain_current_ = 0;
 
-  statistics_ = new Statistics();
+  counters_ = new Counters(statistics);
 
   user_agent_ = NULL;
   InitHeaders();
@@ -1466,8 +1467,8 @@ void DownloadManager::Fini() {
     free(user_agent_);
   user_agent_ = NULL;
 
-  delete statistics_;
-  statistics_ = NULL;
+  delete counters_;
+  counters_ = NULL;
 
   delete opt_host_chain_;
   delete opt_host_chain_rtt_;
@@ -1548,10 +1549,10 @@ Failures DownloadManager::Fetch(JobInfo *info) {
     int retval;
     do {
       retval = curl_easy_perform(handle);
-      statistics_->num_requests++;
+      perf::Inc(counters_->n_requests);
       double elapsed;
       if (curl_easy_getinfo(handle, CURLINFO_TOTAL_TIME, &elapsed) == CURLE_OK)
-        statistics_->transfer_time += elapsed;
+        perf::Xadd(counters_->sz_transfer_time, (int64_t)(elapsed * 1000));
     } while (VerifyAndFinalize(retval, info));
     result = info->error_code;
     ReleaseCurlHandle(info->curl_handle);
@@ -1655,11 +1656,6 @@ void DownloadManager::GetTimeout(unsigned *seconds_proxy,
 }
 
 
-const Statistics &DownloadManager::GetStatistics() {
-  return *statistics_;
-}
-
-
 /**
  * Parses a list of ';'-separated hosts for the host chain.  The empty string
  * removes the host list.
@@ -1725,7 +1721,7 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
     return;
   }
 
-  statistics_->num_proxy_failover++;
+  perf::Inc(counters_->n_proxy_failover);
   string old_proxy = (*opt_proxy_groups_)[opt_proxy_groups_current_][0].url;
 
   // If all proxies from the current load-balancing group are burned, switch to
@@ -1824,7 +1820,7 @@ void DownloadManager::SwitchHost(JobInfo *info) {
     string old_host = (*opt_host_chain_)[opt_host_chain_current_];
     opt_host_chain_current_ = (opt_host_chain_current_+1) %
     opt_host_chain_->size();
-    statistics_->num_host_failover++;
+    perf::Inc(counters_->n_host_failover);
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
              "switching host from %s to %s", old_host.c_str(),
              (*opt_host_chain_)[opt_host_chain_current_].c_str());
@@ -2398,32 +2394,12 @@ void DownloadManager::SetProxyGroupResetDelay(const unsigned seconds) {
 }
 
 
-void DownloadManager::GetProxyBackupInfo(unsigned *reset_delay,
-                                         time_t *timestamp_failover)
-{
-  pthread_mutex_lock(lock_options_);
-  *reset_delay = opt_proxy_groups_reset_after_;
-  *timestamp_failover = opt_timestamp_backup_proxies_;
-  pthread_mutex_unlock(lock_options_);
-}
-
-
 void DownloadManager::SetHostResetDelay(const unsigned seconds)
 {
   pthread_mutex_lock(lock_options_);
   opt_host_reset_after_ = seconds;
   if (opt_host_reset_after_ == 0)
     opt_timestamp_backup_host_ = 0;
-  pthread_mutex_unlock(lock_options_);
-}
-
-
-void DownloadManager::GetHostBackupInfo(unsigned *reset_delay,
-                                        time_t *timestamp_failover)
-{
-  pthread_mutex_lock(lock_options_);
-  *reset_delay = opt_host_reset_after_;
-  *timestamp_failover = opt_timestamp_backup_host_;
   pthread_mutex_unlock(lock_options_);
 }
 
@@ -2436,6 +2412,13 @@ void DownloadManager::SetRetryParameters(const unsigned max_retries,
   opt_max_retries_ = max_retries;
   opt_backoff_init_ms_ = backoff_init_ms;
   opt_backoff_max_ms_ = backoff_max_ms;
+  pthread_mutex_unlock(lock_options_);
+}
+
+
+void DownloadManager::SetMaxIpaddrPerProxy(unsigned limit) {
+  pthread_mutex_lock(lock_options_);
+  resolver->set_throttle(limit);
   pthread_mutex_unlock(lock_options_);
 }
 
@@ -2463,20 +2446,6 @@ void DownloadManager::EnablePipelining() {
 
 void DownloadManager::EnableRedirects() {
   follow_redirects_ = true;
-}
-
-
-//------------------------------------------------------------------------------
-
-
-string Statistics::Print() const {
-  return
-  "Transferred Bytes: " + StringifyInt(uint64_t(transferred_bytes)) + "\n" +
-  "Transfer duration: " + StringifyInt(uint64_t(transfer_time)) + " s\n" +
-  "Number of requests: " + StringifyInt(num_requests) + "\n" +
-  "Number of retries: " + StringifyInt(num_retries) + "\n" +
-  "Number of proxy failovers: " + StringifyInt(num_proxy_failover) + "\n" +
-  "Number of host failovers: " + StringifyInt(num_host_failover) + "\n";
 }
 
 }  // namespace download

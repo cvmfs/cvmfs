@@ -1,4 +1,25 @@
-2.1.21:
+2.2.0:
+  * Fix resolving absolute symlinks into the same repository in libcvmfs
+    (regression)
+  * Add CVMFS_MAX_IPADDR_PER_PROXY parameter to avoid very long fail-over
+    chains
+  * Fix initialization of quota manager in libcvmfs (regression)
+  * Fix cleanup of global state in libcvmfs
+  * Use "unix-none" sqlite vfs in libcvmfs
+  * Add LIBCVMFS_VERSION_MAJOR, LIBCVMFS_VERSION_MINOR, LIBCVMFS_REVISION
+  * Add error code defines in libcvmfs
+  * Restore 2.1.19 option names in libcvmfs
+  * Follow HTTP redirects in S3 backend
+  * Change versioning scheme to MAJOR.MINOR.PATCH
+  * Disable caching for mutable objects in S3 backend (CVM-808)
+  * Automatically pick a union file system when creating a repository
+  * Fix several CentOS7 issues in the cvmfs_server script (CVM-737)
+  * Adjust to upstream OverlayFS changes
+  * Fix crash in 'cvmfs_swissknife dirtab' if .cvmfsdirtab contains /*
+  * Let 'cvmfs_config chksetup' find the Fuse library in /usr/lib/$platform
+    (CVM-802)
+  * Disable Geo-API for atlas nightlies
+  * Add benchmarks to the integration tests
   * Use --max-time curl option in Nagios probe with 3 times connection timeout
   * Add check for 32bit inode overflow to the Nagios probe (CVM-627)
   * Add a timeout to the Nagios probe (CVM-683)

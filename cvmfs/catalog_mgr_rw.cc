@@ -18,6 +18,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "smalloc.h"
+#include "statistics.h"
 #include "upload.h"
 #include "util.h"
 
@@ -31,8 +32,10 @@ WritableCatalogManager::WritableCatalogManager(
   const string              &dir_temp,
   upload::Spooler           *spooler,
   download::DownloadManager *download_manager,
-  const uint64_t             catalog_entry_warn_threshold)
-  : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager)
+  const uint64_t             catalog_entry_warn_threshold,
+  perf::Statistics          *statistics)
+  : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
+      statistics)
   , spooler_(spooler)
   , catalog_entry_warn_threshold_(catalog_entry_warn_threshold)
 {
