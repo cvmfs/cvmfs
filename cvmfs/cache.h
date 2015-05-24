@@ -53,7 +53,7 @@ enum CacheModes {
  * Writing into the cache is streamed and transactional: a file descriptor must
  * be acquired from StartTxn and the object is only visible in the cache after
  * CommitTxn.  The state of the transaction is carried in an opque transaction
- * objects, which needs to be provided by the caller.  The size of the object is
+ * object, which needs to be provided by the caller.  The size of the object is
  * returned by SizeOfTxn.  This way, users of derived classes can take care of
  * the storage allocation (e.g. on the stack), while the derived class
  * determines the contents of the transaction object.  For race-free read access
@@ -61,7 +61,8 @@ enum CacheModes {
  * is used just before the transaction is committed.
  *
  * The integer return values can be negative and, in this case, represent a
- * -errno failure code.
+ * -errno failure code.  Otherwise the return value 0 indicates a success, or
+ * >= 0 for a file descriptor.
  */
 class CacheManager : SingleCopy {
  public:
