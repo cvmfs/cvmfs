@@ -35,6 +35,8 @@ namespace download {
 class DownloadManager;
 }
 
+class QuotaManager;
+
 namespace cache {
 
 enum CacheModes {
@@ -66,7 +68,7 @@ enum CacheModes {
  */
 class CacheManager : SingleCopy {
  public:
-  virtual ~CacheManager() { };
+  virtual ~CacheManager();
   virtual int Open(const shash::Any &id) = 0;
   virtual int64_t GetSize(int fd) = 0;
   virtual int Close(int fd) = 0;
@@ -85,18 +87,20 @@ class CacheManager : SingleCopy {
                      const unsigned char *buffer,
                      const uint64_t size);
 
-  virtual void TearDown2ReadOnly() = 0;
   CacheModes cache_mode() const { return cache_mode_; }
   bool reports_correct_filesize() const { return reports_correct_filesize_; }
+  QuotaManager *quota_mgr() { return quota_mgr_; }
 
  protected:
-  CacheManager()
-    : cache_mode_(kCacheReadWrite)
-    , reports_correct_filesize_(true)
-  { }
+  CacheManager();
 
   CacheModes cache_mode_;
   bool reports_correct_filesize_;
+
+  /**
+   * Never NULL but defaults to NoopQuotaManager.
+   */
+  QuotaManager *quota_mgr_;
 };
 
 
@@ -123,7 +127,7 @@ class PosixCacheManager : public CacheManager {
   virtual int AbortTxn(void *txn, const std::string &dump_path = "");
   virtual int CommitTxn(void *txn);
 
-  virtual void TearDown2ReadOnly();
+  void TearDown2ReadOnly();
 
  private:
   struct Transaction {

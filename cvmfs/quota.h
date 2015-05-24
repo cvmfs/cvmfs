@@ -16,6 +16,7 @@
 
 #include "duplex_sqlite3.h"
 #include "hash.h"
+#include "util.h"
 
 /**
  * The QuotaManager keeps track of the cache contents.  It is
@@ -34,7 +35,7 @@
  * Multiple cache managers can share a single quota manager instance, as it is
  * done for the local shared hard disk cache.
  */
-class QuotaManager {
+class QuotaManager : SingleCopy {
  public:
    /**
     * Backchannel protocol revision.
@@ -45,6 +46,8 @@ class QuotaManager {
 
   QuotaManager() : protocol_revision_(0) { }
   virtual ~QuotaManager() { };
+  virtual bool IsEnforcing() = 0;
+
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description) = 0;
   virtual void InsertVolatile(const shash::Any &hash, const uint64_t size,
@@ -93,6 +96,8 @@ class QuotaManager {
 class NoopQuotaManager : public QuotaManager {
  public:
   virtual ~NoopQuotaManager() { }
+  virtual bool IsEnforcing() { return false; }
+
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description) { }
   virtual void InsertVolatile(const shash::Any &hash, const uint64_t size,
@@ -144,8 +149,9 @@ class PosixQuotaManager : public QuotaManager {
   static PosixQuotaManager *CreateShared(const std::string &exe_path,
     const std::string &cache_dir,
     const uint64_t limit, const uint64_t cleanup_threshold);
-
   virtual ~PosixQuotaManager();
+  virtual bool IsEnforcing() { return true; }
+
   virtual void Insert(const shash::Any &hash, const uint64_t size,
                       const std::string &description);
   virtual void InsertVolatile(const shash::Any &hash, const uint64_t size,

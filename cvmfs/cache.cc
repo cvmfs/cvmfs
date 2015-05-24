@@ -112,6 +112,18 @@ atomic_int32 CallGuard::global_drainout_ = 0;
 //------------------------------------------------------------------------------
 
 
+CacheManager::CacheManager()
+  : cache_mode_(kCacheReadWrite)
+  , reports_correct_filesize_(true)
+  , quota_mgr_(new NoopQuotaManager())
+{ }
+
+
+CacheManager::~CacheManager() {
+  delete quota_mgr_;
+}
+
+
 /**
  * Tries to open a file and copies its contents into a newly malloc'd
  * memory area.  User of the function has to free buffer (if successful).
