@@ -228,6 +228,164 @@ PosixQuotaManager *PosixQuotaManager::Create(
 }
 
 
+/**
+ * Connects to a running shared local quota manager.  Creates one if necessary.
+ */
+PosixQuotaManager *PosixQuotaManager::CreateShared(
+  const std::string &exe_path,
+  const std::string &cache_dir,
+  const uint64_t limit,
+  const uint64_t cleanup_threshold)
+{
+  // Create lock file: only one fuse client at a time
+  const int fd_lockfile = LockFile(cache_dir + "/lock_cachemgr");
+  if (fd_lockfile < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
+             (cache_dir + "/lock_cachemgr").c_str(), errno);
+    return NULL;
+  }
+
+  PosixQuotaManager *quota_mgr =
+    new PosixQuotaManager(limit, cleanup_threshold, cache_dir);
+  quota_mgr->shared_ = true;
+  quota_mgr->spawned_ = true;
+
+  // Try to connect to pipe
+  const string fifo_path = cache_dir + "/cachemgr";
+  LogCvmfs(kLogQuota, kLogDebug, "trying to connect to existing pipe");
+  quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
+  if (quota_mgr->pipe_lru_[1] >= 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "connected to existing cache manager pipe");
+    quota_mgr->initialized_ = true;
+    Nonblock2Block(quota_mgr->pipe_lru_[1]);
+    UnlockFile(fd_lockfile);
+    quota_mgr->GetLimits(&quota_mgr->limit_, &quota_mgr->cleanup_threshold_);
+    LogCvmfs(kLogQuota, kLogDebug,
+             "received limit %"PRIu64", threshold %"PRIu64,
+             quota_mgr->limit_, quota_mgr->cleanup_threshold_);
+    if (FileExists(cache_dir + "/cachemgr.protocol")) {
+      quota_mgr->protocol_revision_ = quota_mgr->GetProtocolRevision();
+      LogCvmfs(kLogQuota, kLogDebug, "connected protocol revision %u",
+               quota_mgr->protocol_revision_);
+    } else {
+      LogCvmfs(kLogQuota, kLogDebug, "connected to ancient cache manager");
+    }
+    return quota_mgr;
+  }
+  const int connect_error = errno;
+
+  // Lock file: let existing cache manager finish first
+  const int fd_lockfile_fifo = LockFile(cache_dir + "/lock_cachemgr.fifo");
+  if (fd_lockfile_fifo < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "could not open lock file %s (%d)",
+             (cache_dir + "/lock_cachemgr.fifo").c_str(), errno);
+    UnlockFile(fd_lockfile);
+    delete quota_mgr;
+    return NULL;
+  }
+  UnlockFile(fd_lockfile_fifo);
+
+  if (connect_error == ENXIO) {
+    LogCvmfs(kLogQuota, kLogDebug, "left-over FIFO found, unlinking");
+    unlink(fifo_path.c_str());
+  }
+
+  // Creating a new FIFO for the cache manager (to be bound later)
+  int retval = mkfifo(fifo_path.c_str(), 0600);
+  if (retval != 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "failed to create cache manager FIFO (%d)",
+             errno);
+    UnlockFile(fd_lockfile);
+    delete quota_mgr;
+    return NULL;
+  }
+
+  // Create new cache manager
+  int pipe_boot[2];
+  int pipe_handshake[2];
+  MakePipe(pipe_boot);
+  MakePipe(pipe_handshake);
+
+  vector<string> command_line;
+  command_line.push_back(exe_path);
+  command_line.push_back("__cachemgr__");
+  command_line.push_back(cache_dir);
+  command_line.push_back(StringifyInt(pipe_boot[1]));
+  command_line.push_back(StringifyInt(pipe_handshake[0]));
+  command_line.push_back(StringifyInt(limit));
+  command_line.push_back(StringifyInt(cleanup_threshold));
+  command_line.push_back(StringifyInt(cvmfs::foreground_));
+  command_line.push_back(StringifyInt(GetLogSyslogLevel()));
+  command_line.push_back(StringifyInt(GetLogSyslogFacility()));
+  command_line.push_back(GetLogDebugFile() + ":" + GetLogMicroSyslog());
+
+  set<int> preserve_filedes;
+  preserve_filedes.insert(0);
+  preserve_filedes.insert(1);
+  preserve_filedes.insert(2);
+  preserve_filedes.insert(pipe_boot[1]);
+  preserve_filedes.insert(pipe_handshake[0]);
+
+  retval = ManagedExec(command_line, preserve_filedes, map<int, int>(), false);
+  if (!retval) {
+    UnlockFile(fd_lockfile);
+    ClosePipe(pipe_boot);
+    ClosePipe(pipe_handshake);
+    delete quota_mgr;
+    LogCvmfs(kLogQuota, kLogDebug, "failed to start cache manager");
+    return NULL;
+  }
+
+  // Wait for cache manager to be ready
+  close(pipe_boot[1]);
+  close(pipe_handshake[0]);
+  char buf;
+  if (read(pipe_boot[0], &buf, 1) != 1) {
+    UnlockFile(fd_lockfile);
+    close(pipe_boot[0]);
+    close(pipe_handshake[1]);
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+             "cache manager did not start");
+    return false;
+  }
+  close(pipe_boot[0]);
+
+  // Connect write end
+  quota_mgr->pipe_lru_[1] = open(fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
+  if (quota_mgr->pipe_lru_[1] < 0) {
+    LogCvmfs(kLogQuota, kLogDebug,
+             "failed to connect to newly created FIFO (%d)", errno);
+    close(pipe_handshake[1]);
+    UnlockFile(fd_lockfile);
+    delete quota_mgr;
+    return NULL;
+  }
+
+  // Finalize handshake
+  buf = 'C';
+  if (write(pipe_handshake[1], &buf, 1) != 1) {
+    UnlockFile(fd_lockfile);
+    close(pipe_handshake[1]);
+    LogCvmfs(kLogQuota, kLogDebug, "could not finalize handshake");
+    delete quota_mgr;
+    return NULL;
+  }
+  close(pipe_handshake[1]);
+
+  Nonblock2Block(quota_mgr->pipe_lru_[1]);
+  LogCvmfs(kLogQuota, kLogDebug, "connected to a new cache manager");
+  quota_mgr->protocol_revision_ = kProtocolRevision;
+
+  UnlockFile(fd_lockfile);
+
+  quota_mgr->initialized_ = true;
+  quota_mgr->GetLimits(&quota_mgr->limit_, &quota_mgr->cleanup_threshold_);
+  LogCvmfs(kLogQuota, kLogDebug, "received limit %"PRIu64", threshold %"PRIu64,
+           quota_mgr->limit_, quota_mgr->cleanup_threshold_);
+  return quota_mgr;
+}
+
+
 bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   if (gauge_ <= leave_size)
     return true;
@@ -415,6 +573,21 @@ pid_t PosixQuotaManager::GetPid() {
   ReadHalfPipe(pipe_pid[0], &result, sizeof(result));
   CloseReturnPipe(pipe_pid);
   return result;
+}
+
+
+uint32_t PosixQuotaManager::GetProtocolRevision() {
+  int pipe_revision[2];
+  MakeReturnPipe(pipe_revision);
+
+  LruCommand cmd;
+  cmd.command_type = kGetProtocolRevision;
+  cmd.return_pipe = pipe_revision[1];
+  WritePipe(pipe_lru_[1], &cmd, sizeof(cmd));
+
+  uint32_t revision;
+  ReadHalfPipe(pipe_revision[0], &revision, sizeof(revision));
+  return revision;
 }
 
 

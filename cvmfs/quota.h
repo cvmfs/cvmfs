@@ -65,6 +65,7 @@ class QuotaManager {
 
   virtual void Spawn() = 0;
   virtual pid_t GetPid() = 0;
+  virtual uint32_t GetProtocolRevision() = 0;
 
   virtual void RegisterBackChannel(int back_channel[2],
                                    const std::string &channel_id) = 0;
@@ -125,6 +126,7 @@ class NoopQuotaManager : public QuotaManager {
 
   virtual void Spawn() { }
   virtual pid_t GetPid() { return getpid(); }
+  virtual uint32_t GetProtocolRevision() { return 0; }
 };
 
 
@@ -139,6 +141,9 @@ class PosixQuotaManager : public QuotaManager {
   static PosixQuotaManager *Create(const std::string &cache_dir,
     const uint64_t limit, const uint64_t cleanup_threshold,
     const bool rebuild_database);
+  static PosixQuotaManager *CreateShared(const std::string &exe_path,
+    const std::string &cache_dir,
+    const uint64_t limit, const uint64_t cleanup_threshold);
 
   virtual ~PosixQuotaManager();
   virtual void Insert(const shash::Any &hash, const uint64_t size,
@@ -167,6 +172,7 @@ class PosixQuotaManager : public QuotaManager {
 
   virtual void Spawn();
   virtual pid_t GetPid();
+  virtual uint32_t GetProtocolRevision();
 
  private:
   /**
