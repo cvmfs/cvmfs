@@ -205,15 +205,18 @@ int PosixCacheManager::AbortTxn(void *txn, const string &dump_path) {
   }
   close(transaction->fd);
   int result = unlink(transaction->tmp_path.c_str());
+  transaction->~Transaction();
   if (result == -1)
     return -errno;
-  transaction->~Transaction();
   return 0;
 }
 
 
 int PosixCacheManager::Close(int fd) {
-  return close(fd);
+  int retval = close(fd);
+  if (retval != 0)
+    return -errno;
+  return 0;
 }
 
 
