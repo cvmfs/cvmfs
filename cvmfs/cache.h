@@ -16,6 +16,7 @@
 #include "backoff.h"
 #include "catalog_mgr.h"
 #include "file_chunk.h"
+#include "gtest/gtest_prod.h"
 #include "manifest_fetch.h"
 #include "shortstring.h"
 #include "signature.h"
@@ -62,12 +63,24 @@ enum CacheModes {
  * to objects that are just being written to the cache, the OpenFromTxn routine
  * is used just before the transaction is committed.
  *
+ * Writing to the cache can be coupled to a quota manager.  The quota manager
+ * maintains some extra information for data chunks: whether they are
+ * volatile, whether they are pinned, and a description (usually the path that
+ * corresponds to a data chunk).  By default the NoopQuotaManager is used, which
+ * ignores all this extra information.  The CtrlTxn() function is used to
+ * specify this extra information sometime between StartTxn() and CommitTxn().
+ *
  * The integer return values can be negative and, in this case, represent a
  * -errno failure code.  Otherwise the return value 0 indicates a success, or
  * >= 0 for a file descriptor.
  */
 class CacheManager : SingleCopy {
  public:
+  // Used in CtrlTxn to describe the type of file that is being stored in the
+  // cache.
+  static const int kFlagPinned   = 0x01;
+  static const int kFlagVolatile = 0x02;
+
   virtual ~CacheManager();
   virtual int Open(const shash::Any &id) = 0;
   virtual int64_t GetSize(int fd) = 0;
@@ -76,6 +89,8 @@ class CacheManager : SingleCopy {
 
   virtual uint16_t SizeOfTxn() = 0;
   virtual int StartTxn(const shash::Any &id, void *txn) = 0;
+  virtual void CtrlTxn(const std::string &description, const int flags,
+                       void *txn) = 0;
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) = 0;
   virtual int Reset(void *txn) = 0;
   virtual int AbortTxn(void *txn, const std::string &dump_path = "") = 0;
@@ -85,7 +100,8 @@ class CacheManager : SingleCopy {
   bool Open2Mem(const shash::Any &id, unsigned char **buffer, uint64_t *size);
   bool CommitFromMem(const shash::Any &id,
                      const unsigned char *buffer,
-                     const uint64_t size);
+                     const uint64_t size,
+                     const std::string &description);
 
   CacheModes cache_mode() const { return cache_mode_; }
   bool reports_correct_filesize() const { return reports_correct_filesize_; }
@@ -109,6 +125,12 @@ class CacheManager : SingleCopy {
  * backing storage.
  */
 class PosixCacheManager : public CacheManager {
+  FRIEND_TEST(T_CacheManager, CommitTxn);
+  FRIEND_TEST(T_CacheManager, CommitTxnFlushFail);
+  FRIEND_TEST(T_CacheManager, Open);
+  FRIEND_TEST(T_CacheManager, OpenFromTxn);
+  FRIEND_TEST(T_CacheManager, Rename);
+
  public:
   static PosixCacheManager *Create(const std::string &cache_path,
                                    const bool alien_cache);
@@ -121,6 +143,8 @@ class PosixCacheManager : public CacheManager {
 
   virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
   virtual int StartTxn(const shash::Any &id, void *txn);
+  virtual void CtrlTxn(const std::string &description, const int flags,
+                       void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
   virtual int Reset(void *txn);
   virtual int OpenFromTxn(void *txn);
@@ -131,18 +155,25 @@ class PosixCacheManager : public CacheManager {
 
  private:
   struct Transaction {
-    Transaction(const std::string &final_path)
+    Transaction(const shash::Any &id, const std::string &final_path)
       : buf_pos(0)
+      , size(0)
       , fd(-1)
+      , flags(0)
       , tmp_path()
       , final_path(final_path)
+      , id(id)
     { }
 
     unsigned char buffer[4096];
     unsigned buf_pos;
+    uint64_t size;
  	  int fd;
+    int flags;
     std::string tmp_path;
     std::string final_path;
+    std::string description;
+    shash::Any id;
   };
 
   PosixCacheManager(const std::string &cache_path, const bool alien_cache)

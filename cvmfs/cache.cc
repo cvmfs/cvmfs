@@ -35,9 +35,11 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #ifndef __APPLE__
 #include <sys/statfs.h>
 #endif
+#include <unistd.h>
 
 #include <algorithm>
 #include <cassert>
@@ -222,7 +224,7 @@ int PosixCacheManager::Close(int fd) {
 }
 
 
-int PosixCacheManager::CommitTxn(void *txn, const bool volatile_content) {
+int PosixCacheManager::CommitTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   int result;
   LogCvmfs(kLogCache, kLogDebug, "commit %s %s",
@@ -345,6 +347,7 @@ int PosixCacheManager::Open(const shash::Any &id) {
   if (result >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit %s", path.c_str());
     // platform_disable_kcache(result);
+    quota_mgr_->Touch(id);
   } else {
     result = -errno;
     LogCvmfs(kLogCache, kLogDebug, "miss %s (%d)", path.c_str(), result);
@@ -371,7 +374,10 @@ int64_t PosixCacheManager::Pread(
   uint64_t size,
   uint64_t offset)
 {
-  return pread(fd, buf, size, offset);
+  int64_t result = pread(fd, buf, size, offset);
+  if (result < 0)
+    return -errno;
+  return result;
 }
 
 
@@ -401,7 +407,10 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 int PosixCacheManager::Reset(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->buf_pos = 0;
-  int retval = ftruncate(transaction->fd, 0);
+  int retval = lseek(transaction->fd, 0, SEEK_SET);
+  if (retval < 0)
+    return -errno;
+  retval = ftruncate(transaction->fd, 0);
   if (retval < 0)
     return -errno;
   return 0;
