@@ -175,12 +175,14 @@ bool CacheManager::Open2Mem(
 bool CacheManager::CommitFromMem(
   const shash::Any &id,
   const unsigned char *buffer,
-  const uint64_t size)
+  const uint64_t size,
+  const string &description)
 {
   void *txn = alloca(this->SizeOfTxn());
   int fd = this->StartTxn(id, txn);
   if (fd < 0)
     return false;
+  this->CtrlTxn(description, 0, txn);
   int64_t retval = this->Write(buffer, size, txn);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
 		this->AbortTxn(txn);
@@ -217,6 +219,44 @@ int PosixCacheManager::Close(int fd) {
   if (retval != 0)
     return -errno;
   return 0;
+}
+
+
+int PosixCacheManager::CommitTxn(void *txn, const bool volatile_content) {
+  Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+  int result;
+  LogCvmfs(kLogCache, kLogDebug, "commit %s %s",
+           transaction->final_path.c_str(), transaction->tmp_path.c_str());
+
+  result = Flush(transaction);
+  close(transaction->fd);
+  if (result < 0) {
+    unlink(transaction->tmp_path.c_str());
+    transaction->~Transaction();
+    return result;
+  }
+
+  if (alien_cache_) {
+    int retval = chmod(transaction->tmp_path.c_str(), 0660);
+    assert(retval == 0);
+  }
+  result =
+    Rename(transaction->tmp_path.c_str(), transaction->final_path.c_str());
+  if (result < 0) {
+    LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
+    unlink(transaction->tmp_path.c_str());
+  } else {
+    // Success, inform quota manager
+    if (transaction->flags & kFlagVolatile) {
+      quota_mgr_->InsertVolatile(transaction->id, transaction->size,
+                                 transaction->description);
+    } else {
+      quota_mgr_->Insert(transaction->id, transaction->size,
+                         transaction->description);
+    }
+  }
+  transaction->~Transaction();
+  return result;
 }
 
 
@@ -257,29 +297,14 @@ PosixCacheManager *PosixCacheManager::Create(
 }
 
 
-int PosixCacheManager::CommitTxn(void *txn) {
+void PosixCacheManager::CtrlTxn(
+  const std::string &description,
+  const int flags,
+  void *txn)
+{
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
-  int result;
-  LogCvmfs(kLogCache, kLogDebug, "commit %s %s",
-           transaction->final_path.c_str(), transaction->tmp_path.c_str());
-
-  result = Flush(transaction);
-  close(transaction->fd);
-  if (result < 0)
-    return result;
-  if (alien_cache_) {
-    int retval = chmod(transaction->tmp_path.c_str(), 0660);
-    assert(retval == 0);
-  }
-  result =
-    Rename(transaction->tmp_path.c_str(), transaction->final_path.c_str());
-  if (result < 0) {
-    result = -errno;
-    LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
-    unlink(transaction->tmp_path.c_str());
-  }
-  transaction->~Transaction();
-  return result;
+  transaction->description = description;
+  transaction->flags = flags;
 }
 
 
@@ -351,18 +376,25 @@ int64_t PosixCacheManager::Pread(
 
 
 int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
+  int result;
   if (!alien_cache_on_nfs_) {
-    return rename(oldpath, newpath);
+    result = rename(oldpath, newpath);
+    if (result < 0)
+      return -errno;
+    return 0;
   }
 
-  int result = link(oldpath, newpath);
+  result = link(oldpath, newpath);
   if (result < 0) {
     if (errno == EEXIST)
       LogCvmfs(kLogCache, kLogDebug, "%s already existed, ignoring", newpath);
     else
-      return result;
+      return -errno;
   }
-  return unlink(oldpath);
+  result = unlink(oldpath);
+  if (result < 0)
+    return -errno;
+  return 0;
 }
 
 
@@ -377,7 +409,7 @@ int PosixCacheManager::Reset(void *txn) {
 
 
 int PosixCacheManager::StartTxn(const shash::Any &id, void *txn) {
-  Transaction *transaction = new (txn) Transaction(GetPathInCache(id));
+  Transaction *transaction = new (txn) Transaction(id, GetPathInCache(id));
   const unsigned temp_path_len = txn_template_path_.length();
 
   char template_path[temp_path_len + 1];
@@ -407,8 +439,10 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   while (written < size) {
     if (transaction->buf_pos == sizeof(transaction->buffer)) {
       int retval = Flush(transaction);
-      if (retval != 0)
+      if (retval != 0) {
+        transaction->size += written;
         return retval;
+      }
     }
     uint64_t remaining = size - written;
     uint64_t space_in_buffer =
@@ -418,6 +452,7 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
     transaction->buf_pos += batch_size;
     written += batch_size;
   }
+  transaction->size += written;
   return written;
 }
 
