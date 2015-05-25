@@ -290,7 +290,7 @@ PosixCacheManager *PosixCacheManager::Create(
   }
 
   if (FileExists(cache_path + "/cvmfscatalog.cache")) {
-    LogCvmfs(kLogCache, kLogStderr | kLogSyslogErr,
+    LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
              "Not mounting on cvmfs 2.0.X cache");
     return NULL;
   }

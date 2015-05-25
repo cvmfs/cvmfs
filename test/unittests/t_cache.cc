@@ -403,6 +403,37 @@ TEST_F(T_CacheManager, CommitTxnFlushFail) {
 }
 
 
+TEST_F(T_CacheManager, Create) {
+  string path = tmp_path_ + "/test";
+  MkdirDeep(path, 0700);
+  EXPECT_EQ(NULL, PosixCacheManager::Create("/dev/null", false));
+  EXPECT_EQ(NULL, PosixCacheManager::Create("/dev/null", true));
+
+  PosixCacheManager *mgr = PosixCacheManager::Create(path, false);
+  EXPECT_TRUE(mgr != NULL);
+  EXPECT_TRUE(DirectoryExists(path + "/ff"));
+  platform_stat64 info;
+  EXPECT_EQ(0, platform_stat((path + "/ff").c_str(), &info));
+  EXPECT_EQ(0700U, info.st_mode & 0x03FF);
+  delete mgr;
+
+  mode_t mask_save = umask(000);
+  string path2 = path + "2";
+  MkdirDeep(path2, 0700);
+  mgr = PosixCacheManager::Create(path2, true);
+  EXPECT_TRUE(mgr != NULL);
+  EXPECT_TRUE(DirectoryExists(path2 + "/ff"));
+  EXPECT_EQ(0, platform_stat((path2 + "/ff").c_str(), &info));
+  EXPECT_EQ(0770U, info.st_mode & 0x03FF);
+  delete mgr;
+  umask(mask_save);
+
+  CopyPath2Path(tmp_path_ + hash_null_.MakePathExplicit(1, 2),
+                path + "/cvmfscatalog.cache");
+  EXPECT_EQ(NULL, PosixCacheManager::Create(path, false));
+}
+
+
 TEST_F(T_CacheManager, GetSize) {
   int fd = cache_mgr_->Open(hash_null_);
   EXPECT_GE(fd, 0);
@@ -580,7 +611,7 @@ TEST_F(T_CacheManager, Write) {
   EXPECT_GE(fd, 0);
   EXPECT_EQ(14096, cache_mgr_->GetSize(fd));
   cache_mgr_->Close(fd);
-  
+
   fd = cache_mgr_->StartTxn(rnd_hash, txn);
   close(fd);
   EXPECT_EQ(-EBADF, cache_mgr_->Write(large_buf, 10000, txn));
