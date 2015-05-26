@@ -46,6 +46,8 @@ class FileSystemTraversal {
   VoidCallback fn_new_file;
   VoidCallback fn_new_symlink;
   VoidCallback fn_new_socket;
+  VoidCallback fn_new_block;
+  VoidCallback fn_new_fifo;
 
   /**
    * Optional callback for all files during recursion to decide
@@ -185,6 +187,14 @@ class FileSystemTraversal {
         Notify(fn_new_symlink, path, dit->d_name);
       } else if(S_ISSOCK(info.st_mode)){
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing socket %s/%s",
+                 path.c_str(), dit->d_name);
+        Notify(fn_new_socket, path, dit->d_name);
+      } else if(S_ISBLK(info.st_mode)){
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg,
+            "passing blocked device %s/%s", path.c_str(), dit->d_name);
+        Notify(fn_new_socket, path, dit->d_name);
+      } else if(S_ISFIFO(info.st_mode)){
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing FIFO %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_socket, path, dit->d_name);
       } else {

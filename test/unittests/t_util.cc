@@ -41,24 +41,24 @@ class ThreadDummy {
 class T_Util : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    const bool retval = MkdirDeep(sandbox, 0700);
-    ASSERT_TRUE(retval) << "failed to create sandbox";
+    const bool retval = MkdirDeep(string(sandbox), 0700);
+    ASSERT_TRUE(retval) << "failed to create string(sandbox)";
   }
 
   virtual void TearDown() {
-    const bool retval = RemoveTree(sandbox);
-    ASSERT_TRUE(retval) << "failed to remove sandbox";
+    const bool retval = RemoveTree(string(sandbox));
+    ASSERT_TRUE(retval) << "failed to remove string(sandbox)";
   }
 
  protected:
   static void WriteBuffer(int fd) {
     sleep(1);
-    write(fd, to_write.c_str(), to_write.length());
+    write(fd, to_write, string(to_write).length());
   }
 
   static string CreateFileWithContent(const string &filename,
       const string &content) {
-    string complete_path = sandbox + "/" + filename;
+    string complete_path = string(sandbox) + "/" + filename;
     FILE* myfile = fopen(complete_path.c_str(), "w");
     fprintf(myfile, content.c_str());
     fclose(myfile);
@@ -103,25 +103,26 @@ class T_Util : public ::testing::Test {
     kill(getpid(), signal);
   }
 
-  static const string sandbox;
-  static const string empty;
-  static const string path_with_slash;
-  static const string path_without_slash;
-  static const string fake_path;
-  static const string socket_address;
-  static const string long_path;
-  static const string to_write;
+  static const char sandbox[];
+  static const char empty[];
+  static const char path_with_slash[];
+  static const char path_without_slash[];
+  static const char fake_path[];
+  static const char socket_address[];
+  static const char long_path[];
+  static const char to_write[];
 };
 
-const string T_Util::sandbox = "/tmp/testutil";
-const string T_Util::empty = "";
-const string T_Util::path_with_slash = "/my/path/";
-const string T_Util::path_without_slash = "/my/path";
-const string T_Util::fake_path = "mypath";
-const string T_Util::socket_address = sandbox + "/mysocket";
-const string T_Util::long_path = sandbox + "/path_path_path_path_path_path_path"
+const char T_Util::sandbox[] = "/tmp/testutil";
+const char T_Util::empty[] = "";
+const char T_Util::path_with_slash[] = "/my/path/";
+const char T_Util::path_without_slash[] = "/my/path";
+const char T_Util::fake_path[] = "mypath";
+const char T_Util::socket_address[] = "/tmp/testutil/mysocket";
+const char T_Util::long_path[] = "/tmp/testutil"
+    "/path_path_path_path_path_path_path_path_path_path_path_path_path_path"
     "_path_path_path_path_path_path_path_path_path_path_path_path_path_path";
-const string T_Util::to_write = "Hello, world!\n";
+const char T_Util::to_write[] = "Hello, world!\n";
 
 
 TEST_F(T_Util, ThreadProxy) {
@@ -178,13 +179,13 @@ TEST_F(T_Util, HasSuffix) {
 
 
 TEST_F(T_Util, RemoveTree) {
-  string tmp_path_ = CreateTempDir(sandbox + "/cvmfs_test", 0700);
+  string tmp_path_ = CreateTempDir(string(sandbox) + "/cvmfs_test", 0700);
   ASSERT_NE("", tmp_path_);
   ASSERT_TRUE(DirectoryExists(tmp_path_));
   EXPECT_TRUE(RemoveTree(tmp_path_));
   EXPECT_FALSE(DirectoryExists(tmp_path_));
 
-  tmp_path_ = CreateTempDir(sandbox + "/cvmfs_test", 0700);
+  tmp_path_ = CreateTempDir(string(sandbox) + "/cvmfs_test", 0700);
   ASSERT_NE("", tmp_path_);
   EXPECT_TRUE(MkdirDeep(tmp_path_ + "/subdir", 0700));
   int fd = open((tmp_path_ + "/subdir/file").c_str(),
@@ -309,7 +310,7 @@ TEST_F(T_Util, IsHttpUrl) {
 }
 
 TEST_F(T_Util, MakeCannonicalPath) {
-  EXPECT_EQ(empty, MakeCanonicalPath(empty));
+  EXPECT_EQ(string(empty), MakeCanonicalPath(string(empty)));
   EXPECT_EQ(path_without_slash, MakeCanonicalPath(path_with_slash));
   EXPECT_EQ(path_without_slash, MakeCanonicalPath(path_without_slash));
 }
@@ -343,7 +344,7 @@ TEST_F(T_Util, GetFileName) {
 
 TEST_F(T_Util, CreateFile) {
   ASSERT_DEATH(CreateFile("myfakepath/otherfakepath.txt", 0777), ".*");
-  string filename = sandbox + "/createfile.txt";
+  string filename = string(sandbox) + "/createfile.txt";
   CreateFile(filename, 0600);
   FILE* myfile = fopen(filename.c_str(), "w");
   EXPECT_NE(static_cast<FILE*>(NULL), myfile);
@@ -355,20 +356,20 @@ TEST_F(T_Util, MakeSocket) {
   int socket_fd2;
 
   ASSERT_DEATH(MakeSocket(long_path, 0600), ".*");
-  EXPECT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
+  EXPECT_NE(-1, socket_fd1 = MakeSocket(string(socket_address), 0777));
   // the second time it should work as well (non socket-alrady-in-use error)
-  EXPECT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
+  EXPECT_NE(-1, socket_fd2 = MakeSocket(string(socket_address), 0777));
   close(socket_fd1);
   close(socket_fd2);
 }
 
 TEST_F(T_Util, ConnectSocket) {
-  int server_fd = MakeSocket(socket_address, 0777);
+  int server_fd = MakeSocket(string(socket_address), 0777);
   listen(server_fd, 1);
-  int client_fd = ConnectSocket(socket_address);
+  int client_fd = ConnectSocket(string(socket_address));
 
-  ASSERT_DEATH(ConnectSocket(long_path), ".*");
-  ASSERT_EQ(-1, ConnectSocket(sandbox + "/fake_socket"));
+  ASSERT_DEATH(ConnectSocket(string(long_path)), ".*");
+  ASSERT_EQ(-1, ConnectSocket(string(sandbox) + "/fake_socket"));
   ASSERT_NE(-1, client_fd);
   close(client_fd);
   close(server_fd);
@@ -378,10 +379,10 @@ TEST_F(T_Util, MakePipe) {
   int fd[2];
   void *buffer_output = calloc(100, sizeof(char));
   MakePipe(fd);
-  write(fd[1], to_write.c_str(), to_write.length());
-  read(fd[0], buffer_output, to_write.length());
+  write(fd[1], to_write, string(to_write).length());
+  read(fd[0], buffer_output, string(to_write).length());
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  EXPECT_STREQ(to_write, static_cast<const char*>(buffer_output));
   ASSERT_DEATH(MakePipe(static_cast<int*>(NULL)), ".*");
   free(buffer_output);
   ClosePipe(fd);
@@ -391,11 +392,11 @@ TEST_F(T_Util, WritePipe) {
   int fd[2];
   void *buffer_output = calloc(20, sizeof(char));
   MakePipe(fd);
-  WritePipe(fd[1], to_write.c_str(), to_write.length());
-  read(fd[0], buffer_output, to_write.length());
+  WritePipe(fd[1], to_write, string(to_write).length());
+  read(fd[0], buffer_output, string(to_write).length());
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
-  ASSERT_DEATH(WritePipe(-1, to_write.c_str(), to_write.length()),
+  EXPECT_STREQ(to_write, static_cast<const char*>(buffer_output));
+  ASSERT_DEATH(WritePipe(-1, to_write, string(to_write).length()),
       ".*");
   free(buffer_output);
   ClosePipe(fd);
@@ -405,11 +406,11 @@ TEST_F(T_Util, ReadPipe) {
   int fd[2];
   void *buffer_output = calloc(20, sizeof(char));
   MakePipe(fd);
-  write(fd[1], to_write.c_str(), to_write.length());
-  ReadPipe(fd[0], buffer_output, to_write.length());
+  write(fd[1], to_write, string(to_write).length());
+  ReadPipe(fd[0], buffer_output, string(to_write).length());
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
-  ASSERT_DEATH(ReadPipe(-1, buffer_output, to_write.length()), ".*");
+  EXPECT_STREQ(to_write, static_cast<const char*>(buffer_output));
+  ASSERT_DEATH(ReadPipe(-1, buffer_output, string(to_write).length()), ".*");
   free(buffer_output);
   ClosePipe(fd);
 }
@@ -420,11 +421,11 @@ TEST_F(T_Util, ReadHalfPipe) {
   MakePipe(fd);
 
   tbb::tbb_thread writer(WriteBuffer, fd[1]);
-  ReadHalfPipe(fd[0], buffer_output, to_write.length());
+  ReadHalfPipe(fd[0], buffer_output, string(to_write).length());
   writer.join();
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
-  ASSERT_DEATH(ReadHalfPipe(-1, buffer_output, to_write.length()),
+  EXPECT_STREQ(to_write, static_cast<const char*>(buffer_output));
+  ASSERT_DEATH(ReadHalfPipe(-1, buffer_output, string(to_write).length()),
       ".*");
   free(buffer_output);
   ClosePipe(fd);
@@ -435,8 +436,8 @@ TEST_F(T_Util, ClosePipe) {
   void *buffer_output = calloc(20, sizeof(char));
   MakePipe(fd);
   ClosePipe(fd);
-  ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
-  ASSERT_DEATH(ReadPipe(fd[0], buffer_output, to_write.length()), ".*");
+  ASSERT_DEATH(WritePipe(fd[1], to_write, string(to_write).length()), ".*");
+  ASSERT_DEATH(ReadPipe(fd[0], buffer_output, string(to_write).length()), ".*");
   free(buffer_output);
 }
 
@@ -466,15 +467,15 @@ TEST_F(T_Util, SendMes2Socket) {
   void *buffer = calloc(20, sizeof(char));
   struct sockaddr_in client_addr;
   unsigned int client_length = sizeof(client_addr);
-  int server_fd = MakeSocket(socket_address, 0777);
+  int server_fd = MakeSocket(string(socket_address), 0777);
   listen(server_fd, 1);
-  int client_fd = ConnectSocket(socket_address);
+  int client_fd = ConnectSocket(string(socket_address));
   SendMsg2Socket(client_fd, to_write);
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
       &client_length);
-  read(new_connection, buffer, to_write.length());
+  read(new_connection, buffer, string(to_write).length());
 
-  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
+  EXPECT_STREQ(to_write, static_cast<const char*>(buffer));
   close(new_connection);
   close(client_fd);
   close(server_fd);
@@ -503,7 +504,7 @@ TEST_F(T_Util, SwitchCredentials) {
 }
 
 TEST_F(T_Util, FileExists) {
-  string filename = sandbox + "/" + "fileexists.txt";
+  string filename = string(sandbox) + "/" + "fileexists.txt";
   FILE* myfile = fopen(filename.c_str(), "w");
   fclose(myfile);
 
@@ -524,7 +525,7 @@ TEST_F(T_Util, DirectoryExists) {
 }
 
 TEST_F(T_Util, SymlinkExists) {
-  string symlinkname = sandbox + "/mysymlink";
+  string symlinkname = string(sandbox) + "/mysymlink";
   string filename = CreateFileWithContent("mysymlinkfile.txt", to_write);
   symlink(filename.c_str(), symlinkname.c_str());
 
@@ -533,18 +534,19 @@ TEST_F(T_Util, SymlinkExists) {
 }
 
 TEST_F(T_Util, MkdirDeep) {
-  string mydirectory = sandbox + "/mydirectory";
+  string mydirectory = string(sandbox) + "/mydirectory";
   string myfile = CreateFileWithContent("myfile.txt", to_write);
 
-  EXPECT_FALSE(MkdirDeep(empty, 0777));
+  EXPECT_FALSE(MkdirDeep(string(empty), 0777));
   EXPECT_TRUE(MkdirDeep(mydirectory, 0777));
-  EXPECT_TRUE(MkdirDeep(sandbox + "/another/another/mydirectory", 0777));
+  EXPECT_TRUE(MkdirDeep(string(sandbox) + "/another/another/mydirectory",
+      0777));
   EXPECT_TRUE(MkdirDeep(mydirectory, 0777));  // already exists, but writable
   EXPECT_FALSE(MkdirDeep(myfile, 0777));
 }
 
 TEST_F(T_Util, MakeCacheDirectories) {
-  const string path = sandbox + "/cache";
+  const string path = string(sandbox) + "/cache";
   MakeCacheDirectories(path, 0777);
 
   EXPECT_TRUE(DirectoryExists(path + "/txn"));
@@ -558,7 +560,7 @@ TEST_F(T_Util, MakeCacheDirectories) {
 }
 
 TEST_F(T_Util, TryLockFile) {
-  string filename = sandbox + "/trylockfile.txt";
+  string filename = string(sandbox) + "/trylockfile.txt";
   int fd;
 
   EXPECT_EQ(-1, TryLockFile("/fakepath/fakefile.txt"));
@@ -568,7 +570,7 @@ TEST_F(T_Util, TryLockFile) {
 }
 
 TEST_F(T_Util, LockFile) {
-  string filename = sandbox + "/lockfile.txt";
+  string filename = string(sandbox) + "/lockfile.txt";
   int retval;
   int fd;
 
@@ -586,7 +588,7 @@ TEST_F(T_Util, LockFile) {
 }
 
 TEST_F(T_Util, UnlockFile) {
-  string filename = sandbox + "/unlockfile.txt";
+  string filename = string(sandbox) + "/unlockfile.txt";
   int fd1 = TryLockFile(filename);
   int fd2;
 
@@ -607,7 +609,7 @@ TEST_F(T_Util, CreateTempFile) {
       0600, "w+", &final_path));
   EXPECT_FALSE(FileExists(final_path));
   EXPECT_NE(static_cast<FILE*>(NULL), file = CreateTempFile(
-      sandbox + "/mytempfile.txt", 0600, "w+", &final_path));
+      string(sandbox) + "/mytempfile.txt", 0600, "w+", &final_path));
   EXPECT_TRUE(FileExists(final_path));
   fclose(file);
 }
@@ -617,7 +619,8 @@ TEST_F(T_Util, CreateTempPath) {
 
   EXPECT_EQ("", file = CreateTempPath("/fakepath/myfakefile.txt", 0600));
   EXPECT_FALSE(FileExists(file));
-  EXPECT_NE("", file = CreateTempPath(sandbox + "/createmppath.txt", 0600));
+  EXPECT_NE("", file = CreateTempPath(string(sandbox) + "/createmppath.txt",
+      0600));
   EXPECT_TRUE(FileExists(file));
 }
 
@@ -626,7 +629,7 @@ TEST_F(T_Util, CreateTempDir) {
 
   EXPECT_EQ("", directory = CreateTempDir("/fakepath/myfakedirectory", 0600));
   EXPECT_FALSE(DirectoryExists(directory));
-  EXPECT_NE("", directory = CreateTempDir(sandbox + "/creatempdirectory",
+  EXPECT_NE("", directory = CreateTempDir(string(sandbox) +"/creatempdirectory",
       0600));
   EXPECT_TRUE(DirectoryExists(directory));
 }
@@ -641,22 +644,22 @@ TEST_F(T_Util, FindFiles) {
   result = FindFiles("/fakepath/fakedir", "");
   EXPECT_TRUE(result.empty());
 
-  result = FindFiles(sandbox, "");  // find them all
+  result = FindFiles(string(sandbox), "");  // find them all
   EXPECT_EQ(size + 2, result.size());  // FindFiles includes . and ..
   for (unsigned i = 0; i < size; ++i)
-    EXPECT_EQ(sandbox + "/" + files[i], result[i + 2]);  // they are sorted
+    EXPECT_EQ(string(sandbox) + "/" + files[i], result[i + 2]);
 
-  result = FindFiles(sandbox, ".fake");
+  result = FindFiles(string(sandbox), ".fake");
   EXPECT_EQ(0u, result.size());
 
-  result = FindFiles(sandbox, ".conf");
+  result = FindFiles(string(sandbox), ".conf");
   EXPECT_EQ(1u, result.size());
-  EXPECT_EQ(sandbox + "/" + files[2], result[0]);
+  EXPECT_EQ(string(sandbox) + "/" + files[2], result[0]);
 
-  result = FindFiles(sandbox, ".txt");
+  result = FindFiles(string(sandbox), ".txt");
   EXPECT_EQ(2u, result.size());
-  EXPECT_EQ(sandbox + "/" + files[0], result[0]);
-  EXPECT_EQ(sandbox + "/" + files[1], result[1]);
+  EXPECT_EQ(string(sandbox) + "/" + files[0], result[0]);
+  EXPECT_EQ(string(sandbox) + "/" + files[1], result[1]);
 }
 
 TEST_F(T_Util, GetUmask) {
@@ -848,7 +851,7 @@ TEST_F(T_Util, ParseKeyvalMem) {
   EXPECT_EQ("0b457ac12225018e0a15330364c20529e15012ab", map['X']);
   EXPECT_EQ("70a5de156ee5eaf4f8e191591b6ade378f1120bd", map['H']);
   EXPECT_EQ("1431669806", map['T']);
-  EXPECT_DEATH(map.at('E'), ".*");
+  EXPECT_TRUE(map.find('E') == map.end());
 }
 
 TEST_F(T_Util, ParseKeyvalPath) {
@@ -876,8 +879,8 @@ TEST_F(T_Util, ParseKeyvalPath) {
   CreateFileWithContent(content_file, cvmfs_published);
 
   EXPECT_FALSE(ParseKeyvalPath("/path/that/does/not/exists.txt", &map));
-  EXPECT_FALSE(ParseKeyvalPath(sandbox + "/" + big_file, &map));
-  EXPECT_TRUE(ParseKeyvalPath(sandbox + "/" + content_file, &map));
+  EXPECT_FALSE(ParseKeyvalPath(string(sandbox) + "/" + big_file, &map));
+  EXPECT_TRUE(ParseKeyvalPath(string(sandbox) + "/" + content_file, &map));
 }
 
 TEST_F(T_Util, DiffTimeSeconds) {
@@ -1034,8 +1037,8 @@ TEST_F(T_Util, ExecuteBinary) {
       false,
       &gdb_pid);
   EXPECT_TRUE(result);
-  read(fd_stdout, buffer, message.size());
-  string response(buffer);
+  read(fd_stdout, buffer, message.length());
+  string response(buffer, message.length());
   EXPECT_EQ(message, response);
 }
 
@@ -1047,7 +1050,7 @@ TEST_F(T_Util, Shell) {
   char buffer[buffer_size];
 
   EXPECT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
-  string path = sandbox + "/" + "newfolder";
+  string path = string(sandbox) + "/" + "newfolder";
   string command = "mkdir -p " + path +  " && cd " + path + " && pwd\n";
   WritePipe(fd_stdin, command.c_str(), command.length());
   ReadPipe(fd_stdout, buffer, path.length());
