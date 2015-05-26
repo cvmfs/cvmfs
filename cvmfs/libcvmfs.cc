@@ -292,10 +292,6 @@ static void usage() {
   PACKAGE_VERSION, defaults.timeout, defaults.timeout_direct);
 }
 
-/* Path to root of repository.  Used to resolve absolute symlinks. */
-// TODO(jblomer): this is currently unused!
-// static string mountpoint;
-
 /* Expand symlinks in all levels of a path.  Also, expand ".." and
  * ".".  This also has the side-effect of ensuring that
  * cvmfs_getattr() is called on all parent paths, which is needed to
@@ -372,23 +368,20 @@ static int expand_path(
 
   // expand symbolic link
 
-  char *ln_buf = reinterpret_cast<char *>(smalloc(st.st_size+2));
+  char *ln_buf = reinterpret_cast<char *>(alloca(st.st_size+2));
   if (!ln_buf) {
     errno = ENOMEM;
     return -1;
   }
   rc = ctx->Readlink(buf.c_str(), ln_buf, st.st_size + 2);
   if (rc != 0) {
-    free(ln_buf);
     errno = -rc;
     return -1;
   }
   if (ln_buf[0] == '/') {
-    // symlink is absolute path
-    // convert /cvmfs/repo/blah --> /blah
-    // TODO(jblomer): this is broken, mountpoint is never set
-    /*size_t len = ::mountpoint.length();
-    if (strncmp(ln_buf, ::mountpoint.c_str(), len) == 0 &&
+    // symlink is absolute path, strip /cvmfs/$repo
+    unsigned len = ctx->mountpoint().length();
+    if (strncmp(ln_buf, ctx->mountpoint().c_str(), len) == 0 &&
         (ln_buf[len] == '/' || ln_buf[len] == '\0'))
     {
       buf = ln_buf+len;
@@ -398,18 +391,18 @@ static int expand_path(
     } else {
       LogCvmfs(kLogCvmfs, kLogDebug,
                "libcvmfs can't resolve symlinks to paths outside of the repo: "
-               "%s --> %s (mountpoint=%s)", path, ln_buf, ::mountpoint.c_str());
+               "%s --> %s (mountpoint=%s)",
+               path, ln_buf, ctx->mountpoint().c_str());
       errno = ENOENT;
       free(ln_buf);
       return -1;
-    }*/
+    }
   } else {
     // symlink is relative path
     buf = GetParentPath(buf);
     buf += "/";
     buf += ln_buf;
   }
-  free(ln_buf);
 
   // In case the symlink references other symlinks or contains ".."
   // or "."  we must now call expand_path on the result.

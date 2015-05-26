@@ -17,6 +17,7 @@
 #include "atomic.h"
 #include "duplex_cares.h"
 #include "gtest/gtest_prod.h"
+#include "prng.h"
 #include "util.h"
 
 namespace dns {
@@ -34,15 +35,13 @@ enum Failures {
   kFailNoAddress,     ///< Resolver returned a positive reply but without IPs
   kFailNotYetResolved,
   kFailOther,
+
+  kFailNumEntries
 };
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 9;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "invalid resolver addresses";
   texts[2] = "DNS query timeout";
@@ -52,7 +51,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[6] = "no IP address for host";
   texts[7] = "internal error, not yet resolved";
   texts[8] = "unknown name resolving error";
-
+  texts[9] = "no text";
   return texts[error];
 }
 
@@ -190,6 +189,8 @@ class Resolver : SingleCopy {
   const std::vector<std::string> &resolvers() const { return resolvers_; }
   unsigned retries() const { return retries_; }
   unsigned timeout_ms() const { return timeout_ms_; }
+  void set_throttle(const unsigned throttle) { throttle_ = throttle; }
+  unsigned throttle() const { return throttle_; }
 
  protected:
   /**
@@ -235,6 +236,18 @@ class Resolver : SingleCopy {
    * Timeout in milliseconds for DNS queries.  Zero means no timeout.
    */
   unsigned timeout_ms_;
+
+  /**
+   * Limit number of resolved IP addresses.  If throttle_ is 0 it has no effect.
+   * Otherwise, if more than thottle_ IPs are registered for a host, only
+   * throttle_ randomly picked IPs are returned.
+   */
+  unsigned throttle_;
+
+  /**
+   * Required for picking IP addresses in throttle_
+   */
+  Prng prng_;
 };
 
 

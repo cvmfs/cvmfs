@@ -301,7 +301,9 @@ Resolver::Resolver(
   : ipv4_only_(ipv4_only)
   , retries_(retries)
   , timeout_ms_(timeout_ms)
+  , throttle_(0)
 {
+  prng_.InitLocaltime();
 }
 
 
@@ -426,6 +428,22 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
       LogCvmfs(kLogDns, kLogDebug, "no addresses returned for %s",
                names[i].c_str());
       host.status_ = kFailNoAddress;
+    }
+
+    // Remove surplus IP addresses
+    if (throttle_ > 0) {
+      while (host.ipv4_addresses_.size() > throttle_) {
+        unsigned random = prng_.Next(host.ipv4_addresses_.size());
+        set<string>::iterator rnd_itr = host.ipv4_addresses_.begin();
+        std::advance(rnd_itr, random);
+        host.ipv4_addresses_.erase(rnd_itr);
+      }
+      while (host.ipv6_addresses_.size() > throttle_) {
+        unsigned random = prng_.Next(host.ipv6_addresses_.size());
+        set<string>::iterator rnd_itr = host.ipv6_addresses_.begin();
+        std::advance(rnd_itr, random);
+        host.ipv6_addresses_.erase(rnd_itr);
+      }
     }
 
     (*hosts)[i] = host;
