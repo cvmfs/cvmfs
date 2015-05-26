@@ -59,6 +59,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_statistics.cc
   t_options.cc
   t_cache.cc
+  t_quota.cc
   t_libcvmfs.cc
   t_backoff.cc
   t_wpad.cc

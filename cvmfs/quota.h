@@ -19,29 +19,29 @@
 #include "util.h"
 
 /**
- * The QuotaManager keeps track of the cache contents.  It is
- * informed by the cache manager about opens and inserts.  The cache manager
- * picks a quota manager that fits to the backend storage (e.g. POSIX,
- * key-value store).  File catalogs are "pinned" in the quota manager.  Since
- * they remain loaded (virtual file descriptor stays open), it does not make
- * sense to remove them.  Regular files might get pinned occasionally as well,
- * for instance for the CernVM "core files".
- *
- * Sometimes it is necessary that the quota manager gives feedback to the cache
- * manager.  This is where back channels are used.  The cache manager can
- * register a back channel, which gets informed for instance if the number of
- * pinned catalogs get large and should be released.
+ * The QuotaManager keeps track of the cache contents.  It is informed by the
+ * cache manager about opens and inserts.  The cache manager picks a quota
+ * manager that fits to the backend storage (e.g. POSIX, key-value store).  File
+ * catalogs are "pinned" in the quota manager.  Since they remain loaded
+ * (virtual file descriptor stays open), it does not make sense to remove them.
+ * Regular files might get pinned occasionally as well, for instance for the
+ * CernVM "core files".
  *
  * Multiple cache managers can share a single quota manager instance, as it is
  * done for the local shared hard disk cache.
+ *
+ * Sometimes it is necessary that a quota manager instance gives feedback to its
+ * users.  This is where back channels are used.  Users can register a back
+ * channel, which gets informed for instance if the number of pinned catalogs
+ * get large and should be released.
  */
 class QuotaManager : SingleCopy {
  public:
-   /**
-    * Backchannel protocol revision.
-    * Revision 1:
-    *  command 'R': release pinned files if possible
-    */
+  /**
+   * Backchannel protocol revision.
+   * Revision 1:
+   *  command 'R': release pinned files if possible
+   */
   static const uint32_t kProtocolRevision;
 
   QuotaManager() : protocol_revision_(0) { }
