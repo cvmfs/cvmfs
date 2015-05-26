@@ -8,7 +8,22 @@
 #include "testutil.h"
 
 
-TEST(T_ManagedExec, RunShell) {
+class T_ManagedExec : public ::testing::Test {
+ protected:
+  std::string GetDebugger() const {
+    // check if we have a GDB installed
+    const std::string gdb = GetExecutablePath("gdb");
+    if (!gdb.empty()) {
+      return gdb;
+    }
+
+    // maybe we are on a recent OS X and we find LLDB?
+    return GetExecutablePath("lldb");
+  }
+};
+
+
+TEST_F(T_ManagedExec, RunShell) {
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
@@ -29,13 +44,13 @@ TEST(T_ManagedExec, RunShell) {
 }
 
 
-TEST(T_ManagedExec, ExecuteBinaryDoubleFork) {
+TEST_F(T_ManagedExec, ExecuteBinaryDoubleFork) {
   int fd_stdin, fd_stdout, fd_stderr;
   pid_t child_pid;
 
   // find gdb in the $PATH of this system
-  const std::string gdb = GetExecutablePath("gdb");
-  ASSERT_NE("", gdb) << "gdb not found, but needed by this test case";
+  const std::string gdb = GetDebugger();
+  ASSERT_NE("", gdb) << "no debugger found, but needed by this test case";
 
   // spawn detached (double forked) child process
   const bool double_fork = true;
@@ -73,17 +88,21 @@ TEST(T_ManagedExec, ExecuteBinaryDoubleFork) {
 }
 
 
-TEST(T_ManagedExec, ExecuteBinaryAsChild) {
+TEST_F(T_ManagedExec, ExecuteBinaryAsChild) {
   int fd_stdin, fd_stdout, fd_stderr;
   pid_t child_pid;
   pid_t my_pid = getpid();
+
+  // find gdb in the $PATH of this system
+  const std::string gdb = GetDebugger();
+  ASSERT_NE("", gdb) << "no debugger found, but needed by this test case";
 
   // spawn a child process (not double forked)
   const bool double_fork = false;
   bool retval = ExecuteBinary(&fd_stdin,
                               &fd_stdout,
                               &fd_stderr,
-                               "gdb",
+                               gdb,
                                std::vector<std::string>(),
                                double_fork,
                               &child_pid);

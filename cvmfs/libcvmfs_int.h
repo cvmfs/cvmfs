@@ -147,8 +147,6 @@ class cvmfs_context : SingleCopy {
       allow_unsigned(false) {}
   };
 
-
- public:
   static cvmfs_context* Create(const options &options);
   static void Destroy(cvmfs_context *ctx);
 
@@ -162,6 +160,7 @@ class cvmfs_context : SingleCopy {
   catalog::LoadError RemountStart();
 
   perf::Statistics *statistics() const { return statistics_; }
+  std::string mountpoint() const { return cfg_.mountpoint; }
 
  protected:
   /**
@@ -183,7 +182,6 @@ class cvmfs_context : SingleCopy {
   bool GetDirentForPath(const PathString         &path,
                         catalog::DirectoryEntry  *dirent);
 
- private:
   perf::Statistics *statistics_;
 
   const options cfg_;
@@ -223,7 +221,6 @@ class cvmfs_context : SingleCopy {
 
   int fd_lockfile;
 
- private:
   bool download_ready_;
   bool signature_ready_;
   bool catalog_ready_;
