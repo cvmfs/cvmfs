@@ -44,8 +44,8 @@ class QuotaManager : SingleCopy {
    */
   static const uint32_t kProtocolRevision;
 
-  QuotaManager() : protocol_revision_(0) { }
-  virtual ~QuotaManager() { };
+  QuotaManager();
+  virtual ~QuotaManager();
   virtual bool IsEnforcing() = 0;
 
   virtual void Insert(const shash::Any &hash, const uint64_t size,
@@ -81,6 +81,7 @@ class QuotaManager : SingleCopy {
    * Hashes over the channel identifier mapped to writing ends of pipes.
    */
   std::map<shash::Md5, int> back_channels_;
+  pthread_mutex_t *lock_back_channels_;
 
   /**
    * Protocol of the running cache manager instance.  Needs to be figured out

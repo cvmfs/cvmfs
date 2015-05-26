@@ -85,6 +85,20 @@ void QuotaManager::BroadcastBackchannels(const string &message) {
 }
 
 
+QuotaManager::QuotaManager() : protocol_revision_(0) {
+  lock_back_channels =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_back_channels, NULL);
+  assert(retval == 0);
+}
+
+
+QuotaManager::~QuotaManager() {
+  pthread_mutex_destroy(lock_back_channels_);
+  free(lock_back_channels_);
+}
+
+
 //------------------------------------------------------------------------------
 
 
