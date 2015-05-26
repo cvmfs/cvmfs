@@ -179,6 +179,9 @@ struct S3FanOutDnsEntry {
 };  // S3FanOutDnsEntry
 
 class S3FanoutManager : SingleCopy {
+ protected:
+  typedef SynchronizingCounter<uint32_t> Semaphore;
+
  public:
   S3FanoutManager();
   ~S3FanoutManager();
@@ -263,7 +266,7 @@ class S3FanoutManager : SingleCopy {
   bool opt_ipv4_only_;
 
   unsigned int max_available_jobs_;
-  sem_t available_jobs_;
+  Semaphore *available_jobs_;
 
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
