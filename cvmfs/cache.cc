@@ -115,8 +115,7 @@ atomic_int32 CallGuard::global_drainout_ = 0;
 
 
 CacheManager::CacheManager()
-  : cache_mode_(kCacheReadWrite)
-  , reports_correct_filesize_(true)
+  : reports_correct_filesize_(true)
   , quota_mgr_(new NoopQuotaManager())
 { }
 
@@ -210,6 +209,7 @@ int PosixCacheManager::AbortTxn(void *txn, const string &dump_path) {
   close(transaction->fd);
   int result = unlink(transaction->tmp_path.c_str());
   transaction->~Transaction();
+  atomic_dec32(&no_inflight_txns_);
   if (result == -1)
     return -errno;
   return 0;
@@ -235,6 +235,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     unlink(transaction->tmp_path.c_str());
     transaction->~Transaction();
+    atomic_dec32(&no_inflight_txns_);
     return result;
   }
 
@@ -258,6 +259,7 @@ int PosixCacheManager::CommitTxn(void *txn) {
     }
   }
   transaction->~Transaction();
+  atomic_dec32(&no_inflight_txns_);
   return result;
 }
 
@@ -418,6 +420,12 @@ int PosixCacheManager::Reset(void *txn) {
 
 
 int PosixCacheManager::StartTxn(const shash::Any &id, void *txn) {
+  atomic_inc32(&no_inflight_txns_);
+  if (cache_mode_ == kCacheReadOnly) {
+    atomic_dec32(&no_inflight_txns_);
+    return -EROFS;
+  }
+
   Transaction *transaction = new (txn) Transaction(id, GetPathInCache(id));
   const unsigned temp_path_len = txn_template_path_.length();
 
@@ -427,6 +435,7 @@ int PosixCacheManager::StartTxn(const shash::Any &id, void *txn) {
   transaction->fd = mkstemp(template_path);
   if (transaction->fd == -1) {
     transaction->~Transaction();
+    atomic_dec32(&no_inflight_txns_);
     return -errno;
   }
 
@@ -438,7 +447,18 @@ int PosixCacheManager::StartTxn(const shash::Any &id, void *txn) {
 
 
 void PosixCacheManager::TearDown2ReadOnly() {
+  cache_mode_ = kCacheReadOnly;
+  while (atomic_read32(&no_inflight_txns_) != 0)
+    SafeSleepMs(50);
 
+  QuotaManager *old_manager = quota_mgr_;
+  quota_mgr_ = new NoopQuotaManager();
+  delete old_manager;
+
+  // TODO(jblomer): Hacks, should be handled elsewhere
+  unlink(("running." + *cvmfs::repository_name_).c_str());
+  LogCvmfs(kLogCache, kLogSyslog, "switch to read-only cache mode");
+  SetLogMicroSyslog("");
 }
 
 

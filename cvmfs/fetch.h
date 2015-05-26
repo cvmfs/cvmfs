@@ -22,7 +22,8 @@ class CacheManager;
 namespace cvmfs {
 
 /**
- * The Fetcher acts as a mediator between a cache manager, a quota manager and   * a download manager.  It provides a file descriptor to a requested object.
+ * The Fetcher acts as a mediator between a cache manager and a download
+ * manager.  It provides a file descriptor to a requested object.
  * If the object is not in the cache, it is downloaded and stored in the cache.
  *
  * Concurrent download requests for the same id are collapsed.
@@ -47,11 +48,11 @@ class Fetcher : SingleCopy {
             const ObjectType object_type);
 
  private:
-   /**
-    * Multiple threads might want to download the same object at the same time.
-    * If that happens, only the first thread performs the download.  The other
-    * threads wait on a pipe for a notification from the first thread.
-    */
+  /**
+   * Multiple threads might want to download the same object at the same time.
+   * If that happens, only the first thread performs the download.  The other
+   * threads wait on a pipe for a notification from the first thread.
+   */
   struct ThreadLocalStorage {
     /**
      * Used during cleanup to find tls_blocks_.
@@ -84,7 +85,7 @@ class Fetcher : SingleCopy {
 
   ThreadLocalStorage *GetTls();
   void CleanupTls(ThreadLocalStorage *tls);
-  void SignalWaitingThreads(const int fd, const shash::Any &id, 
+  void SignalWaitingThreads(const int fd, const shash::Any &id,
                             ThreadLocalStorage *tls);
 
   /**

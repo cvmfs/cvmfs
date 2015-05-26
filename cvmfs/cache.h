@@ -103,14 +103,15 @@ class CacheManager : SingleCopy {
                      const uint64_t size,
                      const std::string &description);
 
-  CacheModes cache_mode() const { return cache_mode_; }
   bool reports_correct_filesize() const { return reports_correct_filesize_; }
   QuotaManager *quota_mgr() { return quota_mgr_; }
 
  protected:
   CacheManager();
 
-  CacheModes cache_mode_;
+  /**
+   * Hack for HDFS which writes file sizes asynchronously.
+   */
   bool reports_correct_filesize_;
 
   /**
@@ -130,6 +131,7 @@ class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, Open);
   FRIEND_TEST(T_CacheManager, OpenFromTxn);
   FRIEND_TEST(T_CacheManager, Rename);
+  FRIEND_TEST(T_CacheManager, TearDown2ReadOnly);
 
  public:
   static PosixCacheManager *Create(const std::string &cache_path,
@@ -154,6 +156,11 @@ class PosixCacheManager : public CacheManager {
   void TearDown2ReadOnly();
 
  private:
+  enum CacheModes {
+    kCacheReadWrite = 0,
+    kCacheReadOnly,
+  };
+
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)
       : buf_pos(0)
@@ -181,7 +188,10 @@ class PosixCacheManager : public CacheManager {
     , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
     , alien_cache_(alien_cache)
     , alien_cache_on_nfs_(false)
-  { }
+    , cache_mode_(kCacheReadWrite)
+  {
+    atomic_init32(&no_inflight_txns_);
+  }
 
   std::string GetPathInCache(const shash::Any &id);
   int Rename(const char *oldpath, const char *newpath);
@@ -191,6 +201,14 @@ class PosixCacheManager : public CacheManager {
   std::string txn_template_path_;
   bool alien_cache_;
   bool alien_cache_on_nfs_;
+  CacheModes cache_mode_;
+
+  /**
+   * The cache can only degrade to a read-only cache once all writable file
+   * descriptors from transactions are closed.  This is indicated by a zero
+   * value in this variable.
+   */
+  atomic_int32 no_inflight_txns_;
 };
 
 

@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -55,6 +56,40 @@ class T_CacheManager : public ::testing::Test {
     EXPECT_EQ(used_fds_, GetNoUsedFds());
   }
 
+  struct TearDownCb {
+    TearDownCb(PosixCacheManager *mgr) : mgr(mgr), finished(false) { }
+    PosixCacheManager *mgr;
+    bool finished;
+  };
+
+  static void *MainTearDown(void *data) {
+    TearDownCb *cb = reinterpret_cast<TearDownCb *>(data);
+    cb->mgr->TearDown2ReadOnly();
+    cb->finished = true;
+    return NULL;
+  }
+
+  bool TearDownTimedOut(PosixCacheManager *mgr) {
+    TearDownCb cb(mgr);
+    pthread_t thread_teardown;
+    int retval = pthread_create(&thread_teardown, NULL, MainTearDown, &cb);
+    assert(retval == 0);
+    unsigned sum_ms = 0;
+    while (!cb.finished) {
+      SafeSleepMs(50);
+      sum_ms += 50;
+      if (sum_ms > 250)
+        break;
+    }
+    if (sum_ms > 250) {
+      retval = pthread_cancel(thread_teardown);
+      assert(retval == 0);
+      return true;
+    }
+    pthread_join(thread_teardown, 0);
+    return false;
+  }
+
  protected:
   PosixCacheManager *cache_mgr_;
   PosixCacheManager *alien_cache_mgr_;
@@ -66,7 +101,8 @@ class T_CacheManager : public ::testing::Test {
 
 
 /**
- * Used to check if quota commands are correctly sent to the QuotaManager.
+ * Used to check if quota commands are correctly sent to the QuotaManager.  Just
+ * records the last command sent to the quota manager.
  */
 class TestQuotaManager : public QuotaManager {
  public:
@@ -212,28 +248,6 @@ class TestCacheManager : public CacheManager {
 };
 
 
-TEST_F(T_CacheManager, Open2Mem) {
-  unsigned char *retrieve_buf;
-  uint64_t retrieve_size;
-
-  EXPECT_FALSE(cache_mgr_->Open2Mem(shash::Any(shash::kMd5),
-    &retrieve_buf, &retrieve_size));
-
-  EXPECT_TRUE(cache_mgr_->Open2Mem(hash_null_, &retrieve_buf, &retrieve_size));
-  EXPECT_EQ(0U, retrieve_size);
-  EXPECT_EQ(NULL, retrieve_buf);
-
-  EXPECT_TRUE(cache_mgr_->Open2Mem(hash_one_, &retrieve_buf, &retrieve_size));
-  EXPECT_EQ(1U, retrieve_size);
-  EXPECT_EQ('A', retrieve_buf[0]);
-
-  TestCacheManager faulty_cache;
-  EXPECT_FALSE(faulty_cache.Open2Mem(hash_one_, &retrieve_buf, &retrieve_size));
-  EXPECT_EQ(0U, retrieve_size);
-  EXPECT_EQ(NULL, retrieve_buf);
-}
-
-
 TEST_F(T_CacheManager, CommitFromMem) {
   shash::Any rnd_hash;
   rnd_hash.Randomize();
@@ -256,6 +270,31 @@ TEST_F(T_CacheManager, CommitFromMem) {
   EXPECT_EQ(0, rmdir(GetParentPath(final_dir).c_str()));
   EXPECT_FALSE(cache_mgr_->CommitFromMem(rnd_hash, &buf, 1, "1"));
 }
+
+
+TEST_F(T_CacheManager, Open2Mem) {
+  unsigned char *retrieve_buf;
+  uint64_t retrieve_size;
+
+  EXPECT_FALSE(cache_mgr_->Open2Mem(shash::Any(shash::kMd5),
+    &retrieve_buf, &retrieve_size));
+
+  EXPECT_TRUE(cache_mgr_->Open2Mem(hash_null_, &retrieve_buf, &retrieve_size));
+  EXPECT_EQ(0U, retrieve_size);
+  EXPECT_EQ(NULL, retrieve_buf);
+
+  EXPECT_TRUE(cache_mgr_->Open2Mem(hash_one_, &retrieve_buf, &retrieve_size));
+  EXPECT_EQ(1U, retrieve_size);
+  EXPECT_EQ('A', retrieve_buf[0]);
+
+  TestCacheManager faulty_cache;
+  EXPECT_FALSE(faulty_cache.Open2Mem(hash_one_, &retrieve_buf, &retrieve_size));
+  EXPECT_EQ(0U, retrieve_size);
+  EXPECT_EQ(NULL, retrieve_buf);
+}
+
+
+//------------------------------------------------------------------------------
 
 
 TEST_F(T_CacheManager, AbortTxn) {
@@ -573,6 +612,50 @@ TEST_F(T_CacheManager, StartTxn) {
   EXPECT_EQ(0, rmdir((tmp_path_ + "/txn").c_str()));
   EXPECT_EQ(-ENOENT, cache_mgr_->StartTxn(rnd_hash, txn));
   MkdirDeep(tmp_path_ + "/txn", 0700);
+}
+
+
+TEST_F(T_CacheManager, TearDown2ReadOnly) {
+  EXPECT_FALSE(TearDownTimedOut(cache_mgr_));
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  EXPECT_EQ(-EROFS, cache_mgr_->StartTxn(hash_null_, txn));
+
+  cache_mgr_->cache_mode_ = PosixCacheManager::kCacheReadWrite;
+
+  void *txn1 = alloca(cache_mgr_->SizeOfTxn());
+  void *txn2 = alloca(cache_mgr_->SizeOfTxn());
+  EXPECT_GE(cache_mgr_->StartTxn(hash_null_, txn1), 0);
+  EXPECT_GE(cache_mgr_->StartTxn(hash_one_, txn2), 0);
+  EXPECT_EQ(0, cache_mgr_->AbortTxn(txn1));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn2));
+  EXPECT_FALSE(TearDownTimedOut(cache_mgr_));
+
+  cache_mgr_->cache_mode_ = PosixCacheManager::kCacheReadWrite;
+
+  EXPECT_GE(cache_mgr_->StartTxn(hash_null_, txn1), 0);
+  EXPECT_GE(cache_mgr_->StartTxn(hash_one_, txn2), 0);
+  pthread_t thread_teardown;
+  TearDownCb cb(cache_mgr_);
+  int retval = pthread_create(&thread_teardown, NULL, MainTearDown, &cb);
+  assert(retval == 0);
+  EXPECT_EQ(0, cache_mgr_->AbortTxn(txn1));
+  SafeSleepMs(75);
+  EXPECT_FALSE(cb.finished);
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn2));
+  SafeSleepMs(75);
+  EXPECT_TRUE(cb.finished);
+  if (cb.finished)
+    pthread_join(thread_teardown, NULL);
+  else
+    pthread_cancel(thread_teardown);
+}
+
+
+TEST_F(T_CacheManager, TearDown2ReadOnlyTimeout) {
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  cache_mgr_->StartTxn(hash_null_, txn);
+  EXPECT_TRUE(TearDownTimedOut(cache_mgr_));
+  cache_mgr_->AbortTxn(txn);
 }
 
 
