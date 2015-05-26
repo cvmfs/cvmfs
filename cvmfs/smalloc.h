@@ -53,7 +53,7 @@ static inline void * __attribute__((used)) smmap(size_t size) {
   assert(size > 0);
   assert(size < std::numeric_limits<size_t>::max() - 4096);
 
-  size_t pages = ((size + 2*sizeof(size_t))+4095)/4096; // round to full page
+  size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;  // round to full page
   unsigned char *mem =
     static_cast<unsigned char *>(mmap(NULL, pages*4096, PROT_READ | PROT_WRITE,
                                  MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS, -1, 0));
