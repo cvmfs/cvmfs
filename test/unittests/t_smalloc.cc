@@ -67,6 +67,6 @@ TEST(T_Smalloc, SmallMmap) {
 
 TEST(T_Smalloc, BigMmap) {
   void *mem = NULL;
-  ASSERT_DEATH(mem = smmap(kBigAllocation), ".*");
+  ASSERT_DEATH(mem = smmap(kBigAllocation - 4096), ".*");
   ASSERT_DEATH(smunmap(mem), ".*");
 }
