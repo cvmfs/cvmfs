@@ -127,7 +127,6 @@ class CacheManager : SingleCopy {
  */
 class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, CommitTxn);
-  FRIEND_TEST(T_CacheManager, CommitTxnFlushFail);
   FRIEND_TEST(T_CacheManager, Open);
   FRIEND_TEST(T_CacheManager, OpenFromTxn);
   FRIEND_TEST(T_CacheManager, Rename);

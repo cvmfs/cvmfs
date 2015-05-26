@@ -417,12 +417,11 @@ TEST_F(T_CacheManager, CommitTxnFlushFail) {
 
   ASSERT_EQ(-ENOENT, cache_mgr_->Open(rnd_hash));
 
-  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, txn), 0);
-  PosixCacheManager::Transaction *transaction =
-    reinterpret_cast<PosixCacheManager::Transaction *>(txn);
+  int fd = cache_mgr_->StartTxn(rnd_hash, txn);
+  EXPECT_GE(fd, 0);
   unsigned char buf = 'A';
   EXPECT_EQ(1U, cache_mgr_->Write(&buf, 1, txn));
-  EXPECT_EQ(0, close(transaction->fd));
+  EXPECT_EQ(0, close(fd));
   EXPECT_EQ(-EBADF, cache_mgr_->CommitTxn(txn));
 }
 
