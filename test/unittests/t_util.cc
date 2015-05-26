@@ -148,8 +148,14 @@ TEST_F(T_Util, GetUidOf) {
 
 
 TEST_F(T_Util, GetGidOf) {
+#ifdef __APPLE__
+  const std::string group_name = "wheel";
+#else
+  const std::string group_name = "root";
+#endif
+
   gid_t gid;
-  EXPECT_TRUE(GetGidOf("root", &gid));
+  EXPECT_TRUE(GetGidOf(group_name, &gid));
   EXPECT_EQ(0U, gid);
   EXPECT_FALSE(GetGidOf("no-such-group", &gid));
 }

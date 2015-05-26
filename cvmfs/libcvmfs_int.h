@@ -208,9 +208,7 @@ class cvmfs_context : SingleCopy {
   atomic_int64 num_fs_read_;
   atomic_int64 num_fs_readlink_;
   atomic_int32 num_io_error_;
-  atomic_int32 open_files_; /**< number of currently open files by Fuse calls */
   atomic_int32 open_dirs_; /**< number of currently open directories */
-  unsigned max_open_files_; /**< maximum allowed number of open files */
   /**
    * Number of reserved file descriptors for internal use
    */
