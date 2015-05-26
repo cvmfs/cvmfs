@@ -7,7 +7,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -18,6 +17,7 @@
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/platform.h"
 #include "../../cvmfs/quota.h"
+#include "testutil.h"
 
 using namespace std;  // NOLINT
 
@@ -52,22 +52,7 @@ class T_CacheManager : public ::testing::Test {
 
     if (tmp_path_ != "")
       RemoveTree(tmp_path_);
-    // Syslog file descriptor could still be open
-
-    closelog();
     EXPECT_EQ(used_fds_, GetNoUsedFds());
-  }
-
-  unsigned GetNoUsedFds() {
-    unsigned result = 0;
-    int max_fd = getdtablesize();
-    assert(max_fd >= 0);
-    for (unsigned fd = 0; fd < unsigned(max_fd); ++fd) {
-      int retval = fcntl(fd, F_GETFD, 0);
-      if (retval != -1)
-        result++;
-    }
-    return result;
   }
 
  protected:

@@ -6,8 +6,10 @@
 #ifdef __APPLE__
   #include <sys/sysctl.h>
 #endif
+#include <syslog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <fstream>  // TODO(jblomer): remove me
 #include <sstream>  // TODO(jblomer): remove me
 
@@ -67,6 +69,23 @@ pid_t GetParentPid(const pid_t pid) {
 
   return parent_pid;
 }
+
+
+unsigned GetNoUsedFds() {
+  // Syslog file descriptor could still be open
+  closelog();
+
+  unsigned result = 0;
+  int max_fd = getdtablesize();
+  assert(max_fd >= 0);
+  for (unsigned fd = 0; fd < unsigned(max_fd); ++fd) {
+    int retval = fcntl(fd, F_GETFD, 0);
+    if (retval != -1)
+      result++;
+  }
+  return result;
+}
+
 
 /**
  * Traverses the $PATH environment variable to find the absolute path of a given
