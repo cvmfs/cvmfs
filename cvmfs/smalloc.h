@@ -49,6 +49,7 @@ static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
 }
 
 static inline void * __attribute__((used)) smmap(size_t size) {
+  // TODO(reneme): make page size platform independent
   assert(size > 0);
   assert(size < std::numeric_limits<size_t>::max() - 4096);
 
