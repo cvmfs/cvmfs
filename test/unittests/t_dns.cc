@@ -716,7 +716,7 @@ TEST_F(T_Dns, CaresResolverTimeout) {
   time_t after = time(NULL);
   // C-ares oddity: why is it kFailInvalidResolvers in CaresResolverBadResolver?
   EXPECT_EQ(host.status(), kFailTimeout);
-  EXPECT_LE(after-before, 2);
+  EXPECT_LE(after-before, 3);
 }
 
 
