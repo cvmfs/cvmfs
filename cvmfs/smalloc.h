@@ -14,6 +14,8 @@
 #include <cassert>
 // #include <cstdio>
 
+#include <limits>
+
 #ifdef __APPLE__
 #define PLATFORM_MAP_ANONYMOUS MAP_ANON
 #else
@@ -48,7 +50,9 @@ static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
 
 static inline void * __attribute__((used)) smmap(size_t size) {
   assert(size > 0);
-  size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;
+  assert(size < std::numeric_limits<size_t>::max() - 4096);
+
+  size_t pages = ((size + 2*sizeof(size_t))+4095)/4096; // round to full page
   unsigned char *mem =
     static_cast<unsigned char *>(mmap(NULL, pages*4096, PROT_READ | PROT_WRITE,
                                  MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS, -1, 0));
