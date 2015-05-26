@@ -83,6 +83,7 @@ class T_GarbageCollector : public ::testing::Test {
     MockCatalog::Reset();
     MockHistory::Reset();
     EXPECT_EQ(0u, MockCatalog::instances);
+    ASSERT_NE(static_cast<GC_MockUploader*>(NULL), uploader_);
     uploader_->TearDown();
     delete uploader_;
   }
