@@ -185,15 +185,15 @@ class FileSystemTraversal {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing symlink %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_symlink, path, dit->d_name);
-      } else if(S_ISSOCK(info.st_mode)){
+      } else if (S_ISSOCK(info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing socket %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_socket, path, dit->d_name);
-      } else if(S_ISBLK(info.st_mode)){
+      } else if (S_ISBLK(info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg,
             "passing blocked device %s/%s", path.c_str(), dit->d_name);
         Notify(fn_new_socket, path, dit->d_name);
-      } else if(S_ISFIFO(info.st_mode)){
+      } else if (S_ISFIFO(info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing FIFO %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_socket, path, dit->d_name);
