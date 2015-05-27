@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include <cerrno>
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/platform.h"
@@ -50,6 +51,13 @@ TEST_F(T_Xattr, CreateFromFile) {
   ASSERT_TRUE(f != NULL);
   fclose(f);
   UnlinkGuard unlink_guard(tmp_path);
+
+  // check if xattr is supported on the current platform
+  const bool success = platform_setxattr(tmp_path, "user.check", "foo");
+  if (!success && errno == EOPNOTSUPP) {
+    SUCCEED() << "extended attributes are not supported on " << tmp_path;
+    return;
+  }
 
   const unsigned int default_attrs = CountAttributesInFile(tmp_path);
 
