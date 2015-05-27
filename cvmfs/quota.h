@@ -151,6 +151,8 @@ class NoopQuotaManager : public QuotaManager {
  * TODO(jblomer): split into client, server, and protocol classes.
  */
 class PosixQuotaManager : public QuotaManager {
+  FRIEND_TEST(T_QuotaManager, BindReturnPipe);
+
  public:
   static PosixQuotaManager *Create(const std::string &cache_dir,
     const uint64_t limit, const uint64_t cleanup_threshold,

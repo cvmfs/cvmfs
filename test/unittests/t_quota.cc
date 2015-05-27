@@ -45,6 +45,7 @@ class T_QuotaManager : public ::testing::Test {
   sig_t sigpipe_save_;
 };
 
+
 TEST_F(T_QuotaManager, BroadcastBackchannels) {
   // Don't die without channels
   quota_mgr_->BroadcastBackchannels("X");
@@ -86,3 +87,18 @@ TEST_F(T_QuotaManager, BroadcastBackchannels) {
   close(channel3[0]);
 }
 
+
+TEST_F(T_QuotaManager, BindReturnPipe) {
+  EXPECT_EQ(42, quota_mgr_->BindReturnPipe(42));
+
+  quota_mgr_->shared_ = true;
+  int pipe_test[2];
+  quota_mgr_->MakeReturnPipe(pipe_test);
+  int fd = quota_mgr_->BindReturnPipe(pipe_test[1]);
+  EXPECT_GE(fd, 0);
+  quota_mgr_->UnbindReturnPipe(pipe_test[1]);
+  quota_mgr_->UnlinkReturnPipe(pipe_test[1]);
+  close(pipe_test[0]);
+  EXPECT_EQ(-1, quota_mgr_->BindReturnPipe(pipe_test[1]));
+  quota_mgr_->shared_ = false;
+}
