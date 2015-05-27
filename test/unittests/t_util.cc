@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "../../cvmfs/shortstring.h"
+#include "../../cvmfs/smalloc.h"
 #include "../../cvmfs/util.h"
 
 using namespace std;  // NOLINT
@@ -41,25 +42,32 @@ class ThreadDummy {
 class T_Util : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    const bool retval = MkdirDeep(string(sandbox), 0700);
-    ASSERT_TRUE(retval) << "failed to create string(sandbox)";
+    empty = "";
+    path_with_slash = "/my/path/";
+    path_without_slash = "/my/path";
+    fake_path = "mypath";
+    to_write = "Hello, world!\n";
+    sandbox = CreateTempDir("/tmp/testutil");
+    socket_address = sandbox + "/mysocket";
+    long_path = sandbox +
+        "/path_path_path_path_path_path_path_path_path_path_path_path_path_"
+        "path_path_path_path_path_path_path_path_path_path_path_path_path";
   }
 
   virtual void TearDown() {
-    const bool retval = RemoveTree(string(sandbox));
-    ASSERT_TRUE(retval) << "failed to remove string(sandbox)";
+    const bool retval = RemoveTree(sandbox);
+    ASSERT_TRUE(retval) << "failed to remove sandbox";
   }
 
  protected:
-  static void WriteBuffer(int fd) {
-    sleep(1);
-    write(fd, to_write, string(to_write).length());
+  static void WriteBuffer(int fd, const string &text) {
+    write(fd, text.c_str(), text.length());
   }
 
-  static string CreateFileWithContent(const string &filename,
+  string CreateFileWithContent(const string &filename,
       const string &content) {
-    string complete_path = string(sandbox) + "/" + filename;
-    FILE* myfile = fopen(complete_path.c_str(), "w");
+    string complete_path = sandbox + "/" + filename;
+    FILE *myfile = fopen(complete_path.c_str(), "w");
     fprintf(myfile, content.c_str());
     fclose(myfile);
     return complete_path;
@@ -97,32 +105,26 @@ class T_Util : public ::testing::Test {
     return t;
   }
 
-  static void SendSignal(int signal) {
-    BlockSignal(signal);
-    sleep(1);
-    kill(getpid(), signal);
+  static void UnBlockSignal(int signum) {
+    sigset_t sigset;
+    int retval = sigemptyset(&sigset);
+    assert(retval == 0);
+    retval = sigaddset(&sigset, signum);
+    assert(retval == 0);
+    retval = pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
+    assert(retval == 0);
   }
 
-  static const char sandbox[];
-  static const char empty[];
-  static const char path_with_slash[];
-  static const char path_without_slash[];
-  static const char fake_path[];
-  static const char socket_address[];
-  static const char long_path[];
-  static const char to_write[];
+  string sandbox;
+  string socket_address;
+  string long_path;
+  string empty;
+  string path_with_slash;
+  string path_without_slash;
+  string fake_path;
+  string to_write;
 };
 
-const char T_Util::sandbox[] = "/tmp/testutil";
-const char T_Util::empty[] = "";
-const char T_Util::path_with_slash[] = "/my/path/";
-const char T_Util::path_without_slash[] = "/my/path";
-const char T_Util::fake_path[] = "mypath";
-const char T_Util::socket_address[] = "/tmp/testutil/mysocket";
-const char T_Util::long_path[] = "/tmp/testutil"
-    "/path_path_path_path_path_path_path_path_path_path_path_path_path_path"
-    "_path_path_path_path_path_path_path_path_path_path_path_path_path_path";
-const char T_Util::to_write[] = "Hello, world!\n";
 
 
 TEST_F(T_Util, ThreadProxy) {
@@ -185,13 +187,13 @@ TEST_F(T_Util, HasSuffix) {
 
 
 TEST_F(T_Util, RemoveTree) {
-  string tmp_path_ = CreateTempDir(string(sandbox) + "/cvmfs_test", 0700);
+  string tmp_path_ = CreateTempDir(sandbox + "/cvmfs_test");
   ASSERT_NE("", tmp_path_);
   ASSERT_TRUE(DirectoryExists(tmp_path_));
   EXPECT_TRUE(RemoveTree(tmp_path_));
   EXPECT_FALSE(DirectoryExists(tmp_path_));
 
-  tmp_path_ = CreateTempDir(string(sandbox) + "/cvmfs_test", 0700);
+  tmp_path_ = CreateTempDir(sandbox + "/cvmfs_test");
   ASSERT_NE("", tmp_path_);
   EXPECT_TRUE(MkdirDeep(tmp_path_ + "/subdir", 0700));
   int fd = open((tmp_path_ + "/subdir/file").c_str(),
@@ -316,7 +318,7 @@ TEST_F(T_Util, IsHttpUrl) {
 }
 
 TEST_F(T_Util, MakeCannonicalPath) {
-  EXPECT_EQ(string(empty), MakeCanonicalPath(string(empty)));
+  EXPECT_EQ(empty, MakeCanonicalPath(empty));
   EXPECT_EQ(path_without_slash, MakeCanonicalPath(path_with_slash));
   EXPECT_EQ(path_without_slash, MakeCanonicalPath(path_without_slash));
 }
@@ -350,7 +352,7 @@ TEST_F(T_Util, GetFileName) {
 
 TEST_F(T_Util, CreateFile) {
   ASSERT_DEATH(CreateFile("myfakepath/otherfakepath.txt", 0777), ".*");
-  string filename = string(sandbox) + "/createfile.txt";
+  string filename = sandbox + "/createfile.txt";
   CreateFile(filename, 0600);
   FILE* myfile = fopen(filename.c_str(), "w");
   EXPECT_NE(static_cast<FILE*>(NULL), myfile);
@@ -362,20 +364,20 @@ TEST_F(T_Util, MakeSocket) {
   int socket_fd2;
 
   ASSERT_DEATH(MakeSocket(long_path, 0600), ".*");
-  EXPECT_NE(-1, socket_fd1 = MakeSocket(string(socket_address), 0777));
+  EXPECT_NE(-1, socket_fd1 = MakeSocket(socket_address, 0777));
   // the second time it should work as well (non socket-alrady-in-use error)
-  EXPECT_NE(-1, socket_fd2 = MakeSocket(string(socket_address), 0777));
+  EXPECT_NE(-1, socket_fd2 = MakeSocket(socket_address, 0777));
   close(socket_fd1);
   close(socket_fd2);
 }
 
 TEST_F(T_Util, ConnectSocket) {
-  int server_fd = MakeSocket(string(socket_address), 0777);
+  int server_fd = MakeSocket(socket_address, 0777);
   listen(server_fd, 1);
-  int client_fd = ConnectSocket(string(socket_address));
+  int client_fd = ConnectSocket(socket_address);
 
-  ASSERT_DEATH(ConnectSocket(string(long_path)), ".*");
-  ASSERT_EQ(-1, ConnectSocket(string(sandbox) + "/fake_socket"));
+  ASSERT_DEATH(ConnectSocket(long_path), ".*");
+  ASSERT_EQ(-1, ConnectSocket(sandbox + "/fake_socket"));
   ASSERT_NE(-1, client_fd);
   close(client_fd);
   close(server_fd);
@@ -383,12 +385,12 @@ TEST_F(T_Util, ConnectSocket) {
 
 TEST_F(T_Util, MakePipe) {
   int fd[2];
-  void *buffer_output = calloc(100, sizeof(char));
+  void *buffer_output = scalloc(100, sizeof(char));
   MakePipe(fd);
-  write(fd[1], to_write, string(to_write).length());
-  read(fd[0], buffer_output, string(to_write).length());
+  write(fd[1], to_write.c_str(), to_write.length());
+  read(fd[0], buffer_output, to_write.length());
 
-  EXPECT_STREQ(to_write, static_cast<const char*>(buffer_output));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
   ASSERT_DEATH(MakePipe(static_cast<int*>(NULL)), ".*");
   free(buffer_output);
   ClosePipe(fd);
@@ -396,13 +398,13 @@ TEST_F(T_Util, MakePipe) {
 
 TEST_F(T_Util, WritePipe) {
   int fd[2];
-  void *buffer_output = calloc(20, sizeof(char));
+  void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
-  WritePipe(fd[1], to_write, string(to_write).length());
-  read(fd[0], buffer_output, string(to_write).length());
+  WritePipe(fd[1], to_write.c_str(), to_write.length());
+  read(fd[0], buffer_output, to_write.length());
 
-  EXPECT_STREQ(to_write, static_cast<const char*>(buffer_output));
-  ASSERT_DEATH(WritePipe(-1, to_write, string(to_write).length()),
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  ASSERT_DEATH(WritePipe(-1, to_write.c_str(), to_write.length()),
       ".*");
   free(buffer_output);
   ClosePipe(fd);
@@ -410,40 +412,39 @@ TEST_F(T_Util, WritePipe) {
 
 TEST_F(T_Util, ReadPipe) {
   int fd[2];
-  void *buffer_output = calloc(20, sizeof(char));
+  void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
-  write(fd[1], to_write, string(to_write).length());
-  ReadPipe(fd[0], buffer_output, string(to_write).length());
+  write(fd[1], to_write.c_str(), to_write.length());
+  ReadPipe(fd[0], buffer_output, to_write.length());
 
-  EXPECT_STREQ(to_write, static_cast<const char*>(buffer_output));
-  ASSERT_DEATH(ReadPipe(-1, buffer_output, string(to_write).length()), ".*");
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  ASSERT_DEATH(ReadPipe(-1, buffer_output, to_write.length()), ".*");
   free(buffer_output);
   ClosePipe(fd);
 }
 
 TEST_F(T_Util, ReadHalfPipe) {
   int fd[2];
-  void *buffer_output = calloc(20, sizeof(char));
+  void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
 
-  tbb::tbb_thread writer(WriteBuffer, fd[1]);
-  ReadHalfPipe(fd[0], buffer_output, string(to_write).length());
+  tbb::tbb_thread writer(WriteBuffer, fd[1], to_write);
+  ReadHalfPipe(fd[0], buffer_output, to_write.length());
   writer.join();
 
-  EXPECT_STREQ(to_write, static_cast<const char*>(buffer_output));
-  ASSERT_DEATH(ReadHalfPipe(-1, buffer_output, string(to_write).length()),
-      ".*");
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  ASSERT_DEATH(ReadHalfPipe(-1, buffer_output, to_write.length()), ".*");
   free(buffer_output);
   ClosePipe(fd);
 }
 
 TEST_F(T_Util, ClosePipe) {
   int fd[2];
-  void *buffer_output = calloc(20, sizeof(char));
+  void *buffer_output = scalloc(20, sizeof(char));
   MakePipe(fd);
   ClosePipe(fd);
-  ASSERT_DEATH(WritePipe(fd[1], to_write, string(to_write).length()), ".*");
-  ASSERT_DEATH(ReadPipe(fd[0], buffer_output, string(to_write).length()), ".*");
+  ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
+  ASSERT_DEATH(ReadPipe(fd[0], buffer_output, to_write.length()), ".*");
   free(buffer_output);
 }
 
@@ -470,18 +471,18 @@ TEST_F(T_Util, Block2Nonblock) {
 }
 
 TEST_F(T_Util, SendMes2Socket) {
-  void *buffer = calloc(20, sizeof(char));
+  void *buffer = scalloc(20, sizeof(char));
   struct sockaddr_in client_addr;
   unsigned int client_length = sizeof(client_addr);
-  int server_fd = MakeSocket(string(socket_address), 0777);
+  int server_fd = MakeSocket(socket_address, 0777);
   listen(server_fd, 1);
-  int client_fd = ConnectSocket(string(socket_address));
+  int client_fd = ConnectSocket(socket_address);
   SendMsg2Socket(client_fd, to_write);
   int new_connection = accept(server_fd, (struct sockaddr *) &client_addr,
       &client_length);
-  read(new_connection, buffer, string(to_write).length());
+  read(new_connection, buffer, to_write.length());
 
-  EXPECT_STREQ(to_write, static_cast<const char*>(buffer));
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer));
   close(new_connection);
   close(client_fd);
   close(server_fd);
@@ -510,7 +511,7 @@ TEST_F(T_Util, SwitchCredentials) {
 }
 
 TEST_F(T_Util, FileExists) {
-  string filename = string(sandbox) + "/" + "fileexists.txt";
+  string filename = sandbox + "/" + "fileexists.txt";
   FILE* myfile = fopen(filename.c_str(), "w");
   fclose(myfile);
 
@@ -531,7 +532,7 @@ TEST_F(T_Util, DirectoryExists) {
 }
 
 TEST_F(T_Util, SymlinkExists) {
-  string symlinkname = string(sandbox) + "/mysymlink";
+  string symlinkname = sandbox + "/mysymlink";
   string filename = CreateFileWithContent("mysymlinkfile.txt", to_write);
   symlink(filename.c_str(), symlinkname.c_str());
 
@@ -540,19 +541,19 @@ TEST_F(T_Util, SymlinkExists) {
 }
 
 TEST_F(T_Util, MkdirDeep) {
-  string mydirectory = string(sandbox) + "/mydirectory";
+  string mydirectory = sandbox + "/mydirectory";
   string myfile = CreateFileWithContent("myfile.txt", to_write);
 
-  EXPECT_FALSE(MkdirDeep(string(empty), 0777));
+  EXPECT_FALSE(MkdirDeep(empty, 0777));
   EXPECT_TRUE(MkdirDeep(mydirectory, 0777));
-  EXPECT_TRUE(MkdirDeep(string(sandbox) + "/another/another/mydirectory",
+  EXPECT_TRUE(MkdirDeep(sandbox + "/another/another/mydirectory",
       0777));
   EXPECT_TRUE(MkdirDeep(mydirectory, 0777));  // already exists, but writable
   EXPECT_FALSE(MkdirDeep(myfile, 0777));
 }
 
 TEST_F(T_Util, MakeCacheDirectories) {
-  const string path = string(sandbox) + "/cache";
+  const string path = sandbox + "/cache";
   MakeCacheDirectories(path, 0777);
 
   EXPECT_TRUE(DirectoryExists(path + "/txn"));
@@ -566,7 +567,7 @@ TEST_F(T_Util, MakeCacheDirectories) {
 }
 
 TEST_F(T_Util, TryLockFile) {
-  string filename = string(sandbox) + "/trylockfile.txt";
+  string filename = sandbox + "/trylockfile.txt";
   int fd;
 
   EXPECT_EQ(-1, TryLockFile("/fakepath/fakefile.txt"));
@@ -576,7 +577,7 @@ TEST_F(T_Util, TryLockFile) {
 }
 
 TEST_F(T_Util, LockFile) {
-  string filename = string(sandbox) + "/lockfile.txt";
+  string filename = sandbox + "/lockfile.txt";
   int retval;
   int fd;
 
@@ -584,7 +585,7 @@ TEST_F(T_Util, LockFile) {
   EXPECT_LE(0, fd = LockFile(filename));
 
   tbb::tbb_thread thread(LockFileTest, filename, &retval);
-  sleep(2);
+  SafeSleepMs(100);
   close(fd);  // releases the lock
   thread.join();
   close(retval);
@@ -594,7 +595,7 @@ TEST_F(T_Util, LockFile) {
 }
 
 TEST_F(T_Util, UnlockFile) {
-  string filename = string(sandbox) + "/unlockfile.txt";
+  string filename = sandbox + "/unlockfile.txt";
   int fd1 = TryLockFile(filename);
   int fd2;
 
@@ -615,7 +616,7 @@ TEST_F(T_Util, CreateTempFile) {
       0600, "w+", &final_path));
   EXPECT_FALSE(FileExists(final_path));
   EXPECT_NE(static_cast<FILE*>(NULL), file = CreateTempFile(
-      string(sandbox) + "/mytempfile.txt", 0600, "w+", &final_path));
+      sandbox + "/mytempfile.txt", 0600, "w+", &final_path));
   EXPECT_TRUE(FileExists(final_path));
   fclose(file);
 }
@@ -625,7 +626,7 @@ TEST_F(T_Util, CreateTempPath) {
 
   EXPECT_EQ("", file = CreateTempPath("/fakepath/myfakefile.txt", 0600));
   EXPECT_FALSE(FileExists(file));
-  EXPECT_NE("", file = CreateTempPath(string(sandbox) + "/createmppath.txt",
+  EXPECT_NE("", file = CreateTempPath(sandbox + "/createmppath.txt",
       0600));
   EXPECT_TRUE(FileExists(file));
 }
@@ -633,10 +634,9 @@ TEST_F(T_Util, CreateTempPath) {
 TEST_F(T_Util, CreateTempDir) {
   string directory;
 
-  EXPECT_EQ("", directory = CreateTempDir("/fakepath/myfakedirectory", 0600));
+  EXPECT_EQ("", directory = CreateTempDir("/fakepath/myfakedirectory"));
   EXPECT_FALSE(DirectoryExists(directory));
-  EXPECT_NE("", directory = CreateTempDir(string(sandbox) +"/creatempdirectory",
-      0600));
+  EXPECT_NE("", directory = CreateTempDir(sandbox +"/creatempdirectory"));
   EXPECT_TRUE(DirectoryExists(directory));
 }
 
@@ -650,22 +650,22 @@ TEST_F(T_Util, FindFiles) {
   result = FindFiles("/fakepath/fakedir", "");
   EXPECT_TRUE(result.empty());
 
-  result = FindFiles(string(sandbox), "");  // find them all
+  result = FindFiles(sandbox, "");  // find them all
   EXPECT_EQ(size + 2, result.size());  // FindFiles includes . and ..
   for (unsigned i = 0; i < size; ++i)
-    EXPECT_EQ(string(sandbox) + "/" + files[i], result[i + 2]);
+    EXPECT_EQ(sandbox + "/" + files[i], result[i + 2]);
 
-  result = FindFiles(string(sandbox), ".fake");
+  result = FindFiles(sandbox, ".fake");
   EXPECT_EQ(0u, result.size());
 
-  result = FindFiles(string(sandbox), ".conf");
+  result = FindFiles(sandbox, ".conf");
   EXPECT_EQ(1u, result.size());
-  EXPECT_EQ(string(sandbox) + "/" + files[2], result[0]);
+  EXPECT_EQ(sandbox + "/" + files[2], result[0]);
 
-  result = FindFiles(string(sandbox), ".txt");
+  result = FindFiles(sandbox, ".txt");
   EXPECT_EQ(2u, result.size());
-  EXPECT_EQ(string(sandbox) + "/" + files[0], result[0]);
-  EXPECT_EQ(string(sandbox) + "/" + files[1], result[1]);
+  EXPECT_EQ(sandbox + "/" + files[0], result[0]);
+  EXPECT_EQ(sandbox + "/" + files[1], result[1]);
 }
 
 TEST_F(T_Util, GetUmask) {
@@ -862,7 +862,7 @@ TEST_F(T_Util, ParseKeyvalMem) {
 
 TEST_F(T_Util, ParseKeyvalPath) {
   map<char, string> map;
-  const char *big_buffer = static_cast<const char *>(calloc(8000,
+  const char *big_buffer = static_cast<const char *>(scalloc(8000,
       sizeof(char)));
   string big_file = "bigfile.txt";
   string content_file = "contentfile.txt";
@@ -885,22 +885,22 @@ TEST_F(T_Util, ParseKeyvalPath) {
   CreateFileWithContent(content_file, cvmfs_published);
 
   EXPECT_FALSE(ParseKeyvalPath("/path/that/does/not/exists.txt", &map));
-  EXPECT_FALSE(ParseKeyvalPath(string(sandbox) + "/" + big_file, &map));
-  EXPECT_TRUE(ParseKeyvalPath(string(sandbox) + "/" + content_file, &map));
+  EXPECT_FALSE(ParseKeyvalPath(sandbox + "/" + big_file, &map));
+  EXPECT_TRUE(ParseKeyvalPath(sandbox + "/" + content_file, &map));
 }
 
 TEST_F(T_Util, DiffTimeSeconds) {
   struct timeval start = CreateTimeval(2, 900000);
   struct timeval end = CreateTimeval(3, 200000);
-  EXPECT_EQ(0.3, DiffTimeSeconds(start, end));
+  EXPECT_DOUBLE_EQ(0.3, DiffTimeSeconds(start, end));
 
   start = CreateTimeval(8, 400000);
   end = CreateTimeval(1, 800000);
-  EXPECT_NE(-6.6, DiffTimeSeconds(start, end));
+  EXPECT_LT(0.0, DiffTimeSeconds(start, end));  // positive difference
 
   start = CreateTimeval(0, 0);
   end = CreateTimeval(4, 0);
-  EXPECT_EQ(4.0, DiffTimeSeconds(start, end));
+  EXPECT_DOUBLE_EQ(4.0, DiffTimeSeconds(start, end));
 }
 
 TEST_F(T_Util, GetLineMem) {
@@ -999,9 +999,10 @@ TEST_F(T_Util, BlockSignal) {
 }
 
 TEST_F(T_Util, WaitForSignal) {
-  tbb::tbb_thread signal_sender(SendSignal, SIGUSR1);
+  BlockSignal(SIGUSR1);
+  kill(getpid(), SIGUSR1);
   WaitForSignal(SIGUSR1);
-  signal_sender.join();
+  UnBlockSignal(SIGUSR1);
 }
 
 TEST_F(T_Util, Daemonize) {
@@ -1056,7 +1057,7 @@ TEST_F(T_Util, Shell) {
   char buffer[buffer_size];
 
   EXPECT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
-  string path = string(sandbox) + "/" + "newfolder";
+  string path = sandbox + "/" + "newfolder";
   string command = "mkdir -p " + path +  " && cd " + path + " && pwd\n";
   WritePipe(fd_stdin, command.c_str(), command.length());
   ReadPipe(fd_stdout, buffer, path.length());
@@ -1073,7 +1074,7 @@ TEST_F(T_Util, ManagedExec) {
   pid_t pid;
   int fd_stdout[2];
   int fd_stdin[2];
-  char *buffer = static_cast<char*>(calloc(100, sizeof(char)));
+  char *buffer = static_cast<char*>(scalloc(100, sizeof(char)));
   MakePipe(fd_stdout);
   MakePipe(fd_stdin);
   string message = "CVMFS";
@@ -1107,7 +1108,7 @@ TEST_F(T_Util, StopWatch) {
   ASSERT_LT(0.0, sw.GetTime());
   ASSERT_DEATH(sw.Stop(), ".*");
   sw.Reset();
-  ASSERT_EQ(0.0, sw.GetTime());
+  ASSERT_DOUBLE_EQ(0.0, sw.GetTime());
 }
 
 TEST_F(T_Util, SafeSleepMs) {

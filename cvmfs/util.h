@@ -140,7 +140,7 @@ bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path);
 std::string CreateTempPath(const std::string &path_prefix, const int mode);
-std::string CreateTempDir(const std::string &path_prefix, const int mode);
+std::string CreateTempDir(const std::string &path_prefix);
 int TryLockFile(const std::string &path);
 int LockFile(const std::string &path);
 void UnlockFile(const int filedes);
@@ -159,12 +159,9 @@ std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);
 std::string StringifyTimeval(const timeval value);
 std::string RfcTimestamp();
-std::string StringifyIpv4(const uint32_t ip_address);
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
-uint64_t HexString2Uint64(const std::string &value);
-int HexDigit2Int(const char digit);
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
