@@ -93,8 +93,9 @@ class AbstractMockUploader : public upload::AbstractUploader {
   explicit AbstractMockUploader(
     const upload::SpoolerDefinition &spooler_definition)
     : AbstractUploader(spooler_definition)
-    , worker_thread_running(false)
-  { }
+  {
+    worker_thread_running = false;
+  }
 
   static DerivedT* MockConstruct() {
     PolymorphicConstructionUnittestAdapter::RegisterPlugin<
@@ -177,7 +178,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
   }
 
  public:
-  volatile bool worker_thread_running;
+  tbb::atomic<bool> worker_thread_running;
 };
 
 template <class DerivedT>

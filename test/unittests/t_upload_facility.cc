@@ -94,9 +94,9 @@ TEST(T_UploadFacility, InitializeAndTearDown) {
   EXPECT_TRUE(uploader->worker_thread_running);
 
   uploader->TearDown();
-  delete uploader;
-
   EXPECT_FALSE(uploader->worker_thread_running);
+
+  delete uploader;
 }
 
 
