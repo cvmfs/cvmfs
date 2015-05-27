@@ -58,7 +58,8 @@ TEST_F(T_Xattr, CreateFromFile) {
   EXPECT_EQ(default_attrs, from_file1->ListKeys().size());
 
   string value;
-  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"));
+  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"))
+    << "failed to set user defined extended attribute (errno: " << errno << ")";
   UniquePtr<XattrList> from_file2(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file2.IsValid());
   EXPECT_EQ(default_attrs + 1, from_file2->ListKeys().size());
