@@ -49,6 +49,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "util.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -56,6 +57,7 @@ const uint32_t QuotaManager::kProtocolRevision = 1;
 
 void QuotaManager::BroadcastBackchannels(const string &message) {
   assert(message.length() > 0);
+  MutexLockGuard lock_guard(*lock_back_channels_);
 
   for (map<shash::Md5, int>::iterator i = back_channels_.begin(),
        iend = back_channels_.end(); i != iend; )
@@ -74,6 +76,7 @@ void QuotaManager::BroadcastBackchannels(const string &message) {
                  "removing back channel %s", i->first.ToString().c_str());
         map<shash::Md5, int>::iterator remove_me = i;
         ++i;
+        close(remove_me->second);
         back_channels_.erase(remove_me);
       } else {
         ++i;
@@ -86,14 +89,19 @@ void QuotaManager::BroadcastBackchannels(const string &message) {
 
 
 QuotaManager::QuotaManager() : protocol_revision_(0) {
-  lock_back_channels =
+  lock_back_channels_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
-  int retval = pthread_mutex_init(lock_back_channels, NULL);
+  int retval = pthread_mutex_init(lock_back_channels_, NULL);
   assert(retval == 0);
 }
 
 
 QuotaManager::~QuotaManager() {
+  for (map<shash::Md5, int>::iterator i = back_channels_.begin(),
+       iend = back_channels_.end(); i != iend; ++i)
+  {
+    close(i->second);
+  }
   pthread_mutex_destroy(lock_back_channels_);
   free(lock_back_channels_);
 }
@@ -947,6 +955,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       shash::Md5 hash;
       memcpy(hash.digest, command_buffer[num_commands].digest,
              shash::kDigestSizes[shash::kMd5]);
+
+      quota_mgr->LockBackChannels();
       map<shash::Md5, int>::const_iterator iter =
         quota_mgr->back_channels_.find(hash);
       if (iter != quota_mgr->back_channels_.end()) {
@@ -955,6 +965,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
         close(iter->second);
       }
       quota_mgr->back_channels_[hash] = return_pipe;
+      quota_mgr->UnlockBackChannels();
+
       char success = 'S';
       WritePipe(return_pipe, &success, sizeof(success));
       LogCvmfs(kLogQuota, kLogDebug, "register back channel %s on fd %d",
@@ -967,6 +979,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       shash::Md5 hash;
       memcpy(hash.digest, command_buffer[num_commands].digest,
              shash::kDigestSizes[shash::kMd5]);
+
+      quota_mgr->LockBackChannels();
       map<shash::Md5, int>::iterator iter =
         quota_mgr->back_channels_.find(hash);
       if (iter != quota_mgr->back_channels_.end()) {
@@ -978,6 +992,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
         LogCvmfs(kLogQuota, kLogDebug | kLogSyslogWarn,
                  "did not find back channel %s", hash.ToString().c_str());
       }
+      quota_mgr->UnlockBackChannels();
+
       continue;
     }
 

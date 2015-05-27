@@ -82,6 +82,14 @@ class QuotaManager : SingleCopy {
    */
   std::map<shash::Md5, int> back_channels_;
   pthread_mutex_t *lock_back_channels_;
+  void LockBackChannels() {
+    int retval = pthread_mutex_lock(lock_back_channels_);
+    assert(retval == 0);
+  }
+  void UnlockBackChannels() {
+    int retval = pthread_mutex_unlock(lock_back_channels_);
+    assert(retval == 0);
+  }
 
   /**
    * Protocol of the running cache manager instance.  Needs to be figured out

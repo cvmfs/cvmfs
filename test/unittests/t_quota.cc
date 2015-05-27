@@ -5,15 +5,20 @@
 #include <gtest/gtest.h>
 
 #include <pthread.h>
+#include <signal.h>
 
 #include "../../cvmfs/cache.h"
 #include "../../cvmfs/quota.h"
+#include "testutil.h"
 
 using namespace std;  // NOLINT
 
 class T_QuotaManager : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    used_fds_ = GetNoUsedFds();
+    sigpipe_save_ = signal(SIGPIPE, SIG_IGN);
+
     // Prepare cache directories
     tmp_path_ = CreateTempDir("/tmp/cvmfs_test", 0700);
     delete cache::PosixCacheManager::Create(tmp_path_, false);
@@ -27,13 +32,17 @@ class T_QuotaManager : public ::testing::Test {
 
   virtual void TearDown() {
     delete quota_mgr_;
+    signal(SIGPIPE, sigpipe_save_);
     if (tmp_path_ != "")
       RemoveTree(tmp_path_);
+    EXPECT_EQ(used_fds_, GetNoUsedFds());
   }
 
  protected:
   PosixQuotaManager *quota_mgr_;
   string tmp_path_;
+  unsigned used_fds_;
+  sig_t sigpipe_save_;
 };
 
 TEST_F(T_QuotaManager, BroadcastBackchannels) {
@@ -55,9 +64,8 @@ TEST_F(T_QuotaManager, BroadcastBackchannels) {
   ReadPipe(channel3[0], &buf[2], 1);
   EXPECT_EQ('X', buf[2]);
 
-  // One dies
+  // One dies and should get unregistered
   EXPECT_EQ(0, close(channel2[0]));
-  EXPECT_EQ(0, close(channel2[1]));
   quota_mgr_->BroadcastBackchannels("X");
   char buf2[2];
   ReadPipe(channel1[0], &buf2[0], 1);
@@ -67,11 +75,14 @@ TEST_F(T_QuotaManager, BroadcastBackchannels) {
 
   // One gets unregistered
   quota_mgr_->UnregisterBackChannel(channel1, "A");
+  // Useless command to make sure the first one is done
+  quota_mgr_->List();
   quota_mgr_->BroadcastBackchannels("X");
-  //char buf3;
-  //ReadPipe(channel3[0], &buf3, 1);
-  //EXPECT_EQ('X', buf3);
+  char buf3;
+  ReadPipe(channel3[0], &buf3, 1);
+  EXPECT_EQ('X', buf3);
 
-  //quota_mgr_->UnregisterBackChannel(channel3, "C");
+  // channel3[1] should be closed by the destructor of the quota manager
+  close(channel3[0]);
 }
 
