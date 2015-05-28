@@ -340,20 +340,22 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         aggregated_file_size += this_chunk.size();
 
         // are all data chunks in the data store?
-        const shash::Any &chunk_hash = this_chunk.content_hash();
-        const string chunk_path = "data"                            +
-                                  chunk_hash.MakePathExplicit(1, 2) +
-                                  shash::kSuffixPartial;
-        if (!Exists(chunk_path)) {
-          const std::string chunk_name = this_chunk.content_hash().ToString() +
-                                         shash::kSuffixPartial;
-          LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
-                                          "offset: %d | size: %d) missing",
-                   chunk_name.c_str(),
-                   full_path.c_str(),
-                   this_chunk.offset(),
-                   this_chunk.size());
-          retval = false;
+        if (check_chunks) {
+          const shash::Any &chunk_hash = this_chunk.content_hash();
+          const string chunk_path = "data"                            +
+                                    chunk_hash.MakePathExplicit(1, 2) +
+                                    shash::kSuffixPartial;
+          if (!Exists(chunk_path)) {
+            const std::string chunk_name =
+                   this_chunk.content_hash().ToString() + shash::kSuffixPartial;
+            LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
+                                            "offset: %d | size: %d) missing",
+                     chunk_name.c_str(),
+                     full_path.c_str(),
+                     this_chunk.offset(),
+                     this_chunk.size());
+            retval = false;
+          }
         }
       }
 
