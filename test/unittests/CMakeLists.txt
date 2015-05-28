@@ -24,7 +24,6 @@ set (CVMFS_UNITTEST_SOURCES
   t_catalog_traversal.cc
   t_fs_traversal.cc
   t_pipe.cc
-  t_managed_exec.cc
   t_prng.cc
   t_buffer.cc
   t_chunk_detectors.cc
