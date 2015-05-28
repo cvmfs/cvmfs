@@ -166,9 +166,4 @@ void Chunk::SetAsBulkChunk() {
                                                // content hash suffix
 }
 
-
-shash::Suffix Chunk::hash_suffix() const {
-  return (IsBulkChunk()) ? file_->hash_suffix() : shash::kSuffixPartial;
-}
-
 }  // namespace upload
