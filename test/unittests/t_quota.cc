@@ -21,16 +21,26 @@ class T_QuotaManager : public ::testing::Test {
 
     // Prepare cache directories
     tmp_path_ = CreateTempDir("/tmp/cvmfs_test", 0700);
+    MkdirDeep(tmp_path_ + "/not_spawned", 0700);
     delete cache::PosixCacheManager::Create(tmp_path_, false);
+    delete cache::PosixCacheManager::Create(tmp_path_ + "/not_spawned", false);
+
+    limit_ = 10*1024*1024;  // 10M
+    threshold_ = 5*1024*1024;  // 5M
 
     quota_mgr_ =
-      PosixQuotaManager::Create(tmp_path_, 10*1024*1024, 5*1024*1024, false);
+      PosixQuotaManager::Create(tmp_path_, limit_, threshold_, false);
     ASSERT_TRUE(quota_mgr_ != NULL);
-
     quota_mgr_->Spawn();
+
+    quota_mgr_not_spawned_ =
+      PosixQuotaManager::Create(tmp_path_ + "/not_spawned", limit_, threshold_,
+                                false);
+    ASSERT_TRUE(quota_mgr_not_spawned_ != NULL);
   }
 
   virtual void TearDown() {
+    delete quota_mgr_not_spawned_;
     delete quota_mgr_;
     signal(SIGPIPE, sigpipe_save_);
     if (tmp_path_ != "")
@@ -39,7 +49,10 @@ class T_QuotaManager : public ::testing::Test {
   }
 
  protected:
+  uint64_t limit_;
+  uint64_t threshold_;
   PosixQuotaManager *quota_mgr_;
+  PosixQuotaManager *quota_mgr_not_spawned_;
   string tmp_path_;
   unsigned used_fds_;
   sig_t sigpipe_save_;
@@ -102,3 +115,24 @@ TEST_F(T_QuotaManager, BindReturnPipe) {
   EXPECT_EQ(-1, quota_mgr_->BindReturnPipe(pipe_test[1]));
   quota_mgr_->shared_ = false;
 }
+
+
+TEST_F(T_QuotaManager, CheckHighPinWatermark) {
+  int channel[2];
+  quota_mgr_->RegisterBackChannel(channel, "A");
+  EXPECT_TRUE(quota_mgr_->Pin(shash::Any(), 4000000, "", false));
+  char buf;
+  ReadPipe(channel[0], &buf, 1);
+  EXPECT_EQ('R', buf);
+  quota_mgr_->UnregisterBackChannel(channel, "A");
+}
+
+
+TEST_F(T_QuotaManager, Cleanup) {
+  shash::Any hash_null;
+  shash::Any hash_rnd;
+  hash_rnd.Randomize();
+  
+  
+}
+
