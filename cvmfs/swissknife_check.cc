@@ -208,7 +208,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     if (!entries[i].checksum().IsNull() && check_chunks) {
       string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
-        chunk_path += "L";
+        chunk_path += shash::kSuffixMicroCatalog;
       if (!Exists(chunk_path)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "data chunk %s (%s) missing",
                  entries[i].checksum().ToString().c_str(), full_path.c_str());
