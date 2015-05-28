@@ -46,7 +46,7 @@ class FileSystemTraversal {
   VoidCallback fn_new_file;
   VoidCallback fn_new_symlink;
   VoidCallback fn_new_socket;
-  VoidCallback fn_new_block;
+  VoidCallback fn_new_blocked_dev;
   VoidCallback fn_new_fifo;
 
   /**
@@ -89,6 +89,9 @@ class FileSystemTraversal {
     fn_leave_dir(NULL),
     fn_new_file(NULL),
     fn_new_symlink(NULL),
+    fn_new_socket(NULL),
+    fn_new_blocked_dev(NULL),
+    fn_new_fifo(NULL),
     fn_ignore_file(NULL),
     fn_new_dir_prefix(NULL),
     fn_new_dir_postfix(NULL),
@@ -108,7 +111,10 @@ class FileSystemTraversal {
            fn_leave_dir != NULL ||
            fn_new_file != NULL ||
            fn_new_symlink != NULL ||
-           fn_new_dir_prefix != NULL);
+           fn_new_dir_prefix != NULL ||
+           fn_new_blocked_dev != NULL ||
+           fn_new_fifo != NULL ||
+           fn_new_socket != NULL);
 
     assert(relative_to_directory_.length() == 0 ||
            dir_path.substr(0, relative_to_directory_.length()) ==
@@ -192,11 +198,11 @@ class FileSystemTraversal {
       } else if (S_ISBLK(info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg,
             "passing blocked device %s/%s", path.c_str(), dit->d_name);
-        Notify(fn_new_socket, path, dit->d_name);
+        Notify(fn_new_blocked_dev, path, dit->d_name);
       } else if (S_ISFIFO(info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing FIFO %s/%s",
                  path.c_str(), dit->d_name);
-        Notify(fn_new_socket, path, dit->d_name);
+        Notify(fn_new_fifo, path, dit->d_name);
       } else {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "unknown file type %s/%s",
                  path.c_str(), dit->d_name);
