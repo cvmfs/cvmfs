@@ -28,6 +28,8 @@ class File;
  * Note that it deliberately _does not_ contain the actual chunk data which is
  * managed dynamically by a stream of Buffers. Still the Chunk class is in
  * charge of scheduling (or deferred scheduling) the write of processed Buffers.
+ * Note: When creating a chunk it is seen as a 'partial' data chunk and can be
+ *       promoted to a 'bulk' chunk (representing an entire file).
  */
 class Chunk {
  public:
@@ -35,9 +37,9 @@ class Chunk {
     file_(file), file_offset_(offset), chunk_size_(0),
     is_bulk_chunk_(false), is_fully_defined_(false), deferred_write_(false),
     zlib_initialized_(false), content_hash_context_(hash_algorithm),
-    content_hash_(hash_algorithm), content_hash_initialized_(false),
-    upload_stream_handle_(NULL), current_deflate_buffer_(NULL),
-    bytes_written_(0)
+    content_hash_(hash_algorithm, shash::kSuffixPartial),
+    content_hash_initialized_(false), upload_stream_handle_(NULL),
+    current_deflate_buffer_(NULL), bytes_written_(0)
   {
     Initialize();
   }
