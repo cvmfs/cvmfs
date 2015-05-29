@@ -2766,10 +2766,11 @@ import() {
   local replicable=0
   local chown_backend=0
   local unionfs=
+  local recreate_whitelist=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:" option; do
+  while getopts "w:o:c:u:k:lsmgf:r" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2801,6 +2802,9 @@ import() {
       f)
         unionfs=$OPTARG
       ;;
+      r)
+        recreate_whitelist=1
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command import: Unrecognized option: $1"
@@ -2817,6 +2821,11 @@ import() {
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
   [ x"$unionfs"  = x ] && unionfs="$(get_available_union_fs)"
+
+  local private_key="${name}.key"
+  local master_key="${name}.masterkey"
+  local certificate="${name}.crt"
+  local public_key="${name}.pub"
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
@@ -2842,9 +2851,13 @@ import() {
   [ -d $storage_location ] || die "Did not find repository storage to import at $storage_location"
   [ -f "${storage_location}/.cvmfspublished" ] && \
   [ -d "${storage_location}/data" ] || die "$storage_location does not seem to be a repository storage"
-  [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
-  local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
-  [ $expiry -gt 0 ] || die "Repository whitelist expired (use -r maybe?)"
+  if [ $recreate_whitelist -eq 0 ]; then
+    [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
+    local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
+    [ $expiry -gt 0 ] || die "Repository whitelist expired (use -r maybe?)"
+  else
+    [ -f ${keys_location}/${master_key} ] || die "no master key found for whitelist recreation"
+  fi
 
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
@@ -2865,10 +2878,6 @@ import() {
 
   # import the old repository security keys
   echo -n "Importing the given key files... "
-  local private_key="${name}.key"
-  local master_key="${name}.masterkey"
-  local certificate="${name}.crt"
-  local public_key="${name}.pub"
   keys="$private_key $certificate $public_key"
   if [ -f ${keys_location}/${master_key} ]; then
     keys="$keys $master_key"
@@ -2893,6 +2902,15 @@ import() {
     if has_selinux; then
       chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
     fi
+    echo "done"
+  fi
+
+  # recreate whitelist if requested
+  if [ $recreate_whitelist -ne 0 ]; then
+    echo -n "Recreating whitelist... "
+    create_whitelist $name $CVMFS_USER               \
+                           ${CVMFS_UPSTREAM_STORAGE} \
+                           ${CVMFS_SPOOL_DIR}/tmp > /dev/null || die "fail!"
     echo "done"
   fi
 
