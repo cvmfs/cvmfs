@@ -235,6 +235,8 @@ class LocalObjectFetcher :
                                         "to '%s' (errno: %d)",
                object_hash.ToString().c_str(), source.c_str(),
                file_path->c_str(), errno);
+      unlink(file_path->c_str());
+      file_path->clear();
     }
 
     return success;
@@ -366,6 +368,8 @@ class HttpObjectFetcher :
                                         "%s to '%s' (%d - %s)",
                object_hash.ToString().c_str(), object_file->c_str(),
                retval, Code2Ascii(retval));
+      unlink(object_file->c_str());
+      object_file->clear();
     }
 
     return success;
