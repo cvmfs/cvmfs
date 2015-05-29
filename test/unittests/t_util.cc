@@ -648,8 +648,9 @@ TEST_F(T_Util, CreateTempDir) {
 
   EXPECT_EQ("", directory = CreateTempDir("/fakepath/myfakedirectory"));
   EXPECT_FALSE(DirectoryExists(directory));
-  EXPECT_NE("", directory = CreateTempDir(sandbox + "/creatempdirectory"));
-  EXPECT_TRUE(DirectoryExists(directory));
+  EXPECT_NE("", directory = CreateTempDir(sandbox + "/creatempdirectory"))
+    << errno;
+  EXPECT_TRUE(DirectoryExists(directory)) << errno;
 }
 
 TEST_F(T_Util, FindFiles) {
@@ -1007,7 +1008,10 @@ TEST_F(T_Util, BlockSignal) {
   EXPECT_DEATH(kill(getpid(), SIGUSR1), ".*");
   BlockSignal(SIGUSR1);
   kill(getpid(), SIGUSR1);  // it doesn't crash after blocking
+
+#ifndef __APPLE__
   EXPECT_DEATH(BlockSignal(-2000), ".*");
+#endif
 }
 
 TEST_F(T_Util, WaitForSignal) {
