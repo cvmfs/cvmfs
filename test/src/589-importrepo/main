@@ -39,6 +39,29 @@ respawn_repository() {
   fi
 }
 
+tamper_whitelist() {
+  local name=$1
+  local repo_backend=$2
+  local repo_keychain=$3
+
+  # recreate whitelist
+  local whitelist=whitelist.${name}
+  echo `date -u --date='last year' "+%Y%m%d%H%M%S" `       >  ${whitelist}.unsigned
+  echo "E`date -u --date='11 months ago' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
+  echo "N$name"                                            >> ${whitelist}.unsigned
+  openssl x509 -fingerprint -sha1 -in ${repo_keychain}/${name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
+  local hash;
+  hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
+  echo "--"     >> ${whitelist}.unsigned
+  echo $hash    >> ${whitelist}.unsigned
+  echo -n $hash >  ${whitelist}.hash
+
+  openssl rsautl -inkey ${repo_keychain}/${name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
+  cat ${whitelist}.unsigned ${whitelist}.signature | sudo tee ${repo_backend}/.cvmfswhitelist > /dev/null
+
+  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -87,8 +110,6 @@ cvmfs_run_test() {
   echo "removing repository"
   destroy_repo $CVMFS_TEST_REPO || return 8
 
-  # ============================================================================
-
   echo "planting repository backend and keychain again"
   respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
 
@@ -100,6 +121,38 @@ cvmfs_run_test() {
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
+  echo "removing repository again"
+  destroy_repo $CVMFS_TEST_REPO || return 10
+
+  echo "planting repository backend but not the keychain again"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend || return $?
+
+  echo "importing repository with a provided keychain"
+  sudo cvmfs_server import -o $CVMFS_TEST_USER -k $(pwd)/$repo_keychain $CVMFS_TEST_REPO || return 11
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
+  echo "removing repository again"
+  destroy_repo $CVMFS_TEST_REPO || return 12
+
+  echo "tamper the whitelist of the copied repository (expire!)"
+  cp ${repo_backend}/$CVMFS_TEST_REPO/.cvmfswhitelist .cvmfswhitelist.bak             || return 13
+  tamper_whitelist $CVMFS_TEST_REPO ${repo_backend}/${CVMFS_TEST_REPO} $repo_keychain || return 14
+
+  echo "planting the repository with the tampered whitelist"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
+
+  echo "importing repository with a provided keychain (should fail due to whitelist)"
+  sudo cvmfs_server import -o $CVMFS_TEST_USER $CVMFS_TEST_REPO && return 14
 
   return 0
 }
