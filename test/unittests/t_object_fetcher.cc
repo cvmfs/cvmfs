@@ -613,6 +613,9 @@ TYPED_TEST_CASE(T_ObjectFetcher, ObjectFetcherTypes);
 TYPED_TEST(T_ObjectFetcher, InitializeSlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   EXPECT_TRUE(object_fetcher.IsValid());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -625,6 +628,9 @@ TYPED_TEST(T_ObjectFetcher, FetchManifestSlow) {
 
   EXPECT_EQ(TestFixture::root_hash,    manifest->catalog_hash());
   EXPECT_EQ(TestFixture::history_hash, manifest->history());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -638,6 +644,9 @@ TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
     history(object_fetcher->FetchHistory());
   ASSERT_TRUE(history.IsValid());
   EXPECT_EQ(TestFixture::previous_history_hash, history->previous_revision());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -651,6 +660,9 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
     << "didn't find: "
     << TestFixture::previous_history_hash.ToStringWithSuffix();
   EXPECT_TRUE(history->previous_revision().IsNull());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -678,6 +690,9 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
   ASSERT_TRUE(catalog.IsValid());
   EXPECT_EQ("",                            catalog->path().ToString());
   EXPECT_EQ(TestFixture::catalog_revision, catalog->revision());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
