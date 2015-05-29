@@ -29,7 +29,7 @@ class T_FsTraversal : public ::testing::Test {
       Untouched,
       Unspecified,
       Socket,
-      BlockedDevice,
+      BlockDevice,
       FIFO
     };
 
@@ -48,7 +48,7 @@ class T_FsTraversal : public ::testing::Test {
       dir_prefix    = false;
       dir_postfix   = false;
       socket_found  = false;
-      blocked_dev_found   = false;
+      block_dev_found   = false;
       fifo_found    = false;
     }
 
@@ -93,8 +93,8 @@ class T_FsTraversal : public ::testing::Test {
         case Socket:
           EXPECT_TRUE(socket_found)   << path;
           break;
-        case BlockedDevice:
-          EXPECT_TRUE(blocked_dev_found)    << path;
+        case BlockDevice:
+          EXPECT_TRUE(block_dev_found)    << path;
           break;
         case FIFO:
           EXPECT_TRUE(fifo_found)     << path;
@@ -115,7 +115,7 @@ class T_FsTraversal : public ::testing::Test {
     bool dir_prefix;
     bool dir_postfix;
     bool socket_found;
-    bool blocked_dev_found;
+    bool block_dev_found;
     bool fifo_found;
   };
 
@@ -184,7 +184,7 @@ class T_FsTraversal : public ::testing::Test {
     traverse->fn_new_dir_prefix  = &DelegateT::DirPrefix;
     traverse->fn_new_dir_postfix = &DelegateT::DirPostfix;
     traverse->fn_new_socket      = &DelegateT::Socket;
-    traverse->fn_new_blocked_dev = &DelegateT::BlockedDevice;
+    traverse->fn_new_block_dev   = &DelegateT::BlockDevice;
     traverse->fn_new_fifo        = &DelegateT::Fifo;
   }
 
@@ -377,10 +377,10 @@ class BaseTraversalDelegate {
       checklist.fifo_found = true;
   }
 
-  virtual void BlockedDevice(const std::string &relative_path,
+  virtual void BlockDevice(const std::string &relative_path,
         const std::string &dir_name) {
       Checklist& checklist = GetChecklist(CombinePath(relative_path, dir_name));
-      checklist.blocked_dev_found = true;
+      checklist.block_dev_found = true;
   }
 
   virtual void Check() const {
@@ -647,28 +647,28 @@ TEST_F(T_FsTraversal, SteeredTraversal) {
 class CustomDelegate {
  public:
   CustomDelegate() :
-    num_blocked_dev(0) {}
-  virtual void BlockedDevice(const std::string &relative_path,
+    num_block_dev(0) {}
+  virtual void BlockDevice(const std::string &relative_path,
       const std::string &dir_name) {
-    ++num_blocked_dev;
+    ++num_block_dev;
   }
 
   virtual ~CustomDelegate() {}
 
   int getNumBlockedDev() const {
-    return num_blocked_dev;
+    return num_block_dev;
   }
 
  private:
-  int num_blocked_dev;
+  int num_block_dev;
 };
 
-TEST_F(T_FsTraversal, BlockedDevice) {
+TEST_F(T_FsTraversal, BlockDevice) {
   CustomDelegate delegate;
   FileSystemTraversal<CustomDelegate> traverse(&delegate,
                                                 "/dev",
                                                 true);
-  traverse.fn_new_blocked_dev = &CustomDelegate::BlockedDevice;
+  traverse.fn_new_block_dev = &CustomDelegate::BlockDevice;
   traverse.Recurse("/dev");
   EXPECT_LT(0, delegate.getNumBlockedDev());
 }
