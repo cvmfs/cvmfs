@@ -394,7 +394,6 @@ static int expand_path(
                "%s --> %s (mountpoint=%s)",
                path, ln_buf, ctx->mountpoint().c_str());
       errno = ENOENT;
-      free(ln_buf);
       return -1;
     }
   } else {

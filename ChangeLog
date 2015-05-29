@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix verification of partial file chunks in cvmfs_server (CVM-842)
   * Remove counting of open file descriptors from libcvmfs
   * Fix resolving absolute symlinks into the same repository in libcvmfs
     (regression)

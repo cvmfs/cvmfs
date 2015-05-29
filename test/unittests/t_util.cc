@@ -1231,11 +1231,12 @@ TEST_F(T_Util, StopWatch) {
 
 TEST_F(T_Util, SafeSleepMs) {
   StopWatch sw;
-  unsigned time = 1000;
+  unsigned time = 100;
   sw.Start();
   SafeSleepMs(time);
   sw.Stop();
-  ASSERT_LE(static_cast<double>(time / 1000), sw.GetTime());
+  ASSERT_LE(static_cast<double>(time / 1000)-50, sw.GetTime());
+  ASSERT_GE(static_cast<double>(time / 1000)+50, sw.GetTime());
 }
 
 TEST_F(T_Util, Base64) {

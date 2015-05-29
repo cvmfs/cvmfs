@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include <cerrno>
 #include <gtest/gtest.h>
 
 #include "../../cvmfs/platform.h"
@@ -51,6 +52,13 @@ TEST_F(T_Xattr, CreateFromFile) {
   fclose(f);
   UnlinkGuard unlink_guard(tmp_path);
 
+  // check if xattr is supported on the current platform
+  const bool success = platform_setxattr(tmp_path, "user.check", "foo");
+  if (!success && errno == EOPNOTSUPP) {
+    SUCCEED() << "extended attributes are not supported on " << tmp_path;
+    return;
+  }
+
   const unsigned int default_attrs = CountAttributesInFile(tmp_path);
 
   UniquePtr<XattrList> from_file1(XattrList::CreateFromFile(tmp_path));
@@ -58,7 +66,8 @@ TEST_F(T_Xattr, CreateFromFile) {
   EXPECT_EQ(default_attrs, from_file1->ListKeys().size());
 
   string value;
-  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"));
+  ASSERT_TRUE(platform_setxattr(tmp_path, "user.test", "value"))
+    << "failed to set user defined extended attribute (errno: " << errno << ")";
   UniquePtr<XattrList> from_file2(XattrList::CreateFromFile(tmp_path));
   ASSERT_TRUE(from_file2.IsValid());
   EXPECT_EQ(default_attrs + 1, from_file2->ListKeys().size());
