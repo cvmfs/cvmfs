@@ -646,11 +646,22 @@ TEST_F(T_FsTraversal, SteeredTraversal) {
 
 class CustomDelegate {
  public:
-  CustomDelegate() :
-    num_block_dev(0) {}
+  explicit CustomDelegate(std::string path) :
+    num_block_dev(0), root_path(path) {}
+
   virtual void BlockDevice(const std::string &relative_path,
       const std::string &dir_name) {
     ++num_block_dev;
+  }
+
+  virtual bool CheckPermissions(const std::string &relative_path,
+      const std::string &dir_name) {
+    std::string file = root_path + relative_path + "/" + dir_name;
+    struct stat s;
+    stat(file.c_str(), &s);
+    if(S_ISDIR(s.st_mode))
+      return access(file.c_str(), X_OK) != 0;
+    return false;
   }
 
   virtual ~CustomDelegate() {}
@@ -661,14 +672,16 @@ class CustomDelegate {
 
  private:
   int num_block_dev;
+  std::string root_path;
 };
 
 TEST_F(T_FsTraversal, BlockDevice) {
-  CustomDelegate delegate;
+  CustomDelegate delegate("/dev");
   FileSystemTraversal<CustomDelegate> traverse(&delegate,
                                                 "/dev",
                                                 true);
   traverse.fn_new_block_dev = &CustomDelegate::BlockDevice;
+  traverse.fn_ignore_file = &CustomDelegate::CheckPermissions;
   traverse.Recurse("/dev");
   EXPECT_LT(0, delegate.getNumBlockedDev());
 }

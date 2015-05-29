@@ -648,7 +648,7 @@ TEST_F(T_Util, CreateTempDir) {
 
   EXPECT_EQ("", directory = CreateTempDir("/fakepath/myfakedirectory"));
   EXPECT_FALSE(DirectoryExists(directory));
-  EXPECT_NE("", directory = CreateTempDir(sandbox +"/creatempdirectory"));
+  EXPECT_NE("", directory = CreateTempDir(sandbox + "/creatempdirectory"));
   EXPECT_TRUE(DirectoryExists(directory));
 }
 
@@ -720,7 +720,7 @@ TEST_F(T_Util, StringifyDouble) {
 
 TEST_F(T_Util, StringifyTime) {
   time_t now = time(NULL);
-  time_t other = 126865826343;
+  time_t other = 1263843;
 
   EXPECT_EQ(GetTimeString(now, true), StringifyTime(now, true));
   EXPECT_EQ(GetTimeString(now, false), StringifyTime(now, false));
@@ -1066,19 +1066,20 @@ TEST_F(T_Util, Shell) {
   int fd_stdout;
   int fd_stderr;
   const int buffer_size = 100;
-  char buffer[buffer_size];
+  char *buffer = static_cast<char*>(scalloc(buffer_size, sizeof(char)));
 
   EXPECT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
   string path = sandbox + "/" + "newfolder";
   string command = "mkdir -p " + path +  " && cd " + path + " && pwd\n";
   WritePipe(fd_stdin, command.c_str(), command.length());
   ReadPipe(fd_stdout, buffer, path.length());
-  string result(buffer);
+  string result(buffer, 0, path.length());
 
   EXPECT_EQ(path, result);
   close(fd_stdin);
   close(fd_stdout);
   close(fd_stderr);
+  free(buffer);
 }
 
 TEST_F(T_Util, ManagedExecCommandLine) {
