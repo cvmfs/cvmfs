@@ -229,6 +229,7 @@ class LocalObjectFetcher :
 
     // decompress the requested object file
     const bool success = zlib::DecompressPath2File(source, f);
+    fclose(f);
     if (!success) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
                                         "to '%s' (errno: %d)",
@@ -236,7 +237,6 @@ class LocalObjectFetcher :
                file_path->c_str(), errno);
     }
 
-    fclose(f);
     return success;
   }
 
@@ -358,6 +358,7 @@ class HttpObjectFetcher :
     download::JobInfo download_catalog(&url, true, false, f, &object_hash);
     download::Failures retval = download_manager_->Fetch(&download_catalog);
     const bool success = (retval == download::kFailOk);
+    fclose(f);
 
     // error checking
     if (!success) {
@@ -367,7 +368,6 @@ class HttpObjectFetcher :
                retval, Code2Ascii(retval));
     }
 
-    fclose(f);
     return success;
   }
 
