@@ -659,9 +659,7 @@ class CustomDelegate {
     std::string file = root_path + relative_path + "/" + dir_name;
     struct stat s;
     stat(file.c_str(), &s);
-    if(S_ISDIR(s.st_mode))
-      return access(file.c_str(), X_OK) != 0;
-    return false;
+    return !S_ISBLK(s.st_mode);
   }
 
   virtual ~CustomDelegate() {}
