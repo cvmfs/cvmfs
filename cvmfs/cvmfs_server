@@ -2843,6 +2843,8 @@ import() {
   [ -f "${storage_location}/.cvmfspublished" ] && \
   [ -d "${storage_location}/data" ] || die "$storage_location does not seem to be a repository storage"
   [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
+  local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
+  [ $expiry -gt 0 ] || die "Repository whitelist expired (use -r maybe?)"
 
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
