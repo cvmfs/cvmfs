@@ -662,6 +662,9 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidHistorySlow) {
       object_fetcher->FetchHistory(h("400d35465f179a4acacb5fe749e6ce20a0bbdb84",
                                      shash::kSuffixHistory)));
   ASSERT_FALSE(history.IsValid());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -686,6 +689,9 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalogSlow) {
     object_fetcher->FetchCatalog(h("5739dc30f42525a261b2f4b383b220df3e36f04d",
                                    shash::kSuffixCatalog), ""));
   ASSERT_FALSE(catalog.IsValid());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
