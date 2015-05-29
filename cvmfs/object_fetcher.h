@@ -230,6 +230,8 @@ class LocalObjectFetcher :
     // decompress the requested object file
     const bool success = zlib::DecompressPath2File(source, f);
     fclose(f);
+
+    // check the decompression success and remove the temporary file otherwise
     if (!success) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to extract object %s from '%s' "
                                         "to '%s' (errno: %d)",
@@ -362,7 +364,7 @@ class HttpObjectFetcher :
     const bool success = (retval == download::kFailOk);
     fclose(f);
 
-    // error checking
+    // check if download worked and remove temporary file if not
     if (!success) {
       LogCvmfs(kLogDownload, kLogDebug, "failed to download object "
                                         "%s to '%s' (%d - %s)",
