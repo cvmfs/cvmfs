@@ -252,7 +252,7 @@ Supported Commands:
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
                 [-f union filesystem type] [-c file ownership (UID:GID)]
-                [-k path to keys] [-g chown backend]
+                [-k path to keys] [-g chown backend] [-r recreate whitelist]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
