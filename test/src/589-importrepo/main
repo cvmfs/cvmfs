@@ -1,0 +1,105 @@
+cvmfs_test_name="Import Contemporary Repository"
+cvmfs_test_autofs_on_startup=false
+
+put_some_files_in() {
+  local working_dir="$1"
+
+  pushdir $working_dir
+
+  mkdir foo
+  mkdir foo/bar
+  echo "hello world" > foo/bar/hello
+  create_big_file foo/bar/big 75
+
+  mkdir bar
+  mkdir bar/foo
+  echo "foobar" >> bar/foo/baz
+  create_big_file bar/foo/large 50
+
+  touch bar/.cvmfscatalog
+
+  popdir
+}
+
+respawn_repository() {
+  local name=$1
+  local user=$2
+  local repo_backend=$3
+  local repo_keychain="$4"
+
+  sudo cp -R ${repo_backend}/* $(get_local_repo_storage) || return 1
+  sudo chown -R $user $(get_local_repo_storage $name)    || return 2
+
+  if [ x"$repo_keychain" != x"" ]; then
+    sudo cp ${repo_keychain}/${CVMFS_TEST_REPO}.pub       /etc/cvmfs/keys || return 3
+    sudo cp ${repo_keychain}/${CVMFS_TEST_REPO}.crt       /etc/cvmfs/keys || return 4
+    sudo cp ${repo_keychain}/${CVMFS_TEST_REPO}.key       /etc/cvmfs/keys || return 5
+    sudo cp ${repo_keychain}/${CVMFS_TEST_REPO}.masterkey /etc/cvmfs/keys || return 6
+    sudo chown $user /etc/cvmfs/keys/${CVMFS_TEST_REPO}.*                 || return 7
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  put_some_files_in $repo_dir || return $?
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  put_some_files_in $reference_dir || return $?
+
+  local publish_log="publish.log"
+  echo "creating CVMFS snapshot (log: $publish_log)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log 2>&1 || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
+  echo "rescue repository backend storage and keychain"
+  local repo_backend="repo_backend"
+  local repo_keychain="repo_keychain"
+  mkdir $repo_backend  || return 1
+  mkdir $repo_keychain || return 2
+  cp -R $(get_local_repo_storage $CVMFS_TEST_REPO) $repo_backend  || return 3
+  cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub        $repo_keychain || return 4
+  cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.crt        $repo_keychain || return 5
+  cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.key        $repo_keychain || return 6
+  cp /etc/cvmfs/keys/${CVMFS_TEST_REPO}.masterkey  $repo_keychain || return 7
+
+  # ============================================================================
+
+  echo "removing repository"
+  destroy_repo $CVMFS_TEST_REPO || return 8
+
+  # ============================================================================
+
+  echo "planting repository backend and keychain again"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
+
+  echo "importing repository to recreate the backend infrastructure"
+  sudo cvmfs_server import -o $CVMFS_TEST_USER $CVMFS_TEST_REPO || return 9
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}
