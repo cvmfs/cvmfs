@@ -375,6 +375,16 @@ class T_ObjectFetcher : public ::testing::Test {
     closedir(dp);
   }
 
+  size_t CountTemporaryFiles() {
+    if (!NeedsFilesystemSandbox()) {
+      return 0;
+    }
+
+    DirectoryListing listing;
+    ListDirectory(temp_directory, &listing);
+    return listing.size();
+  }
+
  private:
   // type-based overloading helper struct
   // Inspired from here:
@@ -685,54 +695,38 @@ TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFilesSlow) {
     return;
   }
 
-  typedef typename TestFixture::DirectoryListing DirectoryListing;
-  DirectoryListing listing;
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-
   size_t files = 0;
-
-  EXPECT_EQ(files, listing.size());
+  EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE(object_fetcher.IsValid());
 
   UniquePtr<manifest::Manifest> manifest(object_fetcher->FetchManifest());
   ASSERT_TRUE(manifest.IsValid());
-
-  EXPECT_EQ(files, listing.size());
+  EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
   UniquePtr<typename TypeParam::CatalogTN> catalog(
     object_fetcher->FetchCatalog(TestFixture::root_hash, ""));
   ASSERT_TRUE(catalog.IsValid());
 
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_LT(files, listing.size());
-  files = listing.size();
+  EXPECT_LT(files, TestFixture::CountTemporaryFiles());
+  files = TestFixture::CountTemporaryFiles();
 
   UniquePtr<typename TypeParam::HistoryTN>
     history(object_fetcher->FetchHistory());
   ASSERT_TRUE(history.IsValid());
 
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_LT(files, listing.size());
-  files = listing.size();
+  EXPECT_LT(files, TestFixture::CountTemporaryFiles());
+  files = TestFixture::CountTemporaryFiles();
 
   delete object_fetcher.Release();
-
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_EQ(files, listing.size());
+  EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
   delete history.Release();
-
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_GT(files, listing.size());
-  files = listing.size();
+  EXPECT_GT(files, TestFixture::CountTemporaryFiles());
+  files = TestFixture::CountTemporaryFiles();
 
   delete catalog.Release();
-
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_GT(files, listing.size());
-  files = listing.size();
-
-  EXPECT_EQ(0u, listing.size());
+  EXPECT_GT(files, TestFixture::CountTemporaryFiles());
+  EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
 }
