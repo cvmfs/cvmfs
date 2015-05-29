@@ -1517,16 +1517,11 @@ create_whitelist() {
 }
 
 
-# figures out the time to expiry of the repository's whitelist
-#
-# @param stratum0  path/URL to stratum0 storage
-# @return          number of seconds until expiry (negativ if already expired)
-get_expiry() {
-  local name=$1
-  local stratum0=$2
+get_expiry_from_string() {
+  local whitelist_string="$1"
 
-  local expires=$(get_item $name $stratum0/.cvmfswhitelist 'noproxy' | head -2 | tail -1 | tail -c15)
-  if echo $expires | grep -q -E --invert-match '^[0-9]{14}$'; then
+  local expires=$(echo "$whitelist_string" | grep -e '^E[0-9]\{14\}$' | tr -d E)
+  if echo "$expires" | grep -q -E --invert-match '^[0-9]{14}$'; then
     echo -1
     return 1
   fi
@@ -1542,6 +1537,17 @@ get_expiry() {
   local now=$(/bin/date -u +%s)
   local valid_countdown=$(( $expires_num-$now ))
   echo $valid_countdown
+}
+
+
+# figures out the time to expiry of the repository's whitelist
+#
+# @param stratum0  path/URL to stratum0 storage
+# @return          number of seconds until expiry (negativ if already expired)
+get_expiry() {
+  local name=$1
+  local stratum0=$2
+  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist 'noproxy')"
 }
 
 
