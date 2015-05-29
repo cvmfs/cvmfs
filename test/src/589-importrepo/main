@@ -21,6 +21,20 @@ put_some_files_in() {
   popdir
 }
 
+change_some_files_in() {
+  local working_dir="$1"
+
+  pushdir $working_dir
+
+  rm -f foo/bar/hello
+  rm -fR bar
+  touch foo/.cvmfscatalog
+
+  create_big_file bar 100
+
+  popdir
+}
+
 respawn_repository() {
   local name=$1
   local user=$2
@@ -151,8 +165,49 @@ cvmfs_run_test() {
   echo "planting the repository with the tampered whitelist"
   respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
 
-  echo "importing repository with a provided keychain (should fail due to whitelist)"
+  echo "importing repository (should fail due to whitelist)"
   sudo cvmfs_server import -o $CVMFS_TEST_USER $CVMFS_TEST_REPO && return 14
+
+  echo "(temporarily) moving the masterkey"
+  local masterkey="/etc/cvmfs/keys/${CVMFS_TEST_REPO}.masterkey"
+  local hidden_masterkey="${masterkey}.hidden"
+  sudo mv $masterkey $hidden_masterkey || return 15
+
+  echo "importing repository (should fail due to missing masterkey)"
+  sudo cvmfs_server import -o $CVMFS_TEST_USER -r $CVMFS_TEST_REPO && return 16
+
+  echo "moving the masterkey back in place"
+  sudo mv $hidden_masterkey $masterkey || return 17
+
+  echo "importing repository and create a fresh whitelist"
+  sudo cvmfs_server import -o $CVMFS_TEST_USER -r $CVMFS_TEST_REPO || return 18
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
+  echo "open transaction to change something"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  change_some_files_in $repo_dir || return $?
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  change_some_files_in $reference_dir || return $?
+
+  local publish2_log="publish2.log"
+  echo "creating CVMFS snapshot (log: $publish2_log)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log 2>&1 || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
 
   return 0
 }
