@@ -1,4 +1,5 @@
 2.2.0:
+  * Handle import of repositories with an expired whitelist (CVM-780)
   * Fix leak of temporary files during garbage collection (CVM-846)
   * Fix verification of partial file chunks in cvmfs_server (CVM-842)
   * Remove counting of open file descriptors from libcvmfs
