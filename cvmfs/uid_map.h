@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "logging.h"
 #include "util.h"
 
 /**
