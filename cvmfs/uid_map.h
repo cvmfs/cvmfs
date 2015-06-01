@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "logging.h"
+#include "sanitizer.h"
 #include "util.h"
 
 /**
@@ -128,6 +129,8 @@ class IntegerMap {
       return false;
     }
 
+    sanitizer::IntegerSanitizer int_sanitizer;
+
     std::string line;
     unsigned int line_number = 0;
     while (GetLineFile(fmap, &line)) {
@@ -139,9 +142,9 @@ class IntegerMap {
 
       std::vector<std::string> components = SplitString(line, ' ');
       FilterEmptyStrings(&components);
-      if (components.size() != 2    ||
-          !IsNumeric(components[1]) ||
-          (components[0] != "*" && !IsNumeric(components[0]))) {
+      if (components.size() != 2                ||
+          !int_sanitizer.IsValid(components[1]) ||
+          (components[0] != "*" && !int_sanitizer.IsValid(components[0]))) {
         fclose(fmap);
         LogCvmfs(kLogUtility, kLogDebug, "failed to read line %d in %s",
                  line_number, path.c_str());
