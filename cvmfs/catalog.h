@@ -145,7 +145,7 @@ class Catalog : public SingleCopy {
                               listing);
   }
   bool AllChunksBegin();
-  bool AllChunksNext(shash::Any *hash, ChunkTypes *type);
+  bool AllChunksNext(shash::Any *hash);
   bool AllChunksEnd();
 
   inline bool ListPathChunks(const PathString &path,
