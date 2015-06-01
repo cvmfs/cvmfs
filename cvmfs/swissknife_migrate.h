@@ -15,6 +15,7 @@
 #include "catalog.h"
 #include "catalog_traversal.h"
 #include "hash.h"
+#include "uid_map.h"
 #include "upload.h"
 #include "util.h"
 #include "util_concurrency.h"
@@ -118,6 +119,9 @@ class CommandMigrate : public Command {
     bool CleanupNestedCatalogs(PendingCatalog *data) const;
     bool CollectAndAggregateStatistics(PendingCatalog *data) const;
 
+    catalog::WritableCatalog*
+      GetWritable(const catalog::Catalog *catalog) const;
+
    protected:
     const std::string  temporary_directory_;
     const bool         collect_catalog_statistics_;
@@ -198,9 +202,43 @@ class CommandMigrate : public Command {
     bool GenerateNewStatisticsCounters(PendingCatalog *data) const;
     bool UpdateCatalogSchema(PendingCatalog *data) const;
     bool CommitDatabaseTransaction(PendingCatalog *data) const;
+  };
 
-    catalog::WritableCatalog*
-      GetWritable(const catalog::Catalog *catalog) const;
+  class ChownMigrationWorker :
+    public AbstractMigrationWorker<ChownMigrationWorker>
+  {
+    friend class AbstractMigrationWorker<ChownMigrationWorker>;
+   public:
+    struct worker_context :
+      AbstractMigrationWorker<ChownMigrationWorker>::worker_context
+    {
+      worker_context(const std::string  &temporary_directory,
+                     const bool          collect_catalog_statistics,
+                     const UidMap       &uid_map,
+                     const GidMap       &gid_map)
+        : AbstractMigrationWorker<ChownMigrationWorker>::worker_context(
+            temporary_directory, collect_catalog_statistics)
+        , uid_map(uid_map)
+        , gid_map(gid_map) { }
+      const UidMap &uid_map;
+      const GidMap &gid_map;
+    };
+
+   public:
+    explicit ChownMigrationWorker(const worker_context *context);
+
+   protected:
+    bool RunMigration(PendingCatalog *data) const;
+    bool ApplyPersonaMappings(PendingCatalog *data) const;
+
+   private:
+    template <class MapT>
+    std::string GenerateMappingStatement(const MapT         &map,
+                                         const std::string  &column) const;
+
+   private:
+    const std::string uid_map_statement_;
+    const std::string gid_map_statement_;
   };
 
  public:
@@ -247,6 +285,11 @@ class CommandMigrate : public Command {
   bool RaiseFileDescriptorLimit() const;
   bool ConfigureSQLite() const;
   void AnalyzeCatalogStatistics() const;
+  bool ReadPersona(const std::string &uid, const std::string &gid);
+  bool ReadPersonaMaps(const std::string &uid_map_path,
+                       const std::string &gid_map_path,
+                             UidMap      *uid_map,
+                             GidMap      *gid_map) const;
 
   bool GenerateNestedCatalogMarkerChunk();
   void CreateNestedCatalogMarkerDirent(const shash::Any &content_hash);
@@ -264,9 +307,9 @@ class CommandMigrate : public Command {
   std::string                     nested_catalog_marker_tmp_path_;
   static catalog::DirectoryEntry  nested_catalog_marker_;
 
-  catalog::Catalog const*                        root_catalog_;
-  UniquePtr<upload::Spooler>                     spooler_;
-  PendingCatalogMap                              pending_catalogs_;
+  catalog::Catalog const*     root_catalog_;
+  UniquePtr<upload::Spooler>  spooler_;
+  PendingCatalogMap           pending_catalogs_;
 
   StopWatch  catalog_loading_stopwatch_;
   StopWatch  migration_stopwatch_;

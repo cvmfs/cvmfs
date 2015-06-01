@@ -33,7 +33,7 @@ CommandMigrate::CommandMigrate() :
 ParameterList CommandMigrate::GetParams() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v',
-    "migration base version ( 2.0.x | 2.1.7 )"));
+    "migration base version ( 2.0.x | 2.1.7 | chown )"));
   r.push_back(Parameter::Mandatory('r',
     "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Mandatory('u', "upstream definition string"));
@@ -46,6 +46,8 @@ ParameterList CommandMigrate::GetParams() {
     "group id to be used for this repository"));
   r.push_back(Parameter::Optional('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional('k', "repository master key(s)"));
+  r.push_back(Parameter::Optional('i', "UID map for chown"));
+  r.push_back(Parameter::Optional('j', "GID map for chown"));
   r.push_back(Parameter::Switch('f', "fix nested catalog transition points"));
   r.push_back(Parameter::Switch('l', "disable linkcount analysis of files"));
   r.push_back(Parameter::Switch('s',
@@ -95,6 +97,12 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                              "";
   const std::string &repo_keys          = (args.count('k') > 0)      ?
                                              *args.find('k')->second :
+                                             "";
+  const std::string &uid_map_path       = (args.count('i') > 0)      ?
+                                             *args.find('i')->second :
+                                             "";
+  const std::string &gid_map_path       = (args.count('j') > 0)      ?
+                                             *args.find('j')->second :
                                              "";
   const bool fix_transition_points      = (args.count('f') > 0);
   const bool analyze_file_linkcounts    = (args.count('l') == 0);
@@ -167,17 +175,9 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Do the actual migration step
   bool migration_succeeded = false;
   if (migration_base == "2.0.x") {
-    if (uid.empty()) {
-      Error("Please provide a user ID");
+    if (!ReadPersona(uid, gid)) {
       return 1;
     }
-    if (gid.empty()) {
-      Error("Please provide a group ID");
-      return 1;
-    }
-
-    uid_ = String2Int64(uid);
-    gid_ = String2Int64(gid);
 
     // Generate and upload a nested catalog marker
     if (!GenerateNestedCatalogMarkerChunk()) {
@@ -200,6 +200,19 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                                 collect_catalog_statistics);
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_217>(manifest_path, &context);
+  } else if (migration_base == "chown") {
+    UidMap uid_map;
+    GidMap gid_map;
+    if (!ReadPersonaMaps(uid_map_path, gid_map_path, &uid_map, &gid_map)) {
+      Error("Failed to read UID and/or GID map");
+      return 1;
+    }
+    ChownMigrationWorker::worker_context context(temporary_directory_,
+                                                 collect_catalog_statistics,
+                                                 uid_map,
+                                                 gid_map);
+    migration_succeeded =
+      DoMigrationAndCommit<ChownMigrationWorker>(manifest_path, &context);
   } else {
     const std::string err_msg = "Unknown migration base: " + migration_base;
     Error(err_msg);
@@ -220,6 +233,52 @@ int CommandMigrate::Main(const ArgumentList &args) {
 
   LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration succeeded");
   return 0;
+}
+
+
+bool CommandMigrate::ReadPersona(const std::string &uid,
+                                   const std::string &gid) {
+  if (uid.empty()) {
+    Error("Please provide a user ID");
+    return false;
+  }
+  if (gid.empty()) {
+    Error("Please provide a group ID");
+    return false;
+  }
+
+  uid_ = String2Int64(uid);
+  gid_ = String2Int64(gid);
+  return true;
+}
+
+
+
+bool CommandMigrate::ReadPersonaMaps(const std::string &uid_map_path,
+                                     const std::string &gid_map_path,
+                                           UidMap      *uid_map,
+                                           GidMap      *gid_map) const {
+  if (!uid_map->Read(uid_map_path) || !uid_map->IsValid()) {
+    Error("Failed to read UID map");
+    return false;
+  }
+
+  if (!gid_map->Read(gid_map_path) || !gid_map->IsValid()) {
+    Error("Failed to read GID map");
+    return false;
+  }
+
+  if (uid_map->RuleCount() == 0 && !uid_map->HasDefault()) {
+    Error("UID map appears to be empty");
+    return false;
+  }
+
+  if (gid_map->RuleCount() == 0 && !gid_map->HasDefault()) {
+    Error("GID map appears to be empty");
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -635,6 +694,15 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
 const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 2;
+
+
+template<class DerivedT>
+catalog::WritableCatalog*
+CommandMigrate::AbstractMigrationWorker<DerivedT>::GetWritable(
+                                        const catalog::Catalog *catalog) const {
+  return dynamic_cast<catalog::WritableCatalog*>(const_cast<catalog::Catalog*>(
+    catalog));
+}
 
 
 CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
@@ -1638,11 +1706,81 @@ bool CommandMigrate::MigrationWorker_217::CommitDatabaseTransaction
 }
 
 
-catalog::WritableCatalog* CommandMigrate::MigrationWorker_217::GetWritable(
-  const catalog::Catalog *catalog) const
-{
-  return dynamic_cast<catalog::WritableCatalog*>(const_cast<catalog::Catalog*>(
-    catalog));
+//------------------------------------------------------------------------------
+
+
+CommandMigrate::ChownMigrationWorker::ChownMigrationWorker(
+                                                const worker_context *context)
+  : AbstractMigrationWorker<ChownMigrationWorker>(context)
+  , uid_map_statement_(GenerateMappingStatement(context->uid_map, "uid"))
+  , gid_map_statement_(GenerateMappingStatement(context->gid_map, "gid"))
+{}
+
+bool CommandMigrate::ChownMigrationWorker::RunMigration(
+                                                   PendingCatalog *data) const {
+  return ApplyPersonaMappings(data);
+}
+
+
+bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
+                                                   PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &db =
+                                     GetWritable(data->old_catalog)->database();
+
+  if (!db.BeginTransaction()) {
+    return false;
+  }
+
+  catalog::Sql uid_sql(db, uid_map_statement_);
+  if (!uid_sql.Execute()) {
+    Error("Failed to update UIDs", uid_sql, data);
+    return false;
+  }
+
+  catalog::Sql gid_sql(db, gid_map_statement_);
+  if (!gid_sql.Execute()) {
+    Error("Failed to update GIDs", gid_sql, data);
+    return false;
+  }
+
+  return db.CommitTransaction();
+}
+
+
+template <class MapT>
+std::string CommandMigrate::ChownMigrationWorker::GenerateMappingStatement(
+                                             const MapT         &map,
+                                             const std::string  &column) const {
+  assert(map.RuleCount() > 0 || map.HasDefault());
+
+  std::string stmt = "UPDATE OR ABORT catalog SET " + column + " = ";
+
+  if (map.RuleCount() == 0) {
+    // map everything to the same value (just a simple UPDATE clause)
+    stmt += StringifyInt(map.GetDefault());
+  } else {
+    // apply multiple ID mappings (UPDATE clause with CASE statement)
+    stmt += "CASE " + column + " ";
+    typedef typename MapT::map_type::const_iterator map_iterator;
+          map_iterator i    = map.GetRuleMap().begin();
+    const map_iterator iend = map.GetRuleMap().end();
+    for (; i != iend; ++i) {
+      stmt += "WHEN " + StringifyInt(i->first) +
+             " THEN " + StringifyInt(i->second) + " ";
+    }
+
+    // add a default (if provided) or leave unchanged if no mapping fits
+    stmt += (map.HasDefault())
+                ? "ELSE " + StringifyInt(map.GetDefault()) + " "
+                : "ELSE " + column + " ";
+    stmt += "END";
+  }
+
+  stmt += ";";
+  return stmt;
 }
 
 }  // namespace swissknife
