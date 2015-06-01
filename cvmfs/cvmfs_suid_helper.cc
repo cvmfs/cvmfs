@@ -98,7 +98,7 @@ static void KillCvmfs(const string &fqrn) {
   const bool retval = platform_getxattr(mountpoint.c_str(), "user.pid", &pid);
   if (!retval || pid.empty())
     exit(1);
-  sanitizer::IntegerSanitizer pid_sanitizer;
+  sanitizer::PositiveIntegerSanitizer pid_sanitizer;
   if (!pid_sanitizer.IsValid(pid))
     exit(1);
   ExecAsRoot("/bin/kill", "-9", pid.c_str(), NULL);
