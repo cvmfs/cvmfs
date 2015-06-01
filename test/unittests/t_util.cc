@@ -97,7 +97,7 @@ class T_Util : public ::testing::Test {
     } else {
       gmtime_r(&seconds, &ts);
     }
-    strftime(buf, sizeof(buf), "%d %b %Y %H:%M:%S", &ts);
+    strftime(buf, sizeof(buf), "%-d %b %Y %H:%M:%S", &ts);
     return string(buf);
   }
 
