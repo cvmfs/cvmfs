@@ -52,21 +52,18 @@ class InputSanitizer {
 class AlphaNumSanitizer : public InputSanitizer {
  public:
   AlphaNumSanitizer() : InputSanitizer("az AZ 09") { }
-  virtual ~AlphaNumSanitizer() { }
 };
 
 
 class RepositorySanitizer : public InputSanitizer {
  public:
   RepositorySanitizer() : InputSanitizer("az AZ 09 - _ .") { }
-  virtual ~RepositorySanitizer() { }
 };
 
 
 class IntegerSanitizer : public InputSanitizer {
  public:
   IntegerSanitizer() : InputSanitizer("09") { }
-  virtual ~IntegerSanitizer() { }
 
  protected:
   virtual bool Sanitize(std::string::const_iterator   begin,
