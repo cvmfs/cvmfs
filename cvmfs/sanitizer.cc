@@ -97,6 +97,24 @@ bool InputSanitizer::IsValid(const std::string &input) const {
   return Sanitize(input, &dummy);
 }
 
+
+bool IntegerSanitizer::Sanitize(
+                          std::string::const_iterator   begin,
+                          std::string::const_iterator   end,
+                          std::string                  *filtered_output) const {
+  if (std::distance(begin, end) == 0) {
+    return false;
+  }
+
+  if (*begin == '-') {
+    // minus is allowed as the first character!
+    filtered_output->push_back('-');
+    begin++;
+  }
+
+  return InputSanitizer::Sanitize(begin, end, filtered_output);
+}
+
 }  // namespace sanitizer
 
 #ifdef CVMFS_NAMESPACE_GUARD

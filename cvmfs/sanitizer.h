@@ -67,6 +67,11 @@ class IntegerSanitizer : public InputSanitizer {
  public:
   IntegerSanitizer() : InputSanitizer("09") { }
   virtual ~IntegerSanitizer() { }
+
+ protected:
+  virtual bool Sanitize(std::string::const_iterator   begin,
+                        std::string::const_iterator   end,
+                        std::string                  *filtered_output) const;
 };
 
 }  // namespace sanitizer
