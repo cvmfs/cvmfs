@@ -1021,6 +1021,10 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
     StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
 
+  // TODO(reneme): this depends on shash::kSuffix* being a char!
+  //               it should be more generic or replaced entirely
+  // TODO(reneme): this is practically the same as SqlListContentHashes and
+  //               should be consolidated
   string sql = "SELECT DISTINCT hash, "
   "CASE WHEN flags & " + StringifyInt(SqlDirent::kFlagFile) + " THEN " +
     StringifyInt(shash::kSuffixNone) + " " +
