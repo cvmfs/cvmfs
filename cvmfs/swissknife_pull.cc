@@ -40,10 +40,41 @@ namespace swissknife {
 
 namespace {
 
-struct ChunkJob {
-  unsigned char type;
-  shash::Algorithms hash_algorithm;
-  unsigned char digest[shash::kMaxDigestSize];
+/**
+ * This just stores an shash::Any in a predictable way to send it through a
+ * POSIX pipe that is not type safe. It breaks good object oriented practises
+ * like information hiding.
+ *
+ * TODO(rene): no words for that... just get rid of it!
+ */
+class ChunkJob {
+ public:
+  ChunkJob()
+    : suffix(shash::kSuffixNone)
+    , hash_algorithm(shash::kAny) {}
+
+  ChunkJob(const shash::Any &hash)
+    : suffix(hash.suffix)
+    , hash_algorithm(hash.algorithm)
+  {
+    memcpy(digest, hash.digest, hash.GetDigestSize());
+  }
+
+  bool IsTerminateJob() const {
+    return (hash_algorithm == shash::kAny);
+  }
+
+  shash::Any hash() const {
+    assert (!IsTerminateJob());
+    return shash::Any(hash_algorithm,
+                      digest,
+                      shash::kDigestSizes[hash_algorithm],
+                      suffix);
+  }
+
+  const shash::Suffix      suffix;
+  const shash::Algorithms  hash_algorithm;
+  unsigned char            digest[shash::kMaxDigestSize];
 };
 
 static void SpoolerOnUpload(const upload::SpoolerResult &result) {
@@ -156,11 +187,10 @@ static void *MainWorker(void *data) {
     pthread_mutex_lock(&lock_pipe);
     ReadPipe(pipe_chunks[0], &next_chunk, sizeof(next_chunk));
     pthread_mutex_unlock(&lock_pipe);
-    if (next_chunk.type == 255)
+    if (next_chunk.IsTerminateJob())
       break;
 
-    shash::Any chunk_hash(next_chunk.hash_algorithm, next_chunk.digest,
-                          shash::kDigestSizes[next_chunk.hash_algorithm]);
+    shash::Any chunk_hash = next_chunk.hash();
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
 
@@ -213,7 +243,6 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
-  catalog::ChunkTypes chunk_type;
   catalog::Catalog *catalog = NULL;
   string file_catalog;
   string file_catalog_vanilla;
@@ -271,20 +300,8 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
     goto pull_cleanup;
   }
-  while (catalog->AllChunksNext(&chunk_hash, &chunk_type)) {
-    ChunkJob next_chunk;
-    switch (chunk_type) {
-      case catalog::kChunkMicroCatalog:
-        next_chunk.type = 'L';
-        break;
-      case catalog::kChunkPiece:
-        next_chunk.type = shash::kSuffixPartial;
-        break;
-      default:
-        next_chunk.type = '\0';
-    }
-    next_chunk.hash_algorithm = chunk_hash.algorithm;
-    memcpy(next_chunk.digest, chunk_hash.digest, chunk_hash.GetDigestSize());
+  while (catalog->AllChunksNext(&chunk_hash)) {
+    ChunkJob next_chunk(chunk_hash);
     WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
     atomic_inc64(&chunk_queue);
   }
@@ -543,7 +560,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   LogCvmfs(kLogCvmfs, kLogStdout, "Stopping %u workers", num_parallel);
   for (unsigned i = 0; i < num_parallel; ++i) {
     ChunkJob terminate_workers;
-    terminate_workers.type = 255;
     WritePipe(pipe_chunks[1], &terminate_workers, sizeof(terminate_workers));
   }
   for (unsigned i = 0; i < num_parallel; ++i) {

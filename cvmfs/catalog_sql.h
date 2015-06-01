@@ -36,17 +36,6 @@ namespace catalog {
 
 class Catalog;
 
-/**
- * Content-addressable chunks can be entire files, micro catalogs (ending L) or
- * pieces of large files (ending P).  Micro catalogs are currently not
- * implemented.
- */
-enum ChunkTypes {
-  kChunkFile = 0,
-  kChunkMicroCatalog,
-  kChunkPiece,
-};
-
 
 class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
  public:
@@ -519,7 +508,7 @@ class SqlAllChunks : public Sql {
  public:
   explicit SqlAllChunks(const CatalogDatabase &database);
   bool Open();
-  bool Next(shash::Any *hash, ChunkTypes *type);
+  bool Next(shash::Any *hash);
   bool Close();
 };
 

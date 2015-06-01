@@ -1046,7 +1046,7 @@ bool SqlAllChunks::Open() {
 }
 
 
-bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
+bool SqlAllChunks::Next(shash::Any *hash) {
   if (! FetchRow()) {
     return false;
   }
