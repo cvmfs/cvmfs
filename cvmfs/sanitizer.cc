@@ -98,6 +98,19 @@ bool InputSanitizer::IsValid(const std::string &input) const {
 }
 
 
+
+bool PositiveIntegerSanitizer::Sanitize(
+                          std::string::const_iterator   begin,
+                          std::string::const_iterator   end,
+                          std::string                  *filtered_output) const {
+  if (std::distance(begin, end) == 0) {
+    return false;
+  }
+
+  return InputSanitizer::Sanitize(begin, end, filtered_output);
+}
+
+
 bool IntegerSanitizer::Sanitize(
                           std::string::const_iterator   begin,
                           std::string::const_iterator   end,

@@ -63,9 +63,19 @@ class RepositorySanitizer : public InputSanitizer {
 };
 
 
-class IntegerSanitizer : public InputSanitizer {
+class PositiveIntegerSanitizer : public InputSanitizer {
  public:
-  IntegerSanitizer() : InputSanitizer("09") { }
+  PositiveIntegerSanitizer() : InputSanitizer("09") { }
+
+ protected:
+  virtual bool Sanitize(std::string::const_iterator   begin,
+                        std::string::const_iterator   end,
+                        std::string                  *filtered_output) const;
+};
+
+class IntegerSanitizer : public PositiveIntegerSanitizer {
+ public:
+  IntegerSanitizer() : PositiveIntegerSanitizer() { }
   virtual ~IntegerSanitizer() { }
 
  protected:
