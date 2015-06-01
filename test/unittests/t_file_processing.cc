@@ -67,10 +67,8 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
  public:
   struct Result {
     Result(MockStreamHandle     *handle,
-           const shash::Any     &computed_content_hash,
-           const shash::Suffix   hash_suffix) :
-      computed_content_hash(computed_content_hash),
-      hash_suffix(hash_suffix)
+           const shash::Any     &computed_content_hash)
+      : computed_content_hash(computed_content_hash)
     {
       RecomputeContentHash(handle->data, handle->nbytes);
 
@@ -99,7 +97,6 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
 
     shash::Any     computed_content_hash;
     shash::Any     recomputed_content_hash;
-    shash::Suffix  hash_suffix;
   };
   typedef std::vector<Result> Results;
 
@@ -130,13 +127,12 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
-                              const shash::Any            content_hash,
-                              const shash::Suffix         hash_suffix) {
+                              const shash::Any            content_hash) {
     MockStreamHandle *local_handle = dynamic_cast<MockStreamHandle*>(handle);
     assert(local_handle != NULL);
 
     // summarize the results produced by the FileProcessor
-    results_.push_back(Result(local_handle, content_hash, hash_suffix));
+    results_.push_back(Result(local_handle, content_hash));
 
     // remove the stream handle and fire callback
     const CallbackTN *callback = local_handle->commit_callback;
@@ -366,7 +362,8 @@ class T_FileProcessing : public FileSandbox {
   }
 
   void CheckHashes(const FP_MockUploader::Results &results,
-                   const ExpectedHashStrings   &reference_hash_strings) const {
+                   const ExpectedHashStrings      &reference_hash_strings) const
+  {
     EXPECT_EQ(reference_hash_strings.size(), results.size())
       << "number of generated chunks did not match";
 
@@ -391,7 +388,8 @@ class T_FileProcessing : public FileSandbox {
       ExpectedHashes::const_iterator kend = reference_hashes.end();
       for (; k != kend; ++k) {
         if (k->first == j->computed_content_hash) {
-          EXPECT_EQ(k->second, j->hash_suffix) << "hash suffix does not fit";
+          EXPECT_EQ(k->second, j->computed_content_hash.suffix)
+            << "hash suffix does not fit";
           found = true;
           break;
         }

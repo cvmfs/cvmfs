@@ -126,8 +126,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
           break;
         case UploadJob::Commit:
           FinalizeStreamedUpload(job.stream_handle,
-                                 job.content_hash,
-                                 job.hash_suffix);
+                                 job.content_hash);
           break;
         case UploadJob::Terminate:
           running = false;
@@ -160,8 +159,8 @@ class AbstractMockUploader : public upload::AbstractUploader {
   }
 
   virtual void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
-                                      const shash::Any            content_hash,
-                                      const shash::Suffix         hash_suffix) {
+                                      const shash::Any            content_hash)
+  {
     assert(AbstractMockUploader::not_implemented);
   }
 
@@ -553,10 +552,7 @@ struct object_fetcher_traits<MockObjectFetcher> {
 class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
  public:
   manifest::Manifest* FetchManifest();
-
-  bool Fetch(const shash::Any    &object_hash,
-             const shash::Suffix  hash_suffix,
-             std::string         *file_path);
+  bool Fetch(const shash::Any &object_hash, std::string *file_path);
 };
 
 

@@ -146,7 +146,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       delete manifest;
       goto sign_fail;
     }
-    shash::Any certificate_hash(manifest->GetHashAlgorithm());
+    shash::Any certificate_hash(manifest->GetHashAlgorithm(),
+                                shash::kSuffixCertificate);
     shash::HashMem((unsigned char *)compr_buf, compr_size, &certificate_hash);
     const string cert_path_tmp = temp_dir + "/cvmfspublisher.tmp";
     if (!CopyMem2Path((unsigned char *)compr_buf, compr_size, cert_path_tmp)) {
@@ -156,8 +157,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     }
     free(compr_buf);
 
-    const string cert_hash_path = "data" +
-                                  certificate_hash.MakePathExplicit(1, 2) + "X";
+    const string cert_hash_path = "data/" + certificate_hash.MakePath();
     spooler->Upload(cert_path_tmp, cert_hash_path);
 
     // Update manifest

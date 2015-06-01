@@ -206,10 +206,9 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     // Check if the chunk is there
     if (!entries[i].checksum().IsNull() && check_chunks) {
-      string chunk_path = "data" +
-                          entries[i].checksum().MakePathExplicit(1, 2);
+      string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
-        chunk_path += "L";
+        chunk_path += shash::kSuffixMicroCatalog;
       if (!Exists(chunk_path)) {
         LogCvmfs(kLogCvmfs, kLogStderr, "data chunk %s (%s) missing",
                  entries[i].checksum().ToString().c_str(), full_path.c_str());
@@ -342,15 +341,11 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
         // are all data chunks in the data store?
         if (check_chunks) {
           const shash::Any &chunk_hash = this_chunk.content_hash();
-          const string chunk_path = "data"                            +
-                                    chunk_hash.MakePathExplicit(1, 2) +
-                                    shash::kSuffixPartial;
+          const string chunk_path = "data/" + chunk_hash.MakePath();
           if (!Exists(chunk_path)) {
-            const std::string chunk_name =
-                   this_chunk.content_hash().ToString() + shash::kSuffixPartial;
             LogCvmfs(kLogCvmfs, kLogStderr, "partial data chunk %s (%s -> "
                                             "offset: %d | size: %d) missing",
-                     chunk_name.c_str(),
+                     this_chunk.content_hash().ToStringWithSuffix().c_str(),
                      full_path.c_str(),
                      this_chunk.offset(),
                      this_chunk.size());
@@ -404,11 +399,8 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 }
 
 
-string CommandCheck::DownloadPiece(const shash::Any catalog_hash,
-                                   const char suffix)
-{
-  string source = "data" + catalog_hash.MakePathExplicit(1, 2);
-  source.push_back(suffix);
+string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
+  string source = "data/" + catalog_hash.MakePath();
   const string dest = "/tmp/" + catalog_hash.ToString();
   const string url = *remote_repository + "/" + source;
   download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
@@ -423,11 +415,8 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash,
 }
 
 
-string CommandCheck::DecompressPiece(const shash::Any catalog_hash,
-                                     const char suffix)
-{
-  string source = "data" + catalog_hash.MakePathExplicit(1, 2);
-  source.push_back(suffix);
+string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
+  string source = "data/" + catalog_hash.MakePath();
   const string dest = "/tmp/" + catalog_hash.ToString();
   if (!zlib::DecompressPath2Path(source, dest))
     return "";
@@ -450,9 +439,9 @@ bool CommandCheck::InspectTree(const string &path,
 
   string tmp_file;
   if (remote_repository == NULL)
-    tmp_file = DecompressPiece(catalog_hash, 'C');
+    tmp_file = DecompressPiece(catalog_hash);
   else
-    tmp_file = DownloadPiece(catalog_hash, 'C');
+    tmp_file = DownloadPiece(catalog_hash);
   if (tmp_file == "") {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to load catalog %s",
              catalog_hash.ToString().c_str());
@@ -636,8 +625,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Validate Manifest
-  const string certificate_path =
-    "data" + manifest->certificate().MakePathExplicit(1, 2) + "X";
+  const string certificate_path = "data/" + manifest->certificate().MakePath();
   if (!Exists(certificate_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());
@@ -655,9 +643,9 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     }
     string tmp_file;
     if (remote_repository == NULL)
-      tmp_file = DecompressPiece(manifest->history(), 'H');
+      tmp_file = DecompressPiece(manifest->history());
     else
-      tmp_file = DownloadPiece(manifest->history(), 'H');
+      tmp_file = DownloadPiece(manifest->history());
     if (tmp_file == "") {
       LogCvmfs(kLogCvmfs, kLogStderr, "failed to load history database %s",
                manifest->history().ToString().c_str());

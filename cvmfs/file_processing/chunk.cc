@@ -160,8 +160,10 @@ Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
 }
 
 
-shash::Suffix Chunk::hash_suffix() const {
-  return (IsBulkChunk()) ? file_->hash_suffix() : shash::kSuffixPartial;
+void Chunk::SetAsBulkChunk() {
+  is_bulk_chunk_       = true;
+  content_hash_.suffix = file_->hash_suffix(); // bulk chunks inherit the file's
+                                               // content hash suffix
 }
 
 }  // namespace upload
