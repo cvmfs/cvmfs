@@ -80,7 +80,7 @@ class T_Util : public ::testing::Test {
       const string &content) {
     string complete_path = sandbox + "/" + filename;
     FILE *myfile = fopen(complete_path.c_str(), "w");
-    fprintf(myfile, content.c_str());
+    fprintf(myfile, "%s", content.c_str());
     fclose(myfile);
     return complete_path;
   }
