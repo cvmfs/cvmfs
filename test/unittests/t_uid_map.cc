@@ -92,7 +92,6 @@ class T_UidMap : public ::testing::Test {
   key_type k(const T k) const { return key_type(k); }
   template <typename T>
   value_type v(const T v) const { return value_type(v); }
-
 };
 
 template <typename MapT>
@@ -105,7 +104,7 @@ TYPED_TEST_CASE(T_UidMap, UidMapTypes);
 
 TYPED_TEST(T_UidMap, Initialize) {
   TypeParam map;
-  EXPECT_TRUE (map.IsValid());
+  EXPECT_TRUE(map.IsValid());
   EXPECT_FALSE(map.HasDefault());
 }
 
@@ -114,7 +113,7 @@ TYPED_TEST(T_UidMap, Insert) {
   TypeParam map;
   map.Set(TestFixture::k(0), TestFixture::v(1));
   map.Set(TestFixture::k(1), TestFixture::v(2));
-  EXPECT_TRUE (map.IsValid());
+  EXPECT_TRUE(map.IsValid());
   EXPECT_FALSE(map.HasDefault());
   EXPECT_EQ(2u, map.RuleCount());
 }

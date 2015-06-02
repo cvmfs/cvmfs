@@ -53,7 +53,7 @@ class ChunkJob {
     : suffix(shash::kSuffixNone)
     , hash_algorithm(shash::kAny) {}
 
-  ChunkJob(const shash::Any &hash)
+  explicit ChunkJob(const shash::Any &hash)
     : suffix(hash.suffix)
     , hash_algorithm(hash.algorithm)
   {
@@ -65,7 +65,7 @@ class ChunkJob {
   }
 
   shash::Any hash() const {
-    assert (!IsTerminateJob());
+    assert(!IsTerminateJob());
     return shash::Any(hash_algorithm,
                       digest,
                       shash::kDigestSizes[hash_algorithm],

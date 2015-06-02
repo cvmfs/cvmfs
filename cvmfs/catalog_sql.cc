@@ -1051,7 +1051,7 @@ bool SqlAllChunks::Open() {
 
 
 bool SqlAllChunks::Next(shash::Any *hash) {
-  if (! FetchRow()) {
+  if (!FetchRow()) {
     return false;
   }
 
