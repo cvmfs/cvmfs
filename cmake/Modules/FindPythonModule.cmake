@@ -4,6 +4,7 @@
 function(find_python_module module)
 	string(TOUPPER ${module} module_upper)
 	if(NOT PYTHON_${module_upper})
+		include (FindPythonInterp)
 		if(ARGC GREATER 1 AND ARGV1 STREQUAL "REQUIRED")
 			set(PY_${module}_FIND_REQUIRED TRUE)
 		endif()
