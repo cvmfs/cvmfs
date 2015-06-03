@@ -217,6 +217,12 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
 #
+# include some common functionality
+#
+include (FindPythonModule)
+
+
+#
 # set some default flags
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
