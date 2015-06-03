@@ -56,7 +56,7 @@ cvmfs_run_test() {
   ls -lisa /cvmfs/${legacy_repo_name} || return 5
 
   echo "load repository configuration"
-  load_repo_config $CVMFS_TEST_REPO
+  load_repo_config $legacy_repo_name
 
   echo "check that the temporary scratch directory is empty"
   [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
