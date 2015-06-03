@@ -2,9 +2,11 @@
 cvmfs_test_name="Import Legacy Repository"
 cvmfs_test_autofs_on_startup=false
 
+TEST519_WORKSPACE=""
 TEST519_LEGACY_STORAGE=""
 TEST519_NEW_REPO_NAME=""
 cleanup() {
+  [ -z "$TEST519_WORKSPACE" ]      || cd $TEST519_WORKSPACE
   [ -z "$TEST519_NEW_REPO_NAME" ]  || sudo cvmfs_server rmfs -f $TEST519_NEW_REPO_NAME
   [ -z "$TEST519_LEGACY_STORAGE" ] || sudo rm -fR $TEST519_LEGACY_STORAGE
 }
@@ -18,6 +20,7 @@ cvmfs_run_test() {
   local legacy_repo_name="testmigration.cern.ch"
   local repo_dir="/cvmfs/${legacy_repo_name}"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+  TEST519_WORKSPACE="$scratch_dir"
 
   echo "make sure there are no legacy repo leftovers from previous tests"
   cleanup_legacy_repo_leftovers "$legacy_repo_name"
