@@ -408,7 +408,6 @@ if (BUILD_SERVER OR BUILD_UNITTESTS)
     add_dependencies (python-geoip libgeoip)
   else (GEOIP_BUILTIN)
     find_package (LibGeoIP REQUIRED)
-    find_package (python-GeoIP REQUIRED)
   endif (GEOIP_BUILTIN)
 
   if (TBB_PRIVATE_LIB)
