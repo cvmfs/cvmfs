@@ -16,9 +16,9 @@ function(find_python_module module)
 			OUTPUT_VARIABLE _${module}_location
 			ERROR_QUIET 
 			OUTPUT_STRIP_TRAILING_WHITESPACE)
-		if(NOT _${module}_status)
+		if(${_${module}_status} EQUAL 0)
 			set(PYTHON_${module_upper} ${_${module}_location} CACHE STRING "Location of Python module ${module}")
-		endif(NOT _${module}_status)
+		endif(${_${module}_status} EQUAL 0)
 	endif(NOT PYTHON_${module_upper})
 	find_package_handle_standard_args(PY_${module} DEFAULT_MSG PYTHON_${module_upper})
 endfunction(find_python_module)
