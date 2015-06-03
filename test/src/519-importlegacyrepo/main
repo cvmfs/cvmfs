@@ -74,14 +74,14 @@ cvmfs_run_test() {
   local big_file="${repo_dir}/dir6/bigfile"
   start_transaction $legacy_repo_name || return $?
   cd $repo_dir
-    rm -fR dir7
-    mkdir -p foo bar
-    touch foo/.cvmfscatalog
-    echo "no meaningful stuff" > foo/bar
-    echo "even less meaning"   > bar/foo
-    ln foo/bar foo/baz
-    ln -s ../foo/baz bar/baz
-    touch $big_file
+    rm -fR dir7                          || return 60
+    mkdir -p foo bar                     || return 61
+    touch foo/.cvmfscatalog              || return 62
+    echo "no meaningful stuff" > foo/bar || return 63
+    echo "even less meaning"   > bar/foo || return 64
+    ln foo/bar foo/baz                   || return 65
+    ln -s ../foo/baz bar/baz             || return 66
+    touch $big_file                      || return 67
   cd $scratch_dir
   publish_repo $legacy_repo_name || return $?
 
