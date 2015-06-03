@@ -1,4 +1,5 @@
 2.2.0:
+  * Build GeoIP libraries for the server only (CVM-854)
   * Add catalog-chown command to cvmfs_server (CVM-836)
   * Handle import of repositories with an expired whitelist (CVM-780)
   * Fix leak of temporary files during garbage collection (CVM-846)
