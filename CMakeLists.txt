@@ -407,7 +407,7 @@ if (BUILD_SERVER OR BUILD_UNITTESTS)
     include (${PYTHON_GEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
     add_dependencies (python-geoip libgeoip)
   else (GEOIP_BUILTIN)
-    find_package (GeoIP REQUIRED)
+    find_package (LibGeoIP REQUIRED)
     find_package (python-GeoIP REQUIRED)
   endif (GEOIP_BUILTIN)
 
