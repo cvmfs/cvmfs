@@ -280,6 +280,14 @@ T Database<DerivedT>::GetProperty(const std::string &key) const {
 
 template <class DerivedT>
 template <typename T>
+T Database<DerivedT>::GetPropertyDefault(const std::string &key,
+                                         const T default_value) const {
+  return (HasProperty(key)) ? GetProperty<T>(key)
+                            : default_value;
+}
+
+template <class DerivedT>
+template <typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key,
                                      const T            value) {
   assert(set_property_);
