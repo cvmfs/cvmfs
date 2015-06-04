@@ -1767,7 +1767,9 @@ get_mounted_root_hash() {
   local repository_name=$1
 
   load_repo_config $repository_name
-  attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly
+  __swissknife info -r $CVMFS_STRATUM0           \
+                    -u ${CVMFS_SPOOL_DIR}/rdonly \
+                    -C $(get_follow_http_redirects_flag)
 }
 
 
