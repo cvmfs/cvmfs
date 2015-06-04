@@ -657,11 +657,17 @@ class CustomDelegate {
 
   void BlockDevice(const std::string &relative_path,
                    const std::string &object_name) {
+    struct stat s;
+    GetStat(relative_path, object_name, &s);
+    EXPECT_TRUE(S_ISBLK(s.st_mode));
     ++num_block_dev;
   }
 
   void CharacterDevice(const std::string &relative_path,
                        const std::string &object_name) {
+    struct stat s;
+    GetStat(relative_path, object_name, &s);
+    EXPECT_TRUE(S_ISCHR(s.st_mode));
     ++num_character_dev;
   }
 
