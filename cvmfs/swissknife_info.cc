@@ -80,7 +80,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 
   // sanity check
   if (args.count('C') > 0 && mount_point.empty()) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "need a CerVM-FS mountpoint (-u) for -C");
+    LogCvmfs(kLogCvmfs, kLogStderr, "need a CernVM-FS mountpoint (-u) for -C");
     return 1;
   }
 
