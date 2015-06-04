@@ -377,6 +377,11 @@ inline bool Sql::Bind(const int index, const unsigned int value) {
 }
 
 template <>
+inline bool Sql::Bind(const int index, const uint64_t value) {
+  return this->BindInt64(index, value);
+}
+
+template <>
 inline bool Sql::Bind(const int index, const sqlite3_int64 value) {
   return this->BindInt64(index, value);
 }
