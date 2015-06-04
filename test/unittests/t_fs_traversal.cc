@@ -656,26 +656,35 @@ class CustomDelegate {
     num_block_dev(0), num_character_dev(0), root_path(path) {}
 
   void BlockDevice(const std::string &relative_path,
-                   const std::string &dir_name) {
+                   const std::string &object_name) {
     ++num_block_dev;
   }
 
   void CharacterDevice(const std::string &relative_path,
-                       const std::string &dir_name) {
+                       const std::string &object_name) {
     ++num_character_dev;
   }
 
   bool CheckPermissions(const std::string &relative_path,
-                        const std::string &dir_name) {
-    const std::string file = root_path + "/" + relative_path + "/" + dir_name;
+                        const std::string &object_name) {
     struct stat s;
-    stat(file.c_str(), &s);
+    GetStat(relative_path, object_name, &s);
     const bool can_read = ( S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR &&
                                                   s.st_mode & S_IXUSR)
                        || (!S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR);
     return !can_read;
   }
 
+ protected:
+  void GetStat(const std::string  &relative_path,
+               const std::string  &obj_name,
+               struct stat        *s) const {
+    const std::string file = root_path + "/" + relative_path + "/" + obj_name;
+    const int retval = stat(file.c_str(), s);
+    ASSERT_EQ(0, retval) << "cannot stat '" << file << "'";
+  }
+
+ public:
   int                num_block_dev;
   int                num_character_dev;
   const std::string  root_path;
