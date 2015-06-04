@@ -413,6 +413,11 @@ inline sqlite3_int64 Sql::Retrieve(const int index) {
 }
 
 template <>
+inline uint64_t Sql::Retrieve(const int index) {
+  return static_cast<uint64_t>(this->RetrieveInt64(index));
+}
+
+template <>
 inline std::string Sql::Retrieve(const int index) {
   return RetrieveString(index);
 }
