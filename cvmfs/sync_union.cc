@@ -152,12 +152,12 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
 void SyncUnionAufs::Traverse() {
   FileSystemTraversal<SyncUnionAufs> traversal(this, scratch_path(), true);
 
-  traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
-  traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
-  traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
-  traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFilePredicate;
+  traversal.fn_enter_dir      = &SyncUnionAufs::EnterDirectory;
+  traversal.fn_leave_dir      = &SyncUnionAufs::LeaveDirectory;
+  traversal.fn_new_file       = &SyncUnionAufs::ProcessRegularFile;
+  traversal.fn_ignore_file    = &SyncUnionAufs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
-  traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
+  traversal.fn_new_symlink    = &SyncUnionAufs::ProcessSymlink;
 
   traversal.Recurse(scratch_path());
 }
