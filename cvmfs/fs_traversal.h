@@ -199,8 +199,8 @@ class FileSystemTraversal {
                  path.c_str(), dit->d_name);
         Notify(fn_new_socket, path, dit->d_name);
       } else if (S_ISBLK(info.st_mode)) {
-        LogCvmfs(kLogFsTraversal, kLogVerboseMsg,
-            "passing blocked device %s/%s", path.c_str(), dit->d_name);
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing block-device %s/%s",
+                 path.c_str(), dit->d_name);
         Notify(fn_new_block_dev, path, dit->d_name);
       } else if (S_ISCHR(info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing character-device "
