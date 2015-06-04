@@ -30,6 +30,7 @@ class T_FsTraversal : public ::testing::Test {
       Unspecified,
       Socket,
       BlockDevice,
+      CharacterDevice,
       FIFO
     };
 
@@ -41,15 +42,16 @@ class T_FsTraversal : public ::testing::Test {
     }
 
     void Init() {
-      enter_dir     = false;
-      leave_dir     = false;
-      file_found    = false;
-      symlink_found = false;
-      dir_prefix    = false;
-      dir_postfix   = false;
-      socket_found  = false;
-      block_dev_found   = false;
-      fifo_found    = false;
+      enter_dir       = false;
+      leave_dir       = false;
+      file_found      = false;
+      symlink_found   = false;
+      dir_prefix      = false;
+      dir_postfix     = false;
+      socket_found    = false;
+      block_dev_found = false;
+      chr_dev_found   = false;
+      fifo_found      = false;
     }
 
     void Check(const Type overwrite_type = Unspecified) const {
@@ -59,45 +61,48 @@ class T_FsTraversal : public ::testing::Test {
 
       switch (type_to_check) {
         case Directory:
-          EXPECT_TRUE(enter_dir)     << path;
-          EXPECT_TRUE(leave_dir)     << path;
-          EXPECT_TRUE(dir_prefix)    << path;
-          EXPECT_TRUE(dir_postfix)   << path;
+          EXPECT_TRUE(enter_dir)       << path;
+          EXPECT_TRUE(leave_dir)       << path;
+          EXPECT_TRUE(dir_prefix)      << path;
+          EXPECT_TRUE(dir_postfix)     << path;
           break;
         case RootDirectory:
-          EXPECT_TRUE(enter_dir)     << path;
-          EXPECT_TRUE(leave_dir)     << path;
-          EXPECT_FALSE(dir_prefix)    << path;
-          EXPECT_FALSE(dir_postfix)   << path;
+          EXPECT_TRUE(enter_dir)       << path;
+          EXPECT_TRUE(leave_dir)       << path;
+          EXPECT_FALSE(dir_prefix)     << path;
+          EXPECT_FALSE(dir_postfix)    << path;
           break;
         case NonTraversedDirectory:
-          EXPECT_TRUE(dir_prefix)    << path;
-          EXPECT_TRUE(dir_postfix)   << path;
-          EXPECT_FALSE(enter_dir)     << path;
-          EXPECT_FALSE(leave_dir)     << path;
+          EXPECT_TRUE(dir_prefix)      << path;
+          EXPECT_TRUE(dir_postfix)     << path;
+          EXPECT_FALSE(enter_dir)      << path;
+          EXPECT_FALSE(leave_dir)      << path;
           break;
         case File:
-          EXPECT_TRUE(file_found)    << path;
+          EXPECT_TRUE(file_found)      << path;
           break;
         case Symlink:
-          EXPECT_TRUE(symlink_found) << path;
+          EXPECT_TRUE(symlink_found)   << path;
           break;
         case Untouched:
-          EXPECT_FALSE(enter_dir)     << path;
-          EXPECT_FALSE(leave_dir)     << path;
-          EXPECT_FALSE(file_found)    << path;
-          EXPECT_FALSE(symlink_found) << path;
-          EXPECT_FALSE(dir_prefix)    << path;
-          EXPECT_FALSE(dir_postfix)   << path;
+          EXPECT_FALSE(enter_dir)      << path;
+          EXPECT_FALSE(leave_dir)      << path;
+          EXPECT_FALSE(file_found)     << path;
+          EXPECT_FALSE(symlink_found)  << path;
+          EXPECT_FALSE(dir_prefix)     << path;
+          EXPECT_FALSE(dir_postfix)    << path;
           break;
         case Socket:
-          EXPECT_TRUE(socket_found)   << path;
+          EXPECT_TRUE(socket_found)    << path;
           break;
         case BlockDevice:
-          EXPECT_TRUE(block_dev_found)    << path;
+          EXPECT_TRUE(block_dev_found) << path;
+          break;
+        case CharacterDevice:
+          EXPECT_TRUE(chr_dev_found)   << path;
           break;
         case FIFO:
-          EXPECT_TRUE(fifo_found)     << path;
+          EXPECT_TRUE(fifo_found)      << path;
           break;
         default:
           FAIL() << "Encountered an unexpected file type";
@@ -116,6 +121,7 @@ class T_FsTraversal : public ::testing::Test {
     bool dir_postfix;
     bool socket_found;
     bool block_dev_found;
+    bool chr_dev_found;
     bool fifo_found;
   };
 
@@ -647,11 +653,16 @@ TEST_F(T_FsTraversal, SteeredTraversal) {
 class CustomDelegate {
  public:
   explicit CustomDelegate(const std::string &path) :
-    num_block_dev(0), root_path(path) {}
+    num_block_dev(0), num_character_dev(0), root_path(path) {}
 
   void BlockDevice(const std::string &relative_path,
                    const std::string &dir_name) {
     ++num_block_dev;
+  }
+
+  void CharacterDevice(const std::string &relative_path,
+                       const std::string &dir_name) {
+    ++num_character_dev;
   }
 
   bool CheckPermissions(const std::string &relative_path,
@@ -668,6 +679,7 @@ class CustomDelegate {
 
  private:
   int num_block_dev;
+  int num_character_dev;
   std::string root_path;
 };
 
