@@ -408,6 +408,11 @@ inline int Sql::Retrieve(const int index) {
 }
 
 template <>
+inline bool Sql::Retrieve(const int index) {
+  return static_cast<bool>(this->RetrieveInt(index));
+}
+
+template <>
 inline sqlite3_int64 Sql::Retrieve(const int index) {
   return this->RetrieveInt64(index);
 }
