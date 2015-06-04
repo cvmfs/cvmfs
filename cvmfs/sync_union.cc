@@ -404,20 +404,6 @@ bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
 }
 
 
-bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
-  bool is_whiteout = ReadlinkEquals(path, "(overlay-whiteout)") &&
-                     XattrEquals(path.c_str(), "trusted.overlay.whiteout", "y");
-  if (is_whiteout) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "OverlayFS [%s] is whiteout symlink",
-             path.c_str());
-  } else {
-    LogCvmfs(kLogUnionFs, kLogDebug, "OverlayFS [%s] is not a whiteout symlink",
-             path.c_str());
-  }
-  return is_whiteout;
-}
-
-
 bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
   return (IsOpaqueDirPath(directory.GetScratchPath()));
 }

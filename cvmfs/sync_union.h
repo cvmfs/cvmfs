@@ -223,7 +223,6 @@ class SyncUnionOverlayfs : public SyncUnion {
   virtual void ProcessFile(SyncItem *entry);
 
  private:
-  bool IsWhiteoutSymlinkPath(const std::string &path) const;
   bool IsOpaqueDirPath(const std::string &path) const;
   std::set<std::string> hardlink_lower_files_;
   uint64_t hardlink_lower_inode_;
