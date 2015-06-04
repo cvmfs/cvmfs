@@ -318,12 +318,13 @@ void SyncUnionOverlayfs::Traverse() {
   FileSystemTraversal<SyncUnionOverlayfs>
     traversal(this, scratch_path(), true);
 
-  traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
-  traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
-  traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
-  traversal.fn_ignore_file = &SyncUnionOverlayfs::IgnoreFilePredicate;
-  traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
-  traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
+  traversal.fn_enter_dir          = &SyncUnionOverlayfs::EnterDirectory;
+  traversal.fn_leave_dir          = &SyncUnionOverlayfs::LeaveDirectory;
+  traversal.fn_new_file           = &SyncUnionOverlayfs::ProcessRegularFile;
+  traversal.fn_new_character_dev  = &SyncUnionOverlayfs::ProcessCharacterDevice;
+  traversal.fn_ignore_file        = &SyncUnionOverlayfs::IgnoreFilePredicate;
+  traversal.fn_new_dir_prefix     = &SyncUnionOverlayfs::ProcessDirectory;
+  traversal.fn_new_symlink        = &SyncUnionOverlayfs::ProcessSymlink;
 
   LogCvmfs(kLogUnionFs, kLogVerboseMsg, "OverlayFS starting traversal "
            "recursion for scratch_path=[%s]",
@@ -399,7 +400,7 @@ bool SyncUnionOverlayfs::XattrEquals(string const &path,
 
 
 bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
-  return (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
+  return entry.IsCharacterDevice();
 }
 
 
@@ -443,6 +444,15 @@ bool SyncUnionOverlayfs::IgnoreFilePredicate(const string &parent_dir,
 {
   // no files need to be ignored for OverlayFS
   return false;
+}
+
+void SyncUnionOverlayfs::ProcessCharacterDevice(const std::string &parent_dir,
+                                                const std::string &filename) {
+  LogCvmfs(kLogUnionFs, kLogDebug,
+           "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
+           parent_dir.c_str(), filename.c_str());
+  SyncItem entry(parent_dir, filename, kItemCharacterDevice, this);
+  ProcessFile(&entry);
 }
 
 }  // namespace publish

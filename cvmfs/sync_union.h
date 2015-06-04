@@ -216,6 +216,8 @@ class SyncUnionOverlayfs : public SyncUnion {
   bool IsOpaqueDirectory(const SyncItem &directory) const;
   bool IgnoreFilePredicate(const std::string &parent_dir,
                            const std::string &filename);
+  void ProcessCharacterDevice(const std::string &parent_dir,
+                              const std::string &filename);
   std::string UnwindWhiteoutFilename(const std::string &filename) const;
   std::set<std::string> GetIgnoreFilenames() const;
   virtual void ProcessFile(SyncItem *entry);
