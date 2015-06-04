@@ -667,10 +667,13 @@ class CustomDelegate {
 
   bool CheckPermissions(const std::string &relative_path,
                         const std::string &dir_name) {
-    std::string file = root_path + "/" + relative_path + "/" + dir_name;
+    const std::string file = root_path + "/" + relative_path + "/" + dir_name;
     struct stat s;
     stat(file.c_str(), &s);
-    return !S_ISBLK(s.st_mode);
+    const bool can_read = ( S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR &&
+                                                  s.st_mode & S_IXUSR)
+                       || (!S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR);
+    return !can_read;
   }
 
   int num_block_dev;
