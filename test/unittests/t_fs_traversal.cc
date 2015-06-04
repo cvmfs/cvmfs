@@ -646,23 +646,21 @@ TEST_F(T_FsTraversal, SteeredTraversal) {
 
 class CustomDelegate {
  public:
-  explicit CustomDelegate(std::string path) :
+  explicit CustomDelegate(const std::string &path) :
     num_block_dev(0), root_path(path) {}
 
-  virtual void BlockDevice(const std::string &relative_path,
-      const std::string &dir_name) {
+  void BlockDevice(const std::string &relative_path,
+                   const std::string &dir_name) {
     ++num_block_dev;
   }
 
-  virtual bool CheckPermissions(const std::string &relative_path,
-      const std::string &dir_name) {
-    std::string file = root_path + relative_path + "/" + dir_name;
+  bool CheckPermissions(const std::string &relative_path,
+                        const std::string &dir_name) {
+    std::string file = root_path + "/" + relative_path + "/" + dir_name;
     struct stat s;
     stat(file.c_str(), &s);
     return !S_ISBLK(s.st_mode);
   }
-
-  virtual ~CustomDelegate() {}
 
   int getNumBlockedDev() const {
     return num_block_dev;
