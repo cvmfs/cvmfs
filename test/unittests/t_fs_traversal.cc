@@ -676,9 +676,9 @@ class CustomDelegate {
     return !can_read;
   }
 
-  int num_block_dev;
-  int num_character_dev;
-  std::string root_path;
+  int                num_block_dev;
+  int                num_character_dev;
+  const std::string  root_path;
 };
 
 TEST_F(T_FsTraversal, BlockDevice) {
