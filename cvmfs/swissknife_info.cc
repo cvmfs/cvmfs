@@ -78,6 +78,12 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
                            :  "";
   const string repository = MakeCanonicalPath(*args.find('r')->second);
 
+  // sanity check
+  if (args.count('C') > 0 && mount_point.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "need a CerVM-FS mountpoint (-u) for -C");
+    return 1;
+  }
+
   // Load manifest file
   // Repository can be HTTP address or on local file system
   // TODO(jblomer): do this using Manifest::Fetch
