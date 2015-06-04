@@ -980,6 +980,7 @@ init_recover:
     LogCvmfs(kLogQuota, kLogDebug, "could not open cache database (%d)", err);
     goto init_database_fail;
   }
+  // TODO(reneme): make this a `QuotaDatabase : public sqlite::Database`
   sql = "PRAGMA synchronous=0; PRAGMA locking_mode=EXCLUSIVE; "
   "PRAGMA auto_vacuum=1; "
   "CREATE TABLE IF NOT EXISTS cache_catalog (sha1 TEXT, size INTEGER, "
