@@ -673,11 +673,6 @@ class CustomDelegate {
     return !S_ISBLK(s.st_mode);
   }
 
-  int getNumBlockedDev() const {
-    return num_block_dev;
-  }
-
- private:
   int num_block_dev;
   int num_character_dev;
   std::string root_path;
@@ -691,5 +686,5 @@ TEST_F(T_FsTraversal, BlockDevice) {
   traverse.fn_new_block_dev = &CustomDelegate::BlockDevice;
   traverse.fn_ignore_file = &CustomDelegate::CheckPermissions;
   traverse.Recurse("/dev");
-  EXPECT_LT(0, delegate.getNumBlockedDev());
+  EXPECT_LT(0, delegate.num_block_dev);
 }
