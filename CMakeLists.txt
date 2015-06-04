@@ -217,6 +217,12 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
 #
+# include some common functionality
+#
+include (FindPythonModule)
+
+
+#
 # set some default flags
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
@@ -407,8 +413,8 @@ if (BUILD_SERVER OR BUILD_UNITTESTS)
     include (${PYTHON_GEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
     add_dependencies (python-geoip libgeoip)
   else (GEOIP_BUILTIN)
-    find_package (GeoIP REQUIRED)
-    find_package (python-GeoIP REQUIRED)
+    find_package (LibGeoIP REQUIRED)
+    find_python_module (GeoIP REQUIRED)
   endif (GEOIP_BUILTIN)
 
   if (TBB_PRIVATE_LIB)
