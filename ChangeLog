@@ -1,4 +1,5 @@
 2.2.0:
+  * Avoid use of attr utility in the server (CVM-853)
   * Build GeoIP libraries for the server only (CVM-854)
   * Add catalog-chown command to cvmfs_server (CVM-836)
   * Handle import of repositories with an expired whitelist (CVM-780)
