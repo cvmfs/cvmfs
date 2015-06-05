@@ -592,8 +592,9 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
 /**
  * Create a directory with a unique name.
  */
-string CreateTempDir(const std::string &path_prefix, const int mode) {
-  char *tmp_dir = strdupa((path_prefix + ".XXXXXX").c_str());
+string CreateTempDir(const std::string &path_prefix) {
+  string dir = path_prefix + ".XXXXXX";
+  char *tmp_dir = strdupa(dir.c_str());
   tmp_dir = mkdtemp(tmp_dir);
   if (tmp_dir == NULL)
     return "";
@@ -639,6 +640,7 @@ bool RemoveTree(const string &path) {
                                                   true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_socket = &RemoveTreeHelper::RemoveFile;
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
   traversal.Recurse(path);
   bool result = remove_tree_helper->success;
@@ -822,13 +824,6 @@ string StringifyTimeval(const timeval value) {
 }
 
 
-string StringifyIpv4(const uint32_t ip4_address) {
-  struct in_addr in_addr;
-  in_addr.s_addr = ip4_address;
-  return string(inet_ntoa(in_addr));
-}
-
-
 /**
  * Parses a timstamp of the form YYYY-MM-DDTHH:MM:SSZ
  * Return 0 on error
@@ -875,21 +870,6 @@ uint64_t String2Uint64(const string &value) {
 }
 
 
-uint64_t HexString2Uint64(const string &value) {
-  uint64_t result;
-  sscanf(value.c_str(), "%"PRIx64, &result);
-  return result;
-}
-
-
-int HexDigit2Int(const char digit) {
-  if ((digit >= '0') && (digit <= '9')) return digit - '0';
-  if ((digit >= 'A') && (digit <= 'F')) return 10 + digit - 'A';
-  if ((digit >= 'a') && (digit <= 'f')) return 10 + digit - 'a';
-  return -1;
-}
-
-
 void String2Uint64Pair(const string &value, uint64_t *a, uint64_t *b) {
   sscanf(value.c_str(), "%"PRIu64" %"PRIu64, a, b);
 }
@@ -924,15 +904,6 @@ bool HasSuffix(
   return (ignore_case)
     ? std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(), icmp)
     : std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
-}
-
-
-bool IsNumeric(const std::string &str) {
-  for (unsigned i = 0; i < str.length(); ++i) {
-    if ((str[i] < '0') || (str[i] > '9'))
-      return false;
-  }
-  return true;
 }
 
 
@@ -1125,6 +1096,9 @@ string ReplaceAll(const string &haystack, const string &needle,
   string result(haystack);
   size_t pos = 0;
   const unsigned needle_size = needle.size();
+  if (needle == "")
+    return result;
+
   while ((pos = result.find(needle, pos)) != string::npos)
     result.replace(pos, needle_size, replace_by);
   return result;

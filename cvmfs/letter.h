@@ -23,14 +23,12 @@ enum Failures {
   kFailBadSignature,
   kFailBadCertificate,
   kFailNameMismatch,
+
+  kFailNumEntries
 };
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 7;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "invalid Base64 input";
   texts[2] = "letter malformed";
@@ -38,7 +36,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[4] = "signature verification failed";
   texts[5] = "certificate is not whitelisted";
   texts[6] = "repository name mismatch";
-
+  texts[7] = "no text";
   return texts[error];
 }
 

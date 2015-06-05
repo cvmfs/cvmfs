@@ -86,8 +86,12 @@ void FileProcessor::FileDone(File *file) {
                                         current_chunk->size()));
   }
 
-  LogCvmfs(kLogSpooler, kLogVerboseMsg, "File '%s' processed completely",
-           file->path().c_str());
+  LogCvmfs(kLogSpooler, kLogVerboseMsg, "File '%s' processed completely "
+                                        "(bulk hash: %s suffix: %c)",
+           file->path().c_str(),
+           file->bulk_chunk()->content_hash().ToString().c_str(),
+           file->hash_suffix());
+  assert(file->hash_suffix() == file->bulk_chunk()->content_hash().suffix);
   NotifyListeners(SpoolerResult(0,
                                 file->path(),
                                 file->bulk_chunk()->content_hash(),

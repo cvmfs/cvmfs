@@ -18,6 +18,12 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
+/**
+ * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+ * Always remember to update the legacy catalog migration classes to produce a
+ * compatible catalog structure when updating the schema revisions here!
+ * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+ */
 const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 // ChangeLog
@@ -40,23 +46,23 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
   assert(read_write());
 
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 0)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (0 --> 1)");
 
     Sql sql_upgrade(*this, "ALTER TABLE nested_catalogs ADD size INTEGER;");
     if (!sql_upgrade.Execute()) {
-      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade nested_catalogs");
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade nested_catalogs");
       return false;
     }
 
     set_schema_revision(1);
     if (!StoreSchemaRevision()) {
-      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
     }
   }
 
   if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 1)) {
-    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision");
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (1 --> 2)");
 
     Sql sql_upgrade1(*this, "ALTER TABLE catalog ADD xattr BLOB;");
     Sql sql_upgrade2(*this,
@@ -66,13 +72,13 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     if (!sql_upgrade1.Execute() || !sql_upgrade2.Execute() ||
         !sql_upgrade3.Execute())
     {
-      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade catalogs (1 --> 2)");
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (1 --> 2)");
       return false;
     }
 
     set_schema_revision(2);
     if (!StoreSchemaRevision()) {
-      LogCvmfs(kLogCatalog, kLogDebug, "failed tp upgrade schema revision");
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
       return false;
     }
   }
@@ -1015,15 +1021,21 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
     StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
 
+  // TODO(reneme): this depends on shash::kSuffix* being a char!
+  //               it should be more generic or replaced entirely
+  // TODO(reneme): this is practically the same as SqlListContentHashes and
+  //               should be consolidated
   string sql = "SELECT DISTINCT hash, "
   "CASE WHEN flags & " + StringifyInt(SqlDirent::kFlagFile) + " THEN " +
-    StringifyInt(kChunkFile) + " " +
+    StringifyInt(shash::kSuffixNone) + " " +
   "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
-    StringifyInt(kChunkMicroCatalog) + " END " +
+    StringifyInt(shash::kSuffixMicroCatalog) + " END " +
   "AS chunk_type, " + flags2hash +
   "FROM catalog WHERE hash IS NOT NULL";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
-    sql += " UNION SELECT DISTINCT chunks.hash, " + StringifyInt(kChunkPiece) +
+    sql +=
+      " UNION "
+      "SELECT DISTINCT chunks.hash, " + StringifyInt(shash::kSuffixPartial) +
       ", " + flags2hash + "FROM chunks, catalog WHERE "
       "chunks.md5path_1=catalog.md5path_1 AND "
       "chunks.md5path_2=catalog.md5path_2";
@@ -1038,14 +1050,14 @@ bool SqlAllChunks::Open() {
 }
 
 
-bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
-  if (FetchRow()) {
-    *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
-                             shash::kSuffixPartial);
-    *type = static_cast<ChunkTypes>(RetrieveInt(1));
-    return true;
+bool SqlAllChunks::Next(shash::Any *hash) {
+  if (!FetchRow()) {
+    return false;
   }
-  return false;
+
+  *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
+                              static_cast<shash::Suffix>(RetrieveInt(1)));
+  return true;
 }
 
 

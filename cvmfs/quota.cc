@@ -311,7 +311,7 @@ static bool DoCleanup(const uint64_t leave_size) {
     // pinned file as it is already reserved (but will be inserted later).
     // Instead, set the pin bit in the db to not run into an endless loop
     if (pinned_chunks_->find(hash) == pinned_chunks_->end()) {
-      trash.push_back((*cache_dir_) + hash.MakePathExplicit(1, 2));
+      trash.push_back((*cache_dir_) + "/" + hash.MakePathWithoutSuffix());
       gauge_ -= sqlite3_column_int64(stmt_lru_, 1);
       LogCvmfs(kLogQuota, kLogDebug, "lru cleanup %s, new gauge %"PRIu64,
                hash_str.c_str(), gauge_);
@@ -1771,7 +1771,7 @@ void Remove(const shash::Any &hash) {
     CloseReturnPipe(pipe_remove);
   }
 
-  unlink(((*cache_dir_) + hash.MakePathExplicit(1, 2)).c_str());
+  unlink(((*cache_dir_) + "/" + hash.MakePathWithoutSuffix()).c_str());
 }
 
 

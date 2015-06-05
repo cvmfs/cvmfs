@@ -159,7 +159,7 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
-    skeleton migrate list-catalogs update-geodb gc"
+    skeleton migrate list-catalogs update-geodb gc catalog-chown"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -252,7 +252,7 @@ Supported Commands:
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
                 [-f union filesystem type] [-c file ownership (UID:GID)]
-                [-k path to keys] [-g chown backend]
+                [-k path to keys] [-g chown backend] [-r recreate whitelist]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
@@ -821,16 +821,16 @@ is_stratum1() {
 
 # checks if a given repository is replicable
 #
-# @param name   the repository name to be checked
+# @param name   the repository name or URL to be checked
 # @return       0 if it is a stratum0 repository and replicable
 is_master_replica() {
   local name=$1
   local is_master_replica
 
-  load_repo_config $name
   if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
-    is_master_replica=$(__swissknife info -r $name -m $(get_follow_http_redirects_flag) 2>/dev/null)
+    is_master_replica=$(__swissknife info -L -r $name -m  2>/dev/null)
   else
+    load_repo_config $name
     is_stratum0 $name || return 1
     is_master_replica=$(__swissknife info -r $CVMFS_STRATUM0 -m $(get_follow_http_redirects_flag) 2>/dev/null)
   fi
@@ -1517,16 +1517,11 @@ create_whitelist() {
 }
 
 
-# figures out the time to expiry of the repository's whitelist
-#
-# @param stratum0  path/URL to stratum0 storage
-# @return          number of seconds until expiry (negativ if already expired)
-get_expiry() {
-  local name=$1
-  local stratum0=$2
+get_expiry_from_string() {
+  local whitelist_string="$1"
 
-  local expires=$(get_item $name $stratum0/.cvmfswhitelist 'noproxy' | head -2 | tail -1 | tail -c15)
-  if echo $expires | grep -q -E --invert-match '^[0-9]{14}$'; then
+  local expires=$(echo "$whitelist_string" | grep -e '^E[0-9]\{14\}$' | tr -d E)
+  if echo "$expires" | grep -q -E --invert-match '^[0-9]{14}$'; then
     echo -1
     return 1
   fi
@@ -1542,6 +1537,17 @@ get_expiry() {
   local now=$(/bin/date -u +%s)
   local valid_countdown=$(( $expires_num-$now ))
   echo $valid_countdown
+}
+
+
+# figures out the time to expiry of the repository's whitelist
+#
+# @param stratum0  path/URL to stratum0 storage
+# @return          number of seconds until expiry (negativ if already expired)
+get_expiry() {
+  local name=$1
+  local stratum0=$2
+  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist 'noproxy')"
 }
 
 
@@ -1761,7 +1767,9 @@ get_mounted_root_hash() {
   local repository_name=$1
 
   load_repo_config $repository_name
-  attr -qg root_hash ${CVMFS_SPOOL_DIR}/rdonly
+  __swissknife info -r $CVMFS_STRATUM0           \
+                    -u ${CVMFS_SPOOL_DIR}/rdonly \
+                    -C $(get_follow_http_redirects_flag)
 }
 
 
@@ -2760,10 +2768,11 @@ import() {
   local replicable=0
   local chown_backend=0
   local unionfs=
+  local recreate_whitelist=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:" option; do
+  while getopts "w:o:c:u:k:lsmgf:r" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2795,6 +2804,9 @@ import() {
       f)
         unionfs=$OPTARG
       ;;
+      r)
+        recreate_whitelist=1
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command import: Unrecognized option: $1"
@@ -2811,6 +2823,11 @@ import() {
   [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
   [ x"$unionfs"  = x ] && unionfs="$(get_available_union_fs)"
+
+  local private_key="${name}.key"
+  local master_key="${name}.masterkey"
+  local certificate="${name}.crt"
+  local public_key="${name}.pub"
 
   # sanity checks
   check_repository_existence $name  && die "The repository $name already exists"
@@ -2836,7 +2853,13 @@ import() {
   [ -d $storage_location ] || die "Did not find repository storage to import at $storage_location"
   [ -f "${storage_location}/.cvmfspublished" ] && \
   [ -d "${storage_location}/data" ] || die "$storage_location does not seem to be a repository storage"
-  [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
+  if [ $recreate_whitelist -eq 0 ]; then
+    [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
+    local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
+    [ $expiry -gt 0 ] || die "Repository whitelist expired (use -r maybe?)"
+  else
+    [ -f ${keys_location}/${master_key} ] || die "no master key found for whitelist recreation"
+  fi
 
   # repository owner dialog
   local cvmfs_user=$(get_cvmfs_owner $name $owner)
@@ -2857,10 +2880,6 @@ import() {
 
   # import the old repository security keys
   echo -n "Importing the given key files... "
-  local private_key="${name}.key"
-  local master_key="${name}.masterkey"
-  local certificate="${name}.crt"
-  local public_key="${name}.pub"
   keys="$private_key $certificate $public_key"
   if [ -f ${keys_location}/${master_key} ]; then
     keys="$keys $master_key"
@@ -2885,6 +2904,15 @@ import() {
     if has_selinux; then
       chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
     fi
+    echo "done"
+  fi
+
+  # recreate whitelist if requested
+  if [ $recreate_whitelist -ne 0 ]; then
+    echo -n "Recreating whitelist... "
+    create_whitelist $name $CVMFS_USER               \
+                           ${CVMFS_UPSTREAM_STORAGE} \
+                           ${CVMFS_SPOOL_DIR}/tmp > /dev/null || die "fail!"
     echo "done"
   fi
 
@@ -4618,6 +4646,87 @@ migrate() {
   done
 
   return $retcode
+}
+
+
+################################################################################
+
+
+catalog_chown() {
+  local names
+  local uid_map
+  local gid_map
+
+  OPTIND=1
+  while getopts "u:g:" option; do
+    case $option in
+      u)
+        uid_map=$OPTARG
+      ;;
+      g)
+        gid_map=$OPTARG
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command catalog-chown: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+   # get repository names
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $@)
+  check_repository_existence "$name"
+
+  # sanity checks
+  [ x"$uid_map" != x"" ] && [ -f $uid_map ] || die "UID map file not found (-u)"
+  [ x"$gid_map" != x"" ] && [ -f $gid_map ] || die "GID map file not found (-g)"
+
+  load_repo_config $name
+
+  # more sanity checks
+  is_stratum0 $name       || die "This is not a stratum 0 repository"
+  is_root $name           || die "Permission denied: Only root can do that"
+  is_in_transaction $name && die "Repository is already in a transaction"
+  health_check $name
+
+  # all following commands need an open repository transaction and are supposed
+  # to commit or abort it after performing the catalog chmod.
+  echo "Opening repository transaction"
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open repository transaction"
+
+  # run the catalog level chmod operation
+  echo "Starting catalog chown"
+
+  local tmp_dir=${CVMFS_SPOOL_DIR}/tmp
+  local manifest=${tmp_dir}/manifest
+  local migrate_command="$(__swissknife_cmd dbg) migrate     \
+                              -v 'chown'                     \
+                              -r $CVMFS_STRATUM0             \
+                              -n $name                       \
+                              -u $CVMFS_UPSTREAM_STORAGE     \
+                              -t $tmp_dir                    \
+                              -k $CVMFS_PUBLIC_KEY           \
+                              -o $manifest                   \
+                              -i $uid_map                    \
+                              -j $gid_map                    \
+                              -s"
+  sh -c "$migrate_command" || die "Fail (executed command: $migrate_command)"
+  local trunk_hash=$(grep "^C" $manifest | tr -d C)
+
+  # finalizing transaction
+  echo "Flushing file system buffers"
+  sync
+
+  # committing newly created revision
+  echo "Signing new manifest"
+  chown $CVMFS_USER $manifest        || die "chmod of new manifest failed";
+  sign_manifest $name $manifest      || die "Signing failed";
+  set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
+
+  return
 }
 
 

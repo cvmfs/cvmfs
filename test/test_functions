@@ -414,6 +414,18 @@ has_repo() {
 }
 
 
+apply_server_cache_config() {
+  local repo=$1
+  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
+  [ x"$CVMFS_TEST_SERVER_CACHE" != x"" ] || return 0
+
+  local cache_base=$(echo "$CVMFS_TEST_SERVER_CACHE" | sed 's/\//\\\//g')
+  # will take effect _after_ the first publish operation...
+  sudo sed -i "s/^\(CVMFS_CACHE_BASE\)=.*\$/\1=${cache_base}/"     $client_conf || return 1
+  sudo sed -i "s/^\(CVMFS_RELOAD_SOCKETS\)=.*\$/\1=${cache_base}/" $client_conf || return 2
+}
+
+
 create_repo() {
   local repo=$1
   local uid=$2
@@ -453,13 +465,7 @@ create_repo() {
                          $extra_options $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
-
-  if [ x"$CVMFS_TEST_SERVER_CACHE" != x"" ]; then
-    local cache_base=$(echo "$CVMFS_TEST_SERVER_CACHE" | sed 's/\//\\\//g')
-    # will take effect _after_ the first publish operation...
-    sudo sed -i "s/^CVMFS_CACHE_BASE=.*\$/CVMFS_CACHE_BASE=${cache_base}/"         $client_conf
-    sudo sed -i "s/^CVMFS_RELOAD_SOCKETS=.*\$/CVMFS_RELOAD_SOCKETS=${cache_base}/" $client_conf
-  fi
+  apply_server_cache_config $repo || return 103
 
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a $client_conf
@@ -1421,10 +1427,13 @@ EOF
 
 }
 
+
 # creates a statistics file
 create_statistics_file() {
   local iteration=$1
   local total_time=$2
+  local memory_median=$3
+  local memory_max=$4
   local statistics_file="${FQRN}_${iteration}.data"
   benchmark_log "creating the statistics file ${statistics_file} calling cvmfs_talk"
   cat >$statistics_file << EOF
@@ -1437,6 +1446,36 @@ EOF
   benchmark_log "Executing cvmfs_talk"
   cvmfs_talk -p "$CVMFS_OPT_CACHEDIR"/$FQRN/cvmfs_io.$FQRN internal affairs | grep \| | tail -n +2 >> $statistics_file
   echo "global.sz_total_time|$total_time|Total execution time (seconds)" >> $statistics_file # of only one iteration without valgrind!
+  echo "global.sz_memory_median|$memory_median|Median memory consumption (KB)" >> $statistics_file
+  echo "global.sz_memory_max|$memory_max|Maximum memory consumption (KB)" >> $statistics_file
+}
+
+
+# collects data during the run
+statistics_daemon() {
+  local dump_file=$1
+  local PID=$2
+  touch $dump_file
+  while [ -f /proc/${PID}/smaps ]; do
+    # memory in KB
+    echo 0 $(awk '/Rss/ {print "+", $2}' /proc/${PID}/smaps) | bc >> $dump_file
+    sleep 2
+  done
+}
+
+
+# collects the median of a file
+collect_median() {
+  local file=$1
+  local num_lines=$(cat $file | wc -l)
+  local median_pos=$(( num_lines / 2 ))
+  echo $(sort $file | sed "${median_pos}q;d")
+}
+
+
+# collects the maximum of a file
+collect_maximum() {
+  echo $(sort $1 | tail -n 1)
 }
 
 
@@ -1445,17 +1484,25 @@ execute_statistics_loop() {
   local code=0
   local iteration=1
   local PID=0
+  local daemon=0
+  local memory_file="memory.stat"
 
   while (( iteration <= $CVMFS_OPT_ITERATIONS && code == 0 )); do
     local start_time=$(date +%s)
+
     cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
     PID=$!
     wait_fqrn_mount
+    statistics_daemon $memory_file $PID &
+    daemon=$!
     ( cvmfs_run_benchmark )
     code=$?
     local end_time=$(date +%s)
     local total_time=$(( end_time - start_time )) # in seconds
-    create_statistics_file $iteration $total_time
+
+    local memory_median=$(collect_median $memory_file)
+    local memory_max=$(collect_maximum $memory_file)
+    create_statistics_file $iteration $total_time $memory_median $memory_max
     cvmfs_umount $FQRN
     wait $PID
     iteration=$(( iteration + 1 ))

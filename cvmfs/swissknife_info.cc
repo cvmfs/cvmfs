@@ -46,8 +46,10 @@ static bool Exists(const string &repository, const string &file)
 ParameterList CommandInfo::GetParams() {
   swissknife::ParameterList r;
   r.push_back(Parameter::Mandatory('r', "repository directory / url"));
+  r.push_back(Parameter::Optional('u', "repository mount point"));
   r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
   r.push_back(Parameter::Switch('c', "show root catalog hash"));
+  r.push_back(Parameter::Switch('C', "show mounted root catalog hash"));
   r.push_back(Parameter::Switch('n', "show fully qualified repository name"));
   r.push_back(Parameter::Switch('t', "show time stamp"));
   r.push_back(Parameter::Switch('m', "check if repository is marked as "
@@ -71,7 +73,16 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
+  const string mount_point = (args.find('u') != args.end())
+                           ?  *args.find('u')->second
+                           :  "";
   const string repository = MakeCanonicalPath(*args.find('r')->second);
+
+  // sanity check
+  if (args.count('C') > 0 && mount_point.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "need a CernVM-FS mountpoint (-u) for -C");
+    return 1;
+  }
 
   // Load manifest file
   // Repository can be HTTP address or on local file system
@@ -116,8 +127,7 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
   }
 
   // Validate Manifest
-  const string certificate_path =
-    "data" + manifest->certificate().MakePathExplicit(1, 2) + "X";
+  const string certificate_path = "data/" + manifest->certificate().MakePath();
   if (!Exists(repository, certificate_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());
@@ -127,6 +137,27 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
 
   // Check if we should be human readable
   const bool human_readable = (args.count('h') > 0);
+
+  // Get information from the mount point
+  if (args.count('C') > 0) {
+    assert(!mount_point.empty());
+    const std::string root_hash_xattr = "user.root_hash";
+    std::string root_hash;
+    const bool success = platform_getxattr(mount_point,
+                                           root_hash_xattr,
+                                           &root_hash);
+    if (!success) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to retrieve extended attribute "
+                                      " '%s' from '%s' (errno: %d)",
+                                      root_hash_xattr.c_str(),
+                                      mount_point.c_str(),
+                                      errno);
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
+             (human_readable) ? "Mounted Root Hash:               " : "",
+             root_hash.c_str());
+  }
 
   // Get information from the Manifest
   if (args.count('c') > 0) {

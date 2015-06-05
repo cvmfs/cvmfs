@@ -146,7 +146,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       delete manifest;
       goto sign_fail;
     }
-    shash::Any certificate_hash(manifest->GetHashAlgorithm());
+    shash::Any certificate_hash(manifest->GetHashAlgorithm(),
+                                shash::kSuffixCertificate);
     shash::HashMem((unsigned char *)compr_buf, compr_size, &certificate_hash);
     const string cert_path_tmp = temp_dir + "/cvmfspublisher.tmp";
     if (!CopyMem2Path((unsigned char *)compr_buf, compr_size, cert_path_tmp)) {
@@ -156,8 +157,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     }
     free(compr_buf);
 
-    const string cert_hash_path = "data" +
-                                  certificate_hash.MakePathExplicit(1, 2) + "X";
+    const string cert_hash_path = "data/" + certificate_hash.MakePath();
     spooler->Upload(cert_path_tmp, cert_hash_path);
 
     // Update manifest
@@ -189,7 +189,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     // Write new manifest
     FILE *fmanifest = fopen(manifest_path.c_str(), "w");
     if (!fmanifest) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to open manifest (errno: %d)",
+               errno);
       delete manifest;
       goto sign_fail;
     }
@@ -197,7 +198,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
          != signed_manifest.length()) ||
         (fwrite(sig, 1, sig_size, fmanifest) != sig_size))
     {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest (errno: %d)",
+               errno);
       fclose(fmanifest);
       unlink(cert_path_tmp.c_str());
       delete manifest;

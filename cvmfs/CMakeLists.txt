@@ -209,7 +209,7 @@ set (CVMFS_SWISSKNIFE_DEBUG_CFLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS} -DDEBUGMSG 
 
 set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
-set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS")
+set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 
 #
 # set some include and linking stuff
@@ -347,9 +347,9 @@ if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
-  add_custom_target (geoip ALL)
 
   if (GEOIP_BUILTIN)
+    add_custom_target (geoip ALL)
     add_dependencies (python-geoip libgeoip)
     add_dependencies (geoip python-geoip)
   endif (GEOIP_BUILTIN)

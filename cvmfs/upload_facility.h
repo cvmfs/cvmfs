@@ -81,18 +81,15 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
     UploadJob(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
               const CallbackTN    *callback = NULL) :
-      type(Upload), stream_handle(handle), buffer(buffer), callback(callback),
-      hash_suffix(shash::kSuffixNone) {}
+      type(Upload), stream_handle(handle), buffer(buffer), callback(callback) {}
 
-    UploadJob(UploadStreamHandle   *handle,
-              const shash::Any     &content_hash,
-              const shash::Suffix  &hash_suffix) :
+    UploadJob(UploadStreamHandle  *handle,
+              const shash::Any    &content_hash) :
       type(Commit), stream_handle(handle), buffer(NULL), callback(NULL),
-      content_hash(content_hash), hash_suffix(hash_suffix) {}
+      content_hash(content_hash) {}
 
     UploadJob() :
-      type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL),
-      hash_suffix(shash::kSuffixNone) {}
+      type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL) {}
 
     Type                 type;
     UploadStreamHandle  *stream_handle;
@@ -103,7 +100,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
     // type=Commit specific fields
     shash::Any           content_hash;
-    shash::Suffix        hash_suffix;
   };
 
  public:
@@ -193,13 +189,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *
    * @param handle        Pointer to a previously acquired UploadStreamHandle
    * @param content_hash  the content hash of the full uploaded data Chunk
-   * @param hash_suffix   the suffix string to be appended to the content hash
    */
   void ScheduleCommit(UploadStreamHandle   *handle,
-                      const shash::Any     &content_hash,
-                      const shash::Suffix  &hash_suffix) {
+                      const shash::Any     &content_hash) {
     ++jobs_in_flight_;
-    upload_queue_.push(UploadJob(handle, content_hash, hash_suffix));
+    upload_queue_.push(UploadJob(handle, content_hash));
   }
 
 
@@ -227,7 +221,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *                        object is a successful deletion as well!)
    */
   virtual bool Remove(const shash::Any &hash_to_delete) {
-    return Remove(hash_to_delete.MakePathWithSuffix("data"));
+    return Remove("data/" + hash_to_delete.MakePath());
   }
 
 

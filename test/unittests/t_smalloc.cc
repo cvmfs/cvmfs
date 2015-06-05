@@ -4,12 +4,13 @@
 
 
 #include <gtest/gtest.h>
+#include <limits>
 
 #include "../../cvmfs/smalloc.h"
 
 
 const size_t kSmallAllocation = 1024UL;
-const size_t kBigAllocation = 1125899906842624UL;  // 1024⁵ Bytes -> 1024 TB
+const size_t kBigAllocation = std::numeric_limits<size_t>::max();
 
 TEST(T_Smalloc, SmallAlloc) {
   void *mem = smalloc(kSmallAllocation);
@@ -66,6 +67,6 @@ TEST(T_Smalloc, SmallMmap) {
 
 TEST(T_Smalloc, BigMmap) {
   void *mem = NULL;
-  ASSERT_DEATH(mem = smmap(kBigAllocation), ".*");
+  ASSERT_DEATH(mem = smmap(kBigAllocation - 8192), ".*Out Of Memory.*");
   ASSERT_DEATH(smunmap(mem), ".*");
 }

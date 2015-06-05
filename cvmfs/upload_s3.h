@@ -56,9 +56,8 @@ class S3Uploader : public AbstractUploader {
   void Upload(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
               const CallbackTN    *callback = NULL);
-  void FinalizeStreamedUpload(UploadStreamHandle   *handle,
-                              const shash::Any     &content_hash,
-                              const shash::Suffix   hash_suffix);
+  void FinalizeStreamedUpload(UploadStreamHandle  *handle,
+                              const shash::Any    &content_hash);
 
   bool Remove(const std::string &file_to_delete);
   bool Peek(const std::string& path) const;

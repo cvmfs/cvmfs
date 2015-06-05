@@ -42,10 +42,8 @@ class CommandCheck : public Command {
                    const uint64_t catalog_size,
                    const catalog::DirectoryEntry *transition_point,
                    catalog::DeltaCounters *computed_counters);
-  std::string DecompressPiece(const shash::Any catalog_hash,
-                              const char suffix);
-  std::string DownloadPiece(const shash::Any catalog_hash,
-                            const char suffix);
+  std::string DecompressPiece(const shash::Any catalog_hash);
+  std::string DownloadPiece(const shash::Any catalog_hash);
   bool Find(const catalog::Catalog *catalog,
             const PathString &path,
             catalog::DeltaCounters *computed_counters);

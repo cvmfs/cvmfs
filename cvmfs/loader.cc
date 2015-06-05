@@ -624,7 +624,7 @@ int main(int argc, char *argv[]) {
       if (argc < 5)
         return 1;
       string alien_cache_dir = argv[2];
-      sanitizer::IntegerSanitizer sanitizer;
+      sanitizer::PositiveIntegerSanitizer sanitizer;
       if (!sanitizer.IsValid(argv[3]) || !sanitizer.IsValid(argv[4]))
         return 1;
       uid_t uid_owner = String2Uint64(argv[3]);

@@ -182,9 +182,7 @@ void S3Uploader::WorkerThread() {
           break;
         case UploadJob::Commit:
           // Note, this block until upload is possible
-          FinalizeStreamedUpload(job.stream_handle,
-                                 job.content_hash,
-                                 job.hash_suffix);
+          FinalizeStreamedUpload(job.stream_handle, job.content_hash);
           break;
         case UploadJob::Terminate:
           running = false;
@@ -481,9 +479,8 @@ void S3Uploader::Upload(UploadStreamHandle  *handle,
 }
 
 
-void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle   *handle,
-                                        const shash::Any     &content_hash,
-                                        const shash::Suffix   hash_suffix) {
+void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
+                                        const shash::Any    &content_hash) {
   int retval = 0;
   S3StreamHandle *local_handle = static_cast<S3StreamHandle*>(handle);
 
@@ -511,8 +508,7 @@ void S3Uploader::FinalizeStreamedUpload(UploadStreamHandle   *handle,
   }
 
   // New file name based on content hash
-  std::string final_path("data" +
-                         content_hash.MakePathWithSuffix(1, 2, hash_suffix));
+  std::string final_path("data/" + content_hash.MakePath());
 
   // Choose S3 account and bucket based on the filename
   std::string access_key, secret_key, bucket_name;
