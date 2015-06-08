@@ -213,6 +213,8 @@ class SyncUnionOverlayfs : public SyncUnion {
                      const std::string &union_path,
                      const std::string &scratch_path);
 
+  bool Initialize();
+
   void Traverse();
   void ProcessFileHardlinkCallback(const std::string &parent_dir,
                                    const std::string &filename);
@@ -233,8 +235,11 @@ class SyncUnionOverlayfs : public SyncUnion {
   std::set<std::string> GetIgnoreFilenames() const;
   virtual void ProcessFile(SyncItem *entry);
 
+  bool ObtainSysAdminCapability() const;
+
  private:
   bool IsOpaqueDirPath(const std::string &path) const;
+
   std::set<std::string> hardlink_lower_files_;
   uint64_t hardlink_lower_inode_;
 };  // class SyncUnionOverlayfs
