@@ -172,12 +172,12 @@ std::string CommandScrub::CheckPathAndExtractHash(
   if (std::isupper(last_character)) {
     has_object_modifier = true;
   }
-  if (has_object_modifier   &&
-      last_character != 'H' &&  // history
-      last_character != 'C' &&  // catalog
-      last_character != 'P' &&  // partial
-      last_character != 'X' &&  // certificate
-      last_character != 'L')    // micro catalogs (currently only reserved)
+  if (has_object_modifier                          &&
+      last_character != shash::kSuffixHistory      &&
+      last_character != shash::kSuffixCatalog      &&
+      last_character != shash::kSuffixPartial      &&
+      last_character != shash::kSuffixCertificate  &&
+      last_character != shash::kSuffixMicroCatalog)
   {
     PrintAlert(Alerts::kUnexpectedModifier, full_path);
     return "";

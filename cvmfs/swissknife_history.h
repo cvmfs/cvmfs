@@ -82,7 +82,6 @@ class CommandTag : public Command {
                                     const shash::Any   &base_hash) const;
   bool FetchObject(const std::string    &repository_url,
                    const shash::Any     &object_hash,
-                   const shash::Suffix   hash_suffix,
                    const std::string    &destination_path) const;
   history::History* GetHistory(const manifest::Manifest  *manifest,
                                const std::string         &repository_url,

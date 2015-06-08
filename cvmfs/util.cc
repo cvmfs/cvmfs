@@ -593,7 +593,8 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
  * Create a directory with a unique name.
  */
 string CreateTempDir(const std::string &path_prefix) {
-  char *tmp_dir = strdupa((path_prefix + ".XXXXXX").c_str());
+  string dir = path_prefix + ".XXXXXX";
+  char *tmp_dir = strdupa(dir.c_str());
   tmp_dir = mkdtemp(tmp_dir);
   if (tmp_dir == NULL)
     return "";

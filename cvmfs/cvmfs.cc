@@ -2390,7 +2390,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
     string history_path = "txn/historydb" + history_hash.ToString() + "." +
                           *cvmfs::repository_name_;
-    string history_url = "/data" + history_hash.MakePathExplicit(1, 2) + "H";
+    string history_url = "/data/" + history_hash.MakePath();
     download::JobInfo download_history(&history_url, true, true, &history_path,
                                        &history_hash);
     retval_dl = cvmfs::download_manager_->Fetch(&download_history);

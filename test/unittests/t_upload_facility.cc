@@ -66,8 +66,7 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
   }
 
   void FinalizeStreamedUpload(upload::UploadStreamHandle *abstract_handle,
-                              const shash::Any            content_hash,
-                              const shash::Suffix         hash_suffix) {
+                              const shash::Any            content_hash) {
     UF_MockStreamHandle* handle =
                              static_cast<UF_MockStreamHandle*>(abstract_handle);
     handle->commits++;
@@ -169,7 +168,7 @@ TEST(T_UploadFacility, CallbacksSlow) {
   EXPECT_EQ(0, chunk_upload_complete_callback_calls);
   EXPECT_EQ(2, buffer_upload_complete_callback_calls);
 
-  uploader->ScheduleCommit(handle, shash::Any(), shash::kSuffixNone);
+  uploader->ScheduleCommit(handle, shash::Any());
 
   uploader->WaitForUpload();
   uploader->TearDown();
@@ -249,7 +248,7 @@ TEST(T_UploadFacility, DataBlockBasicOrdering) {
       AbstractUploader::MakeCallback(&BufferUploadCompleteCallback_T_Ordering));
   }
 
-  uploader->ScheduleCommit(handle, shash::Any(), shash::kSuffixNone);
+  uploader->ScheduleCommit(handle, shash::Any());
   uploader->WaitForUpload();
   uploader->TearDown();
 

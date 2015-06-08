@@ -60,8 +60,7 @@ class LocalUploader : public AbstractUploader {
               CharBuffer          *buffer,
               const CallbackTN    *callback = NULL);
   void FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                              const shash::Any     content_hash,
-                              const shash::Suffix  hash_suffix);
+                              const shash::Any    &content_hash);
 
   bool Remove(const std::string &file_to_delete);
 
