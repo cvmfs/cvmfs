@@ -91,7 +91,7 @@ void FileProcessor::FileDone(File *file) {
            file->path().c_str(),
            file->bulk_chunk()->content_hash().ToString().c_str(),
            file->hash_suffix());
-  assert (file->hash_suffix() == file->bulk_chunk()->content_hash().suffix);
+  assert(file->hash_suffix() == file->bulk_chunk()->content_hash().suffix);
   NotifyListeners(SpoolerResult(0,
                                 file->path(),
                                 file->bulk_chunk()->content_hash(),

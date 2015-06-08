@@ -189,7 +189,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     // Write new manifest
     FILE *fmanifest = fopen(manifest_path.c_str(), "w");
     if (!fmanifest) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to open manifest (errno: %d)",
+               errno);
       delete manifest;
       goto sign_fail;
     }
@@ -197,7 +198,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
          != signed_manifest.length()) ||
         (fwrite(sig, 1, sig_size, fmanifest) != sig_size))
     {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest");
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to write manifest (errno: %d)",
+               errno);
       fclose(fmanifest);
       unlink(cert_path_tmp.c_str());
       delete manifest;

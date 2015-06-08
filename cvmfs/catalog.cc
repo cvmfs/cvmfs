@@ -379,8 +379,8 @@ bool Catalog::AllChunksBegin() {
 }
 
 
-bool Catalog::AllChunksNext(shash::Any *hash, ChunkTypes *type) {
-  return sql_all_chunks_->Next(hash, type);
+bool Catalog::AllChunksNext(shash::Any *hash) {
+  return sql_all_chunks_->Next(hash);
 }
 
 

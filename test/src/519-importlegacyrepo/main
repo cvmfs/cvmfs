@@ -2,9 +2,11 @@
 cvmfs_test_name="Import Legacy Repository"
 cvmfs_test_autofs_on_startup=false
 
+TEST519_WORKSPACE=""
 TEST519_LEGACY_STORAGE=""
 TEST519_NEW_REPO_NAME=""
 cleanup() {
+  [ -z "$TEST519_WORKSPACE" ]      || cd $TEST519_WORKSPACE
   [ -z "$TEST519_NEW_REPO_NAME" ]  || sudo cvmfs_server rmfs -f $TEST519_NEW_REPO_NAME
   [ -z "$TEST519_LEGACY_STORAGE" ] || sudo rm -fR $TEST519_LEGACY_STORAGE
 }
@@ -18,6 +20,7 @@ cvmfs_run_test() {
   local legacy_repo_name="testmigration.cern.ch"
   local repo_dir="/cvmfs/${legacy_repo_name}"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+  TEST519_WORKSPACE="$scratch_dir"
 
   echo "make sure there are no legacy repo leftovers from previous tests"
   cleanup_legacy_repo_leftovers "$legacy_repo_name"
@@ -46,11 +49,14 @@ cvmfs_run_test() {
     -g                     \
     $legacy_repo_name || return 4
 
+  echo "make sure that we are not suffering from the exdev bug"
+  apply_server_cache_config $legacy_repo_name
+
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
   ls -lisa /cvmfs/${legacy_repo_name} || return 5
 
   echo "load repository configuration"
-  load_repo_config $CVMFS_TEST_REPO
+  load_repo_config $legacy_repo_name
 
   echo "check that the temporary scratch directory is empty"
   [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
@@ -59,19 +65,23 @@ cvmfs_run_test() {
   echo "check migrated catalogs and data chunks"
   check_repository $legacy_repo_name || return 6
 
+  echo "create an empty repository revision (exdev workaround)"
+  start_transaction $legacy_repo_name || return $?
+  publish_repo      $legacy_repo_name || return $?
+
   # cheate a new repository revision of the migrated catalogs
   echo "create a new repository revision"
   local big_file="${repo_dir}/dir6/bigfile"
   start_transaction $legacy_repo_name || return $?
   cd $repo_dir
-    rm -fR dir7
-    mkdir -p foo bar
-    touch foo/.cvmfscatalog
-    echo "no meaningful stuff" > foo/bar
-    echo "even less meaning"   > bar/foo
-    ln foo/bar foo/baz
-    ln -s ../foo/baz bar/baz
-    touch $big_file
+    rm -fR dir7                          || return 60
+    mkdir -p foo bar                     || return 61
+    touch foo/.cvmfscatalog              || return 62
+    echo "no meaningful stuff" > foo/bar || return 63
+    echo "even less meaning"   > bar/foo || return 64
+    ln foo/bar foo/baz                   || return 65
+    ln -s ../foo/baz bar/baz             || return 66
+    touch $big_file                      || return 67
   cd $scratch_dir
   publish_repo $legacy_repo_name || return $?
 
