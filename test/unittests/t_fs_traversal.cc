@@ -686,7 +686,7 @@ class CustomDelegate {
                const std::string  &obj_name,
                struct stat        *s) const {
     const std::string file = root_path + "/" + relative_path + "/" + obj_name;
-    const int retval = stat(file.c_str(), s);
+    const int retval = lstat(file.c_str(), s);
     ASSERT_EQ(0, retval) << "cannot stat '" << file << "' (" << errno << ")";
   }
 
