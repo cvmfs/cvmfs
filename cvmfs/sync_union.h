@@ -61,6 +61,13 @@ class SyncUnion {
   virtual ~SyncUnion() {}
 
   /**
+   * Initialize internal state of the synchronisation. This needs to be called
+   * before running anything else.
+   * Note: should be up-called!
+   */
+  virtual bool Initialize();
+
+  /**
    * Main routine, process scratch space
    */
   virtual void Traverse() = 0;
@@ -106,6 +113,8 @@ class SyncUnion {
    */
   virtual bool IgnoreFilePredicate(const std::string &parent_dir,
                                    const std::string &filename) = 0;
+
+  bool IsInitialized() const { return initialized_; }
 
  protected:
   std::string rdonly_path_;
@@ -163,6 +172,7 @@ class SyncUnion {
   virtual void ProcessFile(SyncItem *entry);
 
  private:
+  bool initialized_;
 };  // class SyncUnion
 
 
