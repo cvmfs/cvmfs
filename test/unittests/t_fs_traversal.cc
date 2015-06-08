@@ -676,7 +676,7 @@ class CustomDelegate {
                         const std::string &object_name) {
     platform_stat64 s;
     GetStat(relative_path, object_name, &s);
-    const bool can_read = ( S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR &&
+    const bool can_read =  (S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR &&
                                                   s.st_mode & S_IXUSR)
                        || (!S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR);
     return !can_read;
