@@ -10,19 +10,13 @@
 #include <errno.h>
 #include <unistd.h>
 
-// lgetxattr is only required for overlayfs which does not exist on OS X
-#ifdef __APPLE__
-#define lgetxattr(...) (-1)
-#else
-#include <attr/xattr.h>
-#endif
-
 #include "fs_traversal.h"
 #include "logging.h"
 #include "platform.h"
 #include "sync_item.h"
 #include "sync_mediator.h"
 #include "util.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -378,29 +372,47 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
  * @param[in] name of the attribute for which to compare the value
  * @param[in] value to compare to xattr value
  */
-bool SyncUnionOverlayfs::XattrEquals(string const &path,
-                                     string const &attr_name,
-                                     string const &compare_value)
-{
-  const size_t buf_len = compare_value.length()+1;
-  char *buf = static_cast<char *>(alloca(buf_len+1));
+bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
+  // TODO(reneme): it is quite heavy-weight to allocate an object that contains
+  //               an std::map<> just to check if an xattr is there...
+  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
+  assert (xattrs);
 
-  ssize_t len = lgetxattr(path.c_str(), attr_name.c_str(), buf, buf_len-1);
-  if (len != -1) {
-    buf[len] = '\0';
-  } else {
-    // Error
-    LogCvmfs(kLogUnionFs, kLogDebug, "failed to read xattr %s from %s: %d\n",
-             attr_name.c_str(), path.c_str(), errno);
-    buf[0] = '\0';
+  std::vector<std::string> attrs = xattrs->ListKeys();
+  std::vector<std::string>::const_iterator i    = attrs.begin();
+  std::vector<std::string>::const_iterator iend = attrs.end();
+  LogCvmfs(kLogCvmfs, kLogDebug, "Attrs:");
+  for (; i != iend; ++i) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %s", i->c_str());
   }
 
-  return string(buf) == compare_value;
+  return xattrs && xattrs->Has(attr_name);
 }
 
 
 bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
-  return entry.IsCharacterDevice();
+  /**
+   * There seem to be two versions of overlayfs out there and in production:
+   * 1. whiteouts are 'character device' files
+   * 2. whiteouts are symlinks pointing to '(overlay-whiteout)'
+   */
+  return entry.IsCharacterDevice() ||
+        (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
+}
+
+
+bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
+  const bool is_whiteout = ReadlinkEquals(path, "(overlay-whiteout)");
+  // TODO(reneme): check for the xattr trusted.overlay.whiteout
+  //         Note: This requires CAP_SYS_ADMIN or root... >.<
+  if (is_whiteout) {
+    LogCvmfs(kLogUnionFs, kLogDebug, "OverlayFS [%s] is whiteout symlink",
+             path.c_str());
+  } else {
+    LogCvmfs(kLogUnionFs, kLogDebug, "OverlayFS [%s] is not a whiteout symlink",
+             path.c_str());
+  }
+  return is_whiteout;
 }
 
 
@@ -410,7 +422,7 @@ bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
 
 
 bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
-  bool is_opaque = XattrEquals(path.c_str(), "trusted.overlay.opaque", "y");
+  bool is_opaque = HasXattr(path.c_str(), "trusted.overlay.opaque");
   if (is_opaque) {
     LogCvmfs(kLogUnionFs, kLogDebug, "OverlayFS [%s] has opaque xattr",
              path.c_str());

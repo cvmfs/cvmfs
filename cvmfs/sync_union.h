@@ -208,12 +208,13 @@ class SyncUnionOverlayfs : public SyncUnion {
                                    const std::string &filename);
   static bool ReadlinkEquals(std::string const &path,
                              std::string const &compare_value);
-  static bool XattrEquals(std::string const &path, std::string const &attr_name,
-                          std::string const &compare_value);
+  static bool HasXattr(std::string const &path, std::string const &attr_name);
 
  protected:
   bool IsWhiteoutEntry(const SyncItem &entry) const;
   bool IsOpaqueDirectory(const SyncItem &directory) const;
+  bool IsWhiteoutSymlinkPath(const std::string &path) const;
+
   bool IgnoreFilePredicate(const std::string &parent_dir,
                            const std::string &filename);
   void ProcessCharacterDevice(const std::string &parent_dir,
