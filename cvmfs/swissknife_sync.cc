@@ -576,6 +576,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
+  if (!sync->Initialize()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Initialization of the synchronisation "
+                                    "engine failed");
+    return 4;
+  }
+
   sync->Traverse();
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
@@ -583,7 +589,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!manifest.IsValid()) {
     PrintError("something went wrong during sync");
-    return 4;
+    return 5;
   }
 
   manifest->set_garbage_collectability(params.garbage_collectable);
@@ -595,7 +601,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Failed to create new repository");
-    return 5;
+    return 6;
   }
 
   return 0;

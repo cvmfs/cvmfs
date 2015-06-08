@@ -29,9 +29,16 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
   rdonly_path_(rdonly_path),
   scratch_path_(scratch_path),
   union_path_(union_path),
-  mediator_(mediator)
+  mediator_(mediator),
+  initialized_(false)
 {
   mediator_->RegisterUnionEngine(this);
+}
+
+
+bool SyncUnion::Initialize() {
+  initialized_ = true;
+  return true;
 }
 
 
@@ -144,6 +151,8 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
 
 
 void SyncUnionAufs::Traverse() {
+  assert(this->IsInitialized());
+
   FileSystemTraversal<SyncUnionAufs> traversal(this, scratch_path(), true);
 
   traversal.fn_enter_dir      = &SyncUnionAufs::EnterDirectory;
@@ -309,6 +318,8 @@ void SyncUnionOverlayfs::ProcessFileHardlinkCallback(const string &parent_dir,
 
 
 void SyncUnionOverlayfs::Traverse() {
+  assert(this->IsInitialized());
+
   FileSystemTraversal<SyncUnionOverlayfs>
     traversal(this, scratch_path(), true);
 
