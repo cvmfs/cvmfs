@@ -99,8 +99,9 @@ python_version() {
 
 check_python_module() {
   local module="$1"
-  python -c "import re, ${module}; \
-             print(re.compile('/__init__.py.*').sub('',${module}.__file__))"
+  python -c "import re, ${module};                                           \
+             print(re.compile('/__init__.py.*').sub('',${module}.__file__))" \
+             > /dev/null 2>&1
 }
 
 # makes sure that a version is always of the form x.y.z
