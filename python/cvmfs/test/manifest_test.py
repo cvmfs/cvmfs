@@ -5,14 +5,28 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
-import unittest
-import StringIO
 import datetime
+import os
+import StringIO
+import tempfile
+import unittest
+
 from dateutil.tz import tzutc
 
 import cvmfs
 
 class TestManifest(unittest.TestCase):
+    def writeToTemporary(self, manifest):
+        filename = None
+        with tempfile.NamedTemporaryFile(mode='w+b',
+                                         prefix='py_manifest_ut_',
+                                         dir='/tmp',
+                                         delete=False) as f:
+            filename = f.name
+            f.write(manifest)
+        return filename
+
+
     def setUp(self):
         self.sane_manifest = StringIO.StringIO('\n'.join([
             'C600230b0ba7620426f2e898f1e1f43c5466efe59',
@@ -30,6 +44,8 @@ class TestManifest(unittest.TestCase):
             '0f41e81ed7faade7ad1dafc4be6fa3f7fdc51b05',
             '(§3Êõ0ð¬a˜‚Û}Y„¨x3q    ·EÖ£%²é³üŽ6Ö+>¤XâñÅ=_X‡Ä'
         ]))
+        self.file_manifest = self.writeToTemporary(self.sane_manifest.getvalue())
+        self.assertNotEqual(None, self.file_manifest)
 
         self.unknown_field_manifest = StringIO.StringIO('\n'.join([
             'C600230b0ba7620426f2e898f1e1f43c5466efe59',
@@ -51,6 +67,9 @@ class TestManifest(unittest.TestCase):
 
         self.minimal_manifest = StringIO.StringIO('\n'.join(
             self.minimal_manifest_entries) + '\n--')
+
+    def tearDown(self):
+        os.unlink(self.file_manifest)
 
 
     def test_manifest_creation(self):
