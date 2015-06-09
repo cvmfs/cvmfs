@@ -8,6 +8,8 @@ This file is part of the CernVM File System auxiliary tools.
 from datetime import datetime
 from dateutil.tz import tzutc
 
+from root_file import RootFile
+
 class UnknownManifestField(Exception):
     def __init__(self, key_char):
         self.key_char = key_char
@@ -20,25 +22,17 @@ class ManifestValidityError(Exception):
         Exception.__init__(self, message)
 
 
-class Manifest:
-    """ Wraps information from .cvmfspublished"""
+class Manifest(RootFile):
+    """ Wraps information from .cvmfspublished """
 
     @staticmethod
     def open(manifest_path):
         """ Initializes a Manifest from a local file path """
-        f = open(manifest_path)
-        return Manifest(f)
-
+        with open(manifest_path) as manifest_file:
+            return Manifest(manifest_file)
 
     def __init__(self, manifest_file):
-        """ Initializes a Manifest object from a file pointer to .cvmfspublished """
-        for line in manifest_file.readlines():
-            if len(line) == 0:
-                continue
-            if line[0:2] == "--":
-                break
-            self._read_line(line)
-        self._check_validity()
+        RootFile.__init__(self, manifest_file)
 
 
     def __str__(self):

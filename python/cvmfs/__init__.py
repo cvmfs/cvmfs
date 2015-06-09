@@ -5,7 +5,9 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+from root_file    import IncompleteRootFileSignature
 from manifest     import *
+from whitelist    import *
 from repository   import *
 from availability import *
 from _common      import _split_md5
