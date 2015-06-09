@@ -19,6 +19,11 @@ class ManifestValidityError(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
 
+class IncompleteManifestSignature(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+
+
 
 class Manifest:
     """ Wraps information from .cvmfspublished"""
@@ -32,12 +37,16 @@ class Manifest:
 
     def __init__(self, manifest_file):
         """ Initializes a Manifest object from a file pointer to .cvmfspublished """
+        self.has_signature = False
         for line in manifest_file.readlines():
             if len(line) == 0:
                 continue
             if line[0:2] == "--":
+                self.has_signature = True
                 break
             self._read_line(line)
+        if self.has_signature:
+            self._read_signature(manifest_file)
         self._check_validity()
 
 
@@ -95,3 +104,23 @@ class Manifest:
             raise ManifestValidityError("Manifest lacks a revision entry")
         if not hasattr(self, 'repository_name'):
             raise ManifestValidityError("Manifest lacks a repository name")
+
+
+    def _read_signature(self, manifest_file):
+        """ Reads the signature's checksum and the binary signature string """
+        manifest_file.seek(0)
+        pos = manifest_file.tell()
+        while True:
+            line = manifest_file.readline()
+            if line[0:2] == "--":
+                break
+            if pos == manifest_file.tell():
+                raise IncompleteManifestSignature("Signature not found")
+            pos = manifest_file.tell()
+
+        self.signature_checksum = manifest_file.readline().rstrip()
+        if len(self.signature_checksum) != 40:
+            raise IncompleteManifestSignature("Signature checksum malformed")
+        self.signature = manifest_file.read()
+        if len(self.signature) == 0:
+            raise IncompleteManifestSignature("Binary signature not found")
