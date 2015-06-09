@@ -54,7 +54,8 @@ class TestManifest(unittest.TestCase):
             'Natlas.cern.ch',
             'Rd41d8cd98f00b204e9800998ecf8427e',
             'S4264',
-            'Qi_am_unexpected!'
+            'Qi_am_unexpected!',
+            ''
         ]))
 
         self.minimal_manifest_entries = [
@@ -65,8 +66,9 @@ class TestManifest(unittest.TestCase):
             'Natlas.cern.ch'
         ]
 
-        self.minimal_manifest = StringIO.StringIO('\n'.join(
-            self.minimal_manifest_entries) + '\n--')
+        self.minimal_manifest = StringIO.StringIO(
+            '\n'.join(self.minimal_manifest_entries) + '\n')
+
 
     def tearDown(self):
         os.unlink(self.file_manifest)
@@ -149,6 +151,6 @@ class TestManifest(unittest.TestCase):
         for i in range(len(self.minimal_manifest_entries)):
             incomplete_manifest_entries = list(self.minimal_manifest_entries)
             del incomplete_manifest_entries[i]
-            incomplete_manifest = StringIO.StringIO('\n'.join(incomplete_manifest_entries) + '\n--')
+            incomplete_manifest = StringIO.StringIO('\n'.join(incomplete_manifest_entries))
             self.assertRaises(cvmfs.ManifestValidityError,
                               cvmfs.Manifest, incomplete_manifest)
