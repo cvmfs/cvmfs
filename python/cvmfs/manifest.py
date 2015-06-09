@@ -26,8 +26,8 @@ class Manifest:
     @staticmethod
     def open(manifest_path):
         """ Initializes a Manifest from a local file path """
-        f = open(manifest_path)
-        return Manifest(f)
+        with open(manifest_path) as manifest_file:
+            return Manifest(manifest_file)
 
 
     def __init__(self, manifest_file):
