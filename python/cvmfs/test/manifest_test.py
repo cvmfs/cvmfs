@@ -12,7 +12,6 @@ from dateutil.tz import tzutc
 
 import cvmfs
 
-
 class TestManifest(unittest.TestCase):
     def setUp(self):
         self.sane_manifest = StringIO.StringIO('\n'.join([
