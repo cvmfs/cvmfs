@@ -69,6 +69,38 @@ class TestManifest(unittest.TestCase):
         self.minimal_manifest = StringIO.StringIO(
             '\n'.join(self.minimal_manifest_entries) + '\n')
 
+        self.missing_signature = StringIO.StringIO('\n'.join([
+            'C600230b0ba7620426f2e898f1e1f43c5466efe59',
+            'Rd41d8cd98f00b204e9800998ecf8427e',
+            'D3600',
+            'S4264',
+            'Natlas.cern.ch',
+            '--',
+            ''
+        ]))
+
+        self.broken_signature = StringIO.StringIO('\n'.join([
+            'C600230b0ba7620426f2e898f1e1f43c5466efe59',
+            'Rd41d8cd98f00b204e9800998ecf8427e',
+            'D3600',
+            'S4264',
+            'Natlas.cern.ch',
+            '--',
+            'foobar',
+            ''
+        ]))
+
+        self.incomplete_signature = StringIO.StringIO('\n'.join([
+            'C600230b0ba7620426f2e898f1e1f43c5466efe59',
+            'Rd41d8cd98f00b204e9800998ecf8427e',
+            'D3600',
+            'S4264',
+            'Natlas.cern.ch',
+            '--',
+            '0f41e81ed7faade7ad1dafc4be6fa3f7fdc51b05',
+            ''
+        ]))
+
 
     def tearDown(self):
         os.unlink(self.file_manifest)
@@ -154,3 +186,18 @@ class TestManifest(unittest.TestCase):
             incomplete_manifest = StringIO.StringIO('\n'.join(incomplete_manifest_entries))
             self.assertRaises(cvmfs.ManifestValidityError,
                               cvmfs.Manifest, incomplete_manifest)
+
+
+    def test_missing_signature(self):
+        self.assertRaises(cvmfs.IncompleteManifestSignature,
+                          cvmfs.Manifest, self.missing_signature)
+
+
+    def test_missing_signature(self):
+        self.assertRaises(cvmfs.IncompleteManifestSignature,
+                          cvmfs.Manifest, self.broken_signature)
+
+
+    def test_incomplete_signature(self):
+        self.assertRaises(cvmfs.IncompleteManifestSignature,
+                          cvmfs.Manifest, self.incomplete_signature)
