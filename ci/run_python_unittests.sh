@@ -24,6 +24,8 @@ PY_UT_XML_PREFIX=$1
 which python > /dev/null 2>&1                    || complain "no python available"
 compare_versions "$(python_version)" -gt "2.6.0" || complain "ancient python version"
 check_python_module "xmlrunner"                  || complain "no python-xmlrunner installed"
+check_python_module "dateutil"                   || complain "no python-dateutil installed"
+check_python_module "requests"                   || complain "no python-requests installed"
 
 # run the unit tests
 UNITTESTS="${SCRIPT_LOCATION}/../python/cvmfs/test"
