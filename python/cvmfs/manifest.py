@@ -26,7 +26,7 @@ class IncompleteManifestSignature(Exception):
 
 
 class Manifest:
-    """ Wraps information from .cvmfspublished"""
+    """ Wraps information from .cvmfspublished """
 
     @staticmethod
     def open(manifest_path):
