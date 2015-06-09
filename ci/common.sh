@@ -112,9 +112,9 @@ normalize_version() {
   done
   echo "$version_string"
 }
-version_major() { echo $1 | cut --delimiter=. --fields=1; }
-version_minor() { echo $1 | cut --delimiter=. --fields=2; }
-version_patch() { echo $1 | cut --delimiter=. --fields=3; }
+version_major() { echo $1 | cut -d. -f1; }
+version_minor() { echo $1 | cut -d. -f2; }
+version_patch() { echo $1 | cut -d. -f3; }
 prepend_zeros() { printf %05d "$1"; }
 compare_versions() {
   local lhs="$(normalize_version $1)"
