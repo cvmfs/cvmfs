@@ -15,6 +15,7 @@
 #include <string>
 
 #include "../../cvmfs/fs_traversal.h"
+#include "../../cvmfs/platform.h"
 #include "../../cvmfs/util.h"
 
 class T_FsTraversal : public ::testing::Test {
@@ -657,7 +658,7 @@ class CustomDelegate {
 
   void BlockDevice(const std::string &relative_path,
                    const std::string &object_name) {
-    struct stat s;
+    platform_stat64 s;
     GetStat(relative_path, object_name, &s);
     EXPECT_TRUE(S_ISBLK(s.st_mode));
     ++num_block_dev;
@@ -665,7 +666,7 @@ class CustomDelegate {
 
   void CharacterDevice(const std::string &relative_path,
                        const std::string &object_name) {
-    struct stat s;
+    platform_stat64 s;
     GetStat(relative_path, object_name, &s);
     EXPECT_TRUE(S_ISCHR(s.st_mode));
     ++num_character_dev;
@@ -673,9 +674,9 @@ class CustomDelegate {
 
   bool CheckPermissions(const std::string &relative_path,
                         const std::string &object_name) {
-    struct stat s;
+    platform_stat64 s;
     GetStat(relative_path, object_name, &s);
-    const bool can_read = ( S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR &&
+    const bool can_read =  (S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR &&
                                                   s.st_mode & S_IXUSR)
                        || (!S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR);
     return !can_read;
@@ -684,10 +685,10 @@ class CustomDelegate {
  protected:
   void GetStat(const std::string  &relative_path,
                const std::string  &obj_name,
-               struct stat        *s) const {
+               platform_stat64    *s) const {
     const std::string file = root_path + "/" + relative_path + "/" + obj_name;
-    const int retval = stat(file.c_str(), s);
-    ASSERT_EQ(0, retval) << "cannot stat '" << file << "'";
+    const int retval = platform_lstat(file.c_str(), s);
+    ASSERT_EQ(0, retval) << "cannot stat '" << file << "' (" << errno << ")";
   }
 
  public:

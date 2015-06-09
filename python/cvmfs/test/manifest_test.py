@@ -12,7 +12,6 @@ from dateutil.tz import tzutc
 
 import cvmfs
 
-
 class TestManifest(unittest.TestCase):
     def setUp(self):
         self.sane_manifest = StringIO.StringIO('\n'.join([
@@ -24,6 +23,9 @@ class TestManifest(unittest.TestCase):
             'S4264',
             'T1390395640',
             'X0b457ac12225018e0a15330364c20529e15012ab',
+            'B12154365',
+            'H8296cd873f8cb00d45fb4fd62a003e711ef06bc5',
+            'Gno',
             '--',
             '0f41e81ed7faade7ad1dafc4be6fa3f7fdc51b05',
             '(§3Êõ0ð¬a˜‚Û}Y„¨x3q    ·EÖ£%²é³üŽ6Ö+>¤XâñÅ=_X‡Ä'
@@ -62,7 +64,9 @@ class TestManifest(unittest.TestCase):
         self.assertTrue(hasattr(manifest, 'revision'))
         self.assertTrue(hasattr(manifest, 'last_modified'))
         self.assertTrue(hasattr(manifest, 'certificate'))
-        self.assertFalse(hasattr(manifest, 'history_database'))
+        self.assertTrue(hasattr(manifest, 'root_catalog_size'))
+        self.assertTrue(hasattr(manifest, 'history_database'))
+        self.assertTrue(hasattr(manifest, 'garbage_collectable'))
         self.assertEqual('600230b0ba7620426f2e898f1e1f43c5466efe59', manifest.root_catalog)
         self.assertEqual(3600                                      , manifest.ttl)
         self.assertEqual('0000000000000000000000000000000000000000', manifest.micro_catalog)
@@ -71,6 +75,9 @@ class TestManifest(unittest.TestCase):
         self.assertEqual(4264                                      , manifest.revision)
         self.assertEqual(last_modified                             , manifest.last_modified)
         self.assertEqual('0b457ac12225018e0a15330364c20529e15012ab', manifest.certificate)
+        self.assertEqual(12154365                                  , manifest.root_catalog_size)
+        self.assertEqual('8296cd873f8cb00d45fb4fd62a003e711ef06bc5', manifest.history_database)
+        self.assertFalse(manifest.garbage_collectable)
 
 
     def test_minimal_manifest(self):

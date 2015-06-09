@@ -1547,7 +1547,7 @@ run_benchmark() {
   # use or not warm cache
   if [ x"$CVMFS_OPT_WARM_CACHE" = x"yes" ]; then
     benchmark_log "Starting initial execution"
-    single_execution
+    ( single_execution )
   else
     benchmark_log "Using cold cache"
   fi
@@ -1555,7 +1555,7 @@ run_benchmark() {
   # run the statistics collection mode
   if [ x"$CVMFS_OPT_TALK_STATISTICS" = x"yes" ]; then
     benchmark_log "Executing the statistics collection"
-    execute_statistics_loop
+    ( execute_statistics_loop )
   fi
 
   if [ x"$CVMFS_OPT_VALGRIND" = x"yes" ]; then
@@ -1565,8 +1565,8 @@ run_benchmark() {
     valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
     PID=$!
     wait_fqrn_mount
-    execute_benchmark_loop
-    create_info_file
+    ( execute_benchmark_loop )
+    ( create_info_file )
     benchmark_log "Iterations finished. Unmounting cvmfs"
     cvmfs_umount $FQRN
     wait $PID
