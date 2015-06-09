@@ -6,6 +6,7 @@ This file is part of the CernVM File System auxiliary tools.
 """
 
 from manifest     import *
+from root_file    import IncompleteRootFileSignature
 from repository   import *
 from availability import *
 from _common      import _split_md5

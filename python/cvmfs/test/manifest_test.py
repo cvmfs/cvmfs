@@ -189,15 +189,15 @@ class TestManifest(unittest.TestCase):
 
 
     def test_missing_signature(self):
-        self.assertRaises(cvmfs.IncompleteManifestSignature,
+        self.assertRaises(cvmfs.IncompleteRootFileSignature,
                           cvmfs.Manifest, self.missing_signature)
 
 
     def test_missing_signature(self):
-        self.assertRaises(cvmfs.IncompleteManifestSignature,
+        self.assertRaises(cvmfs.IncompleteRootFileSignature,
                           cvmfs.Manifest, self.broken_signature)
 
 
     def test_incomplete_signature(self):
-        self.assertRaises(cvmfs.IncompleteManifestSignature,
+        self.assertRaises(cvmfs.IncompleteRootFileSignature,
                           cvmfs.Manifest, self.incomplete_signature)
