@@ -13,20 +13,11 @@ import unittest
 
 from dateutil.tz import tzutc
 
+from file_sandbox import FileSandbox
+
 import cvmfs
 
-class TestWhitelist(unittest.TestCase):
-    def writeToTemporary(self, whitelist):
-        filename = None
-        with tempfile.NamedTemporaryFile(mode='w+b',
-                                         prefix='py_whitelist_ut_',
-                                         dir='/tmp',
-                                         delete=False) as f:
-            filename = f.name
-            f.write(whitelist)
-        return filename
-
-
+class TestWhitelist(FileSandbox):
     def setUp(self):
         self.sane_whitelist = StringIO.StringIO('\n'.join([
             '20150603095527',
@@ -40,7 +31,7 @@ class TestWhitelist(unittest.TestCase):
             '-yw????Z%?????sB????f??1?v_ ',
             ''
         ]))
-        self.file_whitelist = self.writeToTemporary(self.sane_whitelist.getvalue())
+        self.file_whitelist = self.write_to_temporary(self.sane_whitelist.getvalue())
         self.assertNotEqual(None, self.file_whitelist)
 
         self.unknown_field_whitelist = StringIO.StringIO('\n'.join([
@@ -96,8 +87,8 @@ class TestWhitelist(unittest.TestCase):
         ]))
 
 
-    def tearDown(self):
-        os.unlink(self.file_whitelist)
+    def temporary_prefix(self):
+        return "py_whitelist_ut_"
 
 
     def test_whitelist_creation(self):

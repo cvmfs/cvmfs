@@ -13,20 +13,11 @@ import unittest
 
 from dateutil.tz import tzutc
 
+from file_sandbox import FileSandbox
+
 import cvmfs
 
-class TestManifest(unittest.TestCase):
-    def writeToTemporary(self, manifest):
-        filename = None
-        with tempfile.NamedTemporaryFile(mode='w+b',
-                                         prefix='py_manifest_ut_',
-                                         dir='/tmp',
-                                         delete=False) as f:
-            filename = f.name
-            f.write(manifest)
-        return filename
-
-
+class TestManifest(FileSandbox):
     def setUp(self):
         self.sane_manifest = StringIO.StringIO('\n'.join([
             'C600230b0ba7620426f2e898f1e1f43c5466efe59',
@@ -44,7 +35,7 @@ class TestManifest(unittest.TestCase):
             '0f41e81ed7faade7ad1dafc4be6fa3f7fdc51b05',
             '(§3Êõ0ð¬a˜‚Û}Y„¨x3q    ·EÖ£%²é³üŽ6Ö+>¤XâñÅ=_X‡Ä'
         ]))
-        self.file_manifest = self.writeToTemporary(self.sane_manifest.getvalue())
+        self.file_manifest = self.write_to_temporary(self.sane_manifest.getvalue())
         self.assertNotEqual(None, self.file_manifest)
 
         self.unknown_field_manifest = StringIO.StringIO('\n'.join([
@@ -102,8 +93,8 @@ class TestManifest(unittest.TestCase):
         ]))
 
 
-    def tearDown(self):
-        os.unlink(self.file_manifest)
+    def temporary_prefix(self):
+        return "py_manifest_ut_"
 
 
     def test_manifest_creation(self):
