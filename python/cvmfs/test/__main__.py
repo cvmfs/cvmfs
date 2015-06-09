@@ -24,6 +24,7 @@ if cmd_folder not in sys.path:
     sys.path.insert(0, cmd_folder)
 
 from manifest_test     import *
+from whitelist_test    import *
 from md5_handling_test import *
 
 import unittest
