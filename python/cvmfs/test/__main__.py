@@ -27,7 +27,26 @@ from manifest_test     import *
 from whitelist_test    import *
 from md5_handling_test import *
 
+import optparse
+import sys
 import unittest
+from xmlrunner import XMLTestRunner
 
 if __name__ == '__main__':
-    unittest.main()
+    parser = optparse.OptionParser()
+    parser.add_option("-x", "--xml-prefix",
+                      dest="xml_prefix",
+                      help="generate XML test report in given directory",
+                      default=None)
+    (options, args) = parser.parse_args()
+    new_argv = [ sys.argv[0] ]
+    new_argv.extend(args)
+    sys.argv = new_argv
+
+    runner = None
+    if options.xml_prefix:
+      runner = XMLTestRunner(output=options.xml_prefix, verbosity=2)
+    else:
+      runner = unittest.TextTestRunner(verbosity=2)
+
+    unittest.main(testRunner=runner)
