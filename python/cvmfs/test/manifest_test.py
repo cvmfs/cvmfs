@@ -99,6 +99,33 @@ class TestManifest(unittest.TestCase):
         self.assertFalse(manifest.garbage_collectable)
 
 
+    def test_mainfest_from_file(self):
+        manifest = cvmfs.Manifest.open(self.file_manifest)
+        last_modified = datetime.datetime(2014, 1, 22, 13, 0, 40, tzinfo=tzutc())
+        self.assertTrue(hasattr(manifest, 'root_catalog'))
+        self.assertTrue(hasattr(manifest, 'ttl'))
+        self.assertTrue(hasattr(manifest, 'micro_catalog'))
+        self.assertTrue(hasattr(manifest, 'repository_name'))
+        self.assertTrue(hasattr(manifest, 'root_hash'))
+        self.assertTrue(hasattr(manifest, 'revision'))
+        self.assertTrue(hasattr(manifest, 'last_modified'))
+        self.assertTrue(hasattr(manifest, 'certificate'))
+        self.assertTrue(hasattr(manifest, 'root_catalog_size'))
+        self.assertTrue(hasattr(manifest, 'history_database'))
+        self.assertTrue(hasattr(manifest, 'garbage_collectable'))
+        self.assertEqual('600230b0ba7620426f2e898f1e1f43c5466efe59', manifest.root_catalog)
+        self.assertEqual(3600                                      , manifest.ttl)
+        self.assertEqual('0000000000000000000000000000000000000000', manifest.micro_catalog)
+        self.assertEqual('atlas.cern.ch'                           , manifest.repository_name)
+        self.assertEqual('d41d8cd98f00b204e9800998ecf8427e'        , manifest.root_hash)
+        self.assertEqual(4264                                      , manifest.revision)
+        self.assertEqual(last_modified                             , manifest.last_modified)
+        self.assertEqual('0b457ac12225018e0a15330364c20529e15012ab', manifest.certificate)
+        self.assertEqual(12154365                                  , manifest.root_catalog_size)
+        self.assertEqual('8296cd873f8cb00d45fb4fd62a003e711ef06bc5', manifest.history_database)
+        self.assertFalse(manifest.garbage_collectable)
+
+
     def test_minimal_manifest(self):
         manifest = cvmfs.Manifest(self.minimal_manifest)
         self.assertTrue(hasattr(manifest, 'root_catalog'))
