@@ -470,22 +470,29 @@ bool PosixQuotaManager::DoCleanup(const uint64_t leave_size) {
   // Double fork avoids zombie, forked removal process must not flush file
   // buffers
   if (!trash.empty()) {
-    pid_t pid;
-    int statloc;
-    if ((pid = fork()) == 0) {
-      if (fork() == 0) {
-        for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
-          LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
-          unlink(trash[i].c_str());
+    if (async_delete_) {
+      pid_t pid;
+      int statloc;
+      if ((pid = fork()) == 0) {
+        if (fork() == 0) {
+          for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
+            LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
+            unlink(trash[i].c_str());
+          }
+          _exit(0);
         }
         _exit(0);
+      } else {
+        if (pid > 0)
+          waitpid(pid, &statloc, 0);
+        else
+          return false;
       }
-      _exit(0);
-    } else {
-      if (pid > 0)
-        waitpid(pid, &statloc, 0);
-      else
-        return false;
+    } else {  // !async_delete_
+      for (unsigned i = 0, iEnd = trash.size(); i < iEnd; ++i) {
+        LogCvmfs(kLogQuota, kLogDebug, "unlink %s", trash[i].c_str());
+        unlink(trash[i].c_str());
+      }
     }
   }
 
@@ -1257,6 +1264,7 @@ PosixQuotaManager::PosixQuotaManager(
   , seq_(0)
   , cache_dir_(cache_dir)
   , fd_lock_cachedb_(-1)
+  , async_delete_(true)
   , database_(NULL)
   , stmt_touch_(NULL)
   , stmt_unpin_(NULL)

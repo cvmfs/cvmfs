@@ -57,6 +57,7 @@ class QuotaManager : SingleCopy {
   virtual void Unpin(const shash::Any &hash) = 0;
   virtual void Touch(const shash::Any &hash) = 0;
   virtual void Remove(const shash::Any &file) = 0;
+  virtual bool Cleanup(const uint64_t leave_size) = 0;
 
   virtual std::vector<std::string> List() = 0;
   virtual std::vector<std::string> ListPinned() = 0;
@@ -152,6 +153,7 @@ class NoopQuotaManager : public QuotaManager {
  */
 class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, BindReturnPipe);
+  FRIEND_TEST(T_QuotaManager, Cleanup);
 
  public:
   static PosixQuotaManager *Create(const std::string &cache_dir,
@@ -397,6 +399,12 @@ class PosixQuotaManager : public QuotaManager {
    * Ensures exclusive cache database access through POSIX file lock.
    */
   int fd_lock_cachedb_;
+
+  /**
+   * If this is true, the unlink operations that correspond to a cleanup run
+   * will be performed in a detached, asynchronous process.
+   */
+  bool async_delete_;
 
   sqlite3 *database_;
   sqlite3_stmt *stmt_touch_;
