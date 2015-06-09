@@ -86,6 +86,33 @@ class TestWhitelist(FileSandbox):
             ''
         ]))
 
+        self.missing_signature = StringIO.StringIO('\n'.join([
+            '20150603095527',
+            'E20150704095527',
+            'Natlas.cern.ch',
+            '--',
+            ''
+        ]))
+
+        self.broken_signature = StringIO.StringIO('\n'.join([
+            '20150603095527',
+            'E20150704095527',
+            'Natlas.cern.ch',
+            '--',
+            '65a3foobarbbb',
+            '-yw????Z%?????sB????f??1?v_ ',
+            ''
+        ]))
+
+        self.incomplete_signature = StringIO.StringIO('\n'.join([
+            '20150603095527',
+            'E20150704095527',
+            'Natlas.cern.ch',
+            '--',
+            '65a35687479260c90d38e4e114dbc345fde90bbb',
+            ''
+        ]))
+
 
     def temporary_prefix(self):
         return "py_whitelist_ut_"
@@ -142,3 +169,19 @@ class TestWhitelist(FileSandbox):
     def test_empty_whitelist(self):
         self.assertRaises(cvmfs.WhitelistValidityError,
                           cvmfs.Whitelist, self.no_fingerprints_whitelist)
+
+
+
+    def test_missing_signature(self):
+        self.assertRaises(cvmfs.IncompleteRootFileSignature,
+                          cvmfs.Whitelist, self.missing_signature)
+
+
+    def test_missing_signature(self):
+        self.assertRaises(cvmfs.IncompleteRootFileSignature,
+                          cvmfs.Whitelist, self.broken_signature)
+
+
+    def test_incomplete_signature(self):
+        self.assertRaises(cvmfs.IncompleteRootFileSignature,
+                          cvmfs.Whitelist, self.incomplete_signature)
