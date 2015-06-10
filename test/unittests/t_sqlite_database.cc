@@ -342,6 +342,38 @@ TEST_F(T_SQLite_Wrapper, PropertyWithoutReopen) {
 }
 
 
+TEST_F(T_SQLite_Wrapper, GetDefaultPropertyWithoutReopen) {
+  const std::string dbp = GetDatabaseFilename();
+
+  DummyDatabase *db1 = DummyDatabase::Create(dbp);
+  ASSERT_NE(static_cast<DummyDatabase*>(NULL), db1);
+
+  EXPECT_TRUE(db1->SetProperty("foo",   "bar"));
+  EXPECT_TRUE(db1->SetProperty("file",  dbp));
+  EXPECT_TRUE(db1->SetProperty("int",   1337));
+  EXPECT_TRUE(db1->SetProperty("float", 13.37));
+
+  EXPECT_EQ("bar", db1->GetPropertyDefault<std::string>("foo",  "0"));
+  EXPECT_EQ(dbp,   db1->GetPropertyDefault<std::string>("file", "1"));
+  EXPECT_EQ(1337,  db1->GetPropertyDefault<int>("int",           2));
+  EXPECT_LT(13.36, db1->GetPropertyDefault<float>("float",       3));
+  EXPECT_GT(13.38, db1->GetPropertyDefault<double>("float",      4));
+  EXPECT_NE(42,    db1->GetPropertyDefault<int>("int",          42));
+
+  EXPECT_FALSE(db1->HasProperty("moep"));
+  EXPECT_FALSE(db1->HasProperty("baz"));
+
+  EXPECT_EQ("tok!", db1->GetPropertyDefault<std::string>("moep", "tok!"));
+  EXPECT_EQ(1337,   db1->GetPropertyDefault<int>("moep",         1337));
+  EXPECT_LT(13.36,  db1->GetPropertyDefault<double>("moep",      13.37));
+  EXPECT_GT(13.38f, db1->GetPropertyDefault<float>("moep",       13.37f));
+  EXPECT_EQ(0,      db1->GetPropertyDefault<double>("baz",       0));
+
+  delete db1;
+  EXPECT_EQ(0u, DummyDatabase::instances);
+}
+
+
 TEST_F(T_SQLite_Wrapper, PropertyWithReadOnlyReopen) {
   const std::string dbp = GetDatabaseFilename();
 

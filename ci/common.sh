@@ -6,6 +6,20 @@ die() {
   exit 1
 }
 
+complain() {
+  local msg="$1"
+  echo "$msg"
+  exit 0
+}
+
+is_linux() {
+  [ x"$(uname)" = x"Linux" ]
+}
+
+is_macos() {
+  [ x"$(uname)" = x"Darwin" ]
+}
+
 get_cvmfs_version_from_cmake() {
   local source_directory="$1"
   cat ${source_directory}/CMakeLists.txt | grep '## CVMFS_VERSION' | awk '{print $3}'
@@ -77,4 +91,42 @@ server=$server
 unittests=$unittests
 config=$config
 EOF
+}
+
+python_version() {
+  python --version 2>&1 | grep -oh '[0-9]\+\.[0-9]\+.[0-9]\+'
+}
+
+check_python_module() {
+  local module="$1"
+  python -c "import re, ${module};                                           \
+             print(re.compile('/__init__.py.*').sub('',${module}.__file__))" \
+             > /dev/null 2>&1
+}
+
+# makes sure that a version is always of the form x.y.z
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  echo "$version_string"
+}
+version_major() { echo $1 | cut -d. -f1; }
+version_minor() { echo $1 | cut -d. -f2; }
+version_patch() { echo $1 | cut -d. -f3; }
+prepend_zeros() { printf %05d "$1"; }
+compare_versions() {
+  local lhs="$(normalize_version $1)"
+  local comparison_operator=$2
+  local rhs="$(normalize_version $3)"
+
+  local lhs1=$(prepend_zeros $(version_major $lhs))
+  local lhs2=$(prepend_zeros $(version_minor $lhs))
+  local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local rhs1=$(prepend_zeros $(version_major $rhs))
+  local rhs2=$(prepend_zeros $(version_minor $rhs))
+  local rhs3=$(prepend_zeros $(version_patch $rhs))
+
+  [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
 }

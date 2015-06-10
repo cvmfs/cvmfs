@@ -177,14 +177,10 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   // Get root prefix
   if (IsRoot()) {
-    Sql sql_root_prefix(database(), "SELECT value FROM properties "
-                                    "WHERE key='root_prefix';");
-    if (sql_root_prefix.FetchRow()) {
-      root_prefix_.Assign(
-        reinterpret_cast<const char *>(
-          sql_root_prefix.RetrieveText(0)),
-        strlen(reinterpret_cast<const char *>(
-          sql_root_prefix.RetrieveText(0))));
+    if (database_->HasProperty("root_prefix")) {
+      const std::string root_prefix =
+                             database_->GetProperty<std::string>("root_prefix");
+      root_prefix_.Assign(root_prefix.data(), root_prefix.size());
       LogCvmfs(kLogCatalog, kLogDebug,
                "found root prefix %s in root catalog file %s",
                root_prefix_.c_str(), db_path.c_str());
@@ -195,10 +191,8 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
 
   // Get volatile content flag
-  Sql sql_volatile_flag(database(), "SELECT value FROM properties "
-                        "WHERE key='volatile';");
-  if (sql_volatile_flag.FetchRow())
-    volatile_flag_ = sql_volatile_flag.RetrieveInt(0);
+  volatile_flag_ = database_->GetPropertyDefault<bool>("volatile",
+                                                       volatile_flag_);
 
   // Read Catalog Counter Statistics
   if (!ReadCatalogCounters()) {
@@ -444,26 +438,19 @@ void Catalog::DropDatabaseFileOwnership() {
 
 
 uint64_t Catalog::GetTTL() const {
-  const string sql = "SELECT value FROM properties WHERE key='TTL';";
-
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
   const uint64_t result =
-    (stmt.FetchRow()) ?  stmt.RetrieveInt64(0) : kDefaultTTL;
+    database().GetPropertyDefault<uint64_t>("TTL", kDefaultTTL);
   pthread_mutex_unlock(lock_);
-
   return result;
 }
 
 
 uint64_t Catalog::GetRevision() const {
-  const string sql = "SELECT value FROM properties WHERE key='revision';";
-
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
-  const uint64_t result = (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
+  const uint64_t result =
+    database().GetPropertyDefault<uint64_t>("revision", 0);
   pthread_mutex_unlock(lock_);
-
   return result;
 }
 
@@ -485,17 +472,13 @@ uint64_t Catalog::GetNumEntries() const {
 
 
 shash::Any Catalog::GetPreviousRevision() const {
-  const string sql =
-    "SELECT value FROM properties WHERE key='previous_revision';";
-
-  shash::Any result;
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
-  if (stmt.FetchRow())
-    result = stmt.RetrieveHashHex(0, shash::kSuffixCatalog);
+  const std::string hash_string =
+    database().GetPropertyDefault<std::string>("previous_revision", "");
   pthread_mutex_unlock(lock_);
-
-  return result;
+  return (!hash_string.empty())
+    ? shash::MkFromHexPtr(shash::HexPtr(hash_string), shash::kSuffixCatalog)
+    : shash::Any();
 }
 
 

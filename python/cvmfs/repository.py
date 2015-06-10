@@ -19,6 +19,7 @@ import cvmfs
 from manifest import Manifest
 from catalog import Catalog
 from history import History
+from certificate import Certificate
 
 class RepositoryNotFound(Exception):
     def __init__(self, repo_path):
@@ -248,6 +249,11 @@ class Repository:
             raise HistoryNotFound(self)
         history_db = self.retrieve_object(self.manifest.history_database, 'H')
         return History(history_db)
+
+
+    def retrieve_certificate(self):
+        certificate = self.retrieve_object(self.manifest.certificate, 'X')
+        return Certificate(certificate)
 
 
     def retrieve_file(self, file_name):
