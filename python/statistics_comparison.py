@@ -1,12 +1,16 @@
 import argparse
-import os
 import glob
+import os
+import re
+import shutil
+import tempfile
 
 from docker import Client
 from parser import Parser
 
 image = "moliholy/slc6"
-tag = "cvmfs-test"
+tag = "cvmfs"
+tmpdir = tempfile.mkdtemp(prefix="comparison.", dir="/tmp")
 
 
 class GitRepository:
@@ -33,19 +37,20 @@ class DockerExecutor:
         client = Client(base_url=self.socket_url, version=self.api_version)
         repo = self.repo
         volumes = ["/tmp"]
-        binds = {"/tmp":
-                    {
-                        "bind": "/tmp",
-                        "ro": False
-                    }
-                }
-
-        cmd = "bash -c \'" + \
-              "export USER=root && " + \
-              "export CVMFS_OPT_VALGRIND=no && " + \
-              "export CVMFS_OPT_TALK_STATISTICS=yes && " + \
-              "export CVMFS_OPT_ITERATIONS=" + os.environ["CVMFS_OPT_ITERATIONS"] + " && " + \
-              "export CVMFS_OPT_WARM_CACHE=" + os.environ["CVMFS_OPT_WARM_CACHE"] + " && " + \
+        binds = {tmpdir:
+                     {
+                         "bind": "/tmp",
+                         "ro": False
+                     }
+                 }
+        environment = {
+            "CVMFS_OPT_VALGRIND": "no",
+            "CVMFS_OPT_TALK_STATISTICS": "yes",
+            "CVMFS_OPT_ITERATIONS": os.environ["CVMFS_OPT_ITERATIONS"],
+            "CVMFS_OPT_WARM_CACHE": os.environ["CVMFS_OPT_WARM_CACHE"],
+            "USER": "root"
+        }
+        cmd = "bash -xc \'" + \
               "cd /workdir/cvmfs/build && " + \
               "rm -rf * && " + \
               "git reset --hard && " + \
@@ -54,19 +59,23 @@ class DockerExecutor:
               "git fetch " + repo.name + " && " + \
               "git checkout -b test " + repo.name + "/" + repo.branch + " && " + \
               "cmake .. && " + \
-              "make install && " + \
+              "make -j 6 install && " + \
+              "cvmfs_config setup nostart nocfgmod && " + \
               "cd /workdir/cvmfs/test && " + \
               "./run.sh /tmp/benchmarks.log " + tests_to_execute + "\'"
-
-        print("Executing benchmarks for the repository \"" + repo.url +
-              "\"" + " in the branch \"" + repo.branch + "\"")
         container_id = client.create_container(image=image + ":" + tag,
+                                               environment=environment,
                                                volumes=volumes,
                                                hostname="cvmfs-test",
                                                tty=True,
                                                command=cmd).get("Id")
         client.start(container_id, privileged=True, binds=binds)
+        print("Executing benchmarks for the repository \"" + repo.url +
+              "\"" + " in the branch \"" + repo.branch + "\". If you want to "
+              "check the output type \"docker -H " + client.base_url +
+              " attach " + container_id + "\" in a different terminal")
         result = client.wait(container_id)
+        client.remove_container(container_id, force=True)
         if result != 0:
             print("Test execution failed! Exiting...")
             exit(100)
@@ -86,12 +95,13 @@ def parse_args():
                            required=False, type=str,
                            help="Docker API version (default 1.17)")
     argparser.add_argument("--benchmarks",
-                           default="atlas",
+                           default="001-atlas",
                            required=False, type=str,
                            help="""Comma-separated list of benchmarks.
                            For example:
-                           atlas,lhcb,alice,cms
-                           cms,lhcb""")
+                           ALL
+                           001-atlas,002-lhcb,003-alice,004-cms
+                           004-cms,002-lhcb""")
     argparser.add_argument("--original_repo",
                            default="https://github.com/cvmfs/cvmfs.git",
                            required=False, type=str,
@@ -109,23 +119,23 @@ def parse_args():
 
 
 def get_benchmark_list(benchmark_string):
-    benchmark_list = str(benchmark_string).split(",")
     result = ""
-    for benchmark in benchmark_list:
-        if benchmark.lower() == "atlas":
-            result += "benchmarks/001-atlas "
-        if benchmark.lower() == "lhcb":
-            result += "benchmarks/002-lhcb "
-        if benchmark.lower() == "alice":
-            result += "benchmarks/003-alice "
-        if benchmark.lower() == "cms":
-            result += "benchmarks/004-cms "
+    regex = re.compile('\d\d\d-[a-z]+$')
+    if benchmark_string.upper() != "ALL":
+        benchmark_list = benchmark_string.split(",")
+        for benchmark in benchmark_list:
+            if regex.match(benchmark):
+                result += "benchmarks/" + benchmark + " "
+            else:
+                print(benchmark + " is not a valid benchmark")
+    else:
+        result = "benchmarks/*"
     return result
 
 
 def parse_files():
-    repo_list = ["atlas.cern.ch", "lhcb.cern.ch", "alice.cern.ch", "cms.cern.ch"]
-    path = "/tmp/cvmfs_benchmarks/"
+    path = tmpdir + "/cvmfs_benchmarks/"
+    repo_list = glob.glob(path + "*")
     parsers = {}
 
     for repository in repo_list:
@@ -138,7 +148,7 @@ def parse_files():
 
 
 def main():
-    final_result_file = "/tmp/comparison.csv"
+    final_result_file = tmpdir + "/comparison.csv"
     DockerExecutor.set_environment_variables()
     args = parse_args()
     origin = GitRepository(args.original_repo, args.original_branch, "original")
@@ -149,7 +159,13 @@ def main():
     print("Downloading the image " + image + ":" + tag)
     c = Client(base_url=args.socket_url, version=args.docker_api_version)
     c.pull(repository=image, tag=tag)
+    # stop all running containers before
+    for container in c.containers():
+        print("    Stopping container " + container["Id"])
+        c.remove_container(container["Id"], force=True)
 
+    print("Done downloading the image. Results of the tests will be placed " +
+          "in " + tmpdir + "\n")
     origin_exec = DockerExecutor(origin, args.socket_url,
                                  args.docker_api_version)
     external_exec = DockerExecutor(external, args.socket_url,
@@ -157,6 +173,8 @@ def main():
     origin_exec.run(tests_to_execute)
     parsers_origin = parse_files()
 
+    shutil.rmtree(tmpdir)  # clean up before the next execution
+    os.mkdir(tmpdir)
     external_exec.run(tests_to_execute)
     parsers_external = parse_files()
 
