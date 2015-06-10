@@ -89,6 +89,23 @@ class TestManifest(FileSandbox):
             #                      ^-- this byte used to be a 'd'
         ]))
 
+        self.full_manifest = StringIO.StringIO('\n'.join([
+            'C044206fcff4545283aaa452b80edfd5d8c740b20',
+            'B75834368',
+            'Rd41d8cd98f00b204e9800998ecf8427e',
+            'D900',
+            'L0000000000000000000000000000000000000000',
+            'S8722',
+            'Natlas.cern.ch',
+            'X0b457ac12225018e0a15330364c20529e15012ab',
+            'H50c37f5517aea2ce9a22c3f17a7056a4f60e7d07',
+            'T1433937750',
+            'Gno',
+            '--',
+            'd79461faeaedc6875ee1592967811deee3fe2b99',
+            'invalid signature'
+        ]))
+
         self.unknown_field_manifest = StringIO.StringIO('\n'.join([
             'C600230b0ba7620426f2e898f1e1f43c5466efe59',
             'D3600',
@@ -192,6 +209,33 @@ class TestManifest(FileSandbox):
         self.assertEqual('0b457ac12225018e0a15330364c20529e15012ab', manifest.certificate)
         self.assertEqual(75834368                                  , manifest.root_catalog_size)
         self.assertEqual('50c37f5517aea2ce9a22c3f17a7056a4f60e7d07', manifest.history_database)
+
+
+    def test_full_manifest(self):
+        manifest = cvmfs.Manifest(self.full_manifest)
+        last_modified = datetime.datetime(2015, 6, 10, 12, 2, 30, tzinfo=tzutc())
+        self.assertTrue(hasattr(manifest, 'root_catalog'))
+        self.assertTrue(hasattr(manifest, 'ttl'))
+        self.assertTrue(hasattr(manifest, 'micro_catalog'))
+        self.assertTrue(hasattr(manifest, 'repository_name'))
+        self.assertTrue(hasattr(manifest, 'root_hash'))
+        self.assertTrue(hasattr(manifest, 'revision'))
+        self.assertTrue(hasattr(manifest, 'last_modified'))
+        self.assertTrue(hasattr(manifest, 'certificate'))
+        self.assertTrue(hasattr(manifest, 'root_catalog_size'))
+        self.assertTrue(hasattr(manifest, 'history_database'))
+        self.assertTrue(hasattr(manifest, 'garbage_collectable'))
+        self.assertEqual('044206fcff4545283aaa452b80edfd5d8c740b20', manifest.root_catalog)
+        self.assertEqual(900                                       , manifest.ttl)
+        self.assertEqual('0000000000000000000000000000000000000000', manifest.micro_catalog)
+        self.assertEqual('atlas.cern.ch'                           , manifest.repository_name)
+        self.assertEqual('d41d8cd98f00b204e9800998ecf8427e'        , manifest.root_hash)
+        self.assertEqual(8722                                      , manifest.revision)
+        self.assertEqual(last_modified                             , manifest.last_modified)
+        self.assertEqual('0b457ac12225018e0a15330364c20529e15012ab', manifest.certificate)
+        self.assertEqual(75834368                                  , manifest.root_catalog_size)
+        self.assertEqual('50c37f5517aea2ce9a22c3f17a7056a4f60e7d07', manifest.history_database)
+        self.assertFalse(                                             manifest.garbage_collectable)
 
 
     def test_minimal_manifest(self):
