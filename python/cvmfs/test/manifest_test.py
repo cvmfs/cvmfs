@@ -58,6 +58,37 @@ class TestManifest(FileSandbox):
         self.file_manifest = self.write_to_temporary(self.sane_manifest.getvalue())
         self.assertNotEqual(None, self.file_manifest)
 
+        self.insane_manifest_tampered = StringIO.StringIO('\n'.join([
+            'C044206fcff4545283aaa452b80edfd5d8c740b20',
+            'B75834368',
+            'Rd41d8cd98f00b204e9800998ecf8427e',
+            'D900',
+            'S8722',
+            'Natlas-malicious.cern.ch',
+            'X0b457ac12225018e0a15330364c20529e15012ab',
+            'H50c37f5517aea2ce9a22c3f17a7056a4f60e7d07',
+            'T1433937750',
+            '--',
+            '892f6997d6046669640b8520842bc7c4f17cf269',
+            '"P4\x99a>LR\x8eE\x91\xdb\xf13\xd9\xec!\xfe\x81\xf4\x1d\x98\xbe\xa7\x80:D\xcd0\x12\x06\x84\x0c(\x89\xe3\x01\x03s\x02\r\x14\xe3\x00{E\x18\x11E/\xa1)\xd7\xc7\x1a\x7f\xf1k"\x08\xbf\xdb3\xa1\xec-8\xb3z\xd5\x95\xcel\x82\x8a\x9a\xb5\xb6\x14\xd8sD\x80\xa7X\x0fx\x03T\x07\x12\xa6\'E\x04\x06\xf9\x17\'s\xeb\xfe\x19`l\xe7\xf4\x96,2\x84-\xa0\xbd.\x86#\xe0\xc09l\xc0\xcbZ\x95\x14# \xc4\xc7\xe1\x00\xc0\x84>\x8a\xae\x86\xc0\xe5\xa82\xc9\x86\xe5\x19\xe7\x85n\xac\xb4\xd8\x0bX\x81q\xdb\x97q\xe8\xacz\xd5\xfa+\n(\xe1\x0c\xff.\x91\xa2\x00\xfa"\xa5IS\xc5\xac\x13&\xda\x96+\xc6mU3\xb0\xd8\x92)Jd\xc14O\x02Gd\x90!\xdf\x06\x9f\xf4\xa5\xd2y\xab\x8c\xf6\x13\xe0d)\x90\xd7\x14\xb5\xf2f%\x80D\x94\xe0d\xb8\xe3\x17\xc4\x0f\xa5\x14\x08\xf4x\xd4\x7f\xa0T\xd4\xb9\xc0\x81d\x9bD\xe8V\xe5\x90\x16'
+        ]))
+
+        self.insane_manifest_broken_signature = StringIO.StringIO('\n'.join([
+            'C044206fcff4545283aaa452b80edfd5d8c740b20',
+            'B75834368',
+            'Rd41d8cd98f00b204e9800998ecf8427e',
+            'D900',
+            'S8722',
+            'Natlas.cern.ch',
+            'X0b457ac12225018e0a15330364c20529e15012ab',
+            'H50c37f5517aea2ce9a22c3f17a7056a4f60e7d07',
+            'T1433937750',
+            '--',
+            'e7d58bfaaf75e9b725aa23c3a666daffd6351b8f',
+            '"P4\x99a>LR\x8eE\x91\xeb\xf13\xd9\xec!\xfe\x81\xf4\x1d\x98\xbe\xa7\x80:D\xcd0\x12\x06\x84\x0c(\x89\xe3\x01\x03s\x02\r\x14\xe3\x00{E\x18\x11E/\xa1)\xd7\xc7\x1a\x7f\xf1k"\x08\xbf\xdb3\xa1\xec-8\xb3z\xd5\x95\xcel\x82\x8a\x9a\xb5\xb6\x14\xd8sD\x80\xa7X\x0fx\x03T\x07\x12\xa6\'E\x04\x06\xf9\x17\'s\xeb\xfe\x19`l\xe7\xf4\x96,2\x84-\xa0\xbd.\x86#\xe0\xc09l\xc0\xcbZ\x95\x14# \xc4\xc7\xe1\x00\xc0\x84>\x8a\xae\x86\xc0\xe5\xa82\xc9\x86\xe5\x19\xe7\x85n\xac\xb4\xd8\x0bX\x81q\xdb\x97q\xe8\xacz\xd5\xfa+\n(\xe1\x0c\xff.\x91\xa2\x00\xfa"\xa5IS\xc5\xac\x13&\xda\x96+\xc6mU3\xb0\xd8\x92)Jd\xc14O\x02Gd\x90!\xdf\x06\x9f\xf4\xa5\xd2y\xab\x8c\xf6\x13\xe0d)\x90\xd7\x14\xb5\xf2f%\x80D\x94\xe0d\xb8\xe3\x17\xc4\x0f\xa5\x14\x08\xf4x\xd4\x7f\xa0T\xd4\xb9\xc0\x81d\x9bD\xe8V\xe5\x90\x16'
+            #                      ^-- this byte used to be a 'd'
+        ]))
+
         self.unknown_field_manifest = StringIO.StringIO('\n'.join([
             'C600230b0ba7620426f2e898f1e1f43c5466efe59',
             'D3600',
@@ -204,3 +235,24 @@ class TestManifest(FileSandbox):
     def test_incomplete_signature(self):
         self.assertRaises(cvmfs.IncompleteRootFileSignature,
                           cvmfs.Manifest, self.incomplete_signature)
+
+
+    def test_verify_signature(self):
+        manifest = cvmfs.Manifest(self.sane_manifest)
+        cert = cvmfs.Certificate(open(self.certificate_file))
+        is_valid = manifest.verify_signature(cert)
+        self.assertTrue(is_valid)
+
+
+    def test_verify_invalid_signature(self):
+        manifest = cvmfs.Manifest(self.insane_manifest_tampered)
+        cert = cvmfs.Certificate(open(self.certificate_file))
+        is_valid = manifest.verify_signature(cert)
+        self.assertFalse(is_valid)
+
+
+    def test_verify_inconsistent_signature(self):
+        manifest = cvmfs.Manifest(self.insane_manifest_broken_signature)
+        cert = cvmfs.Certificate(open(self.certificate_file))
+        is_valid = manifest.verify_signature(cert)
+        self.assertFalse(is_valid)
