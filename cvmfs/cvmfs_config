@@ -20,6 +20,9 @@ case $sys_arch in
     elif [ -x /sbin/rc-service ] ; then
       # OpenRC
       service="/sbin/rc-service"
+    elif [ -x /usr/bin/systemctl ] ; then
+      # archlinux
+      service="/usr/bin/systemctl"
     fi
     if [ -x /sbin/pidof ]; then
       pidof="/sbin/pidof"
@@ -254,13 +257,14 @@ cvmfs_chksetup() {
     fi
   fi
 
+  AUTOMASTER=$(find /etc -name "auto.master" 2>/dev/null | head -1)
   # Check that /etc/auto.cvmfs is referenced in /etc/auto.master
   # Check that /etc/auto.cvmfs is executable on Linux
   local global_mount_dir
   global_mount_dir=$CVMFS_MOUNT_DIR
   case $sys_arch in
     Linux )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" /etc/auto.master 2> /dev/null; then
+      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" $AUTOMASTER 2> /dev/null; then
         if ! check_is_on CVMFS_NFS_SOURCE; then
           echo "Warning: CernVM-FS map is not referenced from autofs master map"
           num_warnings=$(($num_warnings+1))
@@ -274,7 +278,7 @@ cvmfs_chksetup() {
       fi ;;
 
     Darwin )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+/etc/auto_cvmfs" /etc/auto_master 2> /dev/null; then
+      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+/etc/auto_cvmfs" $AUTOMASTER 2> /dev/null; then
         echo "Warning: CernVM-FS map is not referenced from autofs master map"
         num_warnings=$(($num_warnings+1))
       fi ;;
@@ -1231,9 +1235,13 @@ add_user_to_group_fuse() {
 check_auto_mounter() {
   case $sys_arch in
     Linux )
-      $service autofs status > /dev/null 2>&1
-      return $? ;;
-
+        if [[ $service == *systemctl ]]; then
+            $service status autofs >/dev/null 2>&1
+            return $?
+        else
+            $service autofs status > /dev/null 2>&1
+            return $?
+        fi ;;
     Darwin )
       ps aux | grep autofsd | grep -v grep &> /dev/null
       return $? ;;
