@@ -26,6 +26,7 @@ compare_versions "$(python_version)" -gt "2.6.0" || complain "ancient python ver
 check_python_module "xmlrunner"                  || complain "no python-xmlrunner installed"
 check_python_module "dateutil"                   || complain "no python-dateutil installed"
 check_python_module "requests"                   || complain "no python-requests installed"
+check_python_module "M2Crypto"                   || complain "no m2crypto installed"
 
 # run the unit tests
 UNITTESTS="${SCRIPT_LOCATION}/../python/cvmfs/test"
