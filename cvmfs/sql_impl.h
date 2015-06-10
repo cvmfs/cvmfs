@@ -280,6 +280,14 @@ T Database<DerivedT>::GetProperty(const std::string &key) const {
 
 template <class DerivedT>
 template <typename T>
+T Database<DerivedT>::GetPropertyDefault(const std::string &key,
+                                         const T default_value) const {
+  return (HasProperty(key)) ? GetProperty<T>(key)
+                            : default_value;
+}
+
+template <class DerivedT>
+template <typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key,
                                      const T            value) {
   assert(set_property_);
@@ -369,6 +377,11 @@ inline bool Sql::Bind(const int index, const unsigned int value) {
 }
 
 template <>
+inline bool Sql::Bind(const int index, const uint64_t value) {
+  return this->BindInt64(index, value);
+}
+
+template <>
 inline bool Sql::Bind(const int index, const sqlite3_int64 value) {
   return this->BindInt64(index, value);
 }
@@ -400,8 +413,18 @@ inline int Sql::Retrieve(const int index) {
 }
 
 template <>
+inline bool Sql::Retrieve(const int index) {
+  return static_cast<bool>(this->RetrieveInt(index));
+}
+
+template <>
 inline sqlite3_int64 Sql::Retrieve(const int index) {
   return this->RetrieveInt64(index);
+}
+
+template <>
+inline uint64_t Sql::Retrieve(const int index) {
+  return static_cast<uint64_t>(this->RetrieveInt64(index));
 }
 
 template <>
