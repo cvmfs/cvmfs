@@ -1484,7 +1484,6 @@ execute_statistics_loop() {
   local code=0
   local iteration=1
   local PID=0
-  local daemon=0
   local memory_file="memory.stat"
 
   while (( iteration <= $CVMFS_OPT_ITERATIONS && code == 0 )); do
@@ -1493,8 +1492,7 @@ execute_statistics_loop() {
     cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
     PID=$!
     wait_fqrn_mount
-    statistics_daemon $memory_file $PID &
-    daemon=$!
+    statistics_daemon $memory_file $PID & # it kills himself when there is no cvmfs process
     ( cvmfs_run_benchmark )
     code=$?
     local end_time=$(date +%s)
@@ -1522,6 +1520,10 @@ execute_benchmark_loop() {
   local iteration=1
   local code=0
   local count=$CVMFS_OPT_ITERATIONS
+  
+  valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
+  PID=$!
+  wait_fqrn_mount
 
   while (( count > 0 && code == 0 )); do
     benchmark_log "Starting iteration ${iteration}"
@@ -1530,12 +1532,19 @@ execute_benchmark_loop() {
     count=$(( count - 1 ))
     iteration=$(( iteration + 1 ))
   done
+  
+  create_info_file
 
   if [ "$code" -ne 0 ]; then
     benchmark_log "Problem executing the tests. Aborting"
     benchmark_log $(lsof /cvmfs/${FQRN})
     exit 100
   fi
+  
+  benchmark_log "Iterations finished. Unmounting cvmfs"
+  sleep 5  # for prevention
+  cvmfs_umount $FQRN
+  wait $PID
 }
 
 
@@ -1547,7 +1556,11 @@ run_benchmark() {
   # use or not warm cache
   if [ x"$CVMFS_OPT_WARM_CACHE" = x"yes" ]; then
     benchmark_log "Starting initial execution"
-    ( single_execution )
+    single_execution
+    local code=$?
+    if [ $code -ne 0 ]; then
+      die "Failed in the warm cache execution"
+    fi
   else
     benchmark_log "Using cold cache"
   fi
@@ -1555,21 +1568,22 @@ run_benchmark() {
   # run the statistics collection mode
   if [ x"$CVMFS_OPT_TALK_STATISTICS" = x"yes" ]; then
     benchmark_log "Executing the statistics collection"
-    ( execute_statistics_loop )
+    execute_statistics_loop
+    local code=$?
+    if [ $code -ne 0 ]; then
+      die "Failed in the statistics collection"
+    fi
   fi
 
   if [ x"$CVMFS_OPT_VALGRIND" = x"yes" ]; then
     benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
     benchmark_log "Running valgrind with the following parameters: $OPTIONS"
     benchmark_log "Launching the job $CVMFS_OPT_ITERATIONS times"
-    valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
-    PID=$!
-    wait_fqrn_mount
-    ( execute_benchmark_loop )
-    ( create_info_file )
-    benchmark_log "Iterations finished. Unmounting cvmfs"
-    cvmfs_umount $FQRN
-    wait $PID
+    execute_benchmark_loop
+    local code=$?
+    if [ $code -ne 0 ]; then
+      die "Failed in Valgrind"
+    fi
   fi
 }
 
