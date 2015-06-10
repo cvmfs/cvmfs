@@ -91,5 +91,5 @@ class Manifest(RootFile):
             raise ManifestValidityError("Manifest lacks a repository name")
 
 
-    def _verify_signature(self, public_key_path):
-        return False
+    def _verify_signature(self, certificate):
+        return certificate.verify(self.signature, self.signature_checksum)
