@@ -7,6 +7,7 @@ This file is part of the CernVM File System auxiliary tools.
 
 from datetime import datetime
 from dateutil.tz import tzutc
+from M2Crypto import RSA
 
 import re
 
@@ -84,6 +85,15 @@ class Whitelist(RootFile):
             raise WhitelistValidityError("Whitelist without repository name")
         if len(self.fingerprints) == 0:
             raise WhitelistValidityError("No fingerprints are white-listed")
+
+
+    def _verify_signature(self, public_key_path):
+        pubkey = RSA.load_pub_key(public_key_path)
+        try:
+            sig_sum = pubkey.public_decrypt(self.signature, RSA.pkcs1_padding)
+            return sig_sum == self.signature_checksum
+        except RSA.RSAError, e:
+            return False
 
 
     def _read_timestamp(self, timestamp):
