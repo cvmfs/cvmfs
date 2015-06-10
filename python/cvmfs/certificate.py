@@ -18,7 +18,7 @@ class Certificate(CompressedObject):
         self.openssl_certificate = cert
 
     def __str__(self):
-        return "<Certificate>"
+        return "<Certificate " + self.get_fingerprint() + ">"
 
     def __repr__(self):
         return self.__str__()
@@ -26,6 +26,13 @@ class Certificate(CompressedObject):
     def get_openssl_certificate(self):
         """ return the certificate as M2Crypto.X509 object """
         return self.openssl_certificate
+
+
+    def get_fingerprint(self, algorithm='sha1'):
+        """ returns the fingerprint of the X509 certificate """
+        fp = self.openssl_certificate.get_fingerprint(algorithm)
+        return ':'.join([ x + y for x, y in zip(fp[0::2], fp[1::2]) ])
+
 
     def verify(self, signature, message):
         """ verify a given signature to an expected 'message' string """
