@@ -89,3 +89,7 @@ class Manifest(RootFile):
             raise ManifestValidityError("Manifest lacks a revision entry")
         if not hasattr(self, 'repository_name'):
             raise ManifestValidityError("Manifest lacks a repository name")
+
+
+    def _verify_signature(self, public_key_path):
+        return False

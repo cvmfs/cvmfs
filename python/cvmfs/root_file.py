@@ -61,6 +61,14 @@ class RootFile:
             self._read_signature(file_object)
         self._check_validity()
 
+    @abc.abstractmethod
+    def _verify_signature(public_entity):
+        pass
+
+
+    def verify_signature(self, public_entity):
+        return self.has_signature and self._verify_signature(public_entity)
+
 
     def _hash_over_content(self, file_object):
         pos = file_object.tell()
