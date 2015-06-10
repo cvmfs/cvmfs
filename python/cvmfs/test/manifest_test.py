@@ -32,7 +32,7 @@ class TestManifest(FileSandbox):
             'H8296cd873f8cb00d45fb4fd62a003e711ef06bc5',
             'Gno',
             '--',
-            '0f41e81ed7faade7ad1dafc4be6fa3f7fdc51b05',
+            '90d52f3d6d29ce142a75949f815f05580af61974',
             '(§3Êõ0ð¬a˜‚Û}Y„¨x3q    ·EÖ£%²é³üŽ6Ö+>¤XâñÅ=_X‡Ä'
         ]))
         self.file_manifest = self.write_to_temporary(self.sane_manifest.getvalue())
@@ -88,7 +88,7 @@ class TestManifest(FileSandbox):
             'S4264',
             'Natlas.cern.ch',
             '--',
-            '0f41e81ed7faade7ad1dafc4be6fa3f7fdc51b05',
+            'b748926022513a4398743d31c49578bc3a5fc3ef',
             ''
         ]))
 

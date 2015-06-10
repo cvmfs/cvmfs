@@ -71,7 +71,7 @@ class TestWhitelist(FileSandbox):
             #'Natlas.cern.ch',
             'C1:2C:2F:7B:B6:8E:82:CF:50:8A:1D:2B:05:5F:14:1B:69:E6:44:E4',
             '--',
-            '65a35687479260c90d38e4e114dbc345fde90bbb',
+            '006982cdd72e5342283e96db5c312ec65ab7f652',
             '-yw????Z%?????sB????f??1?v_ ',
             ''
         ]))
@@ -81,7 +81,7 @@ class TestWhitelist(FileSandbox):
             'E20150704095527',
             'Natlas.cern.ch',
             '--',
-            '65a35687479260c90d38e4e114dbc345fde90bbb',
+            '7ceba0a0533bfae3d1812beac2e87e4ecb684ecd',
             '-yw????Z%?????sB????f??1?v_ ',
             ''
         ]))
@@ -109,7 +109,7 @@ class TestWhitelist(FileSandbox):
             'E20150704095527',
             'Natlas.cern.ch',
             '--',
-            '65a35687479260c90d38e4e114dbc345fde90bbb',
+            '7ceba0a0533bfae3d1812beac2e87e4ecb684ecd',
             ''
         ]))
 
