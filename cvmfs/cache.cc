@@ -329,7 +329,7 @@ int PosixCacheManager::Flush(Transaction *transaction) {
 
 
 inline string PosixCacheManager::GetPathInCache(const shash::Any &id) {
-  return cache_path_ + id.MakePathExplicit(1, 2);
+  return cache_path_ + "/" + id.MakePathWithoutSuffix();
 }
 
 
@@ -1373,7 +1373,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
     if (!cache_hash.IsNull()) {
       if (catalog_path) {
         if (cache_mode_ == kCacheReadWrite) {
-          *catalog_path = 
+          *catalog_path =
             *cache_path_ + "/" + cache_hash.MakePathWithoutSuffix();
           //TODO-QUOTAMGR
           /*

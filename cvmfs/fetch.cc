@@ -136,7 +136,7 @@ int Fetcher::Fetch(const shash::Any &id,
 
   // Involve the download manager
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", name.c_str());
-  const string url = id.MakePathWithSuffix("/data");
+  const string url = "/data/" + id.MakePath();
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   retval = cache_mgr_->StartTxn(id, txn);
   if (retval < 0) {

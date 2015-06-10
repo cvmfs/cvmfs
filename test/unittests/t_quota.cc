@@ -25,7 +25,7 @@ class T_QuotaManager : public ::testing::Test {
     sigpipe_save_ = signal(SIGPIPE, SIG_IGN);
 
     // Prepare cache directories
-    tmp_path_ = CreateTempDir("/tmp/cvmfs_test", 0700);
+    tmp_path_ = CreateTempDir("/tmp/cvmfs_test");
     MkdirDeep(tmp_path_ + "/not_spawned", 0700);
     delete cache::PosixCacheManager::Create(tmp_path_, false);
     delete cache::PosixCacheManager::Create(tmp_path_ + "/not_spawned", false);
@@ -152,8 +152,8 @@ TEST_F(T_QuotaManager, Cleanup) {
   shash::Any hash_null(shash::kSha1);
   shash::Any hash_rnd(shash::kSha1);
   hash_rnd.Randomize();
-  CreateFile(tmp_path_ + hash_null.MakePathExplicit(1, 2), 0600);
-  CreateFile(tmp_path_ + hash_rnd.MakePathExplicit(1, 2), 0600);
+  CreateFile(tmp_path_ + "/" + hash_null.MakePath(), 0600);
+  CreateFile(tmp_path_ + "/" + hash_rnd.MakePath(), 0600);
   quota_mgr_->async_delete_ = false;
 
   quota_mgr_->Insert(hash_null, 1, "");
@@ -164,8 +164,8 @@ TEST_F(T_QuotaManager, Cleanup) {
   EXPECT_EQ(2U, quota_mgr_->GetSize());
   EXPECT_TRUE(quota_mgr_->Cleanup(0));
   EXPECT_EQ(0U, quota_mgr_->GetSize());
-  EXPECT_FALSE(FileExists(tmp_path_ + hash_null.MakePathExplicit(1, 2)));
-  EXPECT_FALSE(FileExists(tmp_path_ + hash_rnd.MakePathExplicit(1, 2)));
+  EXPECT_FALSE(FileExists(tmp_path_ + "/" + hash_null.MakePath()));
+  EXPECT_FALSE(FileExists(tmp_path_ + "/" + hash_rnd.MakePath()));
 
   quota_mgr_->Insert(hash_null, 1, "");
   EXPECT_TRUE(quota_mgr_->Pin(hash_rnd, 1, "", false));

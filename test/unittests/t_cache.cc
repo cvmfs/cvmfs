@@ -29,7 +29,7 @@ class T_CacheManager : public ::testing::Test {
   virtual void SetUp() {
     used_fds_ = GetNoUsedFds();
 
-    tmp_path_ = CreateTempDir("/tmp/cvmfs_test", 0700);
+    tmp_path_ = CreateTempDir("/tmp/cvmfs_test");
     cache_mgr_ = PosixCacheManager::Create(tmp_path_, false);
     ASSERT_TRUE(cache_mgr_ != NULL);
     alien_cache_mgr_ = PosixCacheManager::Create(tmp_path_, true);
@@ -263,9 +263,9 @@ TEST_F(T_CacheManager, CommitFromMem) {
   TestCacheManager faulty_cache;
   EXPECT_FALSE(faulty_cache.CommitFromMem(rnd_hash, &buf, 1, "1"));
 
-  string final_dir = tmp_path_ + rnd_hash.MakePathExplicit(1, 2);
-  EXPECT_EQ(0, unlink((tmp_path_ + hash_null_.MakePathExplicit(1, 2)).c_str()));
-  EXPECT_EQ(0, unlink((tmp_path_ + hash_one_.MakePathExplicit(1, 2)).c_str()));
+  string final_dir = tmp_path_ + "/" + rnd_hash.MakePath();
+  EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
+  EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_one_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink(final_dir.c_str()));
   EXPECT_EQ(0, rmdir(GetParentPath(final_dir).c_str()));
   EXPECT_FALSE(cache_mgr_->CommitFromMem(rnd_hash, &buf, 1, "1"));
@@ -360,7 +360,7 @@ TEST_F(T_CacheManager, CommitTxn) {
 
   // Test alien cache file mode
   platform_stat64 info;
-  string cache_path = tmp_path_ + rnd_hash.MakePathExplicit(1, 2);
+  string cache_path = tmp_path_ + "/" + rnd_hash.MakePath();
   EXPECT_EQ(0, platform_stat(cache_path.c_str(), &info));
   EXPECT_EQ(0600U, info.st_mode & 0x03FF);
   EXPECT_GE(alien_cache_mgr_->StartTxn(rnd_hash, txn), 0);
@@ -401,9 +401,9 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
   ASSERT_EQ(-ENOENT, cache_mgr_->Open(rnd_hash));
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, txn), 0);
-  string final_dir = GetParentPath(tmp_path_ + rnd_hash.MakePathExplicit(1, 2));
-  EXPECT_EQ(0, unlink((tmp_path_ + hash_null_.MakePathExplicit(1, 2)).c_str()));
-  EXPECT_EQ(0, unlink((tmp_path_ + hash_one_.MakePathExplicit(1, 2)).c_str()));
+  string final_dir = GetParentPath(tmp_path_ + "/" + rnd_hash.MakePath());
+  EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
+  EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_one_.MakePath()).c_str()));
   EXPECT_EQ(0, rmdir(final_dir.c_str()));
   EXPECT_EQ(-ENOENT, cache_mgr_->CommitTxn(txn));
 }
@@ -451,7 +451,7 @@ TEST_F(T_CacheManager, Create) {
   delete mgr;
   umask(mask_save);
 
-  CopyPath2Path(tmp_path_ + hash_null_.MakePathExplicit(1, 2),
+  CopyPath2Path(tmp_path_ + "/" + hash_null_.MakePath(),
                 path + "/cvmfscatalog.cache");
   EXPECT_EQ(NULL, PosixCacheManager::Create(path, false));
 }
@@ -539,8 +539,8 @@ TEST_F(T_CacheManager, Pread) {
 
 
 TEST_F(T_CacheManager, Rename) {
-  string path_null = tmp_path_ + hash_null_.MakePathExplicit(1, 2);
-  string path_one = tmp_path_ + hash_one_.MakePathExplicit(1, 2);
+  string path_null = tmp_path_ + "/" + hash_null_.MakePath();
+  string path_one = tmp_path_ + "/" + hash_one_.MakePath();
 
   EXPECT_EQ(0, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
   EXPECT_FALSE(FileExists(path_null));
