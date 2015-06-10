@@ -114,8 +114,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                         void *userp, void *socketp) {
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(userp);
-  int ajobs = 0;
-  sem_getvalue(&s3fanout_mgr->available_jobs_, &ajobs);
+  const int ajobs = *s3fanout_mgr->available_jobs_;
   LogCvmfs(kLogS3Fanout, kLogDebug, "CallbackCurlSocket called with easy "
            "handle %p, socket %d, action %d, up %d, "
            "sp %d, fds_inuse %d, jobs %d",
@@ -285,7 +284,7 @@ void *S3FanoutManager::MainUpload(void *data) {
         } else {
           // Return easy handle into pool and write result back
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
-          sem_post(&s3fanout_mgr->available_jobs_);
+          s3fanout_mgr->available_jobs_->Decrement();
 
           pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
           s3fanout_mgr->jobs_completed_.push_back(info);
@@ -890,7 +889,8 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   watch_fds_max_ = 4*pool_max_handles_;
 
   max_available_jobs_ = 4*pool_max_handles_;
-  assert(sem_init(&available_jobs_, 1, max_available_jobs_) == 0);
+  available_jobs_ = new Semaphore(max_available_jobs_);
+  assert(NULL != available_jobs_);
 
   opt_timeout_ = 20;
   statistics_ = new Statistics();
@@ -968,7 +968,7 @@ void S3FanoutManager::Fini() {
   delete statistics_;
   statistics_ = NULL;
 
-  sem_destroy(&available_jobs_);
+  delete available_jobs_;
 
   curl_global_cleanup();
 }
@@ -1045,7 +1045,7 @@ int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
  * Push new job to be uploaded to the S3 cloud storage.
  */
 int S3FanoutManager::PushNewJob(JobInfo *info) {
-  sem_wait(&available_jobs_);
+  available_jobs_->Increment();
 
   pthread_mutex_lock(jobs_todo_lock_);
   jobs_todo_.push_back(info);

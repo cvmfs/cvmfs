@@ -622,7 +622,7 @@ void TearDown2ReadOnly() {
  * \return Absolute path in local cache.
  */
 static inline string GetPathInCache(const shash::Any &id) {
-  return *cache_path_ + id.MakePathExplicit(1, 2);
+  return *cache_path_ + "/" + id.MakePathWithoutSuffix();
 }
 
 
@@ -863,7 +863,6 @@ static bool CommitFromMem(const shash::Any &id, const unsigned char *buffer,
  * and only the first one performs the download.
  *
  * @param[in] checksum     content hash of the file to be fetched
- * @param[in] hash_suffix  optional hash suffix to append in the download job
  * @param[in] size         the required disk size of the downloaded data chunk
  * @param[in] cvmfs_path   Path of the chunk as seen in cvmfs
  *
@@ -871,7 +870,6 @@ static bool CommitFromMem(const shash::Any &id, const unsigned char *buffer,
  *         On failure a negative error code.
  */
 static int Fetch(const shash::Any &checksum,
-                 const char        hash_suffix,
                  const uint64_t    size,
                  const string     &cvmfs_path,
                  const bool        volatile_content,
@@ -960,7 +958,7 @@ static int Fetch(const shash::Any &checksum,
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", cvmfs_path.c_str());
   atomic_inc64(&num_download_);
 
-  const string url = "/data" + checksum.MakePathWithSuffix(1, 2, hash_suffix);
+  const string url = "/data/" + checksum.MakePath();
   string final_path;
   string temp_path;
   int fd;  // Used to write the downloaded file
@@ -1081,7 +1079,6 @@ int FetchDirent(const catalog::DirectoryEntry &d,
                 download::DownloadManager *download_manager)
 {
   return Fetch(d.checksum(),
-               shash::kSuffixNone,
                d.size(),
                cvmfs_path,
                volatile_content,
@@ -1104,7 +1101,6 @@ int FetchChunk(const FileChunk &chunk,
                download::DownloadManager *download_manager)
 {
   return Fetch(chunk.content_hash(),
-               shash::kSuffixPartial,
                chunk.size(),
                cvmfs_path,
                volatile_content,
@@ -1181,13 +1177,15 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
                                                   const string &cvmfs_path,
                                                   std::string *catalog_path)
 {
+  assert(hash.suffix == shash::kSuffixCatalog);
+
   CallGuard call_guard;
   int64_t size;
   int retval;
   bool pin_retval;
 
   // Try from cache
-  const string cache_path = *cache_path_ + hash.MakePathExplicit(1, 2);
+  const string cache_path = *cache_path_ + "/" + hash.MakePathWithoutSuffix();
   if (alien_cache_) {
     *catalog_path = cache_path;
     if (FileExists(cache_path)) {
@@ -1240,7 +1238,7 @@ catalog::LoadError CatalogManager::LoadCatalogCas(const shash::Any &hash,
     return catalog::kLoadFail;
   }
 
-  const string url = "/data" + hash.MakePathExplicit(1, 2) + "C";
+  const string url = "/data/" + hash.MakePath();
   download::JobInfo download_catalog(&url, true, true, catalog_file, &hash);
   download_catalog.extra_info = &cvmfs_path;
   download_manager_->Fetch(&download_catalog);
@@ -1342,7 +1340,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
          ++separator_pos) { }
     cache_hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)),
                                      shash::kSuffixCatalog);
-    if (!FileExists(*cache_path_ + cache_hash.MakePathExplicit(1, 2))) {
+    if (!FileExists(*cache_path_ + "/" + cache_hash.MakePathWithoutSuffix())) {
       LogCvmfs(kLogCache, kLogDebug, "found checksum hint without catalog");
       cache_hash = shash::Any();
     } else {
@@ -1371,10 +1369,12 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
   if (manifest_failure != manifest::kFailOk) {
     LogCvmfs(kLogCache, kLogDebug, "failed to fetch manifest (%d - %s)",
              manifest_failure, manifest::Code2Ascii(manifest_failure));
+
     if (!cache_hash.IsNull()) {
       if (catalog_path) {
         if (cache_mode_ == kCacheReadWrite) {
-          *catalog_path = *cache_path_ + cache_hash.MakePathExplicit(1, 2);
+          *catalog_path = 
+            *cache_path_ + "/" + cache_hash.MakePathWithoutSuffix();
           //TODO-QUOTAMGR
           /*
           int64_t size = GetFileSize(*catalog_path);
@@ -1386,12 +1386,12 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
             return catalog::kLoadFail;
           }*/
         }
-        loaded_catalogs_[mountpoint] = cache_hash;
-        *catalog_hash = cache_hash;
-        offline_mode_ = true;
-
-        return catalog::kLoadUp2Date;
       }
+      loaded_catalogs_[mountpoint] = cache_hash;
+      *catalog_hash = cache_hash;
+      offline_mode_ = true;
+
+      return catalog::kLoadUp2Date;
     }
     return catalog::kLoadFail;
   }
@@ -1404,7 +1404,7 @@ catalog::LoadError CatalogManager::LoadCatalog(const PathString  &mountpoint,
   // Short way out, use cached copy
   if (ensemble.manifest->catalog_hash() == cache_hash) {
     if (catalog_path) {
-      *catalog_path = *cache_path_ + cache_hash.MakePathExplicit(1, 2);
+      *catalog_path = *cache_path_ + "/" + cache_hash.MakePathWithoutSuffix();
       // quota::Pin is only effective on first load, afterwards it is a NOP
       if (cache_mode_ == kCacheReadWrite) {
         //TODO-QUOTAMGR

@@ -15,7 +15,9 @@
 // Revision Changelog
 // 13: revision introduced
 // 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
-#define LIBCVMFS_REVISION 14
+// 15: remove counting of open file descriptors
+// 16: remove unnecessary free
+#define LIBCVMFS_REVISION 16
 
 #include <sys/stat.h>
 #include <unistd.h>

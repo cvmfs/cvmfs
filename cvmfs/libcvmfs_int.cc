@@ -597,18 +597,9 @@ int cvmfs_context::Open(const char *c_path) {
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
-    if ((atomic_xadd32(&open_files_, 1) <
-        (static_cast<int>(max_open_files_)) - kNumReservedFd) ||
-        max_open_files_ == 0)
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
-               path.c_str(), fd);
-      return fd;
-    } else {
-      if (close(fd) == 0) atomic_dec32(&open_files_);
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
-      return -EMFILE;
-    }
+    LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
+             path.c_str(), fd);
+    return fd;
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to open path: %s, CAS key %s, error code %d",
@@ -627,9 +618,7 @@ int cvmfs_context::Open(const char *c_path) {
 
 int cvmfs_context::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
-
-  if (close(fd) == 0) atomic_dec32(&open_files_);
-
+  close(fd);
   return 0;
 }
 
@@ -648,6 +637,5 @@ void cvmfs_context::InitRuntimeCounters() {
   atomic_init64(&num_fs_readlink_);
   atomic_init32(&num_io_error_);
 
-  atomic_init32(&open_files_);
   atomic_init32(&open_dirs_);
 }

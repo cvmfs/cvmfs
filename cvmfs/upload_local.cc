@@ -54,9 +54,7 @@ void LocalUploader::WorkerThread() {
                job.callback);
         break;
       case UploadJob::Commit:
-        FinalizeStreamedUpload(job.stream_handle,
-                               job.content_hash,
-                               job.hash_suffix);
+        FinalizeStreamedUpload(job.stream_handle, job.content_hash);
         break;
       case UploadJob::Terminate:
         running = false;
@@ -179,8 +177,7 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
 
 
 void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                                           const shash::Any     content_hash,
-                                           const shash::Suffix  hash_suffix) {
+                                           const shash::Any    &content_hash) {
   int retval = 0;
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
@@ -195,9 +192,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
     return;
   }
 
-  const std::string final_path =
-                "data" + content_hash.MakePathWithSuffix(1, 2, hash_suffix);
-
+  const std::string final_path = "data/" + content_hash.MakePath();
   retval = Move(local_handle->temporary_path.c_str(), final_path.c_str());
   if (retval != 0) {
     const int cpy_errno = errno;

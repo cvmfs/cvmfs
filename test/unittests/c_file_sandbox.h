@@ -50,7 +50,8 @@ class FileSandbox : public ::testing::Test {
     bool retval;
 
     retval = MkdirDeep(sandbox_path_, 0700);
-    ASSERT_TRUE(retval) << "failed to create sandbox";
+    ASSERT_TRUE(retval) << "failed to create sandbox in '" << sandbox_path_
+                        << "' (" << errno << ")";
 
     if (!sandbox_tmp_dir.empty()) {
       retval = MkdirDeep(sandbox_tmp_dir, 0700);
