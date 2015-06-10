@@ -22,6 +22,7 @@ binary string containing the private-key signature terminated by EOF.
 """
 
 import abc
+import hashlib
 
 class IncompleteRootFileSignature(Exception):
     def __init__(self, message):
@@ -57,21 +58,28 @@ class RootFile:
         self._check_validity()
 
 
-    def _read_signature(self, manifest_file):
-        """ Reads the signature's checksum and the binary signature string """
-        manifest_file.seek(0)
-        pos = manifest_file.tell()
+    def _hash_over_content(self, file_object):
+        pos = file_object.tell()
+        hash_sum = hashlib.sha1()
         while True:
-            line = manifest_file.readline()
+            line = file_object.readline()
             if line[0:2] == "--":
                 break
-            if pos == manifest_file.tell():
+            if pos == file_object.tell():
                 raise IncompleteRootFileSignature("Signature not found")
-            pos = manifest_file.tell()
+            hash_sum.update(line)
+            pos = file_object.tell()
+        return hash_sum.hexdigest()
 
-        self.signature_checksum = manifest_file.readline().rstrip()
+
+    def _read_signature(self, file_object):
+        """ Reads the signature's checksum and the binary signature string """
+        file_object.seek(0)
+        message_digest = self._hash_over_content(file_object)
+
+        self.signature_checksum = file_object.readline().rstrip()
         if len(self.signature_checksum) != 40:
             raise IncompleteRootFileSignature("Signature checksum malformed")
-        self.signature = manifest_file.read()
+        self.signature = file_object.read()
         if len(self.signature) == 0:
             raise IncompleteRootFileSignature("Binary signature not found")
