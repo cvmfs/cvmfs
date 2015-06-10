@@ -28,6 +28,10 @@ class IncompleteRootFileSignature(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
 
+class InvalidRootFileSignature(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+
 
 class RootFile:
     """ Base class for CernVM-FS repository's signed 'root files' """
@@ -80,6 +84,8 @@ class RootFile:
         self.signature_checksum = file_object.readline().rstrip()
         if len(self.signature_checksum) != 40:
             raise IncompleteRootFileSignature("Signature checksum malformed")
+        if message_digest != self.signature_checksum:
+            raise InvalidRootFileSignature("Signature checksum doesn't match")
         self.signature = file_object.read()
         if len(self.signature) == 0:
             raise IncompleteRootFileSignature("Binary signature not found")
