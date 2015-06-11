@@ -62,6 +62,7 @@ class QuotaManager : SingleCopy {
   virtual std::vector<std::string> List() = 0;
   virtual std::vector<std::string> ListPinned() = 0;
   virtual std::vector<std::string> ListCatalogs() = 0;
+  virtual std::vector<std::string> ListVolatile() = 0;
   virtual uint64_t GetMaxFileSize() = 0;
   virtual uint64_t GetCapacity() = 0;
   virtual uint64_t GetSize() = 0;
@@ -134,6 +135,9 @@ class NoopQuotaManager : public QuotaManager {
   virtual std::vector<std::string> ListCatalogs() {
     return std::vector<std::string>();
   }
+  virtual std::vector<std::string> ListVolatile() {
+    return std::vector<std::string>();
+  }
   virtual uint64_t GetMaxFileSize() { return 0; }
   virtual uint64_t GetCapacity() { return 0; }
   virtual uint64_t GetSize() { return 0; }
@@ -154,6 +158,7 @@ class NoopQuotaManager : public QuotaManager {
 class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, BindReturnPipe);
   FRIEND_TEST(T_QuotaManager, Cleanup);
+  FRIEND_TEST(T_QuotaManager, Contains);
 
  public:
   static PosixQuotaManager *Create(const std::string &cache_dir,
@@ -184,6 +189,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual std::vector<std::string> List();
   virtual std::vector<std::string> ListPinned();
   virtual std::vector<std::string> ListCatalogs();
+  virtual std::vector<std::string> ListVolatile();
   virtual uint64_t GetMaxFileSize();
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
@@ -224,6 +230,7 @@ class PosixQuotaManager : public QuotaManager {
     kUnregisterBackChannel,
     kGetProtocolRevision,
     kInsertVolatile,
+    kListVolatile,
   };
 
   /**
@@ -418,6 +425,7 @@ class PosixQuotaManager : public QuotaManager {
   sqlite3_stmt *stmt_list_;
   sqlite3_stmt *stmt_list_pinned_;  /**< Loaded catalogs are pinned. */
   sqlite3_stmt *stmt_list_catalogs_;
+  sqlite3_stmt *stmt_list_volatile_;
 
   /**
    * Used in the destructor to steer closing of the database and so on.

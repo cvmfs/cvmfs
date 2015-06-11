@@ -168,6 +168,7 @@ bool PosixQuotaManager::Cleanup(const uint64_t leave_size) {
 void PosixQuotaManager::CloseDatabase() {
   if (stmt_list_catalogs_) sqlite3_finalize(stmt_list_catalogs_);
   if (stmt_list_pinned_) sqlite3_finalize(stmt_list_pinned_);
+  if (stmt_list_volatile_) sqlite3_finalize(stmt_list_volatile_);
   if (stmt_list_) sqlite3_finalize(stmt_list_);
   if (stmt_lru_) sqlite3_finalize(stmt_lru_);
   if (stmt_rm_) sqlite3_finalize(stmt_rm_);
@@ -182,6 +183,7 @@ void PosixQuotaManager::CloseDatabase() {
 
   stmt_list_catalogs_ = NULL;
   stmt_list_pinned_ = NULL;
+  stmt_list_volatile_ = NULL;
   stmt_list_ = NULL;
   stmt_rm_ = NULL;
   stmt_size_ = NULL;
@@ -227,7 +229,7 @@ PosixQuotaManager *PosixQuotaManager::Create(
   const uint64_t cleanup_threshold,
   const bool rebuild_database)
 {
-  if ((cleanup_threshold >= limit) || (limit == 0)) {
+  if (cleanup_threshold >= limit) {
     LogCvmfs(kLogQuota, kLogDebug,
              "invalid parameters: limit %"PRIu64", cleanup_threshold %"PRIu64"",
              limit, cleanup_threshold);
@@ -616,6 +618,7 @@ uint32_t PosixQuotaManager::GetProtocolRevision() {
 
   uint32_t revision;
   ReadHalfPipe(pipe_revision[0], &revision, sizeof(revision));
+  CloseReturnPipe(pipe_revision);
   return revision;
 }
 
@@ -817,6 +820,9 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
                      "SELECT path FROM cache_catalog WHERE pinned<>0;",
                      -1, &stmt_list_pinned_, NULL);
   sqlite3_prepare_v2(database_,
+                     "SELECT path FROM cache_catalog WHERE acseq < 0;",
+                     -1, &stmt_list_volatile_, NULL);
+  sqlite3_prepare_v2(database_,
                      ("SELECT path FROM cache_catalog WHERE type=" +
                       StringifyInt(kFileCatalog) +
                       ";").c_str(), -1, &stmt_list_catalogs_, NULL);
@@ -877,6 +883,14 @@ vector<string> PosixQuotaManager::ListPinned() {
  */
 vector<string> PosixQuotaManager::ListCatalogs() {
   return DoList(kListCatalogs);
+}
+
+
+/**
+ * Lists only files flagged as volatile (priority removal)
+ */
+vector<string> PosixQuotaManager::ListVolatile() {
+  return DoList(kListVolatile);
 }
 
 
@@ -1022,9 +1036,9 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
     // Immediate commands trigger flushing of the buffer
     bool immediate_command = (command_type == kCleanup) ||
       (command_type == kList) || (command_type == kListPinned) ||
-      (command_type == kListCatalogs) || (command_type == kRemove) ||
-      (command_type == kStatus) || (command_type == kLimits) ||
-      (command_type == kPid);
+      (command_type == kListCatalogs) || (command_type == kListVolatile) ||
+      (command_type == kRemove) || (command_type == kStatus) ||
+      (command_type == kLimits) ||(command_type == kPid);
     if (!immediate_command) num_commands++;
 
     if ((num_commands == kCommandBufferSize) || immediate_command)
@@ -1093,6 +1107,8 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
           if (!this_stmt_list) this_stmt_list = quota_mgr->stmt_list_pinned_;
         case kListCatalogs:
           if (!this_stmt_list) this_stmt_list = quota_mgr->stmt_list_catalogs_;
+        case kListVolatile:
+          if (!this_stmt_list) this_stmt_list = quota_mgr->stmt_list_volatile_;
 
           // Pipe back the list, one by one
           int length;
@@ -1277,6 +1293,7 @@ PosixQuotaManager::PosixQuotaManager(
   , stmt_list_(NULL)
   , stmt_list_pinned_(NULL)
   , stmt_list_catalogs_(NULL)
+  , stmt_list_volatile_(NULL)
   , initialized_(false)
 {
   pipe_lru_[0] = pipe_lru_[1] = -1;
