@@ -41,12 +41,14 @@ class TestRepositoryWrapper(unittest.TestCase):
         self.mock_repo.serve_via_http()
         repo = cvmfs.open_repository(self.mock_repo.url)
         self.assertTrue(isinstance(repo, cvmfs.RemoteRepository))
+        self.assertEqual(self.mock_repo.repo_name, repo.manifest.repository_name)
 
 
     def test_open_repository_local(self):
         self.mock_repo.resign_whitelist()
         repo = cvmfs.open_repository(self.mock_repo.dir)
         self.assertTrue(isinstance(repo, cvmfs.LocalRepository))
+        self.assertEqual(self.mock_repo.repo_name, repo.manifest.repository_name)
 
 
     def test_open_repository_verification(self):
@@ -56,19 +58,23 @@ class TestRepositoryWrapper(unittest.TestCase):
                                       self.mock_repo.public_key)
         self.assertTrue(isinstance(repo1, cvmfs.RemoteRepository))
         self.assertTrue(repo1.verify(self.mock_repo.public_key))
+        self.assertEqual(self.mock_repo.repo_name, repo1.manifest.repository_name)
 
         repo2 = cvmfs.open_repository(self.mock_repo.dir,
                                       self.mock_repo.public_key)
         self.assertTrue(isinstance(repo2, cvmfs.LocalRepository))
         self.assertTrue(repo2.verify(self.mock_repo.public_key))
+        self.assertEqual(self.mock_repo.repo_name, repo2.manifest.repository_name)
 
         repo3 = cvmfs.open_repository(self.mock_repo.url)
         self.assertTrue(isinstance(repo3, cvmfs.RemoteRepository))
         self.assertTrue(repo3.verify(self.mock_repo.public_key))
+        self.assertEqual(self.mock_repo.repo_name, repo3.manifest.repository_name)
 
         repo4 = cvmfs.open_repository(self.mock_repo.dir)
         self.assertTrue(isinstance(repo4, cvmfs.LocalRepository))
         self.assertTrue(repo4.verify(self.mock_repo.public_key))
+        self.assertEqual(self.mock_repo.repo_name, repo4.manifest.repository_name)
 
 
     def test_wrong_public_key(self):
