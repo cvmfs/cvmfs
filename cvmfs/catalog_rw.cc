@@ -294,11 +294,7 @@ void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
  * Sets the last modified time stamp of this catalog to current time.
  */
 void WritableCatalog::UpdateLastModified() {
-  const time_t now = time(NULL);
-  const string sql = "INSERT OR REPLACE INTO properties "
-     "(key, value) VALUES ('last_modified', '" + StringifyInt(now) + "');";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("last_modified", static_cast<uint64_t>(time(NULL)));
 }
 
 
@@ -306,19 +302,12 @@ void WritableCatalog::UpdateLastModified() {
  * Increments the revision of the catalog in the database.
  */
 void WritableCatalog::IncrementRevision() {
-  const string sql =
-    "UPDATE properties SET value=value+1 WHERE key='revision';";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  SetRevision(GetRevision() + 1);
 }
 
 
 void WritableCatalog::SetRevision(const uint64_t new_revision) {
-  const string sql =
-    "UPDATE properties SET value=" + StringifyInt(new_revision) +
-    " WHERE key='revision';";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("revision", new_revision);
 }
 
 
@@ -326,10 +315,7 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
  * Sets the content hash of the previous catalog revision.
  */
 void WritableCatalog::SetPreviousRevision(const shash::Any &hash) {
-  const string sql = "INSERT OR REPLACE INTO properties "
-    "(key, value) VALUES ('previous_revision', '" + hash.ToString() + "');";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("previous_revision", hash.ToString());
 }
 
 

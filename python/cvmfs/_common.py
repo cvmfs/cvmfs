@@ -19,6 +19,7 @@ _SERVER_CONFIG_NAME    = "server.conf"
 _REST_CONNECTOR        = "control"
 
 _MANIFEST_NAME         = ".cvmfspublished"
+_WHITELIST_NAME        = ".cvmfswhitelist"
 _LAST_REPLICATION_NAME = ".cvmfs_last_snapshot"
 _REPLICATING_NAME      = ".cvmfs_is_snapshotting"
 

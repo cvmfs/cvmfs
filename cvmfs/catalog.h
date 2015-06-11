@@ -231,6 +231,7 @@ class Catalog : public SingleCopy {
   Counters& GetCounters() { return counters_; }
 
   inline const CatalogDatabase &database() const { return *database_; }
+  inline       CatalogDatabase &database()       { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
   void ResetNestedCatalogCache();

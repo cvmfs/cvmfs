@@ -112,6 +112,8 @@ class Database : SingleCopy {
   template <typename T>
   T GetProperty(const std::string &key) const;
   template <typename T>
+  T GetPropertyDefault(const std::string &key, const T default_value) const;
+  template <typename T>
   bool SetProperty(const std::string &key, const T value);
   bool HasProperty(const std::string &key) const;
 
