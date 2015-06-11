@@ -27,6 +27,7 @@ from manifest_test     import *
 from whitelist_test    import *
 from md5_handling_test import *
 from certificate_test  import *
+from repository_test   import *
 
 import optparse
 import sys
