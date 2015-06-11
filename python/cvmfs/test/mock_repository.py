@@ -63,6 +63,11 @@ class MockRepository:
         self._resign_whitelist(tomorrow)
 
 
+    def make_expired_whitelist(self):
+        yesterday = datetime.datetime.utcnow() - datetime.timedelta(days=2)
+        self._resign_whitelist(yesterday)
+
+
     def _resign_whitelist(self, expiry_date):
         old_whitelist = os.path.join(self.dir, ".cvmfswhitelist")
         new_whitelist = os.path.join(self.dir, ".cvmfswhitelist.new")

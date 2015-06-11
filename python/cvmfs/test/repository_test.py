@@ -84,3 +84,14 @@ class TestRepositoryWrapper(unittest.TestCase):
         self.assertRaises(cvmfs.RepositoryVerificationFailed,
                           cvmfs.open_repository,
                           self.mock_repo.dir, self.public_key_file)
+
+
+    def test_expired_whitelist(self):
+        self.mock_repo.make_expired_whitelist()
+        self.mock_repo.serve_via_http()
+        self.assertRaises(cvmfs.RepositoryVerificationFailed,
+                          cvmfs.open_repository,
+                          self.mock_repo.url, self.mock_repo.public_key)
+        self.assertRaises(cvmfs.RepositoryVerificationFailed,
+                          cvmfs.open_repository,
+                          self.mock_repo.dir, self.mock_repo.public_key)
