@@ -22,13 +22,17 @@ date >> $logfile
 shift
 test_exclusions=0
 xml_output=""
-while getopts "xo:" option; do
+debug=""
+while getopts "xo:d" option; do
   case $option in
     x)
       test_exclusions=1
     ;;
     o)
       xml_output="$OPTARG"
+    ;;
+    d)
+      debug="-x"
     ;;
     ?)
       usage
@@ -207,13 +211,13 @@ do
 
   # run the test
   test_start=$(get_millisecond_epoch)
-  sh -c ". ./test_functions                     && \
-         . $t/main                              && \
-         cd $workdir                            && \
-         cvmfs_run_test $logfile $(pwd)/${t}    && \
-         retval=\$?                             && \
-         retval=\$(mangle_test_retval \$retval) && \
-         exit \$retval" >> $logfile 2>&1
+  sh $debug -c ". ./test_functions                     && \
+                . $t/main                              && \
+                cd $workdir                            && \
+                cvmfs_run_test $logfile $(pwd)/${t}    && \
+                retval=\$?                             && \
+                retval=\$(mangle_test_retval \$retval) && \
+                exit \$retval" >> $logfile 2>&1
   RETVAL=$?
   test_end=$(get_millisecond_epoch)
   test_time_elapsed=$(( ( $test_end - $test_start ) ))
