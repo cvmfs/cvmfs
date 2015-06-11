@@ -7,9 +7,7 @@ This file is part of the CernVM File System auxiliary tools.
 
 import base64
 import datetime
-import os
 import StringIO
-import tempfile
 import unittest
 
 from dateutil.tz import tzutc
@@ -18,8 +16,10 @@ from file_sandbox import FileSandbox
 
 import cvmfs
 
-class TestManifest(FileSandbox):
+class TestManifest(unittest.TestCase):
     def setUp(self):
+        self.sandbox = FileSandbox("py_manifest_ut_")
+
         self.compressed_certificate = '\n'.join([
             'eJxllLmOq1gQQHO+YnLUMtDG4OAFdwODWc1iIDOYxew0q/n6cU8wyauodHSkUqmWr69PQCIrxj+I',
             '3FxFUhBwyS/8onRFQccSIZB0CNl4CkPLYrtHIGJgwLwaiuoln1cGAtuTAAa77pJVW0Ps2zYm76Kg',
@@ -39,7 +39,7 @@ class TestManifest(FileSandbox):
             ''
         ])
         compressed_cert = base64.b64decode(self.compressed_certificate)
-        self.certificate_file = self.write_to_temporary(compressed_cert)
+        self.certificate_file = self.sandbox.write_to_temporary(compressed_cert)
 
         self.sane_manifest = StringIO.StringIO('\n'.join([
             'C044206fcff4545283aaa452b80edfd5d8c740b20',
@@ -55,7 +55,7 @@ class TestManifest(FileSandbox):
             'e7d58bfaaf75e9b725aa23c3a666daffd6351b8f',
             '"P4\x99a>LR\x8eE\x91\xdb\xf13\xd9\xec!\xfe\x81\xf4\x1d\x98\xbe\xa7\x80:D\xcd0\x12\x06\x84\x0c(\x89\xe3\x01\x03s\x02\r\x14\xe3\x00{E\x18\x11E/\xa1)\xd7\xc7\x1a\x7f\xf1k"\x08\xbf\xdb3\xa1\xec-8\xb3z\xd5\x95\xcel\x82\x8a\x9a\xb5\xb6\x14\xd8sD\x80\xa7X\x0fx\x03T\x07\x12\xa6\'E\x04\x06\xf9\x17\'s\xeb\xfe\x19`l\xe7\xf4\x96,2\x84-\xa0\xbd.\x86#\xe0\xc09l\xc0\xcbZ\x95\x14# \xc4\xc7\xe1\x00\xc0\x84>\x8a\xae\x86\xc0\xe5\xa82\xc9\x86\xe5\x19\xe7\x85n\xac\xb4\xd8\x0bX\x81q\xdb\x97q\xe8\xacz\xd5\xfa+\n(\xe1\x0c\xff.\x91\xa2\x00\xfa"\xa5IS\xc5\xac\x13&\xda\x96+\xc6mU3\xb0\xd8\x92)Jd\xc14O\x02Gd\x90!\xdf\x06\x9f\xf4\xa5\xd2y\xab\x8c\xf6\x13\xe0d)\x90\xd7\x14\xb5\xf2f%\x80D\x94\xe0d\xb8\xe3\x17\xc4\x0f\xa5\x14\x08\xf4x\xd4\x7f\xa0T\xd4\xb9\xc0\x81d\x9bD\xe8V\xe5\x90\x16'
         ]))
-        self.file_manifest = self.write_to_temporary(self.sane_manifest.getvalue())
+        self.file_manifest = self.sandbox.write_to_temporary(self.sane_manifest.getvalue())
         self.assertNotEqual(None, self.file_manifest)
 
         self.insane_manifest_tampered = StringIO.StringIO('\n'.join([
@@ -159,10 +159,6 @@ class TestManifest(FileSandbox):
             'b748926022513a4398743d31c49578bc3a5fc3ef',
             ''
         ]))
-
-
-    def temporary_prefix(self):
-        return "py_manifest_ut_"
 
 
     def test_manifest_creation(self):
