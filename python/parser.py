@@ -68,8 +68,8 @@ class Parser:
     def to_csv_multiple_comparison(parser_list1, parser_list2, filename):
         counter_names = parser_list1.values()[0].counters.keys()
         csv = open(filename, "w")
-        for repository in parser_list1:
-            csv.write(";" + repository + ";")
+        for parser in parser_list1.values():
+            csv.write(";" + parser.repository + ";")
         csv.write("\n")
         for i in range(0, len(parser_list1)):
             csv.write(";origin;external")

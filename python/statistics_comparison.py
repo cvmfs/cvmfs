@@ -139,7 +139,7 @@ def parse_files():
     parsers = {}
 
     for repository in repo_list:
-        files_list = glob.glob(path + repository + "/*.data")
+        files_list = glob.glob(repository + "/*.data")
         if len(files_list) > 0:
             parsers[repository] = Parser()
             for datafile in files_list:
@@ -155,6 +155,8 @@ def main():
     external = GitRepository(args.external_repo, args.external_branch,
                              "external")
     tests_to_execute = get_benchmark_list(args.benchmarks)
+    if len(tests_to_execute) == 0:
+        exit(200)
     # download firstly the image
     print("Downloading the image " + image + ":" + tag)
     c = Client(base_url=args.socket_url, version=args.docker_api_version)
