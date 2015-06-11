@@ -69,7 +69,7 @@ class Whitelist(RootFile):
         data     = line[1:-1]
         match    = self._fingerprint_re.search(line[:-1]) # full line!
         if match:
-            self.fingerprints.append(match.groups(1))
+            self.fingerprints.append(match.group(1))
         elif key_char == "2":
             self.last_modified   = self._read_timestamp(line[:-1]) # full line!!
         elif key_char == "E":
