@@ -19,6 +19,7 @@ import cvmfs
 from manifest import Manifest
 from catalog import Catalog
 from history import History
+from whitelist import Whitelist
 from certificate import Certificate
 
 class RepositoryNotFound(Exception):
@@ -249,6 +250,11 @@ class Repository:
             raise HistoryNotFound(self)
         history_db = self.retrieve_object(self.manifest.history_database, 'H')
         return History(history_db)
+
+
+    def retrieve_whitelist(self):
+        whitelist = self.retrieve_file(_common._WHITELIST_NAME)
+        return Whitelist(whitelist)
 
 
     def retrieve_certificate(self):
