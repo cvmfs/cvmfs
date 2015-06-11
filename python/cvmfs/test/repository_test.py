@@ -37,7 +37,6 @@ class TestRepositoryWrapper(unittest.TestCase):
 
 
     def test_open_repository_http(self):
-        self.mock_repo.make_valid_whitelist()
         self.mock_repo.serve_via_http()
         repo = cvmfs.open_repository(self.mock_repo.url)
         self.assertTrue(isinstance(repo, cvmfs.RemoteRepository))
@@ -45,7 +44,6 @@ class TestRepositoryWrapper(unittest.TestCase):
 
 
     def test_open_repository_local(self):
-        self.mock_repo.make_valid_whitelist()
         repo = cvmfs.open_repository(self.mock_repo.dir)
         self.assertTrue(isinstance(repo, cvmfs.LocalRepository))
         self.assertEqual(self.mock_repo.repo_name, repo.manifest.repository_name)
