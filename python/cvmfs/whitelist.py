@@ -51,6 +51,13 @@ class Whitelist(RootFile):
         return self.__str__()
 
 
+    def expired(self):
+        """ checks if the whitelist is expired """
+        tsnow = datetime.utcnow().replace(tzinfo=tzutc())
+        timediff = self.expires - tsnow
+        return timediff.days < 0
+
+
     def contains(self, certificate):
         """ Lookup a certificate fingerprint in the whitelist """
         return certificate.get_fingerprint() in self.fingerprints

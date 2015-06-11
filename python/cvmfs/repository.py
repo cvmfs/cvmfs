@@ -246,6 +246,8 @@ class Repository:
         certificate = self.retrieve_certificate()
         if not whitelist.verify_signature(public_key_path):
             raise RepositoryVerificationFailed("Public key doesn't fit", self)
+        if whitelist.expired():
+            raise RepositoryVerificationFailed("Whitelist expired", self)
         if not whitelist.contains(certificate):
             raise RepositoryVerificationFailed("Certificate not in whitelist", self)
         if not self.manifest.verify_signature(certificate):
