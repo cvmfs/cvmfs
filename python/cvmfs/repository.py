@@ -5,6 +5,7 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+import abc
 import os
 import urlparse
 import tempfile
@@ -195,6 +196,9 @@ class CatalogTreeIterator:
 
 class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
+
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self):
         self._opened_catalogs = {}
         self._read_manifest()
@@ -284,9 +288,10 @@ class Repository:
         return Certificate(certificate)
 
 
+    @abc.abstractmethod
     def retrieve_file(self, file_name):
         """ Abstract method to retrieve a file from the repository """
-        raise Exception("Not implemented!")
+        pass
 
 
     def retrieve_object(self, object_hash, hash_suffix = ''):
