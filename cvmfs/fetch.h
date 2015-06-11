@@ -23,7 +23,8 @@ namespace cvmfs {
 
 /**
  * The Fetcher acts as a mediator between a cache manager and a download
- * manager.  It provides a file descriptor to a requested object.
+ * manager.  It provides a file descriptor to a requested object, which is
+ * usable with the cache manager.
  * If the object is not in the cache, it is downloaded and stored in the cache.
  *
  * Concurrent download requests for the same id are collapsed.

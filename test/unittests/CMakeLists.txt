@@ -64,6 +64,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_wpad.cc
   t_smalloc.cc
   t_uid_map.cc
+  t_fetch.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -167,6 +168,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
   ${CVMFS_SOURCE_DIR}/sink.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
+  ${CVMFS_SOURCE_DIR}/fetch.h
+  ${CVMFS_SOURCE_DIR}/fetch.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
