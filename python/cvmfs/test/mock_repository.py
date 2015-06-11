@@ -6,11 +6,15 @@ This file is part of the CernVM File System auxiliary tools.
 """
 
 import base64
+import datetime
+import hashlib
 import os
 import StringIO
 import tarfile
 import threading
 import unittest
+
+from M2Crypto import RSA
 
 import SimpleHTTPServer
 import SocketServer
@@ -52,6 +56,34 @@ class MockRepository:
     def serve_via_http(self, port = 8000):
         self._spawn_http_server(self._extract_dir, port)
         self.url = "http://localhost:" + str(port) + "/cvmfs/" + self.repo_name
+
+
+    def resign_whitelist(self):
+        old_whitelist = os.path.join(self.dir, ".cvmfswhitelist")
+        new_whitelist = os.path.join(self.dir, ".cvmfswhitelist.new")
+        tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+        wl_hash = hashlib.sha1()
+        with open(new_whitelist, 'w+') as new_wl: # TODO: more elegant is Py 2.7
+            with open(old_whitelist) as old_wl:
+                pos = old_wl.tell()
+                while True:
+                    line = old_wl.readline()
+                    if len(line) > 0 and line[0:2] == 'E20': # fails in 85 years
+                        line = 'E' + tomorrow.strftime("%Y%m%d%H%M%S") + '\n'
+                    if line[0:2] == "--":
+                        break
+                    if pos == old_wl.tell():
+                        raise Exception("Signature not found in whitelist")
+                    wl_hash.update(line)
+                    new_wl.write(line)
+                    pos = old_wl.tell()
+            new_wl.write("--\n")
+            new_wl.write(wl_hash.hexdigest())
+            new_wl.write("\n")
+            key = RSA.load_key(self.master_key)
+            sig = key.private_encrypt(wl_hash.hexdigest(), RSA.pkcs1_padding)
+            new_wl.write(sig)
+        os.rename(new_whitelist, old_whitelist)
 
 
     def _setup_repository(self):
