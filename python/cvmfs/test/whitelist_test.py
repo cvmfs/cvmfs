@@ -171,6 +171,24 @@ class TestWhitelist(FileSandbox):
             ''
         ]))
 
+        yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+        self.expired_whitelist = StringIO.StringIO('\n'.join([
+            '20010603095527',
+            'E' + yesterday.strftime("%Y%m%d%H%M%S"),
+            'Natlas.cern.ch',
+            'C1:2C:2F:7B:B6:8E:82:CF:50:8A:1D:2B:05:5F:14:1B:69:E6:44:E4',
+            ''
+        ]))
+
+        tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+        self.time_valid_whitelist = StringIO.StringIO('\n'.join([
+            '20150603095527',
+            'E' + tomorrow.strftime("%Y%m%d%H%M%S"),
+            'Natlas.cern.ch',
+            'C1:2C:2F:7B:B6:8E:82:CF:50:8A:1D:2B:05:5F:14:1B:69:E6:44:E4',
+            ''
+        ]))
+
 
     def temporary_prefix(self):
         return "py_whitelist_ut_"
@@ -275,3 +293,14 @@ class TestWhitelist(FileSandbox):
             whitelist   = cvmfs.Whitelist(self.insane_whitelist_signature_mismatch)
             certificate = cvmfs.Certificate(cert)
             self.assertFalse(whitelist.contains(certificate))
+
+
+    def test_expired_whitelist(self):
+        whitelist = cvmfs.Whitelist(self.expired_whitelist)
+        self.assertTrue(whitelist.expired())
+
+
+    def test_non_expired_whitelist(self):
+        whitelist = cvmfs.Whitelist(self.time_valid_whitelist)
+        self.assertFalse(whitelist.expired())
+
