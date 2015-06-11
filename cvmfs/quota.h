@@ -160,6 +160,7 @@ class PosixQuotaManager : public QuotaManager {
   FRIEND_TEST(T_QuotaManager, Cleanup);
   FRIEND_TEST(T_QuotaManager, Contains);
   FRIEND_TEST(T_QuotaManager, InitDatabase);
+  FRIEND_TEST(T_QuotaManager, MakeReturnPipe);
 
  public:
   static PosixQuotaManager *Create(const std::string &cache_dir,

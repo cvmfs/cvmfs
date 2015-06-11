@@ -197,6 +197,9 @@ class TestQuotaManager : public QuotaManager {
   virtual std::vector<std::string> ListCatalogs() {
     return std::vector<std::string>();
   }
+  virtual std::vector<std::string> ListVolatile() {
+    return std::vector<std::string>();
+  }
   virtual uint64_t GetMaxFileSize() { return 0; }
   virtual uint64_t GetCapacity() { return 0; }
   virtual uint64_t GetSize() { return 0; }

@@ -12,11 +12,23 @@
 #include <vector>
 
 #include "../../cvmfs/cache.h"
+#include "../../cvmfs/fs_traversal.h"
 #include "../../cvmfs/quota.h"
 #include "../../cvmfs/util.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT
+
+class CountPipeHelper {
+ public:
+  CountPipeHelper() : num_pipes_(0) { }
+  void EncounterPipe(const string &parent_path, const string &name) {
+    num_pipes_++;
+  }
+  unsigned num_pipes() { return num_pipes_; }
+ private:
+  unsigned num_pipes_;
+};
 
 class T_QuotaManager : public ::testing::Test {
  protected:
@@ -54,6 +66,13 @@ class T_QuotaManager : public ::testing::Test {
     delete quota_mgr_not_spawned_;
     delete quota_mgr_;
     signal(SIGPIPE, sigpipe_save_);
+
+    CountPipeHelper count_pipe_helper;
+    FileSystemTraversal<CountPipeHelper> travsl(&count_pipe_helper, "", false);
+    travsl.fn_new_fifo = &CountPipeHelper::EncounterPipe;
+    travsl.Recurse(tmp_path_);
+    EXPECT_EQ(0U, count_pipe_helper.num_pipes());
+
     if (tmp_path_ != "")
       RemoveTree(tmp_path_);
     EXPECT_EQ(used_fds_, GetNoUsedFds());
@@ -66,7 +85,6 @@ class T_QuotaManager : public ::testing::Test {
     return result;
   }
 
- protected:
   uint64_t limit_;
   uint64_t threshold_;
   PosixQuotaManager *quota_mgr_;
@@ -193,6 +211,19 @@ TEST_F(T_QuotaManager, CleanupLru) {
 }
 
 
+TEST_F(T_QuotaManager, CleanupTouchPinnedOnExit) {
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[0], 1, "pinned", false));
+  quota_mgr_->Insert(hashes_[1], 1, "regular");
+  delete quota_mgr_;
+  quota_mgr_ = PosixQuotaManager::Create(tmp_path_, limit_, threshold_, false);
+  quota_mgr_->Spawn();
+  ASSERT_TRUE(quota_mgr_ != NULL);
+  EXPECT_TRUE(quota_mgr_->Cleanup(1));
+  EXPECT_EQ(1U, quota_mgr_->GetSize());
+  EXPECT_EQ("pinned\n", PrintStringVector(quota_mgr_->List()));
+}
+
+
 TEST_F(T_QuotaManager, CleanupVolatile) {
   unsigned N = hashes_.size();
   for (unsigned i = 0; i < N-2; ++i)
@@ -241,6 +272,129 @@ TEST_F(T_QuotaManager, CloseDatabase) {
 }
 
 
-TEST_F(T_QuotaManager, CloseReturnPipe) {
-  // TODO count files in cache dir on fixture shutdown
+TEST_F(T_QuotaManager, Contains) {
+  shash::Any hash_null(shash::kSha1);
+  shash::Any hash_rnd(shash::kSha1);
+  shash::Any hash_rnd2(shash::kSha1);
+  hash_rnd.Randomize();
+  hash_rnd2.Randomize();
+  quota_mgr_->Insert(hash_null, 1, "/a");
+  EXPECT_TRUE(quota_mgr_->Pin(hash_rnd, 1, "/b", false));
+  quota_mgr_->List();  // trigger database commit
+
+  EXPECT_TRUE(quota_mgr_->Contains(hash_null.ToString()));
+  EXPECT_TRUE(quota_mgr_->Contains(hash_rnd.ToString()));
+  EXPECT_FALSE(quota_mgr_->Contains(hash_rnd2.ToString()));
+}
+
+
+TEST_F(T_QuotaManager, Create) {
+  delete quota_mgr_;
+  EXPECT_EQ(NULL, PosixQuotaManager::Create(tmp_path_, 5, 5, false));
+  EXPECT_EQ(NULL, PosixQuotaManager::Create(tmp_path_ + "/noent", 5, 5, false));
+  quota_mgr_ = PosixQuotaManager::Create(tmp_path_, 10, 5, false);
+  EXPECT_TRUE(quota_mgr_ != NULL);
+}
+
+
+TEST_F(T_QuotaManager, CreateShared) {
+  delete quota_mgr_;
+  EXPECT_EQ(NULL,
+    PosixQuotaManager::CreateShared("", tmp_path_ + "/noent", 5, 5));
+
+  // Forking fails
+  EXPECT_EQ(NULL, PosixQuotaManager::CreateShared("", tmp_path_, 5, 5));
+  EXPECT_EQ(0, unlink((tmp_path_ + "/cachemgr").c_str()));
+
+  // TODO(jblomer): test fork logic (requires changes to __cachemgr__ execve)
+
+  quota_mgr_ = PosixQuotaManager::Create(tmp_path_, 10, 5, false);
+  EXPECT_TRUE(quota_mgr_ != NULL);
+}
+
+
+TEST_F(T_QuotaManager, InsertList) {
+  EXPECT_EQ("", PrintStringVector(quota_mgr_->List()));
+  EXPECT_EQ("", PrintStringVector(quota_mgr_->ListCatalogs()));
+  EXPECT_EQ("", PrintStringVector(quota_mgr_->ListPinned()));
+  EXPECT_EQ("", PrintStringVector(quota_mgr_->ListVolatile()));
+
+  quota_mgr_->Insert(hashes_[0], 0, "regular");
+  quota_mgr_->InsertVolatile(hashes_[1], 0, "volatile");
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[2], 0, "pinned", false));
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[3], 1, "catalog", true));
+  EXPECT_EQ(1U, quota_mgr_->GetSize());
+  EXPECT_EQ("regular\nvolatile\npinned\n",
+            PrintStringVector(quota_mgr_->List()));
+  EXPECT_EQ("catalog\n", PrintStringVector(quota_mgr_->ListCatalogs()));
+  EXPECT_EQ("pinned\ncatalog\n", PrintStringVector(quota_mgr_->ListPinned()));
+  EXPECT_EQ("volatile\n", PrintStringVector(quota_mgr_->ListVolatile()));
+
+  // Insert should be idempotent wrt. listing
+  quota_mgr_->Insert(hashes_[0], 0, "regular");
+  quota_mgr_->InsertVolatile(hashes_[1], 0, "volatile");
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[2], 0, "pinned", false));
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[3], 1, "catalog", true));
+  EXPECT_EQ(1U, quota_mgr_->GetSize());
+  EXPECT_EQ("regular\nvolatile\npinned\n",
+            PrintStringVector(quota_mgr_->List()));
+  EXPECT_EQ("catalog\n", PrintStringVector(quota_mgr_->ListCatalogs()));
+  EXPECT_EQ("pinned\ncatalog\n", PrintStringVector(quota_mgr_->ListPinned()));
+  EXPECT_EQ("volatile\n", PrintStringVector(quota_mgr_->ListVolatile()));
+}
+
+
+TEST_F(T_QuotaManager, Getters) {
+  EXPECT_EQ(QuotaManager::kProtocolRevision, quota_mgr_->GetProtocolRevision());
+  EXPECT_EQ(getpid(), quota_mgr_->GetPid());
+
+  EXPECT_EQ(0U, quota_mgr_->GetSize());
+  EXPECT_EQ(0U, quota_mgr_->GetSizePinned());
+
+  quota_mgr_->Insert(hashes_[0], 0, "");
+  quota_mgr_->Insert(hashes_[1], 1, "");
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[2], 1, "", false));
+  EXPECT_EQ(2U, quota_mgr_->GetSize());
+  EXPECT_EQ(1U, quota_mgr_->GetSizePinned());
+}
+
+
+TEST_F(T_QuotaManager, InitDatabase) {
+  PosixQuotaManager *mgr = new PosixQuotaManager(2, 1, tmp_path_ + "/noent");
+  EXPECT_FALSE(mgr->InitDatabase(false));
+
+  EXPECT_TRUE(MkdirDeep(tmp_path_ + "/noent", 0700));
+  EXPECT_FALSE(mgr->InitDatabase(false));
+
+  int fd;
+  fd = open((tmp_path_ + "/noent/cachedb").c_str(), O_WRONLY | O_CREAT, 0600);
+  EXPECT_GE(fd, 0);
+  close(fd);
+  EXPECT_FALSE(mgr->InitDatabase(false));
+
+  delete quota_mgr_;
+  quota_mgr_ = NULL;
+  mgr->cache_dir_ = tmp_path_;
+  EXPECT_TRUE(mgr->InitDatabase(false));
+  mgr->CloseDatabase();
+  EXPECT_TRUE(mgr->InitDatabase(true));
+  mgr->CloseDatabase();
+
+  delete mgr;
+}
+
+
+TEST_F(T_QuotaManager, MakeReturnPipe) {
+  quota_mgr_->shared_ = true;
+  int mypipe[2];
+  int myotherpipe[2];
+  quota_mgr_->MakeReturnPipe(mypipe);
+  EXPECT_EQ(0, mypipe[1]);
+  EXPECT_GE(mypipe[0], 0);
+  quota_mgr_->MakeReturnPipe(myotherpipe);
+  EXPECT_EQ(1, myotherpipe[1]);
+  EXPECT_GE(myotherpipe[0], 0);
+  quota_mgr_->CloseReturnPipe(mypipe);
+  quota_mgr_->CloseReturnPipe(myotherpipe);
+  quota_mgr_->shared_ = false;
 }
