@@ -753,7 +753,7 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
       if (!RebuildDatabase()) {
         LogCvmfs(kLogQuota, kLogDebug,
                  "could not build cache database from file system");
-        sqlite3_finalize(stmt);                 
+        sqlite3_finalize(stmt);
         goto init_database_fail;
       }
     }
@@ -1215,7 +1215,7 @@ bool PosixQuotaManager::Pin(
 
   // Has to run when not yet spawned (cvmfs initialization)
   if (!spawned_) {
-    // Currently code duplication here, not sure if there is a more elegant way
+    // Code duplication here
     if (pinned_chunks_.find(hash) == pinned_chunks_.end()) {
       if (pinned_ + size > cleanup_threshold_) {
         LogCvmfs(kLogQuota, kLogDebug, "failed to insert %s (pinned), no space",
@@ -1240,7 +1240,7 @@ bool PosixQuotaManager::Pin(
     sqlite3_bind_int64(stmt_new_, 3, seq_++);
     sqlite3_bind_text(stmt_new_, 4, &description[0], description.length(),
                       SQLITE_STATIC);
-    sqlite3_bind_int64(stmt_new_, 5, kFileCatalog);
+    sqlite3_bind_int64(stmt_new_, 5, is_catalog ? kFileCatalog : kFileRegular);
     sqlite3_bind_int64(stmt_new_, 6, 1);
     int retval = sqlite3_step(stmt_new_);
     assert((retval == SQLITE_DONE) || (retval == SQLITE_OK));

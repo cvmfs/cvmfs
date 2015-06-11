@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../../cvmfs/cache.h"
+#include "../../cvmfs/compression.h"
 #include "../../cvmfs/fs_traversal.h"
 #include "../../cvmfs/quota.h"
 #include "../../cvmfs/util.h"
@@ -29,6 +30,7 @@ class CountPipeHelper {
  private:
   unsigned num_pipes_;
 };
+
 
 class T_QuotaManager : public ::testing::Test {
  protected:
@@ -397,4 +399,99 @@ TEST_F(T_QuotaManager, MakeReturnPipe) {
   quota_mgr_->CloseReturnPipe(mypipe);
   quota_mgr_->CloseReturnPipe(myotherpipe);
   quota_mgr_->shared_ = false;
+}
+
+
+TEST_F(T_QuotaManager, PinUnpin) {
+  EXPECT_FALSE(quota_mgr_not_spawned_->Pin(hashes_[0], 1000000000, "", false));
+  EXPECT_TRUE(quota_mgr_not_spawned_->Pin(hashes_[0], threshold_, "x", false));
+  EXPECT_TRUE(quota_mgr_not_spawned_->Pin(hashes_[0], threshold_, "x", false));
+  EXPECT_FALSE(quota_mgr_not_spawned_->Pin(hashes_[1], 1, "", false));
+  quota_mgr_not_spawned_->Spawn();
+  quota_mgr_not_spawned_->Insert(hashes_[1], threshold_, "y");
+  EXPECT_EQ("x\ny\n", PrintStringVector(quota_mgr_not_spawned_->List()));
+  EXPECT_EQ("x\n", PrintStringVector(quota_mgr_not_spawned_->ListPinned()));
+
+  delete quota_mgr_not_spawned_;
+  quota_mgr_not_spawned_ =
+    PosixQuotaManager::Create(tmp_path_ + "/not_spawned", limit_, threshold_,
+                              false);
+  ASSERT_TRUE(quota_mgr_not_spawned_ != NULL);
+  EXPECT_TRUE(quota_mgr_not_spawned_->Pin(hashes_[2], 1, "z", false));
+  quota_mgr_not_spawned_->Spawn();
+  EXPECT_EQ("x\nz\n", PrintStringVector(quota_mgr_not_spawned_->List()));
+  EXPECT_EQ("z\n", PrintStringVector(quota_mgr_not_spawned_->ListPinned()));
+
+  EXPECT_FALSE(quota_mgr_not_spawned_->Pin(hashes_[0], threshold_, "x", false));
+  quota_mgr_not_spawned_->Unpin(hashes_[2]);
+  EXPECT_TRUE(quota_mgr_not_spawned_->Pin(hashes_[0], threshold_, "x", false));
+}
+
+
+TEST_F(T_QuotaManager, RebuildDatabase) {
+  delete quota_mgr_;
+  quota_mgr_ = NULL;
+  EXPECT_TRUE(MkdirDeep(tmp_path_ + "/new", 0700));
+  quota_mgr_ =
+    PosixQuotaManager::Create(tmp_path_ + "/new", limit_, threshold_, true);
+  EXPECT_EQ(NULL, quota_mgr_);
+
+  quota_mgr_ =
+    PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
+  ASSERT_TRUE(quota_mgr_ != NULL);
+  quota_mgr_->Spawn();
+  EXPECT_EQ(0U, quota_mgr_->GetSize());
+  EXPECT_EQ("", PrintStringVector(quota_mgr_->List()));
+
+  delete quota_mgr_;
+  quota_mgr_ = NULL;
+  CreateFile(tmp_path_ + "/" + hashes_[0].MakePath(), 0600);
+  CreateFile(tmp_path_ + "/" + hashes_[1].MakePath(), 0600);
+  unsigned char buf = 'x';
+  EXPECT_TRUE(CopyMem2Path(&buf, 1, tmp_path_ + "/" + hashes_[1].MakePath()));
+  quota_mgr_ =
+    PosixQuotaManager::Create(tmp_path_, limit_, threshold_, true);
+  ASSERT_TRUE(quota_mgr_ != NULL);
+  quota_mgr_->Spawn();
+  EXPECT_EQ(1U, quota_mgr_->GetSize());
+  EXPECT_EQ("unknown (automatic rebuild)\nunknown (automatic rebuild)\n",
+            PrintStringVector(quota_mgr_->List()));
+}
+
+
+TEST_F(T_QuotaManager, Remove) {
+  quota_mgr_->Insert(hashes_[0], 1, "a");
+  EXPECT_TRUE(quota_mgr_->Pin(hashes_[1], 1, "b", false));
+
+  quota_mgr_->Remove(hashes_[2]);
+  EXPECT_EQ(2U, quota_mgr_->GetSize());
+  EXPECT_EQ("a\nb\n", PrintStringVector(quota_mgr_->List()));
+  EXPECT_EQ("b\n", PrintStringVector(quota_mgr_->ListPinned()));
+
+  quota_mgr_->Remove(hashes_[1]);
+  EXPECT_EQ(1U, quota_mgr_->GetSize());
+  EXPECT_EQ("a\n", PrintStringVector(quota_mgr_->List()));
+  EXPECT_EQ("", PrintStringVector(quota_mgr_->ListPinned()));
+
+  quota_mgr_->Remove(hashes_[0]);
+  EXPECT_EQ(0U, quota_mgr_->GetSize());
+  EXPECT_EQ("", PrintStringVector(quota_mgr_->List()));
+  EXPECT_EQ("", PrintStringVector(quota_mgr_->ListPinned()));
+}
+
+
+TEST_F(T_QuotaManager, Spawn) {
+  // Multiple attempts should be harmless
+  quota_mgr_->Spawn();
+  quota_mgr_not_spawned_->Spawn();
+  quota_mgr_not_spawned_->Spawn();
+}
+
+
+TEST_F(T_QuotaManager, Touch) {
+  quota_mgr_->Insert(hashes_[0], 1, "a");
+  quota_mgr_->Insert(hashes_[1], 1, "b");
+  quota_mgr_->Touch(hashes_[0]);
+  quota_mgr_->Cleanup(1);
+  EXPECT_EQ("a\n", PrintStringVector(quota_mgr_->List()));
 }
