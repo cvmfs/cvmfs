@@ -270,17 +270,27 @@ cvmfs_mount() {
 
 
 cvmfs_umount() {
-  repositories=$1
-
+  local repositories=$1
+  local times=5
+  local result=-1
+  
   for r in $(echo $repositories | tr , " "); do
-    sudo umount /cvmfs/$r
-    local result=$?
+    while (( result != 0 && times > 0  )); do
+      sudo umount /cvmfs/$r > /dev/null 2>&1
+      result=$?
+      times=$(( $times - 1 ))
+      if [ $result -ne 0 ] && [ $times -gt 0 ]; then
+        echo "Failed to umount. Trying again..."
+        sleep 1
+      fi
+    done
+    
     if [ $result -ne 0 ]; then
       lsof /cvmfs/$r
       return 200
     fi
 
-    timeout=5
+    local timeout=5
     while cat /proc/mounts | grep -q " /cvmfs/$r "; do
       if [ $timeout -eq 0 ]; then
         return 101
@@ -1542,7 +1552,6 @@ execute_benchmark_loop() {
   fi
   
   benchmark_log "Iterations finished. Unmounting cvmfs"
-  sleep 5  # for prevention
   cvmfs_umount $FQRN
   wait $PID
 }
