@@ -74,6 +74,14 @@ class NestedCatalogNotFound(Exception):
     def __str__(self):
         return repr(self.repo)
 
+class RepositoryVerificationFailed(Exception):
+    def __init__(self, message, repo):
+        Exception.__init__(self, message)
+        self.repo = repo
+
+    def __str__(self):
+        return self.args[0] + " (Repo: " + repr(self.repo) + ")"
+
 
 class RepositoryIterator:
     """ Iterates through all directory entries in a whole Repository """
@@ -231,6 +239,18 @@ class Repository:
                 self.replicating_since = self.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
+
+
+    def verify(self, public_key_path):
+        whitelist   = self.retrieve_whitelist()
+        certificate = self.retrieve_certificate()
+        if not whitelist.verify_signature(public_key_path):
+            raise RepositoryVerificationFailed("Public key doesn't fit", self)
+        if not whitelist.contains(certificate):
+            raise RepositoryVerificationFailed("Certificate not in whitelist", self)
+        if not self.manifest.verify_signature(certificate):
+            raise RepositoryVerificationFailed("Certificate doesn't fit", self)
+        return True
 
 
     def catalogs(self, root_catalog = None):
