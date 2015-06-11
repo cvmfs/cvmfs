@@ -51,6 +51,11 @@ class Whitelist(RootFile):
         return self.__str__()
 
 
+    def contains(self, certificate):
+        """ Lookup a certificate fingerprint in the whitelist """
+        return certificate.get_fingerprint() in self.fingerprints
+
+
     def _read_line(self, line):
         """ Parse lines that appear in .cvmfswhitelist """
         # Note: .cvmfswhitelist contains a last_modified field that does not
