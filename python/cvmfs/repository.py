@@ -338,12 +338,19 @@ class Repository:
 
 
 class LocalRepository(Repository):
-    def __init__(self, repo_fqrn):
+    def __init__(self, repo_fqrn_of_path):
+        if os.path.isdir(repo_fqrn_of_path):
+            self._open_local_directory(repo_fqrn_of_path)
+        else:
+            self._open_local_fqrn(repo_fqrn_of_path)
+
+
+    def _open_local_fqrn(self, repo_fqrn):
         repo_config_dir = os.path.join(_common._REPO_CONFIG_PATH, repo_fqrn)
         if not os.path.isdir(repo_config_dir):
             raise RepositoryNotFound(repo_fqrn)
         self._server_config = os.path.join(repo_config_dir, _common._SERVER_CONFIG_NAME)
-        self.type           = self.read_server_config("CVMFS_REPOSITORY_TYPE")
+        self.type = self.read_server_config("CVMFS_REPOSITORY_TYPE")
         if self.type != 'stratum0' and self.type != 'stratum1':
             raise UnknownRepositoryType(repo_fqrn, self.type)
         self._storage_location = self._get_repo_location()
@@ -352,7 +359,15 @@ class LocalRepository(Repository):
         self.fqrn    = repo_fqrn
 
 
+    def _open_local_directory(self, repo_directory):
+        self._server_config = None
+        self._storage_location = repo_directory
+        Repository.__init__(self)
+
+
     def read_server_config(self, config_field):
+        if not self._server_config:
+            raise ConfigurationNotFound(self, "no such file or directory")
         with open(self._server_config) as config_file:
             for config_line in config_file:
                 if config_line.startswith(config_field):
