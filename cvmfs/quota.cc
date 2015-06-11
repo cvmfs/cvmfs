@@ -662,7 +662,7 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
 
   fd_lock_cachedb_ = LockFile(cache_dir_ + "/lock_cachedb");
   if (fd_lock_cachedb_ < 0) {
-    LogCvmfs(kLogCvmfs, kLogDebug, "failed to create cachedb lock");
+    LogCvmfs(kLogQuota, kLogDebug, "failed to create cachedb lock");
     return false;
   }
 
@@ -753,15 +753,16 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
       if (!RebuildDatabase()) {
         LogCvmfs(kLogQuota, kLogDebug,
                  "could not build cache database from file system");
+        sqlite3_finalize(stmt);                 
         goto init_database_fail;
       }
     }
+    sqlite3_finalize(stmt);
   } else {
     LogCvmfs(kLogQuota, kLogDebug, "could not select on cache catalog");
     sqlite3_finalize(stmt);
     goto init_database_fail;
   }
-  sqlite3_finalize(stmt);
 
   // How many bytes do we already have in cache?
   sql = "SELECT sum(size) FROM cache_catalog;";
@@ -829,8 +830,9 @@ bool PosixQuotaManager::InitDatabase(const bool rebuild_database) {
   return true;
 
  init_database_fail:
-  UnlockFile(fd_lock_cachedb_);
   sqlite3_close(database_);
+  database_ = NULL;
+  UnlockFile(fd_lock_cachedb_);
   return false;
 }
 
