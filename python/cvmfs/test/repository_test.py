@@ -29,24 +29,28 @@ class TestRepositoryWrapper(unittest.TestCase):
             '-----END PUBLIC KEY-----'
             ''
         ])
-        self.public_key_file = self.sandbox.write_to_temporary(self.cern_public_key)
+        pubkey = self.sandbox.write_to_temporary(self.cern_public_key)
+        self.public_key_file = pubkey
 
     def tearDown(self):
         del self.mock_repo
 
 
     def test_open_repository_http(self):
+        self.mock_repo.resign_whitelist()
         self.mock_repo.serve_via_http()
         repo = cvmfs.open_repository(self.mock_repo.url)
         self.assertTrue(isinstance(repo, cvmfs.RemoteRepository))
 
 
     def test_open_repository_local(self):
+        self.mock_repo.resign_whitelist()
         repo = cvmfs.open_repository(self.mock_repo.dir)
         self.assertTrue(isinstance(repo, cvmfs.LocalRepository))
 
 
     def test_open_repository_verification(self):
+        self.mock_repo.resign_whitelist()
         self.mock_repo.serve_via_http()
         repo1 = cvmfs.open_repository(self.mock_repo.url,
                                       self.mock_repo.public_key)
@@ -68,6 +72,7 @@ class TestRepositoryWrapper(unittest.TestCase):
 
 
     def test_wrong_public_key(self):
+        self.mock_repo.resign_whitelist()
         self.mock_repo.serve_via_http()
         self.assertRaises(cvmfs.RepositoryVerificationFailed,
                           cvmfs.open_repository,
