@@ -72,7 +72,7 @@ class DockerExecutor:
         client.start(container_id, privileged=True, binds=binds)
         print("Executing benchmarks for the repository \"" + repo.url +
               "\"" + " in the branch \"" + repo.branch + "\". If you want to "
-              "check the output type \"docker -H " + client.base_url +
+              "check the output type \"docker " +
               " attach " + container_id + "\" in a different terminal")
         result = client.wait(container_id)
         client.remove_container(container_id, force=True)
@@ -120,7 +120,7 @@ def parse_args():
 
 def get_benchmark_list(benchmark_string):
     result = ""
-    regex = re.compile('\d\d\d-[a-z]+$')
+    regex = re.compile('^\d\d\d-[a-z]+$')
     if benchmark_string.upper() != "ALL":
         benchmark_list = benchmark_string.split(",")
         for benchmark in benchmark_list:

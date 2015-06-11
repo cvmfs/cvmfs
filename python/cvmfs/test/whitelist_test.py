@@ -5,6 +5,7 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+import base64
 import datetime
 import os
 import StringIO
@@ -32,6 +33,27 @@ class TestWhitelist(FileSandbox):
             ''
         ])
         self.public_key_file = self.write_to_temporary(self.cern_public_key)
+
+        self.compressed_certificate = '\n'.join([
+            'eJxllLmOq1gQQHO+YnLUMtDG4OAFdwODWc1iIDOYxew0q/n6cU8wyauodHSkUqmWr69PQCIrxj+I',
+            '3FxFUhBwyS/8onRFQccSIZB0CNl4CkPLYrtHIGJgwLwaiuoln1cGAtuTAAa77pJVW0Ps2zYm76Kg',
+            'nvJWJG++jAJ11hqjU4hRJw1/dx1W9t7Qie5bHQZGrRC2iBup/Xi7Do8Bdsmm42SjTJfwOvY2Q+p+',
+            '4fsXmvh/tur7R0SiDFiPgE3vwuA2hoE+h5z/jl98ST0QxL/V/YqZbrWee40/RndpjxxohHe+iD5i',
+            'sn9adJQV26F67SKlWBID2ARCG2Aqz4kF8EewO/TJIdBjNEnfUxspTHSCpaem45Yb8syRc9TTIx2+',
+            'uFzoWgk0D604y9RQbvIkDius8Njmg9nLHWqP/TTlImm2Q+uxOo5VMDyuomey65ZMoYNy9ZAflRqx',
+            'zEi59Ok6CBUOaU8RnRMyewW5AuQjjWuKPGba5GQBXcNbX17opJaP9Perjq2n1p84LJ0NqkSZSdTG',
+            'YGm59Gttq4dMzLlHF4usbmzZ2sYX3ZTENYZ25TyEBnZSx3Z+xrnv+RT/KNT67UQ8mI5qxhUnw4sv',
+            'c7vlXI+nLUWcxJQ3lWltV2+wOMWhnZBxaxdVBSGj5cTOpplKpS01Jk5hD1M43OJntNy6JQiRkJAS',
+            'stkhUiSzcggCKwHA/Xu5KADMzwQIWJkytdPoGgp75OFEep4SeQo6v6rol4rsq+CZmRtfZWScBfm+',
+            'BMf4ehh4kFIOdLRzvtepQEf38bK0l+v48NkIG8EG0ltj2NNxSplDLXqXlNi+V7N2pvhLKfpHf9YY',
+            'qk7qyIxzQW6Syqqf0ZhIqW+9cLjT6CbNZyxwlpMqluqqfXDPfe5aOeXhwDn+4g5yaFEwYuF5Bm27',
+            '6I3/cPKfMRgyvp/gyVwaa17S6soH9n5d70X582Mo+IQux83JaVQcGJM9U/39eOG9bm93etYjiTH4',
+            'gj0NUHy+jF7bnPGSvZ+zZ4ZBy77nn37a4XAZXqNys2BYZqJDOeL9wVSZFJmCtyfaUAvWub3Ygee7',
+            'HgJ//lD/XT0x8N+f4F81GFZb',
+            ''
+        ])
+        compressed_cert = base64.b64decode(self.compressed_certificate)
+        self.certificate_file = self.write_to_temporary(compressed_cert)
 
         self.sane_whitelist = StringIO.StringIO('\n'.join([
             '20150603095527',
@@ -239,3 +261,17 @@ class TestWhitelist(FileSandbox):
         whitelist = cvmfs.Whitelist(self.insane_whitelist_broken_signature)
         signature_valid = whitelist.verify_signature(self.public_key_file)
         self.assertFalse(signature_valid)
+
+
+    def test_contains_certificate(self):
+        with open(self.certificate_file) as cert:
+            whitelist   = cvmfs.Whitelist(self.sane_whitelist)
+            certificate = cvmfs.Certificate(cert)
+            self.assertTrue(whitelist.contains(certificate))
+
+
+    def test_doesnt_contain_certificate(self):
+        with open(self.certificate_file) as cert:
+            whitelist   = cvmfs.Whitelist(self.insane_whitelist_signature_mismatch)
+            certificate = cvmfs.Certificate(cert)
+            self.assertFalse(whitelist.contains(certificate))
