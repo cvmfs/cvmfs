@@ -97,23 +97,23 @@ endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
 #
 if (MACOSX)
   set (CMAKE_INSTALL_LIBDIR "lib")
-  set (CMAKE_INSTALL_BINDIR "/sbin")
+  set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
 else (MACOSX) # --> Linux
   if (DEBIAN OR ARCHLINUX)
     if (ARCHLINUX)
-      set (CMAKE_INSTALL_BINDIR "/usr/bin")
+      set (CMAKE_MOUNT_INSTALL_BINDIR "/usr/bin")
     else (ARCHLINUX)
-      set (CMAKE_INSTALL_BINDIR "/sbin")
+      set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
     endif (ARCHLINUX)
     set (CMAKE_INSTALL_LIBDIR "lib")
-  else (DEBIAN) # --> RedHat, Fedora, CentOS, SuSE
-    set (CMAKE_INSTALL_BINDIR "/sbin")
+  else (DEBIAN OR ARCHLINUX) # --> RedHat, Fedora, CentOS, SuSE
+    set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
     if (IS_64_BIT)
       set (CMAKE_INSTALL_LIBDIR "lib64")
     else (IS_64_BIT) # --> 32 Bit
       set (CMAKE_INSTALL_LIBDIR "lib")
     endif (IS_64_BIT)
-  endif (DEBIAN)
+  endif (DEBIAN OR ARCHLINUX)
 endif (MACOSX)
 message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
 
