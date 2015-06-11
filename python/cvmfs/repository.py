@@ -19,6 +19,7 @@ import cvmfs
 from manifest import Manifest
 from catalog import Catalog
 from history import History
+from whitelist import Whitelist
 from certificate import Certificate
 
 class RepositoryNotFound(Exception):
@@ -72,6 +73,14 @@ class NestedCatalogNotFound(Exception):
 
     def __str__(self):
         return repr(self.repo)
+
+class RepositoryVerificationFailed(Exception):
+    def __init__(self, message, repo):
+        Exception.__init__(self, message)
+        self.repo = repo
+
+    def __str__(self):
+        return self.args[0] + " (Repo: " + repr(self.repo) + ")"
 
 
 class RepositoryIterator:
@@ -232,6 +241,18 @@ class Repository:
             pass
 
 
+    def verify(self, public_key_path):
+        whitelist   = self.retrieve_whitelist()
+        certificate = self.retrieve_certificate()
+        if not whitelist.verify_signature(public_key_path):
+            raise RepositoryVerificationFailed("Public key doesn't fit", self)
+        if not whitelist.contains(certificate):
+            raise RepositoryVerificationFailed("Certificate not in whitelist", self)
+        if not self.manifest.verify_signature(certificate):
+            raise RepositoryVerificationFailed("Certificate doesn't fit", self)
+        return True
+
+
     def catalogs(self, root_catalog = None):
         return CatalogTreeIterator(self, root_catalog)
 
@@ -249,6 +270,11 @@ class Repository:
             raise HistoryNotFound(self)
         history_db = self.retrieve_object(self.manifest.history_database, 'H')
         return History(history_db)
+
+
+    def retrieve_whitelist(self):
+        whitelist = self.retrieve_file(_common._WHITELIST_NAME)
+        return Whitelist(whitelist)
 
 
     def retrieve_certificate(self):
@@ -438,8 +464,10 @@ def all_local():
 def all_local_stratum0():
     return [ repo for repo in all_local() if repo.type == 'stratum0' ]
 
-def open_repository(repository_path):
-    if repository_path.startswith("http://"):
-        return RemoteRepository(repository_path)
-    else:
-        return LocalRepository(repository_path)
+def open_repository(repository_path, public_key = None):
+    repo = RemoteRepository(repository_path)              \
+                if repository_path.startswith("http://")  \
+                else LocalRepository(repository_path)
+    if public_key and not repo.verify(public_key):
+        return None
+    return repo
