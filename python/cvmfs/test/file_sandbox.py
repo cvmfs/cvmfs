@@ -6,6 +6,7 @@ This file is part of the CernVM File System auxiliary tools.
 """
 
 import shutil
+import os
 import tempfile
 
 class FileSandbox:
@@ -29,3 +30,17 @@ class FileSandbox:
             filename = f.name
             f.write(string_buffer)
         return filename
+
+
+    def create_directory(self, directory_name):
+        """ creates a directory under self.temporary_dir with the given name """
+        os.mkdir(os.path.join(self.temporary_dir, directory_name))
+
+
+    def write_to_file(self, file_path, string_buffer):
+        """ creates the file_path and writes the data given in string_buffer """
+        full_file_path = os.path.join(self.temporary_dir, file_path)
+        if os.path.isfile(full_file_path):
+            os.unlink(full_file_path)
+        with open(full_file_path, "w+") as f:
+            f.write(string_buffer)
