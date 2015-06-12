@@ -243,6 +243,6 @@ def open_repository(repository_path, public_key = None):
     repo = RemoteRepository(repository_path)              \
                 if repository_path.startswith("http://")  \
                 else LocalRepository(repository_path)
-    if public_key and not repo.verify(public_key):
-        return None
+    if public_key:
+        repo.verify(public_key)
     return repo
