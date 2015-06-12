@@ -86,6 +86,7 @@ class CacheManager : SingleCopy {
   virtual int64_t GetSize(int fd) = 0;
   virtual int Close(int fd) = 0;
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset) = 0;
+  virtual int Dup(int fd) = 0;
 
   virtual uint16_t SizeOfTxn() = 0;
   virtual int StartTxn(const shash::Any &id, void *txn) = 0;
@@ -141,6 +142,7 @@ class PosixCacheManager : public CacheManager {
   virtual int64_t GetSize(int fd);
   virtual int Close(int fd);
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
+  virtual int Dup(int fd);
 
   virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
   virtual int StartTxn(const shash::Any &id, void *txn);

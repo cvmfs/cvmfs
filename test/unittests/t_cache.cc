@@ -228,6 +228,7 @@ class TestCacheManager : public CacheManager {
   virtual int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset) {
     return -EIO;
   }
+  virtual int Dup(int fd) { return fd; }
   virtual uint16_t SizeOfTxn() { return sizeof(int); }
   virtual int StartTxn(const shash::Any &id, void *txn) {
     int fd = open("/dev/null", O_RDONLY);
@@ -457,6 +458,17 @@ TEST_F(T_CacheManager, Create) {
   CopyPath2Path(tmp_path_ + "/" + hash_null_.MakePath(),
                 path + "/cvmfscatalog.cache");
   EXPECT_EQ(NULL, PosixCacheManager::Create(path, false));
+}
+
+
+TEST_F(T_CacheManager, Dup) {
+  EXPECT_EQ(-EBADF, cache_mgr_->Dup(1000000));
+  int fd = cache_mgr_->Open(hash_null_);
+  EXPECT_GE(fd, 0);
+  int fd_dup = cache_mgr_->Dup(fd);
+  EXPECT_NE(fd, fd_dup);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+  EXPECT_EQ(0, cache_mgr_->Close(fd_dup));
 }
 
 

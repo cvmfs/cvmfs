@@ -312,6 +312,14 @@ void PosixCacheManager::CtrlTxn(
 }
 
 
+int PosixCacheManager::Dup(int fd) {
+  int new_fd = dup(fd);
+  if (new_fd < 0)
+    return -errno;
+  return new_fd;
+}
+
+
 int PosixCacheManager::Flush(Transaction *transaction) {
   if (transaction->buf_pos == 0)
     return 0;
