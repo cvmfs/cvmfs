@@ -162,7 +162,7 @@ class LocalRepository(Repository):
         self.type = self.read_server_config("CVMFS_REPOSITORY_TYPE")
         if self.type != 'stratum0' and self.type != 'stratum1':
             raise UnknownRepositoryType(repo_fqrn, self.type)
-        self._storage_location = self._get_repo_location()
+        self._storage_location = self._get_repo_location_from_config()
         Repository.__init__(self)
         self.version = cvmfs.server_version
         self.fqrn    = repo_fqrn
@@ -184,7 +184,7 @@ class LocalRepository(Repository):
         raise ConfigurationNotFound(self, config_field)
 
 
-    def _get_repo_location(self):
+    def _get_repo_location_from_config(self):
         upstream = self.read_server_config("CVMFS_UPSTREAM_STORAGE")
         upstream_type, tmp_dir, upstream_cfg = upstream.split(',')
         if upstream_type != 'local': # might be riak, s3, ... (not implemented)
