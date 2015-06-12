@@ -10,12 +10,12 @@ from manifest     import *
 from whitelist    import *
 from certificate  import *
 from repository   import *
-from availability import *
-from _common      import _split_md5
-from _common      import _combine_md5
 
 import subprocess
 import re
+
+version     = "0.1.0"
+__version__ = version
 
 class ServerNotInstalled(Exception):
     pass
