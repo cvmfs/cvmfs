@@ -133,7 +133,7 @@ int Fetcher::Fetch(
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", name.c_str());
   const string url = "/data/" + id.MakePath();
   void *txn = alloca(cache_mgr_->SizeOfTxn());
-  retval = cache_mgr_->StartTxn(id, txn);
+  retval = cache_mgr_->StartTxn(id, size, txn);
   if (retval < 0) {
     LogCvmfs(kLogCache, kLogDebug, "could not start transaction on %s",
              name.c_str());

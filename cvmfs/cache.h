@@ -76,9 +76,16 @@ enum CacheModes {
  */
 class CacheManager : SingleCopy {
  public:
-   /**
-    * Relevant for the quota management
-    */
+  /**
+   * Sizes of objects should be known for StartTxn().  For file catalogs we
+   * cannot ensure that, however, because the size field for nested catalogs
+   * was only recently added.
+   */
+  static const uint64_t kSizeUnknown;
+
+  /**
+   * Relevant for the quota management
+   */
   enum ObjectType {
     kTypeRegular = 0,
     kTypeCatalog,  // implies pinned
@@ -94,7 +101,7 @@ class CacheManager : SingleCopy {
   virtual int Dup(int fd) = 0;
 
   virtual uint16_t SizeOfTxn() = 0;
-  virtual int StartTxn(const shash::Any &id, void *txn) = 0;
+  virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) = 0;
   virtual void CtrlTxn(const std::string &description,
                        const ObjectType type,
                        const int flags,  // reserved for future use
@@ -153,7 +160,7 @@ class PosixCacheManager : public CacheManager {
   virtual int Dup(int fd);
 
   virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
-  virtual int StartTxn(const shash::Any &id, void *txn);
+  virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn);
   virtual void CtrlTxn(const std::string &description,
                        const ObjectType type,
                        const int flags,

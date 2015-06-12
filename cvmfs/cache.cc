@@ -113,6 +113,7 @@ atomic_int32 CallGuard::global_drainout_ = 0;
 
 //------------------------------------------------------------------------------
 
+const uint64_t CacheManager::kSizeUnknown = uint64_t(-1);
 
 CacheManager::CacheManager()
   : reports_correct_filesize_(true)
@@ -180,7 +181,7 @@ bool CacheManager::CommitFromMem(
   const string &description)
 {
   void *txn = alloca(this->SizeOfTxn());
-  int fd = this->StartTxn(id, txn);
+  int fd = this->StartTxn(id, size, txn);
   if (fd < 0)
     return false;
   this->CtrlTxn(description, kTypeRegular, 0, txn);
@@ -449,7 +450,11 @@ int PosixCacheManager::Reset(void *txn) {
 }
 
 
-int PosixCacheManager::StartTxn(const shash::Any &id, void *txn) {
+int PosixCacheManager::StartTxn(
+  const shash::Any &id,
+  uint64_t size,
+  void *txn)
+{
   atomic_inc32(&no_inflight_txns_);
   if (cache_mode_ == kCacheReadOnly) {
     atomic_dec32(&no_inflight_txns_);
