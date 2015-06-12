@@ -21,7 +21,9 @@ CVMFS_RESULT_LOCATION="$2"
 PYTHON_BUILD_SRC=${CVMFS_RESULT_LOCATION}/py
 
 echo "preparing the build environment in ${CVMFS_RESULT_LOCATION}..."
-mkdir -p $PYTHON_BUILD_SRC
+mkdir -p $PYTHON_BUILD_SRC             \
+         ${CVMFS_RESULT_LOCATION}/RPMS \
+         ${CVMFS_RESULT_LOCATION}/SRPMS
 
 echo "copying the files to be packaged in place..."
 cp -R ${CVMFS_SOURCE_LOCATION}/python/cvmfs $PYTHON_BUILD_SRC
@@ -41,3 +43,10 @@ python setup.py bdist_rpm                                                       
   --dist-dir "$CVMFS_RESULT_LOCATION"                                                 \
   --build-requires 'python-setuptools >= 0.6.10'                                      \
   --release 1
+
+echo "switching to ${CVMFS_RESULT_LOCATION}"
+cd ${CVMFS_RESULT_LOCATION}
+
+echo "move the RPMs into the conventional RPM directories"
+mv *.src.rpm SRPMS
+mv *.rpm     RPMS
