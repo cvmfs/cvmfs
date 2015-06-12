@@ -5,7 +5,5 @@
     * Find local Stratum0 repositories
     * Check installed CernVM-FS (server) versions
     * Read and interpret repository manifest files (.cvmfspublished)
-    * Download arbitrary repository file objects
-    * Inspect CernVM-FS file catalog hierarchy
-    * List directory entries in a directory, single catalog or whole repository
-    * Inspect repository history (CernVM-FS named snapshots)
+    * Read and interpret a repository whitelist (.cvmfswhitelist)
+    * Verify the repository authenticity via public key
