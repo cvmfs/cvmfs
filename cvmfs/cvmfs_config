@@ -257,7 +257,17 @@ cvmfs_chksetup() {
     fi
   fi
 
-  AUTOMASTER=$(find /etc -name "auto.master" 2>/dev/null | head -1)
+  for path in /etc/auto.master /etc/autofs/auto.master; do
+      if [ -f $path ]; then
+          AUTOMASTER=$path
+          break;
+      fi
+  done
+  if [ -z "$AUTOMASTER" ]; then
+      echo "Error: unable to find auto.master in any of the supplied paths!"
+      num_errors=$(($num_errors+1))
+      AUTOMASTER=/dev/null
+  fi
   # Check that /etc/auto.cvmfs is referenced in /etc/auto.master
   # Check that /etc/auto.cvmfs is executable on Linux
   local global_mount_dir
