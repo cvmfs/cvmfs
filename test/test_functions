@@ -229,7 +229,7 @@ cvmfs_clean() {
   sudo sh -c "rm -f /etc/cvmfs/config.d/*"
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET"
 
-  timeout=60
+  local timeout=60
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
       return 101
@@ -310,10 +310,9 @@ has_selinux() {
 
 
 get_cvmfs_cachedir() {
-  repository=$1
+  local repository=$1
 
-  local cache_dir
-  cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
+  local cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
   if [ "x$cache_dir" = "x" ]; then
     echo "Failed to figure out cache directory"
     exit 1
@@ -363,11 +362,11 @@ reset_test_warning_flags() {
 
 
 check_time() {
-  start_time=$1
-  end_time=$2
-  limit=$3
+  local start_time=$1
+  local end_time=$2
+  local limit=$3
 
-  diff_time=$(($end_time-$start_time))
+  local diff_time=$(($end_time-$start_time))
 
   if [ $diff_time -gt $limit ]; then
     echo "Time limit exceeded" >&2
@@ -381,12 +380,12 @@ check_time() {
 
 
 check_memory() {
-  instance=$1
-  limit=$2
+  local instance=$1
+  local limit=$2
 
-  pid=$(attr -qg pid /cvmfs/$instance)             || return 100
-  rss="$(sudo cat /proc/$pid/status | grep VmRSS)" || return 101
-  rss_kb=$(echo $rss | awk '{print $2}')
+  local pid=$(attr -qg pid /cvmfs/$instance)             || return 100
+  local rss="$(sudo cat /proc/$pid/status | grep VmRSS)" || return 101
+  local rss_kb=$(echo $rss | awk '{print $2}')
 
   if [ $rss_kb -gt $limit ]; then
     local inode_tracker="$(sudo cvmfs_talk -i $instance internal affairs | grep 'inode tracker')"
@@ -832,7 +831,7 @@ publish_repo() {
   shift 1
 
   # parse the command line arguments (keep quotation marks)
-  args="-v"
+  local args="-v"
   while [ $# -gt 0 ]; do
     if echo "$1" | grep -q "[[:space:]]"; then
       args="$args \"$1\""
@@ -1394,7 +1393,7 @@ setup_benchmark_environment() {
   if [ ! -d "$CVMFS_OPT_CACHEDIR" ]; then
     mkdir -p "$CVMFS_OPT_CACHEDIR"
     has_selinux
-    selinux=$?
+    local selinux=$?
     if [ "$selinux" -eq 0 ]; then
       chcon -Rv --type=cvmfs_cache_t $CVMFS_OPT_CACHEDIR
     fi
