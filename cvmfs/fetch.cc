@@ -17,6 +17,8 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
+const uint64_t Fetcher::kBigFile = 25*1024*1024;
+
 void TLSDestructor(void *data) {
   Fetcher::ThreadLocalStorage *tls =
     static_cast<Fetcher::ThreadLocalStorage *>(data);
@@ -70,10 +72,11 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
 }
 
 
-int Fetcher::Fetch(const shash::Any &id,
-                   const uint64_t size,
-                   const std::string &name,
-                   const ObjectType object_type)
+int Fetcher::Fetch(
+  const shash::Any &id,
+  const uint64_t size,
+  const std::string &name,
+  const cache::CacheManager::ObjectType object_type)
 {
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
@@ -92,7 +95,7 @@ int Fetcher::Fetch(const shash::Any &id,
   }
 
   // Opportunistically clean up cache for large files
-  if (size >= QuotaManager::kBigFile) {
+  if (size >= kBigFile) {
     assert(quota::GetCapacity() >= size);
     quota::Cleanup(quota::GetCapacity() - size);
   }

@@ -76,10 +76,15 @@ enum CacheModes {
  */
 class CacheManager : SingleCopy {
  public:
-  // Used in CtrlTxn to describe the type of file that is being stored in the
-  // cache.
-  static const int kFlagPinned   = 0x01;
-  static const int kFlagVolatile = 0x02;
+   /**
+    * Relevant for the quota management
+    */
+  enum ObjectType {
+    kTypeRegular = 0,
+    kTypeCatalog,  // implies pinned
+    kTypePinned,
+    kTypeVolatile,
+  };
 
   virtual ~CacheManager();
   virtual int Open(const shash::Any &id) = 0;
@@ -90,7 +95,9 @@ class CacheManager : SingleCopy {
 
   virtual uint16_t SizeOfTxn() = 0;
   virtual int StartTxn(const shash::Any &id, void *txn) = 0;
-  virtual void CtrlTxn(const std::string &description, const int flags,
+  virtual void CtrlTxn(const std::string &description,
+                       const ObjectType type,
+                       const int flags,  // reserved for future use
                        void *txn) = 0;
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) = 0;
   virtual int Reset(void *txn) = 0;
@@ -127,7 +134,8 @@ class CacheManager : SingleCopy {
  * backing storage.
  */
 class PosixCacheManager : public CacheManager {
-  FRIEND_TEST(T_CacheManager, CommitTxn);
+  FRIEND_TEST(T_CacheManager, CommitTxnQuotaNotifications);
+  FRIEND_TEST(T_CacheManager, CommitTxnRenameFail);
   FRIEND_TEST(T_CacheManager, Open);
   FRIEND_TEST(T_CacheManager, OpenFromTxn);
   FRIEND_TEST(T_CacheManager, Rename);
@@ -146,7 +154,9 @@ class PosixCacheManager : public CacheManager {
 
   virtual uint16_t SizeOfTxn() { return sizeof(Transaction); }
   virtual int StartTxn(const shash::Any &id, void *txn);
-  virtual void CtrlTxn(const std::string &description, const int flags,
+  virtual void CtrlTxn(const std::string &description,
+                       const ObjectType type,
+                       const int flags,
                        void *txn);
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
   virtual int Reset(void *txn);
@@ -167,7 +177,7 @@ class PosixCacheManager : public CacheManager {
       : buf_pos(0)
       , size(0)
       , fd(-1)
-      , flags(0)
+      , type(kTypeRegular)
       , tmp_path()
       , final_path(final_path)
       , id(id)
@@ -177,7 +187,7 @@ class PosixCacheManager : public CacheManager {
     unsigned buf_pos;
     uint64_t size;
  	  int fd;
-    int flags;
+    ObjectType type;
     std::string tmp_path;
     std::string final_path;
     std::string description;

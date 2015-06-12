@@ -74,4 +74,3 @@ TEST_F(T_Fetcher, SignalWaitingThreads) {
 }
 
 }  // namespace cvmfs
-

@@ -183,7 +183,7 @@ bool CacheManager::CommitFromMem(
   int fd = this->StartTxn(id, txn);
   if (fd < 0)
     return false;
-  this->CtrlTxn(description, 0, txn);
+  this->CtrlTxn(description, kTypeRegular, 0, txn);
   int64_t retval = this->Write(buffer, size, txn);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
 		this->AbortTxn(txn);
@@ -239,6 +239,22 @@ int PosixCacheManager::CommitTxn(void *txn) {
     return result;
   }
 
+  if ((transaction->type == kTypePinned) || (transaction->type == kTypeCatalog))
+  {
+    bool retval = quota_mgr_->Pin(
+      transaction->id, transaction->size, transaction->description,
+      (transaction->type == kTypeCatalog));
+    if (!retval) {
+      LogCvmfs(kLogCache, kLogDebug, "commit failed: cannot pin %s",
+               transaction->id.ToString().c_str());
+      unlink(transaction->tmp_path.c_str());
+      transaction->~Transaction();
+      atomic_dec32(&no_inflight_txns_);
+      return -ENOSPC;
+    }
+  }
+
+  // Move the temporary file into its final location
   if (alien_cache_) {
     int retval = chmod(transaction->tmp_path.c_str(), 0660);
     assert(retval == 0);
@@ -248,12 +264,17 @@ int PosixCacheManager::CommitTxn(void *txn) {
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug, "commit failed: %s", strerror(errno));
     unlink(transaction->tmp_path.c_str());
+    if ((transaction->type == kTypePinned) ||
+        (transaction->type == kTypeCatalog))
+    {
+      quota_mgr_->Remove(transaction->id);
+    }
   } else {
     // Success, inform quota manager
-    if (transaction->flags & kFlagVolatile) {
+    if (transaction->type == kTypeVolatile) {
       quota_mgr_->InsertVolatile(transaction->id, transaction->size,
                                  transaction->description);
-    } else {
+    } else if (transaction->type == kTypeRegular) {
       quota_mgr_->Insert(transaction->id, transaction->size,
                          transaction->description);
     }
@@ -303,12 +324,13 @@ PosixCacheManager *PosixCacheManager::Create(
 
 void PosixCacheManager::CtrlTxn(
   const std::string &description,
+  const ObjectType type,
   const int flags,
   void *txn)
 {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->description = description;
-  transaction->flags = flags;
+  transaction->type = type;
 }
 
 

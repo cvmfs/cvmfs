@@ -161,7 +161,7 @@ class TestQuotaManager : public QuotaManager {
     last_cmd.size = size;
     last_cmd.description = description;
     last_cmd.is_catalog = is_catalog;
-    return true;
+    return description != "fail";
   }
   virtual void Unpin(const shash::Any &hash) {
     last_cmd = LastCommand();
@@ -237,7 +237,8 @@ class TestCacheManager : public CacheManager {
     return 0;
   }
   virtual void CtrlTxn(
-    const std::string &description, const int flags, void *txn) { }
+    const std::string &description, const ObjectType type, const int flags,
+    void *txn) { }
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) {
     return -EIO;
   }
@@ -371,8 +372,16 @@ TEST_F(T_CacheManager, CommitTxn) {
   EXPECT_EQ(0, alien_cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(0, platform_stat(cache_path.c_str(), &info));
   EXPECT_EQ(0660U, info.st_mode & 0x03FF);
+}
 
-  // Test quota notifications
+
+TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
+  shash::Any rnd_hash;
+  rnd_hash.Randomize();
+  unsigned char buf[] = {'x', 'x', 'x'};
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  ASSERT_TRUE(txn != NULL);
+
   delete cache_mgr_->quota_mgr_;
   cache_mgr_->quota_mgr_ = new TestQuotaManager();
   TestQuotaManager *quota_mgr = reinterpret_cast<TestQuotaManager *>(
@@ -386,13 +395,34 @@ TEST_F(T_CacheManager, CommitTxn) {
   EXPECT_EQ(1U, quota_mgr->last_cmd.size);
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, txn), 0);
-  cache_mgr_->CtrlTxn("desc", CacheManager::kFlagVolatile, txn);
-  EXPECT_EQ(1U, cache_mgr_->Write(&buf, 1, txn));
+  cache_mgr_->CtrlTxn("desc0", CacheManager::kTypeVolatile, 0, txn);
+  EXPECT_EQ(1U, cache_mgr_->Write(buf, 1, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(TestQuotaManager::kCmdInsertVolatile, quota_mgr->last_cmd.cmd);
   EXPECT_EQ(rnd_hash, quota_mgr->last_cmd.hash);
   EXPECT_EQ(1U, quota_mgr->last_cmd.size);
-  EXPECT_EQ("desc", quota_mgr->last_cmd.description);
+  EXPECT_EQ("desc0", quota_mgr->last_cmd.description);
+
+  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, txn), 0);
+  cache_mgr_->CtrlTxn("desc1", CacheManager::kTypePinned, 0, txn);
+  EXPECT_EQ(2U, cache_mgr_->Write(buf, 2, txn));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
+  EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
+  EXPECT_EQ(rnd_hash, quota_mgr->last_cmd.hash);
+  EXPECT_EQ(2U, quota_mgr->last_cmd.size);
+  EXPECT_EQ("desc1", quota_mgr->last_cmd.description);
+  EXPECT_FALSE(quota_mgr->last_cmd.is_catalog);
+
+  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, txn), 0);
+  cache_mgr_->CtrlTxn("desc2", CacheManager::kTypeCatalog, 0, txn);
+  EXPECT_EQ(3U, cache_mgr_->Write(buf, 3, txn));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
+  EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
+  EXPECT_TRUE(quota_mgr->last_cmd.is_catalog);
+
+  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, txn), 0);
+  cache_mgr_->CtrlTxn("fail", CacheManager::kTypeCatalog, 0, txn);
+  EXPECT_EQ(-ENOSPC, cache_mgr_->CommitTxn(txn));
 }
 
 
@@ -403,13 +433,21 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
   ASSERT_TRUE(txn != NULL);
 
   ASSERT_EQ(-ENOENT, cache_mgr_->Open(rnd_hash));
+  
+  delete cache_mgr_->quota_mgr_;
+  cache_mgr_->quota_mgr_ = new TestQuotaManager();
+  TestQuotaManager *quota_mgr = reinterpret_cast<TestQuotaManager *>(
+    cache_mgr_->quota_mgr());
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, txn), 0);
+  cache_mgr_->CtrlTxn("desc", CacheManager::kTypeCatalog, 0, txn);
   string final_dir = GetParentPath(tmp_path_ + "/" + rnd_hash.MakePath());
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_one_.MakePath()).c_str()));
   EXPECT_EQ(0, rmdir(final_dir.c_str()));
   EXPECT_EQ(-ENOENT, cache_mgr_->CommitTxn(txn));
+  EXPECT_EQ(TestQuotaManager::kCmdRemove, quota_mgr->last_cmd.cmd);
+  EXPECT_EQ(rnd_hash, quota_mgr->last_cmd.hash);
 }
 
 
