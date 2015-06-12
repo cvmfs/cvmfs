@@ -8,7 +8,7 @@ import tempfile
 from docker import Client
 from parser import Parser
 
-image = "moliholy/slc6"
+image = "cvm-dockerhub02:5000/slc6"
 tag = "cvmfs"
 tmpdir = tempfile.mkdtemp(prefix="comparison.", dir="/tmp")
 
@@ -160,7 +160,7 @@ def main():
     # download firstly the image
     print("Downloading the image " + image + ":" + tag)
     c = Client(base_url=args.socket_url, version=args.docker_api_version)
-    c.pull(repository=image, tag=tag)
+    c.pull(repository=image, tag=tag, insecure_registry=True)
     # stop all running containers before
     for container in c.containers():
         print("    Stopping container " + container["Id"])
