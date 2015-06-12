@@ -107,6 +107,7 @@ class Repository:
 
 
     def verify(self, public_key_path):
+        """ Use a public key to verify the repository's authenticity """
         whitelist   = self.retrieve_whitelist()
         certificate = self.retrieve_certificate()
         if not whitelist.verify_signature(public_key_path):
@@ -125,11 +126,13 @@ class Repository:
 
 
     def retrieve_whitelist(self):
+        """ retrieve and parse the .cvmfswhitelist file from the repository """
         whitelist = self.retrieve_file(_common._WHITELIST_NAME)
         return Whitelist(whitelist)
 
 
     def retrieve_certificate(self):
+        """ retrieve the repository's certificate file """
         certificate = self.retrieve_object(self.manifest.certificate, 'X')
         return Certificate(certificate)
 
@@ -236,6 +239,7 @@ class RemoteRepository(Repository):
 
 
 def open_repository(repository_path, public_key = None):
+    """ wrapper function accessing a repository by URL, local FQRN or path """
     repo = RemoteRepository(repository_path)              \
                 if repository_path.startswith("http://")  \
                 else LocalRepository(repository_path)
