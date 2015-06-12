@@ -1808,6 +1808,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   unsigned backoff_init = 2000;
   unsigned backoff_max = 10000;
   bool send_info_header = false;
+  unsigned max_ipaddr_per_proxy = 0;
   string tracefile = "";
   string cachedir = string(cvmfs::kDefaultCachedir);
   unsigned max_ttl = 0;
@@ -1896,6 +1897,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       cvmfs::options_manager_->IsOn(parameter))
   {
     send_info_header = true;
+  }
+  if (cvmfs::options_manager_->GetValue("CVMFS_MAX_IPADDR_PER_PROXY",
+                                        &parameter))
+  {
+    max_ipaddr_per_proxy = String2Uint64(parameter);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_USE_GEOAPI", &parameter) &&
       cvmfs::options_manager_->IsOn(parameter))
@@ -2302,6 +2308,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->SetRetryParameters(max_retries,
                                                backoff_init,
                                                backoff_max);
+  cvmfs::download_manager_->SetMaxIpaddrPerProxy(max_ipaddr_per_proxy);
   cvmfs::download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
   delete uuid;
   uuid = NULL;
@@ -2383,7 +2390,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
     string history_path = "txn/historydb" + history_hash.ToString() + "." +
                           *cvmfs::repository_name_;
-    string history_url = "/data" + history_hash.MakePathExplicit(1, 2) + "H";
+    string history_url = "/data/" + history_hash.MakePath();
     download::JobInfo download_history(&history_url, true, true, &history_path,
                                        &history_hash);
     retval_dl = cvmfs::download_manager_->Fetch(&download_history);

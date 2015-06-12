@@ -24,7 +24,6 @@ set (CVMFS_UNITTEST_SOURCES
   t_catalog_traversal.cc
   t_fs_traversal.cc
   t_pipe.cc
-  t_managed_exec.cc
   t_prng.cc
   t_buffer.cc
   t_chunk_detectors.cc
@@ -62,6 +61,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_backoff.cc
   t_wpad.cc
   t_smalloc.cc
+  t_uid_map.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -163,6 +163,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
+
+  ${CVMFS_SOURCE_DIR}/uid_map.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
@@ -170,10 +172,15 @@ set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 #
 # Compiler and Linker Flags for unit tests
 #
-set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64")
-set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -fprofile-arcs -ftest-coverage -fPIC -O0 -DDEBUGMSG -g")
+set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
+set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -fprofile-arcs -fPIC -O0 -DDEBUGMSG -g")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS} -fprofile-arcs -lgcov -coverage")
+set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS} -fprofile-arcs")
+
+if (NOT ${USING_CLANG})
+  set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS} -ftest-coverage")
+  set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS} -lgcov -coverage")
+endif (NOT ${USING_CLANG})
 
 #
 # build CernVM-FS test cases

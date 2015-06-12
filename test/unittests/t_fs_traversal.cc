@@ -15,6 +15,8 @@
 #include <string>
 
 #include "../../cvmfs/fs_traversal.h"
+#include "../../cvmfs/platform.h"
+#include "../../cvmfs/util.h"
 
 class T_FsTraversal : public ::testing::Test {
  public:
@@ -26,7 +28,11 @@ class T_FsTraversal : public ::testing::Test {
       File,
       Symlink,
       Untouched,
-      Unspecified
+      Unspecified,
+      Socket,
+      BlockDevice,
+      CharacterDevice,
+      FIFO
     };
 
     Checklist() : type(Unspecified) {
@@ -37,12 +43,16 @@ class T_FsTraversal : public ::testing::Test {
     }
 
     void Init() {
-      enter_dir     = false;
-      leave_dir     = false;
-      file_found    = false;
-      symlink_found = false;
-      dir_prefix    = false;
-      dir_postfix   = false;
+      enter_dir       = false;
+      leave_dir       = false;
+      file_found      = false;
+      symlink_found   = false;
+      dir_prefix      = false;
+      dir_postfix     = false;
+      socket_found    = false;
+      block_dev_found = false;
+      chr_dev_found   = false;
+      fifo_found      = false;
     }
 
     void Check(const Type overwrite_type = Unspecified) const {
@@ -52,36 +62,48 @@ class T_FsTraversal : public ::testing::Test {
 
       switch (type_to_check) {
         case Directory:
-          EXPECT_TRUE(enter_dir)     << path;
-          EXPECT_TRUE(leave_dir)     << path;
-          EXPECT_TRUE(dir_prefix)    << path;
-          EXPECT_TRUE(dir_postfix)   << path;
+          EXPECT_TRUE(enter_dir)       << path;
+          EXPECT_TRUE(leave_dir)       << path;
+          EXPECT_TRUE(dir_prefix)      << path;
+          EXPECT_TRUE(dir_postfix)     << path;
           break;
         case RootDirectory:
-          EXPECT_TRUE(enter_dir)     << path;
-          EXPECT_TRUE(leave_dir)     << path;
-          EXPECT_FALSE(dir_prefix)    << path;
-          EXPECT_FALSE(dir_postfix)   << path;
+          EXPECT_TRUE(enter_dir)       << path;
+          EXPECT_TRUE(leave_dir)       << path;
+          EXPECT_FALSE(dir_prefix)     << path;
+          EXPECT_FALSE(dir_postfix)    << path;
           break;
         case NonTraversedDirectory:
-          EXPECT_TRUE(dir_prefix)    << path;
-          EXPECT_TRUE(dir_postfix)   << path;
-          EXPECT_FALSE(enter_dir)     << path;
-          EXPECT_FALSE(leave_dir)     << path;
+          EXPECT_TRUE(dir_prefix)      << path;
+          EXPECT_TRUE(dir_postfix)     << path;
+          EXPECT_FALSE(enter_dir)      << path;
+          EXPECT_FALSE(leave_dir)      << path;
           break;
         case File:
-          EXPECT_TRUE(file_found)    << path;
+          EXPECT_TRUE(file_found)      << path;
           break;
         case Symlink:
-          EXPECT_TRUE(symlink_found) << path;
+          EXPECT_TRUE(symlink_found)   << path;
           break;
         case Untouched:
-          EXPECT_FALSE(enter_dir)     << path;
-          EXPECT_FALSE(leave_dir)     << path;
-          EXPECT_FALSE(file_found)    << path;
-          EXPECT_FALSE(symlink_found) << path;
-          EXPECT_FALSE(dir_prefix)    << path;
-          EXPECT_FALSE(dir_postfix)   << path;
+          EXPECT_FALSE(enter_dir)      << path;
+          EXPECT_FALSE(leave_dir)      << path;
+          EXPECT_FALSE(file_found)     << path;
+          EXPECT_FALSE(symlink_found)  << path;
+          EXPECT_FALSE(dir_prefix)     << path;
+          EXPECT_FALSE(dir_postfix)    << path;
+          break;
+        case Socket:
+          EXPECT_TRUE(socket_found)    << path;
+          break;
+        case BlockDevice:
+          EXPECT_TRUE(block_dev_found) << path;
+          break;
+        case CharacterDevice:
+          EXPECT_TRUE(chr_dev_found)   << path;
+          break;
+        case FIFO:
+          EXPECT_TRUE(fifo_found)      << path;
           break;
         default:
           FAIL() << "Encountered an unexpected file type";
@@ -98,6 +120,10 @@ class T_FsTraversal : public ::testing::Test {
     bool symlink_found;
     bool dir_prefix;
     bool dir_postfix;
+    bool socket_found;
+    bool block_dev_found;
+    bool chr_dev_found;
+    bool fifo_found;
   };
 
   typedef std::map<std::string, Checklist> ChecklistMap;
@@ -157,16 +183,16 @@ class T_FsTraversal : public ::testing::Test {
 
 
   template<class DelegateT>
-  void RegisterDelegate(
-    const DelegateT &delegate,
-    FileSystemTraversal<DelegateT> *traverse
-  ) {
+  void RegisterDelegate(FileSystemTraversal<DelegateT> *traverse) {
     traverse->fn_enter_dir       = &DelegateT::EnterDir;
     traverse->fn_leave_dir       = &DelegateT::LeaveDir;
     traverse->fn_new_file        = &DelegateT::File;
     traverse->fn_new_symlink     = &DelegateT::Symlink;
     traverse->fn_new_dir_prefix  = &DelegateT::DirPrefix;
     traverse->fn_new_dir_postfix = &DelegateT::DirPostfix;
+    traverse->fn_new_socket      = &DelegateT::Socket;
+    traverse->fn_new_block_dev   = &DelegateT::BlockDevice;
+    traverse->fn_new_fifo        = &DelegateT::Fifo;
   }
 
 
@@ -195,11 +221,29 @@ class T_FsTraversal : public ::testing::Test {
     reference_[relative_path] = Checklist(relative_path, Checklist::Symlink);
   }
 
+  void CreateSocket(const std::string &relative_path) {
+    const std::string path = testbed_path_ + "/" + relative_path;
+    const int retval = MakeSocket(path, 0755);
+    ASSERT_NE(-1, retval) << "errno: " << errno;
+    reference_[relative_path] = Checklist(relative_path, Checklist::Socket);
+  }
+
+  void MakeFifo(const std::string &relative_path) {
+    const std::string path = testbed_path_ + "/" + relative_path;
+    const int retval = mkfifo(path.c_str(), 0755);
+    ASSERT_EQ(0, retval) << "errno: " << errno;
+    reference_[relative_path] = Checklist(relative_path, Checklist::FIFO);
+  }
+
   void GenerateReferenceDirectoryStructure() {
     MakeDirectory("a");
     MakeDirectory("a/a");
     MakeFile("a/a/foo");
     MakeFile("a/a/bar");
+    CreateSocket("a/a/socket1");
+    CreateSocket("a/a/socket2");
+    MakeFifo("a/a/fifo1");
+    MakeFifo("a/a/fifo2");
     MakeDirectory("a/b");
     MakeFile("a/b/foo");
     MakeFile("a/b/bar");
@@ -208,6 +252,8 @@ class T_FsTraversal : public ::testing::Test {
     MakeFile("a/c/a/foo");
     MakeFile("a/c/a/bar");
     MakeFile("a/c/a/baz");
+    CreateSocket("a/c/a/socket");
+    MakeFifo("a/c/a/fifo");
     MakeDirectory("a/c/b");
     MakeDirectory("a/c/c");
     MakeDirectory("a/c/d");
@@ -215,6 +261,8 @@ class T_FsTraversal : public ::testing::Test {
     MakeFile("a/c/bar");
     MakeFile("a/c/baz");
     MakeSymlink("a/c/lnk", "baz");
+    CreateSocket("a/c/socket");
+    MakeFifo("a/c/fifo");
     MakeDirectory("a/d");
     MakeDirectory("b");
     MakeDirectory("b/a");
@@ -229,6 +277,8 @@ class T_FsTraversal : public ::testing::Test {
     MakeFile("b/b/a/c/c/foo");
     MakeFile("b/b/a/c/c/bar");
     MakeFile("b/b/a/c/c/baz");
+    CreateSocket("b/b/a/c/c/socket");
+    MakeFifo("b/b/a/c/c/fifo");
     MakeSymlink("b/b/a/c/c/2b", "../b");
     MakeDirectory("b/b/a/c/d");
     MakeDirectory("b/b/a/c/e");
@@ -247,6 +297,8 @@ class T_FsTraversal : public ::testing::Test {
     MakeDirectory("c");
     MakeDirectory("c/a");
     MakeFile("c/a/foo");
+    CreateSocket("c/a/socket");
+    MakeFifo("c/a/fifo");
     MakeSymlink("c/a/bfoo", "../b/foo");
     MakeDirectory("c/b");
     MakeFile("c/b/foo");
@@ -254,11 +306,14 @@ class T_FsTraversal : public ::testing::Test {
     MakeFile("c/c/foo");
     MakeDirectory("c/d");
     MakeFile("c/d/foo");
+    MakeFifo("c/d/fifo");
     MakeDirectory("c/e");
     MakeFile("c/e/foo");
     MakeDirectory("c/f");
     MakeFile("c/f/foo");
     MakeFile("c/foo");
+    CreateSocket("c/socket");
+    MakeFifo("c/fifo");
   }
 
  protected:
@@ -315,6 +370,24 @@ class BaseTraversalDelegate {
                           const std::string &dir_name) {
     Checklist& checklist = GetChecklist(CombinePath(relative_path, dir_name));
     checklist.dir_postfix = true;
+  }
+
+  virtual void Socket(const std::string &relative_path,
+      const std::string &dir_name) {
+    Checklist& checklist = GetChecklist(CombinePath(relative_path, dir_name));
+    checklist.socket_found = true;
+  }
+
+  virtual void Fifo(const std::string &relative_path,
+        const std::string &dir_name) {
+      Checklist& checklist = GetChecklist(CombinePath(relative_path, dir_name));
+      checklist.fifo_found = true;
+  }
+
+  virtual void BlockDevice(const std::string &relative_path,
+        const std::string &dir_name) {
+      Checklist& checklist = GetChecklist(CombinePath(relative_path, dir_name));
+      checklist.block_dev_found = true;
   }
 
   virtual void Check() const {
@@ -393,7 +466,7 @@ TEST_F(T_FsTraversal, FullTraversal) {
   FileSystemTraversal<BaseTraversalDelegate> traverse(&delegate,
                                                        testbed_path_,
                                                        true);
-  RegisterDelegate(delegate, &traverse);
+  RegisterDelegate(&traverse);
 
   traverse.Recurse(testbed_path_);
   delegate.Check();
@@ -432,7 +505,7 @@ TEST_F(T_FsTraversal, RootTraversal) {
   FileSystemTraversal<RootTraversalDelegate> traverse(&delegate,
                                                        testbed_path_,
                                                        false);
-  RegisterDelegate(delegate, &traverse);
+  RegisterDelegate(&traverse);
 
   traverse.Recurse(testbed_path_);
   delegate.Check();
@@ -454,6 +527,8 @@ class IgnoringTraversalDelegate : public BaseTraversalDelegate {
     ignored_pathes.insert("a/c/a/baz");
     ignored_pathes.insert("a/c/baz");
     ignored_pathes.insert("b/b/a/c/c/baz");
+    ignored_pathes.insert("b/b/a/c/c/fifo");
+    ignored_pathes.insert("b/b/a/c/c/socket");
     ignored_pathes.insert("a/d");
     ignored_pathes.insert("a/c/d");
     ignored_pathes.insert("b/b/a/c/d");
@@ -465,9 +540,9 @@ class IgnoringTraversalDelegate : public BaseTraversalDelegate {
     ignored_pathes.insert("b/b/a/d/e");
     ignored_pathes.insert("b/d");
     ignored_pathes.insert("c/d");
+    ignored_pathes.insert("c/d/fifo");
     ignored_pathes.insert("c/d/foo");
 
-    std::set<std::string> ignored_but_seen_dirs;
     CheckAllExcept(ignored_pathes);
     CheckPathes(ignored_pathes, Checklist::Untouched);
   }
@@ -497,7 +572,7 @@ TEST_F(T_FsTraversal, IgnoringTraversal) {
   FileSystemTraversal<IgnoringTraversalDelegate> traverse(&delegate,
                                                            testbed_path_,
                                                            true);
-  RegisterDelegate(delegate, &traverse);
+  RegisterDelegate(&traverse);
   traverse.fn_ignore_file = &IgnoringTraversalDelegate::IgnoreFilePredicate;
 
   traverse.Recurse(testbed_path_);
@@ -534,6 +609,8 @@ class SteeringTraversalDelegate : public BaseTraversalDelegate {
     fully_ignored_pathes.insert("a/c/a/foo");
     fully_ignored_pathes.insert("a/c/a/bar");
     fully_ignored_pathes.insert("a/c/a/baz");
+    fully_ignored_pathes.insert("a/c/a/fifo");
+    fully_ignored_pathes.insert("a/c/a/socket");
 
     fully_ignored_pathes.insert("b/b/a/c/a");
     fully_ignored_pathes.insert("b/b/a/c/b");
@@ -541,6 +618,8 @@ class SteeringTraversalDelegate : public BaseTraversalDelegate {
     fully_ignored_pathes.insert("b/b/a/c/c/foo");
     fully_ignored_pathes.insert("b/b/a/c/c/bar");
     fully_ignored_pathes.insert("b/b/a/c/c/baz");
+    fully_ignored_pathes.insert("b/b/a/c/c/fifo");
+    fully_ignored_pathes.insert("b/b/a/c/c/socket");
     fully_ignored_pathes.insert("b/b/a/c/c/2b");
     fully_ignored_pathes.insert("b/b/a/c/d");
     fully_ignored_pathes.insert("b/b/a/c/e");
@@ -563,13 +642,79 @@ class SteeringTraversalDelegate : public BaseTraversalDelegate {
 
 TEST_F(T_FsTraversal, SteeredTraversal) {
   SteeringTraversalDelegate delegate(reference_);
-  FileSystemTraversal<SteeringTraversalDelegate> traverse(
-                                                      &delegate,
-                                                       testbed_path_,
-                                                       true);
-  RegisterDelegate(delegate, &traverse);
+  FileSystemTraversal<SteeringTraversalDelegate> traverse(&delegate,
+                                                           testbed_path_,
+                                                           true);
+  RegisterDelegate(&traverse);
 
   traverse.Recurse(testbed_path_);
   delegate.Check();
 }
 
+class CustomDelegate {
+ public:
+  explicit CustomDelegate(const std::string &path) :
+    num_block_dev(0), num_character_dev(0), root_path(path) {}
+
+  void BlockDevice(const std::string &relative_path,
+                   const std::string &object_name) {
+    platform_stat64 s;
+    GetStat(relative_path, object_name, &s);
+    EXPECT_TRUE(S_ISBLK(s.st_mode));
+    ++num_block_dev;
+  }
+
+  void CharacterDevice(const std::string &relative_path,
+                       const std::string &object_name) {
+    platform_stat64 s;
+    GetStat(relative_path, object_name, &s);
+    EXPECT_TRUE(S_ISCHR(s.st_mode));
+    ++num_character_dev;
+  }
+
+  bool CheckPermissions(const std::string &relative_path,
+                        const std::string &object_name) {
+    platform_stat64 s;
+    GetStat(relative_path, object_name, &s);
+    const bool can_read =  (S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR &&
+                                                  s.st_mode & S_IXUSR)
+                       || (!S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR);
+    return !can_read;
+  }
+
+ protected:
+  void GetStat(const std::string  &relative_path,
+               const std::string  &obj_name,
+               platform_stat64    *s) const {
+    const std::string file = root_path + "/" + relative_path + "/" + obj_name;
+    const int retval = platform_lstat(file.c_str(), s);
+    ASSERT_EQ(0, retval) << "cannot stat '" << file << "' (" << errno << ")";
+  }
+
+ public:
+  int                num_block_dev;
+  int                num_character_dev;
+  const std::string  root_path;
+};
+
+TEST_F(T_FsTraversal, BlockDevice) {
+  CustomDelegate delegate("/dev");
+  FileSystemTraversal<CustomDelegate> traverse(&delegate,
+                                                "/dev",
+                                                true);
+  traverse.fn_new_block_dev = &CustomDelegate::BlockDevice;
+  traverse.fn_ignore_file = &CustomDelegate::CheckPermissions;
+  traverse.Recurse("/dev");
+  EXPECT_LT(0, delegate.num_block_dev);
+}
+
+TEST_F(T_FsTraversal, CharacterDevice) {
+  CustomDelegate delegate("/dev");
+  FileSystemTraversal<CustomDelegate> traverse(&delegate,
+                                                "/dev",
+                                                true);
+  traverse.fn_new_character_dev = &CustomDelegate::CharacterDevice;
+  traverse.fn_ignore_file       = &CustomDelegate::CheckPermissions;
+  traverse.Recurse("/dev");
+  EXPECT_LT(0, delegate.num_character_dev);
+}

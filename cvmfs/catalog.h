@@ -145,7 +145,7 @@ class Catalog : public SingleCopy {
                               listing);
   }
   bool AllChunksBegin();
-  bool AllChunksNext(shash::Any *hash, ChunkTypes *type);
+  bool AllChunksNext(shash::Any *hash);
   bool AllChunksEnd();
 
   inline bool ListPathChunks(const PathString &path,
@@ -231,6 +231,7 @@ class Catalog : public SingleCopy {
   Counters& GetCounters() { return counters_; }
 
   inline const CatalogDatabase &database() const { return *database_; }
+  inline       CatalogDatabase &database()       { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
   void ResetNestedCatalogCache();

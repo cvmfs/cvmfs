@@ -152,10 +152,11 @@ endif(MACOSX)
 option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
 if (MACOSX)
   option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               OFF)
-else ()
+  option (BUILD_SERVER          "Build writer's end programs"                                      OFF)
+else (MACOSX)
   option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               ON)
-endif()
-option (BUILD_SERVER            "Build writer's end programs"                                      ON)
+  option (BUILD_SERVER          "Build writer's end programs"                                      ON)
+endif(MACOSX)
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
@@ -215,6 +216,12 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
     message (FATAL_ERROR "bootstrapping failed")
   endif (BOOTSTRAPPING_RESULT GREATER 0)
 endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
+
+#
+# include some common functionality
+#
+include (FindPythonModule)
+
 
 #
 # set some default flags
@@ -366,15 +373,6 @@ else (GOOGLETEST_BUILTIN)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 endif (GOOGLETEST_BUILTIN)
 
-if (GEOIP_BUILTIN)
-  include (${LIBGEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  include (${PYTHON_GEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  add_dependencies (python-geoip libgeoip)
-else (GEOIP_BUILTIN)
-  find_package (GeoIP REQUIRED)
-  find_package (python-GeoIP REQUIRED)
-endif (GEOIP_BUILTIN)
-
 # required libraries for client and libcvmfs
 if (BUILD_CVMFS OR BUILD_LIBCVMFS)
   if (PACPARSER_BUILTIN)
@@ -413,6 +411,15 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 
 if (BUILD_SERVER OR BUILD_UNITTESTS)
+  if (GEOIP_BUILTIN)
+    include (${LIBGEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+    include (${PYTHON_GEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+    add_dependencies (python-geoip libgeoip)
+  else (GEOIP_BUILTIN)
+    find_package (LibGeoIP REQUIRED)
+    find_python_module (GeoIP REQUIRED)
+  endif (GEOIP_BUILTIN)
+
   if (TBB_PRIVATE_LIB)
     include (${TBB_BUILD_LOCATION}/CVMFS-CMakeLists.txt)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_BUILD_LOCATION}/include)

@@ -1021,15 +1021,21 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
     StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
 
+  // TODO(reneme): this depends on shash::kSuffix* being a char!
+  //               it should be more generic or replaced entirely
+  // TODO(reneme): this is practically the same as SqlListContentHashes and
+  //               should be consolidated
   string sql = "SELECT DISTINCT hash, "
   "CASE WHEN flags & " + StringifyInt(SqlDirent::kFlagFile) + " THEN " +
-    StringifyInt(kChunkFile) + " " +
+    StringifyInt(shash::kSuffixNone) + " " +
   "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
-    StringifyInt(kChunkMicroCatalog) + " END " +
+    StringifyInt(shash::kSuffixMicroCatalog) + " END " +
   "AS chunk_type, " + flags2hash +
   "FROM catalog WHERE hash IS NOT NULL";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
-    sql += " UNION SELECT DISTINCT chunks.hash, " + StringifyInt(kChunkPiece) +
+    sql +=
+      " UNION "
+      "SELECT DISTINCT chunks.hash, " + StringifyInt(shash::kSuffixPartial) +
       ", " + flags2hash + "FROM chunks, catalog WHERE "
       "chunks.md5path_1=catalog.md5path_1 AND "
       "chunks.md5path_2=catalog.md5path_2";
@@ -1044,14 +1050,14 @@ bool SqlAllChunks::Open() {
 }
 
 
-bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
-  if (FetchRow()) {
-    *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
-                             shash::kSuffixPartial);
-    *type = static_cast<ChunkTypes>(RetrieveInt(1));
-    return true;
+bool SqlAllChunks::Next(shash::Any *hash) {
+  if (!FetchRow()) {
+    return false;
   }
-  return false;
+
+  *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
+                              static_cast<shash::Suffix>(RetrieveInt(1)));
+  return true;
 }
 
 

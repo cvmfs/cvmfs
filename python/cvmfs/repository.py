@@ -5,6 +5,7 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+import abc
 import os
 import urlparse
 import tempfile
@@ -19,6 +20,8 @@ import cvmfs
 from manifest import Manifest
 from catalog import Catalog
 from history import History
+from whitelist import Whitelist
+from certificate import Certificate
 
 class RepositoryNotFound(Exception):
     def __init__(self, repo_path):
@@ -71,6 +74,14 @@ class NestedCatalogNotFound(Exception):
 
     def __str__(self):
         return repr(self.repo)
+
+class RepositoryVerificationFailed(Exception):
+    def __init__(self, message, repo):
+        Exception.__init__(self, message)
+        self.repo = repo
+
+    def __str__(self):
+        return self.args[0] + " (Repo: " + repr(self.repo) + ")"
 
 
 class RepositoryIterator:
@@ -185,6 +196,9 @@ class CatalogTreeIterator:
 
 class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
+
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self):
         self._opened_catalogs = {}
         self._read_manifest()
@@ -231,6 +245,20 @@ class Repository:
             pass
 
 
+    def verify(self, public_key_path):
+        whitelist   = self.retrieve_whitelist()
+        certificate = self.retrieve_certificate()
+        if not whitelist.verify_signature(public_key_path):
+            raise RepositoryVerificationFailed("Public key doesn't fit", self)
+        if whitelist.expired():
+            raise RepositoryVerificationFailed("Whitelist expired", self)
+        if not whitelist.contains(certificate):
+            raise RepositoryVerificationFailed("Certificate not in whitelist", self)
+        if not self.manifest.verify_signature(certificate):
+            raise RepositoryVerificationFailed("Certificate doesn't fit", self)
+        return True
+
+
     def catalogs(self, root_catalog = None):
         return CatalogTreeIterator(self, root_catalog)
 
@@ -250,9 +278,20 @@ class Repository:
         return History(history_db)
 
 
+    def retrieve_whitelist(self):
+        whitelist = self.retrieve_file(_common._WHITELIST_NAME)
+        return Whitelist(whitelist)
+
+
+    def retrieve_certificate(self):
+        certificate = self.retrieve_object(self.manifest.certificate, 'X')
+        return Certificate(certificate)
+
+
+    @abc.abstractmethod
     def retrieve_file(self, file_name):
         """ Abstract method to retrieve a file from the repository """
-        raise Exception("Not implemented!")
+        pass
 
 
     def retrieve_object(self, object_hash, hash_suffix = ''):
@@ -304,12 +343,19 @@ class Repository:
 
 
 class LocalRepository(Repository):
-    def __init__(self, repo_fqrn):
+    def __init__(self, repo_fqrn_of_path):
+        if os.path.isdir(repo_fqrn_of_path):
+            self._open_local_directory(repo_fqrn_of_path)
+        else:
+            self._open_local_fqrn(repo_fqrn_of_path)
+
+
+    def _open_local_fqrn(self, repo_fqrn):
         repo_config_dir = os.path.join(_common._REPO_CONFIG_PATH, repo_fqrn)
         if not os.path.isdir(repo_config_dir):
             raise RepositoryNotFound(repo_fqrn)
         self._server_config = os.path.join(repo_config_dir, _common._SERVER_CONFIG_NAME)
-        self.type           = self.read_server_config("CVMFS_REPOSITORY_TYPE")
+        self.type = self.read_server_config("CVMFS_REPOSITORY_TYPE")
         if self.type != 'stratum0' and self.type != 'stratum1':
             raise UnknownRepositoryType(repo_fqrn, self.type)
         self._storage_location = self._get_repo_location()
@@ -318,7 +364,15 @@ class LocalRepository(Repository):
         self.fqrn    = repo_fqrn
 
 
+    def _open_local_directory(self, repo_directory):
+        self._server_config = None
+        self._storage_location = repo_directory
+        Repository.__init__(self)
+
+
     def read_server_config(self, config_field):
+        if not self._server_config:
+            raise ConfigurationNotFound(self, "no such file or directory")
         with open(self._server_config) as config_file:
             for config_line in config_file:
                 if config_line.startswith(config_field):
@@ -432,8 +486,10 @@ def all_local():
 def all_local_stratum0():
     return [ repo for repo in all_local() if repo.type == 'stratum0' ]
 
-def open_repository(repository_path):
-    if repository_path.startswith("http://"):
-        return RemoteRepository(repository_path)
-    else:
-        return LocalRepository(repository_path)
+def open_repository(repository_path, public_key = None):
+    repo = RemoteRepository(repository_path)              \
+                if repository_path.startswith("http://")  \
+                else LocalRepository(repository_path)
+    if public_key and not repo.verify(public_key):
+        return None
+    return repo

@@ -183,7 +183,7 @@ bool GarbageCollector<CatalogTraversalT, HashFilterT>::CheckPreservedRevisions()
 
 template <class CatalogTraversalT, class HashFilterT>
 bool GarbageCollector<CatalogTraversalT, HashFilterT>::
-SweepCondemnedCatalogTree()
+  SweepCondemnedCatalogTree()
 {
   if (configuration_.verbose) {
     LogCvmfs(kLogGc, kLogStdout, "Sweeping Condemned Catalog Graphs");

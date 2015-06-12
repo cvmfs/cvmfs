@@ -24,6 +24,7 @@ class TestMD5Handling(unittest.TestCase):
         lo, hi = cvmfs._split_md5(path_md5.digest())
         self.assertEqual((lo, hi), (self.path_md5_lo, self.path_md5_hi))
 
+
     def test_md5_combination(self):
         digest = cvmfs._combine_md5(self.path_md5_lo, self.path_md5_hi)
         path_md5 = hashlib.md5(self.path)

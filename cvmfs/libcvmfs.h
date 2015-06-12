@@ -14,7 +14,10 @@
 #define LIBCVMFS_VERSION_MINOR 1
 // Revision Changelog
 // 13: revision introduced
-#define LIBCVMFS_REVISION 13
+// 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
+// 15: remove counting of open file descriptors
+// 16: remove unnecessary free
+#define LIBCVMFS_REVISION 16
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -53,7 +56,7 @@
 extern "C" {
 #endif
 
-struct cvmfs_context;
+class cvmfs_context;
 
 /**
  * Initialize global CVMFS library structures

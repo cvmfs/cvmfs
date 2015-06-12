@@ -34,9 +34,17 @@ class InputSanitizer {
 
   std::string Filter(const std::string &input) const;
   bool IsValid(const std::string &input) const;
+
+ protected:
+  bool Sanitize(const std::string &input, std::string *filtered_output) const {
+    return Sanitize(input.begin(), input.end(), filtered_output);
+  }
+  virtual bool Sanitize(std::string::const_iterator   begin,
+                        std::string::const_iterator   end,
+                        std::string                  *filtered_output) const;
+  bool CheckRanges(const char chr) const;
+
  private:
-  virtual bool Sanitize(const std::string &input, std::string *filtered_output)
-    const;
   std::vector<CharRange> valid_ranges_;
 };
 
@@ -44,21 +52,34 @@ class InputSanitizer {
 class AlphaNumSanitizer : public InputSanitizer {
  public:
   AlphaNumSanitizer() : InputSanitizer("az AZ 09") { }
-  virtual ~AlphaNumSanitizer() { }
 };
 
 
 class RepositorySanitizer : public InputSanitizer {
  public:
   RepositorySanitizer() : InputSanitizer("az AZ 09 - _ .") { }
-  virtual ~RepositorySanitizer() { }
 };
 
 
 class IntegerSanitizer : public InputSanitizer {
  public:
   IntegerSanitizer() : InputSanitizer("09") { }
-  virtual ~IntegerSanitizer() { }
+
+ protected:
+  virtual bool Sanitize(std::string::const_iterator   begin,
+                        std::string::const_iterator   end,
+                        std::string                  *filtered_output) const;
+};
+
+
+class PositiveIntegerSanitizer : public IntegerSanitizer {
+ public:
+  PositiveIntegerSanitizer() : IntegerSanitizer() { }
+
+ protected:
+  virtual bool Sanitize(std::string::const_iterator   begin,
+                        std::string::const_iterator   end,
+                        std::string                  *filtered_output) const;
 };
 
 }  // namespace sanitizer

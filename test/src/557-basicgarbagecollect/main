@@ -291,5 +291,35 @@ cvmfs_run_test() {
   echo "check that the temporary scratch directory is empty"
   [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
 
+  # ============================================================================
+
+  echo "perform another basic garbage collection as dryrun (empty tmp dir regression)"
+  cvmfs_server gc -ldf $CVMFS_TEST_REPO || return 18
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  echo "check if shakespeare is gone"
+  peek_backend $CVMFS_TEST_REPO $shakespeare_object    && return 19
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_1 && return 19
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 && return 19
+  peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 && return 19
+
+  echo "check if kafka is still there"
+  peek_backend $CVMFS_TEST_REPO $kafka_object    || return 20
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_1 || return 20
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 || return 20
+  peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 20
+
+  echo "check if the catalog revisions 1-4 are gone"
+  for clg_hash in $condemned_clgs; do
+    peek_backend $CVMFS_TEST_REPO ${clg_hash}C && return 21
+  done
+
+  echo "check if the catalog revisions 5-6 are preserved"
+  for clg_hash in $preserved_clgs; do
+    peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 22
+  done
+
   return 0
 }

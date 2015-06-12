@@ -375,6 +375,16 @@ class T_ObjectFetcher : public ::testing::Test {
     closedir(dp);
   }
 
+  size_t CountTemporaryFiles() {
+    if (!NeedsFilesystemSandbox()) {
+      return 0;
+    }
+
+    DirectoryListing listing;
+    ListDirectory(temp_directory, &listing);
+    return listing.size();
+  }
+
  private:
   // type-based overloading helper struct
   // Inspired from here:
@@ -507,8 +517,8 @@ class T_ObjectFetcher : public ::testing::Test {
     const std::string txn_path = CreateTempPath(temp_directory + "/blob", 0600);
     ASSERT_TRUE(zlib::CompressPath2Path(tmp_path, txn_path, content_hash)) <<
       "failed to compress file " << tmp_path << " to " << tmp_path;
-    const std::string res_path = backend_storage + "/" +
-                                 content_hash->MakePathWithSuffix();
+    const std::string res_path = backend_storage + "/data/" +
+                                 content_hash->MakePath();
     ASSERT_EQ(0, rename(txn_path.c_str(), res_path.c_str())) <<
       "failed to rename() compressed file " << txn_path << " to " << res_path <<
       " with content hash " << content_hash->ToString() <<
@@ -603,6 +613,9 @@ TYPED_TEST_CASE(T_ObjectFetcher, ObjectFetcherTypes);
 TYPED_TEST(T_ObjectFetcher, InitializeSlow) {
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   EXPECT_TRUE(object_fetcher.IsValid());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -615,6 +628,9 @@ TYPED_TEST(T_ObjectFetcher, FetchManifestSlow) {
 
   EXPECT_EQ(TestFixture::root_hash,    manifest->catalog_hash());
   EXPECT_EQ(TestFixture::history_hash, manifest->history());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -628,6 +644,9 @@ TYPED_TEST(T_ObjectFetcher, FetchHistorySlow) {
     history(object_fetcher->FetchHistory());
   ASSERT_TRUE(history.IsValid());
   EXPECT_EQ(TestFixture::previous_history_hash, history->previous_revision());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -641,6 +660,9 @@ TYPED_TEST(T_ObjectFetcher, FetchLegacyHistorySlow) {
     << "didn't find: "
     << TestFixture::previous_history_hash.ToStringWithSuffix();
   EXPECT_TRUE(history->previous_revision().IsNull());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -652,6 +674,9 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidHistorySlow) {
       object_fetcher->FetchHistory(h("400d35465f179a4acacb5fe749e6ce20a0bbdb84",
                                      shash::kSuffixHistory)));
   ASSERT_FALSE(history.IsValid());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -665,6 +690,9 @@ TYPED_TEST(T_ObjectFetcher, FetchCatalogSlow) {
   ASSERT_TRUE(catalog.IsValid());
   EXPECT_EQ("",                            catalog->path().ToString());
   EXPECT_EQ(TestFixture::catalog_revision, catalog->revision());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_LE(1u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -676,6 +704,9 @@ TYPED_TEST(T_ObjectFetcher, FetchInvalidCatalogSlow) {
     object_fetcher->FetchCatalog(h("5739dc30f42525a261b2f4b383b220df3e36f04d",
                                    shash::kSuffixCatalog), ""));
   ASSERT_FALSE(catalog.IsValid());
+  if (TestFixture::NeedsFilesystemSandbox()) {
+    EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
+  }
 }
 
 
@@ -685,54 +716,38 @@ TYPED_TEST(T_ObjectFetcher, AutoCleanupFetchedFilesSlow) {
     return;
   }
 
-  typedef typename TestFixture::DirectoryListing DirectoryListing;
-  DirectoryListing listing;
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-
   size_t files = 0;
-
-  EXPECT_EQ(files, listing.size());
+  EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
   UniquePtr<TypeParam> object_fetcher(TestFixture::GetObjectFetcher());
   ASSERT_TRUE(object_fetcher.IsValid());
 
   UniquePtr<manifest::Manifest> manifest(object_fetcher->FetchManifest());
   ASSERT_TRUE(manifest.IsValid());
-
-  EXPECT_EQ(files, listing.size());
+  EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
   UniquePtr<typename TypeParam::CatalogTN> catalog(
     object_fetcher->FetchCatalog(TestFixture::root_hash, ""));
   ASSERT_TRUE(catalog.IsValid());
 
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_LT(files, listing.size());
-  files = listing.size();
+  EXPECT_LT(files, TestFixture::CountTemporaryFiles());
+  files = TestFixture::CountTemporaryFiles();
 
   UniquePtr<typename TypeParam::HistoryTN>
     history(object_fetcher->FetchHistory());
   ASSERT_TRUE(history.IsValid());
 
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_LT(files, listing.size());
-  files = listing.size();
+  EXPECT_LT(files, TestFixture::CountTemporaryFiles());
+  files = TestFixture::CountTemporaryFiles();
 
   delete object_fetcher.Release();
-
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_EQ(files, listing.size());
+  EXPECT_EQ(files, TestFixture::CountTemporaryFiles());
 
   delete history.Release();
-
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_GT(files, listing.size());
-  files = listing.size();
+  EXPECT_GT(files, TestFixture::CountTemporaryFiles());
+  files = TestFixture::CountTemporaryFiles();
 
   delete catalog.Release();
-
-  TestFixture::ListDirectory(TestFixture::temp_directory, &listing);
-  EXPECT_GT(files, listing.size());
-  files = listing.size();
-
-  EXPECT_EQ(0u, listing.size());
+  EXPECT_GT(files, TestFixture::CountTemporaryFiles());
+  EXPECT_EQ(0u, TestFixture::CountTemporaryFiles());
 }

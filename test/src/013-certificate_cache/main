@@ -11,7 +11,7 @@ cvmfs_run_test() {
   sudo rm -f "$(get_cvmfs_cachedir lhcb.cern.ch)/cvmfschecksum.lhcb.cern.ch" || return 11
 
   ls /cvmfs/lhcb.cern.ch || return 20
-  if ! sudo cvmfs_talk -i lhcb.cern.ch internal affairs | grep -A1 "Certificate cache:" | tail -1 | grep -q "hits: 1"
+  if ! sudo cvmfs_talk -i lhcb.cern.ch internal affairs | grep -A1 "cache.n_certificate_hits" | grep "1"
   then
     sudo cvmfs_talk -i lhcb.cern.ch internal affairs
     return 21

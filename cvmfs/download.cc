@@ -2384,6 +2384,13 @@ void DownloadManager::SetRetryParameters(const unsigned max_retries,
 }
 
 
+void DownloadManager::SetMaxIpaddrPerProxy(unsigned limit) {
+  pthread_mutex_lock(lock_options_);
+  resolver->set_throttle(limit);
+  pthread_mutex_unlock(lock_options_);
+}
+
+
 void DownloadManager::SetProxyTemplates(
   const std::string &direct,
   const std::string &forced)
