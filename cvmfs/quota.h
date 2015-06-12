@@ -44,6 +44,13 @@ class QuotaManager : SingleCopy {
    */
   static const uint32_t kProtocolRevision;
 
+  /**
+   * As of 25M, a file is considered a "big file", which means it is dangerous
+   * to apply asynchronous semantics.  In particular, the Fetcher cleans up
+   * opportunistically before starting to download.
+   */
+  static const uint64_t kBigFile;
+
   QuotaManager();
   virtual ~QuotaManager();
   virtual bool IsEnforcing() = 0;
@@ -138,8 +145,8 @@ class NoopQuotaManager : public QuotaManager {
   virtual std::vector<std::string> ListVolatile() {
     return std::vector<std::string>();
   }
-  virtual uint64_t GetMaxFileSize() { return 0; }
-  virtual uint64_t GetCapacity() { return 0; }
+  virtual uint64_t GetMaxFileSize() { return uint64_t(-1); }
+  virtual uint64_t GetCapacity() { return uint64_t(-1); }
   virtual uint64_t GetSize() { return 0; }
   virtual uint64_t GetSizePinned() { return 0; }
 

@@ -14,6 +14,7 @@
 #include "../../cvmfs/cache.h"
 #include "../../cvmfs/compression.h"
 #include "../../cvmfs/fs_traversal.h"
+#include "../../cvmfs/hash.h"
 #include "../../cvmfs/quota.h"
 #include "../../cvmfs/util.h"
 #include "testutil.h"

@@ -54,6 +54,7 @@
 using namespace std;  // NOLINT
 
 const uint32_t QuotaManager::kProtocolRevision = 1;
+const uint64_t QuotaManager::kBigFile = 25*1024*1024;
 
 void QuotaManager::BroadcastBackchannels(const string &message) {
   assert(message.length() > 0);

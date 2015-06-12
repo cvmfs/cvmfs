@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "download.h"
+#include "gtest/gtest_prod.h"
 #include "hash.h"
 #include "util.h"
 
@@ -30,6 +31,7 @@ namespace cvmfs {
  * Concurrent download requests for the same id are collapsed.
  */
 class Fetcher : SingleCopy {
+  FRIEND_TEST(T_Fetcher, SignalWaitingThreads);
   friend void TLSDestructor(void *data);
 
  public:
@@ -44,7 +46,7 @@ class Fetcher : SingleCopy {
           download::DownloadManager *download_mgr);
   ~Fetcher();
   int Fetch(const shash::Any &id,
-            const int64_t size,
+            const uint64_t size,
             const std::string &name,
             const ObjectType object_type);
 

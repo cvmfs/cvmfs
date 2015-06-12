@@ -10,6 +10,7 @@
 #include "cache.h"
 #include "download.h"
 #include "logging.h"
+#include "quota.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
@@ -70,7 +71,7 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
 
 
 int Fetcher::Fetch(const shash::Any &id,
-                   const int64_t size,
+                   const uint64_t size,
                    const std::string &name,
                    const ObjectType object_type)
 {
@@ -80,28 +81,21 @@ int Fetcher::Fetch(const shash::Any &id,
   // Try to open from local cache
   if ((fd_return = cache_mgr_->Open(id)) >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit: %s", name.c_str());
-
-    // TODO-QUOTAMGR
-    //if (cache_mode_ == kCacheReadWrite)
-    //  quota::Touch(checksum);
     return fd_return;
   }
 
-  // TODO-QUOTAMGR
-  /*if (size > quota::GetMaxFileSize()) {
+  if (size > cache_mgr_->quota_mgr()->GetMaxFileSize()) {
     LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64" "
                                    "requested but only %"PRIu64" bytes free)",
-             size, quota::GetMaxFileSize());
+             size, cache_mgr_->quota_mgr()->GetMaxFileSize());
     return -ENOSPC;
-  }*/
+  }
 
-  // Opportunitically clean up cache for large files
-  // TODO-QUOTAMGR
-  /*
-  if ((size >= kBigFile) && (quota::GetCapacity() > 0)) {
+  // Opportunistically clean up cache for large files
+  if (size >= QuotaManager::kBigFile) {
     assert(quota::GetCapacity() >= size);
     quota::Cleanup(quota::GetCapacity() - size);
-  }*/
+  }
 
   ThreadLocalStorage *tls = GetTls();
 
@@ -124,8 +118,6 @@ int Fetcher::Fetch(const shash::Any &id,
     fd_return = cache_mgr_->Open(id);
     if (fd_return >= 0) {
       pthread_mutex_unlock(lock_queues_download_);
-      // TODO-QUOTAMGR
-      //quota::Touch(checksum);
       return fd_return;
     }
 
@@ -168,7 +160,7 @@ int Fetcher::Fetch(const shash::Any &id,
     assert(file_size >= 0);
     // Allow size to be zero if alien cache, because hadoop-fuse-dfs returns
     // size zero for a while
-    if ((file_size != size) &&
+    if ((static_cast<uint64_t>(file_size) != size) &&
         (cache_mgr_->reports_correct_filesize() || (file_size != 0)))
     {
       LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
@@ -248,13 +240,21 @@ Fetcher::~Fetcher() {
 
 
 void Fetcher::SignalWaitingThreads(
-  const int fd, 
+  const int fd,
   const shash::Any &id,
-  ThreadLocalStorage *tls) 
+  ThreadLocalStorage *tls)
 {
   pthread_mutex_lock(lock_queues_download_);
   for (unsigned i = 0, s = tls->other_pipes_waiting.size(); i < s; ++i) {
-    int fd_dup = (fd >= 0) ? dup(fd) : fd;
+    //int fd_dup = (fd >= 0) ? dup(fd) : -errno/*fd*/;
+    int fd_dup;
+    if (fd >= 0) {
+      fd_dup = dup(fd);
+      if (fd_dup < 0)
+        fd_dup = -errno;
+    } else {
+      fd_dup = fd;
+    }
     WritePipe(tls->other_pipes_waiting[i], &fd_dup, sizeof(int));
   }
   tls->other_pipes_waiting.clear();
