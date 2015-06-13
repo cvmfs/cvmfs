@@ -57,6 +57,7 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
     return tls;
 
   tls = new ThreadLocalStorage();
+  tls->fetcher = this;
   MakePipe(tls->pipe_wait);
   tls->download_job.destination = download::kDestinationFile;
   tls->download_job.compressed = true;

@@ -28,7 +28,9 @@ namespace cvmfs {
  * Concurrent download requests for the same id are collapsed.
  */
 class Fetcher : SingleCopy {
+  FRIEND_TEST(T_Fetcher, GetTls);
   FRIEND_TEST(T_Fetcher, SignalWaitingThreads);
+  friend void *TestGetTls(void *data);
   friend void TLSDestructor(void *data);
 
  public:
@@ -47,6 +49,11 @@ class Fetcher : SingleCopy {
    * threads wait on a pipe for a notification from the first thread.
    */
   struct ThreadLocalStorage {
+    ThreadLocalStorage() {
+      pipe_wait[0] = -1;
+      pipe_wait[1] = -1;
+    }
+    
     /**
      * Used during cleanup to find tls_blocks_.
      */

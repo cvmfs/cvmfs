@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <fcntl.h>
+#include <pthread.h>
 
 #include "../../cvmfs/cache.h"
 #include "../../cvmfs/download.h"
@@ -54,6 +55,31 @@ class T_Fetcher : public ::testing::Test {
   vector<shash::Any> hashes_;
   string tmp_path_;
 };
+
+
+void *TestGetTls(void *data) {
+  Fetcher *f = static_cast<Fetcher *>(data);
+  void *thread_tls = f->GetTls();
+  EXPECT_TRUE(thread_tls != NULL);
+  EXPECT_EQ(thread_tls, f->GetTls());
+  EXPECT_EQ(2U, f->tls_blocks_.size());
+  return thread_tls;
+}
+
+TEST_F(T_Fetcher, GetTls) {
+  void *this_tls = fetcher_->GetTls();
+  EXPECT_TRUE(this_tls != NULL);
+  // Idempotent
+  EXPECT_EQ(this_tls, fetcher_->GetTls());
+  EXPECT_EQ(1U, fetcher_->tls_blocks_.size());
+
+  pthread_t thread;
+  EXPECT_EQ(0, pthread_create(&thread, NULL, TestGetTls, fetcher_));
+  void *other_thread_tls;
+  pthread_join(thread, &other_thread_tls);
+  //EXPECT_TRUE(other_thread_tls != NULL);
+  //EXPECT_NE(other_thread_tls, this_tls);
+}
 
 
 TEST_F(T_Fetcher, SignalWaitingThreads) {
