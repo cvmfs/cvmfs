@@ -17,8 +17,6 @@ using namespace std;  // NOLINT
 
 namespace cvmfs {
 
-const uint64_t Fetcher::kBigFile = 25*1024*1024;
-
 void TLSDestructor(void *data) {
   Fetcher::ThreadLocalStorage *tls =
     static_cast<Fetcher::ThreadLocalStorage *>(data);
@@ -87,19 +85,6 @@ int Fetcher::Fetch(
     return fd_return;
   }
 
-  if (size > cache_mgr_->quota_mgr()->GetMaxFileSize()) {
-    LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64" "
-                                   "requested but only %"PRIu64" bytes free)",
-             size, cache_mgr_->quota_mgr()->GetMaxFileSize());
-    return -ENOSPC;
-  }
-
-  // Opportunistically clean up cache for large files
-  if (size >= kBigFile) {
-    assert(quota::GetCapacity() >= size);
-    quota::Cleanup(quota::GetCapacity() - size);
-  }
-
   ThreadLocalStorage *tls = GetTls();
 
   // Synchronization point: either act as a master thread for this object or
@@ -158,23 +143,6 @@ int Fetcher::Fetch(
       return fd_return;
     }
 
-    // Check decompressed size (a cross check just in case)
-    int64_t file_size = cache_mgr_->GetSize(fd_return);
-    assert(file_size >= 0);
-    // Allow size to be zero if alien cache, because hadoop-fuse-dfs returns
-    // size zero for a while
-    if ((static_cast<uint64_t>(file_size) != size) &&
-        (cache_mgr_->reports_correct_filesize() || (file_size != 0)))
-    {
-      LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-               "size check failure for %s, expected %lu, got %lu",
-               url.c_str(), size, file_size);
-      cache_mgr_->Close(fd_return);
-      cache_mgr_->AbortTxn(txn, quarantaine_path_ + "/" + id.ToString());
-      SignalWaitingThreads(-EIO, id, tls);
-      return -EIO;
-    }
-
     retval = cache_mgr_->CommitTxn(txn);
     if (retval < 0) {
       cache_mgr_->Close(fd_return);
@@ -198,12 +166,10 @@ int Fetcher::Fetch(
 
 
 Fetcher::Fetcher(
-  const string &quarantaine_path,
   cache::CacheManager *cache_mgr,
   download::DownloadManager *download_mgr)
   : lock_queues_download_(NULL)
   , lock_tls_blocks_(NULL)
-  , quarantaine_path_(quarantaine_path)
   , cache_mgr_(cache_mgr)
   , download_mgr_(download_mgr)
 {

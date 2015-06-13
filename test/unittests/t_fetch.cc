@@ -36,7 +36,7 @@ class T_Fetcher : public ::testing::Test {
 
 
 TEST_F(T_Fetcher, SignalWaitingThreads) {
-  Fetcher tmp("", NULL, NULL);
+  Fetcher tmp(NULL, NULL);
   int fd = open("/dev/null", O_RDONLY);
   EXPECT_GE(fd, 0);
   int tls_pipe[2];

@@ -115,10 +115,8 @@ atomic_int32 CallGuard::global_drainout_ = 0;
 
 const uint64_t CacheManager::kSizeUnknown = uint64_t(-1);
 
-CacheManager::CacheManager()
-  : reports_correct_filesize_(true)
-  , quota_mgr_(new NoopQuotaManager())
-{ }
+
+CacheManager::CacheManager() : quota_mgr_(new NoopQuotaManager()) { }
 
 
 CacheManager::~CacheManager() {
@@ -197,16 +195,12 @@ bool CacheManager::CommitFromMem(
 
 //------------------------------------------------------------------------------
 
+const uint64_t PosixCacheManager::kBigFile = 25*1024*1024;  // 25M
 
-int PosixCacheManager::AbortTxn(void *txn, const string &dump_path) {
+
+int PosixCacheManager::AbortTxn(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   LogCvmfs(kLogCache, kLogDebug, "abort %s", transaction->tmp_path.c_str());
-  if (dump_path != "") {
-    LogCvmfs(kLogCache, kLogDebug, "dumping transaction to %s",
-             dump_path.c_str());
-    Flush(transaction);
-    CopyPath2Path(transaction->tmp_path, dump_path);
-  }
   close(transaction->fd);
   int result = unlink(transaction->tmp_path.c_str());
   transaction->~Transaction();
@@ -238,6 +232,26 @@ int PosixCacheManager::CommitTxn(void *txn) {
     transaction->~Transaction();
     atomic_dec32(&no_inflight_txns_);
     return result;
+  }
+
+  // To support debugging, move files into quarantine on file size mismatch
+  if (transaction->size != transaction->expected_size) {
+    // Allow size to be zero if alien cache, because hadoop-fuse-dfs returns
+    // size zero for a while
+    if ( (transaction->expected_size != kSizeUnknown) &&
+         (reports_correct_filesize_ || (transaction->size != 0)) )
+    {
+      LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
+               "size check failure for %s, expected %lu, got %lu",
+               transaction->id.ToString().c_str(),
+               transaction->expected_size, transaction->size);
+      CopyPath2Path(transaction->tmp_path,
+                    cache_path_ + "/quarantaine/" + transaction->id.ToString());
+      unlink(transaction->tmp_path.c_str());
+      transaction->~Transaction();
+      atomic_dec32(&no_inflight_txns_);
+      return -EIO;
+    }
   }
 
   if ((transaction->type == kTypePinned) || (transaction->type == kTypeCatalog))
@@ -440,6 +454,7 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 int PosixCacheManager::Reset(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->buf_pos = 0;
+  transaction->size = 0;
   int retval = lseek(transaction->fd, 0, SEEK_SET);
   if (retval < 0)
     return -errno;
@@ -461,6 +476,22 @@ int PosixCacheManager::StartTxn(
     return -EROFS;
   }
 
+  if (size != kSizeUnknown) {
+    if (size > quota_mgr_->GetMaxFileSize()) {
+      LogCvmfs(kLogCache, kLogDebug, "file too big for lru cache (%"PRIu64" "
+                                     "requested but only %"PRIu64" bytes free)",
+               size, quota_mgr_->GetMaxFileSize());
+      atomic_dec32(&no_inflight_txns_);
+      return -ENOSPC;
+    }
+
+    // Opportunistically clean up cache for large files
+    if (size > kBigFile) {
+      assert(quota_mgr_->GetCapacity() >= size);
+      quota_mgr_->Cleanup(quota_mgr_->GetCapacity() - size);
+    }
+  }
+
   Transaction *transaction = new (txn) Transaction(id, GetPathInCache(id));
   const unsigned temp_path_len = txn_template_path_.length();
 
@@ -477,6 +508,7 @@ int PosixCacheManager::StartTxn(
   LogCvmfs(kLogCache, kLogDebug, "start transaction on %s has result %d",
            template_path, transaction->fd);
   transaction->tmp_path = template_path;
+  transaction->expected_size = size;
   return transaction->fd;
 }
 
@@ -499,6 +531,12 @@ void PosixCacheManager::TearDown2ReadOnly() {
 
 int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
+
+  if (transaction->expected_size != kSizeUnknown) {
+    if (transaction->size + size > transaction->expected_size)
+      return -ENOSPC;
+  }
+
   uint64_t written = 0;
   while (written < size) {
     if (transaction->buf_pos == sizeof(transaction->buffer)) {

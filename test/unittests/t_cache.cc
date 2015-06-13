@@ -180,7 +180,7 @@ class TestQuotaManager : public QuotaManager {
   }
   virtual bool Cleanup(const uint64_t leave_size) {
     last_cmd = LastCommand();
-    last_cmd.cmd = kCmdUnpin;
+    last_cmd.cmd = kCmdCleanup;
     last_cmd.size = leave_size;
     return true;
   }
@@ -200,8 +200,8 @@ class TestQuotaManager : public QuotaManager {
   virtual std::vector<std::string> ListVolatile() {
     return std::vector<std::string>();
   }
-  virtual uint64_t GetMaxFileSize() { return 0; }
-  virtual uint64_t GetCapacity() { return 0; }
+  virtual uint64_t GetMaxFileSize() { return 50*1024*1024; }
+  virtual uint64_t GetCapacity() { return 100*1024*1024; }
   virtual uint64_t GetSize() { return 0; }
   virtual uint64_t GetSizePinned() { return 0; }
 
@@ -243,7 +243,7 @@ class TestCacheManager : public CacheManager {
     return -EIO;
   }
   virtual int Reset(void *txn) { return 0; }
-  virtual int AbortTxn(void *txn, const std::string &dump_path = "") {
+  virtual int AbortTxn(void *txn) {
     return close(*static_cast<int *>(txn));
   }
   virtual int OpenFromTxn(void *txn) { return open("/dev/null", O_RDONLY); }
@@ -313,17 +313,6 @@ TEST_F(T_CacheManager, AbortTxn) {
   EXPECT_TRUE(RemoveTree(tmp_path_ + "/txn"));
   EXPECT_EQ(0, mkdir((tmp_path_ + "/txn").c_str(), 0700));
   EXPECT_EQ(-ENOENT, cache_mgr_->AbortTxn(txn));
-
-  string dump_path = tmp_path_ + "/dump";
-  EXPECT_GE(cache_mgr_->StartTxn(hash_null_, dump_path.length(), txn), 0);
-  EXPECT_EQ(int64_t(dump_path.length()),
-            cache_mgr_->Write(dump_path.data(), dump_path.length(), txn));
-  EXPECT_EQ(0, cache_mgr_->AbortTxn(txn, dump_path));
-  unsigned char *buf;
-  unsigned buf_size;
-  EXPECT_TRUE(CopyPath2Mem(dump_path, &buf, &buf_size));
-  EXPECT_EQ(buf_size, dump_path.length());
-  EXPECT_EQ(dump_path, string(reinterpret_cast<char *>(buf), buf_size));
 }
 
 
@@ -372,6 +361,28 @@ TEST_F(T_CacheManager, CommitTxn) {
   EXPECT_EQ(0, alien_cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(0, platform_stat(cache_path.c_str(), &info));
   EXPECT_EQ(0660U, info.st_mode & 0x03FF);
+}
+
+
+TEST_F(T_CacheManager, CommitTxnSizeMismatch) {
+  shash::Any rnd_hash;
+  rnd_hash.Randomize();
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  ASSERT_TRUE(txn != NULL);
+  unsigned char content = 'x';
+
+  ASSERT_EQ(-ENOENT, cache_mgr_->Open(rnd_hash));
+
+  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
+  EXPECT_EQ(1U, cache_mgr_->Write(&content, 1, txn));
+  EXPECT_EQ(-EIO, cache_mgr_->CommitTxn(txn));
+  unsigned char *buf;
+  unsigned buf_size;
+  EXPECT_TRUE(CopyPath2Mem(tmp_path_ + "/quarantaine/" + rnd_hash.ToString(),
+                           &buf, &buf_size));
+  EXPECT_EQ(1U, buf_size);
+  EXPECT_EQ(content, buf[0]);
+  free(buf);
 }
 
 
@@ -500,7 +511,7 @@ TEST_F(T_CacheManager, Create) {
 
 
 TEST_F(T_CacheManager, Dup) {
-  EXPECT_EQ(-EBADF, cache_mgr_->Dup(1000000));
+  EXPECT_EQ(-EBADF, cache_mgr_->Dup(-1));
   int fd = cache_mgr_->Open(hash_null_);
   EXPECT_GE(fd, 0);
   int fd_dup = cache_mgr_->Dup(fd);
@@ -552,7 +563,7 @@ TEST_F(T_CacheManager, OpenFromTxn) {
 
   ASSERT_EQ(-ENOENT, cache_mgr_->Open(rnd_hash));
 
-  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 1, txn), 0);
+  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 2, txn), 0);
   unsigned char buf = 'A';
   EXPECT_EQ(1U, cache_mgr_->Write(&buf, 1, txn));
   int fd = cache_mgr_->OpenFromTxn(txn);
@@ -626,12 +637,12 @@ TEST_F(T_CacheManager, Reset) {
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 5000, txn), 0);
   EXPECT_EQ(5000, cache_mgr_->Write(large_buf, 5000, txn));
   EXPECT_EQ(0, cache_mgr_->Reset(txn));
-  EXPECT_EQ(1, cache_mgr_->Write(large_buf, 1, txn));
+  EXPECT_EQ(5000, cache_mgr_->Write(large_buf, 5000, txn));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
 
   int fd = cache_mgr_->Open(rnd_hash);
   EXPECT_GE(fd, 0);
-  EXPECT_EQ(1, cache_mgr_->GetSize(fd));
+  EXPECT_EQ(5000, cache_mgr_->GetSize(fd));
   EXPECT_EQ(1, cache_mgr_->Pread(fd, large_buf, 1, 0));
   EXPECT_EQ('A', large_buf[0]);
   cache_mgr_->Close(fd);
@@ -659,6 +670,22 @@ TEST_F(T_CacheManager, StartTxn) {
   int fd = cache_mgr_->StartTxn(rnd_hash, 0, txn);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->GetSize(fd));
+  cache_mgr_->AbortTxn(txn);
+
+  // Cache size management
+  delete cache_mgr_->quota_mgr_;
+  TestQuotaManager *quota_mgr = new TestQuotaManager();
+  cache_mgr_->quota_mgr_ = quota_mgr;
+  EXPECT_EQ(-ENOSPC,
+    cache_mgr_->StartTxn(rnd_hash, quota_mgr->GetMaxFileSize() + 1, txn));
+  fd = cache_mgr_->StartTxn(rnd_hash, PosixCacheManager::kBigFile + 1, txn);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(TestQuotaManager::kCmdCleanup, quota_mgr->last_cmd.cmd);
+  EXPECT_EQ(quota_mgr->GetCapacity() - (PosixCacheManager::kBigFile + 1),
+            quota_mgr->last_cmd.size);
+  cache_mgr_->AbortTxn(txn);
+  fd = cache_mgr_->StartTxn(rnd_hash, CacheManager::kSizeUnknown, txn);
+  EXPECT_GE(fd, 0);
   cache_mgr_->AbortTxn(txn);
 
   EXPECT_EQ(0, rmdir((tmp_path_ + "/txn").c_str()));
@@ -735,6 +762,12 @@ TEST_F(T_CacheManager, Write) {
   fd = cache_mgr_->StartTxn(rnd_hash, 10000, txn);
   close(fd);
   EXPECT_EQ(-EBADF, cache_mgr_->Write(large_buf, 10000, txn));
+  cache_mgr_->AbortTxn(txn);
+
+  fd = cache_mgr_->StartTxn(rnd_hash, 1, txn);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(1, cache_mgr_->Write(large_buf, 1, txn));
+  EXPECT_EQ(-ENOSPC, cache_mgr_->Write(large_buf, 1, txn));
   cache_mgr_->AbortTxn(txn);
 }
 

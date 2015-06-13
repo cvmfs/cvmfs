@@ -108,7 +108,7 @@ class CacheManager : SingleCopy {
                        void *txn) = 0;
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) = 0;
   virtual int Reset(void *txn) = 0;
-  virtual int AbortTxn(void *txn, const std::string &dump_path = "") = 0;
+  virtual int AbortTxn(void *txn) = 0;
   virtual int OpenFromTxn(void *txn) = 0;
   virtual int CommitTxn(void *txn) = 0;
 
@@ -118,16 +118,10 @@ class CacheManager : SingleCopy {
                      const uint64_t size,
                      const std::string &description);
 
-  bool reports_correct_filesize() const { return reports_correct_filesize_; }
   QuotaManager *quota_mgr() { return quota_mgr_; }
 
  protected:
   CacheManager();
-
-  /**
-   * Hack for HDFS which writes file sizes asynchronously.
-   */
-  bool reports_correct_filesize_;
 
   /**
    * Never NULL but defaults to NoopQuotaManager.
@@ -146,9 +140,17 @@ class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, Open);
   FRIEND_TEST(T_CacheManager, OpenFromTxn);
   FRIEND_TEST(T_CacheManager, Rename);
+  FRIEND_TEST(T_CacheManager, StartTxn);
   FRIEND_TEST(T_CacheManager, TearDown2ReadOnly);
 
  public:
+  /**
+   * As of 25M, a file is considered a "big file", which means it is dangerous
+   * to apply asynchronous semantics.  On start of a transaction with a big file
+   * the cache is cleaned up opportunistically.
+   */
+  static const uint64_t kBigFile;
+
   static PosixCacheManager *Create(const std::string &cache_path,
                                    const bool alien_cache);
   virtual	~PosixCacheManager() { };
@@ -168,7 +170,7 @@ class PosixCacheManager : public CacheManager {
   virtual int64_t Write(const void *buf, uint64_t size, void *txn);
   virtual int Reset(void *txn);
   virtual int OpenFromTxn(void *txn);
-  virtual int AbortTxn(void *txn, const std::string &dump_path = "");
+  virtual int AbortTxn(void *txn);
   virtual int CommitTxn(void *txn);
 
   void TearDown2ReadOnly();
@@ -183,6 +185,7 @@ class PosixCacheManager : public CacheManager {
     Transaction(const shash::Any &id, const std::string &final_path)
       : buf_pos(0)
       , size(0)
+      , expected_size(kSizeUnknown)
       , fd(-1)
       , type(kTypeRegular)
       , tmp_path()
@@ -193,6 +196,7 @@ class PosixCacheManager : public CacheManager {
     unsigned char buffer[4096];
     unsigned buf_pos;
     uint64_t size;
+    uint64_t expected_size;
  	  int fd;
     ObjectType type;
     std::string tmp_path;
@@ -207,6 +211,7 @@ class PosixCacheManager : public CacheManager {
     , alien_cache_(alien_cache)
     , alien_cache_on_nfs_(false)
     , cache_mode_(kCacheReadWrite)
+    , reports_correct_filesize_(true)
   {
     atomic_init32(&no_inflight_txns_);
   }
@@ -227,6 +232,11 @@ class PosixCacheManager : public CacheManager {
    * value in this variable.
    */
   atomic_int32 no_inflight_txns_;
+
+  /**
+   * Hack for HDFS which writes file sizes asynchronously.
+   */
+  bool reports_correct_filesize_;
 };
 
 

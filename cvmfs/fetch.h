@@ -36,15 +36,7 @@ class Fetcher : SingleCopy {
   friend void TLSDestructor(void *data);
 
  public:
-  /**
-   * As of 25M, a file is considered a "big file", which means it is dangerous
-   * to apply asynchronous semantics.  In particular, the Fetcher cleans up
-   * opportunistically before starting to download.
-   */
-  static const uint64_t kBigFile;
-
-  Fetcher(const std::string &quarantaine_path,
-          cache::CacheManager *cache_mgr,
+  Fetcher(cache::CacheManager *cache_mgr,
           download::DownloadManager *download_mgr);
   ~Fetcher();
   int Fetch(const shash::Any &id,
@@ -108,7 +100,6 @@ class Fetcher : SingleCopy {
   std::vector<ThreadLocalStorage *> tls_blocks_;
   pthread_mutex_t *lock_tls_blocks_;
 
-  std::string quarantaine_path_;
   cache::CacheManager *cache_mgr_;
   download::DownloadManager *download_mgr_;
 };
