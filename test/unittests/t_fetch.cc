@@ -77,8 +77,21 @@ TEST_F(T_Fetcher, GetTls) {
   EXPECT_EQ(0, pthread_create(&thread, NULL, TestGetTls, fetcher_));
   void *other_thread_tls;
   pthread_join(thread, &other_thread_tls);
-  //EXPECT_TRUE(other_thread_tls != NULL);
-  //EXPECT_NE(other_thread_tls, this_tls);
+  EXPECT_TRUE(other_thread_tls != NULL);
+  EXPECT_NE(other_thread_tls, this_tls);
+}
+
+
+TEST_F(T_Fetcher, Fetch) {
+  unsigned char x = 'x';
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(hashes_[0], &x, 1, ""));
+  int fd =
+    fetcher_->Fetch(hashes_[0], 1, "", cache::CacheManager::kTypeRegular);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+  fd = fetcher_->Fetch(hashes_[0], 1, "", cache::CacheManager::kTypeCatalog);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
 

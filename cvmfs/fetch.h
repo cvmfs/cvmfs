@@ -15,9 +15,35 @@
 #include "download.h"
 #include "gtest/gtest_prod.h"
 #include "hash.h"
+#include "sink.h"
 #include "util.h"
 
 namespace cvmfs {
+
+/**
+ * TransacionSink uses an open transaction in a cache manager as a sink.  It
+ * allows the download manager to write data without knowing about the cache
+ * manager.
+ */
+class TransactionSink : public Sink {
+ public:
+  TransactionSink(cache::CacheManager *cache_mgr, void *open_txn)
+    : cache_mgr_(cache_mgr)
+    , open_txn_(open_txn)
+  { }
+  virtual ~TransactionSink() { }
+  virtual int64_t Write(const void *buf, uint64_t sz) {
+    return cache_mgr_->Write(buf, sz, open_txn_);
+  }
+  virtual int Reset() {
+    return cache_mgr_->Reset(open_txn_);
+  }
+
+ private:
+  cache::CacheManager *cache_mgr_;
+  void *open_txn_;
+};
+
 
 /**
  * The Fetcher uses a cache manager and a download manager in order to provide a
@@ -53,7 +79,7 @@ class Fetcher : SingleCopy {
       pipe_wait[0] = -1;
       pipe_wait[1] = -1;
     }
-    
+
     /**
      * Used during cleanup to find tls_blocks_.
      */

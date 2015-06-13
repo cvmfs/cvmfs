@@ -59,7 +59,7 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
   tls = new ThreadLocalStorage();
   tls->fetcher = this;
   MakePipe(tls->pipe_wait);
-  tls->download_job.destination = download::kDestinationFile;
+  tls->download_job.destination = download::kDestinationSink;
   tls->download_job.compressed = true;
   tls->download_job.probe_hosts = true;
   int retval = pthread_setspecific(thread_local_storage_, tls);
@@ -126,10 +126,12 @@ int Fetcher::Fetch(
     SignalWaitingThreads(retval, id, tls);
     return retval;
   }
+  cache_mgr_->CtrlTxn(name, object_type, 0, txn);
 
   LogCvmfs(kLogCache, kLogDebug, "miss: %s %s", name.c_str(), url.c_str());
+  TransactionSink sink(cache_mgr_, txn);
   tls->download_job.url = &url;
-  //tls->download_job.destination_file = f;
+  tls->download_job.destination_sink = &sink;
   tls->download_job.expected_hash = &id;
   tls->download_job.extra_info = &name;
   download_mgr_->Fetch(&tls->download_job);
