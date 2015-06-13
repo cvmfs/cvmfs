@@ -215,15 +215,7 @@ void Fetcher::SignalWaitingThreads(
 {
   pthread_mutex_lock(lock_queues_download_);
   for (unsigned i = 0, s = tls->other_pipes_waiting.size(); i < s; ++i) {
-    //int fd_dup = (fd >= 0) ? dup(fd) : -errno/*fd*/;
-    int fd_dup;
-    if (fd >= 0) {
-      fd_dup = dup(fd);
-      if (fd_dup < 0)
-        fd_dup = -errno;
-    } else {
-      fd_dup = fd;
-    }
+    int fd_dup = (fd >= 0) ? cache_mgr_->Dup(fd) : fd;
     WritePipe(tls->other_pipes_waiting[i], &fd_dup, sizeof(int));
   }
   tls->other_pipes_waiting.clear();

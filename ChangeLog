@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix memory and file descriptor leak in the download manager during reload
   * Avoid use of attr utility in the server (CVM-853)
   * Build GeoIP libraries for the server only (CVM-854)
   * Add catalog-chown command to cvmfs_server (CVM-836)

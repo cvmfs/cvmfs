@@ -17,16 +17,12 @@
 #include "hash.h"
 #include "util.h"
 
-namespace cache {
-class CacheManager;
-}
-
 namespace cvmfs {
 
 /**
- * The Fetcher acts as a mediator between a cache manager and a download
- * manager.  It provides a file descriptor to a requested object, which is
- * usable with the cache manager.
+ * The Fetcher uses a cache manager and a download manager in order to provide a
+ * (virtual) file descriptor to a requested object, which is valid in the
+ * context of the cache manager.
  * If the object is not in the cache, it is downloaded and stored in the cache.
  *
  * Concurrent download requests for the same id are collapsed.

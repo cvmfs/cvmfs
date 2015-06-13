@@ -6,6 +6,8 @@
 
 #include <fcntl.h>
 
+#include "../../cvmfs/cache.h"
+#include "../../cvmfs/download.h"
 #include "../../cvmfs/fetch.h"
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/util.h"
@@ -23,40 +25,60 @@ class T_Fetcher : public ::testing::Test {
       hashes_.push_back(shash::Any(shash::kSha1));
       hashes_[i].digest[0] = i;
     }
+
+    tmp_path_ = CreateTempDir("/tmp/cvmfs_test");
+    cache_mgr_ = cache::PosixCacheManager::Create(tmp_path_, false);
+    ASSERT_TRUE(cache_mgr_ != NULL);
+
+    download_mgr_ = new download::DownloadManager();
+    download_mgr_->Init(8, false, /* use_system_proxy */ &statistics);
+
+    fetcher_ = new Fetcher(cache_mgr_, download_mgr_);
   }
 
   virtual void TearDown() {
+    delete fetcher_;
+    download_mgr_->Fini();
+    delete download_mgr_;
+    delete cache_mgr_;
+    if (tmp_path_ != "")
+      RemoveTree(tmp_path_);
     EXPECT_EQ(used_fds_, GetNoUsedFds());
   }
 
   Fetcher *fetcher_;
+  cache::PosixCacheManager *cache_mgr_;
+  perf::Statistics statistics;
+  download::DownloadManager *download_mgr_;
   unsigned used_fds_;
   vector<shash::Any> hashes_;
+  string tmp_path_;
 };
 
 
 TEST_F(T_Fetcher, SignalWaitingThreads) {
-  Fetcher tmp(NULL, NULL);
-  int fd = open("/dev/null", O_RDONLY);
+  unsigned char x = 'x';
+  EXPECT_TRUE(cache_mgr_->CommitFromMem(hashes_[0], &x, 1, ""));
+  int fd = cache_mgr_->Open(hashes_[0]);
   EXPECT_GE(fd, 0);
   int tls_pipe[2];
   MakePipe(tls_pipe);
 
-  tmp.queues_download_[hashes_[0]] = NULL;
-  tmp.queues_download_[hashes_[1]] = NULL;
-  tmp.queues_download_[hashes_[2]] = NULL;
+  fetcher_->queues_download_[hashes_[0]] = NULL;
+  fetcher_->queues_download_[hashes_[1]] = NULL;
+  fetcher_->queues_download_[hashes_[2]] = NULL;
 
-  tmp.GetTls()->other_pipes_waiting.push_back(tls_pipe[1]);
-  tmp.SignalWaitingThreads(-1, hashes_[0], tmp.GetTls());
-  EXPECT_EQ(0U, tmp.queues_download_.count(hashes_[0]));
+  fetcher_->GetTls()->other_pipes_waiting.push_back(tls_pipe[1]);
+  fetcher_->SignalWaitingThreads(-1, hashes_[0], fetcher_->GetTls());
+  EXPECT_EQ(0U, fetcher_->queues_download_.count(hashes_[0]));
 
-  tmp.GetTls()->other_pipes_waiting.push_back(tls_pipe[1]);
-  tmp.SignalWaitingThreads(fd, hashes_[1], tmp.GetTls());
-  EXPECT_EQ(0U, tmp.queues_download_.count(hashes_[1]));
+  fetcher_->GetTls()->other_pipes_waiting.push_back(tls_pipe[1]);
+  fetcher_->SignalWaitingThreads(fd, hashes_[1], fetcher_->GetTls());
+  EXPECT_EQ(0U, fetcher_->queues_download_.count(hashes_[1]));
 
-  tmp.GetTls()->other_pipes_waiting.push_back(tls_pipe[1]);
-  tmp.SignalWaitingThreads(1000000, hashes_[2], tmp.GetTls());
-  EXPECT_EQ(0U, tmp.queues_download_.count(hashes_[2]));
+  fetcher_->GetTls()->other_pipes_waiting.push_back(tls_pipe[1]);
+  fetcher_->SignalWaitingThreads(1000000, hashes_[2], fetcher_->GetTls());
+  EXPECT_EQ(0U, fetcher_->queues_download_.count(hashes_[2]));
 
   int fd_return0;
   int fd_return1;
@@ -66,11 +88,11 @@ TEST_F(T_Fetcher, SignalWaitingThreads) {
   ReadPipe(tls_pipe[0], &fd_return2, sizeof(fd_return2));
   EXPECT_EQ(-1, fd_return0);
   EXPECT_NE(fd, fd_return1);
-  EXPECT_EQ(0, close(fd_return1));
+  EXPECT_EQ(0, cache_mgr_->Close(fd_return1));
   EXPECT_EQ(-EBADF, fd_return2);
 
   ClosePipe(tls_pipe);
-  close(fd);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
 
 }  // namespace cvmfs
