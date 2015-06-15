@@ -41,8 +41,8 @@ echo "build the RPM package..."
 python setup.py bdist_rpm                                                             \
   --requires 'python-requests >= 1.1.0, python-dateutil >= 1.4.1, m2crypto >= 0.20.0' \
   --dist-dir "$CVMFS_RESULT_LOCATION"                                                 \
-  --build-requires 'python-setuptools >= 0.6.10'                                      \
-  --release 1
+  --build-requires 'python-setuptools >= 0.6'                                         \
+  --release "1%{?dist}"  # appends RPM dist tag (el6, el7, fc19, ...)
 
 echo "switching to ${CVMFS_RESULT_LOCATION}"
 cd ${CVMFS_RESULT_LOCATION}
