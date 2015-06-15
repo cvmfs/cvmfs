@@ -10,8 +10,12 @@ Use this script to run the python unit tests with an optional XML xUnit report.
 import optparse
 import os
 import sys
-from unittest2 import TestLoader, TextTestRunner
 from xmlrunner import XMLTestRunner
+
+try:
+    from unittest2 import TestLoader, TextTestRunner
+except ImportError:
+    from unittest import TestLoader, TextTestRunner
 
 base_path = os.path.dirname(__file__)
 
