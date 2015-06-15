@@ -141,7 +141,7 @@ int Fetcher::Fetch(
 
     fd_return = cache_mgr_->OpenFromTxn(txn);
     if (fd_return < 0) {
-      retval = cache_mgr_->AbortTxn(txn);
+      cache_mgr_->AbortTxn(txn);
       SignalWaitingThreads(fd_return, id, tls);
       return fd_return;
     }
@@ -149,7 +149,6 @@ int Fetcher::Fetch(
     retval = cache_mgr_->CommitTxn(txn);
     if (retval < 0) {
       cache_mgr_->Close(fd_return);
-      cache_mgr_->AbortTxn(txn);
       SignalWaitingThreads(retval, id, tls);
       return retval;
     }

@@ -1478,7 +1478,7 @@ void DownloadManager::Fini() {
   opt_proxy_groups_ = NULL;
 
   curl_global_cleanup();
-  
+
   delete resolver;
   resolver = NULL;
 }

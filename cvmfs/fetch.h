@@ -57,6 +57,8 @@ class Fetcher : SingleCopy {
   FRIEND_TEST(T_Fetcher, GetTls);
   FRIEND_TEST(T_Fetcher, SignalWaitingThreads);
   friend void *TestGetTls(void *data);
+  friend void *TestFetchCollapse(void *data);
+  friend void *TestFetchCollapse2(void *data);
   friend void TLSDestructor(void *data);
 
  public:
