@@ -649,8 +649,9 @@ static int Fetch(const shash::Any &checksum,
            cvmfs_path.c_str());
   if (result < 0) {
     LogCvmfs(kLogCache, kLogDebug | kLogSyslogErr,
-             "failed to fetch %s (hash: %s, error %d)", cvmfs_path.c_str(),
-             checksum.ToString().c_str(), tls->download_job.error_code);
+             "failed to fetch %s (hash: %s, error %d - %s)", cvmfs_path.c_str(),
+             checksum.ToString().c_str(), tls->download_job.error_code,
+             download::Code2Ascii(tls->download_job.error_code));
   }
   if (fd >= 0) {
     if (f) {
