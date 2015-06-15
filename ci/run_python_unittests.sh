@@ -23,17 +23,18 @@ PY_UT_XML_PREFIX=$1
 # check if python is capable of running the unit tests on the current platform
 which python > /dev/null 2>&1                    || complain "no python available"
 compare_versions "$(python_version)" -gt "2.6.0" || complain "ancient python version"
+check_python_module "unittest2"                  || complain "no unittest2 installed"
 check_python_module "xmlrunner"                  || complain "no python-xmlrunner installed"
 check_python_module "dateutil"                   || complain "no python-dateutil installed"
 check_python_module "requests"                   || complain "no python-requests installed"
 check_python_module "M2Crypto"                   || complain "no m2crypto installed"
 
 # run the unit tests
-UNITTESTS="${SCRIPT_LOCATION}/../python/cvmfs/test"
+UNITTEST_RUNNER="${SCRIPT_LOCATION}/../python/run_unittests.py"
 if [ ! -z "$PY_UT_XML_PREFIX" ]; then
   echo "running python unit tests (XML output to $PY_UT_XML_PREFIX)..."
-  python $UNITTESTS --xml-prefix "$PY_UT_XML_PREFIX"
+  python $UNITTEST_RUNNER --xml-prefix "$PY_UT_XML_PREFIX"
 else
   echo "running python unit tests..."
-  python $UNITTESTS
+  python $UNITTEST_RUNNER
 fi

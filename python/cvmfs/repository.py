@@ -214,6 +214,7 @@ class RemoteRepository(Repository):
     """ Concrete Repository implementation for a repository reachable by HTTP """
     def __init__(self, repo_url):
         self._storage_location = urlparse.urlunparse(urlparse.urlparse(repo_url))
+        self._user_agent = cvmfs.__package_name__ + "/" + cvmfs.__version__
         Repository.__init__(self)
 
 
@@ -227,7 +228,8 @@ class RemoteRepository(Repository):
     def retrieve_file(self, file_name):
         file_url = self._storage_location + "/" + file_name
         tmp_file = tempfile.NamedTemporaryFile('w+b')
-        response = requests.get(file_url, stream=True)
+        headers  = { 'User-Agent': self._user_agent }
+        response = requests.get(file_url, stream=True, headers=headers)
         if response.status_code != requests.codes.ok:
             raise FileNotFoundInRepository(self, file_url)
         for chunk in response.iter_content(chunk_size=4096):

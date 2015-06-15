@@ -17,6 +17,9 @@ import re
 version     = "0.1.0"
 __version__ = version
 
+package_name = "python-cvmfsutils"
+__package_name__ = package_name
+
 class ServerNotInstalled(Exception):
     pass
 
