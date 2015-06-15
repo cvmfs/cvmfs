@@ -37,12 +37,21 @@ cp ${CVMFS_SOURCE_LOCATION}/python/ChangeLog   \
 echo "switching to ${PYTHON_BUILD_SRC}..."
 cd $PYTHON_BUILD_SRC
 
+echo "make sure the RPM dist tag is sane..."
+dist_tag="%{?dist}"
+if is_suse; then
+  suse_major_version="$(cat /etc/SuSE-release | \
+                          grep '^VERSION'     | \
+                          sed -e 's/^VERSION[ =]\+\([0-9]\+\).*$/\1/')"
+  dist_tag=".suse$suse_major_version"
+fi
+
 echo "build the RPM package..."
 python setup.py bdist_rpm                                                             \
   --requires 'python-requests >= 1.1.0, python-dateutil >= 1.4.1, m2crypto >= 0.20.0' \
   --dist-dir "$CVMFS_RESULT_LOCATION"                                                 \
   --build-requires 'python-setuptools >= 0.6'                                         \
-  --release "1%{?dist}"  # appends RPM dist tag (el6, el7, fc19, ...)
+  --release "1$dist_tag"  # appends RPM dist tag (el6, el7, fc19, suse, ...)
 
 echo "switching to ${CVMFS_RESULT_LOCATION}"
 cd ${CVMFS_RESULT_LOCATION}
