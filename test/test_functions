@@ -1351,7 +1351,10 @@ EOF
 clean_benchmark_cache() {
   local cachedir="${CVMFS_OPT_CACHEDIR}/${FQRN}"
   if [ -d "$cachedir" ] && [ "x$cachedir" != x ]; then
-    rm -rf $cachedir/*
+  list=$(ls $cachedir | grep -P "^[0-9a-f]{2}$")
+    for dir in $list; do
+      rm -rf "$cachedir/$dir"/*
+    done
   fi
 }
 
