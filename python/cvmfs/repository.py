@@ -77,7 +77,7 @@ class Repository:
                 self.manifest = Manifest(manifest_file)
             self.fqrn = self.manifest.repository_name
         except FileNotFoundInRepository, e:
-            raise RepositoryNotFound(self._storage_location)
+            raise RepositoryNotFound(self.endpoint)
 
 
     def __read_timestamp(self, timestamp_string):
@@ -165,7 +165,7 @@ class LocalRepository(Repository):
         self.type = self.read_server_config("CVMFS_REPOSITORY_TYPE")
         if self.type != 'stratum0' and self.type != 'stratum1':
             raise UnknownRepositoryType(repo_fqrn, self.type)
-        self._storage_location = self._get_repo_location_from_config()
+        self.endpoint = self._get_repo_location_from_config()
         Repository.__init__(self)
         self.version = cvmfs.server_version
         self.fqrn    = repo_fqrn
@@ -173,7 +173,7 @@ class LocalRepository(Repository):
 
     def _open_local_directory(self, repo_directory):
         self._server_config = None
-        self._storage_location = repo_directory
+        self.endpoint = repo_directory
         Repository.__init__(self)
 
 
@@ -196,7 +196,7 @@ class LocalRepository(Repository):
 
 
     def retrieve_file(self, file_name):
-        file_path = os.path.join(self._storage_location, file_name)
+        file_path = os.path.join(self.endpoint, file_name)
         if not os.path.exists(file_path):
             raise FileNotFoundInRepository(self, file_name)
         return open(file_path, "rb")
@@ -213,20 +213,20 @@ class LocalRepository(Repository):
 class RemoteRepository(Repository):
     """ Concrete Repository implementation for a repository reachable by HTTP """
     def __init__(self, repo_url):
-        self._storage_location = urlparse.urlunparse(urlparse.urlparse(repo_url))
+        self.endpoint = urlparse.urlunparse(urlparse.urlparse(repo_url))
         self._user_agent = cvmfs.__package_name__ + "/" + cvmfs.__version__
         Repository.__init__(self)
 
 
     def __str__(self):
-        return self._storage_location
+        return self.endpoint
 
     def __repr__(self):
-        return "<Remote Repository " + self.fqrn + " at " + self._storage_location + ">"
+        return "<Remote Repository " + self.fqrn + " at " + self.endpoint + ">"
 
 
     def retrieve_file(self, file_name):
-        file_url = self._storage_location + "/" + file_name
+        file_url = self.endpoint + "/" + file_name
         tmp_file = tempfile.NamedTemporaryFile('w+b')
         headers  = { 'User-Agent': self._user_agent }
         response = requests.get(file_url, stream=True, headers=headers)
