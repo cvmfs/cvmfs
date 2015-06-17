@@ -404,15 +404,20 @@ TEST_F(T_QuotaManager, MakeReturnPipe) {
 
 
 TEST_F(T_QuotaManager, PinUnpin) {
+  // Too big to pin
   EXPECT_FALSE(quota_mgr_not_spawned_->Pin(hashes_[0], 1000000000, "", false));
   EXPECT_TRUE(quota_mgr_not_spawned_->Pin(hashes_[0], threshold_, "x", false));
+  // Pinning idempotent
   EXPECT_TRUE(quota_mgr_not_spawned_->Pin(hashes_[0], threshold_, "x", false));
+  // Pinned until threshold
   EXPECT_FALSE(quota_mgr_not_spawned_->Pin(hashes_[1], 1, "", false));
   quota_mgr_not_spawned_->Spawn();
+  // Normal files can still be added
   quota_mgr_not_spawned_->Insert(hashes_[1], threshold_, "y");
   EXPECT_EQ("x\ny\n", PrintStringVector(quota_mgr_not_spawned_->List()));
   EXPECT_EQ("x\n", PrintStringVector(quota_mgr_not_spawned_->ListPinned()));
 
+  // Unpin on destruction
   delete quota_mgr_not_spawned_;
   quota_mgr_not_spawned_ =
     PosixQuotaManager::Create(tmp_path_ + "/not_spawned", limit_, threshold_,
@@ -423,9 +428,22 @@ TEST_F(T_QuotaManager, PinUnpin) {
   EXPECT_EQ("x\nz\n", PrintStringVector(quota_mgr_not_spawned_->List()));
   EXPECT_EQ("z\n", PrintStringVector(quota_mgr_not_spawned_->ListPinned()));
 
+  // Unpin decreases pinned size (and doesn't remove files that still exists)
+  CreateFile(tmp_path_ + "/not_spawned/" + hashes_[2].MakePathWithoutSuffix(),
+             0600);
   EXPECT_FALSE(quota_mgr_not_spawned_->Pin(hashes_[0], threshold_, "x", false));
   quota_mgr_not_spawned_->Unpin(hashes_[2]);
+  EXPECT_EQ("x\nz\n", PrintStringVector(quota_mgr_not_spawned_->List()));
   EXPECT_TRUE(quota_mgr_not_spawned_->Pin(hashes_[0], threshold_, "x", false));
+
+  // Unpin removes a file that does not exist anymore
+  uint64_t size_before_unpin = quota_mgr_not_spawned_->GetSize();
+  string remove_me =
+    tmp_path_ + "/not_spawned/" + hashes_[0].MakePathWithoutSuffix();
+  quota_mgr_not_spawned_->Unpin(hashes_[0]);
+  uint64_t size_after_unpin = quota_mgr_not_spawned_->GetSize();
+  EXPECT_LT(size_after_unpin, size_before_unpin);
+  EXPECT_EQ("z\n", PrintStringVector(quota_mgr_not_spawned_->List()));
 }
 
 

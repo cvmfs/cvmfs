@@ -1030,6 +1030,33 @@ void *PosixQuotaManager::MainCommandServer(void *data) {
       if (iter != quota_mgr->pinned_chunks_.end()) {
         quota_mgr->pinned_ -= iter->second;
         quota_mgr->pinned_chunks_.erase(iter);
+        // It can happen that files get pinned that were removed from the cache
+        // (see cache.cc).  We fix this at this point, where we remove such
+        // entries from the cache database.
+        if (!FileExists(quota_mgr->cache_dir_ + "/" +
+                        hash.MakePathWithoutSuffix()))
+        {
+          LogCvmfs(kLogQuota, kLogDebug,
+                   "remove orphaned pinned hash %s from cache database",
+                   hash_str.c_str());
+          sqlite3_bind_text(quota_mgr->stmt_size_, 1, &hash_str[0],
+                            hash_str.length(), SQLITE_STATIC);
+          int retval;
+          if ((retval = sqlite3_step(quota_mgr->stmt_size_)) == SQLITE_ROW) {
+            uint64_t size = sqlite3_column_int64(quota_mgr->stmt_size_, 0);
+            sqlite3_bind_text(quota_mgr->stmt_rm_, 1, &(hash_str[0]),
+                              hash_str.length(), SQLITE_STATIC);
+            retval = sqlite3_step(quota_mgr->stmt_rm_);
+            if ((retval == SQLITE_DONE) || (retval == SQLITE_OK)) {
+              quota_mgr->gauge_ -= size;
+            } else {
+              LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
+                       "failed to delete %s (%d)", hash_str.c_str(), retval);
+            }
+            sqlite3_reset(quota_mgr->stmt_rm_);
+          }
+          sqlite3_reset(quota_mgr->stmt_size_);
+        }
       } else {
         LogCvmfs(kLogQuota, kLogDebug, "this chunk was not pinned");
       }
