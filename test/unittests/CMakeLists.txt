@@ -65,6 +65,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_smalloc.cc
   t_uid_map.cc
   t_fetch.cc
+  t_manifest.cc
 
   # test utility functions
   testutil.cc testutil.h
@@ -133,7 +134,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/dirtab.h
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest.h
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.h
   ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
 
