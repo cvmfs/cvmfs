@@ -112,6 +112,9 @@ class CacheManager : SingleCopy {
   virtual int OpenFromTxn(void *txn) = 0;
   virtual int CommitTxn(void *txn) = 0;
 
+  int OpenPinned(const shash::Any &id,
+                 const std::string &description,
+                 bool is_catalog);
   bool Open2Mem(const shash::Any &id, unsigned char **buffer, uint64_t *size);
   bool CommitFromMem(const shash::Any &id,
                      const unsigned char *buffer,
@@ -139,6 +142,7 @@ class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, CommitTxnRenameFail);
   FRIEND_TEST(T_CacheManager, Open);
   FRIEND_TEST(T_CacheManager, OpenFromTxn);
+  FRIEND_TEST(T_CacheManager, OpenPinned);
   FRIEND_TEST(T_CacheManager, Rename);
   FRIEND_TEST(T_CacheManager, StartTxn);
   FRIEND_TEST(T_CacheManager, TearDown2ReadOnly);

@@ -299,6 +299,27 @@ TEST_F(T_CacheManager, Open2Mem) {
 }
 
 
+TEST_F(T_CacheManager, OpenPinned) {
+  shash::Any rnd_hash(shash::kSha1);
+  rnd_hash.Randomize();
+  EXPECT_EQ(-ENOENT, cache_mgr_->OpenPinned(rnd_hash, "", false));
+
+  delete cache_mgr_->quota_mgr_;
+  TestQuotaManager *quota_mgr = new TestQuotaManager();
+  cache_mgr_->quota_mgr_ = quota_mgr;
+
+  int fd = cache_mgr_->OpenPinned(hash_null_, "", false);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(TestQuotaManager::kCmdPin, quota_mgr->last_cmd.cmd);
+  EXPECT_EQ(hash_null_, quota_mgr->last_cmd.hash);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+  quota_mgr->Unpin(hash_null_);
+
+  fd = cache_mgr_->OpenPinned(hash_null_, "fail", false);
+  EXPECT_EQ(-ENOSPC, fd);
+}
+
+
 //------------------------------------------------------------------------------
 
 
@@ -394,9 +415,8 @@ TEST_F(T_CacheManager, CommitTxnQuotaNotifications) {
   ASSERT_TRUE(txn != NULL);
 
   delete cache_mgr_->quota_mgr_;
-  cache_mgr_->quota_mgr_ = new TestQuotaManager();
-  TestQuotaManager *quota_mgr = reinterpret_cast<TestQuotaManager *>(
-    cache_mgr_->quota_mgr());
+  TestQuotaManager *quota_mgr = new TestQuotaManager();
+  cache_mgr_->quota_mgr_ = quota_mgr;
 
   EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, 1, txn), 0);
   EXPECT_EQ(1U, cache_mgr_->Write(&buf, 1, txn));

@@ -125,6 +125,31 @@ CacheManager::~CacheManager() {
 
 
 /**
+ * Commits the memory blob buffer to the given chunk id.  No checking!
+ * The hash and the memory blob need to match.
+ */
+bool CacheManager::CommitFromMem(
+  const shash::Any &id,
+  const unsigned char *buffer,
+  const uint64_t size,
+  const string &description)
+{
+  void *txn = alloca(this->SizeOfTxn());
+  int fd = this->StartTxn(id, size, txn);
+  if (fd < 0)
+    return false;
+  this->CtrlTxn(description, kTypeRegular, 0, txn);
+  int64_t retval = this->Write(buffer, size, txn);
+  if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
+		this->AbortTxn(txn);
+    return false;
+  }
+  retval = this->CommitTxn(txn);
+  return retval == 0;
+}
+
+
+/**
  * Tries to open a file and copies its contents into a newly malloc'd
  * memory area.  User of the function has to free buffer (if successful).
  *
@@ -169,27 +194,32 @@ bool CacheManager::Open2Mem(
 
 
 /**
- * Commits the memory blob buffer to the given chunk id.  No checking!
- * The hash and the memory blob need to match.
+ * Uses the regular open and, if the file exists in the cache, pins it.  There
+ * is a race condition: the file can be removed between the open and the Pin.
+ * This is fixed by the quota manager's unpin method that removes files which
+ * do not exist anymore in the cache.  (The quota manager also translates double
+ * pins into a no-op, so that the accounting does not get out of sync.)
  */
-bool CacheManager::CommitFromMem(
+int CacheManager::OpenPinned(
   const shash::Any &id,
-  const unsigned char *buffer,
-  const uint64_t size,
-  const string &description)
+  const string &description,
+  bool is_catalog)
 {
-  void *txn = alloca(this->SizeOfTxn());
-  int fd = this->StartTxn(id, size, txn);
-  if (fd < 0)
-    return false;
-  this->CtrlTxn(description, kTypeRegular, 0, txn);
-  int64_t retval = this->Write(buffer, size, txn);
-  if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
-		this->AbortTxn(txn);
-    return false;
+  int fd = this->Open(id);
+  if (fd >= 0) {
+    int64_t size = this->GetSize(fd);
+    if (size < 0) {
+      this->Close(fd);
+      return size;
+    }
+    bool retval =
+      quota_mgr_->Pin(id, static_cast<uint64_t>(size), description, is_catalog);
+    if (!retval) {
+      this->Close(fd);
+      return -ENOSPC;
+    }
   }
-  retval = this->CommitTxn(txn);
-  return retval == 0;
+  return fd;
 }
 
 
@@ -386,7 +416,7 @@ int64_t PosixCacheManager::GetSize(int fd) {
   return info.st_size;
 }
 
-
+// TODO: open pinned
 int PosixCacheManager::Open(const shash::Any &id) {
   const string path = GetPathInCache(id);
   int result = open(path.c_str(), O_RDONLY);
