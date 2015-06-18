@@ -70,6 +70,9 @@ class Fetcher : SingleCopy {
             const std::string &name,
             const cache::CacheManager::ObjectType object_type);
 
+  cache::CacheManager *cache_mgr() { return cache_mgr_; }
+  download::DownloadManager *download_mgr() { return download_mgr_; }
+
  private:
   /**
    * Multiple threads might want to download the same object at the same time.
@@ -115,6 +118,9 @@ class Fetcher : SingleCopy {
   void CleanupTls(ThreadLocalStorage *tls);
   void SignalWaitingThreads(const int fd, const shash::Any &id,
                             ThreadLocalStorage *tls);
+  int OpenSelect(const shash::Any &id,
+                 const std::string &name,
+                 const cache::CacheManager::ObjectType object_type);
 
   /**
    * Key to the thread's ThreadLocalStorage memory

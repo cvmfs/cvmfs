@@ -81,7 +81,7 @@ int Fetcher::Fetch(
   int retval;
 
   // Try to open from local cache
-  if ((fd_return = cache_mgr_->Open(id)) >= 0) {
+  if ((fd_return = OpenSelect(id, name, object_type)) >= 0) {
     LogCvmfs(kLogCache, kLogDebug, "hit: %s", name.c_str());
     return fd_return;
   }
@@ -104,7 +104,7 @@ int Fetcher::Fetch(
     return fd_return;
   } else {
     // Seems we are the first one, check again in the cache (race condition)
-    fd_return = cache_mgr_->Open(id);
+    fd_return = OpenSelect(id, name, object_type);
     if (fd_return >= 0) {
       pthread_mutex_unlock(lock_queues_download_);
       return fd_return;
@@ -162,6 +162,7 @@ int Fetcher::Fetch(
            id.ToString().c_str(), tls->download_job.error_code,
            download::Code2Ascii(tls->download_job.error_code));
   cache_mgr_->AbortTxn(txn);
+  // TODO: backoff
   SignalWaitingThreads(-EIO, id, tls);
   return -EIO;
 }
@@ -207,6 +208,24 @@ Fetcher::~Fetcher() {
 
   retval = pthread_key_delete(thread_local_storage_);
   assert(retval == 0);
+}
+
+
+/**
+ * Depending on the object type, uses either Open() or OpenPinned() from the
+ * cache manager
+ */
+int Fetcher::OpenSelect(
+  const shash::Any &id,
+  const std::string &name,
+  const cache::CacheManager::ObjectType object_type)
+{
+  bool is_catalog = object_type == cache::CacheManager::kTypeCatalog;
+  if (is_catalog || (object_type == cache::CacheManager::kTypePinned)) {
+    return cache_mgr_->OpenPinned(id, name, is_catalog);
+  } else {
+    return cache_mgr_->Open(id);
+  }
 }
 
 
