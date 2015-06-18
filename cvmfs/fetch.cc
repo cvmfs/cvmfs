@@ -7,6 +7,7 @@
 
 #include <unistd.h>
 
+#include "backoff.h"
 #include "cache.h"
 #include "download.h"
 #include "logging.h"
@@ -162,7 +163,7 @@ int Fetcher::Fetch(
            id.ToString().c_str(), tls->download_job.error_code,
            download::Code2Ascii(tls->download_job.error_code));
   cache_mgr_->AbortTxn(txn);
-  // TODO: backoff
+  backoff_throttle_->Throttle();
   SignalWaitingThreads(-EIO, id, tls);
   return -EIO;
 }
@@ -170,11 +171,13 @@ int Fetcher::Fetch(
 
 Fetcher::Fetcher(
   cache::CacheManager *cache_mgr,
-  download::DownloadManager *download_mgr)
+  download::DownloadManager *download_mgr,
+  BackoffThrottle *backoff_throttle)
   : lock_queues_download_(NULL)
   , lock_tls_blocks_(NULL)
   , cache_mgr_(cache_mgr)
   , download_mgr_(download_mgr)
+  , backoff_throttle_(backoff_throttle)
 {
   int retval;
   retval = pthread_key_create(&thread_local_storage_, TLSDestructor);

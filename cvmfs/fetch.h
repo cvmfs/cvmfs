@@ -18,6 +18,8 @@
 #include "sink.h"
 #include "util.h"
 
+class BackoffThrottle;
+
 namespace cvmfs {
 
 /**
@@ -63,7 +65,8 @@ class Fetcher : SingleCopy {
 
  public:
   Fetcher(cache::CacheManager *cache_mgr,
-          download::DownloadManager *download_mgr);
+          download::DownloadManager *download_mgr,
+          BackoffThrottle *backoff_throttle);
   ~Fetcher();
   int Fetch(const shash::Any &id,
             const uint64_t size,
@@ -139,6 +142,7 @@ class Fetcher : SingleCopy {
 
   cache::CacheManager *cache_mgr_;
   download::DownloadManager *download_mgr_;
+  BackoffThrottle *backoff_throttle_;
 };
 
 }  // namespace cvmfs
