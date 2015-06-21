@@ -899,7 +899,7 @@ vector<string> PosixQuotaManager::ListVolatile() {
 void *PosixQuotaManager::MainCommandServer(void *data) {
   PosixQuotaManager *quota_mgr = static_cast<PosixQuotaManager *>(data);
 
-  LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
+  LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   sqlite3_soft_heap_limit(quota_mgr->kSqliteMemPerThread);
 
   LruCommand command_buffer[kCommandBufferSize];
@@ -2149,7 +2149,7 @@ static void ProcessCommandBunch(const unsigned num,
  * to be executed immediately.
  */
 static void *MainCommandServer(void *data __attribute__((unused))) {
-  LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
+  LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   sqlite3_soft_heap_limit(kSqliteMemPerThread);
 
   back_channels_ = new map<shash::Md5, int>;
@@ -2991,7 +2991,7 @@ static void CleanupPipes(const string &cache_dir) {
  * Entry point for the shared cache manager process
  */
 int MainCacheManager(int argc, char **argv) {
-  LogCvmfs(kLogQuota, kLogDebug, "starting cache manager");
+  LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
   int retval;
 
   retval = monitor::Init(".", "cachemgr", false);
