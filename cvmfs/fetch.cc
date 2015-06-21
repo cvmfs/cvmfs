@@ -12,6 +12,7 @@
 #include "download.h"
 #include "logging.h"
 #include "quota.h"
+#include "statistics.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
@@ -116,6 +117,8 @@ int Fetcher::Fetch(
     pthread_mutex_unlock(lock_queues_download_);
   }
 
+  perf::Inc(n_downloads);
+
   // Involve the download manager
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", name.c_str());
   const string url = "/data/" + id.MakePath();
@@ -172,7 +175,8 @@ int Fetcher::Fetch(
 Fetcher::Fetcher(
   cache::CacheManager *cache_mgr,
   download::DownloadManager *download_mgr,
-  BackoffThrottle *backoff_throttle)
+  BackoffThrottle *backoff_throttle,
+  perf::Statistics *statistics)
   : lock_queues_download_(NULL)
   , lock_tls_blocks_(NULL)
   , cache_mgr_(cache_mgr)
@@ -190,6 +194,8 @@ Fetcher::Fetcher(
     smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_tls_blocks_, NULL);
   assert(retval == 0);
+  n_downloads = statistics->Register("fetch.n_downloads",
+    "overall number of downloaded files (incl. catalogs, chunks)");
 }
 
 

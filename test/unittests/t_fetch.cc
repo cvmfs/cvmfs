@@ -12,6 +12,7 @@
 #include "../../cvmfs/download.h"
 #include "../../cvmfs/fetch.h"
 #include "../../cvmfs/hash.h"
+#include "../../cvmfs/statistics.h"
 #include "../../cvmfs/util.h"
 #include "testutil.h"
 
@@ -59,10 +60,11 @@ class T_Fetcher : public ::testing::Test {
     ASSERT_TRUE(cache_mgr_ != NULL);
 
     download_mgr_ = new download::DownloadManager();
-    download_mgr_->Init(8, false, /* use_system_proxy */ &statistics);
+    download_mgr_->Init(8, false, /* use_system_proxy */ &statistics_);
     download_mgr_->SetHostChain("file://" + tmp_path_);
 
-    fetcher_ = new Fetcher(cache_mgr_, download_mgr_, &backoff_throttle_);
+    fetcher_ = new Fetcher(
+      cache_mgr_, download_mgr_, &backoff_throttle_, &statistics_);
   }
 
   virtual void TearDown() {
@@ -77,7 +79,7 @@ class T_Fetcher : public ::testing::Test {
 
   Fetcher *fetcher_;
   cache::PosixCacheManager *cache_mgr_;
-  perf::Statistics statistics;
+  perf::Statistics statistics_;
   download::DownloadManager *download_mgr_;
   unsigned used_fds_;
   shash::Any hash_regular_;
@@ -230,8 +232,9 @@ TEST_F(T_Fetcher, Fetch) {
 
 TEST_F(T_Fetcher, FetchTransactionFailures) {
   // OpenFromTxn fails
+  perf::Statistics statistics;
   BuggyCacheManager bcm;
-  Fetcher f(&bcm, download_mgr_, &backoff_throttle_);
+  Fetcher f(&bcm, download_mgr_, &backoff_throttle_, &statistics);
   EXPECT_EQ(-EBADF,
     f.Fetch(hash_catalog_, cache::CacheManager::kSizeUnknown, "cat",
             cache::CacheManager::kTypeCatalog));
@@ -291,9 +294,10 @@ void *TestFetchCollapse2(void *data) {
 
 TEST_F(T_Fetcher, FetchCollapse) {
   // Test race condition: first open fails, second one succeds
+  perf::Statistics statistics;
   BuggyCacheManager bcm;
   bcm.open_2nd_try = true;
-  Fetcher f(&bcm, download_mgr_, &backoff_throttle_);
+  Fetcher f(&bcm, download_mgr_, &backoff_throttle_, &statistics);
   int fd = f.Fetch(hash_catalog_, cache::CacheManager::kSizeUnknown, "cat",
                    cache::CacheManager::kTypeCatalog);
   EXPECT_GE(fd, 0);

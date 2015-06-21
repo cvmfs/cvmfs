@@ -20,6 +20,10 @@
 
 class BackoffThrottle;
 
+namespace perf {
+class Statistics;
+}
+
 namespace cvmfs {
 
 /**
@@ -66,7 +70,8 @@ class Fetcher : SingleCopy {
  public:
   Fetcher(cache::CacheManager *cache_mgr,
           download::DownloadManager *download_mgr,
-          BackoffThrottle *backoff_throttle);
+          BackoffThrottle *backoff_throttle,
+          perf::Statistics *statistics);
   ~Fetcher();
   int Fetch(const shash::Any &id,
             const uint64_t size,
@@ -143,6 +148,7 @@ class Fetcher : SingleCopy {
   cache::CacheManager *cache_mgr_;
   download::DownloadManager *download_mgr_;
   BackoffThrottle *backoff_throttle_;
+  perf::Counter *n_downloads;
 };
 
 }  // namespace cvmfs
