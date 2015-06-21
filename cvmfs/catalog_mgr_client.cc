@@ -133,8 +133,7 @@ LoadError ClientCatalogManager::LoadCatalog(
     // must be read from the alien cache instead of the client cache
     checksum_dir = *cache_path_;
   }*/
-  shash::Any cache_hash;
-  cache_hash.suffix = shash::kSuffixCatalog;
+  shash::Any cache_hash(shash::kSha1, shash::kSuffixCatalog);
   uint64_t cache_last_modified = 0;
 
   retval = manifest::Manifest::ReadChecksum(
