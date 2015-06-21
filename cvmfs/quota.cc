@@ -138,6 +138,32 @@ void PosixQuotaManager::CheckHighPinWatermark() {
 }
 
 
+void PosixQuotaManager::CleanupPipes() {
+  DIR *dirp = opendir(cache_dir_.c_str());
+  assert(dirp != NULL);
+
+  platform_dirent64 *dent;
+  bool found_leftovers = false;
+  while ((dent = platform_readdir(dirp)) != NULL) {
+    const string name = dent->d_name;
+    const string path = cache_dir_ + "/" + name;
+    platform_stat64 info;
+    int retval = platform_stat(path.c_str(), &info);
+    if (retval != 0)
+      continue;
+    if (S_ISFIFO(info.st_mode) && (name.substr(0, 4) == "pipe")) {
+      if (!found_leftovers) {
+        LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogWarn,
+                 "removing left-over FIFOs from cache directory");
+      }
+      found_leftovers = true;
+      unlink(path.c_str());
+    }
+  }
+  closedir(dirp);
+}
+
+
 /**
  * Cleans up in data cache, until cache size is below leave_size.
  * The actual unlinking is done in a separate process (fork).
@@ -893,6 +919,142 @@ vector<string> PosixQuotaManager::ListCatalogs() {
  */
 vector<string> PosixQuotaManager::ListVolatile() {
   return DoList(kListVolatile);
+}
+
+
+/**
+ * Entry point for the shared cache manager process
+ */
+int PosixQuotaManager::MainCacheManager(int argc, char **argv) {
+  LogCvmfs(kLogQuota, kLogDebug, "starting quota manager");
+  int retval;
+
+  retval = monitor::Init(".", "cachemgr", false);
+  assert(retval);
+  monitor::Spawn();
+
+  PosixQuotaManager shared_manager(0, 0, "");
+  shared_manager.shared_ = true;
+  shared_manager.spawned_ = true;
+  shared_manager.pinned_ = 0;
+
+  // Process command line arguments
+  shared_manager.cache_dir_ = string(argv[2]);
+  int pipe_boot = String2Int64(argv[3]);
+  int pipe_handshake = String2Int64(argv[4]);
+  shared_manager.limit_ = String2Int64(argv[5]);
+  shared_manager.cleanup_threshold_ = String2Int64(argv[6]);
+  int foreground = String2Int64(argv[7]);
+  int syslog_level = String2Int64(argv[8]);
+  int syslog_facility = String2Int64(argv[9]);
+  vector<string> logfiles = SplitString(argv[10], ':');
+
+  SetLogSyslogLevel(syslog_level);
+  SetLogSyslogFacility(syslog_facility);
+  if ((logfiles.size() > 0) && (logfiles[0] != ""))
+    SetLogDebugFile(logfiles[0] + ".cachemgr");
+  if (logfiles.size() > 1)
+    SetLogMicroSyslog(logfiles[1]);
+
+  if (!foreground)
+    Daemonize();
+
+  // Initialize pipe, open non-blocking as cvmfs is not yet connected
+  const int fd_lockfile_fifo =
+    LockFile(shared_manager.cache_dir_ + "/lock_cachemgr.fifo");
+  if (fd_lockfile_fifo < 0) {
+    LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr, "could not open lock file "
+             "%s (%d)",
+             (shared_manager.cache_dir_ + "/lock_cachemgr.fifo").c_str(),
+             errno);
+    return 1;
+  }
+  const string crash_guard = shared_manager.cache_dir_ + "/cachemgr.running";
+  const bool rebuild = FileExists(crash_guard);
+  retval = open(crash_guard.c_str(), O_RDONLY | O_CREAT, 0600);
+  if (retval < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to create shared cache manager crash guard");
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+  close(retval);
+
+  // Redirect SQlite temp directory to cache (global variable)
+  const string tmp_dir = shared_manager.cache_dir_;
+  sqlite3_temp_directory =
+    static_cast<char *>(sqlite3_malloc(tmp_dir.length() + 1));
+  snprintf(sqlite3_temp_directory, tmp_dir.length() + 1, "%s", tmp_dir.c_str());
+
+  // Cleanup leftover named pipes
+  shared_manager.CleanupPipes();
+
+  if (!shared_manager.InitDatabase(rebuild)) {
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+
+  // Save protocol revision to file.  If the file is not found, it indicates
+  // to the client that the cache manager is from times before the protocol
+  // was versioned.
+  const string protocol_revision_path =
+    shared_manager.cache_dir_ + "/cachemgr.protocol";
+  retval = open(protocol_revision_path.c_str(), O_WRONLY | O_CREAT, 0600);
+  if (retval < 0) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to open protocol revision file (%d)", errno);
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+  const string revision = StringifyInt(kProtocolRevision);
+  int written = write(retval, revision.data(), revision.length());
+  close(retval);
+  if ((written < 0) || static_cast<unsigned>(written) != revision.length()) {
+    LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
+             "failed to write protocol revision (%d)", errno);
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+
+  const string fifo_path = shared_manager.cache_dir_ + "/cachemgr";
+  shared_manager.pipe_lru_[0] = open(fifo_path.c_str(), O_RDONLY | O_NONBLOCK);
+  if (shared_manager.pipe_lru_[0] < 0) {
+    LogCvmfs(kLogQuota, kLogDebug, "failed to listen on FIFO %s (%d)",
+             fifo_path.c_str(), errno);
+    UnlockFile(fd_lockfile_fifo);
+    return 1;
+  }
+  Nonblock2Block(shared_manager.pipe_lru_[0]);
+  LogCvmfs(kLogQuota, kLogDebug, "shared cache manager listening");
+
+  char buf = 'C';
+  WritePipe(pipe_boot, &buf, 1);
+  close(pipe_boot);
+
+  ReadPipe(pipe_handshake, &buf, 1);
+  close(pipe_handshake);
+  LogCvmfs(kLogQuota, kLogDebug, "shared cache manager handshake done");
+
+  // Ensure that broken pipes from clients do not kill the cache manager
+  signal(SIGPIPE, SIG_IGN);
+  // Don't let Ctrl-C ungracefully kill interactive session
+  signal(SIGINT, SIG_IGN);
+
+  shared_manager.MainCommandServer(&shared_manager);
+  unlink(fifo_path.c_str());
+  unlink(protocol_revision_path.c_str());
+  shared_manager.CloseDatabase();
+  unlink(crash_guard.c_str());
+  UnlockFile(fd_lockfile_fifo);
+
+  if (sqlite3_temp_directory) {
+    sqlite3_free(sqlite3_temp_directory);
+    sqlite3_temp_directory = NULL;
+  }
+
+  monitor::Fini();
+
+  return 0;
 }
 
 

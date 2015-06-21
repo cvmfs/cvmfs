@@ -169,6 +169,8 @@ class PosixQuotaManager : public QuotaManager {
   static PosixQuotaManager *CreateShared(const std::string &exe_path,
     const std::string &cache_dir,
     const uint64_t limit, const uint64_t cleanup_threshold);
+  static int MainCacheManager(int argc, char **argv);
+
   virtual ~PosixQuotaManager();
   virtual bool IsEnforcing() { return true; }
 
@@ -330,6 +332,7 @@ class PosixQuotaManager : public QuotaManager {
   void UnbindReturnPipe(int pipe_wronly);
   void UnlinkReturnPipe(int pipe_wronly);
   void CloseReturnPipe(int pipe[2]);
+  void CleanupPipes();
 
   void CheckHighPinWatermark();
   void ProcessCommandBunch(const unsigned num,
