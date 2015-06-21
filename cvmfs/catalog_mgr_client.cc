@@ -72,6 +72,14 @@ Catalog *ClientCatalogManager::CreateCatalog(
 }
 
 
+shash::Any ClientCatalogManager::GetRootHash() {
+  ReadLock();
+  shash::Any result = mounted_catalogs_[PathString("", 0)];
+  Unlock();
+  return result;
+}
+
+
 /**
  * Specialized initialization that uses a fixed root hash.
  */
