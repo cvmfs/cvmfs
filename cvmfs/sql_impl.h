@@ -178,21 +178,24 @@ template <class DerivedT>
 bool Database<DerivedT>::FileReadAhead() {
   // Read-ahead into file system buffers
   // TODO(jblomer): mmap, re-readahead
-  int fd_readahead = open(filename().c_str(), O_RDONLY);
-  if (fd_readahead < 0) {
-    LogCvmfs(kLogSql, kLogDebug, "failed to open %s for read-ahead (%d)",
-             filename().c_str(), errno);
-    return false;
-  }
-
-  const int retval = platform_readahead(fd_readahead);
-  close(fd_readahead);
-  if (retval != 0) {
-    LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
-             "failed to read-ahead %s (%d)", filename().c_str(), errno);
-    // Read-ahead is known to fail on tmpfs.  Don't consider it as a fatal
-    // error.
-    // return false;
+  assert(filename().length() > 1);
+  int fd_readahead;
+  if (filename()[0] != '@') {
+    fd_readahead = open(filename().c_str(), O_RDONLY);
+    if (fd_readahead < 0) {
+      LogCvmfs(kLogSql, kLogDebug, "failed to open %s for read-ahead (%d)",
+               filename().c_str(), errno);
+      return false;
+    }
+    const int retval = platform_readahead(fd_readahead);
+    close(fd_readahead);
+    if (retval != 0) {
+      LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
+               "failed to read-ahead %s (%d)", filename().c_str(), errno);
+      // Read-ahead is known to fail on tmpfs.  Don't consider it as a fatal
+      // error.
+      // return false;
+    }
   }
 
   return true;
