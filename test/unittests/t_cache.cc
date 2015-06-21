@@ -231,6 +231,7 @@ class TestCacheManager : public CacheManager {
     return -EIO;
   }
   virtual int Dup(int fd) { return fd; }
+  virtual int Readahead(int fd) { return 0; }
   virtual uint16_t SizeOfTxn() { return sizeof(int); }
   virtual int StartTxn(const shash::Any &id, uint64_t size, void *txn) {
     int fd = open("/dev/null", O_RDONLY);

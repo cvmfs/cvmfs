@@ -495,6 +495,25 @@ int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
 }
 
 
+/**
+ * Used by the sqlite vfs in order to preload file catalogs into the file system
+ * buffers.
+ */
+int PosixCacheManager::Readahead(int fd) {
+  unsigned char *buf[4096];
+  int nbytes;
+  uint64_t pos = 0;
+  do {
+    nbytes = Pread(fd, buf, 4096, pos);
+    pos += nbytes;
+  } while (nbytes == 4096);
+  LogCvmfs(kLogCache, kLogDebug, "read-ahead %d, %"PRIu64, fd, pos);
+  if (nbytes < 0)
+    return nbytes;
+  return 0;
+}
+
+
 int PosixCacheManager::Reset(void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
   transaction->buf_pos = 0;
