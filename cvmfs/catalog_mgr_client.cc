@@ -134,6 +134,7 @@ LoadError ClientCatalogManager::LoadCatalog(
     checksum_dir = *cache_path_;
   }*/
   shash::Any cache_hash;
+  cache_hash.suffix = shash::kSuffixCatalog;
   uint64_t cache_last_modified = 0;
 
   retval = manifest::Manifest::ReadChecksum(
