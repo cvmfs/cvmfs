@@ -93,6 +93,8 @@ class CacheManager : SingleCopy {
     kTypeVolatile,
   };
 
+  virtual bool AcquireQuotaManager(QuotaManager *quota_mgr) = 0;
+
   virtual ~CacheManager();
   virtual int Open(const shash::Any &id) = 0;
   virtual int64_t GetSize(int fd) = 0;
@@ -158,6 +160,7 @@ class PosixCacheManager : public CacheManager {
   static PosixCacheManager *Create(const std::string &cache_path,
                                    const bool alien_cache);
   virtual	~PosixCacheManager() { };
+  virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const shash::Any &id);
   virtual int64_t GetSize(int fd);

@@ -241,6 +241,20 @@ int PosixCacheManager::AbortTxn(void *txn) {
 }
 
 
+/**
+ * This should only be used to replace the default NoopQuotaManager by a
+ * PosixQuotaManager.  The cache manager takes the ownership of the passed
+ * quota manager.
+ */
+bool PosixCacheManager::AcquireQuotaManager(QuotaManager *quota_mgr) {
+  if (quota_mgr == NULL)
+    return false;
+  delete quota_mgr_;
+  quota_mgr_ = quota_mgr;
+  return true;
+}
+
+
 int PosixCacheManager::Close(int fd) {
   int retval = close(fd);
   if (retval != 0)
@@ -568,6 +582,7 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   }
 
   uint64_t written = 0;
+  const unsigned char *read_pos = reinterpret_cast<const unsigned char *>(buf);
   while (written < size) {
     if (transaction->buf_pos == sizeof(transaction->buffer)) {
       int retval = Flush(transaction);
@@ -580,9 +595,10 @@ int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
     uint64_t space_in_buffer =
       sizeof(transaction->buffer) - transaction->buf_pos;
     uint64_t batch_size = std::min(remaining, space_in_buffer);
-    memcpy(transaction->buffer + transaction->buf_pos, buf, batch_size);
+    memcpy(transaction->buffer + transaction->buf_pos, read_pos, batch_size);
     transaction->buf_pos += batch_size;
     written += batch_size;
+    read_pos += batch_size;
   }
   transaction->size += written;
   return written;

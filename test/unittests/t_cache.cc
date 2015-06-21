@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <cstring>
 #include <string>
 
 #include "../../cvmfs/cache.h"
@@ -222,6 +223,7 @@ class TestCacheManager : public CacheManager {
     delete quota_mgr_;
     quota_mgr_ = new TestQuotaManager();
   }
+  virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
   virtual int Open(const shash::Any &id) { return open("/dev/null", O_RDONLY); }
   virtual int64_t GetSize(int fd) { return 1; }
   virtual int Close(int fd) { return close(fd); }
@@ -789,6 +791,32 @@ TEST_F(T_CacheManager, Write) {
   EXPECT_EQ(1, cache_mgr_->Write(large_buf, 1, txn));
   EXPECT_EQ(-ENOSPC, cache_mgr_->Write(large_buf, 1, txn));
   cache_mgr_->AbortTxn(txn);
+}
+
+
+TEST_F(T_CacheManager, WriteCompare) {
+  unsigned N = 100000;
+  char large_buf[N];
+  Prng prng;
+  prng.InitLocaltime();
+  for (unsigned i = 0; i < N; ++i)
+    large_buf[i] = prng.Next(128);
+
+  shash::Any rnd_hash;
+  rnd_hash.Randomize();
+  void *txn = alloca(cache_mgr_->SizeOfTxn());
+  ASSERT_TRUE(txn != NULL);
+  EXPECT_GE(cache_mgr_->StartTxn(rnd_hash, N, txn), 0);
+  EXPECT_EQ(N, cache_mgr_->Write(large_buf, N, txn));
+  EXPECT_EQ(0, cache_mgr_->CommitTxn(txn));
+
+  int fd = cache_mgr_->Open(rnd_hash);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(N, cache_mgr_->GetSize(fd));
+  char receive_buf[N];
+  EXPECT_EQ(N, cache_mgr_->Pread(fd, receive_buf, N, 0));
+  EXPECT_EQ(0, memcmp(large_buf, receive_buf, N));
+  cache_mgr_->Close(fd);
 }
 
 }  // namespace cache
