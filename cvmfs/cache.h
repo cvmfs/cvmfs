@@ -159,6 +159,11 @@ class PosixCacheManager : public CacheManager {
   FRIEND_TEST(T_CacheManager, TearDown2ReadOnly);
 
  public:
+  enum CacheModes {
+    kCacheReadWrite = 0,
+    kCacheReadOnly,
+  };
+
   /**
    * As of 25M, a file is considered a "big file", which means it is dangerous
    * to apply asynchronous semantics.  On start of a transaction with a big file
@@ -193,13 +198,9 @@ class PosixCacheManager : public CacheManager {
   virtual int CommitTxn(void *txn);
 
   void TearDown2ReadOnly();
+  CacheModes cache_mode() { return cache_mode_; }
 
  private:
-  enum CacheModes {
-    kCacheReadWrite = 0,
-    kCacheReadOnly,
-  };
-
   struct Transaction {
     Transaction(const shash::Any &id, const std::string &final_path)
       : buf_pos(0)
