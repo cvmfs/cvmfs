@@ -118,6 +118,7 @@ class CacheManager : SingleCopy {
   int OpenPinned(const shash::Any &id,
                  const std::string &description,
                  bool is_catalog);
+  int ChecksumFd(int fd, shash::Any *id);
   bool Open2Mem(const shash::Any &id, unsigned char **buffer, uint64_t *size);
   bool CommitFromMem(const shash::Any &id,
                      const unsigned char *buffer,

@@ -19,6 +19,7 @@
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/platform.h"
 #include "../../cvmfs/quota.h"
+#include "../../cvmfs/smalloc.h"
 #include "testutil.h"
 
 using namespace std;  // NOLINT
@@ -40,6 +41,12 @@ class T_CacheManager : public ::testing::Test {
     unsigned char buf = 'A';
     hash_one_.digest[0] = 1;
     ASSERT_TRUE(cache_mgr_->CommitFromMem(hash_one_, &buf, 1, "one"));
+
+    unsigned char *zero_page;
+    hash_page_.digest[0] = 2;
+    zero_page = reinterpret_cast<unsigned char *>(scalloc(4096, 1));
+    ASSERT_TRUE(cache_mgr_->CommitFromMem(hash_page_, zero_page, 4096, "buf"));
+    free(zero_page);
   }
 
   virtual void TearDown() {
@@ -97,6 +104,7 @@ class T_CacheManager : public ::testing::Test {
   string tmp_path_;
   shash::Any hash_null_;
   shash::Any hash_one_;
+  shash::Any hash_page_;
   unsigned used_fds_;
 };
 
@@ -254,6 +262,29 @@ class TestCacheManager : public CacheManager {
     return 0;
   }
 };
+
+
+TEST_F(T_CacheManager, ChecksumFd) {
+  shash::Any hash(shash::kSha1);
+  EXPECT_EQ(-EBADF, cache_mgr_->ChecksumFd(1000000, &hash));
+  int fd = cache_mgr_->Open(hash_null_);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
+  EXPECT_EQ("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", hash.ToString());
+  cache_mgr_->Close(fd);
+
+  fd = cache_mgr_->Open(hash_one_);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
+  EXPECT_EQ("0bbd725a1003cd41b89b209f70e514f12f2a1062", hash.ToString());
+  cache_mgr_->Close(fd);
+
+  fd = cache_mgr_->Open(hash_page_);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->ChecksumFd(fd, &hash));
+  EXPECT_EQ("54b34b84872a06a373967f68726e29353d3fe7b2", hash.ToString());
+  cache_mgr_->Close(fd);
+}
 
 
 TEST_F(T_CacheManager, CommitFromMem) {

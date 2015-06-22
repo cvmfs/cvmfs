@@ -125,6 +125,46 @@ CacheManager::~CacheManager() {
 
 
 /**
+ * Compresses and checksums the file pointed to by fd.  The hash algorithm needs
+ * to be set in id.
+ */
+int CacheManager::ChecksumFd(int fd, shash::Any *id) {
+  shash::ContextPtr hash_context(id->algorithm);
+  hash_context.buffer = alloca(hash_context.size);
+  shash::Init(hash_context);
+
+  z_stream strm;
+  zlib::CompressInit(&strm);
+  zlib::StreamStates retval;
+
+  unsigned char buf[4096];
+  uint64_t pos = 0;
+  bool eof;
+
+  do {
+    int64_t nbytes = Pread(fd, buf, 4096, pos);
+    if (nbytes < 0) {
+      zlib::CompressFini(&strm);
+      return nbytes;
+    }
+    pos += nbytes;
+    eof = nbytes < 4096;
+    retval = zlib::CompressZStream2Null(buf, nbytes, eof, &strm, &hash_context);
+    if (retval == zlib::kStreamDataError) {
+      zlib::CompressFini(&strm);
+      return -EINVAL;
+    }
+  } while (!eof);
+
+  zlib::CompressFini(&strm);
+  if (retval != zlib::kStreamEnd)
+    return -EINVAL;
+  shash::Final(hash_context, id);
+  return 0;
+}
+
+
+/**
  * Commits the memory blob buffer to the given chunk id.  No checking!
  * The hash and the memory blob need to match.
  */

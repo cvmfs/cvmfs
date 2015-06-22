@@ -158,6 +158,34 @@ void DecompressFini(z_stream *strm) {
 }
 
 
+StreamStates CompressZStream2Null(
+  const void *buf,
+  const int64_t size,
+  const bool eof,
+  z_stream *strm,
+  shash::ContextPtr *hash_context)
+{
+  unsigned char out[kZChunk];
+  int z_ret;
+
+  strm->avail_in = size;
+  strm->next_in = static_cast<unsigned char *>(const_cast<void *>(buf));
+  // Run deflate() on input until output buffer not full, finish
+  // compression if all of source has been read in
+  do {
+    strm->avail_out = kZChunk;
+    strm->next_out = out;
+    z_ret = deflate(strm, eof ? Z_FINISH : Z_NO_FLUSH);  // no bad return value
+    if (z_ret == Z_STREAM_ERROR)
+      return kStreamDataError;
+    size_t have = kZChunk - strm->avail_out;
+    shash::Update(out, have, *hash_context);
+  } while (strm->avail_out == 0);
+
+  return (z_ret == Z_STREAM_END ? kStreamEnd : kStreamContinue);
+}
+
+
 StreamStates DecompressZStream2Sink(
   const void *buf,
   const int64_t size,
