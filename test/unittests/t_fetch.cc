@@ -104,6 +104,7 @@ class BuggyCacheManager : public cache::CacheManager {
     , continue_ctrltxn(false)
     , allow_open_from_txn(false)
   { }
+  virtual cache::CacheManagerIds id() { return cache::kUnknownCacheManager; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
   virtual int Open(const shash::Any &id) {
     if (!allow_open) {

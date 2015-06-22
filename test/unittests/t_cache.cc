@@ -231,6 +231,7 @@ class TestCacheManager : public CacheManager {
     delete quota_mgr_;
     quota_mgr_ = new TestQuotaManager();
   }
+  virtual CacheManagerIds id() { return kUnknownCacheManager; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
   virtual int Open(const shash::Any &id) { return open("/dev/null", O_RDONLY); }
   virtual int64_t GetSize(int fd) { return 1; }

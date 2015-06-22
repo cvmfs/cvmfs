@@ -40,6 +40,11 @@ class QuotaManager;
 
 namespace cache {
 
+enum CacheManagerIds {
+  kUnknownCacheManager = 0,
+  kPosixCacheManager,
+};
+
 enum CacheModes {
   kCacheReadWrite = 0,
   kCacheReadOnly,
@@ -92,6 +97,8 @@ class CacheManager : SingleCopy {
     kTypePinned,
     kTypeVolatile,
   };
+
+  virtual CacheManagerIds id() = 0;
 
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr) = 0;
 
@@ -158,6 +165,8 @@ class PosixCacheManager : public CacheManager {
    * the cache is cleaned up opportunistically.
    */
   static const uint64_t kBigFile;
+
+  virtual CacheManagerIds id() { return kPosixCacheManager; }
 
   static PosixCacheManager *Create(const std::string &cache_path,
                                    const bool alien_cache);
