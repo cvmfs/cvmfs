@@ -199,6 +199,8 @@ class PosixCacheManager : public CacheManager {
 
   void TearDown2ReadOnly();
   CacheModes cache_mode() { return cache_mode_; }
+  bool alien_cache() { return alien_cache_; }
+  std::string cache_path() { return cache_path_; }
 
  private:
   struct Transaction {
