@@ -17,7 +17,8 @@
 // 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
 // 15: remove counting of open file descriptors
 // 16: remove unnecessary free
-#define LIBCVMFS_REVISION 16
+// 17: apply new classes around the cache manager
+#define LIBCVMFS_REVISION 17
 
 #include <sys/stat.h>
 #include <unistd.h>
