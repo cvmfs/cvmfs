@@ -10,6 +10,7 @@ from manifest     import *
 from whitelist    import *
 from certificate  import *
 from repository   import *
+from availability import *
 
 import subprocess
 import re
