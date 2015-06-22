@@ -7,6 +7,10 @@
 
 #include <string>
 
+namespace cache {
+class CacheManager;
+}
+
 namespace perf {
 class Statistics;
 }
@@ -18,7 +22,9 @@ enum VfsOptions {
   kVfsOptDefault,  // the VFS becomes the default for new database connections.
 };
 
-bool RegisterVfsRdOnly(perf::Statistics *statistics, const VfsOptions options);
+bool RegisterVfsRdOnly(cache::CacheManager *cache_mgr,
+                       perf::Statistics *statistics, 
+                       const VfsOptions options);
 bool UnregisterVfsRdOnly();
 
 }  // namespace sqlite

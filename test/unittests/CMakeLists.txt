@@ -157,6 +157,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.h
   ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/backoff.cc
   ${CVMFS_SOURCE_DIR}/monitor.h
@@ -173,6 +175,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/uid_map.h
   ${CVMFS_SOURCE_DIR}/fetch.h
   ${CVMFS_SOURCE_DIR}/fetch.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})

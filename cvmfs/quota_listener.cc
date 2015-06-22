@@ -22,6 +22,7 @@ namespace quota {
 struct ListenerHandle {
   int pipe_backchannel[2];
   int pipe_terminate[2];
+  QuotaManager *quota_manager;
   catalog::AbstractCatalogManager *catalog_manager;
   string repository_name;
   pthread_t thread_listener;
@@ -121,12 +122,14 @@ static void *MainWatchdogListener(void *data) {
  * Registers a back channel that reacts on high watermark of pinned chunks
  */
 ListenerHandle *
-RegisterUnpinListener(catalog::AbstractCatalogManager *catalog_manager,
+RegisterUnpinListener(QuotaManager *quota_manager,
+                      catalog::AbstractCatalogManager *catalog_manager,
                       const string &repository_name)
 {
   ListenerHandle *handle = new ListenerHandle();
-  quota::RegisterBackChannel(handle->pipe_backchannel, repository_name);
+  quota_manager->RegisterBackChannel(handle->pipe_backchannel, repository_name);
   MakePipe(handle->pipe_terminate);
+  handle->quota_manager = quota_manager;
   handle->catalog_manager = catalog_manager;
   handle->repository_name = repository_name;
   int retval = pthread_create(&handle->thread_listener, NULL, MainUnpinListener,
@@ -141,10 +144,14 @@ RegisterUnpinListener(catalog::AbstractCatalogManager *catalog_manager,
  * disappears
  */
 ListenerHandle *
-RegisterWatchdogListener(const string &repository_name) {
+RegisterWatchdogListener(
+  QuotaManager *quota_manager,
+  const string &repository_name)
+{
   ListenerHandle *handle = new ListenerHandle();
-  quota::RegisterBackChannel(handle->pipe_backchannel, repository_name);
+  quota_manager->RegisterBackChannel(handle->pipe_backchannel, repository_name);
   MakePipe(handle->pipe_terminate);
+  handle->quota_manager = quota_manager;
   handle->catalog_manager = NULL;
   handle->repository_name = repository_name;
   int retval = pthread_create(&handle->thread_listener, NULL,
@@ -161,7 +168,8 @@ void UnregisterListener(ListenerHandle *handle) {
   pthread_join(handle->thread_listener, NULL);
   ClosePipe(handle->pipe_terminate);
 
-  UnregisterBackChannel(handle->pipe_backchannel, handle->repository_name);
+  handle->quota_manager->UnregisterBackChannel(
+    handle->pipe_backchannel, handle->repository_name);
 
   delete handle;
 }

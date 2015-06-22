@@ -17,9 +17,14 @@
 #include "lru.h"
 #include "util.h"
 
+namespace cache{
+class CacheManager;
+}
+
 namespace download {
 class DownloadManager;
 }
+
 namespace perf {
 class Statistics;
 }
@@ -32,6 +37,7 @@ extern pid_t pid_;
 extern std::string *mountpoint_;
 extern std::string *repository_name_;
 extern download::DownloadManager *download_manager_;
+extern cache::CacheManager *cache_manager_;
 extern int max_cache_timeout_;
 extern bool foreground_;
 extern bool nfs_maps_;
@@ -46,6 +52,7 @@ std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes
 void SetMaxTTL(const unsigned value);  // in minutes
 void ResetErrorCounters();
+void UnregisterQuotaListener();
 
 }  // namespace cvmfs
 
