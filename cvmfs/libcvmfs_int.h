@@ -117,9 +117,9 @@ class cvmfs_globals : SingleCopy {
   gid_t             gid_;
   int               fd_lockfile_;
   pthread_mutex_t  *libcrypto_locks_;
-  void             *sqlite_scratch;
   void             *sqlite_page_cache;
   bool lock_created_;
+  bool vfs_registered_;
 };
 
 

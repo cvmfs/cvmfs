@@ -119,13 +119,14 @@ cvmfs_globals::cvmfs_globals()
   , gid_(0)
   , fd_lockfile_(-1)
   , libcrypto_locks_(NULL)
-  , sqlite_scratch(NULL)
   , sqlite_page_cache(NULL)
   , lock_created_(false)
+  , vfs_registered_(false)
   { }
 
 cvmfs_globals::~cvmfs_globals() {
-  sqlite::UnregisterVfsRdOnly();
+  if (vfs_registered_)
+    sqlite::UnregisterVfsRdOnly();
 
   delete cache_mgr_;
   cache_mgr_ = NULL;
@@ -134,20 +135,14 @@ cvmfs_globals::~cvmfs_globals() {
     UnlockFile(fd_lockfile_);
   }
 
-  CRYPTO_set_locking_callback(NULL);
-  for (int i = 0; i < CRYPTO_num_locks(); ++i)
-    pthread_mutex_destroy(&(libcrypto_locks_[i]));
-  OPENSSL_free(libcrypto_locks_);
+  if (libcrypto_locks_) {
+    CRYPTO_set_locking_callback(NULL);
+    for (int i = 0; i < CRYPTO_num_locks(); ++i)
+      pthread_mutex_destroy(&(libcrypto_locks_[i]));
+    OPENSSL_free(libcrypto_locks_);
+  }
 
   sqlite3_shutdown();
-  if (sqlite_scratch) {
-    free(sqlite_scratch);
-    sqlite_scratch = NULL;
-  }
-  if (sqlite_page_cache) {
-    free(sqlite_page_cache);
-    sqlite_page_cache = NULL;
-  }
   delete statistics_;
 }
 
@@ -164,10 +159,7 @@ int cvmfs_globals::Setup(const options &opts) {
   int retval;
 
   // Tune SQlite3
-  sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   sqlite_page_cache = smalloc(1280*3275);  // 4MB
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, sqlite_scratch, 8192, 16);
-  assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, sqlite_page_cache,
                           1280, 3275);
   assert(retval == SQLITE_OK);
@@ -257,6 +249,7 @@ int cvmfs_globals::Setup(const options &opts) {
   retval = sqlite::RegisterVfsRdOnly(
     cache_mgr_, statistics_, sqlite::kVfsOptDefault);
   assert(retval);
+  vfs_registered_ = true;
 
   cvmfs::pid_ = getpid();
 
