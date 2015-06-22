@@ -30,7 +30,7 @@ class T_Manifest : public ::testing::Test {
   }
 
  protected:
-   string tmp_path_;
+  string tmp_path_;
 };
 
 

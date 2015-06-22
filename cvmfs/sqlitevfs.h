@@ -23,7 +23,7 @@ enum VfsOptions {
 };
 
 bool RegisterVfsRdOnly(cache::CacheManager *cache_mgr,
-                       perf::Statistics *statistics, 
+                       perf::Statistics *statistics,
                        const VfsOptions options);
 bool UnregisterVfsRdOnly();
 

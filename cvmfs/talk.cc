@@ -454,7 +454,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "pid cachemgr") {
-        const string pid_str = 
+        const string pid_str =
           StringifyInt(cvmfs::cache_manager_->quota_mgr()->GetPid()) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "pid watchdog") {

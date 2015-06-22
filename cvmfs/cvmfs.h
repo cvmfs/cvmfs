@@ -17,7 +17,7 @@
 #include "lru.h"
 #include "util.h"
 
-namespace cache{
+namespace cache {
 class CacheManager;
 }
 

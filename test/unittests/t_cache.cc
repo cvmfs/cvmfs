@@ -65,7 +65,7 @@ class T_CacheManager : public ::testing::Test {
   }
 
   struct TearDownCb {
-    TearDownCb(PosixCacheManager *mgr) : mgr(mgr), finished(false) { }
+    explicit TearDownCb(PosixCacheManager *mgr) : mgr(mgr), finished(false) { }
     PosixCacheManager *mgr;
     bool finished;
   };
@@ -674,7 +674,7 @@ TEST_F(T_CacheManager, Rename) {
   EXPECT_FALSE(FileExists(path_null));
   EXPECT_TRUE(FileExists(path_one));
   // Does not work on nfs
-  //EXPECT_EQ(0, cache_mgr_->Rename(path_one.c_str(), path_one.c_str()));
+  // EXPECT_EQ(0, cache_mgr_->Rename(path_one.c_str(), path_one.c_str()));
   EXPECT_EQ(0, cache_mgr_->Rename(path_one.c_str(), path_null.c_str()));
   EXPECT_TRUE(FileExists(path_null));
   EXPECT_FALSE(FileExists(path_one));

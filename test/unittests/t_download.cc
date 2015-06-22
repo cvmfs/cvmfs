@@ -11,10 +11,10 @@
 #include "../../cvmfs/compression.h"
 #include "../../cvmfs/download.h"
 #include "../../cvmfs/hash.h"
-#include "../../cvmfs/statistics.h"
-#include "../../cvmfs/util.h"
 #include "../../cvmfs/prng.h"
 #include "../../cvmfs/sink.h"
+#include "../../cvmfs/statistics.h"
+#include "../../cvmfs/util.h"
 
 using namespace std;  // NOLINT
 

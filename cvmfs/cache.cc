@@ -181,7 +181,7 @@ bool CacheManager::CommitFromMem(
   this->CtrlTxn(description, kTypeRegular, 0, txn);
   int64_t retval = this->Write(buffer, size, txn);
   if ((retval < 0) || (static_cast<uint64_t>(retval) != size)) {
-		this->AbortTxn(txn);
+    this->AbortTxn(txn);
     return false;
   }
   retval = this->CommitTxn(txn);
@@ -470,7 +470,7 @@ int64_t PosixCacheManager::GetSize(int fd) {
   return info.st_size;
 }
 
-// TODO: open pinned
+
 int PosixCacheManager::Open(const shash::Any &id) {
   const string path = GetPathInCache(id);
   int result = open(path.c_str(), O_RDONLY);

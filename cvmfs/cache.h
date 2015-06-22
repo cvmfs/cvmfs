@@ -20,8 +20,8 @@
 #include "manifest_fetch.h"
 #include "shortstring.h"
 #include "signature.h"
-#include "util.h"
 #include "statistics.h"
+#include "util.h"
 
 namespace catalog {
 class DirectoryEntry;
@@ -175,7 +175,7 @@ class PosixCacheManager : public CacheManager {
 
   static PosixCacheManager *Create(const std::string &cache_path,
                                    const bool alien_cache);
-  virtual	~PosixCacheManager() { };
+  virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
   virtual int Open(const shash::Any &id);
@@ -217,7 +217,7 @@ class PosixCacheManager : public CacheManager {
     unsigned buf_pos;
     uint64_t size;
     uint64_t expected_size;
- 	  int fd;
+    int fd;
     ObjectType type;
     std::string tmp_path;
     std::string final_path;

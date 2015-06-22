@@ -6,8 +6,8 @@
 #include "catalog_mgr_client.h"
 
 #include "cache.h"
-#include "fetch.h"
 #include "download.h"
+#include "fetch.h"
 #include "manifest.h"
 #include "quota.h"
 #include "signature.h"
