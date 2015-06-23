@@ -96,7 +96,6 @@ class TzInfos:
 
     @staticmethod
     def _generate_tzd():
-        print "generating"
         TzInfos.tzd = {}
         tz_str = '''-12 Y
 -11 X NUT SST
