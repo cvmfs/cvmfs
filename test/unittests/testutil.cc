@@ -175,6 +175,22 @@ DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
   return dirent;
 }
 
+catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
+    const Metadata& metadata) {
+  DirectoryEntry dirent;
+  dirent.name_       = NameString(metadata.name);
+  dirent.mode_       = metadata.mode;
+  dirent.uid_        = metadata.uid;
+  dirent.gid_        = metadata.gid;
+  dirent.size_       = metadata.size;
+  dirent.mtime_      = metadata.mtime;
+  dirent.symlink_    = LinkString(metadata.symlink);
+  dirent.linkcount_  = metadata.linkcount;
+  dirent.has_xattrs_ = metadata.has_xattrs;
+  dirent.checksum_   = metadata.checksum;
+  return dirent;
+}
+
 }  // namespace catalog
 
 

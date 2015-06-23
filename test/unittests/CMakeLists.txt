@@ -54,6 +54,7 @@ set (CVMFS_UNITTEST_SOURCES
   t_uuid.cc
   t_object_fetcher.cc
   t_catalog_sql.cc
+  t_catalog.cc
   t_xattr.cc
   t_statistics.cc
   t_options.cc
@@ -104,6 +105,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog_sql.h
   ${CVMFS_SOURCE_DIR}/catalog_sql.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_rw.cc
 
   ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
   ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
