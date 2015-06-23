@@ -908,7 +908,7 @@ cvmfs_reload() {
   done
 
   rm -f "${CVMFS_RELOAD_SOCKETS}/pid.*" "${CVMFS_RELOAD_SOCKETS}/guard_files*"
-  cd /
+  trap "echo ' *** reloading CernVM-FS repositories must not be interrupted at this point *** '" HUP INT QUIT TERM
   local m
   for m in $mount_list
   do
@@ -916,6 +916,7 @@ cvmfs_reload() {
     get_attr fqrn ${m}; fqrn=$attr_value
     get_attr pid ${m}; pid=$attr_value
     if [ -z "$fqrn" ] || [ -z "$pid" ]; then
+      # This repository must have been unmounted just now
       cd /
       continue
     fi
