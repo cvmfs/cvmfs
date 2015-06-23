@@ -4371,7 +4371,7 @@ snapshot() {
         -t $timeout                                    \
         -a $retries $with_history $log_level"
 
-    $user_shell "date > ${spool_dir}/tmp/last_snapshot"
+    $user_shell "date --utc > ${spool_dir}/tmp/last_snapshot"
     $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
       -i ${spool_dir}/tmp/last_snapshot                    \
       -o .cvmfs_last_snapshot"

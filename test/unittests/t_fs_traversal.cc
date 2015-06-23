@@ -15,6 +15,7 @@
 #include <string>
 
 #include "../../cvmfs/fs_traversal.h"
+#include "../../cvmfs/platform.h"
 #include "../../cvmfs/util.h"
 
 class T_FsTraversal : public ::testing::Test {
@@ -30,6 +31,7 @@ class T_FsTraversal : public ::testing::Test {
       Unspecified,
       Socket,
       BlockDevice,
+      CharacterDevice,
       FIFO
     };
 
@@ -41,15 +43,16 @@ class T_FsTraversal : public ::testing::Test {
     }
 
     void Init() {
-      enter_dir     = false;
-      leave_dir     = false;
-      file_found    = false;
-      symlink_found = false;
-      dir_prefix    = false;
-      dir_postfix   = false;
-      socket_found  = false;
-      block_dev_found   = false;
-      fifo_found    = false;
+      enter_dir       = false;
+      leave_dir       = false;
+      file_found      = false;
+      symlink_found   = false;
+      dir_prefix      = false;
+      dir_postfix     = false;
+      socket_found    = false;
+      block_dev_found = false;
+      chr_dev_found   = false;
+      fifo_found      = false;
     }
 
     void Check(const Type overwrite_type = Unspecified) const {
@@ -59,45 +62,48 @@ class T_FsTraversal : public ::testing::Test {
 
       switch (type_to_check) {
         case Directory:
-          EXPECT_TRUE(enter_dir)     << path;
-          EXPECT_TRUE(leave_dir)     << path;
-          EXPECT_TRUE(dir_prefix)    << path;
-          EXPECT_TRUE(dir_postfix)   << path;
+          EXPECT_TRUE(enter_dir)       << path;
+          EXPECT_TRUE(leave_dir)       << path;
+          EXPECT_TRUE(dir_prefix)      << path;
+          EXPECT_TRUE(dir_postfix)     << path;
           break;
         case RootDirectory:
-          EXPECT_TRUE(enter_dir)     << path;
-          EXPECT_TRUE(leave_dir)     << path;
-          EXPECT_FALSE(dir_prefix)    << path;
-          EXPECT_FALSE(dir_postfix)   << path;
+          EXPECT_TRUE(enter_dir)       << path;
+          EXPECT_TRUE(leave_dir)       << path;
+          EXPECT_FALSE(dir_prefix)     << path;
+          EXPECT_FALSE(dir_postfix)    << path;
           break;
         case NonTraversedDirectory:
-          EXPECT_TRUE(dir_prefix)    << path;
-          EXPECT_TRUE(dir_postfix)   << path;
-          EXPECT_FALSE(enter_dir)     << path;
-          EXPECT_FALSE(leave_dir)     << path;
+          EXPECT_TRUE(dir_prefix)      << path;
+          EXPECT_TRUE(dir_postfix)     << path;
+          EXPECT_FALSE(enter_dir)      << path;
+          EXPECT_FALSE(leave_dir)      << path;
           break;
         case File:
-          EXPECT_TRUE(file_found)    << path;
+          EXPECT_TRUE(file_found)      << path;
           break;
         case Symlink:
-          EXPECT_TRUE(symlink_found) << path;
+          EXPECT_TRUE(symlink_found)   << path;
           break;
         case Untouched:
-          EXPECT_FALSE(enter_dir)     << path;
-          EXPECT_FALSE(leave_dir)     << path;
-          EXPECT_FALSE(file_found)    << path;
-          EXPECT_FALSE(symlink_found) << path;
-          EXPECT_FALSE(dir_prefix)    << path;
-          EXPECT_FALSE(dir_postfix)   << path;
+          EXPECT_FALSE(enter_dir)      << path;
+          EXPECT_FALSE(leave_dir)      << path;
+          EXPECT_FALSE(file_found)     << path;
+          EXPECT_FALSE(symlink_found)  << path;
+          EXPECT_FALSE(dir_prefix)     << path;
+          EXPECT_FALSE(dir_postfix)    << path;
           break;
         case Socket:
-          EXPECT_TRUE(socket_found)   << path;
+          EXPECT_TRUE(socket_found)    << path;
           break;
         case BlockDevice:
-          EXPECT_TRUE(block_dev_found)    << path;
+          EXPECT_TRUE(block_dev_found) << path;
+          break;
+        case CharacterDevice:
+          EXPECT_TRUE(chr_dev_found)   << path;
           break;
         case FIFO:
-          EXPECT_TRUE(fifo_found)     << path;
+          EXPECT_TRUE(fifo_found)      << path;
           break;
         default:
           FAIL() << "Encountered an unexpected file type";
@@ -116,6 +122,7 @@ class T_FsTraversal : public ::testing::Test {
     bool dir_postfix;
     bool socket_found;
     bool block_dev_found;
+    bool chr_dev_found;
     bool fifo_found;
   };
 
@@ -646,31 +653,48 @@ TEST_F(T_FsTraversal, SteeredTraversal) {
 
 class CustomDelegate {
  public:
-  explicit CustomDelegate(std::string path) :
-    num_block_dev(0), root_path(path) {}
+  explicit CustomDelegate(const std::string &path) :
+    num_block_dev(0), num_character_dev(0), root_path(path) {}
 
-  virtual void BlockDevice(const std::string &relative_path,
-      const std::string &dir_name) {
+  void BlockDevice(const std::string &relative_path,
+                   const std::string &object_name) {
+    platform_stat64 s;
+    GetStat(relative_path, object_name, &s);
+    EXPECT_TRUE(S_ISBLK(s.st_mode));
     ++num_block_dev;
   }
 
-  virtual bool CheckPermissions(const std::string &relative_path,
-      const std::string &dir_name) {
-    std::string file = root_path + relative_path + "/" + dir_name;
-    struct stat s;
-    stat(file.c_str(), &s);
-    return !S_ISBLK(s.st_mode);
+  void CharacterDevice(const std::string &relative_path,
+                       const std::string &object_name) {
+    platform_stat64 s;
+    GetStat(relative_path, object_name, &s);
+    EXPECT_TRUE(S_ISCHR(s.st_mode));
+    ++num_character_dev;
   }
 
-  virtual ~CustomDelegate() {}
-
-  int getNumBlockedDev() const {
-    return num_block_dev;
+  bool CheckPermissions(const std::string &relative_path,
+                        const std::string &object_name) {
+    platform_stat64 s;
+    GetStat(relative_path, object_name, &s);
+    const bool can_read =  (S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR &&
+                                                  s.st_mode & S_IXUSR)
+                       || (!S_ISDIR(s.st_mode) && s.st_mode & S_IRUSR);
+    return !can_read;
   }
 
- private:
-  int num_block_dev;
-  std::string root_path;
+ protected:
+  void GetStat(const std::string  &relative_path,
+               const std::string  &obj_name,
+               platform_stat64    *s) const {
+    const std::string file = root_path + "/" + relative_path + "/" + obj_name;
+    const int retval = platform_lstat(file.c_str(), s);
+    ASSERT_EQ(0, retval) << "cannot stat '" << file << "' (" << errno << ")";
+  }
+
+ public:
+  int                num_block_dev;
+  int                num_character_dev;
+  const std::string  root_path;
 };
 
 TEST_F(T_FsTraversal, BlockDevice) {
@@ -681,5 +705,16 @@ TEST_F(T_FsTraversal, BlockDevice) {
   traverse.fn_new_block_dev = &CustomDelegate::BlockDevice;
   traverse.fn_ignore_file = &CustomDelegate::CheckPermissions;
   traverse.Recurse("/dev");
-  EXPECT_LT(0, delegate.getNumBlockedDev());
+  EXPECT_LT(0, delegate.num_block_dev);
+}
+
+TEST_F(T_FsTraversal, CharacterDevice) {
+  CustomDelegate delegate("/dev");
+  FileSystemTraversal<CustomDelegate> traverse(&delegate,
+                                                "/dev",
+                                                true);
+  traverse.fn_new_character_dev = &CustomDelegate::CharacterDevice;
+  traverse.fn_ignore_file       = &CustomDelegate::CheckPermissions;
+  traverse.Recurse("/dev");
+  EXPECT_LT(0, delegate.num_character_dev);
 }
