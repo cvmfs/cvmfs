@@ -11,6 +11,7 @@ import zlib
 import sqlite3
 import subprocess
 import shutil
+import math
 
 
 _REPO_CONFIG_PATH      = "/etc/cvmfs/repositories.d"
@@ -69,3 +70,7 @@ class FileObject(CompressedObject):
 
     def file(self):
         return self.get_uncompressed_file()
+
+
+def _logistic_function(a):
+    return lambda x: round(1 - (1/(1 + math.exp(-5.5 * ((float(x)/float(a)) - 1)))), 2)
