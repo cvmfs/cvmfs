@@ -11,12 +11,11 @@ import zlib
 import sqlite3
 import subprocess
 import shutil
+import math
 
 
 _REPO_CONFIG_PATH      = "/etc/cvmfs/repositories.d"
 _SERVER_CONFIG_NAME    = "server.conf"
-
-_REST_CONNECTOR        = "control"
 
 _MANIFEST_NAME         = ".cvmfspublished"
 _WHITELIST_NAME        = ".cvmfswhitelist"
@@ -65,44 +64,6 @@ class CompressedObject:
             self.compressed_file_.close()
 
 
-
-class DatabaseObject(CompressedObject):
-    db_handle_ = None
-
-    def __init__(self, compressed_db_file):
-        CompressedObject.__init__(self, compressed_db_file)
-        self._open_database()
-
-    def __del__(self):
-        if self.db_handle_:
-            self.db_handle_.close()
-        self._close()
-
-    def _open_database(self):
-        """ Create and configure a database handle to the Catalog """
-        self.db_handle_ = sqlite3.connect(self.file_.name)
-        self.db_handle_.text_factory = str
-
-
-    def read_properties_table(self, reader):
-        """ Retrieve all properties stored in the 'properties' table """
-        props = self.run_sql("SELECT key, value FROM properties;")
-        for prop in props:
-            prop_key   = prop[0]
-            prop_value = prop[1]
-            reader(prop_key, prop_value)
-
-    def run_sql(self, sql):
-        """ Run an arbitrary SQL query on the catalog database """
-        cursor = self.db_handle_.cursor()
-        cursor.execute(sql)
-        return cursor.fetchall()
-
-    def open_interactive(self):
-        """ Spawns a sqlite shell for interactive catalog database inspection """
-        subprocess.call(['sqlite3', self.file_.name])
-
-
 class FileObject(CompressedObject):
     def __init__(self, compressed_file):
         CompressedObject.__init__(self, compressed_file)
@@ -110,24 +71,6 @@ class FileObject(CompressedObject):
     def file(self):
         return self.get_uncompressed_file()
 
-def _binary_buffer_to_hex_string(binbuf):
-    return "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,binbuf)))
 
-def _split_md5(md5digest):
-    hi = lo = 0
-    for i in range(0, 8):
-        lo = lo | (ord(md5digest[i]) << (i * 8))
-    for i in range(8,16):
-        hi = hi | (ord(md5digest[i]) << ((i - 8) * 8))
-    return ctypes.c_int64(lo).value, ctypes.c_int64(hi).value  # signed int!
-
-def _combine_md5(lo, hi):
-    md5digest = [ '\x00','\x00','\x00','\x00','\x00','\x00','\x00','\x00',
-                  '\x00','\x00','\x00','\x00','\x00','\x00','\x00','\x00' ]
-    for i in range(0, 8):
-        md5digest[i] = chr(lo & 0xFF)
-        lo = lo >> 8
-    for i in range(8,16):
-        md5digest[i] = chr(hi & 0xFF)
-        hi = hi >> 8
-    return ''.join(md5digest)
+def _logistic_function(a):
+    return lambda x: round(1 - (1/(1 + math.exp(-5.5 * ((float(x)/float(a)) - 1)))), 2)

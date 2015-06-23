@@ -5,30 +5,55 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
-import cvmfs
+import math
+from datetime    import datetime
+from dateutil.tz import tzutc
 
-class WrongRepositoryType(Exception):
-    def __init__(self, repo, expected_type):
-        assert repo.type != expected_type
-        self.repo          = repo
-        self.expected_type = expected_type
+from _common import _logistic_function
 
-    def __str__(self):
-        return self.repo.fqrn + " is of type '" + self.repo.type  + "' but '" + self.expected_type + "' was expected"
+class Availability:
+    def __init__(self, stratum0, **kwargs):
+        self.stratum0  = stratum0
+        self.stratum1s = []
+        self._get_param_or_default('revision_threshold',     5, **kwargs)
+        self._get_param_or_default('replication_threshold', 60, **kwargs)
 
+    def _get_param_or_default(self, argname, default, **kwargs):
+        value = default if argname not in kwargs else kwargs[argname]
+        setattr(self, argname, value)
 
-class AvailabilityAssessment:
-    def _check_repo_type(self, repo, expected_type):
-        if repo.has_repository_type() and repo.type != expected_type:
-            raise WrongRepositoryType(repo, expected_type)
-        return True;
+    def add_stratum1(self, stratum1):
+        self.stratum1s.append(stratum1)
 
-    def __init__(self, stratum0_repository, stratum1_repositories = []):
-        self._check_repo_type(stratum0_repository, 'stratum0')
-        for stratum1 in stratum1_repositories:
-            self._check_repo_type(stratum1, 'stratum1')
-        self.stratum0  = stratum0_repository
-        self.stratum1s = stratum1_repositories
+    def has_stratum1s(self):
+        return len(self.stratum1s) > 0
 
-    def assess(self):
-        pass
+    def get_current_revision(self):
+        return self.stratum0.manifest.revision
+
+    def get_oldest_revision(self):
+        return min([ s1.manifest.revision for s1 in self.stratum1s ]) \
+            if   self.has_stratum1s()                                 \
+            else self.get_current_revision()
+
+    def get_oldest_stratum1(self):
+        return min(self.stratum1s, key=lambda s1: s1.manifest.revision) \
+            if   self.has_stratum1s()                                   \
+            else None
+
+    def get_stratum1_health_score(self, stratum1):
+        f_revision    = _logistic_function(self.revision_threshold)
+        f_replication = _logistic_function(self.replication_threshold)
+        d_revision    = self.get_current_revision() - stratum1.manifest.revision
+        d_replication = datetime.now(tzutc()) - stratum1.last_replication
+        d_replication = d_replication.days * 24*60*60 + d_replication.seconds
+        return f_revision(d_revision) * f_replication(d_replication / 60.0)
+
+    def get_stratum1_health_scores(self):
+        get_score = lambda s1: self.get_stratum1_health_score(s1)
+        return [ (s1, get_score(s1)) for s1 in self.stratum1s ]
+
+    def get_repository_health_score(self):
+        scores = [ score for s1, score in self.get_stratum1_health_scores() ]
+        return reduce(lambda x,y: x*y, scores)
+

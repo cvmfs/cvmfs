@@ -1348,6 +1348,15 @@ EOF
 
 }
 
+clean_benchmark_cache() {
+  local cachedir="${CVMFS_OPT_CACHEDIR}/${FQRN}"
+  if [ -d "$cachedir" ] && [ "x$cachedir" != x ]; then
+  list=$(ls '$cachedir' | grep -P "^[0-9a-f]{2}$")
+    for dir in $list; do
+      rm -f "$cachedir/$dir"/*
+    done
+  fi
+}
 
 # sets the valgrind options depending on the test type
 #
@@ -1377,10 +1386,7 @@ setup_benchmark_environment() {
   mkdir -p $workspace/cache
 
   # cleaning the cache
-  local cachedir="${CVMFS_OPT_CACHEDIR}/${FQRN}"
-  if [ -d "$cachedir" ] && [ "x$cachedir" != x ]; then
-    rm -rf $cachedir/*
-  fi
+  clean_benchmark_cache
 
   # mtab trick
   if [ ! -h /etc/mtab ]; then
@@ -1398,9 +1404,7 @@ setup_benchmark_environment() {
       chcon -Rv --type=cvmfs_cache_t $CVMFS_OPT_CACHEDIR
     fi
   else
-    if [ x"$CVMFS_OPT_CACHEDIR" != x ]; then
-      rm -rf "$CVMFS_OPT_CACHEDIR"/*
-    fi
+    clean_benchmark_cache
   fi
 
   # create a cvmfs.conf file or use a custom one
@@ -1497,7 +1501,11 @@ execute_statistics_loop() {
 
   while (( iteration <= $CVMFS_OPT_ITERATIONS && code == 0 )); do
     local start_time=$(date +%s)
-
+    # cleaning the cache if necessary before executing the actual benchmark
+    if [ x"$CVMFS_OPT_WARM_CACHE" != x"yes" ]; then
+      clean_benchmark_cache
+    fi
+    
     cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
     PID=$!
     wait_fqrn_mount
@@ -1535,6 +1543,10 @@ execute_benchmark_loop() {
   wait_fqrn_mount
 
   while (( count > 0 && code == 0 )); do
+    # cleaning the cache if necessary before executing the actual benchmark
+    if [ x"$CVMFS_OPT_WARM_CACHE" != x"yes" ]; then
+      clean_benchmark_cache
+    fi
     benchmark_log "Starting iteration ${iteration}"
     ( cvmfs_run_benchmark )
     code=$?

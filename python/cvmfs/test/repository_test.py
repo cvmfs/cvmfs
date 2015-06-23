@@ -41,12 +41,14 @@ class TestRepositoryWrapper(unittest.TestCase):
         repo = cvmfs.open_repository(self.mock_repo.url)
         self.assertTrue(isinstance(repo, cvmfs.RemoteRepository))
         self.assertEqual(self.mock_repo.repo_name, repo.manifest.repository_name)
+        self.assertEqual(self.mock_repo.url, repo.endpoint)
 
 
     def test_open_repository_local(self):
         repo = cvmfs.open_repository(self.mock_repo.dir)
         self.assertTrue(isinstance(repo, cvmfs.LocalRepository))
         self.assertEqual(self.mock_repo.repo_name, repo.manifest.repository_name)
+        self.assertEqual(self.mock_repo.dir, repo.endpoint)
 
 
     def test_open_repository_verification(self):

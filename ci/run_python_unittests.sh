@@ -27,13 +27,17 @@ check_python_module "xmlrunner"                  || complain "no python-xmlrunne
 check_python_module "dateutil"                   || complain "no python-dateutil installed"
 check_python_module "requests"                   || complain "no python-requests installed"
 check_python_module "M2Crypto"                   || complain "no m2crypto installed"
+if compare_versions "$(python_version)" -lt "2.7.0"; then
+  # unittest2 is a back-port of the Python 2.7 unittest features
+  check_python_module "unittest2" || complain "python 2.6 but no unittest2 installed"
+fi
 
 # run the unit tests
-UNITTESTS="${SCRIPT_LOCATION}/../python/cvmfs/test"
+UNITTEST_RUNNER="${SCRIPT_LOCATION}/../python/run_unittests.py"
 if [ ! -z "$PY_UT_XML_PREFIX" ]; then
   echo "running python unit tests (XML output to $PY_UT_XML_PREFIX)..."
-  python $UNITTESTS --xml-prefix "$PY_UT_XML_PREFIX"
+  python $UNITTEST_RUNNER --xml-prefix "$PY_UT_XML_PREFIX"
 else
   echo "running python unit tests..."
-  python $UNITTESTS
+  python $UNITTEST_RUNNER
 fi
