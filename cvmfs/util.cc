@@ -662,8 +662,6 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
   platform_dirent64 *dirent;
   while ((dirent = platform_readdir(dirp))) {
     const string name(dirent->d_name);
-    if ((name == ".") || (name == ".."))
-      continue;
     if ((name.length() >= suffix.length()) &&
         (name.substr(name.length()-suffix.length()) == suffix))
     {
