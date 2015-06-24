@@ -354,10 +354,7 @@ if (BUILD_SERVER)
     add_dependencies (geoip python-geoip)
   endif (GEOIP_BUILTIN)
 
-  include (${VJSON_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   add_dependencies (cvmfs_swissknife libvjson)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_BUILTIN_LOCATION}/src)
-  include_directories (${INCLUDE_DIRECTORIES})
 
   if (LIBCURL_BUILTIN)
     add_dependencies (cvmfs_swissknife libcares libcurl)

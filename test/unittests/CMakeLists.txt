@@ -6,14 +6,15 @@ set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 
 #
-# unit test source files
+# unit test files
 #
-set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
-set (CVMFS_UNITTEST_SOURCES
+set(CVMFS_UNITTEST_FILES
   # test steering
   main.cc
-
-  # unit test files
+  
+  # test utility functions
+  testutil.cc testutil.h
+  
   t_atomic.cc
   t_smallhash.cc
   t_bigvector.cc
@@ -62,9 +63,15 @@ set (CVMFS_UNITTEST_SOURCES
   t_wpad.cc
   t_smalloc.cc
   t_uid_map.cc
+)
 
-  # test utility functions
-  testutil.cc testutil.h
+#
+# unit test source files
+#
+set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
+set (CVMFS_UNITTEST_SOURCES 
+
+  ${CVMFS_UNITTEST_FILES}
 
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
@@ -167,19 +174,109 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/uid_map.h
 )
 
-set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
+set (CVMFS_UNITTEST_DEBUG_SOURCES 
+
+  # unit test files
+  ${CVMFS_UNITTEST_FILES}
+  
+  # cvmfs/ directory
+  ${CVMFS_SOURCE_DIR}/auto_umount.cc
+  ${CVMFS_SOURCE_DIR}/backoff.cc
+  ${CVMFS_SOURCE_DIR}/cache.cc
+  ${CVMFS_SOURCE_DIR}/catalog.cc
+  ${CVMFS_SOURCE_DIR}/catalog_counters.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_rw.cc
+  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
+  ${CVMFS_SOURCE_DIR}/compat.cc
+  ${CVMFS_SOURCE_DIR}/compression.cc
+  #${CVMFS_SOURCE_DIR}/cvmfs.cc
+  ${CVMFS_SOURCE_DIR}/directory_entry.cc
+  ${CVMFS_SOURCE_DIR}/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/dns.cc
+  ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/file_chunk.cc
+  ${CVMFS_SOURCE_DIR}/globals.cc
+  ${CVMFS_SOURCE_DIR}/glue_buffer.cc
+  ${CVMFS_SOURCE_DIR}/hash.cc
+  ${CVMFS_SOURCE_DIR}/history_sql.cc
+  ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+  #${CVMFS_SOURCE_DIR}/json_document.cc
+  ${CVMFS_SOURCE_DIR}/letter.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs.cc
+  ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
+  #${CVMFS_SOURCE_DIR}/loader_talk.cc
+  ${CVMFS_SOURCE_DIR}/logging.cc
+  ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/monitor.cc
+  #${CVMFS_SOURCE_DIR}/nfs_maps.cc
+  ${CVMFS_SOURCE_DIR}/nfs_shared_maps.cc
+  ${CVMFS_SOURCE_DIR}/options.cc
+  ${CVMFS_SOURCE_DIR}/quota.cc
+  ${CVMFS_SOURCE_DIR}/quota_listener.cc
+  ${CVMFS_SOURCE_DIR}/s3fanout.cc
+  ${CVMFS_SOURCE_DIR}/sanitizer.cc
+  ${CVMFS_SOURCE_DIR}/signature.cc
+  ${CVMFS_SOURCE_DIR}/sql.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/statistics.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_check.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_gc.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_history.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_info.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_letter.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_lsrepo.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_migrate.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_pull.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_scrub.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_sign.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_sync.cc
+  #${CVMFS_SOURCE_DIR}/swissknife_zpipe.cc
+  ${CVMFS_SOURCE_DIR}/sync_item.cc
+  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
+  ${CVMFS_SOURCE_DIR}/sync_union.cc
+  #${CVMFS_SOURCE_DIR}/talk.cc
+  ${CVMFS_SOURCE_DIR}/tracer.cc
+  ${CVMFS_SOURCE_DIR}/upload.cc
+  ${CVMFS_SOURCE_DIR}/upload_facility.cc
+  ${CVMFS_SOURCE_DIR}/upload_local.cc
+  ${CVMFS_SOURCE_DIR}/upload_s3.cc
+  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
+  ${CVMFS_SOURCE_DIR}/util.cc
+  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
+  ${CVMFS_SOURCE_DIR}/uuid.cc
+  ${CVMFS_SOURCE_DIR}/whitelist.cc
+  ${CVMFS_SOURCE_DIR}/wpad.cc
+  ${CVMFS_SOURCE_DIR}/xattr.cc
+  
+  # cvmfs/file_processing directory
+  ${CVMFS_SOURCE_DIR}/file_processing/async_reader.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/chunk.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/file.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
+  ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
+  
+  # cvmfs/garbage_collection directory
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
+  ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
+)
 
 #
 # Compiler and Linker Flags for unit tests
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
-set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -fprofile-arcs -fPIC -O0 -DDEBUGMSG -g")
+set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -fprofile-arcs -ftest-coverage -fPIC -O0 -DDEBUGMSG -g")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS} -fprofile-arcs")
+set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS} -fprofile-arcs -ftest-coverage")
 
 if (NOT ${USING_CLANG})
-  set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS} -ftest-coverage")
-  set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS} -lgcov -coverage")
+  set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS} -ftest-coverage -fprofile-arcs")
+  set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
 endif (NOT ${USING_CLANG})
 
 #
@@ -195,6 +292,7 @@ endif (BUILD_UNITTESTS)
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} googletest)
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libvjson)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
