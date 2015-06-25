@@ -448,8 +448,9 @@ void *DownloadManager::MainDownload(void *data) {
     } else {
       timeout = -1;
       gettimeofday(&timeval_stop, NULL);
-      perf::Xadd(download_mgr->counters_->sz_transfer_time,
+      int64_t delta = static_cast<int64_t>(
         1000 * DiffTimeSeconds(timeval_start, timeval_stop));
+      perf::Xadd(download_mgr->counters_->sz_transfer_time, delta);
     }
     int retval = poll(download_mgr->watch_fds_, download_mgr->watch_fds_inuse_,
                       timeout);
@@ -981,7 +982,7 @@ void DownloadManager::UpdateStatistics(CURL *handle) {
   double val;
 
   if (curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val) == CURLE_OK)
-    perf::Xadd(counters_->sz_transferred_bytes, val);
+    perf::Xadd(counters_->sz_transferred_bytes, static_cast<int64_t>(val));
 }
 
 

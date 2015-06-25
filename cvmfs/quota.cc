@@ -394,9 +394,10 @@ PosixQuotaManager *PosixQuotaManager::CreateShared(
     UnlockFile(fd_lockfile);
     close(pipe_boot[0]);
     close(pipe_handshake[1]);
+    delete quota_mgr;
     LogCvmfs(kLogQuota, kLogDebug | kLogSyslogErr,
              "cache manager did not start");
-    return false;
+    return NULL;
   }
   close(pipe_boot[0]);
 
