@@ -265,10 +265,10 @@ TEST(T_Shash, MakePathExplicit) {
   shash::Any hash_sha256(shash::kSha256);
   hash_sha256.Randomize(&prng);
   ASSERT_FALSE(hash_sha256.IsNull());
-  EXPECT_EQ(hash_sha256.MakePathExplicit(1, 2),
-   "51/c00c437200dac16a2efcf04234ddde05e1665519a85df98572985bbd9881e3-sha256");
-  EXPECT_EQ(hash_sha256.MakePathExplicit(1, 3),
-   "51c/00c437200dac16a2efcf04234ddde05e1665519a85df98572985bbd9881e3-sha256");
+  EXPECT_EQ(hash_sha256.MakePathExplicit(1, 2), "51/"
+    "c00c437200dac16a2efcf04234ddde05e1665519a85df98572985bbd9881e3-sha256");
+  EXPECT_EQ(hash_sha256.MakePathExplicit(1, 3), "51c/"
+    "00c437200dac16a2efcf04234ddde05e1665519a85df98572985bbd9881e3-sha256");
 }
 
 
