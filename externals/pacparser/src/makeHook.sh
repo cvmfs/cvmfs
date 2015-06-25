@@ -7,7 +7,7 @@ static_result_dir=src/static
 echo "make clean && make for libpacparser..."
 [ -d $static_result_dir ] && rm -fR $static_result_dir
 make -C src clean
-make -C src
+make -j1 -C src
 echo "finished internal build of libpacparser"
 
 echo "creating static link library for libpacparser..."
