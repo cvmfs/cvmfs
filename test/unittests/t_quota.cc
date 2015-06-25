@@ -150,7 +150,7 @@ TEST_F(T_QuotaManager, BindReturnPipe) {
   quota_mgr_->MakeReturnPipe(pipe_test);
   int fd = quota_mgr_->BindReturnPipe(pipe_test[1]);
   EXPECT_GE(fd, 0);
-  quota_mgr_->UnbindReturnPipe(pipe_test[1]);
+  quota_mgr_->UnbindReturnPipe(fd);
   quota_mgr_->UnlinkReturnPipe(pipe_test[1]);
   close(pipe_test[0]);
   EXPECT_EQ(-1, quota_mgr_->BindReturnPipe(pipe_test[1]));
