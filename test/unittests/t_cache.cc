@@ -77,7 +77,7 @@ class T_CacheManager : public ::testing::Test {
     return NULL;
   }
 
-  bool TearDownTimedOut(PosixCacheManager *mgr) {
+  bool TearDownTimedOut(PosixCacheManager *mgr, const unsigned timeout_ms) {
     TearDownCb cb(mgr);
     pthread_t thread_teardown;
     int retval = pthread_create(&thread_teardown, NULL, MainTearDown, &cb);
@@ -86,10 +86,10 @@ class T_CacheManager : public ::testing::Test {
     while (!cb.finished) {
       SafeSleepMs(50);
       sum_ms += 50;
-      if (sum_ms > 250)
+      if (sum_ms > timeout_ms)
         break;
     }
-    if (sum_ms > 250) {
+    if (sum_ms > timeout_ms) {
       retval = pthread_cancel(thread_teardown);
       assert(retval == 0);
       return true;
@@ -750,7 +750,7 @@ TEST_F(T_CacheManager, StartTxn) {
 
 
 TEST_F(T_CacheManager, TearDown2ReadOnly) {
-  EXPECT_FALSE(TearDownTimedOut(cache_mgr_));
+  EXPECT_FALSE(TearDownTimedOut(cache_mgr_, 2500));
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   EXPECT_EQ(-EROFS, cache_mgr_->StartTxn(hash_null_, 0, txn));
 
@@ -762,7 +762,7 @@ TEST_F(T_CacheManager, TearDown2ReadOnly) {
   EXPECT_GE(cache_mgr_->StartTxn(hash_one_, 0, txn2), 0);
   EXPECT_EQ(0, cache_mgr_->AbortTxn(txn1));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn2));
-  EXPECT_FALSE(TearDownTimedOut(cache_mgr_));
+  EXPECT_FALSE(TearDownTimedOut(cache_mgr_, 2500));
 
   cache_mgr_->cache_mode_ = PosixCacheManager::kCacheReadWrite;
 
@@ -788,7 +788,7 @@ TEST_F(T_CacheManager, TearDown2ReadOnly) {
 TEST_F(T_CacheManager, TearDown2ReadOnlyTimeout) {
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   cache_mgr_->StartTxn(hash_null_, 0, txn);
-  EXPECT_TRUE(TearDownTimedOut(cache_mgr_));
+  EXPECT_TRUE(TearDownTimedOut(cache_mgr_, 500));
   cache_mgr_->AbortTxn(txn);
 }
 
