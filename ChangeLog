@@ -1,4 +1,5 @@
 2.2.0:
+  * Add support for SHA-256
   * Add listing of /var/run/cvmfs to bugreport tarball (CVM-868)
   * Prevent ctrl+c during cvmfs_config reload (CVM-869)
   * Avoid use of attr utility in the server (CVM-853)
