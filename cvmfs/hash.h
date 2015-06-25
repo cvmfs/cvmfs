@@ -37,6 +37,7 @@ enum Algorithms {
   kMd5 = 0,
   kSha1,
   kRmd160,
+  kSha256,
   kAny,
 };
 
@@ -53,22 +54,22 @@ const char kSuffixCertificate  = 'X';
  * Corresponds to Algorithms.  "Any" is the maximum of all the other
  * digest sizes.
  */
-const unsigned kDigestSizes[] = {16, 20, 20, 20};
-const unsigned kMaxDigestSize = 20;
+const unsigned kDigestSizes[] = {16, 20, 20, 32, 32};
+const unsigned kMaxDigestSize = 32;
 /**
  * Hex representations of hashes with the same length need a suffix
  * to be distinguished from each other.  They should all have one but
  * for backwards compatibility MD5 and SHA-1 have none.
  */
 extern const char *kAlgorithmIds[];
-// in hash.cc: const char *kAlgorithmIds[] = {"", "", "-rmd160", ""};
-const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 0};
+// in hash.cc: const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", ""};
+const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 7, 0};
 const unsigned kMaxAlgorithmIdentifierSize = 7;
 
 /**
  * Corresponds to Algorithms.  There is no block size for Any
  */
-const unsigned kBlockSizes[] = {64, 64, 64};
+const unsigned kBlockSizes[] = {64, 64, 64, 64};
 
 
 /**
@@ -375,28 +376,29 @@ struct Md5 : public Digest<16, kMd5> {
 
 struct Sha1 : public Digest<20, kSha1> { };
 struct Rmd160 : public Digest<20, kRmd160> { };
+struct Sha256 : public Digest<32, kSha256> { };
 
 /**
  * Any as such must not be used except for digest storage.
  * To do real work, the class has to be "blessed" to be a real hash by
  * setting the algorithm field accordingly.
  */
-struct Any : public Digest<20, kAny> {
-  Any() : Digest<20, kAny>() { }
+struct Any : public Digest<32, kAny> {
+  Any() : Digest<32, kAny>() { }
 
   explicit Any(const Algorithms a,
                const char       s = kSuffixNone) :
-    Digest<20, kAny>() { algorithm = a; suffix = s; }
+    Digest<32, kAny>() { algorithm = a; suffix = s; }
 
   Any(const Algorithms     a,
       const unsigned char *digest_buffer, const unsigned buffer_size,
       const Suffix         suffix = kSuffixNone) :
-    Digest<20, kAny>(a, digest_buffer, buffer_size, suffix) { }
+    Digest<32, kAny>(a, digest_buffer, buffer_size, suffix) { }
 
   explicit Any(const Algorithms  a,
                const HexPtr      hex,
                const char        suffix = kSuffixNone) :
-    Digest<20, kAny>(a, hex, suffix) { }
+    Digest<32, kAny>(a, hex, suffix) { }
 };
 
 
@@ -426,12 +428,14 @@ void Init(ContextPtr context);
 void Update(const unsigned char *buffer, const unsigned buffer_size,
             ContextPtr context);
 void Final(ContextPtr context, Any *any_digest);
+bool HashFile(const std::string &filename, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
+void HashString(const std::string &content, Any *any_digest);
 void Hmac(const std::string &key,
           const unsigned char *buffer, const unsigned buffer_size,
           Any *any_digest);
-bool HashFile(const std::string filename, Any *any_digest);
+
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
 Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);

@@ -1493,6 +1493,9 @@ create_whitelist() {
   if [ "x$CVMFS_HASH_ALGORITHM" = "xrmd160" ]; then
     fingerprint="$(openssl x509 -fingerprint -rmd160 -in /etc/cvmfs/keys/${name}.crt | grep 'RIPEMD160 Fingerprint' | sed 's/RIPEMD160 Fingerprint=//')-RMD160"
     echo "$fingerprint" >> ${whitelist}.unsigned
+  elif [ "x$CVMFS_HASH_ALGORITHM" = "xsha256" ]; then
+    fingerprint="$(openssl x509 -fingerprint -sha256 -in /etc/cvmfs/keys/${name}.crt | grep 'SHA256 Fingerprint' | sed 's/SHA256 Fingerprint=//')-SHA256"
+    echo "$fingerprint" >> ${whitelist}.unsigned
   else
     openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
   fi
@@ -1500,6 +1503,8 @@ create_whitelist() {
   local hash;
   if [ "x$CVMFS_HASH_ALGORITHM" = "xrmd160" ]; then
     hash="`openssl rmd160 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`-rmd160"
+  elif [ "x$CVMFS_HASH_ALGORITHM" = "xsha256" ]; then
+    hash="`openssl sha256 < ${whitelist}.unsigned | tr -d '\n' | tail -c64`-sha256"
   else
     hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
   fi
