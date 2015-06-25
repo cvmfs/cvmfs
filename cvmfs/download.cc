@@ -151,6 +151,9 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
       return kFailLocalIO;
   }
 
+  if (info->destination == kDestinationSink)
+    assert(info->destination_sink != NULL);
+
   return kFailOk;
 }
 
@@ -259,7 +262,30 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
   if (info->expected_hash)
     shash::Update((unsigned char *)ptr, num_bytes, info->hash_context);
 
-  if (info->destination == kDestinationMem) {
+  if (info->destination == kDestinationSink) {
+    if (info->compressed) {
+      zlib::StreamStates retval =
+        zlib::DecompressZStream2Sink(ptr, num_bytes,
+                                     &info->zstream, info->destination_sink);
+      if (retval == zlib::kStreamDataError) {
+        LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
+                 info->url->c_str());
+        info->error_code = kFailBadData;
+        return 0;
+      } else if (retval == zlib::kStreamIOError) {
+        LogCvmfs(kLogDownload, kLogSyslogErr,
+                 "decompressing %s, local IO error", info->url->c_str());
+        info->error_code = kFailLocalIO;
+        return 0;
+      }
+    } else {
+      int64_t written = info->destination_sink->Write(ptr, num_bytes);
+      if ((written < 0) || (static_cast<uint64_t>(written) != num_bytes)) {
+        info->error_code = kFailLocalIO;
+        return 0;
+      }
+    }
+  } else if (info->destination == kDestinationMem) {
     // Write to memory
     if (info->destination_mem.pos + num_bytes > info->destination_mem.size) {
       if (info->destination_mem.size == 0) {
@@ -285,9 +311,8 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       // LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
       //          num_bytes, info->url->c_str());
       zlib::StreamStates retval =
-        zlib::DecompressZStream2File(&info->zstream,
-                                     info->destination_file,
-                                     ptr, num_bytes);
+        zlib::DecompressZStream2File(ptr, num_bytes,
+                                     &info->zstream, info->destination_file);
       if (retval == zlib::kStreamDataError) {
         LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
                  info->url->c_str());
@@ -312,6 +337,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 
 
 //------------------------------------------------------------------------------
+
 
 const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
@@ -1178,6 +1204,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
       rewind(info->destination_file);
     }
+    if (info->destination == kDestinationSink) {
+      if (info->destination_sink->Reset() != 0) {
+        info->error_code = kFailLocalIO;
+        goto verify_and_finalize_stop;
+      }
+    }
     if (info->expected_hash)
       shash::Init(info->hash_context);
     if (info->compressed)
@@ -1446,6 +1478,9 @@ void DownloadManager::Fini() {
   opt_proxy_groups_ = NULL;
 
   curl_global_cleanup();
+
+  delete resolver;
+  resolver = NULL;
 }
 
 

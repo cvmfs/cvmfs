@@ -58,11 +58,15 @@ set(CVMFS_UNITTEST_FILES
   t_xattr.cc
   t_statistics.cc
   t_options.cc
+  t_cache.cc
+  t_quota.cc
   t_libcvmfs.cc
   t_backoff.cc
   t_wpad.cc
   t_smalloc.cc
   t_uid_map.cc
+  t_fetch.cc
+  t_manifest.cc
 )
 
 #
@@ -137,7 +141,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/dirtab.h
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest.h
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.h
   ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
 
@@ -158,6 +164,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.h
   ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/backoff.cc
   ${CVMFS_SOURCE_DIR}/monitor.h
@@ -170,8 +178,12 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
-
+  ${CVMFS_SOURCE_DIR}/sink.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
+  ${CVMFS_SOURCE_DIR}/fetch.h
+  ${CVMFS_SOURCE_DIR}/fetch.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES 

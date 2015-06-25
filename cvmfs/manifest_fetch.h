@@ -89,7 +89,7 @@ struct ManifestEnsemble {
   unsigned whitelist_pkcs7_size;
 };
 
-
+// TODO(jblomer): analogous to the Fetcher class, make a ManifestFetcher class
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
                const uint64_t minimum_timestamp, const shash::Any *base_catalog,
                signature::SignatureManager *signature_manager,

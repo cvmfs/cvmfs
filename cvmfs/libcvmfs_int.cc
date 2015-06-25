@@ -49,10 +49,12 @@
 #include "atomic.h"
 #include "backoff.h"
 #include "cache.h"
+#include "catalog_mgr_client.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
+#include "fetch.h"
 #include "globals.h"
 #include "hash.h"
 #include "libcvmfs.h"
@@ -65,8 +67,8 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "sqlitevfs.h"
 #include "statistics.h"
-#include "tracer.h"
 #include "util.h"
 #include "wpad.h"
 
@@ -110,33 +112,38 @@ void cvmfs_globals::Destroy() {
   assert(cvmfs_globals::instance == NULL);
 }
 
-cvmfs_globals::cvmfs_globals() :
-  sqlite_scratch(NULL),
-  sqlite_page_cache(NULL),
-  options_ready_(false),
-  lock_created_(false),
-  cache_ready_(false),
-  quota_ready_(false) {}
+cvmfs_globals::cvmfs_globals()
+  : statistics_(new perf::Statistics())
+  , cache_mgr_(NULL)
+  , uid_(0)
+  , gid_(0)
+  , fd_lockfile_(-1)
+  , libcrypto_locks_(NULL)
+  , sqlite_page_cache(NULL)
+  , lock_created_(false)
+  , vfs_registered_(false)
+  { }
 
 cvmfs_globals::~cvmfs_globals() {
+  if (vfs_registered_)
+    sqlite::UnregisterVfsRdOnly();
+
+  delete cache_mgr_;
+  cache_mgr_ = NULL;
+
   if (lock_created_) {
     UnlockFile(fd_lockfile_);
   }
 
-  if (cache_ready_) {
-    cache::Fini();
+  if (libcrypto_locks_) {
+    CRYPTO_set_locking_callback(NULL);
+    for (int i = 0; i < CRYPTO_num_locks(); ++i)
+      pthread_mutex_destroy(&(libcrypto_locks_[i]));
+    OPENSSL_free(libcrypto_locks_);
   }
-
-  if (quota_ready_) {
-    quota::Fini();
-  }
-
-  CRYPTO_set_locking_callback(NULL);
-  for (int i = 0; i < CRYPTO_num_locks(); ++i)
-    pthread_mutex_destroy(&(libcrypto_locks_[i]));
-  OPENSSL_free(libcrypto_locks_);
 
   sqlite3_shutdown();
+  delete statistics_;
 }
 
 int cvmfs_globals::Setup(const options &opts) {
@@ -148,22 +155,16 @@ int cvmfs_globals::Setup(const options &opts) {
   }
   uid_ = getuid();
   gid_ = getgid();
-  options_ready_ = true;
 
   int retval;
 
   // Tune SQlite3
-  sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   sqlite_page_cache = smalloc(1280*3275);  // 4MB
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, sqlite_scratch, 8192, 16);
-  assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, sqlite_page_cache,
                           1280, 3275);
   assert(retval == SQLITE_OK);
   // 4 KB
   retval = sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128);
-  assert(retval == SQLITE_OK);
-  retval = sqlite3_vfs_register(sqlite3_vfs_find("unix-none"), 1);
   assert(retval == SQLITE_OK);
 
   // Libcrypto
@@ -222,21 +223,6 @@ int cvmfs_globals::Setup(const options &opts) {
   }
   lock_created_ = true;
 
-  // Init quota / managed cache (currently unused)
-  LogCvmfs(kLogCvmfs, kLogDebug, "unlimited cache size, unmanaged cache");
-  const uint64_t quota_limit      = 0;
-  const uint64_t quota_threshold  = 0;
-  const bool     rebuild_database = false;
-  // Initialization of the quota manager takes a file lock
-  if (!quota::Init(lock_directory_, quota_limit, quota_threshold,
-                   rebuild_database))
-  {
-    PrintError("Failed to initialize lru cache");
-    return LIBCVMFS_FAIL_INITQUOTA;
-  }
-  quota::Spawn();
-  quota_ready_ = true;
-
   if (opts.alien_cachedir != "") {
     cache_directory_ = opts.alien_cachedir;
   }
@@ -252,14 +238,18 @@ int cvmfs_globals::Setup(const options &opts) {
   }
   // Creates a set of cache directories (256 directories named 00..ff) if not
   // using alien cachdir
-  if (!cache::Init(cache_directory_,
-                   opts.alien_cache || opts.alien_cachedir != ""))
-  {
+  cache_mgr_ = cache::PosixCacheManager::Create(
+    cache_directory_, opts.alien_cache || opts.alien_cachedir != "");
+  if (cache_mgr_ == NULL) {
     PrintError("Failed to setup cache in " + cache_directory_ +
                ": " + strerror(errno));
     return LIBCVMFS_FAIL_INITCACHE;
   }
-  cache_ready_ = true;
+
+  retval = sqlite::RegisterVfsRdOnly(
+    cache_mgr_, statistics_, sqlite::kVfsOptDefault);
+  assert(retval);
+  vfs_registered_ = true;
 
   cvmfs::pid_ = getpid();
 
@@ -345,11 +335,15 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
     }
   }
 
+  fetcher_ = new cvmfs::Fetcher(
+    cvmfs_globals::Instance()->cache_mgr(),
+    download_manager_,
+    backoff_throttle_,
+    statistics_);
+
   // Load initial file catalog
-  catalog_manager_ = new cache::CatalogManager(repository_name_,
-                                               signature_manager_,
-                                               download_manager_,
-                                               statistics);
+  catalog_manager_ = new catalog::ClientCatalogManager(
+    repository_name_, fetcher_, signature_manager_, statistics_);
   bool clg_mgr_init;
   if (!opts.root_hash.empty()) {
     const shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(opts.root_hash),
@@ -373,33 +367,39 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
       statistics);
   pathcache_ready_ = true;
 
-  if (!opts.tracefile.empty()) {
-    tracer::Init(8192, 7000, opts.tracefile);
-  } else {
-    tracer::InitNull();
-  }
-  tracer_ready_ = true;
-
   return 0;
 }
 
-cvmfs_context::cvmfs_context(const options &opts) :
-  cfg_(opts),
-  repository_name_(opts.repo_name),
-  boot_time_(time(NULL)),
-  md5path_cache_(NULL),
-  backoff_throttle_(new BackoffThrottle),
-  fd_lockfile(-1),
-  download_ready_(false),
-  signature_ready_(false),
-  catalog_ready_(false),
-  pathcache_ready_(false),
-  tracer_ready_(false)
+cvmfs_context::cvmfs_context(const options &opts)
+  : statistics_(NULL)
+  , cfg_(opts)
+  , repository_name_(opts.repo_name)
+  , pid_(0)
+  , boot_time_(time(NULL))
+  , catalog_manager_(NULL)
+  , signature_manager_(NULL)
+  , download_manager_(NULL)
+  , fetcher_(NULL)
+  , md5path_cache_(NULL)
+  , backoff_throttle_(new BackoffThrottle)
+  , fd_lockfile(-1)
+  , download_ready_(false)
+  , signature_ready_(false)
+  , catalog_ready_(false)
+  , pathcache_ready_(false)
 {
   InitRuntimeCounters();
 }
 
 cvmfs_context::~cvmfs_context() {
+  delete fetcher_;
+  fetcher_ = NULL;
+
+  if (catalog_ready_) {
+    delete catalog_manager_;
+    catalog_manager_ = NULL;
+  }
+
   if (download_ready_) {
     download_manager_->Fini();
     delete download_manager_;
@@ -412,18 +412,9 @@ cvmfs_context::~cvmfs_context() {
     signature_manager_ = NULL;
   }
 
-  if (catalog_ready_) {
-    delete catalog_manager_;
-    catalog_manager_ = NULL;
-  }
-
   if (pathcache_ready_) {
     delete md5path_cache_;
     md5path_cache_ = NULL;
-  }
-
-  if (tracer_ready_) {
-    tracer::Fini();
   }
 
   delete backoff_throttle_;
@@ -591,9 +582,11 @@ int cvmfs_context::Open(const char *c_path) {
     return -ENOENT;
   }
 
-  const bool volatile_content = false;
-  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()),
-                          volatile_content, download_manager_);
+  fd = fetcher_->Fetch(
+    dirent.checksum(),
+    dirent.size(),
+    string(path.GetChars(), path.GetLength()),
+    cache::CacheManager::kTypeRegular);
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
@@ -609,16 +602,13 @@ int cvmfs_context::Open(const char *c_path) {
     }
   }
 
-  // Prevent Squid DoS
-  backoff_throttle_->Throttle();
-
   atomic_inc32(&num_io_error_);
   return fd;
 }
 
 int cvmfs_context::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
-  close(fd);
+  cvmfs_globals::Instance()->cache_mgr()->Close(fd);
   return 0;
 }
 

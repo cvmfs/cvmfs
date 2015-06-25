@@ -25,6 +25,8 @@
 pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);
 
+unsigned GetNoUsedFds();
+
 time_t t(const int day, const int month, const int year);
 shash::Any h(const std::string &hash,
              const shash::Suffix suffix = shash::kSuffixNone);

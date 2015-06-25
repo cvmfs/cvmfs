@@ -20,7 +20,11 @@
 #include "util.h"
 
 namespace cache {
-class CatalogManager;
+class CacheManager;
+}
+
+namespace catalog {
+class ClientCatalogManager;
 }
 
 namespace signature {
@@ -41,6 +45,7 @@ namespace cvmfs {
 extern pid_t         pid_;
 extern std::string  *repository_name_;
 extern bool          foreground_;
+class Fetcher;
 }
 
 /**
@@ -89,6 +94,7 @@ class cvmfs_globals : SingleCopy {
   static cvmfs_globals* Instance();
 
   pthread_mutex_t *libcrypto_locks() { return libcrypto_locks_; }
+  cache::CacheManager *cache_mgr() { return cache_mgr_; }
 
  protected:
   int Setup(const options &opts);
@@ -103,18 +109,17 @@ class cvmfs_globals : SingleCopy {
 
   static cvmfs_globals *instance;
 
+  perf::Statistics *statistics_;
+  cache::CacheManager *cache_mgr_;
   std::string       cache_directory_;
   std::string       lock_directory_;
   uid_t             uid_;
   gid_t             gid_;
   int               fd_lockfile_;
   pthread_mutex_t  *libcrypto_locks_;
-  void             *sqlite_scratch;
   void             *sqlite_page_cache;
-  bool options_ready_;
   bool lock_created_;
-  bool cache_ready_;
-  bool quota_ready_;
+  bool vfs_registered_;
 };
 
 
@@ -129,7 +134,7 @@ class cvmfs_context : SingleCopy {
     std::string    url;
     std::string    proxies;
     std::string    fallback_proxies;
-    std::string    tracefile;
+    std::string    tracefile;  // unused
     std::string    pubkey;
     std::string    deep_mount;
     std::string    blacklist;
@@ -195,9 +200,10 @@ class cvmfs_context : SingleCopy {
   std::string repository_name_;
   pid_t pid_;  /**< will be set after deamon() */
   time_t boot_time_;
-  cache::CatalogManager *catalog_manager_;
+  catalog::ClientCatalogManager *catalog_manager_;
   signature::SignatureManager *signature_manager_;
   download::DownloadManager *download_manager_;
+  cvmfs::Fetcher *fetcher_;
   lru::Md5PathCache *md5path_cache_;
 
   atomic_int64 num_fs_open_;
@@ -223,7 +229,6 @@ class cvmfs_context : SingleCopy {
   bool signature_ready_;
   bool catalog_ready_;
   bool pathcache_ready_;
-  bool tracer_ready_;
 };
 
 #endif  // CVMFS_LIBCVMFS_INT_H_

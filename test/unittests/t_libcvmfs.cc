@@ -85,6 +85,8 @@ TEST_F(T_Libcvmfs, InitFailures) {
 
   retval = cvmfs_init("");
   ASSERT_EQ(LIBCVMFS_FAIL_MKCACHE, retval);
+
+  sqlite3_shutdown();
 }
 
 

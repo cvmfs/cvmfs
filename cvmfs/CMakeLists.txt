@@ -21,7 +21,7 @@ set (CVMFS_LOADER_SOURCES
 set (CVMFS_CLIENT_SOURCES
   smalloc.h
   logging.cc logging.h logging_internal.h
-  tracer.h tracer.cc atomic.h
+  atomic.h
   duplex_sqlite3.h duplex_curl.h duplex_cares.h
   signature.h signature.cc
   quota.h quota.cc
@@ -48,6 +48,7 @@ set (CVMFS_CLIENT_SOURCES
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr.cc
+  catalog_mgr_client.h catalog_mgr_client.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   directory_entry.h directory_entry.cc
   shortstring.h
@@ -56,12 +57,15 @@ set (CVMFS_CLIENT_SOURCES
   xattr.h xattr.cc
   statistics.h statistics.cc
   sqlitevfs.cc sqlitevfs.h
+  fetch.cc fetch.h
+  sink.h
 )
 
 
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
+  tracer.h tracer.cc
   options.cc options.h
   talk.h talk.cc
   nfs_maps.h nfs_maps.cc
