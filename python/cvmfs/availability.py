@@ -20,7 +20,7 @@ class Availability:
 
     def _get_param_or_default(self, argname, default, **kwargs):
         if argname not in kwargs:
-            return default
+            setattr(self, argname, default)
         else:
             setattr(self, argname, kwargs[argname])
 
