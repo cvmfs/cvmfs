@@ -24,8 +24,8 @@ class TestLogisticFunction(unittest.TestCase):
             if i > 10:
                 i_05 = float(i) * 0.5
                 i_15 = float(i) * 1.5
-                self.assertLess   (0.90, f(i_05), msg=("i = %d | i_05 = %f" % (i , i_05)))
-                self.assertGreater(0.10, f(i_15), msg=("i = %d | i_15 = %f" % (i , i_15)))
+                self.assertTrue(0.90 < f(i_05), msg=("i = %d | i_05 = %f" % (i , i_05)))
+                self.assertTrue(0.10 > f(i_15), msg=("i = %d | i_15 = %f" % (i , i_15)))
 
 
     def test_large_numbers(self):
@@ -38,5 +38,5 @@ class TestLogisticFunction(unittest.TestCase):
 
             i_05 = float(i) * 0.5
             i_15 = float(i) * 1.5
-            self.assertLess   (0.90, f(i_05), msg=("i = %d | i_05 = %f" % (i , i_05)))
-            self.assertGreater(0.10, f(i_15), msg=("i = %d | i_15 = %f" % (i , i_15)))
+            self.assertTrue(0.90 < f(i_05), msg=("i = %d | i_05 = %f" % (i , i_05)))
+            self.assertTrue(0.10 > f(i_15), msg=("i = %d | i_15 = %f" % (i , i_15)))

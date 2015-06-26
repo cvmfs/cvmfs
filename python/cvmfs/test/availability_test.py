@@ -8,10 +8,7 @@ This file is part of the CernVM File System auxiliary tools.
 from datetime    import datetime, timedelta
 from dateutil.tz import tzutc
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
+import unittest
 
 import cvmfs
 
@@ -73,15 +70,15 @@ class TestAvailability(unittest.TestCase):
         severe   = MockRepository(revision =  992, last_replication=self._get_recent_time(45))
         fatal    = MockRepository(revision =  980, last_replication=self._get_recent_time(90))
 
-        self.assertLess(0.95, avail.get_stratum1_health_score(healthy))
+        self.assertTrue(0.95 < avail.get_stratum1_health_score(healthy))
 
-        self.assertGreater(0.9, avail.get_stratum1_health_score(degraded))
-        self.assertLess   (0.7, avail.get_stratum1_health_score(degraded))
+        self.assertTrue(0.9 > avail.get_stratum1_health_score(degraded))
+        self.assertTrue(0.7 < avail.get_stratum1_health_score(degraded))
 
-        self.assertGreater(0.7, avail.get_stratum1_health_score(severe))
-        self.assertLess   (0.4, avail.get_stratum1_health_score(severe))
+        self.assertTrue(0.7 > avail.get_stratum1_health_score(severe))
+        self.assertTrue(0.4 < avail.get_stratum1_health_score(severe))
 
-        self.assertGreater(0.2, avail.get_stratum1_health_score(fatal))
+        self.assertTrue(0.2 > avail.get_stratum1_health_score(fatal))
 
 
     def test_repository_scores(self):
@@ -95,19 +92,19 @@ class TestAvailability(unittest.TestCase):
 
         avail.add_stratum1(healthy)
         avail.add_stratum1(healthy)
-        self.assertLess(0.95, avail.get_repository_health_score())
+        self.assertTrue(0.95 < avail.get_repository_health_score())
 
         avail.add_stratum1(degraded)
-        self.assertGreater(0.9, avail.get_repository_health_score())
-        self.assertLess   (0.8, avail.get_repository_health_score())
+        self.assertTrue(0.9 > avail.get_repository_health_score())
+        self.assertTrue(0.8 < avail.get_repository_health_score())
 
         avail.add_stratum1(severe)
-        self.assertGreater(0.8, avail.get_repository_health_score())
-        self.assertLess   (0.5, avail.get_repository_health_score())
+        self.assertTrue(0.8 > avail.get_repository_health_score())
+        self.assertTrue(0.5 < avail.get_repository_health_score())
 
         avail.add_stratum1(severe)
-        self.assertGreater(0.5, avail.get_repository_health_score())
-        self.assertLess   (0.2, avail.get_repository_health_score())
+        self.assertTrue(0.5 > avail.get_repository_health_score())
+        self.assertTrue(0.2 < avail.get_repository_health_score())
 
         avail.add_stratum1(fatal)
-        self.assertGreater(0.2, avail.get_repository_health_score())
+        self.assertTrue(0.2 > avail.get_repository_health_score())
