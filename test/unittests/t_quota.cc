@@ -278,9 +278,9 @@ TEST_F(T_QuotaManager, CloseDatabase) {
 TEST_F(T_QuotaManager, Contains) {
   shash::Any hash_null(shash::kSha1);
   shash::Any hash_rnd(shash::kSha1);
-  shash::Any hash_rnd2(shash::kSha1);
   hash_rnd.Randomize();
-  hash_rnd2.Randomize();
+  shash::Any hash_rnd2(hash_rnd);
+  hash_rnd2.algorithm = shash::kRmd160;
   quota_mgr_->Insert(hash_null, 1, "/a");
   EXPECT_TRUE(quota_mgr_->Pin(hash_rnd, 1, "/b", false));
   quota_mgr_->List();  // trigger database commit
