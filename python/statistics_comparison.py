@@ -8,7 +8,7 @@ import tempfile
 from docker import Client
 from parser import Parser
 
-image = "cvm-dockerhub02:5000/slc6"
+image = "cvm-dockerhub02.cern.ch:5000/slc6"
 tag = "cvmfs"
 tmpdir = tempfile.mkdtemp(prefix="comparison.", dir="/tmp")
 
@@ -32,6 +32,8 @@ class DockerExecutor:
             os.environ["CVMFS_OPT_ITERATIONS"] = "1"
         if "CVMFS_OPT_WARM_CACHE" not in os.environ:
             os.environ["CVMFS_OPT_WARM_CACHE"] = "no"
+        if "CVMFS_OPT_PARALLEL_RUNS" not in os.environ:
+            os.environ["CVMFS_OPT_PARALLEL_RUNS"] = "1"
 
     def run(self, tests_to_execute):
         client = Client(base_url=self.socket_url, version=self.api_version)
@@ -48,6 +50,7 @@ class DockerExecutor:
             "CVMFS_OPT_TALK_STATISTICS": "yes",
             "CVMFS_OPT_ITERATIONS": os.environ["CVMFS_OPT_ITERATIONS"],
             "CVMFS_OPT_WARM_CACHE": os.environ["CVMFS_OPT_WARM_CACHE"],
+            "CVMFS_OPT_PARALLEL_RUNS": os.environ["CVMFS_OPT_PARALLEL_RUNS"],
             "USER": "root"
         }
         cmd = "bash -xc \'" + \
@@ -91,7 +94,7 @@ def parse_args():
                                 unix://path/to/docker.sock
                                 tcp://X.X.X.X:port""")
     argparser.add_argument("--docker_api_version",
-                           default="1.17",
+                           default="1.18",
                            required=False, type=str,
                            help="Docker API version (default 1.17)")
     argparser.add_argument("--benchmarks",
@@ -114,6 +117,10 @@ def parse_args():
                            default="devel",
                            required=False, type=str,
                            help="External branch to compare to")
+    argparser.add_argument("--output",
+                           default="/tmp/comparison.csv",
+                           required=False, type=str,
+                           help="Output CSV file")
     argparser.add_argument("external_repo", type=str)
     return argparser.parse_args()
 
@@ -148,15 +155,18 @@ def parse_files():
 
 
 def main():
-    final_result_file = tmpdir + "/comparison.csv"
     DockerExecutor.set_environment_variables()
     args = parse_args()
+    final_result_file = args.output
     origin = GitRepository(args.original_repo, args.original_branch, "original")
     external = GitRepository(args.external_repo, args.external_branch,
                              "external")
     tests_to_execute = get_benchmark_list(args.benchmarks)
     if len(tests_to_execute) == 0:
         exit(200)
+    if not final_result_file.endswith(".csv"):
+        print("Please specify a CSV file as output")
+        exit(201)
     # download firstly the image
     print("Downloading the image " + image + ":" + tag)
     c = Client(base_url=args.socket_url, version=args.docker_api_version)
@@ -166,8 +176,7 @@ def main():
         print("    Stopping container " + container["Id"])
         c.remove_container(container["Id"], force=True)
 
-    print("Done downloading the image. Results of the tests will be placed " +
-          "in " + tmpdir + "\n")
+    print("Done downloading the image")
     origin_exec = DockerExecutor(origin, args.socket_url,
                                  args.docker_api_version)
     external_exec = DockerExecutor(external, args.socket_url,
