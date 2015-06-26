@@ -97,3 +97,13 @@ class TestRepositoryWrapper(unittest.TestCase):
         self.assertRaises(cvmfs.RepositoryVerificationFailed,
                           cvmfs.open_repository,
                           self.mock_repo.dir, self.mock_repo.public_key)
+
+
+    def test_download_non_existent_file(self):
+        self.mock_repo.make_valid_whitelist()
+        self.mock_repo.serve_via_http()
+        repo = cvmfs.open_repository(self.mock_repo.url,
+                                     self.mock_repo.public_key)
+        self.assertRaises(cvmfs.FileNotFoundInRepository,
+                          repo.retrieve_file,
+                          "unobtainium.txt")
