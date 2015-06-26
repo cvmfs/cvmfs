@@ -198,6 +198,7 @@ set (CVMFS_UNITTEST_DEBUG_SOURCES
   ${CVMFS_SOURCE_DIR}/catalog.cc
   ${CVMFS_SOURCE_DIR}/catalog_counters.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
   ${CVMFS_SOURCE_DIR}/catalog_rw.cc
@@ -209,6 +210,7 @@ set (CVMFS_UNITTEST_DEBUG_SOURCES
   ${CVMFS_SOURCE_DIR}/dirtab.cc
   ${CVMFS_SOURCE_DIR}/dns.cc
   ${CVMFS_SOURCE_DIR}/download.cc
+  ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/file_chunk.cc
   ${CVMFS_SOURCE_DIR}/globals.cc
   ${CVMFS_SOURCE_DIR}/glue_buffer.cc
@@ -282,13 +284,13 @@ set (CVMFS_UNITTEST_DEBUG_SOURCES
 # Compiler and Linker Flags for unit tests
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
-set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -fprofile-arcs -ftest-coverage -fPIC -O0 -DDEBUGMSG -g")
+set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS} -fprofile-arcs -ftest-coverage")
+set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 if (NOT ${USING_CLANG})
-  set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS} -ftest-coverage -fprofile-arcs")
-  set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
+  set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS} -fprofile-arcs -ftest-coverage -fPIC")
+  set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS} -fprofile-arcs -ftest-coverage")
 endif (NOT ${USING_CLANG})
 
 #
