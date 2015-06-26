@@ -773,10 +773,16 @@ TEST_F(T_CacheManager, TearDown2ReadOnly) {
   int retval = pthread_create(&thread_teardown, NULL, MainTearDown, &cb);
   assert(retval == 0);
   EXPECT_EQ(0, cache_mgr_->AbortTxn(txn1));
-  SafeSleepMs(75);
+  SafeSleepMs(100);
   EXPECT_FALSE(cb.finished);
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn2));
-  SafeSleepMs(75);
+  unsigned waiting = 0;
+  do {
+    if (cb.finished)
+      break;
+    SafeSleepMs(50);
+    waiting += 50;
+  } while (waiting < 10000);
   EXPECT_TRUE(cb.finished);
   if (cb.finished)
     pthread_join(thread_teardown, NULL);
