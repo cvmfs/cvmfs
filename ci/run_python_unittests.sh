@@ -27,10 +27,6 @@ check_python_module "xmlrunner"                  || complain "no python-xmlrunne
 check_python_module "dateutil"                   || complain "no python-dateutil installed"
 check_python_module "ctypes"                     || complain "no python-ctypes installed"
 check_python_module "M2Crypto"                   || complain "no m2crypto installed"
-if compare_versions "$(python_version)" -lt "2.7.0"; then
-  # unittest2 is a back-port of the Python 2.7 unittest features
-  check_python_module "unittest2" || complain "python 2.6 but no unittest2 installed"
-fi
 
 # run the unit tests
 UNITTEST_RUNNER="${SCRIPT_LOCATION}/../python/run_unittests.py"
