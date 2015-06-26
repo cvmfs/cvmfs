@@ -7,8 +7,8 @@ This file is part of the CernVM File System auxiliary tools.
 
 import os
 import urlparse
+import urllib2
 import tempfile
-import requests
 from datetime import datetime
 import dateutil.parser
 from dateutil.tz import tzutc
@@ -232,13 +232,15 @@ class RemoteRepository(Repository):
     def retrieve_file(self, file_name):
         file_url = self.endpoint + "/" + file_name
         tmp_file = tempfile.NamedTemporaryFile('w+b')
-        headers  = { 'User-Agent': self._user_agent }
-        response = requests.get(file_url, stream=True, headers=headers)
-        if response.status_code != requests.codes.ok:
+
+        request  = urllib2.Request(file_url, {'User-Agent': self._user_agent})
+        response = None
+        try:
+            response = urllib2.urlopen(request)
+        except HTTPError, e:
             raise FileNotFoundInRepository(self, file_url)
-        for chunk in response.iter_content(chunk_size=4096):
-            if chunk:
-                tmp_file.write(chunk)
+
+        tmp_file.write(response.read())
         tmp_file.seek(0)
         tmp_file.flush()
         return tmp_file
