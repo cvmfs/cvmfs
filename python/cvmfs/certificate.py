@@ -5,7 +5,9 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
-from M2Crypto import X509
+import M2Crypto
+from M2Crypto import EVP, X509, m2, util
+from distutils.version import LooseVersion, StrictVersion
 
 from _common import CompressedObject
 
@@ -28,9 +30,27 @@ class Certificate(CompressedObject):
         return self.openssl_certificate
 
 
+    def _get_fingerprint(self, algorithm='sha1'):
+        """ Workaround for RHEL5 with ancient version of M2Crypto """
+        if LooseVersion(M2Crypto.version) < StrictVersion("0.17"):
+            der = self.openssl_certificate.as_der()
+            md = EVP.MessageDigest(algorithm)
+            md.update(der)
+            digest = md.final()
+            return hex(util.octx_to_num(digest))[2:-1].upper()
+        else:
+            return self.openssl_certificate.get_fingerprint()
+
+    def _check_signature(self, pubkey, signature):
+        """ Workaround for RHEL5 with ancient version of M2Crypto """
+        if LooseVersion(M2Crypto.version) < StrictVersion("0.18"):
+            return m2.verify_final(pubkey.ctx, signature, pubkey.pkey)
+        else:
+            return pubkey.verify_final(signature)
+
     def get_fingerprint(self, algorithm='sha1'):
         """ returns the fingerprint of the X509 certificate """
-        fp = self.openssl_certificate.get_fingerprint(algorithm)
+        fp = self._get_fingerprint()
         return ':'.join([ x + y for x, y in zip(fp[0::2], fp[1::2]) ])
 
 
@@ -40,4 +60,4 @@ class Certificate(CompressedObject):
         pubkey.reset_context(md='sha1')
         pubkey.verify_init()
         pubkey.verify_update(message)
-        return pubkey.verify_final(signature)
+        return self._check_signature(pubkey, signature)
