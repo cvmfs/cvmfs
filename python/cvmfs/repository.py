@@ -238,7 +238,7 @@ class RemoteRepository(Repository):
         response = None
         try:
             response = urllib2.urlopen(request)
-        except HTTPError, e:
+        except urllib2.HTTPError, e:
             raise FileNotFoundInRepository(self, file_url)
 
         tmp_file.write(response.read())
