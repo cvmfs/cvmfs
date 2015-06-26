@@ -21,7 +21,6 @@ key-value line content (without the termination line) followed by an \n and a
 binary string containing the private-key signature terminated by EOF.
 """
 
-import abc
 import hashlib
 
 class IncompleteRootFileSignature(Exception):
@@ -36,17 +35,12 @@ class InvalidRootFileSignature(Exception):
 class RootFile:
     """ Base class for CernVM-FS repository's signed 'root files' """
 
-    __metaclass__ = abc.ABCMeta
-
-    @abc.abstractmethod
     def _read_line(self, line):
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
     def _check_validity(self):
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
     def __init__(self, file_object):
         """ Initializes a root file object from a file pointer """
         self.has_signature = False
@@ -61,9 +55,8 @@ class RootFile:
             self._read_signature(file_object)
         self._check_validity()
 
-    @abc.abstractmethod
     def _verify_signature(public_entity):
-        pass
+        raise NotImplementedError()
 
 
     def verify_signature(self, public_entity):
