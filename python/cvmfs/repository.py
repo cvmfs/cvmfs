@@ -233,7 +233,8 @@ class RemoteRepository(Repository):
         file_url = self.endpoint + "/" + file_name
         tmp_file = tempfile.NamedTemporaryFile('w+b')
 
-        request  = urllib2.Request(file_url, {'User-Agent': self._user_agent})
+        request  = urllib2.Request(file_url)
+        request.add_header('User-Agent', self._user_agent)
         response = None
         try:
             response = urllib2.urlopen(request)
