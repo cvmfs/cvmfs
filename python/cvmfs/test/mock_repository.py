@@ -17,15 +17,15 @@ import unittest
 from M2Crypto import RSA
 
 import SimpleHTTPServer
-import SocketServer
 
-from file_sandbox import FileSandbox
+from file_sandbox     import FileSandbox
+from tcp_server_26ish import Py26ishTCPServer
 
-class CvmfsTestServer(SocketServer.TCPServer):
+class CvmfsTestServer(Py26ishTCPServer):
     allow_reuse_address = True
     def __init__(self, document_root, bind_address, handler):
         self.document_root = document_root
-        SocketServer.TCPServer.__init__(self, bind_address, handler)
+        Py26ishTCPServer.__init__(self, bind_address, handler)
 
 class CvmfsRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def translate_path(self, path):
@@ -72,26 +72,28 @@ class MockRepository:
         old_whitelist = os.path.join(self.dir, ".cvmfswhitelist")
         new_whitelist = os.path.join(self.dir, ".cvmfswhitelist.new")
         wl_hash = hashlib.sha1()
-        with open(new_whitelist, 'w+') as new_wl: # TODO: more elegant is Py 2.7
-            with open(old_whitelist) as old_wl:
-                pos = old_wl.tell()
-                while True:
-                    line = old_wl.readline()
-                    if len(line) >= 3 and line[0:3] == 'E20': #fails in 85 years
-                        line = 'E' + expiry_date.strftime("%Y%m%d%H%M%S") + '\n'
-                    if line[0:2] == "--":
-                        break
-                    if pos == old_wl.tell():
-                        raise Exception("Signature not found in whitelist")
-                    wl_hash.update(line)
-                    new_wl.write(line)
-                    pos = old_wl.tell()
-            new_wl.write("--\n")
-            new_wl.write(wl_hash.hexdigest())
-            new_wl.write("\n")
-            key = RSA.load_key(self.master_key)
-            sig = key.private_encrypt(wl_hash.hexdigest(), RSA.pkcs1_padding)
-            new_wl.write(sig)
+        new_wl = open(new_whitelist, 'w+')
+        old_wl = open(old_whitelist)
+        pos = old_wl.tell()
+        while True:
+            line = old_wl.readline()
+            if len(line) >= 3 and line[0:3] == 'E20': #fails in 85 years
+                line = 'E' + expiry_date.strftime("%Y%m%d%H%M%S") + '\n'
+            if line[0:2] == "--":
+                break
+            if pos == old_wl.tell():
+                raise Exception("Signature not found in whitelist")
+            wl_hash.update(line)
+            new_wl.write(line)
+            pos = old_wl.tell()
+        old_wl.close()
+        new_wl.write("--\n")
+        new_wl.write(wl_hash.hexdigest())
+        new_wl.write("\n")
+        key = RSA.load_key(self.master_key)
+        sig = key.private_encrypt(wl_hash.hexdigest(), RSA.pkcs1_padding)
+        new_wl.write(sig)
+        new_wl.close()
         os.rename(new_whitelist, old_whitelist)
 
 

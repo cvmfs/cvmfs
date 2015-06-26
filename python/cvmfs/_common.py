@@ -8,7 +8,6 @@ This file is part of the CernVM File System auxiliary tools.
 import ctypes
 import tempfile
 import zlib
-import sqlite3
 import subprocess
 import shutil
 import math

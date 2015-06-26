@@ -73,10 +73,10 @@ client_version = None
 
 try:
     server_version = _get_server_version()
-except (ServerNotInstalled, VersionNotDetected) as e:
+except ServerNotInstalled, VersionNotDetected:
     has_server = False
 
 try:
     client_version = _get_client_version()
-except ClientNotInstalled, e:
+except ClientNotInstalled:
     has_client = False
