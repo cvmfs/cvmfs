@@ -278,17 +278,19 @@ class TestWhitelist(unittest.TestCase):
 
 
     def test_contains_certificate(self):
-        with open(self.certificate_file) as cert:
-            whitelist   = cvmfs.Whitelist(self.sane_whitelist)
-            certificate = cvmfs.Certificate(cert)
-            self.assertTrue(whitelist.contains(certificate))
+        cert = open(self.certificate_file)
+        whitelist   = cvmfs.Whitelist(self.sane_whitelist)
+        certificate = cvmfs.Certificate(cert)
+        cert.close()
+        self.assertTrue(whitelist.contains(certificate))
 
 
     def test_doesnt_contain_certificate(self):
-        with open(self.certificate_file) as cert:
-            whitelist   = cvmfs.Whitelist(self.insane_whitelist_signature_mismatch)
-            certificate = cvmfs.Certificate(cert)
-            self.assertFalse(whitelist.contains(certificate))
+        cert = open(self.certificate_file)
+        whitelist   = cvmfs.Whitelist(self.insane_whitelist_signature_mismatch)
+        certificate = cvmfs.Certificate(cert)
+        cert.close()
+        self.assertFalse(whitelist.contains(certificate))
 
 
     def test_expired_whitelist(self):

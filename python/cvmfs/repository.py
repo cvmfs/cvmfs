@@ -73,8 +73,9 @@ class Repository:
 
     def _read_manifest(self):
         try:
-            with self.retrieve_file(_common._MANIFEST_NAME) as manifest_file:
-                self.manifest = Manifest(manifest_file)
+            manifest_file = self.retrieve_file(_common._MANIFEST_NAME)
+            self.manifest = Manifest(manifest_file)
+            manifest_file.close()
             self.fqrn = self.manifest.repository_name
         except FileNotFoundInRepository, e:
             raise RepositoryNotFound(self.endpoint)
@@ -90,9 +91,10 @@ class Repository:
 
     def _try_to_get_last_replication_timestamp(self):
         try:
-            with self.retrieve_file(_common._LAST_REPLICATION_NAME) as rf:
-                timestamp = rf.readline()
-                self.last_replication = self.__read_timestamp(timestamp)
+            last_rep_file = self.retrieve_file(_common._LAST_REPLICATION_NAME)
+            timestamp = last_rep_file.readline()
+            last_rep_file.close()
+            self.last_replication = self.__read_timestamp(timestamp)
             if not self.has_repository_type():
                 self.type = 'stratum1'
         except FileNotFoundInRepository, e:
@@ -102,10 +104,11 @@ class Repository:
     def _try_to_get_replication_state(self):
         self.replicating = False
         try:
-            with self.retrieve_file(_common._REPLICATING_NAME) as rf:
-                timestamp = rf.readline()
-                self.replicating = True
-                self.replicating_since = self.__read_timestamp(timestamp)
+            rep_state_file = self.retrieve_file(_common._REPLICATING_NAME)
+            timestamp = rep_state_file.readline()
+            rep_state_file.close()
+            self.replicating = True
+            self.replicating_since = self.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
 
@@ -184,10 +187,11 @@ class LocalRepository(Repository):
     def read_server_config(self, config_field):
         if not self._server_config:
             raise ConfigurationNotFound(self, "no such file or directory")
-        with open(self._server_config) as config_file:
-            for config_line in config_file:
-                if config_line.startswith(config_field):
-                    return config_line[len(config_field)+1:].strip()
+        config_file = open(self._server_config)
+        for config_line in config_file:
+            if config_line.startswith(config_field):
+                return config_line[len(config_field)+1:].strip()
+        config_file.close()
         raise ConfigurationNotFound(self, config_field)
 
 
