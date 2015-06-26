@@ -1524,6 +1524,7 @@ execute_statistics_loop() {
       if [ $retval -ne 0 ]; then
         code=$retval
         echo "One thread failed in $FQRN. Check /tmp/$FQRN.log"
+      fi
     done
 
     local end_time=$(date +%s)
