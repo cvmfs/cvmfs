@@ -17,15 +17,15 @@ import unittest
 from M2Crypto import RSA
 
 import SimpleHTTPServer
-import SocketServer
 
-from file_sandbox import FileSandbox
+from file_sandbox     import FileSandbox
+from tcp_server_26ish import Py26ishTCPServer
 
-class CvmfsTestServer(SocketServer.TCPServer):
+class CvmfsTestServer(Py26ishTCPServer):
     allow_reuse_address = True
     def __init__(self, document_root, bind_address, handler):
         self.document_root = document_root
-        SocketServer.TCPServer.__init__(self, bind_address, handler)
+        Py26ishTCPServer.__init__(self, bind_address, handler)
 
 class CvmfsRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def translate_path(self, path):
