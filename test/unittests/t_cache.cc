@@ -750,7 +750,7 @@ TEST_F(T_CacheManager, StartTxn) {
 
 
 TEST_F(T_CacheManager, TearDown2ReadOnly) {
-  EXPECT_FALSE(TearDownTimedOut(cache_mgr_, 2500));
+  EXPECT_FALSE(TearDownTimedOut(cache_mgr_, 10000));
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   EXPECT_EQ(-EROFS, cache_mgr_->StartTxn(hash_null_, 0, txn));
 
@@ -762,7 +762,7 @@ TEST_F(T_CacheManager, TearDown2ReadOnly) {
   EXPECT_GE(cache_mgr_->StartTxn(hash_one_, 0, txn2), 0);
   EXPECT_EQ(0, cache_mgr_->AbortTxn(txn1));
   EXPECT_EQ(0, cache_mgr_->CommitTxn(txn2));
-  EXPECT_FALSE(TearDownTimedOut(cache_mgr_, 2500));
+  EXPECT_FALSE(TearDownTimedOut(cache_mgr_, 10000));
 
   cache_mgr_->cache_mode_ = PosixCacheManager::kCacheReadWrite;
 
