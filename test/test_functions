@@ -39,6 +39,7 @@ CVMFS_OPT_TEST_TYPE=${CVMFS_OPT_TEST_TYPE:=callgrind} # callgrind / memcheck
 CVMFS_OPT_CONFIG_FILE=${CVMFS_OPT_CONFIG_FILE:=}
 CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=/tmp/cvmfs_benchmarks}
 CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=/var/lib/cvmfs/benchmark}
+CVMFS_OPT_PARALLEL_RUNS=${CVMFS_OPT_PARALLEL_RUNS:=1}
 CVMFS_OPT_MTAB_MODIFIED="false"
 
 
@@ -1497,6 +1498,7 @@ execute_statistics_loop() {
   local code=0
   local iteration=1
   local PID=0
+  local processes=()
   local memory_file="memory.stat"
 
   while (( iteration <= $CVMFS_OPT_ITERATIONS && code == 0 )); do
@@ -1509,9 +1511,21 @@ execute_statistics_loop() {
     cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
     PID=$!
     wait_fqrn_mount
-    statistics_daemon $memory_file $PID & # it kills himself when there is no cvmfs process
-    ( cvmfs_run_benchmark )
-    code=$?
+    statistics_daemon $memory_file $PID >/dev/null 2>&1 & # it kills himself when there is no cvmfs process
+
+    for i in $(seq 1 1 $CVMFS_OPT_PARALLEL_RUNS); do
+      ( cvmfs_run_benchmark ) > /tmp/$FQRN.log.$i 2>&1 &
+      processes[$i]=$!
+    done
+
+    for pid in ${processes[@]}; do
+      wait $pid
+      local retval=$?
+      if [ $retval -ne 0 ]; then
+        code=$retval
+        echo "One thread failed in $FQRN. Check /tmp/$FQRN.log"
+    done
+
     local end_time=$(date +%s)
     local total_time=$(( end_time - start_time )) # in seconds
 
