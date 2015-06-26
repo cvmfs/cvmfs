@@ -65,6 +65,8 @@ endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 #
 if (CMAKE_CXX_COMPILER MATCHES ".*clang")
   set(USING_CLANG 1)
+else (CMAKE_CXX_COMPILER MATCHES ".*clang")
+  set(USING_CLANG 0)
 endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
 #
