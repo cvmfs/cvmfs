@@ -246,9 +246,13 @@ class RemoteRepository(Repository):
 
 def open_repository(repository_path, public_key = None):
     """ wrapper function accessing a repository by URL, local FQRN or path """
-    repo = RemoteRepository(repository_path)              \
-                if repository_path.startswith("http://")  \
-                else LocalRepository(repository_path)
+    repo = None
+    if repository_path.startswith("http://"):
+        repo = RemoteRepository(repository_path)
+    else:
+        repo = LocalRepository(repository_path)
+
     if public_key:
         repo.verify(public_key)
+
     return repo

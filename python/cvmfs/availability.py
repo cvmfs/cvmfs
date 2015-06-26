@@ -19,8 +19,10 @@ class Availability:
         self._get_param_or_default('replication_threshold', 60, **kwargs)
 
     def _get_param_or_default(self, argname, default, **kwargs):
-        value = default if argname not in kwargs else kwargs[argname]
-        setattr(self, argname, value)
+        if argname not in kwargs:
+            return default
+        else:
+            setattr(self, argname, kwargs[argname])
 
     def add_stratum1(self, stratum1):
         self.stratum1s.append(stratum1)
@@ -32,14 +34,22 @@ class Availability:
         return self.stratum0.manifest.revision
 
     def get_oldest_revision(self):
-        return min([ s1.manifest.revision for s1 in self.stratum1s ]) \
-            if   self.has_stratum1s()                                 \
-            else self.get_current_revision()
+        if self.has_stratum1s():
+            return min([ s1.manifest.revision for s1 in self.stratum1s ])
+        else:
+            return self.get_current_revision()
 
     def get_oldest_stratum1(self):
-        return min(self.stratum1s, key=lambda s1: s1.manifest.revision) \
-            if   self.has_stratum1s()                                   \
-            else None
+        if self.has_stratum1s():
+            oldest_s1 = None
+            revision  = self.get_current_revision()
+            for s1 in self.stratum1s:
+                if revision > s1.manifest.revision:
+                    oldest_s1 = s1
+                    revision  = s1.manifest.revision
+            return oldest_s1
+        else:
+            return None
 
     def get_stratum1_health_score(self, stratum1):
         f_revision    = _logistic_function(self.revision_threshold)
