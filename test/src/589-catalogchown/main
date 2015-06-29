@@ -107,6 +107,9 @@ check_file_permissions_1() {
   local gid_2=$6
   local gid_3=$7
 
+  local ctu=$(id -ru $CVMFS_TEST_USER)
+  local ctg=$(id -rg $CVMFS_TEST_USER)
+
   pushdir $working_dir
 
   check_file foo/owned_by_root $(id -ru root) $(id -rg root) || return 1
@@ -127,6 +130,8 @@ check_file_permissions_1() {
   check_file foo ${uid_1} ${gid_1}                           || return 13
   check_file bar ${uid_2} ${gid_3}                           || return 14
   check_file baz ${uid_3} ${gid_2}                           || return 15
+
+  check_file . $ctu $ctg                                     || return 16
 
   popdir
 }
@@ -200,6 +205,8 @@ check_file_permissions_2() {
   check_file bar $uid_1 $gid_1                || return 14
   check_file baz $ctu   $ctg                  || return 15
 
+  check_file . $ctu $ctg                      || return 16
+
   popdir
 }
 
@@ -271,6 +278,8 @@ check_file_permissions_3() {
   check_file foo $ctu $gid_3                || return 13
   check_file bar $ctu $ctg                  || return 14
   check_file baz $ctu $ctg                  || return 15
+
+  check_file . $ctu $ctg                    || return 16
 
   popdir
 }
