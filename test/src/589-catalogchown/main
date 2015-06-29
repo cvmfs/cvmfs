@@ -48,7 +48,12 @@ check_file() {
   local gid=$3
 
   local persona="$(stat --format='%u:%g' $path)"
-  [ x"$persona" = x"${uid}:${gid}" ]
+  if [ x"$persona" != x"${uid}:${gid}" ]; then
+    echo "unexpected ownership for '$path': $persona | ${uid}:${gid}"
+    return 1
+  else
+    return 0
+  fi
 }
 
 produce_files_in_1() {
