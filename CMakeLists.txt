@@ -177,6 +177,7 @@ option (LEVELDB_BUILTIN         "Don't use system leveldb"                      
 option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
+option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 
 #
 # define where to find the external dependencies
@@ -242,6 +243,11 @@ if (NOT ARM AND NOT IS_64_BIT)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
 endif (NOT ARM AND NOT IS_64_BIT)
+
+if (BUILD_COVERAGE AND NOT USING_CLANG)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fprofile-arcs -ftest-coverage -fPIC")
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
+endif (BUILD_COVERAGE)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
