@@ -378,6 +378,10 @@ EOF
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
+  echo "get spool and rdonly directory"
+  load_repo_config $CVMFS_TEST_REPO
+  local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
+
   echo "starting transaction to edit repository"
   start_transaction $CVMFS_TEST_REPO || return $?
 
@@ -394,7 +398,7 @@ EOF
   compare_directories $repo_dir $reference_dir || return $?
 
   echo "check if the file permissions are properly set (repo)"
-  check_file_permissions_1 $repo_dir      $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+  check_file_permissions_1 $rdonly_dir    $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
 
   echo "check if the file permissions are properly set (reference)"
   check_file_permissions_1 $reference_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
@@ -417,7 +421,7 @@ EOF
   compare_directories $repo_dir $reference_dir || return $?
 
   echo "check if the file permissions are properly set (repo)"
-  check_file_permissions_2 $repo_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+  check_file_permissions_2 $rdonly_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -454,7 +458,7 @@ EOF
   compare_directories $repo_dir $reference_dir || return $?
 
   echo "check if the file permissions are properly set (repo)"
-  check_file_permissions_3 $repo_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
+  check_file_permissions_3 $rdonly_dir $uid_1 $uid_2 $uid_3 $gid_1 $gid_2 $gid_3 || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
