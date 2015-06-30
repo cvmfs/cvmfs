@@ -157,6 +157,202 @@ mount_partition() {
 }
 
 
+is_linux() {
+  [ x"$(uname)" = x"Linux" ]
+}
+
+
+is_macos() {
+  [ x"$(uname)" = x"Darwin" ]
+}
+
+
+get_number_of_cpu_cores() {
+  if is_linux; then
+    cat /proc/cpuinfo | grep -e '^processor' | wc -l
+  elif is_macos; then
+    sysctl -n hw.ncpu
+  else
+    echo "1"
+  fi
+}
+
+
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+
+rpm_name_string() {
+  local rpm_file=$1
+  echo $(rpm -qp --queryformat '%{NAME}' $rpm_file)
+}
+
+
+deb_name_string() {
+  local deb_file=$1
+  echo $(dpkg --info $deb_file | grep " Package: " | sed 's/ Package: //')
+}
+
+
+check_package_manager_response() {
+  local retcode=$1
+  local pkg_mgr_name="$2"
+  local pkg_mgr_output="$3"
+
+  if [ $retcode -ne 0 ]; then
+    echo "fail"
+    echo "$pkg_mgr_name said:"
+    echo $pkg_mgr_output
+    exit 102
+  else
+    echo "done"
+  fi
+
+  return $retcode
+}
+
+
+install_rpm() {
+  local rpm_files="$1"
+  local yum_output
+
+  for this_rpm in $rpm_files; do
+    local rpm_name=$(rpm_name_string $this_rpm)
+
+    # check if the given rpm is already installed
+    if rpm -q $rpm_name > /dev/null 2>&1; then
+      echo "RPM '$rpm_name' is already installed"
+      exit 101
+    fi
+
+    # install the RPM
+    echo -n "Installing RPM '$rpm_name' ... "
+    yum_output=$(sudo yum -y install --nogpgcheck $this_rpm 2>&1)
+    check_package_manager_response $? "Yum" "$yum_output"
+  done
+}
+
+
+install_deb() {
+  local deb_files="$1"
+  local deb_output
+
+  for this_deb in $deb_files; do
+    local deb_name=$(deb_name_string $this_deb)
+
+    # install DEB package
+    echo -n "Installing DEB package '$deb_name' ... "
+    deb_output=$(sudo gdebi --non-interactive --quiet $this_deb)
+    check_package_manager_response $? "DPKG" "$deb_output"
+  done
+}
+
+
+install_from_repo() {
+  local package_names="$1"
+  local pkg_mgr
+  local pkg_mgr_output
+
+  # find out which package manager to use
+  if which apt-get > /dev/null 2>&1; then
+    pkg_mgr="apt-get"
+  else
+    pkg_mgr="yum"
+  fi
+
+  # install package from repository
+  echo -n "Installing Packages '$package_names' ... "
+  pkg_mgr_output=$(sudo $pkg_mgr -y install $package_names 2>&1)
+  check_package_manager_response $? $pkg_mgr "$pkg_mgr_output"
+}
+
+
+install_ruby_gem() {
+  local gem_name=$1
+  local pkg_mgr_name="gem"
+  local pkg_mgr_output=""
+
+  echo -n "Installing Ruby gem '$gem_name' ... "
+  pkg_mgr_output=$(sudo gem install $gem_name 2>&1)
+  check_package_manager_response $? $pkg_mgr_name "$pkg_mgr_output"
+}
+
+
+attach_user_group() {
+  local groupname=$1
+  local username
+
+  # add the group to the user's list of groups
+  username=$(id --user --name)
+  sudo /usr/sbin/usermod -a -G $groupname $username || return 1
+}
+
+
+set_nofile_limit() {
+  local limit_value=$1
+  echo "*    hard nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
+  echo "*    soft nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
+  echo "root hard nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
+  echo "root soft nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
+}
+
+
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+
+create_fakes3_config() {
+  [ ! -f $FAKE_S3_CONFIG ] || sudo rm -f $FAKE_S3_CONFIG
+  sudo tee $FAKE_S3_CONFIG > /dev/null << EOF
+CVMFS_S3_HOST=localhost
+CVMFS_S3_PORT=$FAKE_S3_PORT
+CVMFS_S3_ACCESS_KEY=not
+CVMFS_S3_SECRET_KEY=important
+CVMFS_S3_BUCKETS_PER_ACCOUNT=1
+CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10
+CVMFS_S3_BUCKET=$FAKE_S3_BUCKET
+EOF
+}
+
+
+start_fakes3() {
+  local logfile=$1
+
+  [ ! -d $FAKE_S3_STORAGE ] || sudo rm -fR $FAKE_S3_STORAGE > /dev/null 2>&1 || return 1
+  sudo mkdir -p $FAKE_S3_STORAGE                            > /dev/null 2>&1 || return 2
+  create_fakes3_config                                      > /dev/null 2>&1 || return 3
+  run_background_service $logfile "sudo fakes3 --port $FAKE_S3_PORT --root $FAKE_S3_STORAGE"
+}
+
+
+check_result() {
+  local res=$1
+  if [ $res -ne 0 ]; then
+    echo "Failed!"
+  else
+    echo "OK"
+  fi
+}
+
+
+run_unittests() {
+  echo -n "running CernVM-FS unit tests... "
+  local xml_output="${UNITTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}"
+  cvmfs_unittests --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
+  local ut_retval=$?
+  check_result $ut_retval
+
+  return $ut_retval
+}
+
+
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+
+
 die() {
   local msg="$1"
   echo $msg
