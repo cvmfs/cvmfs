@@ -927,6 +927,7 @@ int main(int argc, char *argv[]) {
   fuse_session_destroy(session);
   fuse_unmount(mount_point_->c_str(), channel);
   fuse_opt_free_args(mount_options);
+  delete mount_options;
   channel = NULL;
   session = NULL;
   mount_options = NULL;
