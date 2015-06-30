@@ -1363,10 +1363,11 @@ clean_benchmark_cache() {
 #
 # @param test_type  concrete test to execute
 set_valgrind_options() {
+  local option="$1"
   local CVMFS_OPT_CALLGRIND="--tool=callgrind --dump-before=fuse_session_loop_mt --dump-after=fuse_session_loop_mt --dsymutil=yes --log-file=${FQRN}.callgrind.log -v"
   local CVMFS_OPT_MEMCHECK="--tool=memcheck --xml=yes --xml-file=${FQRN}.memcheck.xml --trace-children=yes --child-silent-after-fork=yes --leak-check=yes --log-file=${FQRN}.memcheck.log -v"
   OPTIONS=""
-  case $CVMFS_OPT_TEST_TYPE in
+  case $option in
     callgrind)
       OPTIONS=$CVMFS_OPT_CALLGRIND
     ;;
@@ -1586,7 +1587,6 @@ execute_benchmark_loop() {
 # runs a benchmark $CVMFS_OPT_ITERATIONS times
 run_benchmark() {
   local statistics_file="$FQRN.data"
-  set_valgrind_options
 
   # use or not warm cache
   if [ x"$CVMFS_OPT_WARM_CACHE" = x"yes" ]; then
@@ -1611,14 +1611,17 @@ run_benchmark() {
   fi
 
   if [ x"$CVMFS_OPT_VALGRIND" = x"yes" ]; then
-    benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
-    benchmark_log "Running valgrind with the following parameters: $OPTIONS"
-    benchmark_log "Launching the job $CVMFS_OPT_ITERATIONS times"
-    execute_benchmark_loop
-    local code=$?
-    if [ $code -ne 0 ]; then
-      die "Failed in Valgrind"
-    fi
+    for tool in $CVMFS_OPT_TEST_TYPE; do
+      set_valgrind_options $tool
+      benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
+      benchmark_log "Running valgrind with the following parameters: $OPTIONS"
+      benchmark_log "Launching the job $CVMFS_OPT_ITERATIONS times"
+      execute_benchmark_loop
+      local code=$?
+      if [ $code -ne 0 ]; then
+        die "Failed in Valgrind"
+      fi
+    done
   fi
 }
 
