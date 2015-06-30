@@ -940,6 +940,17 @@ int main(int argc, char *argv[]) {
 
   CleanupLibcryptoMt();
 
+  delete loader_exports_;
+  delete config_files_;
+  delete repository_name_;
+  delete mount_point_;
+  delete socket_path_;
+  loader_exports_ = NULL;
+  config_files_ = NULL;
+  repository_name_ = NULL;
+  mount_point_ = NULL;
+  socket_path_ = NULL;
+
   if (retval != 0)
     return kFailFuseLoop;
   return kFailOk;
