@@ -247,7 +247,7 @@ endif (NOT ARM AND NOT IS_64_BIT)
 if (BUILD_COVERAGE AND NOT USING_CLANG)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fprofile-arcs -ftest-coverage -fPIC")
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
-endif (BUILD_COVERAGE)
+endif (BUILD_COVERAGE AND NOT USING_CLANG)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
