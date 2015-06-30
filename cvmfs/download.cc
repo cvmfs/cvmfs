@@ -980,9 +980,16 @@ void DownloadManager::ValidateProxyIpsUnlocked(
  */
 void DownloadManager::UpdateStatistics(CURL *handle) {
   double val;
+  int retval;
+  int64_t sum = 0;
 
-  if (curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val) == CURLE_OK)
-    perf::Xadd(counters_->sz_transferred_bytes, static_cast<int64_t>(val));
+  retval = curl_easy_getinfo(handle, CURLINFO_SIZE_DOWNLOAD, &val);
+  assert(retval == CURLE_OK);
+  sum += static_cast<int64_t>(val);
+  /*retval = curl_easy_getinfo(handle, CURLINFO_HEADER_SIZE, &val);
+  assert(retval == CURLE_OK);
+  sum += static_cast<int64_t>(val);*/
+  perf::Xadd(counters_->sz_transferred_bytes, sum);
 }
 
 
@@ -1330,6 +1337,7 @@ DownloadManager::DownloadManager() {
   opt_backoff_max_ms_ = 0;
   enable_info_header_ = false;
   opt_ipv4_only_ = false;
+  follow_redirects_ = false;
 
   resolver = NULL;
 

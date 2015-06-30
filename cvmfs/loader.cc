@@ -927,6 +927,7 @@ int main(int argc, char *argv[]) {
   fuse_session_destroy(session);
   fuse_unmount(mount_point_->c_str(), channel);
   fuse_opt_free_args(mount_options);
+  delete mount_options;
   channel = NULL;
   session = NULL;
   mount_options = NULL;
@@ -938,6 +939,17 @@ int main(int argc, char *argv[]) {
            mount_point_->c_str(), repository_name_->c_str());
 
   CleanupLibcryptoMt();
+
+  delete loader_exports_;
+  delete config_files_;
+  delete repository_name_;
+  delete mount_point_;
+  delete socket_path_;
+  loader_exports_ = NULL;
+  config_files_ = NULL;
+  repository_name_ = NULL;
+  mount_point_ = NULL;
+  socket_path_ = NULL;
 
   if (retval != 0)
     return kFailFuseLoop;
