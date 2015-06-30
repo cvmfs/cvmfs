@@ -186,99 +186,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/sqlitevfs.h
 )
 
-set (CVMFS_UNITTEST_DEBUG_SOURCES 
-
-  # unit test files
-  ${CVMFS_UNITTEST_FILES}
-  
-  # cvmfs/ directory
-  ${CVMFS_SOURCE_DIR}/auto_umount.cc
-  ${CVMFS_SOURCE_DIR}/backoff.cc
-  ${CVMFS_SOURCE_DIR}/cache.cc
-  ${CVMFS_SOURCE_DIR}/catalog.cc
-  ${CVMFS_SOURCE_DIR}/catalog_counters.cc
-  ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
-  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
-  ${CVMFS_SOURCE_DIR}/catalog_mgr_ro.cc
-  ${CVMFS_SOURCE_DIR}/catalog_mgr_rw.cc
-  ${CVMFS_SOURCE_DIR}/catalog_rw.cc
-  ${CVMFS_SOURCE_DIR}/catalog_sql.cc
-  ${CVMFS_SOURCE_DIR}/compat.cc
-  ${CVMFS_SOURCE_DIR}/compression.cc
-  #${CVMFS_SOURCE_DIR}/cvmfs.cc
-  ${CVMFS_SOURCE_DIR}/directory_entry.cc
-  ${CVMFS_SOURCE_DIR}/dirtab.cc
-  ${CVMFS_SOURCE_DIR}/dns.cc
-  ${CVMFS_SOURCE_DIR}/download.cc
-  ${CVMFS_SOURCE_DIR}/fetch.cc
-  ${CVMFS_SOURCE_DIR}/file_chunk.cc
-  ${CVMFS_SOURCE_DIR}/globals.cc
-  ${CVMFS_SOURCE_DIR}/glue_buffer.cc
-  ${CVMFS_SOURCE_DIR}/hash.cc
-  ${CVMFS_SOURCE_DIR}/history_sql.cc
-  ${CVMFS_SOURCE_DIR}/history_sqlite.cc
-  #${CVMFS_SOURCE_DIR}/json_document.cc
-  ${CVMFS_SOURCE_DIR}/letter.cc
-  ${CVMFS_SOURCE_DIR}/libcvmfs.cc
-  ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
-  #${CVMFS_SOURCE_DIR}/loader_talk.cc
-  ${CVMFS_SOURCE_DIR}/logging.cc
-  ${CVMFS_SOURCE_DIR}/manifest.cc
-  ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
-  ${CVMFS_SOURCE_DIR}/monitor.cc
-  #${CVMFS_SOURCE_DIR}/nfs_maps.cc
-  ${CVMFS_SOURCE_DIR}/nfs_shared_maps.cc
-  ${CVMFS_SOURCE_DIR}/options.cc
-  ${CVMFS_SOURCE_DIR}/quota.cc
-  ${CVMFS_SOURCE_DIR}/quota_listener.cc
-  ${CVMFS_SOURCE_DIR}/s3fanout.cc
-  ${CVMFS_SOURCE_DIR}/sanitizer.cc
-  ${CVMFS_SOURCE_DIR}/signature.cc
-  ${CVMFS_SOURCE_DIR}/sql.cc
-  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
-  ${CVMFS_SOURCE_DIR}/statistics.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_check.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_gc.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_history.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_info.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_letter.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_lsrepo.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_migrate.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_pull.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_scrub.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_sign.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_sync.cc
-  #${CVMFS_SOURCE_DIR}/swissknife_zpipe.cc
-  ${CVMFS_SOURCE_DIR}/sync_item.cc
-  ${CVMFS_SOURCE_DIR}/sync_mediator.cc
-  ${CVMFS_SOURCE_DIR}/sync_union.cc
-  #${CVMFS_SOURCE_DIR}/talk.cc
-  ${CVMFS_SOURCE_DIR}/tracer.cc
-  ${CVMFS_SOURCE_DIR}/upload.cc
-  ${CVMFS_SOURCE_DIR}/upload_facility.cc
-  ${CVMFS_SOURCE_DIR}/upload_local.cc
-  ${CVMFS_SOURCE_DIR}/upload_s3.cc
-  ${CVMFS_SOURCE_DIR}/upload_spooler_definition.cc
-  ${CVMFS_SOURCE_DIR}/util.cc
-  ${CVMFS_SOURCE_DIR}/util_concurrency.cc
-  ${CVMFS_SOURCE_DIR}/uuid.cc
-  ${CVMFS_SOURCE_DIR}/whitelist.cc
-  ${CVMFS_SOURCE_DIR}/wpad.cc
-  ${CVMFS_SOURCE_DIR}/xattr.cc
-  
-  # cvmfs/file_processing directory
-  ${CVMFS_SOURCE_DIR}/file_processing/async_reader.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/chunk.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/chunk_detector.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/file.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/file_processor.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/io_dispatcher.cc
-  ${CVMFS_SOURCE_DIR}/file_processing/processor.cc
-  
-  # cvmfs/garbage_collection directory
-  ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
-  ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc
-)
+set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
 #
 # Compiler and Linker Flags for unit tests
@@ -287,11 +195,6 @@ set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -
 set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-
-if (NOT ${USING_CLANG})
-  set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS} -fprofile-arcs -ftest-coverage -fPIC")
-  set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS} -fprofile-arcs -ftest-coverage")
-endif (NOT ${USING_CLANG})
 
 #
 # build CernVM-FS test cases
