@@ -6,14 +6,15 @@ set (PROJECT_TEST_NAME "cvmfs_unittests")
 set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 
 #
-# unit test source files
+# unit test files
 #
-set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
-set (CVMFS_UNITTEST_SOURCES
+set(CVMFS_UNITTEST_FILES
   # test steering
   main.cc
-
-  # unit test files
+  
+  # test utility functions
+  testutil.cc testutil.h
+  
   t_atomic.cc
   t_smallhash.cc
   t_bigvector.cc
@@ -58,14 +59,24 @@ set (CVMFS_UNITTEST_SOURCES
   t_xattr.cc
   t_statistics.cc
   t_options.cc
+  t_cache.cc
+  t_quota.cc
   t_libcvmfs.cc
   t_backoff.cc
   t_wpad.cc
   t_smalloc.cc
   t_uid_map.cc
+  t_fetch.cc
+  t_manifest.cc
+)
 
-  # test utility functions
-  testutil.cc testutil.h
+#
+# unit test source files
+#
+set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
+set (CVMFS_UNITTEST_SOURCES 
+
+  ${CVMFS_UNITTEST_FILES}
 
   # test dependencies
   ${CVMFS_SOURCE_DIR}/atomic.h
@@ -132,7 +143,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/dirtab.h
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
+  ${CVMFS_SOURCE_DIR}/manifest.h
   ${CVMFS_SOURCE_DIR}/manifest_fetch.cc
+  ${CVMFS_SOURCE_DIR}/manifest_fetch.h
   ${CVMFS_SOURCE_DIR}/signature.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
 
@@ -153,6 +166,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/quota.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_client.h
   ${CVMFS_SOURCE_DIR}/backoff.h
   ${CVMFS_SOURCE_DIR}/backoff.cc
   ${CVMFS_SOURCE_DIR}/monitor.h
@@ -165,8 +180,12 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc
-
+  ${CVMFS_SOURCE_DIR}/sink.h
   ${CVMFS_SOURCE_DIR}/uid_map.h
+  ${CVMFS_SOURCE_DIR}/fetch.h
+  ${CVMFS_SOURCE_DIR}/fetch.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
+  ${CVMFS_SOURCE_DIR}/sqlitevfs.h
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
@@ -175,14 +194,9 @@ set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 # Compiler and Linker Flags for unit tests
 #
 set (CVMFS_UNITTESTS_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -DGTEST_HAS_TR1_TUPLE=0 -DCVMFS_LIBCVMFS -D_FILE_OFFSET_BITS=64 -fexceptions")
-set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -fprofile-arcs -fPIC -O0 -DDEBUGMSG -g")
+set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_CFLAGS} -O0 -DDEBUGMSG -g")
 set (CVMFS_UNITTESTS_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS} -fprofile-arcs")
-
-if (NOT ${USING_CLANG})
-  set (CVMFS_UNITTESTS_DEBUG_CFLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS} -ftest-coverage")
-  set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS} -lgcov -coverage")
-endif (NOT ${USING_CLANG})
+set (CVMFS_UNITTESTS_DEBUG_LD_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 #
 # build CernVM-FS test cases
@@ -197,6 +211,7 @@ endif (BUILD_UNITTESTS)
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} googletest)
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libvjson)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -244,6 +259,8 @@ if (BUILD_UNITTESTS_DEBUG)
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
+  
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha2)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -264,7 +281,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} pthread dl)
+                             ${SHA2_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} pthread dl)
 
 if (BUILD_UNITTESTS)
   target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})

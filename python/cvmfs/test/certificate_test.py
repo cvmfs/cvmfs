@@ -43,30 +43,35 @@ class TestCertificate(unittest.TestCase):
 
 
     def test_load(self):
-        with open(self.certificate_file) as cert_file:
-            cert = cvmfs.Certificate(cert_file)
+        cert_file = open(self.certificate_file)
+        cert = cvmfs.Certificate(cert_file)
+        cert_file.close()
 
 
     def test_get_openssl_x509(self):
-        with open(self.certificate_file) as cert_file:
-            cert = cvmfs.Certificate(cert_file)
-            x509 = cert.get_openssl_certificate()
-            self.assertTrue(isinstance(x509, X509))
+        cert_file = open(self.certificate_file)
+        cert = cvmfs.Certificate(cert_file)
+        cert_file.close()
+        x509 = cert.get_openssl_certificate()
+        self.assertTrue(isinstance(x509, X509))
 
 
     def test_verify_message(self):
-        with open(self.certificate_file) as cert_file:
-            cert = cvmfs.Certificate(cert_file)
-            self.assertTrue(cert.verify(self.signature, self.message_digest))
+        cert_file = open(self.certificate_file)
+        cert = cvmfs.Certificate(cert_file)
+        cert_file.close()
+        self.assertTrue(cert.verify(self.signature, self.message_digest))
 
 
     def test_verify_tampered_message(self):
-        with open(self.certificate_file) as cert_file:
-            cert = cvmfs.Certificate(cert_file)
-            self.assertFalse(cert.verify(self.signature, "I am Malory!"))
+        cert_file = open(self.certificate_file)
+        cert = cvmfs.Certificate(cert_file)
+        cert_file.close()
+        self.assertFalse(cert.verify(self.signature, "I am Malory!"))
 
 
     def test_certificate_fingerprint(self):
-        with open(self.certificate_file) as cert_file:
-            cert = cvmfs.Certificate(cert_file)
-            self.assertEqual(self.fingerprint, cert.get_fingerprint())
+        cert_file = open(self.certificate_file)
+        cert = cvmfs.Certificate(cert_file)
+        cert_file.close()
+        self.assertEqual(self.fingerprint, cert.get_fingerprint())

@@ -52,6 +52,10 @@ class Manifest {
   std::string ExportString() const;
   bool Export(const std::string &path) const;
   bool ExportChecksum(const std::string &directory, const int mode) const;
+  static bool ReadChecksum(const std::string &repo_name,
+                           const std::string &directory,
+                           shash::Any *hash,
+                           uint64_t *last_modified);
 
   shash::Algorithms GetHashAlgorithm() const { return catalog_hash_.algorithm; }
 

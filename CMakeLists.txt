@@ -65,6 +65,8 @@ endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 #
 if (CMAKE_CXX_COMPILER MATCHES ".*clang")
   set(USING_CLANG 1)
+else (CMAKE_CXX_COMPILER MATCHES ".*clang")
+  set(USING_CLANG 0)
 endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 
 #
@@ -175,6 +177,7 @@ option (LEVELDB_BUILTIN         "Don't use system leveldb"                      
 option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
+option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 
 #
 # define where to find the external dependencies
@@ -192,6 +195,7 @@ set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_zlib")
 set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_sparsehash")
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_leveldb")
 set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
+set (SHA2_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha2")
 set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
 set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
@@ -239,6 +243,11 @@ if (NOT ARM AND NOT IS_64_BIT)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
 endif (NOT ARM AND NOT IS_64_BIT)
+
+if (BUILD_COVERAGE AND NOT USING_CLANG)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fprofile-arcs -ftest-coverage -fPIC")
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
+endif (BUILD_COVERAGE AND NOT USING_CLANG)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
@@ -333,6 +342,9 @@ else (LIBCURL_BUILTIN)
   endif(CURL_INCLUDE_DIRS)
 endif (LIBCURL_BUILTIN)
 
+include (${VJSON_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_BUILTIN_LOCATION}/src)
+
 if (SQLITE3_BUILTIN)
   include (${SQLITE3_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   set (SQLITE3_LIBRARY "")
@@ -348,6 +360,8 @@ else (ZLIB_BUILTIN)
   find_package (ZLIB REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 endif (ZLIB_BUILTIN)
+
+include (${SHA2_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
 
 
 if (NOT MACOSX)

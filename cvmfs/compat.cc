@@ -40,6 +40,22 @@ void MigrateAny(const Any *old_hash, shash::Any *new_hash) {
 //------------------------------------------------------------------------------
 
 
+namespace shash_v2 {
+
+const char *kSuffixes[] = {"", "", "-rmd160", ""};
+
+void MigrateAny(const Any *old_hash, shash::Any *new_hash) {
+  memcpy(new_hash->digest, old_hash->digest, kDigestSizes[kAny]);
+  new_hash->algorithm = shash::Algorithms(old_hash->algorithm);
+  new_hash->suffix = old_hash->suffix;
+}
+
+}  // namespace shash_v2
+
+
+//------------------------------------------------------------------------------
+
+
 namespace inode_tracker {
 
 bool InodeContainer::ConstructPath(const uint64_t inode, PathString *path) {
@@ -192,5 +208,50 @@ void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
 }
 
 }  // namespace chunk_tables
+
+
+//------------------------------------------------------------------------------
+
+
+namespace chunk_tables_v2 {
+
+ChunkTables::~ChunkTables() {
+  pthread_mutex_destroy(lock);
+  free(lock);
+  for (unsigned i = 0; i < kNumHandleLocks; ++i) {
+    pthread_mutex_destroy(handle_locks.At(i));
+    free(handle_locks.At(i));
+  }
+}
+
+void Migrate(ChunkTables *old_tables, ::ChunkTables *new_tables) {
+  new_tables->next_handle = old_tables->next_handle;
+  new_tables->handle2fd = old_tables->handle2fd;
+  new_tables->inode2references = old_tables->inode2references;
+
+  SmallHashDynamic<uint64_t, FileChunkReflist> *old_inode2chunks =
+    &old_tables->inode2chunks;
+  for (unsigned keyno = 0; keyno < old_inode2chunks->capacity(); ++keyno) {
+    const uint64_t inode = old_inode2chunks->keys()[keyno];
+    if (inode == 0) continue;
+
+    FileChunkReflist *old_reflist = &old_inode2chunks->values()[keyno];
+    BigVector<FileChunk> *old_list = old_reflist->list;
+    FileChunkList *new_list = new FileChunkList();
+    for (unsigned i = 0; i < old_list->size(); ++i) {
+      const FileChunk *old_chunk = old_list->AtPtr(i);
+      off_t offset = old_chunk->offset();
+      size_t size = old_chunk->size();
+      shash::Any hash;
+      shash_v2::MigrateAny(&old_chunk->content_hash_, &hash);
+      new_list->PushBack(::FileChunk(hash, offset, size));
+    }
+    delete old_list;
+    ::FileChunkReflist new_reflist(new_list, old_reflist->path);
+    new_tables->inode2chunks.Insert(inode, new_reflist);
+  }
+}
+
+}  // namespace chunk_tables_v2
 
 }  // namespace compat

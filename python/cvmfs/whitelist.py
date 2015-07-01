@@ -32,8 +32,10 @@ class Whitelist(RootFile):
     @staticmethod
     def open(whitelist_path):
         """ Initializes a whitelist from a local file path """
-        with open(whitelist_path) as manifest_file:
-            return Whitelist(manifest_file)
+        whitelist_file = open(whitelist_path)
+        whitelist = Whitelist(whitelist_file)
+        whitelist_file.close()
+        return whitelist
 
     _fingerprint_re = None
     _timestamp_re   = None

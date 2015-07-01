@@ -5,11 +5,10 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
-import abc
 import os
 import urlparse
+import urllib2
 import tempfile
-import requests
 from datetime import datetime
 import dateutil.parser
 from dateutil.tz import tzutc
@@ -63,8 +62,6 @@ class RepositoryVerificationFailed(Exception):
 class Repository:
     """ Abstract Wrapper around a CVMFS Repository representation """
 
-    __metaclass__ = abc.ABCMeta
-
     def __init__(self):
         self._read_manifest()
         self._try_to_get_last_replication_timestamp()
@@ -73,22 +70,28 @@ class Repository:
 
     def _read_manifest(self):
         try:
-            with self.retrieve_file(_common._MANIFEST_NAME) as manifest_file:
-                self.manifest = Manifest(manifest_file)
+            manifest_file = self.retrieve_file(_common._MANIFEST_NAME)
+            self.manifest = Manifest(manifest_file)
+            manifest_file.close()
             self.fqrn = self.manifest.repository_name
         except FileNotFoundInRepository, e:
             raise RepositoryNotFound(self.endpoint)
 
 
     def __read_timestamp(self, timestamp_string):
-        return dateutil.parser.parse(timestamp_string)
+        local_ts = dateutil.parser.parse(timestamp_string,
+                                         ignoretz=False,
+                                         tzinfos=_common.TzInfos.get_tzinfos())
+        return local_ts.astimezone(tzutc())
+
 
 
     def _try_to_get_last_replication_timestamp(self):
         try:
-            with self.retrieve_file(_common._LAST_REPLICATION_NAME) as rf:
-                timestamp = rf.readline()
-                self.last_replication = self.__read_timestamp(timestamp)
+            last_rep_file = self.retrieve_file(_common._LAST_REPLICATION_NAME)
+            timestamp = last_rep_file.readline()
+            last_rep_file.close()
+            self.last_replication = self.__read_timestamp(timestamp)
             if not self.has_repository_type():
                 self.type = 'stratum1'
         except FileNotFoundInRepository, e:
@@ -98,10 +101,11 @@ class Repository:
     def _try_to_get_replication_state(self):
         self.replicating = False
         try:
-            with self.retrieve_file(_common._REPLICATING_NAME) as rf:
-                timestamp = rf.readline()
-                self.replicating = True
-                self.replicating_since = self.__read_timestamp(timestamp)
+            rep_state_file = self.retrieve_file(_common._REPLICATING_NAME)
+            timestamp = rep_state_file.readline()
+            rep_state_file.close()
+            self.replicating = True
+            self.replicating_since = self.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
 
@@ -137,10 +141,9 @@ class Repository:
         return Certificate(certificate)
 
 
-    @abc.abstractmethod
     def retrieve_file(self, file_name):
         """ Abstract method to retrieve a file from the repository """
-        pass
+        raise NotImplementedError()
 
 
     def retrieve_object(self, object_hash, hash_suffix = ''):
@@ -180,10 +183,11 @@ class LocalRepository(Repository):
     def read_server_config(self, config_field):
         if not self._server_config:
             raise ConfigurationNotFound(self, "no such file or directory")
-        with open(self._server_config) as config_file:
-            for config_line in config_file:
-                if config_line.startswith(config_field):
-                    return config_line[len(config_field)+1:].strip()
+        config_file = open(self._server_config)
+        for config_line in config_file:
+            if config_line.startswith(config_field):
+                return config_line[len(config_field)+1:].strip()
+        config_file.close()
         raise ConfigurationNotFound(self, config_field)
 
 
@@ -228,13 +232,16 @@ class RemoteRepository(Repository):
     def retrieve_file(self, file_name):
         file_url = self.endpoint + "/" + file_name
         tmp_file = tempfile.NamedTemporaryFile('w+b')
-        headers  = { 'User-Agent': self._user_agent }
-        response = requests.get(file_url, stream=True, headers=headers)
-        if response.status_code != requests.codes.ok:
+
+        request  = urllib2.Request(file_url)
+        request.add_header('User-Agent', self._user_agent)
+        response = None
+        try:
+            response = urllib2.urlopen(request)
+        except urllib2.HTTPError, e:
             raise FileNotFoundInRepository(self, file_url)
-        for chunk in response.iter_content(chunk_size=4096):
-            if chunk:
-                tmp_file.write(chunk)
+
+        tmp_file.write(response.read())
         tmp_file.seek(0)
         tmp_file.flush()
         return tmp_file
@@ -242,9 +249,13 @@ class RemoteRepository(Repository):
 
 def open_repository(repository_path, public_key = None):
     """ wrapper function accessing a repository by URL, local FQRN or path """
-    repo = RemoteRepository(repository_path)              \
-                if repository_path.startswith("http://")  \
-                else LocalRepository(repository_path)
+    repo = None
+    if repository_path.startswith("http://"):
+        repo = RemoteRepository(repository_path)
+    else:
+        repo = LocalRepository(repository_path)
+
     if public_key:
         repo.verify(public_key)
+
     return repo
