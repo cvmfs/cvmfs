@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix rare race that can result in a hanging reload
   * Fix memory and file descriptor leak in the download manager during reload
   * Add support for SHA-256
   * Add listing of /var/run/cvmfs to bugreport tarball (CVM-868)
