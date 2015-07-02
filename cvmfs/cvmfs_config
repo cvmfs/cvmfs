@@ -894,8 +894,6 @@ cvmfs_reload() {
     return $?
   fi
 
-  # Avoid deadlock if cwd is on cvmfs
-  cd /
   # Organized reload of all repositories
   if [ ! -d "$CVMFS_RELOAD_SOCKETS" ]; then
     local mount_list
@@ -908,6 +906,10 @@ cvmfs_reload() {
     return 0
   fi
 
+  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    # Ensure that we capture the config repository as well
+    cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null
+  fi
   mkdir "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" 2>/dev/null
   if [ $? -ne 0 ]; then
     echo "Another reload process has not finished yet"
@@ -924,6 +926,9 @@ cvmfs_reload() {
   do
     touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64 -w0)
   done
+
+  # Avoid deadlock if cwd is on cvmfs
+  cd /
 
   rm -f "${CVMFS_RELOAD_SOCKETS}/pid.*" "${CVMFS_RELOAD_SOCKETS}/guard_files*"
   trap "echo ' *** reloading CernVM-FS repositories must not be interrupted at this point *** '" HUP INT QUIT TERM
