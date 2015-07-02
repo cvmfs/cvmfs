@@ -1384,12 +1384,14 @@ set_valgrind_options() {
 setup_benchmark_environment() {
   local workspace="$1"
   local me=$(whoami)
-  sudo sh -c "mkdir -p /cvmfs/$FQRN && chown $me /cvmfs/$FQRN"
   mkdir -p "$CVMFS_OPT_OUTPUT_DIR/$FQRN"
   mkdir -p $workspace/cache
   
   # make sure the user can execute /bin/fusermount, write into /dev/fuse and write into /cvmfs/<repo>
-  sudo sh -c "usermod -a -G fuse $me"
+  sudo chmod 666 /dev/fuse
+  sudo chmod 4755 /bin/fusermount
+  sudo mkdir -p /cvmfs/$FQRN
+  sudo chown $me /cvmfs/$FQRN
   
   # mtab trick
   if [ ! -h /etc/mtab ]; then
