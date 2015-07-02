@@ -606,6 +606,15 @@ int cvmfs_context::Open(const char *c_path) {
   return fd;
 }
 
+int64_t cvmfs_context::Pread(
+  int fd,
+  void *buf,
+  uint64_t size,
+  uint64_t offset)
+{
+  return fetcher_->cache_mgr()->Pread(fd, buf, size, offset);
+}
+
 int cvmfs_context::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
   cvmfs_globals::Instance()->cache_mgr()->Close(fd);

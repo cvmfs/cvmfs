@@ -160,6 +160,7 @@ class cvmfs_context : SingleCopy {
   int ListDirectory(const char *path, char ***buf, size_t *buflen);
 
   int Open(const char *c_path);
+  int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
   int Close(int fd);
 
   catalog::LoadError RemountStart();
