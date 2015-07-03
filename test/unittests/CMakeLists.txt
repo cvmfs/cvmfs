@@ -210,7 +210,6 @@ endif (BUILD_UNITTESTS)
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} googletest)
-  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libvjson)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
