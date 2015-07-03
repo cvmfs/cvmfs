@@ -68,6 +68,7 @@ set(CVMFS_UNITTEST_FILES
   t_uid_map.cc
   t_fetch.cc
   t_manifest.cc
+  t_tracer.cc
 )
 
 #

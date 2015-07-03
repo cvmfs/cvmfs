@@ -20,6 +20,9 @@ case $sys_arch in
     elif [ -x /sbin/rc-service ] ; then
       # OpenRC
       service="/sbin/rc-service"
+    elif [ -x /usr/bin/systemctl ] ; then
+      # archlinux
+      service="/usr/bin/systemctl"
     fi
     if [ -x /sbin/pidof ]; then
       pidof="/sbin/pidof"
@@ -226,7 +229,11 @@ cvmfs_chksetup() {
   if [ "$sys_arch" = "Darwin" ]; then
     tools="/sbin/mount_cvmfs"
   elif [ "$sys_arch" = "Linux" ]; then
-    tools="/sbin/mount.cvmfs"
+    if [ -d /sbin ]; then
+      tools="/sbin/mount.cvmfs"
+    else
+      tools="/usr/bin/mount.cvmfs"
+    fi
   fi
 
   local tool
@@ -254,13 +261,24 @@ cvmfs_chksetup() {
     fi
   fi
 
+  for path in /etc/auto.master /etc/autofs/auto.master; do
+      if [ -f $path ]; then
+          AUTOMASTER=$path
+          break;
+      fi
+  done
+  if [ -z "$AUTOMASTER" ]; then
+      echo "Error: unable to find auto.master in any of the supplied paths!"
+      num_errors=$(($num_errors+1))
+      AUTOMASTER=/dev/null
+  fi
   # Check that /etc/auto.cvmfs is referenced in /etc/auto.master
   # Check that /etc/auto.cvmfs is executable on Linux
   local global_mount_dir
   global_mount_dir=$CVMFS_MOUNT_DIR
   case $sys_arch in
     Linux )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" /etc/auto.master 2> /dev/null; then
+      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" $AUTOMASTER 2> /dev/null; then
         if ! check_is_on CVMFS_NFS_SOURCE; then
           echo "Warning: CernVM-FS map is not referenced from autofs master map"
           num_warnings=$(($num_warnings+1))
@@ -274,7 +292,7 @@ cvmfs_chksetup() {
       fi ;;
 
     Darwin )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+/etc/auto_cvmfs" /etc/auto_master 2> /dev/null; then
+      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+/etc/auto_cvmfs" $AUTOMASTER 2> /dev/null; then
         echo "Warning: CernVM-FS map is not referenced from autofs master map"
         num_warnings=$(($num_warnings+1))
       fi ;;
@@ -876,8 +894,6 @@ cvmfs_reload() {
     return $?
   fi
 
-  # Avoid deadlock if cwd is on cvmfs
-  cd /
   # Organized reload of all repositories
   if [ ! -d "$CVMFS_RELOAD_SOCKETS" ]; then
     local mount_list
@@ -890,6 +906,10 @@ cvmfs_reload() {
     return 0
   fi
 
+  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    # Ensure that we capture the config repository as well
+    cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null
+  fi
   mkdir "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" 2>/dev/null
   if [ $? -ne 0 ]; then
     echo "Another reload process has not finished yet"
@@ -906,6 +926,9 @@ cvmfs_reload() {
   do
     touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64 -w0)
   done
+
+  # Avoid deadlock if cwd is on cvmfs
+  cd /
 
   rm -f "${CVMFS_RELOAD_SOCKETS}/pid.*" "${CVMFS_RELOAD_SOCKETS}/guard_files*"
   trap "echo ' *** reloading CernVM-FS repositories must not be interrupted at this point *** '" HUP INT QUIT TERM
@@ -1232,9 +1255,13 @@ add_user_to_group_fuse() {
 check_auto_mounter() {
   case $sys_arch in
     Linux )
-      $service autofs status > /dev/null 2>&1
-      return $? ;;
-
+        if [[ $service == *systemctl ]]; then
+            $service status autofs >/dev/null 2>&1
+            return $?
+        else
+            $service autofs status > /dev/null 2>&1
+            return $?
+        fi ;;
     Darwin )
       ps aux | grep autofsd | grep -v grep &> /dev/null
       return $? ;;
@@ -1379,6 +1406,36 @@ activate_service() {
 }
 
 
+reload_service() {
+  local svc=$1
+
+  case $sys_arch in
+    Linux )
+      if [ -e /usr/bin/systemctl ]; then
+        /usr/bin/systemctl reload -q ${svc}.service
+      elif [ -e /sbin/service -o -e /usr/sbin/service ]; then
+        local servicebin=/sbin/service
+        if [ ! -e $servicebin ]; then
+          servicebin=/usr/sbin/service
+        fi
+        $servicebin $svc reload >/dev/null 2>&1
+      else
+        echo "Utility to manage services missing"
+        exit 1
+      fi
+    ;;
+    Darwin )
+      # Not supported at this point
+      :
+    ;;
+    * )
+      echo "Architecture $sys_arch is not supported"
+      exit 1
+    ;;
+  esac
+}
+
+
 configure_autofs() {
   case $sys_arch in
     Linux )
@@ -1386,7 +1443,7 @@ configure_autofs() {
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
       if ! grep -q "^$cvmfs_map" /etc/auto.master; then
         echo "$cvmfs_map" >> /etc/auto.master
-        $pidof automount > /dev/null && $service autofs reload > /dev/null || true
+        $pidof automount > /dev/null && reload_service autofs || true
       fi ;;
 
    Darwin )
