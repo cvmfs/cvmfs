@@ -92,3 +92,77 @@ pthread_mutex_t *ChunkTables::Handle2Lock(const uint64_t handle) const {
     static_cast<double>((uint32_t)(-1));
   return handle_locks.At((uint32_t)bucket % kNumHandleLocks);
 }
+
+
+//------------------------------------------------------------------------------
+
+
+SimpleChunkTables::SimpleChunkTables() {
+  lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_, NULL);
+  assert(retval == 0);
+}
+
+
+SimpleChunkTables::~SimpleChunkTables() {
+  for (unsigned i = 0; i < fd_table_.size(); ++i) {
+    delete fd_table_[i].list;
+  }
+  pthread_mutex_destroy(lock_);
+  free(lock_);
+}
+
+
+int SimpleChunkTables::Add(FileChunkReflist chunks) {
+  assert(chunks.list != NULL);
+  unsigned i = 0;
+  Lock();
+  for (; i < fd_table_.size(); ++i) {
+    if (fd_table_[i].list == NULL) {
+      fd_table_[i] = chunks;
+      Unlock();
+      return i;
+    }
+  }
+  fd_table_.push_back(chunks);
+  Unlock();
+  return i;
+}
+
+
+FileChunkReflist SimpleChunkTables::Get(int fd) {
+  FileChunkReflist result;
+  if (fd < 0)
+    return result;
+
+  unsigned idx = static_cast<unsigned>(fd);
+  Lock();
+  if (idx < fd_table_.size())
+    result = fd_table_[idx];
+  Unlock();
+  return result;
+}
+
+
+void SimpleChunkTables::Release(int fd) {
+  if (fd < 0)
+    return;
+
+  Lock();
+  unsigned idx = static_cast<unsigned>(fd);
+  if (idx >= fd_table_.size()) {
+    Unlock();
+    return;
+  }
+
+  delete fd_table_[idx].list;
+  fd_table_[idx].list = NULL;
+  fd_table_[idx].path.Assign("", 0);
+  if (idx == fd_table_.size() - 1) {
+    do {
+      fd_table_.pop_back();
+    } while (!fd_table_.empty() && (fd_table_.back().list == NULL));
+  }
+  Unlock();
+}

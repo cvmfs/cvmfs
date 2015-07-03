@@ -581,6 +581,63 @@ int cvmfs_context::Open(const char *c_path) {
   if (!found) {
     return -ENOENT;
   }
+  
+  /*if (dirent.IsChunkedFile()) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "chunked file %s opened (download delayed to read() call)",
+             path.c_str());
+
+    
+
+    chunk_tables_->Lock();
+    if (!chunk_tables_->inode2chunks.Contains(ino)) {
+      chunk_tables_->Unlock();
+
+      // Retrieve File chunks from the catalog
+      FileChunkList *chunks = new FileChunkList();
+      if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
+                                           chunks) ||
+          chunks->IsEmpty())
+      {
+        remount_fence_->Leave();
+        LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+                 "'chunked', but no chunks found.", path.c_str());
+        fuse_reply_err(req, EIO);
+        return;
+      }
+      remount_fence_->Leave();
+
+      chunk_tables_->Lock();
+      // Check again to avoid race
+      if (!chunk_tables_->inode2chunks.Contains(ino)) {
+        chunk_tables_->inode2chunks.Insert(ino, FileChunkReflist(chunks, path));
+        chunk_tables_->inode2references.Insert(ino, 1);
+      } else {
+        uint32_t refctr;
+        bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
+        assert(retval);
+        chunk_tables_->inode2references.Insert(ino, refctr+1);
+      }
+    } else {
+      remount_fence_->Leave();
+      uint32_t refctr;
+      bool retval = chunk_tables_->inode2references.Lookup(ino, &refctr);
+      assert(retval);
+      chunk_tables_->inode2references.Insert(ino, refctr+1);
+    }
+
+    // Update the chunk handle list
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "linking chunk handle %d to inode: %"PRIu64,
+             chunk_tables_->next_handle, uint64_t(ino));
+    chunk_tables_->handle2fd.Insert(chunk_tables_->next_handle, ChunkFd());
+    fi->fh = static_cast<uint64_t>(-chunk_tables_->next_handle);
+    ++chunk_tables_->next_handle;
+    chunk_tables_->Unlock();
+
+    fuse_reply_open(req, fi);
+    return;
+  }*/
 
   fd = fetcher_->Fetch(
     dirent.checksum(),

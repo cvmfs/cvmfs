@@ -21,6 +21,7 @@
 #include "hash.h"
 #include "shortstring.h"
 #include "smallhash.h"
+#include "util.h"
 
 /**
  * Describes a FileChunk as generated from the FileProcessor in collaboration
@@ -108,6 +109,36 @@ struct ChunkTables {
   SmallHashDynamic<uint64_t, uint32_t> inode2references;
   uint64_t next_handle;
   pthread_mutex_t *lock;
+};
+
+
+/**
+ * Connects virtual file descriptors to FileChunkLists.  Used by libcvmfs.
+ * Tries to keep the file descriptors small because they need to fit within
+ * 32bit.  This class has the ownership of the FileChunkList objects pointed to
+ * by the elements of fd_table_.
+ */
+class SimpleChunkTables : SingleCopy {
+ public:
+  SimpleChunkTables();
+  ~SimpleChunkTables();
+  int Add(FileChunkReflist chunks);
+  FileChunkReflist Get(int fd);
+  void Release(int fd);
+
+ private:
+  inline void Lock() {
+    int retval = pthread_mutex_lock(lock_);
+    assert(retval == 0);
+  }
+
+  inline void Unlock() {
+    int retval = pthread_mutex_unlock(lock_);
+    assert(retval == 0);
+  }
+
+  std::vector<FileChunkReflist> fd_table_;
+  pthread_mutex_t *lock_;
 };
 
 #endif  // CVMFS_FILE_CHUNK_H_
