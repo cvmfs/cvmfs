@@ -28,7 +28,34 @@ class T_FileChunk : public ::testing::Test {
 };
 
 
+TEST_F(T_FileChunk, FindChunkIdx) {
+  FileChunkList single;
+  FileChunkReflist reflist(&single, PathString(""));
+  EXPECT_DEATH(reflist.FindChunkIdx(0), ".*");
+
+  single.PushBack(FileChunk());
+  EXPECT_EQ(0U, reflist.FindChunkIdx(0));
+  EXPECT_EQ(0U, reflist.FindChunkIdx(100));
+
+  single.PushBack(FileChunk(shash::Any(), 1, 0));
+  EXPECT_EQ(0U, reflist.FindChunkIdx(0));
+  EXPECT_EQ(1U, reflist.FindChunkIdx(1));
+  EXPECT_EQ(1U, reflist.FindChunkIdx(100));
+
+  for (unsigned i = 2; i < 10; ++i) {
+    single.PushBack(FileChunk(shash::Any(), i, 0));
+  }
+  EXPECT_EQ(0U, reflist.FindChunkIdx(0));
+  EXPECT_EQ(5U, reflist.FindChunkIdx(5));
+  EXPECT_EQ(9U, reflist.FindChunkIdx(9));
+  EXPECT_EQ(9U, reflist.FindChunkIdx(10));
+  EXPECT_EQ(9U, reflist.FindChunkIdx(100));
+}
+
+
 TEST_F(T_FileChunk, Simple) {
+  EXPECT_DEATH(simple_.Add(FileChunkReflist()), ".*");
+
   EXPECT_EQ(0, simple_.Add(NewChunks()));
   EXPECT_EQ(1, simple_.Add(NewChunks()));
   EXPECT_EQ(2, simple_.Add(NewChunks()));

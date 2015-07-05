@@ -71,8 +71,6 @@
 #include "util.h"
 #include "wpad.h"
 
-#define DEBUGMSG 1
-
 using namespace std;  // NOLINT
 
 namespace cvmfs {
@@ -636,42 +634,19 @@ int64_t cvmfs_context::Pread(
     if (chunk_list == NULL)
       return -EBADF;
 
-    uint64_t overall_bytes_fetched = 0;
-
-    // Find the chunk that holds the beginning of the requested data
-    assert(chunk_list->size() > 0);
-    unsigned idx_low = 0, idx_high = chunk_list->size()-1;
-    unsigned chunk_idx = idx_high/2;
-    while (idx_low < idx_high) {
-      if (static_cast<uint64_t>(chunk_list->AtPtr(chunk_idx)->offset()) > off)
-      {
-        assert(idx_high > 0);
-        idx_high = chunk_idx-1;
-      } else {
-        if ((chunk_idx == chunk_list->size()-1) ||
-            (static_cast<uint64_t>(chunk_list->AtPtr(chunk_idx+1)->offset())
-              > off))
-        {
-          break;
-        }
-        idx_low = chunk_idx + 1;
-      }
-      chunk_idx = idx_low + (idx_high-idx_low)/2;
-    }
-
     // Fetch all needed chunks and read the requested data
+    unsigned chunk_idx = open_chunks.chunk_reflist.FindChunkIdx(off);
+    uint64_t overall_bytes_fetched = 0;
     off_t offset_in_chunk = off - chunk_list->AtPtr(chunk_idx)->offset();
     do {
       // Open file descriptor to chunk
       ChunkFd *chunk_fd = open_chunks.chunk_fd;
       if ((chunk_fd->fd == -1) || (chunk_fd->chunk_idx != chunk_idx)) {
         if (chunk_fd->fd != -1) fetcher_->cache_mgr()->Close(chunk_fd->fd);
-        string verbose_path =
-          "Part of " + open_chunks.chunk_reflist.path.ToString();
         chunk_fd->fd = fetcher_->Fetch(
           chunk_list->AtPtr(chunk_idx)->content_hash(),
           chunk_list->AtPtr(chunk_idx)->size(),
-          verbose_path,
+          "no path info",
           cache::CacheManager::kTypeRegular);
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;

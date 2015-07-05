@@ -15,6 +15,36 @@ static inline uint32_t hasher_uint64t(const uint64_t &value) {
   return MurmurHash2(&value, sizeof(value), 0x07387a4f);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+unsigned FileChunkReflist::FindChunkIdx(const uint64_t off) {
+  assert(list && (list->size() > 0));
+  unsigned idx_low = 0;
+  unsigned idx_high = list->size()-1;
+  unsigned chunk_idx = idx_high/2;
+  while (idx_low < idx_high) {
+    if (static_cast<uint64_t>(list->AtPtr(chunk_idx)->offset()) > off) {
+      assert(idx_high > 0);
+      idx_high = chunk_idx - 1;
+    } else {
+      if ((chunk_idx == list->size() - 1) ||
+          (static_cast<uint64_t>(list->AtPtr(chunk_idx + 1)->offset()) > off))
+      {
+        break;
+      }
+      idx_low = chunk_idx + 1;
+    }
+    chunk_idx = idx_low + (idx_high - idx_low) / 2;
+  }
+  return chunk_idx;
+}
+
+
+//------------------------------------------------------------------------------
+
+
 void ChunkTables::InitLocks() {
   lock =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
