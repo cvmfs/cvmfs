@@ -1242,20 +1242,20 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         chunks.list->AtPtr(chunk_idx)->size() - offset_in_chunk;
       size_t bytes_to_read_in_chunk =
         std::min(bytes_to_read, remaining_bytes_in_chunk);
-      const size_t bytes_fetched = cache_manager_->Pread(
+      const int64_t bytes_fetched = cache_manager_->Pread(
         chunk_fd.fd,
         data + overall_bytes_fetched,
         bytes_to_read_in_chunk,
         offset_in_chunk);
 
-      if (bytes_fetched == (size_t)-1) {
-        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %d result %d (%s)",
-                 errno, bytes_fetched, chunks.path.ToString().c_str());
+      if (bytes_fetched < 0) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %"PRId64" (%s)",
+                 bytes_fetched, chunks.path.ToString().c_str());
         chunk_tables_->Lock();
         chunk_tables_->handle2fd.Insert(chunk_handle, chunk_fd);
         chunk_tables_->Unlock();
         UnlockMutex(handle_lock);
-        fuse_reply_err(req, errno);
+        fuse_reply_err(req, -bytes_fetched);
         return;
       }
       overall_bytes_fetched += bytes_fetched;
@@ -1275,7 +1275,12 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
              chunk_fd.fd);
   } else {
     const int64_t fd = fi->fh;
-    overall_bytes_fetched = cache_manager_->Pread(fd, data, size, off);
+    int64_t nbytes = cache_manager_->Pread(fd, data, size, off);
+    if (nbytes < 0) {
+      fuse_reply_err(req, -nbytes);
+      return;
+    }
+    overall_bytes_fetched = nbytes;
   }
 
   // Push it to user

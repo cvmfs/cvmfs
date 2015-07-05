@@ -107,7 +107,7 @@ SimpleChunkTables::SimpleChunkTables() {
 
 SimpleChunkTables::~SimpleChunkTables() {
   for (unsigned i = 0; i < fd_table_.size(); ++i) {
-    delete fd_table_[i].list;
+    delete fd_table_[i].chunk_reflist.list;
   }
   pthread_mutex_destroy(lock_);
   free(lock_);
@@ -116,23 +116,26 @@ SimpleChunkTables::~SimpleChunkTables() {
 
 int SimpleChunkTables::Add(FileChunkReflist chunks) {
   assert(chunks.list != NULL);
+  OpenChunks new_entry;
+  new_entry.chunk_reflist = chunks;
+  new_entry.chunk_fd = new ChunkFd();
   unsigned i = 0;
   Lock();
   for (; i < fd_table_.size(); ++i) {
-    if (fd_table_[i].list == NULL) {
-      fd_table_[i] = chunks;
+    if (fd_table_[i].chunk_reflist.list == NULL) {
+      fd_table_[i] = new_entry;
       Unlock();
       return i;
     }
   }
-  fd_table_.push_back(chunks);
+  fd_table_.push_back(new_entry);
   Unlock();
   return i;
 }
 
 
-FileChunkReflist SimpleChunkTables::Get(int fd) {
-  FileChunkReflist result;
+SimpleChunkTables::OpenChunks SimpleChunkTables::Get(int fd) {
+  OpenChunks result;
   if (fd < 0)
     return result;
 
@@ -156,13 +159,13 @@ void SimpleChunkTables::Release(int fd) {
     return;
   }
 
-  delete fd_table_[idx].list;
-  fd_table_[idx].list = NULL;
-  fd_table_[idx].path.Assign("", 0);
-  if (idx == fd_table_.size() - 1) {
-    do {
-      fd_table_.pop_back();
-    } while (!fd_table_.empty() && (fd_table_.back().list == NULL));
+  delete fd_table_[idx].chunk_reflist.list;
+  fd_table_[idx].chunk_reflist.list = NULL;
+  fd_table_[idx].chunk_reflist.path.Assign("", 0);
+  delete fd_table_[idx].chunk_fd;
+  fd_table_[idx].chunk_fd = NULL;
+  while (!fd_table_.empty() && (fd_table_.back().chunk_reflist.list == NULL)) {
+    fd_table_.pop_back();
   }
   Unlock();
 }

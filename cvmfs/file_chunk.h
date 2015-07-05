@@ -50,11 +50,9 @@ class FileChunk {
 typedef BigVector<FileChunk> FileChunkList;
 
 struct FileChunkReflist {
-  FileChunkReflist() {
-    list = NULL;
-  }
+  FileChunkReflist() : list(NULL) { }
   FileChunkReflist(FileChunkList *l, const PathString &p) :
-    list(l), path(p) {}
+    list(l), path(p) { }
   FileChunkList *list;
   PathString path;
 };
@@ -62,12 +60,10 @@ struct FileChunkReflist {
 
 /**
  * Stores the chunk index of a file descriptor.  Needed for the Fuse module
+ * and for libcvmfs.
  */
 struct ChunkFd {
-  ChunkFd() {
-    fd = -1;
-    chunk_idx = 0;
-  }
+  ChunkFd() : fd(-1), chunk_idx(0) { }
   int fd;  // -1 or pointing to chunk_idx
   unsigned chunk_idx;
 };
@@ -115,15 +111,25 @@ struct ChunkTables {
 /**
  * Connects virtual file descriptors to FileChunkLists.  Used by libcvmfs.
  * Tries to keep the file descriptors small because they need to fit within
- * 32bit.  This class has the ownership of the FileChunkList objects pointed to
- * by the elements of fd_table_.
+ * 32bit.  This class takes the ownership of the FileChunkList objects pointed
+ * to by the elements of fd_table_.
  */
 class SimpleChunkTables : SingleCopy {
  public:
+  /**
+   * While a chunked file is open, a single file descriptor is moved around the
+   * individual chunks.
+   */
+  struct OpenChunks {
+    OpenChunks() : chunk_fd(NULL) { }
+    ChunkFd *chunk_fd;
+    FileChunkReflist chunk_reflist;
+  };
+
   SimpleChunkTables();
   ~SimpleChunkTables();
   int Add(FileChunkReflist chunks);
-  FileChunkReflist Get(int fd);
+  OpenChunks Get(int fd);
   void Release(int fd);
 
  private:
@@ -137,7 +143,7 @@ class SimpleChunkTables : SingleCopy {
     assert(retval == 0);
   }
 
-  std::vector<FileChunkReflist> fd_table_;
+  std::vector<OpenChunks> fd_table_;
   pthread_mutex_t *lock_;
 };
 

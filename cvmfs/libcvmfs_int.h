@@ -15,7 +15,9 @@
 #include <string>
 #include <vector>
 
+#include "backoff.h"
 #include "catalog_mgr.h"
+#include "file_chunk.h"
 #include "lru.h"
 #include "util.h"
 
@@ -38,8 +40,6 @@ class DownloadManager;
 namespace perf {
 class Statistics;
 }
-
-class BackoffThrottle;
 
 namespace cvmfs {
 extern pid_t         pid_;
@@ -160,7 +160,7 @@ class cvmfs_context : SingleCopy {
   int ListDirectory(const char *path, char ***buf, size_t *buflen);
 
   int Open(const char *c_path);
-  int64_t Pread(int fd, void *buf, uint64_t size, uint64_t offset);
+  int64_t Pread(int fd, void *buf, uint64_t size, uint64_t off);
   int Close(int fd);
 
   catalog::LoadError RemountStart();
@@ -176,6 +176,8 @@ class cvmfs_context : SingleCopy {
   ~cvmfs_context();
 
  private:
+  static const int kFdChunked = 1 << 30;
+
   int Setup(const options &opts, perf::Statistics *statistics);
 
   void InitRuntimeCounters();
@@ -222,7 +224,8 @@ class cvmfs_context : SingleCopy {
   static const int kNumReservedFd = 512;
   static const unsigned int kMd5pathCacheSize = 32000;
 
-  BackoffThrottle *backoff_throttle_;
+  BackoffThrottle backoff_throttle_;
+  SimpleChunkTables chunk_tables_;
 
   int fd_lockfile;
 

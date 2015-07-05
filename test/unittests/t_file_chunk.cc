@@ -44,14 +44,14 @@ TEST_F(T_FileChunk, Simple) {
   simple_.Release(3);
   simple_.Release(4);
   EXPECT_EQ(3, simple_.Add(NewChunks()));
-  
-  FileChunkReflist chunks;
-  chunks = simple_.Get(0);
-  EXPECT_TRUE(chunks.list != NULL);
-  chunks = simple_.Get(-1);
-  EXPECT_EQ(NULL, chunks.list);
-  chunks = simple_.Get(4);
-  EXPECT_EQ(NULL, chunks.list);
+
+  SimpleChunkTables::OpenChunks open_chunks;
+  open_chunks = simple_.Get(0);
+  EXPECT_TRUE(open_chunks.chunk_reflist.list != NULL);
+  open_chunks = simple_.Get(-1);
+  EXPECT_EQ(NULL, open_chunks.chunk_reflist.list);
+  open_chunks = simple_.Get(4);
+  EXPECT_EQ(NULL, open_chunks.chunk_reflist.list);
 
   simple_.Release(0);
   simple_.Release(1);
