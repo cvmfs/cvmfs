@@ -114,7 +114,7 @@ struct ChunkTables {
 /**
  * Connects virtual file descriptors to FileChunkLists.  Used by libcvmfs.
  * Tries to keep the file descriptors small because they need to fit within
- * 32bit.  This class takes the ownership of the FileChunkList objects pointed
+ * 29bit.  This class takes the ownership of the FileChunkList objects pointed
  * to by the elements of fd_table_.
  */
 class SimpleChunkTables : SingleCopy {

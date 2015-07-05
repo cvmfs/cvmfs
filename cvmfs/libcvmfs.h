@@ -18,7 +18,7 @@
 // 15: remove counting of open file descriptors
 // 16: remove unnecessary free
 // 17: apply new classes around the cache manager
-// 18: add cvmfs_pread
+// 18: add cvmfs_pread and support for chunked files
 #define LIBCVMFS_REVISION 18
 
 #include <sys/stat.h>
