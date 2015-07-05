@@ -53,7 +53,7 @@ struct FileChunkReflist {
   FileChunkReflist() : list(NULL) { }
   FileChunkReflist(FileChunkList *l, const PathString &p) :
     list(l), path(p) { }
-  
+
   unsigned FindChunkIdx(const uint64_t offset);
 
   FileChunkList *list;
