@@ -690,6 +690,15 @@ int main(int argc, char *argv[]) {
     options_manager->ParseDefault(*repository_name_);
   }
 
+#ifdef __APPLE__
+  string volname = "-ovolname=" + *repository_name_ + " (CernVM-FS)";
+  fuse_opt_add_arg(mount_options, volname.c_str());
+  // Allow for up to 5 minute "hangs" before OS X may kill cvmfs
+  fuse_opt_add_arg(mount_options, "-odaemon_timeout=300");
+  fuse_opt_add_arg(mount_options, "-onoapplexattr");
+  // Make libfuse single-threaded for the time being; see CVM-871, CVM-855
+  single_threaded_ = true;
+#endif
   if (options_manager->GetValue("CVMFS_MOUNT_RW", &parameter) &&
       options_manager->IsOn(parameter))
   {
