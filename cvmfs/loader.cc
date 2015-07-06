@@ -691,7 +691,7 @@ int main(int argc, char *argv[]) {
   }
 
 #ifdef __APPLE__
-  string volname = "-ovolname=" + *repository_name_ + " (CernVM-FS)";
+  string volname = "-ovolname=" + *repository_name_;
   fuse_opt_add_arg(mount_options, volname.c_str());
   // Allow for up to 5 minute "hangs" before OS X may kill cvmfs
   fuse_opt_add_arg(mount_options, "-odaemon_timeout=300");
