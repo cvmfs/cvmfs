@@ -306,6 +306,7 @@ TEST_F(T_CacheManager, CommitFromMem) {
   string final_dir = tmp_path_ + "/" + rnd_hash.MakePath();
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_one_.MakePath()).c_str()));
+  EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_page_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink(final_dir.c_str()));
   EXPECT_EQ(0, rmdir(GetParentPath(final_dir).c_str()));
   EXPECT_FALSE(cache_mgr_->CommitFromMem(rnd_hash, &buf, 1, "1"));
@@ -510,6 +511,7 @@ TEST_F(T_CacheManager, CommitTxnRenameFail) {
   string final_dir = GetParentPath(tmp_path_ + "/" + rnd_hash.MakePath());
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_null_.MakePath()).c_str()));
   EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_one_.MakePath()).c_str()));
+  EXPECT_EQ(0, unlink((tmp_path_ + "/" + hash_page_.MakePath()).c_str()));
   EXPECT_EQ(0, rmdir(final_dir.c_str()));
   EXPECT_EQ(-ENOENT, cache_mgr_->CommitTxn(txn));
   EXPECT_EQ(TestQuotaManager::kCmdRemove, quota_mgr->last_cmd.cmd);
