@@ -1,4 +1,6 @@
 2.2.0:
+  * Prepare OS X mount helper for osxfuse 3
+  * Fix stack trace generation on OS X
   * Tune OS X Fuse mount options
   * Add support for chunked files in libcvmfs (CVM-687)
   * Fix rare race that can result in a hanging reload
