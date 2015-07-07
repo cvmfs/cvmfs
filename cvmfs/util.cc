@@ -1375,7 +1375,7 @@ bool ManagedExec(const vector<string>  &command_line,
   assert(retcode);
   if (status_code != ForkFailures::kSendPid) {
     close(pipe_fork.read_end);
-    LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%s)",
+    LogCvmfs(kLogCvmfs, kLogDebug, "managed execve failed (%s)",
              ForkFailures::ToString(status_code).c_str());
     return false;
   }

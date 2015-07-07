@@ -162,10 +162,14 @@ static void SendTrace(int sig,
 #ifndef CVMFS_LIBCVMFS
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
                sig, send_errno);
-      void *addr[64];
-      int num_addr = backtrace(addr, 64);
+      void *addr[kMaxBacktrace];
+      // Note: this doesn't work due to the signal stack on OS X (it works on
+      // Linux).  Since anyway lldb is supposed to produce the backtrace, we
+      // consider it more important to protect cvmfs against stack overflows.
+      int num_addr = backtrace(addr, kMaxBacktrace);
       char **symbols = backtrace_symbols(addr, num_addr);
-      string backtrace = "Backtrace:\n";
+      string backtrace = "Backtrace (" + StringifyInt(num_addr) +
+                         " symbols):\n";
       for (int i = 0; i < num_addr; ++i)
         backtrace += string(symbols[i]) + "\n";
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
@@ -211,7 +215,11 @@ static void LogEmergency(string msg) {
  * @return         the data read from the pipe
  */
 static string ReadUntilGdbPrompt(int fd_pipe) {
+#ifdef __APPLE__
+  static const string gdb_prompt = "(lldb)";
+#else
   static const string gdb_prompt = "\n(gdb) ";
+#endif
 
   string        result;
   char          mini_buffer;
@@ -263,30 +271,53 @@ static string GenerateStackTrace(const string &exe_path,
   int fd_stdout;
   int fd_stderr;
   vector<string> argv;  // TODO(jblomer): C++11 initializer list...
+#ifndef __APPLE__
   argv.push_back("-q");
   argv.push_back("-n");
   argv.push_back(exe_path);
+#else
+  argv.push_back("-p");
+#endif
   argv.push_back(StringifyInt(pid));
   pid_t gdb_pid = 0;
   const bool double_fork = false;
   retval = ExecuteBinary(&fd_stdin,
                          &fd_stdout,
                          &fd_stderr,
+#ifdef __APPLE__
+                          "lldb",
+#else
                           "gdb",
+#endif
                           argv,
                           double_fork,
                          &gdb_pid);
   assert(retval);
 
+
   // Skip the gdb startup output
   ReadUntilGdbPrompt(fd_stdout);
 
   // Send stacktrace command to gdb
-  const string gdb_cmd = "thread apply all bt\n"  // backtrace all threads
-                         "quit\n";                // stop gdb
-  WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
+#ifdef __APPLE__
+  const string gdb_cmd = "bt all\n" "quit\n";
+#else
+  const string gdb_cmd = "thread apply all bt\n" "quit\n";
+#endif
+  // The execve can have failed, which can't be detected in ExecuteBinary.
+  // Instead, writing to the pipe will fail.
+  ssize_t nbytes = write(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
+  if ((nbytes < 0) || (static_cast<unsigned>(nbytes) != gdb_cmd.length())) {
+    result += "failed to start gdb/lldb (" + StringifyInt(nbytes) + " bytes "
+              "written, errno " + StringifyInt(errno) + ")\n";
+    return result;
+  }
 
   // Read the stack trace from the stdout of our gdb process
+#ifdef __APPLE__
+  // lldb has one more prompt
+  result += ReadUntilGdbPrompt(fd_stdout);
+#endif
   result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
 
   // Close the connection to the terminated gdb process
@@ -360,6 +391,7 @@ static string ReportStacktrace() {
  * Listens on the pipe and logs the stacktrace or quits silently.
  */
 static void Watchdog() {
+  signal(SIGPIPE, SIG_IGN);
   ControlFlow::Flags control_flow;
 
   if (!pipe_watchdog_->Read(&control_flow)) {
