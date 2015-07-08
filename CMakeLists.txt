@@ -212,6 +212,15 @@ set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
 set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
 
+#
+# Until the bugfix https://sourceware.org/ml/binutils/2015-04/msg00302.html
+# is released in binutils, we disable libcvmfs on AArch64
+#
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+  message("Warning: not building libcvmfs on AArch64")
+  set (BUILD_LIBCVMFS OFF)
+endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
 
