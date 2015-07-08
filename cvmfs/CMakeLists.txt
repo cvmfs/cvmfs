@@ -273,6 +273,8 @@ if (BUILD_CVMFS)
 
   add_dependencies (cvmfs_fuse_debug libsha2)
   add_dependencies (cvmfs_fuse libsha2)
+  add_dependencies (cvmfs2 libsha2)
+  add_dependencies (cvmfs_fsck libsha2)
 
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
