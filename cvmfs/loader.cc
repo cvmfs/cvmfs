@@ -696,8 +696,8 @@ int main(int argc, char *argv[]) {
   // Allow for up to 5 minute "hangs" before OS X may kill cvmfs
   fuse_opt_add_arg(mount_options, "-odaemon_timeout=300");
   fuse_opt_add_arg(mount_options, "-onoapplexattr");
-  // Make libfuse single-threaded for the time being; see CVM-871, CVM-855
-  single_threaded_ = true;
+  // Should libfuse be single-threaded?  See CVM-871, CVM-855
+  // single_threaded_ = true;
 #endif
   if (options_manager->GetValue("CVMFS_MOUNT_RW", &parameter) &&
       options_manager->IsOn(parameter))
