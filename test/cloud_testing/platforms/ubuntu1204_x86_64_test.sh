@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # source the common platform independent functionality and option parsing
 script_location=$(cd "$(dirname "$0")"; pwd)
