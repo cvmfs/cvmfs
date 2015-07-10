@@ -2025,6 +2025,20 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::statistics_->Register("linkstring.n_instances", "Number of instances");
   cvmfs::statistics_->Register("linkstring.n_overflows", "Number of overflows");
 
+  // register inode tracker counters
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_insert", "overall number of accessed inodes");
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_remove", "overall number of evicted inodes");
+  cvmfs::statistics_->Register(
+    "inode_tracker.no_reference", "currently active inodes");
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_hit_inode", "overall number of inode lookups");
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_hit_path", "overall number of successful path lookups");
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_miss_path", "overall number of unsuccessful path lookups");
+
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
   cvmfs::cachedir_ = new string(cachedir);

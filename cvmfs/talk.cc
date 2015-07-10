@@ -33,6 +33,7 @@
 #include "cvmfs.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
+#include "glue_buffer.h"
 #include "loader.h"
 #include "logging.h"
 #include "lru.h"
@@ -367,7 +368,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         int highwater;
         string result;
 
-        // manually setting the values of the ShortString counters
+        // Manually setting the values of the ShortString counters
         cvmfs::statistics_->Lookup("pathstring.n_instances")->
             Set(PathString::num_instances());
         cvmfs::statistics_->Lookup("pathstring.n_overflows")->
@@ -380,6 +381,22 @@ static void *MainTalk(void *data __attribute__((unused))) {
             Set(LinkString::num_instances());
         cvmfs::statistics_->Lookup("linkstring.n_overflows")->
             Set(LinkString::num_overflows());
+
+        // Manually setting the inode tracker numbers
+        glue::InodeTracker::Statistics inode_stats =
+          cvmfs::inode_tracker_->GetStatistics();
+        cvmfs::statistics_->Lookup("inode_tracker.n_insert")->Set(
+          atomic_read64(&inode_stats.num_inserts));
+        cvmfs::statistics_->Lookup("inode_tracker.n_remove")->Set(
+          atomic_read64(&inode_stats.num_removes));
+        cvmfs::statistics_->Lookup("inode_tracker.no_reference")->Set(
+          atomic_read64(&inode_stats.num_references));
+        cvmfs::statistics_->Lookup("inode_tracker.n_hit_inode")->Set(
+          atomic_read64(&inode_stats.num_hits_inode));
+        cvmfs::statistics_->Lookup("inode_tracker.n_hit_path")->Set(
+          atomic_read64(&inode_stats.num_hits_path));
+        cvmfs::statistics_->Lookup("inode_tracker.n_miss_path")->Set(
+          atomic_read64(&inode_stats.num_misses_path));
 
         if (cvmfs::cache_manager_->id() == cache::kPosixCacheManager) {
           cache::PosixCacheManager *cache_mgr =
