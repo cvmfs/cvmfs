@@ -131,7 +131,9 @@ cvmfs_run_test() {
   # download upstream package
   current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
   echo "Version of testee:        $current_version"
-  previous_version=$(decrement_version $current_version)
+  # FIX ME: Once 2.2.0 is the "previous version" go back to the decrement_version
+  # previous_version=$(decrement_version $current_version)
+  previous_version="2.1.20"
   echo "Version to be downloaded: $previous_version"
   upstream_package_url=$(guess_package_url "cvmfs" ${previous_version}-1)
   echo "Download URL:             $upstream_package_url"
