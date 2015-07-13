@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 usage() {
   echo "$0 <logfile> [-o xUnit XML output] [-x <exclusion list> --] [test list]"
