@@ -14,7 +14,7 @@ custom_cache_dir="${ephemeral}/cvmfs_server_cache"
 sudo chmod a+w "$ephemeral" || die "couldn't chmod storage at $ephemeral"
 mkdir "$custom_cache_dir"   || die "couldn't create cache dir $custom_cache_dir"
 
-retval = 0
+retval=0
 
 # allow apache access to the mounted server file system
 echo -n "setting SELinux labels for apache... "
