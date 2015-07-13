@@ -9,12 +9,18 @@ cvmfs_run_test() {
 
   local cache_dir=$(cvmfs_config showconfig ams.cern.ch | grep CVMFS_CACHE_DIR | cut -d= -f2)
   cvmfs_umount
+  local umount_result=$?
+  cat /proc/mounts
+
+  if [ $umount_result -ne 0 ]; then
+    return 5
+  fi
 
   if [ "x$cache_dir" = x ]; then
     return 20
   fi
   sudo rm -rf "$cache_dir"
-  
+
   # TODO: traffic shaping
   cvmfs_mount ams.cern.ch "CVMFS_TIMEOUT=1" "CVMFS_TIMEOUT_DIRECT=1" \
      "CVMFS_LOW_SPEED_LIMIT=1073741824" && ls /cvmfs/ams.cern.ch/Offline
