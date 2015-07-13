@@ -2378,9 +2378,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::statistics_);
 
   // Load initial file catalog
-  retval = sqlite::RegisterVfsRdOnly(
-    cvmfs::cache_manager_, cvmfs::statistics_, sqlite::kVfsOptDefault);
-  assert(retval);
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
   cvmfs::inode_annotation_ = new catalog::InodeGenerationAnnotation();
@@ -2462,6 +2459,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     root_hash = tag.root_hash.ToString();
   }
 
+  retval = sqlite::RegisterVfsRdOnly(
+    cvmfs::cache_manager_, cvmfs::statistics_, sqlite::kVfsOptDefault);
+  assert(retval);
+  
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
     shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)),
