@@ -72,7 +72,7 @@ void AbstractCatalogManager::CheckInodeWatermark() {
   uint64_t uint32_border = 1;
   uint32_border = uint32_border << 32;
   if (highest_inode >= uint32_border) {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogWarn, "inodes excess 32bit");
+    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogWarn, "inodes exceed 32bit");
     inode_watermark_status_++;
   }
 }
