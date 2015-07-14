@@ -2462,7 +2462,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   retval = sqlite::RegisterVfsRdOnly(
     cvmfs::cache_manager_, cvmfs::statistics_, sqlite::kVfsOptDefault);
   assert(retval);
-  
+
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;
     shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)),
