@@ -565,7 +565,8 @@ void Fini() {
   result = unlink(socket_path_->c_str());
   if (result != 0) {
     LogCvmfs(kLogTalk, kLogSyslogWarn,
-             "Could not remove cvmfs_io socket from cache directory.");
+             "Could not remove cvmfs_io socket from cache directory (%d)",
+             errno);
   }
 
   delete cachedir_;

@@ -75,6 +75,7 @@ echo "running CernVM-FS client test cases..."
 CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
 ./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
                               -x src/004-davinci                              \
+                                 src/005-asetup                               \
                                  src/007-testjobs                             \
                                  src/045-oasis                                \
                                  --                                           \
@@ -91,6 +92,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
                                  src/524-corruptmanifestfailover              \
                                  src/577-garbagecollecthiddenstratum1revision \
                                  src/579-garbagecollectstratum1legacytag      \
+                                 src/585-xattrs                               \
                                  --                                           \
                                  src/5*                                       \
                               || retval=1
