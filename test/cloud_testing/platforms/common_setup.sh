@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common.sh

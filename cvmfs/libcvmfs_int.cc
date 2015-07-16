@@ -47,7 +47,6 @@
 #include <vector>
 
 #include "atomic.h"
-#include "backoff.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
 #include "compression.h"
@@ -338,7 +337,7 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   fetcher_ = new cvmfs::Fetcher(
     cvmfs_globals::Instance()->cache_mgr(),
     download_manager_,
-    backoff_throttle_,
+    &backoff_throttle_,
     statistics_);
 
   // Load initial file catalog
@@ -381,7 +380,6 @@ cvmfs_context::cvmfs_context(const options &opts)
   , download_manager_(NULL)
   , fetcher_(NULL)
   , md5path_cache_(NULL)
-  , backoff_throttle_(new BackoffThrottle)
   , fd_lockfile(-1)
   , download_ready_(false)
   , signature_ready_(false)
@@ -416,9 +414,6 @@ cvmfs_context::~cvmfs_context() {
     delete md5path_cache_;
     md5path_cache_ = NULL;
   }
-
-  delete backoff_throttle_;
-  backoff_throttle_ = NULL;
 }
 
 bool cvmfs_context::GetDirentForPath(const PathString         &path,
@@ -582,6 +577,26 @@ int cvmfs_context::Open(const char *c_path) {
     return -ENOENT;
   }
 
+  if (dirent.IsChunkedFile()) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "chunked file %s opened (download delayed to read() call)",
+             path.c_str());
+
+    FileChunkList *chunks = new FileChunkList();
+    if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
+                                          chunks) ||
+        chunks->IsEmpty())
+    {
+      LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+               "'chunked', but no chunks found.", path.c_str());
+      atomic_inc32(&num_io_error_);
+      return -EIO;
+    }
+
+    fd = chunk_tables_.Add(FileChunkReflist(chunks, path));
+    return fd | kFdChunked;
+  }
+
   fd = fetcher_->Fetch(
     dirent.checksum(),
     dirent.size(),
@@ -606,9 +621,86 @@ int cvmfs_context::Open(const char *c_path) {
   return fd;
 }
 
+int64_t cvmfs_context::Pread(
+  int fd,
+  void *buf,
+  uint64_t size,
+  uint64_t off)
+{
+  if (fd & kFdChunked) {
+    const int chunk_handle = fd & ~kFdChunked;
+    SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
+    FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
+    if (chunk_list == NULL)
+      return -EBADF;
+
+    // Fetch all needed chunks and read the requested data
+    unsigned chunk_idx = open_chunks.chunk_reflist.FindChunkIdx(off);
+    uint64_t overall_bytes_fetched = 0;
+    off_t offset_in_chunk = off - chunk_list->AtPtr(chunk_idx)->offset();
+    do {
+      // Open file descriptor to chunk
+      ChunkFd *chunk_fd = open_chunks.chunk_fd;
+      if ((chunk_fd->fd == -1) || (chunk_fd->chunk_idx != chunk_idx)) {
+        if (chunk_fd->fd != -1) fetcher_->cache_mgr()->Close(chunk_fd->fd);
+        chunk_fd->fd = fetcher_->Fetch(
+          chunk_list->AtPtr(chunk_idx)->content_hash(),
+          chunk_list->AtPtr(chunk_idx)->size(),
+          "no path info",
+          cache::CacheManager::kTypeRegular);
+        if (chunk_fd->fd < 0) {
+          chunk_fd->fd = -1;
+          return -EIO;
+        }
+        chunk_fd->chunk_idx = chunk_idx;
+      }
+
+      LogCvmfs(kLogCvmfs, kLogDebug, "reading from chunk fd %d",
+               chunk_fd->fd);
+      // Read data from chunk
+      const size_t bytes_to_read = size - overall_bytes_fetched;
+      const size_t remaining_bytes_in_chunk =
+        chunk_list->AtPtr(chunk_idx)->size() - offset_in_chunk;
+      size_t bytes_to_read_in_chunk =
+        std::min(bytes_to_read, remaining_bytes_in_chunk);
+      const int64_t bytes_fetched = fetcher_->cache_mgr()->Pread(
+        chunk_fd->fd,
+        reinterpret_cast<char *>(buf) + overall_bytes_fetched,
+        bytes_to_read_in_chunk,
+        offset_in_chunk);
+
+      if (bytes_fetched < 0) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %d (%s)",
+                 bytes_fetched,
+                 open_chunks.chunk_reflist.path.ToString().c_str());
+        return -bytes_fetched;
+      }
+      overall_bytes_fetched += bytes_fetched;
+
+      // Proceed to the next chunk to keep on reading data
+      ++chunk_idx;
+      offset_in_chunk = 0;
+    } while ((overall_bytes_fetched < size) &&
+             (chunk_idx < chunk_list->size()));
+    return overall_bytes_fetched;
+  } else {
+    return fetcher_->cache_mgr()->Pread(fd, buf, size, off);
+  }
+}
+
 int cvmfs_context::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
-  cvmfs_globals::Instance()->cache_mgr()->Close(fd);
+  if (fd & kFdChunked) {
+    const int chunk_handle = fd & ~kFdChunked;
+    SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
+    if (open_chunks.chunk_reflist.list == NULL)
+      return -EBADF;
+    if (open_chunks.chunk_fd->fd != -1)
+      cvmfs_globals::Instance()->cache_mgr()->Close(open_chunks.chunk_fd->fd);
+    chunk_tables_.Release(chunk_handle);
+  } else {
+    cvmfs_globals::Instance()->cache_mgr()->Close(fd);
+  }
   return 0;
 }
 

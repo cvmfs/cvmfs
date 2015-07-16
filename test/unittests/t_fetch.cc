@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 
+#include "../../cvmfs/atomic.h"
 #include "../../cvmfs/backoff.h"
 #include "../../cvmfs/cache.h"
 #include "../../cvmfs/download.h"
@@ -100,10 +101,11 @@ class BuggyCacheManager : public cache::CacheManager {
     : open_2nd_try(false)
     , allow_open(false)
     , stall_in_ctrltxn(false)
-    , waiting_in_ctrltxn(false)
-    , continue_ctrltxn(false)
     , allow_open_from_txn(false)
-  { }
+  {
+    atomic_init32(&waiting_in_ctrltxn);
+    atomic_init32(&continue_ctrltxn);
+  }
   virtual cache::CacheManagerIds id() { return cache::kUnknownCacheManager; }
   virtual bool AcquireQuotaManager(QuotaManager *qm) { return false; }
   virtual int Open(const shash::Any &id) {
@@ -134,9 +136,9 @@ class BuggyCacheManager : public cache::CacheManager {
     void *txn)
   {
     if (stall_in_ctrltxn) {
-      waiting_in_ctrltxn = true;
-      while (!continue_ctrltxn) { }
-      waiting_in_ctrltxn = false;
+      atomic_inc32(&waiting_in_ctrltxn);
+      while (atomic_read32(&continue_ctrltxn) == 0) { }
+      atomic_dec32(&waiting_in_ctrltxn);
     }
   }
   virtual int64_t Write(const void *buf, uint64_t sz, void *txn) {
@@ -160,8 +162,8 @@ class BuggyCacheManager : public cache::CacheManager {
   bool open_2nd_try;
   bool allow_open;
   bool stall_in_ctrltxn;
-  bool waiting_in_ctrltxn;
-  bool continue_ctrltxn;
+  atomic_int32 waiting_in_ctrltxn;
+  atomic_int32 continue_ctrltxn;
   bool allow_open_from_txn;
 };
 
@@ -284,7 +286,7 @@ void *TestFetchCollapse2(void *data) {
       if (iDownloadQueue->second->size() > 0) {
         // printf("open up %s", iDownloadQueue->first.ToString().c_str());
         bcm->stall_in_ctrltxn = false;
-        bcm->continue_ctrltxn = true;
+        atomic_inc32(&bcm->continue_ctrltxn);
       }
     }
     pthread_mutex_unlock(f->lock_queues_download_);
@@ -324,7 +326,7 @@ TEST_F(T_Fetcher, FetchCollapse) {
     pthread_create(&thread_collapse2, NULL, TestFetchCollapse2, &f));
 
   // Piggy-back onto existing download
-  while (!bcm.waiting_in_ctrltxn) { }
+  while (atomic_read32(&bcm.waiting_in_ctrltxn) == 0) { }
   fd = f.Fetch(hash_catalog_, cache::CacheManager::kSizeUnknown, "cat",
                cache::CacheManager::kTypeCatalog);
   EXPECT_EQ(-EROFS, fd);

@@ -1182,24 +1182,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     assert(retval);
     chunk_tables_->Unlock();
 
-    // Find the chunk that holds the beginning of the requested data
-    assert(chunks.list->size() > 0);
-    unsigned idx_low = 0, idx_high = chunks.list->size()-1;
-    unsigned chunk_idx = idx_high/2;
-    while (idx_low < idx_high) {
-      if (chunks.list->AtPtr(chunk_idx)->offset() > off) {
-        assert(idx_high > 0);
-        idx_high = chunk_idx-1;
-      } else {
-        if ((chunk_idx == chunks.list->size()-1) ||
-            chunks.list->AtPtr(chunk_idx+1)->offset() > off)
-        {
-          break;
-        }
-        idx_low = chunk_idx + 1;
-      }
-      chunk_idx = idx_low + (idx_high-idx_low)/2;
-    }
+    unsigned chunk_idx = chunks.FindChunkIdx(off);
 
     // Lock chunk handle
     pthread_mutex_t *handle_lock = chunk_tables_->Handle2Lock(chunk_handle);
@@ -1242,20 +1225,20 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         chunks.list->AtPtr(chunk_idx)->size() - offset_in_chunk;
       size_t bytes_to_read_in_chunk =
         std::min(bytes_to_read, remaining_bytes_in_chunk);
-      const size_t bytes_fetched = cache_manager_->Pread(
+      const int64_t bytes_fetched = cache_manager_->Pread(
         chunk_fd.fd,
         data + overall_bytes_fetched,
         bytes_to_read_in_chunk,
         offset_in_chunk);
 
-      if (bytes_fetched == (size_t)-1) {
-        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %d result %d (%s)",
-                 errno, bytes_fetched, chunks.path.ToString().c_str());
+      if (bytes_fetched < 0) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %"PRId64" (%s)",
+                 bytes_fetched, chunks.path.ToString().c_str());
         chunk_tables_->Lock();
         chunk_tables_->handle2fd.Insert(chunk_handle, chunk_fd);
         chunk_tables_->Unlock();
         UnlockMutex(handle_lock);
-        fuse_reply_err(req, errno);
+        fuse_reply_err(req, -bytes_fetched);
         return;
       }
       overall_bytes_fetched += bytes_fetched;
@@ -1275,7 +1258,12 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
              chunk_fd.fd);
   } else {
     const int64_t fd = fi->fh;
-    overall_bytes_fetched = cache_manager_->Pread(fd, data, size, off);
+    int64_t nbytes = cache_manager_->Pread(fd, data, size, off);
+    if (nbytes < 0) {
+      fuse_reply_err(req, -nbytes);
+      return;
+    }
+    overall_bytes_fetched = nbytes;
   }
 
   // Push it to user
@@ -2037,6 +2025,20 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::statistics_->Register("linkstring.n_instances", "Number of instances");
   cvmfs::statistics_->Register("linkstring.n_overflows", "Number of overflows");
 
+  // register inode tracker counters
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_insert", "overall number of accessed inodes");
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_remove", "overall number of evicted inodes");
+  cvmfs::statistics_->Register(
+    "inode_tracker.no_reference", "currently active inodes");
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_hit_inode", "overall number of inode lookups");
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_hit_path", "overall number of successful path lookups");
+  cvmfs::statistics_->Register(
+    "inode_tracker.n_miss_path", "overall number of unsuccessful path lookups");
+
   // Fill cvmfs option variables from configuration
   cvmfs::foreground_ = loader_exports->foreground;
   cvmfs::cachedir_ = new string(cachedir);
@@ -2376,9 +2378,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::statistics_);
 
   // Load initial file catalog
-  retval = sqlite::RegisterVfsRdOnly(
-    cvmfs::cache_manager_, cvmfs::statistics_, sqlite::kVfsOptDefault);
-  assert(retval);
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
            sizeof(fuse_ino_t) * 8);
   cvmfs::inode_annotation_ = new catalog::InodeGenerationAnnotation();
@@ -2459,6 +2458,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
     root_hash = tag.root_hash.ToString();
   }
+
+  retval = sqlite::RegisterVfsRdOnly(
+    cvmfs::cache_manager_, cvmfs::statistics_, sqlite::kVfsOptDefault);
+  assert(retval);
 
   if (root_hash != "") {
     cvmfs::fixed_catalog_ = true;

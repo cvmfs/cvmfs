@@ -69,6 +69,7 @@ set(CVMFS_UNITTEST_FILES
   t_fetch.cc
   t_manifest.cc
   t_tracer.cc
+  t_file_chunk.cc
 )
 
 #

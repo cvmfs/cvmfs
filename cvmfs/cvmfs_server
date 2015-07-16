@@ -1504,7 +1504,7 @@ create_whitelist() {
   if [ "x$CVMFS_HASH_ALGORITHM" = "xrmd160" ]; then
     hash="`openssl rmd160 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`-rmd160"
   elif [ "x$CVMFS_HASH_ALGORITHM" = "xsha256" ]; then
-    hash="`openssl sha256 < ${whitelist}.unsigned | tr -d '\n' | tail -c64`-sha256"
+    hash="`cat ${whitelist}.unsigned | sha256sum | tr -d '\n' | head -c64`-sha256"
   else
     hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
   fi

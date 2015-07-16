@@ -29,6 +29,10 @@ namespace perf {
 class Statistics;
 }
 
+namespace glue {
+class InodeTracker;
+}
+
 
 namespace cvmfs {
 
@@ -42,6 +46,7 @@ extern int max_cache_timeout_;
 extern bool foreground_;
 extern bool nfs_maps_;
 extern perf::Statistics *statistics_;
+extern glue::InodeTracker *inode_tracker_;
 
 bool Evict(const std::string &path);
 bool Pin(const std::string &path);

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 export LC_ALL=C
 
@@ -340,7 +340,7 @@ check_result() {
 run_unittests() {
   echo -n "running CernVM-FS unit tests... "
   local xml_output="${UNITTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}"
-  cvmfs_unittests --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
+  /usr/bin/cvmfs_unittests --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
   local ut_retval=$?
   check_result $ut_retval
 
