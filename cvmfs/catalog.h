@@ -114,9 +114,6 @@ class Catalog : public SingleCopy {
 
   bool OpenDatabase(const std::string &db_path);
 
-  bool LookupInode(const inode_t inode,
-                   DirectoryEntry *dirent,
-                   shash::Md5 *parent_md5path) const;
   bool LookupMd5Path(const shash::Md5 &md5path, DirectoryEntry *dirent) const;
   inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const {
     return LookupMd5Path(shash::Md5(path.GetChars(), path.GetLength()), dirent);
