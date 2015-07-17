@@ -38,7 +38,7 @@ CVMFS_OPT_ITERATIONS=${CVMFS_OPT_ITERATIONS:=1}
 CVMFS_OPT_TEST_TYPE=${CVMFS_OPT_TEST_TYPE:=callgrind} # callgrind / memcheck
 CVMFS_OPT_CONFIG_FILE=${CVMFS_OPT_CONFIG_FILE:=}
 CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=/tmp/cvmfs_benchmarks}
-CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=/var/lib/cvmfs/benchmark}
+CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=~/.benchmark}
 CVMFS_OPT_PARALLEL_RUNS=${CVMFS_OPT_PARALLEL_RUNS:=1}
 CVMFS_OPT_MTAB_MODIFIED="false"
 
@@ -1318,7 +1318,7 @@ wait_fqrn_mount() {
 
 # runs the command once, mounting and unmounting the repository
 single_execution() {
-  cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 & #> /dev/null 2>&1 &
+  cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
   wait_fqrn_mount
   ( cvmfs_run_benchmark )
   local code=$?
@@ -1383,17 +1383,20 @@ set_valgrind_options() {
 # @param workspace  absolute path to the directory where the benchmark will put the files in
 setup_benchmark_environment() {
   local workspace="$1"
-  mkdir -p /cvmfs/$FQRN
+  local me=$(whoami)
   mkdir -p "$CVMFS_OPT_OUTPUT_DIR/$FQRN"
   mkdir -p $workspace/cache
-
-  # cleaning the cache
-  clean_benchmark_cache
-
+  
+  # make sure the user can execute /bin/fusermount, write into /dev/fuse and write into /cvmfs/<repo>
+  sudo chmod 666 /dev/fuse
+  sudo chmod 4755 /bin/fusermount
+  sudo mkdir -p /cvmfs/$FQRN
+  sudo chown $me /cvmfs/$FQRN
+  
   # mtab trick
   if [ ! -h /etc/mtab ]; then
-    mv /etc/mtab /etc/mtab.save
-    ln -s /proc/mounts /etc/mtab
+    sudo sh -c "mv /etc/mtab /etc/mtab.save"
+    sudo sh -c "ln -s /proc/mounts /etc/mtab"
     CVMFS_OPT_MTAB_MODIFIED="true"
   fi
 
@@ -1473,7 +1476,7 @@ statistics_daemon() {
   touch $dump_file
   while [ -f /proc/${PID}/smaps ]; do
     # memory in KB
-    echo 0 $(awk '/Rss/ {print "+", $2}' /proc/${PID}/smaps) | bc >> $dump_file
+    echo 0 $(sudo awk '/Rss/ {print "+", $2}' /proc/${PID}/smaps) | bc >> $dump_file
     sleep 2
   done
 }
@@ -1632,7 +1635,7 @@ collect_benchmark_results() {
 
   # undo the mtab trick
   if [ x"$CVMFS_OPT_MTAB_MODIFIED" = x"true" ]; then
-    mv /etc/mtab.save /etc/mtab
+    sudo mv /etc/mtab.save /etc/mtab
   fi
 
   # collect the results
