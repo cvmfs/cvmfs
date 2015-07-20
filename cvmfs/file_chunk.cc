@@ -15,6 +15,36 @@ static inline uint32_t hasher_uint64t(const uint64_t &value) {
   return MurmurHash2(&value, sizeof(value), 0x07387a4f);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+unsigned FileChunkReflist::FindChunkIdx(const uint64_t off) {
+  assert(list && (list->size() > 0));
+  unsigned idx_low = 0;
+  unsigned idx_high = list->size()-1;
+  unsigned chunk_idx = idx_high/2;
+  while (idx_low < idx_high) {
+    if (static_cast<uint64_t>(list->AtPtr(chunk_idx)->offset()) > off) {
+      assert(idx_high > 0);
+      idx_high = chunk_idx - 1;
+    } else {
+      if ((chunk_idx == list->size() - 1) ||
+          (static_cast<uint64_t>(list->AtPtr(chunk_idx + 1)->offset()) > off))
+      {
+        break;
+      }
+      idx_low = chunk_idx + 1;
+    }
+    chunk_idx = idx_low + (idx_high - idx_low) / 2;
+  }
+  return chunk_idx;
+}
+
+
+//------------------------------------------------------------------------------
+
+
 void ChunkTables::InitLocks() {
   lock =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
@@ -91,4 +121,81 @@ pthread_mutex_t *ChunkTables::Handle2Lock(const uint64_t handle) const {
     static_cast<double>(hash) * static_cast<double>(kNumHandleLocks) /
     static_cast<double>((uint32_t)(-1));
   return handle_locks.At((uint32_t)bucket % kNumHandleLocks);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+SimpleChunkTables::SimpleChunkTables() {
+  lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_, NULL);
+  assert(retval == 0);
+}
+
+
+SimpleChunkTables::~SimpleChunkTables() {
+  for (unsigned i = 0; i < fd_table_.size(); ++i) {
+    delete fd_table_[i].chunk_reflist.list;
+  }
+  pthread_mutex_destroy(lock_);
+  free(lock_);
+}
+
+
+int SimpleChunkTables::Add(FileChunkReflist chunks) {
+  assert(chunks.list != NULL);
+  OpenChunks new_entry;
+  new_entry.chunk_reflist = chunks;
+  new_entry.chunk_fd = new ChunkFd();
+  unsigned i = 0;
+  Lock();
+  for (; i < fd_table_.size(); ++i) {
+    if (fd_table_[i].chunk_reflist.list == NULL) {
+      fd_table_[i] = new_entry;
+      Unlock();
+      return i;
+    }
+  }
+  fd_table_.push_back(new_entry);
+  Unlock();
+  return i;
+}
+
+
+SimpleChunkTables::OpenChunks SimpleChunkTables::Get(int fd) {
+  OpenChunks result;
+  if (fd < 0)
+    return result;
+
+  unsigned idx = static_cast<unsigned>(fd);
+  Lock();
+  if (idx < fd_table_.size())
+    result = fd_table_[idx];
+  Unlock();
+  return result;
+}
+
+
+void SimpleChunkTables::Release(int fd) {
+  if (fd < 0)
+    return;
+
+  Lock();
+  unsigned idx = static_cast<unsigned>(fd);
+  if (idx >= fd_table_.size()) {
+    Unlock();
+    return;
+  }
+
+  delete fd_table_[idx].chunk_reflist.list;
+  fd_table_[idx].chunk_reflist.list = NULL;
+  fd_table_[idx].chunk_reflist.path.Assign("", 0);
+  delete fd_table_[idx].chunk_fd;
+  fd_table_[idx].chunk_fd = NULL;
+  while (!fd_table_.empty() && (fd_table_.back().chunk_reflist.list == NULL)) {
+    fd_table_.pop_back();
+  }
+  Unlock();
 }

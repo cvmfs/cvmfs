@@ -33,6 +33,7 @@
 #include "cvmfs.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
+#include "glue_buffer.h"
 #include "loader.h"
 #include "logging.h"
 #include "lru.h"
@@ -113,11 +114,12 @@ static void *MainTalk(void *data __attribute__((unused))) {
         tracer::Flush();
         Answer(con_fd, "OK\n");
       } else if (line == "cache size") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          uint64_t size_unpinned = quota::GetSize();
-          uint64_t size_pinned = quota::GetSizePinned();
+          uint64_t size_unpinned = quota_mgr->GetSize();
+          uint64_t size_pinned = quota_mgr->GetSizePinned();
           const string size_str = "Current cache size is " +
             StringifyInt(size_unpinned / (1024*1024)) + "MB (" +
             StringifyInt(size_unpinned) + " Bytes), pinned: " +
@@ -126,35 +128,39 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, size_str);
         }
       } else if (line == "cache list") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls = quota::List();
+          vector<string> ls = quota_mgr->List();
           AnswerStringList(con_fd, ls);
         }
       } else if (line == "cache list pinned") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls_pinned = quota::ListPinned();
+          vector<string> ls_pinned = quota_mgr->ListPinned();
           AnswerStringList(con_fd, ls_pinned);
         }
       } else if (line == "cache list catalogs") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls_catalogs = quota::ListCatalogs();
+          vector<string> ls_catalogs = quota_mgr->ListCatalogs();
           AnswerStringList(con_fd, ls_catalogs);
         }
       } else if (line.substr(0, 7) == "cleanup") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
           if (line.length() < 9) {
             Answer(con_fd, "Usage: cleanup <MB>\n");
           } else {
             const uint64_t size = String2Uint64(line.substr(8))*1024*1024;
-            if (quota::Cleanup(size)) {
+            if (quota_mgr->Cleanup(size)) {
               Answer(con_fd, "OK\n");
             } else {
               Answer(con_fd, "Not fully cleaned "
@@ -362,7 +368,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
         int highwater;
         string result;
 
-        // manually setting the values of the ShortString counters
+        // Manually setting the values of the ShortString counters
         cvmfs::statistics_->Lookup("pathstring.n_instances")->
             Set(PathString::num_instances());
         cvmfs::statistics_->Lookup("pathstring.n_overflows")->
@@ -376,16 +382,36 @@ static void *MainTalk(void *data __attribute__((unused))) {
         cvmfs::statistics_->Lookup("linkstring.n_overflows")->
             Set(LinkString::num_overflows());
 
-        result += "\nCache Mode: ";
-        switch (cache::GetCacheMode()) {
-          case cache::kCacheReadWrite:
-            result += "read-write";
-            break;
-          case cache::kCacheReadOnly:
-            result += "read-only";
-            break;
-          default:
-            result += "unknown";
+        // Manually setting the inode tracker numbers
+        glue::InodeTracker::Statistics inode_stats =
+          cvmfs::inode_tracker_->GetStatistics();
+        cvmfs::statistics_->Lookup("inode_tracker.n_insert")->Set(
+          atomic_read64(&inode_stats.num_inserts));
+        cvmfs::statistics_->Lookup("inode_tracker.n_remove")->Set(
+          atomic_read64(&inode_stats.num_removes));
+        cvmfs::statistics_->Lookup("inode_tracker.no_reference")->Set(
+          atomic_read64(&inode_stats.num_references));
+        cvmfs::statistics_->Lookup("inode_tracker.n_hit_inode")->Set(
+          atomic_read64(&inode_stats.num_hits_inode));
+        cvmfs::statistics_->Lookup("inode_tracker.n_hit_path")->Set(
+          atomic_read64(&inode_stats.num_hits_path));
+        cvmfs::statistics_->Lookup("inode_tracker.n_miss_path")->Set(
+          atomic_read64(&inode_stats.num_misses_path));
+
+        if (cvmfs::cache_manager_->id() == cache::kPosixCacheManager) {
+          cache::PosixCacheManager *cache_mgr =
+            reinterpret_cast<cache::PosixCacheManager *>(cvmfs::cache_manager_);
+          result += "\nCache Mode: ";
+          switch (cache_mgr->cache_mode()) {
+            case cache::PosixCacheManager::kCacheReadWrite:
+              result += "read-write";
+              break;
+            case cache::PosixCacheManager::kCacheReadOnly:
+              result += "read-only";
+              break;
+            default:
+              result += "unknown";
+          }
         }
         bool drainout_mode;
         bool maintenance_mode;
@@ -445,7 +471,8 @@ static void *MainTalk(void *data __attribute__((unused))) {
         const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "pid cachemgr") {
-        const string pid_str = StringifyInt(quota::GetPid()) + "\n";
+        const string pid_str =
+          StringifyInt(cvmfs::cache_manager_->quota_mgr()->GetPid()) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "pid watchdog") {
         const string pid_str = StringifyInt(monitor::GetPid()) + "\n";
@@ -473,8 +500,16 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "version patchlevel") {
         Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
       } else if (line == "tear down to read-only") {
-        cache::TearDown2ReadOnly();
-        Answer(con_fd, "In read-only mode\n");
+        if (cvmfs::cache_manager_->id() != cache::kPosixCacheManager) {
+          Answer(con_fd, "not supported\n");
+        } else {
+          // hack
+          cvmfs::UnregisterQuotaListener();
+          cache::PosixCacheManager *cache_mgr =
+            reinterpret_cast<cache::PosixCacheManager *>(cvmfs::cache_manager_);
+          cache_mgr->TearDown2ReadOnly();
+          Answer(con_fd, "In read-only mode\n");
+        }
       } else {
         Answer(con_fd, "unknown command\n");
       }
@@ -530,7 +565,8 @@ void Fini() {
   result = unlink(socket_path_->c_str());
   if (result != 0) {
     LogCvmfs(kLogTalk, kLogSyslogWarn,
-             "Could not remove cvmfs_io socket from cache directory.");
+             "Could not remove cvmfs_io socket from cache directory (%d)",
+             errno);
   }
 
   delete cachedir_;

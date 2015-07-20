@@ -32,8 +32,10 @@ class Whitelist(RootFile):
     @staticmethod
     def open(whitelist_path):
         """ Initializes a whitelist from a local file path """
-        with open(whitelist_path) as manifest_file:
-            return Whitelist(manifest_file)
+        whitelist_file = open(whitelist_path)
+        whitelist = Whitelist(whitelist_file)
+        whitelist_file.close()
+        return whitelist
 
     _fingerprint_re = None
     _timestamp_re   = None
@@ -49,6 +51,13 @@ class Whitelist(RootFile):
 
     def __repr__(self):
         return self.__str__()
+
+
+    def expired(self):
+        """ checks if the whitelist is expired """
+        tsnow = datetime.utcnow().replace(tzinfo=tzutc())
+        timediff = self.expires - tsnow
+        return timediff.days < 0
 
 
     def contains(self, certificate):

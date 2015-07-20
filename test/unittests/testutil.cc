@@ -6,8 +6,10 @@
 #ifdef __APPLE__
   #include <sys/sysctl.h>
 #endif
+#include <syslog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <fstream>  // TODO(jblomer): remove me
 #include <sstream>  // TODO(jblomer): remove me
 
@@ -67,6 +69,23 @@ pid_t GetParentPid(const pid_t pid) {
 
   return parent_pid;
 }
+
+
+unsigned GetNoUsedFds() {
+  // Syslog file descriptor could still be open
+  closelog();
+
+  unsigned result = 0;
+  int max_fd = getdtablesize();
+  assert(max_fd >= 0);
+  for (unsigned fd = 0; fd < unsigned(max_fd); ++fd) {
+    int retval = fcntl(fd, F_GETFD, 0);
+    if (retval != -1)
+      result++;
+  }
+  return result;
+}
+
 
 /**
  * Traverses the $PATH environment variable to find the absolute path of a given
@@ -172,6 +191,22 @@ DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
   dirent.is_chunked_file_ = true;
+  return dirent;
+}
+
+catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
+    const Metadata& metadata) {
+  DirectoryEntry dirent;
+  dirent.name_       = NameString(metadata.name);
+  dirent.mode_       = metadata.mode;
+  dirent.uid_        = metadata.uid;
+  dirent.gid_        = metadata.gid;
+  dirent.size_       = metadata.size;
+  dirent.mtime_      = metadata.mtime;
+  dirent.symlink_    = LinkString(metadata.symlink);
+  dirent.linkcount_  = metadata.linkcount;
+  dirent.has_xattrs_ = metadata.has_xattrs;
+  dirent.checksum_   = metadata.checksum;
   return dirent;
 }
 

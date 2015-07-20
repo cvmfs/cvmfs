@@ -212,37 +212,6 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
 
 /**
- * Performs a lookup on this Catalog for a given inode
- * @param inode the inode to perform the lookup for
- * @param dirent this will be set to the found entry
- * @param parent_md5path this will be set to the hash of the parent path
- * @return true if lookup was successful, false otherwise
- */
-bool Catalog::LookupInode(const inode_t inode, DirectoryEntry *dirent,
-                          shash::Md5 *parent_md5path) const
-{
-  assert(IsInitialized());
-
-  pthread_mutex_lock(lock_);
-  sql_lookup_inode_->BindRowId(GetRowIdFromInode(inode));
-  const bool found = sql_lookup_inode_->FetchRow();
-
-  // Retrieve the DirectoryEntry if needed
-  if (found && (dirent != NULL))
-      *dirent = sql_lookup_inode_->GetDirent(this);
-
-  // Retrieve the path_hash of the parent path if needed
-  if (parent_md5path != NULL)
-      *parent_md5path = sql_lookup_inode_->GetParentPathHash();
-
-  sql_lookup_inode_->Reset();
-  pthread_mutex_unlock(lock_);
-
-  return found;
-}
-
-
-/**
  * Performs a lookup on this Catalog for a given MD5 path hash.
  * @param md5path the MD5 hash of the searched path
  * @param expand_symlink indicates if variables in symlink should be resolved

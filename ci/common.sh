@@ -20,6 +20,10 @@ is_macos() {
   [ x"$(uname)" = x"Darwin" ]
 }
 
+is_suse() {
+  [ -f /etc/SuSE-release ]
+}
+
 get_cvmfs_version_from_cmake() {
   local source_directory="$1"
   cat ${source_directory}/CMakeLists.txt | grep '## CVMFS_VERSION' | awk '{print $3}'

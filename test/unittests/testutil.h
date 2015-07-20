@@ -25,6 +25,8 @@
 pid_t GetParentPid(const pid_t pid);
 std::string GetExecutablePath(const std::string &exe_name);
 
+unsigned GetNoUsedFds();
+
 time_t t(const int day, const int month, const int year);
 shash::Any h(const std::string &hash,
              const shash::Suffix suffix = shash::kSuffixNone);
@@ -33,10 +35,25 @@ namespace catalog {
 
 class DirectoryEntryTestFactory {
  public:
+  struct Metadata {
+    std::string name;
+    unsigned int mode;
+    uid_t uid;
+    gid_t gid;
+    uint64_t size;
+    time_t mtime;
+    std::string symlink;
+    uint32_t linkcount;
+    bool has_xattrs;
+    shash::Any checksum;
+  };
+
+ public:
   static catalog::DirectoryEntry RegularFile();
   static catalog::DirectoryEntry Directory();
   static catalog::DirectoryEntry Symlink();
   static catalog::DirectoryEntry ChunkedFile();
+  static catalog::DirectoryEntry Make(const Metadata &metadata);
 };
 
 }  // namespace catalog

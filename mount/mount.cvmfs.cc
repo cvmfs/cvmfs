@@ -69,7 +69,15 @@ static bool CheckFuse() {
   string fuse_device;
   int retval;
 #ifdef __APPLE__
-  retval = system("/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs");
+  if (FileExists("/Library/Filesystems/osxfuse.fs/Contents/Resources/"
+                 "load_osxfuse"))
+  {
+    // OS X Fuse 3
+    retval = system("/Library/Filesystems/osxfuse.fs/Contents/Resources/"
+                    "load_osxfuse");
+  } else {
+    retval = system("/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs");
+  }
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed loading OSX Fuse");
     return false;
