@@ -30,6 +30,65 @@ produce_files_in_1() {
   popdir
 }
 
+produce_files_in_2() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  touch foo/1.0/.cvmfscatalog
+  touch foo/1.1/.cvmfscatalog
+  touch foo/1.2/.cvmfscatalog
+
+  touch bar/.cvmfscatalog
+
+  popdir
+}
+
+produce_files_in_3() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -f foo/.cvmfscatalog
+  rm -f bar/.cvmfscatalog
+
+  touch bar/2.0/.cvmfscatalog
+  touch bar/2.1/.cvmfscatalog
+  touch bar/2.2/.cvmfscatalog
+
+  popdir
+}
+
+
+setup_environment_variables_1() {
+  export FOO_VERSION=1.2
+  export BAR_VERSION=2.1
+  export PROGRAM_TYPE=foo
+  export GENERIC_VERSION=1.1
+}
+
+setup_environment_variables_2() {
+  export FOO_VERSION=1.0
+  export BAR_VERSION=2.2
+  export PROGRAM_TYPE=bar
+  export GENERIC_VERSION=2.1
+}
+
+setup_environment_variables_3() {
+  export FOO_VERSION=1.1
+  export BAR_VERSION=2.0
+  export PROGRAM_TYPE=foo
+  export GENERIC_VERSION=1.0
+}
+
+
+print_envionment_variables() {
+  echo "\$FOO_VERSION     = $FOO_VERSION"
+  echo "\$BAR_VERSION     = $BAR_VERSION"
+  echo "\$PROGRAM_TYPE    = $PROGRAM_TYPE"
+  echo "\$GENERIC_VERSION = $GENERIC_VERSION"
+}
+
 
 check_symlink() {
   local symlink_path="$1"
@@ -56,11 +115,20 @@ check_symlink() {
 }
 
 
+check_symlinks() {
+  local mountpoint="$1"
+  check_symlink "${mountpoint}/bar/current" "${BAR_VERSION}"                     || return 1
+  check_symlink "${mountpoint}/foo/current" "${FOO_VERSION}"                     || return 2
+  check_symlink "${mountpoint}/bin"         "${PROGRAM_TYPE}/current"            || return 3
+  check_symlink "${mountpoint}/general"     "${PROGRAM_TYPE}/${GENERIC_VERSION}" || return 4
+}
+
+
 TEST_592_MOUNTPOINT=""
 cleanup() {
   if [ ! -z $TEST_592_MOUNTPOINT ]; then
     echo -n "umounting ${TEST_592_MOUNTPOINT}... "
-    sudo umount $TEST_592_MOUNTPOINT && echo "done" || echo "fail"
+    remove_local_mount $TEST_592_MOUNTPOINT && echo "done" || echo "fail"
   fi
 }
 
@@ -90,26 +158,65 @@ cvmfs_run_test() {
   trap cleanup EXIT HUP INT TERM
 
   echo "set up environment variables"
-  export FOO_VERSION=1.2
-  export BAR_VERSION=2.1
-  export PROGRAM_TYPE=foo
-  export GENERIC_VERSION=1.1
-  echo "\$FOO_VERSION     = $FOO_VERSION"
-  echo "\$BAR_VERSION     = $BAR_VERSION"
-  echo "\$PROGRAM_TYPE    = $PROGRAM_TYPE"
-  echo "\$GENERIC_VERSION = $GENERIC_VERSION"
+  setup_environment_variables_1 || return 2
+  print_envionment_variables    || return 3
 
   echo "create a local mount of the created repository"
   TEST_592_MOUNTPOINT="$(pwd)/local_mount"
   do_local_mount "$TEST_592_MOUNTPOINT" \
                  "$CVMFS_TEST_REPO"     \
-                 "$(get_local_repo_url $CVMFS_TEST_REPO)" || return 2
+                 "$(get_local_repo_url $CVMFS_TEST_REPO)" || return 4
 
   echo "check magic symlinks"
-  check_symlink "${TEST_592_MOUNTPOINT}/bar/current" "${BAR_VERSION}"                     || return 3
-  check_symlink "${TEST_592_MOUNTPOINT}/foo/current" "${FOO_VERSION}"                     || return 4
-  check_symlink "${TEST_592_MOUNTPOINT}/bin"         "${PROGRAM_TYPE}/current"            || return 5
-  check_symlink "${TEST_592_MOUNTPOINT}/general"     "${PROGRAM_TYPE}/${GENERIC_VERSION}" || return 6
+  check_symlinks "$TEST_592_MOUNTPOINT" || return 5
+
+  echo "umount private mount"
+  remove_local_mount $TEST_592_MOUNTPOINT || return 6
+
+  echo "open transaction to fiddle with nested catalogs"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "change repository structure"
+  produce_files_in_2 $repo_dir || return 7
+
+  echo "publish changes"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "set up new environment variables"
+  setup_environment_variables_2 || return 8
+  print_envionment_variables    || return 9
+
+  echo "create a local mount of the created repository"
+  do_local_mount "$TEST_592_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO"     \
+                 "$(get_local_repo_url $CVMFS_TEST_REPO)" || return 10
+
+  echo "check magic symlinks"
+  check_symlinks $TEST_592_MOUNTPOINT || return 11
+
+  echo "umount private mount"
+  remove_local_mount $TEST_592_MOUNTPOINT || return 12
+
+  echo "open transaction to fiddle with nested catalogs"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "change repository structure"
+  produce_files_in_3 $repo_dir || return 13
+
+  echo "publish changes"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "set up new environment variables"
+  setup_environment_variables_3 || return 14
+  print_envionment_variables    || return 15
+
+  echo "create a local mount of the created repository"
+  do_local_mount "$TEST_592_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO"     \
+                 "$(get_local_repo_url $CVMFS_TEST_REPO)" || return 16
+
+  echo "check magic symlinks"
+  check_symlinks $TEST_592_MOUNTPOINT || return 17
 
   return 0
 }
