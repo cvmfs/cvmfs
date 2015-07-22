@@ -316,17 +316,19 @@ bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
  * Returns only struct stat values
  * @param path_hash the MD5 hash of the path of the directory to list
  * @param listing will be set to the resulting DirectoryEntryList
+ * @param expand_symlink defines if magic symlinks should be resolved
  * @return true on successful listing, false otherwise
  */
 bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
-                             DirectoryEntryList *listing) const
+                             DirectoryEntryList *listing,
+                             const bool expand_symlink) const
 {
   assert(IsInitialized());
 
   pthread_mutex_lock(lock_);
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
-    DirectoryEntry dirent = sql_listing_->GetDirent(this);
+    DirectoryEntry dirent = sql_listing_->GetDirent(this, expand_symlink);
     FixTransitionPoint(md5path, &dirent);
     listing->push_back(dirent);
   }
