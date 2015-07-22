@@ -1,0 +1,225 @@
+cvmfs_test_name="Rename of Directory containing Changes"
+cvmfs_test_autofs_on_startup=false
+
+produce_initial_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir contains_nothing
+
+  mkdir contains_file
+  echo "another useless file" > contains_file/file
+
+  mkdir contains_empty_dir
+  mkdir contains_empty_dir/empty_dir
+
+  mkdir contains_dir
+  mkdir contains_dir/dir
+  echo "useless file content" > contains_dir/dir/useless
+
+  mkdir contains_many_entries
+  mkdir contains_many_entries/dir
+  echo "nothing to see here" > contains_many_entries/file
+
+  popdir
+}
+
+add_file_and_rename_parent() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "additional file for testing" > contains_nothing/useful
+  mv contains_nothing contains_nothing_renamed
+
+  popdir
+}
+
+remove_file_and_rename_parent() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -f contains_file/file
+  mv contains_file contains_file_renamed
+
+  popdir
+}
+
+remove_empty_directory_and_rename_parent() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -fR contains_empty_dir/empty_dir
+  mv contains_empty_dir contains_empty_dir_renamed
+
+  popdir
+}
+
+remove_directory_and_rename_parent() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -fR contains_dir/dir
+  mv contains_dir contains_dir_renamed
+
+  popdir
+}
+
+remove_directory_among_many_entries_and_rename_parent() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -fR contains_many_entries/dir
+  mv contains_many_entries contains_many_entries_renamed
+
+  popdir
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository (1)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_initial_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_initial_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "starting transaction to edit repository (2)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting a new file in dir and rename dir"
+  add_file_and_rename_parent $repo_dir || return 5
+
+  echo "doing exactly the same in the scratch space for comparison"
+  add_file_and_rename_parent $reference_dir || return 6
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "starting transaction to edit repository (3)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "removing a file from dir and renaming dir"
+  remove_file_and_rename_parent $repo_dir || return 7
+
+  echo "doing exactly the same in the scratch space for comparison"
+  remove_file_and_rename_parent $reference_dir || return 8
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "starting transaction to edit repository (4)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "removing an empty directory in dir and renaming dir"
+  remove_empty_directory_and_rename_parent $repo_dir || return 8
+
+  echo "doing exactly the same in the scratch space for comparison"
+  remove_empty_directory_and_rename_parent $reference_dir || return 9
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "starting transaction to edit repository (5)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "removing a non-empty directory in dir and rename dir"
+  remove_directory_and_rename_parent $repo_dir || return 10
+
+  echo "doing exactly the same in the scratch space for comparison"
+  remove_directory_and_rename_parent $reference_dir || return 11
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+#
+# ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+#
+
+  echo "starting transaction to edit repository (6)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "removing an entry among others in dir and rename dir"
+  remove_directory_among_many_entries_and_rename_parent $repo_dir || return 12
+
+  echo "doing exactly the same in the scratch space for comparison"
+  remove_directory_among_many_entries_and_rename_parent $reference_dir || return 13
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}
+
