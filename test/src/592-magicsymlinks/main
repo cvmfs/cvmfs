@@ -1,0 +1,116 @@
+cvmfs_test_name="Magic Symlinks"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in_1() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir -p 'foo/1.0' 'foo/1.1' 'foo/1.2'
+  mkdir -p 'bar/2.0' 'bar/2.1' 'bar/2.2'
+
+  for d in $(find . -mindepth 2 -type d); do
+    head -c 10 /dev/urandom > ${d}/f
+    head -c 10 /dev/urandom > ${d}/g
+    head -c 10 /dev/urandom > ${d}/h
+  done
+
+  ln -s 'foo' foo_dir
+  ln -s 'bar' bar_dir
+
+  ln -s '$(FOO_VERSION)' foo/current
+  ln -s '$(BAR_VERSION)' bar/current
+
+  ln -s '$(PROGRAM_TYPE)/current' bin
+
+  ln -s '$(PROGRAM_TYPE)/$(GENERIC_VERSION)' general
+
+  touch foo/.cvmfscatalog
+
+  popdir
+}
+
+
+check_symlink() {
+  local symlink_path="$1"
+  local expected_link="$2"
+
+  if [ ! -h $symlink_path ]; then
+    echo "symlink '$symlink_path' doesn't exist"
+    return 1
+  fi
+
+  local link_content=
+  link_content=$(readlink $symlink_path)
+  if [ $? != 0 ]; then
+    echo "failed to read link value for '$symlink_path'"
+    return 2
+  fi
+
+  if [ x"$link_content" != x"$expected_link" ]; then
+    echo "symlink doesn't have the expected content"
+    echo "expected: $expected_link"
+    echo "found:    $link_content"
+    return 3
+  fi
+}
+
+
+TEST_592_MOUNTPOINT=""
+cleanup() {
+  if [ ! -z $TEST_592_MOUNTPOINT ]; then
+    echo -n "umounting ${TEST_592_MOUNTPOINT}... "
+    sudo umount $TEST_592_MOUNTPOINT && echo "done" || echo "fail"
+  fi
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in_1 $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "set up environment variables"
+  export FOO_VERSION=1.2
+  export BAR_VERSION=2.1
+  export PROGRAM_TYPE=foo
+  export GENERIC_VERSION=1.1
+  echo "\$FOO_VERSION     = $FOO_VERSION"
+  echo "\$BAR_VERSION     = $BAR_VERSION"
+  echo "\$PROGRAM_TYPE    = $PROGRAM_TYPE"
+  echo "\$GENERIC_VERSION = $GENERIC_VERSION"
+
+  echo "create a local mount of the created repository"
+  TEST_592_MOUNTPOINT="$(pwd)/local_mount"
+  do_local_mount "$TEST_592_MOUNTPOINT" \
+                 "$CVMFS_TEST_REPO"     \
+                 "$(get_local_repo_url $CVMFS_TEST_REPO)" || return 2
+
+  echo "check magic symlinks"
+  check_symlink "${TEST_592_MOUNTPOINT}/bar/current" "${BAR_VERSION}"                     || return 3
+  check_symlink "${TEST_592_MOUNTPOINT}/foo/current" "${FOO_VERSION}"                     || return 4
+  check_symlink "${TEST_592_MOUNTPOINT}/bin"         "${PROGRAM_TYPE}/current"            || return 5
+  check_symlink "${TEST_592_MOUNTPOINT}/general"     "${PROGRAM_TYPE}/${GENERIC_VERSION}" || return 6
+
+  return 0
+}
+
