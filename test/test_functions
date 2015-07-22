@@ -1743,8 +1743,8 @@ do_local_mount() {
   local repo_name="$2"
   local repo_url="$3"
   local cache="$(get_cache_directory $mountpoint)"
-  local config="${mountpoint}.conf"
-  local output="${mountpoint}.log"
+  local config="$(mktemp ${mountpoint}.XXXXX.conf)"
+  local output="$(mktemp ${mountpoint}.XXXXX.log)"
 
   mkdir $mountpoint $cache
   cat > $config << EOF
@@ -1756,4 +1756,12 @@ CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${repo_name}.pub
 CVMFS_KCACHE_TIMEOUT=15
 EOF
   cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
+}
+
+remove_local_mount() {
+  local mountpoint="$1"
+  local cache="$(get_cache_directory $mountpoint)"
+
+  sudo umount $mountpoint
+  rm -fR $cache $mountpoint
 }
