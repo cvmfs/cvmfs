@@ -47,10 +47,10 @@ class SyncItem {
    *  @param entryType well...
    */
   SyncItem();  // TODO(rmeusel): Remove
-  SyncItem(const std::string &relative_parent_path,
-           const std::string &filename,
-           const SyncItemType entry_type,
-           const SyncUnion *union_engine);
+  SyncItem(const std::string  &relative_parent_path,
+           const std::string  &filename,
+           const SyncUnion    *union_engine,
+           const SyncItemType  entry_type = kItemUnknown);
 
   inline bool IsDirectory()     const { return IsType(kItemDir);              }
   inline bool WasDirectory()    const { return WasType(kItemDir);             }

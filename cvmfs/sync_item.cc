@@ -21,10 +21,10 @@ SyncItem::SyncItem() :
 {
 }
 
-SyncItem::SyncItem(const string &relative_parent_path,
-                   const string &filename,
-                   const SyncItemType entry_type,
-                   const SyncUnion *union_engine) :
+SyncItem::SyncItem(const string       &relative_parent_path,
+                   const string       &filename,
+                   const SyncUnion    *union_engine,
+                   const SyncItemType  entry_type) :
   union_engine_(union_engine),
   whiteout_(false),
   relative_parent_path_(relative_parent_path),
