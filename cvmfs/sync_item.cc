@@ -30,9 +30,22 @@ SyncItem::SyncItem(const string &relative_parent_path,
   relative_parent_path_(relative_parent_path),
   filename_(filename),
   scratch_type_(entry_type),
-  rdonly_type_(GetRdOnlyFiletype())
+  rdonly_type_(kItemUnknown)
 {
   content_hash_.algorithm = shash::kAny;
+}
+
+
+SyncItemType SyncItem::GetGenericFiletype(const SyncItem::EntryStat &stat) const
+{
+  const SyncItemType type = stat.GetSyncItemType();
+  if (type == kItemUnknown) {
+    PrintWarning("'" + GetRelativePath() + "' has an unsupported file type "
+                 "(st_mode: " + StringifyInt(stat.stat.st_mode) +
+                 " errno: " + StringifyInt(stat.error_code) + ")");
+    abort();
+  }
+  return type;
 }
 
 
@@ -47,13 +60,19 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
   //    /foo/bar/regular_file/is_dir_now
   if (rdonly_stat_.error_code == ENOENT ||
       rdonly_stat_.error_code == ENOTDIR) return kItemNew;
-  if (S_ISDIR(rdonly_stat_.stat.st_mode)) return kItemDir;
-  if (S_ISREG(rdonly_stat_.stat.st_mode)) return kItemFile;
-  if (S_ISLNK(rdonly_stat_.stat.st_mode)) return kItemSymlink;
-  PrintWarning("'" + GetRelativePath() + "' has an unsupported file type "
-               "(st_mode: " + StringifyInt(rdonly_stat_.stat.st_mode) +
-               " errno: " + StringifyInt(rdonly_stat_.error_code) + ")");
-  abort();
+  return GetGenericFiletype(rdonly_stat_);
+}
+
+
+SyncItemType SyncItem::GetScratchFiletype() const {
+  StatScratch();
+  if (scratch_stat_.error_code != 0) {
+    PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
+                 "errno: " + StringifyInt(scratch_stat_.error_code) + ")");
+    abort();
+  }
+
+  return GetGenericFiletype(scratch_stat_);
 }
 
 
