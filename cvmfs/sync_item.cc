@@ -68,7 +68,7 @@ SyncItemType SyncItem::GetScratchFiletype() const {
   StatScratch();
   if (scratch_stat_.error_code != 0) {
     PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
-                 "errno: " + StringifyInt(scratch_stat_.error_code) + ")");
+                 "(errno: " + StringifyInt(scratch_stat_.error_code) + ")");
     abort();
   }
 
