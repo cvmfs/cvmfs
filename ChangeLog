@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix rare crashes on publish due to false whiteout handling (CVM-880)
   * Fix moving of magic symlinks into nested catalogs (CVM-874)
   * Prepare OS X mount helper for osxfuse 3
   * Fix stack trace generation on OS X
