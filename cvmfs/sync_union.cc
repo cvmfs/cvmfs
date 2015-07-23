@@ -46,7 +46,7 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
-  SyncItem entry(parent_dir, dir_name, kItemDir, this);
+  SyncItem entry(parent_dir, dir_name, this, kItemDir);
 
   if (entry.IsNew()) {
     mediator_->Add(entry);
@@ -70,7 +70,7 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, kItemFile, this);
+  SyncItem entry(parent_dir, filename, this, kItemFile);
   ProcessFile(&entry);
 }
 
@@ -80,7 +80,7 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
-  SyncItem entry(parent_dir, link_name, kItemSymlink, this);
+  SyncItem entry(parent_dir, link_name, this, kItemSymlink);
   ProcessFile(&entry);
 }
 
@@ -115,7 +115,7 @@ void SyncUnion::ProcessFile(SyncItem *entry) {
 void SyncUnion::EnterDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, kItemDir, this);
+  SyncItem entry(parent_dir, dir_name, this, kItemDir);
   mediator_->EnterDirectory(entry);
 }
 
@@ -123,7 +123,7 @@ void SyncUnion::EnterDirectory(const string &parent_dir,
 void SyncUnion::LeaveDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, kItemDir, this);
+  SyncItem entry(parent_dir, dir_name, this, kItemDir);
   mediator_->LeaveDirectory(entry);
 }
 
@@ -301,7 +301,7 @@ void SyncUnionOverlayfs::ProcessFileHardlinkCallback(const string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessFileHardlinkCallback(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, kItemFile, this);
+  SyncItem entry(parent_dir, filename, this, kItemFile);
   if (entry.GetRdOnlyLinkcount() > 1) {
     if (hardlink_lower_inode_ == entry.GetRdOnlyInode()) {
       LogCvmfs(kLogUnionFs, kLogDebug,
