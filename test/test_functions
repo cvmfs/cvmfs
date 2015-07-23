@@ -274,7 +274,7 @@ cvmfs_umount() {
   local repositories=$1
   local times=5
   local result=-1
-  
+
   for r in $(echo $repositories | tr , " "); do
     while (( result != 0 && times > 0  )); do
       sudo umount /cvmfs/$r > /dev/null 2>&1
@@ -285,7 +285,7 @@ cvmfs_umount() {
         sleep 1
       fi
     done
-    
+
     if [ $result -ne 0 ]; then
       lsof /cvmfs/$r
       return 200
@@ -1386,13 +1386,13 @@ setup_benchmark_environment() {
   local me=$(whoami)
   mkdir -p "$CVMFS_OPT_OUTPUT_DIR/$FQRN"
   mkdir -p $workspace/cache
-  
+
   # make sure the user can execute /bin/fusermount, write into /dev/fuse and write into /cvmfs/<repo>
   sudo chmod 666 /dev/fuse
   sudo chmod 4755 /bin/fusermount
   sudo mkdir -p /cvmfs/$FQRN
   sudo chown $me /cvmfs/$FQRN
-  
+
   # mtab trick
   if [ ! -h /etc/mtab ]; then
     sudo sh -c "mv /etc/mtab /etc/mtab.save"
@@ -1511,7 +1511,7 @@ execute_statistics_loop() {
     if [ x"$CVMFS_OPT_WARM_CACHE" != x"yes" ]; then
       clean_benchmark_cache
     fi
-    
+
     cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
     PID=$!
     wait_fqrn_mount
@@ -1556,7 +1556,7 @@ execute_benchmark_loop() {
   local iteration=1
   local code=0
   local count=$CVMFS_OPT_ITERATIONS
-  
+
   valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
   PID=$!
   wait_fqrn_mount
@@ -1572,7 +1572,7 @@ execute_benchmark_loop() {
     count=$(( count - 1 ))
     iteration=$(( iteration + 1 ))
   done
-  
+
   create_info_file
 
   if [ "$code" -ne 0 ]; then
@@ -1580,7 +1580,7 @@ execute_benchmark_loop() {
     benchmark_log $(lsof /cvmfs/${FQRN})
     exit 100
   fi
-  
+
   benchmark_log "Iterations finished. Unmounting cvmfs"
   cvmfs_umount $FQRN
   wait $PID
@@ -1730,4 +1730,38 @@ export_xunit_xml() {
     xunit_testcase "$xml_file" "$testcase" "$logfile"
   done
   xunit_epilogue "$xml_file"
+}
+
+
+get_cache_directory() {
+  local mountpoint="$1"
+  echo "${mountpoint}c"
+}
+
+do_local_mount() {
+  local mountpoint="$1"
+  local repo_name="$2"
+  local repo_url="$3"
+  local cache="$(get_cache_directory $mountpoint)"
+  local config="$(mktemp ${mountpoint}.XXXXX.conf)"
+  local output="$(mktemp ${mountpoint}.XXXXX.log)"
+
+  mkdir $mountpoint $cache
+  cat > $config << EOF
+CVMFS_CACHE_BASE=$cache
+CVMFS_RELOAD_SOCKETS=$cache
+CVMFS_SERVER_URL=$repo_url
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${repo_name}.pub
+CVMFS_KCACHE_TIMEOUT=15
+EOF
+  cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
+}
+
+remove_local_mount() {
+  local mountpoint="$1"
+  local cache="$(get_cache_directory $mountpoint)"
+
+  sudo umount $mountpoint
+  rm -fR $cache $mountpoint
 }

@@ -105,8 +105,8 @@ class T_Catalog : public ::testing::Test {
     catalog::DirectoryEntryTestFactory::Metadata metadata;
     metadata.name       = name;
     metadata.mode       = mode | S_IRWXU;  // file permissions/mode
-    metadata.uid        = 0;
-    metadata.gid        = 0;
+    metadata.uid        = getuid();
+    metadata.gid        = getgid();
     metadata.size       = 4 * 1024;
     metadata.mtime      = IsoTimestamp2UtcTime("2015-06-19T09:10:18Z");
     metadata.symlink    = symlink;

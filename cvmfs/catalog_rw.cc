@@ -377,7 +377,9 @@ void WritableCatalog::MoveToNestedRecursively(
   // After creating a new nested catalog we have to move all elements
   // now contained by the new one.  List and move them recursively.
   DirectoryEntryList listing;
-  bool retval = ListingPath(PathString(directory), &listing);
+  const bool resolve_magic_symlinks = false;
+  bool retval = ListingPath(PathString(directory), &listing,
+                            resolve_magic_symlinks);
   assert(retval);
 
   // Go through the listing
