@@ -2564,10 +2564,11 @@ add_replica() {
   local owner
   local silence_httpd_warning=0
   local enable_auto_gc=0
+  local s3_config
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:w:az" option
+  while getopts "o:u:n:w:azs:" option
   do
     case $option in
       u)
@@ -2587,6 +2588,9 @@ add_replica() {
       ;;
       z)
         enable_auto_gc=1
+      ;;
+      s)
+        s3_config=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2622,8 +2626,17 @@ add_replica() {
   fi
 
   # upstream generation (defaults to local upstream)
+  local stratum1=""
   if [ x"$upstream" = x"" ]; then
-    upstream=$(make_local_upstream $alias_name)
+    if [ x"$s3_config" != x"" ]; then
+      [ x"$stratum1_url" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
+      upstream=$(make_s3_upstream $alias_name $s3_config)
+      stratum1=$(mangle_s3_cvmfs_url $alias_name "$stratum1_url")
+    else
+      upstream=$(make_local_upstream $alias_name)
+      stratum1="http://localhost/cvmfs/${alias_name}"
+      [ ! -z "$stratum1_url" ] && stratum1="$stratum1_url"
+    fi
   fi
 
   # additional configuration
@@ -2632,8 +2645,6 @@ add_replica() {
   local temp_dir="${spool_dir}/tmp"
   local storage_dir=""
   is_local_upstream $upstream && storage_dir=$(get_upstream_config $upstream)
-  local stratum1="http://localhost/cvmfs/${alias_name}"
-  [ ! -z "$stratum1_url" ] && stratum1="$stratum1_url"
 
   # additional sanity checks
   is_root || die "Only root can create a new repository"
