@@ -1352,7 +1352,7 @@ EOF
 clean_benchmark_cache() {
   local cachedir="${CVMFS_OPT_CACHEDIR}/${FQRN}"
   if [ -d "$cachedir" ] && [ "x$cachedir" != x ]; then
-  list=$(ls '$cachedir' | grep -P "^[0-9a-f]{2}$")
+  list=$(ls $cachedir | grep -P "^[0-9a-f]{2}$")
     for dir in $list; do
       rm -f "$cachedir/$dir"/*
     done
@@ -1365,7 +1365,7 @@ clean_benchmark_cache() {
 set_valgrind_options() {
   local option="$1"
   local CVMFS_OPT_CALLGRIND="--tool=callgrind --dump-before=fuse_session_loop_mt --dump-after=fuse_session_loop_mt --dsymutil=yes --log-file=${FQRN}.callgrind.log -v"
-  local CVMFS_OPT_MEMCHECK="--tool=memcheck --xml=yes --xml-file=${FQRN}.memcheck.xml --trace-children=yes --child-silent-after-fork=yes --leak-check=yes --log-file=${FQRN}.memcheck.log -v"
+  local CVMFS_OPT_MEMCHECK="--tool=memcheck --xml=yes --xml-file=${FQRN}.memcheck.xml --leak-check=yes --log-file=${FQRN}.memcheck.log -v"
   OPTIONS=""
   case $option in
     callgrind)
