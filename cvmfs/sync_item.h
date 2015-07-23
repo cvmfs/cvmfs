@@ -60,6 +60,9 @@ class SyncItem {
   inline bool WasSymlink()      const { return WasType(kItemSymlink);         }
   inline bool IsNew()           const { return WasType(kItemNew);             }
 
+  // TODO(reneme): code smell! This depends on the UnionEngine to call
+  //                           MarkAsWhiteout(), before it potentially gives the
+  //                           wrong result!
   inline bool IsWhiteout()      const { return whiteout_;                     }
   inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog";  }
   bool IsOpaqueDirectory() const;
