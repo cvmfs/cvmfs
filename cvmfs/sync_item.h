@@ -139,7 +139,7 @@ class SyncItem {
   inline void StatUnion(const bool refresh = false) const {
     StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  inline void StatOverlay(const bool refresh = false) const {
+  inline void StatScratch(const bool refresh = false) const {
     StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
   }
   static void StatGeneric(const std::string  &path,
