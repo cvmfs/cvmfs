@@ -1655,11 +1655,11 @@ make_s3_upstream() {
   make_upstream "S3" "/tmp" "${repo_name}@${s3_config}"
 }
 
-mangle_s3_stratum0_url() {
+mangle_s3_cvmfs_url() {
   local repo_name=$1
-  local s3_stratum0_url="$2"
-  [ $(echo -n "$s3_stratum0_url" | tail -c1) = "/" ] || s3_stratum0_url="${s3_stratum0_url}/"
-  echo "${s3_stratum0_url}${repo_name}"
+  local s3_url="$2"
+  [ $(echo -n "$s3_url" | tail -c1) = "/" ] || s3_url="${s3_url}/"
+  echo "${s3_url}${repo_name}"
 }
 
 
@@ -2418,7 +2418,7 @@ mkfs() {
     if [ x"$s3_config" != x"" ]; then
       [ x"$stratum0" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
       upstream=$(make_s3_upstream $name $s3_config)
-      stratum0=$(mangle_s3_stratum0_url $name "$stratum0")
+      stratum0=$(mangle_s3_cvmfs_url $name "$stratum0")
     else
       upstream=$(make_local_upstream $name)
       [ x"$stratum0" = x"" ] && stratum0="http://localhost/cvmfs/$name"
