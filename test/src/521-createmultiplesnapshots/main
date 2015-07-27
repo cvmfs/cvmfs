@@ -237,6 +237,15 @@ produce_last_files_in() {
   popdir
 }
 
+check_stratum1_tmp_dir_emptiness() {
+  local tmp_dir="$1"
+  local tmp_dir_entries
+  echo "check stratum1 tmp directory"
+  tmp_dir_entries=$(ls $tmp_dir | wc -l)
+  echo "$tmp_dir contains: $tmp_dir_entries"
+  [ $tmp_dir_entries -eq 0 ]
+}
+
 desaster_cleanup() {
   local mountpoint=$1
   local replica_name=$2
@@ -287,8 +296,17 @@ cvmfs_run_test() {
                   /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
     || { desaster_cleanup $mnt_point $replica_name; return 7; }
 
+  echo -n "get Stratum 1 spool directory: "
+  load_repo_config $replica_name
+  local s1_spool_tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  load_repo_config $CVMFS_TEST_REPO
+  echo "$s1_spool_tmp_dir"
+
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 9; }
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || { desaster_cleanup $mnt_point $replica_name; return 101; }
 
   echo "mount the Stratum1 repository on a local mountpoint"
   mkdir $mnt_point cache
@@ -326,6 +344,9 @@ EOF
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 17; }
 
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || { desaster_cleanup $mnt_point $replica_name; return 102; }
+
   echo "remount the replica"
   cvmfs2 -d -o config=private.conf test.cern.ch $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 18; }
 
@@ -353,6 +374,9 @@ EOF
 
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 25; }
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || { desaster_cleanup $mnt_point $replica_name; return 103; }
 
   echo "remount the replica"
   cvmfs2 -d -o config=private.conf test.cern.ch $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 26; }
