@@ -4370,10 +4370,12 @@ snapshot() {
     fi
 
     # put a magic file in the repository root to signal a snapshot in progress
-    $user_shell "date > ${spool_dir}/tmp/snapshotting"
+    local snapshotting_tmp="${spool_dir}/tmp/snapshotting"
+    $user_shell "date > $snapshotting_tmp"
     $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
-      -i ${spool_dir}/tmp/snapshotting \
+      -i $snapshotting_tmp                                 \
       -o .cvmfs_is_snapshotting"
+    $user_shell "rm -f $snapshotting_tmp"
 
     # do the actual snapshot actions
     local with_history=""
@@ -4387,10 +4389,12 @@ snapshot() {
         -t $timeout                                    \
         -a $retries $with_history $log_level"
 
-    $user_shell "date --utc > ${spool_dir}/tmp/last_snapshot"
+    local last_snapshot_tmp="${spool_dir}/tmp/last_snapshot"
+    $user_shell "date --utc > $last_snapshot_tmp"
     $user_shell "$(__swissknife_cmd) upload -r ${upstream} \
-      -i ${spool_dir}/tmp/last_snapshot                    \
+      -i $last_snapshot_tmp                                \
       -o .cvmfs_last_snapshot"
+    $user_shell "rm -f $last_snapshot_tmp"
 
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $alias_name; then
