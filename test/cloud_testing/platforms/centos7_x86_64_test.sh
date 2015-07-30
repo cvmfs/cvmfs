@@ -43,14 +43,6 @@ CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
                               || retval=1
 
 
-echo "running CernVM-FS server test cases..."
-CVMFS_TEST_SERVER_CACHE="$custom_cache_dir"                                   \
-CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
-./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
-                                 src/5*                                       \
-                              || retval=1
-
-
 echo "running CernVM-FS migration test cases..."
 CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
 ./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
