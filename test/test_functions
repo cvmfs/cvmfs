@@ -1743,8 +1743,8 @@ do_local_mount() {
   local repo_name="$2"
   local repo_url="$3"
   local cache="$(get_cache_directory $mountpoint)"
-  local config="$(mktemp ${mountpoint}.XXXXX.conf)"
-  local output="$(mktemp ${mountpoint}.XXXXX.log)"
+  local config="$(mktemp ${mountpoint}.conf.XXXXX)"
+  local output="$(mktemp ${mountpoint}.log.XXXXX)"
 
   mkdir $mountpoint $cache
   cat > $config << EOF
