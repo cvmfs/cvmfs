@@ -3,6 +3,7 @@
 import cvmfs
 import sys
 import os
+import urllib
 
 class MerkleCatalogTreeIterator(cvmfs.CatalogTreeIterator):
     def __init__(self, repository, root_catalog, visited_hashes = set()):
@@ -30,8 +31,10 @@ if len(sys.argv) < 3 or len(sys.argv) > 4:
     usage()
     sys.exit(1)
 
-dest  = sys.argv[2] + "/data"
-repo  = cvmfs.open_repository(sys.argv[1])
+main_folder = sys.argv[2]
+dest  = main_folder + "/data"
+url = sys.argv[1]
+repo  = cvmfs.open_repository(url)
 depth = sys.argv[3] if len(sys.argv) == 4 else 0
 
 try:
@@ -41,6 +44,14 @@ except ValueError, e:
     print
     print "<history depth> needs to be an integer"
     sys.exit(1)
+
+# download the .cvmfspublished file first
+try:
+    urllib.URLopener().retrieve(url + "/.cvmfspublished", main_folder + "/.cvmfspublished")
+except ValueError, e:
+    usage()
+    print
+    print "<repo url> does not contain .cvmfspublished file"
 
 try:
     os.mkdir(dest, 0755)
