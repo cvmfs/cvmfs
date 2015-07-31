@@ -78,7 +78,7 @@ install_from_repo rubygems
 install_from_repo java
 
 # install ruby gem for FakeS3
-install_ruby_gem fakes3
+install_ruby_gem fakes3 0.2.0  # latest is 0.2.1 (23.07.2015) that didn't work.
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

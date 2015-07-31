@@ -7,6 +7,8 @@
  * the SQlite file once opened.  It works purely on the file descriptor.
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include "cvmfs_config.h"
 #include "sqlitevfs.h"
 
@@ -25,7 +27,9 @@
 #include <cstring>
 #include <ctime>
 
+#include "cache.h"
 #include "duplex_sqlite3.h"
+#include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
 #include "statistics.h"
@@ -44,7 +48,8 @@ const char *kVfsName = "cvmfs-readonly";
  */
 struct VfsRdOnly {
   VfsRdOnly()
-    : n_access(NULL)
+    : cache_mgr(NULL)
+    , n_access(NULL)
     , no_open(NULL)
     , n_rand(NULL)
     , sz_rand(NULL)
@@ -54,6 +59,7 @@ struct VfsRdOnly {
     , sz_sleep(NULL)
     , n_time(NULL)
   { }
+  cache::CacheManager *cache_mgr;
   perf::Counter *n_access;
   perf::Counter *no_open;
   perf::Counter *n_rand;
@@ -80,7 +86,7 @@ struct VfsRdOnlyFile {
 
 static int VfsRdOnlyClose(sqlite3_file *pFile) {
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
-  int retval = close(p->fd);
+  int retval = p->vfs_rdonly->cache_mgr->Close(p->fd);
   if (retval == 0) {
     perf::Dec(p->vfs_rdonly->no_open);
     return SQLITE_OK;
@@ -100,7 +106,7 @@ static int VfsRdOnlyRead(
   sqlite_int64 iOfst
 ) {
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
-  ssize_t got = pread(p->fd, zBuf, iAmt, iOfst);
+  ssize_t got = p->vfs_rdonly->cache_mgr->Pread(p->fd, zBuf, iAmt, iOfst);
   perf::Inc(p->vfs_rdonly->n_read);
   if (got == iAmt) {
     perf::Xadd(p->vfs_rdonly->sz_read, iAmt);
@@ -204,7 +210,8 @@ static int VfsRdOnlyDeviceCharacteristics(
 
 
 /**
- * Supports only read-only opens.
+ * Supports only read-only opens.  The "file name" has to be in the form of
+ * '@<file descriptor>', where file descriptor is usable by the cache manager.
  */
 static int VfsRdOnlyOpen(
   sqlite3_vfs *vfs,
@@ -230,6 +237,8 @@ static int VfsRdOnlyOpen(
   };
 
   VfsRdOnlyFile *p = reinterpret_cast<VfsRdOnlyFile *>(pFile);
+  cache::CacheManager *cache_mgr =
+    reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->cache_mgr;
   // Prevent xClose from being called in case of errors
   p->base.pMethods = NULL;
 
@@ -240,19 +249,29 @@ static int VfsRdOnlyOpen(
   if (flags & SQLITE_OPEN_EXCLUSIVE)
     return SQLITE_IOERR;
 
-  p->fd = open(zName, O_RDONLY);
+  assert(zName && (zName[0] == '@'));
+  p->fd = String2Int64(string(&zName[1]));
   if (p->fd < 0)
     return SQLITE_IOERR;
-  platform_stat64 info;
-  int retval = platform_fstat(p->fd, &info);
-  if (retval != 0)
+  int64_t size = cache_mgr->GetSize(p->fd);
+  if (size < 0) {
+    cache_mgr->Close(p->fd);
+    p->fd = -1;
     return SQLITE_IOERR_FSTAT;
-  p->size = info.st_size;
+  }
+  if (cache_mgr->Readahead(p->fd) != 0) {
+    cache_mgr->Close(p->fd);
+    p->fd = -1;
+    return SQLITE_IOERR;
+  }
+  p->size = static_cast<uint64_t>(size);
   if (pOutFlags)
     *pOutFlags = flags;
   p->vfs_rdonly = reinterpret_cast<VfsRdOnly *>(vfs->pAppData);
   p->base.pMethods = &io_methods;
   perf::Inc(p->vfs_rdonly->no_open);
+  LogCvmfs(kLogSql, kLogDebug, "open sqlite3 catalog on fd %d, size %"PRIu64,
+           p->fd, p->size);
   return SQLITE_OK;
 }
 
@@ -284,7 +303,7 @@ static int VfsRdOnlyAccess(
     return SQLITE_OK;
   }
 
-  int amode = 0;
+  /*int amode = 0;
   switch (flags) {
     case SQLITE_ACCESS_EXISTS:
       amode = F_OK;
@@ -295,7 +314,9 @@ static int VfsRdOnlyAccess(
     default:
       assert(false);
   }
-  *pResOut = (access(zPath, amode) == 0);
+  *pResOut = (access(zPath, amode) == 0);*/
+  // This VFS deals with file descriptors, we know the files are there
+  *pResOut = 0;
   perf::Inc(reinterpret_cast<VfsRdOnly *>(vfs->pAppData)->n_access);
   return SQLITE_OK;
 }
@@ -416,6 +437,7 @@ static int VfsRdOnlyGetLastError(
  * Can only be registered once.
  */
 bool RegisterVfsRdOnly(
+  cache::CacheManager *cache_mgr,
   perf::Statistics *statistics,
   const VfsOptions options)
 {
@@ -452,6 +474,7 @@ bool RegisterVfsRdOnly(
     return false;
   }
 
+  vfs_rdonly->cache_mgr = cache_mgr;
   vfs_rdonly->n_access =
     statistics->Register("sqlite.n_access", "overall number of access() calls");
   vfs_rdonly->no_open =

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 usage() {
   echo "$0 <logfile> [-o xUnit XML output] [-x <exclusion list> --] [test list]"
@@ -211,13 +211,13 @@ do
 
   # run the test
   test_start=$(get_millisecond_epoch)
-  sh $debug -c ". ./test_functions                     && \
-                . $t/main                              && \
-                cd $workdir                            && \
-                cvmfs_run_test $logfile $(pwd)/${t}    && \
-                retval=\$?                             && \
-                retval=\$(mangle_test_retval \$retval) && \
-                exit \$retval" >> $logfile 2>&1
+  bash $debug -c ". ./test_functions                     && \
+                  . $t/main                              && \
+                  cd $workdir                            && \
+                  cvmfs_run_test $logfile $(pwd)/${t}    && \
+                  retval=\$?                             && \
+                  retval=\$(mangle_test_retval \$retval) && \
+                  exit \$retval" >> $logfile 2>&1
   RETVAL=$?
   test_end=$(get_millisecond_epoch)
   test_time_elapsed=$(( ( $test_end - $test_start ) ))

@@ -818,7 +818,6 @@ TYPED_TEST(T_History, GetHashes) {
         TagVectorItr j    = dummy_tags.begin();
   const TagVectorItr jend = dummy_tags.end();
         std::vector<shash::Any>::const_iterator k    = hashes.begin();
-  const std::vector<shash::Any>::const_iterator kend = hashes.end();
   ASSERT_EQ(dummy_tags.size(), hashes.size());
   for (; j != jend; ++j, ++k) {
     EXPECT_EQ(j->root_hash, *k);
@@ -880,7 +879,6 @@ TYPED_TEST(T_History, GetHashesWithDuplicates) {
         TagVectorItr j    = dummy_tags.begin();
   const TagVectorItr jend = dummy_tags.end();
         std::vector<shash::Any>::const_iterator k    = hashes.begin();
-  const std::vector<shash::Any>::const_iterator kend = hashes.end();
   ASSERT_EQ(dummy_count + 1, hashes.size());
   for (; j != jend; ++j, ++k) {
     EXPECT_EQ(j->root_hash, *k);

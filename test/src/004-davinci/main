@@ -28,7 +28,7 @@ cvmfs_run_test() {
   echo "All catalogs: $all_catalogs"
   sudo cvmfs_talk -i lhcb.cern.ch internal affairs || return 9
 
-  check_memory lhcb.cern.ch 60000
+  check_memory lhcb.cern.ch 65000
  
   return 0
 }

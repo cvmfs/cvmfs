@@ -21,7 +21,8 @@ enum SyncItemType {
   kItemDir,
   kItemFile,
   kItemSymlink,
-  kItemNew
+  kItemNew,
+  kItemUnknown
 };
 
 
@@ -46,21 +47,25 @@ class SyncItem {
    *  @param entryType well...
    */
   SyncItem();  // TODO(rmeusel): Remove
-  SyncItem(const std::string &relative_parent_path,
-           const std::string &filename,
-           const SyncItemType entry_type,
-           const SyncUnion *union_engine);
+  SyncItem(const std::string  &relative_parent_path,
+           const std::string  &filename,
+           const SyncUnion    *union_engine,
+           const SyncItemType  entry_type = kItemUnknown);
 
-  inline bool IsDirectory()     const { return scratch_type_ == kItemDir;     }
-  inline bool WasDirectory()    const { return rdonly_type_  == kItemDir;     }
-  inline bool IsRegularFile()   const { return scratch_type_ == kItemFile;    }
-  inline bool WasRegularFile()  const { return rdonly_type_  == kItemFile;    }
-  inline bool IsSymlink()       const { return scratch_type_ == kItemSymlink; }
-  inline bool WasSymlink()      const { return rdonly_type_  == kItemSymlink; }
+  inline bool IsDirectory()     const { return IsType(kItemDir);              }
+  inline bool WasDirectory()    const { return WasType(kItemDir);             }
+  inline bool IsRegularFile()   const { return IsType(kItemFile);             }
+  inline bool WasRegularFile()  const { return WasType(kItemFile);            }
+  inline bool IsSymlink()       const { return IsType(kItemSymlink);          }
+  inline bool WasSymlink()      const { return WasType(kItemSymlink);         }
+  inline bool IsNew()           const { return WasType(kItemNew);             }
+
+  // TODO(reneme): code smell! This depends on the UnionEngine to call
+  //                           MarkAsWhiteout(), before it potentially gives the
+  //                           wrong result!
   inline bool IsWhiteout()      const { return whiteout_;                     }
   inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog";  }
   bool IsOpaqueDirectory() const;
-  bool IsNew() const { return rdonly_type_ == kItemNew; }
 
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
@@ -101,6 +106,21 @@ class SyncItem {
 
  protected:
   SyncItemType GetRdOnlyFiletype() const;
+  SyncItemType GetScratchFiletype() const;
+
+  inline bool IsType(const SyncItemType expected_type) const {
+    if (scratch_type_ == kItemUnknown) {
+      scratch_type_ = GetScratchFiletype();
+    }
+    return scratch_type_ == expected_type;
+  }
+
+  inline bool WasType(const SyncItemType expected_type) const {
+    if (rdonly_type_ == kItemUnknown) {
+      rdonly_type_ = GetRdOnlyFiletype();
+    }
+    return rdonly_type_ == expected_type;
+  }
 
  private:
   /**
@@ -111,10 +131,20 @@ class SyncItem {
       memset(&stat, 0, sizeof(stat));
     }
 
+    inline SyncItemType GetSyncItemType() const {
+      assert(obtained);
+      if (S_ISDIR(stat.st_mode)) return kItemDir;
+      if (S_ISREG(stat.st_mode)) return kItemFile;
+      if (S_ISLNK(stat.st_mode)) return kItemSymlink;
+      return kItemUnknown;
+    }
+
     bool obtained;   /**< false at the beginning, true after first stat call */
     int error_code;  /**< errno value of the stat call */
     platform_stat64 stat;
   };
+
+  SyncItemType GetGenericFiletype(const EntryStat &stat) const;
 
   const SyncUnion *union_engine_;
 
@@ -126,8 +156,8 @@ class SyncItem {
   std::string relative_parent_path_;
   std::string filename_;
 
-  SyncItemType scratch_type_;
-  SyncItemType rdonly_type_;
+  mutable SyncItemType scratch_type_;
+  mutable SyncItemType rdonly_type_;
 
   // The hash of regular file's content
   shash::Any content_hash_;
@@ -139,7 +169,7 @@ class SyncItem {
   inline void StatUnion(const bool refresh = false) const {
     StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  inline void StatOverlay(const bool refresh = false) const {
+  inline void StatScratch(const bool refresh = false) const {
     StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
   }
   static void StatGeneric(const std::string  &path,

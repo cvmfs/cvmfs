@@ -23,12 +23,12 @@ class FileSandbox:
     def write_to_temporary(self, string_buffer):
         """ stores the provided content into a /tmp path that is returned """
         filename = None
-        with tempfile.NamedTemporaryFile(mode='w+b',
-                                         prefix=self.file_prefix,
-                                         dir=self.temporary_dir,
-                                         delete=False) as f:
-            filename = f.name
-            f.write(string_buffer)
+        tmp_file_tuple = tempfile.mkstemp(prefix=self.file_prefix,
+                                          dir=self.temporary_dir)
+        tmp_fd   = tmp_file_tuple[0]
+        filename = tmp_file_tuple[1]
+        os.write(tmp_fd, string_buffer)
+        os.close(tmp_fd)
         return filename
 
 
@@ -42,5 +42,6 @@ class FileSandbox:
         full_file_path = os.path.join(self.temporary_dir, file_path)
         if os.path.isfile(full_file_path):
             os.unlink(full_file_path)
-        with open(full_file_path, "w+") as f:
-            f.write(string_buffer)
+        f = open(full_file_path, "w+")
+        f.write(string_buffer)
+        f.close()

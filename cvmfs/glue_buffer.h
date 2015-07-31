@@ -400,6 +400,8 @@ class InodeReferences {
  */
 class InodeTracker {
  public:
+  // Cannot be moved to the statistics manager because it has to survive
+  // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics() {
       atomic_init64(&num_inserts);

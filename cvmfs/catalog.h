@@ -114,9 +114,6 @@ class Catalog : public SingleCopy {
 
   bool OpenDatabase(const std::string &db_path);
 
-  bool LookupInode(const inode_t inode,
-                   DirectoryEntry *dirent,
-                   shash::Md5 *parent_md5path) const;
   bool LookupMd5Path(const shash::Md5 &md5path, DirectoryEntry *dirent) const;
   inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const {
     return LookupMd5Path(shash::Md5(path.GetChars(), path.GetLength()), dirent);
@@ -129,12 +126,14 @@ class Catalog : public SingleCopy {
   }
 
   bool ListingMd5Path(const shash::Md5 &md5path,
-                      DirectoryEntryList *listing) const;
+                      DirectoryEntryList *listing,
+                      const bool expand_symlink = true) const;
   inline bool ListingPath(const PathString &path,
-                      DirectoryEntryList *listing) const
+                          DirectoryEntryList *listing,
+                          const bool expand_symlink = true) const
   {
     return ListingMd5Path(shash::Md5(path.GetChars(), path.GetLength()),
-                          listing);
+                          listing, expand_symlink);
   }
   bool ListingMd5PathStat(const shash::Md5 &md5path,
                           StatEntryList *listing) const;

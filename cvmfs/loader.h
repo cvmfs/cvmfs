@@ -91,6 +91,7 @@ enum StateId {
   kStateGlueBufferV3,       // >= 2.1.15
   kStateGlueBufferV4,       // >= 2.1.20
   kStateOpenFilesV2,        // >= 2.1.20
+  kStateOpenFilesV3,        // >= 2.2.0
 };
 
 
@@ -132,14 +133,19 @@ typedef std::vector<LoadEvent *> EventList;
  * Note: Do not forget to check the version of LoaderExports in cvmfs.cc when
  *       using fields that were not present in version 1
  *
- * CernVM-FS 2.1.8  --> Version 2
- * CernVM-FS 2.1.21 --> Version 3
+ * CernVM-FS 2.1.8 --> Version 2
+ * CernVM-FS 2.2.0 --> Version 3
  */
 struct LoaderExports {
   LoaderExports() :
     version(3),
     size(sizeof(LoaderExports)), boot_time(0), foreground(false),
     disable_watchdog(false), simple_options_parsing(false) {}
+
+  ~LoaderExports() {
+    for (unsigned i = 0; i < history.size(); ++i)
+      delete history[i];
+  }
 
   uint32_t version;
   uint32_t size;
@@ -156,7 +162,7 @@ struct LoaderExports {
   // added with CernVM-FS 2.1.8 (LoaderExports Version: 2)
   bool disable_watchdog;
 
-  // added with CernVM-FS 2.1.21 (LoaderExports Version: 3)
+  // added with CernVM-FS 2.2.0 (LoaderExports Version: 3)
   bool simple_options_parsing;
 };
 

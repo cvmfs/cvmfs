@@ -212,37 +212,6 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
 
 /**
- * Performs a lookup on this Catalog for a given inode
- * @param inode the inode to perform the lookup for
- * @param dirent this will be set to the found entry
- * @param parent_md5path this will be set to the hash of the parent path
- * @return true if lookup was successful, false otherwise
- */
-bool Catalog::LookupInode(const inode_t inode, DirectoryEntry *dirent,
-                          shash::Md5 *parent_md5path) const
-{
-  assert(IsInitialized());
-
-  pthread_mutex_lock(lock_);
-  sql_lookup_inode_->BindRowId(GetRowIdFromInode(inode));
-  const bool found = sql_lookup_inode_->FetchRow();
-
-  // Retrieve the DirectoryEntry if needed
-  if (found && (dirent != NULL))
-      *dirent = sql_lookup_inode_->GetDirent(this);
-
-  // Retrieve the path_hash of the parent path if needed
-  if (parent_md5path != NULL)
-      *parent_md5path = sql_lookup_inode_->GetParentPathHash();
-
-  sql_lookup_inode_->Reset();
-  pthread_mutex_unlock(lock_);
-
-  return found;
-}
-
-
-/**
  * Performs a lookup on this Catalog for a given MD5 path hash.
  * @param md5path the MD5 hash of the searched path
  * @param expand_symlink indicates if variables in symlink should be resolved
@@ -347,17 +316,19 @@ bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
  * Returns only struct stat values
  * @param path_hash the MD5 hash of the path of the directory to list
  * @param listing will be set to the resulting DirectoryEntryList
+ * @param expand_symlink defines if magic symlinks should be resolved
  * @return true on successful listing, false otherwise
  */
 bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
-                             DirectoryEntryList *listing) const
+                             DirectoryEntryList *listing,
+                             const bool expand_symlink) const
 {
   assert(IsInitialized());
 
   pthread_mutex_lock(lock_);
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
-    DirectoryEntry dirent = sql_listing_->GetDirent(this);
+    DirectoryEntry dirent = sql_listing_->GetDirent(this, expand_symlink);
     FixTransitionPoint(md5path, &dirent);
     listing->push_back(dirent);
   }

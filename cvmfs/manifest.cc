@@ -14,7 +14,6 @@ using namespace std;  // NOLINT
 
 namespace manifest {
 
-
 Manifest *Manifest::LoadMem(const unsigned char *buffer,
                             const unsigned length)
 {
@@ -182,6 +181,44 @@ bool Manifest::ExportChecksum(const string &directory, const int mode) const {
     return false;
   }
   return true;
+}
+
+
+/**
+ * Read the hash and the last-modified time stamp from the
+ * cvmfschecksum.$repository file in the given directory.
+ */
+bool Manifest::ReadChecksum(
+  const std::string &repo_name,
+  const std::string &directory,
+  shash::Any *hash,
+  uint64_t *last_modified)
+{
+  bool result = false;
+  const string checksum_path = directory + "/cvmfschecksum." + repo_name;
+  FILE *file_checksum = fopen(checksum_path.c_str(), "r");
+  char tmp[128];
+  int read_bytes;
+  if (file_checksum && (read_bytes = fread(tmp, 1, 128, file_checksum)) > 0) {
+    // Separate hash from timestamp
+    int separator_pos = 0;
+    for (; (separator_pos < read_bytes) && (tmp[separator_pos] != 'T');
+         ++separator_pos) { }
+    *hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)),
+                                shash::kSuffixCatalog);
+
+    // Get local last modified time
+    string str_modified;
+    if ((tmp[separator_pos] == 'T') && (read_bytes > (separator_pos+1))) {
+      str_modified = string(tmp+separator_pos+1,
+                            read_bytes-(separator_pos+1));
+      *last_modified = String2Uint64(str_modified);
+      result = true;
+    }
+  }
+  if (file_checksum) fclose(file_checksum);
+
+  return result;
 }
 
 }  // namespace manifest
