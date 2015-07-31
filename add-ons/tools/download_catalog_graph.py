@@ -2,6 +2,7 @@
 
 import cvmfs
 import sys
+import os
 
 class MerkleCatalogTreeIterator(cvmfs.CatalogTreeIterator):
     def __init__(self, repository, root_catalog, visited_hashes = set()):
@@ -29,7 +30,7 @@ if len(sys.argv) < 3 or len(sys.argv) > 4:
     usage()
     sys.exit(1)
 
-dest  = sys.argv[2]
+dest  = sys.argv[2] + "/data"
 repo  = cvmfs.open_repository(sys.argv[1])
 depth = sys.argv[3] if len(sys.argv) == 4 else 0
 
@@ -40,6 +41,16 @@ except ValueError, e:
     print
     print "<history depth> needs to be an integer"
     sys.exit(1)
+
+try:
+    os.mkdir(dest, 0755)
+    for i in range(0x00, 0xff + 1):
+        new_folder = "{0:#0{1}x}".format(i, 4)[2:]
+        os.mkdir(dest + "/" + new_folder, 0755)
+except ValueError, e:
+    usage()
+    print
+    print "<download destination> needs to exist and be writable"
 
 if depth == 0:
     print "Downloading entire catalog tree from " + repo.manifest.repository_name
@@ -54,7 +65,7 @@ while True:
     for catalog in MerkleCatalogTreeIterator(repo, root_clg, visited_hashes):
         if catalog.is_root():
             print "Downloading revision" , catalog.revision , "..."
-        catalog.save_to(dest + "/" + catalog.hash + "C")
+        catalog.save_to(dest + "/" + catalog.hash[:2] + "/" + catalog.hash[2:] + "C")
         repo.close_catalog(catalog)
 
     if depth > 0:
