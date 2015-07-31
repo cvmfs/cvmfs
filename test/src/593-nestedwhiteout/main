@@ -77,6 +77,32 @@ remove_directory_among_many_entries_and_rename_parent() {
   rm -fR contains_many_entries/dir
   mv contains_many_entries contains_many_entries_renamed
 
+  # On RHEL 5 this is disallowed by SELinux for some reason. I am not sure, but
+  # I suppose that is a bug of either AUFS or SELinux due to some funny labeling
+  #
+  # respective SELinux audit.log entry:
+  # type=AVC msg=audit(...:59864): avc:  denied  { associate } for
+  # pid=... comm="mv" name="contains_many_entries_renamed"
+  # scontext=system_u:object_r:unlabeled_t:s0 tcontext=system_u:object_r:fs_t:s0
+  # tclass=filesystem
+  #
+  # Instead of adding an allow-rule to the cvmfs SELinux module, I introduced
+  # this little workaround that forces SELinux to keep its voice down.
+  if [ $? -ne 0 ] && [ -f /etc/redhat-release ]; then
+    local redhat_release
+    redhat_release=$(cat /etc/redhat-release | sed -e 's/^.* \([0-9]\+\)\..*$/\1/')
+
+    if [ $redhat_release -eq 5 ]; then
+      echo "we are on RHEL 5 and SELinux is old and doddery here :o)"
+      echo -n "disabling SELinux... "
+      sudo setenforce 0 && echo "done" || echo "fail"
+      echo -n "trying again... "
+      mv contains_many_entries contains_many_entries_renamed > /dev/null 2>&1 && echo "okay" || echo "fail"
+      echo -n "enabling SELinux... "
+      sudo setenforce 1 && echo "done" || echo "fail"
+    fi
+  fi
+
   popdir
 }
 
