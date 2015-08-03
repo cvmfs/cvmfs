@@ -165,7 +165,7 @@ cvmfs_run_test() {
   TEST_592_MOUNTPOINT="$(pwd)/local_mount"
   do_local_mount "$TEST_592_MOUNTPOINT" \
                  "$CVMFS_TEST_REPO"     \
-                 "$(get_local_repo_url $CVMFS_TEST_REPO)" || return 4
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 4
 
   echo "check magic symlinks"
   check_symlinks "$TEST_592_MOUNTPOINT" || return 5
@@ -189,7 +189,7 @@ cvmfs_run_test() {
   echo "create a local mount of the created repository"
   do_local_mount "$TEST_592_MOUNTPOINT" \
                  "$CVMFS_TEST_REPO"     \
-                 "$(get_local_repo_url $CVMFS_TEST_REPO)" || return 10
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 10
 
   echo "check magic symlinks"
   check_symlinks $TEST_592_MOUNTPOINT || return 11
@@ -213,7 +213,7 @@ cvmfs_run_test() {
   echo "create a local mount of the created repository"
   do_local_mount "$TEST_592_MOUNTPOINT" \
                  "$CVMFS_TEST_REPO"     \
-                 "$(get_local_repo_url $CVMFS_TEST_REPO)" || return 16
+                 "$(get_repo_url $CVMFS_TEST_REPO)" || return 16
 
   echo "check magic symlinks"
   check_symlinks $TEST_592_MOUNTPOINT || return 17
