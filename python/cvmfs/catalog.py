@@ -328,7 +328,7 @@ class Catalog(DatabaseObject):
     def _canonicalize_path(self, path):
         if not path:
             return ""
-        return os.path.realpath(path)
+        return os.path.abspath(path)
 
 
     def _check_validity(self):
