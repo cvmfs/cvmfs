@@ -79,10 +79,11 @@ cvmfs_run_test() {
   echo sha1-hashed > /cvmfs/$CVMFS_TEST_REPO/sha1-hashed
   publish_repo $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 21; }
   sudo cvmfs_server resign $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 22; }
-  head -c8 /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished | grep rmd160
-  if [ $? -eq 0 ]; then
-    desaster_cleanup $mnt_point $replica_name; return 23;
-  fi
+
+  echo "checking if the hash algorithm was changed"
+  local manifest_url="$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"
+  echo "Manifest URL: $manifest_url"
+  [ -z $(curl "$manifest_url" | grep -e '^C.*rmd160$') ] || { desaster_cleanup $mnt_point $replica_name; return 23; }
 
   echo "replicating mixed hashes"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 24; }
