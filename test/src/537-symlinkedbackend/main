@@ -27,7 +27,7 @@ CVMFS_TEST_537_SELINUX_DISABLED=0
 cleanup() {
   echo "running cleanup..."
   [ $CVMFS_TEST_537_REPO_CREATED     -eq 0 ] || destroy_repo $CVMFS_TEST_REPO
-  [ $CVMFS_TEST_537_SELINUX_DISABLED -eq 0 ] || sudo setsebool httpd_enable_homedirs false
+  [ $CVMFS_TEST_537_SELINUX_DISABLED -eq 0 ] || sudo setenforce 1
 }
 
 cvmfs_run_test() {
@@ -58,7 +58,7 @@ cvmfs_run_test() {
   if has_selinux; then
     echo "make sure that SELinux does not interfere"
     CVMFS_TEST_537_SELINUX_DISABLED=1
-    sudo setsebool httpd_enable_homedirs true || return 6
+    sudo setenforce 0 || return 6
   fi
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
