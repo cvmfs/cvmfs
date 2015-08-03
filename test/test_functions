@@ -559,12 +559,12 @@ create_stratum1() {
   shift 4
   local additional_parameters="$*"
   local s3_config=""
-  # TODO: Re-enable this as soon as Stratum1 is supported
-  #       with an S3 backend
-  # if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
-  #   echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
-  #   s3_config=" -s $CVMFS_TEST_S3_CONFIG"
-  # fi
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    local stratum1_url=$(get_repo_url $replica_name)
+    echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
+    echo "  Stratum1:  $stratum1_url"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url"
+  fi
   sudo cvmfs_server add-replica -o $CVMFS_TEST_USER    \
                                 -n $replica_name       \
                                 -a                     \
