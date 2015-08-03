@@ -570,7 +570,8 @@ create_stratum1() {
   local additional_parameters="$*"
   local s3_config=""
   if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
-    local stratum1_url=$(get_repo_url $replica_name)
+    local stratum1_url="$CVMFS_TEST_HTTP_BASE"
+    [ ! -z "$stratum1_url" ] || die "\$CVMFS_TEST_HTTP_BASE needs to be set for S3 tests to work!"
     echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
     echo "  Stratum1:  $stratum1_url"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url"
