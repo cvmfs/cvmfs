@@ -139,15 +139,7 @@ cvmfs_run_test() {
   check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || { desaster_cleanup $mnt_point $replica_name; return 101; }
 
   echo "mount the Stratum1 repository on a local mountpoint"
-  mkdir $mnt_point cache
-  cat > private.conf << EOF
-CVMFS_CACHE_BASE=$(pwd)/cache
-CVMFS_RELOAD_SOCKETS=$(pwd)/cache
-CVMFS_SERVER_URL=http://127.0.0.1/cvmfs/$replica_name
-CVMFS_HTTP_PROXY=DIRECT
-CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
-EOF
-  cvmfs2 -d -o config=private.conf test.cern.ch $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 10; }
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 10; }
 
   echo "check if the Stratum1 repository contains exactly the same as the reference copy"
   compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 11; }
