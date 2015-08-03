@@ -16,7 +16,7 @@ CVMFS_TEST_538_S1_NAME=
 CVMFS_TEST_538_MOUNTPOINT=
 cleanup() {
   echo "running cleanup..."
-  [ $CVMFS_TEST_538_SELINUX_DISABLED -eq 0 ] || sudo setsebool httpd_enable_homedirs false
+  [ $CVMFS_TEST_538_SELINUX_DISABLED -eq 0 ] || sudo setenforce 1
   [ -z $CVMFS_TEST_538_S1_NAME ]             || sudo cvmfs_server rmfs -f $CVMFS_TEST_538_S1_NAME
   [ -z $CVMFS_TEST_538_MOUNTPOINT ]          || sudo umount $CVMFS_TEST_538_MOUNTPOINT
 }
@@ -74,7 +74,7 @@ cvmfs_run_test() {
   if has_selinux; then
     echo "make sure that SELinux does not interfere"
     CVMFS_TEST_538_SELINUX_DISABLED=1
-    sudo setsebool httpd_enable_homedirs true || return 16
+    sudo setenforce 0 || return 16
   fi
 
   echo "create Stratum1 repository on the same machine"
