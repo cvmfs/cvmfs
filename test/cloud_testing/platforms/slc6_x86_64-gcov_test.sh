@@ -111,7 +111,7 @@ CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
 # if [ $s3_retval -eq 0 ]; then
 #   echo "running CernVM-FS server test cases against FakeS3..."
 #   CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                                      \
-#   CVMFS_TEST_STRATUM0=$FAKE_S3_URL                                          \
+#   CVMFS_TEST_HTTP_BASE=$FAKE_S3_URL                                         \
 #   CVMFS_TEST_SERVER_CACHE='/srv/cache'                                      \
 #   CVMFS_TEST_CLASS_NAME=S3ServerIntegrationTests                            \
 #   ./run.sh $TEST_S3_LOGFILE -o ${TEST_S3_LOGFILE}${XUNIT_OUTPUT_SUFFIX}     \
