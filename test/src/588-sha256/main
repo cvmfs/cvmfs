@@ -88,20 +88,11 @@ cvmfs_run_test() {
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 24; }
 
   echo "mount the Stratum1 repository on a local mountpoint"
-  mkdir $mnt_point cache
-  cat > private.conf << EOF
-CVMFS_CACHE_BASE=$(pwd)/cache
-CVMFS_RELOAD_SOCKETS=$(pwd)/cache
-CVMFS_SERVER_URL=http://127.0.0.1/cvmfs/$replica_name
-CVMFS_HTTP_PROXY=DIRECT
-CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
-EOF
-  cvmfs2 -d -o config=private.conf $CVMFS_TEST_REPO $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 14; }
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 14; }
 
   echo "clean up"
   sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 15; }
   sudo cvmfs_server rmfs -f $replica_name
-
 
   return 0
 }
