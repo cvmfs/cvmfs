@@ -71,7 +71,7 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO || return $?
 
-  # echo "install a desaster cleanup function"
+  echo "install a desaster cleanup function"
   trap cleanup EXIT HUP INT TERM || return $?
 
   echo "create Stratum1 repository on the same machine"
