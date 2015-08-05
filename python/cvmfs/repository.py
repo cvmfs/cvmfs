@@ -93,10 +93,14 @@ class RepositoryIterator:
             self.catalog_iterator = catalog.__iter__()
 
 
-    def __init__(self, repository):
+    def __init__(self, repository, catalog_hash=None):
         self.repository    = repository
         self.catalog_stack = collections.deque()
-        self._push_catalog(repository.retrieve_root_catalog())
+        if catalog_hash is None:
+            catalog = repository.retrieve_root_catalog()
+        else:
+            catalog = repository.retrieve_catalog(catalog_hash)
+        self._push_catalog(catalog)
 
 
     def __iter__(self):
