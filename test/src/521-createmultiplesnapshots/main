@@ -263,7 +263,7 @@ cvmfs_run_test() {
   local reference_dir=$scratch_dir/reference_dir
 
   local mnt_point="$(pwd)/mountpount"
-  local replica_name="$CVMFS_TEST_REPO.replic"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?

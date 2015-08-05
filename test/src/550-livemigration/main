@@ -119,7 +119,7 @@ cvmfs_run_test() {
   local legacy_repo_name="testmigration.cern.ch"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
   local legacy_repo_url="$(get_local_repo_url $legacy_repo_name)"
-  local replica_name="${legacy_repo_name}.stratum1"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   local replica_url="$(get_repo_url $replica_name)"
   local key_location="/etc/cvmfs/keys"
   local s0_mnt="$(pwd)/s0"

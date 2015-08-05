@@ -57,7 +57,7 @@ cvmfs_run_test() {
   sudo find /var/spool/cvmfs/$CVMFS_TEST_REPO/cache -type f | grep sha256 || return 11
 
   local mnt_point="$(pwd)/mountpoint"
-  local replica_name="$CVMFS_TEST_REPO.replic"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   echo "create Stratum1 repository on the same machine"
   load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
