@@ -31,7 +31,7 @@ cvmfs_run_test() {
   local reference_dir=$scratch_dir/reference_dir
 
   local mnt_point="$(pwd)/mountpount"
-  local replica_name="$CVMFS_TEST_REPO.replic"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
 
   local backend_dir="/srv/cvmfs/${replica_name}"
   local symlink_destination="${scratch_dir}/backend"

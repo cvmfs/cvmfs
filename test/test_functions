@@ -27,7 +27,8 @@ CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
-CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}
+CVMFS_TEST_HTTP_BASE=${CVMFS_TEST_HTTP_BASE:=}
+CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}   # backward compatibility! use CVMFS_TEST_HTTP_BASE instead
 CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
 
 # These OPT variables are for the benchmark options under the benchmarks folder
@@ -41,6 +42,15 @@ CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=/tmp/cvmfs_benchmarks}
 CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=~/.benchmark}
 CVMFS_OPT_PARALLEL_RUNS=${CVMFS_OPT_PARALLEL_RUNS:=1}
 CVMFS_OPT_MTAB_MODIFIED="false"
+
+# backward compatibility.
+#     CVMFS_TEST_STRATUM0 was replaced by CVMFS_TEST_HTTP_BASE to better reflect
+#     the purpose of this variable. Please don't use CVMFS_TEST_STRATUM0 anymore
+if [ -z "$CVMFS_TEST_HTTP_BASE" ] && [ ! -z "$CVMFS_TEST_STRATUM0" ]; then
+  echo "Warning: You are using the deprecated CVMFS_TEST_STRATUM0 variable."
+  echo "         Please consider switching to CVMFS_TEST_HTTP_BASE"
+  CVMFS_TEST_HTTP_BASE="$CVMFS_TEST_STRATUM0"
+fi
 
 
 if [ -f /.dockerinit ]; then
@@ -459,9 +469,9 @@ create_repo() {
     echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG"
   fi
-  if [ x"$CVMFS_TEST_STRATUM0" != x"" ]; then
-    echo "  Stratum0: $CVMFS_TEST_STRATUM0"
-    stratum0=" -w $CVMFS_TEST_STRATUM0"
+  if [ x"$CVMFS_TEST_HTTP_BASE" != x"" ]; then
+    echo "  Stratum0: $CVMFS_TEST_HTTP_BASE"
+    stratum0=" -w $CVMFS_TEST_HTTP_BASE"
   fi
   if [ x"$CVMFS_TEST_UNIONFS" != x"" ]; then
     echo "  UnionFS: $CVMFS_TEST_UNIONFS"
@@ -551,6 +561,12 @@ make_huge_repo() {
 }
 
 
+get_stratum1_name() {
+  local repo_name="$1"
+  echo "$repo_name.$(date +%s%N | md5sum | head -c6).replica"
+}
+
+
 create_stratum1() {
   local replica_name=$1
   local uid=$2
@@ -559,12 +575,13 @@ create_stratum1() {
   shift 4
   local additional_parameters="$*"
   local s3_config=""
-  # TODO: Re-enable this as soon as Stratum1 is supported
-  #       with an S3 backend
-  # if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
-  #   echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
-  #   s3_config=" -s $CVMFS_TEST_S3_CONFIG"
-  # fi
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    local stratum1_url="$CVMFS_TEST_HTTP_BASE"
+    [ ! -z "$stratum1_url" ] || die "\$CVMFS_TEST_HTTP_BASE needs to be set for S3 tests to work!"
+    echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
+    echo "  Stratum1:  $stratum1_url"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url"
+  fi
   sudo cvmfs_server add-replica -o $CVMFS_TEST_USER    \
                                 -n $replica_name       \
                                 -a                     \
@@ -1078,8 +1095,8 @@ get_local_repo_url() {
 
 get_s3_repo_url() {
   local repo_name="$1"
-  local s3_stratum0_url="$CVMFS_TEST_STRATUM0"
-  [ x"$s3_stratum0_url" != x"" ] || die "\$CVMFS_TEST_STRATUM0 needs to be set for S3 tests to work!"
+  local s3_stratum0_url="$CVMFS_TEST_HTTP_BASE"
+  [ x"$s3_stratum0_url" != x"" ] || die "\$CVMFS_TEST_HTTP_BASE needs to be set for S3 tests to work!"
   [ $(echo -n "$s3_stratum0_url" | tail -c1) = "/" ] || s3_stratum0_url="${s3_stratum0_url}/"
   echo "${s3_stratum0_url}${repo_name}"
 }
