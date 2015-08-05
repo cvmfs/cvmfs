@@ -53,6 +53,17 @@ run_background_snapshot() {
   fi
 }
 
+count_fetched_catalogs() {
+  local replication_log_file="$1"
+
+  # figure out where replication starts to process repository tags
+  # we do not want to count in that part of the log
+  local cutmark=$(cat $replication_log_file | grep -n "repository tag" | head -n 1 | cut -f1 -d:)
+
+  # count the number of times the pulling decided to fetch chunks
+  cat $replication_log_file | head -n $cutmark | grep 'Processing chunks' | wc -l
+}
+
 
 CVMFS_TEST_584_REPLICA_NAME=""
 cleanup() {
@@ -231,8 +242,8 @@ cvmfs_run_test() {
 
   echo "check the log files"
   echo "(6 should have snapshotted, 7 should have aborted, 8 should have waited and later snapshotted)"
-  local revisions_snapshotted_by_6=$(cat $snapshot_log_6 | grep 'Processing chunks' | wc -l)
-  local revisions_snapshotted_by_7=$(cat $snapshot_log_7 | grep 'Processing chunks' | wc -l)
+  local revisions_snapshotted_by_6=$(count_fetched_catalogs $snapshot_log_6)
+  local revisions_snapshotted_by_7=$(count_fetched_catalogs $snapshot_log_7)
   echo "Number 6 snapshotted $revisions_snapshotted_by_6 revisions"
   echo "Number 7 snapshotted $revisions_snapshotted_by_7 revisions"
   [ $revisions_snapshotted_by_6 -eq 6 ]                             || return 33
