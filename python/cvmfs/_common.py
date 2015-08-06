@@ -11,6 +11,7 @@ import zlib
 import sqlite3
 import subprocess
 import shutil
+import os
 
 
 _REPO_CONFIG_PATH      = "/etc/cvmfs/repositories.d"
@@ -48,6 +49,14 @@ class CompressedObject:
 
     def save_uncompressed_to(self, path):
         shutil.copyfile(self.get_uncompressed_file().name, path)
+
+    def size_compressed(self):
+        """ Size of the compressed file in bytes """
+        return os.path.getsize(self.compressed_file_.name)
+
+    def size_uncompressed(self):
+        """Size of the uncompressed file in bytes """
+        return os.path.getsize(self.file_.name)
 
     def _decompress(self):
         """ Unzip a file to a temporary referenced by self.file_ """
