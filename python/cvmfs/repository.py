@@ -7,6 +7,7 @@ This file is part of the CernVM File System auxiliary tools.
 
 import abc
 import os
+import glob
 import urlparse
 import tempfile
 import requests
@@ -14,6 +15,7 @@ import collections
 from datetime import datetime
 import dateutil.parser
 from dateutil.tz import tzutc
+import zlib
 
 import _common
 import cvmfs
@@ -198,12 +200,128 @@ class CatalogTreeIterator:
 
 
 
+class Cache:
+    def __init__(self, cache_dir):
+        if not os.path.exists(cache_dir):
+            cache_dir = tempfile.mkdtemp(dir='/tmp', prefix='cache.')
+        self._cache_dir = cache_dir
+        self._create_cache_structure()
+        
+    def _create_dir(self, path):
+        cache_full_path = '/'.join([self._cache_dir, path])
+        if not os.path.exists(cache_full_path):
+            os.mkdir(cache_full_path, 0755)
+            
+    def _create_cache_structure(self):
+        self._create_dir('data')
+        for i in range(0x00, 0xff + 1):
+            new_folder = '{0:#0{1}x}'.format(i, 4)[2:]
+            self._create_dir('data' + '/' + new_folder)
+       
+    def add(self, file_name):
+        full_path = '/'.join([self._cache_dir, file_name])
+        return open(full_path, 'w+')
+    
+    def get(self, file_name):
+        full_path = '/'.join([self._cache_dir, file_name])
+        if os.path.exists(full_path):
+            return open(full_path, "rb")
+        return None
+    
+    def evict(self):
+        for i in range(0x00, 0xff + 1):
+            folder = '{0:#0{1}x}'.format(i, 4)[2:]
+            wildcard = '/'.join([self._cache_dir, folder, '*'])
+            os.remove(glob.glob(wildcard))
+
+
+class Fetcher:
+    """ Abstract wrapper around a Fetcher """
+    
+    __metadata__ = abc.ABCMeta
+    
+    def __init__(self, cache_dir=''):
+        self.cache = Cache(cache_dir)
+    
+    @abc.abstractmethod
+    def retrieve_file(self, file_name):
+        """ Abstract method to retrieve a file from the repository """
+        pass
+
+
+class LocalFetcher(Fetcher):
+    """ Retrieves files ONLY from the local cache """
+    def __init__(self, cache_dir=''):
+        Fetcher.__init__(self, cache_dir)
+    
+    def retrieve_file(self, file_name, decompress=False):
+        cached_file = self.cache.get(file_name)
+        if not cached_file:
+            raise FileNotFoundInRepository(self, file_name)
+        return cached_file
+        
+    
+class RemoteFetcher(Fetcher):
+    """ Retrieves files from the local cache if found, and from remote otherwise """
+
+
+    def __init__(self, repo_url, cache_dir=""):
+        Fetcher.__init__(self, cache_dir)
+        self._repo_url = repo_url
+
+
+    def _download_content_and_store(self, cached_file, file_url):
+        response = requests.get(file_url, stream=True)
+        if response.status_code != requests.codes.ok:
+            raise FileNotFoundInRepository(self, file_url)
+        for chunk in response.iter_content(chunk_size=4096):
+            if chunk:
+                cached_file.write(chunk)
+        cached_file.seek(0)
+        cached_file.flush()
+        return cached_file
+
+
+    def _download_content_and_decompress(self, cached_file, file_url):
+        response = requests.get(file_url, stream=False)
+        if response.status_code != requests.codes.ok:
+            raise FileNotFoundInRepository(self, file_url)
+        decompressed_content = zlib.decompress(response.text)
+        cached_file.write(decompressed_content)
+        cached_file.seek(0)
+        cached_file.flush()
+        return cached_file
+
+
+    def _retrieve_file(self, file_name, decompress):
+        file_url = '/'.join([self._repo_url, file_name])
+        cached_file = self.cache.add(file_name)
+        if not decompress:
+            return self._download_content_and_store(cached_file, file_url)
+        else:
+            return self._download_content_and_decompress(cached_file, file_url)
+
+
+    def retrieve_file(self, file_name, decompress=False):
+        cached_file = self.cache.get(file_name)
+        if cached_file:
+            if not decompress:
+                return cached_file
+        return self._retrieve_file(file_name, decompress)
+            
+
 class Repository:
-    """ Abstract Wrapper around a CVMFS Repository representation """
+    """ Wrapper around a CVMFS Repository representation """
 
-    __metaclass__ = abc.ABCMeta
 
-    def __init__(self):
+    def __init__(self, cache_dir='', repo_url=''):
+        if repo_url == '' and cache_dir == '':
+            raise Exception("repo_url and cache_dir cannot be empty at the same time")
+        if repo_url == '':
+            self._fetcher = LocalFetcher(cache_dir)
+        else:
+            self._fetcher = RemoteFetcher(repo_url, cache_dir)
+        self._storage_location = self._fetcher.cache._cache_dir
         self._opened_catalogs = {}
         self._read_manifest()
         self._try_to_get_last_replication_timestamp()
@@ -223,7 +341,8 @@ class Repository:
             raise RepositoryNotFound(self._storage_location)
 
 
-    def __read_timestamp(self, timestamp_string):
+    @staticmethod
+    def __read_timestamp(timestamp_string):
         return dateutil.parser.parse(timestamp_string)
 
 
@@ -231,7 +350,7 @@ class Repository:
         try:
             with self.retrieve_file(_common._LAST_REPLICATION_NAME) as rf:
                 timestamp = rf.readline()
-                self.last_replication = self.__read_timestamp(timestamp)
+                self.last_replication = Repository.__read_timestamp(timestamp)
             if not self.has_repository_type():
                 self.type = 'stratum1'
         except FileNotFoundInRepository, e:
@@ -244,7 +363,7 @@ class Repository:
             with self.retrieve_file(_common._REPLICATING_NAME) as rf:
                 timestamp = rf.readline()
                 self.replicating = True
-                self.replicating_since = self.__read_timestamp(timestamp)
+                self.replicating_since = Repository.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
 
@@ -292,10 +411,9 @@ class Repository:
         return Certificate(certificate)
 
 
-    @abc.abstractmethod
-    def retrieve_file(self, file_name):
-        """ Abstract method to retrieve a file from the repository """
-        pass
+    def retrieve_file(self, file_name, decompress=False):
+        """ Method to retrieve a file from the repository """
+        return self._fetcher.retrieve_file(file_name)
 
 
     def retrieve_object(self, object_hash, hash_suffix = ''):
@@ -342,143 +460,6 @@ class Repository:
         new_catalog = Catalog(catalog_file, catalog_hash)
         self._opened_catalogs[catalog_hash] = new_catalog
         return new_catalog
-
-
-
-
-class LocalRepository(Repository):
-    def __init__(self, repo_fqrn_of_path):
-        if os.path.isdir(repo_fqrn_of_path):
-            self._open_local_directory(repo_fqrn_of_path)
-        else:
-            self._open_local_fqrn(repo_fqrn_of_path)
-
-
-    def _open_local_fqrn(self, repo_fqrn):
-        repo_config_dir = os.path.join(_common._REPO_CONFIG_PATH, repo_fqrn)
-        if not os.path.isdir(repo_config_dir):
-            raise RepositoryNotFound(repo_fqrn)
-        self._server_config = os.path.join(repo_config_dir, _common._SERVER_CONFIG_NAME)
-        self.type = self.read_server_config("CVMFS_REPOSITORY_TYPE")
-        if self.type != 'stratum0' and self.type != 'stratum1':
-            raise UnknownRepositoryType(repo_fqrn, self.type)
-        self._storage_location = self._get_repo_location()
-        Repository.__init__(self)
-        self.version = cvmfs.server_version
-        self.fqrn    = repo_fqrn
-
-
-    def _open_local_directory(self, repo_directory):
-        self._server_config = None
-        self._storage_location = repo_directory
-        Repository.__init__(self)
-
-
-    def read_server_config(self, config_field):
-        if not self._server_config:
-            raise ConfigurationNotFound(self, "no such file or directory")
-        with open(self._server_config) as config_file:
-            for config_line in config_file:
-                if config_line.startswith(config_field):
-                    return config_line[len(config_field)+1:].strip()
-        raise ConfigurationNotFound(self, config_field)
-
-
-    def _get_repo_location(self):
-        upstream = self.read_server_config("CVMFS_UPSTREAM_STORAGE")
-        upstream_type, tmp_dir, upstream_cfg = upstream.split(',')
-        if upstream_type != 'local': # might be riak, s3, ... (not implemented)
-            raise UnknownRepositoryType(repo_fqrn, upstream_type)
-        return upstream_cfg # location of the repository backend storage
-
-
-    def retrieve_file(self, file_name):
-        file_path = os.path.join(self._storage_location, file_name)
-        if not os.path.exists(file_path):
-            raise FileNotFoundInRepository(self, file_name)
-        return open(file_path, "rb")
-
-
-    def __str__(self):
-        return self.fqrn
-
-    def __repr__(self):
-        return "<Local Repository " + self.fqrn + ">"
-
-
-
-class RemoteRepository(Repository):
-    """ Concrete Repository implementation for a repository reachable by HTTP """
-    def __init__(self, repo_url):
-        self._storage_location = urlparse.urlunparse(urlparse.urlparse(repo_url))
-        self._try_to_get_repo_information()
-        Repository.__init__(self)
-
-
-    def __str__(self):
-        return self._storage_location
-
-    def __repr__(self):
-        return "<Remote Repository " + self.fqrn + " at " + self._storage_location + ">"
-
-
-    def _get_rest_url(self, method_name):
-        return "/".join((self._storage_location,
-                         _common._REST_CONNECTOR,
-                         method_name))
-
-
-    def has_rest_api(self):
-        if not hasattr(self, '_rest_api'):
-            api_url = self._get_rest_url('info')
-            response = requests.head(api_url)
-            self._has_rest_api = (response.status_code == requests.codes.ok)
-        return self._has_rest_api
-
-
-    def __rest_request(self, http_verb_method, rest_method_name):
-        api_url  = self._get_rest_url(rest_method_name)
-        response = http_verb_method(api_url)
-        response.raise_for_status()
-        return response.json()
-
-
-    def _GET_rest_request(self, method_name):
-        return self.__rest_request(requests.get, method_name)
-
-
-    def _POST_rest_request(self, method_name):
-        return self.__rest_request(requests.post, method_name)
-
-
-    def _try_to_get_repo_information(self):
-        self.type          = 'unknown'
-        self.version       = 'unknown'
-        if self.has_rest_api():
-            general_infos      = self._GET_rest_request('info')
-            self.type          = general_infos['type']
-            self.version       = general_infos['version']
-
-
-    def start_replication(self):
-        res = self._POST_rest_request('replicate')
-        if res['result'] != 'ok':
-            raise CannotReplicate(self)
-
-
-    def retrieve_file(self, file_name):
-        file_url = self._storage_location + "/" + file_name
-        tmp_file = tempfile.NamedTemporaryFile('w+b')
-        response = requests.get(file_url, stream=True)
-        if response.status_code != requests.codes.ok:
-            raise FileNotFoundInRepository(self, file_url)
-        for chunk in response.iter_content(chunk_size=4096):
-            if chunk:
-                tmp_file.write(chunk)
-        tmp_file.seek(0)
-        tmp_file.flush()
-        return tmp_file
-
 
 
 def all_local():
