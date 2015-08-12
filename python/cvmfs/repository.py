@@ -201,15 +201,17 @@ class CatalogTreeIterator:
 
 
 class Cache:
-    def __init__(self, cache_dir):
+    def __init__(self, cache_dir, metadata_cleanup):
         if not os.path.exists(cache_dir):
             cache_dir = tempfile.mkdtemp(dir='/tmp', prefix='cache.')
         self._cache_dir = cache_dir
         self._create_cache_structure()
+        if metadata_cleanup:
+            self._cleanup_metadata()
 
-
-    def cache_path(self):
-        return str(self._cache_dir)
+    def _cleanup_metadata(self):
+        for f in glob.glob(self._cache_dir + '/' + '.cvmfs*'):
+            os.remove(f)
 
 
     def _create_dir(self, path):
@@ -223,6 +225,10 @@ class Cache:
         for i in range(0x00, 0xff + 1):
             new_folder = '{0:#0{1}x}'.format(i, 4)[2:]
             self._create_dir('data' + '/' + new_folder)
+
+
+    def cache_path(self):
+        return str(self._cache_dir)
 
 
     def add(self, file_name):
@@ -250,8 +256,19 @@ class Fetcher:
 
     __metadata__ = abc.ABCMeta
 
-    def __init__(self, cache_dir=''):
-        self.cache = Cache(cache_dir)
+    def __init__(self, cache_dir='', metadata_cleanup=False):
+        self.cache = Cache(cache_dir, metadata_cleanup)
+
+
+    @staticmethod
+    def _decompress_file(compressed_file):
+        """ Decompresses a file in a temporary directory """
+        decompressed_data = zlib.decompress(compressed_file.read())
+        temp_file_path = tempfile.mktemp(dir='/tmp')
+        temp_file = open(temp_file_path, 'w+')
+        Fetcher._write_content_into_file(decompressed_data, temp_file)
+        return temp_file
+
 
     @staticmethod
     def _write_content_into_file(content, opened_file):
@@ -262,35 +279,23 @@ class Fetcher:
 
 
     @abc.abstractmethod
-    def retrieve_file(self, file_name, decompress):
+    def retrieve_file(self, file_name):
         """ Abstract method to retrieve a file from the repository """
         pass
 
 
 
 class LocalFetcher(Fetcher):
-    """ Retrieves files ONLY from the local cache """
+    """ Retrieves files only from the local cache """
 
     def __init__(self, cache_dir=''):
-        Fetcher.__init__(self, cache_dir)
+        Fetcher.__init__(self, cache_dir, metadata_cleanup=False)
 
-    @staticmethod
-    def _decompress_file(compressed_file):
-        decompressed_data = zlib.decompress(compressed_file.read())
-        temp_file_path = tempfile.mktemp(dir='/tmp')
-        temp_file = open(temp_file_path, 'w+')
-        Fetcher._write_content_into_file(decompressed_data, temp_file)
-        return temp_file
-
-    def retrieve_file(self, file_name, decompress):
-        """ The LocalFetcher does not store the decompressed version. Its cache usage is in read-only """
+    def retrieve_file(self, file_name):
+        """ The LocalFetcher works in read-only mode with its cache """
         cached_file = self.cache.get(file_name)
         if not cached_file:
             raise FileNotFoundInRepository(self, file_name)
-        if decompress:
-            decompressed_file = LocalFetcher._decompress_file(cached_file)
-            cached_file.close()
-            return decompressed_file
         return cached_file
 
 
@@ -298,8 +303,8 @@ class LocalFetcher(Fetcher):
 class RemoteFetcher(Fetcher):
     """ Retrieves files from the local cache if found, and from remote otherwise """
 
-    def __init__(self, repo_url, cache_dir = ''):
-        Fetcher.__init__(self, cache_dir)
+    def __init__(self, repo_url, cache_dir=''):
+        Fetcher.__init__(self, cache_dir, metadata_cleanup=True)
         self._repo_url = repo_url
 
 
@@ -315,30 +320,36 @@ class RemoteFetcher(Fetcher):
         return cached_file
 
 
+    def __make_file_url(self, file_name):
+        return '/'.join([self._repo_url, file_name])
+
+
     def _download_content_and_decompress(self, cached_file, file_url):
-        response = requests.get(file_url, stream = False)
+        response = requests.get(file_url, stream=False)
         if response.status_code != requests.codes.ok:
             raise FileNotFoundInRepository(self, file_url)
-        decompressed_content = zlib.decompress(response.text)
+        decompressed_content = zlib.decompress(response.content)
         Fetcher._write_content_into_file(decompressed_content, cached_file)
         return cached_file
 
 
-    def _retrieve_file(self, file_name, decompress):
-        file_url = '/'.join([self._repo_url, file_name])
+    def _retrieve_file(self, file_name):
+        file_url = self.__make_file_url(file_name)
         cached_file = self.cache.add(file_name)
-        if not decompress:
-            return self._download_content_and_store(cached_file, file_url)
-        else:
-            return self._download_content_and_decompress(cached_file, file_url)
+        return self._download_content_and_decompress(cached_file, file_url)
 
 
-    def retrieve_file(self, file_name, decompress):
+    def retrieve_raw_file(self, file_name):
+        cached_file = self.cache.add(file_name)
+        file_url = self.__make_file_url(file_name)
+        return self._download_content_and_store(cached_file, file_url)
+
+
+    def retrieve_file(self, file_name):
         cached_file = self.cache.get(file_name)
         if cached_file:
-            if not decompress:
-                return cached_file
-        return self._retrieve_file(file_name, decompress)
+            return cached_file
+        return self._retrieve_file(file_name)
 
 
 
@@ -365,7 +376,7 @@ class Repository:
 
     def _read_manifest(self):
         try:
-            with self.retrieve_file(_common._MANIFEST_NAME) as manifest_file:
+            with self._retrieve_raw_file(_common._MANIFEST_NAME) as manifest_file:
                 self.manifest = Manifest(manifest_file)
             self.fqrn = self.manifest.repository_name
         except FileNotFoundInRepository, e:
@@ -379,7 +390,7 @@ class Repository:
 
     def _try_to_get_last_replication_timestamp(self):
         try:
-            with self.retrieve_file(_common._LAST_REPLICATION_NAME) as rf:
+            with self._retrieve_raw_file(_common._LAST_REPLICATION_NAME) as rf:
                 timestamp = rf.readline()
                 self.last_replication = Repository.__read_timestamp(timestamp)
             if not self.has_repository_type():
@@ -391,12 +402,18 @@ class Repository:
     def _try_to_get_replication_state(self):
         self.replicating = False
         try:
-            with self.retrieve_file(_common._REPLICATING_NAME) as rf:
+            with self._retrieve_raw_file(_common._REPLICATING_NAME) as rf:
                 timestamp = rf.readline()
                 self.replicating = True
                 self.replicating_since = Repository.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
+
+
+    def _retrieve_raw_file(self, file_name):
+        if isinstance(self._fetcher, RemoteFetcher):
+            return self._fetcher.retrieve_raw_file(file_name)
+        return self._fetcher.retrieve_file(file_name)
 
 
     def verify(self, public_key_path):
@@ -442,9 +459,9 @@ class Repository:
         return Certificate(certificate)
 
 
-    def retrieve_file(self, file_name, decompress = False):
+    def retrieve_file(self, file_name):
         """ Method to retrieve a file from the repository """
-        return self._fetcher.retrieve_file(file_name, decompress)
+        return self._fetcher.retrieve_file(file_name)
 
 
     def retrieve_object(self, object_hash, hash_suffix = ''):

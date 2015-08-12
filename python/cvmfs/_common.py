@@ -75,17 +75,17 @@ class CompressedObject:
 
 
 
-class DatabaseObject(CompressedObject):
+class DatabaseObject:
     db_handle_ = None
 
-    def __init__(self, compressed_db_file):
-        CompressedObject.__init__(self, compressed_db_file)
+    def __init__(self, db_file):
+        self.file_ = db_file
         self._open_database()
 
     def __del__(self):
         if self.db_handle_:
             self.db_handle_.close()
-        self._close()
+        self.file_.close()
 
     def _open_database(self):
         """ Create and configure a database handle to the Catalog """
