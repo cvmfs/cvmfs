@@ -8,6 +8,7 @@ test/cloud_testing/ec2_config.sh
 python/dist/*
 python/python_cvmfsutils.egg-info/*
 python/MANIFEST
+.vagrant/
 
 # Eclipse-related files
 .project
