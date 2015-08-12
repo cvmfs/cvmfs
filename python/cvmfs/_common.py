@@ -6,11 +6,8 @@ This file is part of the CernVM File System auxiliary tools.
 """
 
 import ctypes
-import tempfile
-import zlib
 import sqlite3
 import subprocess
-import shutil
 import os
 
 
@@ -28,50 +25,6 @@ _REPLICATING_NAME      = ".cvmfs_is_snapshotting"
 class CvmfsNotInstalled(Exception):
     def __init__(self):
         Exception.__init__(self, "It seems that cvmfs is not installed on this machine!")
-
-
-class CompressedObject:
-    file_            = None
-    compressed_file_ = None
-
-    def __init__(self, compressed_file):
-        self.compressed_file_ = compressed_file
-        self._decompress()
-
-    def get_compressed_file(self):
-        return self.compressed_file_
-
-    def get_uncompressed_file(self):
-        return self.file_
-
-    def save_to(self, path):
-        shutil.copyfile(self.get_compressed_file().name, path)
-
-    def save_uncompressed_to(self, path):
-        shutil.copyfile(self.get_uncompressed_file().name, path)
-
-    def size_compressed(self):
-        """ Size of the compressed file in bytes """
-        return os.path.getsize(self.compressed_file_.name)
-
-    def size_uncompressed(self):
-        """Size of the uncompressed file in bytes """
-        return os.path.getsize(self.file_.name)
-
-    def _decompress(self):
-        """ Unzip a file to a temporary referenced by self.file_ """
-        self.file_ = tempfile.NamedTemporaryFile('w+b')
-        self.compressed_file_.seek(0)
-        self.file_.write(zlib.decompress(self.compressed_file_.read()))
-        self.file_.flush()
-        self.file_.seek(0)
-        self.compressed_file_.seek(0)
-
-    def _close(self):
-        if self.file_:
-            self.file_.close()
-        if self.compressed_file_:
-            self.compressed_file_.close()
 
 
 
@@ -92,6 +45,8 @@ class DatabaseObject:
         self.db_handle_ = sqlite3.connect(self.file_.name)
         self.db_handle_.text_factory = str
 
+    def db_size(self):
+        return os.path.getsize(self.file_.name)
 
     def read_properties_table(self, reader):
         """ Retrieve all properties stored in the 'properties' table """
