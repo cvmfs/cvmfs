@@ -92,8 +92,7 @@ class DirectoryEntry:
             raise Exception("Cannot retrieve symlink")
         elif self.is_directory():
             raise Exception("Cannot retrieve directory")
-        f = repository.retrieve_object(self.content_hash_string())
-        return f.file()
+        return repository.retrieve_object(self.content_hash_string())
 
     def is_directory(self):
         return (self.flags & _Flags.Directory) > 0
