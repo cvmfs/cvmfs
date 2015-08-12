@@ -228,7 +228,7 @@ class Cache:
         self._create_dir('data')
         for i in range(0x00, 0xff + 1):
             new_folder = '{0:#0{1}x}'.format(i, 4)[2:]
-            self._create_dir('data' + '/' + new_folder)
+            self._create_dir(os.path.join('data', new_folder))
 
 
     def cache_path(self):
@@ -288,8 +288,16 @@ class Fetcher:
         opened_file.flush()
 
 
-    @abc.abstractmethod
     def retrieve_file(self, file_name):
+        """ Method to retrieve a file from the repository """
+        cached_file = self.cache.get(file_name)
+        if not cached_file:
+            return self._retrieve_file(file_name)
+        return cached_file
+
+
+    @abc.abstractmethod
+    def _retrieve_file(self, file_name):
         """ Abstract method to retrieve a file from the repository """
         pass
 
@@ -319,16 +327,6 @@ class LocalFetcher(Fetcher):
             return cached_file
         else:
             raise FileNotFoundInRepository(file_name)
-
-
-    def retrieve_file(self, file_name):
-        """ Retrieves an decompressed file from the cache if exists or the
-        decompressed version in the local repository otherwise
-        """
-        cached_file = self.cache.get(file_name)
-        if not cached_file:
-            return self._retrieve_file(file_name)
-        return cached_file
 
 
     def retrieve_raw_file(self, file_name):
@@ -388,13 +386,6 @@ class RemoteFetcher(Fetcher):
         return RemoteFetcher._download_content_and_store(cached_file, file_url)
 
 
-    def retrieve_file(self, file_name):
-        cached_file = self.cache.get(file_name)
-        if cached_file:
-            return cached_file
-        return self._retrieve_file(file_name)
-
-
 
 class Repository:
     """ Wrapper around a CVMFS Repository representation """
@@ -415,8 +406,8 @@ class Repository:
             self._fetcher = RemoteFetcher(source, cache_dir)
         elif os.path.exists(source):
             self._fetcher = LocalFetcher(source, cache_dir)
-        elif os.path.exists('/srv/cvmfs/' + source):
-            self._fetcher = LocalFetcher('/srv/cvmfs/' + source, cache_dir)
+        elif os.path.exists(os.path.join('/srv/cvmfs', source)):
+            self._fetcher = LocalFetcher(os.path.join('/srv/cvmfs', source, cache_dir))
         else:
             raise RepositoryNotFound(source)
 
@@ -427,7 +418,7 @@ class Repository:
 
     def _read_manifest(self):
         try:
-            with self._retrieve_raw_file(_common._MANIFEST_NAME) as manifest_file:
+            with self._fetcher.retrieve_raw_file(_common._MANIFEST_NAME) as manifest_file:
                 self.manifest = Manifest(manifest_file)
             self.fqrn = self.manifest.repository_name
         except FileNotFoundInRepository, e:
@@ -441,7 +432,7 @@ class Repository:
 
     def _try_to_get_last_replication_timestamp(self):
         try:
-            with self._retrieve_raw_file(_common._LAST_REPLICATION_NAME) as rf:
+            with self._fetcher.retrieve_raw_file(_common._LAST_REPLICATION_NAME) as rf:
                 timestamp = rf.readline()
                 self.last_replication = Repository.__read_timestamp(timestamp)
             if not self.has_repository_type():
@@ -453,16 +444,12 @@ class Repository:
     def _try_to_get_replication_state(self):
         self.replicating = False
         try:
-            with self._retrieve_raw_file(_common._REPLICATING_NAME) as rf:
+            with self._fetcher.retrieve_raw_file(_common._REPLICATING_NAME) as rf:
                 timestamp = rf.readline()
                 self.replicating = True
                 self.replicating_since = Repository.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
-
-
-    def _retrieve_raw_file(self, file_name):
-        return self._fetcher.retrieve_raw_file(file_name)
 
 
     def verify(self, public_key_path):
@@ -567,8 +554,3 @@ def all_local():
 def all_local_stratum0():
     return [ repo for repo in all_local() if repo.type == 'stratum0' ]
 
-def open_repository(repository_path, public_key = None):
-    repo = Repository(repository_path)
-    if public_key and not repo.verify(public_key):
-        return None
-    return repo
