@@ -29,24 +29,22 @@ class CvmfsNotInstalled(Exception):
 
 
 class DatabaseObject:
-    db_handle_ = None
+    _db_handle = None
 
     def __init__(self, db_file):
-        self.file_ = db_file
+        self._file = db_file
         self._open_database()
 
     def __del__(self):
-        if self.db_handle_:
-            self.db_handle_.close()
-        self.file_.close()
+        self._file.close()
 
     def _open_database(self):
         """ Create and configure a database handle to the Catalog """
-        self.db_handle_ = sqlite3.connect(self.file_.name)
-        self.db_handle_.text_factory = str
+        self._db_handle = sqlite3.connect(self._file.name)
+        self._db_handle.text_factory = str
 
     def db_size(self):
-        return os.path.getsize(self.file_.name)
+        return os.path.getsize(self._file.name)
 
     def read_properties_table(self, reader):
         """ Retrieve all properties stored in the 'properties' table """
@@ -58,21 +56,15 @@ class DatabaseObject:
 
     def run_sql(self, sql):
         """ Run an arbitrary SQL query on the catalog database """
-        cursor = self.db_handle_.cursor()
+        cursor = self._db_handle.cursor()
         cursor.execute(sql)
         return cursor.fetchall()
 
     def open_interactive(self):
         """ Spawns a sqlite shell for interactive catalog database inspection """
-        subprocess.call(['sqlite3', self.file_.name])
+        subprocess.call(['sqlite3', self._file.name])
 
 
-class FileObject(CompressedObject):
-    def __init__(self, compressed_file):
-        CompressedObject.__init__(self, compressed_file)
-
-    def file(self):
-        return self.get_uncompressed_file()
 
 def _binary_buffer_to_hex_string(binbuf):
     return "".join(map(lambda c: ("%0.2X" % c).lower(),map(ord,binbuf)))
@@ -90,8 +82,8 @@ def _combine_md5(lo, hi):
                   '\x00','\x00','\x00','\x00','\x00','\x00','\x00','\x00' ]
     for i in range(0, 8):
         md5digest[i] = chr(lo & 0xFF)
-        lo = lo >> 8
+        lo >>= 8
     for i in range(8,16):
         md5digest[i] = chr(hi & 0xFF)
-        hi = hi >> 8
+        hi >>= 8
     return ''.join(md5digest)

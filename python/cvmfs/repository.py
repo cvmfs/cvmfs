@@ -558,15 +558,13 @@ def all_local():
     d = _common._REPO_CONFIG_PATH
     if not os.path.isdir(d):
         raise _common.CvmfsNotInstalled
-    return [ Repository(cache_dir=repo) for repo in os.listdir(d) if os.path.isdir(os.path.join(d, repo)) ]
+    return [ Repository(repo) for repo in os.listdir(d) if os.path.isdir(os.path.join(d, repo)) ]
 
 def all_local_stratum0():
     return [ repo for repo in all_local() if repo.type == 'stratum0' ]
 
 def open_repository(repository_path, public_key = None):
-    repo = Repository(repo_url=repository_path)              \
-                if repository_path.startswith("http://")  \
-                else Repository(cache_dir=repository_path)
+    repo = Repository(repository_path)
     if public_key and not repo.verify(public_key):
         return None
     return repo
