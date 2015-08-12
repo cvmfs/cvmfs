@@ -5,7 +5,7 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
-from _common import _binary_buffer_to_hex_string, FileObject
+from _common import _binary_buffer_to_hex_string
 
 
 class _Flags:
@@ -92,7 +92,7 @@ class DirectoryEntry:
             raise Exception("Cannot retrieve symlink")
         elif self.is_directory():
             raise Exception("Cannot retrieve directory")
-        f = FileObject(repository.retrieve_object(self.content_hash_string()))
+        f = repository.retrieve_object(self.content_hash_string())
         return f.file()
 
     def is_directory(self):

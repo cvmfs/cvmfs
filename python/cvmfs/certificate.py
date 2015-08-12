@@ -7,14 +7,12 @@ This file is part of the CernVM File System auxiliary tools.
 
 from M2Crypto import X509
 
-from _common import CompressedObject
-
-class Certificate(CompressedObject):
+class Certificate:
     """ Wraps an X.509 certificate object as stored in CVMFS repositories """
 
     def __init__(self, certificate_file):
-        CompressedObject.__init__(self, certificate_file)
-        cert = X509.load_cert_string(self.get_uncompressed_file().read())
+        self._certificate_file = certificate_file
+        cert = X509.load_cert_string(self._certificate_file.read())
         self.openssl_certificate = cert
 
     def __str__(self):
