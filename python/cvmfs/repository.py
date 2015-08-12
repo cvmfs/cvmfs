@@ -8,7 +8,6 @@ This file is part of the CernVM File System auxiliary tools.
 import abc
 import os
 import glob
-import urlparse
 import tempfile
 import requests
 import collections
@@ -18,7 +17,6 @@ from dateutil.tz import tzutc
 import zlib
 
 import _common
-import cvmfs
 from manifest import Manifest
 from catalog import Catalog
 from history import History
@@ -27,6 +25,7 @@ from certificate import Certificate
 
 class RepositoryNotFound(Exception):
     def __init__(self, repo_path):
+        Exception.__init__(self)
         self.path = repo_path
 
     def __str__(self):
@@ -34,6 +33,7 @@ class RepositoryNotFound(Exception):
 
 class UnknownRepositoryType(Exception):
     def __init__(self, repo_fqrn, repo_type):
+        Exception.__init__(self)
         self.fqrn = repo_fqrn
         self.type = repo_type
 
@@ -42,6 +42,7 @@ class UnknownRepositoryType(Exception):
 
 class ConfigurationNotFound(Exception):
     def __init__(self, repo, config_field):
+        Exception.__init__(self)
         self.repo         = repo
         self.config_field = config_field
 
@@ -49,8 +50,8 @@ class ConfigurationNotFound(Exception):
         return repr(self.repo) + " " + self.config_field
 
 class FileNotFoundInRepository(Exception):
-    def __init__(self, repo, file_name):
-        self.repo      = repo
+    def __init__(self, file_name):
+        Exception.__init__(self)
         self.file_name = file_name
 
     def __str__(self):
@@ -58,6 +59,7 @@ class FileNotFoundInRepository(Exception):
 
 class HistoryNotFound(Exception):
     def __init__(self, repo):
+        Exception.__init__(self)
         self.repo = repo
 
     def __str__(self):
@@ -65,6 +67,7 @@ class HistoryNotFound(Exception):
 
 class CannotReplicate(Exception):
     def __init__(self, repo):
+        Exception.__init__(self)
         self.repo = repo
 
     def __str__(self):
@@ -72,6 +75,7 @@ class CannotReplicate(Exception):
 
 class NestedCatalogNotFound(Exception):
     def __init__(self, repo):
+        Exception.__init__(self)
         self.repo = repo
 
     def __str__(self):
@@ -256,8 +260,13 @@ class Fetcher:
 
     __metadata__ = abc.ABCMeta
 
-    def __init__(self, cache_dir='', metadata_cleanup=False):
+    def __init__(self, source, cache_dir='', metadata_cleanup=False):
         self.cache = Cache(cache_dir, metadata_cleanup)
+        self.source = source
+
+
+    def _make_file_uri(self, file_name):
+        return '/'.join([self.source, file_name])
 
 
     @staticmethod
@@ -284,19 +293,54 @@ class Fetcher:
         pass
 
 
+    @abc.abstractmethod
+    def retrieve_raw_file(self, file_name):
+        """ Abstract method to retrieve a raw file from the repository """
+        pass
+
+
 
 class LocalFetcher(Fetcher):
     """ Retrieves files only from the local cache """
 
-    def __init__(self, cache_dir=''):
-        Fetcher.__init__(self, cache_dir, metadata_cleanup=False)
+    def __init__(self, local_repo, cache_dir=''):
+        Fetcher.__init__(self, local_repo, cache_dir, metadata_cleanup=False)
+
+
+    def _retrieve_file(self, file_name):
+        full_path = self._make_file_uri(file_name)
+        if os.path.exists(full_path):
+            compressed_file = open(full_path, 'r')
+            decompressed_content = zlib.decompress(compressed_file.read())
+            compressed_file.close()
+            cached_file = self.cache.add(file_name)
+            self._write_content_into_file(decompressed_content, cached_file)
+            return cached_file
+        else:
+            raise FileNotFoundInRepository(file_name)
+
 
     def retrieve_file(self, file_name):
-        """ The LocalFetcher works in read-only mode with its cache """
+        """ Retrieves an decompressed file from the cache if exists or the decompressed
+         version in the local repository otherwise
+        """
         cached_file = self.cache.get(file_name)
         if not cached_file:
-            raise FileNotFoundInRepository(self, file_name)
+            return self._retrieve_file(file_name)
         return cached_file
+
+
+    def retrieve_raw_file(self, file_name):
+        """ Retrieves the file directly from the source """
+        full_path = self._make_file_uri(file_name)
+        if os.path.exists(full_path):
+            cached_file = self.cache.add(file_name)
+            compressed_file = open(full_path, 'r')
+            Fetcher._write_content_into_file(compressed_file.read(), cached_file)
+            cached_file.close()
+            compressed_file.seek(0)
+            return compressed_file
+        raise FileNotFoundInRepository(file_name)
 
 
 
@@ -304,12 +348,11 @@ class RemoteFetcher(Fetcher):
     """ Retrieves files from the local cache if found, and from remote otherwise """
 
     def __init__(self, repo_url, cache_dir=''):
-        Fetcher.__init__(self, cache_dir, metadata_cleanup=True)
-        self._repo_url = repo_url
+        Fetcher.__init__(self, repo_url, cache_dir, metadata_cleanup=True)
 
 
     def _download_content_and_store(self, cached_file, file_url):
-        response = requests.get(file_url, stream = True)
+        response = requests.get(file_url, stream=True)
         if response.status_code != requests.codes.ok:
             raise FileNotFoundInRepository(self, file_url)
         for chunk in response.iter_content(chunk_size=4096):
@@ -320,28 +363,24 @@ class RemoteFetcher(Fetcher):
         return cached_file
 
 
-    def __make_file_url(self, file_name):
-        return '/'.join([self._repo_url, file_name])
-
-
     def _download_content_and_decompress(self, cached_file, file_url):
         response = requests.get(file_url, stream=False)
         if response.status_code != requests.codes.ok:
-            raise FileNotFoundInRepository(self, file_url)
+            raise FileNotFoundInRepository(file_url)
         decompressed_content = zlib.decompress(response.content)
         Fetcher._write_content_into_file(decompressed_content, cached_file)
         return cached_file
 
 
     def _retrieve_file(self, file_name):
-        file_url = self.__make_file_url(file_name)
+        file_url = self._make_file_uri(file_name)
         cached_file = self.cache.add(file_name)
         return self._download_content_and_decompress(cached_file, file_url)
 
 
     def retrieve_raw_file(self, file_name):
         cached_file = self.cache.add(file_name)
-        file_url = self.__make_file_url(file_name)
+        file_url = self._make_file_uri(file_name)
         return self._download_content_and_store(cached_file, file_url)
 
 
@@ -356,18 +395,26 @@ class RemoteFetcher(Fetcher):
 class Repository:
     """ Wrapper around a CVMFS Repository representation """
 
-    def __init__(self, cache_dir='', repo_url=''):
-        if repo_url == '' and cache_dir == '':
-            raise Exception('repo_url and cache_dir cannot be empty at the same time')
-        if repo_url == '':
-            self._fetcher = LocalFetcher(cache_dir)
-        else:
-            self._fetcher = RemoteFetcher(repo_url, cache_dir)
+    def __init__(self, source, cache_dir=''):
+        if source == '':
+            raise Exception('source cannot be empty')
+        self.__determine_source(source, cache_dir)
         self._storage_location = self._fetcher.cache.cache_path()
         self._opened_catalogs = {}
         self._read_manifest()
         self._try_to_get_last_replication_timestamp()
         self._try_to_get_replication_state()
+
+
+    def __determine_source(self, source, cache_dir):
+        if source.startswith("http://"):
+            self._fetcher = RemoteFetcher(source, cache_dir)
+        elif os.path.exists(source):
+            self._fetcher = LocalFetcher(source, cache_dir)
+        elif os.path.exists('/srv/cvmfs/' + source):
+            self._fetcher = LocalFetcher('/srv/cvmfs/' + source, cache_dir)
+        else:
+            raise RepositoryNotFound(source)
 
 
     def __iter__(self):
@@ -411,9 +458,7 @@ class Repository:
 
 
     def _retrieve_raw_file(self, file_name):
-        if isinstance(self._fetcher, RemoteFetcher):
-            return self._fetcher.retrieve_raw_file(file_name)
-        return self._fetcher.retrieve_file(file_name)
+        return self._fetcher.retrieve_raw_file(file_name)
 
 
     def verify(self, public_key_path):
