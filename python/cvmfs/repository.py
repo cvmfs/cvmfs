@@ -14,6 +14,7 @@ import collections
 from datetime import datetime
 import dateutil.parser
 from dateutil.tz import tzutc
+import shutil
 import zlib
 
 import _common
@@ -205,13 +206,12 @@ class CatalogTreeIterator:
 
 
 class Cache:
-    def __init__(self, cache_dir, metadata_cleanup):
+    def __init__(self, cache_dir):
         if not os.path.exists(cache_dir):
             cache_dir = tempfile.mkdtemp(dir='/tmp', prefix='cache.')
         self._cache_dir = cache_dir
         self._create_cache_structure()
-        if metadata_cleanup:
-            self._cleanup_metadata()
+        self._cleanup_metadata()
 
     def _cleanup_metadata(self):
         for f in glob.glob(self._cache_dir + '/' + '.cvmfs*'):
@@ -219,7 +219,7 @@ class Cache:
 
 
     def _create_dir(self, path):
-        cache_full_path = '/'.join([self._cache_dir, path])
+        cache_full_path = os.path.join(self._cache_dir, path)
         if not os.path.exists(cache_full_path):
             os.mkdir(cache_full_path, 0755)
 
@@ -236,22 +236,21 @@ class Cache:
 
 
     def add(self, file_name):
-        full_path = '/'.join([self._cache_dir, file_name])
+        full_path = os.path.join(self._cache_dir, file_name)
         return open(full_path, 'w+')
 
 
     def get(self, file_name):
-        full_path = '/'.join([self._cache_dir, file_name])
+        full_path = os.path.join(self._cache_dir, file_name)
         if os.path.exists(full_path):
             return open(full_path, 'rb')
         return None
 
 
     def evict(self):
-        for i in range(0x00, 0xff + 1):
-            folder = '{0:#0{1}x}'.format(i, 4)[2:]
-            wildcard = '/'.join([self._cache_dir, folder, '*'])
-            os.remove(glob.glob(wildcard))
+        data_path = os.path.join(self._cache_dir, 'data')
+        shutil.rmtree(data_path)
+        self._create_cache_structure()
 
 
 
@@ -260,13 +259,13 @@ class Fetcher:
 
     __metadata__ = abc.ABCMeta
 
-    def __init__(self, source, cache_dir='', metadata_cleanup=False):
-        self.cache = Cache(cache_dir, metadata_cleanup)
+    def __init__(self, source, cache_dir=''):
+        self.cache = Cache(cache_dir)
         self.source = source
 
 
     def _make_file_uri(self, file_name):
-        return '/'.join([self.source, file_name])
+        return os.path.join(self.source, file_name)
 
 
     @staticmethod
@@ -281,7 +280,9 @@ class Fetcher:
 
     @staticmethod
     def _write_content_into_file(content, opened_file):
-        """ Writes content into the opened file. The file must have write permission """
+        """ Writes content into the opened file. The file must have
+         write permission
+        """
         opened_file.write(content)
         opened_file.seek(0)
         opened_file.flush()
@@ -304,7 +305,7 @@ class LocalFetcher(Fetcher):
     """ Retrieves files only from the local cache """
 
     def __init__(self, local_repo, cache_dir=''):
-        Fetcher.__init__(self, local_repo, cache_dir, metadata_cleanup=False)
+        Fetcher.__init__(self, local_repo, cache_dir)
 
 
     def _retrieve_file(self, file_name):
@@ -321,8 +322,8 @@ class LocalFetcher(Fetcher):
 
 
     def retrieve_file(self, file_name):
-        """ Retrieves an decompressed file from the cache if exists or the decompressed
-         version in the local repository otherwise
+        """ Retrieves an decompressed file from the cache if exists or the
+        decompressed version in the local repository otherwise
         """
         cached_file = self.cache.get(file_name)
         if not cached_file:
@@ -345,16 +346,18 @@ class LocalFetcher(Fetcher):
 
 
 class RemoteFetcher(Fetcher):
-    """ Retrieves files from the local cache if found, and from remote otherwise """
+    """ Retrieves files from the local cache if found, and from
+    remote otherwise
+    """
 
     def __init__(self, repo_url, cache_dir=''):
-        Fetcher.__init__(self, repo_url, cache_dir, metadata_cleanup=True)
+        Fetcher.__init__(self, repo_url, cache_dir)
 
-
-    def _download_content_and_store(self, cached_file, file_url):
+    @staticmethod
+    def _download_content_and_store(cached_file, file_url):
         response = requests.get(file_url, stream=True)
         if response.status_code != requests.codes.ok:
-            raise FileNotFoundInRepository(self, file_url)
+            raise FileNotFoundInRepository(file_url)
         for chunk in response.iter_content(chunk_size=4096):
             if chunk:
                 cached_file.write(chunk)
@@ -363,7 +366,8 @@ class RemoteFetcher(Fetcher):
         return cached_file
 
 
-    def _download_content_and_decompress(self, cached_file, file_url):
+    @staticmethod
+    def _download_content_and_decompress(cached_file, file_url):
         response = requests.get(file_url, stream=False)
         if response.status_code != requests.codes.ok:
             raise FileNotFoundInRepository(file_url)
@@ -375,13 +379,13 @@ class RemoteFetcher(Fetcher):
     def _retrieve_file(self, file_name):
         file_url = self._make_file_uri(file_name)
         cached_file = self.cache.add(file_name)
-        return self._download_content_and_decompress(cached_file, file_url)
+        return RemoteFetcher._download_content_and_decompress(cached_file, file_url)
 
 
     def retrieve_raw_file(self, file_name):
         cached_file = self.cache.add(file_name)
         file_url = self._make_file_uri(file_name)
-        return self._download_content_and_store(cached_file, file_url)
+        return RemoteFetcher._download_content_and_store(cached_file, file_url)
 
 
     def retrieve_file(self, file_name):
