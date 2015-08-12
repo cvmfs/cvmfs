@@ -164,7 +164,7 @@ class CatalogTreeIterator:
             self.catalog_reference = None
 
         def get_catalog(self):
-            if self.catalog == None:
+            if self.catalog is None:
                 self.catalog = self.catalog_reference.retrieve_from(self.repository)
             return self.catalog
 
