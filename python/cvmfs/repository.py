@@ -206,28 +206,37 @@ class Cache:
             cache_dir = tempfile.mkdtemp(dir='/tmp', prefix='cache.')
         self._cache_dir = cache_dir
         self._create_cache_structure()
-        
+
+
+    def cache_path(self):
+        return str(self._cache_dir)
+
+
     def _create_dir(self, path):
         cache_full_path = '/'.join([self._cache_dir, path])
         if not os.path.exists(cache_full_path):
             os.mkdir(cache_full_path, 0755)
-            
+
+
     def _create_cache_structure(self):
         self._create_dir('data')
         for i in range(0x00, 0xff + 1):
             new_folder = '{0:#0{1}x}'.format(i, 4)[2:]
             self._create_dir('data' + '/' + new_folder)
-       
+
+
     def add(self, file_name):
         full_path = '/'.join([self._cache_dir, file_name])
         return open(full_path, 'w+')
-    
+
+
     def get(self, file_name):
         full_path = '/'.join([self._cache_dir, file_name])
         if os.path.exists(full_path):
-            return open(full_path, "rb")
+            return open(full_path, 'rb')
         return None
-    
+
+
     def evict(self):
         for i in range(0x00, 0xff + 1):
             folder = '{0:#0{1}x}'.format(i, 4)[2:]
@@ -235,43 +244,67 @@ class Cache:
             os.remove(glob.glob(wildcard))
 
 
+
 class Fetcher:
     """ Abstract wrapper around a Fetcher """
-    
+
     __metadata__ = abc.ABCMeta
-    
+
     def __init__(self, cache_dir=''):
         self.cache = Cache(cache_dir)
-    
+
+    @staticmethod
+    def _write_content_into_file(content, opened_file):
+        """ Writes content into the opened file. The file must have write permission """
+        opened_file.write(content)
+        opened_file.seek(0)
+        opened_file.flush()
+
+
     @abc.abstractmethod
-    def retrieve_file(self, file_name):
+    def retrieve_file(self, file_name, decompress):
         """ Abstract method to retrieve a file from the repository """
         pass
 
 
+
 class LocalFetcher(Fetcher):
     """ Retrieves files ONLY from the local cache """
+
     def __init__(self, cache_dir=''):
         Fetcher.__init__(self, cache_dir)
-    
-    def retrieve_file(self, file_name, decompress=False):
+
+    @staticmethod
+    def _decompress_file(compressed_file):
+        decompressed_data = zlib.decompress(compressed_file.read())
+        temp_file_path = tempfile.mktemp(dir='/tmp')
+        temp_file = open(temp_file_path, 'w+')
+        Fetcher._write_content_into_file(decompressed_data, temp_file)
+        return temp_file
+
+    def retrieve_file(self, file_name, decompress):
+        """ The LocalFetcher does not store the decompressed version. Its cache usage is in read-only """
         cached_file = self.cache.get(file_name)
         if not cached_file:
             raise FileNotFoundInRepository(self, file_name)
+        if decompress:
+            decompressed_file = LocalFetcher._decompress_file(cached_file)
+            cached_file.close()
+            return decompressed_file
         return cached_file
-        
-    
+
+
+
 class RemoteFetcher(Fetcher):
     """ Retrieves files from the local cache if found, and from remote otherwise """
 
-
-    def __init__(self, repo_url, cache_dir=""):
+    def __init__(self, repo_url, cache_dir = ''):
         Fetcher.__init__(self, cache_dir)
         self._repo_url = repo_url
 
 
     def _download_content_and_store(self, cached_file, file_url):
-        response = requests.get(file_url, stream=True)
+        response = requests.get(file_url, stream = True)
         if response.status_code != requests.codes.ok:
             raise FileNotFoundInRepository(self, file_url)
         for chunk in response.iter_content(chunk_size=4096):
@@ -283,13 +316,11 @@ class RemoteFetcher(Fetcher):
 
 
     def _download_content_and_decompress(self, cached_file, file_url):
-        response = requests.get(file_url, stream=False)
+        response = requests.get(file_url, stream = False)
         if response.status_code != requests.codes.ok:
             raise FileNotFoundInRepository(self, file_url)
         decompressed_content = zlib.decompress(response.text)
-        cached_file.write(decompressed_content)
-        cached_file.seek(0)
-        cached_file.flush()
+        Fetcher._write_content_into_file(decompressed_content, cached_file)
         return cached_file
 
 
@@ -302,26 +333,26 @@ class RemoteFetcher(Fetcher):
             return self._download_content_and_decompress(cached_file, file_url)
 
 
-    def retrieve_file(self, file_name, decompress=False):
+    def retrieve_file(self, file_name, decompress):
         cached_file = self.cache.get(file_name)
         if cached_file:
             if not decompress:
                 return cached_file
         return self._retrieve_file(file_name, decompress)
-            
+
+
 
 class Repository:
     """ Wrapper around a CVMFS Repository representation """
 
-
     def __init__(self, cache_dir='', repo_url=''):
         if repo_url == '' and cache_dir == '':
-            raise Exception("repo_url and cache_dir cannot be empty at the same time")
+            raise Exception('repo_url and cache_dir cannot be empty at the same time')
         if repo_url == '':
             self._fetcher = LocalFetcher(cache_dir)
         else:
             self._fetcher = RemoteFetcher(repo_url, cache_dir)
-        self._storage_location = self._fetcher.cache._cache_dir
+        self._storage_location = self._fetcher.cache.cache_path()
         self._opened_catalogs = {}
         self._read_manifest()
         self._try_to_get_last_replication_timestamp()
@@ -411,9 +442,9 @@ class Repository:
         return Certificate(certificate)
 
 
-    def retrieve_file(self, file_name, decompress=False):
+    def retrieve_file(self, file_name, decompress = False):
         """ Method to retrieve a file from the repository """
-        return self._fetcher.retrieve_file(file_name)
+        return self._fetcher.retrieve_file(file_name, decompress)
 
 
     def retrieve_object(self, object_hash, hash_suffix = ''):
@@ -441,7 +472,6 @@ class Repository:
 
     def close_catalog(self, catalog):
         try:
-            open_catalog = self._opened_catalogs[catalog.hash]
             del self._opened_catalogs[catalog.hash]
         except KeyError, e:
             print "not found:" , catalog.hash
@@ -466,15 +496,15 @@ def all_local():
     d = _common._REPO_CONFIG_PATH
     if not os.path.isdir(d):
         raise _common.CvmfsNotInstalled
-    return [ LocalRepository(repo) for repo in os.listdir(d) if os.path.isdir(os.path.join(d, repo)) ]
+    return [ Repository(cache_dir=repo) for repo in os.listdir(d) if os.path.isdir(os.path.join(d, repo)) ]
 
 def all_local_stratum0():
     return [ repo for repo in all_local() if repo.type == 'stratum0' ]
 
 def open_repository(repository_path, public_key = None):
-    repo = RemoteRepository(repository_path)              \
+    repo = Repository(repo_url=repository_path)              \
                 if repository_path.startswith("http://")  \
-                else LocalRepository(repository_path)
+                else Repository(cache_dir=repository_path)
     if public_key and not repo.verify(public_key):
         return None
     return repo
