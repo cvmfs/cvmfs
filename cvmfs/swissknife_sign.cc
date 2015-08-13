@@ -235,3 +235,15 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   return 1;
 }
 
+
+void swissknife::CommandSign::CertificateUploadCallback(
+                                          const upload::SpoolerResult &result) {
+  shash::Any certificate_hash;
+  if (result.return_code == 0) {
+    certificate_hash = result.content_hash;
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate (retcod: %d)",
+             result.return_code);
+  }
+  certificate_hash_.Set(certificate_hash);
+}

@@ -7,7 +7,13 @@
 
 #include <string>
 
+#include "hash.h"
+#include "util_concurrency.h"
 #include "swissknife.h"
+
+namespace upload {
+  struct SpoolerResult;
+}
 
 namespace swissknife {
 
@@ -30,6 +36,12 @@ class CommandSign : public Command {
     return r;
   }
   int Main(const ArgumentList &args);
+
+ protected:
+  void CertificateUploadCallback(const upload::SpoolerResult &result);
+
+ private:
+  Future<shash::Any> certificate_hash_;
 };
 
 }  // namespace swissknife
