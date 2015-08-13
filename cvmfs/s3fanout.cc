@@ -202,7 +202,12 @@ void *S3FanoutManager::MainUpload(void *data) {
 
       s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info,
                                                                         handle);
-      assert(init_failure == s3fanout::kFailOk);
+      if (init_failure != s3fanout::kFailOk) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to initialize CURL handle "
+                                           "(error: %d - %s | errno: %d)",
+                 init_failure, Code2Ascii(init_failure), errno);
+        abort();
+      }
       s3fanout_mgr->SetUrlOptions(info);
 
       curl_multi_add_handle(s3fanout_mgr->curl_multi_, handle);
@@ -560,15 +565,24 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                      &content_md5);
     } else if (info->origin == kOriginPath) {
       bool hashretval = shash::HashFile(info->origin_path, &content_md5);
-      if (!hashretval)
+      if (!hashretval) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to hash file %s (errno: %d)",
+                 info->origin_path.c_str(), errno);
         return kFailLocalIO;
+      }
       int64_t file_size = GetFileSize(info->origin_path);
-      if (file_size == -1)
+      if (file_size == -1) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to stat file %s (errno: %d)",
+                 info->origin_path.c_str(), errno);
         return kFailLocalIO;
+      }
       assert(info->origin_file == NULL);
       info->origin_file = fopen(info->origin_path.c_str(), "r");
-      if (info->origin_file == NULL)
+      if (info->origin_file == NULL) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to open file %s (errno: %d)",
+                 info->origin_path.c_str(), errno);
         return kFailLocalIO;
+      }
       retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
                                 static_cast<curl_off_t>(file_size));
       assert(retval == CURLE_OK);
@@ -767,7 +781,13 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->http_headers = NULL;
     s3fanout::Failures init_failure = InitializeRequest(info,
                                                         info->curl_handle);
-    assert(init_failure == s3fanout::kFailOk);
+
+    if (init_failure != s3fanout::kFailOk) {
+      LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to initialize CURL handle "
+                                         "(error: %d - %s | errno: %d)",
+               init_failure, Code2Ascii(init_failure), errno);
+      abort();
+    }
     SetUrlOptions(info);
     // Reset origin
     if (info->origin == kOriginMem)

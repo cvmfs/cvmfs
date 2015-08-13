@@ -3,12 +3,6 @@ cvmfs_test_name="Migrating CernVM-FS 2.0 Repository to 2.1.x"
 cvmfs_test_autofs_on_startup=false
 
 
-get_cache_directory() {
-  local mountpoint="$1"
-  echo "${mountpoint}c"
-}
-
-
 get_talk_pipe() {
   local mountpoint="$1"
   local repo_name="$2"
@@ -64,27 +58,6 @@ stop_mocked_apache_access() {
   apache_switch on  > /dev/null
   curl --output /dev/null --silent --head --fail "$legacy_repo_url/.cvmfspublished" && die "fail (.cvmfspublished still reachable)"
   echo "done"
-}
-
-
-do_local_mount() {
-  local mountpoint="$1"
-  local repo_name="$2"
-  local repo_url="$3"
-  local cache="$(get_cache_directory $mountpoint)"
-  local config="${mountpoint}.conf"
-  local output="${mountpoint}.log"
-
-  mkdir $mountpoint $cache
-  cat > $config << EOF
-CVMFS_CACHE_BASE=$cache
-CVMFS_RELOAD_SOCKETS=$cache
-CVMFS_SERVER_URL=$repo_url
-CVMFS_HTTP_PROXY=DIRECT
-CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${repo_name}.pub
-CVMFS_KCACHE_TIMEOUT=15
-EOF
-  cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
 }
 
 
@@ -146,7 +119,7 @@ cvmfs_run_test() {
   local legacy_repo_name="testmigration.cern.ch"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
   local legacy_repo_url="$(get_local_repo_url $legacy_repo_name)"
-  local replica_name="${legacy_repo_name}.stratum1"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   local replica_url="$(get_repo_url $replica_name)"
   local key_location="/etc/cvmfs/keys"
   local s0_mnt="$(pwd)/s0"

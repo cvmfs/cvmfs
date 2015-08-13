@@ -192,7 +192,7 @@ cvmfs_run_test() {
   trap cleanup EXIT HUP INT TERM || return $?
 
   echo "create Stratum1 repository on the same machine"
-  local replica_name="${CVMFS_TEST_REPO}.replic"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   CVMFS_TEST_576_REPLICA_NAME="$replica_name"
   load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
@@ -205,6 +205,18 @@ cvmfs_run_test() {
 
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
   cvmfs_server snapshot $replica_name || return 2
+
+  echo -n "get Stratum 1 spool directory: "
+  load_repo_config $replica_name
+  local s1_spool_tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  load_repo_config $CVMFS_TEST_REPO
+  echo "$s1_spool_tmp_dir"
+
+  echo "check that tmp directory is empty after replicating"
+  local s1_tmp_no=
+  s1_tmp_no=$(ls "$s1_spool_tmp_dir" | wc -l)
+  echo "$s1_spool_tmp_dir contains: $s1_tmp_no entries"
+  [ $s1_tmp_no -eq 0 ] || return 101
 
   # ============================================================================
 
@@ -288,6 +300,11 @@ cvmfs_run_test() {
 
   echo "update the stratum 1"
   cvmfs_server snapshot $replica_name
+
+  echo "check that tmp directory is empty after replicating"
+  s1_tmp_no=$(ls "$s1_spool_tmp_dir" | wc -l)
+  echo "$s1_spool_tmp_dir contains: $s1_tmp_no entries"
+  [ $s1_tmp_no -eq 0 ] || return 102
 
   # ============================================================================
 

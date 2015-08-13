@@ -57,7 +57,7 @@ cvmfs_run_test() {
   sudo find /var/spool/cvmfs/$CVMFS_TEST_REPO/cache -type f | grep sha256 || return 11
 
   local mnt_point="$(pwd)/mountpoint"
-  local replica_name="$CVMFS_TEST_REPO.replic"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   echo "create Stratum1 repository on the same machine"
   load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
@@ -79,29 +79,21 @@ cvmfs_run_test() {
   echo sha1-hashed > /cvmfs/$CVMFS_TEST_REPO/sha1-hashed
   publish_repo $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 21; }
   sudo cvmfs_server resign $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 22; }
-  head -c8 /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished | grep sha256
-  if [ $? -eq 0 ]; then
-    desaster_cleanup $mnt_point $replica_name; return 23;
-  fi
+
+  echo "checking if the hash algorithm was changed"
+  local manifest_url="$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"
+  echo "Manifest URL: $manifest_url"
+  [ -z $(curl "$manifest_url" | grep -e '^C.*sha256$') ] || { desaster_cleanup $mnt_point $replica_name; return 23; }
 
   echo "replicating mixed hashes"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 24; }
 
   echo "mount the Stratum1 repository on a local mountpoint"
-  mkdir $mnt_point cache
-  cat > private.conf << EOF
-CVMFS_CACHE_BASE=$(pwd)/cache
-CVMFS_RELOAD_SOCKETS=$(pwd)/cache
-CVMFS_SERVER_URL=http://127.0.0.1/cvmfs/$replica_name
-CVMFS_HTTP_PROXY=DIRECT
-CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
-EOF
-  cvmfs2 -d -o config=private.conf $CVMFS_TEST_REPO $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 14; }
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 14; }
 
   echo "clean up"
   sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 15; }
   sudo cvmfs_server rmfs -f $replica_name
-
 
   return 0
 }

@@ -11,12 +11,14 @@ produce_files_in() {
   popdir
 }
 
-desaster_cleanup() {
-  local mountpoint=$1
-  local replica_name=$2
-
-  sudo umount $mountpoint > /dev/null 2>&1
-  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+CVMFS_TEST_538_SELINUX_DISABLED=0
+CVMFS_TEST_538_S1_NAME=
+CVMFS_TEST_538_MOUNTPOINT=
+cleanup() {
+  echo "running cleanup..."
+  [ $CVMFS_TEST_538_SELINUX_DISABLED -eq 0 ] || sudo setenforce 1
+  [ -z $CVMFS_TEST_538_S1_NAME ]             || sudo cvmfs_server rmfs -f $CVMFS_TEST_538_S1_NAME
+  [ -z $CVMFS_TEST_538_MOUNTPOINT ]          || sudo umount $CVMFS_TEST_538_MOUNTPOINT
 }
 
 cvmfs_run_test() {
@@ -29,7 +31,7 @@ cvmfs_run_test() {
   local reference_dir=$scratch_dir/reference_dir
 
   local mnt_point="$(pwd)/mountpount"
-  local replica_name="$CVMFS_TEST_REPO.replic"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
 
   local backend_dir="/srv/cvmfs/${replica_name}"
   local symlink_destination="${scratch_dir}/backend"
@@ -66,26 +68,29 @@ cvmfs_run_test() {
   mkdir $symlink_destination || return 6
   sudo ln --symbolic $symlink_destination $backend_dir || return 7
 
+  echo "register cleanup trap"
+  trap cleanup EXIT HUP INT TERM || return $?
+
   if has_selinux; then
     echo "make sure that SELinux does not interfere"
-    sudo setsebool httpd_enable_homedirs true || return 16
-    selinux_disabled=1
+    CVMFS_TEST_538_SELINUX_DISABLED=1
+    sudo setenforce 0 || return 16
   fi
 
   echo "create Stratum1 repository on the same machine"
   load_repo_config $CVMFS_TEST_REPO
+  CVMFS_TEST_538_S1_NAME="$replica_name"
   create_stratum1 $replica_name                          \
                   $CVMFS_TEST_USER                       \
                   $CVMFS_STRATUM0                        \
-                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
-    || { desaster_cleanup $mnt_point $replica_name; return 8; }
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub || return 8
 
   echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
-  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 9; }
+  cvmfs_server snapshot $replica_name || return 9
 
   echo "check if there is snapshot data in the symlink destination"
-  [ -f ${symlink_destination}/.cvmfspublished ] || { desaster_cleanup $mnt_point $replica_name; return 10; }
-  [ -d ${symlink_destination}/data ]             || { desaster_cleanup $mnt_point $replica_name; return 11; }
+  [ -f ${symlink_destination}/.cvmfspublished ] || return 10
+  [ -d ${symlink_destination}/data ]            || return 11
 
   echo "mount the Stratum1 repository on a local mountpoint"
   mkdir $mnt_point cache
@@ -96,24 +101,14 @@ CVMFS_SERVER_URL=http://127.0.0.1/cvmfs/$replica_name
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
 EOF
-  cvmfs2 -d -o config=private.conf test.cern.ch $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 12; }
+  CVMFS_TEST_538_MOUNTPOINT="$mnt_point"
+  cvmfs2 -d -o config=private.conf test.cern.ch $mnt_point >> cvmfs2_output.log 2>&1 || return 12
 
   echo "check the integrity of the stratum 1"
-  check_repository $replica_name -i || { desaster_cleanup $mnt_point $replica_name; return 13; }
+  check_repository $replica_name -i || return 13
 
   echo "check if the Stratum1 repository contains exactly the same as the reference copy"
-  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 14; }
-
-  echo "unmount the Stratum1 repository"
-  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 15; }
-
-  echo "clean up"
-  sudo cvmfs_server rmfs -f $replica_name
-
-  if [ $selinux_disabled -ne 0 ]; then
-    echo "reverting SELinux config"
-    sudo setsebool httpd_enable_homedirs false || return 17
-  fi
+  compare_directories $mnt_point $reference_dir || return 14
 
   return 0
 }

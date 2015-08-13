@@ -126,12 +126,14 @@ class Catalog : public SingleCopy {
   }
 
   bool ListingMd5Path(const shash::Md5 &md5path,
-                      DirectoryEntryList *listing) const;
+                      DirectoryEntryList *listing,
+                      const bool expand_symlink = true) const;
   inline bool ListingPath(const PathString &path,
-                      DirectoryEntryList *listing) const
+                          DirectoryEntryList *listing,
+                          const bool expand_symlink = true) const
   {
     return ListingMd5Path(shash::Md5(path.GetChars(), path.GetLength()),
-                          listing);
+                          listing, expand_symlink);
   }
   bool ListingMd5PathStat(const shash::Md5 &md5path,
                           StatEntryList *listing) const;

@@ -269,12 +269,20 @@ install_from_repo() {
 
 
 install_ruby_gem() {
-  local gem_name=$1
+  local gem_name="$1"
+  local gem_version="$2"
   local pkg_mgr_name="gem"
   local pkg_mgr_output=""
 
-  echo -n "Installing Ruby gem '$gem_name' ... "
-  pkg_mgr_output=$(sudo gem install $gem_name 2>&1)
+  local gem_install_cmd="sudo gem install $gem_name"
+  if [ ! -z "$gem_version" ]; then
+    gem_install_cmd="$gem_install_cmd --version $gem_version"
+  else
+    gem_version="latest"
+  fi
+
+  echo -n "Installing Ruby gem '$gem_name' (version: $gem_version) ... "
+  pkg_mgr_output=$($gem_install_cmd 2>&1)
   check_package_manager_response $? $pkg_mgr_name "$pkg_mgr_output"
 }
 
