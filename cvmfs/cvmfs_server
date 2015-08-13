@@ -484,19 +484,22 @@ check_multiple_repository_existence() {
 
 
 # checks if the aufs kernel module is present
-#
+# of if aufs is compiled in
 # @return   0 if the aufs kernel module is loaded
 check_aufs() {
-  /sbin/modprobe -q aufs || test -d /sys/fs/aufs
+  /sbin/modprobe -q aufs || test -d /sys/fs/aufs || \
+  test x"$(zgrep AUFS_FS /proc/config.gz | awk -F = '{print $2}')" = xy	
 }
 
 
-# checks if the overlayfs kernel module is present
-#
+# checks if the overlayfs kernel module is present 
+# of if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
+  
   /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
-  /sbin/modprobe -q overlay   || test -d /sys/module/overlay
+  /sbin/modprobe -q overlay   || test -d /sys/module/overlay || \
+  test x"$(zgrep OVERLAY_FS /proc/config.gz | awk -F = '{print $2}')" = xy
 }
 
 # check if at least one of the supported union file systems is available
@@ -519,7 +522,8 @@ get_overlayfs_name() {
   check_overlayfs || die "overlayfs is not installed!"
   if /sbin/modprobe -q overlayfs || [ -d /sys/module/overlayfs ]; then
     echo "overlayfs"
-  elif /sbin/modprobe -q overlay || [ -d /sys/module/overlay ]; then
+  elif /sbin/modprobe -q overlay || [ -d /sys/module/overlay ] || \
+       test x"$(zgrep OVERLAY_FS /proc/config.gz | awk -F = '{print $2}')" = xy ; then
     echo "overlay"
   else
     die "cannot determine overlayfs name"
