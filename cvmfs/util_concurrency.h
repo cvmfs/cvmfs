@@ -310,8 +310,9 @@ class Observable;
 template <typename ParamT>
 class Observable : public Callbackable<ParamT>,
                    SingleCopy {
- protected:
+ public:
   typedef typename Callbackable<ParamT>::CallbackTN*  CallbackPtr;
+ protected:
   typedef std::set<CallbackPtr>                       Callbacks;
 
  public:
