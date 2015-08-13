@@ -269,16 +269,6 @@ class Fetcher:
 
 
     @staticmethod
-    def _decompress_file(compressed_file):
-        """ Decompresses a file in a temporary directory """
-        decompressed_data = zlib.decompress(compressed_file.read())
-        temp_file_path = tempfile.mktemp(dir='/tmp')
-        temp_file = open(temp_file_path, 'w+')
-        Fetcher._write_content_into_file(decompressed_data, temp_file)
-        return temp_file
-
-
-    @staticmethod
     def _write_content_into_file(content, opened_file):
         """ Writes content into the opened file. The file must have
          write permission
@@ -289,7 +279,9 @@ class Fetcher:
 
 
     def retrieve_file(self, file_name):
-        """ Method to retrieve a file from the repository """
+        """ Method to retrieve a file from the cache if exists, or from
+        the repository if it doesn't
+        """
         cached_file = self.cache.get(file_name)
         if not cached_file:
             return self._retrieve_file(file_name)
