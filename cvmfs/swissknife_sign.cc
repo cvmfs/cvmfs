@@ -145,6 +145,11 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     const shash::Any certificate_hash = certificate_hash_.Get();
     spooler->UnregisterListener(callback);
 
+    if (certificate_hash.IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate");
+      goto sign_fail;
+    }
+
     // Update manifest
     manifest->set_certificate(certificate_hash);
     manifest->set_repository_name(repo_name);
