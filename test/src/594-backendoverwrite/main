@@ -1,0 +1,175 @@
+
+cvmfs_test_name="Backend File Overwrite Behaviour"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  currd="$(pwd)"
+
+  pushdir $working_dir
+
+  echo "meaningless file content" > file1
+  echo "more clever file content" > file2
+
+  cp ${currd}/big big
+
+  popdir
+}
+
+change_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # change the big file slightly close to the end
+  # Note: replaces four bytes in the last 1MiB block of the file
+  local fiddle_string="MOEP"
+  local last_block=$(( 1024 * 1024 - $(echo -n "$fiddle_string" | wc -c) ))
+
+  dd if=big of=big_changed bs=1024k count=49
+  echo -n "$fiddle_string" >> big_changed
+  tail -c $last_block big  >> big_changed
+
+  # touch one of the small files and edit the other one
+  touch file1
+  echo "way more stuff in this file" >> file2
+
+  popdir
+}
+
+
+get_last_modified_timestamps_in_backend() {
+  for f in $(find /srv/cvmfs/$CVMFS_TEST_REPO/data/ | \
+      grep -E "^/srv/cvmfs/$CVMFS_TEST_REPO/data/[a-z0-9]+/[a-z0-9]+.$"); do
+    echo "$f $(stat -c %Y $f)"
+  done
+}
+
+compare_file_modification_times() {
+  local before=$1
+  local after=$2
+
+  local old_ifs=$IFS
+  IFS='
+'
+
+  local touches=0
+  local adds=0
+
+  # O(n^2) takes forever... but hey... :-)
+  for l1 in $(cat $after); do
+    local file=$(echo "$l1" | awk '{print $1}')
+    local mtime=$(echo "$l1" | awk '{print $2}')
+    local found=0
+
+    for l2 in $(cat $before); do
+      local file2=$(echo "$l2" | awk '{print $1}')
+      local mtime2=$(echo "$l2" | awk '{print $2}')
+
+      if [ x"$file" = x"$file2" ]; then
+        found=1
+        if [ x"$mtime" != x"$mtime2" ]; then
+          echo "TOUCH $file" >&2
+          touches=$(( $touches + 1 ))
+        fi
+      fi
+    done
+
+    if [ $found -eq 0 ]; then
+      echo "ADDED $file" >&2
+      adds=$(( $adds + 1 ))
+    fi
+  done
+
+  IFS=$old_ifs
+  echo "$touches $adds"
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "create a random big file"
+  dd if=/dev/urandom of=big bs=1024k count=50
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir|| return $?
+
+  echo "take note of last file changes in the backend"
+  local mtime_log_1="mtime_1.log"
+  get_last_modified_timestamps_in_backend > $mtime_log_1
+
+  # ============================================================================
+
+  echo "wait a moment to avoid race conditions"
+  sleep 2
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "change stuff in the repository"
+  change_files_in $repo_dir || return 7
+
+  echo "change exactly the same stuff in the scratch space"
+  change_files_in $reference_dir || return 8
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the changed directories"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "take note of last file changes in the backend"
+  local mtime_log_2="mtime_2.log"
+  get_last_modified_timestamps_in_backend > $mtime_log_2
+
+  # ============================================================================
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  echo "check that legacy files haven't been modified by the second publish"
+  local comparison_log="comparison.log"
+  local summary=$(compare_file_modification_times $mtime_log_1 $mtime_log_2 2>$comparison_log)
+  local touches=$(echo $summary | awk '{print $1}')
+  local adds=$(echo $summary | awk '{print $2}')
+
+  echo "Summary:"
+  echo "Touches:   $touches"
+  echo "Additions: $adds"
+
+  if [ $touches -gt 0 ]; then
+    echo "found touched files in the backend, printing log:"
+    cat $comparison_log
+    return 9
+  fi
+
+  return 0
+}
