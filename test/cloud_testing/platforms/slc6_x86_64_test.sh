@@ -115,6 +115,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/583-httpredirects                        \
                                src/585-xattrs                               \
                                src/591-importrepo                           \
+                               src/594-backendoverwrite                     \
                                --                                           \
                                src/5* || retval=1
 
