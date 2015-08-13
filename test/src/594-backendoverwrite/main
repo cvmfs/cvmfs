@@ -171,5 +171,10 @@ cvmfs_run_test() {
     return 9
   fi
 
+  # ============================================================================
+
+  echo "check that the transaction directory is empty"
+  [ $(ls /srv/cvmfs/${CVMFS_TEST_REPO}/data/txn | wc -l) -eq 0 ] || return 10
+
   return 0
 }
