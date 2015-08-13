@@ -115,16 +115,18 @@ class InodeGenerationAnnotation : public InodeAnnotation {
   uint64_t inode_offset_;
 };
 
-
+template <class CatalogT>
 class AbstractCatalogManager;
+
 /**
  * Here, the Cwd Buffer is registered in order to save the inodes of
  * processes' cwd before a new catalog snapshot is applied
  */
+template <class CatalogT>
 class RemountListener {
  public:
   virtual ~RemountListener() { }
-  virtual void BeforeRemount(AbstractCatalogManager *source) = 0;
+  virtual void BeforeRemount(AbstractCatalogManager<CatalogT> *source) = 0;
 };
 
 
@@ -142,7 +144,11 @@ class RemountListener {
  *   catalog_manager->Init();
  *   catalog_manager->Lookup(<inode>, &<result_entry>);
  */
+template <class CatalogT>
 class AbstractCatalogManager : public SingleCopy {
+ public:
+  typedef std::vector<CatalogT*> CatalogList;
+
  public:
   static const inode_t kInodeOffset = 255;
   explicit AbstractCatalogManager(perf::Statistics *statistics);
@@ -179,7 +185,7 @@ class AbstractCatalogManager : public SingleCopy {
                       const shash::Algorithms interpret_hashes_as,
                       FileChunkList *chunks);
 
-  void RegisterRemountListener(RemountListener *listener) {
+  void RegisterRemountListener(RemountListener<CatalogT> *listener) {
     WriteLock();
     remount_listener_ = listener;
     Unlock();
@@ -225,8 +231,8 @@ class AbstractCatalogManager : public SingleCopy {
                                 const shash::Any &hash,
                                 std::string  *catalog_path,
                                 shash::Any   *catalog_hash) = 0;
-  virtual void UnloadCatalog(const Catalog *catalog) { }
-  virtual void ActivateCatalog(Catalog *catalog) { }
+  virtual void UnloadCatalog(const CatalogT *catalog) { }
+  virtual void ActivateCatalog(CatalogT *catalog) { }
 
   /**
    * Create a new Catalog object.
@@ -237,24 +243,24 @@ class AbstractCatalogManager : public SingleCopy {
    * @param parent_catalog  the parent of the catalog to create
    * @return a newly created (derived) Catalog
    */
-  virtual Catalog* CreateCatalog(const PathString  &mountpoint,
-                                 const shash::Any  &catalog_hash,
-                                 Catalog *parent_catalog) = 0;
+  virtual CatalogT* CreateCatalog(const PathString  &mountpoint,
+                                  const shash::Any  &catalog_hash,
+                                  CatalogT *parent_catalog) = 0;
 
-  Catalog *MountCatalog(const PathString &mountpoint, const shash::Any &hash,
-                        Catalog *parent_catalog);
-  bool MountSubtree(const PathString &path, const Catalog *entry_point,
-                    Catalog **leaf_catalog);
+  CatalogT *MountCatalog(const PathString &mountpoint, const shash::Any &hash,
+                         CatalogT *parent_catalog);
+  bool MountSubtree(const PathString &path, const CatalogT *entry_point,
+                    CatalogT **leaf_catalog);
 
-  bool AttachCatalog(const std::string &db_path, Catalog *new_catalog);
-  void DetachCatalog(Catalog *catalog);
-  void DetachSubtree(Catalog *catalog);
+  bool AttachCatalog(const std::string &db_path, CatalogT *new_catalog);
+  void DetachCatalog(CatalogT *catalog);
+  void DetachSubtree(CatalogT *catalog);
   void DetachAll() { if (!catalogs_.empty()) DetachSubtree(GetRootCatalog()); }
   bool IsAttached(const PathString &root_path,
-                  Catalog **attached_catalog) const;
+                  CatalogT **attached_catalog) const;
 
-  inline Catalog* GetRootCatalog() const { return catalogs_.front(); }
-  Catalog *FindCatalog(const PathString &path) const;
+  inline CatalogT* GetRootCatalog() const { return catalogs_.front(); }
+  CatalogT *FindCatalog(const PathString &path) const;
 
   inline void ReadLock() const {
     int retval = pthread_rwlock_rdlock(rwlock_);
@@ -290,13 +296,13 @@ class AbstractCatalogManager : public SingleCopy {
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;
-  RemountListener *remount_listener_;
+  RemountListener<CatalogT> *remount_listener_;
   OwnerMap uid_map_;
   OwnerMap gid_map_;
 
   // Not needed anymore since there are the glue buffers
   // Catalog *Inode2Catalog(const inode_t inode);
-  std::string PrintHierarchyRecursively(const Catalog *catalog,
+  std::string PrintHierarchyRecursively(const CatalogT *catalog,
                                         const int level) const;
 
   InodeRange AcquireInodes(uint64_t size);
@@ -304,5 +310,7 @@ class AbstractCatalogManager : public SingleCopy {
 };  // class CatalogManager
 
 }  // namespace catalog
+
+#include "catalog_mgr_impl.h"
 
 #endif  // CVMFS_CATALOG_MGR_H_

@@ -50,7 +50,7 @@ namespace catalog {
  * Unpin() method of the corresponding quota manager; loaded catalogs need to
  * be unpinned when the class is destructed.
  */
-class ClientCatalogManager : public AbstractCatalogManager {
+class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   // Maintains certificate hit/miss counters
   friend class CachedManifestEnsemble;
 

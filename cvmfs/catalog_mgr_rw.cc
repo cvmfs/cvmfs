@@ -174,7 +174,8 @@ bool WritableCatalogManager::FindCatalog(const string &path,
                                          WritableCatalog **result)
 {
   Catalog *best_fit =
-    AbstractCatalogManager::FindCatalog(PathString(path.data(), path.length()));
+    AbstractCatalogManager<Catalog>::FindCatalog(PathString(path.data(),
+                                                            path.length()));
   assert(best_fit != NULL);
   Catalog *catalog = NULL;
   bool retval = MountSubtree(PathString(path.data(), path.length()),

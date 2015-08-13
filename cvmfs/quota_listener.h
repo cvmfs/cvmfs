@@ -21,16 +21,20 @@
 
 class QuotaManager;
 namespace catalog {
+template <class CatalogT>
 class AbstractCatalogManager;
+class Catalog;
 }
 
 namespace quota {
+
+typedef catalog::AbstractCatalogManager<catalog::Catalog> CatalogManager;
 
 struct ListenerHandle;
 
 ListenerHandle *
 RegisterUnpinListener(QuotaManager *quota_manager,
-                      catalog::AbstractCatalogManager *catalog_manager,
+                      CatalogManager *catalog_manager,
                       const std::string &repository_name);
 ListenerHandle * RegisterWatchdogListener(QuotaManager *quota_manager,
                                           const std::string &repository_name);

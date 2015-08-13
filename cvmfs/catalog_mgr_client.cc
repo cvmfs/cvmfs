@@ -34,7 +34,7 @@ ClientCatalogManager::ClientCatalogManager(
   cvmfs::Fetcher *fetcher,
   signature::SignatureManager *signature_mgr,
   perf::Statistics *statistics)
-  : AbstractCatalogManager(statistics)
+  : AbstractCatalogManager<Catalog>(statistics)
   , repo_name_(repo_name)
   , fetcher_(fetcher)
   , signature_mgr_(signature_mgr)
