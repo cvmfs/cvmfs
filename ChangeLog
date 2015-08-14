@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix crash for invalid spooler definition (CVM-891)
   * Fix leak of temporary files in the S3 backend (CVM-881)
   * Add -s <S3 config file> switch to add-replica command
   * Fix rare crashes on publish due to false whiteout handling (CVM-880)
