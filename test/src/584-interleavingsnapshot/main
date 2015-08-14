@@ -6,21 +6,22 @@ cvmfs_test_autofs_on_startup=false
 create_fake_lock() {
   local name=$1
   load_repo_config $name
-  echo "creating ${CVMFS_SPOOL_DIR}/is_snapshotting"
-  mkdir ${CVMFS_SPOOL_DIR}/is_snapshotting
+  echo "creating ${CVMFS_SPOOL_DIR}/is_snapshotting.lock"
+  echo "$$" > ${CVMFS_SPOOL_DIR}/is_snapshotting.lock # use our own PID to fool
+                                                      # the stale lock check
 }
 
 remove_fake_lock() {
   local name=$1
   load_repo_config $name
-  echo "removing ${CVMFS_SPOOL_DIR}/is_snapshotting"
-  rmdir ${CVMFS_SPOOL_DIR}/is_snapshotting
+  echo "removing ${CVMFS_SPOOL_DIR}/is_snapshotting.lock"
+  rm -f ${CVMFS_SPOOL_DIR}/is_snapshotting.lock
 }
 
 check_lock() {
   local name=$1
   load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/is_snapshotting ]
+  [ -f ${CVMFS_SPOOL_DIR}/is_snapshotting.lock ]
 }
 
 run_background_snapshot() {
