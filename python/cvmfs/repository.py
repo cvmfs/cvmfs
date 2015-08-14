@@ -271,11 +271,10 @@ class Fetcher:
     @staticmethod
     def _write_content_into_file(content, opened_file):
         """ Writes content into the opened file. The file must have
-         write permission
+         write permission. The file is closed after after the operation
         """
         opened_file.write(content)
-        opened_file.seek(0)
-        opened_file.flush()
+        opened_file.close()
 
 
     def retrieve_file(self, file_name):
@@ -316,7 +315,7 @@ class LocalFetcher(Fetcher):
             compressed_file.close()
             cached_file = self.cache.add(file_name)
             self._write_content_into_file(decompressed_content, cached_file)
-            return cached_file
+            return self.cache.get(file_name)
         else:
             raise FileNotFoundInRepository(file_name)
 
@@ -328,7 +327,6 @@ class LocalFetcher(Fetcher):
             cached_file = self.cache.add(file_name)
             compressed_file = open(full_path, 'r')
             Fetcher._write_content_into_file(compressed_file.read(), cached_file)
-            cached_file.close()
             compressed_file.seek(0)
             return compressed_file
         raise FileNotFoundInRepository(file_name)
@@ -351,9 +349,7 @@ class RemoteFetcher(Fetcher):
         for chunk in response.iter_content(chunk_size=4096):
             if chunk:
                 cached_file.write(chunk)
-        cached_file.seek(0)
-        cached_file.flush()
-        return cached_file
+        cached_file.close()
 
 
     @staticmethod
@@ -363,19 +359,20 @@ class RemoteFetcher(Fetcher):
             raise FileNotFoundInRepository(file_url)
         decompressed_content = zlib.decompress(response.content)
         Fetcher._write_content_into_file(decompressed_content, cached_file)
-        return cached_file
 
 
     def _retrieve_file(self, file_name):
         file_url = self._make_file_uri(file_name)
         cached_file = self.cache.add(file_name)
-        return RemoteFetcher._download_content_and_decompress(cached_file, file_url)
+        RemoteFetcher._download_content_and_decompress(cached_file, file_url)
+        return self.cache.get(file_name)
 
 
     def retrieve_raw_file(self, file_name):
         cached_file = self.cache.add(file_name)
         file_url = self._make_file_uri(file_name)
-        return RemoteFetcher._download_content_and_store(cached_file, file_url)
+        RemoteFetcher._download_content_and_store(cached_file, file_url)
+        return self.cache.get(file_name)
 
 
 
