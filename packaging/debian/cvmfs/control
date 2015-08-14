@@ -28,7 +28,7 @@ Description: CernVM File System Server
 Package: cvmfs-unittests
 Architecture: i386 amd64 arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: libssl-dev, uuid-dev, cvmfs (= ${source:Version}), cvmfs-server (= ${source:Version})
+Depends: libssl-dev, uuid-dev, cvmfs-server (= ${source:Version})
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
 Description: CernVM File System Unit Tests
