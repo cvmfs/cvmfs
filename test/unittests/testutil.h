@@ -352,7 +352,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     return std::vector<MockCatalog*>();
   }
   bool HasParent() const { return parent_ != NULL; }
-  void RemoveChild(MockCatalog *child) { }
+  void RemoveChild(MockCatalog *child);
   catalog::InodeRange inode_range() const { return catalog::InodeRange(); }
   bool OpenDatabase(const std::string &db_path) { return true; }
   uint64_t max_row_id() const { return std::numeric_limits<uint64_t>::max(); }
@@ -361,7 +361,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   void SetOwnerMaps(const catalog::OwnerMap *uid_map,
                     const catalog::OwnerMap *gid_map) { }
   bool IsInitialized() const { return true; }
-  MockCatalog* FindSubtree(const PathString &path) const { return NULL; }
+  MockCatalog* FindSubtree(const PathString &path) const;
 
 
  protected:
@@ -392,7 +392,6 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     return (previous_ != NULL) ? previous_->hash() : shash::Any();
   }
 
- public:
   const PathString   path()          const { return PathString(root_path_);  }
   const std::string& root_path()     const { return root_path_;              }
   const shash::Any&  hash()          const { return catalog_hash_;           }
@@ -453,9 +452,9 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
     return kLoadNew;
   }
 
-  virtual Catalog* CreateCatalog(const PathString  &mountpoint,
+  virtual MockCatalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
-                                 Catalog *parent_catalog);
+                                 MockCatalog *parent_catalog);
 
 };
 

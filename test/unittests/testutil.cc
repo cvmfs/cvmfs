@@ -245,6 +245,26 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
   return new_catalog;
 }
 
+void MockCatalog::RemoveChild(MockCatalog *child) {
+  std::vector<NestedCatalog>::iterator iter = children_.begin();
+  bool found = false;
+  while (!found && iter != children_.end()) {
+    if (iter->hash == child->hash()) {
+      children_.erase(iter);
+      found = true;
+    }
+    iter++;
+  }
+}
+
+MockCatalog* MockCatalog::FindSubtree(const PathString &path) const {
+  for (unsigned i = 0; i < children_.size(); ++i) {
+    if (children_[i].path == path)
+      return children_[i].child;
+  }
+  return NULL;
+}
+
 void MockCatalog::RegisterChild(MockCatalog *child) {
   NestedCatalog nested;
   nested.path  = PathString(child->root_path());
@@ -290,6 +310,20 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
   }
 
   return referenced_objects_;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+MockCatalog* catalog::MockCatalogManager::CreateCatalog(
+                               const PathString  &mountpoint,
+                               const shash::Any  &catalog_hash,
+                               MockCatalog *parent_catalog)
+{
+  bool is_root = parent_catalog == NULL;
+  return new MockCatalog(mountpoint.ToString(), catalog_hash, 4096, 1231,
+                         0, is_root, parent_catalog, NULL);
 }
 
 

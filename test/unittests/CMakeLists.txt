@@ -23,6 +23,7 @@ set(CVMFS_UNITTEST_FILES
   t_polymorphic_construction.cc
   t_catalog_counters.cc
   t_catalog_traversal.cc
+  t_catalog_mgr.cc
   t_fs_traversal.cc
   t_pipe.cc
   t_prng.cc
