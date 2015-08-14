@@ -1047,33 +1047,6 @@ publish_succeeded() {
   release_lock $pub_lock
 }
 
-acquire_snapshot_lock() {
-  local name=$1
-  load_repo_config $name
-  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
-  mkdir $snapshot_lock > /dev/null 2>&1 || return 1
-}
-
-wait_and_acquire_snapshot_lock() {
-  local name=$1
-  while ! acquire_snapshot_lock $name; do
-    sleep 10
-  done
-}
-
-release_snapshot_lock() {
-  local name=$1
-  load_repo_config $name
-  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
-  rmdir $snapshot_lock > /dev/null 2>&1
-}
-
-is_snapshotting() {
-  local name=$1
-  load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/is_snapshotting ]
-}
-
 
 # checks if a user exists in the system
 #
@@ -4332,8 +4305,8 @@ __snapshot_cleanup() {
 
   $user_shell "$(__swissknife_cmd) remove     \
                  -r ${CVMFS_UPSTREAM_STORAGE} \
-                 -o .cvmfs_is_snapshotting" || echo "Warning: failed to remove .cvmfs_is_snapshotting"
-  release_snapshot_lock $alias_name         || echo "Warning: failed to release snapshotting lock"
+                 -o .cvmfs_is_snapshotting"       || echo "Warning: failed to remove .cvmfs_is_snapshotting"
+  release_lock ${CVMFS_SPOOL_DIR}/is_snapshotting || echo "Warning: failed to release snapshotting lock"
 }
 
 snapshot() {
@@ -4387,6 +4360,7 @@ snapshot() {
     public_key=$CVMFS_PUBLIC_KEY
     timeout=$CVMFS_HTTP_TIMEOUT
     retries=$CVMFS_HTTP_RETRIES
+    snapshot_lock=${spool_dir}/is_snapshotting
 
     # more sanity checks
     is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
@@ -4411,7 +4385,7 @@ snapshot() {
     fi
 
     # check for other snapshots in progress
-    if ! acquire_snapshot_lock $alias_name; then
+    if ! acquire_lock $snapshot_lock; then
       if [ $abort_on_conflict -eq 1 ]; then
         echo "another snapshot is in progress... aborting"
         retcode=1
@@ -4425,7 +4399,7 @@ snapshot() {
       fi
 
       echo "waiting for another snapshot to finish..."
-      if ! wait_and_acquire_snapshot_lock $alias_name; then
+      if ! wait_and_acquire_lock $snapshot_lock; then
         echo "failed to acquire snapshot lock"
         retcode=1
         continue
