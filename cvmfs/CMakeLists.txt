@@ -185,6 +185,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   manifest_fetch.cc manifest_fetch.h
   object_fetcher.h
   options.cc options.h
+  pack.cc pack.h
   path_filters/dirtab.cc path_filters/dirtab.h
   path_filters/relaxed_path_filter.cc path_filters/relaxed_path_filter.h
   pathspec/pathspec.cc pathspec/pathspec.h
