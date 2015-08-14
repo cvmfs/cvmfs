@@ -115,12 +115,12 @@ EOF
   echo "check the contents of the hooks"
   cat ${hook_dir}/transaction_before_hook | grep -q  "transaction_before_hook" || return 8
   cat ${hook_dir}/transaction_before_hook | grep -q  "$CVMFS_TEST_REPO"        || return 9
-  cat ${hook_dir}/transaction_before_hook | grep -qv "in_transaction"          || return 10
+  cat ${hook_dir}/transaction_before_hook | grep -qv "in_transaction.lock"     || return 10
   cat ${hook_dir}/transaction_before_hook | grep -q  "$user_string"            || return 11
 
   cat ${hook_dir}/transaction_after_hook  | grep -q "transaction_after_hook"  || return 12
   cat ${hook_dir}/transaction_after_hook  | grep -q "$CVMFS_TEST_REPO"        || return 13
-  cat ${hook_dir}/transaction_after_hook  | grep -q "in_transaction"          || return 14
+  cat ${hook_dir}/transaction_after_hook  | grep -q "in_transaction.lock"     || return 14
   cat ${hook_dir}/transaction_after_hook  | grep -q "$user_string"            || return 15
 
   # ============================================================================
@@ -184,15 +184,15 @@ EOF
   echo "check the contents of the publishing hooks"
   cat ${hook_dir}/publish_before_hook | grep -q  "publish_before_hook"         || return 24
   cat ${hook_dir}/publish_before_hook | grep -q  "$CVMFS_TEST_REPO"            || return 25
-  cat ${hook_dir}/publish_before_hook | grep -q  "in_transaction"              || return 26
-  cat ${hook_dir}/publish_before_hook | grep -qv "is_publishing"               || return 27
+  cat ${hook_dir}/publish_before_hook | grep -q  "in_transaction.lock"         || return 26
+  cat ${hook_dir}/publish_before_hook | grep -qv "is_publishing.lock"          || return 27
   cat ${hook_dir}/publish_before_hook | grep -q  "/cvmfs/$CVMFS_TEST_REPO.*rw" || return 28
   cat ${hook_dir}/publish_before_hook | grep -q  "$user_string"                || return 29
 
   cat ${hook_dir}/publish_after_hook  | grep -q  "publish_after_hook"          || return 30
   cat ${hook_dir}/publish_after_hook  | grep -q  "$CVMFS_TEST_REPO"            || return 31
-  cat ${hook_dir}/publish_after_hook  | grep -qv "in_transaction"              || return 32
-  cat ${hook_dir}/publish_after_hook  | grep -qv "is_publishing"               || return 33
+  cat ${hook_dir}/publish_after_hook  | grep -qv "in_transaction.lock"         || return 32
+  cat ${hook_dir}/publish_after_hook  | grep -qv "is_publishing.lock"          || return 33
   cat ${hook_dir}/publish_after_hook  | grep -q  "/cvmfs/$CVMFS_TEST_REPO.*ro" || return 34
   cat ${hook_dir}/publish_after_hook  | grep -q  "$user_string"                || return 35
 
@@ -263,15 +263,15 @@ EOF
   echo "check the contents of the abort hooks"
   cat ${hook_dir}/abort_before_hook | grep -q  "abort_before_hook"           || return 45
   cat ${hook_dir}/abort_before_hook | grep -q  "$CVMFS_TEST_REPO"            || return 46
-  cat ${hook_dir}/abort_before_hook | grep -q  "in_transaction"              || return 47
-  cat ${hook_dir}/abort_before_hook | grep -qv "is_publishing"               || return 48
+  cat ${hook_dir}/abort_before_hook | grep -q  "in_transaction.lock"         || return 47
+  cat ${hook_dir}/abort_before_hook | grep -qv "is_publishing.lock"          || return 48
   cat ${hook_dir}/abort_before_hook | grep -q  "/cvmfs/$CVMFS_TEST_REPO.*rw" || return 49
   cat ${hook_dir}/abort_before_hook | grep -q  "will_be_aborted"             || return 50
   cat ${hook_dir}/abort_before_hook | grep -q  "$user_string"                || return 51
 
   cat ${hook_dir}/abort_after_hook  | grep -q  "abort_after_hook"            || return 52
   cat ${hook_dir}/abort_after_hook  | grep -q  "$CVMFS_TEST_REPO"            || return 53
-  cat ${hook_dir}/abort_after_hook  | grep -qv "in_transaction"              || return 54
+  cat ${hook_dir}/abort_after_hook  | grep -qv "in_transaction.lock"         || return 54
   cat ${hook_dir}/abort_after_hook  | grep -q  "/cvmfs/$CVMFS_TEST_REPO.*ro" || return 55
   cat ${hook_dir}/abort_after_hook  | grep -qv "will_be_aborted"             || return 56
   cat ${hook_dir}/abort_after_hook  | grep -q  "$user_string"                || return 57
