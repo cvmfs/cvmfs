@@ -892,6 +892,72 @@ get_auto_garbage_collection_timespan() {
   fi
 }
 
+
+# Helper functions for file locking including detection of stale locks
+# Note: The implementation idea was found here:
+#       http://rute.2038bug.com/node23.html.gz
+__is_valid_lock() {
+  local path="$1"
+  local ignore_stale="$2"
+
+  local lock_file="${path}.lock"
+  [ -f $lock_file ]      || return 1 # lock doesn't exist
+  [ -z "$ignore_stale" ] || return 0 # lock is there (skip the stale test)
+
+  local stale_pid=$(cat $lock_file 2>/dev/null)
+  [ $stale_pid -gt 0 ]     && \
+  kill -0 $stale_pid 2>/dev/null
+}
+
+acquire_lock() { # hardlink creation is guaranteed to be atomic!
+  local path="$1"
+  local ignore_stale="$2"
+
+  local pid="$$"
+  local temp_file="${path}.${pid}"
+  local lock_file="${path}.lock"
+  echo $pid > $temp_file || return 1 # probably no access to $path
+
+  if ln $temp_file $lock_file 2>/dev/null; then
+    rm -f $temp_file 2>/dev/null
+    return 0 # lock acquired
+  fi
+
+  if __is_valid_lock "$path" "$ignore_stale"; then
+    rm -f $temp_file 2>/dev/null
+    return 1 # lock couldn't be acquired and appears valid
+  fi
+
+  rm -f $lock_file 2>/dev/null # lock was stale and can be removed
+  if ln $temp_file $lock_file; then
+    rm -f $temp_file 2>/dev/null
+    return 0 # lock acquired
+  fi
+
+  rm -f $temp_file 2>/dev/null
+  return 1 # lock couldn't be acquired after removing stale lock (lost the race)
+}
+
+wait_and_acquire_lock() {
+  local path="$1"
+  while ! acquire_lock "$path"; do
+    sleep 5
+  done
+}
+
+release_lock() {
+  local path="$1"
+  local lock_file="${path}.lock"
+  rm -f $lock_file 2>/dev/null
+}
+
+check_lock() {
+  local path="$1"
+  local ignore_stale="$2"
+  __is_valid_lock "${path}" "$ignore_stale"
+}
+
+
 # checks if a repository is currently in a transaction
 #
 # @param name  the repository name to be checked
