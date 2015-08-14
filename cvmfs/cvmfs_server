@@ -965,7 +965,7 @@ check_lock() {
 is_in_transaction() {
   local name=$1
   load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/in_transaction ]
+  check_lock ${CVMFS_SPOOL_DIR}/in_transaction ignore_stale
 }
 
 open_transaction() {
@@ -973,9 +973,9 @@ open_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
-  is_stratum0 $name                 || die "Cannot open transaction on Stratum1"
-  mkdir "$tx_lock" > /dev/null 2>&1 || die "Failed to create transaction lock"
-  cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
+  is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
+  acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
+  cvmfs_suid_helper open  $name        || die "Failed to make /cvmfs/$name writable"
 }
 
 # closes a previously opened transaction
@@ -1008,7 +1008,7 @@ close_transaction() {
   [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
   cvmfs_suid_helper rdonly_mount $name > /dev/null
   cvmfs_suid_helper rw_mount $name
-  rmdir "$tx_lock"
+  release_lock "$tx_lock"
 }
 
 # checks if a repository is currently runing a publish procedure
@@ -1018,14 +1018,14 @@ close_transaction() {
 is_publishing() {
   local name=$1
   load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/is_publishing ]
+  check_lock ${CVMFS_SPOOL_DIR}/is_publishing ignore_stale
 }
 
 publish_starting() {
   local name=$1
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
-  mkdir "$pub_lock" > /dev/null 2>&1 || die "Failed to acquire publishing lock"
+  acquire_lock "$pub_lock" ignore_stale || die "Failed to acquire publishing lock"
   trap "publish_failed $name" EXIT HUP INT TERM
   cvmfs_suid_helper lock $name
 }
@@ -1035,7 +1035,7 @@ publish_failed() {
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
-  rmdir $pub_lock > /dev/null 2>&1
+  release_lock $pub_lock
   cvmfs_suid_helper open $name
 }
 
@@ -1044,7 +1044,7 @@ publish_succeeded() {
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
-  rmdir $pub_lock > /dev/null 2>&1
+  release_lock $pub_lock
 }
 
 acquire_snapshot_lock() {
