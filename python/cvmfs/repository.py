@@ -487,15 +487,10 @@ class Repository:
         return Certificate(certificate)
 
 
-    def retrieve_file(self, file_name):
-        """ Method to retrieve a file from the repository """
-        return self._fetcher.retrieve_file(file_name)
-
-
     def retrieve_object(self, object_hash, hash_suffix = ''):
         """ Retrieves an object from the content addressable storage """
         path = "data/" + object_hash[:2] + "/" + object_hash[2:] + hash_suffix
-        return self.retrieve_file(path)
+        return self._fetcher.retrieve_file(path)
 
 
     def retrieve_root_catalog(self):
@@ -505,10 +500,9 @@ class Repository:
     def retrieve_catalog_for_path(self, needle_path):
         """ Recursively walk down the Catalogs and find the best fit for a path """
         clg = self.retrieve_root_catalog()
-        nested_reference = None
         while True:
             new_nested_reference = clg.FindNestedForPath(needle_path)
-            if new_nested_reference == None:
+            if new_nested_reference is None:
                 break
             nested_reference = new_nested_reference
             clg = self.retrieve_catalog(nested_reference.hash)
