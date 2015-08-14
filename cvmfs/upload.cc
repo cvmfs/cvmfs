@@ -27,7 +27,9 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
 
 
 Spooler::~Spooler() {
-  uploader_->TearDown();
+  if (uploader_) {
+    uploader_->TearDown();
+  }
 }
 
 
