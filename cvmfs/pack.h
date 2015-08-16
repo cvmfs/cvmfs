@@ -7,9 +7,12 @@
 
 #include <inttypes.h>
 
+#include <cstdio>
+#include <string>
 #include <vector>
 
 #include "util.h"
+#include "util_concurrency.h"
 
 namespace shash {
 class Any;
@@ -30,6 +33,8 @@ class Any;
  * replication.
  */
 class ObjectPack {
+  friend class ObjectPackProducer;
+
  private:
   class Bucket;
 
@@ -54,18 +59,15 @@ class ObjectPack {
    * Wrapper around memory to which data can be added.  The memory should
    * represent a piece of content-addressable storage.
    */
-  class Bucket : SingleCopy {
-   public:
+  struct Bucket : SingleCopy {
      Bucket();
      ~Bucket();
      void Add(const void *buf, const uint64_t buf_size);
-     void SetId(const shash::Any &id) { id_ = id; }
-     uint64_t size() const { return size_; }
-   private:
-    unsigned char *content_;
-    uint64_t size_;
-    uint64_t capacity_;
-    shash::Any id_;
+
+    unsigned char *content;
+    uint64_t size;
+    uint64_t capacity;
+    shash::Any id;
   };
 
   /**
@@ -87,8 +89,88 @@ class ObjectPack {
 };
 
 
-class ObjectPackStreamer() {
-  
+/**
+ * Seriializes ObjectPacks.  It can also serialize a single large file as an
+ * "object pack", which otherwise would need special treatment.
+ */
+class ObjectPackProducer {
+ public:
+  explicit ObjectPackProducer(ObjectPack *pack);
+  ObjectPackProducer(const shash::Any &id, FILE *big_file);
+  unsigned ProduceNext(const unsigned buf_size, unsigned char *buf);
+  void GetDigest(shash::Any *hash);
+  unsigned GetHeaderSize() { return header_.size(); }
+
+ private:
+  /**
+   * Unused if big_file_ is used.
+   */
+  ObjectPack *pack_;
+
+  /**
+   * Unused if object pack is used.  Rewind before giving to ObjectPackProducer.
+   */
+  FILE *big_file_;
+
+  /**
+   * Keeps track of how many bytes have been produced.
+   */
+  uint64_t pos_;
+
+  /**
+   * Keeps track of the current index in pack_->buckets_
+   */
+  unsigned idx_;
+
+  /**
+   * Keeps track of the current position in pack_->buckets_[idx_]
+   */
+  unsigned pos_in_bucket_;
+
+  /**
+   * The header is created in the constructor.
+   */
+  std::string header_;
+};
+
+
+/**
+ * Data structures required for the ObjectPackConsumer.  BuildEvent is a
+ * template parameter for the Observable base class of ObjectPack and hence
+ * moved into this base class.
+ */
+class ObjectPackConsumerBase {
+ public:
+  struct BuildEvent {
+    shash::Any id;
+    uint64_t size;
+    unsigned buf_size;
+    void *buf;
+  };
+
+  enum BuildState {
+    kStateContinue = 0,
+    kStateDone,
+    kStateAbort,
+  };
+};
+
+
+/**
+ * Deserializes and ObjectPack created by ObjectPackProducer.  For every object
+ * it calls all listeners with a BuildEvent parameter at least once for every
+ * object.  For large objects, it calls the listeners multiple times.  It won't
+ * verify the incoming data, this is up to the listeners handling the data.
+ * The ObjectPackConsumer will verify the header digest, however.
+ */
+class ObjectPackConsumer : public ObjectPackConsumerBase
+                         , Observable<ObjectPackConsumerBase::BuildEvent> {
+ public:
+  ObjectPackConsumer(const shash::Any &expected_digest);
+  BuildState ConsumeNext(const unsigned buf_size, const void *buf);
+
+ private:
+  shash::Any expected_digest_;
 };
 
 #endif  // CVMFS_PACK_H_

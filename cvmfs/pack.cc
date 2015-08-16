@@ -4,32 +4,34 @@
 
 #include "pack.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 
+#include "platform.h"
 #include "smalloc.h"
 
 using namespace std;  // NOLINT
 
 ObjectPack::Bucket::Bucket()
-  : content_(reinterpret_cast<unsigned char *>(smalloc(128)))
-  , size_(0)
-  , capacity_(128)
+  : content(reinterpret_cast<unsigned char *>(smalloc(128)))
+  , size(0)
+  , capacity(128)
 { }
 
 
 void ObjectPack::Bucket::Add(const void *buf, const uint64_t buf_size) {
-  while (size_ + buf_size > capacity_) {
-    capacity_ *= 2;
-    content_ = reinterpret_cast<unsigned char *>(srealloc(content_, capacity_));
+  while (size + buf_size > capacity) {
+    capacity *= 2;
+    content = reinterpret_cast<unsigned char *>(srealloc(content, capacity));
   }
-  memcpy(content_ + size_, buf, buf_size);
-  size_ += buf_size;
+  memcpy(content + size, buf, buf_size);
+  size += buf_size;
 }
 
 
 ObjectPack::Bucket::~Bucket() {
-  free(content_);
+  free(content);
 }
 
 
@@ -52,9 +54,9 @@ bool ObjectPack::CommitBucket(
   const shash::Any &id,
   const ObjectPack::BucketHandle handle)
 {
-  handle->SetId(id);
+  handle->id = id;
 
-  if (size_ + handle->size() > limit_)
+  if (size_ + handle->size > limit_)
     return false;
   open_buckets_.erase(handle);
   buckets_.push_back(handle);
@@ -98,3 +100,123 @@ ObjectPack::~ObjectPack() {
   for (unsigned i = 0; i < buckets_.size(); ++i)
     delete buckets_[i];
 }
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * Hash over the header.  The hash algorithm needs to be provided by hash.
+ */
+void ObjectPackProducer::GetDigest(shash::Any *hash) {
+  assert(hash);
+  shash::HashString(header_, hash);
+}
+
+
+ObjectPackProducer::ObjectPackProducer(ObjectPack *pack)
+  : pack_(pack)
+  , big_file_(NULL)
+  , pos_(0)
+  , idx_(0)
+  , pos_in_bucket_(0)
+{
+  unsigned N = pack->buckets_.size();
+  // rough guess, most likely a little too much
+  header_.reserve(30 + N * (2 * shash::kMaxDigestSize + 5));
+
+  header_ = "V 1\n";
+  header_ += "S " + StringifyInt(pack->size_) + "\n";
+  header_ += "N " + StringifyInt(N) + "\n";
+  header_ += "--\n";
+
+  const bool with_suffix = true;
+  uint64_t offset = 0;
+  for (unsigned i = 0; i < N; ++i) {
+    header_ += pack->buckets_[i]->id.ToString(with_suffix);
+    header_ += " ";
+    header_ += StringifyInt(offset);
+    header_ += "\n";
+    offset += pack->buckets_[i]->size;
+  }
+}
+
+
+ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file)
+  : pack_(NULL)
+  , big_file_(big_file)
+  , pos_(0)
+  , idx_(0)
+  , pos_in_bucket_(0)
+{
+  int fd = fileno(big_file_);
+  assert(fd >= 0);
+  platform_stat64 info;
+  int retval = platform_fstat(fd, &info);
+  assert(retval == 0);
+
+  header_ = "V 1\n";
+  header_ += "S " + StringifyInt(info.st_size) + "\n";
+  header_ += "N 1\n";
+  header_ += "--\n";
+
+  const bool with_suffix = true;
+  header_ += id.ToString(with_suffix) + " 0\n";
+}
+
+
+/**
+ * Copies as many bytes as possible into buf.  If the returned number of bytes
+ * is shorter than buf_size, everything has been produced.
+ */
+unsigned ObjectPackProducer::ProduceNext(
+  const unsigned buf_size,
+  unsigned char *buf)
+{
+  const unsigned remaining_in_header =
+    (pos_ < header_.size()) ? (header_.size() - pos_) : 0;
+  const unsigned nbytes_header = std::min(remaining_in_header, buf_size);
+  if (nbytes_header) {
+    memcpy(buf, header_.data() + pos_, nbytes_header);
+    pos_ += nbytes_header;
+  }
+
+  unsigned remaining_in_buf = buf_size - nbytes_header;
+  if (remaining_in_buf == 0)
+    return nbytes_header;
+  unsigned nbytes_payload = 0;
+
+  if (big_file_) {
+    size_t nbytes = fread(buf + nbytes_header, 1, remaining_in_buf, big_file_);
+    nbytes_payload = nbytes;
+    pos_ += nbytes_payload;
+  } else if (idx_ < pack_->buckets_.size()) {
+    // Copy a few buckets more
+    while ((remaining_in_buf) > 0 && (idx_ < pack_->buckets_.size())) {
+      const unsigned remaining_in_bucket =
+        pack_->buckets_[idx_]->size - pos_in_bucket_;
+      const unsigned nbytes = std::min(remaining_in_buf, remaining_in_bucket);
+      memcpy(buf + nbytes_header + nbytes_payload,
+             pack_->buckets_[idx_]->content + pos_in_bucket_,
+             nbytes);
+
+      pos_in_bucket_ += nbytes;
+      nbytes_payload += nbytes;
+      remaining_in_buf -= nbytes;
+      if (nbytes == remaining_in_bucket) {
+        pos_in_bucket_ = 0;
+        idx_++;
+      }
+    }
+  }
+
+  return nbytes_header + nbytes_payload;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+ObjectPackConsumer::ObjectPackConsumer(const shash::Any &expected_digest)
+  : expected_digest_(expected_digest)
+{ }
