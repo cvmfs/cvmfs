@@ -56,6 +56,7 @@ set(CVMFS_UNITTEST_FILES
   t_manifest.cc
   t_object_fetcher.cc
   t_options.cc
+  t_pack.cc
   t_pathspec.cc
   t_pipe.cc
   t_platforms.cc
@@ -82,7 +83,6 @@ set(CVMFS_UNITTEST_FILES
   t_util_concurrency.cc
   t_uuid.cc
   t_wpad.cc
-  t_xattr.cc
 )
 
 #
@@ -139,6 +139,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/monitor.cc ${CVMFS_SOURCE_DIR}/monitor.h
   ${CVMFS_SOURCE_DIR}/murmur.h
   ${CVMFS_SOURCE_DIR}/options.cc ${CVMFS_SOURCE_DIR}/options.h
+  ${CVMFS_SOURCE_DIR}/pack.cc ${CVMFS_SOURCE_DIR}/pack.h
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc ${CVMFS_SOURCE_DIR}/path_filters/dirtab.h
   ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.h
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec.cc ${CVMFS_SOURCE_DIR}/pathspec/pathspec.h
