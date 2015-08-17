@@ -590,9 +590,10 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
   PathString path_slash(path);
   path_slash.Append("/", 1);
   perf::Inc(statistics_.n_nested_listing);
-  const Catalog::NestedCatalogList& nested_catalogs =
+  typedef typename CatalogT::NestedCatalogList NestedCatalogList;
+  const NestedCatalogList& nested_catalogs =
     parent->ListNestedCatalogs();
-  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
+  for (typename NestedCatalogList::const_iterator i = nested_catalogs.begin(),
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
@@ -629,7 +630,8 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
  * Loading of catalogs is implemented by derived classes.
  */
 template <class CatalogT>
-CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(const PathString &mountpoint,
+CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
+                                              const PathString &mountpoint,
                                               const shash::Any &hash,
                                               CatalogT *parent_catalog)
 {
