@@ -488,15 +488,14 @@ check_multiple_repository_existence() {
 # @return   0 if the aufs kernel module is loaded
 check_aufs() {
   /sbin/modprobe -q aufs || test -d /sys/fs/aufs || \
-  test x"$(zgrep AUFS_FS /proc/config.gz | awk -F = '{print $2}')" = xy	
+  test x"$(zgrep AUFS_FS /proc/config.gz | awk -F = '{print $2}')" = xy
 }
 
 
-# checks if the overlayfs kernel module is present 
+# checks if the overlayfs kernel module is present
 # of if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
-  
   /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
   /sbin/modprobe -q overlay   || test -d /sys/module/overlay || \
   test x"$(zgrep OVERLAY_FS /proc/config.gz | awk -F = '{print $2}')" = xy
