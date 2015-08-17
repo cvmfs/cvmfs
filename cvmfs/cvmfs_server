@@ -622,7 +622,7 @@ get_apache_conf_path() {
   local res_path="/etc/${APACHE_CONF}"
   if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
     echo "${res_path}/conf-available"
-  elif [ -d "${res_path}/modules.d" ]
+  elif [ -d "${res_path}/modules.d" ]; then
     echo "${res_path}/modules.d"
   else
     echo "${res_path}/conf.d"
