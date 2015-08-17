@@ -43,4 +43,20 @@ Vagrant.configure(2) do |config|
 
     cvm.vm.provision "shell", path: "vagrant/provision_cernvm.sh"
   end
+
+  config.vm.define "slc6" do |slc6|
+    unless Vagrant.has_plugin?("vagrant-reload")
+      puts "-------------------- WARNING --------------------"
+      puts "Vagrant plugin 'vagrant-reload' is not installed."
+      puts "Please run: vagrant plugin install vagrant-reload"
+      puts "-------------------------------------------------"
+    end
+
+    slc6.vm.box = "bytepark/scientific-6.5-64"
+    slc6.vm.network "private_network", ip: "192.168.33.11"
+    slc6.vm.synced_folder '.', '/vagrant', nfs: true
+
+    slc6.vm.provision "shell", path: "vagrant/provision_slc6.sh"
+    slc6.vm.provision :reload
+  end
 end
