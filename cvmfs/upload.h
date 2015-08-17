@@ -176,6 +176,16 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void ProcessHistory(const std::string &local_path);
 
+
+  /**
+   * Convenience wrapper to process a certificate file. This sets the
+   * processing parameters (like chunking and hash suffixes) accordingly.
+   *
+   * @param local_path  the location of the certificate file
+   */
+  void ProcessCertificate(const std::string &local_path);
+
+
   /**
    * Deletes the given file from the repository backend storage. This is done
    * synchronous, in any case.
