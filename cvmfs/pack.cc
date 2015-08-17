@@ -21,6 +21,9 @@ ObjectPack::Bucket::Bucket()
 
 
 void ObjectPack::Bucket::Add(const void *buf, const uint64_t buf_size) {
+  if (buf_size == 0)
+    return;
+  
   while (size + buf_size > capacity) {
     capacity *= 2;
     content = reinterpret_cast<unsigned char *>(srealloc(content, capacity));
