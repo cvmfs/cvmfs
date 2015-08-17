@@ -6,6 +6,6 @@
 
 #include "../../cvmfs/pack.h"
 
-TEST(T_Pack, ObjectPack) {
-  
+TEST(T_Pack, Bucket) {
+
 }

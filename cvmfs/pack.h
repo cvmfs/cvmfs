@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "gtest/gtest_prod.h"
 #include "util.h"
 #include "util_concurrency.h"
 
@@ -19,7 +20,7 @@ class Any;
 }
 
 /**
- * Multiple content-addressable objects in a single BLOB.  An ObjectPack has
+ * Multiple content-addressable objects in a single BLOB.  A ObjectPack has
  * a header, an index containing all the objects and their offsets followed
  * by the concatenated objects.  The secure hash of the index is in the header.
  * Header and Index are JSON objects.
@@ -34,6 +35,7 @@ class Any;
  */
 class ObjectPack {
   friend class ObjectPackProducer;
+  FRIEND_TEST(T_Pack, Bucket);
 
  private:
   class Bucket;
@@ -166,7 +168,7 @@ class ObjectPackConsumerBase {
 class ObjectPackConsumer : public ObjectPackConsumerBase
                          , Observable<ObjectPackConsumerBase::BuildEvent> {
  public:
-  ObjectPackConsumer(const shash::Any &expected_digest);
+  explicit ObjectPackConsumer(const shash::Any &expected_digest);
   BuildState ConsumeNext(const unsigned buf_size, const void *buf);
 
  private:
