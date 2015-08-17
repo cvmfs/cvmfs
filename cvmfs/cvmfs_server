@@ -2250,7 +2250,7 @@ update_geodb() {
   done
 
   # sanity checks
-  is_root || $lazy || die "Only root can update the geo database"
+  [ -w "$dbfile" ] || $lazy || die "geo database is not writable by $(whoami)"
   [ -d $dbdir ] || die "$dbdir does not exist"
 
   # check if this is a lazy update and it isn't time to try again yet
@@ -2265,7 +2265,7 @@ update_geodb() {
     fi
   fi
 
-  if is_root; then
+  if [ -w "$dbfile" ]; then
     echo "Downloading geoip database"
     if ! curl -sS --fail --connect-timeout 10 --max-time 60 "$dburl" >$dbfile.gz 2>$outfile; then
       retcode=1
