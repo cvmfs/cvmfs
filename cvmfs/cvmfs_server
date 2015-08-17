@@ -492,8 +492,7 @@ check_multiple_repository_existence() {
 # of if aufs is compiled in
 # @return   0 if the aufs kernel module is loaded
 check_aufs() {
-  /sbin/modprobe -q aufs || test -d /sys/fs/aufs || \
-  test x"$(zgrep AUFS_FS /proc/config.gz | awk -F = '{print $2}')" = xy
+  /sbin/modprobe -q aufs || test -d /sys/fs/aufs
 }
 
 
