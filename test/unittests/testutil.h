@@ -289,7 +289,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   static unsigned int      instances;
 
  public:
-  struct NestedCatalog {
+   struct NestedCatalog {
     PathString   path;
     shash::Any   hash;
     MockCatalog *child;
@@ -300,6 +300,30 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   struct File {
     shash::Any  hash;
     size_t      size;
+    shash::Md5  path_hash;
+    shash::Md5  parent_hash;
+    string      name;
+
+    File() : hash(shash::Any()), size(0), path_hash(shash::Md5()),
+        parent_hash(shash::Md5()), name("") { }
+
+    File(const shash::Any &hash, size_t size, string parent_path, string name) :
+      hash(hash), size(size), name(name)
+    {
+      string full_path = parent_path + "/" + name;
+      if (parent_path == "" && name == "")
+        parent_hash = shash::Md5();
+      else
+        parent_hash = shash::Md5(parent_path.c_str(), parent_path.length());
+      path_hash = shash::Md5(full_path.c_str(), full_path.length());
+    }
+
+    catalog::DirectoryEntry ToDirectoryEntry() const {
+      bool is_file = hash == shash::Any();
+      if (!is_file)
+        return catalog::DirectoryEntryTestFactory::Directory();
+      return catalog::DirectoryEntryTestFactory::RegularFile();
+    }
   };
   typedef std::vector<File> FileList;
 
@@ -349,7 +373,10 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   }
 
   std::vector<MockCatalog*> GetChildren() const {
-    return std::vector<MockCatalog*>();
+    std::vector<MockCatalog*> children_arr;
+    for (unsigned i = 0; i < children_.size(); ++i)
+      children_arr.push_back(children_[i].child);
+    return children_arr;
   }
   bool HasParent() const { return parent_ != NULL; }
   void RemoveChild(MockCatalog *child);
@@ -362,6 +389,11 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
                     const catalog::OwnerMap *gid_map) { }
   bool IsInitialized() const { return true; }
   MockCatalog* FindSubtree(const PathString &path) const;
+  uint64_t GetTTL() const { return 0; }
+  bool LookupRawSymlink(const PathString &path,
+                                LinkString *raw_symlink) const { return false; }
+  bool LookupPath(const PathString &path,
+                  catalog::DirectoryEntry *dirent) const;
 
 
  protected:
@@ -397,7 +429,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   const shash::Any&  hash()          const { return catalog_hash_;           }
   uint64_t           catalog_size()  const { return catalog_size_;           }
   unsigned int       revision()      const { return revision_;               }
-
+  bool               volatile_flag() const { return false;                   }
   MockCatalog*       parent()        const { return parent_;                 }
   MockCatalog*       previous()      const { return previous_;               }
 
@@ -407,7 +439,10 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
  public:
   void RegisterChild(MockCatalog *child);
-  void AddFile(const shash::Any &content_hash, const size_t file_size);
+  void AddFile(const shash::Any &content_hash,
+               const size_t file_size,
+               const string &parent_path = "",
+               const string &name = "");
   void AddChunk(const shash::Any &chunk_content_hash, const size_t chunk_size);
 
  protected:
@@ -448,13 +483,13 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
                                 std::string  *catalog_path,
                                 shash::Any   *catalog_hash)
   {
-
     return kLoadNew;
   }
 
   virtual MockCatalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
                                  MockCatalog *parent_catalog);
+  MockCatalog* RetrieveRootCatalog() { return GetRootCatalog(); }
 
 };
 

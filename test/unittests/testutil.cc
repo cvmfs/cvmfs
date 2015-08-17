@@ -265,6 +265,18 @@ MockCatalog* MockCatalog::FindSubtree(const PathString &path) const {
   return NULL;
 }
 
+bool MockCatalog::LookupPath(const PathString &path,
+                catalog::DirectoryEntry *dirent) const {
+  shash::Md5 md5_path(path.GetChars(), path.GetLength());
+  for (unsigned i = 0; i < files_.size(); ++i) {
+    if (files_[i].path_hash == md5_path) {
+      *dirent = files_[i].ToDirectoryEntry();
+      return true;
+    }
+  }
+  return false;
+}
+
 void MockCatalog::RegisterChild(MockCatalog *child) {
   NestedCatalog nested;
   nested.path  = PathString(child->root_path());
@@ -275,10 +287,11 @@ void MockCatalog::RegisterChild(MockCatalog *child) {
 }
 
 void MockCatalog::AddFile(const shash::Any   &content_hash,
-                          const size_t        file_size) {
-  MockCatalog::File f;
-  f.hash = content_hash;
-  f.size = file_size;
+                          const size_t        file_size,
+                          const string        &parent_path,
+                          const string        &name)
+{
+  MockCatalog::File f(content_hash, file_size, parent_path, name);
   files_.push_back(f);
 }
 
@@ -322,7 +335,7 @@ MockCatalog* catalog::MockCatalogManager::CreateCatalog(
                                MockCatalog *parent_catalog)
 {
   bool is_root = parent_catalog == NULL;
-  return new MockCatalog(mountpoint.ToString(), catalog_hash, 4096, 1231,
+  return new MockCatalog(mountpoint.ToString(), catalog_hash, 4096, 1,
                          0, is_root, parent_catalog, NULL);
 }
 
