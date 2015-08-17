@@ -5,22 +5,25 @@ cvmfs_test_autofs_on_startup=false
 
 create_fake_lock() {
   local name=$1
+  local pid=${2:-$$} # use our own PID by default to fool the stale lock check
+
   load_repo_config $name
-  echo "creating ${CVMFS_SPOOL_DIR}/is_snapshotting"
-  mkdir ${CVMFS_SPOOL_DIR}/is_snapshotting
+
+  echo "creating ${CVMFS_SPOOL_DIR}/is_snapshotting.lock with PID $pid"
+  echo "$pid" > ${CVMFS_SPOOL_DIR}/is_snapshotting.lock
 }
 
 remove_fake_lock() {
   local name=$1
   load_repo_config $name
-  echo "removing ${CVMFS_SPOOL_DIR}/is_snapshotting"
-  rmdir ${CVMFS_SPOOL_DIR}/is_snapshotting
+  echo "removing ${CVMFS_SPOOL_DIR}/is_snapshotting.lock"
+  rm -f ${CVMFS_SPOOL_DIR}/is_snapshotting.lock
 }
 
 check_lock() {
   local name=$1
   load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/is_snapshotting ]
+  [ -f ${CVMFS_SPOOL_DIR}/is_snapshotting.lock ]
 }
 
 run_background_snapshot() {
@@ -252,6 +255,21 @@ cvmfs_run_test() {
   cat $snapshot_log_7 | grep 'another snapshot.*in progress.*abort' || return 36
   cat $snapshot_log_8 | grep 'waiting.*snapshot to finish'          || return 37
   cat $snapshot_log_8 | grep 'Uploading manifest'                   || return 38
+
+  # ============================================================================
+
+  echo "place a fake lock that is stale"
+  create_fake_lock $replica_name 3282168345613 || return 39
+
+  echo "create a snapshot (should work - despite the stale lock)"
+  local snapshot_log_9="snapshot_9.log"
+  run_background_snapshot $replica_name $snapshot_log_9 30 || return 40
+
+  echo "check if the lock is gone"
+  check_lock $replica_name && return 41
+
+  echo "check the log file"
+  cat $snapshot_log_9 | grep 'Uploading manifest' || return 42
 
   return 0
 }

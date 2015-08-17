@@ -95,7 +95,7 @@ cvmfs_run_test() {
   cat $check_log_3 | grep -e "Trying to remount /cvmfs/${CVMFS_TEST_REPO}"                             || return 17
 
   echo "check if transaction is open"
-  [ -e ${CVMFS_SPOOL_DIR}/in_transaction ] || return 18
+  [ -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 18
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -111,7 +111,7 @@ cvmfs_run_test() {
   cat $check_log_4 | grep -e "${CVMFS_TEST_REPO} .* cannot be repaired"                                   || return 22
 
   echo "check if transaction is still open"
-  [ -e ${CVMFS_SPOOL_DIR}/in_transaction ] || return 23
+  [ -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 23
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -169,7 +169,7 @@ cvmfs_run_test() {
   cat $check_log_7 | grep -e "Trying to remount /cvmfs/${CVMFS_TEST_REPO} read/write"                     || return 41
 
   echo "check that repository is not in a transaction"
-  [ ! -e ${CVMFS_SPOOL_DIR}/in_transaction ] || return 42
+  [ ! -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 42
 
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 43
@@ -244,7 +244,7 @@ cvmfs_run_test() {
   cat $check_log_10 | grep -e "${CVMFS_TEST_REPO} .* cannot be repaired"                 || return 58
 
   echo "check if transaction is still open"
-  [ -e ${CVMFS_SPOOL_DIR}/in_transaction ] || return 59
+  [ -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 59
 
   echo "run abort to bring the repository back in shape"
   local check_log_11="check_11.log"
@@ -259,7 +259,7 @@ cvmfs_run_test() {
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "check if transaction is closed"
-  [ ! -e ${CVMFS_SPOOL_DIR}/in_transaction ] || return 65
+  [ ! -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 65
 
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 66
