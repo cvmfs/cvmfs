@@ -74,8 +74,7 @@ class T_CatalogManager : public ::testing::Test {
                           reinterpret_cast<const unsigned char*>(hashes[3]),
                           size, suffix);
     new_catalog->AddFile(hash, file_size, "/dir/dir/dir", "file4");
-    // detach the recently created catalog
-    catalog_mgr_->DetachNested();
+    root_catalog->RemoveChild(new_catalog);
     ASSERT_EQ(0u, root_catalog->GetChildren().size());
     ASSERT_EQ(1, catalog_mgr_->GetNumCatalogs());
   }
