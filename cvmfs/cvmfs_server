@@ -52,11 +52,16 @@ if which httpd2 > /dev/null 2>&1; then # SLES/OpenSuSE
   APACHE_BIN="$(which httpd2)"
   APACHE_CTL="$APACHE_BIN"
   APACHE_WSGI_MODPKG="apache2-mod_wsgi"
-elif which apache2 > /dev/null 2>&1; then # Debian based
+elif which apache2 > /dev/null 2>&1; then
   APACHE_CONF="apache2"
   APACHE_BIN="$(which apache2)"
-  APACHE_CTL="$(which apachectl)"
-  APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
+  if which apachectl > /dev/null 2>&1; then # Debian
+    APACHE_CTL="$(which apachectl)"
+    APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
+  elif which apache2ctl > /dev/null 2>&1; then # Gentoo
+    APACHE_CTL="$(which apache2ctl)"
+    APACHE_WSGI_MODPKG="www-apache/mod_wsgi"
+  fi
 else # RedHat based
   APACHE_CONF="httpd"
   APACHE_BIN="/usr/sbin/httpd"
