@@ -304,11 +304,6 @@ if [ $1 = 0 ] ; then
 fi
 %endif
 
-%preun server
-if [ $1 = 0 ] ; then
-    rm -f /var/lib/cvmfs-server/geo/*
-fi
-
 %postun
 if [ $1 -eq 0 ]; then
    #sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master
@@ -389,6 +384,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Mon Aug 17 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
+- Avoid rm -f /var/lib/cvmfs-server/geo/* in preuninstall
 * Wed Jan 07 2015 Jakob Blomer <jblomer@cern.ch> - 2.1.20
 - Add chkconfig dependency
 * Wed Dec 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20
