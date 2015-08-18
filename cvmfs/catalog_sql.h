@@ -102,13 +102,11 @@ class Sql : public sqlite::Sql {
     const shash::Algorithms  hash_algo,
     const char               hash_suffix = shash::kSuffixNone) const
   {
+    const unsigned char *buffer = static_cast<const unsigned char *>(
+      RetrieveBlob(idx_column));
     const int byte_count = RetrieveBytes(idx_column);
-    if (byte_count > 0) {
-      const unsigned char *buffer = static_cast<const unsigned char *>(
-        RetrieveBlob(idx_column));
-      return shash::Any(hash_algo, buffer, hash_suffix);
-    }
-    return shash::Any(hash_algo);
+    return (byte_count > 0) ? shash::Any(hash_algo, buffer, hash_suffix)
+                            : shash::Any(hash_algo);
   }
 
   /**
