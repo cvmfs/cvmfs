@@ -35,7 +35,7 @@ class TestFile : public upload::AbstractFile {
   off_t          read_offset() const { return read_offset_; }
 
   shash::Any GetHash() const {
-    return shash::Any(shash::kSha1, sha1_digest_, SHA_DIGEST_LENGTH);
+    return shash::Any(shash::kSha1, sha1_digest_);
   }
 
   const shash::Any& GetExpectedHash() const {

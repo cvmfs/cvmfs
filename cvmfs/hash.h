@@ -168,12 +168,11 @@ struct Digest {
   }
 
   Digest(const Algorithms a,
-         const unsigned char *digest_buffer, const unsigned buffer_size,
+         const unsigned char *digest_buffer,
          const Suffix s = kSuffixNone) :
     algorithm(a), suffix(s)
   {
-    assert(buffer_size <= digest_size_);
-    memcpy(digest, digest_buffer, buffer_size);
+    memcpy(digest, digest_buffer, kDigestSizes[a]);
   }
 
   /**
@@ -391,9 +390,9 @@ struct Any : public Digest<32, kAny> {
     Digest<32, kAny>() { algorithm = a; suffix = s; }
 
   Any(const Algorithms     a,
-      const unsigned char *digest_buffer, const unsigned buffer_size,
+      const unsigned char *digest_buffer,
       const Suffix         suffix = kSuffixNone) :
-    Digest<32, kAny>(a, digest_buffer, buffer_size, suffix) { }
+    Digest<32, kAny>(a, digest_buffer, suffix) { }
 
   explicit Any(const Algorithms  a,
                const HexPtr      hex,

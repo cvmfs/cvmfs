@@ -106,7 +106,7 @@ class Sql : public sqlite::Sql {
     if (byte_count > 0) {
       const unsigned char *buffer = static_cast<const unsigned char *>(
         RetrieveBlob(idx_column));
-      return shash::Any(hash_algo, buffer, byte_count, hash_suffix);
+      return shash::Any(hash_algo, buffer, hash_suffix);
     }
     return shash::Any(hash_algo);
   }
