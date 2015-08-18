@@ -102,6 +102,11 @@ class Sql : public sqlite::Sql {
     const shash::Algorithms  hash_algo,
     const char               hash_suffix = shash::kSuffixNone) const
   {
+    // Note: SQLite documentation advises to first define the data type of BLOB
+    //       by calling sqlite3_column_XXX() on the column and _afterwards_ get
+    //       the number of bytes using sqlite3_column_bytes().
+    //
+    //  See: https://www.sqlite.org/c3ref/column_blob.html
     const unsigned char *buffer = static_cast<const unsigned char *>(
       RetrieveBlob(idx_column));
     const int byte_count = RetrieveBytes(idx_column);
