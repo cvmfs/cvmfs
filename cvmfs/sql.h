@@ -340,6 +340,15 @@ class Sql {
   int RetrieveType(const int idx_column) const {
     return sqlite3_column_type(statement_, idx_column);
   }
+
+  /**
+   * Determines the number of bytes necessary to store the column's data as a
+   * string. This might involve type conversions and depends on which other
+   * RetrieveXXX methods were called on the same column index before!
+   *
+   * See SQLite documentation for sqlite_column_bytes() for details:
+   *   https://www.sqlite.org/c3ref/column_blob.html
+   */
   int RetrieveBytes(const int idx_column) const {
     return sqlite3_column_bytes(statement_, idx_column);
   }
