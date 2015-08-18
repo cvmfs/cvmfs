@@ -408,7 +408,8 @@ void WritableCatalog::MoveToNestedRecursively(
       MoveToNestedRecursively(full_path, new_nested_catalog,
                               grand_child_mountpoints);
     } else if (i->IsChunkedFile()) {
-      MoveFileChunksToNested(full_path, new_nested_catalog);
+      MoveFileChunksToNested(full_path, i->hash_algorithm(),
+                             new_nested_catalog);
     }
 
     // Remove the entry from the current catalog
@@ -439,12 +440,12 @@ void WritableCatalog::MoveCatalogsToNested(
 
 
 void WritableCatalog::MoveFileChunksToNested(
-  const std::string  &full_path,
-  WritableCatalog    *new_nested_catalog)
+  const std::string       &full_path,
+  const shash::Algorithms  algorithm,
+  WritableCatalog         *new_nested_catalog)
 {
   FileChunkList chunks;
-  // Moving opaque chunks, we don't care about the hash algorithm
-  ListPathChunks(PathString(full_path), shash::kAny, &chunks);
+  ListPathChunks(PathString(full_path), algorithm, &chunks);
   assert(chunks.size() > 0);
 
   for (unsigned i = 0; i < chunks.size(); ++i) {
