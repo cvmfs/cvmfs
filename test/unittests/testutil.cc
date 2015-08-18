@@ -10,11 +10,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <map>
 #include <fstream>  // TODO(jblomer): remove me
 #include <sstream>  // TODO(jblomer): remove me
 
 #include "../../cvmfs/manifest.h"
 #include "testutil.h"
+#include "../../cvmfs/hash.h"
 
 
 static void SkipWhitespace(std::istringstream *iss) {
@@ -246,11 +248,11 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
 }
 
 void MockCatalog::RemoveChild(MockCatalog *child) {
-  std::vector<NestedCatalog>::iterator iter = children_.begin();
+  std::vector<NestedCatalog>::iterator iter = active_children_.begin();
   bool found = false;
-  while (!found && iter != children_.end()) {
+  while (!found && iter != active_children_.end()) {
     if (iter->hash == child->hash()) {
-      children_.erase(iter);
+      active_children_.erase(iter);
       found = true;
     }
     iter++;
@@ -258,9 +260,9 @@ void MockCatalog::RemoveChild(MockCatalog *child) {
 }
 
 MockCatalog* MockCatalog::FindSubtree(const PathString &path) const {
-  for (unsigned i = 0; i < children_.size(); ++i) {
-    if (children_[i].path == path)
-      return children_[i].child;
+  for (unsigned i = 0; i < active_children_.size(); ++i) {
+    if (active_children_[i].path == path)
+      return active_children_[i].child;
   }
   return NULL;
 }
@@ -277,13 +279,22 @@ bool MockCatalog::LookupPath(const PathString &path,
   return false;
 }
 
-void MockCatalog::RegisterChild(MockCatalog *child) {
+void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   NestedCatalog nested;
   nested.path  = PathString(child->root_path());
   nested.hash  = child->hash();
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);
+}
+
+void MockCatalog::AddChild(MockCatalog *child) {
+  NestedCatalog nested;
+  nested.path  = PathString(child->root_path());
+  nested.hash  = child->hash();
+  nested.child = child;
+  nested.size  = child->catalog_size();
+  active_children_.push_back(nested);
 }
 
 void MockCatalog::AddFile(const shash::Any   &content_hash,
@@ -334,9 +345,32 @@ MockCatalog* catalog::MockCatalogManager::CreateCatalog(
                                const shash::Any  &catalog_hash,
                                MockCatalog *parent_catalog)
 {
+  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
+  if (it != catalog_map_.end()) {
+    return it->second;
+  }
   bool is_root = parent_catalog == NULL;
   return new MockCatalog(mountpoint.ToString(), catalog_hash, 4096, 1,
                          0, is_root, parent_catalog, NULL);
+}
+
+catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
+                                                  const PathString &mountpoint,
+                                                  const shash::Any &hash,
+                                                  string  *catalog_path,
+                                                  shash::Any *catalog_hash)
+{
+   map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
+   if (it != catalog_map_.end() && catalog_hash != NULL) {
+     MockCatalog *catalog = it->second;
+     *catalog_hash = catalog->hash();
+   } else {
+     MockCatalog * catalog = new MockCatalog(mountpoint.ToString(),
+                                             hash, 4096, 1, 0,
+                                             true, NULL, NULL);
+     catalog_map_[mountpoint] = catalog;
+   }
+   return kLoadNew;
 }
 
 

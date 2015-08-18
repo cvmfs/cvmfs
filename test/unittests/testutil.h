@@ -319,8 +319,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     }
 
     catalog::DirectoryEntry ToDirectoryEntry() const {
-      bool is_file = hash == shash::Any();
-      if (!is_file)
+      bool is_directory = hash.IsNull();
+      if (is_directory)
         return catalog::DirectoryEntryTestFactory::Directory();
       return catalog::DirectoryEntryTestFactory::RegularFile();
     }
@@ -346,24 +346,29 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
               const bool         is_root,
               MockCatalog *parent   = NULL,
               MockCatalog *previous = NULL) :
-    parent_(parent), previous_(previous), root_path_(root_path),
-    catalog_hash_(catalog_hash), catalog_size_(catalog_size),
-    revision_(revision), last_modified_(last_modified), is_root_(is_root),
+    initialized_(false), parent_(parent), previous_(previous),
+    root_path_(root_path), catalog_hash_(catalog_hash),
+    catalog_size_(catalog_size), revision_(revision),
+    last_modified_(last_modified), is_root_(is_root),
     owns_database_file_(false)
   {
+    if (this->catalog_hash_.IsNull()) {
+      this->catalog_hash_.Randomize();
+    }
     if (parent != NULL) {
-      parent->RegisterChild(this);
+      parent->RegisterNestedCatalog(this);
     }
     ++MockCatalog::instances;
   }
 
   MockCatalog(const MockCatalog &other) :
-    parent_(other.parent_), previous_(other.previous_),
+    initialized_(false), parent_(other.parent_), previous_(other.previous_),
     root_path_(other.root_path_), catalog_hash_(other.catalog_hash_),
     catalog_size_(other.catalog_size_), revision_(other.revision_),
     last_modified_(other.last_modified_), is_root_(other.is_root_),
-    owns_database_file_(false), children_(other.children_),
-    files_(other.files_), chunks_(other.chunks_)
+    owns_database_file_(false), active_children_(other.active_children_),
+    children_(other.children_), files_(other.files_),
+    chunks_(other.chunks_)
   {
     ++MockCatalog::instances;
   }
@@ -371,6 +376,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   ~MockCatalog() {
     --MockCatalog::instances;
   }
+
+  void AddChild(MockCatalog *child);
 
   std::vector<MockCatalog*> GetChildren() const {
     std::vector<MockCatalog*> children_arr;
@@ -381,13 +388,18 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   bool HasParent() const { return parent_ != NULL; }
   void RemoveChild(MockCatalog *child);
   catalog::InodeRange inode_range() const { return catalog::InodeRange(); }
-  bool OpenDatabase(const std::string &db_path) { return true; }
+  bool OpenDatabase(const std::string &db_path) {
+    initialized_ = true;
+    if (parent_ != NULL)
+      parent_->AddChild(this);
+    return true;
+  }
   uint64_t max_row_id() const { return std::numeric_limits<uint64_t>::max(); }
   void set_inode_range(const catalog::InodeRange value) { }
   void SetInodeAnnotation(catalog::InodeAnnotation *new_annotation) { }
   void SetOwnerMaps(const catalog::OwnerMap *uid_map,
                     const catalog::OwnerMap *gid_map) { }
-  bool IsInitialized() const { return true; }
+  bool IsInitialized() const { return initialized_; }
   MockCatalog* FindSubtree(const PathString &path) const;
   uint64_t GetTTL() const { return 0; }
   bool LookupRawSymlink(const PathString &path,
@@ -438,7 +450,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   void set_parent(MockCatalog *parent) { parent_ = parent; }
 
  public:
-  void RegisterChild(MockCatalog *child);
+  void RegisterNestedCatalog(MockCatalog *child);
   void AddFile(const shash::Any &content_hash,
                const size_t file_size,
                const string &parent_path = "",
@@ -451,16 +463,17 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   }
 
  private:
+  bool                initialized_;
   MockCatalog        *parent_;
   MockCatalog        *previous_;
   const std::string   root_path_;
-  const shash::Any    catalog_hash_;
+  shash::Any          catalog_hash_;
   const uint64_t      catalog_size_;
   const unsigned int  revision_;
   const time_t        last_modified_;
   const bool          is_root_;
   bool                owns_database_file_;
-
+  NestedCatalogList   active_children_;
   NestedCatalogList   children_;
   FileList            files_;
   ChunkList           chunks_;
@@ -481,16 +494,20 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
                                 std::string  *catalog_path,
-                                shash::Any   *catalog_hash)
-  {
-    return kLoadNew;
-  }
+                                shash::Any   *catalog_hash);
 
   virtual MockCatalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
                                  MockCatalog *parent_catalog);
   MockCatalog* RetrieveRootCatalog() { return GetRootCatalog(); }
+  void RegisterNewCatalog(MockCatalog *new_catalog) {
+    string mountpoint_str = new_catalog->root_path();
+    PathString mountpoint(mountpoint_str.c_str(), mountpoint_str.length());
+    catalog_map_[mountpoint] = new_catalog;
+  }
 
+ protected:
+  map<PathString, MockCatalog*> catalog_map_;
 };
 
 } // namespace catalog
