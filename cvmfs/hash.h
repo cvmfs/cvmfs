@@ -382,22 +382,22 @@ struct Sha256 : public Digest<32, kSha256> { };
  * To do real work, the class has to be "blessed" to be a real hash by
  * setting the algorithm field accordingly.
  */
-struct Any : public Digest<32, kAny> {
-  Any() : Digest<32, kAny>() { }
+struct Any : public Digest<kMaxDigestSize, kAny> {
+  Any() : Digest<kMaxDigestSize, kAny>() { }
 
   explicit Any(const Algorithms a,
                const char       s = kSuffixNone) :
-    Digest<32, kAny>() { algorithm = a; suffix = s; }
+    Digest<kMaxDigestSize, kAny>() { algorithm = a; suffix = s; }
 
   Any(const Algorithms     a,
       const unsigned char *digest_buffer,
       const Suffix         suffix = kSuffixNone) :
-    Digest<32, kAny>(a, digest_buffer, suffix) { }
+    Digest<kMaxDigestSize, kAny>(a, digest_buffer, suffix) { }
 
   explicit Any(const Algorithms  a,
                const HexPtr      hex,
                const char        suffix = kSuffixNone) :
-    Digest<32, kAny>(a, hex, suffix) { }
+    Digest<kMaxDigestSize, kAny>(a, hex, suffix) { }
 };
 
 
