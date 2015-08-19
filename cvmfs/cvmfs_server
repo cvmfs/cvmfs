@@ -2699,18 +2699,13 @@ add_replica() {
   check_user $cvmfs_user || die "No user $cvmfs_user"
   check_upstream_validity $upstream
   if is_local_upstream $upstream; then
-    if ! check_apache; then
-      if [ $silence_httpd_warning -eq 1 ]; then
-        echo "Warning: Apache is needed to access this CVMFS replication"
-      else
-        die "Apache must be installed and running"
-      fi
-    elif [ $silence_httpd_warning -eq 0 ]; then
+    if [ $silence_httpd_warning -eq 0 ]; then
+      check_apache || die "Apache must be installed and running"
       check_wsgi_module
       update_geodb -l
-      if [ "$cvmfs_user" != root ]; then
-        echo "NOTE: If snapshot is not run regularly as root, do update-geodb monthly from cron"
-      fi
+      [ x"$cvmfs_user" = x"root" ] || echo "NOTE: If snapshot is not run regularly as root, do update-geodb monthly from cron"
+    else
+      check_apache || echo "Warning: Apache is needed to access this CVMFS replication"
     fi
   fi
 
