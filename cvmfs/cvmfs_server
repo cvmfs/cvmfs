@@ -2743,9 +2743,10 @@ EOF
   fi
 
   if is_local_upstream $upstream; then
-    ((echo "# Created by cvmfs_server.  Don't touch."
-      cat_wsgi_config ${alias_name}; cat) | \
-      create_apache_config_file "cvmfs.${alias_name}.conf") << EOF
+    create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
+# Created by cvmfs_server.  Don't touch.
+$(cat_wsgi_config ${alias_name})
+
 KeepAlive On
 # Translation URL to real pathname
 Alias /cvmfs/$alias_name ${storage_dir}
