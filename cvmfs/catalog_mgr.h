@@ -118,17 +118,6 @@ class InodeGenerationAnnotation : public InodeAnnotation {
 template <class CatalogT>
 class AbstractCatalogManager;
 
-/**
- * Here, the Cwd Buffer is registered in order to save the inodes of
- * processes' cwd before a new catalog snapshot is applied
- */
-template <class CatalogT>
-class RemountListener {
- public:
-  virtual ~RemountListener() { }
-  virtual void BeforeRemount(AbstractCatalogManager<CatalogT> *source) = 0;
-};
-
 
 /**
  * This class provides the read-only interface to a tree of catalogs
@@ -149,7 +138,6 @@ class AbstractCatalogManager : public SingleCopy {
  public:
   typedef std::vector<CatalogT*> CatalogList;
 
- public:
   static const inode_t kInodeOffset = 255;
   explicit AbstractCatalogManager(perf::Statistics *statistics);
   virtual ~AbstractCatalogManager();
@@ -184,12 +172,6 @@ class AbstractCatalogManager : public SingleCopy {
   bool ListFileChunks(const PathString &path,
                       const shash::Algorithms interpret_hashes_as,
                       FileChunkList *chunks);
-
-  void RegisterRemountListener(RemountListener<CatalogT> *listener) {
-    WriteLock();
-    remount_listener_ = listener;
-    Unlock();
-  }
   void SetOwnerMaps(const OwnerMap &uid_map, const OwnerMap &gid_map);
 
   Statistics statistics() const { return statistics_; }
@@ -297,7 +279,6 @@ class AbstractCatalogManager : public SingleCopy {
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
   pthread_key_t pkey_sqlitemem_;
-  RemountListener<CatalogT> *remount_listener_;
   OwnerMap uid_map_;
   OwnerMap gid_map_;
 
