@@ -307,15 +307,19 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     File() : hash(shash::Any()), size(0), path_hash(shash::Md5()),
         parent_hash(shash::Md5()), name("") { }
 
-    File(const shash::Any &hash, size_t size, string parent_path, string name) :
+    File(const shash::Any &hash, size_t size, const string &parent_path,
+         const string &name) :
       hash(hash), size(size), name(name)
     {
-      string full_path = parent_path + "/" + name;
-      if (parent_path == "" && name == "")
-        parent_hash = shash::Md5();
-      else
+      if (parent_path == "" && name == "") {
+        parent_hash = shash::Md5("", 0);
+        path_hash = shash::Md5("", 0);
+      }
+      else {
+        string full_path = parent_path + "/" + name;
         parent_hash = shash::Md5(parent_path.c_str(), parent_path.length());
-      path_hash = shash::Md5(full_path.c_str(), full_path.length());
+        path_hash = shash::Md5(full_path.c_str(), full_path.length());
+      }
     }
 
     catalog::DirectoryEntry ToDirectoryEntry() const {
@@ -358,6 +362,11 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     if (parent != NULL) {
       parent->RegisterNestedCatalog(this);
     }
+    unsigned pos = root_path.find_last_of('/');
+    string parent_path = root_path.substr(0, pos);
+    string name = root_path.substr(pos + 1, string::npos);
+    File mountpoint_file(shash::Any(), 4096, parent_path, name);
+    files_.push_back(mountpoint_file);
     ++MockCatalog::instances;
   }
 
@@ -406,6 +415,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
                                 LinkString *raw_symlink) const { return false; }
   bool LookupPath(const PathString &path,
                   catalog::DirectoryEntry *dirent) const;
+  bool ListingPath(const PathString &path,
+                   catalog::DirectoryEntryList *listing) const;
 
 
  protected:

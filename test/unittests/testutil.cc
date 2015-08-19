@@ -279,6 +279,22 @@ bool MockCatalog::LookupPath(const PathString &path,
   return false;
 }
 
+bool MockCatalog::ListingPath(const PathString &path,
+                 catalog::DirectoryEntryList *listing) const {
+  listing->clear();
+  bool found = false;
+  for (unsigned i = 0; i < files_.size(); ++i) {
+    shash::Md5 path_hash(path.GetChars(), path.GetLength());
+    if (files_[i].parent_hash == path_hash)
+      listing->push_back(files_[i].ToDirectoryEntry());
+    else if (files_[i].path_hash == path_hash)
+      found = true;
+  }
+  if (!found)  // the parent does not exists, nor the children then
+    listing->clear();
+  return found;
+}
+
 void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   NestedCatalog nested;
   nested.path  = PathString(child->root_path());
