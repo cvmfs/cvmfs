@@ -130,14 +130,17 @@ TEST_F(T_CatalogManager, Lookup) {
   EXPECT_TRUE(dirent.IsDirectory());
   EXPECT_TRUE(catalog_mgr_->LookupPath("/file1", kLookupSole, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
-  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/file2", kLookupSole, &dirent));
+  // the father directory belongs to the catalog, so there is no problem
+  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/file2", kLookupFull, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // /dir/dir/dir/file4 belongs to a catalog that is not mounted yet
   EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupSole,
                                        &dirent));
   // the new catalog should be mounted now
   EXPECT_EQ(2, catalog_mgr_->GetNumCatalogs());
-  EXPECT_FALSE(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupFull,
+
+  // the father directory should also belong to the nested catalo
+  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupFull,
                                        &dirent));
   // it is not a symplink, so it should crash
   EXPECT_DEATH(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupRawSymlink,
@@ -145,9 +148,26 @@ TEST_F(T_CatalogManager, Lookup) {
   EXPECT_EQ(2, catalog_mgr_->GetNumCatalogs());
 }
 
+TEST_F(T_CatalogManager, Listing) {
+  catalog::DirectoryEntry dirent;
+  ASSERT_TRUE(catalog_mgr_->Init());
+  AddTree();
+  DirectoryEntryList del;
+  EXPECT_FALSE(catalog_mgr_->Listing("/fakepath", &del));
+  EXPECT_EQ(0u, del.size());
+  EXPECT_TRUE(catalog_mgr_->Listing("/dir/dir", &del));
+  EXPECT_EQ(2u, del.size());
+  // now it will have to mount the nested catalog
+  EXPECT_TRUE(catalog_mgr_->Listing("/dir/dir/dir", &del));
+  EXPECT_EQ(2u, del.size());
+  EXPECT_EQ(2, catalog_mgr_->GetNumCatalogs());
+}
+
 TEST_F(T_CatalogManager, Remount) {
   EXPECT_TRUE(catalog_mgr_->Init());
-  EXPECT_EQ(kLoadNew, catalog_mgr_->Remount(true));
+  LoadError le;
+  EXPECT_EQ(kLoadNew, le = catalog_mgr_->Remount(true));
+  EXPECT_EQ("loaded new catalog", Code2Ascii(le));
   EXPECT_EQ(kLoadNew, catalog_mgr_->Remount(false));
 }
 
