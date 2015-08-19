@@ -2697,6 +2697,7 @@ add_replica() {
   # additional sanity checks
   is_root || die "Only root can create a new repository"
   check_user $cvmfs_user || die "No user $cvmfs_user"
+  check_upstream_validity $upstream
   if is_local_upstream $upstream; then
     if ! check_apache; then
       if [ $silence_httpd_warning -eq 1 ]; then
@@ -2712,7 +2713,6 @@ add_replica() {
       fi
     fi
   fi
-  check_upstream_validity $upstream
 
   echo -n "Creating Configuration Files... "
   mkdir -p /etc/cvmfs/repositories.d/${alias_name}
