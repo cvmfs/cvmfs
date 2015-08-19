@@ -21,6 +21,9 @@ namespace catalog {
 
 class T_CatalogManager : public ::testing::Test {
  protected:
+  static const char *hashes[];
+
+ protected:
   void SetUp() {
     catalog_mgr_ = new MockCatalogManager(&statistics_);
   }
@@ -31,7 +34,6 @@ class T_CatalogManager : public ::testing::Test {
 
   void AddTree() {
     const shash::Any empty_hash = shash::Any();
-    const int size = 32;
     const size_t file_size = 4096;
     const char suffix = shash::kSha1;
     shash::Any hash;
@@ -44,14 +46,14 @@ class T_CatalogManager : public ::testing::Test {
     // adding "/file1"
     hash = shash::Any(shash::kSha1,
                       reinterpret_cast<const unsigned char*>(hashes[1]),
-                      size, suffix);
+                      suffix);
     root_catalog->AddFile(hash, file_size, "", "file1");
     // adding "/dir/dir"
     root_catalog->AddFile(empty_content, file_size, "/dir", "dir");
     // adding "/dir/dir/file2"
     hash = shash::Any(shash::kSha1,
                       reinterpret_cast<const unsigned char*>(hashes[1]),
-                      size, suffix);
+                      suffix);
     root_catalog->AddFile(hash, file_size, "/dir/dir", "file2");
     // adding "/dir/dir/dir"
     root_catalog->AddFile(empty_content, file_size, "/dir/dir", "dir");
@@ -68,19 +70,18 @@ class T_CatalogManager : public ::testing::Test {
     // adding "/dir/dir/dir/file3" to the new nested catalog
     hash = shash::Any(shash::kSha1,
                           reinterpret_cast<const unsigned char*>(hashes[2]),
-                          size, suffix);
+                          suffix);
     new_catalog->AddFile(hash, file_size, "/dir/dir/dir", "file3");
     // adding "/dir/dir/dir/file4" to the new nested catalog
     hash = shash::Any(shash::kSha1,
                           reinterpret_cast<const unsigned char*>(hashes[3]),
-                          size, suffix);
+                          suffix);
     new_catalog->AddFile(hash, file_size, "/dir/dir/dir", "file4");
     // we haven't mounted the second catalog yet!
     ASSERT_EQ(1, catalog_mgr_->GetNumCatalogs());
   }
 
  protected:
-  const static char *hashes[];
   MockCatalogManager *catalog_mgr_;
   perf::Statistics statistics_;
 };
@@ -171,4 +172,4 @@ TEST_F(T_CatalogManager, Remount) {
   EXPECT_EQ(kLoadNew, catalog_mgr_->Remount(false));
 }
 
-}
+}  // namespace catalog

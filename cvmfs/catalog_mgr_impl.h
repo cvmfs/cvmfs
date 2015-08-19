@@ -1,16 +1,9 @@
-/*
- * catalog_mgr_impl.h
- *
- *  Created on: Aug 13, 2015
- *      Author: molina
+/**
+ * This file is part of the CernVM File System
  */
 
 #ifndef CVMFS_CATALOG_MGR_IMPL_H_
 #define CVMFS_CATALOG_MGR_IMPL_H_
-
-/**
- * This file is part of the CernVM File System
- */
 
 #define __STDC_FORMAT_MACROS
 
@@ -20,6 +13,7 @@
 #include <inttypes.h>
 
 #include <cassert>
+#include <string>
 
 #include "logging.h"
 #include "shortstring.h"
@@ -32,7 +26,8 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 template <class CatalogT>
-AbstractCatalogManager<CatalogT>::AbstractCatalogManager(perf::Statistics *statistics) :
+AbstractCatalogManager<CatalogT>::AbstractCatalogManager(
+    perf::Statistics *statistics) :
   statistics_(statistics) {
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
@@ -57,7 +52,8 @@ AbstractCatalogManager<CatalogT>::~AbstractCatalogManager() {
 }
 
 template <class CatalogT>
-void AbstractCatalogManager<CatalogT>::SetInodeAnnotation(InodeAnnotation *new_annotation)
+void AbstractCatalogManager<CatalogT>::SetInodeAnnotation(
+    InodeAnnotation *new_annotation)
 {
   assert(catalogs_.empty() || (new_annotation == inode_annotation_));
   inode_annotation_ = new_annotation;
@@ -177,7 +173,8 @@ void AbstractCatalogManager<CatalogT>::DetachNested() {
 /**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
  * @param path      the path to find in the catalogs
- * @param options   whether to perform another lookup to get the parent entry, too
+ * @param options   whether to perform another lookup to get the parent entry,
+ *                  too
  * @param dirent    the resulting DirectoryEntry, or special Negative entry
  *                  Note: can be set to zero if the result is not important
  * @return true if lookup succeeded otherwise false
@@ -531,7 +528,8 @@ void AbstractCatalogManager<CatalogT>::ReleaseInodes(const InodeRange chunk) {
  * @return the catalog which is best fitting at the given path
  */
 template <class CatalogT>
-CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(const PathString &path) const {
+CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(
+    const PathString &path) const {
   assert(catalogs_.size() > 0);
 
   // Start at the root catalog and successively go down the catalog tree
@@ -782,7 +780,7 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchyRecursively(
   CatalogList children = catalog->GetChildren();
   typename CatalogList::const_iterator i = children.begin();
   typename CatalogList::const_iterator iend = children.end();
-  for (;i != iend; ++i) {
+  for (; i != iend; ++i) {
     output += PrintHierarchyRecursively(*i, level + 1);
   }
 
@@ -804,4 +802,4 @@ void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {
 
 
 
-#endif /* CVMFS_CATALOG_MGR_IMPL_H_ */
+#endif  // CVMFS_CATALOG_MGR_IMPL_H_
