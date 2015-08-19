@@ -48,7 +48,7 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                curl attr httpd
 
 # install convenience packages for development
-yum -y install git tig iftop htop
+yum -y install git tig iftop htop jq
 
 # link the CernVM-FS source directory in place
 if [ ! -L $CVMFS_SOURCE_DIR ]; then
@@ -68,4 +68,5 @@ sed -i -e 's/^vagrant.*/vagrant ALL=(ALL) NOPASSWD:ALL/' /etc/sudoers
 
 # create CVMFS test user
 useradd $CVMFS_TEST_USER
+usermod -a -G fuse $CVMFS_TEST_USER
 echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
