@@ -2702,7 +2702,6 @@ add_replica() {
     if [ $silence_httpd_warning -eq 0 ]; then
       check_apache || die "Apache must be installed and running"
       check_wsgi_module
-      update_geodb -l
       [ x"$cvmfs_user" = x"root" ] || echo "NOTE: If snapshot is not run regularly as root, do update-geodb monthly from cron"
     else
       check_apache || echo "Warning: Apache is needed to access this CVMFS replication"
@@ -2764,11 +2763,14 @@ Alias /cvmfs/$alias_name ${storage_dir}
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
 </Directory>
 EOF
+
     reload_apache > /dev/null
   fi
   echo "done"
 
   if is_local_upstream $upstream; then
+    _update_geodb -l
+
     echo -n "Create CernVM-FS Storage... "
     mkdir -p $storage_dir
     create_repository_skeleton $storage_dir $cvmfs_user > /dev/null
