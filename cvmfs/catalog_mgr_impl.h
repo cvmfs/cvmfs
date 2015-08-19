@@ -45,7 +45,6 @@ AbstractCatalogManager<CatalogT>::AbstractCatalogManager(perf::Statistics *stati
   assert(retval == 0);
   retval = pthread_key_create(&pkey_sqlitemem_, NULL);
   assert(retval == 0);
-  remount_listener_ = NULL;
 }
 
 template <class CatalogT>
@@ -120,8 +119,6 @@ LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
     return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
 
   WriteLock();
-  if (remount_listener_)
-    remount_listener_->BeforeRemount(this);
 
   string     catalog_path;
   shash::Any catalog_hash;
