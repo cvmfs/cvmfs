@@ -2224,26 +2224,58 @@ has_file_descriptors_on_mount_point() {
 #                                                                              #
 ################################################################################
 
-_check_old_dbfile() {
-  local dbfile=$1
-  local lazy=$2
-  # only to be used from update_geodb
-  if [ -n "`find $dbfile -mtime +"$CVMFS_UPDATEGEO_MAXDAYS"`" ]; then
-    if ! is_root; then
-      echo "Geoip database more than $CVMFS_UPDATEGEO_MAXDAYS days old, do update-geodb as root regularly"
-    elif $lazy; then
-      echo "Geoip database more than $CVMFS_UPDATEGEO_MAXDAYS days old, try update-geodb without -l"
-    else
-      echo "Geoip database more than $CVMFS_UPDATEGEO_MAXDAYS days old, but should never reach this point"
-    fi
+_update_geodb_days_since_update() {
+  local timestamp=$(date +%s)
+  local db_mtime=$(stat --format='%Y' $CVMFS_UPDATEGEO_DB)
+  local days_since_update=$(( ( $timestamp - $db_mtime ) / 86400 ))
+  echo "$days_since_update"
+}
+
+_update_geodb_lazy_install_slot() {
+  [ "`date +%w`" -eq "$CVMFS_UPDATEGEO_DAY"  ] && \
+  [ "`date +%k`" -gt "$CVMFS_UPDATEGEO_HOUR" ]
+}
+
+_update_geodb_install() {
+  local retcode=0
+  local dbfile="$CVMFS_UPDATEGEO_DB"
+  local download_target=${CVMFS_UPDATEGEO_DB}.gz
+  local unzip_target=${CVMFS_UPDATEGEO_DB}.new
+
+  # downloading the GeoIP database file
+  if ! curl -sS                  \
+            --fail               \
+            --connect-timeout 10 \
+            --max-time 60        \
+            "$CVMFS_UPDATEGEO_URL" > $download_target 2>/dev/null; then
+    echo "failed to download $CVMFS_UPDATEGEO_URL" >&2
+    rm -f $download_target
     return 1
   fi
+
+  # unzipping the GeoIP database file
+  if ! zcat $download_target > $unzip_target 2>/dev/null; then
+    echo "failed to unzip $download_target to $unzip_target" >&2
+    rm -f $download_target $unzip_target
+    return 2
+  fi
+
+  # get rid of the zipped GeoIP database
+  rm -f $download_target
+
+  # atomically installing the GeoIP database
+  if ! mv -f $unzip_target $dbfile; then
+    echo "failed to install $dbfile" >&2
+    rm -f $unzip_target
+    return 3
+  fi
+
+  return 0
 }
 
 _update_geodb() {
   local dbfile=$CVMFS_UPDATEGEO_DB
   local dbdir=$CVMFS_UPDATEGEO_DIR
-  local outfile=$dbdir/update.out
   local lazy=false
   local retcode=0
 
@@ -2262,61 +2294,30 @@ _update_geodb() {
   done
 
   # sanity checks
-  [ -w "$dbfile" ] || $lazy || die "geo database is not writable by $(whoami)"
-  [ -d $dbdir ] || die "$dbdir does not exist"
+  [ -w "$dbdir"  ]   || { echo "Directory '$dbdir' doesn't exist or is not writable by $(whoami)" >&2; return 1; }
+  [ ! -f "$dbfile" ] || [ -w "$dbfile" ] || { echo "GeoIP database '$dbfile' is not writable by $(whoami)" >&2; return 2; }
 
-  # check if this is a lazy update and it isn't time to try again yet
-  if $lazy && [ -f $dbfile ] && [ -f $outfile ]; then
-    if [ -z "`find $outfile -mtime +$CVMFS_UPDATEGEO_MINDAYS`" ] || \
-        [ "`date +%w`" -ne "$CVMFS_UPDATEGEO_DAY" ] ||
-        [ "`date +%k`" -lt "$CVMFS_UPDATEGEO_HOUR" ]; then
-      # not time to try again yet
-      # if dbfile is old, warn but don't treat it as an error
-      _check_old_dbfile $dbfile $lazy || true
-      return
-    fi
-  fi
-
-  if [ -w "$dbfile" ]; then
-    echo "Downloading geoip database"
-    if ! curl -sS --fail --connect-timeout 10 --max-time 60 "$CVMFS_UPDATEGEO_URL" >$dbfile.gz 2>$outfile; then
-      retcode=1
-    fi
-    cat $outfile
-    if [ $retcode = 0 ]; then
-      if [ -s $dbfile.gz ]; then
-        if zcat $dbfile.gz >$dbfile.new; then
-          rm -f $dbfile.gz
-          mv -f $dbfile.new $dbfile
-        else
-          rm -f $dbfile.gz $dbfile.new
-          echo "error unzipping geoip database"
-          $lazy || return 1
-        fi
-      else
-        rm -f $dbfile.gz
-        echo "downloaded geoip database empty"
-        $lazy || return 1
-      fi
+  # check if an update/installation needs to be done
+  if [ ! -f "$dbfile" ]; then
+    echo -n "Installing GeoIP Database... "
+  elif ! $lazy; then
+    echo -n "Updating GeoIP Database... "
+  elif [ $(_update_geodb_days_since_update) -gt $CVMFS_UPDATEGEO_MAXDAYS ]; then
+    echo -n "GeoIP Database is very old. Updating... "
+  elif [ $(_update_geodb_days_since_update) -gt $CVMFS_UPDATEGEO_MINDAYS ]; then
+    if _update_geodb_lazy_install_slot; then
+      echo -n "GeoIP Database is expired. Updating... "
     else
-      rm -f $dbfile.gz
-      echo "error downloading $CVMFS_UPDATEGEO_URL"
-      $lazy || return 1
+      echo "GeoIP Database is expired but doing nothing right now."
+      return 0
     fi
-  # else not root, can't do the download
+  else
+    echo "GeoIP Database is up to date. Nothing to do."
+    return 0
   fi
 
-  if [ ! -f $dbfile ]; then
-    # database has never been downloaded, fatal error
-    is_root || die "Geoip database not downloaded, do update-geodb as root"
-    ! $lazy || die "Geoip database failed to download, do update-geodb without -l"
-    die "Geoip database not downloaded, should never reach this point"
-  fi
-
-  # treat an old dbfile as an error, but not fatal to other cvmfs_server functions
-  _check_old_dbfile $dbfile $lazy || return 1
-
-  return
+  # at this point the database needs to be installed or updated
+  _update_geodb_install && echo "done" || { echo "fail"; return 3; }
 }
 
 update_geodb() {
