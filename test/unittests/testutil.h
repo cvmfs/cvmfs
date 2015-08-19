@@ -10,6 +10,7 @@
 #include <sys/types.h>
 
 #include <ctime>
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -289,7 +290,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   static unsigned int      instances;
 
  public:
-   struct NestedCatalog {
+  struct NestedCatalog {
     PathString   path;
     shash::Any   hash;
     MockCatalog *child;
@@ -314,8 +315,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
       if (parent_path == "" && name == "") {
         parent_hash = shash::Md5("", 0);
         path_hash = shash::Md5("", 0);
-      }
-      else {
+      } else {
         string full_path = parent_path + "/" + name;
         parent_hash = shash::Md5(parent_path.c_str(), parent_path.length());
         path_hash = shash::Md5(full_path.c_str(), full_path.length());
@@ -499,7 +499,7 @@ namespace catalog {
 
 class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
  public:
-  MockCatalogManager(perf::Statistics *statistics) :
+  explicit MockCatalogManager(perf::Statistics *statistics) :
     AbstractCatalogManager<MockCatalog>(statistics) { }
 
   virtual LoadError LoadCatalog(const PathString &mountpoint,
@@ -521,7 +521,7 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
   map<PathString, MockCatalog*> catalog_map_;
 };
 
-} // namespace catalog
+}  // namespace catalog
 
 
 //------------------------------------------------------------------------------

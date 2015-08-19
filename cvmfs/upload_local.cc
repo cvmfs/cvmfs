@@ -193,7 +193,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
   }
 
   const std::string final_path = "data/" + content_hash.MakePath();
-  if (! Peek(final_path)) {
+  if (!Peek(final_path)) {
     retval = Move(local_handle->temporary_path, final_path);
     if (retval != 0) {
       const int cpy_errno = errno;

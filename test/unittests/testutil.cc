@@ -10,13 +10,13 @@
 
 #include <algorithm>
 #include <cassert>
-#include <map>
 #include <fstream>  // TODO(jblomer): remove me
+#include <map>
 #include <sstream>  // TODO(jblomer): remove me
 
+#include "../../cvmfs/hash.h"
 #include "../../cvmfs/manifest.h"
 #include "testutil.h"
-#include "../../cvmfs/hash.h"
 
 
 static void SkipWhitespace(std::istringstream *iss) {
@@ -376,17 +376,17 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
                                                   string  *catalog_path,
                                                   shash::Any *catalog_hash)
 {
-   map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
-   if (it != catalog_map_.end() && catalog_hash != NULL) {
-     MockCatalog *catalog = it->second;
-     *catalog_hash = catalog->hash();
-   } else {
-     MockCatalog * catalog = new MockCatalog(mountpoint.ToString(),
-                                             hash, 4096, 1, 0,
-                                             true, NULL, NULL);
-     catalog_map_[mountpoint] = catalog;
-   }
-   return kLoadNew;
+  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
+  if (it != catalog_map_.end() && catalog_hash != NULL) {
+    MockCatalog *catalog = it->second;
+    *catalog_hash = catalog->hash();
+  } else {
+    MockCatalog * catalog = new MockCatalog(mountpoint.ToString(),
+                                           hash, 4096, 1, 0,
+                                           true, NULL, NULL);
+    catalog_map_[mountpoint] = catalog;
+  }
+  return kLoadNew;
 }
 
 
