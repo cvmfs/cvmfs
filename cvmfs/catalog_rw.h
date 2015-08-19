@@ -163,8 +163,9 @@ class WritableCatalog : public Catalog {
     std::vector<std::string> *grand_child_mountpoints);
   void MoveCatalogsToNested(const std::vector<std::string> &nested_catalogs,
                             WritableCatalog *new_nested_catalog);
-  void MoveFileChunksToNested(const std::string  &full_path,
-                              WritableCatalog    *new_nested_catalog);
+  void MoveFileChunksToNested(const std::string       &full_path,
+                              const shash::Algorithms  algorithm,
+                              WritableCatalog         *new_nested_catalog);
 
   void CopyToParent();
   void CopyCatalogsToParent();

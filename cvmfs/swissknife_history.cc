@@ -196,7 +196,7 @@ bool CommandTag::CloseAndPublishHistory(Environment *env) {
 
   // compress and upload the new history database
   Future<shash::Any> history_hash;
-  upload::Spooler::CallbackTN* callback =
+  upload::Spooler::CallbackPtr callback =
     env->spooler->RegisterListener(&CommandTag::UploadClosure,
                                     this,
                                    &history_hash);
@@ -246,7 +246,7 @@ bool CommandTag::UploadCatalogAndUpdateManifest(
 
   // upload the catalog
   Future<shash::Any> catalog_hash;
-  upload::Spooler::CallbackTN* callback =
+  upload::Spooler::CallbackPtr callback =
     env->spooler->RegisterListener(&CommandTag::UploadClosure,
                                     this,
                                    &catalog_hash);

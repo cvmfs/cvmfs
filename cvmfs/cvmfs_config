@@ -272,7 +272,7 @@ cvmfs_chksetup() {
       num_errors=$(($num_errors+1))
       AUTOMASTER=/dev/null
   fi
-  # Check that /etc/auto.cvmfs is referenced in /etc/auto.master
+  # Check that /etc/auto.cvmfs is referenced in auto.master
   # Check that /etc/auto.cvmfs is executable on Linux
   local global_mount_dir
   global_mount_dir=$CVMFS_MOUNT_DIR
@@ -1108,7 +1108,8 @@ cvmfs_bugreport() {
                  'cvmfs_config status' 'cvmfs_config showconfig' \
                  'cvmfs_config chksetup' 'cvmfs_config stat -v' 'cvmfs_talk internal affairs' \
                  'cat /etc/fuse.conf'  'ls -la /usr/bin/fusermount' 'ls -la /bin/fusermount' \
-                 'cat /etc/auto.master' 'cat /etc/sysconfig/autofs' 'cat /etc/default/autofs' \
+                 'cat /etc/auto.master' 'cat /etc/autofs/auto.master' 'cat /etc/sysconfig/autofs' \
+                 'cat /etc/default/autofs' 'cat /etc/conf.d/autofs' \
                  'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' 'cat /proc/cpuinfo' \
                  'cat /etc/hosts' 'free -m' )
       ;;
@@ -1437,12 +1438,23 @@ reload_service() {
 
 
 configure_autofs() {
+  for path in /etc/auto.master /etc/autofs/auto.master; do
+    if [ -f $path ]; then
+      AUTOMASTER=$path
+      break;
+    fi
+  done
+  if [ -z "$AUTOMASTER" ]; then
+    echo "Error: unable to find auto.master in any of the supplied paths!"
+    num_errors=$(($num_errors+1))
+    AUTOMASTER=/dev/null
+  fi
   case $sys_arch in
     Linux )
-      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master #Still needed or needs to be adjusted?
+      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" $AUTOMASTER #Still needed or needs to be adjusted?
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
-      if ! grep -q "^$cvmfs_map" /etc/auto.master; then
-        echo "$cvmfs_map" >> /etc/auto.master
+      if ! grep -q "^$cvmfs_map" $AUTOMASTER; then
+        echo "$cvmfs_map" >> $AUTOMASTER
         $pidof automount > /dev/null && reload_service autofs || true
       fi ;;
 

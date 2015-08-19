@@ -1,4 +1,8 @@
 2.2.0:
+  * Allow geodb update for non-root users (CVM-895)
+  * Don't commit exisiting files to local storage backend in server (CVM-894)
+  * Fix stale lock file on server machine crash (CVM-810)
+  * Fix crash for invalid spooler definition (CVM-891)
   * Fix leak of temporary files in the S3 backend (CVM-881)
   * Add -s <S3 config file> switch to add-replica command
   * Fix rare crashes on publish due to false whiteout handling (CVM-880)

@@ -68,7 +68,6 @@ class ChunkJob {
     assert(!IsTerminateJob());
     return shash::Any(hash_algorithm,
                       digest,
-                      shash::kDigestSizes[hash_algorithm],
                       suffix);
   }
 

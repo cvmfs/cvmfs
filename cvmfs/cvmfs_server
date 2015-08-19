@@ -52,11 +52,16 @@ if which httpd2 > /dev/null 2>&1; then # SLES/OpenSuSE
   APACHE_BIN="$(which httpd2)"
   APACHE_CTL="$APACHE_BIN"
   APACHE_WSGI_MODPKG="apache2-mod_wsgi"
-elif which apache2 > /dev/null 2>&1; then # Debian based
+elif which apache2 > /dev/null 2>&1; then
   APACHE_CONF="apache2"
   APACHE_BIN="$(which apache2)"
-  APACHE_CTL="$(which apachectl)"
-  APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
+  if which apachectl > /dev/null 2>&1; then # Debian
+    APACHE_CTL="$(which apachectl)"
+    APACHE_WSGI_MODPKG="libapache2-mod-wsgi"
+  elif which apache2ctl > /dev/null 2>&1; then # Gentoo
+    APACHE_CTL="$(which apache2ctl)"
+    APACHE_WSGI_MODPKG="www-apache/mod_wsgi"
+  fi
 else # RedHat based
   APACHE_CONF="httpd"
   APACHE_BIN="/usr/sbin/httpd"
@@ -484,7 +489,7 @@ check_multiple_repository_existence() {
 
 
 # checks if the aufs kernel module is present
-#
+# of if aufs is compiled in
 # @return   0 if the aufs kernel module is loaded
 check_aufs() {
   /sbin/modprobe -q aufs || test -d /sys/fs/aufs
@@ -492,11 +497,12 @@ check_aufs() {
 
 
 # checks if the overlayfs kernel module is present
-#
+# of if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
   /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
-  /sbin/modprobe -q overlay   || test -d /sys/module/overlay
+  /sbin/modprobe -q overlay   || test -d /sys/module/overlay || \
+  test x"$(zgrep OVERLAY_FS /proc/config.gz | awk -F = '{print $2}')" = xy
 }
 
 # check if at least one of the supported union file systems is available
@@ -519,7 +525,8 @@ get_overlayfs_name() {
   check_overlayfs || die "overlayfs is not installed!"
   if /sbin/modprobe -q overlayfs || [ -d /sys/module/overlayfs ]; then
     echo "overlayfs"
-  elif /sbin/modprobe -q overlay || [ -d /sys/module/overlay ]; then
+  elif /sbin/modprobe -q overlay || [ -d /sys/module/overlay ] || \
+       test x"$(zgrep OVERLAY_FS /proc/config.gz | awk -F = '{print $2}')" = xy ; then
     echo "overlay"
   else
     die "cannot determine overlayfs name"
@@ -614,6 +621,8 @@ get_apache_conf_path() {
   local res_path="/etc/${APACHE_CONF}"
   if [ x"$(get_apache_conf_mode)" = x"$APACHE_CONF_MODE_CONFAVAIL" ]; then
     echo "${res_path}/conf-available"
+  elif [ -d "${res_path}/modules.d" ]; then
+    echo "${res_path}/modules.d"
   else
     echo "${res_path}/conf.d"
   fi
@@ -886,6 +895,72 @@ get_auto_garbage_collection_timespan() {
   fi
 }
 
+
+# Helper functions for file locking including detection of stale locks
+# Note: The implementation idea was found here:
+#       http://rute.2038bug.com/node23.html.gz
+__is_valid_lock() {
+  local path="$1"
+  local ignore_stale="$2"
+
+  local lock_file="${path}.lock"
+  [ -f $lock_file ]      || return 1 # lock doesn't exist
+  [ -z "$ignore_stale" ] || return 0 # lock is there (skip the stale test)
+
+  local stale_pid=$(cat $lock_file 2>/dev/null)
+  [ $stale_pid -gt 0 ]     && \
+  kill -0 $stale_pid 2>/dev/null
+}
+
+acquire_lock() { # hardlink creation is guaranteed to be atomic!
+  local path="$1"
+  local ignore_stale="$2"
+
+  local pid="$$"
+  local temp_file="${path}.${pid}"
+  local lock_file="${path}.lock"
+  echo $pid > $temp_file || return 1 # probably no access to $path
+
+  if ln $temp_file $lock_file 2>/dev/null; then
+    rm -f $temp_file 2>/dev/null
+    return 0 # lock acquired
+  fi
+
+  if __is_valid_lock "$path" "$ignore_stale"; then
+    rm -f $temp_file 2>/dev/null
+    return 1 # lock couldn't be acquired and appears valid
+  fi
+
+  rm -f $lock_file 2>/dev/null # lock was stale and can be removed
+  if ln $temp_file $lock_file; then
+    rm -f $temp_file 2>/dev/null
+    return 0 # lock acquired
+  fi
+
+  rm -f $temp_file 2>/dev/null
+  return 1 # lock couldn't be acquired after removing stale lock (lost the race)
+}
+
+wait_and_acquire_lock() {
+  local path="$1"
+  while ! acquire_lock "$path"; do
+    sleep 5
+  done
+}
+
+release_lock() {
+  local path="$1"
+  local lock_file="${path}.lock"
+  rm -f $lock_file 2>/dev/null
+}
+
+check_lock() {
+  local path="$1"
+  local ignore_stale="$2"
+  __is_valid_lock "${path}" "$ignore_stale"
+}
+
+
 # checks if a repository is currently in a transaction
 #
 # @param name  the repository name to be checked
@@ -893,7 +968,7 @@ get_auto_garbage_collection_timespan() {
 is_in_transaction() {
   local name=$1
   load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/in_transaction ]
+  check_lock ${CVMFS_SPOOL_DIR}/in_transaction ignore_stale
 }
 
 open_transaction() {
@@ -901,9 +976,9 @@ open_transaction() {
   load_repo_config $name
   local tx_lock="${CVMFS_SPOOL_DIR}/in_transaction"
 
-  is_stratum0 $name                 || die "Cannot open transaction on Stratum1"
-  mkdir "$tx_lock" > /dev/null 2>&1 || die "Failed to create transaction lock"
-  cvmfs_suid_helper open  $name     || die "Failed to make /cvmfs/$name writable"
+  is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
+  acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
+  cvmfs_suid_helper open  $name        || die "Failed to make /cvmfs/$name writable"
 }
 
 # closes a previously opened transaction
@@ -936,7 +1011,7 @@ close_transaction() {
   [ ! -z "$tmp_dir" ] && rm -fR "${tmp_dir}"/*
   cvmfs_suid_helper rdonly_mount $name > /dev/null
   cvmfs_suid_helper rw_mount $name
-  rmdir "$tx_lock"
+  release_lock "$tx_lock"
 }
 
 # checks if a repository is currently runing a publish procedure
@@ -946,14 +1021,14 @@ close_transaction() {
 is_publishing() {
   local name=$1
   load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/is_publishing ]
+  check_lock ${CVMFS_SPOOL_DIR}/is_publishing ignore_stale
 }
 
 publish_starting() {
   local name=$1
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
-  mkdir "$pub_lock" > /dev/null 2>&1 || die "Failed to acquire publishing lock"
+  acquire_lock "$pub_lock" ignore_stale || die "Failed to acquire publishing lock"
   trap "publish_failed $name" EXIT HUP INT TERM
   cvmfs_suid_helper lock $name
 }
@@ -963,7 +1038,7 @@ publish_failed() {
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
-  rmdir $pub_lock > /dev/null 2>&1
+  release_lock $pub_lock
   cvmfs_suid_helper open $name
 }
 
@@ -972,34 +1047,7 @@ publish_succeeded() {
   load_repo_config $name
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
-  rmdir $pub_lock > /dev/null 2>&1
-}
-
-acquire_snapshot_lock() {
-  local name=$1
-  load_repo_config $name
-  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
-  mkdir $snapshot_lock > /dev/null 2>&1 || return 1
-}
-
-wait_and_acquire_snapshot_lock() {
-  local name=$1
-  while ! acquire_snapshot_lock $name; do
-    sleep 10
-  done
-}
-
-release_snapshot_lock() {
-  local name=$1
-  load_repo_config $name
-  local snapshot_lock="${CVMFS_SPOOL_DIR}/is_snapshotting"
-  rmdir $snapshot_lock > /dev/null 2>&1
-}
-
-is_snapshotting() {
-  local name=$1
-  load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/is_snapshotting ]
+  release_lock $pub_lock
 }
 
 
@@ -2211,7 +2259,7 @@ update_geodb() {
   done
 
   # sanity checks
-  is_root || $lazy || die "Only root can update the geo database"
+  [ -w "$dbfile" ] || $lazy || die "geo database is not writable by $(whoami)"
   [ -d $dbdir ] || die "$dbdir does not exist"
 
   # check if this is a lazy update and it isn't time to try again yet
@@ -2226,7 +2274,7 @@ update_geodb() {
     fi
   fi
 
-  if is_root; then
+  if [ -w "$dbfile" ]; then
     echo "Downloading geoip database"
     if ! curl -sS --fail --connect-timeout 10 --max-time 60 "$dburl" >$dbfile.gz 2>$outfile; then
       retcode=1
@@ -4260,8 +4308,8 @@ __snapshot_cleanup() {
 
   $user_shell "$(__swissknife_cmd) remove     \
                  -r ${CVMFS_UPSTREAM_STORAGE} \
-                 -o .cvmfs_is_snapshotting" || echo "Warning: failed to remove .cvmfs_is_snapshotting"
-  release_snapshot_lock $alias_name         || echo "Warning: failed to release snapshotting lock"
+                 -o .cvmfs_is_snapshotting"       || echo "Warning: failed to remove .cvmfs_is_snapshotting"
+  release_lock ${CVMFS_SPOOL_DIR}/is_snapshotting || echo "Warning: failed to release snapshotting lock"
 }
 
 snapshot() {
@@ -4315,6 +4363,7 @@ snapshot() {
     public_key=$CVMFS_PUBLIC_KEY
     timeout=$CVMFS_HTTP_TIMEOUT
     retries=$CVMFS_HTTP_RETRIES
+    snapshot_lock=${spool_dir}/is_snapshotting
 
     # more sanity checks
     is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
@@ -4339,7 +4388,7 @@ snapshot() {
     fi
 
     # check for other snapshots in progress
-    if ! acquire_snapshot_lock $alias_name; then
+    if ! acquire_lock $snapshot_lock; then
       if [ $abort_on_conflict -eq 1 ]; then
         echo "another snapshot is in progress... aborting"
         retcode=1
@@ -4353,7 +4402,7 @@ snapshot() {
       fi
 
       echo "waiting for another snapshot to finish..."
-      if ! wait_and_acquire_snapshot_lock $alias_name; then
+      if ! wait_and_acquire_lock $snapshot_lock; then
         echo "failed to acquire snapshot lock"
         retcode=1
         continue
