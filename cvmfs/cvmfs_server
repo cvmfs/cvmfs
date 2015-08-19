@@ -2240,7 +2240,7 @@ _check_old_dbfile() {
   fi
 }
 
-update_geodb() {
+_update_geodb() {
   local dbfile=$CVMFS_UPDATEGEO_DB
   local dbdir=$CVMFS_UPDATEGEO_DIR
   local outfile=$dbdir/update.out
@@ -2317,6 +2317,12 @@ update_geodb() {
   _check_old_dbfile $dbfile $lazy || return 1
 
   return
+}
+
+update_geodb() {
+  # sanity checks
+  [ -w $CVMFS_UPDATEGEO_DB ] || die "GeoIP database is not writable by $(whoami)"
+  _update_geodb $@
 }
 
 ################################################################################
@@ -4375,7 +4381,7 @@ snapshot() {
         #  apache was enabled later
         check_wsgi_module
         # try to update the geodb, but continue if it doesn't work
-        update_geodb -l || true
+        _update_geodb -l || true
     fi
     [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
     gc_timespan="$(get_auto_garbage_collection_timespan $alias_name)" || { retcode=1; continue; }
@@ -4623,7 +4629,7 @@ migrate_2_1_15() {
 
   if check_apache; then
     check_wsgi_module
-    update_geodb -l
+    _update_geodb -l
   fi
   # else apache is currently stopped, add-replica may have been run with -a
 
