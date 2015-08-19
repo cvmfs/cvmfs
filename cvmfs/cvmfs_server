@@ -2321,8 +2321,10 @@ _update_geodb() {
 }
 
 update_geodb() {
-  # sanity checks
-  [ -w $CVMFS_UPDATEGEO_DB ] || die "GeoIP database is not writable by $(whoami)"
+  local dbdir=$CVMFS_UPDATEGEO_DIR
+  local dbfile=$CVMFS_UPDATEGEO_DB
+  [ -w "$dbdir"  ] || die "Directory '$dbdir' not writable by $(whoami)"
+  [ ! -f "$dbfile" ] || [ -w "$dbfile" ] || die "GeoIP database '$dbfile' is not writable by $(whoami)"
   _update_geodb $@
 }
 
