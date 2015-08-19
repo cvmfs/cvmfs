@@ -34,6 +34,10 @@ CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
 CVMFS_UPDATEGEO_MINDAYS=25 # Minimum days between update attempts
 CVMFS_UPDATEGEO_MAXDAYS=100 # Maximum days old before considering it an error
 
+CVMFS_UPDATEGEO_URL="http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz"
+CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
+CVMFS_UPDATEGEO_DB=${CVMFS_UPDATEGEO_DIR}/GeoLiteCity.dat
+
 
 # setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
@@ -2237,9 +2241,8 @@ _check_old_dbfile() {
 }
 
 update_geodb() {
-  local dburl="http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz"
-  local dbdir="/var/lib/cvmfs-server/geo"
-  local dbfile=$dbdir/GeoLiteCity.dat
+  local dbfile=$CVMFS_UPDATEGEO_DB
+  local dbdir=$CVMFS_UPDATEGEO_DIR
   local outfile=$dbdir/update.out
   local lazy=false
   local retcode=0
@@ -2276,7 +2279,7 @@ update_geodb() {
 
   if [ -w "$dbfile" ]; then
     echo "Downloading geoip database"
-    if ! curl -sS --fail --connect-timeout 10 --max-time 60 "$dburl" >$dbfile.gz 2>$outfile; then
+    if ! curl -sS --fail --connect-timeout 10 --max-time 60 "$CVMFS_UPDATEGEO_URL" >$dbfile.gz 2>$outfile; then
       retcode=1
     fi
     cat $outfile
@@ -2297,7 +2300,7 @@ update_geodb() {
       fi
     else
       rm -f $dbfile.gz
-      echo "error downloading $dburl"
+      echo "error downloading $CVMFS_UPDATEGEO_URL"
       $lazy || return 1
     fi
   # else not root, can't do the download
