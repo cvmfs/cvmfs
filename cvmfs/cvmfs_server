@@ -4379,11 +4379,7 @@ snapshot() {
     # more sanity checks
     is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
-    if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
-        # this might have been missed if add-replica -a was used or
-        #  if a migrate was done while apache wasn't running, but then
-        #  apache was enabled later
-        check_wsgi_module
+    if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
         # try to update the geodb, but continue if it doesn't work
         _update_geodb -l || true
     fi
