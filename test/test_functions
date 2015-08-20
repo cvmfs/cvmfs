@@ -580,11 +580,10 @@ create_stratum1() {
     [ ! -z "$stratum1_url" ] || die "\$CVMFS_TEST_HTTP_BASE needs to be set for S3 tests to work!"
     echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
     echo "  Stratum1:  $stratum1_url"
-    s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
   fi
   sudo cvmfs_server add-replica -o $CVMFS_TEST_USER    \
                                 -n $replica_name       \
-                                -a                     \
                                 $s3_config             \
                                 $additional_parameters \
                                 $stratum0_url          \
