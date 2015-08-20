@@ -4379,15 +4379,16 @@ snapshot() {
     # more sanity checks
     is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
-    if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-        # try to update the geodb, but continue if it doesn't work
-        _update_geodb -l || true
-    fi
     [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
     gc_timespan="$(get_auto_garbage_collection_timespan $alias_name)" || { retcode=1; continue; }
 
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
+
+    if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+        # try to update the geodb, but continue if it doesn't work
+        _update_geodb -l || true
+    fi
 
     local initial_snapshot=0
     if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
