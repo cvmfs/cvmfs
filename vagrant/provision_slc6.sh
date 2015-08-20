@@ -52,6 +52,22 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
 yum -y install git tig iftop htop jq rubygems screen
 gem install fakes3 --version 0.2.0
 
+# setup and run a FakeS3 server
+FAKES3_PORT=13337
+if [ ! -x /etc/init.d/fakes3 ]; then
+  cp ${VAGRANT_WORKSPACE}/vagrant/fakes3.init.d.sh /etc/init.d/fakes3
+  chmod a+x /etc/init.d/fakes3
+  chkconfig --add fakes3
+  chkconfig fakes3 on
+  service fakes3 start
+fi
+
+# drop a FakeS3 default configuration for CVMFS server
+if [ ! -f /etc/cvmfs/fakes3.default.conf ]; then
+  mkdir -p /etc/cvmfs
+  cp ${VAGRANT_WORKSPACE}/vagrant/fakes3.default.conf /etc/cvmfs
+fi
+
 # link the CernVM-FS source directory in place
 if [ ! -L $CVMFS_SOURCE_DIR ]; then
   ln -s $VAGRANT_WORKSPACE $CVMFS_SOURCE_DIR
