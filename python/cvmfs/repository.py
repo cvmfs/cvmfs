@@ -7,7 +7,6 @@ This file is part of the CernVM File System auxiliary tools.
 
 import abc
 import os
-import glob
 import tempfile
 import requests
 import collections
@@ -84,7 +83,7 @@ class RepositoryVerificationFailed(Exception):
         return self.args[0] + " (Repo: " + repr(self.repo) + ")"
 
 
-class RepositoryIterator:
+class RepositoryIterator(object):
     """ Iterates through all directory entries in a whole Repository """
 
     class _CatalogIterator:
@@ -149,7 +148,7 @@ class RepositoryIterator:
         return self.catalog_stack.pop()
 
 
-class CatalogTreeIterator:
+class CatalogTreeIterator(object):
     class _CatalogWrapper:
         def __init__(self, repository):
             self.repository        = repository
@@ -197,8 +196,18 @@ class CatalogTreeIterator:
         return wrapper.get_catalog()
 
 
+class Resource(file):
+    def __init__(self, name, mode, tmp_dir):
+        self.__final_destination_path = name
+        temp_file_path = tempfile.mktemp(dir=tmp_dir, prefix='tmp.')
+        super(Resource, self).__init__(temp_file_path, mode)
 
-class Cache:
+    def close(self):
+        super(Resource, self).close()
+        os.rename(self.name, self.__final_destination_path)
+
+
+class Cache(object):
     def __init__(self, cache_dir):
         if not os.path.exists(cache_dir):
             cache_dir = tempfile.mkdtemp(dir='/tmp', prefix='cache.')
@@ -219,28 +228,28 @@ class Cache:
             except OSError:
                 pass
 
-
     def _create_dir(self, path):
         cache_full_path = os.path.join(self._cache_dir, path)
         if not os.path.exists(cache_full_path):
             os.mkdir(cache_full_path, 0755)
-
 
     def _create_cache_structure(self):
         self._create_dir('data')
         for i in range(0x00, 0xff + 1):
             new_folder = '{0:#0{1}x}'.format(i, 4)[2:]
             self._create_dir(os.path.join('data', new_folder))
+        self._create_dir(os.path.join('data', 'txn'))
 
+    def get_transaction_dir(self):
+        return os.path.join(self._cache_dir, 'data', 'txn')
 
-    def cache_path(self):
+    def get_cache_path(self):
         return str(self._cache_dir)
-
 
     def add(self, file_name):
         full_path = os.path.join(self._cache_dir, file_name)
-        return open(full_path, 'w+')
-
+        tmp_dir = self.get_transaction_dir()
+        return Resource(full_path, "w+", tmp_dir)
 
     def get(self, file_name):
         full_path = os.path.join(self._cache_dir, file_name)
@@ -248,91 +257,84 @@ class Cache:
             return open(full_path, 'rb')
         return None
 
-
     def clear(self):
         data_path = os.path.join(self._cache_dir, 'data')
         shutil.rmtree(data_path)
         self._create_cache_structure()
 
 
-
-class Fetcher:
+class Fetcher(object):
     """ Abstract wrapper around a Fetcher """
 
     __metadata__ = abc.ABCMeta
 
     def __init__(self, source, cache_dir=''):
-        self.cache = Cache(cache_dir)
+        self.__cache = Cache(cache_dir)
         self.source = source
-
 
     def _make_file_uri(self, file_name):
         return os.path.join(self.source, file_name)
 
-
-    @staticmethod
-    def _write_content_into_file(content, opened_file):
-        """ Writes content into the opened file. The file must have
-         write permission. The file is closed after after the operation
-        """
-        opened_file.write(content)
-        opened_file.close()
-
+    def get_cache_path(self):
+        return self.__cache.get_cache_path()
 
     def retrieve_file(self, file_name):
         """ Method to retrieve a file from the cache if exists, or from
         the repository if it doesn't
         """
-        cached_file = self.cache.get(file_name)
+        cached_file = self.__cache.get(file_name)
         if not cached_file:
-            return self._retrieve_file(file_name)
+            cached_file = self.__cache.add(file_name)
+            self._retrieve_file(file_name, cached_file)
+            return self.__cache.get(file_name)
         return cached_file
 
+    def retrieve_raw_file(self, file_name):
+        cached_file = self.__cache.get(file_name)
+        if not cached_file:
+            cached_file = self.__cache.add(file_name)
+            self._retrieve_raw_file(file_name, cached_file)
+            return self.__cache.get(file_name)
+        return cached_file
 
     @abc.abstractmethod
-    def _retrieve_file(self, file_name):
+    def _retrieve_file(self, file_name, cached_file):
         """ Abstract method to retrieve a file from the repository """
         pass
 
-
     @abc.abstractmethod
-    def retrieve_raw_file(self, file_name):
+    def _retrieve_raw_file(self, file_name, cached_file):
         """ Abstract method to retrieve a raw file from the repository """
         pass
-
 
 
 class LocalFetcher(Fetcher):
     """ Retrieves files only from the local cache """
 
     def __init__(self, local_repo, cache_dir=''):
-        Fetcher.__init__(self, local_repo, cache_dir)
+        super(LocalFetcher, self).__init__(local_repo, cache_dir)
 
-
-    def _retrieve_file(self, file_name):
+    def _retrieve_file(self, file_name, cached_file):
         full_path = self._make_file_uri(file_name)
         if os.path.exists(full_path):
             compressed_file = open(full_path, 'r')
             decompressed_content = zlib.decompress(compressed_file.read())
             compressed_file.close()
-            cached_file = self.cache.add(file_name)
-            self._write_content_into_file(decompressed_content, cached_file)
-            return self.cache.get(file_name)
+            cached_file.write(decompressed_content)
+            cached_file.close()
         else:
             raise FileNotFoundInRepository(file_name)
 
-
-    def retrieve_raw_file(self, file_name):
+    def _retrieve_raw_file(self, file_name, cached_file):
         """ Retrieves the file directly from the source """
         full_path = self._make_file_uri(file_name)
         if os.path.exists(full_path):
-            cached_file = self.cache.add(file_name)
             compressed_file = open(full_path, 'r')
-            self._write_content_into_file(compressed_file.read(), cached_file)
-            compressed_file.seek(0)
-            return compressed_file
-        raise FileNotFoundInRepository(file_name)
-
+            cached_file.write(compressed_file.read())
+            compressed_file.close()
+            cached_file.close()
+        else:
+            raise FileNotFoundInRepository(file_name)
 
 
 class RemoteFetcher(Fetcher):
@@ -341,7 +343,7 @@ class RemoteFetcher(Fetcher):
     """
 
     def __init__(self, repo_url, cache_dir=''):
-        Fetcher.__init__(self, repo_url, cache_dir)
+        super(RemoteFetcher, self).__init__(repo_url, cache_dir)
 
     @staticmethod
     def _download_content_and_store(cached_file, file_url):
@@ -351,8 +353,6 @@ class RemoteFetcher(Fetcher):
         for chunk in response.iter_content(chunk_size=4096):
             if chunk:
                 cached_file.write(chunk)
-        cached_file.close()
-
 
     @staticmethod
     def _download_content_and_decompress(cached_file, file_url):
@@ -360,32 +360,27 @@ class RemoteFetcher(Fetcher):
         if response.status_code != requests.codes.ok:
             raise FileNotFoundInRepository(file_url)
         decompressed_content = zlib.decompress(response.content)
-        Fetcher._write_content_into_file(decompressed_content, cached_file)
+        cached_file.write(decompressed_content)
 
-
-    def _retrieve_file(self, file_name):
+    def _retrieve_file(self, file_name, cached_file):
         file_url = self._make_file_uri(file_name)
-        cached_file = self.cache.add(file_name)
         self._download_content_and_decompress(cached_file, file_url)
-        return self.cache.get(file_name)
+        cached_file.close()
 
-
-    def retrieve_raw_file(self, file_name):
-        cached_file = self.cache.add(file_name)
+    def _retrieve_raw_file(self, file_name, cached_file):
         file_url = self._make_file_uri(file_name)
         self._download_content_and_store(cached_file, file_url)
-        return self.cache.get(file_name)
+        cached_file.close()
 
 
-
-class Repository:
+class Repository(object):
     """ Wrapper around a CVMFS Repository representation """
 
     def __init__(self, source, cache_dir=''):
         if source == '':
             raise Exception('source cannot be empty')
         self._fetcher = self.__init_fetcher(source, cache_dir)
-        self._storage_location = self._fetcher.cache.cache_path()
+        self._storage_location = self._fetcher.get_cache_path()
         self._opened_catalogs = {}
         self._read_manifest()
         self._try_to_get_last_replication_timestamp()
