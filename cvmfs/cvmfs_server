@@ -2312,7 +2312,8 @@ _update_geodb() {
       return 0
     fi
   else
-    echo "GeoIP Database is up to date. Nothing to do."
+    local days_old=$(_update_geodb_days_since_update)
+    echo "GeoIP Database is up to date ($days_old days old). Nothing to do."
     return 0
   fi
 
