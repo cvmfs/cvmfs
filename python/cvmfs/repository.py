@@ -364,14 +364,14 @@ class RemoteFetcher(Fetcher):
     def _retrieve_file(self, file_name):
         file_url = self._make_file_uri(file_name)
         cached_file = self.cache.add(file_name)
-        RemoteFetcher._download_content_and_decompress(cached_file, file_url)
+        self._download_content_and_decompress(cached_file, file_url)
         return self.cache.get(file_name)
 
 
     def retrieve_raw_file(self, file_name):
         cached_file = self.cache.add(file_name)
         file_url = self._make_file_uri(file_name)
-        RemoteFetcher._download_content_and_store(cached_file, file_url)
+        self._download_content_and_store(cached_file, file_url)
         return self.cache.get(file_name)
 
 
@@ -423,7 +423,7 @@ class Repository:
         try:
             with self._fetcher.retrieve_raw_file(_common._LAST_REPLICATION_NAME) as rf:
                 timestamp = rf.readline()
-                self.last_replication = Repository.__read_timestamp(timestamp)
+                self.last_replication = self.__read_timestamp(timestamp)
             if not self.has_repository_type():
                 self.type = 'stratum1'
         except FileNotFoundInRepository, e:
@@ -436,7 +436,7 @@ class Repository:
             with self._fetcher.retrieve_raw_file(_common._REPLICATING_NAME) as rf:
                 timestamp = rf.readline()
                 self.replicating = True
-                self.replicating_since = Repository.__read_timestamp(timestamp)
+                self.replicating_since = self.__read_timestamp(timestamp)
         except FileNotFoundInRepository, e:
             pass
 
@@ -475,7 +475,7 @@ class Repository:
 
 
     def retrieve_whitelist(self):
-        whitelist = self.retrieve_file(_common._WHITELIST_NAME)
+        whitelist = self._fetcher.retrieve_file(_common._WHITELIST_NAME)
         return Whitelist(whitelist)
 
 

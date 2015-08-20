@@ -72,9 +72,9 @@ def _binary_buffer_to_hex_string(binbuf):
 def _split_md5(md5digest):
     hi = lo = 0
     for i in range(0, 8):
-        lo = lo | (ord(md5digest[i]) << (i * 8))
+        lo |= (ord(md5digest[i]) << (i * 8))
     for i in range(8,16):
-        hi = hi | (ord(md5digest[i]) << ((i - 8) * 8))
+        hi |= (ord(md5digest[i]) << ((i - 8) * 8))
     return ctypes.c_int64(lo).value, ctypes.c_int64(hi).value  # signed int!
 
 def _combine_md5(lo, hi):

@@ -57,7 +57,7 @@ class Chunk:
         return _binary_buffer_to_hex_string(self.content_hash) + suffix
 
     @staticmethod
-    def _catalog_db_fields():
+    def catalog_db_fields():
         return "md5path_1, md5path_2, offset, size, hash"
 
 
@@ -82,7 +82,7 @@ class DirectoryEntry:
                str(self.md5path_1) + "|" + str(self.md5path_2) + ">"
 
     @staticmethod
-    def _catalog_db_fields():
+    def catalog_db_fields():
         # see DirectoryEntry.__init__()
         return "md5path_1, md5path_2, parent_1, parent_2, hash, \
                 flags, size, mode, mtime, name, symlink"
@@ -130,11 +130,11 @@ class DirectoryEntry:
         bit_mask     = _Flags.ContentHashType
         right_shifts = 0
         while bit_mask & 1 == 0:
-            bit_mask = bit_mask >> 1
+            bit_mask >>= 1
             right_shifts += 1
         hash_type = ((self.flags & _Flags.ContentHashType) >> right_shifts) + 1
         self.content_hash_type = \
-            hash_type if hash_type > 0 and hash_type < ContentHashTypes.UpperBound \
+            hash_type if 0 < hash_type < ContentHashTypes.UpperBound \
                       else ContentHashTypes.Unknown
 
     # def BacktracePath(self, containing_catalog, repo):

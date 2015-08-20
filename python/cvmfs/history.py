@@ -50,21 +50,17 @@ class History(DatabaseObject):
     def __repr__(self):
         return self.__str__()
 
-
     def __iter__(self):
         return self.list_tags().__iter__()
-
 
     def list_tags(self):
         results = self.run_sql(RevisionTag.sql_query())
         return [ RevisionTag(sql_res) for sql_res in results ]
 
-
     def _read_properties(self):
         self.read_properties_table(lambda prop_key, prop_value:
             self._read_property(prop_key, prop_value))
         assert hasattr(self, 'schema') and self.schema == '1.0'
-
 
     def _read_property(self, prop_key, prop_value):
         if prop_key == "schema":
