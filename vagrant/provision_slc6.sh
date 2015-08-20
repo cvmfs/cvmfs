@@ -85,6 +85,8 @@ fi
 sed -i -e 's/^vagrant.*/vagrant ALL=(ALL) NOPASSWD:ALL/' /etc/sudoers
 
 # create CVMFS test user
-useradd $CVMFS_TEST_USER
-usermod -a -G fuse $CVMFS_TEST_USER
-echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+if ! id $CVMFS_TEST_USER > /dev/null 2>&1; then
+  useradd $CVMFS_TEST_USER
+  usermod -a -G fuse $CVMFS_TEST_USER
+  echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+fi
