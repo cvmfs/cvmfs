@@ -550,8 +550,9 @@ CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(
  * @return true if catalog is already present, false otherwise
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
-                                        CatalogT **attached_catalog) const
+bool AbstractCatalogManager<CatalogT>::IsAttached(
+    const PathString &root_path,
+    CatalogT **attached_catalog) const
 {
   if (catalogs_.size() == 0)
     return false;
@@ -572,9 +573,10 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
  * The final leaf nested catalog is returned.
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
-                                          const CatalogT *entry_point,
-                                          CatalogT **leaf_catalog)
+bool AbstractCatalogManager<CatalogT>::MountSubtree(
+    const PathString &path,
+    const CatalogT *entry_point,
+    CatalogT **leaf_catalog)
 {
   bool result = true;
   CatalogT *parent = (entry_point == NULL) ?
@@ -665,8 +667,9 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
  * @return true on success, false otherwise
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
-                                           CatalogT *new_catalog)
+bool AbstractCatalogManager<CatalogT>::AttachCatalog(
+    const string &db_path,
+    CatalogT *new_catalog)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "attaching catalog file %s",
            db_path.c_str());

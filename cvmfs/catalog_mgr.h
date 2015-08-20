@@ -128,6 +128,10 @@ class AbstractCatalogManager;
  *
  * The loading / creating of catalogs is up to derived classes.
  *
+ * Here CatalogT can be one of the following classes:
+ *  - Catalog and derived classes: for normal functionality of CVMFS
+ *  - MockCatalog: for testing the catalog manager
+ *
  * Usage:
  *   DerivedCatalogManager *catalog_manager = new DerivedCatalogManager();
  *   catalog_manager->Init();
