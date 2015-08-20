@@ -48,7 +48,8 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                curl attr httpd
 
 # install convenience packages for development
-yum -y install git tig iftop htop jq
+yum -y install git tig iftop htop jq rubygems
+gem install fakes3 --version 0.2.0
 
 # link the CernVM-FS source directory in place
 if [ ! -L $CVMFS_SOURCE_DIR ]; then
