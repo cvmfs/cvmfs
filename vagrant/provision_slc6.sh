@@ -6,6 +6,7 @@ WORKSPACE="provision"
 RELEASE_PKG="https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-2-5.noarch.rpm"
 CVMFS_TEST_USER="sftnight"
 CVMFS_SOURCE_DIR="$(pwd)/cvmfs"
+VAGRANT_WORKSPACE="/vagrant"
 
 # set VM locale
 export LANG="en_US.UTF-8"
@@ -53,7 +54,7 @@ gem install fakes3 --version 0.2.0
 
 # link the CernVM-FS source directory in place
 if [ ! -L $CVMFS_SOURCE_DIR ]; then
-  ln -s /vagrant $CVMFS_SOURCE_DIR
+  ln -s $VAGRANT_WORKSPACE $CVMFS_SOURCE_DIR
   chown -h vagrant:vagrant $CVMFS_SOURCE_DIR
 fi
 
