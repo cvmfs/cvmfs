@@ -36,6 +36,8 @@ class DatabaseObject:
         self._open_database()
 
     def __del__(self):
+        if self._db_handle:
+            self._db_handle.close()
         self._file.close()
 
     def _open_database(self):
@@ -58,7 +60,9 @@ class DatabaseObject:
         """ Run an arbitrary SQL query on the catalog database """
         cursor = self._db_handle.cursor()
         cursor.execute(sql)
-        return cursor.fetchall()
+        data = cursor.fetchall()
+        cursor.close()
+        return data
 
     def open_interactive(self):
         """ Spawns a sqlite shell for interactive catalog database inspection """

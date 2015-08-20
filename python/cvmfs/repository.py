@@ -26,7 +26,6 @@ from certificate import Certificate
 
 class RepositoryNotFound(Exception):
     def __init__(self, repo_path):
-        Exception.__init__(self)
         self.path = repo_path
 
     def __str__(self):
@@ -34,7 +33,6 @@ class RepositoryNotFound(Exception):
 
 class UnknownRepositoryType(Exception):
     def __init__(self, repo_fqrn, repo_type):
-        Exception.__init__(self)
         self.fqrn = repo_fqrn
         self.type = repo_type
 
@@ -43,7 +41,6 @@ class UnknownRepositoryType(Exception):
 
 class ConfigurationNotFound(Exception):
     def __init__(self, repo, config_field):
-        Exception.__init__(self)
         self.repo         = repo
         self.config_field = config_field
 
@@ -52,7 +49,6 @@ class ConfigurationNotFound(Exception):
 
 class FileNotFoundInRepository(Exception):
     def __init__(self, file_name):
-        Exception.__init__(self)
         self.file_name = file_name
 
     def __str__(self):
@@ -60,7 +56,6 @@ class FileNotFoundInRepository(Exception):
 
 class HistoryNotFound(Exception):
     def __init__(self, repo):
-        Exception.__init__(self)
         self.repo = repo
 
     def __str__(self):
@@ -68,7 +63,6 @@ class HistoryNotFound(Exception):
 
 class CannotReplicate(Exception):
     def __init__(self, repo):
-        Exception.__init__(self)
         self.repo = repo
 
     def __str__(self):
@@ -76,7 +70,6 @@ class CannotReplicate(Exception):
 
 class NestedCatalogNotFound(Exception):
     def __init__(self, repo):
-        Exception.__init__(self)
         self.repo = repo
 
     def __str__(self):
@@ -214,8 +207,17 @@ class Cache:
         self._cleanup_metadata()
 
     def _cleanup_metadata(self):
-        for f in glob.glob(self._cache_dir + '/' + '.cvmfs*'):
-            os.remove(f)
+        metadata_file_list = [
+            os.path.join(self._cache_dir, _common._MANIFEST_NAME),
+            os.path.join(self._cache_dir, _common._LAST_REPLICATION_NAME),
+            os.path.join(self._cache_dir, _common._REPLICATING_NAME),
+            os.path.join(self._cache_dir, _common._WHITELIST_NAME)
+        ]
+        for metadata_file in metadata_file_list:
+            try:
+                os.remove(metadata_file)
+            except OSError:
+                pass
 
 
     def _create_dir(self, path):
@@ -247,7 +249,7 @@ class Cache:
         return None
 
 
-    def evict(self):
+    def clear(self):
         data_path = os.path.join(self._cache_dir, 'data')
         shutil.rmtree(data_path)
         self._create_cache_structure()
@@ -326,7 +328,7 @@ class LocalFetcher(Fetcher):
         if os.path.exists(full_path):
             cached_file = self.cache.add(file_name)
             compressed_file = open(full_path, 'r')
-            Fetcher._write_content_into_file(compressed_file.read(), cached_file)
+            self._write_content_into_file(compressed_file.read(), cached_file)
             compressed_file.seek(0)
             return compressed_file
         raise FileNotFoundInRepository(file_name)
@@ -382,7 +384,7 @@ class Repository:
     def __init__(self, source, cache_dir=''):
         if source == '':
             raise Exception('source cannot be empty')
-        self.__determine_source(source, cache_dir)
+        self._fetcher = self.__init_fetcher(source, cache_dir)
         self._storage_location = self._fetcher.cache.cache_path()
         self._opened_catalogs = {}
         self._read_manifest()
@@ -390,13 +392,14 @@ class Repository:
         self._try_to_get_replication_state()
 
 
-    def __determine_source(self, source, cache_dir):
+    @staticmethod
+    def __init_fetcher(source, cache_dir):
         if source.startswith("http://"):
-            self._fetcher = RemoteFetcher(source, cache_dir)
-        elif os.path.exists(source):
-            self._fetcher = LocalFetcher(source, cache_dir)
-        elif os.path.exists(os.path.join('/srv/cvmfs', source)):
-            self._fetcher = LocalFetcher(os.path.join('/srv/cvmfs', source, cache_dir))
+            return RemoteFetcher(source, cache_dir)
+        if os.path.exists(source):
+            return LocalFetcher(source, cache_dir)
+        if os.path.exists(os.path.join('/srv/cvmfs', source)):
+            return LocalFetcher(os.path.join('/srv/cvmfs', source, cache_dir))
         else:
             raise RepositoryNotFound(source)
 
