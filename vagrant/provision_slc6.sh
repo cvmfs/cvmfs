@@ -6,6 +6,7 @@ WORKSPACE="provision"
 RELEASE_PKG="https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-2-5.noarch.rpm"
 CVMFS_TEST_USER="sftnight"
 CVMFS_SOURCE_DIR="$(pwd)/cvmfs"
+VAGRANT_WORKSPACE="/vagrant"
 
 # set VM locale
 export LANG="en_US.UTF-8"
@@ -48,11 +49,28 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                curl attr httpd
 
 # install convenience packages for development
-yum -y install git tig iftop htop jq
+yum -y install git tig iftop htop jq rubygems screen
+gem install fakes3 --version 0.2.0
+
+# setup and run a FakeS3 server
+FAKES3_PORT=13337
+if [ ! -x /etc/init.d/fakes3 ]; then
+  cp ${VAGRANT_WORKSPACE}/vagrant/fakes3.init.d.sh /etc/init.d/fakes3
+  chmod a+x /etc/init.d/fakes3
+  chkconfig --add fakes3
+  chkconfig fakes3 on
+  service fakes3 start
+fi
+
+# drop a FakeS3 default configuration for CVMFS server
+if [ ! -f /etc/cvmfs/fakes3.default.conf ]; then
+  mkdir -p /etc/cvmfs
+  cp ${VAGRANT_WORKSPACE}/vagrant/fakes3.default.conf /etc/cvmfs
+fi
 
 # link the CernVM-FS source directory in place
 if [ ! -L $CVMFS_SOURCE_DIR ]; then
-  ln -s /vagrant $CVMFS_SOURCE_DIR
+  ln -s $VAGRANT_WORKSPACE $CVMFS_SOURCE_DIR
   chown -h vagrant:vagrant $CVMFS_SOURCE_DIR
 fi
 
@@ -67,6 +85,8 @@ fi
 sed -i -e 's/^vagrant.*/vagrant ALL=(ALL) NOPASSWD:ALL/' /etc/sudoers
 
 # create CVMFS test user
-useradd $CVMFS_TEST_USER
-usermod -a -G fuse $CVMFS_TEST_USER
-echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+if ! id $CVMFS_TEST_USER > /dev/null 2>&1; then
+  useradd $CVMFS_TEST_USER
+  usermod -a -G fuse $CVMFS_TEST_USER
+  echo "$CVMFS_TEST_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+fi
