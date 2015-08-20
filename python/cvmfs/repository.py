@@ -475,7 +475,7 @@ class Repository:
 
 
     def retrieve_whitelist(self):
-        whitelist = self._fetcher.retrieve_file(_common._WHITELIST_NAME)
+        whitelist = self._fetcher.retrieve_raw_file(_common._WHITELIST_NAME)
         return Whitelist(whitelist)
 
 
@@ -537,3 +537,8 @@ def all_local():
 def all_local_stratum0():
     return [ repo for repo in all_local() if repo.type == 'stratum0' ]
 
+def open_repository(repository_path, public_key = None):
+    repo = Repository(repository_path)
+    if public_key and not repo.verify(public_key):
+        return None
+    return repo

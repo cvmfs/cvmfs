@@ -12,7 +12,6 @@ import os
 import StringIO
 import tarfile
 import threading
-import unittest
 
 from M2Crypto import RSA
 
@@ -31,7 +30,7 @@ class CvmfsRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def translate_path(self, path):
         return os.path.normpath(self.server.document_root + os.sep + path)
 
-    def log_message(self, format, *args):
+    def log_message(self, msg_format, *args):
         pass
 
 

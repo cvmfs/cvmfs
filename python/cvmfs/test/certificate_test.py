@@ -7,6 +7,7 @@ This file is part of the CernVM File System auxiliary tools.
 
 import base64
 import unittest
+import zlib
 
 from M2Crypto.X509 import X509
 
@@ -35,7 +36,7 @@ class TestCertificate(unittest.TestCase):
             ''
         ])
         compressed_cert = base64.b64decode(self.compressed_certificate)
-        self.certificate_file = self.sandbox.write_to_temporary(compressed_cert)
+        self.certificate_file = self.sandbox.write_to_temporary(zlib.decompress(compressed_cert))
         self.fingerprint = "81:8D:BE:49:A7:3E:F1:C4:DA:01:50:F0:80:D4:CB:27:96:80:1D"
 
         self.message_digest = "e380c3276b33440dd3e80af116fd6ee307b8ca6a"
@@ -44,7 +45,7 @@ class TestCertificate(unittest.TestCase):
 
     def test_load(self):
         with open(self.certificate_file) as cert_file:
-            cert = cvmfs.Certificate(cert_file)
+            cvmfs.Certificate(cert_file)
 
 
     def test_get_openssl_x509(self):

@@ -9,6 +9,7 @@ import base64
 import datetime
 import StringIO
 import unittest
+import zlib
 
 from dateutil.tz import tzutc
 
@@ -39,7 +40,7 @@ class TestManifest(unittest.TestCase):
             ''
         ])
         compressed_cert = base64.b64decode(self.compressed_certificate)
-        self.certificate_file = self.sandbox.write_to_temporary(compressed_cert)
+        self.certificate_file = self.sandbox.write_to_temporary(zlib.decompress(compressed_cert))
 
         self.sane_manifest = StringIO.StringIO('\n'.join([
             'C044206fcff4545283aaa452b80edfd5d8c740b20',
