@@ -2233,7 +2233,7 @@ _update_geodb_days_since_update() {
 
 _update_geodb_lazy_install_slot() {
   [ "`date +%w`" -eq "$CVMFS_UPDATEGEO_DAY"  ] && \
-  [ "`date +%k`" -gt "$CVMFS_UPDATEGEO_HOUR" ]
+  [ "`date +%k`" -ge "$CVMFS_UPDATEGEO_HOUR" ]
 }
 
 _update_geodb_install() {
