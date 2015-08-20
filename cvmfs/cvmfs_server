@@ -2711,7 +2711,12 @@ add_replica() {
     if [ $silence_httpd_warning -eq 0 ]; then
       check_apache || die "Apache must be installed and running"
       check_wsgi_module
-      [ x"$cvmfs_user" = x"root" ] || echo "NOTE: If snapshot is not run regularly as root, do update-geodb monthly from cron"
+      if [ x"$cvmfs_user" != x"root" ]; then
+        echo "NOTE: If snapshot is not run regularly as root, the GeoIP database will not be updated."
+        echo "      You have two options, either:"
+        echo "      1. chown $CVMFS_UPDATEGEO_DIR and $CVMFS_UPDATEGEO_DB accordingly OR"
+        echo "      2. run update-geodb monthly as root"
+      fi
     else
       check_apache || echo "Warning: Apache is needed to access this CVMFS replication"
     fi
