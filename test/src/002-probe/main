@@ -7,7 +7,14 @@ cvmfs_run_test() {
   cvmfs_mount atlas.cern.ch,lhcb.cern.ch || return 1
   ls /cvmfs/atlas.cern.ch || return 2
   ls /cvmfs/lhcb.cern.ch || return 3
-  
+
+  local inode_tracker="$(sudo cvmfs_talk -i atlas.cern.ch internal affairs | grep 'inode tracker')"
+  local inserts=$(sudo cvmfs_talk -i atlas.cern.ch internal affairs | grep '^inode_tracker.n_insert' | cut -d\| -f2)
+  local removes=$(sudo cvmfs_talk -i atlas.cern.ch internal affairs | grep '^inode_tracker.n_remove' | cut -d\| -f2)
+  local elements=$(( $inserts - $removes ))
+
+  echo $elements
+
   return 0
 }
 
