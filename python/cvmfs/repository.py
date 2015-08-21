@@ -197,10 +197,18 @@ class CatalogTreeIterator(object):
 
 
 class Resource(file):
-    def __init__(self, name, mode, tmp_dir):
+    """ Wrapper around a writable file. The actual file will be renamed
+    to a different location once it is closed
+    """
+
+    def __init__(self, name, tmp_dir):
         self.__final_destination_path = name
         temp_file_path = tempfile.mktemp(dir=tmp_dir, prefix='tmp.')
-        super(Resource, self).__init__(temp_file_path, mode)
+        super(Resource, self).__init__(temp_file_path, 'w+')
+
+    def __del__(self):
+        if not self.closed:
+            self.close()
 
     def close(self):
         super(Resource, self).close()
@@ -246,21 +254,25 @@ class Cache(object):
     def get_cache_path(self):
         return str(self._cache_dir)
 
-    def add(self, file_name):
+    def transaction(self, file_name):
         full_path = os.path.join(self._cache_dir, file_name)
         tmp_dir = self.get_transaction_dir()
-        return Resource(full_path, "w+", tmp_dir)
+        return Resource(full_path, tmp_dir)
+
+    @staticmethod
+    def commit(resource):
+        resource.close()
 
     def get(self, file_name):
         full_path = os.path.join(self._cache_dir, file_name)
         if os.path.exists(full_path):
-            return open(full_path, 'rb')
+            try:
+                # if the file has been removed by now the open method
+                # throws an exception
+                return open(full_path, 'rb')
+            except IOError, e:
+                raise FileNotFoundInRepository(full_path)
         return None
-
-    def clear(self):
-        data_path = os.path.join(self._cache_dir, 'data')
-        shutil.rmtree(data_path)
-        self._create_cache_structure()
 
 
 class Fetcher(object):
@@ -279,23 +291,33 @@ class Fetcher(object):
         return self.__cache.get_cache_path()
 
     def retrieve_file(self, file_name):
-        """ Method to retrieve a file from the cache if exists, or from
-        the repository if it doesn't
         """
-        cached_file = self.__cache.get(file_name)
-        if not cached_file:
-            cached_file = self.__cache.add(file_name)
-            self._retrieve_file(file_name, cached_file)
-            return self.__cache.get(file_name)
-        return cached_file
+        Method to retrieve a file from the cache if exists, or from
+        the repository if it doesn't. In case it has to be retrieved from
+        the repository it will also be decompressed before being stored in
+        the cache
+        :param file_name: name of the file in the repository
+        :return: a file read-only file object that represents the cached file
+        """
+        return self._retrieve(file_name, self._retrieve_file)
 
     def retrieve_raw_file(self, file_name):
-        cached_file = self.__cache.get(file_name)
-        if not cached_file:
-            cached_file = self.__cache.add(file_name)
-            self._retrieve_raw_file(file_name, cached_file)
-            return self.__cache.get(file_name)
-        return cached_file
+        """
+        Method to retrieve a file from the cache if exists, or from
+        the repository if it doesn't. In case it has to be retrieved from
+        the repository it won't be decompressed
+        :param file_name: name of the file in the repository
+        :return: a file read-only file object that represents the cached file
+        """
+        return self._retrieve(file_name, self._retrieve_raw_file)
+
+    def _retrieve(self, file_name, retrieve_fn):
+        cached_file_ro = self.__cache.get(file_name)
+        if not cached_file_ro:
+            cached_file_rw = self.__cache.transaction(file_name)
+            retrieve_fn(file_name, cached_file_rw)
+            self.__cache.commit(cached_file_rw)
+        return self.__cache.get(file_name)
 
     @abc.abstractmethod
     def _retrieve_file(self, file_name, cached_file):
@@ -321,7 +343,6 @@ class LocalFetcher(Fetcher):
             decompressed_content = zlib.decompress(compressed_file.read())
             compressed_file.close()
             cached_file.write(decompressed_content)
-            cached_file.close()
         else:
             raise FileNotFoundInRepository(file_name)
 
@@ -329,10 +350,9 @@ class LocalFetcher(Fetcher):
         """ Retrieves the file directly from the source """
         full_path = self._make_file_uri(file_name)
         if os.path.exists(full_path):
-            compressed_file = open(full_path, 'r')
-            cached_file.write(compressed_file.read())
-            compressed_file.close()
-            cached_file.close()
+            raw_file = open(full_path, 'rb')
+            cached_file.write(raw_file.read())
+            raw_file.close()
         else:
             raise FileNotFoundInRepository(file_name)
 
@@ -365,12 +385,10 @@ class RemoteFetcher(Fetcher):
     def _retrieve_file(self, file_name, cached_file):
         file_url = self._make_file_uri(file_name)
         self._download_content_and_decompress(cached_file, file_url)
-        cached_file.close()
 
     def _retrieve_raw_file(self, file_name, cached_file):
         file_url = self._make_file_uri(file_name)
         self._download_content_and_store(cached_file, file_url)
-        cached_file.close()
 
 
 class Repository(object):
@@ -516,8 +534,7 @@ class Repository(object):
         """ Download and open a catalog from the repository """
         if catalog_hash in self._opened_catalogs:
             return self._opened_catalogs[catalog_hash]
-        else:
-            return self._retrieve_and_open_catalog(catalog_hash)
+        return self._retrieve_and_open_catalog(catalog_hash)
 
     def _retrieve_and_open_catalog(self, catalog_hash):
         catalog_file = self.retrieve_object(catalog_hash, 'C')
