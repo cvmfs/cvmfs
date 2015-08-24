@@ -3236,7 +3236,7 @@ list_catalogs() {
   # do it!
   local user_shell="$(get_user_shell $name)"
   local lsrepo_cmd
-  lsrepo_cmd="$(__swissknife_cmd) lsrepo         \
+  lsrepo_cmd="$(__swissknife_cmd dbg) lsrepo     \
                        -r $CVMFS_STRATUM0        \
                        -n $CVMFS_REPOSITORY_NAME \
                        -k $CVMFS_PUBLIC_KEY      \
