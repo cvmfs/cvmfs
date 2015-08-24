@@ -26,7 +26,7 @@ class T_Fetcher : public ::testing::Test {
   virtual void SetUp() {
     used_fds_ = GetNoUsedFds();
 
-    tmp_path_ = CreateTempDir("./cvmfs_ut_fetcher");
+    tmp_path_ = CreateTempDir(GetCurrentWorkingDirectory() + "/cvmfs_ut_fetch");
     // Three source files that can be downloaded
     src_path_ = tmp_path_ + "/data";
     hash_regular_ = shash::Any(shash::kSha1);
