@@ -42,7 +42,7 @@ class T_UnlinkGuard : public ::testing::Test {
   }
 };
 
-const std::string T_UnlinkGuard::sandbox = "/tmp/cvmfs_ut_unlink_guard";
+const std::string T_UnlinkGuard::sandbox = "./cvmfs_ut_unlink_guard";
 
 
 TEST_F(T_UnlinkGuard, Initialize) {}

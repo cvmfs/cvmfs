@@ -580,8 +580,7 @@ template <class UploadersT>
 atomic_int64 T_Uploaders<UploadersT>::gSeed = 0;
 
 template <class UploadersT>
-const std::string T_Uploaders<UploadersT>::sandbox_path =
-    "/tmp/cvmfs_ut_uploaders";
+const std::string T_Uploaders<UploadersT>::sandbox_path = "./cvmfs_ut_uploader";
 
 template <class UploadersT>
 const std::string T_Uploaders<UploadersT>::tmp_dir =

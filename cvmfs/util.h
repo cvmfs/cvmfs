@@ -141,6 +141,7 @@ FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path);
 std::string CreateTempPath(const std::string &path_prefix, const int mode);
 std::string CreateTempDir(const std::string &path_prefix);
+std::string GetCurrentWorkingDirectory();
 int TryLockFile(const std::string &path);
 int LockFile(const std::string &path);
 void UnlockFile(const int filedes);

@@ -14,6 +14,7 @@ set(CVMFS_UNITTEST_FILES
   
   # test utility functions
   testutil.cc testutil.h
+  env.cc env.h
   
   t_atomic.cc
   t_smallhash.cc

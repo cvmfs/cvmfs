@@ -119,7 +119,7 @@ class T_AsyncReader : public FileSandbox {
 
  public:
   T_AsyncReader() :
-    FileSandbox("/tmp/cvmfs_ut_asyncreader") {}
+    FileSandbox("./cvmfs_ut_asyncreader") {}
 
  protected:
   void SetUp() {

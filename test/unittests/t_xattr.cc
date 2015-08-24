@@ -47,7 +47,7 @@ TEST_F(T_Xattr, CreateFromFile) {
 
   // Create extended attributes
   string tmp_path;
-  FILE *f = CreateTempFile("/tmp/cvmfs_ut_xattr", 0600, "w", &tmp_path);
+  FILE *f = CreateTempFile("./cvmfs_ut_xattr", 0600, "w", &tmp_path);
   ASSERT_TRUE(f != NULL);
   fclose(f);
   UnlinkGuard unlink_guard(tmp_path);

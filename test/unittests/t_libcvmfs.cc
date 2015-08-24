@@ -29,7 +29,7 @@ class T_Libcvmfs : public ::testing::Test {
     }
 
     cvmfs_set_log_fn(cvmfs_log_ignore);
-    tmp_path_ = CreateTempDir("/tmp/cvmfs_test");
+    tmp_path_ = CreateTempDir("./cvmfs_ut_libcvmfs");
     ASSERT_NE("", tmp_path_);
     opt_cache_ = "quota_limit=0,quota_threshold=0,rebuild_cachedb,"
                  "cache_directory=" + tmp_path_;

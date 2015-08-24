@@ -40,7 +40,7 @@ class T_QuotaManager : public ::testing::Test {
     sigpipe_save_ = signal(SIGPIPE, SIG_IGN);
 
     // Prepare cache directories
-    tmp_path_ = CreateTempDir("/tmp/cvmfs_test");
+    tmp_path_ = CreateTempDir("./cvmfs_ut_quota_manager");
     MkdirDeep(tmp_path_ + "/not_spawned", 0700);
     delete cache::PosixCacheManager::Create(tmp_path_, false);
     delete cache::PosixCacheManager::Create(tmp_path_ + "/not_spawned", false);

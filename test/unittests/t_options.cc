@@ -13,7 +13,7 @@ template <class OptionsT>
 class T_Options : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    FILE *temp_file = CreateTempFile("/tmp/cvmfs-test", 0600, "w",
+    FILE *temp_file = CreateTempFile("./cvmfs_ut_options", 0600, "w",
         &config_file_);
     ASSERT_TRUE(temp_file != NULL);
     unlink_guard_.Set(config_file_);
