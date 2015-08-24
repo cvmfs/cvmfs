@@ -196,26 +196,27 @@ class CatalogTreeIterator(object):
         return wrapper.get_catalog()
 
 
-class Resource(file):
-    """ Wrapper around a writable file. The actual file will be renamed
-    to a different location once it is closed
-    """
-
-    def __init__(self, name, tmp_dir):
-        self.__final_destination_path = name
-        temp_file_path = tempfile.mktemp(dir=tmp_dir, prefix='tmp.')
-        super(Resource, self).__init__(temp_file_path, 'w+')
-
-    def __del__(self):
-        if not self.closed:
-            self.close()
-
-    def close(self):
-        super(Resource, self).close()
-        os.rename(self.name, self.__final_destination_path)
-
 
 class Cache(object):
+
+    class TransactionFile(file):
+        """ Wrapper around a writable file. The actual file will be renamed
+        to a different location once it is closed
+        """
+
+        def __init__(self, name, tmp_dir):
+            self.__final_destination_path = name
+            temp_file_path = tempfile.mktemp(dir=tmp_dir, prefix='tmp.')
+            super(Cache.TransactionFile, self).__init__(temp_file_path, 'w+')
+
+        def __del__(self):
+            if not self.closed:
+                self.close()
+
+        def close(self):
+            super(Cache.TransactionFile, self).close()
+            os.rename(self.name, self.__final_destination_path)
+
     def __init__(self, cache_dir):
         if not os.path.exists(cache_dir):
             cache_dir = tempfile.mkdtemp(dir='/tmp', prefix='cache.')
@@ -257,7 +258,7 @@ class Cache(object):
     def transaction(self, file_name):
         full_path = os.path.join(self._cache_dir, file_name)
         tmp_dir = self.get_transaction_dir()
-        return Resource(full_path, tmp_dir)
+        return Cache.TransactionFile(full_path, tmp_dir)
 
     @staticmethod
     def commit(resource):
