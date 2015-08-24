@@ -122,7 +122,7 @@ cvmfs_run_test() {
   fi
 
   local current_weekday=$(date +%w)
-  local current_hour=$(date +%k)
+  local current_hour=$(date +%-k)
   local mindays=3
   local maxdays=5
 
