@@ -3222,20 +3222,27 @@ list_catalogs() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  health_check $name $silence_warnings
 
   # get repository information
   load_repo_config $name
+
+  # more sanity checks
+  is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  health_check $name $silence_warnings
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
 
   # do it!
-  __swissknife lsrepo         \
-    -r $CVMFS_STRATUM0        \
-    -n $CVMFS_REPOSITORY_NAME \
-    -k $CVMFS_PUBLIC_KEY      \
-    $param_list
+  local user_shell="$(get_user_shell $name)"
+  local lsrepo_cmd
+  lsrepo_cmd="$(__swissknife_cmd) lsrepo         \
+                       -r $CVMFS_STRATUM0        \
+                       -n $CVMFS_REPOSITORY_NAME \
+                       -k $CVMFS_PUBLIC_KEY      \
+                       -l ${CVMFS_SPOOL_DIR}/tmp \
+                       $param_list"
+  $user_shell "$lsrepo_cmd"
 }
 
 
