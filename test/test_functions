@@ -769,7 +769,7 @@ check_catalog_presence() {
   local catalog_path=$1
   local repo_name=$2
 
-  cvmfs_server list-catalogs -x $repo_name | grep -x -q $catalog_path
+  cvmfs_server list-catalogs -x $repo_name | grep -x $catalog_path > /dev/null 2>&1
   return $?
 }
 

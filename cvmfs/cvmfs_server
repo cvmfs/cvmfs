@@ -3222,20 +3222,27 @@ list_catalogs() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  health_check $name $silence_warnings
 
   # get repository information
   load_repo_config $name
+
+  # more sanity checks
+  is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  health_check $name $silence_warnings
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
 
   # do it!
-  __swissknife lsrepo         \
-    -r $CVMFS_STRATUM0        \
-    -n $CVMFS_REPOSITORY_NAME \
-    -k $CVMFS_PUBLIC_KEY      \
-    $param_list
+  local user_shell="$(get_user_shell $name)"
+  local lsrepo_cmd
+  lsrepo_cmd="$(__swissknife_cmd dbg) lsrepo     \
+                       -r $CVMFS_STRATUM0        \
+                       -n $CVMFS_REPOSITORY_NAME \
+                       -k $CVMFS_PUBLIC_KEY      \
+                       -l ${CVMFS_SPOOL_DIR}/tmp \
+                       $param_list"
+  $user_shell "$lsrepo_cmd"
 }
 
 
@@ -3359,6 +3366,7 @@ tag() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   load_repo_config $name
+  is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
   health_check $name $silence_warnings
@@ -3402,7 +3410,6 @@ tag() {
   # all following commands need an open repository transaction and are supposed
   # to commit or abort it after performing a tag database manipulation. Hence,
   # they also need to performed by the repository owner or root
-  is_owner_or_root $name                    || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   [ ! -z "$tag_name" -o ! -z "$tag_names" ] || die "Tag name missing"
   echo "$tag_name" | grep -q -v " "         || die "Spaces are not allowed in tag names"
 
@@ -3506,7 +3513,7 @@ check() {
         check_integrity=1
       ;;
       t)
-        tag="-t $OPTARG"
+        tag="-n $OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3522,10 +3529,13 @@ check() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  health_check $name
 
   # get repository information
   load_repo_config $name
+
+  # more sanity checks
+  is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  health_check $name
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
@@ -3549,7 +3559,14 @@ check() {
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying Catalog Integrity of $name ..."
-  __swissknife check $tag $check_chunks_param $log_level_param -r $stratum0
+  local user_shell="$(get_user_shell $name)"
+  local check_cmd
+  check_cmd="$(__swissknife_cmd dbg) check $tag  \
+                     $check_chunks_param         \
+                     $log_level_param            \
+                     -r $stratum0                \
+                     -t ${CVMFS_SPOOL_DIR}/tmp"
+  $user_shell "$check_cmd"
 }
 
 
