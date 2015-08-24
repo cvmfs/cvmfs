@@ -3522,10 +3522,13 @@ check() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  health_check $name
 
   # get repository information
   load_repo_config $name
+
+  # more sanity checks
+  is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  health_check $name
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
