@@ -3366,6 +3366,7 @@ tag() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   load_repo_config $name
+  is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
   health_check $name $silence_warnings
@@ -3409,7 +3410,6 @@ tag() {
   # all following commands need an open repository transaction and are supposed
   # to commit or abort it after performing a tag database manipulation. Hence,
   # they also need to performed by the repository owner or root
-  is_owner_or_root $name                    || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   [ ! -z "$tag_name" -o ! -z "$tag_names" ] || die "Tag name missing"
   echo "$tag_name" | grep -q -v " "         || die "Spaces are not allowed in tag names"
 
