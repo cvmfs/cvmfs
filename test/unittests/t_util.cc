@@ -48,7 +48,7 @@ class T_Util : public ::testing::Test {
     path_without_slash = "/my/path";
     fake_path = "mypath";
     to_write = "Hello, world!\n";
-    sandbox = CreateTempDir("./cvmfs_ut_testutil");
+    sandbox = CreateTempDir(GetCurrentWorkingDirectory() + "/cvmfs_ut_util");
     socket_address = sandbox + "/mysocket";
     long_path = sandbox +
         "/path_path_path_path_path_path_path_path_path_path_path_path_path_"
