@@ -3559,11 +3559,14 @@ check() {
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying Catalog Integrity of $name ..."
-  __swissknife check $tag                \
-                     $check_chunks_param \
-                     $log_level_param    \
-                     -r $stratum0        \
-                     -t ${CVMFS_SPOOL_DIR}/tmp
+  local user_shell="$(get_user_shell $name)"
+  local check_cmd
+  check_cmd="$(__swissknife_cmd dbg) check $tag  \
+                     $check_chunks_param         \
+                     $log_level_param            \
+                     -r $stratum0                \
+                     -t ${CVMFS_SPOOL_DIR}/tmp"
+  $user_shell "$check_cmd"
 }
 
 
