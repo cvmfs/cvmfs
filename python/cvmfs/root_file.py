@@ -62,7 +62,7 @@ class RootFile:
         self._check_validity()
 
     @abc.abstractmethod
-    def _verify_signature(public_entity):
+    def _verify_signature(self, public_entity):
         pass
 
 
@@ -70,7 +70,8 @@ class RootFile:
         return self.has_signature and self._verify_signature(public_entity)
 
 
-    def _hash_over_content(self, file_object):
+    @staticmethod
+    def _hash_over_content(file_object):
         pos = file_object.tell()
         hash_sum = hashlib.sha1()
         while True:

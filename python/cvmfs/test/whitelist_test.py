@@ -9,6 +9,7 @@ import base64
 import datetime
 import StringIO
 import unittest
+import zlib
 
 from dateutil.tz import tzutc
 
@@ -53,7 +54,7 @@ class TestWhitelist(unittest.TestCase):
             ''
         ])
         compressed_cert = base64.b64decode(self.compressed_certificate)
-        self.certificate_file = self.sandbox.write_to_temporary(compressed_cert)
+        self.certificate_file = self.sandbox.write_to_temporary(zlib.decompress(compressed_cert))
 
         self.sane_whitelist = StringIO.StringIO('\n'.join([
             '20150603095527',

@@ -227,7 +227,7 @@ class Catalog(DatabaseObject):
 
     def list_directory_split_md5(self, parent_1, parent_2):
         """ Create a directory listing of DirectoryEntry items based on MD5 path """
-        res = self.run_sql("SELECT " + DirectoryEntry._catalog_db_fields() + " \
+        res = self.run_sql("SELECT " + DirectoryEntry.catalog_db_fields() + " \
                             FROM catalog                                       \
                             WHERE parent_1 = " + str(parent_1) + " AND         \
                                   parent_2 = " + str(parent_2) + "             \
@@ -250,7 +250,7 @@ class Catalog(DatabaseObject):
 
     def find_directory_entry_split_md5(self, md5path_1, md5path_2):
         """ Finds the DirectoryEntry for the given split MD5 hashed path """
-        res = self.run_sql("SELECT " + DirectoryEntry._catalog_db_fields() + " \
+        res = self.run_sql("SELECT " + DirectoryEntry.catalog_db_fields() + " \
                             FROM catalog                                       \
                             WHERE md5path_1 = " + str(md5path_1) + " AND       \
                                   md5path_2 = " + str(md5path_2) + "           \
@@ -305,7 +305,7 @@ class Catalog(DatabaseObject):
         """ Finds and adds the file chunk of a DirectoryEntry """
         if self.schema < 2.4:
             return
-        res = self.run_sql("SELECT " + Chunk._catalog_db_fields() + "           \
+        res = self.run_sql("SELECT " + Chunk.catalog_db_fields() + "            \
                             FROM chunks                                         \
                             WHERE md5path_1 = " + str(dirent.md5path_1) + " AND \
                                   md5path_2 = " + str(dirent.md5path_2) + "     \
@@ -325,7 +325,8 @@ class Catalog(DatabaseObject):
             self.last_modified = datetime.datetime.min
 
 
-    def _canonicalize_path(self, path):
+    @staticmethod
+    def _canonicalize_path(path):
         if not path:
             return ""
         return os.path.abspath(path)
@@ -334,12 +335,12 @@ class Catalog(DatabaseObject):
     def _check_validity(self):
         """ Check that all crucial properties have been found in the database """
         if not hasattr(self, 'revision'):
-          raise Exception("Catalog lacks a revision entry")
+            raise Exception("Catalog lacks a revision entry")
         if not hasattr(self, 'schema'):
-          raise Exception("Catalog lacks a schema entry")
+            raise Exception("Catalog lacks a schema entry")
         if not hasattr(self, 'root_prefix'):
-          raise Exception("Catalog lacks a root prefix entry")
+            raise Exception("Catalog lacks a root prefix entry")
         if not hasattr(self, 'last_modified'):
-          raise Exception("Catalog lacks a last modification entry")
+            raise Exception("Catalog lacks a last modification entry")
 
 

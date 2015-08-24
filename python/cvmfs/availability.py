@@ -14,11 +14,13 @@ class WrongRepositoryType(Exception):
         self.expected_type = expected_type
 
     def __str__(self):
-        return self.repo.fqrn + " is of type '" + self.repo.type  + "' but '" + self.expected_type + "' was expected"
+        return self.repo.fqrn + " is of type '" + self.repo.type + "' but '" + \
+            self.expected_type + "' was expected"
 
 
 class AvailabilityAssessment:
-    def _check_repo_type(self, repo, expected_type):
+    @staticmethod
+    def _check_repo_type(repo, expected_type):
         if repo.has_repository_type() and repo.type != expected_type:
             raise WrongRepositoryType(repo, expected_type)
         return True;

@@ -30,6 +30,7 @@ setup(
   test_suite='cvmfs.test',
   install_requires=[ # don't forget to adapt the matching RPM dependencies!
     'python-dateutil >= 1.4.1',
-    'requests >= 1.1.0'
+    'requests >= 1.1.0',
+    'M2Crypto >= 0.20.0'
   ]
 )

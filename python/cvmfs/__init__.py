@@ -44,7 +44,6 @@ def check_output(popen_args):
 
 
 def _get_server_version():
-    output = ''
     try:
         output = check_output(['cvmfs_server'])
         return __extract_version_string(output)
@@ -53,7 +52,6 @@ def _get_server_version():
 
 
 def _get_client_version():
-    output = ''
     try:
         output = check_output(['cvmfs2', '--version'])
     except OSError, e:
