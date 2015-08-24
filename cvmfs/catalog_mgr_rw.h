@@ -37,6 +37,7 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
+#include "directory_entry.h"
 #include "upload_spooler_result.h"
 #include "xattr.h"
 
@@ -58,9 +59,14 @@ class Statistics;
 }
 
 namespace catalog {
+class CatalogBalancer;
+}
+
+namespace catalog {
 
 class WritableCatalogManager : public SimpleCatalogManager {
  public:
+  friend class CatalogBalancer;
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
@@ -111,6 +117,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   manifest::Manifest *Commit(const bool     stop_for_tweaks,
                              const uint64_t manual_revision);
+  void Balance();
+  void FixWeight(Catalog *catalog);
 
  protected:
   void EnforceSqliteMemLimit() { }
@@ -160,7 +168,72 @@ class WritableCatalogManager : public SimpleCatalogManager {
    * Directories don't have extended attributes at this point.
    */
   XattrList empty_xattrs;
+
+  /**
+   * Balancer thresholds
+   */
+  const unsigned max_weight_;
+  const unsigned min_weight_;
+  const unsigned balance_weight_;
 };  // class WritableCatalogManager
+
+
+
+class CatalogBalancer {
+ public:
+  CatalogBalancer(WritableCatalogManager *catalog_mgr,
+                  unsigned min_weight, unsigned max_weight,
+                  unsigned balance_weight)
+    : catalog_mgr_(catalog_mgr) { }
+
+  void Balance(Catalog *catalog = NULL);
+
+
+ protected:
+  struct VirtualNode {
+    vector<VirtualNode> children;
+    unsigned weight;
+    DirectoryEntry dirent;
+    string path;
+    bool is_new_nested_catalog;
+
+    void ExtractChildren(WritableCatalogManager *catalog_mgr);
+    void CaltulateWeight();
+    explicit VirtualNode(const string &path,
+                         WritableCatalogManager *catalog_mgr)
+      : children(), weight(1), dirent(), path(path),
+        is_new_nested_catalog(false) {
+      catalog_mgr->LookupPath(path, kLookupSole, &dirent);
+      if (!IsCatalog() && IsDirectory())
+        ExtractChildren(catalog_mgr);
+    }
+    VirtualNode(const string &path, const DirectoryEntry &dirent,
+                WritableCatalogManager *catalog_mgr)
+      : children(), weight(1), dirent(dirent), path(path),
+        is_new_nested_catalog(false) {
+      if (!IsCatalog() && IsDirectory())
+        ExtractChildren(catalog_mgr);
+    }
+    bool IsDirectory() { return dirent.IsDirectory(); }
+    bool IsCatalog() { return is_new_nested_catalog ||
+        dirent.IsNestedCatalogMountpoint(); }
+  };
+
+ private:
+  void OptimalPartition(VirtualNode *virtual_node);
+  void AddCvmfsCatalogFile(string path);
+  DirectoryEntryBase CreateEmptyContentDirectoryEntryBase(string name,
+                                                          uid_t uid,
+                                                          gid_t gid);
+  static VirtualNode *MaxChild(VirtualNode *virtual_node);
+  void AddCatalog(VirtualNode *child_node);
+
+ private:
+  WritableCatalogManager *catalog_mgr_;
+};
+
+
+
 
 }  // namespace catalog
 
