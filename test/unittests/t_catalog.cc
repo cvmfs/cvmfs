@@ -23,7 +23,7 @@ class T_Catalog : public ::testing::Test {
   virtual void SetUp() {
     catalog = NULL;
     nested = NULL;
-    sandbox = CreateTempDir("/tmp/cvmfs_ut_catalog");
+    sandbox = CreateTempDir("./cvmfs_ut_catalog");
     ASSERT_FALSE(sandbox.empty());
     FileChunk file_chunk;
 

@@ -20,7 +20,7 @@ namespace manifest {
 class T_Manifest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    tmp_path_ = CreateTempDir("/tmp/cvmfs-test");
+    tmp_path_ = CreateTempDir("./cvmfs_ut_manifest");
     EXPECT_NE("", tmp_path_);
   }
 

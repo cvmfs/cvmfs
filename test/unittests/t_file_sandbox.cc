@@ -50,7 +50,7 @@ class T_FileSandbox : public FileSandbox {
   }
 };
 
-const std::string T_FileSandbox::sandbox_path = "/tmp/cvmfs_ut_filesandbox";
+const std::string T_FileSandbox::sandbox_path = "./cvmfs_ut_filesandbox";
 
 
 TEST_F(T_FileSandbox, SandboxCreation) {
