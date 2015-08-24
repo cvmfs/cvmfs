@@ -3506,7 +3506,7 @@ check() {
         check_integrity=1
       ;;
       t)
-        tag="-t $OPTARG"
+        tag="-n $OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3549,7 +3549,11 @@ check() {
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying Catalog Integrity of $name ..."
-  __swissknife check $tag $check_chunks_param $log_level_param -r $stratum0
+  __swissknife check $tag                \
+                     $check_chunks_param \
+                     $log_level_param    \
+                     -r $stratum0        \
+                     -t ${CVMFS_SPOOL_DIR}/tmp
 }
 
 
