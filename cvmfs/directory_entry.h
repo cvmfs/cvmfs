@@ -28,9 +28,6 @@ class SyncItem;
 namespace swissknife {
 class CommandMigrate;
 }
-namespace catalog {
-class CatalogBalancer;
-}
 
 namespace catalog {
 
@@ -38,6 +35,11 @@ namespace catalog {
 class DirectoryEntryTestFactory;
 
 class Catalog;
+class WritableCatalog;
+class WritableCatalogManager;
+
+template <class CatalogMgrT, class CatalogT>
+class CatalogBalancer;
 typedef uint64_t inode_t;
 
 enum SpecialDirents {
@@ -51,7 +53,7 @@ enum SpecialDirents {
  */
 class DirectoryEntryBase {
   // Create .cvmfscatalog and .cvmfsautocatalog files
-  friend class catalog::CatalogBalancer;
+  friend class CatalogBalancer<WritableCatalogManager, WritableCatalog>;
   // Simplify creation of DirectoryEntry objects for write back
   friend class publish::SyncItem;
   // Simplify file system like _touch_ of DirectoryEntry objects

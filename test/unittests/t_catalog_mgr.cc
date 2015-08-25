@@ -172,4 +172,10 @@ TEST_F(T_CatalogManager, Remount) {
   EXPECT_EQ(kLoadNew, catalog_mgr_->Remount(false));
 }
 
+TEST_F(T_CatalogManager, Balance) {
+  ASSERT_TRUE(catalog_mgr_->Init());
+  AddTree();
+
+}
+
 }  // namespace catalog

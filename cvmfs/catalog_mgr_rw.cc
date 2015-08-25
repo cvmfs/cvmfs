@@ -866,9 +866,10 @@ void WritableCatalogManager::FixWeight(Catalog* catalog) {
     RemoveNestedCatalog(catalog->path().ToString());
   }
   else if (catalog->GetNumEntries() > max_weight_) {
-    CatalogBalancer catalog_balancer(this, max_weight_,
-                                     min_weight_,
-                                     balance_weight_);
+    CatalogBalancer<WritableCatalogManager, Catalog> catalog_balancer(this,
+                                                             max_weight_,
+                                                             min_weight_,
+                                                             balance_weight_);
     catalog_balancer.Balance(catalog);
   }
 }
@@ -883,128 +884,5 @@ void WritableCatalogManager::CatalogUploadCallback(
 
   unlink(result.local_path.c_str());
 }
-
-DirectoryEntryBase CatalogBalancer::CreateEmptyContentDirectoryEntryBase(
-    string name, uid_t uid, gid_t gid) {
-  shash::Algorithms algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
-  shash::Any file_hash(algorithm);
-  shash::HashString("", &file_hash);
-
-  DirectoryEntryBase deb;
-  deb.name_ = NameString(name);
-  deb.mode_ = S_IFREG | S_IRWXU;
-  deb.size_ = 0;
-  deb.linkcount_ = 1;
-  deb.checksum_ = file_hash;
-  deb.has_xattrs_ = false;
-  deb.mtime_ = time(NULL);
-  deb.inode_ = catalog::DirectoryEntry::kInvalidInode;
-  deb.parent_inode_ = catalog::DirectoryEntry::kInvalidInode;
-  deb.uid_ = uid;
-  deb.gid_ = gid;
-  return deb;
-}
-
-void CatalogBalancer::AddCvmfsCatalogFile(string path) {
-  XattrList xattr;
-  DirectoryEntry parent;
-  catalog_mgr_->LookupPath(PathString(path), kLookupSole, &parent);
-  DirectoryEntryBase cvmfscatalog =
-      CreateEmptyContentDirectoryEntryBase(".cvmfscatalog", parent.uid(),
-                                           parent.gid());
-  DirectoryEntryBase cvmfsautocatalog =
-      CreateEmptyContentDirectoryEntryBase(".cvmfsautocatalog", parent.uid(),
-                                           parent.gid());
-  catalog_mgr_->AddFile(cvmfscatalog, xattr, path);
-  catalog_mgr_->AddFile(cvmfsautocatalog, xattr, path);
-}
-
-
-void CatalogBalancer::Balance(Catalog *catalog) {
-  if (catalog == NULL) {
-    vector<Catalog*> catalogs = catalog_mgr_->GetCatalogs();
-    for (unsigned i = 0; i < catalogs.size(); ++i)
-      Balance(catalogs[i]);
-    return;
-  }
-  string catalog_path = catalog->path().ToString();
-  VirtualNode root_node(catalog_path, catalog_mgr_);
-  root_node.ExtractChildren(catalog_mgr_);
-  // we have just recursively loaded the entire virtual tree!
-  OptimalPartition(&root_node);
-}
-
-void CatalogBalancer::OptimalPartition(VirtualNode *virtual_node) {
-  // postorder track of the fs-tree
-  for (unsigned i = 0; i < virtual_node->children.size(); ++i) {
-    VirtualNode *virtual_child = &virtual_node->children[i];
-    if (virtual_child->IsDirectory() && !virtual_child->IsCatalog())
-      OptimalPartition(virtual_child);
-  }
-  virtual_node->CaltulateWeight();
-  while (virtual_node->weight > catalog_mgr_->balance_weight_) {
-    VirtualNode *heaviest_node = MaxChild(virtual_node);
-    // we directly add a catalog in this node
-    // TODO apply heuristics here
-    AddCatalog(heaviest_node);
-    AddCvmfsCatalogFile(heaviest_node->path + "/.cvmfscatalog");
-    virtual_node->CaltulateWeight();
-  }
-}
-
-CatalogBalancer::VirtualNode *CatalogBalancer::MaxChild(
-    VirtualNode *virtual_node) {
-  VirtualNode *max_child = NULL;
-  unsigned max_weight = 0;
-  if (virtual_node->IsDirectory() && ! virtual_node->IsCatalog()) {
-    for ( unsigned i = 0; i < virtual_node->children.size(); ++i) {
-      VirtualNode *child = &virtual_node->children[i];
-      if (child->IsDirectory() &&
-          !child->IsCatalog() &&
-          max_weight < child->weight) {
-        max_weight = child->weight;
-        max_child = child;
-      }
-    }
-  }
-  return max_child;
-}
-
-void CatalogBalancer::AddCatalog(VirtualNode *child_node) {
-  if (child_node != NULL) {
-    catalog_mgr_->CreateNestedCatalog(child_node->path);
-    child_node->weight = 1;
-    child_node->is_new_nested_catalog = true;
-    LogCvmfs(kLogPublish, kLogVerboseMsg, "automatic creation of nested"
-        " catalog in '%s'", child_node->path.c_str());
-  }
-}
-
-void CatalogBalancer::VirtualNode::ExtractChildren(
-    WritableCatalogManager *catalog_mgr) {
-  DirectoryEntryList direntlist;
-  catalog_mgr->Listing(path, &direntlist);
-  for (unsigned i = 0; i < direntlist.size(); ++i) {
-    string children_path = path + "/" + direntlist[i].name().ToString();
-    children.push_back(VirtualNode(children_path, direntlist[i],
-                                   catalog_mgr));
-    weight += children[i].weight;
-  }
-}
-
-void CatalogBalancer::VirtualNode::CaltulateWeight() {
-   weight = 1;
-   if (!IsCatalog() && IsDirectory()) {
-     for (unsigned i = 0; i < children.size(); ++i) {
-       weight += children[i].weight;
-     }
-   }
- }
-
-
-
-
-
-
 
 }  // namespace catalog

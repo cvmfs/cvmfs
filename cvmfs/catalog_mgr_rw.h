@@ -59,6 +59,7 @@ class Statistics;
 }
 
 namespace catalog {
+template <class CatalogMgrT, class CatalogT>
 class CatalogBalancer;
 }
 
@@ -66,7 +67,7 @@ namespace catalog {
 
 class WritableCatalogManager : public SimpleCatalogManager {
  public:
-  friend class CatalogBalancer;
+  friend class CatalogBalancer<WritableCatalogManager, Catalog>;
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
@@ -178,15 +179,15 @@ class WritableCatalogManager : public SimpleCatalogManager {
 };  // class WritableCatalogManager
 
 
-
+template <class CatalogMgrT, class CatalogT>
 class CatalogBalancer {
  public:
-  CatalogBalancer(WritableCatalogManager *catalog_mgr,
+  CatalogBalancer(CatalogMgrT *catalog_mgr,
                   unsigned min_weight, unsigned max_weight,
                   unsigned balance_weight)
     : catalog_mgr_(catalog_mgr) { }
 
-  void Balance(Catalog *catalog = NULL);
+  void Balance(CatalogT *catalog = NULL);
 
 
  protected:
@@ -197,10 +198,10 @@ class CatalogBalancer {
     string path;
     bool is_new_nested_catalog;
 
-    void ExtractChildren(WritableCatalogManager *catalog_mgr);
+    void ExtractChildren(CatalogMgrT *catalog_mgr);
     void CaltulateWeight();
     explicit VirtualNode(const string &path,
-                         WritableCatalogManager *catalog_mgr)
+                         CatalogT *catalog_mgr)
       : children(), weight(1), dirent(), path(path),
         is_new_nested_catalog(false) {
       catalog_mgr->LookupPath(path, kLookupSole, &dirent);
@@ -208,7 +209,7 @@ class CatalogBalancer {
         ExtractChildren(catalog_mgr);
     }
     VirtualNode(const string &path, const DirectoryEntry &dirent,
-                WritableCatalogManager *catalog_mgr)
+                CatalogT *catalog_mgr)
       : children(), weight(1), dirent(dirent), path(path),
         is_new_nested_catalog(false) {
       if (!IsCatalog() && IsDirectory())
@@ -229,12 +230,13 @@ class CatalogBalancer {
   void AddCatalog(VirtualNode *child_node);
 
  private:
-  WritableCatalogManager *catalog_mgr_;
+  CatalogMgrT *catalog_mgr_;
 };
 
 
-
-
 }  // namespace catalog
+
+
+#include "catalog_mgr_rw_impl.h"
 
 #endif  // CVMFS_CATALOG_MGR_RW_H_
