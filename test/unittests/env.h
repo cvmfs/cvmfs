@@ -23,7 +23,7 @@
  */
 class CvmfsEnvironment : public ::testing::Environment {
  private:
-  static const size_t kMaxPathLength;
+  static const char* kSandboxEnvVariable;
 
  public:
   CvmfsEnvironment(const int argc, char **argv);
@@ -41,7 +41,6 @@ class CvmfsEnvironment : public ::testing::Environment {
   static bool IsDeathTestExecution(const int argc, char **argv);
 
  private:
-  std::string GetSandboxPointerPath(const pid_t pid) const;
   void ChangeDirectoryToSandbox() const;
 
   void CreateSandbox();
@@ -52,7 +51,6 @@ class CvmfsEnvironment : public ::testing::Environment {
  private:
   const bool   is_death_test_execution_;
   std::string  sandbox_;
-  std::string  sandbox_pointer_;
 };
 
 #endif  /* TEST_UNITTESTS_ENV_H_ */
