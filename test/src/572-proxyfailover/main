@@ -98,6 +98,11 @@ reset_proxies() {
   sleep 2
 }
 
+# just a wrapper around the function in test_functions
+msec_to_sec() {
+  milliseconds_to_seconds $1
+}
+
 cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
