@@ -16,7 +16,7 @@
 #include "../../cvmfs/util.h"
 
 
-const size_t CvmfsEnvironment::kMaxPathLength = 255;
+const char* CvmfsEnvironment::kSandboxEnvVariable = "CVMFS_UT_SANDBOX";
 
 
 CvmfsEnvironment::CvmfsEnvironment(const int argc, char **argv)
@@ -39,7 +39,6 @@ bool CvmfsEnvironment::IsDeathTestExecution(const int argc, char **argv) {
 
 void CvmfsEnvironment::SetUp() {
   assert(sandbox_.empty());
-  assert(sandbox_pointer_.empty());
 
   if (!is_death_test_execution_) {
     CreateSandbox();
@@ -48,8 +47,6 @@ void CvmfsEnvironment::SetUp() {
   }
 
   assert(!sandbox_.empty());
-  assert(!sandbox_pointer_.empty());
-
   ChangeDirectoryToSandbox();
 }
 
@@ -58,13 +55,6 @@ void CvmfsEnvironment::TearDown() {
   if (!is_death_test_execution_) {
     RemoveSandbox();
   }
-}
-
-
-std::string CvmfsEnvironment::GetSandboxPointerPath(const pid_t pid) const {
-  std::stringstream ss;
-  ss << "/tmp/cvmfs_ut_sandbox.pid." << pid;
-  return ss.str();
 }
 
 
@@ -81,73 +71,45 @@ void CvmfsEnvironment::CreateSandbox() {
   }
   sandbox_ = sandbox;
 
-  // create sandbox pointer file next to sandbox directory
-  const std::string sandbox_pointer_path = GetSandboxPointerPath(getpid());
-  std::ofstream sandbox_pointer;
-  sandbox_pointer.open(sandbox_pointer_path.c_str(),
-                       std::ios::out | std::ios::trunc);
-  if (!sandbox_pointer.is_open()) {
-    std::cerr << "Unittest Setup: Failed to create sandbox pointer file "
-              << "'" << sandbox_pointer_path << "' (errno: " << errno << ")."
+  // put sandbox path into the environment to be picked up by child processes
+  unsetenv(kSandboxEnvVariable);
+  if (setenv(kSandboxEnvVariable, sandbox_.c_str(), 1) != 0) {
+    std::cerr << "Unittest Setup: Failed to append sandbox path to environment "
+              << "'" << kSandboxEnvVariable << "' (errno: " << errno << ")."
               << std::endl;
     abort();
   }
-
-  sandbox_pointer << sandbox_ << std::endl;
-  sandbox_pointer.close();
-  sandbox_pointer_ = sandbox_pointer_path;
 }
 
 
 void CvmfsEnvironment::AdoptSandboxFromParent() {
   assert(sandbox_.empty());
-  assert(sandbox_pointer_.empty());
 
-  const std::string sandbox_pointer_path = GetSandboxPointerPath(getppid());
-  if (!FileExists(sandbox_pointer_path)) {
-    std::cerr << "Unittest Setup: Failed to find sandbox pointer file "
-              << "'" << sandbox_pointer_path << "' of parent process."
+  const char *sandbox = getenv(kSandboxEnvVariable);
+  if (NULL == sandbox) {
+    std::cerr << "Unittest Setup: Failed to read sandbox path from environment "
+              << "'" << kSandboxEnvVariable << "' (errno: " << errno << ")."
               << std::endl;
     abort();
   }
 
-  std::ifstream sandbox_pointer;
-  sandbox_pointer.open(sandbox_pointer_path.c_str());
-  if (!sandbox_pointer.is_open()) {
-    std::cerr << "Unittest Setup: Failed to open sandbox pointer file "
-              << "'" << sandbox_pointer_path << "' (errno: " << errno << ")."
-              << std::endl;
-    abort();
-  }
-
-  char path[256] = { '\0' };
-  sandbox_pointer.getline(path, sizeof(path));
-  if (sandbox_pointer.fail() || sandbox_pointer.bad() || strlen(path) == 0) {
-    std::cerr << "Unittest Setup: Failed to read sandbox pointer file "
-              << "'" << sandbox_pointer_path << "' (errno: " << errno << ")."
-              << std::endl;
-    abort();
-  }
-
-  if (!DirectoryExists(path)) {
+  if (!DirectoryExists(sandbox)) {
     std::cerr << "Unittest Setup: Failed to find sandbox directory "
-              << "'" << path << "' pointed to by "
-              << "'" << sandbox_pointer_path << "'"
+              << "'" << sandbox << "' pointed to by "
+              << "'" << kSandboxEnvVariable << "'"
               << std::endl;
     abort();
   }
 
-  sandbox_pointer_ = sandbox_pointer_path;
-  sandbox_         = path;
+  sandbox_ = sandbox;
 }
 
 
 void CvmfsEnvironment::RemoveSandbox() {
   assert(!sandbox_.empty());
-  assert(!sandbox_pointer_.empty());
-
-  unlink(sandbox_pointer_.c_str());
+  unsetenv(kSandboxEnvVariable);
   RemoveTree(sandbox_);
+  sandbox_ = "";
 }
 
 
