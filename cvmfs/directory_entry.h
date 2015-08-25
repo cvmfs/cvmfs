@@ -34,11 +34,11 @@ namespace catalog {
 // Create DirectoryEntries for unit test purposes.
 class DirectoryEntryTestFactory;
 
+class MockCatalogManager;
 class Catalog;
-class WritableCatalog;
 class WritableCatalogManager;
 
-template <class CatalogMgrT, class CatalogT>
+template <class CatalogMgrT>
 class CatalogBalancer;
 typedef uint64_t inode_t;
 
@@ -52,8 +52,10 @@ enum SpecialDirents {
  * for a directory entry.
  */
 class DirectoryEntryBase {
+  // For testing the catalog balancing
+  friend class CatalogBalancer<MockCatalogManager>;
   // Create .cvmfscatalog and .cvmfsautocatalog files
-  friend class CatalogBalancer<WritableCatalogManager, WritableCatalog>;
+  friend class CatalogBalancer<WritableCatalogManager>;
   // Simplify creation of DirectoryEntry objects for write back
   friend class publish::SyncItem;
   // Simplify file system like _touch_ of DirectoryEntry objects

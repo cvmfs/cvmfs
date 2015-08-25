@@ -9,6 +9,7 @@
 
 #include "../../cvmfs/catalog.h"
 #include "../../cvmfs/catalog_mgr.h"
+#include "../../cvmfs/catalog_mgr_rw.h"
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/shortstring.h"
 #include "../../cvmfs/util.h"
@@ -33,7 +34,6 @@ class T_CatalogManager : public ::testing::Test {
   }
 
   void AddTree() {
-    const shash::Any empty_hash = shash::Any();
     const size_t file_size = 4096;
     const char suffix = shash::kSha1;
     shash::Any hash;
@@ -175,7 +175,9 @@ TEST_F(T_CatalogManager, Remount) {
 TEST_F(T_CatalogManager, Balance) {
   ASSERT_TRUE(catalog_mgr_->Init());
   AddTree();
-
+  CatalogBalancer<MockCatalogManager> balancer(
+      catalog_mgr_, 1, 3, 5);
+  balancer.Balance();  // balancing the whole tree
 }
 
 }  // namespace catalog

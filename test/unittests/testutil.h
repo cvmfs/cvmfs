@@ -279,6 +279,7 @@ namespace swissknife {
 class CatalogTraversalParams;
 }
 
+namespace catalog {
 
 /**
  * This is a minimal mock of a Catalog class.
@@ -322,11 +323,11 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
       }
     }
 
-    catalog::DirectoryEntry ToDirectoryEntry() const {
+    DirectoryEntry ToDirectoryEntry() const {
       bool is_directory = hash.IsNull();
       if (is_directory)
-        return catalog::DirectoryEntryTestFactory::Directory();
-      return catalog::DirectoryEntryTestFactory::RegularFile();
+        return DirectoryEntryTestFactory::Directory();
+      return DirectoryEntryTestFactory::RegularFile();
     }
   };
   typedef std::vector<File> FileList;
@@ -396,7 +397,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   }
   bool HasParent() const { return parent_ != NULL; }
   void RemoveChild(MockCatalog *child);
-  catalog::InodeRange inode_range() const { return catalog::InodeRange(); }
+  InodeRange inode_range() const { return InodeRange(); }
   bool OpenDatabase(const std::string &db_path) {
     initialized_ = true;
     if (parent_ != NULL)
@@ -404,19 +405,19 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     return true;
   }
   uint64_t max_row_id() const { return std::numeric_limits<uint64_t>::max(); }
-  void set_inode_range(const catalog::InodeRange value) { }
-  void SetInodeAnnotation(catalog::InodeAnnotation *new_annotation) { }
-  void SetOwnerMaps(const catalog::OwnerMap *uid_map,
-                    const catalog::OwnerMap *gid_map) { }
+  void set_inode_range(const InodeRange value) { }
+  void SetInodeAnnotation(InodeAnnotation *new_annotation) { }
+  void SetOwnerMaps(const OwnerMap *uid_map,
+                    const OwnerMap *gid_map) { }
   bool IsInitialized() const { return initialized_; }
   MockCatalog* FindSubtree(const PathString &path) const;
   uint64_t GetTTL() const { return 0; }
   bool LookupRawSymlink(const PathString &path,
                                 LinkString *raw_symlink) const { return false; }
   bool LookupPath(const PathString &path,
-                  catalog::DirectoryEntry *dirent) const;
+                  DirectoryEntry *dirent) const;
   bool ListingPath(const PathString &path,
-                   catalog::DirectoryEntryList *listing) const;
+                   DirectoryEntryList *listing) const;
 
 
  protected:
@@ -424,7 +425,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   MockCatalog& operator= (const MockCatalog &other);
 
   // API in this 'public block' is used by CatalogTraversal
-  // (see catalog.h - catalog::Catalog for details)
+  // (see catalog.h - Catalog for details)
  public:
   static MockCatalog* AttachFreely(const std::string  &root_path,
                                    const std::string  &file,
@@ -492,15 +493,22 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   mutable HashVector  referenced_objects_;
 };
 
+}
+
 //------------------------------------------------------------------------------
 
 namespace catalog {
 
+template <class CatalogMgrT>
+class CatalogBalancer;
 
 class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
  public:
+  friend class CatalogBalancer<MockCatalogManager>;
   explicit MockCatalogManager(perf::Statistics *statistics) :
-    AbstractCatalogManager<MockCatalog>(statistics) { }
+    AbstractCatalogManager<MockCatalog>(statistics),
+    max_weight_(5), min_weight_(1), balance_weight_(3),
+    spooler_(new Spooler()) { }
 
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
@@ -511,14 +519,58 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
                                  const shash::Any  &catalog_hash,
                                  MockCatalog *parent_catalog);
   MockCatalog* RetrieveRootCatalog() { return GetRootCatalog(); }
+  void AddFile(const DirectoryEntryBase &entry,
+               const XattrList &xattrs,
+               const std::string &parent_directory)
+  {
+    MockCatalog *best_catalog = FindCatalog(PathString(parent_directory));
+    best_catalog->AddFile(entry.checksum(), entry.size(),
+                          parent_directory, entry.name().ToString());
+  }
+
   void RegisterNewCatalog(MockCatalog *new_catalog) {
     string mountpoint_str = new_catalog->root_path();
     PathString mountpoint(mountpoint_str.c_str(), mountpoint_str.length());
     catalog_map_[mountpoint] = new_catalog;
   }
 
+  MockCatalog *FindCatalog(const PathString &path) {
+    map<PathString, MockCatalog*>::iterator it;
+    string best_match = "";
+    unsigned best_match_length = 0;
+    for (it = catalog_map_.begin(); it != catalog_map_.end(); ++it) {
+      string key = it->first.ToString();
+      if (path.ToString().find(key) != string::npos) {
+        unsigned length = key.length();
+        if (length > best_match_length) {
+          best_match_length = length;
+          best_match = key;
+        }
+      }
+    }
+    return catalog_map_[PathString(best_match)];
+  }
+
+  void CreateNestedCatalog(const string &mountpoint) {
+    MockCatalog *parent = FindCatalog(PathString(mountpoint));
+    MockCatalog *new_catalog = new MockCatalog(mountpoint, shash::Any(),
+                                               4096, 1, 0, false,
+                                               parent, NULL);
+    RegisterNewCatalog(new_catalog);
+  }
+
+
+
  protected:
+  typedef struct {
+    shash::Algorithms GetHashAlgorithm() { return shash::kSha256; }
+  }Spooler;
+
+  Spooler *spooler_;
   map<PathString, MockCatalog*> catalog_map_;
+  unsigned max_weight_;
+  unsigned min_weight_;
+  unsigned balance_weight_;
 };
 
 }  // namespace catalog
@@ -665,7 +717,7 @@ class MockObjectFetcher;
 
 template <>
 struct object_fetcher_traits<MockObjectFetcher> {
-  typedef MockCatalog CatalogTN;
+  typedef catalog::MockCatalog CatalogTN;
   typedef MockHistory HistoryTN;
 };
 

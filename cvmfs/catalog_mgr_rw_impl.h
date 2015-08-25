@@ -33,9 +33,9 @@ using namespace std;
 
 namespace catalog {
 
-template <class CatalogMgrT, class CatalogT>
+template <class CatalogMgrT>
 DirectoryEntryBase
-CatalogBalancer<CatalogMgrT, CatalogT>::CreateEmptyContentDirectoryEntryBase(
+CatalogBalancer<CatalogMgrT>::CreateEmptyContentDirectoryEntryBase(
     string name, uid_t uid, gid_t gid) {
   shash::Algorithms algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
   shash::Any file_hash(algorithm);
@@ -56,8 +56,8 @@ CatalogBalancer<CatalogMgrT, CatalogT>::CreateEmptyContentDirectoryEntryBase(
   return deb;
 }
 
-template <class CatalogMgrT, class CatalogT>
-void CatalogBalancer<CatalogMgrT, CatalogT>::AddCvmfsCatalogFile(string path) {
+template <class CatalogMgrT>
+void CatalogBalancer<CatalogMgrT>::AddCvmfsCatalogFile(string path) {
   XattrList xattr;
   DirectoryEntry parent;
   catalog_mgr_->LookupPath(PathString(path), kLookupSole, &parent);
@@ -71,33 +71,35 @@ void CatalogBalancer<CatalogMgrT, CatalogT>::AddCvmfsCatalogFile(string path) {
   catalog_mgr_->AddFile(cvmfsautocatalog, xattr, path);
 }
 
-template <class CatalogMgrT, class CatalogT>
-void CatalogBalancer<CatalogMgrT, CatalogT>::Balance(CatalogT *catalog) {
+template <class CatalogMgrT>
+void CatalogBalancer<CatalogMgrT>::Balance(catalog_t *catalog) {
   if (catalog == NULL) {
-    vector<Catalog*> catalogs = catalog_mgr_->GetCatalogs();
+    vector<catalog_t*> catalogs = catalog_mgr_->GetCatalogs();
     for (unsigned i = 0; i < catalogs.size(); ++i)
       Balance(catalogs[i]);
     return;
   }
   string catalog_path = catalog->path().ToString();
-  typename VirtualNode root_node(catalog_path, catalog_mgr_);
+  virtual_node_t root_node(catalog_path, catalog_mgr_);
   root_node.ExtractChildren(catalog_mgr_);
   // we have just recursively loaded the entire virtual tree!
   OptimalPartition(&root_node);
 }
 
-template <class CatalogMgrT, class CatalogT>
-void CatalogBalancer<CatalogMgrT, CatalogT>::OptimalPartition(
-    typename VirtualNode *virtual_node) {
+template <class CatalogMgrT>
+void CatalogBalancer<CatalogMgrT>::OptimalPartition(
+    typename CatalogBalancer<CatalogMgrT>::VirtualNode *virtual_node) {
   // postorder track of the fs-tree
   for (unsigned i = 0; i < virtual_node->children.size(); ++i) {
-    typename VirtualNode *virtual_child = &virtual_node->children[i];
+    typename CatalogBalancer<CatalogMgrT>::VirtualNode *virtual_child =
+        &virtual_node->children[i];
     if (virtual_child->IsDirectory() && !virtual_child->IsCatalog())
       OptimalPartition(virtual_child);
   }
   virtual_node->CaltulateWeight();
   while (virtual_node->weight > catalog_mgr_->balance_weight_) {
-    typename VirtualNode *heaviest_node = MaxChild(virtual_node);
+    typename CatalogBalancer<CatalogMgrT>::VirtualNode *heaviest_node =
+        MaxChild(virtual_node);
     // we directly add a catalog in this node
     // TODO (molina) apply heuristics here
     AddCatalog(heaviest_node);
@@ -106,16 +108,17 @@ void CatalogBalancer<CatalogMgrT, CatalogT>::OptimalPartition(
   }
 }
 
-template <class CatalogMgrT, class CatalogT>
-typename CatalogBalancer<CatalogMgrT, CatalogT>::VirtualNode*
-CatalogBalancer<CatalogMgrT, CatalogT>::MaxChild(
-    typename CatalogBalancer<CatalogMgrT, CatalogT>::VirtualNode *virtual_node)
+template <class CatalogMgrT>
+typename CatalogBalancer<CatalogMgrT>::VirtualNode*
+CatalogBalancer<CatalogMgrT>::MaxChild(
+    typename CatalogBalancer<CatalogMgrT>::VirtualNode *virtual_node)
 {
-  typename VirtualNode *max_child = NULL;
+  typename CatalogBalancer<CatalogMgrT>::VirtualNode *max_child = NULL;
   unsigned max_weight = 0;
   if (virtual_node->IsDirectory() && ! virtual_node->IsCatalog()) {
     for ( unsigned i = 0; i < virtual_node->children.size(); ++i) {
-      typename VirtualNode *child = &virtual_node->children[i];
+      typename CatalogBalancer<CatalogMgrT>::VirtualNode *child =
+          &virtual_node->children[i];
       if (child->IsDirectory() &&
           !child->IsCatalog() &&
           max_weight < child->weight) {
@@ -127,9 +130,9 @@ CatalogBalancer<CatalogMgrT, CatalogT>::MaxChild(
   return max_child;
 }
 
-template <class CatalogMgrT, class CatalogT>
-void CatalogBalancer<CatalogMgrT, CatalogT>::AddCatalog(
-    typename CatalogBalancer<CatalogMgrT, CatalogT>::VirtualNode *child_node) {
+template <class CatalogMgrT>
+void CatalogBalancer<CatalogMgrT>::AddCatalog(
+    typename CatalogBalancer<CatalogMgrT>::VirtualNode *child_node) {
   if (child_node != NULL) {
     catalog_mgr_->CreateNestedCatalog(child_node->path);
     child_node->weight = 1;
@@ -139,21 +142,22 @@ void CatalogBalancer<CatalogMgrT, CatalogT>::AddCatalog(
   }
 }
 
-template <class CatalogMgrT, class CatalogT>
-void CatalogBalancer<CatalogMgrT, CatalogT>::VirtualNode::ExtractChildren(
+template <class CatalogMgrT>
+void CatalogBalancer<CatalogMgrT>::VirtualNode::ExtractChildren(
     CatalogMgrT *catalog_mgr) {
   DirectoryEntryList direntlist;
   catalog_mgr->Listing(path, &direntlist);
   for (unsigned i = 0; i < direntlist.size(); ++i) {
     string children_path = path + "/" + direntlist[i].name().ToString();
-    children.push_back(typename VirtualNode(children_path, direntlist[i],
-                                   catalog_mgr));
+    children.push_back(typename CatalogBalancer<CatalogMgrT>::VirtualNode(
+        children_path, direntlist[i],
+        catalog_mgr));
     weight += children[i].weight;
   }
 }
 
-template <class CatalogMgrT, class CatalogT>
-void CatalogBalancer<CatalogMgrT, CatalogT>::VirtualNode::CaltulateWeight() {
+template <class CatalogMgrT>
+void CatalogBalancer<CatalogMgrT>::VirtualNode::CaltulateWeight() {
   weight = 1;
   if (!IsCatalog() && IsDirectory()) {
     for (unsigned i = 0; i < children.size(); ++i) {

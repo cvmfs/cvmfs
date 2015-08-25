@@ -59,7 +59,7 @@ class Statistics;
 }
 
 namespace catalog {
-template <class CatalogMgrT, class CatalogT>
+template <class CatalogMgrT>
 class CatalogBalancer;
 }
 
@@ -67,7 +67,7 @@ namespace catalog {
 
 class WritableCatalogManager : public SimpleCatalogManager {
  public:
-  friend class CatalogBalancer<WritableCatalogManager, Catalog>;
+  friend class CatalogBalancer<WritableCatalogManager>;
   WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
@@ -179,15 +179,16 @@ class WritableCatalogManager : public SimpleCatalogManager {
 };  // class WritableCatalogManager
 
 
-template <class CatalogMgrT, class CatalogT>
+template <class CatalogMgrT>
 class CatalogBalancer {
  public:
+  typedef typename CatalogMgrT::catalog_t catalog_t;
   CatalogBalancer(CatalogMgrT *catalog_mgr,
                   unsigned min_weight, unsigned max_weight,
                   unsigned balance_weight)
     : catalog_mgr_(catalog_mgr) { }
 
-  void Balance(CatalogT *catalog = NULL);
+  void Balance(catalog_t *catalog = NULL);
 
 
  protected:
@@ -200,8 +201,7 @@ class CatalogBalancer {
 
     void ExtractChildren(CatalogMgrT *catalog_mgr);
     void CaltulateWeight();
-    explicit VirtualNode(const string &path,
-                         CatalogT *catalog_mgr)
+    VirtualNode(const string &path, CatalogMgrT *catalog_mgr)
       : children(), weight(1), dirent(), path(path),
         is_new_nested_catalog(false) {
       catalog_mgr->LookupPath(path, kLookupSole, &dirent);
@@ -209,7 +209,7 @@ class CatalogBalancer {
         ExtractChildren(catalog_mgr);
     }
     VirtualNode(const string &path, const DirectoryEntry &dirent,
-                CatalogT *catalog_mgr)
+                CatalogMgrT *catalog_mgr)
       : children(), weight(1), dirent(dirent), path(path),
         is_new_nested_catalog(false) {
       if (!IsCatalog() && IsDirectory())
@@ -219,6 +219,7 @@ class CatalogBalancer {
     bool IsCatalog() { return is_new_nested_catalog ||
         dirent.IsNestedCatalogMountpoint(); }
   };
+  typedef typename CatalogBalancer<CatalogMgrT>::VirtualNode virtual_node_t;
 
  private:
   void OptimalPartition(VirtualNode *virtual_node);
