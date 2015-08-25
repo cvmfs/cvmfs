@@ -30,7 +30,7 @@ class CommandCheck : public Command {
     ParameterList r;
     r.push_back(Parameter::Mandatory('r', "repository directory / url"));
     r.push_back(Parameter::Optional('n', "check specific repository tag"));
-    r.push_back(Parameter::Optional('t', "temporary directory (default: /tmp)"));
+    r.push_back(Parameter::Optional('t', "temp directory (default: /tmp)"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Switch('c', "check availability of data chunks"));
     return r;

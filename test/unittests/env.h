@@ -7,6 +7,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 /**
  * This class manages the unit test file system sandbox in /tmp. Unittests that
  * need to create or interact with files are supposed to do that in the current

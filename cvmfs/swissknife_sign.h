@@ -8,8 +8,8 @@
 #include <string>
 
 #include "hash.h"
-#include "util_concurrency.h"
 #include "swissknife.h"
+#include "util_concurrency.h"
 
 namespace upload {
   struct SpoolerResult;
