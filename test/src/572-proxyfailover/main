@@ -205,7 +205,7 @@ EOF
   echo "mount CVMFS again (should take a moment)"
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 14
   echo "took $(msec_to_sec $mount_time) seconds"
-  [ $mount_time -ge 3 ]                || return 15
+  [ $mount_time -ge 3000 ]             || return 15
   check_active_proxy_group $mnt_pipe 0 || return 16
 
   echo "umount CVMFS"
@@ -219,7 +219,7 @@ EOF
   echo "mount CVMFS again (should take a moment)"
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 19
   echo "took $(msec_to_sec $mount_time) seconds"
-  [ $mount_time -ge 3 ] || return 20
+  [ $mount_time -ge 3000 ]             || return 20
   check_active_proxy_group $mnt_pipe 0 || return 21
 
   echo "switch proxy group to broken proxies"
@@ -230,7 +230,7 @@ EOF
   local cat_time=0
   cat_time=$(stop_watch cat $mnt_dummy_file | tail -n1)
   echo "took $(msec_to_sec $cat_time) seconds"
-  [ $cat_time -ge 3 ] || return 24
+  [ $cat_time -ge 3000 ]                                   || return 24
   cat $mnt_dummy_file | grep -q "meaningless file content" || return 25
   check_active_proxy_group $mnt_pipe 0 || return 26
 
@@ -253,7 +253,7 @@ EOF
   clear_cache $mnt_cache                                                 || return 30
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 31
   echo "took $(msec_to_sec $mount_time) seconds"
-  [ $mount_time -lt 3 ]                || return 32
+  [ $mount_time -lt 3000 ]             || return 32
   check_active_proxy_group $mnt_pipe 0 || return 33
 
   echo "destroy all proxies (very high delay)"
