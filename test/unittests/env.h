@@ -10,11 +10,14 @@
 /**
  * This class manages the unit test file system sandbox in /tmp. Unittests that
  * need to create or interact with files are supposed to do that in the current
- * working directory.
+ * working directory. It creates a pointer file to advertise the created sand-
+ * box to child processes spawned to run death tests.
  *
  * Furthermore this class detects if it runs in a re-spawned death test process
  * and does not re-create a sandbox in that case. Obviously such death test
  * processes cannot clean up after themselves, leaving behind leaked temp files.
+ * In such cases the pointer file of the parent process is read and its sandbox
+ * directory is re-used.
  */
 class CvmfsEnvironment : public ::testing::Environment {
  private:
@@ -36,8 +39,18 @@ class CvmfsEnvironment : public ::testing::Environment {
   static bool IsDeathTestExecution(const int argc, char **argv);
 
  private:
-  const bool   owns_sandbox_;
+  std::string GetSandboxPointerPath(const pid_t pid) const;
+  void ChangeDirectoryToSandbox() const;
+
+  void CreateSandbox();
+  void AdoptSandboxFromParent();
+
+  void RemoveSandbox();
+
+ private:
+  const bool   is_death_test_execution_;
   std::string  sandbox_;
+  std::string  sandbox_pointer_;
 };
 
 #endif  /* TEST_UNITTESTS_ENV_H_ */
