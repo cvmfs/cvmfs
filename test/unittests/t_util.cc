@@ -1073,7 +1073,7 @@ TEST_F(T_Util, Shell) {
   char *buffer = static_cast<char*>(scalloc(buffer_size, sizeof(char)));
 
   EXPECT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
-  string path = sandbox + "/" + "newfolder";
+  string path = sandbox + "/newfolder";
   string command = "mkdir -p " + path +  " && cd " + path + " && pwd\n";
   WritePipe(fd_stdin, command.c_str(), command.length());
   ReadPipe(fd_stdout, buffer, path.length());
