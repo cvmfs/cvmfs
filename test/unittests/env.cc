@@ -49,7 +49,6 @@ void CvmfsEnvironment::SetUp() {
   assert(!sandbox_pointer_.empty());
 
   ChangeDirectoryToSandbox();
-  assert(GetCurrentWorkingDirectory() == sandbox_);
 }
 
 
