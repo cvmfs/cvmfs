@@ -98,6 +98,11 @@ reset_proxies() {
   sleep 2
 }
 
+# just a wrapper around the function in test_functions
+msec_to_sec() {
+  milliseconds_to_seconds $1
+}
+
 cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
@@ -183,7 +188,7 @@ EOF
   local mount_time=0
   TEST572_MOUNT_POINT="$mntpnt"
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf)" || return 10
-  echo "took $mount_time seconds"
+  echo "took $(msec_to_sec $mount_time) seconds"
 
   echo "checking active proxy group through $mnt_pipe"
   check_active_proxy_group $mnt_pipe 0 || return 11
@@ -199,8 +204,8 @@ EOF
 
   echo "mount CVMFS again (should take a moment)"
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 14
-  echo "took $mount_time seconds"
-  [ $mount_time -ge 3 ]                || return 15
+  echo "took $(msec_to_sec $mount_time) seconds"
+  [ $mount_time -ge 3000 ]             || return 15
   check_active_proxy_group $mnt_pipe 0 || return 16
 
   echo "umount CVMFS"
@@ -213,8 +218,8 @@ EOF
 
   echo "mount CVMFS again (should take a moment)"
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 19
-  echo "took $mount_time seconds"
-  [ $mount_time -ge 3 ] || return 20
+  echo "took $(msec_to_sec $mount_time) seconds"
+  [ $mount_time -ge 3000 ]             || return 20
   check_active_proxy_group $mnt_pipe 0 || return 21
 
   echo "switch proxy group to broken proxies"
@@ -224,8 +229,8 @@ EOF
   echo "try to access a file in the mountpoint (should take a moment)"
   local cat_time=0
   cat_time=$(stop_watch cat $mnt_dummy_file | tail -n1)
-  echo "took $cat_time seconds"
-  [ $cat_time -ge 3 ] || return 24
+  echo "took $(msec_to_sec $cat_time) seconds"
+  [ $cat_time -ge 3000 ]                                   || return 24
   cat $mnt_dummy_file | grep -q "meaningless file content" || return 25
   check_active_proxy_group $mnt_pipe 0 || return 26
 
@@ -239,7 +244,7 @@ EOF
 
   echo "mount CVMFS again (should fail)"
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" && return 29
-  echo "took $mount_time seconds"
+  echo "took $(msec_to_sec $mount_time) seconds"
 
   echo "reset the proxies"
   reset_proxies
@@ -247,8 +252,8 @@ EOF
   echo "mount CVMFS again (should be quick)"
   clear_cache $mnt_cache                                                 || return 30
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 31
-  echo "took $mount_time seconds"
-  [ $mount_time -lt 3 ]                || return 32
+  echo "took $(msec_to_sec $mount_time) seconds"
+  [ $mount_time -lt 3000 ]             || return 32
   check_active_proxy_group $mnt_pipe 0 || return 33
 
   echo "destroy all proxies (very high delay)"
@@ -281,7 +286,7 @@ EOF
 
   echo "mount CVMFS again (should be quick)"
   mount_time="$(stop_watch mount_private $mntpnt $mnt_conf 2>/dev/null)" || return 40
-  echo "took $mount_time seconds"
+  echo "took $(msec_to_sec $mount_time) seconds"
   check_active_proxy_group $mnt_pipe 1 || return 41
 
   return 0
