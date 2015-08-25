@@ -217,6 +217,7 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
 
 //------------------------------------------------------------------------------
 
+namespace catalog {
 
 unsigned int MockCatalog::instances = 0;
 
@@ -389,6 +390,8 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
   return kLoadNew;
 }
 
+}  // namespace catalog
+
 
 //------------------------------------------------------------------------------
 
@@ -396,9 +399,10 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   const uint64_t    catalog_size = 0;
   const std::string root_path    = "";
-  manifest::Manifest* manifest = new manifest::Manifest(MockCatalog::root_hash,
-                                                        catalog_size,
-                                                        root_path);
+  manifest::Manifest* manifest = new manifest::Manifest(
+      catalog::MockCatalog::root_hash,
+      catalog_size,
+      root_path);
   manifest->set_history(MockHistory::root_hash);
   return manifest;
 }
@@ -409,7 +413,6 @@ bool MockObjectFetcher::Fetch(const shash::Any &object_hash,
   *file_path = object_hash.ToString();
   return true;
 }
-
 
 //------------------------------------------------------------------------------
 
