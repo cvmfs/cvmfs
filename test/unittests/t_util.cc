@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <tbb/tbb_thread.h>
 #include <unistd.h>
 
@@ -53,6 +54,11 @@ class T_Util : public ::testing::Test {
     long_path = sandbox +
         "/path_path_path_path_path_path_path_path_path_path_path_path_path_"
         "path_path_path_path_path_path_path_path_path_path_path_path_path";
+
+    struct sockaddr_un sock_addr;
+    EXPECT_GT(sizeof(sock_addr.sun_path),
+              socket_address.length()) << "Socket path '" << socket_address
+                                       << "' seems to be bogus";
   }
 
   virtual void TearDown() {
