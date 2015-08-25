@@ -3,27 +3,29 @@
  */
 
 #include "env.h"
-#include "../../cvmfs/util.h"
 
 #include <cassert>
 #include <cerrno>
 #include <cstdlib>
 
 #include <fstream>
-#include <string>
-#include <sstream>
 #include <iostream>
+#include <sstream>
+#include <string>
+
+#include "../../cvmfs/util.h"
 
 
 const size_t CvmfsEnvironment::kMaxPathLength = 255;
 
 
-CvmfsEnvironment::CvmfsEnvironment(const int argc, char **argv) :
-  is_death_test_execution_(CvmfsEnvironment::IsDeathTestExecution(argc, argv)) {}
+CvmfsEnvironment::CvmfsEnvironment(const int argc, char **argv)
+  : is_death_test_execution_(CvmfsEnvironment::IsDeathTestExecution(argc, argv))
+  { }
 
 
 bool CvmfsEnvironment::IsDeathTestExecution(const int argc, char **argv) {
-  const char* death_test_flag="--gtest_internal_run_death_test";
+  const char* death_test_flag = "--gtest_internal_run_death_test";
 
   for (int i = 0; i < argc; ++i) {
     if (strncmp(argv[i], death_test_flag, strlen(death_test_flag)) == 0) {
@@ -39,7 +41,7 @@ void CvmfsEnvironment::SetUp() {
   assert(sandbox_.empty());
   assert(sandbox_pointer_.empty());
 
-  if (! is_death_test_execution_) {
+  if (!is_death_test_execution_) {
     CreateSandbox();
   } else {
     AdoptSandboxFromParent();
@@ -53,7 +55,7 @@ void CvmfsEnvironment::SetUp() {
 
 
 void CvmfsEnvironment::TearDown() {
-  if (! is_death_test_execution_) {
+  if (!is_death_test_execution_) {
     RemoveSandbox();
   }
 }
@@ -102,7 +104,7 @@ void CvmfsEnvironment::AdoptSandboxFromParent() {
   assert(sandbox_pointer_.empty());
 
   const std::string sandbox_pointer_path = GetSandboxPointerPath(getppid());
-  if (! FileExists(sandbox_pointer_path)) {
+  if (!FileExists(sandbox_pointer_path)) {
     std::cerr << "Unittest Setup: Failed to find sandbox pointer file "
               << "'" << sandbox_pointer_path << "' of parent process."
               << std::endl;
@@ -141,10 +143,10 @@ void CvmfsEnvironment::AdoptSandboxFromParent() {
 
 
 void CvmfsEnvironment::RemoveSandbox() {
-  assert (!sandbox_.empty());
-  assert (!sandbox_pointer_.empty());
+  assert(!sandbox_.empty());
+  assert(!sandbox_pointer_.empty());
 
-  unlink (sandbox_pointer_.c_str());
+  unlink(sandbox_pointer_.c_str());
   RemoveTree(sandbox_);
 }
 
