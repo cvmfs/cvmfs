@@ -36,8 +36,18 @@ class CvmfsEnvironment : public ::testing::Environment {
   static bool IsDeathTestExecution(const int argc, char **argv);
 
  private:
-  const bool   owns_sandbox_;
+  std::string GetSandboxPointerPath(const pid_t pid) const;
+  void ChangeDirectoryToSandbox() const;
+
+  void CreateSandbox();
+  void AdoptSandboxFromParent();
+
+  void RemoveSandbox();
+
+ private:
+  const bool   is_death_test_execution_;
   std::string  sandbox_;
+  std::string  sandbox_pointer_;
 };
 
 #endif  /* TEST_UNITTESTS_ENV_H_ */
