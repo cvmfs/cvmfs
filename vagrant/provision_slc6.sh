@@ -49,7 +49,7 @@ yum -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                curl attr httpd
 
 # install convenience packages for development
-yum -y install git tig iftop htop jq rubygems screen nc
+yum -y install git tig iftop htop jq rubygems screen nc python-unittest2
 gem install fakes3 --version 0.2.0
 
 # setup and run a FakeS3 server
