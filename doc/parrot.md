@@ -31,10 +31,10 @@ Test parrot with
 Repositories that are not available by default from the builtin `<default-repositories>` list can be explicitly added to `PARROT_CVMFS_REPO`.  The repository name, a stratum 1 URL, and the public key of the repository need to be provided.  For instance, in order to add alice-ocdb.cern.ch and ilc.desy.de to the list of repositories, we can write
 
     export CERN_S1="http://cvmfs-stratum-one.cern.ch/cvmfs"
-    export DESY_S1="http://grid-cvmfs-one.desy.de:8000"
+    export DESY_S1="http://grid-cvmfs-one.desy.de:8000/cvmfs"
     export PARROT_CVMFS_REPO="<default-repositories> \
       alice-ocdb.cern.ch:url=${CERN_S1}/alice-ocdb.cern.ch,pubkey=/etc/cvmfs/keys/cern.ch/cern-it1.cern.ch.pub \
-      ilc.desy.de:url=${DESY_S1}/cvmfs/ilc.desy.de,pubkey=/etc/cvmfs/keys/desy.de/desy.de.pub"
+      ilc.desy.de:url=${DESY_S1}/ilc.desy.de,pubkey=/etc/cvmfs/keys/desy.de/desy.de.pub"
 
 given that the repository public keys are in the provided paths.
 
