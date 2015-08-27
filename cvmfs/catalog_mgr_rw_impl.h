@@ -102,9 +102,11 @@ void CatalogBalancer<CatalogMgrT>::OptimalPartition(
         MaxChild(virtual_node);
     // we directly add a catalog in this node
     // TODO (molina) apply heuristics here
-    AddCatalog(heaviest_node);
-    AddCvmfsCatalogFile(heaviest_node->path + "/.cvmfscatalog");
-    virtual_node->CaltulateWeight();
+    if (heaviest_node->weight >= catalog_mgr_->min_weight_) {
+      AddCatalog(heaviest_node);
+      AddCvmfsCatalogFile(heaviest_node->path + "/.cvmfscatalog");
+      virtual_node->CaltulateWeight();
+    }
   }
 }
 
@@ -150,8 +152,7 @@ void CatalogBalancer<CatalogMgrT>::VirtualNode::ExtractChildren(
   for (unsigned i = 0; i < direntlist.size(); ++i) {
     string children_path = path + "/" + direntlist[i].name().ToString();
     children.push_back(typename CatalogBalancer<CatalogMgrT>::VirtualNode(
-        children_path, direntlist[i],
-        catalog_mgr));
+        children_path, direntlist[i], catalog_mgr));
     weight += children[i].weight;
   }
 }

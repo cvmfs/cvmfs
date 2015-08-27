@@ -183,9 +183,7 @@ template <class CatalogMgrT>
 class CatalogBalancer {
  public:
   typedef typename CatalogMgrT::catalog_t catalog_t;
-  CatalogBalancer(CatalogMgrT *catalog_mgr,
-                  unsigned min_weight, unsigned max_weight,
-                  unsigned balance_weight)
+  CatalogBalancer(CatalogMgrT *catalog_mgr)
     : catalog_mgr_(catalog_mgr) { }
 
   void Balance(catalog_t *catalog = NULL);

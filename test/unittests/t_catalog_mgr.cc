@@ -65,8 +65,7 @@ class T_CatalogManager : public ::testing::Test {
                                                4096, 1, 0, false,
                                                root_catalog, NULL);
     ASSERT_NE(static_cast<MockCatalog*>(NULL), new_catalog);
-    ASSERT_EQ(1u, root_catalog->GetChildren().size());
-    catalog_mgr_->RegisterNewCatalog(new_catalog);
+    ASSERT_EQ(0u, root_catalog->GetChildren().size());  // not mounted yet!!
     // adding "/dir/dir/dir/file3" to the new nested catalog
     hash = shash::Any(shash::kSha1,
                           reinterpret_cast<const unsigned char*>(hashes[2]),
@@ -79,6 +78,8 @@ class T_CatalogManager : public ::testing::Test {
     new_catalog->AddFile(hash, file_size, "/dir/dir/dir", "file4");
     // we haven't mounted the second catalog yet!
     ASSERT_EQ(1, catalog_mgr_->GetNumCatalogs());
+    catalog_mgr_->RegisterNewCatalog(root_catalog);
+    catalog_mgr_->RegisterNewCatalog(new_catalog);
   }
 
  protected:
@@ -134,6 +135,7 @@ TEST_F(T_CatalogManager, Lookup) {
   // the father directory belongs to the catalog, so there is no problem
   EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/file2", kLookupFull, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
+  EXPECT_EQ(1, catalog_mgr_->GetNumCatalogs());
   // /dir/dir/dir/file4 belongs to a catalog that is not mounted yet
   EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupSole,
                                        &dirent));
@@ -173,10 +175,14 @@ TEST_F(T_CatalogManager, Remount) {
 }
 
 TEST_F(T_CatalogManager, Balance) {
+  DirectoryEntry dummy;
   ASSERT_TRUE(catalog_mgr_->Init());
   AddTree();
-  CatalogBalancer<MockCatalogManager> balancer(
-      catalog_mgr_, 1, 3, 5);
+  // this lookup is only to virtually "force" the catalog manager to mount
+  // the nested catalog we created
+  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupSole,
+                                       &dummy));
+  CatalogBalancer<MockCatalogManager> balancer(catalog_mgr_);
   balancer.Balance();  // balancing the whole tree
 }
 

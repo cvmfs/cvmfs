@@ -866,10 +866,7 @@ void WritableCatalogManager::FixWeight(Catalog* catalog) {
     RemoveNestedCatalog(catalog->path().ToString());
   }
   else if (catalog->GetNumEntries() > max_weight_) {
-    CatalogBalancer<WritableCatalogManager, Catalog> catalog_balancer(this,
-                                                             max_weight_,
-                                                             min_weight_,
-                                                             balance_weight_);
+    CatalogBalancer<WritableCatalogManager> catalog_balancer(this);
     catalog_balancer.Balance(catalog);
   }
 }

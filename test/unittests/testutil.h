@@ -51,10 +51,19 @@ class DirectoryEntryTestFactory {
   };
 
  public:
-  static catalog::DirectoryEntry RegularFile();
-  static catalog::DirectoryEntry Directory();
-  static catalog::DirectoryEntry Symlink();
-  static catalog::DirectoryEntry ChunkedFile();
+  static catalog::DirectoryEntry RegularFile(
+      const string &name = "",
+      unsigned size = 4096,
+      shash::Any content_hash = shash::Any());
+  static catalog::DirectoryEntry Directory(
+      const string &name = "", unsigned size = 4096,
+      shash::Any content_hash = shash::Any(),
+      bool is_nested_catalog_mountpint = false);
+  static catalog::DirectoryEntry Symlink(const string &name = "",
+                                         unsigned size = 4096,
+                                         const string &symlink_path = "");
+  static catalog::DirectoryEntry ChunkedFile(
+      shash::Any content_hash = shash::Any());
   static catalog::DirectoryEntry Make(const Metadata &metadata);
 };
 
@@ -305,17 +314,20 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     shash::Md5  path_hash;
     shash::Md5  parent_hash;
     string      name;
+    bool        is_nested_catalog_mountpoint;
 
     File() : hash(shash::Any()), size(0), path_hash(shash::Md5()),
-        parent_hash(shash::Md5()), name("") { }
+        parent_hash(shash::Md5()), name(""), is_nested_catalog_mountpoint(false)
+    { }
 
     File(const shash::Any &hash, size_t size, const string &parent_path,
          const string &name) :
-      hash(hash), size(size), name(name)
+      hash(hash), size(size), name(name), is_nested_catalog_mountpoint(false)
     {
       if (parent_path == "" && name == "") {
         parent_hash = shash::Md5("", 0);
         path_hash = shash::Md5("", 0);
+        is_nested_catalog_mountpoint = true;
       } else {
         string full_path = parent_path + "/" + name;
         parent_hash = shash::Md5(parent_path.c_str(), parent_path.length());
@@ -326,8 +338,9 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     DirectoryEntry ToDirectoryEntry() const {
       bool is_directory = hash.IsNull();
       if (is_directory)
-        return DirectoryEntryTestFactory::Directory();
-      return DirectoryEntryTestFactory::RegularFile();
+        return DirectoryEntryTestFactory::Directory(name, size, hash,
+                                                  is_nested_catalog_mountpoint);
+      return DirectoryEntryTestFactory::RegularFile(name, size, hash);
     }
   };
   typedef std::vector<File> FileList;
@@ -391,8 +404,8 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
   std::vector<MockCatalog*> GetChildren() const {
     std::vector<MockCatalog*> children_arr;
-    for (unsigned i = 0; i < children_.size(); ++i)
-      children_arr.push_back(children_[i].child);
+    for (unsigned i = 0; i < active_children_.size(); ++i)
+      children_arr.push_back(active_children_[i].child);
     return children_arr;
   }
   bool HasParent() const { return parent_ != NULL; }
@@ -410,7 +423,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   void SetOwnerMaps(const OwnerMap *uid_map,
                     const OwnerMap *gid_map) { }
   bool IsInitialized() const { return initialized_; }
-  MockCatalog* FindSubtree(const PathString &path) const;
+  MockCatalog* FindSubtree(const PathString &path);
   uint64_t GetTTL() const { return 0; }
   bool LookupRawSymlink(const PathString &path,
                                 LinkString *raw_symlink) const { return false; }
@@ -506,9 +519,8 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
  public:
   friend class CatalogBalancer<MockCatalogManager>;
   explicit MockCatalogManager(perf::Statistics *statistics) :
-    AbstractCatalogManager<MockCatalog>(statistics),
-    max_weight_(5), min_weight_(1), balance_weight_(3),
-    spooler_(new Spooler()) { }
+    AbstractCatalogManager<MockCatalog>(statistics), spooler_(new Spooler()),
+    max_weight_(5), min_weight_(1), balance_weight_(3) { }
 
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
