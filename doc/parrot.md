@@ -81,5 +81,4 @@ If you want to compile parrot+cvmfs from sources, please use the `libcvmfs-stabl
 
 Use the git branch that reflects the latest released version from the [cctools github repository](https://github.com/cooperative-computing-lab/cctools).  Configure and compile cctools as usual with the `./configure --with-cvmfs-path <CVMFS INSTALL PREFIX>`, e.g. ``./configure --with-cvmfs-path /usr`.
 
-Note that the cvmfs-devel package contains libcvmfs.h and libcvmfs.a but not
-necessarily the latest known good version.
+Note that the cvmfs-devel package contains libcvmfs.h and libcvmfs.a but not necessarily the latest known good version.
