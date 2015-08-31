@@ -24,6 +24,13 @@ is_suse() {
   [ -f /etc/SuSE-release ]
 }
 
+get_package_type() {
+  which dpkg > /dev/null 2>&1 && echo "deb" && return 0
+  which rpm  > /dev/null 2>&1 && echo "rpm" && return 0
+  [ x"$(uname)" = x"Darwin" ] && echo "pkg" && return 0
+  return 1
+}
+
 get_cvmfs_version_from_cmake() {
   local source_directory="$1"
   cat ${source_directory}/CMakeLists.txt | grep '## CVMFS_VERSION' | awk '{print $3}'
