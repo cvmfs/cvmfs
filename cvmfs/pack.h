@@ -21,17 +21,17 @@ class Any;
 }
 
 /**
- * Multiple content-addressable objects in a single BLOB.  A ObjectPack has
- * a header, an index containing all the objects and their offsets followed
- * by the concatenated objects.  The secure hash of the index is in the header.
- * Header and Index are JSON objects.
+ * Multiple content-addressable objects in a single BLOB.  A (serialized)
+ * ObjectPack has a header, an index containing all the objects and their
+ * offsets followed by the concatenated objects.  The secure hash of the index
+ * is in the header.
  *
  * This allows to verify the hash of the index and the hash of all objects
  * individually.  Thus, objects can be read and written in parallel to and from
  * the ObjectPack.
  *
- * Objects are used by tentacles to send change sets to the octopus server as
- * well as by the stratum 0 to transfer object bulks to stratum 1s during
+ * Objects are used by "tentacles" to send change sets to the "octopus server"
+ * as well as by the stratum 0 to transfer object bulks to stratum 1s during
  * replication.
  */
 class ObjectPack : SingleCopy {
@@ -103,7 +103,7 @@ class ObjectPack : SingleCopy {
 
 
 /**
- * Seriializes ObjectPacks.  It can also serialize a single large file as an
+ * Serializes ObjectPacks.  It can also serialize a single large file as an
  * "object pack", which otherwise would need special treatment.
  */
 class ObjectPackProducer {
