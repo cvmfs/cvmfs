@@ -192,6 +192,8 @@ ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file)
 
   const bool with_suffix = true;
   header_ += id.ToString(with_suffix) + " 0\n";
+  
+  rewind(big_file);
 }
 
 
