@@ -9,6 +9,7 @@
 #include <string>
 
 #include "../../cvmfs/pack.h"
+#include "../../cvmfs/smalloc.h"
 #include "../../cvmfs/util.h"
 
 using namespace std;  // NOLINT
@@ -104,10 +105,24 @@ TEST_F(T_Pack, ObjectPackOverflow) {
   small_pack.AddToBucket(&buf, 1, handle_two);
   small_pack.AddToBucket(&buf, 1, handle_two);
   EXPECT_FALSE(small_pack.CommitBucket(shash::Any(hash_null), handle_two));
+  small_pack.DiscardBucket(handle_two);
 
   ObjectPack::BucketHandle handle_three = small_pack.OpenBucket();
   small_pack.AddToBucket(&buf, 1, handle_three);
   EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null), handle_three));
+
+  // Fail due to too many objects
+  ObjectPack::BucketHandle *handles;
+  handles = reinterpret_cast<ObjectPack::BucketHandle *>(
+    smalloc((ObjectPack::kMaxObjects + 1) * sizeof(ObjectPack::BucketHandle)));
+  for (unsigned i = 0; i < ObjectPack::kMaxObjects; ++i) {
+    handles[i] = pack_.OpenBucket();
+    EXPECT_TRUE(pack_.CommitBucket(hash_null, handles[i]));
+  }
+  handles[ObjectPack::kMaxObjects] = pack_.OpenBucket();
+  EXPECT_FALSE(pack_.CommitBucket(hash_null, handles[ObjectPack::kMaxObjects]));
+  pack_.DiscardBucket(handles[ObjectPack::kMaxObjects]);
+  free(handles);
 }
 
 
