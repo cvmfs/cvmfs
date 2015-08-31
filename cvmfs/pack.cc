@@ -61,6 +61,8 @@ bool ObjectPack::CommitBucket(
   handle->id = id;
 
   MutexLockGuard mutex_guard(lock_);
+  if (buckets_.size() >= kMaxObjects)
+    return false;
   if (size_ + handle->size > limit_)
     return false;
   open_buckets_.erase(handle);
@@ -192,7 +194,7 @@ ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file)
 
   const bool with_suffix = true;
   header_ += id.ToString(with_suffix) + " 0\n";
-  
+
   rewind(big_file);
 }
 
@@ -249,6 +251,9 @@ unsigned ObjectPackProducer::ProduceNext(
 //------------------------------------------------------------------------------
 
 
-ObjectPackConsumer::ObjectPackConsumer(const shash::Any &expected_digest)
+ObjectPackConsumer::ObjectPackConsumer(
+  const shash::Any &expected_digest,
+  const unsigned expected_header_size)
   : expected_digest_(expected_digest)
+  , expected_header_size_(expected_header_size)
 { }

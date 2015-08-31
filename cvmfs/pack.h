@@ -47,6 +47,12 @@ class ObjectPack : SingleCopy {
   typedef Bucket * BucketHandle;
 
   static const uint64_t kDefaultLimit = 200*1024*1024;  // 200MB
+  /**
+   * Limit the maximum number of objects to avoid very large headers.  Assuming
+   * Sha256 (32 bytes) + 9 bytes for the offset in hex notation, a header 
+   * with 100,000 files should fit in 4M.
+   */
+  static const uint64_t kMaxObjects = 100000;
 
   ObjectPack();
   explicit ObjectPack(const uint64_t limit);
@@ -164,13 +170,14 @@ class ObjectPackConsumerBase {
   enum BuildState {
     kStateContinue = 0,
     kStateDone,
-    kStateAbort,
+    kStateCorrupt,
+    kStateTooBig,  // header too big
   };
 };
 
 
 /**
- * Deserializes and ObjectPack created by ObjectPackProducer.  For every object
+ * Deserializes an ObjectPack created by ObjectPackProducer.  For every object
  * it calls all listeners with a BuildEvent parameter at least once for every
  * object.  For large objects, it calls the listeners multiple times.  It won't
  * verify the incoming data, this is up to the listeners handling the data.
@@ -179,11 +186,14 @@ class ObjectPackConsumerBase {
 class ObjectPackConsumer : public ObjectPackConsumerBase
                          , Observable<ObjectPackConsumerBase::BuildEvent> {
  public:
-  explicit ObjectPackConsumer(const shash::Any &expected_digest);
+  explicit ObjectPackConsumer(
+    const shash::Any &expected_digest,
+    const unsigned expected_header_size);
   BuildState ConsumeNext(const unsigned buf_size, const void *buf);
 
  private:
   shash::Any expected_digest_;
+  unsigned expected_header_size_;
 };
 
 #endif  // CVMFS_PACK_H_
