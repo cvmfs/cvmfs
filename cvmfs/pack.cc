@@ -163,13 +163,11 @@ ObjectPackProducer::ObjectPackProducer(ObjectPack *pack)
   header_ += "--\n";
 
   const bool with_suffix = true;
-  uint64_t offset = 0;
   for (unsigned i = 0; i < N; ++i) {
     header_ += pack->buckets_[i]->id.ToString(with_suffix);
     header_ += " ";
-    header_ += StringifyInt(offset);
+    header_ += StringifyInt(pack->buckets_[i]->size);
     header_ += "\n";
-    offset += pack->buckets_[i]->size;
   }
 }
 
@@ -186,14 +184,15 @@ ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file)
   platform_stat64 info;
   int retval = platform_fstat(fd, &info);
   assert(retval == 0);
+  string str_size = StringifyInt(info.st_size);
 
   header_ = "V 1\n";
-  header_ += "S " + StringifyInt(info.st_size) + "\n";
+  header_ += "S " + str_size + "\n";
   header_ += "N 1\n";
   header_ += "--\n";
 
   const bool with_suffix = true;
-  header_ += id.ToString(with_suffix) + " 0\n";
+  header_ += id.ToString(with_suffix) + " " + str_size + "\n";
 
   rewind(big_file);
 }
@@ -256,4 +255,59 @@ ObjectPackConsumer::ObjectPackConsumer(
   const unsigned expected_header_size)
   : expected_digest_(expected_digest)
   , expected_header_size_(expected_header_size)
-{ }
+  , state_(kStateContinue)
+{
+  // Upper limit of 100B per entry
+  if (expected_header_size > (100 * ObjectPack::kMaxObjects)) {
+    state_ = kStateTooBig;
+    return;
+  }
+
+  header_.reserve(expected_header_size);
+}
+
+
+ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
+  const unsigned buf_size,
+  const char *buf)
+{
+  if (state_ != kStateContinue)
+    return state_;
+
+  const unsigned remaining_in_header =
+    (pos_ < expected_header_size_) ? (expected_header_size_ - pos_) : 0;
+  const unsigned nbytes_header = std::min(remaining_in_header, buf_size);
+  if (nbytes_header) {
+    header_ += string(buf + pos_, nbytes_header);
+    pos_ += nbytes_header;
+  }
+
+  if (pos_ == expected_header_size_) {
+    shash::Any digest(expected_digest_.algorithm);
+    shash::HashString(header_, &digest);
+    if (digest != expected_digest_) {
+      state_ = kStateCorrupt;
+      return state_;
+    } else {
+      bool retval = InterpretHeader();
+      if (!retval) {
+        state_ = kStateBadFormat;
+        return state_;
+      }
+      // We don't need the raw string anymore
+      header_.clear();
+    }
+  }
+
+  return kStateContinue;
+  /*unsigned remaining_in_buf = buf_size - nbytes_header;
+  if (remaining_in_buf == 0) {
+    return nbytes_header;
+  }
+  unsigned nbytes_payload = 0;*/
+}
+
+
+bool ObjectPackConsumer::InterpretHeader() {
+  return false;
+}
