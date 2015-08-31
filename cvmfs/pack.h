@@ -6,6 +6,7 @@
 #define CVMFS_PACK_H_
 
 #include <inttypes.h>
+#include <pthread.h>
 
 #include <cstdio>
 #include <string>
@@ -33,9 +34,11 @@ class Any;
  * well as by the stratum 0 to transfer object bulks to stratum 1s during
  * replication.
  */
-class ObjectPack {
+class ObjectPack : SingleCopy {
   friend class ObjectPackProducer;
   FRIEND_TEST(T_Pack, Bucket);
+  FRIEND_TEST(T_Pack, ObjectPack);
+  FRIEND_TEST(T_Pack, ObjectPackTransfer);
 
  private:
   class Bucket;
@@ -45,15 +48,16 @@ class ObjectPack {
 
   static const uint64_t kDefaultLimit = 200*1024*1024;  // 200MB
 
-  ObjectPack() : limit_(kDefaultLimit), size_(0) { }
+  ObjectPack();
+  explicit ObjectPack(const uint64_t limit);
   ~ObjectPack();
 
   BucketHandle OpenBucket();
   void AddToBucket(const void *buf, const uint64_t size,
                    const BucketHandle handle);
+
   bool CommitBucket(const shash::Any &id, const BucketHandle handle);
   void DiscardBucket(const BucketHandle handle);
-
   void TransferBucket(const BucketHandle handle, ObjectPack *other);
 
  private:
@@ -71,6 +75,13 @@ class ObjectPack {
     uint64_t capacity;
     shash::Any id;
   };
+
+  void InitLock();
+
+  /**
+   * Protects open_buckets_ and buckets_ collections.
+   */
+  pthread_mutex_t *lock_;
 
   /**
    * Maximum size of this object pack.
