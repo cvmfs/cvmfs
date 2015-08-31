@@ -10,6 +10,7 @@
 
 #include "platform.h"
 #include "smalloc.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -23,7 +24,7 @@ ObjectPack::Bucket::Bucket()
 void ObjectPack::Bucket::Add(const void *buf, const uint64_t buf_size) {
   if (buf_size == 0)
     return;
-  
+
   while (size + buf_size > capacity) {
     capacity *= 2;
     content = reinterpret_cast<unsigned char *>(srealloc(content, capacity));
@@ -59,37 +60,38 @@ bool ObjectPack::CommitBucket(
 {
   handle->id = id;
 
+  MutexLockGuard mutex_guard(lock_);
   if (size_ + handle->size > limit_)
     return false;
   open_buckets_.erase(handle);
   buckets_.push_back(handle);
+  size_ += handle->size;
   return true;
 }
 
 
 void ObjectPack::DiscardBucket(const BucketHandle handle) {
+  MutexLockGuard mutex_guard(lock_);
   open_buckets_.erase(handle);
   delete handle;
 }
 
 
-/**
- * If a commit failed, an open Bucket can be transferred to another ObjectPack
- * with more space.
- */
-void ObjectPack::TransferBucket(
-  const ObjectPack::BucketHandle handle,
-  ObjectPack *other)
-{
-  open_buckets_.erase(handle);
-  other->open_buckets_.insert(handle);
+void ObjectPack::InitLock() {
+  lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_, NULL);
+  assert(retval == 0);
 }
 
 
-ObjectPack::BucketHandle ObjectPack::OpenBucket() {
-  BucketHandle handle = new Bucket();
-  open_buckets_.insert(handle);
-  return handle;
+ObjectPack::ObjectPack() : limit_(kDefaultLimit), size_(0) {
+  InitLock();
+}
+
+
+ObjectPack::ObjectPack(const uint64_t limit) : limit_(limit), size_(0) {
+  InitLock();
 }
 
 
@@ -102,6 +104,31 @@ ObjectPack::~ObjectPack() {
 
   for (unsigned i = 0; i < buckets_.size(); ++i)
     delete buckets_[i];
+  pthread_mutex_destroy(lock_);
+  free(lock_);
+}
+
+
+ObjectPack::BucketHandle ObjectPack::OpenBucket() {
+  BucketHandle handle = new Bucket();
+
+  MutexLockGuard mutex_guard(lock_);
+  open_buckets_.insert(handle);
+  return handle;
+}
+
+
+/**
+ * If a commit failed, an open Bucket can be transferred to another ObjectPack
+ * with more space.
+ */
+void ObjectPack::TransferBucket(
+  const ObjectPack::BucketHandle handle,
+  ObjectPack *other)
+{
+  MutexLockGuard mutex_guard(lock_);
+  open_buckets_.erase(handle);
+  other->open_buckets_.insert(handle);
 }
 
 
