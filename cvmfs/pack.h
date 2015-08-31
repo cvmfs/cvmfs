@@ -49,8 +49,8 @@ class ObjectPack : SingleCopy {
   static const uint64_t kDefaultLimit = 200*1024*1024;  // 200MB
   /**
    * Limit the maximum number of objects to avoid very large headers.  Assuming
-   * Sha256 (32 bytes) + 9 bytes for the offset in hex notation, a header 
-   * with 100,000 files should fit in 4M.
+   * Sha256 (71 bytes hex) + 9 bytes for the file sizes, a header with 100,000
+   * files should fit in 10M.
    */
   static const uint64_t kMaxObjects = 100000;
 
@@ -111,6 +111,12 @@ class ObjectPack : SingleCopy {
 /**
  * Serializes ObjectPacks.  It can also serialize a single large file as an
  * "object pack", which otherwise would need special treatment.
+ *
+ * The serialized format has a global, human readable header which has lines of
+ * character keys and string values (like the cvmfs manifest) follwed by a "--"
+ * separator line followed by the index of objects.  This index is a list of
+ * hash digest (hex) and object size (decimal) tuples, separated by line
+ * breaks.
  */
 class ObjectPackProducer {
  public:
@@ -171,6 +177,7 @@ class ObjectPackConsumerBase {
     kStateContinue = 0,
     kStateDone,
     kStateCorrupt,
+    kStateBadFormat,
     kStateTooBig,  // header too big
   };
 };
@@ -189,11 +196,26 @@ class ObjectPackConsumer : public ObjectPackConsumerBase
   explicit ObjectPackConsumer(
     const shash::Any &expected_digest,
     const unsigned expected_header_size);
-  BuildState ConsumeNext(const unsigned buf_size, const void *buf);
+  BuildState ConsumeNext(const unsigned buf_size, const char *buf);
 
  private:
+  bool InterpretHeader();
+
   shash::Any expected_digest_;
   unsigned expected_header_size_;
+
+  /**
+   * Keeps track of how many bytes have been consumed.
+   */
+  uint64_t pos_;
+
+  /**
+   * The state starts in kStateContinue and makes exactly one transition into
+   * one of the other states as more bytes are consumed.
+   */
+  BuildState state_;
+
+  std::string header_;
 };
 
 #endif  // CVMFS_PACK_H_

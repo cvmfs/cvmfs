@@ -157,9 +157,9 @@ TEST_F(T_Pack, Produce) {
 
   ObjectPackProducer producer(&pack_of_three);
   const string expected_result = "V 1\nS 4097\nN 3\n--\n" +
+    hash_null.ToString() + " 4096\n" +
     hash_null.ToString() + " 0\n" +
-    hash_null.ToString() + " 4096\n" +
-    hash_null.ToString() + " 4096\n" +
+    hash_null.ToString() + " 1\n" +
     string(4096, '\0') + string(1, '1');
 
   unsigned char out_buf[8192];
@@ -210,7 +210,8 @@ TEST_F(T_Pack, ProducerFile) {
   ObjectPackProducer producer(hash_null, ffoo_);
   const string expected_result =
     "V 1\nS " + StringifyInt(foo_content_.size()) + "\nN 1\n--\n" +
-    hash_null.ToString() + " 0\n" + foo_content_;
+    hash_null.ToString() + " " + StringifyInt(foo_content_.size()) + "\n" +
+    foo_content_;
 
   unsigned char buf[4096];
   unsigned nbytes = producer.ProduceNext(4096, buf);
