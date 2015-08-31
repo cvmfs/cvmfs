@@ -66,7 +66,7 @@ shift 1
 
 docker_source_location="/srv/source"
 docker_build_location="/srv/build"
-docker_build_script="${docker_source_location}/ci/${build_script}"
+docker_build_script="${docker_source_location}/ci/$(basename $build_script)"
 
 args="${docker_source_location} ${docker_build_location}"
 while [ $# -gt 0 ]; do
