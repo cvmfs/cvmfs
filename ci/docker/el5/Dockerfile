@@ -30,3 +30,7 @@ RUN         yum -y update && yum -y install                     \
                                         selinux-policy-devel    \
                                         selinux-policy-targeted \
                                         zlib-devel
+
+RUN         useradd sftnight && usermod -a -G mock sftnight
+USER        sftnight
+WORKDIR     /home/sftnight

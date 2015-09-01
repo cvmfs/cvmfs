@@ -1,6 +1,7 @@
 FROM        centos:6
 MAINTAINER  Rene Meusel <rene.meusel@cern.ch>
 
+RUN         yum -y update && yum -y install epel-release
 RUN         yum -y update && yum -y install                     \
                                         autofs                  \
                                         cmake                   \
@@ -33,3 +34,7 @@ RUN         yum -y update && yum -y install                     \
                                         sysvinit-tools          \
                                         tree                    \
                                         zlib-devel
+
+RUN         useradd sftnight && usermod -a -G mock sftnight
+USER        sftnight
+WORKDIR     /home/sftnight
