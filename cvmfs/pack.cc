@@ -7,9 +7,11 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <map>
 
 #include "platform.h"
 #include "smalloc.h"
+#include "util.h"
 #include "util_concurrency.h"
 
 using namespace std;  // NOLINT
@@ -255,15 +257,20 @@ ObjectPackConsumer::ObjectPackConsumer(
   const unsigned expected_header_size)
   : expected_digest_(expected_digest)
   , expected_header_size_(expected_header_size)
+  , pos_(0)
+  , idx_(0)
+  , pos_in_object_(0)
+  , pos_in_accu_(0)
   , state_(kStateContinue)
+  , size_(0)
 {
   // Upper limit of 100B per entry
   if (expected_header_size > (100 * ObjectPack::kMaxObjects)) {
-    state_ = kStateTooBig;
+    state_ = kStateHeaderTooBig;
     return;
   }
 
-  header_.reserve(expected_header_size);
+  raw_header_.reserve(expected_header_size);
 }
 
 
@@ -271,6 +278,12 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
   const unsigned buf_size,
   const char *buf)
 {
+  if (buf_size == 0)
+    return state_;
+  if (state_ == kStateDone) {
+    state_ = kStateTrailingBytes;
+    return state_;
+  }
   if (state_ != kStateContinue)
     return state_;
 
@@ -278,36 +291,144 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
     (pos_ < expected_header_size_) ? (expected_header_size_ - pos_) : 0;
   const unsigned nbytes_header = std::min(remaining_in_header, buf_size);
   if (nbytes_header) {
-    header_ += string(buf + pos_, nbytes_header);
+    raw_header_ += string(buf + pos_, nbytes_header);
     pos_ += nbytes_header;
   }
 
+  // This condition can only be true once through the lifetime of the Consumer.
   if (pos_ == expected_header_size_) {
     shash::Any digest(expected_digest_.algorithm);
-    shash::HashString(header_, &digest);
+    shash::HashString(raw_header_, &digest);
     if (digest != expected_digest_) {
       state_ = kStateCorrupt;
       return state_;
     } else {
-      bool retval = InterpretHeader();
+      bool retval = ParseHeader();
       if (!retval) {
         state_ = kStateBadFormat;
         return state_;
       }
       // We don't need the raw string anymore
-      header_.clear();
+      raw_header_.clear();
+    }
+
+    // Empty pack?
+    if ((buf_size == nbytes_header) && (index_.size() == 0)) {
+      state_ = kStateDone;
+      return state_;
     }
   }
 
-  return kStateContinue;
-  /*unsigned remaining_in_buf = buf_size - nbytes_header;
-  if (remaining_in_buf == 0) {
-    return nbytes_header;
-  }
-  unsigned nbytes_payload = 0;*/
+  unsigned remaining_in_buf = buf_size - nbytes_header;
+  const unsigned char *payload =
+    reinterpret_cast<const unsigned char *>(buf) + nbytes_header;
+  return ConsumePayload(remaining_in_buf, payload);
 }
 
 
-bool ObjectPackConsumer::InterpretHeader() {
-  return false;
+/**
+ * Informs listeners for small complete objects.  For large objects, buffers the
+ * input into reasonably sized chunks.  buf can contain both a chunk of data
+ * that needs to be added to the consumer's accumulator and a bunch of
+ * complete small objects.  We use the accumulator only if necessary to avoid
+ * unnecessary memory copies.
+ */
+ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
+  const unsigned buf_size,
+  const unsigned char *buf)
+{
+  uint64_t pos_in_buf = 0;
+  while ((pos_in_buf < buf_size) && (idx_ < index_.size())) {
+    // Fill the accumulator or process next small object
+    uint64_t nbytes;  // How many bytes are consumed in this iteration
+    const uint64_t remaining_in_buf = buf_size - pos_in_buf;
+    const uint64_t remaining_in_object = index_[idx_].size - pos_in_object_;
+    const bool is_small_rest = remaining_in_buf < kAccuSize;
+
+    // We use the accumulator if there is already something in or if we have a
+    // small piece of data of a larger object.
+    if ((pos_in_accu_ > 0) ||
+        ((remaining_in_buf < remaining_in_object) && is_small_rest))
+    {
+      const uint64_t remaining_in_accu = kAccuSize - pos_in_accu_;
+      nbytes = std::min(remaining_in_accu, remaining_in_buf);
+      memcpy(accumulator_ + pos_in_accu_, buf + pos_in_buf, nbytes);
+      pos_in_accu_ += nbytes;
+      if (pos_in_accu_ == kAccuSize) {
+        NotifyListeners(BuildEvent(index_[idx_].id, index_[idx_].size,
+                                   kAccuSize, accumulator_));
+        pos_in_accu_ = 0;
+      }
+    } else {  // directly trigger listeners using buf
+      nbytes = std::min(remaining_in_object, remaining_in_buf);
+      NotifyListeners(BuildEvent(index_[idx_].id, index_[idx_].size,
+                                 nbytes, buf + pos_in_buf));
+    }
+
+    pos_in_buf += nbytes;
+    pos_in_object_ += nbytes;
+    if (nbytes == remaining_in_object) {
+      idx_++;
+      pos_in_object_ = 0;
+    }
+  }
+
+  pos_ += buf_size;
+
+  if (idx_ == index_.size())
+    state_ = (pos_in_buf == buf_size) ? kStateDone : kStateTrailingBytes;
+  else
+    state_ = kStateContinue;
+  return state_;
+}
+
+
+bool ObjectPackConsumer::ParseHeader() {
+  map<char, string> header;
+  const unsigned char *data = reinterpret_cast<const unsigned char *>(
+    raw_header_.data());
+  ParseKeyvalMem(data, raw_header_.size(), &header);
+  if (header.find('V') == header.end())
+    return false;
+  if (header['V'] != "1")
+    return false;
+  size_ = String2Uint64(header['S']);
+  unsigned nobjects = String2Uint64(header['N']);
+
+  if (nobjects == 0)
+    return true;
+
+  // Build the object index
+  size_t separator_idx = raw_header_.find("--\n");
+  if (separator_idx == string::npos)
+    return false;
+  unsigned index_idx = separator_idx + 3;
+  if (index_idx >= raw_header_.size())
+    return false;
+
+  uint64_t sum_size = 0;
+  do {
+    unsigned remaining_in_header = raw_header_.size() - index_idx;
+    string line =
+      GetLineMem(raw_header_.data() + index_idx, remaining_in_header);
+    if (line == "")
+      break;
+
+    // We could use SplitString but we can have many lines so we do something
+    // more efficient here
+    separator_idx = line.find_first_of(' ');
+    if ( (separator_idx == 0) || (separator_idx == string::npos) ||
+         (separator_idx == (line.size() - 1)) )
+    {
+      return false;
+    }
+    uint64_t size = String2Uint64(line.substr(separator_idx + 1));
+    sum_size += size;
+    const IndexEntry index_entry(
+      shash::MkFromSuffixedHexPtr(shash::HexPtr(line.substr(0, separator_idx))),
+      size);
+    index_.push_back(index_entry);
+  } while (true);
+
+  return (nobjects == index_.size()) && (size_ == sum_size);
 }
