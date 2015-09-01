@@ -167,10 +167,21 @@ class ObjectPackProducer {
 class ObjectPackConsumerBase {
  public:
   struct BuildEvent {
+    BuildEvent(
+      const shash::Any &id,
+      uint64_t size,
+      unsigned buf_size,
+      const void *buf)
+      : id(id)
+      , size(size)
+      , buf_size(buf_size)
+      , buf(buf)
+    { }
+
     shash::Any id;
     uint64_t size;
     unsigned buf_size;
-    void *buf;
+    const void *buf;
   };
 
   enum BuildState {
@@ -178,7 +189,8 @@ class ObjectPackConsumerBase {
     kStateDone,
     kStateCorrupt,
     kStateBadFormat,
-    kStateTooBig,  // header too big
+    kStateHeaderTooBig,
+    kStateTrailingBytes,
   };
 };
 
@@ -199,15 +211,51 @@ class ObjectPackConsumer : public ObjectPackConsumerBase
   BuildState ConsumeNext(const unsigned buf_size, const char *buf);
 
  private:
-  bool InterpretHeader();
+  /**
+   * For large objects, notify listeners in chunks of 128kB.
+   */
+  static const unsigned kAccuSize = 128 * 1024;
+
+  struct IndexEntry {
+    IndexEntry(const shash::Any &id, const uint64_t size)
+      : id(id)
+      , size(size)
+      { }
+    shash::Any id;
+    uint64_t size;
+  };
+
+  bool ParseHeader();
+  BuildState ConsumePayload(const unsigned buf_size, const unsigned char *buf);
 
   shash::Any expected_digest_;
   unsigned expected_header_size_;
 
   /**
-   * Keeps track of how many bytes have been consumed.
+   * Keeps track of how many bytes have been consumed from the payload.
    */
   uint64_t pos_;
+
+  /**
+   * Keeps track of the current index in the array of objects (index_)
+   */
+  unsigned idx_;
+
+  /**
+   * Keeps track of how many bytes have been processed from the current object.
+   */
+  unsigned pos_in_object_;
+
+  /**
+   * Collects data for large objects so that the number of callbacks to the
+   * listeners is reduced.
+   */
+  unsigned char accumulator_[kAccuSize];
+
+  /**
+   * Keeps track of how many live bytes are stored in the accumulator_.
+   */
+  unsigned pos_in_accu_;
 
   /**
    * The state starts in kStateContinue and makes exactly one transition into
@@ -215,7 +263,14 @@ class ObjectPackConsumer : public ObjectPackConsumerBase
    */
   BuildState state_;
 
-  std::string header_;
+  /**
+   * Temporary store for the incomplete header.  Once completely consumed, the
+   * header is interpreted into global_header_ and object_index_.
+   */
+  std::string raw_header_;
+
+  uint64_t size_;
+  std::vector<IndexEntry> index_;
 };
 
 #endif  // CVMFS_PACK_H_

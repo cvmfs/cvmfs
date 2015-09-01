@@ -18,7 +18,9 @@ using namespace std;  // NOLINT
 class T_Pack : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    hash_null = shash::Any(shash::kSha1);
+    hash_null_ = shash::Any(shash::kSha1);
+    hash_partial_ = shash::Any(shash::kRmd160);
+    hash_partial_.suffix = shash::kSuffixPartial;
 
     ffoo_ = CreateTempFile("cvmfstest", 0600, "w+", &foo_path_);
     assert(ffoo_);
@@ -36,7 +38,8 @@ class T_Pack : public ::testing::Test {
 
  protected:
   ObjectPack pack_;
-  shash::Any hash_null;
+  shash::Any hash_null_;
+  shash::Any hash_partial_;
   string foo_path_;
   FILE *ffoo_;
   string foo_content_;
@@ -69,7 +72,7 @@ TEST_F(T_Pack, ObjectPack) {
   pack_.AddToBucket(&buf, 1, handle_one);
   pack_.AddToBucket(&buf, 1, handle_one);
 
-  EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null), handle_one));
+  EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null_), handle_one));
   EXPECT_EQ(1U, pack_.open_buckets_.size());
   ASSERT_EQ(1U, pack_.buckets_.size());
   EXPECT_EQ(2U, pack_.buckets_[0]->size);
@@ -79,7 +82,7 @@ TEST_F(T_Pack, ObjectPack) {
   EXPECT_EQ(2U, pack_.open_buckets_.size());
   EXPECT_EQ(1U, pack_.buckets_.size());
   pack_.AddToBucket(&buf, 1, handle_three);
-  EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null), handle_three));
+  EXPECT_TRUE(pack_.CommitBucket(shash::Any(hash_null_), handle_three));
   EXPECT_EQ(1U, pack_.open_buckets_.size());
   ASSERT_EQ(2U, pack_.buckets_.size());
   EXPECT_EQ(2U, pack_.buckets_[0]->size);
@@ -99,17 +102,17 @@ TEST_F(T_Pack, ObjectPackOverflow) {
   ObjectPack::BucketHandle handle_one = small_pack.OpenBucket();
   char buf = '0';
   small_pack.AddToBucket(&buf, 1, handle_one);
-  EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null), handle_one));
+  EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null_), handle_one));
 
   ObjectPack::BucketHandle handle_two = small_pack.OpenBucket();
   small_pack.AddToBucket(&buf, 1, handle_two);
   small_pack.AddToBucket(&buf, 1, handle_two);
-  EXPECT_FALSE(small_pack.CommitBucket(shash::Any(hash_null), handle_two));
+  EXPECT_FALSE(small_pack.CommitBucket(shash::Any(hash_null_), handle_two));
   small_pack.DiscardBucket(handle_two);
 
   ObjectPack::BucketHandle handle_three = small_pack.OpenBucket();
   small_pack.AddToBucket(&buf, 1, handle_three);
-  EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null), handle_three));
+  EXPECT_TRUE(small_pack.CommitBucket(shash::Any(hash_null_), handle_three));
 
   // Fail due to too many objects
   ObjectPack::BucketHandle *handles;
@@ -117,10 +120,11 @@ TEST_F(T_Pack, ObjectPackOverflow) {
     smalloc((ObjectPack::kMaxObjects + 1) * sizeof(ObjectPack::BucketHandle)));
   for (unsigned i = 0; i < ObjectPack::kMaxObjects; ++i) {
     handles[i] = pack_.OpenBucket();
-    EXPECT_TRUE(pack_.CommitBucket(hash_null, handles[i]));
+    EXPECT_TRUE(pack_.CommitBucket(hash_null_, handles[i]));
   }
   handles[ObjectPack::kMaxObjects] = pack_.OpenBucket();
-  EXPECT_FALSE(pack_.CommitBucket(hash_null, handles[ObjectPack::kMaxObjects]));
+  EXPECT_FALSE(pack_.CommitBucket(hash_null_, 
+               handles[ObjectPack::kMaxObjects]));
   pack_.DiscardBucket(handles[ObjectPack::kMaxObjects]);
   free(handles);
 }
@@ -151,15 +155,15 @@ TEST_F(T_Pack, Produce) {
   pack_of_three.AddToBucket(buf, 4096, handle_one);
   buf[0] = '1';
   pack_of_three.AddToBucket(buf, 1, handle_three);
-  EXPECT_TRUE(pack_of_three.CommitBucket(hash_null, handle_one));
-  EXPECT_TRUE(pack_of_three.CommitBucket(hash_null, handle_two));
-  EXPECT_TRUE(pack_of_three.CommitBucket(hash_null, handle_three));
+  EXPECT_TRUE(pack_of_three.CommitBucket(hash_null_, handle_one));
+  EXPECT_TRUE(pack_of_three.CommitBucket(hash_partial_, handle_two));
+  EXPECT_TRUE(pack_of_three.CommitBucket(hash_null_, handle_three));
 
   ObjectPackProducer producer(&pack_of_three);
   const string expected_result = "V 1\nS 4097\nN 3\n--\n" +
-    hash_null.ToString() + " 4096\n" +
-    hash_null.ToString() + " 0\n" +
-    hash_null.ToString() + " 1\n" +
+    hash_null_.ToString(true) + " 4096\n" +
+    hash_partial_.ToString(true) + " 0\n" +
+    hash_null_.ToString(true) + " 1\n" +
     string(4096, '\0') + string(1, '1');
 
   unsigned char out_buf[8192];
@@ -207,10 +211,10 @@ TEST_F(T_Pack, ProducerEmpty) {
 
 
 TEST_F(T_Pack, ProducerFile) {
-  ObjectPackProducer producer(hash_null, ffoo_);
+  ObjectPackProducer producer(hash_null_, ffoo_);
   const string expected_result =
     "V 1\nS " + StringifyInt(foo_content_.size()) + "\nN 1\n--\n" +
-    hash_null.ToString() + " " + StringifyInt(foo_content_.size()) + "\n" +
+    hash_null_.ToString(true) + " " + StringifyInt(foo_content_.size()) + "\n" +
     foo_content_;
 
   unsigned char buf[4096];
@@ -218,7 +222,7 @@ TEST_F(T_Pack, ProducerFile) {
   EXPECT_EQ(expected_result.size(), nbytes);
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(buf), nbytes));
 
-  ObjectPackProducer producer_two(hash_null, ffoo_);
+  ObjectPackProducer producer_two(hash_null_, ffoo_);
   unsigned pos = 0;
   do {
     nbytes = producer_two.ProduceNext(1, buf + pos);
