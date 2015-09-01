@@ -37,7 +37,8 @@ container_dir="${SCRIPT_LOCATION}/docker/${CVMFS_DOCKER_IMAGE}"
 
 # do special tricks for certain docker containers
 if [ x"$CVMFS_DOCKER_IMAGE" = x"el4" ]; then
-  if ! sudo docker images $image_name | grep -q "$image_name"; then
+  el4_base="cvmfs/el4_base"
+  if ! sudo docker images $el4_base | grep -q "$el4_base"; then
     el4_image="${container_dir}/centos49.tar.gz"
     sudo docker run --privileged                 \
                     --interactive=true           \
@@ -47,14 +48,15 @@ if [ x"$CVMFS_DOCKER_IMAGE" = x"el4" ]; then
                     /srv/build.sh
     [ $? -eq 0 ]      || die "failed to build CentOS 4 container image"
     [ -f $el4_image ] || die "didn't find '${el4_image}' after building"
-    cat $el4_image | sudo docker import - $image_name
+    cat $el4_image | sudo docker import - $el4_base
     [ $? -eq 0 ] || die "failed to import just built el4 image ($el4_image)"
     rm -f $el4_image
   fi
-else
-  sudo docker build --tag="$image_name" $container_dir
-  [ $? -eq 0 ] || die "failed to build $CVMFS_DOCKER_IMAGE ($container_dir)"
 fi
+
+# make sure the docker container to be used is built and ready to go
+sudo docker build --tag="$image_name" $container_dir
+[ $? -eq 0 ] || die "failed to build $CVMFS_DOCKER_IMAGE ($container_dir)"
 
 # parse the command line arguments (keep quotation marks)
 # Note: By convention the build scripts are called like this:
