@@ -24,6 +24,14 @@ is_suse() {
   [ -f /etc/SuSE-release ]
 }
 
+is_redhat() {
+  [ -f /etc/redhat-release ]
+}
+
+get_redhat_version() {
+  cat /etc/redhat-release | sed -e 's/^.* \([0-9]\+\)\..*$/\1/'
+}
+
 get_package_type() {
   which dpkg > /dev/null 2>&1 && echo "deb" && return 0
   which rpm  > /dev/null 2>&1 && echo "rpm" && return 0
