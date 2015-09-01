@@ -494,6 +494,7 @@ void Hmac(const std::string &key,
 
 Algorithms ParseHashAlgorithm(const std::string &algorithm_option);
 Any MkFromHexPtr(const HexPtr hex, const Suffix suffix = kSuffixNone);
+Any MkFromSuffixedHexPtr(const HexPtr hex);
 
 }  // namespace shash
 
