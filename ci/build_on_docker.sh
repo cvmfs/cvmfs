@@ -41,8 +41,6 @@ if [ x"$CVMFS_DOCKER_IMAGE" = x"el4" ]; then
   if ! sudo docker images $el4_base | grep -q "$el4_base"; then
     el4_image="${container_dir}/centos49.tar.gz"
     sudo docker run --privileged                 \
-                    --interactive=true           \
-                    --tty=true                   \
                     --volume=$container_dir:/srv \
                     centos:centos6               \
                     /srv/build.sh
@@ -87,7 +85,5 @@ done
 echo "++ $docker_build_script $args"
 sudo docker run --volume=${CVMFS_SOURCE_LOCATION}:${docker_source_location} \
                 --volume=${CVMFS_RESULT_LOCATION}:${docker_build_location}  \
-                --interactive=true                                          \
-                --tty=true                                                  \
                 $image_name                                                 \
                 $docker_build_script $args
