@@ -65,6 +65,8 @@ class ObjectPack : SingleCopy {
   bool CommitBucket(const shash::Any &id, const BucketHandle handle);
   void DiscardBucket(const BucketHandle handle);
   void TransferBucket(const BucketHandle handle, ObjectPack *other);
+  
+  uint64_t size() const { return size_; }
 
  private:
   /**
@@ -72,6 +74,8 @@ class ObjectPack : SingleCopy {
    * represent a piece of content-addressable storage.
    */
   struct Bucket : SingleCopy {
+    static const unsigned kInitialSize = 128;
+
      Bucket();
      ~Bucket();
      void Add(const void *buf, const uint64_t buf_size);
@@ -203,12 +207,13 @@ class ObjectPackConsumerBase {
  * The ObjectPackConsumer will verify the header digest, however.
  */
 class ObjectPackConsumer : public ObjectPackConsumerBase
-                         , Observable<ObjectPackConsumerBase::BuildEvent> {
+                         , public Observable<ObjectPackConsumerBase::BuildEvent>
+{
  public:
   explicit ObjectPackConsumer(
     const shash::Any &expected_digest,
     const unsigned expected_header_size);
-  BuildState ConsumeNext(const unsigned buf_size, const char *buf);
+  BuildState ConsumeNext(const unsigned buf_size, const unsigned char *buf);
 
  private:
   /**
@@ -269,7 +274,14 @@ class ObjectPackConsumer : public ObjectPackConsumerBase
    */
   std::string raw_header_;
 
+  /**
+   * Total size of all the objects in the pack (header not included).
+   */
   uint64_t size_;
+
+  /**
+   * Hash id and size of the individual objects in order.
+   */
   std::vector<IndexEntry> index_;
 };
 
