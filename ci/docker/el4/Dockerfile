@@ -1,9 +1,8 @@
 ## See README.md, build.sh and ../build_on_docker.sh
 
-FROM       cvmfs/el4_base
+FROM       cvmfs/slc49_i386
 MAINTAINER Rene Meusel <rene.meusel@cern.ch>
 
-RUN        yum -y update && yum -y install epel-release
 RUN        yum -y update && yum -y install                      \
                                         attr                    \
                                         autofs                  \
@@ -15,20 +14,20 @@ RUN        yum -y update && yum -y install                      \
                                         curl                    \
                                         e2fsprogs               \
                                         e2fsprogs-devel         \
-                                        fuse                    \
                                         fuse-devel              \
                                         fuse-libs               \
                                         gawk                    \
                                         gcc4                    \
                                         gcc4-c++                \
                                         gdb                     \
+                                        git                     \
                                         glibc-common            \
                                         grep                    \
                                         gzip                    \
-                                        hardlink                \
                                         httpd                   \
                                         initscripts             \
                                         libattr-devel           \
+                                        make                    \
                                         openssl                 \
                                         openssl-devel           \
                                         patch                   \
@@ -38,7 +37,6 @@ RUN        yum -y update && yum -y install                      \
                                         python-devel            \
                                         rpm-build               \
                                         sed                     \
-                                        selinux-policy-devel    \
                                         selinux-policy-targeted \
                                         shadow-utils            \
                                         sudo                    \
@@ -46,3 +44,7 @@ RUN        yum -y update && yum -y install                      \
                                         unzip                   \
                                         which                   \
                                         zlib
+
+# fix bogus %{_sysconfdir} and %{_defaultdocdir} RPM macro definitions
+RUN        sed -i -e 's/^\(%_sysconfdir[[:space:]]\+\).*$/\1\/etc/g'                  /usr/lib/rpm/macros && \
+           sed -i -e 's/^\(%_defaultdocdir[[:space:]]\+\).*$/\1%{_usr}\/share\/doc/g' /usr/lib/rpm/macros

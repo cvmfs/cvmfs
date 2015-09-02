@@ -37,9 +37,9 @@ container_dir="${SCRIPT_LOCATION}/docker/${CVMFS_DOCKER_IMAGE}"
 
 # do special tricks for certain docker containers
 if [ x"$CVMFS_DOCKER_IMAGE" = x"el4" ]; then
-  el4_base="cvmfs/el4_base"
+  el4_base="cvmfs/slc49_i386"
   if ! sudo docker images $el4_base | grep -q "$el4_base"; then
-    el4_image="${container_dir}/centos49.tar.gz"
+    el4_image="${container_dir}/slc49_i386.tar.gz"
     sudo docker run --privileged                 \
                     --volume=$container_dir:/srv \
                     centos:centos6               \

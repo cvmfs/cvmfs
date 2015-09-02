@@ -8,7 +8,7 @@ exec 0<&-
 
 set -e -u -x
 
-DEST_IMG="/srv/centos49.tar.gz"
+DEST_IMG="/srv/slc49_i386.tar.gz"
 
 rm -f ${DEST_IMG}
 
@@ -25,28 +25,31 @@ plugins=1
 installonly_limit=5
 distroverpkg=centos-release
 
-[c4-base]
-name=CentOS-4 - Base
-baseurl=http://vault.centos.org/4.9/os/x86_64/
-gpgcheck=1
-gpgkey=http://vault.centos.org/RPM-GPG-KEY-CentOS-4
+[sl4-base]
+name=SL-4 - Base
+baseurl=http://cvm-storage00.cern.ch/yum/sl4/os/i386/RPMS/
+gpgcheck=0
 
-[c4-updates]
-name=CentOS-4 - Updates
-baseurl=http://vault.centos.org/4.9/updates/x86_64/
-gpgcheck=1
-gpgkey=http://vault.centos.org/RPM-GPG-KEY-CentOS-4
+[sl4-fastbugs]
+name=SL-4 - Fastbugs
+baseurl=http://cvm-storage00.cern.ch/yum/sl4/fastbugs/i386/
+gpgcheck=0
+
+[sl4-epel]
+name=SL-4 - EPEL
+baseurl=http://cvm-storage00.cern.ch/yum/sl4/epel/i386/
+gpgcheck=0
 EOF
 
-## touch, chmod; /dev/null; /etc/fstab; 
+## touch, chmod; /dev/null; /etc/fstab;
 mkdir ${instroot}/{dev,etc,proc}
-mknod ${instroot}/dev/null c 1 3 
+mknod ${instroot}/dev/null c 1 3
 touch ${instroot}/etc/fstab
 
 yum \
     -c ${tmpyum} \
     --disablerepo='*' \
-    --enablerepo='c4-*' \
+    --enablerepo='sl4-*' \
     --setopt=cachedir=${instroot}/var/cache/yum \
     --setopt=logfile=${instroot}/var/log/yum.log \
     --setopt=keepcache=1 \
@@ -54,7 +57,7 @@ yum \
     -y \
     --installroot=${instroot} \
     install \
-    centos-release yum iputils coreutils which curl || echo "ignoring failed yum; $?"
+    sl-release coreutils iputils which curl rpm yum yum-conf || echo "ignoring failed yum; $?"
 
 cp /etc/resolv.conf ${instroot}/etc/resolv.conf
 
@@ -70,17 +73,43 @@ chroot ${instroot} sh -c 'echo "NETWORKING=yes" > /etc/sysconfig/network'
 ## set timezone of container to UTC
 chroot ${instroot} ln -f /usr/share/zoneinfo/Etc/UTC /etc/localtime
 
-sed -i \
-    -e '/^mirrorlist/d' \
-    -e 's@^#baseurl=http://mirror.centos.org/centos/$releasever/@baseurl=http://vault.centos.org/4.9/@g' \
-    ${instroot}/etc/yum.repos.d/CentOS*.repo
+## reset yum repositories
+rm -f ${instroot}/etc/yum.repos.d/sl-rhaps.repo      \
+      ${instroot}/etc/yum.repos.d/sl-testing.repo    \
+      ${instroot}/etc/yum.repos.d/sl4x-contrib.repo  \
+      ${instroot}/etc/yum.repos.d/sl4x-fastbugs.repo \
+      ${instroot}/etc/yum.repos.d/sl4x-errata.repo   \
+      ${instroot}/etc/yum.repos.d/dag.repo           \
+      ${instroot}/etc/yum.repos.d/dries.repo         \
+      ${instroot}/etc/yum.repos.d/atrpms.repo        \
+      ${instroot}/etc/yum.repos.d/sl4x.repo
 
-## epel
-curl -f -L -o ${instroot}/tmp/RPM-GPG-KEY-EPEL-4 http://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-4
-curl -f -L -o ${instroot}/tmp/epel-release-4-10.noarch.rpm https://dl.fedoraproject.org/pub/epel/4/x86_64/epel-release-4-10.noarch.rpm
-chroot ${instroot} rpm --import /tmp/RPM-GPG-KEY-EPEL-4
-chroot ${instroot} yum localinstall -y /tmp/epel-release-4-10.noarch.rpm
-rm -f ${instroot}/tmp/epel-release-4-10.noarch.rpm ${instroot}/tmp/RPM-GPG-KEY-EPEL-4
+cat << EOF > ${instroot}/etc/yum.repos.d/sl4x.repo
+[sl-base]
+name=SL 4 base
+baseurl=http://cvm-storage00.cern.ch/yum/sl4/os/i386/RPMS/
+enabled=1
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-csieh file:///etc/pki/rpm-gpg/RPM-GPG-KEY-dawson file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpolok file:///etc/pki/rpm-gpg/RPM-GPG-KEY-cern file:///etc/pki/rpm-gpg/RPM-GPG-KEY-sl file:///etc/pki/rpm-gpg/RPM-GPG-KEY-sl4
+EOF
+
+cat << EOF > ${instroot}/etc/yum.repos.d/sl4x-fastbugs.repo
+[sl-fastbug]
+name=SL 4 base
+baseurl=http://cvm-storage00.cern.ch/yum/sl4/fastbugs/i386/
+enabled=1
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-csieh file:///etc/pki/rpm-gpg/RPM-GPG-KEY-dawson file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpolok file:///etc/pki/rpm-gpg/RPM-GPG-KEY-cern file:///etc/pki/rpm-gpg/RPM-GPG-KEY-sl file:///etc/pki/rpm-gpg/RPM-GPG-KEY-sl4
+EOF
+
+cat << EOF > ${instroot}/etc/yum.repos.d/sl4x-epel.repo
+[sl-epel]
+name=SL 4 EPEL
+baseurl=http://cvm-storage00.cern.ch/yum/sl4/epel/i386/
+enabled=1
+gpgcheck=0
+EOF
+
 
 chroot ${instroot} yum clean all
 

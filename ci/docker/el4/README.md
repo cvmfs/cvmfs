@@ -23,6 +23,6 @@ So, no automated builds.
 
 ## Credit
 
-The CentOS 4 image creation script was adopted from
+The SLC 4 image creation script was adopted from
 [Brian Lador](https://github.com/blalor)'s 
 [GitHub repository](https://github.com/blalor/docker-centos4-base).
