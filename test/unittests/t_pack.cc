@@ -29,6 +29,18 @@ class T_Pack : public ::testing::Test {
     assert(nbytes == foo_content_.size());
     int retval = fflush(ffoo_);
     assert(retval == 0);
+
+    unsigned char buf[4096];
+    memset(buf, 0, 4096);
+    ObjectPack::BucketHandle handle_one = pack_of_three_.OpenBucket();
+    ObjectPack::BucketHandle handle_two = pack_of_three_.OpenBucket();
+    ObjectPack::BucketHandle handle_three = pack_of_three_.OpenBucket();
+    pack_of_three_.AddToBucket(buf, 4096, handle_one);
+    buf[0] = '1';
+    pack_of_three_.AddToBucket(buf, 1, handle_three);
+    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_null_, handle_one));
+    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_partial_, handle_two));
+    EXPECT_TRUE(pack_of_three_.CommitBucket(hash_null_, handle_three));
   }
 
   virtual void TearDown() {
@@ -36,13 +48,36 @@ class T_Pack : public ::testing::Test {
     unlink(foo_path_.c_str());
   }
 
- protected:
   ObjectPack pack_;
+  ObjectPack pack_of_three_;
   shash::Any hash_null_;
   shash::Any hash_partial_;
   string foo_path_;
   FILE *ffoo_;
   string foo_content_;
+};
+
+
+class ConsumerCallbacks {
+ public:
+  ConsumerCallbacks() : total_size(0), total_objects(0), this_size(0) { }
+
+  void OnEvent(const ObjectPackConsumer::BuildEvent &event) {
+    total_size += event.buf_size;
+    this_size += event.buf_size;
+    if (this_size == event.size) {
+      this_size = 0;
+      total_objects++;
+    }
+  }
+
+  void Reset() {
+    total_size = total_objects = this_size = 0;
+  }
+
+  uint64_t total_size;
+  uint64_t total_objects;
+  uint64_t this_size;
 };
 
 
@@ -123,7 +158,7 @@ TEST_F(T_Pack, ObjectPackOverflow) {
     EXPECT_TRUE(pack_.CommitBucket(hash_null_, handles[i]));
   }
   handles[ObjectPack::kMaxObjects] = pack_.OpenBucket();
-  EXPECT_FALSE(pack_.CommitBucket(hash_null_, 
+  EXPECT_FALSE(pack_.CommitBucket(hash_null_,
                handles[ObjectPack::kMaxObjects]));
   pack_.DiscardBucket(handles[ObjectPack::kMaxObjects]);
   free(handles);
@@ -146,21 +181,8 @@ TEST_F(T_Pack, ObjectPackTransfer) {
 
 
 TEST_F(T_Pack, Produce) {
-  ObjectPack pack_of_three;
-  unsigned char buf[4096];
-  memset(buf, 0, 4096);
-  ObjectPack::BucketHandle handle_one = pack_of_three.OpenBucket();
-  ObjectPack::BucketHandle handle_two = pack_of_three.OpenBucket();
-  ObjectPack::BucketHandle handle_three = pack_of_three.OpenBucket();
-  pack_of_three.AddToBucket(buf, 4096, handle_one);
-  buf[0] = '1';
-  pack_of_three.AddToBucket(buf, 1, handle_three);
-  EXPECT_TRUE(pack_of_three.CommitBucket(hash_null_, handle_one));
-  EXPECT_TRUE(pack_of_three.CommitBucket(hash_partial_, handle_two));
-  EXPECT_TRUE(pack_of_three.CommitBucket(hash_null_, handle_three));
-
-  ObjectPackProducer producer(&pack_of_three);
-  const string expected_result = "V 1\nS 4097\nN 3\n--\n" +
+  ObjectPackProducer producer(&pack_of_three_);
+  const string expected_result = "V1\nS4097\nN3\n--\n" +
     hash_null_.ToString(true) + " 4096\n" +
     hash_partial_.ToString(true) + " 0\n" +
     hash_null_.ToString(true) + " 1\n" +
@@ -171,7 +193,7 @@ TEST_F(T_Pack, Produce) {
   EXPECT_EQ(expected_result.size(), nbytes);
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(out_buf), nbytes));
 
-  ObjectPackProducer producer_two(&pack_of_three);
+  ObjectPackProducer producer_two(&pack_of_three_);
   unsigned pos = 0;
   do {
     nbytes = producer_two.ProduceNext(1, out_buf + pos);
@@ -185,8 +207,8 @@ TEST_F(T_Pack, Produce) {
 
 TEST_F(T_Pack, ProducerEmpty) {
   ObjectPackProducer producer(&pack_);
-  const string expected_result = "V 1\nS 0\nN 0\n--\n";
-  EXPECT_EQ(15U, producer.GetHeaderSize());
+  const string expected_result = "V1\nS0\nN0\n--\n";
+  EXPECT_EQ(12U, producer.GetHeaderSize());
   shash::Any digest(shash::kSha1);
   producer.GetDigest(&digest);
   shash::Any expected_digest(shash::kSha1);
@@ -213,7 +235,7 @@ TEST_F(T_Pack, ProducerEmpty) {
 TEST_F(T_Pack, ProducerFile) {
   ObjectPackProducer producer(hash_null_, ffoo_);
   const string expected_result =
-    "V 1\nS " + StringifyInt(foo_content_.size()) + "\nN 1\n--\n" +
+    "V1\nS" + StringifyInt(foo_content_.size()) + "\nN1\n--\n" +
     hash_null_.ToString(true) + " " + StringifyInt(foo_content_.size()) + "\n" +
     foo_content_;
 
@@ -231,4 +253,50 @@ TEST_F(T_Pack, ProducerFile) {
   pos--;
   EXPECT_EQ(expected_result.size(), pos);
   EXPECT_EQ(expected_result, string(reinterpret_cast<char *>(buf), pos));
+}
+
+
+TEST_F(T_Pack, Consumer) {
+  shash::Any digest(shash::kSha256);
+  ObjectPackProducer producer(&pack_of_three_);
+  producer.GetDigest(&digest);
+  ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
+
+  ConsumerCallbacks callbacks;
+  consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
+  unsigned char buf[8192];
+  unsigned nbytes = producer.ProduceNext(8192, buf);
+  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(3U, callbacks.total_objects);
+  EXPECT_EQ(pack_of_three_.size(), callbacks.total_size);
+
+  callbacks.Reset();
+  ObjectPackConsumer consumer_two(digest, producer.GetHeaderSize());
+  consumer_two.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
+  for (unsigned i = 0; i < nbytes; ++i)
+    consumer_two.ConsumeNext(1, buf + i);
+  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer_two.ConsumeNext(0, NULL));
+  EXPECT_EQ(3U, callbacks.total_objects);
+  EXPECT_EQ(pack_of_three_.size(), callbacks.total_size);
+}
+
+
+TEST_F(T_Pack, ConsumerEmpty) {
+  shash::Any digest(shash::kSha256);
+  ObjectPackProducer producer(&pack_);
+  producer.GetDigest(&digest);
+  ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
+
+  ConsumerCallbacks callbacks;
+  consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
+  unsigned char buf[4096];
+  unsigned nbytes = producer.ProduceNext(4096, buf);
+  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(nbytes, buf));
+  EXPECT_EQ(0U, callbacks.total_objects);
+  EXPECT_EQ(0U, callbacks.total_size);
+
+  ObjectPackConsumer consumer_two(digest, producer.GetHeaderSize());
+  for (unsigned i = 0; i < nbytes; ++i)
+    consumer_two.ConsumeNext(1, buf + i);
+  EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer_two.ConsumeNext(0, NULL));
 }

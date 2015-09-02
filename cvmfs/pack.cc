@@ -17,9 +17,9 @@
 using namespace std;  // NOLINT
 
 ObjectPack::Bucket::Bucket()
-  : content(reinterpret_cast<unsigned char *>(smalloc(128)))
+  : content(reinterpret_cast<unsigned char *>(smalloc(kInitialSize)))
   , size(0)
-  , capacity(128)
+  , capacity(kInitialSize)
 { }
 
 
@@ -159,9 +159,9 @@ ObjectPackProducer::ObjectPackProducer(ObjectPack *pack)
   // rough guess, most likely a little too much
   header_.reserve(30 + N * (2 * shash::kMaxDigestSize + 5));
 
-  header_ = "V 1\n";
-  header_ += "S " + StringifyInt(pack->size_) + "\n";
-  header_ += "N " + StringifyInt(N) + "\n";
+  header_ = "V1\n";
+  header_ += "S" + StringifyInt(pack->size_) + "\n";
+  header_ += "N" + StringifyInt(N) + "\n";
   header_ += "--\n";
 
   const bool with_suffix = true;
@@ -188,9 +188,9 @@ ObjectPackProducer::ObjectPackProducer(const shash::Any &id, FILE *big_file)
   assert(retval == 0);
   string str_size = StringifyInt(info.st_size);
 
-  header_ = "V 1\n";
-  header_ += "S " + str_size + "\n";
-  header_ += "N 1\n";
+  header_ = "V1\n";
+  header_ += "S" + str_size + "\n";
+  header_ += "N1\n";
   header_ += "--\n";
 
   const bool with_suffix = true;
@@ -273,10 +273,13 @@ ObjectPackConsumer::ObjectPackConsumer(
   raw_header_.reserve(expected_header_size);
 }
 
-
+/**
+ * At the end of the function, pos_ will have progressed by buf_size (unless
+ * the buffer contains trailing garbage bytes.
+ */
 ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
   const unsigned buf_size,
-  const char *buf)
+  const unsigned char *buf)
 {
   if (buf_size == 0)
     return state_;
@@ -291,12 +294,15 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
     (pos_ < expected_header_size_) ? (expected_header_size_ - pos_) : 0;
   const unsigned nbytes_header = std::min(remaining_in_header, buf_size);
   if (nbytes_header) {
-    raw_header_ += string(buf + pos_, nbytes_header);
+    raw_header_ += string(reinterpret_cast<const char *>(buf), nbytes_header);
     pos_ += nbytes_header;
   }
 
+  if (pos_ < expected_header_size_)
+    return kStateContinue;
+
   // This condition can only be true once through the lifetime of the Consumer.
-  if (pos_ == expected_header_size_) {
+  if (nbytes_header && (pos_ == expected_header_size_)) {
     shash::Any digest(expected_digest_.algorithm);
     shash::HashString(raw_header_, &digest);
     if (digest != expected_digest_) {
@@ -320,8 +326,7 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumeNext(
   }
 
   unsigned remaining_in_buf = buf_size - nbytes_header;
-  const unsigned char *payload =
-    reinterpret_cast<const unsigned char *>(buf) + nbytes_header;
+  const unsigned char *payload = buf + nbytes_header;
   return ConsumePayload(remaining_in_buf, payload);
 }
 
@@ -354,9 +359,9 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
       nbytes = std::min(remaining_in_accu, remaining_in_buf);
       memcpy(accumulator_ + pos_in_accu_, buf + pos_in_buf, nbytes);
       pos_in_accu_ += nbytes;
-      if (pos_in_accu_ == kAccuSize) {
+      if ((pos_in_accu_ == kAccuSize) || (nbytes == remaining_in_object)) {
         NotifyListeners(BuildEvent(index_[idx_].id, index_[idx_].size,
-                                   kAccuSize, accumulator_));
+                                   pos_in_accu_, accumulator_));
         pos_in_accu_ = 0;
       }
     } else {  // directly trigger listeners using buf
@@ -408,7 +413,7 @@ bool ObjectPackConsumer::ParseHeader() {
 
   uint64_t sum_size = 0;
   do {
-    unsigned remaining_in_header = raw_header_.size() - index_idx;
+    const unsigned remaining_in_header = raw_header_.size() - index_idx;
     string line =
       GetLineMem(raw_header_.data() + index_idx, remaining_in_header);
     if (line == "")
@@ -428,7 +433,9 @@ bool ObjectPackConsumer::ParseHeader() {
       shash::MkFromSuffixedHexPtr(shash::HexPtr(line.substr(0, separator_idx))),
       size);
     index_.push_back(index_entry);
-  } while (true);
+
+    index_idx += line.size() + 1;
+  } while (index_idx < raw_header_.size());
 
   return (nobjects == index_.size()) && (size_ == sum_size);
 }
