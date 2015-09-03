@@ -39,6 +39,13 @@ get_package_type() {
   return 1
 }
 
+get_default_compiler_arch() {
+  local compiler=""
+  which gcc   > /dev/null 2>&1 && compiler="gcc"
+  which clang > /dev/null 2>&1 && compiler="clang"
+  [ ! -z $compiler ] && $compiler -dumpmachine | grep -ohe '^[^-]\+'
+}
+
 get_cvmfs_version_from_cmake() {
   local source_directory="$1"
   cat ${source_directory}/CMakeLists.txt | grep '## CVMFS_VERSION' | awk '{print $3}'

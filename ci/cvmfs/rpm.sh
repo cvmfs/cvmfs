@@ -69,9 +69,11 @@ else
 fi
 
 if [ x"$CVMFS_BUILD_ARCH" = x"native" ]; then
-  echo "building..."
+  default_arch="$(get_default_compiler_arch)"
+  echo "building ($default_arch)..."
   rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
            --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
+           --target="$default_arch"                         \
            -ba $spec_file
 else
   if [ $(id -u) -eq 0 ]; then
