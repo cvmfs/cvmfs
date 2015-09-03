@@ -352,11 +352,12 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
 
     // We use the accumulator if there is already something in or if we have a
     // small piece of data of a larger object.
+    nbytes = std::min(remaining_in_object, remaining_in_buf);
     if ((pos_in_accu_ > 0) ||
         ((remaining_in_buf < remaining_in_object) && is_small_rest))
     {
       const uint64_t remaining_in_accu = kAccuSize - pos_in_accu_;
-      nbytes = std::min(remaining_in_accu, remaining_in_buf);
+      nbytes = std::min(remaining_in_accu, nbytes);
       memcpy(accumulator_ + pos_in_accu_, buf + pos_in_buf, nbytes);
       pos_in_accu_ += nbytes;
       if ((pos_in_accu_ == kAccuSize) || (nbytes == remaining_in_object)) {
@@ -365,7 +366,6 @@ ObjectPackConsumerBase::BuildState ObjectPackConsumer::ConsumePayload(
         pos_in_accu_ = 0;
       }
     } else {  // directly trigger listeners using buf
-      nbytes = std::min(remaining_in_object, remaining_in_buf);
       NotifyListeners(BuildEvent(index_[idx_].id, index_[idx_].size,
                                  nbytes, buf + pos_in_buf));
     }

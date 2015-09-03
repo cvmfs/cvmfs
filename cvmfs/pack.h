@@ -65,8 +65,9 @@ class ObjectPack : SingleCopy {
   bool CommitBucket(const shash::Any &id, const BucketHandle handle);
   void DiscardBucket(const BucketHandle handle);
   void TransferBucket(const BucketHandle handle, ObjectPack *other);
-  
+
   uint64_t size() const { return size_; }
+  unsigned GetNoObjects() const { return buckets_.size(); }
 
  private:
   /**

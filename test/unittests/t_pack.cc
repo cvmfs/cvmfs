@@ -9,10 +9,38 @@
 #include <string>
 
 #include "../../cvmfs/pack.h"
+#include "../../cvmfs/prng.h"
 #include "../../cvmfs/smalloc.h"
 #include "../../cvmfs/util.h"
 
 using namespace std;  // NOLINT
+
+
+class ConsumerCallbacks {
+ public:
+  ConsumerCallbacks()
+    : total_size(0), total_objects(0), this_size(0), verify_errors(0) { }
+
+  void OnEvent(const ObjectPackConsumer::BuildEvent &event) {
+    total_size += event.buf_size;
+    this_size += event.buf_size;
+    if (this_size == event.size) {
+      this_size = 0;
+      total_objects++;
+    }
+  }
+
+  void Reset() {
+    total_size = total_objects = this_size = 0;
+    verify_errors = 0;
+  }
+
+  
+  uint64_t total_size;
+  uint64_t total_objects;
+  uint64_t this_size;
+  unsigned verify_errors;
+};
 
 
 class T_Pack : public ::testing::Test {
@@ -48,6 +76,53 @@ class T_Pack : public ::testing::Test {
     unlink(foo_path_.c_str());
   }
 
+  void RealWorld() {
+    const unsigned kMaxObject = 4 * 1024 * 1024;  // 4MB
+    const unsigned kBufSize = 1 * 1024 * 1024;  // 1MB
+    Prng prng;
+    prng.InitLocaltime();
+    unsigned char *obj_buf =
+      reinterpret_cast<unsigned char *>(smalloc(kMaxObject));
+    for (unsigned i = 0; i < kMaxObject; ++i)
+      obj_buf[i] = prng.Next(256);
+
+    bool has_space = true;
+    do {
+      ObjectPack::BucketHandle handle = pack_.OpenBucket();
+      uint64_t size = prng.Next(kMaxObject +1);
+      shash::Any obj_digest(shash::kMd5);
+      shash::HashMem(obj_buf, size, &obj_digest);
+      pack_.AddToBucket(obj_buf, size, handle);
+      has_space = pack_.CommitBucket(obj_digest, handle);
+    } while (has_space);
+    free(obj_buf);
+
+    //printf("produced %d objects of total size %d MB\n",
+    //        pack_.GetNoObjects(), pack_.size()/(1024*1024));
+
+    shash::Any digest(shash::kSha256);
+    ObjectPackProducer producer(&pack_);
+    producer.GetDigest(&digest);
+    ObjectPackConsumer consumer(digest, producer.GetHeaderSize());
+    ConsumerCallbacks callbacks;
+    // TODO Verify objects
+    consumer.RegisterListener(&ConsumerCallbacks::OnEvent, &callbacks);
+    unsigned char *transfer_buf =
+      reinterpret_cast<unsigned char *>(smalloc(kBufSize));
+    unsigned nspace;
+    unsigned nwritten;
+    do {
+      nspace = prng.Next(kBufSize + 1);
+      nwritten = producer.ProduceNext(nspace, transfer_buf);
+      consumer.ConsumeNext(nwritten, transfer_buf);
+    } while (nspace == nwritten);
+    free(transfer_buf);
+
+    EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer.ConsumeNext(0, NULL));
+    EXPECT_EQ(pack_.GetNoObjects(), callbacks.total_objects);
+    EXPECT_EQ(pack_.size(), callbacks.total_size);
+  }
+
   ObjectPack pack_;
   ObjectPack pack_of_three_;
   shash::Any hash_null_;
@@ -55,29 +130,6 @@ class T_Pack : public ::testing::Test {
   string foo_path_;
   FILE *ffoo_;
   string foo_content_;
-};
-
-
-class ConsumerCallbacks {
- public:
-  ConsumerCallbacks() : total_size(0), total_objects(0), this_size(0) { }
-
-  void OnEvent(const ObjectPackConsumer::BuildEvent &event) {
-    total_size += event.buf_size;
-    this_size += event.buf_size;
-    if (this_size == event.size) {
-      this_size = 0;
-      total_objects++;
-    }
-  }
-
-  void Reset() {
-    total_size = total_objects = this_size = 0;
-  }
-
-  uint64_t total_size;
-  uint64_t total_objects;
-  uint64_t this_size;
 };
 
 
@@ -299,4 +351,15 @@ TEST_F(T_Pack, ConsumerEmpty) {
   for (unsigned i = 0; i < nbytes; ++i)
     consumer_two.ConsumeNext(1, buf + i);
   EXPECT_EQ(ObjectPackConsumer::kStateDone, consumer_two.ConsumeNext(0, NULL));
+}
+
+
+TEST_F(T_Pack, RealWorld) {
+  RealWorld();
+}
+
+
+TEST_F(T_Pack, RealWorldSlow) {
+  for (unsigned i = 0; i < 64; ++i)
+    RealWorld();
 }
