@@ -15,7 +15,6 @@ Make sure the right version of parrot is executed by checking `parrot_run -v`.  
 
 Export the following environment variables:
 
-    export PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES=yes
     export PARROT_CVMFS_REPO="<default-repositories>"
     export HTTP_PROXY='<SITE HTTP PROXY>'  # or 'DIRECT;' if not on a cluster or grid site
 
@@ -77,8 +76,25 @@ For feedback and bug reports, please write to either the [cctools mailing list](
 
 ## Compiling from Sources
 
-If you want to compile parrot+cvmfs from sources, please use the `libcvmfs-stable` git branch from the [CernVM-FS github repository](https://github.com/cvmfs/cvmfs/tree/libcvmfs-stable).  The `libcvmfs-stable` branch reflects a state between the head of development (`devel`) and the latest released version (`master`).  Compile and install CernVM-FS as usual with the cmake option `-DBUILD_LIBCVMFS=yes`.  This will install the libcvmfs.h and libcvmfs.a files, which parrot needs to pick up.
+If you want to compile parrot+cvmfs from sources, please use the `libcvmfs-stable` git branch from the [CernVM-FS github repository](https://github.com/cvmfs/cvmfs/tree/libcvmfs-stable).  The `libcvmfs-stable` branch reflects a state between the head of development (`devel`) and the latest released version (`master`).
 
-Use the git branch that reflects the latest released version from the [cctools github repository](https://github.com/cooperative-computing-lab/cctools).  Configure and compile cctools as usual with the `./configure --with-cvmfs-path <CVMFS INSTALL PREFIX>`, e.g. ``./configure --with-cvmfs-path /usr`.
+Compile a using [libuuid](http://sourceforge.net/projects/libuuid):
+
+    ./configure --prefix=/tmp/cvmfs/UUID --enable-static --disable-shared
+    make
+    make install
+
+To create libcvmfs.a in /tmp/cvmfs/INSTALLCVMFS, compile and install CernVM-FS with the following commands
+
+    cmake -Wno-dev -DINSTALL_MOUNT_SCRIPTS=OFF -DBUILD_SERVER:BOOL=OFF \
+      -DBUILD_CVMFS:BOOL=OFF -DBUILD_LIBCVMFS:BOOL=ON \
+      -DINSTALL_BASH_COMPLETION:BOOL=OFF \
+      -DCMAKE_INSTALL_PREFIX:PATH=/tmp/cvmfs/CVMFS \
+      -DUUID_LIBRARY:FILE=/tmp/cvmfs/UUID/lib/libuuid.a \
+      -DUUID_INCLUDE_DIR:PATH=/tmp/cvmfs/UUID/include
+    make libpacparser
+    cd cvmfs && make && make install
+
+For parrot, use the git branch that reflects the latest released version from the [cctools github repository](https://github.com/cooperative-computing-lab/cctools).  Configure and compile cctools as usual with the `./configure --with-cvmfs-path <CVMFS INSTALL PREFIX>`, e.g. `./configure --with-cvmfs-path /tmp/cvmfs/CVMFS`.
 
 Note that the cvmfs-devel package contains libcvmfs.h and libcvmfs.a but not necessarily the latest known good version.
