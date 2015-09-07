@@ -23,7 +23,7 @@ struct ListenerHandle {
   int pipe_backchannel[2];
   int pipe_terminate[2];
   QuotaManager *quota_manager;
-  catalog::AbstractCatalogManager *catalog_manager;
+  CatalogManager *catalog_manager;
   string repository_name;
   pthread_t thread_listener;
 };
@@ -123,7 +123,7 @@ static void *MainWatchdogListener(void *data) {
  */
 ListenerHandle *
 RegisterUnpinListener(QuotaManager *quota_manager,
-                      catalog::AbstractCatalogManager *catalog_manager,
+                      CatalogManager *catalog_manager,
                       const string &repository_name)
 {
   ListenerHandle *handle = new ListenerHandle();

@@ -2,6 +2,9 @@
  * This file is part of the CernVM File System
  */
 
+#ifndef CVMFS_CATALOG_MGR_IMPL_H_
+#define CVMFS_CATALOG_MGR_IMPL_H_
+
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
@@ -10,6 +13,7 @@
 #include <inttypes.h>
 
 #include <cassert>
+#include <string>
 
 #include "logging.h"
 #include "shortstring.h"
@@ -21,11 +25,12 @@ using namespace std;  // NOLINT
 
 namespace catalog {
 
-
-AbstractCatalogManager::AbstractCatalogManager(perf::Statistics *statistics) :
+template <class CatalogT>
+AbstractCatalogManager<CatalogT>::AbstractCatalogManager(
+    perf::Statistics *statistics) :
   statistics_(statistics) {
   inode_watermark_status_ = 0;
-  inode_gauge_ = AbstractCatalogManager::kInodeOffset;
+  inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
   revision_cache_ = 0;
   inode_annotation_ = NULL;
   incarnation_ = 0;
@@ -35,34 +40,34 @@ AbstractCatalogManager::AbstractCatalogManager(perf::Statistics *statistics) :
   assert(retval == 0);
   retval = pthread_key_create(&pkey_sqlitemem_, NULL);
   assert(retval == 0);
-  remount_listener_ = NULL;
 }
 
-
-AbstractCatalogManager::~AbstractCatalogManager() {
+template <class CatalogT>
+AbstractCatalogManager<CatalogT>::~AbstractCatalogManager() {
   DetachAll();
   pthread_key_delete(pkey_sqlitemem_);
   pthread_rwlock_destroy(rwlock_);
   free(rwlock_);
 }
 
-
-void AbstractCatalogManager::SetInodeAnnotation(InodeAnnotation *new_annotation)
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::SetInodeAnnotation(
+    InodeAnnotation *new_annotation)
 {
   assert(catalogs_.empty() || (new_annotation == inode_annotation_));
   inode_annotation_ = new_annotation;
 }
 
-
-void AbstractCatalogManager::SetOwnerMaps(const OwnerMap &uid_map,
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::SetOwnerMaps(const OwnerMap &uid_map,
                                           const OwnerMap &gid_map)
 {
   uid_map_ = uid_map;
   gid_map_ = gid_map;
 }
 
-
-void AbstractCatalogManager::CheckInodeWatermark() {
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::CheckInodeWatermark() {
   if (inode_watermark_status_ > 0)
     return;
 
@@ -82,7 +87,8 @@ void AbstractCatalogManager::CheckInodeWatermark() {
  * Initializes the CatalogManager and loads and attaches the root entry.
  * @return true on successful init, otherwise false
  */
-bool AbstractCatalogManager::Init() {
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::Init() {
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog");
   WriteLock();
   bool attached = MountCatalog(PathString("", 0), shash::Any(), NULL);
@@ -101,15 +107,14 @@ bool AbstractCatalogManager::Init() {
  * it is mounted and replaces the currently mounted tree (all existing catalogs
  * are detached)
  */
-LoadError AbstractCatalogManager::Remount(const bool dry_run) {
+template <class CatalogT>
+LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remounting repositories (dry run %d)", dry_run);
   if (dry_run)
     return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
 
   WriteLock();
-  if (remount_listener_)
-    remount_listener_->BeforeRemount(this);
 
   string     catalog_path;
   shash::Any catalog_hash;
@@ -120,9 +125,9 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
-    inode_gauge_ = AbstractCatalogManager::kInodeOffset;
+    inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
 
-    Catalog *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
+    CatalogT *new_root = CreateCatalog(PathString("", 0), catalog_hash, NULL);
     assert(new_root);
     bool retval = AttachCatalog(catalog_path, new_root);
     assert(retval);
@@ -141,15 +146,16 @@ LoadError AbstractCatalogManager::Remount(const bool dry_run) {
 /**
  * Detaches everything except the root catalog
  */
-void AbstractCatalogManager::DetachNested() {
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::DetachNested() {
   WriteLock();
   if (catalogs_.empty()) {
     Unlock();
     return;
   }
 
-  CatalogList::const_iterator i;
-  CatalogList::const_iterator iend;
+  typename CatalogList::const_iterator i;
+  typename CatalogList::const_iterator iend;
   CatalogList catalogs_to_detach = GetRootCatalog()->GetChildren();
   for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end();
        i != iend; ++i)
@@ -164,12 +170,14 @@ void AbstractCatalogManager::DetachNested() {
 /**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
  * @param path      the path to find in the catalogs
- * @param options   whether to perform another lookup to get the parent entry, too
+ * @param options   whether to perform another lookup to get the parent entry,
+ *                  too
  * @param dirent    the resulting DirectoryEntry, or special Negative entry
  *                  Note: can be set to zero if the result is not important
  * @return true if lookup succeeded otherwise false
  */
-bool AbstractCatalogManager::LookupPath(const PathString &path,
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
                                         const LookupOptions options,
                                         DirectoryEntry *dirent)
 {
@@ -184,7 +192,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   EnforceSqliteMemLimit();
   ReadLock();
 
-  Catalog *best_fit = FindCatalog(path);
+  CatalogT *best_fit = FindCatalog(path);
   assert(best_fit != NULL);
 
   perf::Inc(statistics_.n_lookup_path);
@@ -208,7 +216,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
       LogCvmfs(kLogCatalog, kLogDebug,
                "entry not found, we may have to load nested catalogs");
 
-      Catalog *nested_catalog;
+      CatalogT *nested_catalog;
       found = MountSubtree(path, best_fit, &nested_catalog);
       // DowngradeLock(); TODO
 
@@ -288,8 +296,8 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   return false;
 }
 
-
-bool AbstractCatalogManager::LookupXattrs(
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   const PathString &path,
   XattrList *xattrs)
 {
@@ -298,8 +306,8 @@ bool AbstractCatalogManager::LookupXattrs(
   ReadLock();
 
   // Find catalog, possibly load nested
-  Catalog *best_fit = FindCatalog(path);
-  Catalog *catalog = best_fit;
+  CatalogT *best_fit = FindCatalog(path);
+  CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, NULL)) {
     Unlock();
     WriteLock();
@@ -327,7 +335,8 @@ bool AbstractCatalogManager::LookupXattrs(
  * @param listing the resulting DirectoryEntryList
  * @return true if listing succeeded otherwise false
  */
-bool AbstractCatalogManager::Listing(const PathString &path,
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
                                      DirectoryEntryList *listing)
 {
   EnforceSqliteMemLimit();
@@ -335,8 +344,8 @@ bool AbstractCatalogManager::Listing(const PathString &path,
   ReadLock();
 
   // Find catalog, possibly load nested
-  Catalog *best_fit = FindCatalog(path);
-  Catalog *catalog = best_fit;
+  CatalogT *best_fit = FindCatalog(path);
+  CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, NULL)) {
     Unlock();
     WriteLock();
@@ -364,7 +373,8 @@ bool AbstractCatalogManager::Listing(const PathString &path,
  * @param listing the resulting StatEntryList
  * @return true if listing succeeded otherwise false
  */
-bool AbstractCatalogManager::ListingStat(const PathString &path,
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::ListingStat(const PathString &path,
                                         StatEntryList *listing)
 {
   EnforceSqliteMemLimit();
@@ -372,8 +382,8 @@ bool AbstractCatalogManager::ListingStat(const PathString &path,
   ReadLock();
 
   // Find catalog, possibly load nested
-  Catalog *best_fit = FindCatalog(path);
-  Catalog *catalog = best_fit;
+  CatalogT *best_fit = FindCatalog(path);
+  CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, NULL)) {
     Unlock();
     WriteLock();
@@ -402,7 +412,8 @@ bool AbstractCatalogManager::ListingStat(const PathString &path,
  *        same than the chunk hashes)
  * @return true if listing succeeded otherwise false
  */
-bool AbstractCatalogManager::ListFileChunks(
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::ListFileChunks(
   const PathString &path,
   const shash::Algorithms interpret_hashes_as,
   FileChunkList *chunks)
@@ -412,8 +423,8 @@ bool AbstractCatalogManager::ListFileChunks(
   ReadLock();
 
   // Find catalog, possibly load nested
-  Catalog *best_fit = FindCatalog(path);
-  Catalog *catalog = best_fit;
+  CatalogT *best_fit = FindCatalog(path);
+  CatalogT *catalog = best_fit;
   if (MountSubtree(path, best_fit, NULL)) {
     Unlock();
     WriteLock();
@@ -433,32 +444,32 @@ bool AbstractCatalogManager::ListFileChunks(
 }
 
 
-
-uint64_t AbstractCatalogManager::GetRevision() const {
+template <class CatalogT>
+uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
   ReadLock();
   const uint64_t revision = revision_cache_;
   Unlock();
   return revision;
 }
 
-
-bool AbstractCatalogManager::GetVolatileFlag() const {
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::GetVolatileFlag() const {
   ReadLock();
   const bool volatile_flag = GetRootCatalog()->volatile_flag();
   Unlock();
   return volatile_flag;
 }
 
-
-uint64_t AbstractCatalogManager::GetTTL() const {
+template <class CatalogT>
+uint64_t AbstractCatalogManager<CatalogT>::GetTTL() const {
   ReadLock();
   const uint64_t revision = GetRootCatalog()->GetTTL();
   Unlock();
   return revision;
 }
 
-
-int AbstractCatalogManager::GetNumCatalogs() const {
+template <class CatalogT>
+int AbstractCatalogManager<CatalogT>::GetNumCatalogs() const {
   ReadLock();
   int result = catalogs_.size();
   Unlock();
@@ -469,7 +480,8 @@ int AbstractCatalogManager::GetNumCatalogs() const {
 /**
  * Gets a formatted tree of the currently attached catalogs
  */
-string AbstractCatalogManager::PrintHierarchy() const {
+template <class CatalogT>
+string AbstractCatalogManager<CatalogT>::PrintHierarchy() const {
   ReadLock();
   const string output = PrintHierarchyRecursively(GetRootCatalog(), 0);
   Unlock();
@@ -481,7 +493,8 @@ string AbstractCatalogManager::PrintHierarchy() const {
  * Assigns the next free numbers in the 64 bit space
  * TODO: this may run out of free inodes at some point (with 32bit at least)
  */
-InodeRange AbstractCatalogManager::AcquireInodes(uint64_t size) {
+template <class CatalogT>
+InodeRange AbstractCatalogManager<CatalogT>::AcquireInodes(uint64_t size) {
   InodeRange result;
   result.offset = inode_gauge_;
   result.size = size;
@@ -499,7 +512,8 @@ InodeRange AbstractCatalogManager::AcquireInodes(uint64_t size) {
  * invalid.
  * @param chunk the InodeChunk to be freed
  */
-void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::ReleaseInodes(const InodeRange chunk) {
   // TODO(jblomer) currently inodes are only released on remount
 }
 
@@ -510,12 +524,14 @@ void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
  * @param path the path a catalog is searched for
  * @return the catalog which is best fitting at the given path
  */
-Catalog* AbstractCatalogManager::FindCatalog(const PathString &path) const {
+template <class CatalogT>
+CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(
+    const PathString &path) const {
   assert(catalogs_.size() > 0);
 
   // Start at the root catalog and successively go down the catalog tree
-  Catalog *best_fit = GetRootCatalog();
-  Catalog *next_fit = NULL;
+  CatalogT *best_fit = GetRootCatalog();
+  CatalogT *next_fit = NULL;
   while (best_fit->path() != path) {
     next_fit = best_fit->FindSubtree(path);
     if (next_fit == NULL)
@@ -533,13 +549,15 @@ Catalog* AbstractCatalogManager::FindCatalog(const PathString &path) const {
  * @param attached_catalog is set to the searched catalog, if not NULL
  * @return true if catalog is already present, false otherwise
  */
-bool AbstractCatalogManager::IsAttached(const PathString &root_path,
-                                        Catalog **attached_catalog) const
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::IsAttached(
+    const PathString &root_path,
+    CatalogT **attached_catalog) const
 {
   if (catalogs_.size() == 0)
     return false;
 
-  Catalog *best_fit = FindCatalog(root_path);
+  CatalogT *best_fit = FindCatalog(root_path);
   if (best_fit->path() != root_path)
     return false;
 
@@ -554,22 +572,25 @@ bool AbstractCatalogManager::IsAttached(const PathString &root_path,
  * nested catalog for the given path.
  * The final leaf nested catalog is returned.
  */
-bool AbstractCatalogManager::MountSubtree(const PathString &path,
-                                          const Catalog *entry_point,
-                                          Catalog **leaf_catalog)
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::MountSubtree(
+    const PathString &path,
+    const CatalogT *entry_point,
+    CatalogT **leaf_catalog)
 {
   bool result = true;
-  Catalog *parent = (entry_point == NULL) ?
-                    GetRootCatalog() : const_cast<Catalog *>(entry_point);
+  CatalogT *parent = (entry_point == NULL) ?
+                    GetRootCatalog() : const_cast<CatalogT *>(entry_point);
   assert(path.StartsWith(parent->path()));
 
   // Try to find path as a super string of nested catalog mount points
   PathString path_slash(path);
   path_slash.Append("/", 1);
   perf::Inc(statistics_.n_nested_listing);
-  const Catalog::NestedCatalogList& nested_catalogs =
+  typedef typename CatalogT::NestedCatalogList NestedCatalogList;
+  const NestedCatalogList& nested_catalogs =
     parent->ListNestedCatalogs();
-  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
+  for (typename NestedCatalogList::const_iterator i = nested_catalogs.begin(),
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
@@ -578,7 +599,7 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
     if (path_slash.StartsWith(nested_path_slash)) {
       if (leaf_catalog == NULL)
         return true;
-      Catalog *new_nested;
+      CatalogT *new_nested;
       LogCvmfs(kLogCatalog, kLogDebug, "load nested catalog at %s",
                i->path.c_str());
       // prevent endless recursion with corrupted catalogs
@@ -605,11 +626,13 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
  * Load a catalog file and attach it to the tree of Catalog objects.
  * Loading of catalogs is implemented by derived classes.
  */
-Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
+template <class CatalogT>
+CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
+                                              const PathString &mountpoint,
                                               const shash::Any &hash,
-                                              Catalog *parent_catalog)
+                                              CatalogT *parent_catalog)
 {
-  Catalog *attached_catalog = NULL;
+  CatalogT *attached_catalog = NULL;
   if (IsAttached(mountpoint, &attached_catalog))
     return attached_catalog;
 
@@ -643,8 +666,10 @@ Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
  * @param new_catalog the catalog to attach to this CatalogManager
  * @return true on success, false otherwise
  */
-bool AbstractCatalogManager::AttachCatalog(const string &db_path,
-                                           Catalog *new_catalog)
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::AttachCatalog(
+    const string &db_path,
+    CatalogT *new_catalog)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "attaching catalog file %s",
            db_path.c_str());
@@ -690,7 +715,8 @@ bool AbstractCatalogManager::AttachCatalog(const string &db_path,
  * @param catalog the catalog to detach
  * @return true on success, false otherwise
  */
-void AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::DetachCatalog(CatalogT *catalog) {
   if (catalog->HasParent())
     catalog->parent()->RemoveChild(catalog);
 
@@ -698,8 +724,8 @@ void AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
   UnloadCatalog(catalog);
 
   // Delete catalog from internal lists
-  CatalogList::iterator i;
-  CatalogList::const_iterator iend;
+  typename CatalogList::iterator i;
+  typename CatalogList::const_iterator iend;
   for (i = catalogs_.begin(), iend = catalogs_.end(); i != iend; ++i) {
     if (*i == catalog) {
       catalogs_.erase(i);
@@ -718,10 +744,11 @@ void AbstractCatalogManager::DetachCatalog(Catalog *catalog) {
  * @param catalog the catalog to detach
  * @return true on success, false otherwise
  */
-void AbstractCatalogManager::DetachSubtree(Catalog *catalog) {
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::DetachSubtree(CatalogT *catalog) {
   // Detach all child catalogs recursively
-  CatalogList::const_iterator i;
-  CatalogList::const_iterator iend;
+  typename CatalogList::const_iterator i;
+  typename CatalogList::const_iterator iend;
   CatalogList catalogs_to_detach = catalog->GetChildren();
   for (i = catalogs_to_detach.begin(), iend = catalogs_to_detach.end();
        i != iend; ++i)
@@ -736,8 +763,10 @@ void AbstractCatalogManager::DetachSubtree(Catalog *catalog) {
 /**
  * Formats the catalog hierarchy
  */
-string AbstractCatalogManager::PrintHierarchyRecursively(const Catalog *catalog,
-                                                         const int level) const
+template <class CatalogT>
+string AbstractCatalogManager<CatalogT>::PrintHierarchyRecursively(
+                                                      const CatalogT *catalog,
+                                                      const int level) const
 {
   string output;
 
@@ -749,17 +778,17 @@ string AbstractCatalogManager::PrintHierarchyRecursively(const Catalog *catalog,
     string(catalog->path().GetChars(), catalog->path().GetLength()) + "\n";
 
   CatalogList children = catalog->GetChildren();
-  for (CatalogList::const_iterator i = children.begin(), iEnd = children.end();
-       i != iEnd; ++i)
-  {
+  typename CatalogList::const_iterator i = children.begin();
+  typename CatalogList::const_iterator iend = children.end();
+  for (; i != iend; ++i) {
     output += PrintHierarchyRecursively(*i, level + 1);
   }
 
   return output;
 }
 
-
-void AbstractCatalogManager::EnforceSqliteMemLimit() {
+template <class CatalogT>
+void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {
   char *mem_enforced =
     static_cast<char *>(pthread_getspecific(pkey_sqlitemem_));
   if (mem_enforced == NULL) {
@@ -769,3 +798,8 @@ void AbstractCatalogManager::EnforceSqliteMemLimit() {
 }
 
 }  // namespace catalog
+
+
+
+
+#endif  // CVMFS_CATALOG_MGR_IMPL_H_

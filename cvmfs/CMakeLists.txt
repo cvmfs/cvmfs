@@ -47,7 +47,7 @@ set (CVMFS_CLIENT_SOURCES
   sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
-  catalog_mgr.h catalog_mgr.cc
+  catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_client.h catalog_mgr_client.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   directory_entry.h directory_entry.cc
@@ -164,7 +164,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_rw.h catalog_rw.cc
-  catalog_mgr.h catalog_mgr.cc
+  catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_ro.h catalog_mgr_ro.cc
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
