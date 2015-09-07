@@ -20,38 +20,33 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 class T_CatalogManager : public ::testing::Test {
+
+ public:
+  T_CatalogManager() : statistics_(), catalog_mgr_(&statistics_) { }
+
  protected:
-  void SetUp() {
-    catalog_mgr_ = new MockCatalogManager(&statistics_);
-  }
-
-  void TearDown() {
-    delete catalog_mgr_;
-  }
-
   void AddTree() {
     const shash::Any empty_hash = shash::Any();
-    const int size = 32;
     const size_t file_size = 4096;
-    const char suffix = shash::kSha1;
+    char suffix = shash::kSha1;
     shash::Any hash;
     shash::Any empty_content;
     // adding ""
-    MockCatalog *root_catalog = catalog_mgr_->RetrieveRootCatalog();
+    MockCatalog *root_catalog = catalog_mgr_.RetrieveRootCatalog();
     root_catalog->AddFile(empty_content, file_size, "", "");
     // adding "/dir"
     root_catalog->AddFile(empty_content, file_size, "", "dir");
     // adding "/file1"
     hash = shash::Any(shash::kSha1,
-                      reinterpret_cast<const unsigned char*>(hashes[1]),
-                      size, suffix);
+                      reinterpret_cast<const unsigned char*>(hashes[0]),
+                      suffix);
     root_catalog->AddFile(hash, file_size, "", "file1");
     // adding "/dir/dir"
     root_catalog->AddFile(empty_content, file_size, "/dir", "dir");
     // adding "/dir/dir/file2"
     hash = shash::Any(shash::kSha1,
                       reinterpret_cast<const unsigned char*>(hashes[1]),
-                      size, suffix);
+                      suffix);
     root_catalog->AddFile(hash, file_size, "/dir/dir", "file2");
     // adding "/dir/dir/dir"
     root_catalog->AddFile(empty_content, file_size, "/dir/dir", "dir");
@@ -64,25 +59,44 @@ class T_CatalogManager : public ::testing::Test {
                                                root_catalog, NULL);
     ASSERT_NE(static_cast<MockCatalog*>(NULL), new_catalog);
     ASSERT_EQ(1u, root_catalog->GetChildren().size());
-    catalog_mgr_->RegisterNewCatalog(new_catalog);
+    catalog_mgr_.RegisterNewCatalog(new_catalog);
     // adding "/dir/dir/dir/file3" to the new nested catalog
     hash = shash::Any(shash::kSha1,
-                          reinterpret_cast<const unsigned char*>(hashes[2]),
-                          size, suffix);
+                      reinterpret_cast<const unsigned char*>(hashes[2]),
+                      suffix);
     new_catalog->AddFile(hash, file_size, "/dir/dir/dir", "file3");
     // adding "/dir/dir/dir/file4" to the new nested catalog
     hash = shash::Any(shash::kSha1,
-                          reinterpret_cast<const unsigned char*>(hashes[3]),
-                          size, suffix);
+                      reinterpret_cast<const unsigned char*>(hashes[3]),
+                      suffix);
     new_catalog->AddFile(hash, file_size, "/dir/dir/dir", "file4");
+    // adding "/dir/dir/dir/dir"
+    new_catalog->AddFile(empty_content, file_size, "/dir/dir/dir", "dir");
+    // adding "/dir/dir/dir/dir/dir"
+    new_catalog->AddFile(empty_content, file_size, "/dir/dir/dir/dir", "dir");
     // we haven't mounted the second catalog yet!
-    ASSERT_EQ(1, catalog_mgr_->GetNumCatalogs());
+    ASSERT_EQ(1, catalog_mgr_.GetNumCatalogs());
+
+    // mounting a new catalog in "/dir/dir/dir/dir/dir"
+    MockCatalog *new_catalog_2 = new MockCatalog("/dir/dir/dir/dir/dir",
+                                                 shash::Any(),
+                                                 4096, 1, 0, false,
+                                                 new_catalog, NULL);
+    ASSERT_EQ(1u, root_catalog->GetChildren().size());
+    catalog_mgr_.RegisterNewCatalog(new_catalog_2);
+    // adding "/dir/dir/dir/dir/dir/file5"
+    hash = shash::Any(shash::kSha1,
+                      reinterpret_cast<const unsigned char*>(hashes[4]),
+                      suffix);
+    new_catalog_2->AddFile(hash, file_size, "/dir/dir/dir/dir/dir", "file5");
+    // we haven't mounted the third catalog yet!
+    ASSERT_EQ(1, catalog_mgr_.GetNumCatalogs());
   }
 
  protected:
   const static char *hashes[];
-  MockCatalogManager *catalog_mgr_;
   perf::Statistics statistics_;
+  MockCatalogManager catalog_mgr_;
 };
 
 const char *T_CatalogManager::hashes[] = {
@@ -96,16 +110,16 @@ const char *T_CatalogManager::hashes[] = {
 
 
 TEST_F(T_CatalogManager, InitialConfiguration) {
-  EXPECT_TRUE(catalog_mgr_->Init());
-  EXPECT_EQ(1, catalog_mgr_->GetNumCatalogs());
-  EXPECT_EQ(1u, catalog_mgr_->GetRevision());
-  EXPECT_FALSE(catalog_mgr_->GetVolatileFlag());
-  EXPECT_EQ(0u, catalog_mgr_->GetTTL());
+  EXPECT_TRUE(catalog_mgr_.Init());
+  EXPECT_EQ(1, catalog_mgr_.GetNumCatalogs());
+  EXPECT_EQ(1u, catalog_mgr_.GetRevision());
+  EXPECT_FALSE(catalog_mgr_.GetVolatileFlag());
+  EXPECT_EQ(0u, catalog_mgr_.GetTTL());
 }
 
 TEST_F(T_CatalogManager, Statistics) {
-  EXPECT_TRUE(catalog_mgr_->Init());
-  Statistics st = catalog_mgr_->statistics();
+  EXPECT_TRUE(catalog_mgr_.Init());
+  const Statistics &st = catalog_mgr_.statistics();
   EXPECT_EQ(0u, st.n_listing->Get());
   EXPECT_EQ(0u, st.n_lookup_inode->Get());
   EXPECT_EQ(0u, st.n_lookup_path->Get());
@@ -116,59 +130,109 @@ TEST_F(T_CatalogManager, Statistics) {
 
 TEST_F(T_CatalogManager, InodeConfiguration) {
   InodeGenerationAnnotation annotation;
-  catalog_mgr_->SetInodeAnnotation(&annotation);
-  EXPECT_TRUE(catalog_mgr_->Init());
+  catalog_mgr_.SetInodeAnnotation(&annotation);
+  EXPECT_TRUE(catalog_mgr_.Init());
 }
 
 TEST_F(T_CatalogManager, Lookup) {
   catalog::DirectoryEntry dirent;
-  ASSERT_TRUE(catalog_mgr_->Init());
+  ASSERT_TRUE(catalog_mgr_.Init());
   AddTree();
-  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir", kLookupSole, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir", kLookupSole, &dirent));
   EXPECT_TRUE(dirent.IsDirectory());
-  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir", kLookupSole, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir", kLookupSole, &dirent));
   EXPECT_TRUE(dirent.IsDirectory());
-  EXPECT_TRUE(catalog_mgr_->LookupPath("/file1", kLookupSole, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupSole, &dirent));
+  EXPECT_TRUE(dirent.IsRegular());
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupFull, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // the father directory belongs to the catalog, so there is no problem
-  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/file2", kLookupFull, &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/file2", kLookupFull, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // /dir/dir/dir/file4 belongs to a catalog that is not mounted yet
-  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupSole,
-                                       &dirent));
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupSole,
+                                      &dirent));
   // the new catalog should be mounted now
-  EXPECT_EQ(2, catalog_mgr_->GetNumCatalogs());
+  EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
 
-  // the father directory should also belong to the nested catalo
-  EXPECT_TRUE(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupFull,
-                                       &dirent));
+  // the father directory should also belong to the nested catalog
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupFull,
+                                      &dirent));
   // it is not a symplink, so it should crash
-  EXPECT_DEATH(catalog_mgr_->LookupPath("/dir/dir/dir/file4", kLookupRawSymlink,
-                                         &dirent), ".*");
-  EXPECT_EQ(2, catalog_mgr_->GetNumCatalogs());
+  EXPECT_DEATH(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupRawSymlink,
+                                      &dirent), ".*");
+
+  // load the next catalog
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
+                                      kLookupFull, &dirent));
+  // the new catalog should be mounted now
+  EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+}
+
+TEST_F(T_CatalogManager, LongLookup) {
+  catalog::DirectoryEntry dirent;
+  ASSERT_TRUE(catalog_mgr_.Init());
+  AddTree();
+  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/dir/dir/file5",
+                                      kLookupFull, &dirent));
+  EXPECT_TRUE(dirent.IsRegular());
+  // we should have mounted two catalogs
+  EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
 }
 
 TEST_F(T_CatalogManager, Listing) {
   catalog::DirectoryEntry dirent;
-  ASSERT_TRUE(catalog_mgr_->Init());
+  ASSERT_TRUE(catalog_mgr_.Init());
   AddTree();
   DirectoryEntryList del;
-  EXPECT_FALSE(catalog_mgr_->Listing("/fakepath", &del));
+  EXPECT_FALSE(catalog_mgr_.Listing("/fakepath", &del));
   EXPECT_EQ(0u, del.size());
-  EXPECT_TRUE(catalog_mgr_->Listing("/dir/dir", &del));
+  EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir", &del));
   EXPECT_EQ(2u, del.size());
   // now it will have to mount the nested catalog
-  EXPECT_TRUE(catalog_mgr_->Listing("/dir/dir/dir", &del));
-  EXPECT_EQ(2u, del.size());
-  EXPECT_EQ(2, catalog_mgr_->GetNumCatalogs());
+  EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir", &del));
+  EXPECT_EQ(3u, del.size());
+  EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
+  // mounting the next nested catalog
+  EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir", &del));
+  EXPECT_EQ(1u, del.size());
+  EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+}
+
+TEST_F(T_CatalogManager, LongListing) {
+  catalog::DirectoryEntry dirent;
+  ASSERT_TRUE(catalog_mgr_.Init());
+  AddTree();
+  DirectoryEntryList del;
+  // mounting the directly the deepest nested catalog
+  EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir", &del));
+  EXPECT_EQ(1u, del.size());
+  EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
+}
+
+TEST_F(T_CatalogManager, FailListing) {
+  catalog::DirectoryEntry dirent;
+  ASSERT_TRUE(catalog_mgr_.Init());
+  AddTree();
+  DirectoryEntryList del;
+  // trying with a fake path inside the nested catalog
+  EXPECT_EQ(1, catalog_mgr_.GetNumCatalogs());
+  EXPECT_FALSE(catalog_mgr_.Listing("/dir/dir/dir/fakedir", &del));
+  EXPECT_EQ(0u, del.size());
+  // even though the listing failed it should have loaded the nested catalog
+  EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
+  //trying now with the next nested catalog
+  EXPECT_FALSE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir/fakedir", &del));
+  EXPECT_EQ(0u, del.size());
+  EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
 }
 
 TEST_F(T_CatalogManager, Remount) {
-  EXPECT_TRUE(catalog_mgr_->Init());
+  EXPECT_TRUE(catalog_mgr_.Init());
   LoadError le;
-  EXPECT_EQ(kLoadNew, le = catalog_mgr_->Remount(true));
+  EXPECT_EQ(kLoadNew, le = catalog_mgr_.Remount(true));
   EXPECT_EQ("loaded new catalog", Code2Ascii(le));
-  EXPECT_EQ(kLoadNew, catalog_mgr_->Remount(false));
+  EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
 }
 
 }
