@@ -5,10 +5,6 @@
 #ifndef CVMFS_CATALOG_MGR_IMPL_H_
 #define CVMFS_CATALOG_MGR_IMPL_H_
 
-/**
- * This file is part of the CernVM File System
- */
-
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
