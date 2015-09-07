@@ -555,8 +555,9 @@ CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(const PathString &path) 
  * @return true if catalog is already present, false otherwise
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
-                                        CatalogT **attached_catalog) const
+bool AbstractCatalogManager<CatalogT>::IsAttached(
+    const PathString &root_path,
+    CatalogT **attached_catalog) const
 {
   if (catalogs_.size() == 0)
     return false;
@@ -577,9 +578,10 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
  * The final leaf nested catalog is returned.
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
-                                          const CatalogT *entry_point,
-                                          CatalogT **leaf_catalog)
+bool AbstractCatalogManager<CatalogT>::MountSubtree(
+    const PathString &path,
+    const CatalogT *entry_point,
+    CatalogT **leaf_catalog)
 {
   bool result = true;
   CatalogT *parent = (entry_point == NULL) ?
@@ -629,9 +631,10 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
  * Loading of catalogs is implemented by derived classes.
  */
 template <class CatalogT>
-CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(const PathString &mountpoint,
-                                              const shash::Any &hash,
-                                              CatalogT *parent_catalog)
+CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
+    const PathString &mountpoint,
+    const shash::Any &hash,
+    CatalogT *parent_catalog)
 {
   CatalogT *attached_catalog = NULL;
   if (IsAttached(mountpoint, &attached_catalog))
@@ -780,7 +783,7 @@ string AbstractCatalogManager<CatalogT>::PrintHierarchyRecursively(
   CatalogList children = catalog->GetChildren();
   typename CatalogList::const_iterator i = children.begin();
   typename CatalogList::const_iterator iend = children.end();
-  for (;i != iend; ++i) {
+  for (; i != iend; ++i) {
     output += PrintHierarchyRecursively(*i, level + 1);
   }
 
@@ -802,4 +805,4 @@ void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {
 
 
 
-#endif /* CVMFS_CATALOG_MGR_IMPL_H_ */
+#endif  /* CVMFS_CATALOG_MGR_IMPL_H_ */

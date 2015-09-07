@@ -139,6 +139,8 @@ class RemountListener {
  *
  * The loading / creating of catalogs is up to derived classes.
  *
+ * CatalogT is either Catalog or MockCatalog.
+ *
  * Usage:
  *   DerivedCatalogManager *catalog_manager = new DerivedCatalogManager();
  *   catalog_manager->Init();
@@ -149,7 +151,6 @@ class AbstractCatalogManager : public SingleCopy {
  public:
   typedef std::vector<CatalogT*> CatalogList;
 
- public:
   static const inode_t kInodeOffset = 255;
   explicit AbstractCatalogManager(perf::Statistics *statistics);
   virtual ~AbstractCatalogManager();
