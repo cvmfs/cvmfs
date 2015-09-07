@@ -29,7 +29,7 @@ class Statistics;
 
 namespace catalog {
 
-class SimpleCatalogManager : public AbstractCatalogManager {
+class SimpleCatalogManager : public AbstractCatalogManager<Catalog> {
  public:
   SimpleCatalogManager(
     const shash::Any           &base_hash,
@@ -38,7 +38,7 @@ class SimpleCatalogManager : public AbstractCatalogManager {
     download::DownloadManager  *download_manager,
     perf::Statistics           *statistics,
     const bool                  manage_catalog_files = false)
-    : AbstractCatalogManager(statistics)
+    : AbstractCatalogManager<Catalog>(statistics)
     , base_hash_(base_hash)
     , stratum0_(stratum0)
     , dir_temp_(dir_temp)

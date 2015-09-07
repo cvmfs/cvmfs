@@ -10,11 +10,13 @@
 #include <sys/types.h>
 
 #include <ctime>
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
+#include "../../cvmfs/catalog_mgr.h"
 #include "../../cvmfs/directory_entry.h"
 #include "../../cvmfs/hash.h"
 #include "../../cvmfs/history.h"
@@ -347,6 +349,22 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     --MockCatalog::instances;
   }
 
+  std::vector<MockCatalog*> GetChildren() const {
+    return std::vector<MockCatalog*>();
+  }
+  bool HasParent() const { return parent_ != NULL; }
+  void RemoveChild(MockCatalog *child) { }
+  catalog::InodeRange inode_range() const { return catalog::InodeRange(); }
+  bool OpenDatabase(const std::string &db_path) { return true; }
+  uint64_t max_row_id() const { return std::numeric_limits<uint64_t>::max(); }
+  void set_inode_range(const catalog::InodeRange value) { }
+  void SetInodeAnnotation(catalog::InodeAnnotation *new_annotation) { }
+  void SetOwnerMaps(const catalog::OwnerMap *uid_map,
+                    const catalog::OwnerMap *gid_map) { }
+  bool IsInitialized() const { return true; }
+  MockCatalog* FindSubtree(const PathString &path) const { return NULL; }
+
+
  protected:
   // silence coverity
   MockCatalog& operator= (const MockCatalog &other);
@@ -416,6 +434,31 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
   mutable HashVector  referenced_objects_;
 };
+
+//------------------------------------------------------------------------------
+
+namespace catalog {
+
+
+class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
+ public:
+  explicit MockCatalogManager(perf::Statistics *statistics) :
+    AbstractCatalogManager<MockCatalog>(statistics) { }
+
+  virtual LoadError LoadCatalog(const PathString &mountpoint,
+                                const shash::Any &hash,
+                                std::string  *catalog_path,
+                                shash::Any   *catalog_hash)
+  {
+    return kLoadNew;
+  }
+
+  virtual Catalog* CreateCatalog(const PathString  &mountpoint,
+                                 const shash::Any  &catalog_hash,
+                                 Catalog *parent_catalog);
+};
+
+}  // namespace catalog
 
 
 //------------------------------------------------------------------------------

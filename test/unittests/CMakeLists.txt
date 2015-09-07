@@ -167,8 +167,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/quota.h
   ${CVMFS_SOURCE_DIR}/quota.cc
-  ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_impl.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_client.h
   ${CVMFS_SOURCE_DIR}/backoff.h
