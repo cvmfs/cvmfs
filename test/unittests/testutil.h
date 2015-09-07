@@ -10,6 +10,7 @@
 #include <sys/types.h>
 
 #include <ctime>
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -441,7 +442,7 @@ namespace catalog {
 
 class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
  public:
-  MockCatalogManager(perf::Statistics *statistics) :
+  explicit MockCatalogManager(perf::Statistics *statistics) :
     AbstractCatalogManager<MockCatalog>(statistics) { }
 
   virtual LoadError LoadCatalog(const PathString &mountpoint,
@@ -449,17 +450,15 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
                                 std::string  *catalog_path,
                                 shash::Any   *catalog_hash)
   {
-
     return kLoadNew;
   }
 
   virtual Catalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,
                                  Catalog *parent_catalog);
-
 };
 
-} // namespace catalog
+}  // namespace catalog
 
 
 //------------------------------------------------------------------------------

@@ -30,4 +30,4 @@ namespace catalog {
 
 
 
-}
+}  // namespace catalog

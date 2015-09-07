@@ -1,8 +1,5 @@
 /*
- * catalog_mgr_impl.h
- *
- *  Created on: Aug 13, 2015
- *      Author: molina
+ * This file is part of the CernVM File System
  */
 
 #ifndef CVMFS_CATALOG_MGR_IMPL_H_
@@ -20,6 +17,7 @@
 #include <inttypes.h>
 
 #include <cassert>
+#include <string>
 
 #include "logging.h"
 #include "shortstring.h"
@@ -32,7 +30,8 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 template <class CatalogT>
-AbstractCatalogManager<CatalogT>::AbstractCatalogManager(perf::Statistics *statistics) :
+AbstractCatalogManager<CatalogT>::AbstractCatalogManager(
+    perf::Statistics *statistics) :
   statistics_(statistics) {
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager<CatalogT>::kInodeOffset;
@@ -56,15 +55,16 @@ AbstractCatalogManager<CatalogT>::~AbstractCatalogManager() {
 }
 
 template <class CatalogT>
-void AbstractCatalogManager<CatalogT>::SetInodeAnnotation(InodeAnnotation *new_annotation)
-{
+void AbstractCatalogManager<CatalogT>::SetInodeAnnotation(
+    InodeAnnotation *new_annotation) {
   assert(catalogs_.empty() || (new_annotation == inode_annotation_));
   inode_annotation_ = new_annotation;
 }
 
 template <class CatalogT>
-void AbstractCatalogManager<CatalogT>::SetOwnerMaps(const OwnerMap &uid_map,
-                                          const OwnerMap &gid_map)
+void AbstractCatalogManager<CatalogT>::SetOwnerMaps(
+    const OwnerMap &uid_map,
+    const OwnerMap &gid_map)
 {
   uid_map_ = uid_map;
   gid_map_ = gid_map;
@@ -528,7 +528,8 @@ void AbstractCatalogManager<CatalogT>::ReleaseInodes(const InodeRange chunk) {
  * @return the catalog which is best fitting at the given path
  */
 template <class CatalogT>
-CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(const PathString &path) const {
+CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(
+    const PathString &path) const {
   assert(catalogs_.size() > 0);
 
   // Start at the root catalog and successively go down the catalog tree
@@ -668,8 +669,9 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
  * @return true on success, false otherwise
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
-                                           CatalogT *new_catalog)
+bool AbstractCatalogManager<CatalogT>::AttachCatalog(
+    const string &db_path,
+    CatalogT *new_catalog)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "attaching catalog file %s",
            db_path.c_str());
@@ -802,4 +804,4 @@ void AbstractCatalogManager<CatalogT>::EnforceSqliteMemLimit() {
 
 
 
-#endif  /* CVMFS_CATALOG_MGR_IMPL_H_ */
+#endif  // CVMFS_CATALOG_MGR_IMPL_H_
