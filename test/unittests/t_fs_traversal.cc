@@ -129,7 +129,7 @@ class T_FsTraversal : public ::testing::Test {
   typedef std::map<std::string, Checklist> ChecklistMap;
 
  protected:
-  T_FsTraversal() : tmp_path_("/tmp") {}
+  T_FsTraversal() : tmp_path_(".") {}
 
   virtual void SetUp() {
     // create a testbed directory

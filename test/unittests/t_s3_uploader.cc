@@ -518,7 +518,7 @@ class T_S3Uploader : public FileSandbox {
 };
 atomic_int64 T_S3Uploader::gSeed = 0;
 
-const std::string T_S3Uploader::sandbox_path = "/tmp/cvmfs_ut_s3uploader";
+const std::string T_S3Uploader::sandbox_path = "./cvmfs_ut_s3uploader";
 const std::string T_S3Uploader::tmp_dir =
   T_S3Uploader::sandbox_path + "/tmp";
 const std::string T_S3Uploader::dest_dir = T_S3Uploader::sandbox_path + "/dest";

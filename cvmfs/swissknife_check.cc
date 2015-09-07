@@ -401,7 +401,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
 string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
   string source = "data/" + catalog_hash.MakePath();
-  const string dest = "/tmp/" + catalog_hash.ToString();
+  const string dest = temp_directory_ + "/" + catalog_hash.ToString();
   const string url = *remote_repository + "/" + source;
   download::JobInfo download_catalog(&url, true, false, &dest, &catalog_hash);
   download::Failures retval = g_download_manager->Fetch(&download_catalog);
@@ -417,7 +417,7 @@ string CommandCheck::DownloadPiece(const shash::Any catalog_hash) {
 
 string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
   string source = "data/" + catalog_hash.MakePath();
-  const string dest = "/tmp/" + catalog_hash.ToString();
+  const string dest = temp_directory_ + "/" + catalog_hash.ToString();
   if (!zlib::DecompressPath2Path(source, dest))
     return "";
 
@@ -570,8 +570,11 @@ bool CommandCheck::InspectTree(const string &path,
 int CommandCheck::Main(const swissknife::ArgumentList &args) {
   string tag_name;
   check_chunks = false;
-  if (args.find('t') != args.end())
-    tag_name = *args.find('t')->second;
+
+  temp_directory_ = (args.find('t') != args.end()) ? *args.find('t')->second
+                                                   : "/tmp";
+  if (args.find('n') != args.end())
+    tag_name = *args.find('n')->second;
   if (args.find('c') != args.end())
     check_chunks = true;
   if (args.find('l') != args.end()) {

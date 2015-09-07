@@ -6,18 +6,6 @@
 # backwards compatibility). Please don't change it unless you know what
 # you're doing.
 Vagrant.configure(2) do |config|
-  config.vm.box = "cernvm"
-  # config.vm.box_url = ... TODO(reneme): maybe add later for convenience
-
-  config.vm.boot_timeout = 1200 # CernVM might load stuff over a slow network
-                                # and need a lot of time on first boot up
-
-  config.vm.network "private_network", ip: "192.168.33.10"
-
-  # config.vm.synced_folder '.', '/vagrant', nfs: true   TODO(reneme): quicker!
-
-  config.vm.provision "shell", path: "vagrant/provision_cernvm.sh"
-
   # allow virtual box to take advantage of the host's speed
   # Snippet found here (thanks to Stefan Wrobel): 
   # https://stefanwrobel.com/how-to-make-vagrant-performance-not-suck
@@ -40,5 +28,41 @@ Vagrant.configure(2) do |config|
 
     v.customize ["modifyvm", :id, "--memory", mem]
     v.customize ["modifyvm", :id, "--cpus", cpus]
+  end
+
+  config.vm.define "cernvm" do |cvm|
+    cvm.vm.box = "cernvm"
+    # cvm.vm.box_url = ... TODO(reneme): maybe add later for convenience
+
+    cvm.vm.boot_timeout = 1200 # CernVM might load stuff over a slow network
+                                  # and need a lot of time on first boot up
+
+    cvm.vm.network "private_network", ip: "192.168.33.10"
+
+    # cvm.vm.synced_folder '.', '/vagrant', nfs: true   TODO(reneme): quicker!
+
+    cvm.vm.provision "shell", path: "vagrant/provision_cernvm.sh"
+  end
+
+  config.vm.define "slc6" do |slc6|
+    unless Vagrant.has_plugin?("vagrant-reload")
+      puts "-------------------- WARNING --------------------"
+      puts "Vagrant plugin 'vagrant-reload' is not installed."
+      puts "Please run: vagrant plugin install vagrant-reload"
+      puts "-------------------------------------------------"
+    end
+
+    slc6.vm.box = "bytepark/scientific-6.5-64"
+    slc6.vm.network "private_network", ip: "192.168.33.11"
+    slc6.vm.synced_folder '.', '/vagrant', nfs: true
+
+    slc6.vm.provision "shell", path: "vagrant/provision_slc6.sh"
+    slc6.vm.provision :reload
+  end
+
+  config.vm.define "ubuntu" do |ub|
+    ub.vm.box = "ubuntu-trusty"
+    ub.vm.network "private_network", ip: "192.168.33.12"
+    ub.vm.synced_folder '.', '/vagrant', nfs: true
   end
 end

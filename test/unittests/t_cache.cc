@@ -31,7 +31,7 @@ class T_CacheManager : public ::testing::Test {
   virtual void SetUp() {
     used_fds_ = GetNoUsedFds();
 
-    tmp_path_ = CreateTempDir("/tmp/cvmfs_test");
+    tmp_path_ = CreateTempDir("./cvmfs_ut_cache_manager");
     cache_mgr_ = PosixCacheManager::Create(tmp_path_, false);
     ASSERT_TRUE(cache_mgr_ != NULL);
     alien_cache_mgr_ = PosixCacheManager::Create(tmp_path_, true);

@@ -95,7 +95,7 @@ class T_UidMap : public ::testing::Test {
 };
 
 template <typename MapT>
-const std::string T_UidMap<MapT>::sandbox = "/tmp/cvmfs_ut_uid_map";
+const std::string T_UidMap<MapT>::sandbox = "./cvmfs_ut_uid_map";
 
 typedef ::testing::Types<
   UidMap,

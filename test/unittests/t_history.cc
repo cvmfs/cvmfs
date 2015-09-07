@@ -304,7 +304,7 @@ class T_History : public ::testing::Test {
 };
 
 template <class HistoryT>
-const std::string T_History<HistoryT>::sandbox = "/tmp/cvmfs_ut_history";
+const std::string T_History<HistoryT>::sandbox = "./cvmfs_ut_history";
 
 template <class HistoryT>
 const std::string T_History<HistoryT>::fqrn    = "test.cern.ch";

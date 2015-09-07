@@ -82,7 +82,7 @@ static void RevertToRevision0(catalog::CatalogDatabase *db) {
 
 TEST_F(T_CatalogSql, SchemaMigration) {
   string path;
-  FILE *ftmp = CreateTempFile("/tmp/cvmfs-test", 0600, "w+", &path);
+  FILE *ftmp = CreateTempFile("./cvmfs_ut_catalog_sql", 0600, "w+", &path);
   ASSERT_TRUE(ftmp != NULL);
   fclose(ftmp);
   UnlinkGuard unlink_guard(path);

@@ -193,17 +193,26 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
   }
 
   const std::string final_path = "data/" + content_hash.MakePath();
-  retval = Move(local_handle->temporary_path.c_str(), final_path.c_str());
-  if (retval != 0) {
-    const int cpy_errno = errno;
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move temp file '%s' to "
-                                          "final location '%s' (errno: %d)",
-             local_handle->temporary_path.c_str(),
-             final_path.c_str(),
-             cpy_errno);
-    atomic_inc32(&copy_errors_);
-    Respond(handle->commit_callback, UploaderResults(cpy_errno));
-    return;
+  if (!Peek(final_path)) {
+    retval = Move(local_handle->temporary_path, final_path);
+    if (retval != 0) {
+      const int cpy_errno = errno;
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move temp file '%s' to "
+                                            "final location '%s' (errno: %d)",
+               local_handle->temporary_path.c_str(),
+               final_path.c_str(),
+               cpy_errno);
+      atomic_inc32(&copy_errors_);
+      Respond(handle->commit_callback, UploaderResults(cpy_errno));
+      return;
+    }
+  } else {
+    const int retval = unlink(local_handle->temporary_path.c_str());
+    if (retval != 0) {
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to remove temporary '%s' "
+                                            "(errno: %d)",
+               local_handle->temporary_path.c_str(), errno);
+    }
   }
 
   const CallbackTN *callback = handle->commit_callback;

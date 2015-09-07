@@ -90,9 +90,7 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
       sha1_retval = SHA1_Final(sha1_digest_, &sha_context);
       ASSERT_EQ(1, sha1_retval) << "failed to finalize SHA1 checksum";
 
-      recomputed_content_hash = shash::Any(shash::kSha1,
-                                           sha1_digest_,
-                                           SHA_DIGEST_LENGTH);
+      recomputed_content_hash = shash::Any(shash::kSha1, sha1_digest_);
     }
 
     shash::Any     computed_content_hash;
