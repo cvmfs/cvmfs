@@ -19,7 +19,7 @@ namespace tracer {
 class T_Tracer : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    trace_file_ = CreateTempPath("/tmp/cvmfs-test", 0600);
+    trace_file_ = CreateTempPath("./cvmfs_ut_tracer", 0600);
     EXPECT_NE("", trace_file_);
   }
 

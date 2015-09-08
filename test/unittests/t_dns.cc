@@ -29,7 +29,7 @@ class T_Dns : public ::testing::Test {
       CaresResolver::Create(true /* ipv4_only */, 1 /* retries */, 2000);
     ASSERT_TRUE(ipv4_resolver);
 
-    fhostfile = CreateTempFile("/tmp/cvmfstest", 0600, "w", &hostfile);
+    fhostfile = CreateTempFile("./cvmfs_ut_dns", 0600, "w", &hostfile);
     ASSERT_TRUE(fhostfile);
     hostfile_resolver = HostfileResolver::Create(hostfile, false);
     ASSERT_TRUE(hostfile_resolver);

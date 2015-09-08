@@ -7,7 +7,7 @@
 set -e
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
-. ${SCRIPT_LOCATION}/common.sh
+. ${SCRIPT_LOCATION}/../common.sh
 
 if [ $# -lt 2 ]; then
   echo "Usage: $0 <CernVM-FS source directory> <build result location> [<nightly build number>]"
@@ -18,6 +18,8 @@ fi
 CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
+
+CVMFS_BUILD_ARCH="${CVMFS_BUILD_ARCH:=native}"
 
 CVMFS_CONFIG_PACKAGE="cvmfs-config-default-1.2-1.noarch.rpm"
 
@@ -66,10 +68,33 @@ else
   echo "creating release: $cvmfs_version"
 fi
 
-echo "building..."
-rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
-         --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
-         -ba $spec_file
+if [ x"$CVMFS_BUILD_ARCH" = x"native" ]; then
+  default_arch="$(get_default_compiler_arch)"
+  echo "building ($default_arch)..."
+  rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
+           --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
+           --target="$default_arch"                         \
+           -ba $spec_file
+else
+  if [ $(id -u) -eq 0 ]; then
+    echo "ERROR: mock cannot run as root" >&2
+    exit 1
+  fi
+  mock_cfg=""
+  is_redhat && mock_cfg="epel-$(get_redhat_version)-$CVMFS_BUILD_ARCH"
+  echo "building source RPM (mock architecture $mock_cfg)..."
+  /usr/bin/mock -r $mock_cfg --buildsrpm                               \
+                             --spec=$CVMFS_RESULT_LOCATION/$spec_file  \
+                             --sources=$CVMFS_RESULT_LOCATION/SOURCES  \
+                             --resultdir=$CVMFS_RESULT_LOCATION
+
+  src_rpm="$(find $CVMFS_RESULT_LOCATION -type f -name "*.src.rpm")"
+  echo "source RPM: $src_rpm"
+
+  echo "building packages (mock architecture $mock_cfg)..."
+  /usr/bin/mock -r $mock_cfg --rebuild $src_rpm \
+                             --resultdir=$CVMFS_RESULT_LOCATION
+fi
 
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then

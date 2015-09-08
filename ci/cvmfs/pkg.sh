@@ -7,7 +7,7 @@
 set -e
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
-. ${SCRIPT_LOCATION}/common.sh
+. ${SCRIPT_LOCATION}/../common.sh
 
 if [ $# -lt 2 ]; then
   echo "Usage: $0 <CernVM-FS source directory> <build result location> [<nightly build number>]"
