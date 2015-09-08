@@ -168,53 +168,31 @@ shash::Any h(const std::string &hash, const shash::Suffix suffix) {
 
 namespace catalog {
 
-DirectoryEntry DirectoryEntryTestFactory::RegularFile(const string &name,
-                                                      unsigned size,
-                                                      shash::Any hash) {
+DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
-  dirent.name_ = NameString(name);
-  dirent.checksum_ = hash;
-  dirent.size_ = size;
-  dirent.is_nested_catalog_mountpoint_ = false;
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::Directory(
-    const string &name,
-    unsigned size,
-    shash::Any hash,
-    bool is_nested_catalog_mountpoint) {
+DirectoryEntry DirectoryEntryTestFactory::Directory() {
   DirectoryEntry dirent;
   dirent.mode_ = 16893;
-  dirent.name_ = NameString(name);
-  dirent.checksum_ = hash;
-  dirent.size_ = size;
-  dirent.is_nested_catalog_mountpoint_ = is_nested_catalog_mountpoint;
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::Symlink(const string &name,
-                                                  unsigned size,
-                                                  const string &symlink_path) {
+DirectoryEntry DirectoryEntryTestFactory::Symlink() {
   DirectoryEntry dirent;
   dirent.mode_ = 41471;
-  dirent.name_ = NameString(name);
-  dirent.size_ = size;
-  dirent.symlink_ = LinkString(symlink_path);
-  dirent.is_nested_catalog_mountpoint_ = false;
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash) {
+DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
   dirent.is_chunked_file_ = true;
-  dirent.checksum_ = content_hash;
-  dirent.is_nested_catalog_mountpoint_ = false;
   return dirent;
 }
 
@@ -231,7 +209,6 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
   dirent.linkcount_  = metadata.linkcount;
   dirent.has_xattrs_ = metadata.has_xattrs;
   dirent.checksum_   = metadata.checksum;
-  dirent.is_nested_catalog_mountpoint_ = false;
   return dirent;
 }
 
@@ -240,7 +217,6 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
 
 //------------------------------------------------------------------------------
 
-namespace catalog {
 
 unsigned int MockCatalog::instances = 0;
 
@@ -273,31 +249,20 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
 
 void MockCatalog::RemoveChild(MockCatalog *child) {
   std::vector<NestedCatalog>::iterator iter = active_children_.begin();
-  bool found = false;
-  while (!found && iter != active_children_.end()) {
+  while (iter != active_children_.end()) {
     if (iter->hash == child->hash()) {
       active_children_.erase(iter);
-      found = true;
+      return;
     }
     iter++;
   }
 }
 
-MockCatalog* MockCatalog::FindSubtree(const PathString &path) {
-  NestedCatalogList::iterator it;
-  DirectoryEntry dummy;
+MockCatalog* MockCatalog::FindSubtree(const PathString &path) const {
   for (unsigned i = 0; i < active_children_.size(); ++i) {
-    if (active_children_[i].child->LookupPath(path, &dummy))
+    if (active_children_[i].path == path)
       return active_children_[i].child;
   }
-  /*for (it = children_.begin(); it != children_.end(); ++it) {
-    if (it->child->LookupPath(path, &dummy)) {
-      MockCatalog *child = it->child;
-      AddChild(child);
-      children_.erase(it);
-      return child;
-    }
-  }*/
   return NULL;
 }
 
@@ -315,18 +280,13 @@ bool MockCatalog::LookupPath(const PathString &path,
 
 bool MockCatalog::ListingPath(const PathString &path,
                  catalog::DirectoryEntryList *listing) const {
-  listing->clear();
-  bool found = false;
+  unsigned initial_size = listing->size();
+  shash::Md5 path_hash(path.GetChars(), path.GetLength());
   for (unsigned i = 0; i < files_.size(); ++i) {
-    shash::Md5 path_hash(path.GetChars(), path.GetLength());
-    if (files_[i].parent_hash == path_hash && files_[i].path_hash != path_hash)
+    if (files_[i].parent_hash == path_hash)
       listing->push_back(files_[i].ToDirectoryEntry());
-    else if (files_[i].path_hash == path_hash)
-      found = true;
   }
-  if (!found)  // the parent does not exists, nor the children then
-    listing->clear();
-  return found;
+  return listing->size() > initial_size;
 }
 
 void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
@@ -423,8 +383,6 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
   return kLoadNew;
 }
 
-}  // namespace catalog
-
 
 //------------------------------------------------------------------------------
 
@@ -432,10 +390,9 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   const uint64_t    catalog_size = 0;
   const std::string root_path    = "";
-  manifest::Manifest* manifest = new manifest::Manifest(
-      catalog::MockCatalog::root_hash,
-      catalog_size,
-      root_path);
+  manifest::Manifest* manifest = new manifest::Manifest(MockCatalog::root_hash,
+                                                        catalog_size,
+                                                        root_path);
   manifest->set_history(MockHistory::root_hash);
   return manifest;
 }
@@ -446,6 +403,7 @@ bool MockObjectFetcher::Fetch(const shash::Any &object_hash,
   *file_path = object_hash.ToString();
   return true;
 }
+
 
 //------------------------------------------------------------------------------
 

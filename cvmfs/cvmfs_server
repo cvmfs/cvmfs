@@ -2233,7 +2233,7 @@ _update_geodb_days_since_update() {
 
 _update_geodb_lazy_install_slot() {
   [ "`date +%w`" -eq "$CVMFS_UPDATEGEO_DAY"  ] && \
-  [ "`date +%k`" -gt "$CVMFS_UPDATEGEO_HOUR" ]
+  [ "`date +%k`" -ge "$CVMFS_UPDATEGEO_HOUR" ]
 }
 
 _update_geodb_install() {
@@ -2312,7 +2312,8 @@ _update_geodb() {
       return 0
     fi
   else
-    echo "GeoIP Database is up to date. Nothing to do."
+    local days_old=$(_update_geodb_days_since_update)
+    echo "GeoIP Database is up to date ($days_old days old). Nothing to do."
     return 0
   fi
 
@@ -2321,10 +2322,6 @@ _update_geodb() {
 }
 
 update_geodb() {
-  local dbdir=$CVMFS_UPDATEGEO_DIR
-  local dbfile=$CVMFS_UPDATEGEO_DB
-  [ -w "$dbdir"  ] || die "Directory '$dbdir' not writable by $(whoami)"
-  [ ! -f "$dbfile" ] || [ -w "$dbfile" ] || die "GeoIP database '$dbfile' is not writable by $(whoami)"
   _update_geodb $@
 }
 
@@ -2714,7 +2711,14 @@ add_replica() {
     if [ $silence_httpd_warning -eq 0 ]; then
       check_apache || die "Apache must be installed and running"
       check_wsgi_module
-      [ x"$cvmfs_user" = x"root" ] || echo "NOTE: If snapshot is not run regularly as root, do update-geodb monthly from cron"
+      if [ x"$cvmfs_user" != x"root" ]; then
+        echo "NOTE: If snapshot is not run regularly as root, the GeoIP database will not be updated."
+        echo "      You have three options:"
+        echo "      1. chown $CVMFS_UPDATEGEO_DIR and $CVMFS_UPDATEGEO_DB accordingly OR"
+        echo "      2. run update-geodb monthly as root OR"
+        echo "      3. chown $CVMFS_UPDATEGEO_DIR and $CVMFS_UPDATEGEO_DB to a dedicated"
+        echo "         user ID and run update-geodb monthly as that user"
+      fi
     else
       check_apache || echo "Warning: Apache is needed to access this CVMFS replication"
     fi
@@ -3218,20 +3222,27 @@ list_catalogs() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  health_check $name $silence_warnings
 
   # get repository information
   load_repo_config $name
+
+  # more sanity checks
+  is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  health_check $name $silence_warnings
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
 
   # do it!
-  __swissknife lsrepo         \
-    -r $CVMFS_STRATUM0        \
-    -n $CVMFS_REPOSITORY_NAME \
-    -k $CVMFS_PUBLIC_KEY      \
-    $param_list
+  local user_shell="$(get_user_shell $name)"
+  local lsrepo_cmd
+  lsrepo_cmd="$(__swissknife_cmd dbg) lsrepo     \
+                       -r $CVMFS_STRATUM0        \
+                       -n $CVMFS_REPOSITORY_NAME \
+                       -k $CVMFS_PUBLIC_KEY      \
+                       -l ${CVMFS_SPOOL_DIR}/tmp \
+                       $param_list"
+  $user_shell "$lsrepo_cmd"
 }
 
 
@@ -3355,6 +3366,7 @@ tag() {
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
   load_repo_config $name
+  is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   is_stratum0 $name                || die "This is not a stratum 0 repository"
   ! is_publishing $name            || die "Repository is currently publishing"
   health_check $name $silence_warnings
@@ -3398,7 +3410,6 @@ tag() {
   # all following commands need an open repository transaction and are supposed
   # to commit or abort it after performing a tag database manipulation. Hence,
   # they also need to performed by the repository owner or root
-  is_owner_or_root $name                    || die "Permission denied: Repository $name is owned by $CVMFS_USER"
   [ ! -z "$tag_name" -o ! -z "$tag_names" ] || die "Tag name missing"
   echo "$tag_name" | grep -q -v " "         || die "Spaces are not allowed in tag names"
 
@@ -3502,7 +3513,7 @@ check() {
         check_integrity=1
       ;;
       t)
-        tag="-t $OPTARG"
+        tag="-n $OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3518,10 +3529,13 @@ check() {
 
   # sanity checks
   check_repository_existence $name || die "The repository $name does not exist"
-  health_check $name
 
   # get repository information
   load_repo_config $name
+
+  # more sanity checks
+  is_owner_or_root $name || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  health_check $name
 
   # check if repository is compatible to the installed CernVM-FS version
   check_repository_compatibility
@@ -3545,7 +3559,14 @@ check() {
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
   echo "Verifying Catalog Integrity of $name ..."
-  __swissknife check $tag $check_chunks_param $log_level_param -r $stratum0
+  local user_shell="$(get_user_shell $name)"
+  local check_cmd
+  check_cmd="$(__swissknife_cmd dbg) check $tag  \
+                     $check_chunks_param         \
+                     $log_level_param            \
+                     -r $stratum0                \
+                     -t ${CVMFS_SPOOL_DIR}/tmp"
+  $user_shell "$check_cmd"
 }
 
 
@@ -4378,19 +4399,23 @@ snapshot() {
     # more sanity checks
     is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
     check_repository_compatibility
-    if is_local_upstream $CVMFS_UPSTREAM_STORAGE && check_apache; then
-        # this might have been missed if add-replica -a was used or
-        #  if a migrate was done while apache wasn't running, but then
-        #  apache was enabled later
-        check_wsgi_module
-        # try to update the geodb, but continue if it doesn't work
-        _update_geodb -l || true
-    fi
     [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
     gc_timespan="$(get_auto_garbage_collection_timespan $alias_name)" || { retcode=1; continue; }
+    if is_local_upstream $CVMFS_UPSTREAM_STORAGE && is_root && check_apache; then
+      # this might have been missed if add-replica -a was used or
+      #  if a migrate was done while apache wasn't running, but then
+      #  apache was enabled later
+      # unfortunately we can only check it if snapshot is run as root...
+      check_wsgi_module
+    fi
 
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
+
+    if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+        # try to update the geodb, but continue if it doesn't work
+        _update_geodb -l || true
+    fi
 
     local initial_snapshot=0
     if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then

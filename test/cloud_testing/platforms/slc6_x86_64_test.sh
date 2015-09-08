@@ -116,6 +116,7 @@ if [ $s3_retval -eq 0 ]; then
                                src/585-xattrs                               \
                                src/591-importrepo                           \
                                src/594-backendoverwrite                     \
+                               src/595-geoipdbupdate                        \
                                --                                           \
                                src/5* || retval=1
 

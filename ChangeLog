@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix leak of temporary files in .cvmfsdirtab handling (CVM-818)
   * Allow geodb update for non-root users (CVM-895)
   * Don't commit exisiting files to local storage backend in server (CVM-894)
   * Fix stale lock file on server machine crash (CVM-810)

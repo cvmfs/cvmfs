@@ -400,6 +400,10 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     --MockCatalog::instances;
   }
 
+  /**
+   * Adds a new catalog to the mounted children list
+   * @param child new catalog-child to be added
+   */
   void AddChild(MockCatalog *child);
 
   std::vector<MockCatalog*> GetChildren() const {
@@ -409,6 +413,10 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     return children_arr;
   }
   bool HasParent() const { return parent_ != NULL; }
+  /**
+   * Removes a catalog from the already mounted catalog list
+   * @param child catalog to be removed form the active catalog list
+   */
   void RemoveChild(MockCatalog *child);
   InodeRange inode_range() const { return InodeRange(); }
   bool OpenDatabase(const std::string &db_path) {
@@ -475,6 +483,10 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   void set_parent(MockCatalog *parent) { parent_ = parent; }
 
  public:
+  /**
+   * Adds the catalog to the unmounted catalog list
+   * @param child new catalog to be added to the unmounted catalog list
+   */
   void RegisterNestedCatalog(MockCatalog *child);
   void AddFile(const shash::Any &content_hash,
                const size_t file_size,

@@ -134,7 +134,7 @@ class T_SQLite_Wrapper : public ::testing::Test {
   }
 };
 
-const std::string T_SQLite_Wrapper::sandbox = "/tmp/cvmfs_ut_sqlite_wrapper";
+const std::string T_SQLite_Wrapper::sandbox = "./cvmfs_ut_sqlite_wrapper";
 
 
 TEST_F(T_SQLite_Wrapper, Initialize) {}

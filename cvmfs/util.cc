@@ -603,6 +603,15 @@ string CreateTempDir(const std::string &path_prefix) {
 
 
 /**
+ * Get the current working directory of the running process
+ */
+std::string GetCurrentWorkingDirectory() {
+  char cwd[PATH_MAX];
+  return (getcwd(cwd, sizeof(cwd)) != NULL) ? std::string(cwd) : std::string();
+}
+
+
+/**
  * Helper class that provides callback funtions for the file system traversal.
  */
 class RemoveTreeHelper {

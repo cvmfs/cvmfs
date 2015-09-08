@@ -128,9 +128,7 @@ class AbstractCatalogManager;
  *
  * The loading / creating of catalogs is up to derived classes.
  *
- * Here CatalogT can be one of the following classes:
- *  - Catalog and derived classes: for normal functionality of CVMFS
- *  - MockCatalog: for testing the catalog manager
+ * CatalogT is either Catalog or MockCatalog.
  *
  * Usage:
  *   DerivedCatalogManager *catalog_manager = new DerivedCatalogManager();
@@ -141,7 +139,6 @@ template <class CatalogT>
 class AbstractCatalogManager : public SingleCopy {
  public:
   typedef std::vector<CatalogT*> CatalogList;
-  typedef CatalogT catalog_t;
 
   static const inode_t kInodeOffset = 255;
   explicit AbstractCatalogManager(perf::Statistics *statistics);
@@ -280,6 +277,7 @@ class AbstractCatalogManager : public SingleCopy {
    * Counts how often the inodes have been invalidated.
    */
   uint64_t incarnation_;
+  // TODO(molina) we could just add an atomic global counter instead
   InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;

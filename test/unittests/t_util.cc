@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <tbb/tbb_thread.h>
 #include <unistd.h>
 
@@ -48,11 +49,16 @@ class T_Util : public ::testing::Test {
     path_without_slash = "/my/path";
     fake_path = "mypath";
     to_write = "Hello, world!\n";
-    sandbox = CreateTempDir("/tmp/testutil");
+    sandbox = CreateTempDir(GetCurrentWorkingDirectory() + "/cvmfs_ut_util");
     socket_address = sandbox + "/mysocket";
     long_path = sandbox +
         "/path_path_path_path_path_path_path_path_path_path_path_path_path_"
         "path_path_path_path_path_path_path_path_path_path_path_path_path";
+
+    struct sockaddr_un sock_addr;
+    EXPECT_GT(sizeof(sock_addr.sun_path),
+              socket_address.length()) << "Socket path '" << socket_address
+                                       << "' seems to be bogus";
   }
 
   virtual void TearDown() {
@@ -1073,7 +1079,7 @@ TEST_F(T_Util, Shell) {
   char *buffer = static_cast<char*>(scalloc(buffer_size, sizeof(char)));
 
   EXPECT_TRUE(Shell(&fd_stdin, &fd_stdout, &fd_stderr));
-  string path = sandbox + "/" + "newfolder";
+  string path = sandbox + "/newfolder";
   string command = "mkdir -p " + path +  " && cd " + path + " && pwd\n";
   WritePipe(fd_stdin, command.c_str(), command.length());
   ReadPipe(fd_stdout, buffer, path.length());

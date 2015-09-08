@@ -543,7 +543,7 @@ class T_ObjectFetcher : public ::testing::Test {
 
 template <class ObjectFetcherT>
 const std::string T_ObjectFetcher<ObjectFetcherT>::sandbox =
-  "/tmp/cvmfs_ut_object_fetcher";
+  GetCurrentWorkingDirectory() + "/cvmfs_ut_object_fetcher";
 
 template <class ObjectFetcherT>
 const std::string T_ObjectFetcher<ObjectFetcherT>::fqrn = "test.cern.ch";
