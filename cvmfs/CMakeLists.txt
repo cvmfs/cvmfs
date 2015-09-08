@@ -490,8 +490,17 @@ if (BUILD_LIBCVMFS)
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
   target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
-
 endif (BUILD_LIBCVMFS)
+
+
+if (BUILD_OCTOPUS)
+  set (CVMFS_OCTOPUS_SOURCES
+    webapi/fcgi.h webapi/fcgi.cc
+    webapi/octopus.cc)
+
+  add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
+endif (BUILD_OCTOPUS)
+
 
 if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
