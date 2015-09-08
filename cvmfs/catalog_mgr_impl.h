@@ -1,4 +1,4 @@
-/*
+/**
  * This file is part of the CernVM File System
  */
 
@@ -52,15 +52,15 @@ AbstractCatalogManager<CatalogT>::~AbstractCatalogManager() {
 
 template <class CatalogT>
 void AbstractCatalogManager<CatalogT>::SetInodeAnnotation(
-    InodeAnnotation *new_annotation) {
+    InodeAnnotation *new_annotation)
+{
   assert(catalogs_.empty() || (new_annotation == inode_annotation_));
   inode_annotation_ = new_annotation;
 }
 
 template <class CatalogT>
-void AbstractCatalogManager<CatalogT>::SetOwnerMaps(
-    const OwnerMap &uid_map,
-    const OwnerMap &gid_map)
+void AbstractCatalogManager<CatalogT>::SetOwnerMaps(const OwnerMap &uid_map,
+                                          const OwnerMap &gid_map)
 {
   uid_map_ = uid_map;
   gid_map_ = gid_map;
@@ -170,7 +170,8 @@ void AbstractCatalogManager<CatalogT>::DetachNested() {
 /**
  * Perform a lookup for a specific DirectoryEntry in the catalogs.
  * @param path      the path to find in the catalogs
- * @param options   whether to perform another lookup to get the parent entry, too
+ * @param options   whether to perform another lookup to get the parent entry,
+ *                  too
  * @param dirent    the resulting DirectoryEntry, or special Negative entry
  *                  Note: can be set to zero if the result is not important
  * @return true if lookup succeeded otherwise false
@@ -549,9 +550,8 @@ CatalogT* AbstractCatalogManager<CatalogT>::FindCatalog(
  * @return true if catalog is already present, false otherwise
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::IsAttached(
-    const PathString &root_path,
-    CatalogT **attached_catalog) const
+bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
+                                        CatalogT **attached_catalog) const
 {
   if (catalogs_.size() == 0)
     return false;
@@ -572,10 +572,9 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(
  * The final leaf nested catalog is returned.
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::MountSubtree(
-    const PathString &path,
-    const CatalogT *entry_point,
-    CatalogT **leaf_catalog)
+bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
+                                          const CatalogT *entry_point,
+                                          CatalogT **leaf_catalog)
 {
   bool result = true;
   CatalogT *parent = (entry_point == NULL) ?
@@ -586,9 +585,10 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
   PathString path_slash(path);
   path_slash.Append("/", 1);
   perf::Inc(statistics_.n_nested_listing);
-  const Catalog::NestedCatalogList& nested_catalogs =
+  typedef typename CatalogT::NestedCatalogList NestedCatalogList;
+  const NestedCatalogList& nested_catalogs =
     parent->ListNestedCatalogs();
-  for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
+  for (typename NestedCatalogList::const_iterator i = nested_catalogs.begin(),
        iEnd = nested_catalogs.end(); i != iEnd; ++i)
   {
     // Next nesting level
@@ -626,9 +626,9 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(
  */
 template <class CatalogT>
 CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
-    const PathString &mountpoint,
-    const shash::Any &hash,
-    CatalogT *parent_catalog)
+                                              const PathString &mountpoint,
+                                              const shash::Any &hash,
+                                              CatalogT *parent_catalog)
 {
   CatalogT *attached_catalog = NULL;
   if (IsAttached(mountpoint, &attached_catalog))
@@ -665,9 +665,8 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
  * @return true on success, false otherwise
  */
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::AttachCatalog(
-    const string &db_path,
-    CatalogT *new_catalog)
+bool AbstractCatalogManager<CatalogT>::AttachCatalog(const string &db_path,
+                                           CatalogT *new_catalog)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "attaching catalog file %s",
            db_path.c_str());

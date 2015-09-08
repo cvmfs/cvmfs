@@ -217,6 +217,7 @@ class AbstractCatalogManager : public SingleCopy {
                                 shash::Any   *catalog_hash) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
+  const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }
 
   /**
    * Create a new Catalog object.
@@ -276,6 +277,7 @@ class AbstractCatalogManager : public SingleCopy {
    * Counts how often the inodes have been invalidated.
    */
   uint64_t incarnation_;
+  // TODO(molina) we could just add an atomic global counter instead
   InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;
