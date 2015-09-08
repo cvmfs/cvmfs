@@ -277,6 +277,7 @@ class AbstractCatalogManager : public SingleCopy {
    * Counts how often the inodes have been invalidated.
    */
   uint64_t incarnation_;
+  // TODO(molina) we could just add an atomic global counter instead
   InodeAnnotation *inode_annotation_;  /**< applied to all catalogs */
   pthread_rwlock_t *rwlock_;
   Statistics statistics_;

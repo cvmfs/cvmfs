@@ -25,8 +25,33 @@ class T_CatalogManager : public ::testing::Test {
   T_CatalogManager() : statistics_(), catalog_mgr_(&statistics_) { }
 
  protected:
+  /**
+   * This method creates a file system structure in the catalogs as follows:
+   *
+   * +-/ (ROOT CATALOG)
+   *   |
+   *   +-file1
+   *   |
+   *   +-dir
+   *     |
+   *     +-dir
+   *       |
+   *       +-file2
+   *       |
+   *       +-dir (NESTED CATALOG)
+   *         |
+   *         +-file3
+   *         |
+   *         +-file4
+   *         |
+   *         +-dir
+   *           |
+   *           +-dir (NESTED CATALOG)
+   *             |
+   *             +-file5
+   *
+   */
   void AddTree() {
-    const shash::Any empty_hash = shash::Any();
     const size_t file_size = 4096;
     char suffix = shash::kSha1;
     shash::Any hash;
@@ -129,9 +154,15 @@ TEST_F(T_CatalogManager, Statistics) {
 }
 
 TEST_F(T_CatalogManager, InodeConfiguration) {
+  const uint64_t initial_offset = 1000;
   InodeGenerationAnnotation annotation;
+  annotation.IncGeneration(initial_offset);
   catalog_mgr_.SetInodeAnnotation(&annotation);
   EXPECT_TRUE(catalog_mgr_.Init());
+  // now the root catalog is loaded and has 6 entries
+  EXPECT_EQ(initial_offset + 1 +
+            AbstractCatalogManager<MockCatalogManager>::kInodeOffset,
+            catalog_mgr_.GetRootInode());
 }
 
 TEST_F(T_CatalogManager, Lookup) {
@@ -187,13 +218,16 @@ TEST_F(T_CatalogManager, Listing) {
   DirectoryEntryList del;
   EXPECT_FALSE(catalog_mgr_.Listing("/fakepath", &del));
   EXPECT_EQ(0u, del.size());
+  del.clear();
   EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir", &del));
   EXPECT_EQ(2u, del.size());
   // now it will have to mount the nested catalog
+  del.clear();
   EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir", &del));
   EXPECT_EQ(3u, del.size());
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
   // mounting the next nested catalog
+  del.clear();
   EXPECT_TRUE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir", &del));
   EXPECT_EQ(1u, del.size());
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
@@ -231,7 +265,6 @@ TEST_F(T_CatalogManager, Remount) {
   EXPECT_TRUE(catalog_mgr_.Init());
   LoadError le;
   EXPECT_EQ(kLoadNew, le = catalog_mgr_.Remount(true));
-  EXPECT_EQ("loaded new catalog", Code2Ascii(le));
   EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
 }
 

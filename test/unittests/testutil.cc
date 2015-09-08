@@ -249,11 +249,10 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
 
 void MockCatalog::RemoveChild(MockCatalog *child) {
   std::vector<NestedCatalog>::iterator iter = active_children_.begin();
-  bool found = false;
-  while (!found && iter != active_children_.end()) {
+  while (iter != active_children_.end()) {
     if (iter->hash == child->hash()) {
       active_children_.erase(iter);
-      found = true;
+      return;
     }
     iter++;
   }
@@ -281,18 +280,13 @@ bool MockCatalog::LookupPath(const PathString &path,
 
 bool MockCatalog::ListingPath(const PathString &path,
                  catalog::DirectoryEntryList *listing) const {
-  listing->clear();
-  bool found = false;
+  unsigned initial_size = listing->size();
+  shash::Md5 path_hash(path.GetChars(), path.GetLength());
   for (unsigned i = 0; i < files_.size(); ++i) {
-    shash::Md5 path_hash(path.GetChars(), path.GetLength());
     if (files_[i].parent_hash == path_hash)
       listing->push_back(files_[i].ToDirectoryEntry());
-    else if (files_[i].path_hash == path_hash)
-      found = true;
   }
-  if (!found)  // the parent does not exists, nor the children then
-    listing->clear();
-  return found;
+  return listing->size() > initial_size;
 }
 
 void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
