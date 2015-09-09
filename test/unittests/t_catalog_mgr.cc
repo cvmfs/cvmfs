@@ -268,4 +268,4 @@ TEST_F(T_CatalogManager, Remount) {
   EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
 }
 
-}
+}  // namespace catalog
