@@ -83,8 +83,6 @@ class T_CatalogManager : public ::testing::Test {
                                                4096, 1, 0, false,
                                                root_catalog, NULL);
     ASSERT_NE(static_cast<MockCatalog*>(NULL), new_catalog);
-    ASSERT_EQ(1u, root_catalog->GetChildren().size());
-    catalog_mgr_.RegisterNewCatalog(new_catalog);
     // adding "/dir/dir/dir/file3" to the new nested catalog
     hash = shash::Any(shash::kSha1,
                       reinterpret_cast<const unsigned char*>(hashes[2]),
@@ -107,8 +105,6 @@ class T_CatalogManager : public ::testing::Test {
                                                  shash::Any(),
                                                  4096, 1, 0, false,
                                                  new_catalog, NULL);
-    ASSERT_EQ(1u, root_catalog->GetChildren().size());
-    catalog_mgr_.RegisterNewCatalog(new_catalog_2);
     // adding "/dir/dir/dir/dir/dir/file5"
     hash = shash::Any(shash::kSha1,
                       reinterpret_cast<const unsigned char*>(hashes[4]),
@@ -116,6 +112,8 @@ class T_CatalogManager : public ::testing::Test {
     new_catalog_2->AddFile(hash, file_size, "/dir/dir/dir/dir/dir", "file5");
     // we haven't mounted the third catalog yet!
     ASSERT_EQ(1, catalog_mgr_.GetNumCatalogs());
+    catalog_mgr_.RegisterNewCatalog(new_catalog);
+    catalog_mgr_.RegisterNewCatalog(new_catalog_2);
   }
 
  protected:
