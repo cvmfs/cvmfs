@@ -501,6 +501,9 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_OCTOPUS)
   set (CVMFS_OCTOPUS_SOURCES
+    logging.h logging_internal.h logging.cc
+    pathspec/pathspec.h pathspec/pathspec.cc
+    pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
     webapi/fcgi.h webapi/fcgi.cc
     webapi/octopus.cc)
 
@@ -736,6 +739,15 @@ if (BUILD_SERVER)
     DESTINATION    "/var/www/wsgi-scripts"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
+
+  if (BUILD_OCTOPUS)
+    install(
+      TARGETS      cvmfs_octopus.fcgi
+      RUNTIME
+      DESTINATION  "/usr/share/cvmfs-server/webapi"
+      PERMISSIONS  OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+    )
+  endif (BUILD_OCTOPUS)
 
   if (GEOIP_BUILTIN)
     install(

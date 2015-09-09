@@ -5,6 +5,7 @@
 #include "cvmfs_config.h"
 #include "fcgi.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -14,6 +15,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
+
+#include "../logging.h"
+#include "../platform.h"
 
 using namespace std;  // NOLINT
 
@@ -34,9 +38,29 @@ void FastCgi::AbortRequest() {
   if (!keep_connection_) {
     CloseConnection();
   } else {
+    global_request_id_++;
     request_id_ = -1;
     keep_connection_ = false;
+    params_.clear();
   }
+}
+
+
+unsigned FastCgi::AddShortKv(
+  const string &key,
+  const string &value,
+  unsigned buf_size,
+  unsigned char *buf)
+{
+  assert((key.length() <= 127) && (value.length() <= 128));
+  unsigned nbytes = key.length() + value.length() + 2;
+  assert(buf_size >= nbytes);
+
+  buf[0] = static_cast<unsigned char>(key.length() & 0xff);
+  buf[1] = static_cast<unsigned char>(value.length() & 0xff);
+  memcpy(&buf[2], key.data(), key.length());
+  memcpy(&buf[2 + key.length()], value.data(), value.length());
+  return nbytes;
 }
 
 
@@ -44,13 +68,21 @@ void FastCgi::AbortRequest() {
  * Checks if a network connection was received from the allowed set of IP
  * addresses (see section 3.2 of fcgi specification).
  */
-bool FastCgi::CheckValidSource() {
-  char *environ_web_server_addrs = getenv("FCGI_WEB_SERVER_ADDRS");
-  if (environ_web_server_addrs == NULL)
+bool FastCgi::CheckValidSource(const struct sockaddr_in &addr_in) {
+  char *env_allow_from = getenv("FCGI_WEB_SERVER_ADDRS");
+  if ((env_allow_from == NULL) || (*env_allow_from == '\0'))
     return true;
 
-  // TODO(jblomer): actually perform the check.  For the time being, this
-  // class supports UNIX sockets only
+  char *allow_from = strdupa(env_allow_from);
+  char *cur;
+  char *next;
+  for (cur = allow_from; cur != NULL; cur = next) {
+    next = strchr(cur, ',');
+    if (next != NULL)
+      *next++ = '\0';
+    if (inet_addr(cur) == addr_in.sin_addr.s_addr)
+      return true;
+  }
   return false;
 }
 
@@ -62,6 +94,22 @@ void FastCgi::CloseConnection() {
     request_id_ = -1;
     keep_connection_ = false;
   }
+  global_request_id_++;
+  params_.clear();
+}
+
+
+string FastCgi::DumpParams() {
+  if (request_id_ == -1)
+    return "";
+
+  string result;
+  for (map<string, string>::const_iterator i = params_.begin(),
+       i_end = params_.end(); i != i_end; ++i)
+  {
+    result += i->first + "=" + i->second + "\n";
+  }
+  return result;
 }
 
 
@@ -76,9 +124,36 @@ void FastCgi::EndRequest(uint32_t exit_code) {
   if (!keep_connection_) {
     CloseConnection();
   } else {
+    global_request_id_++;
     request_id_ = -1;
     keep_connection_ = false;
+    params_.clear();
   }
+}
+
+
+FastCgi::FastCgi()
+    : fd_sock_(kCgiListnsockFileno)
+    , is_tcp_socket_(false)
+    , fd_transport_(-1)
+    , global_request_id_(1)
+    , request_id_(-1)
+    , keep_connection_(false)
+{ }
+
+
+FastCgi::~FastCgi() {
+  if (is_tcp_socket_)
+    close(fd_sock_);
+}
+
+
+bool FastCgi::GetParam(const string &key, string *value) {
+  map<string, string>::const_iterator it = params_.find(key);
+  if (it != params_.end()) {
+    *value = it->second;
+  }
+  return false;
 }
 
 
@@ -102,47 +177,96 @@ bool FastCgi::IsFcgi() {
 }
 
 
-FastCgi::FastCgi()
-    : fd_transport_(-1)
-    , request_id_(-1)
-    , keep_connection_(false)
-{ }
+/**
+ * Used to pre-spawn the CGI process for use with nginx.
+ */
+bool FastCgi::MkTcpSocket(const string &ip4_address, uint16_t port) {
+  fd_sock_ = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (fd_sock_ < 0)
+    return false;
+
+  struct sockaddr_in in_addr;
+  memset(&in_addr, 0, sizeof(in_addr));
+  in_addr.sin_family = AF_INET;
+  in_addr.sin_addr.s_addr = (ip4_address == "") ?
+                            INADDR_ANY : inet_addr(ip4_address.c_str());
+  in_addr.sin_port = htons(port);
+  int retval = bind(fd_sock_, reinterpret_cast<struct sockaddr *>(&in_addr),
+                    sizeof(in_addr));
+  if (retval != 0) {
+    close(fd_sock_);
+    fd_sock_ = -1;
+    return false;
+  }
+
+  retval = listen(fd_sock_, 4);
+  if (retval != 0) {
+    close(fd_sock_);
+    fd_sock_ = -1;
+    return false;
+  }
+
+  is_tcp_socket_ = true;
+  return true;
+}
 
 
 /**
  * Protocol processing as far as the application is not involved.  What is
- * received for stdin is pointed to in buf and length.
+ * received for stdin is pointed to in buf and length.  A different id is set
+ * for every request.
  */
-FastCgi::Event FastCgi::NextEvent(unsigned char **buf, unsigned *length) {
+FastCgi::Event FastCgi::NextEvent(
+  unsigned char **buf,
+  unsigned *length,
+  uint64_t *id)
+{
   *buf = NULL;
   *length = 0;
+  *id = global_request_id_;
 
   while (true) {
     if (fd_transport_ == -1) {
-      // TODO(jblomer): deal properly with interrupts
-      fd_transport_ = accept(kCgiListnsockFileno, NULL, NULL);
-      if ((fd_transport_ < 0) || !CheckValidSource())
+      sockaddr_in addr_in;
+      socklen_t addr_len = sizeof(addr_in);
+      fd_transport_ =
+        accept(fd_sock_, reinterpret_cast<struct sockaddr *>(&addr_in),
+               &addr_len);
+      if (fd_transport_ < 0)
         return kEventExit;
+
+      // For UNIX sockets, addr_in is garbage (but FCGI_WEB_SERVER_ADDRS is not
+      // defined)
+      if (is_tcp_socket_ && !CheckValidSource(addr_in)) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr,
+                 "FastCGI connection from invalid source %s",
+                 inet_ntoa(addr_in.sin_addr));
+        close(fd_transport_);
+        fd_transport_ = -1;
+        continue;
+      }
     }
 
     Header header;
     if (!ReadHeader(fd_transport_, &header)) {
       CloseConnection();
-      continue;
+      return kEventTransportError;
     }
 
     uint16_t role;
     bool keep_connection;
     switch (header.type) {
       case kTypeValues:
-        assert(header.request_id == 0);
-        // TODO(jblomer): implement reply
+        if (!ProcessValues(header)) {
+          CloseConnection();
+          return kEventTransportError;
+        }
         break;
 
       case kTypeBegin:
         if (!ReadBeginBody(fd_transport_, &role, &keep_connection)) {
           CloseConnection();
-          continue;
+          return kEventTransportError;
         }
         if (request_id_ != -1) {
           ReplyEndRequest(fd_transport_, header.request_id, 0,
@@ -157,13 +281,12 @@ FastCgi::Event FastCgi::NextEvent(unsigned char **buf, unsigned *length) {
         }
         keep_connection_ = keep_connection;
         request_id_ = header.request_id;
-        params_.clear();
         break;
 
       case kTypeAbort:
         if (request_id_ != header.request_id) {
           CloseConnection();
-          continue;
+          return kEventTransportError;
         }
         return kEventAbortReq;
         break;
@@ -171,22 +294,22 @@ FastCgi::Event FastCgi::NextEvent(unsigned char **buf, unsigned *length) {
       case kTypeParams:
         if (request_id_ != header.request_id) {
           CloseConnection();
-          continue;
+          return kEventTransportError;
         }
         if (!ReadParams(header)) {
           CloseConnection();
-          continue;
+          return kEventTransportError;
         }
         break;
 
       case kTypeStdin:
         if (request_id_ != header.request_id) {
           CloseConnection();
-          continue;
+          return kEventTransportError;
         }
         if (!ReadContent(header.content_length, header.padding_length)) {
           CloseConnection();
-          continue;
+          return kEventTransportError;
         }
         *buf = content_buf_;
         *length = header.content_length;
@@ -196,16 +319,23 @@ FastCgi::Event FastCgi::NextEvent(unsigned char **buf, unsigned *length) {
       case kTypeData:
         // Only used in Filter role
         CloseConnection();
-        continue;
+        return kEventTransportError;
 
       default:
         // Unexpected type
         if (header.request_id == 0) {
           ReplyUnknownType(fd_transport_, header.type);
+        } else {
+          // we did not sign up for other application records
+          CloseConnection();
+          return kEventTransportError;
         }
         continue;
     }  // switch (header.type)
   }  // accept loop
+
+  // Never here
+  return kEventExit;
 }
 
 
@@ -254,6 +384,67 @@ bool FastCgi::ParseKvPair(
   *nparsed += key_length;
   *value = string(data + *nparsed, value_length);
   *nparsed += value_length;
+  return true;
+}
+
+
+/**
+ * Reads the kTypeValues body and replies with a kTypeValuesResult record.
+ */
+bool FastCgi::ProcessValues(const Header &request_header) {
+  unsigned nbytes = request_header.content_length +
+                    request_header.padding_length;
+  // Can't use content_buf_ because kTypeValues requests can come anytime
+  char *data = reinterpret_cast<char *>(alloca(nbytes));
+  if (nbytes > 0) {
+    int received = read(fd_transport_, data, nbytes);
+    if ((received < 0) || (static_cast<unsigned>(received) != nbytes))
+      return false;
+  }
+
+  // Large enough to answer all three kValue... params
+  const unsigned ret_buf_len = 64;
+  unsigned char ret_buf[ret_buf_len];
+  unsigned ret_pos = 0;
+  unsigned pos = 0;
+  bool max_conns = false;
+  bool max_reqs = false;
+  bool mpx_conns = false;
+  while (pos < request_header.content_length) {
+    unsigned nparsed;
+    string key;
+    string value;
+    if (!ParseKvPair(data + pos, request_header.content_length - pos,
+                     &nparsed, &key, &value))
+    {
+      return false;
+    }
+    pos += nparsed;
+
+    if (!max_conns && (key == kValueMaxConns)) {
+      ret_pos +=
+        AddShortKv(key, "1", ret_buf_len - ret_pos, ret_buf + ret_pos);
+      max_conns = true;
+    }
+    if (!max_reqs && (key == kValueMaxReqs)) {
+      ret_pos +=
+        AddShortKv(key, "1", ret_buf_len - ret_pos, ret_buf + ret_pos);
+      max_reqs = true;
+    }
+    if (!mpx_conns && (key == kValueMpxConns)) {
+      ret_pos +=
+        AddShortKv(key, "0", ret_buf_len - ret_pos, ret_buf + ret_pos);
+      mpx_conns = true;
+    }
+  }
+
+  RawHeader ret_header;
+  ret_header.type = kTypeValuesResult;
+  FlattenUint16(ret_pos,
+                &ret_header.content_length_b1,
+                &ret_header.content_length_b0);
+  write(fd_transport_, &ret_header, sizeof(ret_header));
+  write(fd_transport_, ret_buf, ret_pos);
   return true;
 }
 
@@ -333,7 +524,8 @@ bool FastCgi::ReadParams(const Header &first_header) {
     if (!ParseKvPair(data.data() + pos, len - pos, &nparsed, &key, &value))
       return false;
     pos += nparsed;
-    params_[key] = value;
+    if (key.length() > 0)
+      params_[key] = value;
   }
   return true;
 }

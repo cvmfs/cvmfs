@@ -5,6 +5,7 @@
 #ifndef CVMFS_WEBAPI_FCGI_H_
 #define CVMFS_WEBAPI_FCGI_H_
 
+#include <netinet/in.h>
 #include <stdint.h>
 
 #include <cstring>
@@ -16,24 +17,28 @@
 /**
  * Implements a simple FastCGI responder role.  This responder cannot multi-
  * plex connections.  See http://www.fastcgi.com/devkit/doc/fcgi-spec.html
- * It is supposed to be used in the following way:
+ * It is supposed to be used in the following way.  Don't forget to sanitize
+ * everything you get out from fcgi.
  *
  * unsigned char *buf;
  * unsigned length;
+ * uint64_t id = 0;
  * FastCgi::Event event;
- * while ((event = fcgi.NextEvent(&buf, &length)) != FastCgi::kEventExit) {
+ * while ((event = fcgi.NextEvent(&buf, &length, &id)) != FastCgi::kEventExit) {
  *   switch (event) {
  *     case FastCgi::kEventAbortReq:
  *       fcgi.AbortRequest();
  *       break;
  *     case FastCgi::kEventStdin:
+ *       // Use id to detect if this new input is part of the same request than
+ *       // the previous one.
  *       // Process buf; if length == 0, the input stream is finished
  *       // For POST: compare CONTENT-LENGTH with actual stream length
- *       fcgi.Get("PARAMETER") ...
+ *       fcgi.GetParam("PARAMETER", ...) ...
  *       fcgi.SendData("...", false);
  *       fcgi.SendData("...", true);
  *       fcgi.SendError("...", true);
- *       fcgi.EndRequest(0);
+ *       fcgi.EndRequest(0);  // or failure status code
  *       break;
  *     default:
  *       abort();
@@ -44,17 +49,24 @@ class FastCgi {
  public:
   enum Event {
     kEventExit = 0,
+    kEventTransportError,
     kEventAbortReq,
     kEventStdin,
   };
 
   FastCgi();
+  ~FastCgi();
   bool IsFcgi();
   void AbortRequest();
   void EndRequest(uint32_t exit_code);
   bool SendData(const std::string &data, bool finish);
   bool SendError(const std::string &data, bool finish);
-  Event NextEvent(unsigned char **buf, unsigned *length);
+  Event NextEvent(unsigned char **buf, unsigned *length, uint64_t *id);
+
+  bool GetParam(const std::string &key, std::string *value);
+  std::string DumpParams();
+
+  bool MkTcpSocket(const std::string &ip4_address, uint16_t port);
 
  private:
   static const int kCgiListnsockFileno = 0;
@@ -87,17 +99,17 @@ class FastCgi {
    * Values for type component of Header.
    */
   enum RecordType {
-    kTypeBegin = 1,     // Application record, WS --> App
-    kTypeAbort = 2,     // Application record, WS --> App
-    kTypeEnd = 3,       // Application record, App --> WS
-    kTypeParams = 4,    // Application record, WS --> App
-    kTypeStdin = 5,     // Application stream record, WS --> App
-    kTypeStdout = 6,    // Application stream record, App --> WS
-    kTypeStderr = 7,    // Application stream record, App --> WS
-    kTypeData = 8,      // Application stream record, WS --> App
-    kTypeValues = 9,    // Management record, WS --> App
-    kTypeResult = 10,   // Management record, App --> WS
-    kTypeUnknown = 11,  // Management record, App --> WS
+    kTypeBegin = 1,           // Application record, WS --> App
+    kTypeAbort = 2,           // Application record, WS --> App
+    kTypeEnd = 3,             // Application record, App --> WS
+    kTypeParams = 4,          // Application record, WS --> App
+    kTypeStdin = 5,           // Application stream record, WS --> App
+    kTypeStdout = 6,          // Application stream record, App --> WS
+    kTypeStderr = 7,          // Application stream record, App --> WS
+    kTypeData = 8,            // Application stream record, WS --> App
+    kTypeValues = 9,          // Management record, WS --> App
+    kTypeValuesResult = 10,   // Management record, App --> WS
+    kTypeUnknown = 11,        // Management record, App --> WS
   };
 
   /**
@@ -172,7 +184,7 @@ class FastCgi {
     unsigned char reserved[7];
   };
 
-  bool CheckValidSource();
+  bool CheckValidSource(const struct sockaddr_in &addr_in);
   void CloseConnection();
 
   bool ReadHeader(int fd_transport, Header *header);
@@ -189,6 +201,8 @@ class FastCgi {
   bool ReplyStream(unsigned char type,
                    const unsigned char *data, unsigned length);
 
+  bool ProcessValues(const Header &request_header);
+
   inline uint16_t MkUint16(const unsigned char b1, const unsigned char b0) {
     return (static_cast<uint16_t>(b1) << 8) + static_cast<uint16_t>(b0);
   }
@@ -199,8 +213,26 @@ class FastCgi {
     *b0 = static_cast<unsigned char>(val & 0xff);
   }
 
+  unsigned AddShortKv(const std::string &key, const std::string &value,
+                      unsigned buf_size, unsigned char *buf);
+
+  /**
+   * kCgiListnsockFileno for fcgi processes spawned by the server, otherwise
+   * filled by MkTcpSocket().
+   */
+  int fd_sock_;
+  bool is_tcp_socket_;
+
   unsigned char content_buf_[64 * 1024 + 255];
   int fd_transport_;
+
+  /**
+   * Returned by NextEvent().  Has a different value for every request.  Never
+   * zero, so the application can initialize its id state to zero and detect
+   * if a stdin event is for the same request or a new one.
+   */
+  uint64_t global_request_id_;
+
   int request_id_;
   bool keep_connection_;
   std::map<std::string, std::string> params_;
