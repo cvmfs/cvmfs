@@ -463,7 +463,8 @@ TEST_F(T_CatalogTraversal, SimpleTraversal) {
 //------------------------------------------------------------------------------
 
 
-std::vector<catalog::MockCatalog*> SimpleTraversalNoCloseCallback_visited_catalogs;
+std::vector<catalog::MockCatalog*>
+    SimpleTraversalNoCloseCallback_visited_catalogs;
 void SimpleTraversalNoCloseCallback(
   const MockedCatalogTraversal::CallbackDataTN &data)
 {
@@ -628,7 +629,8 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversal) {
 //------------------------------------------------------------------------------
 
 
-std::vector<catalog::MockCatalog*> FirstLevelHistoryTraversalNoClose_visited_catalogs;
+std::vector<catalog::MockCatalog*>
+    FirstLevelHistoryTraversalNoClose_visited_catalogs;
 void FirstLevelHistoryTraversalNoCloseCallback(
   const MockedCatalogTraversal::CallbackDataTN &data)
 {

@@ -34,6 +34,7 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
 #include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
@@ -183,7 +184,7 @@ template <class CatalogMgrT>
 class CatalogBalancer {
  public:
   typedef typename CatalogMgrT::catalog_t catalog_t;
-  CatalogBalancer(CatalogMgrT *catalog_mgr)
+  explicit CatalogBalancer(CatalogMgrT *catalog_mgr)
     : catalog_mgr_(catalog_mgr) { }
 
   void Balance(catalog_t *catalog = NULL);

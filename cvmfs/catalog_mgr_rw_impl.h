@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <string>
+#include <vector>
 
 #include "catalog_rw.h"
 #include "directory_entry.h"
@@ -29,7 +30,7 @@
 
 
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace catalog {
 
@@ -101,7 +102,7 @@ void CatalogBalancer<CatalogMgrT>::OptimalPartition(
     typename CatalogBalancer<CatalogMgrT>::VirtualNode *heaviest_node =
         MaxChild(virtual_node);
     // we directly add a catalog in this node
-    // TODO (molina) apply heuristics here
+    // TODO(molina) apply heuristics here
     if (heaviest_node->weight >= catalog_mgr_->min_weight_) {
       AddCatalog(heaviest_node);
       AddCvmfsCatalogFile(heaviest_node->path + "/.cvmfscatalog");
@@ -117,8 +118,8 @@ CatalogBalancer<CatalogMgrT>::MaxChild(
 {
   typename CatalogBalancer<CatalogMgrT>::VirtualNode *max_child = NULL;
   unsigned max_weight = 0;
-  if (virtual_node->IsDirectory() && ! virtual_node->IsCatalog()) {
-    for ( unsigned i = 0; i < virtual_node->children.size(); ++i) {
+  if (virtual_node->IsDirectory() && !virtual_node->IsCatalog()) {
+    for (unsigned i = 0; i < virtual_node->children.size(); ++i) {
       typename CatalogBalancer<CatalogMgrT>::VirtualNode *child =
           &virtual_node->children[i];
       if (child->IsDirectory() &&
@@ -169,4 +170,4 @@ void CatalogBalancer<CatalogMgrT>::VirtualNode::CaltulateWeight() {
 
 }  // namespace catalog
 
-#endif  // CVMFS_CATALOG_MGR_IMPL_H_
+#endif  // CVMFS_CATALOG_MGR_RW_IMPL_H_

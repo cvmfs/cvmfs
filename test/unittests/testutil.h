@@ -518,7 +518,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   mutable HashVector  referenced_objects_;
 };
 
-}
+}  // namespace catalog
 
 //------------------------------------------------------------------------------
 
