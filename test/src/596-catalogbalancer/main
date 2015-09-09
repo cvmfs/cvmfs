@@ -1,0 +1,107 @@
+cvmfs_test_name="Catalog balancer"
+cvmfs_test_autofs_on_startup=false
+
+add_files() {
+  local repo_dirination=$1
+  local num_files=$2
+  mkdir -p "$repo_dirination"
+  local body="$repo_dirination/file"
+
+  for i in $(seq 1 1 $num_files); do
+    touch "$body$i"
+  done
+}
+
+add_catalog() {
+  local repo_dirination=$1
+  touch "$repo_dirination/.cvmfscatalog"
+}
+
+cvmfs_run_test() {
+  local repo="test.local"
+  local repo_dir="/cvmfs/test.local"
+
+  create_repo "$repo" $(whoami)
+
+    sudo bash -c "echo 'CVMFS_AUTOCATALOG=true
+  CVMFS_AUTOCATALOG_MAX_WEIGHT=20
+  CVMFS_AUTOCATALOG_MIN_WEIGHT=8' >> /etc/cvmfs/repositories.d/$repo/server.conf"
+
+  start_transaction "$repo"
+  add_files "$repo_dir" 25
+  add_files "$repo_dir/dir100" 100
+  add_files "$repo_dir/dir3" 3
+  add_files "$repo_dir/dir4" 4
+  add_catalog "$repo_dir/dir4"
+  publish_repo "$repo"
+
+  echo "Checking first iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 1
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 2
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 3
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 4
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 5
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 6
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 7
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 8
+
+  start_transaction "$repo"
+  add_files "$repo_dir/dir/dir30" 30
+  for i in $(ls "$repo_dir" | grep "file"); do
+    rm "$repo_dir/$i"
+  done
+  publish_repo "$repo"
+
+  echo "Checking second iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 1
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 2
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 3
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 4
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 5
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 6
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 7
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 8
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 9
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 10
+
+  start_transaction "$repo"
+  add_files "$repo_dir/dir60" 60
+  publish_repo "$repo"
+
+  echo "Checking third iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 1
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 2
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 3
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 4
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 5
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 6
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 7
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 8
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 9
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 10
+    [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 11
+    [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 12
+
+  start_transaction "$repo"
+  for i in $(ls $repo_dir/dir60 | grep "file"); do
+    rm "$repo_dir/dir60/$i"
+  done
+  add_files "$repo_dir/dir60" 1
+  publish_repo "$repo"
+
+  echo "Checking fourth iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 1
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 2
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 3
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 4
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 5
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 6
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 7
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 8
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 9
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 10
+  ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 11
+  ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 12
+
+  destroy_repo "$repo"
+}
