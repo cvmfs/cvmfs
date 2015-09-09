@@ -75,7 +75,10 @@ class WritableCatalogManager : public SimpleCatalogManager {
                          upload::Spooler   *spooler,
                          download::DownloadManager *download_manager,
                          uint64_t catalog_entry_warn_threshold,
-                         perf::Statistics *statistics);
+                         perf::Statistics *statistics,
+                         bool is_balanced,
+                         unsigned max_weight,
+                         unsigned min_weight);
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
@@ -112,6 +115,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void RemoveNestedCatalog(const std::string &mountpoint);
   bool IsTransitionPoint(const std::string &path);
 
+  inline bool IsBalanced() const { return is_balanced_; }
   /**
    * TODO
    */
@@ -174,6 +178,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   /**
    * Balancer thresholds
    */
+  const bool is_balanced_;
   const unsigned max_weight_;
   const unsigned min_weight_;
   const unsigned balance_weight_;

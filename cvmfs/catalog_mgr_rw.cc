@@ -36,14 +36,18 @@ WritableCatalogManager::WritableCatalogManager(
   upload::Spooler           *spooler,
   download::DownloadManager *download_manager,
   const uint64_t             catalog_entry_warn_threshold,
-  perf::Statistics          *statistics)
+  perf::Statistics          *statistics,
+  bool                       is_balanced,
+  unsigned                   max_weight,
+  unsigned                   min_weight)
   : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
       statistics)
   , spooler_(spooler)
   , catalog_entry_warn_threshold_(catalog_entry_warn_threshold)
-  , max_weight_(100000)
-  , min_weight_(1000)
-  , balance_weight_(50000)
+  , is_balanced_(is_balanced)
+  , max_weight_(max_weight)
+  , min_weight_(min_weight)
+  , balance_weight_(max_weight / 2)
 {
   sync_lock_ =
     reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));

@@ -28,7 +28,10 @@ struct SyncParameters {
     avg_file_chunk_size(8*1024*1024),
     max_file_chunk_size(16*1024*1024),
     manual_revision(0),
-    max_concurrent_write_jobs(0) {}
+    max_concurrent_write_jobs(0),
+    is_balanced(false),
+    max_weight(100000),
+    min_weight(1000) {}
 
   upload::Spooler *spooler;
   std::string      dir_union;
@@ -54,6 +57,9 @@ struct SyncParameters {
   size_t           max_file_chunk_size;
   uint64_t         manual_revision;
   uint64_t         max_concurrent_write_jobs;
+  bool             is_balanced;
+  unsigned         max_weight;
+  unsigned         min_weight;
 };
 
 namespace catalog {
@@ -197,6 +203,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Mandatory('w', "stratum 0 base url"));
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
+    r.push_back(Parameter::Mandatory('A', "autocatalog enabled/disabled"));
     r.push_back(Parameter::Switch('n', "create new repository"));
     r.push_back(Parameter::Switch('x', "print change set"));
     r.push_back(Parameter::Switch('y', "dry run"));
@@ -218,6 +225,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('j', "catalog entry warning threshold"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
+    r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
+    r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
     return r;
   }
   int Main(const ArgumentList &args);

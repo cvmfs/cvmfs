@@ -556,7 +556,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, g_download_manager,
                     params.catalog_entry_warn_threshold,
-                    g_statistics);
+                    g_statistics,
+                    params.is_balanced,
+                    params.max_weight,
+                    params.min_weight);
   catalog_manager.Init();
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;

@@ -104,8 +104,8 @@ void CatalogBalancer<CatalogMgrT>::OptimalPartition(
     // we directly add a catalog in this node
     // TODO(molina) apply heuristics here
     if (heaviest_node->weight >= catalog_mgr_->min_weight_) {
-      AddCatalog(heaviest_node);
       AddCvmfsCatalogFile(heaviest_node->path + "/.cvmfscatalog");
+      AddCatalog(heaviest_node);
       virtual_node->CaltulateWeight();
     }
   }

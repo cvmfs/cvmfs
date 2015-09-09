@@ -226,7 +226,8 @@ manifest::Manifest *SyncMediator::Commit() {
     return NULL;
   }
 
-  catalog_manager_->Balance();
+  if (catalog_manager_->IsBalanced())
+    catalog_manager_->Balance();
   catalog_manager_->PrecalculateListings();
   return catalog_manager_->Commit(params_->stop_for_catalog_tweaks,
                                   params_->manual_revision);
