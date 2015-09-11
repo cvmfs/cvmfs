@@ -124,7 +124,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   manifest::Manifest *Commit(const bool     stop_for_tweaks,
                              const uint64_t manual_revision);
   void Balance();
-  void FixWeight(Catalog *catalog);
+  void FixWeight(WritableCatalog *catalog);
 
  protected:
   void EnforceSqliteMemLimit() { }
