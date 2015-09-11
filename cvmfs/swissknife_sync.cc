@@ -479,6 +479,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.stratum0 = *args.find('w')->second;
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
+  params.is_balanced = *args.find('A')->second == "true";
 
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
@@ -498,6 +499,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
+
+  if (args.find('X') != args.end())
+    params.max_weight = String2Uint64(*args.find('X')->second);
+  if (args.find('M') != args.end())
+    params.min_weight = String2Uint64(*args.find('M')->second);
 
   if (args.find('p') != args.end()) {
     params.use_file_chunking = true;
