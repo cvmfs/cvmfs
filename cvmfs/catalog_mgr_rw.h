@@ -209,8 +209,6 @@ class CatalogBalancer {
       : children(), weight(1), dirent(), path(path),
         is_new_nested_catalog(false) {
       catalog_mgr->LookupPath(path, kLookupSole, &dirent);
-      if (!IsCatalog() && IsDirectory())
-        ExtractChildren(catalog_mgr);
     }
     VirtualNode(const string &path, const DirectoryEntry &dirent,
                 CatalogMgrT *catalog_mgr)

@@ -61,15 +61,18 @@ template <class CatalogMgrT>
 void CatalogBalancer<CatalogMgrT>::AddCvmfsCatalogFile(string path) {
   XattrList xattr;
   DirectoryEntry parent;
-  catalog_mgr_->LookupPath(PathString(path), kLookupSole, &parent);
+  bool retval;
+  retval = catalog_mgr_->LookupPath(PathString(path), kLookupSole, &parent);
+  assert(retval);
   DirectoryEntryBase cvmfscatalog =
       CreateEmptyContentDirectoryEntryBase(".cvmfscatalog", parent.uid(),
                                            parent.gid());
   DirectoryEntryBase cvmfsautocatalog =
       CreateEmptyContentDirectoryEntryBase(".cvmfsautocatalog", parent.uid(),
                                            parent.gid());
-  catalog_mgr_->AddFile(cvmfscatalog, xattr, path);
-  catalog_mgr_->AddFile(cvmfsautocatalog, xattr, path);
+  string relative_path = path.substr(1);
+  catalog_mgr_->AddFile(cvmfscatalog, xattr, relative_path);
+  catalog_mgr_->AddFile(cvmfsautocatalog, xattr, relative_path);
 }
 
 template <class CatalogMgrT>
@@ -105,7 +108,7 @@ void CatalogBalancer<CatalogMgrT>::OptimalPartition(
     // TODO(molina) apply heuristics here
     if (heaviest_node != NULL &&
         heaviest_node->weight >= catalog_mgr_->min_weight_) {
-      AddCvmfsCatalogFile(heaviest_node->path + "/.cvmfscatalog");
+      AddCvmfsCatalogFile(heaviest_node->path);
       AddCatalog(heaviest_node);
       virtual_node->CaltulateWeight();
     } else {
@@ -122,7 +125,9 @@ CatalogBalancer<CatalogMgrT>::MaxChild(
 {
   virtual_node_t *max_child = NULL;
   unsigned max_weight = 0;
-  if (virtual_node->IsDirectory() && !virtual_node->IsCatalog()) {
+  if (virtual_node->IsDirectory() &&
+      !virtual_node->IsCatalog() &&
+      !virtual_node->is_new_nested_catalog) {
     for (unsigned i = 0; i < virtual_node->children.size(); ++i) {
       virtual_node_t *child = &virtual_node->children[i];
       if (child->IsDirectory() &&
@@ -139,7 +144,8 @@ CatalogBalancer<CatalogMgrT>::MaxChild(
 template <class CatalogMgrT>
 void CatalogBalancer<CatalogMgrT>::AddCatalog(virtual_node_t *child_node) {
   if (child_node != NULL) {
-    catalog_mgr_->CreateNestedCatalog(child_node->path);
+    string new_catalog_path = child_node->path.substr(1);
+    catalog_mgr_->CreateNestedCatalog(new_catalog_path);
     child_node->weight = 1;
     child_node->is_new_nested_catalog = true;
     LogCvmfs(kLogPublish, kLogStdout, "automatic creation of nested"

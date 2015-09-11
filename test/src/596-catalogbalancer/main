@@ -2,10 +2,10 @@ cvmfs_test_name="Catalog balancer"
 cvmfs_test_autofs_on_startup=false
 
 add_files() {
-  local repo_dirination=$1
+  local repo_dir=$1
   local num_files=$2
-  mkdir -p "$repo_dirination"
-  local body="$repo_dirination/file"
+  mkdir -p "$repo_dir"
+  local body="$repo_dir/file"
 
   for i in $(seq 1 1 $num_files); do
     touch "$body$i"
@@ -13,13 +13,14 @@ add_files() {
 }
 
 add_catalog() {
-  local repo_dirination=$1
-  touch "$repo_dirination/.cvmfscatalog"
+  local repo_dir=$1
+  touch "$repo_dir/.cvmfscatalog"
 }
 
 cvmfs_run_test() {
+  apache_switch on
   local repo="test.local"
-  local repo_dir="/cvmfs/test.local"
+  local repo_dir="/cvmfs/$repo"
 
   create_repo "$repo" $(whoami)
 
