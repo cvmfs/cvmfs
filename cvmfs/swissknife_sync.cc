@@ -479,10 +479,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.stratum0 = *args.find('w')->second;
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
-  params.is_balanced = *args.find('A')->second == "true";
 
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
+  if (args.find('A') != args.end()) params.is_balanced = true;
   if (args.find('x') != args.end()) params.print_changeset = true;
   if (args.find('y') != args.end()) params.dry_run = true;
   if (args.find('m') != args.end()) params.mucatalogs = true;

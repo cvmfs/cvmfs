@@ -176,7 +176,6 @@ DirectoryEntry DirectoryEntryTestFactory::RegularFile(const string &name,
   dirent.name_ = NameString(name);
   dirent.checksum_ = hash;
   dirent.size_ = size;
-  dirent.is_nested_catalog_mountpoint_ = false;
   return dirent;
 }
 
@@ -204,7 +203,6 @@ DirectoryEntry DirectoryEntryTestFactory::Symlink(const string &name,
   dirent.name_ = NameString(name);
   dirent.size_ = size;
   dirent.symlink_ = LinkString(symlink_path);
-  dirent.is_nested_catalog_mountpoint_ = false;
   return dirent;
 }
 
@@ -214,7 +212,6 @@ DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash) {
   dirent.mode_ = 33188;
   dirent.is_chunked_file_ = true;
   dirent.checksum_ = content_hash;
-  dirent.is_nested_catalog_mountpoint_ = false;
   return dirent;
 }
 
@@ -231,7 +228,6 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
   dirent.linkcount_  = metadata.linkcount;
   dirent.has_xattrs_ = metadata.has_xattrs;
   dirent.checksum_   = metadata.checksum;
-  dirent.is_nested_catalog_mountpoint_ = false;
   return dirent;
 }
 

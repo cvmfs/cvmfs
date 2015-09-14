@@ -24,7 +24,7 @@ cvmfs_run_test() {
 
   create_repo "$repo" $(whoami)
 
-    sudo bash -c "echo 'CVMFS_AUTOCATALOG=true
+  sudo bash -c "echo 'CVMFS_AUTOCATALOGS=true
   CVMFS_AUTOCATALOG_MAX_WEIGHT=20
   CVMFS_AUTOCATALOG_MIN_WEIGHT=8' >> /etc/cvmfs/repositories.d/$repo/server.conf"
 

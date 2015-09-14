@@ -12,12 +12,9 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <ctime>
 #include <string>
 
 #include "catalog_rw.h"
-#include "directory_entry.h"
-#include "hash.h"
 #include "logging.h"
 #include "manifest.h"
 #include "smalloc.h"
@@ -847,11 +844,13 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   return hash_catalog;
 }
 
-void WritableCatalogManager::Balance() {
-  CatalogList catalog_list = GetCatalogs();
+void WritableCatalogManager::DoBalance() {
+  ReadLock();
+  CatalogList &catalog_list = GetCatalogs();
   for (unsigned i = 0; i < catalog_list.size(); ++i) {
     FixWeight(static_cast<WritableCatalog*>(catalog_list[i]));
   }
+  Unlock();
 }
 
 void WritableCatalogManager::FixWeight(WritableCatalog* catalog) {

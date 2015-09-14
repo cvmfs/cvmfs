@@ -1939,7 +1939,7 @@ CVMFS_HASH_ALGORITHM=$hash_algo
 CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
-CVMFS_AUTOCATALOG=false
+CVMFS_AUTOCATALOGS=false
 EOF
 
   # append GC specific configuration
@@ -3852,7 +3852,6 @@ publish() {
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
-    autocatalog="$CVMFS_AUTOCATALOG"
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
@@ -3903,7 +3902,6 @@ publish() {
       -w $stratum0                                   \
       -o $manifest                                   \
       -e $hash_algorithm                             \
-      -A $autocatalog                                \
       $(get_follow_http_redirects_flag)              \
       $log_level $tweaks_option $verbosity"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
@@ -3915,11 +3913,14 @@ publish() {
        -a $CVMFS_AVG_CHUNK_SIZE \
        -h $CVMFS_MAX_CHUNK_SIZE"
     fi
-    if [ "x$CVMFS_AUTOCATALOG_MAX_WEIGHT" != "x" ]; then
-      sync_command="$sync_command -X $CVMFS_AUTOCATALOG_MAX_WEIGHT"
+    if [ "x$CVMFS_AUTOCATALOGS" = "xtrue" ]; then
+      sync_command="$sync_command -A"
     fi
-    if [ "x$CVMFS_AUTOCATALOG_MIN_WEIGHT" != "x" ]; then
-      sync_command="$sync_command -M $CVMFS_AUTOCATALOG_MIN_WEIGHT"
+    if [ "x$CVMFS_AUTOCATALOGS_MAX_WEIGHT" != "x" ]; then
+      sync_command="$sync_command -X $CVMFS_AUTOCATALOGS_MAX_WEIGHT"
+    fi
+    if [ "x$CVMFS_AUTOCATALOGS_MIN_WEIGHT" != "x" ]; then
+      sync_command="$sync_command -M $CVMFS_AUTOCATALOGS_MIN_WEIGHT"
     fi
     if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
       sync_command="$sync_command -i"
