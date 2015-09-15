@@ -15,6 +15,7 @@
 #include <string>
 
 #include "catalog_rw.h"
+#include "catalog_balancer.h"
 #include "logging.h"
 #include "manifest.h"
 #include "smalloc.h"
@@ -846,7 +847,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 
 void WritableCatalogManager::DoBalance() {
   ReadLock();
-  CatalogList &catalog_list = GetCatalogs();
+  const CatalogList &catalog_list = GetCatalogs();
   for (unsigned i = 0; i < catalog_list.size(); ++i) {
     FixWeight(static_cast<WritableCatalog*>(catalog_list[i]));
   }

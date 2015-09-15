@@ -167,6 +167,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_ro.h catalog_mgr_ro.cc
   catalog_mgr_rw.h catalog_mgr_rw.cc
+  catalog_balancer.h catalog_balancer_impl.h
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   dirtab.h dirtab.cc
   history.h

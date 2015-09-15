@@ -1,12 +1,11 @@
 /**
- * This file is part of the CernVM file system.
+ * This file is part of the CernVM File System.
  */
 
+#ifndef CATALOG_BALANCER_IMPL_H
+#define CATALOG_BALANCER_IMPL_H
 
-#ifndef CVMFS_CATALOG_MGR_RW_IMPL_H_
-#define CVMFS_CATALOG_MGR_RW_IMPL_H_
-
-#include "catalog_mgr_rw.h"
+#include "catalog_balancer.h"
 
 #include <inttypes.h>
 #include <unistd.h>
@@ -27,7 +26,6 @@
 #include "statistics.h"
 #include "upload.h"
 #include "util.h"
-
 
 
 using namespace std;  // NOLINT
@@ -105,7 +103,7 @@ void CatalogBalancer<CatalogMgrT>::PartitionOptimally(
         heaviest_node->weight >= catalog_mgr_->min_weight_) {
       // the catalog now generated _cannot_ be overflowed because the tree is
       // being traversed in postorder, handling the lightest nodes first
-      AddCvmfsCatalogFile(heaviest_node->path);
+      AddCatalogMarker(heaviest_node->path);
       AddCatalog(heaviest_node);
       virtual_node->FixWeight();
     } else {
@@ -188,4 +186,7 @@ void CatalogBalancer<CatalogMgrT>::VirtualNode::FixWeight() {
 
 }  // namespace catalog
 
-#endif  // CVMFS_CATALOG_MGR_RW_IMPL_H_
+
+
+#endif	/* CATALOG_BALANCER_IMPL_H */
+
