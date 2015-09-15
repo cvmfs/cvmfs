@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "catalog_mgr.h"
 #include "directory_entry.h"
 
 
@@ -100,7 +99,7 @@ class CatalogBalancer {
 
     void ExtractChildren(CatalogMgrT *catalog_mgr);
     void FixWeight();
-    VirtualNode(const string &path, CatalogMgrT *catalog_mgr)
+    VirtualNode(const std::string &path, CatalogMgrT *catalog_mgr)
       : children(), weight(1), dirent(), path(path),
         is_new_nested_catalog(false) {
       catalog_mgr->LookupPath(path, kLookupSole, &dirent);
@@ -120,8 +119,8 @@ class CatalogBalancer {
 
  private:
   void PartitionOptimally(VirtualNode *virtual_node);
-  void AddCatalogMarker(string path);
-  DirectoryEntryBase MakeEmptyDirectoryEntryBase(string name,
+  void AddCatalogMarker(std::string path);
+  DirectoryEntryBase MakeEmptyDirectoryEntryBase(std::string name,
                                                  uid_t uid,
                                                  gid_t gid);
   static VirtualNode *MaxChild(VirtualNode *virtual_node);
@@ -131,11 +130,9 @@ class CatalogBalancer {
   CatalogMgrT *catalog_mgr_;
 };
 
-#include "catalog_balancer_impl.h"
-
 }  // namespace catalog
 
-
+#include "catalog_balancer_impl.h"
 
 #endif	/* CATALOG_BALANCER_H */
 

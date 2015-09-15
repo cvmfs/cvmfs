@@ -7,25 +7,14 @@
 
 #include "catalog_balancer.h"
 
-#include <inttypes.h>
-#include <unistd.h>
-
 #include <cassert>
-#include <cstdio>
-#include <cstdlib>
-#include <ctime>
+#include <inttypes.h>
 #include <string>
 #include <vector>
 
-#include "catalog_rw.h"
 #include "directory_entry.h"
 #include "hash.h"
 #include "logging.h"
-#include "manifest.h"
-#include "smalloc.h"
-#include "statistics.h"
-#include "upload.h"
-#include "util.h"
 
 
 using namespace std;  // NOLINT

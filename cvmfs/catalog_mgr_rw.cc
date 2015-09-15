@@ -35,14 +35,14 @@ WritableCatalogManager::WritableCatalogManager(
   download::DownloadManager *download_manager,
   const uint64_t             catalog_entry_warn_threshold,
   perf::Statistics          *statistics,
-  bool                       is_balanced,
+  bool                       is_balanceable,
   unsigned                   max_weight,
   unsigned                   min_weight)
   : SimpleCatalogManager(base_hash, stratum0, dir_temp, download_manager,
       statistics)
   , spooler_(spooler)
   , catalog_entry_warn_threshold_(catalog_entry_warn_threshold)
-  , is_balanced_(is_balanced)
+  , is_balanceable_(is_balanceable)
   , max_weight_(max_weight)
   , min_weight_(min_weight)
   , balance_weight_(max_weight / 2)
