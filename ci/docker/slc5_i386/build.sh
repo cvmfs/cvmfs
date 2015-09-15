@@ -47,7 +47,7 @@ yum --disablerepo='*'             \
     --enablerepo="$YUM_REPO_NAME" \
     --installroot=$DESTINATION    \
     -y install                    \
-    sl-release coreutils iputils rpm yum yum-conf
+    sl-release coreutils tar iputils rpm yum yum-conf
 touch ${DESTINATION}/etc/mtab
 
 echo "fixing yum configuration files to architecture..."
