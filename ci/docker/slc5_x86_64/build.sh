@@ -16,13 +16,14 @@ fi
 IMAGE="$1"
 DESTINATION="$(mktemp -d)"
 YUM_REPO_CFG=/etc/yum/repos.d/slc5_bootstrap.repo
+YUM_REPO_NAME=slc5-os-bootstrap
 
 echo "checking yum installation..."
 check_yum_environment
 
 echo "setting up bootstrap repository..."
 cat > $YUM_REPO_CFG << EOF
-[slc5-os-bootstrap]
+[$YUM_REPO_NAME]
 name=Scientific Linux CERN 5 (SLC5) base system packages
 baseurl=http://linuxsoft.cern.ch/cern/slc5X/$BASE_ARCH/yum/os/
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-cern
@@ -42,10 +43,10 @@ rpm_db_dir="$(find $DESTINATION -type d | tail -n1)"
 echo $rpm_db_dir
 
 echo "bootstrapping the system..."
-yum --disablerepo='*'                \
-    --enablerepo='slc5-os-bootstrap' \
-    --installroot=$DESTINATION       \
-    -y install                       \
+yum --disablerepo='*'             \
+    --enablerepo="$YUM_REPO_NAME" \
+    --installroot=$DESTINATION    \
+    -y install                    \
     sl-release coreutils iputils rpm yum yum-conf
 touch ${DESTINATION}/etc/mtab
 
