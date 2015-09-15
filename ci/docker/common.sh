@@ -51,7 +51,7 @@ fix_yum_config_to_architecture() {
 
   for f in $(find $yum_repos_d -type f); do
     echo -n "patching ${f}... "
-    sed -i -e 's/\$basearch/i386/g' $f
+    sed -i -e "s/\$basearch/$basearch/g" $f
     echo "done"
   done
 }
