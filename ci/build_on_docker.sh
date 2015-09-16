@@ -35,26 +35,20 @@ image_name="cvmfs/${CVMFS_DOCKER_IMAGE}"
 container_dir="${SCRIPT_LOCATION}/docker/${CVMFS_DOCKER_IMAGE}"
 [ -d $container_dir ] || die "container $CVMFS_DOCKER_IMAGE not found"
 
-# do special tricks for certain docker containers
-if [ x"$CVMFS_DOCKER_IMAGE" = x"el4" ]; then
-  el4_base="cvmfs/slc49_i386"
-  if ! sudo docker images $el4_base | grep -q "$el4_base"; then
-    el4_image="${container_dir}/slc49_i386.tar.gz"
-    sudo docker run --privileged                 \
-                    --volume=$container_dir:/srv \
-                    centos:centos6               \
-                    /srv/build.sh
-    [ $? -eq 0 ]      || die "failed to build CentOS 4 container image"
-    [ -f $el4_image ] || die "didn't find '${el4_image}' after building"
-    cat $el4_image | sudo docker import - $el4_base
-    [ $? -eq 0 ] || die "failed to import just built el4 image ($el4_image)"
-    rm -f $el4_image
-  fi
+# bootstrap the docker container if necessary
+if ! sudo docker images $image_name | grep -q "$image_name"; then
+  echo "bootstrapping docker image for ${image_name}..."
+  build_workdir=$(mktemp -d)
+  old_wordir=$(pwd)
+  cd $build_workdir
+  cp ${container_dir}/* .
+  [ -x ${container_dir}/build.sh ]                       || die "./build.sh not available or not executable"
+  ${container_dir}/build.sh ${CVMFS_DOCKER_IMAGE}.tar.gz || die "Failed to build chroot tarball"
+  sudo docker build --tag=$image_name .
+  [ $? -eq 0 ] || die "Failed to build docker image '$image_name'"
+  cd $old_wordir
+  rm -fR $build_workdir
 fi
-
-# make sure the docker container to be used is built and ready to go
-sudo docker build --tag="$image_name" $container_dir
-[ $? -eq 0 ] || die "failed to build $CVMFS_DOCKER_IMAGE ($container_dir)"
 
 # parse the command line arguments (keep quotation marks)
 # Note: By convention the build scripts are called like this:
