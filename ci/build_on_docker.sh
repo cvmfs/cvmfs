@@ -14,7 +14,9 @@ if [ $# -lt 4 ]; then
   echo "Usage: $0 <CernVM-FS source directory> <build result location>"
   echo "<docker image name> <build script invocation with OPTIONAL parameters>"
   echo
-  echo "This script runs a build script inside a docker container."
+  echo "This script runs a build script inside a docker container. The docker "
+  echo "image is generated on demand - i.e. look into ci/docker for available"
+  echo "docker image blueprints."
   echo
   echo "NOTE: Don't specify the source and build directory for the build script"
   echo "      this will be passed automatically. Any optional parameters may"
