@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "catalog_mgr.h"
 #include "directory_entry.h"
 
 
@@ -91,10 +92,10 @@ class CatalogBalancer {
       * - Directories which are catalog mount points: it is always one
       */
   struct VirtualNode {
-    vector<VirtualNode> children;
+    std::vector<VirtualNode> children;
     unsigned weight;
     DirectoryEntry dirent;
-    string path;
+    std::string path;
     bool is_new_nested_catalog;
 
     void ExtractChildren(CatalogMgrT *catalog_mgr);
@@ -104,7 +105,7 @@ class CatalogBalancer {
         is_new_nested_catalog(false) {
       catalog_mgr->LookupPath(path, kLookupSole, &dirent);
     }
-    VirtualNode(const string &path, const DirectoryEntry &dirent,
+    VirtualNode(const std::string &path, const DirectoryEntry &dirent,
                 CatalogMgrT *catalog_mgr)
       : children(), weight(1), dirent(dirent), path(path),
         is_new_nested_catalog(false) {

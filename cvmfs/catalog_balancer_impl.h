@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "catalog_mgr.h"
 #include "directory_entry.h"
 #include "hash.h"
 #include "logging.h"
@@ -60,7 +61,12 @@ void CatalogBalancer<CatalogMgrT>::AddCatalogMarker(string path) {
 template <class CatalogMgrT>
 void CatalogBalancer<CatalogMgrT>::Balance(catalog_t *catalog) {
   if (catalog == NULL) {
+    // obtain a copy of the catalogs
     vector<catalog_t*> catalogs = catalog_mgr_->GetCatalogs();
+    // we need to reverse the catalog list in order to analyze the
+    // last added ones first. This is necessary in the weird case the child
+    // catalog's underflow provokes an overflow in the father
+    reverse(catalogs.begin(), catalogs.end());
     for (unsigned i = 0; i < catalogs.size(); ++i)
       Balance(catalogs[i]);
     return;
@@ -132,7 +138,7 @@ void CatalogBalancer<CatalogMgrT>::AddCatalog(virtual_node_t *child_node) {
     catalog_mgr_->CreateNestedCatalog(new_catalog_path);
     child_node->weight = 1;
     child_node->is_new_nested_catalog = true;
-    LogCvmfs(kLogPublish, kLogStdout, "automatic creation of nested"
+    LogCvmfs(kLogPublish, kLogStdout, "Automatic creation of nested"
         " catalog in '%s'", child_node->path.c_str());
   }
 }

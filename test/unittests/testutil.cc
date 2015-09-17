@@ -303,7 +303,7 @@ bool MockCatalog::ListingPath(const PathString &path,
   unsigned initial_size = listing->size();
   shash::Md5 path_hash(path.GetChars(), path.GetLength());
   for (unsigned i = 0; i < files_.size(); ++i) {
-    if (files_[i].parent_hash == path_hash)
+    if (files_[i].parent_hash == path_hash && files_[i].name != "")
       listing->push_back(files_[i].ToDirectoryEntry());
   }
   return listing->size() > initial_size;
@@ -316,6 +316,17 @@ void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);
+  
+  // update the directory entries in both catalogs
+  string path = child->root_path();
+  File *mountpoint = FindFile(path);
+  if (mountpoint != NULL) {
+    mountpoint->is_nested_catalog_mountpoint = true;
+  }
+  File *child_mountpoint = child->FindFile(path);
+  if (child_mountpoint != NULL) {
+    child_mountpoint->is_nested_catalog_mountpoint = true;
+  }
 }
 
 void MockCatalog::AddChild(MockCatalog *child) {
@@ -395,7 +406,7 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
     MockCatalog *catalog = it->second;
     *catalog_hash = catalog->hash();
   } else {
-    MockCatalog * catalog = new MockCatalog(mountpoint.ToString(),
+    MockCatalog *catalog = new MockCatalog(mountpoint.ToString(),
                                            hash, 4096, 1, 0,
                                            true, NULL, NULL);
     catalog_map_[mountpoint] = catalog;
