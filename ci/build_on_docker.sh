@@ -44,8 +44,8 @@ if ! sudo docker images $image_name | grep -q "$image_name"; then
   old_wordir=$(pwd)
   cd $build_workdir
   cp ${container_dir}/* .
-  [ -x ${container_dir}/build.sh ]                            || die "./build.sh not available or not executable"
-  sudo ${container_dir}/build.sh ${CVMFS_DOCKER_IMAGE}.tar.gz || die "Failed to build chroot tarball"
+  [ -x ${container_dir}/build.sh ] || die "./build.sh not available or not executable"
+  sudo ${container_dir}/build.sh   || die "Failed to build chroot tarball"
   sudo docker build --tag=$image_name .
   [ $? -eq 0 ] || die "Failed to build docker image '$image_name'"
   cd $old_wordir
