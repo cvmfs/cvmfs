@@ -15,8 +15,8 @@ fi
 
 IMAGE="$1"
 DESTINATION="$(mktemp -d)"
-YUM_REPO_CFG=/etc/yum/repos.d/cc7_bootstrap.repo
-YUM_REPO_NAME=cc7-base-bootstrap
+YUM_REPO_CFG=/etc/yum/repos.d/cc7_${BASE_ARCH}-bootstrap.repo
+YUM_REPO_NAME=cc7-${BASE_ARCH}-base-bootstrap
 
 echo "checking yum installation..."
 check_yum_environment
