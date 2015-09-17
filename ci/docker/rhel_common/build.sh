@@ -23,6 +23,16 @@ DESTINATION="$(mktemp -d)"
 YUM_REPO_CFG=/etc/yum/repos.d/${SYSTEM_NAME}_${BASE_ARCH}-bootstrap.repo
 YUM_REPO_NAME=${SYSTEM_NAME}-${BASE_ARCH}-os-bootstrap
 
+echo "installing cleanup handler..."
+cleanup() {
+  echo "cleaning up the build environment..."
+  umount ${DESTINATION}/dev  || true
+  umount ${DESTINATION}/proc || true
+  rm -f $YUM_REPO_CFG        || true
+  rm -fR $DESTINATION        || true
+}
+trap cleanup EXIT HUP INT TERM
+
 echo "checking yum installation..."
 check_yum_environment
 
@@ -82,9 +92,5 @@ umount ${DESTINATION}/proc || true # ignore failing umount
 
 echo "packaging up the image..."
 tar -czf $TARBALL_NAME -C $DESTINATION .
-
-echo "cleaning up the build environment..."
-rm -f $YUM_REPO_CFG
-rm -fR $DESTINATION
 
 echo "created $TARBALL_NAME ($(stat --format='%s' $TARBALL_NAME) bytes)"
