@@ -34,6 +34,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 echo "checking yum installation..."
+install_yum_repo_keys
 check_yum_environment
 
 echo "setting up bootstrap repository..."
