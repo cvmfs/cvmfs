@@ -77,8 +77,8 @@ rm -r ${DESTINATION}/var/cache/yum/
 echo "doing final housekeeping..."
 chroot $DESTINATION yum clean all
 rm -f ${DESTINATION}/etc/resolv.conf
-umount ${DESTINATION}/dev
-umount ${DESTINATION}/proc
+umount ${DESTINATION}/dev  || true # ignore failing umount
+umount ${DESTINATION}/proc || true # ignore failing umount
 
 echo "packaging up the image..."
 tar -czf $TARBALL_NAME -C $DESTINATION .
