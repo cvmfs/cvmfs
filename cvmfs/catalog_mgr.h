@@ -140,7 +140,7 @@ class AbstractCatalogManager : public SingleCopy {
  public:
   typedef std::vector<CatalogT*> CatalogList;
   typedef CatalogT catalog_t;
-  
+
   static const inode_t kInodeOffset = 255;
   explicit AbstractCatalogManager(perf::Statistics *statistics);
   virtual ~AbstractCatalogManager();

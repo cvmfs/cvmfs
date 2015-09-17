@@ -2,13 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CATALOG_BALANCER_IMPL_H
-#define CATALOG_BALANCER_IMPL_H
+#ifndef CVMFS_CATALOG_BALANCER_IMPL_H_
+#define CVMFS_CATALOG_BALANCER_IMPL_H_
 
 #include "catalog_balancer.h"
 
-#include <cassert>
 #include <inttypes.h>
+
+#include <cassert>
 #include <string>
 #include <vector>
 
@@ -183,5 +184,5 @@ void CatalogBalancer<CatalogMgrT>::VirtualNode::FixWeight() {
 
 
 
-#endif	/* CATALOG_BALANCER_IMPL_H */
+#endif  // CVMFS_CATALOG_BALANCER_IMPL_H_
 

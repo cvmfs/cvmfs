@@ -316,7 +316,7 @@ void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);
-  
+
   // update the directory entries in both catalogs
   string path = child->root_path();
   File *mountpoint = FindFile(path);

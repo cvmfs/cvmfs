@@ -14,8 +14,8 @@
 #include <cstdlib>
 #include <string>
 
-#include "catalog_rw.h"
 #include "catalog_balancer.h"
+#include "catalog_rw.h"
 #include "logging.h"
 #include "manifest.h"
 #include "smalloc.h"

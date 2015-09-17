@@ -18,7 +18,7 @@ struct SyncParameters {
   static const size_t DEFAULT_MIN_FILE_CHUNK_SIZE = 4*1024*1024;
   static const size_t DEFAULT_AVG_FILE_CHUNK_SIZE = 8*1024*1024;
   static const size_t DEFAULT_MAX_FILE_CHUNK_SIZE = 16*1024*1024;
-  
+
   SyncParameters() :
     spooler(NULL),
     union_fs_type("aufs"),
