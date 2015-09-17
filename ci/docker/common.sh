@@ -11,6 +11,11 @@ check_yum_environment() {
   which yum > /dev/null 2>&1 || die "Yum ist not available"
 }
 
+get_yum_repo_mirror() {
+  local mirrorlist_url="$1"
+  curl -s "$mirrorlist_url" | grep -e "^http.*" | head -n1 || die "yum mirror retrieval failed"
+}
+
 find_or_install_yum_repo_key() {
   local key_path="$1"
   local sink="/dev/null"
