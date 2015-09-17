@@ -1,7 +1,7 @@
 FROM        scratch
 MAINTAINER  Rene Meusel <rene.meusel@cern.ch>
 
-ADD         slc5_x86.tar.gz /
+ADD         slc5_i386.tar.gz /
 RUN         yum -y update && yum -y install                     \
                                         autofs                  \
                                         buildsys-macros         \
