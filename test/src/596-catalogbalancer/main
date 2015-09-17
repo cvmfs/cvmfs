@@ -125,5 +125,32 @@ cvmfs_run_test() {
   ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 12
   if check_catalog_presence "/dir60" "$repo"; then return 101; fi
 
+
+  start_transaction "$repo"
+  # now suppose the user creates a '.cvmfsautocatalog' file
+  touch "$repo_dir/dir4/.cvmfsautocatalog"
+  # now the system should get rid of the catalog in /dir4 and delete both entries
+  publish_repo "$repo"
+
+  echo "Checking fifth iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 1
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 2
+  if check_catalog_presence "/dir3" "$repo"; then return 101; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 3
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 4
+  if ! check_catalog_presence "/" "$repo"; then return 101; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 5
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 6
+  if ! check_catalog_presence "/dir100" "$repo"; then return 101; fi
+  ! [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 7
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 8
+  if check_catalog_presence "/dir4" "$repo"; then return 101; fi
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 9
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 10
+  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 101; fi
+  ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 11
+  ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 12
+  if check_catalog_presence "/dir60" "$repo"; then return 101; fi
+
   destroy_repo "$repo"
 }
