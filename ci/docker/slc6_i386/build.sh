@@ -15,8 +15,8 @@ fi
 
 IMAGE="$1"
 DESTINATION="$(mktemp -d)"
-YUM_REPO_CFG=/etc/yum/repos.d/slc6_bootstrap.repo
-YUM_REPO_NAME=slc6-os-bootstrap
+YUM_REPO_CFG=/etc/yum/repos.d/slc6_${BASE_ARCH}-bootstrap.repo
+YUM_REPO_NAME=slc6-${BASE_ARCH}-os-bootstrap
 
 echo "checking yum installation..."
 check_yum_environment
