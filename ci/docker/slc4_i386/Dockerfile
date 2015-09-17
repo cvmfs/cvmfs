@@ -20,14 +20,11 @@ ADD        sl4x-epel.repo     /etc/yum.repos.d/
 ADD        sl4x-fastbugs.repo /etc/yum.repos.d/
 
 RUN        yum -y update && yum -y install                      \
-                                        attr                    \
-                                        autofs                  \
                                         bash                    \
                                         checkpolicy             \
                                         chkconfig               \
                                         cmake                   \
                                         coreutils               \
-                                        curl                    \
                                         e2fsprogs               \
                                         e2fsprogs-devel         \
                                         fuse-devel              \
@@ -35,12 +32,10 @@ RUN        yum -y update && yum -y install                      \
                                         gawk                    \
                                         gcc4                    \
                                         gcc4-c++                \
-                                        gdb                     \
                                         git                     \
                                         glibc-common            \
                                         grep                    \
                                         gzip                    \
-                                        httpd                   \
                                         initscripts             \
                                         libattr-devel           \
                                         make                    \
@@ -49,13 +44,11 @@ RUN        yum -y update && yum -y install                      \
                                         patch                   \
                                         perl                    \
                                         pkgconfig               \
-                                        psmisc                  \
                                         python-devel            \
                                         rpm-build               \
                                         sed                     \
                                         selinux-policy-targeted \
                                         shadow-utils            \
-                                        sudo                    \
                                         SysVinit                \
                                         unzip                   \
                                         which                   \
