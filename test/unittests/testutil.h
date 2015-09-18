@@ -288,7 +288,6 @@ namespace swissknife {
 class CatalogTraversalParams;
 }
 
-namespace catalog {
 
 /**
  * This is a minimal mock of a Catalog class.
@@ -335,12 +334,12 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
       }
     }
 
-    DirectoryEntry ToDirectoryEntry() const {
+    catalog::DirectoryEntry ToDirectoryEntry() const {
       bool is_directory = hash.IsNull();
       if (is_directory)
-        return DirectoryEntryTestFactory::Directory(name, size, hash,
+        return catalog::DirectoryEntryTestFactory::Directory(name, size, hash,
                                                   is_nested_catalog_mountpoint);
-      return DirectoryEntryTestFactory::RegularFile(name, size, hash);
+      return catalog::DirectoryEntryTestFactory::RegularFile(name, size, hash);
     }
   };
   typedef std::vector<File> FileList;
@@ -418,7 +417,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
    * @param child catalog to be removed form the active catalog list
    */
   void RemoveChild(MockCatalog *child);
-  InodeRange inode_range() const { return InodeRange(); }
+  catalog::InodeRange inode_range() const { return catalog::InodeRange(); }
   bool OpenDatabase(const std::string &db_path) {
     initialized_ = true;
     if (parent_ != NULL)
@@ -426,19 +425,19 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
     return true;
   }
   uint64_t max_row_id() const { return std::numeric_limits<uint64_t>::max(); }
-  void set_inode_range(const InodeRange value) { }
-  void SetInodeAnnotation(InodeAnnotation *new_annotation) { }
-  void SetOwnerMaps(const OwnerMap *uid_map,
-                    const OwnerMap *gid_map) { }
+  void set_inode_range(const catalog::InodeRange value) { }
+  void SetInodeAnnotation(catalog::InodeAnnotation *new_annotation) { }
+  void SetOwnerMaps(const catalog::OwnerMap *uid_map,
+                    const catalog::OwnerMap *gid_map) { }
   bool IsInitialized() const { return initialized_; }
   MockCatalog* FindSubtree(const PathString &path);
   uint64_t GetTTL() const { return 0; }
   bool LookupRawSymlink(const PathString &path,
                                 LinkString *raw_symlink) const { return false; }
   bool LookupPath(const PathString &path,
-                  DirectoryEntry *dirent) const;
+                  catalog::DirectoryEntry *dirent) const;
   bool ListingPath(const PathString &path,
-                   DirectoryEntryList *listing) const;
+                   catalog::DirectoryEntryList *listing) const;
 
 
  protected:
@@ -446,7 +445,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   MockCatalog& operator= (const MockCatalog &other);
 
   // API in this 'public block' is used by CatalogTraversal
-  // (see catalog.h - Catalog for details)
+  // (see catalog.h - catalog::Catalog for details)
  public:
   static MockCatalog* AttachFreely(const std::string  &root_path,
                                    const std::string  &file,
@@ -525,8 +524,6 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 
   mutable HashVector  referenced_objects_;
 };
-
-}  // namespace catalog
 
 //------------------------------------------------------------------------------
 
@@ -749,7 +746,7 @@ class MockObjectFetcher;
 
 template <>
 struct object_fetcher_traits<MockObjectFetcher> {
-  typedef catalog::MockCatalog CatalogTN;
+  typedef MockCatalog CatalogTN;
   typedef MockHistory HistoryTN;
 };
 

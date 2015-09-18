@@ -64,7 +64,7 @@ class T_ObjectFetcher : public ::testing::Test {
     }
 
     MockHistory::Reset();
-    catalog::MockCatalog::Reset();
+    MockCatalog::Reset();
 
     root_hash             = shash::Any();
     history_hash          = shash::Any();
@@ -501,15 +501,15 @@ class T_ObjectFetcher : public ::testing::Test {
   void CreateCatalog(const type<MockObjectFetcher >  type_spec,
                            shash::Any               *content_hash,
                      const std::string              &root_path) {
-    *content_hash = catalog::MockCatalog::root_hash;
-    catalog::MockCatalog *catalog = new catalog::MockCatalog(root_path,
+    *content_hash = MockCatalog::root_hash;
+    MockCatalog *catalog = new MockCatalog(root_path,
                                            *content_hash,
                                            1024,
                                            catalog_revision,
                                            t(27, 11, 1987),
                                            true);
     // register the new catalog in the data structures
-    catalog::MockCatalog::RegisterObject(catalog->hash(), catalog);
+    MockCatalog::RegisterObject(catalog->hash(), catalog);
   }
 
   void InsertIntoStorage(const std::string  &tmp_path,

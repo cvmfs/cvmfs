@@ -26,11 +26,11 @@ class T_CatalogTraversal : public ::testing::Test {
   static const std::string fqrn;
 
  public:
-  catalog::MockCatalog *dummy_catalog_hierarchy;
+  MockCatalog *dummy_catalog_hierarchy;
 
  protected:
-  typedef std::map<std::string, catalog::MockCatalog*>    CatalogPathMap;
-  typedef std::map<unsigned int, CatalogPathMap>          RevisionMap;
+  typedef std::map<std::string, MockCatalog*>    CatalogPathMap;
+  typedef std::map<unsigned int, CatalogPathMap> RevisionMap;
 
   struct RootCatalogInfo {
     RootCatalogInfo() : timestamp(0) {}
@@ -57,13 +57,13 @@ class T_CatalogTraversal : public ::testing::Test {
   void SetUp() {
     dice_.InitLocaltime();
     SetupDummyCatalogs();
-    EXPECT_EQ(initial_catalog_instances, catalog::MockCatalog::instances);
+    EXPECT_EQ(initial_catalog_instances, MockCatalog::instances);
   }
 
   void TearDown() {
-    catalog::MockCatalog::Reset();
+    MockCatalog::Reset();
     MockHistory::Reset();
-    EXPECT_EQ(0u, catalog::MockCatalog::instances);
+    EXPECT_EQ(0u, MockCatalog::instances);
   }
 
   TraversalParams GetBasicTraversalParams() {
@@ -113,7 +113,7 @@ class T_CatalogTraversal : public ::testing::Test {
     }
   }
 
-  catalog::MockCatalog* GetCatalog(const unsigned int  revision,
+  MockCatalog* GetCatalog(const unsigned int  revision,
                           const std::string  &path) {
     RevisionMap::const_iterator rev_itr = revisions_.find(revision);
     if (rev_itr == revisions_.end()) {
@@ -151,7 +151,7 @@ class T_CatalogTraversal : public ::testing::Test {
     return rev_itr->second;
   }
 
-  catalog::MockCatalog* GetRevisionHead(const unsigned int revision) {
+  MockCatalog* GetRevisionHead(const unsigned int revision) {
     CatalogPathMap &catalogs = GetCatalogTree(revision);
     CatalogPathMap::iterator catalogs_itr = catalogs.find("");
     assert(catalogs_itr != catalogs.end());
@@ -160,8 +160,8 @@ class T_CatalogTraversal : public ::testing::Test {
     return catalogs_itr->second;
   }
 
-  catalog::MockCatalog* GetBranchHead(const std::string   &root_path,
-                                      const unsigned int   revision) {
+  MockCatalog* GetBranchHead(const std::string   &root_path,
+                             const unsigned int   revision) {
     CatalogPathMap &catalogs = GetCatalogTree(revision);
     CatalogPathMap::iterator catalogs_itr = catalogs.find(root_path);
     assert(catalogs_itr != catalogs.end());
@@ -200,7 +200,7 @@ class T_CatalogTraversal : public ::testing::Test {
      *    Revision 3:   - adds branch 1-1                                  17     06.03.2009   c9e011bbf7529d25c958bc0f948eefef79e991cd
      *    Revision 4:   - adds branch 1-2 and branch 1-1 is recreated      25     18.07.2010   eec5694dfe5f2055a358acfb4fda7748c896df24
      *    Revision 5:   - adds branch 1-3                                  28     16.11.2014   3c726334c98537e92c8b92b76852f77e3a425be9
-     *    Revision 6:   - removes branch 1-0                               21     17.11.2014   catalog::MockCatalog::root_hash
+     *    Revision 6:   - removes branch 1-0                               21     17.11.2014   MockCatalog::root_hash
      *
      */
 
@@ -221,7 +221,7 @@ class T_CatalogTraversal : public ::testing::Test {
       RootCatalogInfo(h("3c726334c98537e92c8b92b76852f77e3a425be9", 'C'),
                       t(16, 11, 2014));
     root_catalogs[6] =
-      RootCatalogInfo(catalog::MockCatalog::root_hash, t(17, 11, 2014));
+      RootCatalogInfo(MockCatalog::root_hash, t(17, 11, 2014));
     root_catalogs_ = root_catalogs;
 
     for (unsigned int r = 1; r <= max_revision; ++r) {
@@ -260,7 +260,7 @@ class T_CatalogTraversal : public ::testing::Test {
     revisions_[revision] = CatalogPathMap();
 
     // create the root catalog
-    catalog::MockCatalog *root_catalog =
+    MockCatalog *root_catalog =
       CreateAndRegisterCatalog("", revision, GetRootTimestamp(revision), NULL,
                                GetRootHash(revision));
 
@@ -299,38 +299,38 @@ class T_CatalogTraversal : public ::testing::Test {
   }
 
   void MakeBranch(const std::string &branch, const unsigned int revision) {
-    catalog::MockCatalog   *revision_root = GetRevisionHead(revision);
+    MockCatalog   *revision_root = GetRevisionHead(revision);
     const time_t   ts            = GetRootTimestamp(revision);
 
     if (branch == "/00/10") {
-      catalog::MockCatalog *_10 =
+      MockCatalog *_10 =
         CreateAndRegisterCatalog("/00/10", revision, ts + 1, revision_root);
-      catalog::MockCatalog *_20 =
+      MockCatalog *_20 =
         CreateAndRegisterCatalog("/00/10/20", revision, ts + 2, _10);
       CreateAndRegisterCatalog("/00/10/21", revision, ts + 3, _10);
-      catalog::MockCatalog *_30 =
+      MockCatalog *_30 =
         CreateAndRegisterCatalog("/00/10/20/30", revision, ts +  4, _20);
       CreateAndRegisterCatalog("/00/10/20/31", revision, ts + 5, _20);
       CreateAndRegisterCatalog("/00/10/20/32", revision, ts + 6, _20);
       CreateAndRegisterCatalog("/00/10/20/30/40", revision, ts + 7, _30);
     } else if (branch == "/00/11") {
-      catalog::MockCatalog *_11 =
+      MockCatalog *_11 =
         CreateAndRegisterCatalog("/00/11", revision, ts + 8, revision_root);
-      catalog::MockCatalog *_22 =
+      MockCatalog *_22 =
         CreateAndRegisterCatalog("/00/11/22", revision, ts + 9, _11);
       CreateAndRegisterCatalog("/00/11/23", revision, ts + 10, _11);
       CreateAndRegisterCatalog("/00/11/24", revision, ts + 11, _11);
       CreateAndRegisterCatalog("/00/11/22/33", revision, ts + 12, _22);
-      catalog::MockCatalog *_34 =
+      MockCatalog *_34 =
         CreateAndRegisterCatalog("/00/11/22/34", revision, ts + 13, _22);
       CreateAndRegisterCatalog("/00/11/22/34/41", revision, ts + 14, _34);
       CreateAndRegisterCatalog("/00/11/22/34/42", revision, ts + 15, _34);
       CreateAndRegisterCatalog("/00/11/22/34/43", revision, ts + 16, _34);
     } else if (branch == "/00/12") {
-      catalog::MockCatalog *_12 =
+      MockCatalog *_12 =
         CreateAndRegisterCatalog("/00/12", revision, ts + 17, revision_root);
       CreateAndRegisterCatalog("/00/12/25", revision, ts + 28, _12);
-      catalog::MockCatalog *_26 =
+      MockCatalog *_26 =
         CreateAndRegisterCatalog("/00/12/26", revision, ts + 19, _12);
       CreateAndRegisterCatalog("/00/12/27", revision, ts + 20, _12);
       CreateAndRegisterCatalog("/00/12/26/35", revision, ts + 21, _26);
@@ -338,7 +338,7 @@ class T_CatalogTraversal : public ::testing::Test {
       CreateAndRegisterCatalog("/00/12/26/37", revision, ts + 23, _26);
       CreateAndRegisterCatalog("/00/12/26/38", revision, ts + 24, _26);
     } else if (branch == "/00/13") {
-      catalog::MockCatalog *_13 =
+      MockCatalog *_13 =
         CreateAndRegisterCatalog("/00/13", revision, ts + 25, revision_root);
       CreateAndRegisterCatalog("/00/13/28", revision, ts + 26, _13);
       CreateAndRegisterCatalog("/00/13/29", revision, ts + 27, _13);
@@ -347,11 +347,11 @@ class T_CatalogTraversal : public ::testing::Test {
     }
   }
 
-  catalog::MockCatalog* CreateAndRegisterCatalog(
-                  const                        std::string  &root_path,
-                  const unsigned int           revision,
-                  const time_t                 timestamp,
-                  catalog::MockCatalog        *parent       = NULL,
+  MockCatalog* CreateAndRegisterCatalog(
+                  const std::string  &root_path,
+                  const unsigned int  revision,
+                  const time_t        timestamp,
+                  MockCatalog        *parent       = NULL,
                   const shash::Any   &catalog_hash = shash::Any(shash::kSha1)) {
     // produce a random hash if no catalog has was given
     shash::Any effective_clg_hash = catalog_hash;
@@ -364,7 +364,7 @@ class T_CatalogTraversal : public ::testing::Test {
     CatalogPathMap &catalogs = GetCatalogTree(revision);
 
     // find previous catalog from the RevisionsMaps (if there is one)
-    catalog::MockCatalog *previous_catalog = NULL;
+    MockCatalog *previous_catalog = NULL;
     if (revision > 1) {
       RevisionMap::iterator prev_rev_itr = revisions_.find(revision - 1);
       assert(prev_rev_itr != revisions_.end());
@@ -377,17 +377,17 @@ class T_CatalogTraversal : public ::testing::Test {
 
     // produce the new catalog with references to it's predecessor and parent
     const bool is_root = (parent == NULL);
-    catalog::MockCatalog *catalog = new catalog::MockCatalog(root_path,
-                                                    effective_clg_hash,
-                                                    dice_.Next(10000),
-                                                    revision,
-                                                    timestamp,
-                                                    is_root,
-                                                    parent,
-                                                    previous_catalog);
+    MockCatalog *catalog = new MockCatalog(root_path,
+                                           effective_clg_hash,
+                                           dice_.Next(10000),
+                                           revision,
+                                           timestamp,
+                                           is_root,
+                                           parent,
+                                           previous_catalog);
 
     // register the new catalog in the data structures
-    catalog::MockCatalog::RegisterObject(catalog->hash(), catalog);
+    MockCatalog::RegisterObject(catalog->hash(), catalog);
     catalogs[root_path] = catalog;
     return catalog;
   }
@@ -463,13 +463,12 @@ TEST_F(T_CatalogTraversal, SimpleTraversal) {
 //------------------------------------------------------------------------------
 
 
-std::vector<catalog::MockCatalog*>
-    SimpleTraversalNoCloseCallback_visited_catalogs;
+std::vector<MockCatalog*> SimpleTraversalNoCloseCallback_visited_catalogs;
 void SimpleTraversalNoCloseCallback(
   const MockedCatalogTraversal::CallbackDataTN &data)
 {
   SimpleTraversalNoCloseCallback_visited_catalogs.push_back(
-    const_cast<catalog::MockCatalog*>(data.catalog));
+    const_cast<MockCatalog*>(data.catalog));
 }
 
 TEST_F(T_CatalogTraversal, SimpleTraversalNoClose) {
@@ -483,9 +482,9 @@ TEST_F(T_CatalogTraversal, SimpleTraversalNoClose) {
   bool t1 = traverse.Traverse();
   EXPECT_TRUE(t1);
 
-  EXPECT_EQ(21u + initial_catalog_instances, catalog::MockCatalog::instances);
+  EXPECT_EQ(21u + initial_catalog_instances, MockCatalog::instances);
 
-  std::vector<catalog::MockCatalog*>::const_iterator i, iend;
+  std::vector<MockCatalog*>::const_iterator i, iend;
   for (i    = SimpleTraversalNoCloseCallback_visited_catalogs.begin(),
        iend = SimpleTraversalNoCloseCallback_visited_catalogs.end();
        i != iend; ++i) {
@@ -629,13 +628,12 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversal) {
 //------------------------------------------------------------------------------
 
 
-std::vector<catalog::MockCatalog*>
-    FirstLevelHistoryTraversalNoClose_visited_catalogs;
+std::vector<MockCatalog*> FirstLevelHistoryTraversalNoClose_visited_catalogs;
 void FirstLevelHistoryTraversalNoCloseCallback(
   const MockedCatalogTraversal::CallbackDataTN &data)
 {
   FirstLevelHistoryTraversalNoClose_visited_catalogs.push_back(
-    const_cast<catalog::MockCatalog*>(data.catalog));
+    const_cast<MockCatalog*>(data.catalog));
 }
 
 TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
@@ -650,9 +648,9 @@ TEST_F(T_CatalogTraversal, FirstLevelHistoryTraversalNoClose) {
   const bool t1 = traverse.Traverse();
   EXPECT_TRUE(t1);
 
-  EXPECT_EQ(49u + initial_catalog_instances, catalog::MockCatalog::instances);
+  EXPECT_EQ(49u + initial_catalog_instances, MockCatalog::instances);
 
-  std::vector<catalog::MockCatalog*>::const_iterator i, iend;
+  std::vector<MockCatalog*>::const_iterator i, iend;
   for (i    = FirstLevelHistoryTraversalNoClose_visited_catalogs.begin(),
        iend = FirstLevelHistoryTraversalNoClose_visited_catalogs.end();
        i != iend; ++i) {
@@ -2285,7 +2283,7 @@ TEST_F(T_CatalogTraversal, TraverseUntilUnavailableRevisionNoRepeat) {
   deleted_catalogs.insert(GetRootHash(2));
   deleted_catalogs.insert(GetRootHash(3));
   deleted_catalogs.insert(GetRootHash(4));
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2350,12 +2348,12 @@ TEST_F(T_CatalogTraversal, UnavailableNestedNoRepeat) {
   UnavailableNestedNoRepeat_visited_catalogs.clear();
   EXPECT_EQ(0u, UnavailableNestedNoRepeat_visited_catalogs.size());
 
-  catalog::MockCatalog* doomed_nested_catalog = GetCatalog(2, "/00/10/20");
-  ASSERT_NE(static_cast<catalog::MockCatalog*>(NULL), doomed_nested_catalog);
+  MockCatalog* doomed_nested_catalog = GetCatalog(2, "/00/10/20");
+  ASSERT_NE(static_cast<MockCatalog*>(NULL), doomed_nested_catalog);
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(doomed_nested_catalog->hash());
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2427,12 +2425,12 @@ TEST_F(T_CatalogTraversal, IgnoreUnavailableNestedNoRepeat) {
   IgnoreUnavailableNestedNoRepeat_visited_catalogs.clear();
   EXPECT_EQ(0u, IgnoreUnavailableNestedNoRepeat_visited_catalogs.size());
 
-  catalog::MockCatalog* doomed_nested_catalog = GetCatalog(2, "/00/10/20");
-  ASSERT_NE(static_cast<catalog::MockCatalog*>(NULL), doomed_nested_catalog);
+  MockCatalog* doomed_nested_catalog = GetCatalog(2, "/00/10/20");
+  ASSERT_NE(static_cast<MockCatalog*>(NULL), doomed_nested_catalog);
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(doomed_nested_catalog->hash());
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   CatalogIdentifiers catalogs;
 
@@ -2879,7 +2877,7 @@ TEST_F(T_CatalogTraversal, FullHistoryDepthFirstTraversalUnavailableAncestor) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(2));
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   TraversalParams params = GetBasicTraversalParams();
   params.history             = TraversalParams::kFullHistory;
@@ -3680,7 +3678,7 @@ TEST_F(
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   TraversalParams params = GetBasicTraversalParams();
   params.timestamp           = t(6, 6, 2003);
@@ -3757,7 +3755,7 @@ TEST_F(
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   TraversalParams params = GetBasicTraversalParams();
   params.timestamp           = t(6, 6, 2003);
@@ -3847,7 +3845,7 @@ TEST_F(T_CatalogTraversal, NamedSnapshotTraversalWithTimestampThresholdNoRepeat)
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(GetRootHash(4));
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   TraversalParams params = GetBasicTraversalParams();
   // excludes all revisions but HEAD

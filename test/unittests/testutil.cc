@@ -236,7 +236,6 @@ catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
 
 //------------------------------------------------------------------------------
 
-namespace catalog {
 
 unsigned int MockCatalog::instances = 0;
 
@@ -414,8 +413,6 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
   return kLoadNew;
 }
 
-}  // namespace catalog
-
 
 //------------------------------------------------------------------------------
 
@@ -424,7 +421,7 @@ manifest::Manifest* MockObjectFetcher::FetchManifest() {
   const uint64_t    catalog_size = 0;
   const std::string root_path    = "";
   manifest::Manifest* manifest = new manifest::Manifest(
-      catalog::MockCatalog::root_hash,
+      MockCatalog::root_hash,
       catalog_size,
       root_path);
   manifest->set_history(MockHistory::root_hash);

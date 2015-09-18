@@ -62,10 +62,10 @@ class T_GarbageCollector : public ::testing::Test {
   static const std::string fqrn;
 
  public:
-  catalog::MockCatalog *dummy_catalog_hierarchy;
+  MockCatalog *dummy_catalog_hierarchy;
 
  protected:
-  typedef std::map<std::pair<unsigned int, std::string>, catalog::MockCatalog*>
+  typedef std::map<std::pair<unsigned int, std::string>, MockCatalog*>
     RevisionMap;
   typedef GarbageCollector<MockedCatalogTraversal, SimpleHashFilter>
     MyGarbageCollector;
@@ -80,9 +80,9 @@ class T_GarbageCollector : public ::testing::Test {
   }
 
   void TearDown() {
-    catalog::MockCatalog::Reset();
+    MockCatalog::Reset();
     MockHistory::Reset();
-    EXPECT_EQ(0u, catalog::MockCatalog::instances);
+    EXPECT_EQ(0u, MockCatalog::instances);
     ASSERT_NE(static_cast<GC_MockUploader*>(NULL), uploader_);
     uploader_->TearDown();
     delete uploader_;
@@ -334,7 +334,7 @@ class T_GarbageCollector : public ::testing::Test {
 
     c[mp(5, "00")] =
       CreateAndRegisterCatalog("", 5, t(26, 12, 2004), NULL,
-                               c[mp(4, "00")], catalog::MockCatalog::root_hash);
+                               c[mp(4, "00")], MockCatalog::root_hash);
     c[mp(5, "10")] =
       CreateAndRegisterCatalog("/00/10", 5, t(26, 12, 2004) + 10,
                                c[mp(5, "00")], c[mp(4, "10")]);
@@ -405,12 +405,12 @@ class T_GarbageCollector : public ::testing::Test {
     history->CommitTransaction();
   }
 
-  catalog::MockCatalog* CreateAndRegisterCatalog(
+  MockCatalog* CreateAndRegisterCatalog(
                   const std::string  &root_path,
                   const unsigned int  revision,
                   const time_t        last_modified,
-                  catalog::MockCatalog        *parent       = NULL,
-                  catalog::MockCatalog        *previous     = NULL,
+                  MockCatalog        *parent       = NULL,
+                  MockCatalog        *previous     = NULL,
                   const shash::Any   &catalog_hash = shash::Any(shash::kSha1)) {
     // produce a random hash if no catalog has was given
     shash::Any effective_clg_hash = catalog_hash;
@@ -421,7 +421,7 @@ class T_GarbageCollector : public ::testing::Test {
 
     // produce the new catalog with references to it's predecessor and parent
     const bool is_root = (parent == NULL);
-    catalog::MockCatalog *catalog = new catalog::MockCatalog(root_path,
+    MockCatalog *catalog = new MockCatalog(root_path,
                                            effective_clg_hash,
                                            dice_.Next(10000),
                                            revision,
@@ -431,17 +431,17 @@ class T_GarbageCollector : public ::testing::Test {
                                            previous);
 
     // register the new catalog in the data structures
-    catalog::MockCatalog::RegisterObject(catalog->hash(), catalog);
+    MockCatalog::RegisterObject(catalog->hash(), catalog);
     return catalog;
   }
 
-  catalog::MockCatalog* ReuseCatalog(catalog::MockCatalog *legacy_catalog,
-                            catalog::MockCatalog *additional_parent_catalog) {
+  MockCatalog* ReuseCatalog(MockCatalog *legacy_catalog,
+                            MockCatalog *additional_parent_catalog) {
     additional_parent_catalog->RegisterNestedCatalog(legacy_catalog);
     return legacy_catalog;
   }
 
-  catalog::MockCatalog* GetCatalog(const unsigned int   revision,
+  MockCatalog* GetCatalog(const unsigned int   revision,
                           const std::string   &clg_index) {
     RevisionMap::const_iterator i = catalogs_.find(mp(revision, clg_index));
     assert(i != catalogs_.end());
@@ -700,7 +700,7 @@ TEST_F(T_GarbageCollector, KeepNamedSnapshotsWithAlreadySweepedRevisions) {
   deleted_catalogs.insert(c[mp(3, "00")]->hash());
   deleted_catalogs.insert(c[mp(3, "10")]->hash());
   deleted_catalogs.insert(c[mp(3, "11")]->hash());
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   EXPECT_FALSE(upl->HasDeleted(c[mp(2, "00")]->hash()));
   EXPECT_FALSE(upl->HasDeleted(c[mp(2, "10")]->hash()));
@@ -730,7 +730,7 @@ TEST_F(T_GarbageCollector, UnreachableNestedCatalog) {
 
   std::set<shash::Any> deleted_catalogs;
   deleted_catalogs.insert(c[mp(3, "10")]->hash());
-  catalog::MockCatalog::s_deleted_objects = &deleted_catalogs;
+  MockCatalog::s_deleted_objects = &deleted_catalogs;
 
   history::History *history = MockHistory::Get(MockHistory::root_hash);;
   ASSERT_NE(static_cast<history::History*>(NULL), history);
@@ -832,7 +832,7 @@ TEST_F(T_GarbageCollector, OnTheFlyDeletionOfCatalogs) {
   // to simulate the actual deletion of objects
   RevisionMap     &c   = catalogs_;
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
-  catalog::MockCatalog::s_deleted_objects = &upl->deleted_hashes;
+  MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
   const bool gc1 = gc.Collect();
   EXPECT_TRUE(gc1);
@@ -1140,7 +1140,7 @@ TEST_F(T_GarbageCollector, NamedTagsInRecycleBin) {
   // to simulate the actual deletion of objects
   RevisionMap     &c   = catalogs_;
   GC_MockUploader *upl = static_cast<GC_MockUploader*>(config.uploader);
-  catalog::MockCatalog::s_deleted_objects = &upl->deleted_hashes;
+  MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
   // run a first garbage collection (leaving only named snapshots)
   MyGarbageCollector gc1(config);
@@ -1222,7 +1222,7 @@ TEST_F(T_GarbageCollector, FindAndSweepOrphanedNamedSnapshot) {
 
  // wire up std::set<> deleted_hashes in uploader with the MockObjectFetcher
  // to simulate the actual deletion of objects
- catalog::MockCatalog::s_deleted_objects = &upl->deleted_hashes;
+ MockCatalog::s_deleted_objects = &upl->deleted_hashes;
 
  const bool gc1 = gc.Collect();
  EXPECT_TRUE(gc1);

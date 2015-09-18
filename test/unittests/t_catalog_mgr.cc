@@ -21,6 +21,7 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 class T_CatalogManager : public ::testing::Test {
+
  public:
   T_CatalogManager() : statistics_(), catalog_mgr_(&statistics_) { }
 
@@ -28,7 +29,7 @@ class T_CatalogManager : public ::testing::Test {
   /**
    * This method creates a file system structure in the catalogs as follows:
    *
-   * +-/ (ROOT CATALOG) - weight 6 -> will be balanced
+   * +-/ (ROOT CATALOG)
    *   |
    *   +-file1
    *   |
@@ -38,7 +39,7 @@ class T_CatalogManager : public ::testing::Test {
    *       |
    *       +-file2
    *       |
-   *       +-dir (NESTED CATALOG) - weight 5 -> will be balanced
+   *       +-dir (NESTED CATALOG)
    *         |
    *         +-file3
    *         |
@@ -46,7 +47,7 @@ class T_CatalogManager : public ::testing::Test {
    *         |
    *         +-dir
    *           |
-   *           +-dir (NESTED CATALOG) - weight 2 -> won't be balanced
+   *           +-dir (NESTED CATALOG)
    *             |
    *             +-file5
    *
@@ -117,7 +118,7 @@ class T_CatalogManager : public ::testing::Test {
   }
 
  protected:
-  static const char *hashes[];
+  const static char *hashes[];
   perf::Statistics statistics_;
   MockCatalogManager catalog_mgr_;
 };
@@ -253,7 +254,7 @@ TEST_F(T_CatalogManager, FailListing) {
   EXPECT_EQ(0u, del.size());
   // even though the listing failed it should have loaded the nested catalog
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
-  // trying now with the next nested catalog
+  //trying now with the next nested catalog
   EXPECT_FALSE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir/fakedir", &del));
   EXPECT_EQ(0u, del.size());
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
@@ -287,8 +288,9 @@ TEST_F(T_CatalogManager, Balance) {
 
 TEST_F(T_CatalogManager, Remount) {
   EXPECT_TRUE(catalog_mgr_.Init());
-  EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(true));
+  LoadError le;
+  EXPECT_EQ(kLoadNew, le = catalog_mgr_.Remount(true));
   EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
 }
 
-}  // namespace catalog
+}

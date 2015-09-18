@@ -213,5 +213,4 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
 }  // namespace catalog
 
-
 #endif  // CVMFS_CATALOG_MGR_RW_H_
