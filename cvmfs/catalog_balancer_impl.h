@@ -99,9 +99,10 @@ void CatalogBalancer<CatalogMgrT>::PartitionOptimally(
         heaviest_node->weight >= catalog_mgr_->min_weight_) {
       // the catalog now generated _cannot_ be overflowed because the tree is
       // being traversed in postorder, handling the lightest nodes first
+      unsigned max_weight = heaviest_node->weight;
       AddCatalogMarker(heaviest_node->path);
       AddCatalog(heaviest_node);
-      virtual_node->FixWeight();
+      virtual_node->weight -= (max_weight - 1);
     } else {
       // there is no possibility for this directory to be a catalog
       break;
