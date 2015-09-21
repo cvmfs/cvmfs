@@ -1,0 +1,342 @@
+
+#include "voms_authz.h"
+
+#include "voms/voms_apic.h"
+#include "fuse/fuse_lowlevel.h"
+
+#include <sys/fsuid.h>
+#include <limits.h>
+#include <time.h>
+#include <errno.h>
+#include <cstring>
+
+#include <vector>
+#include <string>
+#include <map>
+
+#include "../logging.h"
+
+static time_t get_mono_time()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
+    return ts.tv_sec;
+}
+
+class VOMSSessionCache {
+
+public:
+
+    VOMSSessionCache()
+      : m_last_clean(get_mono_time())
+    {
+        pthread_mutex_init(&m_mutex, NULL);
+    }
+
+    ~VOMSSessionCache()
+    {
+        for (KeyToVOMS::const_iterator it = m_map.begin(); it!=m_map.end(); it++)
+        {
+            VOMS_Destroy(it->second.first);
+        }
+        pthread_mutex_destroy(&m_mutex);
+    }
+
+    bool get(pid_t pid, struct vomsdata *&vomsinfo)
+    {
+        time_t now = get_mono_time();
+        KeyType mykey;
+        if (!lookup(pid, mykey)) {return false;}
+        LogCvmfs(kLogVoms, kLogDebug, "PID %d maps to session %d, bday %llu", pid, mykey.first, mykey.second);
+        pthread_mutex_lock(&m_mutex);
+        if (now > m_last_clean + 100) {clean_tables();};
+        KeyToVOMS::const_iterator iter = m_map.find(mykey);
+        pthread_mutex_unlock(&m_mutex);
+        if (iter == m_map.end())
+        {
+            return false;
+        }
+        LogCvmfs(kLogVoms, kLogDebug, "Session %d, bday %llu has cached VOMS data", mykey.first, mykey.second);
+        vomsinfo = iter->second.first;
+        return true;
+    }
+
+    // Put the VOMS data into the map.  Map owns the pointer
+    // after this returns.  This function is thread safe.
+    //
+    // The returned pointer is the data in the map which is possibly
+    // not the input vomsdata.
+    //
+    // If result is NULL, then the operation failed and errno is set.
+    struct vomsdata *try_put(pid_t pid, struct vomsdata *voms_ptr)
+    {
+        KeyType mykey;
+        if (!lookup(pid, mykey))
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to determine session key for PID %d.", pid);
+            return false;
+        }
+        time_t now = get_mono_time();
+
+        pthread_mutex_lock(&m_mutex);
+        std::pair<KeyToVOMS::iterator, bool> result = m_map.insert(std::make_pair(mykey, std::make_pair(voms_ptr, now)));
+        pthread_mutex_unlock(&m_mutex);
+        if (!result.second)
+        {
+            VOMS_Destroy(voms_ptr);
+        }
+        LogCvmfs(kLogVoms, kLogDebug, "Cached VOMS data for session %d, bday %llu.", mykey.first, mykey.second);
+        return result.first->second.first;
+    }
+
+private:
+
+    typedef std::pair<pid_t, unsigned long long> KeyType;
+    typedef std::pair<struct vomsdata*, time_t> ValueType;
+    typedef std::map<KeyType, ValueType> KeyToVOMS;
+
+    typedef std::map<KeyType, KeyType> PidToSid;
+    PidToSid m_pid_map;
+
+    // Lookup pid's sid and birthdy.
+    // Returns false on failure and sets errno.
+    bool lookup(pid_t pid, KeyType &mykey)
+    {
+        char pidpath[PATH_MAX];
+        if (snprintf(pidpath, PATH_MAX, "/proc/%d/stat", pid) >= PATH_MAX)
+        {
+            errno=ERANGE;
+            return false;
+        }
+        FILE *fp;
+        if (NULL == (fp = fopen(pidpath, "r")))
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to open status file.");
+            return false;
+        }
+        pid_t sid;
+        unsigned long long birthday;
+        int result;
+        // TODO: EINTR handling
+        result = fscanf(fp, "%*d %*s %*c %*d %*d %d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %*d %llu", &sid, &birthday);
+        fclose(fp);
+        if (result != 2)
+        {
+            if (errno == 0) {errno = EINVAL;}
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to parse status file for pid %d: (errno=%d) %s, fscanf result %d", pid, errno, strerror(errno), result);
+            return false;
+        }
+
+        KeyType pidkey(pid, birthday);
+
+        pthread_mutex_lock(&m_mutex);
+        PidToSid::iterator it = m_pid_map.find(pidkey);
+        pthread_mutex_unlock(&m_mutex);
+        if (it == m_pid_map.end())
+        {
+            if (snprintf(pidpath, PATH_MAX, "/proc/%d/stat", sid) >= PATH_MAX) {errno=ERANGE; return false;}
+            if (NULL == (fp = fopen(pidpath, "r"))) {LogCvmfs(kLogVoms, kLogDebug, "Failed to open session's status file."); return false;}
+            result = fscanf(fp, "%*d %*s %*c %*d %*d %d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %*d %llu", &sid, &birthday);
+            fclose(fp);
+            if (result != 2)
+            {
+                if (errno == 0) {errno = EINVAL;}
+                LogCvmfs(kLogVoms, kLogDebug, "Failed to parse status file for sid %d: (errno=%d) %s, fscanf result %d", pid, errno, strerror(errno), result);
+                return false;
+            }
+            mykey.first = sid;
+            mykey.second = birthday;
+            pthread_mutex_lock(&m_mutex);
+            m_pid_map.insert(std::make_pair(pidkey, mykey));
+            pthread_mutex_unlock(&m_mutex);
+        }
+        else
+        {
+            mykey = it->second;
+        }
+
+        LogCvmfs(kLogVoms, kLogDebug, "Lookup key; sid=%d, bday=%d", sid, birthday);
+        return true;
+    }
+
+    // MUST CALL LOCKED
+    void clean_tables()
+    {
+        LogCvmfs(kLogVoms, kLogDebug, "Expiring VOMS credential tables.");
+        m_pid_map.clear();
+        m_last_clean = get_mono_time();
+        time_t expiry = m_last_clean + 100;
+        KeyToVOMS::iterator it = m_map.begin();
+        while (it != m_map.end())
+        {
+            if (it->second.second < expiry)
+            {
+                VOMS_Destroy(it->second.first);
+                m_map.erase(it++);
+            }
+            else {++it;}
+        }
+    }
+
+    time_t m_last_clean;
+    pthread_mutex_t m_mutex;
+
+    KeyToVOMS m_map;
+};
+
+
+static VOMSSessionCache g_cache;
+
+
+static FILE *
+GetProxyFile(const struct fuse_ctx *ctx)
+{
+    return GetProxyFile(ctx->pid, ctx->uid, ctx->gid);
+}
+
+
+/*
+ * Create the VOMS data structure to the best of our abilities.
+ *
+ * Resulting memory is owned by caller and must be destroyed with VOMS_Destroy.
+ */
+static struct vomsdata*
+GenerateVOMSData(const struct fuse_ctx *ctx)
+{
+    FILE *fp = GetProxyFile(ctx);
+    if (!fp)
+    {
+        LogCvmfs(kLogVoms, kLogDebug, "Could not find process's proxy file.");
+        return NULL;
+    }
+
+    struct vomsdata *voms_ptr = VOMS_Init(NULL, NULL);
+    int error = 0;
+    VOMS_SetVerificationType(VERIFY_NONE, voms_ptr, &error);
+    if (!VOMS_RetrieveFromFile(fp, RECURSE_CHAIN, voms_ptr, &error))
+    {
+        char *err_str = VOMS_ErrorMessage(voms_ptr, error, NULL, 0);
+        LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS file: %s\n", err_str);
+        free(err_str);
+        VOMS_Destroy(voms_ptr);
+        return NULL;
+    }
+    return voms_ptr;
+}
+
+
+static void
+SplitGroupToPaths(const std::string &group, std::vector<std::string> &hierarchy)
+{
+    size_t start=0, end=0;
+    while ((end = group.find('/', start)) != std::string::npos)
+    {
+        if (end-start)
+        {
+            hierarchy.push_back(group.substr(start, end-start));
+        }
+        start = end+1;
+    }
+    if (start != group.size()-1) {hierarchy.push_back(group.substr(start));}
+}
+
+
+static bool
+IsSubgroupOf(const std::vector<std::string> group1, const std::vector<std::string> group2)
+{
+    if (group1.size() < group2.size())
+    {
+        return false;
+    }
+    std::vector<std::string>::const_iterator it1=group1.begin();
+    for (std::vector<std::string>::const_iterator it2=group2.begin(); it2!=group2.end(); it1++,it2++)
+    {
+        if (*it1 != *it2) {return false;}
+    }
+    return true;
+}
+
+
+static bool
+IsRoleMatching(const char *role1, const char *role2)
+{
+    if ((role2 == NULL) || (strlen(role2) == 0) || !strcmp(role2, "NULL")) {return true;}
+    if ((role1 == NULL) || !strcmp(role1, "NULL")) {return false;}
+
+    return !strcmp(role1, role2);
+}
+
+
+bool
+CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
+{
+    // Break the authz into VOMS and roles.
+
+    // We will compare the required auth against the cached session VOMS info.
+    // Roles must match exactly; Sub-groups are authorized in their parent group.
+
+    // NOTE: Trim out everything past the first ',' or '\n'; this will allow us to extend the authz in the future.
+    size_t delim = std::min(authz.find(","), authz.find("\n"));
+    std::string first_authz = (delim != std::string::npos) ? authz.substr(0, delim) : authz;
+    delim = first_authz.find("/Role=");
+    std::string role, group;
+    if (delim != std::string::npos)
+    {
+        role = first_authz.substr(delim+6);
+        group = first_authz.substr(0, delim);
+    }
+    else
+    {
+        group = first_authz;
+    }
+    if (group[0] != '/') {return false;}
+    std::vector<std::string> group_hierarchy;
+    SplitGroupToPaths(group, group_hierarchy);
+
+    LogCvmfs(kLogVoms, kLogDebug, "Checking whether user with UID %d has VOMS auth %s.", ctx->uid, authz.c_str());
+
+    struct vomsdata *voms_ptr;
+    if (!g_cache.get(ctx->pid, voms_ptr))
+    {
+        voms_ptr = GenerateVOMSData(ctx);
+        if (voms_ptr)
+        {
+            voms_ptr = g_cache.try_put(ctx->pid, voms_ptr);
+            LogCvmfs(kLogVoms, kLogDebug, "Caching user's VOMS credentials at point %p.", voms_ptr);
+        }
+        else
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "User has no VOMS credentials.");
+            return false;
+        }
+    }
+    else
+    {
+        LogCvmfs(kLogVoms, kLogDebug, "Using cached VOMS credentials.");
+    }
+    if (!voms_ptr)
+    {
+        LogCvmfs(kLogVoms, kLogDebug, "ERROR: VOMS credentials are null pointer.");
+        return false;
+    }
+
+    // Now we have valid VOMS data, check authz.
+    for (int idx=0; voms_ptr->data[idx] != NULL; idx++)
+    { // Iterator through the VOs
+        struct voms *it = voms_ptr->data[idx];
+        // Iterate through the FQANs.
+        for (int idx2=0; it->std[idx2] != NULL; idx2++)
+        {
+            struct data *it2 = it->std[idx2];
+            LogCvmfs(kLogVoms, kLogDebug, "Checking (%s Role=%s) against group %s, role %s.", group.c_str(), role.c_str(), it2->group, it2->role);
+            std::vector<std::string> avail_hierarchy;
+            SplitGroupToPaths(it2->group, avail_hierarchy);
+            if (IsSubgroupOf(avail_hierarchy, group_hierarchy) && IsRoleMatching(it2->role, role.c_str()))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
