@@ -21,18 +21,31 @@ SyncItem::SyncItem() :
 {
 }
 
-SyncItem::SyncItem(const string &relative_parent_path,
-                   const string &filename,
-                   const SyncItemType entry_type,
-                   const SyncUnion *union_engine) :
+SyncItem::SyncItem(const string       &relative_parent_path,
+                   const string       &filename,
+                   const SyncUnion    *union_engine,
+                   const SyncItemType  entry_type) :
   union_engine_(union_engine),
   whiteout_(false),
   relative_parent_path_(relative_parent_path),
   filename_(filename),
   scratch_type_(entry_type),
-  rdonly_type_(GetRdOnlyFiletype())
+  rdonly_type_(kItemUnknown)
 {
   content_hash_.algorithm = shash::kAny;
+}
+
+
+SyncItemType SyncItem::GetGenericFiletype(const SyncItem::EntryStat &stat) const
+{
+  const SyncItemType type = stat.GetSyncItemType();
+  if (type == kItemUnknown) {
+    PrintWarning("'" + GetRelativePath() + "' has an unsupported file type "
+                 "(st_mode: " + StringifyInt(stat.stat.st_mode) +
+                 " errno: " + StringifyInt(stat.error_code) + ")");
+    abort();
+  }
+  return type;
 }
 
 
@@ -47,13 +60,19 @@ SyncItemType SyncItem::GetRdOnlyFiletype() const {
   //    /foo/bar/regular_file/is_dir_now
   if (rdonly_stat_.error_code == ENOENT ||
       rdonly_stat_.error_code == ENOTDIR) return kItemNew;
-  if (S_ISDIR(rdonly_stat_.stat.st_mode)) return kItemDir;
-  if (S_ISREG(rdonly_stat_.stat.st_mode)) return kItemFile;
-  if (S_ISLNK(rdonly_stat_.stat.st_mode)) return kItemSymlink;
-  PrintWarning("'" + GetRelativePath() + "' has an unsupported file type "
-               "(st_mode: " + StringifyInt(rdonly_stat_.stat.st_mode) +
-               " errno: " + StringifyInt(rdonly_stat_.error_code) + ")");
-  abort();
+  return GetGenericFiletype(rdonly_stat_);
+}
+
+
+SyncItemType SyncItem::GetScratchFiletype() const {
+  StatScratch();
+  if (scratch_stat_.error_code != 0) {
+    PrintWarning("Failed to stat() '" + GetRelativePath() + "' in scratch. "
+                 "(errno: " + StringifyInt(scratch_stat_.error_code) + ")");
+    abort();
+  }
+
+  return GetGenericFiletype(scratch_stat_);
 }
 
 
@@ -63,7 +82,7 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
   filename_ = actual_filename;
 
   // Find the entry in the repository
-  StatRdOnly(true); // <== refreshing the stat (filename might have changed)
+  StatRdOnly(true);  // <== refreshing the stat (filename might have changed)
   if (rdonly_stat_.error_code != 0) {
     PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not "
                  "found in repository.");
@@ -125,7 +144,8 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   // inode and parent inode is determined at runtime of client
   dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
   dirent.parent_inode_   = catalog::DirectoryEntry::kInvalidInode;
-  dirent.linkcount_      = this->GetUnionStat().st_nlink; // TODO: is this a good idea here?
+  // TODO(rmeusel): is this a good idea here?
+  dirent.linkcount_      = this->GetUnionStat().st_nlink;
 
   dirent.mode_           = this->GetUnionStat().st_mode;
   dirent.uid_            = this->GetUnionStat().st_uid;
@@ -138,7 +158,8 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
 
   if (this->IsSymlink()) {
     char slnk[PATH_MAX+1];
-		const ssize_t length = readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
+    const ssize_t length =
+      readlink((this->GetUnionPath()).c_str(), slnk, PATH_MAX);
     assert(length >= 0);
     dirent.symlink_.Assign(slnk, length);
   }
@@ -164,4 +185,4 @@ std::string SyncItem::GetScratchPath() const {
   return union_engine_->scratch_path() + relative_path;
 }
 
-}  // namespace sync
+}  // namespace publish

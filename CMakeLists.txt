@@ -15,11 +15,11 @@ message ("Running CMake version ${CMAKE_VERSION}")
 # The version numbers
 #
 # DON'T DELETE
-## CVMFS_VERSION 2.1.20
+## CVMFS_VERSION 2.2.0
 #---------------------
 set (CernVM-FS_VERSION_MAJOR 2)
-set (CernVM-FS_VERSION_MINOR 1)
-set (CernVM-FS_VERSION_PATCH 20)
+set (CernVM-FS_VERSION_MINOR 2)
+set (CernVM-FS_VERSION_PATCH 0)
 set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MINOR}.${CernVM-FS_VERSION_PATCH}")
 
 #
@@ -55,9 +55,13 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   if (EXISTS /etc/debian_version)
     set (DEBIAN TRUE)
   endif (EXISTS /etc/debian_version)
+  if (EXISTS /etc/arch-release)
+    set (ARCHLINUX TRUE)
+  endif (EXISTS /etc/arch-release)
 else (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set (LINUX FALSE)
   set (DEBIAN FALSE)
+  set (ARCHLINUX FALSE)
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 #
@@ -65,7 +69,95 @@ endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 #
 if (CMAKE_CXX_COMPILER MATCHES ".*clang")
   set(USING_CLANG 1)
+else (CMAKE_CXX_COMPILER MATCHES ".*clang")
+  set(USING_CLANG 0)
 endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
+
+#
+# figure out if we are on a 64bit system
+#
+if (CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set (IS_64_BIT FALSE)
+else (CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set (IS_64_BIT TRUE)
+endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
+
+#
+# check if we are compiling on ARM
+#
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+  set (ARM TRUE)
+else (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+  set (ARM FALSE)
+endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
+
+#
+# define the installation location of the shared library files
+# Note: We do not support multi-arch on Debian systems for the time being and
+#       hence cannot use GNUInstallDirs as this would assume multi-arch.
+#       (https://wiki.debian.org/Multiarch)
+#
+if (MACOSX)
+  set (CMAKE_INSTALL_LIBDIR "lib")
+  set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
+else (MACOSX) # --> Linux
+  if (DEBIAN OR ARCHLINUX)
+    if (ARCHLINUX)
+      set (CMAKE_MOUNT_INSTALL_BINDIR "/usr/bin")
+    else (ARCHLINUX)
+      set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
+    endif (ARCHLINUX)
+    set (CMAKE_INSTALL_LIBDIR "lib")
+  else (DEBIAN OR ARCHLINUX) # --> RedHat, Fedora, CentOS, SuSE
+    set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
+    if (IS_64_BIT)
+      set (CMAKE_INSTALL_LIBDIR "lib64")
+    else (IS_64_BIT) # --> 32 Bit
+      set (CMAKE_INSTALL_LIBDIR "lib")
+    endif (IS_64_BIT)
+  endif (DEBIAN OR ARCHLINUX)
+endif (MACOSX)
+message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
+
+#
+# Workaround for Debian packaging debhelper trying to pass -D_FORTIFY_SOURCE=2
+# through CPPFLAGS that is not officially supported by CMake. Hence, debhelper
+# appends CPPFLAGS to CFLAGS which breaks the build of the c-ares external.
+# This filters out flags that scares c-ares's ./configure script.
+#
+set (TMP_C_FLAGS "${CFLAGS} ${CMAKE_C_FLAGS}")
+set (CFLAGS        "") # this should better be `unset()` but CMake 2.6.2 doesn't
+set (ENV{CFLAGS}   "") # support it. Should be changed as soon as SLES 11 brings
+set (CMAKE_C_FLAGS "") # an update for CMake or we drop support for the platform
+set (LDFLAGS $ENV{LDFLAGS})
+separate_arguments (TMP_C_FLAGS)
+foreach (CMPLR_FLAG ${TMP_C_FLAGS})
+  if (${CMPLR_FLAG} MATCHES ^-[DIU].*)
+    message ("Moving ${CMPLR_FLAG} from CFLAGS into CPPFLAGS")
+    set (CPPFLAGS "${CPPFLAGS} ${CMPLR_FLAG}")
+  elseif (${CMPLR_FLAG} MATCHES ^-[Ll].*)
+    message ("Moving ${CMPLR_FLAG} from CFLAGS into LDFLAGS")
+    set (LDFLAGS "${LDFLAGS} ${CMPLR_FLAG}")
+    set (CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} ${CMPLR_FLAG}")
+  else (${CMPLR_FLAG} MATCHES ^-[DUILl].*)
+    set (CFLAGS "${CFLAGS} ${CMPLR_FLAG}")
+  endif (${CMPLR_FLAG} MATCHES ^-[DIU].*)
+endforeach (CMPLR_FLAG)
+set (ENV{CPPFLAGS}   "${CPPFLAGS}")
+set (CMAKE_C_FLAGS   "${CFLAGS}")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CPPFLAGS}")
+set (ENV{CFLAGS}     "${CFLAGS}")
+set (ENV{LDFLAGS}    "${LDFLAGS}")
+
+#
+# set name of fuse library (-losxfuse for osxfuse)
+#
+if (MACOSX)
+  set(LIBFUSE osxfuse)
+else (MACOSX)
+  set(LIBFUSE fuse)
+endif(MACOSX)
+
 
 #
 # provide some options to the user
@@ -73,16 +165,18 @@ endif (CMAKE_CXX_COMPILER MATCHES ".*clang")
 option (BUILD_CVMFS             "Build the CernVM-FS FUSE module"                                  ON)
 if (MACOSX)
   option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               OFF)
-else ()
+  option (BUILD_SERVER          "Build writer's end programs"                                      OFF)
+else (MACOSX)
   option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               ON)
-endif()
-option (BUILD_SERVER            "Build writer's end programs"                                      ON)
+  option (BUILD_SERVER          "Build writer's end programs"                                      ON)
+endif(MACOSX)
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
+option (BUILD_DOCUMENTATION     "Build the CerVM-FS documentation using Doxygen"                   OFF)
 option (INSTALL_UNITTESTS       "Install the unit test binary (mainly for packaging)"              OFF)
 option (INSTALL_UNITTESTS_DEBUG "Install the unit test debug binary"                               OFF)
-option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin"                  ON)
+option (INSTALL_MOUNT_SCRIPTS   "Install CernVM-FS mount tools in /etc and /sbin (/usr/bin)"       ON)
 option (INSTALL_PUBLIC_KEYS     "Install public key chain for CERN, EGI, and OSG"                  ON)
 option (INSTALL_BASH_COMPLETION "Install bash completion rules for cvmfs* commands in /etc"        ON)
 option (SQLITE3_BUILTIN         "Don't use system SQLite3"                                         ON)
@@ -94,15 +188,7 @@ option (LEVELDB_BUILTIN         "Don't use system leveldb"                      
 option (GOOGLETEST_BUILTIN      "Don't use system installation of google test"                     ON)
 option (GEOIP_BUILTIN           "Don't use system GeoIP library and python-GeoIP"                  ON)
 option (TBB_PRIVATE_LIB         "Compile our own TBB shared libraries"                             ON)
-
-#
-# set name of fuse library (-losxfuse for osxfuse)
-#
-if (MACOSX)
-  set(LIBFUSE osxfuse)
-else (MACOSX)
-  set(LIBFUSE fuse)
-endif(MACOSX)
+option (BUILD_COVERAGE          "Compile to collect code coverage reports"                         OFF)
 
 #
 # define where to find the external dependencies
@@ -120,10 +206,20 @@ set (ZLIB_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_zlib")
 set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_sparsehash")
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_leveldb")
 set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
+set (SHA2_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha2")
 set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
 set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
 set (TBB_BUILD_LOCATION           "${EXTERNALS_BUILD_LOCATION}/build_tbb")
+
+#
+# Until the bugfix https://sourceware.org/ml/binutils/2015-04/msg00302.html
+# is released in binutils, we disable libcvmfs on AArch64
+#
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+  message("Warning: not building libcvmfs on AArch64")
+  set (BUILD_LIBCVMFS OFF)
+endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
 
 # create the directory for controlled out of source building of external stuff
 file (MAKE_DIRECTORY ${EXTERNALS_BUILD_LOCATION})
@@ -145,6 +241,12 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 
 #
+# include some common functionality
+#
+include (FindPythonModule)
+
+
+#
 # set some default flags
 #
 # flags in CMAKE_C**_FLAGS are always passed to the compiler
@@ -152,32 +254,20 @@ endif (EXISTS "${CMAKE_SOURCE_DIR}/bootstrap.sh")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fno-exceptions -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fno-strict-aliasing -fasynchronous-unwind-tables -fno-omit-frame-pointer -fvisibility=hidden -Wall -D_REENTRANT -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES")
 
-if (CMAKE_SIZEOF_VOID_P EQUAL 4)
-  set (IS_64_BIT FALSE)
-  set (CVMFS_INSTALL_LIBDIR "lib")
-  if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "i686")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
-  endif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "i686")
-else (CMAKE_SIZEOF_VOID_P EQUAL 4)
-  set (IS_64_BIT TRUE)
-  if (NOT DEBIAN)
-    set (CVMFS_INSTALL_LIBDIR "lib64")
-  else (NOT DEBIAN)
-    set (CVMFS_INSTALL_LIBDIR "lib")
-  endif (NOT DEBIAN)
-endif (CMAKE_SIZEOF_VOID_P EQUAL 4)
-
-include (GNUInstallDirs OPTIONAL)
-if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-  message (WARNING " Did not find default library path for this system. Guessing '${CVMFS_INSTALL_LIBDIR}' ...")
-  set (CMAKE_INSTALL_LIBDIR ${CVMFS_INSTALL_LIBDIR})
-endif (NOT DEFINED CMAKE_INSTALL_LIBDIR)
-
 if (NOT USING_CLANG)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-optimize-sibling-calls")
   set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-optimize-sibling-calls")
 endif (NOT USING_CLANG)
+
+if (NOT ARM AND NOT IS_64_BIT)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
+endif (NOT ARM AND NOT IS_64_BIT)
+
+if (BUILD_COVERAGE AND NOT USING_CLANG)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -fprofile-arcs -ftest-coverage -fPIC")
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
+endif (BUILD_COVERAGE AND NOT USING_CLANG)
 
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
 
@@ -252,19 +342,22 @@ if (LIBCURL_BUILTIN)
   include (${CARES_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   include (${LIBCURL_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   set (CURL_LIBRARIES "")
+  set (CARES_LIBRARIES "")
 else (LIBCURL_BUILTIN)
   find_package (CURL REQUIRED)
+  find_package (CARES REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CURL_INCLUDE_DIRS})
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${CARES_INCLUDE_DIRS})
   if (CURL_INCLUDE_DIRS)
     find_program(CURL_CONFIG_EXEC NAMES curl-config)
     if (CURL_CONFIG_EXEC)
       execute_process(
-	COMMAND ${CURL_CONFIG_EXEC} --features
-	OUTPUT_VARIABLE _libcurl_features
-	ERROR_VARIABLE _libcurl_features_error
-	)
+       COMMAND ${CURL_CONFIG_EXEC} --features
+       OUTPUT_VARIABLE _libcurl_features
+       ERROR_VARIABLE _libcurl_features_error
+       )
       if (NOT ${_libcurl_features} MATCHES AsynchDNS)
-	message(FATAL_ERROR "libcurl was not compiled with c-ares")
+       message(FATAL_ERROR "libcurl was not compiled with c-ares")
       endif (NOT ${_libcurl_features} MATCHES AsynchDNS)
     else (CURL_CONFIG_EXEC)
       message(SEND_ERROR "Command \"${CURL_CONFIG_EXEC} --features\" failed with output:\n${_libcurl_features_error}")
@@ -288,6 +381,8 @@ else (ZLIB_BUILTIN)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${ZLIB_INCLUDE_DIRS})
 endif (ZLIB_BUILTIN)
 
+include (${SHA2_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+
 
 if (NOT MACOSX)
   set (HAVE_LIB_RT TRUE)
@@ -308,14 +403,6 @@ else (GOOGLETEST_BUILTIN)
   find_package (GTest REQUIRED)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${GTEST_INCLUDE_DIRS})
 endif (GOOGLETEST_BUILTIN)
-
-if (GEOIP_BUILTIN)
-  include (${LIBGEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-  include (${PYTHON_GEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-else (GEOIP_BUILTIN)
-  find_package (GeoIP REQUIRED)
-  find_package (python-GeoIP REQUIRED)
-endif (GEOIP_BUILTIN)
 
 # required libraries for client and libcvmfs
 if (BUILD_CVMFS OR BUILD_LIBCVMFS)
@@ -355,6 +442,17 @@ if (BUILD_CVMFS)
 endif (BUILD_CVMFS)
 
 if (BUILD_SERVER OR BUILD_UNITTESTS)
+  include (${VJSON_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_BUILTIN_LOCATION}/src)
+  if (GEOIP_BUILTIN)
+    include (${LIBGEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+    include (${PYTHON_GEOIP_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
+    add_dependencies (python-geoip libgeoip)
+  else (GEOIP_BUILTIN)
+    find_package (LibGeoIP REQUIRED)
+    find_python_module (GeoIP REQUIRED)
+  endif (GEOIP_BUILTIN)
+
   if (TBB_PRIVATE_LIB)
     include (${TBB_BUILD_LOCATION}/CVMFS-CMakeLists.txt)
     set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${TBB_BUILD_LOCATION}/include)
@@ -386,10 +484,10 @@ endif (INSTALL_MOUNT_SCRIPTS)
 #
 # compile the unit tests
 #
-if (BUILD_UNITTESTS)
+if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
   enable_testing ()
   add_subdirectory (test/unittests)
-endif (BUILD_UNITTESTS)
+endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
 
 #
 # Documentation
@@ -404,3 +502,24 @@ install (
 # configure the packaging stuff
 #
 include (CPackLists.txt)
+
+#
+# Generate the documentation using doxygen
+#
+if (BUILD_DOCUMENTATION)
+  message (STATUS "Generating Doxygen configuration ...")
+  set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+  set (DOXYFILE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
+  set (DOXYFILE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/")
+  set (DOXYFILE_LATEX "OFF")
+  execute_process (
+    COMMAND sh -c "cp ${CMAKE_SOURCE_DIR}/doc/Doxyfile.in ${CMAKE_BINARY_DIR}/Doxyfile.in"
+  )
+  execute_process (
+    COMMAND sh -c "/bin/sed -i -e 's/@VERSION@/${CernVM-FS_VERSION_STRING}/g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
+  )
+  execute_process (   
+    COMMAND sh -c "/bin/sed -i -e 's,@SRC_DIR@,${CMAKE_SOURCE_DIR},g' ${CMAKE_BINARY_DIR}/Doxyfile.in"
+  )
+  include (cmake/Modules/UseDoxygen)
+endif (BUILD_DOCUMENTATION)

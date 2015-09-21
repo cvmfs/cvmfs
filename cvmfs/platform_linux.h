@@ -7,8 +7,8 @@
 #ifndef CVMFS_PLATFORM_LINUX_H_
 #define CVMFS_PLATFORM_LINUX_H_
 
-#include <sys/types.h> // contains ssize_t needed inside <attr/xattr.h>
-#include <attr/xattr.h>
+#include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
+#include <attr/xattr.h>  // NOLINT(build/include_alpha)
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -19,8 +19,8 @@
 #include <sys/file.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
-#include <sys/stat.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -152,7 +152,7 @@ inline int platform_spinlock_trylock(platform_spinlock *lock) {
 /**
  * pthread_self() is not necessarily an unsigned long.
  */
-inline unsigned long platform_gettid() {
+inline pthread_t platform_gettid() {
   return pthread_self();
 }
 
@@ -215,6 +215,7 @@ inline int platform_fstat(int filedes, platform_stat64 *buf) {
   return fstat64(filedes, buf);
 }
 
+// TODO(jblomer): the translation from C to C++ should be done elsewhere
 inline bool platform_getxattr(const std::string &path, const std::string &name,
                               std::string *value)
 {
@@ -240,6 +241,33 @@ inline bool platform_getxattr(const std::string &path, const std::string &name,
   return true;
 }
 
+// TODO(jblomer): the translation from C to C++ should be done elsewhere
+inline bool platform_setxattr(
+  const std::string &path,
+  const std::string &name,
+  const std::string &value)
+{
+  int retval = setxattr(
+    path.c_str(), name.c_str(), value.c_str(), value.size(), 0);
+  return retval == 0;
+}
+
+
+inline ssize_t platform_lgetxattr(
+  const char *path,
+  const char *name,
+  void *value,
+  size_t size
+) {
+  return lgetxattr(path, name, value, size);
+}
+
+
+inline ssize_t platform_llistxattr(const char *path, char *list, size_t size) {
+  return llistxattr(path, list, size);
+}
+
+
 inline void platform_disable_kcache(int filedes) {
   (void)posix_fadvise(filedes, 0, 0, POSIX_FADV_RANDOM | POSIX_FADV_NOREUSE);
 }
@@ -258,7 +286,7 @@ inline const char* platform_getexepath() {
   static char buf[PATH_MAX] = {0};
   if (strlen(buf) == 0) {
     int ret = readlink("/proc/self/exe", buf, PATH_MAX);
-    if (ret > 0 && ret < (int)PATH_MAX) {
+    if (ret > 0 && ret < static_cast<int>(PATH_MAX)) {
        buf[ret] = 0;
     }
   }
@@ -266,7 +294,7 @@ inline const char* platform_getexepath() {
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_PLATFORM_LINUX_H_

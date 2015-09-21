@@ -7,17 +7,17 @@
 
 #include <stdint.h>
 
-#include <ctime>
 #include <cstdio>
+#include <ctime>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "gtest/gtest_prod.h"
-
 #include "atomic.h"
 #include "duplex_cares.h"
+#include "gtest/gtest_prod.h"
+#include "prng.h"
 #include "util.h"
 
 namespace dns {
@@ -35,15 +35,13 @@ enum Failures {
   kFailNoAddress,     ///< Resolver returned a positive reply but without IPs
   kFailNotYetResolved,
   kFailOther,
+
+  kFailNumEntries
 };
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 9;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "invalid resolver addresses";
   texts[2] = "DNS query timeout";
@@ -53,7 +51,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[6] = "no IP address for host";
   texts[7] = "internal error, not yet resolved";
   texts[8] = "unknown name resolving error";
-
+  texts[9] = "no text";
   return texts[error];
 }
 
@@ -98,8 +96,12 @@ class Host {
   int64_t id() const { return id_; }
   bool HasIpv4() const { return !ipv4_addresses_.empty(); }
   bool HasIpv6() const { return !ipv6_addresses_.empty(); }
-  const std::set<std::string> &ipv4_addresses() const { return ipv4_addresses_; }
-  const std::set<std::string> &ipv6_addresses() const { return ipv6_addresses_; }
+  const std::set<std::string> &ipv4_addresses() const {
+    return ipv4_addresses_;
+  }
+  const std::set<std::string> &ipv6_addresses() const {
+    return ipv6_addresses_;
+  }
   const std::string &name() const { return name_; }
   Failures status() const { return status_; }
 
@@ -187,6 +189,8 @@ class Resolver : SingleCopy {
   const std::vector<std::string> &resolvers() const { return resolvers_; }
   unsigned retries() const { return retries_; }
   unsigned timeout_ms() const { return timeout_ms_; }
+  void set_throttle(const unsigned throttle) { throttle_ = throttle; }
+  unsigned throttle() const { return throttle_; }
 
  protected:
   /**
@@ -232,6 +236,18 @@ class Resolver : SingleCopy {
    * Timeout in milliseconds for DNS queries.  Zero means no timeout.
    */
   unsigned timeout_ms_;
+
+  /**
+   * Limit number of resolved IP addresses.  If throttle_ is 0 it has no effect.
+   * Otherwise, if more than thottle_ IPs are registered for a host, only
+   * throttle_ randomly picked IPs are returned.
+   */
+  unsigned throttle_;
+
+  /**
+   * Required for picking IP addresses in throttle_
+   */
+  Prng prng_;
 };
 
 
@@ -290,13 +306,14 @@ class HostfileResolver : public Resolver {
   virtual ~HostfileResolver();
 
   virtual bool SetResolvers(const std::vector<std::string> &resolvers) {
-    return true; };
+    return true;
+  }
   virtual bool SetSearchDomains(const std::vector<std::string> &domains);
-  virtual void SetSystemResolvers() { };
+  virtual void SetSystemResolvers() { }
   virtual void SetSystemSearchDomains();
 
  protected:
-  HostfileResolver(const bool ipv4_only);
+  explicit HostfileResolver(const bool ipv4_only);
   virtual void DoResolve(const std::vector<std::string> &names,
                          const std::vector<bool> &skip,
                          std::vector<std::vector<std::string> > *ipv4_addresses,
@@ -333,6 +350,7 @@ class HostfileResolver : public Resolver {
  */
 class NormalResolver : public Resolver {
   FRIEND_TEST(T_Dns, NormalResolverConstruct);
+
  public:
   static NormalResolver *Create(const bool ipv4_only,
                                 const unsigned retries,

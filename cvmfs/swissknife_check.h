@@ -5,9 +5,11 @@
 #ifndef CVMFS_SWISSKNIFE_CHECK_H_
 #define CVMFS_SWISSKNIFE_CHECK_H_
 
-#include "swissknife.h"
-#include "hash.h"
+#include <string>
+
 #include "catalog.h"
+#include "hash.h"
+#include "swissknife.h"
 
 namespace download {
 class DownloadManager;
@@ -17,19 +19,20 @@ namespace swissknife {
 
 class CommandCheck : public Command {
  public:
-  ~CommandCheck() { };
-  std::string GetName() { return "check"; };
+  ~CommandCheck() { }
+  std::string GetName() { return "check"; }
   std::string GetDescription() {
     return "CernVM File System repository sanity checker\n"
       "This command checks the consisteny of the file catalogs of a "
         "cvmfs repository.";
-  };
+  }
   ParameterList GetParams() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('r', "repository directory / url"));
-    r.push_back(Parameter::Optional ('t', "check specific repository tag"));
-    r.push_back(Parameter::Optional ('l', "log level (0-4, default: 2)"));
-    r.push_back(Parameter::Switch   ('c', "check availability of data chunks"));
+    r.push_back(Parameter::Optional('n', "check specific repository tag"));
+    r.push_back(Parameter::Optional('t', "temp directory (default: /tmp)"));
+    r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
+    r.push_back(Parameter::Switch('c', "check availability of data chunks"));
     return r;
   }
   int Main(const ArgumentList &args);
@@ -40,10 +43,8 @@ class CommandCheck : public Command {
                    const uint64_t catalog_size,
                    const catalog::DirectoryEntry *transition_point,
                    catalog::DeltaCounters *computed_counters);
-  std::string DecompressPiece(const shash::Any catalog_hash,
-                              const char suffix);
-  std::string DownloadPiece(const shash::Any catalog_hash,
-                            const char suffix);
+  std::string DecompressPiece(const shash::Any catalog_hash);
+  std::string DownloadPiece(const shash::Any catalog_hash);
   bool Find(const catalog::Catalog *catalog,
             const PathString &path,
             catalog::DeltaCounters *computed_counters);
@@ -54,8 +55,11 @@ class CommandCheck : public Command {
                       const catalog::DirectoryEntry &b,
                       const bool compare_names,
                       const bool is_transition_point = false);
+
+ private:
+  std::string temp_directory_;
 };
 
-}
+}  // namespace swissknife
 
 #endif  // CVMFS_SWISSKNIFE_CHECK_H_

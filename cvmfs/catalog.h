@@ -5,15 +5,15 @@
 #ifndef CVMFS_CATALOG_H_
 #define CVMFS_CATALOG_H_
 
-#include <stdint.h>
 #include <pthread.h>
+#include <stdint.h>
 
 #include <cassert>
-
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
+#include "catalog_counters.h"
 #include "catalog_sql.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
@@ -21,10 +21,10 @@
 #include "shortstring.h"
 #include "sql.h"
 #include "util.h"
-#include "catalog_counters.h"
+#include "xattr.h"
 
 namespace swissknife {
-  class CommandMigrate;
+class CommandMigrate;
 }
 
 namespace catalog {
@@ -68,7 +68,7 @@ struct InodeRange {
  */
 class InodeAnnotation {
  public:
-  virtual ~InodeAnnotation() { };
+  virtual ~InodeAnnotation() { }
   virtual inode_t Annotate(const inode_t raw_inode) = 0;
   virtual void IncGeneration(const uint64_t by) = 0;
   virtual inode_t GetGeneration() = 0;
@@ -87,8 +87,8 @@ class InodeAnnotation {
  */
 class Catalog : public SingleCopy {
   friend class AbstractCatalogManager;
-  friend class SqlLookup;                  // for mangled inode and uid/gid maps
-  friend class swissknife::CommandMigrate; // for catalog version migration
+  friend class SqlLookup;                   // for mangled inode and uid maps
+  friend class swissknife::CommandMigrate;  // for catalog version migration
 
  public:
   typedef std::vector<shash::Any> HashVector;
@@ -114,22 +114,26 @@ class Catalog : public SingleCopy {
 
   bool OpenDatabase(const std::string &db_path);
 
-  bool LookupInode(const inode_t inode,
-                   DirectoryEntry *dirent, shash::Md5 *parent_md5path) const;
   bool LookupMd5Path(const shash::Md5 &md5path, DirectoryEntry *dirent) const;
-  inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const
-  {
+  inline bool LookupPath(const PathString &path, DirectoryEntry *dirent) const {
     return LookupMd5Path(shash::Md5(path.GetChars(), path.GetLength()), dirent);
   }
   bool LookupRawSymlink(const PathString &path, LinkString *raw_symlink) const;
+  bool LookupXattrsMd5Path(const shash::Md5 &md5path, XattrList *xattrs) const;
+  bool LookupXattrsPath(const PathString &path, XattrList *xattrs) const {
+    return LookupXattrsMd5Path(
+      shash::Md5(path.GetChars(), path.GetLength()), xattrs);
+  }
 
   bool ListingMd5Path(const shash::Md5 &md5path,
-                      DirectoryEntryList *listing) const;
+                      DirectoryEntryList *listing,
+                      const bool expand_symlink = true) const;
   inline bool ListingPath(const PathString &path,
-                      DirectoryEntryList *listing) const
+                          DirectoryEntryList *listing,
+                          const bool expand_symlink = true) const
   {
     return ListingMd5Path(shash::Md5(path.GetChars(), path.GetLength()),
-                          listing);
+                          listing, expand_symlink);
   }
   bool ListingMd5PathStat(const shash::Md5 &md5path,
                           StatEntryList *listing) const;
@@ -140,7 +144,7 @@ class Catalog : public SingleCopy {
                               listing);
   }
   bool AllChunksBegin();
-  bool AllChunksNext(shash::Any *hash, ChunkTypes *type);
+  bool AllChunksNext(shash::Any *hash);
   bool AllChunksEnd();
 
   inline bool ListPathChunks(const PathString &path,
@@ -158,7 +162,7 @@ class Catalog : public SingleCopy {
   void TakeDatabaseFileOwnership();
   void DropDatabaseFileOwnership();
   bool OwnsDatabaseFile() const {
-    return NULL != database_ && database_->OwnsFile();
+    return ((database_ != NULL) && database_->OwnsFile()) || managed_database_;
   }
 
   uint64_t GetTTL() const;
@@ -166,7 +170,7 @@ class Catalog : public SingleCopy {
   uint64_t GetLastModified() const;
   uint64_t GetNumEntries() const;
   shash::Any GetPreviousRevision() const;
-  const Counters& GetCounters() const { return counters_; };
+  const Counters& GetCounters() const { return counters_; }
 
   inline float schema() const { return database().schema_version(); }
   inline PathString path() const { return path_; }
@@ -223,9 +227,10 @@ class Catalog : public SingleCopy {
   Catalog* FindSubtree(const PathString &path) const;
   Catalog* FindChild(const PathString &mountpoint) const;
 
-  Counters& GetCounters() { return counters_; };
+  Counters& GetCounters() { return counters_; }
 
   inline const CatalogDatabase &database() const { return *database_; }
+  inline       CatalogDatabase &database()       { return *database_; }
   inline void set_parent(Catalog *catalog) { parent_ = catalog; }
 
   void ResetNestedCatalogCache();
@@ -251,6 +256,7 @@ class Catalog : public SingleCopy {
   PathString path_;
   bool volatile_flag_;
   const bool is_root_;
+  bool managed_database_;
 
   Catalog *parent_;
   NestedCatalogMap children_;
@@ -273,6 +279,7 @@ class Catalog : public SingleCopy {
   SqlNestedCatalogListing  *sql_list_nested_;
   SqlAllChunks             *sql_all_chunks_;
   SqlChunksListing         *sql_chunks_listing_;
+  SqlLookupXattrs          *sql_lookup_xattrs_;
 
   mutable HashVector        referenced_hashes_;
 };  // class Catalog

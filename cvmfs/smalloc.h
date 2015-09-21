@@ -7,11 +7,14 @@
 #ifndef CVMFS_SMALLOC_H_
 #define CVMFS_SMALLOC_H_
 
-#include <sys/mman.h>
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+
 #include <cassert>
-//#include <cstdio>
+// #include <cstdio>
+
+#include <limits>
 
 #ifdef __APPLE__
 #define PLATFORM_MAP_ANONYMOUS MAP_ANON
@@ -46,29 +49,32 @@ static inline void * __attribute__((used)) scalloc(size_t count, size_t size) {
 }
 
 static inline void * __attribute__((used)) smmap(size_t size) {
+  // TODO(reneme): make page size platform independent
   assert(size > 0);
-  size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;
+  assert(size < std::numeric_limits<size_t>::max() - 4096);
+
+  size_t pages = ((size + 2*sizeof(size_t))+4095)/4096;  // round to full page
   unsigned char *mem =
     static_cast<unsigned char *>(mmap(NULL, pages*4096, PROT_READ | PROT_WRITE,
                                  MAP_PRIVATE | PLATFORM_MAP_ANONYMOUS, -1, 0));
-  //printf("SMMAP %d bytes at %p\n", pages*4096, mem);
+  // printf("SMMAP %d bytes at %p\n", pages*4096, mem);
   assert((mem != MAP_FAILED) && "Out Of Memory");
-  *((size_t *)(mem)) = kMemMarker;
-  *((size_t *)(mem)+1) = pages;
+  *(reinterpret_cast<size_t *>(mem)) = kMemMarker;
+  *(reinterpret_cast<size_t *>(mem) + 1) = pages;
   return mem + 2*sizeof(size_t);
 }
 
 static inline void __attribute__((used)) smunmap(void *mem) {
   unsigned char *area = static_cast<unsigned char *>(mem);
   area = area - sizeof(size_t);
-  size_t pages = *((size_t *)(area));
+  size_t pages = *(reinterpret_cast<size_t *>(area));
   int retval = munmap(area-sizeof(size_t), pages*4096);
-  //printf("SUNMMAP %d bytes at %p\n", pages*4096, area);
+  // printf("SUNMMAP %d bytes at %p\n", pages*4096, area);
   assert((retval == 0) && "Invalid umnmap");
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_SMALLOC_H_

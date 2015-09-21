@@ -4,21 +4,26 @@
 
 #define __STDC_FORMAT_MACROS
 
+#include "cvmfs_config.h"
 #include "catalog_mgr.h"
 
 #include <inttypes.h>
+
 #include <cassert>
 
 #include "logging.h"
-#include "smalloc.h"
 #include "shortstring.h"
+#include "smalloc.h"
+#include "statistics.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
 namespace catalog {
 
 
-AbstractCatalogManager::AbstractCatalogManager() {
+AbstractCatalogManager::AbstractCatalogManager(perf::Statistics *statistics) :
+  statistics_(statistics) {
   inode_watermark_status_ = 0;
   inode_gauge_ = AbstractCatalogManager::kInodeOffset;
   revision_cache_ = 0;
@@ -67,7 +72,7 @@ void AbstractCatalogManager::CheckInodeWatermark() {
   uint64_t uint32_border = 1;
   uint32_border = uint32_border << 32;
   if (highest_inode >= uint32_border) {
-    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogWarn, "inodes excess 32bit");
+    LogCvmfs(kLogCatalog, kLogDebug | kLogSyslogWarn, "inodes exceed 32bit");
     inode_watermark_status_++;
   }
 }
@@ -182,7 +187,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
   Catalog *best_fit = FindCatalog(path);
   assert(best_fit != NULL);
 
-  atomic_inc64(&statistics_.num_lookup_path);
+  perf::Inc(statistics_.n_lookup_path);
   LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in catalog: '%s'",
            path.c_str(), best_fit->path().c_str());
   bool found = best_fit->LookupPath(path, dirent);
@@ -196,7 +201,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
     // Check again to avoid race
     best_fit = FindCatalog(path);
     assert(best_fit != NULL);
-    atomic_inc64(&statistics_.num_lookup_path);
+    perf::Inc(statistics_.n_lookup_path);
     found = best_fit->LookupPath(path, dirent);
 
     if (!found) {
@@ -214,7 +219,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
       }
 
       if (nested_catalog != best_fit) {
-        atomic_inc64(&statistics_.num_lookup_path);
+        perf::Inc(statistics_.n_lookup_path);
         found = nested_catalog->LookupPath(path, dirent);
         if (!found) {
           LogCvmfs(kLogCatalog, kLogDebug,
@@ -245,7 +250,7 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
 
   // Look for parent entry
   if ((options & kLookupFull) == kLookupFull) {
-    assert (dirent != NULL);
+    assert(dirent != NULL);
 
     DirectoryEntry parent;
     PathString parent_path = GetParentPath(path);
@@ -279,8 +284,40 @@ bool AbstractCatalogManager::LookupPath(const PathString &path,
  lookup_path_notfound:
   Unlock();
   // Includes both: ENOENT and not found due to I/O error
-  atomic_inc64(&statistics_.num_lookup_path_negative);
+  perf::Inc(statistics_.n_lookup_path_negative);
   return false;
+}
+
+
+bool AbstractCatalogManager::LookupXattrs(
+  const PathString &path,
+  XattrList *xattrs)
+{
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Find catalog, possibly load nested
+  Catalog *best_fit = FindCatalog(path);
+  Catalog *catalog = best_fit;
+  if (MountSubtree(path, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(path);
+    result = MountSubtree(path, best_fit, &catalog);
+    // DowngradeLock(); TODO
+    if (!result) {
+      Unlock();
+      return false;
+    }
+  }
+
+  perf::Inc(statistics_.n_lookup_xattrs);
+  result = catalog->LookupXattrsPath(path, xattrs);
+
+  Unlock();
+  return result;
 }
 
 
@@ -313,7 +350,7 @@ bool AbstractCatalogManager::Listing(const PathString &path,
     }
   }
 
-  atomic_inc64(&statistics_.num_listing);
+  perf::Inc(statistics_.n_listing);
   result = catalog->ListingPath(path, listing);
 
   Unlock();
@@ -350,7 +387,7 @@ bool AbstractCatalogManager::ListingStat(const PathString &path,
     }
   }
 
-  atomic_inc64(&statistics_.num_listing);
+  perf::Inc(statistics_.n_listing);
   result = catalog->ListingPathStat(path, listing);
 
   Unlock();
@@ -463,7 +500,7 @@ InodeRange AbstractCatalogManager::AcquireInodes(uint64_t size) {
  * @param chunk the InodeChunk to be freed
  */
 void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
-  // TODO currently inodes are only released on remount
+  // TODO(jblomer) currently inodes are only released on remount
 }
 
 
@@ -474,7 +511,7 @@ void AbstractCatalogManager::ReleaseInodes(const InodeRange chunk) {
  * @return the catalog which is best fitting at the given path
  */
 Catalog* AbstractCatalogManager::FindCatalog(const PathString &path) const {
-  assert (catalogs_.size() > 0);
+  assert(catalogs_.size() > 0);
 
   // Start at the root catalog and successively go down the catalog tree
   Catalog *best_fit = GetRootCatalog();
@@ -529,7 +566,7 @@ bool AbstractCatalogManager::MountSubtree(const PathString &path,
   // Try to find path as a super string of nested catalog mount points
   PathString path_slash(path);
   path_slash.Append("/", 1);
-  atomic_inc64(&statistics_.num_nested_listing);
+  perf::Inc(statistics_.n_nested_listing);
   const Catalog::NestedCatalogList& nested_catalogs =
     parent->ListNestedCatalogs();
   for (Catalog::NestedCatalogList::const_iterator i = nested_catalogs.begin(),
@@ -578,10 +615,8 @@ Catalog *AbstractCatalogManager::MountCatalog(const PathString &mountpoint,
 
   string     catalog_path;
   shash::Any catalog_hash;
-  const LoadError retval = LoadCatalog( mountpoint,
-                                        hash,
-                                       &catalog_path,
-                                       &catalog_hash);
+  const LoadError retval =
+    LoadCatalog(mountpoint, hash, &catalog_path, &catalog_hash);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
              mountpoint.c_str(), retval, Code2Ascii(retval));
@@ -714,7 +749,6 @@ string AbstractCatalogManager::PrintHierarchyRecursively(const Catalog *catalog,
     string(catalog->path().GetChars(), catalog->path().GetLength()) + "\n";
 
   CatalogList children = catalog->GetChildren();
-  CatalogList::const_iterator i,iend;
   for (CatalogList::const_iterator i = children.begin(), iEnd = children.end();
        i != iEnd; ++i)
   {
@@ -730,8 +764,8 @@ void AbstractCatalogManager::EnforceSqliteMemLimit() {
     static_cast<char *>(pthread_getspecific(pkey_sqlitemem_));
   if (mem_enforced == NULL) {
     sqlite3_soft_heap_limit(kSqliteMemPerThread);
-    pthread_setspecific(pkey_sqlitemem_, (char *)(1));
+    pthread_setspecific(pkey_sqlitemem_, reinterpret_cast<char *>(1));
   }
 }
 
-}
+}  // namespace catalog

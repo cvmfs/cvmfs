@@ -5,17 +5,17 @@
 #include "cvmfs_config.h"
 #include "wpad.h"
 
-#include <cstdlib>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 
-#include <vector>
 #include <string>
-
-#include "pacparser.h"
+#include <vector>
 
 #include "download.h"
 #include "logging.h"
+#include "pacparser.h"
+#include "statistics.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
@@ -233,11 +233,12 @@ int MainResolveProxyDescription(int argc, char **argv) {
     LogCvmfs(kLogDownload, kLogStderr, "arguments missing");
     return 1;
   }
+  perf::Statistics statistics;
   string proxy_configuration = argv[2];
   string host_list = argv[3];
 
   DownloadManager download_manager;
-  download_manager.Init(1, false);
+  download_manager.Init(1, false, &statistics);
   download_manager.SetHostChain(host_list);
   string resolved_proxies = ResolveProxyDescription(proxy_configuration,
                                                     &download_manager);

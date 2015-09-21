@@ -1,18 +1,4 @@
 The CernVM-FS python package allows for the inspection of CernVM-FS repositories
-using python. In particular to browse their file catalog hierarchy, inspect
-CernVM-FS repository manifests (a.k.a. .cvmfspublished files) and the history of
-named snapshots inside any CernVM-FS 2.1 repository.
-
-Example Usage:
-
-   import cvmfs
-
-   repo = cvmfs.RemoteRepository('http://cvmfs-stratum-one.cern.ch/opt/boss')
-   print 'Last Revision:' , repo.manifest.revision , repo.manifest.last_modified
-   root_catalog = repo.retrieve_root_catalog()
-   print 'Catalog Schema:' , root_catalog.schema
-   for nested_catalog_ref in root_catalog.list_nested():
-       print 'Nested Catalog at:' , nested_catalog_ref.root_path
-   print 'Listing repository'
-   for full_path, dirent in repo:
-       print full_path
+using python. Currently the functionality is restricted to retrieving both the
+repository Manifest and Whitelist. Furthermore the package can verify the auth-
+enticity of a repository using a provided public key file.

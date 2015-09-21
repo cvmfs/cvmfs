@@ -2,14 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "upload.h"
-
-#include "util_concurrency.h"
 
 #include <vector>
 
-using namespace upload;
+#include "util_concurrency.h"
 
+namespace upload {
 
 Spooler* Spooler::Construct(const SpoolerDefinition &spooler_definition) {
   Spooler *result = new Spooler(spooler_definition);
@@ -27,7 +27,9 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
 
 
 Spooler::~Spooler() {
-  uploader_->TearDown();
+  if (uploader_) {
+    uploader_->TearDown();
+  }
 }
 
 
@@ -62,6 +64,10 @@ void Spooler::ProcessCatalog(const std::string &local_path) {
 
 void Spooler::ProcessHistory(const std::string &local_path) {
   file_processor_->Process(local_path, false, shash::kSuffixHistory);
+}
+
+void Spooler::ProcessCertificate(const std::string &local_path) {
+  file_processor_->Process(local_path, false, shash::kSuffixCertificate);
 }
 
 
@@ -104,3 +110,5 @@ void Spooler::WaitForUpload() const {
 unsigned int Spooler::GetNumberOfErrors() const {
   return uploader_->GetNumberOfErrors();
 }
+
+}  // namespace upload

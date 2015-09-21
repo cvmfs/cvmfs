@@ -15,12 +15,13 @@ set (CVMFS_LOADER_SOURCES
   globals.h globals.cc
   loader_talk.h loader_talk.cc
   loader.h loader.cc
+  statistics.h statistics.cc
 )
 
 set (CVMFS_CLIENT_SOURCES
   smalloc.h
   logging.cc logging.h logging_internal.h
-  tracer.h tracer.cc atomic.h
+  atomic.h
   duplex_sqlite3.h duplex_curl.h duplex_cares.h
   signature.h signature.cc
   quota.h quota.cc
@@ -47,17 +48,24 @@ set (CVMFS_CLIENT_SOURCES
   catalog_sql.h catalog_sql.cc
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr.cc
+  catalog_mgr_client.h catalog_mgr_client.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   directory_entry.h directory_entry.cc
   shortstring.h
   file_chunk.h file_chunk.cc
   fs_traversal.h
+  xattr.h xattr.cc
+  statistics.h statistics.cc
+  sqlitevfs.cc sqlitevfs.h
+  fetch.cc fetch.h
+  sink.h
 )
 
 
 set (CVMFS2_DEBUG_SOURCES
   ${CVMFS_CLIENT_SOURCES}
 
+  tracer.h tracer.cc
   options.cc options.h
   talk.h talk.cc
   nfs_maps.h nfs_maps.cc
@@ -96,6 +104,7 @@ set (CVMFS_FSCK_SOURCES
   prng.h
   hash.cc hash.h
   util.cc util.h
+  statistics.h statistics.cc
   cvmfs_fsck.cc)
 
 set (CVMFS_SWISSKNIFE_SOURCES
@@ -114,6 +123,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   object_fetcher.h
+  statistics.cc statistics.h
 
   file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
   file_processing/char_buffer.h
@@ -163,6 +173,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   history_sql.h history_sql.cc
   history_sqlite.h history_sqlite.cc
   letter.h letter.cc
+  xattr.h xattr.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
   swissknife_check.h swissknife_check.cc
@@ -202,7 +213,7 @@ set (CVMFS_SWISSKNIFE_DEBUG_CFLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS} -DDEBUGMSG 
 
 set (CVMFS_FSCK_CFLAGS "${CVMFS_FSCK_CFLAGS} -DCVMFS_CLIENT")
 
-set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS")
+set (LIBCVMFS_CFLAGS "${LIBCVMFS_CFLAGS} -D_FILE_OFFSET_BITS=64 -DCVMFS_CLIENT -DCVMFS_LIBCVMFS -fexceptions")
 
 #
 # set some include and linking stuff
@@ -235,8 +246,8 @@ if (BUILD_CVMFS)
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_fuse_debug pacparser)
-    add_dependencies (cvmfs_fuse pacparser)
+    add_dependencies (cvmfs_fuse_debug libpacparser)
+    add_dependencies (cvmfs_fuse libpacparser)
   endif (PACPARSER_BUILTIN)
 
   if (SQLITE3_BUILTIN)
@@ -260,6 +271,11 @@ if (BUILD_CVMFS)
     add_dependencies (cvmfs_fuse libleveldb)
   endif (LEVELDB_BUILTIN)
 
+  add_dependencies (cvmfs_fuse_debug libsha2)
+  add_dependencies (cvmfs_fuse libsha2)
+  add_dependencies (cvmfs2 libsha2)
+  add_dependencies (cvmfs_fsck libsha2)
+
   # set some properties
   set (CVMFS_LOADER_LD_FLAGS "${CVMFS_LOADER_LD_FLAGS} -ldl -lm")
   set_target_properties (cvmfs2 PROPERTIES COMPILE_FLAGS "${CVMFS_LOADER_CFLAGS}" LINK_FLAGS "${CVMFS_LOADER_LD_FLAGS}")
@@ -271,12 +287,12 @@ if (BUILD_CVMFS)
   set_target_properties (cvmfs_fuse_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
 
   # link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
-  set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
+  set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA2_ARCHIVE} pthread dl)
 
-  target_link_libraries (cvmfs2           ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES} ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl)
+  target_link_libraries (cvmfs2           ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES} ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA2_ARCHIVE} pthread dl)
   target_link_libraries (cvmfs_fuse_debug ${CVMFS2_DEBUG_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fuse       ${CVMFS2_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
-  target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} pthread)
+  target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${SHA2_ARCHIVE} pthread)
 
 endif (BUILD_CVMFS)
 
@@ -293,7 +309,7 @@ if (BUILD_LIBCVMFS)
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_only pacparser)
+    add_dependencies (cvmfs_only libpacparser)
     set (LIBCVMFS_LIBS ${PACPARSER_ARCHIVE} ${LIBCVMFS_LIBS} )
   endif (PACPARSER_BUILTIN)
 
@@ -310,6 +326,9 @@ if (BUILD_LIBCVMFS)
   if (SPARSEHASH_BUILTIN)
     add_dependencies (cvmfs_only sparsehash)
   endif (SPARSEHASH_BUILTIN)
+
+  add_dependencies (cvmfs_only libsha2)
+  set (LIBCVMFS_LIBS ${SHA2_ARCHIVE} ${LIBCVMFS_LIBS})
 
   set_target_properties (cvmfs_only PROPERTIES COMPILE_FLAGS "${LIBCVMFS_CFLAGS}")
 
@@ -331,7 +350,7 @@ if (BUILD_LIBCVMFS)
   add_dependencies (libcvmfs cvmfs_only)
 
   add_executable( test_libcvmfs ${TEST_LIBCVMFS_SOURCES} )
-  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
+  target_link_libraries( test_libcvmfs ${CMAKE_CURRENT_BINARY_DIR}/libcvmfs.a ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${RT_LIBRARY} ${UUID_LIBRARIES} pthread dl )
   add_dependencies (test_libcvmfs libcvmfs)
 
 endif (BUILD_LIBCVMFS)
@@ -340,17 +359,14 @@ if (BUILD_SERVER)
   # create targets with corresponding sources and static link libraries
   add_executable (cvmfs_swissknife ${CVMFS_SWISSKNIFE_SOURCES})
   add_executable (cvmfs_suid_helper ${CVMFS_SUID_HELPER_SOURCES})
-  add_custom_target (geoip ALL)
 
   if (GEOIP_BUILTIN)
+    add_custom_target (geoip ALL)
     add_dependencies (python-geoip libgeoip)
     add_dependencies (geoip python-geoip)
   endif (GEOIP_BUILTIN)
 
-  include (${VJSON_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   add_dependencies (cvmfs_swissknife libvjson)
-  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VJSON_BUILTIN_LOCATION}/src)
-  include_directories (${INCLUDE_DIRECTORIES})
 
   if (LIBCURL_BUILTIN)
     add_dependencies (cvmfs_swissknife libcares libcurl)
@@ -368,10 +384,12 @@ if (BUILD_SERVER)
     add_dependencies (cvmfs_swissknife libtbb)
   endif (TBB_PRIVATE_LIB)
 
+  add_dependencies (cvmfs_swissknife libsha2)
+
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
-  target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE} pthread dl)
+  target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
@@ -392,6 +410,8 @@ if (BUILD_SERVER)
       add_dependencies (cvmfs_swissknife_debug libtbb)
     endif (TBB_PRIVATE_LIB)
 
+    add_dependencies (cvmfs_swissknife_debug libsha2)
+
     set_target_properties (cvmfs_swissknife_debug PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_DEBUG_LD_FLAGS}")
 
     # link the stuff (*_LIBRARIES are dynamic link libraries)
@@ -399,7 +419,7 @@ if (BUILD_SERVER)
       message (WARNING "Debug libraries of TBB were not found. Using the release versions instead.")
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
-    target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} pthread dl)
+    target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 

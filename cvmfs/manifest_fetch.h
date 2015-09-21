@@ -5,8 +5,8 @@
 #ifndef CVMFS_MANIFEST_FETCH_H_
 #define CVMFS_MANIFEST_FETCH_H_
 
-#include <string>
 #include <cstdlib>
+#include <string>
 
 #include "manifest.h"
 
@@ -36,14 +36,12 @@ enum Failures {
   kFailBadWhitelist,
   kFailInvalidCertificate,
   kFailUnknown,
+
+  kFailNumEntries
 };
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 11;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "failed to download";
   texts[2] = "incomplete manifest";
@@ -55,7 +53,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[8] = "bad whitelist";
   texts[9] = "invalid certificate";
   texts[10] = "unknown error";
-
+  texts[11] = "no text";
   return texts[error];
 }
 
@@ -91,7 +89,7 @@ struct ManifestEnsemble {
   unsigned whitelist_pkcs7_size;
 };
 
-
+// TODO(jblomer): analogous to the Fetcher class, make a ManifestFetcher class
 Failures Fetch(const std::string &base_url, const std::string &repository_name,
                const uint64_t minimum_timestamp, const shash::Any *base_catalog,
                signature::SignatureManager *signature_manager,

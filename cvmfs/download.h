@@ -23,19 +23,11 @@
 #include "duplex_curl.h"
 #include "hash.h"
 #include "prng.h"
+#include "sink.h"
+#include "statistics.h"
 
 
 namespace download {
-
-/**
- * Where to store downloaded data.
- */
-enum Destination {
-  kDestinationMem = 1,
-  kDestinationFile,
-  kDestinationPath,
-  kDestinationNone
-};  // Destination
 
 /**
  * Possible return values.
@@ -56,15 +48,13 @@ enum Failures {
   kFailBadData,
   kFailTooBig,
   kFailOther,
+
+  kFailNumEntries
 };  // Failures
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 13;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "local I/O failure";
   texts[2] = "malformed URL";
@@ -78,30 +68,46 @@ inline const char *Code2Ascii(const Failures error) {
   texts[10] = "corrupted data received";
   texts[11] = "resource too big to download";
   texts[12] = "unknown network error";
-
+  texts[13] = "no text";
   return texts[error];
 }
 
 
-struct Statistics {
-  double transferred_bytes;
-  double transfer_time;
-  uint64_t num_requests;
-  uint64_t num_retries;
-  uint64_t num_proxy_failover;
-  uint64_t num_host_failover;
+/**
+ * Where to store downloaded data.
+ */
+enum Destination {
+  kDestinationMem = 1,
+  kDestinationFile,
+  kDestinationPath,
+  kDestinationSink,
+  kDestinationNone
+};  // Destination
 
-  Statistics() {
-    transferred_bytes = 0.0;
-    transfer_time = 0.0;
-    num_requests = 0;
-    num_retries = 0;
-    num_proxy_failover = 0;
-    num_host_failover = 0;
+
+struct Counters {
+  perf::Counter *sz_transferred_bytes;
+  perf::Counter *sz_transfer_time;  // measured in miliseconds
+  perf::Counter *n_requests;
+  perf::Counter *n_retries;
+  perf::Counter *n_proxy_failover;
+  perf::Counter *n_host_failover;
+
+  explicit Counters(perf::Statistics *statistics) {
+    sz_transferred_bytes = statistics->Register("download.sz_transferred_bytes",
+        "Number of transferred bytes");
+    sz_transfer_time = statistics->Register("download.sz_transfer_time",
+        "Transfer time (miliseconds)");
+    n_requests = statistics->Register("download.n_requests",
+        "Number of requests");
+    n_retries = statistics->Register("download.n_retries",
+        "Number of retries");
+    n_proxy_failover = statistics->Register("download.n_proxy_failover",
+        "Number of proxy failovers");
+    n_host_failover = statistics->Register("download.n_host_failover",
+        "Number of host failovers");
   }
-
-  std::string Print() const;
-};  // Statistics
+};  // Counters
 
 
 /**
@@ -121,6 +127,7 @@ struct JobInfo {
   } destination_mem;
   FILE *destination_file;
   const std::string *destination_path;
+  cvmfs::Sink *destination_sink;
   const shash::Any *expected_hash;
   const std::string *extra_info;
 
@@ -136,6 +143,7 @@ struct JobInfo {
     destination_mem.data = NULL;
     destination_file = NULL;
     destination_path = NULL;
+    destination_sink = NULL;
     expected_hash = NULL;
     extra_info = NULL;
 
@@ -182,6 +190,17 @@ struct JobInfo {
     compressed = c;
     probe_hosts = ph;
     destination = kDestinationMem;
+    expected_hash = h;
+  }
+  JobInfo(const std::string *u, const bool c, const bool ph,
+          cvmfs::Sink *s, const shash::Any *h)
+  {
+    Init();
+    url = u;
+    compressed = c;
+    probe_hosts = ph;
+    destination = kDestinationSink;
+    destination_sink = s;
     expected_hash = h;
   }
   JobInfo(const std::string *u, const bool ph) {
@@ -249,6 +268,7 @@ class HeaderLists {
 class DownloadManager {
   FRIEND_TEST(T_Download, ValidateGeoReply);
   FRIEND_TEST(T_Download, StripDirect);
+
  public:
   struct ProxyInfo {
     ProxyInfo() { }
@@ -290,7 +310,8 @@ class DownloadManager {
   DownloadManager();
   ~DownloadManager();
 
-  void Init(const unsigned max_pool_handles, const bool use_system_proxy);
+  void Init(const unsigned max_pool_handles, const bool use_system_proxy,
+      perf::Statistics * statistics);
   void Fini();
   void Spawn();
   Failures Fetch(JobInfo *info);
@@ -300,7 +321,6 @@ class DownloadManager {
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
-  const Statistics &GetStatistics();
   void SetHostChain(const std::string &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
@@ -318,16 +338,16 @@ class DownloadManager {
   void RebalanceProxies();
   void SwitchProxyGroup();
   void SetProxyGroupResetDelay(const unsigned seconds);
-  void GetProxyBackupInfo(unsigned *reset_delay, time_t *timestamp_failover);
   void SetHostResetDelay(const unsigned seconds);
-  void GetHostBackupInfo(unsigned *reset_delay, time_t *timestamp_failover);
   void SetRetryParameters(const unsigned max_retries,
                           const unsigned backoff_init_ms,
                           const unsigned backoff_max_ms);
+  void SetMaxIpaddrPerProxy(unsigned limit);
   void SetProxyTemplates(const std::string &direct, const std::string &forced);
   void EnableInfoHeader();
   void EnablePipelining();
   void EnableRedirects();
+
  private:
   static int CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                 void *userp, void *socketp);
@@ -460,7 +480,7 @@ class DownloadManager {
 
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.
-  Statistics *statistics_;
+  Counters *counters_;
 };  // DownloadManager
 
 }  // namespace download

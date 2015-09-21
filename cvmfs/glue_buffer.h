@@ -8,25 +8,24 @@
  * functions.
  */
 
-#include <stdint.h>
+#include <google/sparse_hash_map>
 #include <pthread.h>
 #include <sched.h>
+#include <stdint.h>
 
 #include <cassert>
 #include <cstring>
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
-#include <google/sparse_hash_map>
-
-#include "shortstring.h"
 #include "atomic.h"
 #include "catalog_mgr.h"
-#include "util.h"
 #include "hash.h"
+#include "shortstring.h"
 #include "smallhash.h"
 #include "smalloc.h"
+#include "util.h"
 
 #ifndef CVMFS_GLUE_BUFFER_H_
 #define CVMFS_GLUE_BUFFER_H_
@@ -35,7 +34,7 @@ namespace glue {
 
 static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *((uint32_t *)key.digest + 1);
+  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 
@@ -91,7 +90,7 @@ class StringHeap : public SingleCopy {
     Init(128*1024);  // 128kB (should be >= 64kB+2B which is largest string)
   }
 
-  StringHeap(const uint32_t minimum_size) {
+  explicit StringHeap(const uint32_t minimum_size) {
     Init(minimum_size);
   }
 
@@ -140,7 +139,7 @@ class StringHeap : public SingleCopy {
 
   double GetUsage() const {
     if (size_ == 0) return 1.0;
-    return (double)(used_) / (double)(size_);
+    return static_cast<double>(used_) / static_cast<double>(size_);
   }
 
   uint64_t used() const { return used_; }
@@ -316,6 +315,7 @@ class PathMap {
     map_.Clear();
     path_store_.Clear();
   }
+
  private:
   SmallHashDynamic<shash::Md5, uint64_t> map_;
   PathStore path_store_;
@@ -345,6 +345,7 @@ class InodeMap {
   }
 
   void Clear() { map_.Clear(); }
+
  private:
   SmallHashDynamic<uint64_t, shash::Md5> map_;
 };
@@ -385,6 +386,7 @@ class InodeReferences {
   void Clear() {
     map_.Clear();
   }
+
  private:
   SmallHashDynamic<uint64_t, uint32_t> map_;
 };
@@ -398,6 +400,8 @@ class InodeReferences {
  */
 class InodeTracker {
  public:
+  // Cannot be moved to the statistics manager because it has to survive
+  // reloads.  Added manually in the fuse module initialization and in talk.cc.
   struct Statistics {
     Statistics() {
       atomic_init64(&num_inserts);
@@ -450,7 +454,7 @@ class InodeTracker {
     Lock();
     bool removed = inode_references_.Put(inode, by);
     if (removed) {
-      // TODO: pop operation (Lookup+Erase)
+      // TODO(jblomer): pop operation (Lookup+Erase)
       shash::Md5 md5path;
       bool found = inode_map_.LookupMd5Path(inode, &md5path);
       assert(found);
@@ -472,8 +476,11 @@ class InodeTracker {
     }
     Unlock();
 
-    if (found) atomic_inc64(&statistics_.num_hits_path);
-    else atomic_inc64(&statistics_.num_misses_path);
+    if (found) {
+      atomic_inc64(&statistics_.num_hits_path);
+    } else {
+      atomic_inc64(&statistics_.num_misses_path);
+    }
     return found;
   }
 

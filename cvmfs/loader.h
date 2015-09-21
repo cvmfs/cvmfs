@@ -8,9 +8,9 @@
 #define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
+#include <fuse/fuse_lowlevel.h>
 #include <stdint.h>
 #include <time.h>
-#include <fuse/fuse_lowlevel.h>
 
 #include <cstring>
 #include <string>
@@ -29,7 +29,7 @@ enum Failures {
   kFailLoaderTalk,
   kFailFuseLoop,
   kFailLoadLibrary,
-  kFailIncompatibleVersions,  // TODO
+  kFailIncompatibleVersions,  // TODO(jblomer)
   kFailCacheDir,
   kFailPeers,
   kFailNfsMaps,
@@ -45,14 +45,12 @@ enum Failures {
   kFailDoubleMount,
   kFailHistory,
   kFailWpad,
+
+  kFailNumEntries
 };
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 24;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "unknown error";
   texts[2] = "illegal options";
@@ -77,7 +75,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[21] = "double mount";
   texts[22] = "history init failure";
   texts[23] = "proxy auto-discovery failed";
-
+  texts[24] = "no text";
   return texts[error];
 }
 
@@ -93,6 +91,7 @@ enum StateId {
   kStateGlueBufferV3,       // >= 2.1.15
   kStateGlueBufferV4,       // >= 2.1.20
   kStateOpenFilesV2,        // >= 2.1.20
+  kStateOpenFilesV3,        // >= 2.2.0
 };
 
 
@@ -135,12 +134,18 @@ typedef std::vector<LoadEvent *> EventList;
  *       using fields that were not present in version 1
  *
  * CernVM-FS 2.1.8 --> Version 2
+ * CernVM-FS 2.2.0 --> Version 3
  */
 struct LoaderExports {
   LoaderExports() :
-    version(2),
+    version(3),
     size(sizeof(LoaderExports)), boot_time(0), foreground(false),
-    disable_watchdog(false) {}
+    disable_watchdog(false), simple_options_parsing(false) {}
+
+  ~LoaderExports() {
+    for (unsigned i = 0; i < history.size(); ++i)
+      delete history[i];
+  }
 
   uint32_t version;
   uint32_t size;
@@ -156,6 +161,9 @@ struct LoaderExports {
 
   // added with CernVM-FS 2.1.8 (LoaderExports Version: 2)
   bool disable_watchdog;
+
+  // added with CernVM-FS 2.2.0 (LoaderExports Version: 3)
+  bool simple_options_parsing;
 };
 
 

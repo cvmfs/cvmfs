@@ -5,21 +5,21 @@
 #include "cvmfs_config.h"
 #include "auto_umount.h"
 
-#include <unistd.h>
+#include <dirent.h>
 #include <errno.h>
 #include <sys/types.h>
-#include <dirent.h>
+#include <unistd.h>
 
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
-#include <map>
 
-#include "platform.h"
 #include "logging.h"
+#include "platform.h"
 #include "util.h"
 
-using namespace std;
+using namespace std;  // NOLINT
 
 namespace auto_umount {
 

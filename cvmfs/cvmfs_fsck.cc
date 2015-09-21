@@ -10,27 +10,26 @@
 
 #include "cvmfs_config.h"
 
-#include <sys/stat.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <unistd.h>
-#include <dirent.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <errno.h>
 
-#include <cstring>
+#include <cstdio>
 #include <cstdlib>
-
+#include <cstring>
 #include <string>
 
-#include "platform.h"
-#include "util.h"
-#include "hash.h"
 #include "atomic.h"
 #include "compression.h"
-#include "smalloc.h"
+#include "hash.h"
 #include "logging.h"
+#include "platform.h"
+#include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -309,7 +308,8 @@ int main(int argc, char **argv) {
   atomic_init32(&g_num_err_unfixed);
   atomic_init32(&g_num_err_operational);
   atomic_init32(&g_num_tmp_catalog);
-  pthread_t *workers = (pthread_t *)smalloc(g_num_threads * sizeof(pthread_t));
+  pthread_t *workers = reinterpret_cast<pthread_t *>(
+    smalloc(g_num_threads * sizeof(pthread_t)));
   if (!g_verbose)
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Verifying: ");
   for (int i = 0; i < g_num_threads; ++i) {
@@ -332,7 +332,7 @@ int main(int argc, char **argv) {
            atomic_read32(&g_num_files));
 
   if (atomic_read32(&g_num_tmp_catalog) > 0)
-    LogCvmfs(kLogCvmfs, kLogStdout, "Temorary file catalogs were found.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Temporary file catalogs were found.");
 
   if (atomic_read32(&g_force_rebuild)) {
     if (unlink("cachedb") == 0) {

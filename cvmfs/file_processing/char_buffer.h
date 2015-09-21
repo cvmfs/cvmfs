@@ -2,14 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef UPLOAD_FILE_PROCESSING_BUFFER_H
-#define UPLOAD_FILE_PROCESSING_BUFFER_H
+#ifndef CVMFS_FILE_PROCESSING_CHAR_BUFFER_H_
+#define CVMFS_FILE_PROCESSING_CHAR_BUFFER_H_
 
+#include <sys/types.h>
 #include <tbb/scalable_allocator.h>
 
 #include <cassert>
 #include <vector>
-#include <sys/types.h>
 
 #include "../util.h"
 
@@ -26,14 +26,14 @@ class CharBuffer : public Buffer<unsigned char,
                                  tbb::scalable_allocator<unsigned char> > {
  public:
   CharBuffer() : base_offset_(0) {}
-  CharBuffer(const size_t size) :
+  explicit CharBuffer(const size_t size) :
     Buffer<unsigned char, tbb::scalable_allocator<unsigned char> >(size),
     base_offset_(0) {}
 
   CharBuffer* Clone() const {
-    assert (IsInitialized());
+    assert(IsInitialized());
     CharBuffer* new_buffer = new CharBuffer(size());
-    assert (new_buffer->IsInitialized());
+    assert(new_buffer->IsInitialized());
     new_buffer->SetUsedBytes(used_bytes());
     new_buffer->SetBaseOffset(base_offset());
     memcpy(new_buffer->ptr(), ptr(), size_bytes());
@@ -49,6 +49,6 @@ class CharBuffer : public Buffer<unsigned char,
 
 typedef std::vector<CharBuffer*> CharBufferVector;
 
-} // namespace upload
+}  // namespace upload
 
-#endif /* UPLOAD_FILE_PROCESSING_BUFFER_H */
+#endif  // CVMFS_FILE_PROCESSING_CHAR_BUFFER_H_

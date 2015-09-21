@@ -1,6 +1,6 @@
 Summary: CernVM File System Default Configuration and Public Keys
 Name: cvmfs-config-default
-Version: 1.1
+Version: 1.2
 Release: 2
 Source0: cern.ch.pub
 Source1: cern-it1.cern.ch.pub
@@ -22,10 +22,10 @@ License: BSD
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Provides: cvmfs-config = %{version}-%{release}
-Obsoletes: cvmfs-keys
-Conflicts: cvmfs-keys
-Obsoletes: cvmfs-init-scripts
-Conflicts: cvmfs-init-scripts
+Obsoletes: cvmfs-keys < 1.6
+Provides: cvmfs-keys = 1.6
+Obsoletes: cvmfs-init-scripts < 1.0.21
+Provides: cvmfs-init-scripts = 1.0.21
 
 Conflicts: cvmfs < 2.1.20
 Conflicts: cvmfs-server < 2.1.20
@@ -75,6 +75,14 @@ done
 %config %{_sysconfdir}/cvmfs/config.d/*
 
 %changelog
+* Fri May 22 2015 Dave Dykstra <dwd@fnal.gov> - 1.2-2
+- Change Obsoletes/Conflicts on cvmfs-keys and cvmfs-init-scripts to
+  Obsoletes/Provides with specific version numbers, according to Fedora
+  packaging guidelines
+
+* Wed Apr 01 2015 Jakob Blomer <jblomer@cern.ch> - 1.2-1
+- Disable Geo-API for ATLAS nightlies
+
 * Mon Feb 23 2015 Jakob Blomer <jblomer@cern.ch> - 1.1-2
 - use versioned provides
 

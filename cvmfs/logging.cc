@@ -11,20 +11,20 @@
  * If DEBUGMSG is undefined, pure debug messages are compiled into no-ops.
  */
 
-#include "logging_internal.h"
+#include "logging_internal.h"  // NOLINT(build/include)
 
-#include <pthread.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <pthread.h>
 #include <syslog.h>
 #include <time.h>
+#include <unistd.h>
 
-#include <cstdlib>
-#include <cstdio>
 #include <cassert>
-#include <ctime>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <ctime>
 
 #include "platform.h"
 #include "smalloc.h"
@@ -50,7 +50,7 @@ const char *module_names[] = { "unknown", "cache", "catalog", "sql", "cvmfs",
   "hash", "download", "compress", "quota", "talk", "monitor", "lru",
   "fuse stub", "signature", "fs traversal", "catalog traversal",
   "nfs maps", "publish", "spooler", "concurrency", "utility", "glue buffer",
-  "history", "unionfs", "pathspec", "s3fanout", "gc", "dns" };
+  "history", "unionfs", "pathspec", "upload s3", "s3fanout", "gc", "dns" };
 int syslog_facility = LOG_USER;
 int syslog_level = LOG_NOTICE;
 char *syslog_prefix = NULL;
@@ -460,5 +460,5 @@ void PrintWarning(const string &message) {
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif

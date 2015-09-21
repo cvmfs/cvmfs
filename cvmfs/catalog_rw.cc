@@ -12,6 +12,7 @@
 
 #include "logging.h"
 #include "util.h"
+#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -80,7 +81,7 @@ void WritableCatalog::Commit() {
 
 
 void WritableCatalog::InitPreparedStatements() {
-  Catalog::InitPreparedStatements(); // polymorphism: up call
+  Catalog::InitPreparedStatements();  // polymorphism: up call
 
   bool retval = Sql(database(), "PRAGMA foreign_keys = ON;").Execute();
   assert(retval);
@@ -132,28 +133,39 @@ uint32_t WritableCatalog::GetMaxLinkId() const {
  * @param entry_path the full path of the DirectoryEntry to add
  * @param parent_path the full path of the containing directory
  */
-void WritableCatalog::AddEntry(const DirectoryEntry &entry,
-                               const string &entry_path,
-                               const string &parent_path)
+void WritableCatalog::AddEntry(
+  const DirectoryEntry &entry,
+  const XattrList &xattrs,
+  const string &entry_path,
+  const string &parent_path)
 {
   SetDirty();
-
-  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
-  shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "add entry '%s' to '%s'",
                                         entry_path.c_str(),
                                         path().c_str());
 
+  shash::Md5 path_hash((shash::AsciiPtr(entry_path)));
+  shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
+  DirectoryEntry effective_entry(entry);
+  effective_entry.set_has_xattrs(!xattrs.IsEmpty());
+
   bool retval =
     sql_insert_->BindPathHash(path_hash) &&
     sql_insert_->BindParentPathHash(parent_hash) &&
-    sql_insert_->BindDirent(entry) &&
-    sql_insert_->Execute();
+    sql_insert_->BindDirent(effective_entry);
+  assert(retval);
+  if (xattrs.IsEmpty()) {
+    retval = sql_insert_->BindXattrEmpty();
+  } else {
+    retval = sql_insert_->BindXattr(xattrs);
+  }
+  assert(retval);
+  retval = sql_insert_->Execute();
   assert(retval);
   sql_insert_->Reset();
 
-  delta_counters_.Increment(entry);
+  delta_counters_.Increment(effective_entry);
 }
 
 
@@ -172,7 +184,7 @@ void WritableCatalog::RemoveEntry(const string &file_path) {
 
   SetDirty();
 
-  // if the entry used to be a chunked file... remove the chunks
+  // If the entry used to be a chunked file... remove the chunks
   if (entry.IsChunkedFile()) {
     RemoveFileChunks(file_path);
   }
@@ -282,11 +294,7 @@ void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
  * Sets the last modified time stamp of this catalog to current time.
  */
 void WritableCatalog::UpdateLastModified() {
-  const time_t now = time(NULL);
-  const string sql = "INSERT OR REPLACE INTO properties "
-     "(key, value) VALUES ('last_modified', '" + StringifyInt(now) + "');";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("last_modified", static_cast<uint64_t>(time(NULL)));
 }
 
 
@@ -294,19 +302,12 @@ void WritableCatalog::UpdateLastModified() {
  * Increments the revision of the catalog in the database.
  */
 void WritableCatalog::IncrementRevision() {
-  const string sql =
-    "UPDATE properties SET value=value+1 WHERE key='revision';";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  SetRevision(GetRevision() + 1);
 }
 
 
 void WritableCatalog::SetRevision(const uint64_t new_revision) {
-  const string sql =
-    "UPDATE properties SET value=" + StringifyInt(new_revision) +
-    " WHERE key='revision';";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("revision", new_revision);
 }
 
 
@@ -314,10 +315,7 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
  * Sets the content hash of the previous catalog revision.
  */
 void WritableCatalog::SetPreviousRevision(const shash::Any &hash) {
-  const string sql = "INSERT OR REPLACE INTO properties "
-    "(key, value) VALUES ('previous_revision', '" + hash.ToString() + "');";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("previous_revision", hash.ToString());
 }
 
 
@@ -379,17 +377,28 @@ void WritableCatalog::MoveToNestedRecursively(
   // After creating a new nested catalog we have to move all elements
   // now contained by the new one.  List and move them recursively.
   DirectoryEntryList listing;
-  bool retval = ListingPath(PathString(directory), &listing);
+  const bool resolve_magic_symlinks = false;
+  bool retval = ListingPath(PathString(directory), &listing,
+                            resolve_magic_symlinks);
   assert(retval);
 
   // Go through the listing
+  XattrList empty_xattrs;
   for (DirectoryEntryList::const_iterator i = listing.begin(),
        iEnd = listing.end(); i != iEnd; ++i)
   {
     const string full_path = i->GetFullPath(directory);
 
     // The entries are first inserted into the new catalog
-    new_nested_catalog->AddEntry(*i, full_path);
+    if (i->HasXattrs()) {
+      XattrList xattrs;
+      retval = LookupXattrsPath(PathString(full_path), &xattrs);
+      assert(retval);
+      assert(!xattrs.IsEmpty());
+      new_nested_catalog->AddEntry(*i, xattrs, full_path);
+    } else {
+      new_nested_catalog->AddEntry(*i, empty_xattrs, full_path);
+    }
 
     // Then we check if we have some special cases:
     if (i->IsNestedCatalogMountpoint()) {
@@ -399,7 +408,8 @@ void WritableCatalog::MoveToNestedRecursively(
       MoveToNestedRecursively(full_path, new_nested_catalog,
                               grand_child_mountpoints);
     } else if (i->IsChunkedFile()) {
-      MoveFileChunksToNested(full_path, new_nested_catalog);
+      MoveFileChunksToNested(full_path, i->hash_algorithm(),
+                             new_nested_catalog);
     }
 
     // Remove the entry from the current catalog
@@ -430,13 +440,13 @@ void WritableCatalog::MoveCatalogsToNested(
 
 
 void WritableCatalog::MoveFileChunksToNested(
-  const std::string  &full_path,
-  WritableCatalog    *new_nested_catalog)
+  const std::string       &full_path,
+  const shash::Algorithms  algorithm,
+  WritableCatalog         *new_nested_catalog)
 {
   FileChunkList chunks;
-  // Moving opaque chunks, we don't care about the hash algorithm
-  ListPathChunks(PathString(full_path), shash::kAny, &chunks);
-  assert (chunks.size() > 0);
+  ListPathChunks(PathString(full_path), algorithm, &chunks);
+  assert(chunks.size() > 0);
 
   for (unsigned i = 0; i < chunks.size(); ++i) {
     new_nested_catalog->AddFileChunk(full_path, *chunks.AtPtr(i));
@@ -558,10 +568,10 @@ void WritableCatalog::MergeIntoParent() {
   CopyCatalogsToParent();
 
   // Fix counters in parent
-  delta_counters_.PopulateToParent(parent->delta_counters_);
+  delta_counters_.PopulateToParent(&parent->delta_counters_);
   Counters &counters = GetCounters();
   counters.ApplyDelta(delta_counters_);
-  counters.MergeIntoParent(parent->delta_counters_);
+  counters.MergeIntoParent(&parent->delta_counters_);
 
   // Remove the nested catalog reference for this nested catalog.
   // From now on this catalog will be dangling!
@@ -657,7 +667,7 @@ void WritableCatalog::CopyToParent() {
 void WritableCatalog::UpdateCounters() {
   const bool retval = delta_counters_.WriteToDatabase(database()) &&
                       ReadCatalogCounters();
-  assert (retval);
+  assert(retval);
 }
 
 
@@ -683,10 +693,10 @@ void WritableCatalog::VacuumDatabaseIfNecessary() {
     LogCvmfs(kLogCatalog, kLogStdout | kLogNoLinebreak,
              "Note: Catalog at %s gets defragmented (%.2f%% %s)... ",
              (IsRoot()) ? "/" : path().c_str(), ratio * 100.0, reason.c_str());
-    if (! db.Vacuum()) {
+    if (!db.Vacuum()) {
       LogCvmfs(kLogCatalog, kLogStderr, "failed (SQLite: %s)",
                db.GetLastErrorMsg().c_str());
-      assert (false);
+      assert(false);
     }
     LogCvmfs(kLogCatalog, kLogStdout, "done");
   }

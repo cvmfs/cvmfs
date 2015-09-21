@@ -127,7 +127,7 @@
     <f n="usr" o="root" g="wheel" p="16877">
       <f n="local" o="root" g="wheel" p="16877">
         <f n="lib" o="root" g="wheel" p="16877">
-          <f n="libcvmfs_fuse.2.1.20.dylib" o="root" g="wheel" p="33261">
+          <f n="libcvmfs_fuse.2.2.0.dylib" o="root" g="wheel" p="33261">
             <mod>group</mod>
             <mod>owner</mod>
           </f>
@@ -135,7 +135,7 @@
             <mod>group</mod>
             <mod>owner</mod>
           </f>
-          <f n="libcvmfs_fuse_debug.2.1.20.dylib" o="root" g="wheel" p="33261">
+          <f n="libcvmfs_fuse_debug.2.2.0.dylib" o="root" g="wheel" p="33261">
             <mod>group</mod>
             <mod>owner</mod>
           </f>
@@ -170,7 +170,7 @@
         </f>
         <f n="share" o="root" g="wheel" p="16877">
           <f n="doc" o="root" g="wheel" p="16893">
-            <f n="cvmfs-2.1.20" o="root" g="wheel" p="16893">
+            <f n="cvmfs-2.2.0" o="root" g="wheel" p="16893">
               <f n="AUTHORS" o="root" g="wheel" p="33204">
                 <mod>mode</mod>
                 <mod>group</mod>

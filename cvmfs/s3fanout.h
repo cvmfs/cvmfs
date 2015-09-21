@@ -5,21 +5,21 @@
 #ifndef CVMFS_S3FANOUT_H_
 #define CVMFS_S3FANOUT_H_
 
-#include <semaphore.h>
 #include <poll.h>
+#include <semaphore.h>
 
-#include <vector>
-#include <set>
+#include <climits>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
-#include <climits>
+#include <vector>
 
+#include "dns.h"
 #include "duplex_curl.h"
 #include "prng.h"
-#include "util_concurrency.h"
-#include "dns.h"
 #include "util.h"
+#include "util_concurrency.h"
 
 namespace s3fanout {
 
@@ -44,15 +44,13 @@ enum Failures {
   kFailNotFound,
   kFailServiceUnavailable,
   kFailOther,
+
+  kFailNumEntries
 };  // Failures
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 9;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "S3: OK";
   texts[1] = "S3: local I/O failure";
   texts[2] = "S3: malformed URL (bad request)";
@@ -62,7 +60,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[6] = "S3: not found";
   texts[7] = "S3: service not available";
   texts[8] = "S3: unknown network error";
-
+  texts[9] = "no text";
   return texts[error];
 }
 
@@ -92,6 +90,7 @@ struct JobInfo {
   enum RequestType {
     kReqHead = 0,
     kReqPut,
+    kReqPutNoCache,
     kReqDelete,
   };
 
@@ -116,16 +115,19 @@ struct JobInfo {
   JobInfo() { JobInfoInit(); }
   JobInfo(const std::string access_key, const std::string secret_key,
           const std::string hostname,   const std::string bucket,
-          const std::string object_key, const std::string origin_path) :
+          const std::string object_key, void *callback,
+          const std::string origin_path) :
           access_key(access_key), secret_key(secret_key),
           hostname(hostname), bucket(bucket),
           object_key(object_key), origin_path(origin_path) {
     JobInfoInit();
     origin = kOriginPath;
+    this->callback = callback;
   }
   JobInfo(const std::string access_key, const std::string secret_key,
           const std::string hostname,   const std::string bucket,
-          const std::string object_key,
+          const std::string object_key, void *callback,
+          MemoryMappedFile  *mmf,
           const unsigned char *buffer, size_t size) :
           access_key(access_key), secret_key(secret_key),
           hostname(hostname), bucket(bucket),
@@ -134,6 +136,8 @@ struct JobInfo {
     origin = kOriginMem;
     origin_mem.size = size;
     origin_mem.data = buffer;
+    this->callback = callback;
+    this->mmf = mmf;
   }
   void JobInfoInit() {
     curl_handle = NULL;
@@ -145,7 +149,7 @@ struct JobInfo {
     callback = NULL;
     mmf = NULL;
     origin_file = NULL;
-    request = kReqHead;
+    request = kReqPut;
     error_code = kFailOk;
     num_retries = 0;
     backoff_ms = 0;
@@ -175,6 +179,9 @@ struct S3FanOutDnsEntry {
 };  // S3FanOutDnsEntry
 
 class S3FanoutManager : SingleCopy {
+ protected:
+  typedef SynchronizingCounter<uint32_t> Semaphore;
+
  public:
   S3FanoutManager();
   ~S3FanoutManager();
@@ -259,7 +266,7 @@ class S3FanoutManager : SingleCopy {
   bool opt_ipv4_only_;
 
   unsigned int max_available_jobs_;
-  sem_t available_jobs_;
+  Semaphore *available_jobs_;
 
   // Writes and reads should be atomic because reading happens in a different
   // thread than writing.

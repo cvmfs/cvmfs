@@ -1,0 +1,123 @@
+
+cvmfs_test_name="Slash-Asterisk Rule in .cvmfsdirtab"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in_1() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create some basic directories
+  mkdir People
+  mkdir Animals
+  mkdir Aliens
+  mkdir Stones
+
+  # create a .cvmfsdirtab containing /*
+  echo "/*" > .cvmfsdirtab
+
+  popdir
+}
+
+check_catalog_presence_1() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 5 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /        $repo_name && \
+     check_catalog_presence /People  $repo_name && \
+     check_catalog_presence /Animals $repo_name && \
+     check_catalog_presence /Aliens  $repo_name && \
+     check_catalog_presence /Stones  $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+produce_files_in_2() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create some more directories
+  mkdir Mountains
+  mkdir Forests
+  mkdir Lakes
+
+  # add some files to some of the directories
+  cp_bin         People
+  cp_usrbin      Stones
+
+  popdir
+}
+
+check_catalog_presence_2() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 8 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /          $repo_name && \
+     check_catalog_presence /People    $repo_name && \
+     check_catalog_presence /Animals   $repo_name && \
+     check_catalog_presence /Aliens    $repo_name && \
+     check_catalog_presence /Stones    $repo_name && \
+     check_catalog_presence /Mountains $repo_name && \
+     check_catalog_presence /Forests   $repo_name && \
+     check_catalog_presence /Lakes     $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in_1 $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository (1)"
+  check_catalog_presence_1 $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the repository"
+  produce_files_in_2 $repo_dir || return 2
+
+  echo "creating CVMFS snapshot"
+  local publish_log_1=publish_1.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository (2)"
+  check_catalog_presence_2 $CVMFS_TEST_REPO || return $?
+
+  return 0
+}
+

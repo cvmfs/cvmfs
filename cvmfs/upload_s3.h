@@ -6,11 +6,11 @@
 #define CVMFS_UPLOAD_S3_H_
 
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
-#include "upload_facility.h"
 #include "s3fanout.h"
+#include "upload_facility.h"
 
 namespace upload {
 
@@ -56,9 +56,8 @@ class S3Uploader : public AbstractUploader {
   void Upload(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
               const CallbackTN    *callback = NULL);
-  void FinalizeStreamedUpload(UploadStreamHandle   *handle,
-                              const shash::Any     &content_hash,
-                              const shash::Suffix   hash_suffix);
+  void FinalizeStreamedUpload(UploadStreamHandle  *handle,
+                              const shash::Any    &content_hash);
 
   bool Remove(const std::string &file_to_delete);
   bool Peek(const std::string& path) const;
@@ -76,11 +75,7 @@ class S3Uploader : public AbstractUploader {
 
  private:
   bool ParseSpoolerDefinition(const SpoolerDefinition &spooler_definition);
-  bool UploadFile(const std::string &filename,
-                  char              *buff,
-                  unsigned long      size_of_file,
-                  const CallbackTN  *callback,
-                  MemoryMappedFile  *mmf);
+  bool UploadJobInfo(s3fanout::JobInfo *info);
 
   int GetKeysAndBucket(const std::string  &filename,
                        std::string        *access_key,

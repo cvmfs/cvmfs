@@ -5,14 +5,21 @@ Created by René Meusel
 This file is part of the CernVM File System auxiliary tools.
 """
 
+from root_file    import IncompleteRootFileSignature
 from manifest     import *
+from whitelist    import *
+from certificate  import *
 from repository   import *
 from availability import *
-from _common      import _split_md5
-from _common      import _combine_md5
 
 import subprocess
 import re
+
+version     = "0.1.0"
+__version__ = version
+
+package_name = "python-cvmfsutils"
+__package_name__ = package_name
 
 class ServerNotInstalled(Exception):
     pass
@@ -66,10 +73,10 @@ client_version = None
 
 try:
     server_version = _get_server_version()
-except (ServerNotInstalled, VersionNotDetected) as e:
+except ServerNotInstalled, VersionNotDetected:
     has_server = False
 
 try:
     client_version = _get_client_version()
-except ClientNotInstalled, e:
+except ClientNotInstalled:
     has_client = False

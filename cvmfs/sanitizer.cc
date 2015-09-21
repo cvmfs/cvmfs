@@ -60,25 +60,28 @@ InputSanitizer::InputSanitizer(const string &whitelist) {
 }
 
 
-bool InputSanitizer::Sanitize(const std::string &input,
-                              std::string *filtered_output) const
-{
-  *filtered_output = "";
+bool InputSanitizer::Sanitize(
+                          std::string::const_iterator   begin,
+                          std::string::const_iterator   end,
+                          std::string                  *filtered_output) const {
   bool is_sane = true;
-  for (unsigned i = 0; i < input.length(); ++i) {
-    bool valid_char = false;
-    for (unsigned j = 0; j < valid_ranges_.size(); ++j) {
-      if (valid_ranges_[j].InRange(input[i])) {
-        valid_char = true;
-        break;
-      }
-    }
-    if (valid_char)
-      filtered_output->push_back(input[i]);
+  for (; begin != end; ++begin) {
+    if (CheckRanges(*begin))
+      filtered_output->push_back(*begin);
     else
       is_sane = false;
   }
   return is_sane;
+}
+
+
+bool InputSanitizer::CheckRanges(const char chr) const {
+  for (unsigned j = 0; j < valid_ranges_.size(); ++j) {
+    if (valid_ranges_[j].InRange(chr)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 
@@ -94,8 +97,38 @@ bool InputSanitizer::IsValid(const std::string &input) const {
   return Sanitize(input, &dummy);
 }
 
+
+bool IntegerSanitizer::Sanitize(
+                          std::string::const_iterator   begin,
+                          std::string::const_iterator   end,
+                          std::string                  *filtered_output) const {
+  if (std::distance(begin, end) == 0) {
+    return false;
+  }
+
+  if (*begin == '-') {
+    // minus is allowed as the first character!
+    filtered_output->push_back('-');
+    begin++;
+  }
+
+  return InputSanitizer::Sanitize(begin, end, filtered_output);
+}
+
+
+bool PositiveIntegerSanitizer::Sanitize(
+                          std::string::const_iterator   begin,
+                          std::string::const_iterator   end,
+                          std::string                  *filtered_output) const {
+  if (std::distance(begin, end) == 0) {
+    return false;
+  }
+
+  return InputSanitizer::Sanitize(begin, end, filtered_output);
+}
+
 }  // namespace sanitizer
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif

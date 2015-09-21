@@ -11,36 +11,36 @@
 #include "cvmfs_config.h"
 #include "monitor.h"
 
+#include <errno.h>
+#include <execinfo.h>
+#include <pthread.h>
 #include <signal.h>
 #include <sys/resource.h>
+#include <sys/types.h>
 #ifdef __APPLE__
   #include <sys/ucontext.h>
 #else
   #include <ucontext.h>
 #endif
-#include <execinfo.h>
-#include <sys/types.h>
 #include <sys/uio.h>
-#include <unistd.h>
-#include <errno.h>
 #include <sys/wait.h>
-#include <pthread.h>
 #include <time.h>
+#include <unistd.h>
 
-#include <string>
 #include <map>
+#include <string>
+#include <vector>
 
-#include <cstring>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cassert>
-
-#include "platform.h"
-#include "util.h"
-#include "logging.h"
-#include "smalloc.h"
+#include <cstring>
 
 #include "cvmfs.h"
+#include "logging.h"
+#include "platform.h"
+#include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -51,8 +51,10 @@ extern loader::CvmfsExports *g_cvmfs_exports;
 
 namespace monitor {
 
-const unsigned kMinOpenFiles = 8192;  /**< minmum threshold for the maximum
-                                       number of open files */
+/**
+ * Minmum threshold for the maximum number of open files
+ */
+const unsigned kMinOpenFiles = 8192;
 const unsigned kMaxBacktrace = 64;  /**< reported stracktrace depth */
 const unsigned kSignalHandlerStacksize = 2*1024*1024;  /**< 2 MB */
 
@@ -76,7 +78,7 @@ struct CrashData {
 };
 
 struct ControlFlow {
-  enum Flags { // TODO: C++11 (type safe enum)
+  enum Flags {  // TODO(rmeusel): C++11 (type safe enum)
     kProduceStacktrace = 0,
     kQuit,
     kUnknown,
@@ -151,7 +153,7 @@ static void SendTrace(int sig,
   // Do not die before the stack trace was generated
   // kill -SIGQUIT <pid> will finish this
   int counter = 0;
-  while(true) {
+  while (true) {
     SafeSleepMs(100);
     // quit anyway after 30 seconds
     if (++counter == 300) {
@@ -160,10 +162,14 @@ static void SendTrace(int sig,
 #ifndef CVMFS_LIBCVMFS
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "Signal %d, errno %d",
                sig, send_errno);
-      void *addr[64];
-      int num_addr = backtrace(addr, 64);
+      void *addr[kMaxBacktrace];
+      // Note: this doesn't work due to the signal stack on OS X (it works on
+      // Linux).  Since anyway lldb is supposed to produce the backtrace, we
+      // consider it more important to protect cvmfs against stack overflows.
+      int num_addr = backtrace(addr, kMaxBacktrace);
       char **symbols = backtrace_symbols(addr, num_addr);
-      string backtrace = "Backtrace:\n";
+      string backtrace = "Backtrace (" + StringifyInt(num_addr) +
+                         " symbols):\n";
       for (int i = 0; i < num_addr; ++i)
         backtrace += string(symbols[i]) + "\n";
       LogCvmfs(kLogCvmfs, kLogSyslogErr, "%s", backtrace.c_str());
@@ -209,7 +215,11 @@ static void LogEmergency(string msg) {
  * @return         the data read from the pipe
  */
 static string ReadUntilGdbPrompt(int fd_pipe) {
+#ifdef __APPLE__
+  static const string gdb_prompt = "(lldb)";
+#else
   static const string gdb_prompt = "\n(gdb) ";
+#endif
 
   string        result;
   char          mini_buffer;
@@ -260,31 +270,54 @@ static string GenerateStackTrace(const string &exe_path,
   int fd_stdin;
   int fd_stdout;
   int fd_stderr;
-  std::vector<std::string> argv; // TODO: C++11 initializer list...
+  vector<string> argv;  // TODO(jblomer): C++11 initializer list...
+#ifndef __APPLE__
   argv.push_back("-q");
   argv.push_back("-n");
   argv.push_back(exe_path);
+#else
+  argv.push_back("-p");
+#endif
   argv.push_back(StringifyInt(pid));
   pid_t gdb_pid = 0;
   const bool double_fork = false;
   retval = ExecuteBinary(&fd_stdin,
                          &fd_stdout,
                          &fd_stderr,
+#ifdef __APPLE__
+                          "lldb",
+#else
                           "gdb",
+#endif
                           argv,
                           double_fork,
                          &gdb_pid);
   assert(retval);
 
+
   // Skip the gdb startup output
   ReadUntilGdbPrompt(fd_stdout);
 
   // Send stacktrace command to gdb
-  const string gdb_cmd = "thread apply all bt\n" // backtrace all threads
-                         "quit\n";               // stop gdb
-  WritePipe(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
+#ifdef __APPLE__
+  const string gdb_cmd = "bt all\n" "quit\n";
+#else
+  const string gdb_cmd = "thread apply all bt\n" "quit\n";
+#endif
+  // The execve can have failed, which can't be detected in ExecuteBinary.
+  // Instead, writing to the pipe will fail.
+  ssize_t nbytes = write(fd_stdin, gdb_cmd.data(), gdb_cmd.length());
+  if ((nbytes < 0) || (static_cast<unsigned>(nbytes) != gdb_cmd.length())) {
+    result += "failed to start gdb/lldb (" + StringifyInt(nbytes) + " bytes "
+              "written, errno " + StringifyInt(errno) + ")\n";
+    return result;
+  }
 
   // Read the stack trace from the stdout of our gdb process
+#ifdef __APPLE__
+  // lldb has one more prompt
+  result += ReadUntilGdbPrompt(fd_stdout);
+#endif
   result += ReadUntilGdbPrompt(fd_stdout) + "\n\n";
 
   // Close the connection to the terminated gdb process
@@ -358,6 +391,7 @@ static string ReportStacktrace() {
  * Listens on the pipe and logs the stacktrace or quits silently.
  */
 static void Watchdog() {
+  signal(SIGPIPE, SIG_IGN);
   ControlFlow::Flags control_flow;
 
   if (!pipe_watchdog_->Read(&control_flow)) {
@@ -458,15 +492,15 @@ void Spawn() {
           close(pipe_pid.write_end);
           // Close all unused file descriptors
           // close also usyslog, only get it back if necessary
-          //string usyslog_save = GetLogMicroSyslog();
+          // string usyslog_save = GetLogMicroSyslog();
           string debuglog_save = GetLogDebugFile();
-          //SetLogMicroSyslog("");
+          // SetLogMicroSyslog("");
           SetLogDebugFile("");
           for (int fd = 0; fd < max_fd; fd++) {
             if (fd != pipe_watchdog_->read_end)
               close(fd);
           }
-          //SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
+          // SetLogMicroSyslog(usyslog_save);  // no-op if usyslog not used
           SetLogDebugFile(debuglog_save);  // no-op if debug log not used
           Watchdog();
           exit(0);
@@ -533,7 +567,7 @@ unsigned GetMaxOpenFiles() {
   static bool     already_done = false;
 
   /* check number of open files (lazy evaluation) */
-  if (! already_done) {
+  if (!already_done) {
     unsigned int soft_limit = 0;
     int hard_limit = 0;
 

@@ -63,12 +63,12 @@ class History {
       description(d) {}
 
     inline const char* GetChannelName() const {
-      switch(channel) {
+      switch (channel) {
         case kChannelTrunk: return "trunk";
         case kChannelDevel: return "development";
         case kChannelTest:  return "testing";
         case kChannelProd:  return "production";
-        default: assert (false && "unknown channel id");
+        default: assert(false && "unknown channel id");
       }
     }
 
@@ -94,7 +94,7 @@ class History {
   };
 
  public:
-  virtual ~History() {};
+  virtual ~History() { }
 
   virtual bool IsWritable() const     = 0;
   virtual unsigned GetNumberOfTags() const = 0;
@@ -179,6 +179,6 @@ class History {
   std::string   fqrn_;
 };
 
-}  // namespace hsitory
+}  // namespace history
 
 #endif  // CVMFS_HISTORY_H_

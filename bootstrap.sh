@@ -7,7 +7,7 @@ CURL_VERSION=7.39.0
 PACPARSER_VERSION=1.3.1
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
-LEVELDB_VERSION=1.15.0
+LEVELDB_VERSION=1.18
 GOOGLETEST_VERSION=1.7.0
 TBB_VERSION=4.3-1
 LIBGEOIP_VERSION=1.6.0
@@ -99,6 +99,7 @@ do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 
 do_copy     "sqlite3"
 do_copy     "vjson"
+do_copy     "sha2"
 
 patch_external "leveldb"     "dont_search_snappy.patch"           \
                              "dont_search_tcmalloc.patch"

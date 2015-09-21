@@ -5,31 +5,34 @@ cvmfs_test_autofs_on_startup=false
 
 create_fake_lock() {
   local name=$1
+  local pid=${2:-$$} # use our own PID by default to fool the stale lock check
+
   load_repo_config $name
-  echo "creating ${CVMFS_SPOOL_DIR}/is_snapshotting"
-  mkdir ${CVMFS_SPOOL_DIR}/is_snapshotting
+
+  echo "creating ${CVMFS_SPOOL_DIR}/is_snapshotting.lock with PID $pid"
+  echo "$pid" > ${CVMFS_SPOOL_DIR}/is_snapshotting.lock
 }
 
 remove_fake_lock() {
   local name=$1
   load_repo_config $name
-  echo "removing ${CVMFS_SPOOL_DIR}/is_snapshotting"
-  rmdir ${CVMFS_SPOOL_DIR}/is_snapshotting
+  echo "removing ${CVMFS_SPOOL_DIR}/is_snapshotting.lock"
+  rm -f ${CVMFS_SPOOL_DIR}/is_snapshotting.lock
 }
 
 check_lock() {
   local name=$1
   load_repo_config $name
-  [ -d ${CVMFS_SPOOL_DIR}/is_snapshotting ]
+  [ -f ${CVMFS_SPOOL_DIR}/is_snapshotting.lock ]
 }
 
 run_background_snapshot() {
   local name=$1
   local logfile=$2
-  shift 2
+  local max_waiting_time=$3
+  shift 3
   local snapshot_params="$*"
 
-  local max_waiting_time=180
   local snapshot_command="cvmfs_server snapshot $snapshot_params $name"
   local pid=0
 
@@ -53,6 +56,17 @@ run_background_snapshot() {
   fi
 }
 
+count_fetched_catalogs() {
+  local replication_log_file="$1"
+
+  # figure out where replication starts to process repository tags
+  # we do not want to count in that part of the log
+  local cutmark=$(cat $replication_log_file | grep -n "repository tag" | head -n 1 | cut -f1 -d:)
+
+  # count the number of times the pulling decided to fetch chunks
+  cat $replication_log_file | head -n $cutmark | grep 'Processing chunks' | wc -l
+}
+
 
 CVMFS_TEST_584_REPLICA_NAME=""
 cleanup() {
@@ -71,11 +85,11 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO || return $?
 
-  # echo "install a desaster cleanup function"
+  echo "install a desaster cleanup function"
   trap cleanup EXIT HUP INT TERM || return $?
 
   echo "create Stratum1 repository on the same machine"
-  local replica_name="${CVMFS_TEST_REPO}.replic"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   CVMFS_TEST_584_REPLICA_NAME="$replica_name"
   load_repo_config $CVMFS_TEST_REPO
   create_stratum1 $replica_name                          \
@@ -90,7 +104,7 @@ cvmfs_run_test() {
 
   echo "create an initial snapshot (should immediately fail)"
   local snapshot_log_1="snapshot_1.log"
-  run_background_snapshot $replica_name $snapshot_log_1 || return 2
+  run_background_snapshot $replica_name $snapshot_log_1 15 || return 2
 
   echo "check if the snapshotting lock is there"
   check_lock $replica_name || return 3
@@ -100,7 +114,7 @@ cvmfs_run_test() {
 
   echo "create an initial snapshot without waiting (should immediately fail)"
   local snapshot_log_2="snapshot_2.log"
-  run_background_snapshot $replica_name $snapshot_log_2 -t || return 5
+  run_background_snapshot $replica_name $snapshot_log_2 15 -t || return 5
 
   echo "check if the snapshotting lock is there"
   check_lock $replica_name || return 6
@@ -115,7 +129,7 @@ cvmfs_run_test() {
 
   echo "create an initial snapshot (should work)"
   local snapshot_log_3="snapshot_3.log"
-  run_background_snapshot $replica_name $snapshot_log_3 || return 9
+  run_background_snapshot $replica_name $snapshot_log_3 120 || return 9
 
   echo "check if the snapshotting lock is gone"
   check_lock $replica_name && return 10
@@ -167,7 +181,7 @@ cvmfs_run_test() {
 
   echo "try to snapshot (should hang forever)"
   local snapshot_log_4="snapshot_4.log"
-  run_background_snapshot $replica_name $snapshot_log_4 && return 17
+  run_background_snapshot $replica_name $snapshot_log_4 30 && return 17
 
   echo "check if the snapshotting lock is there"
   check_lock $replica_name || return 18
@@ -177,7 +191,7 @@ cvmfs_run_test() {
 
   echo "try to snapshot (without waiting)"
   local snapshot_log_5="snapshot_5.log"
-  run_background_snapshot $replica_name $snapshot_log_5 -t || return 20
+  run_background_snapshot $replica_name $snapshot_log_5 30 -t || return 20
 
   echo "check if the snapshotting lock is there"
   check_lock $replica_name || return 21
@@ -203,7 +217,7 @@ cvmfs_run_test() {
 
   echo "run a second snapshot concurrently (should abort immediately)"
   local snapshot_log_7="snapshot_7.log"
-  run_background_snapshot $replica_name $snapshot_log_7 -t || return 26
+  run_background_snapshot $replica_name $snapshot_log_7 15 -t || return 26
 
   echo "check if the snapshotting lock is there"
   check_lock $replica_name || return 27
@@ -216,7 +230,7 @@ cvmfs_run_test() {
 
   echo "run a second snapshot concurrently (should wait and later do the snapshot)"
   local snapshot_log_8="snapshot_8.log"
-  run_background_snapshot $replica_name $snapshot_log_8 || return 30
+  run_background_snapshot $replica_name $snapshot_log_8 800 || return 30
 
   echo "check if the first snapshot is gone (kill it otherwise)"
   if kill -0 $pid6 > /dev/null 2>&1; then
@@ -231,8 +245,8 @@ cvmfs_run_test() {
 
   echo "check the log files"
   echo "(6 should have snapshotted, 7 should have aborted, 8 should have waited and later snapshotted)"
-  local revisions_snapshotted_by_6=$(cat $snapshot_log_6 | grep 'Processing chunks' | wc -l)
-  local revisions_snapshotted_by_7=$(cat $snapshot_log_7 | grep 'Processing chunks' | wc -l)
+  local revisions_snapshotted_by_6=$(count_fetched_catalogs $snapshot_log_6)
+  local revisions_snapshotted_by_7=$(count_fetched_catalogs $snapshot_log_7)
   echo "Number 6 snapshotted $revisions_snapshotted_by_6 revisions"
   echo "Number 7 snapshotted $revisions_snapshotted_by_7 revisions"
   [ $revisions_snapshotted_by_6 -eq 6 ]                             || return 33
@@ -241,6 +255,21 @@ cvmfs_run_test() {
   cat $snapshot_log_7 | grep 'another snapshot.*in progress.*abort' || return 36
   cat $snapshot_log_8 | grep 'waiting.*snapshot to finish'          || return 37
   cat $snapshot_log_8 | grep 'Uploading manifest'                   || return 38
+
+  # ============================================================================
+
+  echo "place a fake lock that is stale"
+  create_fake_lock $replica_name 3282168345613 || return 39
+
+  echo "create a snapshot (should work - despite the stale lock)"
+  local snapshot_log_9="snapshot_9.log"
+  run_background_snapshot $replica_name $snapshot_log_9 30 || return 40
+
+  echo "check if the lock is gone"
+  check_lock $replica_name && return 41
+
+  echo "check the log file"
+  cat $snapshot_log_9 | grep 'Uploading manifest' || return 42
 
   return 0
 }

@@ -21,7 +21,7 @@
 
 Summary: CernVM File System
 Name: cvmfs
-Version: 2.1.20
+Version: 2.2.0
 Release: 1%{?dist}
 Source0: https://ecsft.cern.ch/dist/cvmfs/%{name}-%{version}.tar.gz
 %if 0%{?selinux_cvmfs}
@@ -304,11 +304,6 @@ if [ $1 = 0 ] ; then
 fi
 %endif
 
-%preun server
-if [ $1 = 0 ] ; then
-    rm -f /var/lib/cvmfs-server/geo/*
-fi
-
 %postun
 if [ $1 -eq 0 ]; then
    #sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master
@@ -386,8 +381,11 @@ fi
 %files unittests
 %defattr(-,root,root)
 %{_bindir}/cvmfs_unittests
+%doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Mon Aug 17 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
+- Avoid rm -f /var/lib/cvmfs-server/geo/* in preuninstall
 * Wed Jan 07 2015 Jakob Blomer <jblomer@cern.ch> - 2.1.20
 - Add chkconfig dependency
 * Wed Dec 10 2014 Jakob Blomer <jblomer@cern.ch> - 2.1.20

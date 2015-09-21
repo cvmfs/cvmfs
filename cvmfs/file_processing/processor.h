@@ -1,7 +1,13 @@
-#ifndef UPLOAD_FILE_PROCESSING_PROCESSOR_H
-#define UPLOAD_FILE_PROCESSING_PROCESSOR_H
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef CVMFS_FILE_PROCESSING_PROCESSOR_H_
+#define CVMFS_FILE_PROCESSING_PROCESSOR_H_
 
 #include <tbb/task.h>
+
+#include <vector>
 
 #include "char_buffer.h"
 #include "file_scrubbing_task.h"
@@ -90,17 +96,20 @@ class FileScrubbingTask : public AbstractFileScrubbingTask<File> {
   CutMarks FindNextChunkCutMarks();
 
   void QueueForDeferredProcessing(Chunk *chunk) {
-    assert (chunk != NULL);
+    assert(chunk != NULL);
     chunks_to_process_.push_back(chunk);
   }
   void SpawnTasksAndWaitForProcessing();
   void CommitFinishedChunks() const;
 
  private:
-  std::vector<Chunk*>  chunks_to_process_; ///< Filled on runtime of FileScrubbingTask with all
-                                           ///< Chunks that need to "see" the data in buffer_
+  /**
+   * Filled on runtime of FileScrubbingTask with all Chunks that need to "see"
+   * the data in buffer_
+   */
+  std::vector<Chunk*>  chunks_to_process_;
 };
 
-} // namespace upload
+}  // namespace upload
 
-#endif /* UPLOAD_FILE_PROCESSING_PROCESSOR_H */
+#endif  // CVMFS_FILE_PROCESSING_PROCESSOR_H_

@@ -1,16 +1,19 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
 #include <openssl/sha.h>
-
-#include <cassert>
 #include <pthread.h>
 #include <unistd.h>
 
-#include "../../cvmfs/util.h"
+#include <cassert>
+
+#include "../../cvmfs/file_processing/async_reader.h"
 #include "../../cvmfs/file_processing/char_buffer.h"
 #include "../../cvmfs/file_processing/file_scrubbing_task.h"
-#include "../../cvmfs/file_processing/async_reader.h"
-
+#include "../../cvmfs/util.h"
 #include "c_file_sandbox.h"
 
 namespace upload {
@@ -24,7 +27,7 @@ class TestFile : public upload::AbstractFile {
     read_offset_(0)
   {
     const int sha1_retval = SHA1_Init(&sha1_context_);
-    assert (sha1_retval == 1);
+    assert(sha1_retval == 1);
   }
 
   unsigned char* sha1_digest()       { return sha1_digest_; }
@@ -32,7 +35,7 @@ class TestFile : public upload::AbstractFile {
   off_t          read_offset() const { return read_offset_; }
 
   shash::Any GetHash() const {
-    return shash::Any(shash::kSha1, sha1_digest_, SHA_DIGEST_LENGTH);
+    return shash::Any(shash::kSha1, sha1_digest_);
   }
 
   const shash::Any& GetExpectedHash() const {
@@ -41,7 +44,7 @@ class TestFile : public upload::AbstractFile {
 
   void CheckHash() const {
     const shash::Any computed_hash = GetHash();
-    EXPECT_EQ (expected_hash_, computed_hash)
+    EXPECT_EQ(expected_hash_, computed_hash)
       << "content hashes do not fit!" << std::endl
       << "expected: " << expected_hash_.ToString() << std::endl
       << "computed: " << computed_hash.ToString();
@@ -89,12 +92,12 @@ class DummyFileScrubbingTask :
     sha_retcode = SHA1_Update(file->sha1_context(),
                               buffer->ptr(),
                               buffer->used_bytes());
-    EXPECT_EQ (1, sha_retcode) << "Error during SHA1 update";
+    EXPECT_EQ(1, sha_retcode) << "Error during SHA1 update";
 
     if (IsLast()) {
       sha_retcode = SHA1_Final(file->sha1_digest(),
                                file->sha1_context());
-      EXPECT_EQ (1, sha_retcode) << "Error during SHA1 finalization";
+      EXPECT_EQ(1, sha_retcode) << "Error during SHA1 finalization";
     }
   }
 
@@ -102,7 +105,7 @@ class DummyFileScrubbingTask :
     file->IncreaseReadOffset(buffer->used_bytes());
 
     if (IsLast()) {
-      EXPECT_EQ (file->size(), static_cast<size_t>(file->read_offset()))
+      EXPECT_EQ(file->size(), static_cast<size_t>(file->read_offset()))
         << "File size and bytes read differ";
     }
   }
@@ -116,7 +119,7 @@ class T_AsyncReader : public FileSandbox {
 
  public:
   T_AsyncReader() :
-    FileSandbox("/tmp/cvmfs_ut_asyncreader") {}
+    FileSandbox("./cvmfs_ut_asyncreader") {}
 
  protected:
   void SetUp() {
@@ -149,12 +152,7 @@ class T_AsyncReader : public FileSandbox {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, Initialize) {
+TEST_F(T_AsyncReader, Initialize) {
   const size_t        max_buffer_size = 4096;
   const unsigned int  max_buffers_in_flight = 10;
 
@@ -164,12 +162,7 @@ TEST_F (T_AsyncReader, Initialize) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, ReadEmptyFile) {
+TEST_F(T_AsyncReader, ReadEmptyFile) {
   const size_t        max_buffer_size = 4096;
   const unsigned int  max_buffers_in_flight = 10;
 
@@ -186,16 +179,11 @@ TEST_F (T_AsyncReader, ReadEmptyFile) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, ReadSmallFile) {
+TEST_F(T_AsyncReader, ReadSmallFile) {
   TestFile *f = new TestFile(GetSmallFile(), GetSmallFileHash());
 
-  const size_t        max_buffer_size = f->size() * 3; // will fit in one buffer
-  const unsigned int  max_buffers_in_flight = 10;
+  const size_t max_buffer_size = f->size() * 3;  // will fit in one buffer
+  const unsigned int max_buffers_in_flight = 10;
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
   reader.Initialize();
@@ -209,18 +197,13 @@ TEST_F (T_AsyncReader, ReadSmallFile) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 unsigned int g_FileReadCallback_Callback_calls = 0;
-void FileReadCallback_Callback(TestFile* const& file) {
+static void FileReadCallback_Callback(TestFile* const& file) {
   file->CheckHash();
   ++g_FileReadCallback_Callback_calls;
 }
 
-TEST_F (T_AsyncReader, FileReadCallback) {
+TEST_F(T_AsyncReader, FileReadCallback) {
   const unsigned int file_count = 5;
 
   std::vector<TestFile*> files;
@@ -244,23 +227,18 @@ TEST_F (T_AsyncReader, FileReadCallback) {
 
   reader.Wait();
 
-  EXPECT_EQ (file_count, g_FileReadCallback_Callback_calls)
+  EXPECT_EQ(file_count, g_FileReadCallback_Callback_calls)
     << "number of callback invocation does not match";
 
   reader.TearDown();
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, ReadHugeFile) {
+TEST_F(T_AsyncReader, ReadHugeFileSlow) {
   TestFile *f = new TestFile(GetHugeFile(), GetHugeFileHash());
 
-  const size_t        max_buffer_size = 524288; // will NOT fit in one buffer
-  const unsigned int  max_buffers_in_flight = 10;
+  const size_t max_buffer_size = 524288;  // will NOT fit in one buffer
+  const unsigned int max_buffers_in_flight = 10;
 
   MyReader reader(max_buffer_size, max_buffers_in_flight);
   reader.Initialize();
@@ -274,12 +252,7 @@ TEST_F (T_AsyncReader, ReadHugeFile) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
-TEST_F (T_AsyncReader, ReadManyBigFiles) {
+TEST_F(T_AsyncReader, ReadManyBigFilesSlow) {
   const int file_count = 5000;
 
   std::vector<TestFile*> files;
@@ -289,7 +262,7 @@ TEST_F (T_AsyncReader, ReadManyBigFiles) {
   }
 
   const size_t        max_buffer_size = 524288;
-  const unsigned int  max_buffers_in_flight = 5; // less buffers than files
+  const unsigned int  max_buffers_in_flight = 5;  // less buffers than files
   MyReader reader(max_buffer_size, max_buffers_in_flight);
   reader.Initialize();
 
@@ -311,16 +284,12 @@ TEST_F (T_AsyncReader, ReadManyBigFiles) {
 }
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-
-
 void *deadlock_test(void *v_files) {
-  std::vector<TestFile*> &files = *static_cast<std::vector<TestFile*>*>(v_files);
+  std::vector<TestFile*> &files =
+    *static_cast<std::vector<TestFile *> *>(v_files);
 
   const size_t        max_buffer_size = 524288;
-  const unsigned int  max_buffers_in_flight = 5; // less buffers than files
+  const unsigned int  max_buffers_in_flight = 5;  // less buffers than files
   T_AsyncReader::MyReader reader(max_buffer_size, max_buffers_in_flight);
   reader.Initialize();
 
@@ -354,10 +323,10 @@ void *deadlock_test(void *v_files) {
 
   reader.TearDown();
 
-  return (void*)1337;
+  return reinterpret_cast<void *>(1337);
 }
 
-TEST_F (T_AsyncReader, MultipleWaits) {
+TEST_F(T_AsyncReader, MultipleWaitsSlow) {
   const int file_count = 10000;
   std::vector<TestFile*> files;
   files.reserve(file_count);
@@ -370,22 +339,22 @@ TEST_F (T_AsyncReader, MultipleWaits) {
                                   NULL,
                                  &deadlock_test,
                                   static_cast<void*>(&files));
-  ASSERT_EQ (0, res);
+  ASSERT_EQ(0, res);
 
   unsigned int timeout = 10;
   while (pthread_kill(thread, 0) != ESRCH && timeout > 0) {
     sleep(1);
     --timeout;
   }
-  EXPECT_LT (0u, timeout) << "Timeout expired (possible Deadlock!)";
+  EXPECT_LT(0u, timeout) << "Timeout expired (possible Deadlock!)";
   if (timeout == 0) {
     pthread_cancel(thread);
   } else {
     void *return_value;
     const int join_res = pthread_join(thread, &return_value);
-    ASSERT_EQ (0, join_res);
-    EXPECT_EQ ((void*)1337, return_value);
+    ASSERT_EQ(0, join_res);
+    EXPECT_EQ((void*)1337, return_value);
   }
 }
 
-}
+}  // namespace upload

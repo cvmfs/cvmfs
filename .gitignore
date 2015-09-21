@@ -8,4 +8,41 @@ test/cloud_testing/ec2_config.sh
 python/dist/*
 python/python_cvmfsutils.egg-info/*
 python/MANIFEST
+.vagrant/
 
+# Eclipse-related files
+.project
+.cproject
+.metadata
+.settings
+RemoteSystemsTempFiles/
+
+# Externals
+externals/build_*/
+externals/.decompressionDone
+
+# CMake stuff
+cvmfs_config.h
+CMakeCache.txt
+CMakeFiles/
+CPackConfig.cmake
+CPackSourceConfig.cmake
+CTestTestfile.cmake
+cmake_install.cmake
+cvmfs/cmake_install.cmake
+mount/cmake_install.cmake
+test/unittests/CTestTestfile.cmake
+test/unittests/cmake_install.cmake
+Makefile
+cvmfs/Makefile
+mount/Makefile
+test/unittests/Makefile
+
+# Outputs
+cvmfs/*.dylib
+cvmfs/cvmfs2
+cvmfs/cvmfs_fsck
+cvmfs/cvmfs_suid_helper
+cvmfs/cvmfs_swissknife
+mount/mount_cvmfs
+test/unittests/cvmfs_unittests

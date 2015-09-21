@@ -2,7 +2,7 @@
  * This file is part of the CernVM File System.
  */
 
-// TODO: Move to Riak specific source files
+// TODO(rmeusel): Move to Riak specific source files
 
 #include "json_document.h"
 
@@ -12,7 +12,7 @@ JsonDocument::JsonDocument() :
 
 
 bool JsonDocument::Parse(char *buffer) {
-  assert (root_ == NULL);
+  assert(root_ == NULL);
 
   char *error_pos  = 0;
   char *error_desc = 0;

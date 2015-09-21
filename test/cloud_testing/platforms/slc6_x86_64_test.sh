@@ -1,13 +1,10 @@
 #!/bin/sh
 
 # source the common platform independent functionality and option parsing
-script_location=$(dirname $(readlink --canonicalize $0))
+script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
 
-ut_retval=0
-it_retval=0
-s3_retval=0
-mg_retval=0
+retval=0
 
 # format additional disks with ext4 and many inodes
 echo -n "formatting new disk partitions... "
@@ -55,55 +52,83 @@ echo "done"
 
 # running unit test suite
 run_unittests --gtest_shuffle \
-              --gtest_death_test_use_fork || ut_retval=$?
+              --gtest_death_test_use_fork || retval=1
 
-echo "running CernVM-FS test cases..."
+
 cd ${SOURCE_DIRECTORY}/test
-export CVMFS_TEST_SERVER_CACHE='/srv/cache' &&                         \
-./run.sh $TEST_LOGFILE -x src/005-asetup                               \
-                          src/024-reload-during-asetup                 \
-                          src/518-hardlinkstresstest                   \
-                          src/523-corruptchunkfailover                 \
-                          src/524-corruptmanifestfailover              \
-                          src/577-garbagecollecthiddenstratum1revision \
-                          src/579-garbagecollectstratum1legacytag || it_retval=$?
+echo "running CernVM-FS client test cases..."
+CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
+./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                              -x src/005-asetup                               \
+                                 src/024-reload-during-asetup                 \
+                                 --                                           \
+                                 src/0*                                       \
+                              || retval=1
+
+
+echo "running CernVM-FS server test cases..."
+CVMFS_TEST_SERVER_CACHE='/srv/cache'                                          \
+CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
+./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                              -x src/518-hardlinkstresstest                   \
+                                 src/523-corruptchunkfailover                 \
+                                 src/524-corruptmanifestfailover              \
+                                 src/577-garbagecollecthiddenstratum1revision \
+                                 src/579-garbagecollectstratum1legacytag      \
+                                 src/585-xattrs                               \
+                                 --                                           \
+                                 src/5*                                       \
+                              || retval=1
+
 
 echo -n "starting FakeS3 service... "
-fakes3_pid=$(start_fakes3 $FAKE_S3_LOGFILE) || { s3_retval=$?; die "fail"; }
+s3_retval=0
+fakes3_pid=$(start_fakes3 $FAKE_S3_LOGFILE) || { s3_retval=1; retval=1; echo "fail"; }
 echo "done ($fakes3_pid)"
 
 if [ $s3_retval -eq 0 ]; then
-    echo "running CernVM-FS server test cases against FakeS3..."
-    export CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                    &&         \
-    export CVMFS_TEST_STRATUM0=$FAKE_S3_URL                        &&         \
-    export CVMFS_TEST_SERVER_CACHE='/srv/cache'                    &&         \
-    ./run.sh $TEST_S3_LOGFILE -x src/0*                                       \
-                                 src/518-hardlinkstresstest                   \
-                                 src/519-importlegacyrepo                     \
-                                 src/522-missingchunkfailover                 \
-                                 src/523-corruptchunkfailover                 \
-                                 src/524-corruptmanifestfailover              \
-                                 src/525-bigrepo                              \
-                                 src/528-recreatespoolarea                    \
-                                 src/530-recreatespoolarea_defaultkey         \
-                                 src/537-symlinkedbackend                     \
-                                 src/538-symlinkedstratum1backend             \
-                                 src/542-storagescrubbing                     \
-                                 src/543-storagescrubbing_scriptable          \
-                                 src/550-livemigration                        \
-                                 src/563-garbagecollectlegacy                 \
-                                 src/568-migratecorruptrepo                   \
-                                 src/571-localbackendumask                    \
-                                 src/572-proxyfailover                        \
-                                 src/577-garbagecollecthiddenstratum1revision \
-                                 src/579-garbagecollectstratum1legacytag      \
-                                 src/583-httpredirects || s3_retval=$?
+  echo "running CernVM-FS server test cases against FakeS3..."
+  CVMFS_TEST_S3_CONFIG=$FAKE_S3_CONFIG                                      \
+  CVMFS_TEST_HTTP_BASE=$FAKE_S3_URL                                         \
+  CVMFS_TEST_SERVER_CACHE='/srv/cache'                                      \
+  CVMFS_TEST_CLASS_NAME=S3ServerIntegrationTests                            \
+  ./run.sh $TEST_S3_LOGFILE -o ${TEST_S3_LOGFILE}${XUNIT_OUTPUT_SUFFIX}     \
+                            -x src/518-hardlinkstresstest                   \
+                               src/519-importlegacyrepo                     \
+                               src/522-missingchunkfailover                 \
+                               src/523-corruptchunkfailover                 \
+                               src/524-corruptmanifestfailover              \
+                               src/525-bigrepo                              \
+                               src/528-recreatespoolarea                    \
+                               src/530-recreatespoolarea_defaultkey         \
+                               src/537-symlinkedbackend                     \
+                               src/538-symlinkedstratum1backend             \
+                               src/542-storagescrubbing                     \
+                               src/543-storagescrubbing_scriptable          \
+                               src/550-livemigration                        \
+                               src/563-garbagecollectlegacy                 \
+                               src/568-migratecorruptrepo                   \
+                               src/571-localbackendumask                    \
+                               src/572-proxyfailover                        \
+                               src/577-garbagecollecthiddenstratum1revision \
+                               src/579-garbagecollectstratum1legacytag      \
+                               src/583-httpredirects                        \
+                               src/585-xattrs                               \
+                               src/591-importrepo                           \
+                               src/594-backendoverwrite                     \
+                               src/595-geoipdbupdate                        \
+                               --                                           \
+                               src/5* || retval=1
 
-    echo -n "killing FakeS3... "
-    sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
+  echo -n "killing FakeS3... "
+  sudo kill -2 $fakes3_pid && echo "done" || echo "fail"
 fi
 
-echo "running CernVM-FS migration test cases..."
-./run.sh $MIGRATIONTEST_LOGFILE migration_tests/001-hotpatch || mg_retval=$?
 
-[ $ut_retval -eq 0 ] && [ $it_retval -eq 0 ] && [ $s3_retval -eq 0 ] && [ $mg_retval -eq 0 ]
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
+
+exit $retval

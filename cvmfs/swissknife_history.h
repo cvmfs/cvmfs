@@ -6,28 +6,29 @@
 #define CVMFS_SWISSKNIFE_HISTORY_H_
 
 #include <string>
-#include "swissknife.h"
+#include <vector>
+
 #include "hash.h"
-#include "util_concurrency.h"
 #include "history_sqlite.h"
+#include "swissknife.h"
+#include "util_concurrency.h"
 
 namespace manifest {
-  class Manifest;
+class Manifest;
 }
 
 namespace catalog {
-  class Catalog;
-  class WritableCatalog;
+class Catalog;
+class WritableCatalog;
 }
 
 namespace upload {
-  class SpoolerDefinition;
-  class SpoolerResult;
-  class Spooler;
+struct SpoolerDefinition;
+struct SpoolerResult;
+class Spooler;
 }
 
 namespace swissknife {
-
 
 class CommandTag : public Command {
  public:
@@ -57,10 +58,10 @@ class CommandTag : public Command {
   };
 
  public:
-  CommandTag() {};
+  CommandTag() { }
 
  protected:
-  void InsertCommonParameters(ParameterList &parameters);
+  void InsertCommonParameters(ParameterList *parameters);
 
   Environment* InitializeEnvironment(const ArgumentList &args,
                                      const bool read_write);
@@ -81,7 +82,6 @@ class CommandTag : public Command {
                                     const shash::Any   &base_hash) const;
   bool FetchObject(const std::string    &repository_url,
                    const shash::Any     &object_hash,
-                   const shash::Suffix   hash_suffix,
                    const std::string    &destination_path) const;
   history::History* GetHistory(const manifest::Manifest  *manifest,
                                const std::string         &repository_url,
@@ -104,9 +104,7 @@ class CommandTag : public Command {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 class CommandCreateTag : public CommandTag {
@@ -132,9 +130,7 @@ class CommandCreateTag : public CommandTag {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 class CommandRemoveTag : public CommandTag {
@@ -149,9 +145,7 @@ class CommandRemoveTag : public CommandTag {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 class CommandListTags : public CommandTag {
@@ -170,9 +164,7 @@ class CommandListTags : public CommandTag {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 class CommandInfoTag : public CommandTag {
@@ -191,9 +183,7 @@ class CommandInfoTag : public CommandTag {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 class CommandRollbackTag : public CommandTag {
@@ -211,9 +201,7 @@ class CommandRollbackTag : public CommandTag {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 class CommandEmptyRecycleBin : public CommandTag {

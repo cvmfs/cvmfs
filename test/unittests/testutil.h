@@ -1,17 +1,31 @@
-#ifndef CVMFS_UNITTEST_TESTUTIL
-#define CVMFS_UNITTEST_TESTUTIL
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef TEST_UNITTESTS_TESTUTIL_H_
+#define TEST_UNITTESTS_TESTUTIL_H_
+
+#include <gtest/gtest.h>
 
 #include <sys/types.h>
-#include <ctime>
 
-#include "../../cvmfs/upload_facility.h"
-#include "../../cvmfs/hash.h"
+#include <ctime>
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+
 #include "../../cvmfs/directory_entry.h"
-#include "../../cvmfs/util.h"
+#include "../../cvmfs/hash.h"
 #include "../../cvmfs/history.h"
 #include "../../cvmfs/object_fetcher.h"
+#include "../../cvmfs/upload_facility.h"
+#include "../../cvmfs/util.h"
 
 pid_t GetParentPid(const pid_t pid);
+std::string GetExecutablePath(const std::string &exe_name);
+
+unsigned GetNoUsedFds();
 
 time_t t(const int day, const int month, const int year);
 shash::Any h(const std::string &hash,
@@ -21,13 +35,28 @@ namespace catalog {
 
 class DirectoryEntryTestFactory {
  public:
+  struct Metadata {
+    std::string name;
+    unsigned int mode;
+    uid_t uid;
+    gid_t gid;
+    uint64_t size;
+    time_t mtime;
+    std::string symlink;
+    uint32_t linkcount;
+    bool has_xattrs;
+    shash::Any checksum;
+  };
+
+ public:
   static catalog::DirectoryEntry RegularFile();
   static catalog::DirectoryEntry Directory();
   static catalog::DirectoryEntry Symlink();
   static catalog::DirectoryEntry ChunkedFile();
+  static catalog::DirectoryEntry Make(const Metadata &metadata);
 };
 
-} /* namespace catalog */
+}  // namespace catalog
 
 class PolymorphicConstructionUnittestAdapter {
  public:
@@ -43,20 +72,18 @@ class PolymorphicConstructionUnittestAdapter {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
-static const std::string g_sandbox_path    = "/tmp/cvmfs_mockuploader";
-static const std::string g_sandbox_tmp_dir = g_sandbox_path + "/tmp";
-static upload::SpoolerDefinition MockSpoolerDefinition() {
+static const char* g_sandbox_path    = "./cvmfs_mockuploader";
+static const char* g_sandbox_tmp_dir = "./cvmfs_mockuploader/tmp";
+static inline upload::SpoolerDefinition MockSpoolerDefinition() {
   const size_t      min_chunk_size   = 512000;
   const size_t      avg_chunk_size   = 2 * min_chunk_size;
   const size_t      max_chunk_size   = 4 * min_chunk_size;
 
-  return upload::SpoolerDefinition("mock," + g_sandbox_path + "," +
-                                             g_sandbox_tmp_dir,
+  return upload::SpoolerDefinition("mock," + std::string(g_sandbox_path) + "," +
+                                             std::string(g_sandbox_tmp_dir),
                                    shash::kSha1,
                                    true,
                                    min_chunk_size,
@@ -70,7 +97,7 @@ static upload::SpoolerDefinition MockSpoolerDefinition() {
  * very common parts and takes care of the internal instrumentation of
  * PolymorphicConstruction.
  */
-template <class DerivedT> // curiously recurring template pattern
+template <class DerivedT>  // curiously recurring template pattern
 class AbstractMockUploader : public upload::AbstractUploader {
  protected:
   static const bool not_implemented = false;
@@ -80,17 +107,19 @@ class AbstractMockUploader : public upload::AbstractUploader {
   static const std::string sandbox_tmp_dir;
 
  public:
-  AbstractMockUploader(const upload::SpoolerDefinition &spooler_definition) :
-    AbstractUploader(spooler_definition),
-    worker_thread_running(false) {}
+  explicit AbstractMockUploader(
+    const upload::SpoolerDefinition &spooler_definition)
+    : AbstractUploader(spooler_definition)
+  {
+    worker_thread_running = false;
+  }
 
   static DerivedT* MockConstruct() {
     PolymorphicConstructionUnittestAdapter::RegisterPlugin<
                                                       upload::AbstractUploader,
                                                       DerivedT>();
     DerivedT* result = dynamic_cast<DerivedT*>(
-      AbstractUploader::Construct(MockSpoolerDefinition())
-    );
+      AbstractUploader::Construct(MockSpoolerDefinition()));
     PolymorphicConstructionUnittestAdapter::UnregisterAllPlugins<
                                                     upload::AbstractUploader>();
     return result;
@@ -114,14 +143,13 @@ class AbstractMockUploader : public upload::AbstractUploader {
           break;
         case UploadJob::Commit:
           FinalizeStreamedUpload(job.stream_handle,
-                                 job.content_hash,
-                                 job.hash_suffix);
+                                 job.content_hash);
           break;
         case UploadJob::Terminate:
           running = false;
           break;
         default:
-          assert (AbstractMockUploader::not_implemented);
+          assert(AbstractMockUploader::not_implemented);
           break;
       }
     }
@@ -132,52 +160,52 @@ class AbstractMockUploader : public upload::AbstractUploader {
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
                           const CallbackTN   *callback = NULL) {
-    assert (AbstractMockUploader::not_implemented);
+    assert(AbstractMockUploader::not_implemented);
   }
 
   virtual upload::UploadStreamHandle* InitStreamedUpload(
                                             const CallbackTN *callback = NULL) {
-    assert (AbstractMockUploader::not_implemented);
+    assert(AbstractMockUploader::not_implemented);
     return NULL;
   }
 
   virtual void Upload(upload::UploadStreamHandle  *handle,
                       upload::CharBuffer          *buffer,
                       const CallbackTN            *callback = NULL) {
-    assert (AbstractMockUploader::not_implemented);
+    assert(AbstractMockUploader::not_implemented);
   }
 
   virtual void FinalizeStreamedUpload(upload::UploadStreamHandle *handle,
-                                      const shash::Any            content_hash,
-                                      const shash::Suffix         hash_suffix) {
-    assert (AbstractMockUploader::not_implemented);
+                                      const shash::Any            content_hash)
+  {
+    assert(AbstractMockUploader::not_implemented);
   }
 
   virtual bool Remove(const std::string &file_to_delete) {
-    assert (AbstractMockUploader::not_implemented);
+    assert(AbstractMockUploader::not_implemented);
   }
 
   virtual bool Peek(const std::string &path) const {
-    assert (AbstractMockUploader::not_implemented);
+    assert(AbstractMockUploader::not_implemented);
   }
 
   virtual unsigned int GetNumberOfErrors() const {
-    assert (AbstractMockUploader::not_implemented);
+    assert(AbstractMockUploader::not_implemented);
   }
 
  public:
-  volatile bool worker_thread_running;
+  tbb::atomic<bool> worker_thread_running;
 };
 
 template <class DerivedT>
-const std::string AbstractMockUploader<DerivedT>::sandbox_path    = g_sandbox_path;
+const std::string AbstractMockUploader<DerivedT>::sandbox_path =
+  g_sandbox_path;
 template <class DerivedT>
-const std::string AbstractMockUploader<DerivedT>::sandbox_tmp_dir = g_sandbox_tmp_dir;
+const std::string AbstractMockUploader<DerivedT>::sandbox_tmp_dir =
+  g_sandbox_tmp_dir;
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 template <class ObjectT>
@@ -197,12 +225,13 @@ class MockObjectStorage {
   }
 
   static void RegisterObject(const shash::Any &hash, ObjectT *object) {
-    ASSERT_FALSE (Exists(hash)) << "exists already: " << hash.ToString();
+    ASSERT_FALSE(Exists(hash)) << "exists already: " << hash.ToString();
     MockObjectStorage::available_objects[hash] = object;
   }
 
   static void UnregisterObjects() {
-    typename MockObjectStorage<ObjectT>::AvailableObjects::const_iterator i, iend;
+    typename MockObjectStorage<ObjectT>::AvailableObjects::const_iterator
+      i, iend;
     for (i    = MockObjectStorage<ObjectT>::available_objects.begin(),
          iend = MockObjectStorage<ObjectT>::available_objects.end();
          i != iend; ++i)
@@ -213,7 +242,7 @@ class MockObjectStorage {
   }
 
   static ObjectT* Get(const shash::Any &hash) {
-    return (Exists(hash) && ! IsDeleted(hash))
+    return (Exists(hash) && !IsDeleted(hash))
       ? available_objects[hash]
       : NULL;
   }
@@ -237,17 +266,15 @@ template <class ObjectT>
 std::set<shash::Any>* MockObjectStorage<ObjectT>::s_deleted_objects;
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 namespace manifest {
-  class Manifest;
+class Manifest;
 }
 
 namespace swissknife {
-  class CatalogTraversalParams;
+class CatalogTraversalParams;
 }
 
 
@@ -324,9 +351,9 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
   // silence coverity
   MockCatalog& operator= (const MockCatalog &other);
 
- public: /* API in this 'public block' is used by CatalogTraversal
-          * (see catalog.h - catalog::Catalog for details)
-          */
+  // API in this 'public block' is used by CatalogTraversal
+  // (see catalog.h - catalog::Catalog for details)
+ public:
   static MockCatalog* AttachFreely(const std::string  &root_path,
                                    const std::string  &file,
                                    const shash::Any   &catalog_hash,
@@ -391,9 +418,7 @@ class MockCatalog : public MockObjectStorage<MockCatalog> {
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 class MockHistory : public history::History,
@@ -489,7 +514,7 @@ class MockHistory : public history::History,
   }
 
   struct DateSmallerThan {
-    DateSmallerThan(time_t date) : date_(date) {}
+    explicit DateSmallerThan(time_t date) : date_(date) { }
     bool operator()(const Tag &tag) const {
       return tag.timestamp <= date_;
     }
@@ -497,9 +522,10 @@ class MockHistory : public history::History,
   };
 
   struct RollbackPredicate {
-    RollbackPredicate(const Tag &tag, const bool inverse = false) :
-      tag_(tag),
-      inverse_(inverse) {}
+    explicit RollbackPredicate(const Tag &tag, const bool inverse = false)
+      : tag_(tag)
+      , inverse_(inverse)
+    { }
     bool operator()(const Tag &tag) const {
       const bool p = (tag.revision > tag_.revision || tag.name == tag_.name) &&
                       tag.channel == tag_.channel;
@@ -510,7 +536,7 @@ class MockHistory : public history::History,
   };
 
   struct TagRemover {
-    TagRemover(MockHistory *history) : history_(history) {}
+    explicit TagRemover(MockHistory *history) : history_(history) { }
     bool operator()(const Tag &tag) {
       return history_->Remove(tag.name);
     }
@@ -526,9 +552,7 @@ class MockHistory : public history::History,
 };
 
 
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
+//------------------------------------------------------------------------------
 
 
 class MockObjectFetcher;
@@ -545,11 +569,8 @@ struct object_fetcher_traits<MockObjectFetcher> {
 class MockObjectFetcher : public AbstractObjectFetcher<MockObjectFetcher> {
  public:
   manifest::Manifest* FetchManifest();
-
-  bool Fetch(const shash::Any    &object_hash,
-             const shash::Suffix  hash_suffix,
-             std::string         *file_path);
+  bool Fetch(const shash::Any &object_hash, std::string *file_path);
 };
 
 
-#endif /* CVMFS_UNITTEST_TESTUTIL */
+#endif  // TEST_UNITTESTS_TESTUTIL_H_

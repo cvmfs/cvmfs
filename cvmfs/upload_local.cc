@@ -2,18 +2,20 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "upload_local.h"
 
 #include <errno.h>
 
-#include "logging.h"
+#include <string>
+
 #include "compression.h"
+#include "file_processing/char_buffer.h"
+#include "logging.h"
 #include "util.h"
 
-#include "file_processing/char_buffer.h"
 
-using namespace upload;
-
+namespace upload {
 
 LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition) :
   AbstractUploader(spooler_definition),
@@ -21,8 +23,8 @@ LocalUploader::LocalUploader(const SpoolerDefinition &spooler_definition) :
   upstream_path_(spooler_definition.spooler_configuration),
   temporary_path_(spooler_definition.temporary_path)
 {
-  assert (spooler_definition.IsValid() &&
-          spooler_definition.driver_type == SpoolerDefinition::Local);
+  assert(spooler_definition.IsValid() &&
+         spooler_definition.driver_type == SpoolerDefinition::Local);
 
   atomic_init32(&copy_errors_);
 }
@@ -52,29 +54,27 @@ void LocalUploader::WorkerThread() {
                job.callback);
         break;
       case UploadJob::Commit:
-        FinalizeStreamedUpload(job.stream_handle,
-                               job.content_hash,
-                               job.hash_suffix);
+        FinalizeStreamedUpload(job.stream_handle, job.content_hash);
         break;
       case UploadJob::Terminate:
         running = false;
         break;
       default:
         const bool unknown_job_type = false;
-        assert (unknown_job_type);
+        assert(unknown_job_type);
         break;
     }
   }
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Local WorkerThread exited.");
-
 }
 
 
-void LocalUploader::FileUpload(const std::string &local_path,
-                               const std::string &remote_path,
-                               const CallbackTN   *callback) {
-
+void LocalUploader::FileUpload(
+  const std::string &local_path,
+  const std::string &remote_path,
+  const CallbackTN   *callback
+) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "FileUpload call started.");
 
   // create destination in backend storage temporary directory
@@ -117,17 +117,18 @@ int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
   const std::string tmp_path = CreateTempPath(temporary_path_ + "/" + "chunk",
                                               0644);
   if (tmp_path.empty()) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to create temp file for upload of "
-                                      "file chunk (errno: %d).", errno);
+    LogCvmfs(kLogSpooler, kLogStderr,
+             "Failed to create temp file for upload of file chunk (errno: %d).",
+             errno);
     atomic_inc32(&copy_errors_);
     return -1;
   }
 
   const int tmp_fd = open(tmp_path.c_str(), O_WRONLY);
   if (tmp_fd < 0) {
-    LogCvmfs(kLogSpooler, kLogStderr, "Failed to open temp file '%s' for upload "
-                                      "of file chunk (errno: %d)",
-             tmp_path.c_str(), errno);
+    LogCvmfs(kLogSpooler, kLogStderr,
+             "Failed to open temp file '%s' for upload of file chunk "
+             "(errno: %d)", tmp_path.c_str(), errno);
     unlink(tmp_path.c_str());
     atomic_inc32(&copy_errors_);
     return tmp_fd;
@@ -153,7 +154,7 @@ UploadStreamHandle* LocalUploader::InitStreamedUpload(
 void LocalUploader::Upload(UploadStreamHandle  *handle,
                            CharBuffer          *buffer,
                            const CallbackTN    *callback) {
-  assert (buffer->IsInitialized());
+  assert(buffer->IsInitialized());
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
   const size_t bytes_written = write(local_handle->file_descriptor,
@@ -176,8 +177,7 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
 
 
 void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                                           const shash::Any     content_hash,
-                                           const shash::Suffix  hash_suffix) {
+                                           const shash::Any    &content_hash) {
   int retval = 0;
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
@@ -192,20 +192,27 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
     return;
   }
 
-  const std::string final_path =
-                "data" + content_hash.MakePathWithSuffix(1, 2, hash_suffix);
-
-  retval = Move(local_handle->temporary_path.c_str(), final_path.c_str());
-  if (retval != 0) {
-    const int cpy_errno = errno;
-    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move temp file '%s' to "
-                                          "final location '%s' (errno: %d)",
-             local_handle->temporary_path.c_str(),
-             final_path.c_str(),
-             cpy_errno);
-    atomic_inc32(&copy_errors_);
-    Respond(handle->commit_callback, UploaderResults(cpy_errno));
-    return;
+  const std::string final_path = "data/" + content_hash.MakePath();
+  if (!Peek(final_path)) {
+    retval = Move(local_handle->temporary_path, final_path);
+    if (retval != 0) {
+      const int cpy_errno = errno;
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to move temp file '%s' to "
+                                            "final location '%s' (errno: %d)",
+               local_handle->temporary_path.c_str(),
+               final_path.c_str(),
+               cpy_errno);
+      atomic_inc32(&copy_errors_);
+      Respond(handle->commit_callback, UploaderResults(cpy_errno));
+      return;
+    }
+  } else {
+    const int retval = unlink(local_handle->temporary_path.c_str());
+    if (retval != 0) {
+      LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to remove temporary '%s' "
+                                            "(errno: %d)",
+               local_handle->temporary_path.c_str(), errno);
+    }
   }
 
   const CallbackTN *callback = handle->commit_callback;
@@ -251,3 +258,5 @@ int LocalUploader::Move(const std::string &local_path,
 
   return retcode;
 }
+
+}  // namespace upload

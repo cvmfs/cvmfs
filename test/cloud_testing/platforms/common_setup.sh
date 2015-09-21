@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common.sh
@@ -12,9 +12,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #  CONFIG_PACKAGES       location of the CernVM-FS config packages
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
 #  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
-#  TEST_LOGFILE          location of the test logfile to be used
-#  UNITTEST_LOGFILE      location of the unit test logfile to be used
-#  MIGRATIONTEST_LOGFILE location of the migration test logfile to be used
+#  LOG_DIRECTORY         location of the test log files to be created
 #
 
 SERVER_PACKAGE=""
@@ -22,12 +20,10 @@ CLIENT_PACKAGE=""
 UNITTEST_PACKAGE=""
 CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
-TEST_LOGFILE=""
-UNITTEST_LOGFILE=""
-MIGRATIONTEST_LOGFILE=""
+LOG_DIRECTORY=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:k:t:g:l:u:m:" option; do
+while getopts "s:c:k:t:g:l:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
@@ -45,13 +41,7 @@ while getopts "s:c:k:t:g:l:u:m:" option; do
       UNITTEST_PACKAGE=$OPTARG
       ;;
     l)
-      TEST_LOGFILE=$OPTARG
-      ;;
-    u)
-      UNITTEST_LOGFILE=$OPTARG
-      ;;
-    m)
-      MIGRATIONTEST_LOGFILE=$OPTARG
+      LOG_DIRECTORY=$OPTARG
       ;;
     ?)
       shift $(($OPTIND-2))
@@ -66,9 +56,7 @@ if [ "x$SERVER_PACKAGE"        = "x" ] ||
    [ "x$CONFIG_PACKAGES"       = "x" ] ||
    [ "x$SOURCE_DIRECTORY"      = "x" ] ||
    [ "x$UNITTEST_PACKAGE"      = "x" ] ||
-   [ "x$TEST_LOGFILE"          = "x" ] ||
-   [ "x$UNITTEST_LOGFILE"      = "x" ] ||
-   [ "x$MIGRATIONTEST_LOGFILE" = "x" ]; then
+   [ "x$LOG_DIRECTORY"         = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
@@ -78,124 +66,5 @@ if [ $(id --user --name) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
   exit 3
 fi
-
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#
-
-
-rpm_name_string() {
-  local rpm_file=$1
-  echo $(rpm -qp --queryformat '%{NAME}' $rpm_file)
-}
-
-
-deb_name_string() {
-  local deb_file=$1
-  echo $(dpkg --info $deb_file | grep " Package: " | sed 's/ Package: //')
-}
-
-
-check_package_manager_response() {
-  local retcode=$1
-  local pkg_mgr_name="$2"
-  local pkg_mgr_output="$3"
-
-  if [ $retcode -ne 0 ]; then
-    echo "fail"
-    echo "$pkg_mgr_name said:"
-    echo $pkg_mgr_output
-    exit 102
-  else
-    echo "done"
-  fi
-
-  return $retcode
-}
-
-
-install_rpm() {
-  local rpm_files="$1"
-  local yum_output
-
-  for this_rpm in $rpm_files; do
-    local rpm_name=$(rpm_name_string $this_rpm)
-
-    # check if the given rpm is already installed
-    if rpm -q $rpm_name > /dev/null 2>&1; then
-      echo "RPM '$rpm_name' is already installed"
-      exit 101
-    fi
-
-    # install the RPM
-    echo -n "Installing RPM '$rpm_name' ... "
-    yum_output=$(sudo yum -y install --nogpgcheck $this_rpm 2>&1)
-    check_package_manager_response $? "Yum" "$yum_output"
-  done
-}
-
-
-install_deb() {
-  local deb_files="$1"
-  local deb_output
-
-  for this_deb in $deb_files; do
-    local deb_name=$(deb_name_string $this_deb)
-
-    # install DEB package
-    echo -n "Installing DEB package '$deb_name' ... "
-    deb_output=$(sudo gdebi --non-interactive --quiet $this_deb)
-    check_package_manager_response $? "DPKG" "$deb_output"
-  done
-}
-
-
-install_from_repo() {
-  local package_names="$1"
-  local pkg_mgr
-  local pkg_mgr_output
-
-  # find out which package manager to use
-  if which apt-get > /dev/null 2>&1; then
-    pkg_mgr="apt-get"
-  else
-    pkg_mgr="yum"
-  fi
-
-  # install package from repository
-  echo -n "Installing Packages '$package_names' ... "
-  pkg_mgr_output=$(sudo $pkg_mgr -y install $package_names 2>&1)
-  check_package_manager_response $? $pkg_mgr "$pkg_mgr_output"
-}
-
-
-install_ruby_gem() {
-  local gem_name=$1
-  local pkg_mgr_name="gem"
-  local pkg_mgr_output=""
-
-  echo -n "Installing Ruby gem '$gem_name' ... "
-  pkg_mgr_output=$(sudo gem install $gem_name 2>&1)
-  check_package_manager_response $? $pkg_mgr_name "$pkg_mgr_output"
-}
-
-
-attach_user_group() {
-  local groupname=$1
-  local username
-
-  # add the group to the user's list of groups
-  username=$(id --user --name)
-  sudo /usr/sbin/usermod -a -G $groupname $username || return 1
-}
-
-
-set_nofile_limit() {
-  local limit_value=$1
-  echo "*    hard nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
-  echo "*    soft nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
-  echo "root hard nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
-  echo "root soft nofile $limit_value" | sudo tee --append /etc/security/limits.conf > /dev/null
-}
 
 echo "Hostname is $(hostname)"

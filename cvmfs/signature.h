@@ -5,17 +5,17 @@
 #ifndef CVMFS_SIGNATURE_H_
 #define CVMFS_SIGNATURE_H_
 
-#include <string>
-#include <vector>
-#include <cstdio>
-
+#include <openssl/bio.h>
+#include <openssl/engine.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
-#include <openssl/x509.h>
-#include <openssl/err.h>
-#include <openssl/bio.h>
 #include <openssl/rsa.h>
-#include <openssl/engine.h>
+#include <openssl/x509.h>
+
+#include <cstdio>
+#include <string>
+#include <vector>
 
 #include "hash.h"
 

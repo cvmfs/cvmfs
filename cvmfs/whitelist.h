@@ -38,15 +38,13 @@ enum Failures {
   kFailBadCaChain,
   kFailNotListed,
   kFailBlacklisted,
+
+  kFailNumEntries
 };
 
 
 inline const char *Code2Ascii(const Failures error) {
-  const int kNumElems = 15;
-  if (error >= kNumElems)
-    return "no text available (internal error)";
-
-  const char *texts[kNumElems];
+  const char *texts[kFailNumEntries + 1];
   texts[0] = "OK";
   texts[1] = "failed to download whitelist";
   texts[2] = "empty whitelist";
@@ -62,7 +60,7 @@ inline const char *Code2Ascii(const Failures error) {
   texts[12] = "failed to verify CA chain";
   texts[13] = "certificate not on whitelist";
   texts[14] = "certificate blacklisted";
-
+  texts[15] = "no text";
   return texts[error];
 }
 

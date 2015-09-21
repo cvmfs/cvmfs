@@ -19,8 +19,9 @@
 
 #include <string>
 
+class QuotaManager;
 namespace catalog {
-  class AbstractCatalogManager;
+class AbstractCatalogManager;
 }
 
 namespace quota {
@@ -28,9 +29,11 @@ namespace quota {
 struct ListenerHandle;
 
 ListenerHandle *
-RegisterUnpinListener(catalog::AbstractCatalogManager *catalog_manager,
+RegisterUnpinListener(QuotaManager *quota_manager,
+                      catalog::AbstractCatalogManager *catalog_manager,
                       const std::string &repository_name);
-ListenerHandle * RegisterWatchdogListener(const std::string &repository_name);
+ListenerHandle * RegisterWatchdogListener(QuotaManager *quota_manager,
+                                          const std::string &repository_name);
 void UnregisterListener(ListenerHandle *handle);
 
 }  // namespace quota

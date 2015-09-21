@@ -87,7 +87,7 @@ cvmfs_run_test() {
   local logfile=$1
   local script_location=$2
 
-  . ${script_location}/../common.sh
+  . ${script_location}/../../common/migration_tests/common.sh
 
   local src_dir='/cvmfs/sft.cern.ch/lcg/external/experimental'
   local xxl_files_dir='/cvmfs/cernvm-prod.cern.ch'
@@ -131,7 +131,9 @@ cvmfs_run_test() {
   # download upstream package
   current_version=$(package_version $CVMFS_CLIENT_PACKAGE)
   echo "Version of testee:        $current_version"
-  previous_version=$(decrement_version $current_version)
+  # FIX ME: Once 2.2.0 is the "previous version" go back to the decrement_version
+  # previous_version=$(decrement_version $current_version)
+  previous_version="2.1.20"
   echo "Version to be downloaded: $previous_version"
   upstream_package_url=$(guess_package_url "cvmfs" ${previous_version}-1)
   echo "Download URL:             $upstream_package_url"
@@ -145,22 +147,6 @@ cvmfs_run_test() {
     echo "uninstalling CernVM-FS $installed_version"
     uninstall_package "cvmfs" || return 3
   fi
-
-  # uninstall the cvmfs-config package for CernVM-FS and replace it by the
-  # last released cvmfs-keys package (1.5-1)
-  # Note: this will not be needed after CernVM-FS 2.1.20 is released
-  #       furthermore the re-install of cvmfs-config is not needed later on!
-  cvmfs_config_pkgs="$(get_providing_packages cvmfs-config)"
-  echo "Uninstalling $cvmfs_config_pkgs (providing cvmfs-config)"
-  for cvmfs_config_pkg in $cvmfs_config_pkgs; do
-    uninstall_package $cvmfs_config_pkg || return 20
-  done
-
-  local cvmfs_keys_url=$(guess_cvmfs_keys_url "1.5-1")
-  local cvmfs_keys=$(basename $cvmfs_keys_url)
-  echo "Download URL for cvmfs-keys: $cvmfs_keys_url"
-  wget --no-check-certificate --quiet $cvmfs_keys_url || return 21
-  install_packages $cvmfs_keys                        || return 22
 
   # install the upstream CernVM-FS package
   echo "installing CernVM-FS $previous_version"
@@ -210,7 +196,7 @@ cvmfs_run_test() {
   echo "updating CernVM-FS package to version $current_version"
   kill -0 $tar_pid || return 11 # tar finished already >.<
   kill -0 $chksum_pid || return 11 # checksumming finished already >.<
-  install_packages "$CVMFS_CLIENT_PACKAGE $CVMFS_CONFIG_PACKAGES" || return 12 # TODO: revert that after 2.1.20 is released
+  install_packages "$CVMFS_CLIENT_PACKAGE"
   kill -0 $tar_pid || return 13 # tar finished already >.<
   kill -0 $chksum_pid || return 13 # checksumming finished already >.<
 

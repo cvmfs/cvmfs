@@ -9,9 +9,9 @@
 
 #include <cassert>
 
-#include "manifest.h"
-#include "hash.h"
 #include "download.h"
+#include "hash.h"
+#include "manifest.h"
 #include "signature.h"
 #include "util.h"
 #include "whitelist.h"
@@ -97,14 +97,14 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   certificate_hash = ensemble->manifest->certificate();
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {
-    certificate_url += certificate_hash.MakePathExplicit(1, 2) + "X";
+    certificate_url += "/" + certificate_hash.MakePath();
     retval_dl = download_manager->Fetch(&download_certificate);
     if (retval_dl != download::kFailOk) {
       result = kFailLoad;
         goto cleanup;
     }
-    ensemble->cert_buf =
-      reinterpret_cast<unsigned char *>(download_certificate.destination_mem.data);
+    ensemble->cert_buf = reinterpret_cast<unsigned char *>(
+      download_certificate.destination_mem.data);
     ensemble->cert_size = download_certificate.destination_mem.size;
   }
   retval_b = signature_manager->LoadCertificateMem(ensemble->cert_buf,

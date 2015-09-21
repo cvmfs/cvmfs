@@ -6,9 +6,9 @@ gpgcheck=1
 enabled=1
 protect=1
 
-[cernvm-ng]
-name=CernVM-FS 2.1 packages
-baseurl=http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-ng/EL/$releasever/$basearch/
+[cernvm-config]
+name=CernVM-FS extra config packages
+baseurl=http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-config/EL/$releasever/$basearch/
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
 gpgcheck=1
 enabled=0
@@ -23,7 +23,7 @@ enabled=0
 protect=1
 
 [cernvm-kernel]
-name=CernVM-FS AUFS enabled SL6 kernel
+name=CernVM-FS AUFS enabled kernel
 baseurl=http://cvmrepo.web.cern.ch/cvmrepo/yum/cvmfs-kernel/EL/$releasever/$basearch/
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM
 gpgcheck=1

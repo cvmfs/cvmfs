@@ -2,13 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef UPLOAD_FILE_PROCESSING_FILE_PROCESSOR_H_
-#define UPLOAD_FILE_PROCESSING_FILE_PROCESSOR_H_
+#ifndef CVMFS_FILE_PROCESSING_FILE_PROCESSOR_H_
+#define CVMFS_FILE_PROCESSING_FILE_PROCESSOR_H_
+
+#include <string>
 
 #include "../hash.h"
+#include "../upload_spooler_result.h"
 #include "../util.h"
 #include "../util_concurrency.h"
-#include "../upload_spooler_result.h"
 
 namespace upload {
 
@@ -61,7 +63,7 @@ namespace upload {
 class AbstractUploader;
 class IoDispatcher;
 class File;
-class SpoolerDefinition;
+struct SpoolerDefinition;
 
 /**
  * This is the outer most wrapper class that should be used by the Spooler.
@@ -96,6 +98,6 @@ class FileProcessor : public Observable<SpoolerResult> {
   const size_t       maximal_chunk_size_;
 };
 
-}
+}  // namespace upload
 
-#endif /* UPLOAD_FILE_PROCESSING_FILE_PROCESSOR_H_ */
+#endif  // CVMFS_FILE_PROCESSING_FILE_PROCESSOR_H_

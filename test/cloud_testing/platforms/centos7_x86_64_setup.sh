@@ -13,15 +13,15 @@ install_rpm $UNITTEST_PACKAGE
 
 # installing WSGI apache module
 echo "installing python WSGI module..."
-install_from_repo mod_wsgi || die "fail (installing mod_wsgi)"
-sudo service httpd restart || die "fail (restarting apache)"
+install_from_repo mod_wsgi   || die "fail (installing mod_wsgi)"
+sudo systemctl restart httpd || die "fail (restarting apache)"
 
 # setup environment
 echo -n "setting up CernVM-FS environment..."
 sudo cvmfs_config setup                          || die "fail (cvmfs_config setup)"
 sudo mkdir -p /var/log/cvmfs-test                || die "fail (mkdir /var/log/cvmfs-test)"
 sudo chown sftnight:sftnight /var/log/cvmfs-test || die "fail (chown /var/log/cvmfs-test)"
-sudo service autofs start                        || die "fail (service autofs start)"
+sudo systemctl start autofs                      || die "fail (systemctl start autofs)"
 sudo cvmfs_config chksetup > /dev/null           || die "fail (cvmfs_config chksetup)"
 echo "done"
 
@@ -31,6 +31,7 @@ install_from_repo gcc
 install_from_repo gcc-c++
 install_from_repo rubygems
 install_from_repo wget
+install_from_repo redhat-lsb-core
 
 # install ruby gem for FakeS3
 install_ruby_gem fakes3

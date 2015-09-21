@@ -7,8 +7,8 @@
 #ifndef CVMFS_BIGVECTOR_H_
 #define CVMFS_BIGVECTOR_H_
 
-#include <cstdlib>
 #include <cassert>
+#include <cstdlib>
 
 #include "smalloc.h"
 
@@ -99,6 +99,7 @@ class BigVector {
 
   size_t size() const { return size_; }
   size_t capacity() const { return capacity_; }
+
  private:
   static const size_t kNumInit = 16;
   static const size_t kMmapThreshold = 128*1024;

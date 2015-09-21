@@ -32,10 +32,10 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <map>
 #include <set>
 #include <string>
@@ -82,6 +82,22 @@ const signed char db64_table[] =
   };
 
 static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+namespace {
+
+/**
+ * Used for cas  insensitive HasSuffix
+ */
+struct IgnoreCaseComperator {
+  IgnoreCaseComperator() { }
+  bool operator() (const std::string::value_type a,
+                   const std::string::value_type b) const
+  {
+    return std::tolower(a) == std::tolower(b);
+  }
+};
+
+}  // anonymous namespace
 
 /**
  * Removes a trailing "/" from a path.
@@ -158,7 +174,7 @@ NameString GetFileName(const PathString &path) {
 
 
 bool IsAbsolutePath(const std::string &path) {
-  return (! path.empty() && path[0] == '/');
+  return (!path.empty() && path[0] == '/');
 }
 
 
@@ -245,7 +261,7 @@ int ConnectSocket(const string &path) {
   if (connect(socket_fd, (struct sockaddr *)&sock_addr,
               sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
-    //LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
+    // LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
     close(socket_fd);
     return -1;
   }
@@ -574,6 +590,28 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
 
 
 /**
+ * Create a directory with a unique name.
+ */
+string CreateTempDir(const std::string &path_prefix) {
+  string dir = path_prefix + ".XXXXXX";
+  char *tmp_dir = strdupa(dir.c_str());
+  tmp_dir = mkdtemp(tmp_dir);
+  if (tmp_dir == NULL)
+    return "";
+  return string(tmp_dir);
+}
+
+
+/**
+ * Get the current working directory of the running process
+ */
+std::string GetCurrentWorkingDirectory() {
+  char cwd[PATH_MAX];
+  return (getcwd(cwd, sizeof(cwd)) != NULL) ? std::string(cwd) : std::string();
+}
+
+
+/**
  * Helper class that provides callback funtions for the file system traversal.
  */
 class RemoveTreeHelper {
@@ -611,6 +649,7 @@ bool RemoveTree(const string &path) {
                                                   true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_socket = &RemoveTreeHelper::RemoveFile;
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
   traversal.Recurse(path);
   bool result = remove_tree_helper->success;
@@ -648,8 +687,10 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
  * Name -> UID from passwd database
  */
 bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
-  struct passwd *result;
-  result = getpwnam(username.c_str());
+  char buf[16*1024];
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  getpwnam_r(username.c_str(), &pwd, buf, sizeof(buf), &result);
   if (result == NULL)
     return false;
   *uid = result->pw_uid;
@@ -662,8 +703,10 @@ bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
  * Name -> GID from groups database
  */
 bool GetGidOf(const std::string &groupname, gid_t *gid) {
+  char buf[16*1024];
+  struct group grp;
   struct group *result;
-  result = getgrnam(groupname.c_str());
+  getgrnam_r(groupname.c_str(), &grp, buf, sizeof(buf), &result);
   if (result == NULL)
     return false;
   *gid = result->gr_gid;
@@ -758,26 +801,27 @@ string StringifyTime(const time_t seconds, const bool utc) {
 }
 
 
-  /**
-   * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
-   */
-  std::string RfcTimestamp() {
-    const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
-			    "Aug", "Sep", "Oct", "Nov", "Dec"};
-    const char *day_of_week[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+/**
+ * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
+ */
+std::string RfcTimestamp() {
+  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
+    "Aug", "Sep", "Oct", "Nov", "Dec"};
+  const char *day_of_week[] =
+    {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
-    struct tm timestamp;
-    time_t now = time(NULL);
-    gmtime_r(&now, &timestamp);
+  struct tm timestamp;
+  time_t now = time(NULL);
+  gmtime_r(&now, &timestamp);
 
-    char buffer[30];
-    snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
-	     day_of_week[timestamp.tm_wday], timestamp.tm_mday,
-	     months[timestamp.tm_mon], timestamp.tm_year + 1900,
-	     timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
-	     timestamp.tm_zone);
-    return string(buffer);
-  }
+  char buffer[30];
+  snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
+    day_of_week[timestamp.tm_wday], timestamp.tm_mday,
+    months[timestamp.tm_mon], timestamp.tm_year + 1900,
+    timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
+    timestamp.tm_zone);
+  return string(buffer);
+}
 
 string StringifyTimeval(const timeval value) {
   char buffer[64];
@@ -786,13 +830,6 @@ string StringifyTimeval(const timeval value) {
   snprintf(buffer, sizeof(buffer), "%"PRId64".%03d",
            msec, static_cast<int>(value.tv_usec % 1000));
   return string(buffer);
-}
-
-
-string StringifyIpv4(const uint32_t ip4_address) {
-  struct in_addr in_addr;
-  in_addr.s_addr = ip4_address;
-  return string(inet_ntoa(in_addr));
 }
 
 
@@ -842,21 +879,6 @@ uint64_t String2Uint64(const string &value) {
 }
 
 
-uint64_t HexString2Uint64(const string &value) {
-  uint64_t result;
-  sscanf(value.c_str(), "%"PRIx64, &result);
-  return result;
-}
-
-
-int HexDigit2Int(const char digit) {
-  if ((digit >= '0') && (digit <= '9')) return digit - '0';
-  if ((digit >= 'A') && (digit <= 'F')) return 10 + digit - 'A';
-  if ((digit >= 'a') && (digit <= 'f')) return 10 + digit - 'a';
-  return -1;
-}
-
-
 void String2Uint64Pair(const string &value, uint64_t *a, uint64_t *b) {
   sscanf(value.c_str(), "%"PRIu64" %"PRIu64, a, b);
 }
@@ -881,12 +903,16 @@ bool HasPrefix(const string &str, const string &prefix,
 }
 
 
-bool IsNumeric(const std::string &str) {
-  for (unsigned i = 0; i < str.length(); ++i) {
-    if ((str[i] < '0') || (str[i] > '9'))
-      return false;
-  }
-  return true;
+bool HasSuffix(
+  const std::string &str,
+  const std::string &suffix,
+  const bool ignore_case)
+{
+  if (suffix.size() > str.size()) return false;
+  const IgnoreCaseComperator icmp;
+  return (ignore_case)
+    ? std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(), icmp)
+    : std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
 }
 
 
@@ -1079,6 +1105,9 @@ string ReplaceAll(const string &haystack, const string &needle,
   string result(haystack);
   size_t pos = 0;
   const unsigned needle_size = needle.size();
+  if (needle == "")
+    return result;
+
   while ((pos = result.find(needle, pos)) != string::npos)
     result.replace(pos, needle_size, replace_by);
   return result;
@@ -1146,14 +1175,15 @@ void Daemonize() {
 }
 
 
-bool ExecuteBinary(      int                       *fd_stdin,
-                         int                       *fd_stdout,
-                         int                       *fd_stderr,
-                   const std::string               &binary_path,
-                   const std::vector<std::string>  &argv,
-                   const bool                       double_fork,
-                         pid_t                     *child_pid)
-{
+bool ExecuteBinary(
+  int *fd_stdin,
+  int *fd_stdout,
+  int *fd_stderr,
+  const std::string &binary_path,
+  const std::vector<std::string> &argv,
+  const bool double_fork,
+  pid_t *child_pid
+) {
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -1206,7 +1236,7 @@ bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
                        vector<string>(), double_fork);
 }
 
-struct ForkFailures { // TODO: C++11 (type safe enum)
+struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
   enum Names {
     kSendPid,
     kUnknown,
@@ -1354,7 +1384,7 @@ bool ManagedExec(const vector<string>  &command_line,
   assert(retcode);
   if (status_code != ForkFailures::kSendPid) {
     close(pipe_fork.read_end);
-    LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%s)",
+    LogCvmfs(kLogCvmfs, kLogDebug, "managed execve failed (%s)",
              ForkFailures::ToString(status_code).c_str());
     return false;
   }
@@ -1369,14 +1399,16 @@ bool ManagedExec(const vector<string>  &command_line,
   close(pipe_fork.read_end);
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
            command_line[0].c_str(),
-           (int)buf_child_pid);
+           static_cast<int>(buf_child_pid));
   return true;
 }
 
+
 // -----------------------------------------------------------------------------
 
+
 void StopWatch::Start() {
-  assert (!running_);
+  assert(!running_);
 
   gettimeofday(&start_, NULL);
   running_ = true;
@@ -1384,7 +1416,7 @@ void StopWatch::Start() {
 
 
 void StopWatch::Stop() {
-  assert (running_);
+  assert(running_);
 
   gettimeofday(&end_, NULL);
   running_ = false;
@@ -1399,7 +1431,7 @@ void StopWatch::Reset() {
 
 
 double StopWatch::GetTime() const {
-  assert (!running_);
+  assert(!running_);
 
   return DiffTimeSeconds(start_, end_);
 }
@@ -1516,7 +1548,7 @@ MemoryMappedFile::~MemoryMappedFile() {
 }
 
 bool MemoryMappedFile::Map() {
-  assert (!mapped_);
+  assert(!mapped_);
 
   // open the file
   int fd;
@@ -1562,7 +1594,7 @@ bool MemoryMappedFile::Map() {
 }
 
 void MemoryMappedFile::Unmap() {
-  assert (mapped_);
+  assert(mapped_);
 
   if (mapped_file_ == NULL) {
     return;
@@ -1574,7 +1606,7 @@ void MemoryMappedFile::Unmap() {
   {
     LogCvmfs(kLogUtility, kLogStderr, "failed to unmap %s", file_path_.c_str());
     const bool munmap_failed = false;
-    assert (munmap_failed);
+    assert(munmap_failed);
   }
 
   // reset (resettable) data
@@ -1585,7 +1617,6 @@ void MemoryMappedFile::Unmap() {
   LogCvmfs(kLogUtility, kLogVerboseMsg, "munmap'ed %s", file_path_.c_str());
 }
 
-
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif

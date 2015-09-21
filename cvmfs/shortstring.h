@@ -6,13 +6,12 @@
  * path names that are usually small.
  */
 
-#ifndef SHORTSTRING_H_
-#define SHORTSTRING_H_
+#ifndef CVMFS_SHORTSTRING_H_
+#define CVMFS_SHORTSTRING_H_
 
-#include <cstring>
-
-#include <string>
 #include <algorithm>
+#include <cstring>
+#include <string>
 
 #include "atomic.h"
 
@@ -119,7 +118,7 @@ class ShortString {
     if (long_string_)
       return long_string_->c_str();
 
-    char *c = (char *)stack_ + length_;
+    char *c = const_cast<char *>(stack_) + length_;
     *c = '\0';
     return stack_;
   }
@@ -197,7 +196,7 @@ template<unsigned char StackSize, char Type>
 atomic_int64 ShortString<StackSize, Type>::num_instances_ = 0;
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
-#endif  // SHORTSTRING_H_
+#endif  // CVMFS_SHORTSTRING_H_

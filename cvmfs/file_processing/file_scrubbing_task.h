@@ -1,11 +1,17 @@
-#ifndef UPLOAD_FILE_PROCESSING_FILE_SCRUBBING_TASK_H
-#define UPLOAD_FILE_PROCESSING_FILE_SCRUBBING_TASK_H
+/**
+ * This file is part of the CernVM File System.
+ */
+
+#ifndef CVMFS_FILE_PROCESSING_FILE_SCRUBBING_TASK_H_
+#define CVMFS_FILE_PROCESSING_FILE_SCRUBBING_TASK_H_
 
 #include <tbb/task.h>
 
+#include <string>
+
 #include "async_reader.h"
 
-namespace upload { // TODO: remove or replace
+namespace upload {  // TODO(rmeusel): remove or replace
 
 class CharBuffer;
 
@@ -68,14 +74,20 @@ class AbstractFileScrubbingTask : public tbb::task {
   }
 
  private:
-  FileT          *file_;    ///< the associated file that is to be processed
-  CharBuffer     *buffer_;  ///< the CharBuffer containing the current data Block
-  AbstractReader *reader_;  ///< the Reader that is responsible for the given data Block
-  const bool      is_last_; ///< defines if we have the last piece
-  tbb::task      *next_;    ///< the next FileScrubbingTask
-                            ///< (if NULL, no more data will come after this FileScrubbingTask)
+  FileT *file_;  ///< the associated file that is to be processed
+  CharBuffer *buffer_;  ///< the CharBuffer containing the current data Block
+  /**
+   * The Reader that is responsible for the given data Block
+   */
+  AbstractReader *reader_;
+  const bool is_last_;  ///< defines if we have the last piece
+  /**
+   * The next FileScrubbingTask (if NULL, no more data will come after this
+   * FileScrubbingTask)
+   */
+  tbb::task *next_;
 };
 
-}
+}  // namespace upload
 
-#endif /* UPLOAD_FILE_PROCESSING_FILE_SCRUBBING_TASK_H */
+#endif  // CVMFS_FILE_PROCESSING_FILE_SCRUBBING_TASK_H_

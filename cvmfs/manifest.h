@@ -6,8 +6,10 @@
 #define CVMFS_MANIFEST_H_
 
 #include <stdint.h>
-#include <string>
+
 #include <map>
+#include <string>
+
 #include "hash.h"
 #include "history.h"
 
@@ -45,11 +47,15 @@ class Manifest {
     certificate_(certificate),
     history_(history),
     publish_timestamp_(publish_timestamp),
-    garbage_collectable_(garbage_collectable) { };
+    garbage_collectable_(garbage_collectable) { }
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
   bool ExportChecksum(const std::string &directory, const int mode) const;
+  static bool ReadChecksum(const std::string &repo_name,
+                           const std::string &directory,
+                           shash::Any *hash,
+                           uint64_t *last_modified);
 
   shash::Algorithms GetHashAlgorithm() const { return catalog_hash_.algorithm; }
 
@@ -86,6 +92,7 @@ class Manifest {
   shash::Any history() const { return history_; }
   uint64_t publish_timestamp() const { return publish_timestamp_; }
   bool garbage_collectable() const { return garbage_collectable_; }
+
  private:
   static Manifest *Load(const std::map<char, std::string> &content);
   shash::Any catalog_hash_;

@@ -2,16 +2,17 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_UPLOAD_FACILITY_
-#define CVMFS_UPLOAD_FACILITY_
+#ifndef CVMFS_UPLOAD_FACILITY_H_
+#define CVMFS_UPLOAD_FACILITY_H_
 
-#include <tbb/tbb_thread.h>
 #include <tbb/concurrent_queue.h>
+#include <tbb/tbb_thread.h>
 
-#include "util.h"
-#include "util_concurrency.h"
+#include <string>
 
 #include "upload_spooler_definition.h"
+#include "util.h"
+#include "util_concurrency.h"
 
 namespace upload {
 
@@ -36,7 +37,7 @@ struct UploaderResults {
     local_path(""),
     buffer(buffer) {}
 
-  UploaderResults(const int return_code) :
+  explicit UploaderResults(const int return_code) :
     type(kChunkCommit),
     return_code(return_code),
     local_path(""),
@@ -80,18 +81,15 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
     UploadJob(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
               const CallbackTN    *callback = NULL) :
-      type(Upload), stream_handle(handle), buffer(buffer), callback(callback),
-      hash_suffix(shash::kSuffixNone) {}
+      type(Upload), stream_handle(handle), buffer(buffer), callback(callback) {}
 
-    UploadJob(UploadStreamHandle   *handle,
-              const shash::Any     &content_hash,
-              const shash::Suffix  &hash_suffix) :
+    UploadJob(UploadStreamHandle  *handle,
+              const shash::Any    &content_hash) :
       type(Commit), stream_handle(handle), buffer(NULL), callback(NULL),
-      content_hash(content_hash), hash_suffix(hash_suffix) {}
+      content_hash(content_hash) {}
 
     UploadJob() :
-      type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL),
-      hash_suffix(shash::kSuffixNone) {}
+      type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL) {}
 
     Type                 type;
     UploadStreamHandle  *stream_handle;
@@ -102,12 +100,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
     // type=Commit specific fields
     shash::Any           content_hash;
-    shash::Suffix        hash_suffix;
   };
 
  public:
   virtual ~AbstractUploader() {
-    assert (torn_down_ && "Call AbstractUploader::TearDown() before dtor!");
+    assert(torn_down_ && "Call AbstractUploader::TearDown() before dtor!");
   }
 
   /**
@@ -192,13 +189,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *
    * @param handle        Pointer to a previously acquired UploadStreamHandle
    * @param content_hash  the content hash of the full uploaded data Chunk
-   * @param hash_suffix   the suffix string to be appended to the content hash
    */
   void ScheduleCommit(UploadStreamHandle   *handle,
-                      const shash::Any     &content_hash,
-                      const shash::Suffix  &hash_suffix) {
+                      const shash::Any     &content_hash) {
     ++jobs_in_flight_;
-    upload_queue_.push(UploadJob(handle, content_hash, hash_suffix));
+    upload_queue_.push(UploadJob(handle, content_hash));
   }
 
 
@@ -226,7 +221,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *                        object is a successful deletion as well!)
    */
   virtual bool Remove(const shash::Any &hash_to_delete) {
-    return Remove(hash_to_delete.MakePathWithSuffix("data"));
+    return Remove("data/" + hash_to_delete.MakePath());
   }
 
 
@@ -254,7 +249,7 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
 
  protected:
-  AbstractUploader(const SpoolerDefinition& spooler_definition);
+  explicit AbstractUploader(const SpoolerDefinition& spooler_definition);
 
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
@@ -306,8 +301,8 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    * @param job_slot   a reference for an UploadJob slot to be pulled
    * @return           true if a job was successfully popped
    */
-  bool TryToAcquireNewJob(UploadJob &job_slot) {
-    return upload_queue_.try_pop(job_slot);
+  bool TryToAcquireNewJob(UploadJob *job_slot) {
+    return upload_queue_.try_pop(*job_slot);
   }
 
 
@@ -362,14 +357,13 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 struct UploadStreamHandle {
   typedef AbstractUploader::CallbackTN CallbackTN;
 
-  UploadStreamHandle(const CallbackTN *commit_callback) :
+  explicit UploadStreamHandle(const CallbackTN *commit_callback) :
     commit_callback(commit_callback) {}
   virtual ~UploadStreamHandle() {}
 
   const CallbackTN *commit_callback;
 };
 
+}  // namespace upload
 
-}
-
-#endif /* CVMFS_UPLOAD_FACILITY_ */
+#endif  // CVMFS_UPLOAD_FACILITY_H_

@@ -7,8 +7,8 @@
 #include "sync_union.h"
 
 #include <alloca.h>
-#include <unistd.h>
 #include <errno.h>
+#include <unistd.h>
 
 // lgetxattr is only required for overlayfs which does not exist on OS X
 #ifdef __APPLE__
@@ -17,12 +17,12 @@
 #include <attr/xattr.h>
 #endif
 
-#include "platform.h"
-#include "util.h"
 #include "fs_traversal.h"
-#include "sync_item.h"
 #include "logging.h"
+#include "platform.h"
+#include "sync_item.h"
 #include "sync_mediator.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -46,18 +46,18 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
-  SyncItem entry(parent_dir, dir_name, kItemDir, this);
+  SyncItem entry(parent_dir, dir_name, this, kItemDir);
 
   if (entry.IsNew()) {
     mediator_->Add(entry);
     // Recursion stops here. All content of new directory
     // is added later by the SyncMediator
     return false;
-  } else { // directory already existed...
-    if (entry.IsOpaqueDirectory()) { // was directory completely overwritten?
+  } else {  // directory already existed...
+    if (entry.IsOpaqueDirectory()) {  // was directory completely overwritten?
       mediator_->Replace(entry);
-      return false; // <-- replace does not need any further recursion
-    } else { // directory was just changed internally... only touch needed
+      return false;  // <-- replace does not need any further recursion
+    } else {  // directory was just changed internally... only touch needed
       mediator_->Touch(entry);
       return true;
     }
@@ -70,8 +70,8 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, kItemFile, this);
-  ProcessFile(entry);
+  SyncItem entry(parent_dir, filename, this, kItemFile);
+  ProcessFile(&entry);
 }
 
 
@@ -80,33 +80,33 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
-  SyncItem entry(parent_dir, link_name, kItemSymlink, this);
-  ProcessFile(entry);
+  SyncItem entry(parent_dir, link_name, this, kItemSymlink);
+  ProcessFile(&entry);
 }
 
 
-void SyncUnion::ProcessFile(SyncItem &entry) {
+void SyncUnion::ProcessFile(SyncItem *entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
-           entry.filename().c_str());
+           entry->filename().c_str());
   // Process whiteout prefix
-  if (IsWhiteoutEntry(entry)) {
-    string actual_filename = UnwindWhiteoutFilename(entry.filename());
+  if (IsWhiteoutEntry(*entry)) {
+    string actual_filename = UnwindWhiteoutFilename(entry->filename());
     LogCvmfs(kLogUnionFs, kLogVerboseMsg,
              "processing file [%s] as whiteout of [%s] (remove)",
-             entry.filename().c_str(), actual_filename.c_str());
-    entry.MarkAsWhiteout(actual_filename);
-    mediator_->Remove(entry);
+             entry->filename().c_str(), actual_filename.c_str());
+    entry->MarkAsWhiteout(actual_filename);
+    mediator_->Remove(*entry);
   } else {
     // Process normal file
-    if (entry.IsNew()) {
+    if (entry->IsNew()) {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg, "processing file [%s] as new (add)",
-               entry.filename().c_str());
-      mediator_->Add(entry);
+               entry->filename().c_str());
+      mediator_->Add(*entry);
     } else {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg,
                "processing file [%s] as existing (touch)",
-               entry.filename().c_str());
-      mediator_->Touch(entry);
+               entry->filename().c_str());
+      mediator_->Touch(*entry);
     }
   }
 }
@@ -115,7 +115,7 @@ void SyncUnion::ProcessFile(SyncItem &entry) {
 void SyncUnion::EnterDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, kItemDir, this);
+  SyncItem entry(parent_dir, dir_name, this, kItemDir);
   mediator_->EnterDirectory(entry);
 }
 
@@ -123,7 +123,7 @@ void SyncUnion::EnterDirectory(const string &parent_dir,
 void SyncUnion::LeaveDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, kItemDir, this);
+  SyncItem entry(parent_dir, dir_name, this, kItemDir);
   mediator_->LeaveDirectory(entry);
 }
 
@@ -199,22 +199,22 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
 }
 
 
-void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
+void SyncUnionOverlayfs::ProcessFile(SyncItem *entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessFile(%s)",
-           entry.filename().c_str());
+           entry->filename().c_str());
 
   // If lower-level file exists and has multiple hard links, warn user
-  if (!entry.IsNew() && entry.GetRdOnlyLinkcount() > 1) {
+  if (!entry->IsNew() && entry->GetRdOnlyLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogVerboseMsg, "OverlayFS have copied-up file %s "
              "with existing hardlinks in lowerdir.",
-             entry.GetUnionPath().c_str());
+             entry->GetUnionPath().c_str());
 
-    hardlink_lower_inode_ = entry.GetRdOnlyInode();
+    hardlink_lower_inode_ = entry->GetRdOnlyInode();
     hardlink_lower_files_.clear();
 
-    string rdonly_parent_dir = GetParentPath(entry.GetRdOnlyPath());
-    string scratch_parent_dir = GetParentPath(entry.GetScratchPath());
-    string union_parent_dir = GetParentPath(entry.GetUnionPath());
+    string rdonly_parent_dir = GetParentPath(entry->GetRdOnlyPath());
+    string scratch_parent_dir = GetParentPath(entry->GetScratchPath());
+    string union_parent_dir = GetParentPath(entry->GetUnionPath());
 
     // Find all hardlinks in lowerdir corresponding to this entry
     // (only check this dir since we don't allow cross-dir hardlinks in CVMFS)
@@ -226,20 +226,20 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
 
     // Should now have hardlink_lower_files_ populated with the files
     // in this hardlink group
-    if (hardlink_lower_files_.size() != entry.GetRdOnlyLinkcount()) {
+    if (hardlink_lower_files_.size() != entry->GetRdOnlyLinkcount()) {
       LogCvmfs(kLogUnionFs, kLogWarning, "Found %u entries in hardlink group "
                "for %s in overlayfs lowerdir directory %s, "
                "was expecting %u (do the hardlinks span directories?)",
                hardlink_lower_files_.size(),
-               entry.GetRdOnlyPath().c_str(),
+               entry->GetRdOnlyPath().c_str(),
                rdonly_parent_dir.c_str(),
-               entry.GetRdOnlyLinkcount());
+               entry->GetRdOnlyLinkcount());
     } else {
       LogCvmfs(kLogUnionFs, kLogDebug, "Found %u entries in hardlink group "
                "for %s in overlayfs lowerdir directory %s, as expected.",
                hardlink_lower_files_.size(),
-               entry.GetRdOnlyPath().c_str(),
-               GetParentPath(entry.GetRdOnlyPath()).c_str());
+               entry->GetRdOnlyPath().c_str(),
+               GetParentPath(entry->GetRdOnlyPath()).c_str());
       // have the expected number of entries in the hardlink group,
       // check if they are all present in the scratch layer (upperdir)
       for (set<string>::iterator i = hardlink_lower_files_.begin(),
@@ -273,23 +273,22 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
   "find %s -inum %"PRIu64"\n"
   "\n"
   "To restore all hardlinks in this group, try something like:\n"
-  "for file in $(find %s -inum %"PRIu64"); do rm ${file} && ln %s ${file}; done\n"
-  "\n"
+  "for file in $(find %s -inum %"PRIu64"); do rm ${file} && ln %s ${file}; done"
+  "\n\n"
   "Once you have corrected the issue, run `cvmfs_server publish` again\n",
                      filename.c_str(),
-                     entry.GetUnionPath().c_str(),
-                     entry.GetRdOnlyInode(),
+                     entry->GetUnionPath().c_str(),
+                     entry->GetRdOnlyInode(),
                      union_path.c_str(),
-                     entry.GetUnionPath().c_str(), union_path.c_str(),
-                     union_parent_dir.c_str(), entry.GetRdOnlyInode(),
-                     union_parent_dir.c_str(), entry.GetRdOnlyInode(),
-                     entry.GetUnionPath().c_str()
-            );  // LogCvmfs
+                     entry->GetUnionPath().c_str(), union_path.c_str(),
+                     union_parent_dir.c_str(), entry->GetRdOnlyInode(),
+                     union_parent_dir.c_str(), entry->GetRdOnlyInode(),
+                     entry->GetUnionPath().c_str());  // LogCvmfs
             abort();
           }  // error == ENOENT
-        }  //platform_lstat < 0
+        }  // platform_lstat < 0
       }  // for hardlink_lower_files_
-    }  // hardlink_lower_files_.size() == entry.GetRdOnlyLinkcount()
+    }  // hardlink_lower_files_.size() == entry->GetRdOnlyLinkcount()
   }  // Is hardlink
 
   SyncUnion::ProcessFile(entry);
@@ -302,7 +301,7 @@ void SyncUnionOverlayfs::ProcessFileHardlinkCallback(const string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessFileHardlinkCallback(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, kItemFile, this);
+  SyncItem entry(parent_dir, filename, this, kItemFile);
   if (entry.GetRdOnlyLinkcount() > 1) {
     if (hardlink_lower_inode_ == entry.GetRdOnlyInode()) {
       LogCvmfs(kLogUnionFs, kLogDebug,
@@ -446,4 +445,4 @@ bool SyncUnionOverlayfs::IgnoreFilePredicate(const string &parent_dir,
   return false;
 }
 
-}  // namespace sync
+}  // namespace publish

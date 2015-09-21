@@ -5,16 +5,18 @@
 #ifndef CVMFS_COMPRESSION_H_
 #define CVMFS_COMPRESSION_H_
 
-#include <stdio.h>
-#include <stdint.h>
 #include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
 
 #include <string>
 
 #include "duplex_zlib.h"
+#include "sink.h"
 
 namespace shash {
-  struct Any;
+struct Any;
+class ContextPtr;
 }
 
 bool CopyPath2Path(const std::string &src, const std::string &dest);
@@ -34,13 +36,19 @@ enum StreamStates {
   kStreamEnd,
 };
 
+
 void CompressInit(z_stream *strm);
 void DecompressInit(z_stream *strm);
 void CompressFini(z_stream *strm);
 void DecompressFini(z_stream *strm);
 
-StreamStates DecompressZStream2File(z_stream *strm, FILE *f, const void *buf,
-                                    const int64_t size);
+StreamStates CompressZStream2Null(
+  const void *buf, const int64_t size, const bool eof,
+  z_stream *strm, shash::ContextPtr *hash_context);
+StreamStates DecompressZStream2File(const void *buf, const int64_t size,
+                                    z_stream *strm, FILE *f);
+StreamStates DecompressZStream2Sink(const void *buf, const int64_t size,
+                                    z_stream *strm, cvmfs::Sink *sink);
 
 bool CompressPath2Path(const std::string &src, const std::string &dest);
 bool CompressPath2Path(const std::string &src, const std::string &dest,

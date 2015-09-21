@@ -2,10 +2,12 @@
  * This file is part of the CernVM File System.
  */
 
+#ifndef CVMFS_UTIL_CONCURRENCY_IMPL_H_
+#define CVMFS_UTIL_CONCURRENCY_IMPL_H_
+
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
-
 
 //
 // +----------------------------------------------------------------------------
@@ -17,7 +19,7 @@ template <typename T>
 Future<T>::Future() : object_(), object_was_set_(false) {
   const bool init_successful = (pthread_mutex_init(&mutex_, NULL)     == 0   &&
                                 pthread_cond_init(&object_set_, NULL) == 0);
-  assert (init_successful);
+  assert(init_successful);
 }
 
 
@@ -31,7 +33,7 @@ Future<T>::~Future() {
 template <typename T>
 void Future<T>::Set(const T &object) {
   MutexLockGuard guard(mutex_);
-  assert (!object_was_set_);
+  assert(!object_was_set_);
   object_         = object;
   object_was_set_ = true;
   pthread_cond_broadcast(&object_set_);
@@ -44,7 +46,7 @@ void Future<T>::Wait() const {
   if (!object_was_set_) {
     pthread_cond_wait(&object_set_, &mutex_);
   }
-  assert (object_was_set_);
+  assert(object_was_set_);
 }
 
 
@@ -71,8 +73,8 @@ const T& Future<T>::Get() const {
 template <typename T>
 void SynchronizingCounter<T>::SetValueUnprotected(const T new_value) {
   // make sure that 0 <= new_value <= maximal_value_ if maximal_value_ != 0
-  assert ( ! HasMaximalValue() ||
-          (new_value >= T(0) && new_value <= maximal_value_));
+  assert(!HasMaximalValue() ||
+         (new_value >= T(0) && new_value <= maximal_value_));
 
   value_ = new_value;
 
@@ -91,7 +93,7 @@ void SynchronizingCounter<T>::WaitForFreeSlotUnprotected() {
   while (HasMaximalValue() && value_ >= maximal_value_) {
     pthread_cond_wait(&free_slot_, &mutex_);
   }
-  assert (! HasMaximalValue() || value_ < maximal_value_);
+  assert(!HasMaximalValue() || value_ < maximal_value_);
 }
 
 
@@ -99,18 +101,17 @@ template <typename T>
 void SynchronizingCounter<T>::Initialize() {
   const bool init_successful = (
     pthread_mutex_init(&mutex_,       NULL) == 0 &&
-    pthread_cond_init (&became_zero_, NULL) == 0 &&
-    pthread_cond_init (&free_slot_,   NULL) == 0
-  );
-  assert (init_successful);
+    pthread_cond_init(&became_zero_, NULL) == 0 &&
+    pthread_cond_init(&free_slot_,   NULL) == 0);
+  assert(init_successful);
 }
 
 
 template <typename T>
 void SynchronizingCounter<T>::Destroy() {
   pthread_mutex_destroy(&mutex_);
-  pthread_cond_destroy (&became_zero_);
-  pthread_cond_destroy (&free_slot_);
+  pthread_cond_destroy(&became_zero_);
+  pthread_cond_destroy(&free_slot_);
 }
 
 
@@ -123,7 +124,7 @@ void SynchronizingCounter<T>::Destroy() {
 template <typename ParamT>
 Observable<ParamT>::Observable() {
   const int ret = pthread_rwlock_init(&listeners_rw_lock_, NULL);
-  assert (ret == 0);
+  assert(ret == 0);
 }
 
 
@@ -190,7 +191,7 @@ void Observable<ParamT>::UnregisterListener(
   // if it is not registered --> crash
   WriteLockGuard guard(listeners_rw_lock_);
   const size_t was_removed = listeners_.erase(callback_object);
-  assert (was_removed > 0);
+  assert(was_removed > 0);
   delete callback_object;
 }
 
@@ -234,16 +235,15 @@ FifoChannel<T>::FifoChannel(const size_t maximal_length,
   maximal_queue_length_(maximal_length),
   queue_drainout_threshold_(drainout_threshold)
 {
-  assert (drainout_threshold <= maximal_length);
-  assert (drainout_threshold >  0);
+  assert(drainout_threshold <= maximal_length);
+  assert(drainout_threshold >  0);
 
   const bool successful = (
     pthread_mutex_init(&mutex_, NULL)              == 0 &&
     pthread_cond_init(&queue_is_not_empty_, NULL)  == 0 &&
-    pthread_cond_init(&queue_is_not_full_, NULL)   == 0
-  );
+    pthread_cond_init(&queue_is_not_full_, NULL)   == 0);
 
-  assert (successful);
+  assert(successful);
 }
 
 
@@ -350,8 +350,8 @@ ConcurrentWorkers<WorkerT>::ConcurrentWorkers(
   jobs_queue_(maximal_queue_length, maximal_queue_length / 4 + 1),
   results_queue_(maximal_queue_length, 1)
 {
-  assert (maximal_queue_length  >= number_of_workers);
-  assert (number_of_workers     >  0);
+  assert(maximal_queue_length >= number_of_workers);
+  assert(number_of_workers >  0);
 
   atomic_init32(&jobs_pending_);
   atomic_init32(&jobs_failed_);
@@ -405,7 +405,7 @@ bool ConcurrentWorkers<WorkerT>::Initialize() {
 
 template <class WorkerT>
 bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
-  assert (worker_threads_.size() == 0);
+  assert(worker_threads_.size() == 0);
   worker_threads_.resize(number_of_workers_);
 
   // set the running flag to trap workers in their treadmills
@@ -417,10 +417,11 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
   WorkerThreads::const_iterator iend = worker_threads_.end();
   for (; i != iend; ++i) {
     pthread_t* thread = &(*i);
-    const int retval = pthread_create(thread,
-                                      NULL,
-                                      &ConcurrentWorkers<WorkerT>::RunWorker,
-                               (void*)&thread_context_);
+    const int retval = pthread_create(
+      thread,
+      NULL,
+      &ConcurrentWorkers<WorkerT>::RunWorker,
+      reinterpret_cast<void *>(&thread_context_));
     if (retval != 0) {
       LogCvmfs(kLogConcurrency, kLogWarning, "Failed to spawn a Worker");
       success = false;
@@ -429,10 +430,11 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
 
   // spawn the callback processing thread
   const int retval =
-    pthread_create(&callback_thread_,
-                    NULL,
-                   &ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper,
-            (void*)&thread_context_);
+    pthread_create(
+      &callback_thread_,
+      NULL,
+      &ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper,
+      reinterpret_cast<void *>(&thread_context_));
     if (retval != 0) {
       LogCvmfs(kLogConcurrency, kLogWarning, "Failed to spawn the callback "
                                              "worker thread");
@@ -442,8 +444,8 @@ bool ConcurrentWorkers<WorkerT>::SpawnWorkers() {
   // wait for all workers to report in...
   {
     MutexLockGuard guard(status_mutex_);
-
-    while (workers_started_ < number_of_workers_ + 1) { // +1 -> callback thread
+    // +1 -> callback thread
+    while (workers_started_ < number_of_workers_ + 1) {
       pthread_cond_wait(&worker_started_, &status_mutex_);
     }
   }
@@ -514,12 +516,13 @@ void* ConcurrentWorkers<WorkerT>::RunWorker(void *run_binding) {
 
 template <class WorkerT>
 void* ConcurrentWorkers<WorkerT>::RunCallbackThreadWrapper(void *run_binding) {
-  const RunBinding           &binding = *(static_cast<RunBinding*>(run_binding));
-  ConcurrentWorkers<WorkerT> *master  = binding.delegate;
+  const RunBinding &binding = *(static_cast<RunBinding*>(run_binding));
+  ConcurrentWorkers<WorkerT> *master = binding.delegate;
 
   master->ReportStartedWorker();
 
-  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Started dedicated callback worker");
+  LogCvmfs(kLogConcurrency, kLogVerboseMsg,
+           "Started dedicated callback worker");
   master->RunCallbackThread();
   LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Terminating Callback Worker...");
 
@@ -581,7 +584,7 @@ void ConcurrentWorkers<WorkerT>::Schedule(WorkerJob job) {
 
 template <class WorkerT>
 void ConcurrentWorkers<WorkerT>::ScheduleDeathSentences() {
-  assert (!IsRunning());
+  assert(!IsRunning());
 
   // make sure that the queue is empty before we schedule a death sentence
   TruncateJobQueue();
@@ -626,7 +629,7 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   //       their last acquired job. To make sure that each worker will check
   //       the running state, we schedule empty jobs or Death Sentences.
 
-  assert (IsRunning());
+  assert(IsRunning());
 
   // unset the running flag (causing threads to die on the next checkpoint)
   StopRunning();
@@ -662,16 +665,16 @@ void ConcurrentWorkers<WorkerT>::Terminate() {
   }
 
   // thanks, and good bye...
-  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "All workers stopped. They processed "
-                                            "%d jobs. Terminating...",
+  LogCvmfs(kLogConcurrency, kLogVerboseMsg,
+           "All workers stopped. They processed %d jobs. Terminating...",
            atomic_read64(&jobs_processed_));
 }
 
 
 template <class WorkerT>
 void ConcurrentWorkers<WorkerT>::WaitForEmptyQueue() const {
-  LogCvmfs(kLogConcurrency, kLogVerboseMsg, "Waiting for %d jobs to be finished",
-           atomic_read32(&jobs_pending_));
+  LogCvmfs(kLogConcurrency, kLogVerboseMsg,
+           "Waiting for %d jobs to be finished", atomic_read32(&jobs_pending_));
 
   // wait until all pending jobs are processed
   {
@@ -712,7 +715,8 @@ void ConcurrentWorkers<WorkerT>::JobDone(
   results_queue_.Enqueue(CallbackJob(data));
 }
 
-
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
+
+#endif  // CVMFS_UTIL_CONCURRENCY_IMPL_H_

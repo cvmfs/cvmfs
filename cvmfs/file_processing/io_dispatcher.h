@@ -2,25 +2,24 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef UPLOAD_FILE_PROCESSING_IO_DISPATCHER_H
-#define UPLOAD_FILE_PROCESSING_IO_DISPATCHER_H
-
-#include <sys/types.h>
-#include <list>
-
-#include <tbb/atomic.h>
-#include <tbb/concurrent_queue.h>
-#include <tbb/task_scheduler_init.h>
-#include <tbb/tbb_thread.h>
-#include <tbb/task.h>
+#ifndef CVMFS_FILE_PROCESSING_IO_DISPATCHER_H_
+#define CVMFS_FILE_PROCESSING_IO_DISPATCHER_H_
 
 #include <pthread.h>
+#include <sys/types.h>
+#include <tbb/atomic.h>
+#include <tbb/concurrent_queue.h>
+#include <tbb/task.h>
+#include <tbb/task_scheduler_init.h>
+#include <tbb/tbb_thread.h>
 
-#include "char_buffer.h"
+#include <list>
+
+#include "../upload_facility.h"
 #include "async_reader.h"
+#include "char_buffer.h"
 #include "file.h"
 #include "processor.h"
-#include "../upload_facility.h"
 
 namespace upload {
 
@@ -90,14 +89,14 @@ class IoDispatcher {
       chunk(chunk), buffer(buffer), delete_buffer(delete_buffer),
       type(UploadChunk) {}
 
-    WriteJob(Chunk *chunk) :
+    explicit WriteJob(Chunk *chunk) :
       chunk(chunk), buffer(NULL), delete_buffer(false),
       type(CommitChunk) {}
 
-    Chunk       *chunk;         ///< Chunk to be (partially) uploaded
-    CharBuffer  *buffer;        ///< Data to be uploaded (or appended)
-    bool         delete_buffer; ///< Delete the buffer after upload?
-    JobType      type;          ///< Type of the WriteJob (see general info)
+    Chunk       *chunk;          ///< Chunk to be (partially) uploaded
+    CharBuffer  *buffer;         ///< Data to be uploaded (or appended)
+    bool         delete_buffer;  ///< Delete the buffer after upload?
+    JobType      type;           ///< Type of the WriteJob (see general info)
   };
 
   /**
@@ -135,7 +134,7 @@ class IoDispatcher {
     const bool mutex_inits_successful = (
       pthread_mutex_init(&processing_done_mutex_,    NULL) == 0 &&
       pthread_cond_init(&processing_done_condition_, NULL) == 0);
-    assert (mutex_inits_successful);
+    assert(mutex_inits_successful);
   }
 
   ~IoDispatcher() {
@@ -202,26 +201,38 @@ class IoDispatcher {
     ++chunks_in_flight_;
   }
 
-  void ChunkUploadCompleteCallback(const UploaderResults &results, Chunk* chunk);
+  void ChunkUploadCompleteCallback(const UploaderResults &results,
+                                   Chunk* chunk);
   void BufferUploadCompleteCallback(const UploaderResults      &results,
                                     BufferUploadCompleteParam   buffer_info);
 
  private:
-  const size_t                     max_read_buffer_size_;      ///< maximal data block size for file read-in
+  /**
+   * Maximal data block size for file read-in
+   */
+  const size_t max_read_buffer_size_;
 
-  tbb::atomic<unsigned int>        chunks_in_flight_;          ///< number of Chunks currently in processing
-  tbb::atomic<unsigned int>        file_count_;                ///< overall number of processed files
+  /**
+   * Number of Chunks currently in processing
+   */
+  tbb::atomic<unsigned int> chunks_in_flight_;
+  tbb::atomic<unsigned int> file_count_;  ///< overall number of processed files
 
-  pthread_mutex_t                  processing_done_mutex_;
-  pthread_cond_t                   processing_done_condition_;
+  pthread_mutex_t processing_done_mutex_;
+  pthread_cond_t processing_done_condition_;
 
-  Reader<FileScrubbingTask, File>  reader_;                    ///< dedicated File Reader object
+  Reader<FileScrubbingTask, File> reader_;  ///< dedicated File Reader object
 
-  AbstractUploader                *uploader_;                  ///< (weak) reference to the used AbstractUploaer
-  FileProcessor                   *file_processor_;            ///< (weak) reference to the FileProcesser in command
+  /**
+   * (weak) reference to the used AbstractUploaer.
+   */
+  AbstractUploader *uploader_;
+  /**
+   * (weak) reference to the FileProcesser in command
+   */
+  FileProcessor *file_processor_;
 };
 
-} // namespace upload
+}  // namespace upload
 
-
-#endif /* UPLOAD_FILE_PROCESSING_IO_DISPATCHER_H */
+#endif  // CVMFS_FILE_PROCESSING_IO_DISPATCHER_H_

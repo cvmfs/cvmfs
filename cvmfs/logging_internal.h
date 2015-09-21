@@ -65,6 +65,7 @@ enum LogSource {
   kLogHistory,
   kLogUnionFs,
   kLogPathspec,
+  kLogUploadS3,
   kLogS3Fanout,
   kLogGc,
   kLogDns
@@ -94,7 +95,7 @@ void SetAltLogFunc(void (*fn)(const LogSource source, const int mask,
                               const char *msg));
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_LOGGING_INTERNAL_H_

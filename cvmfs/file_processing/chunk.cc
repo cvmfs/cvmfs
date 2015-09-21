@@ -2,15 +2,15 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "chunk.h"
 
-#include "io_dispatcher.h"
-#include "file.h"
 #include "../file_chunk.h"
 #include "../smalloc.h"
+#include "file.h"
+#include "io_dispatcher.h"
 
-using namespace upload;
-
+namespace upload {
 
 CharBuffer* Chunk::GetDeflateBuffer(const size_t bytes) {
   if (current_deflate_buffer_              == NULL ||
@@ -30,7 +30,7 @@ void Chunk::ScheduleWrite(CharBuffer *buffer) {
   compressed_size_ += buffer->used_bytes();
 
   if (deferred_write_) {
-    assert (! HasUploadStreamHandle());
+    assert(!HasUploadStreamHandle());
     deferred_buffers_.push_back(buffer);
   } else {
     file_->io_dispatcher()->ScheduleWrite(this, buffer);
@@ -39,7 +39,7 @@ void Chunk::ScheduleWrite(CharBuffer *buffer) {
 
 
 void Chunk::FlushDeferredWrites(const bool delete_buffers) {
-  assert (deferred_write_);
+  assert(deferred_write_);
 
   std::vector<CharBuffer*>::const_iterator i    = deferred_buffers_.begin();
   std::vector<CharBuffer*>::const_iterator iend = deferred_buffers_.end();
@@ -64,7 +64,7 @@ void Chunk::Initialize() {
   zlib_context_.next_in  = Z_NULL;
   zlib_context_.avail_in = 0;
   const int zlib_retval = deflateInit(&zlib_context_, Z_DEFAULT_COMPRESSION);
-  assert (zlib_retval == 0);
+  assert(zlib_retval == 0);
 
   zlib_initialized_         = true;
   content_hash_initialized_ = true;
@@ -72,15 +72,15 @@ void Chunk::Initialize() {
 
 
 void Chunk::Finalize() {
-  assert (! done_);
+  assert(!done_);
 
   shash::Final(content_hash_context_, &content_hash_);
   free(content_hash_context_.buffer);
   content_hash_context_.buffer = NULL;
 
-  assert (zlib_context_.avail_in == 0);
+  assert(zlib_context_.avail_in == 0);
   const int retcode = deflateEnd(&zlib_context_);
-  assert (retcode == Z_OK);
+  assert(retcode == Z_OK);
 
   if (current_deflate_buffer_ != NULL) {
     ScheduleWrite(current_deflate_buffer_);
@@ -117,30 +117,30 @@ Chunk::Chunk(const Chunk &other) :
   bytes_written_(other.bytes_written_),
   compressed_size_(other.compressed_size_)
 {
-  assert (! other.done_);
-  assert (! other.HasUploadStreamHandle());
-  assert (other.bytes_written_ == 0);
-  assert (other.zlib_context_.avail_in == 0);
+  assert(!other.done_);
+  assert(!other.HasUploadStreamHandle());
+  assert(other.bytes_written_ == 0);
+  assert(other.zlib_context_.avail_in == 0);
 
   current_deflate_buffer_ = other.current_deflate_buffer_->Clone();
 
   content_hash_context_.buffer = smalloc(content_hash_context_.size);
-  memcpy(      content_hash_context_.buffer,
+  memcpy(content_hash_context_.buffer,
          other.content_hash_context_.buffer,
-               content_hash_context_.size);
+         content_hash_context_.size);
 
   const int retval = deflateCopy(&zlib_context_,
                                  const_cast<z_streamp>(&other.zlib_context_));
-  assert (retval == Z_OK);
+  assert(retval == Z_OK);
   zlib_initialized_ = true;
 }
 
 
 Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
-  assert (! done_);
-  assert (deferred_write_);
-  assert (! HasUploadStreamHandle());
-  assert (file_offset_ == 0);
+  assert(!done_);
+  assert(deferred_write_);
+  assert(!HasUploadStreamHandle());
+  assert(file_offset_ == 0);
 
   // create a new bulk chunk and upload the (copied) data buffers that have been
   // hold back (deferred write)
@@ -154,12 +154,16 @@ Chunk* Chunk::CopyAsBulkChunk(const size_t file_size) {
 
   // upload the deferred buffers and delete them after the upload is complete
   FlushDeferredWrites();
-  assert (! deferred_write_);
+  assert(!deferred_write_);
 
   return new_bulk_chunk;
 }
 
 
-shash::Suffix Chunk::hash_suffix() const {
-  return (IsBulkChunk()) ? file_->hash_suffix() : shash::kSuffixPartial;
+void Chunk::SetAsBulkChunk() {
+  is_bulk_chunk_       = true;
+  content_hash_.suffix = file_->hash_suffix();  // bulk chunks inherit file_'s
+                                                // content hash suffix
 }
+
+}  // namespace upload

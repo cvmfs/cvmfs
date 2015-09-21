@@ -137,7 +137,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
     }
 
     download::DownloadManager download_manager;
-    download_manager.Init(2, false);
+    download_manager.Init(2, false, g_statistics);
     whitelist::Whitelist whitelist(fqrn, &download_manager, &signature_manager);
     retval_wl = whitelist.Load(repository_url);
     if (retval_wl != whitelist::kFailOk) {
@@ -236,7 +236,7 @@ int swissknife::CommandLetter::Main(const swissknife::ArgumentList &args) {
       tcgetattr(fileno(stdin), &defrsett);
       newrsett = defrsett;
       newrsett.c_lflag &= ~ECHO;
-      if(tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
+      if (tcsetattr(fileno(stdin), TCSAFLUSH, &newrsett) != 0) {
         LogCvmfs(kLogCvmfs, kLogStderr, "terminal failure");
         return 2;
       }
