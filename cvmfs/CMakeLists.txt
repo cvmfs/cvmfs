@@ -50,6 +50,7 @@ set (CVMFS_CLIENT_SOURCES
   catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_client.h catalog_mgr_client.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
+  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
   directory_entry.h directory_entry.cc
   shortstring.h
   file_chunk.h file_chunk.cc
@@ -77,6 +78,7 @@ set (CVMFS2_DEBUG_SOURCES
   history_sqlite.h history_sqlite.cc
   quota_listener.h quota_listener.cc
   auto_umount.h auto_umount.cc
+  voms_authz/voms_authz.cc
   cvmfs.h cvmfs.cc
 )
 
@@ -124,6 +126,8 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   object_fetcher.h
   statistics.cc statistics.h
+
+  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
 
   file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
   file_processing/char_buffer.h
@@ -287,7 +291,7 @@ if (BUILD_CVMFS)
   set_target_properties (cvmfs_fuse_debug PROPERTIES VERSION ${CernVM-FS_VERSION_STRING})
 
   # link the stuff (*_LIBRARIES are dynamic link libraries *_archive are static link libraries ... one of them will be empty for each dependency)
-  set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA2_ARCHIVE} pthread dl)
+  set (CVMFS_FUSE_LINK_LIBRARIES ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${PACPARSER_LIBRARIES} ${ZLIB_LIBRARIES} ${LEVELDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${FUSE_LIBRARIES} ${LIBFUSE_ARCHIVE} ${SQLITE3_ARCHIVE} ${LIBCURL_ARCHIVE} ${PACPARSER_ARCHIVE} ${LEVELDB_ARCHIVE} ${CARES_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA2_ARCHIVE} vomsapi pthread dl)
 
   target_link_libraries (cvmfs2           ${CVMFS_LOADER_LIBS} ${OPENSSL_LIBRARIES} ${LIBFUSE} ${RT_LIBRARY} ${UUID_LIBRARIES} ${SHA2_ARCHIVE} pthread dl)
   target_link_libraries (cvmfs_fuse_debug ${CVMFS2_DEBUG_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
