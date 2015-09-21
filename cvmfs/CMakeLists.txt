@@ -495,13 +495,17 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_OCTOPUS)
   set (CVMFS_OCTOPUS_SOURCES
+    util.h util.cc
+    uuid.h uuid.cc
     logging.h logging_internal.h logging.cc
     pathspec/pathspec.h pathspec/pathspec.cc
     pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
     webapi/fcgi.h webapi/fcgi.cc
+    webapi/macaroon.h webapi/macaroon.cc
     webapi/octopus.cc)
 
   add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
+  target_link_libraries(cvmfs_octopus.fcgi ${UUID_LIBRARIES} pthread)
 endif (BUILD_OCTOPUS)
 
 

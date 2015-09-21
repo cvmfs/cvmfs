@@ -11,7 +11,11 @@ namespace cvmfs {
 
 /**
  * Holds a unique identifies which is either read from a file or, if the file
- * does not yet exist, created and stored in a file.
+ * does not yet exist, created and stored in a file.  This is how it is used to
+ * identify a cvmfs cache directory.
+ *
+ * In order to create many UUIDs for short-lived objects (see webapi/macaroon),
+ * use the Create factory method with an empty path.
  */
 class Uuid {
  public:

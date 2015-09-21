@@ -1,4 +1,4 @@
-/*
+/**
  * This file is part of the CernVM File System
  */
 
@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
   FastCgi fcgi;
   if (!fcgi.IsFcgi()) {
     printf("not in FastCGI context, starting localhost:9000\n");
-    if (!fcgi.MkTcpSocket("", 9000)) {
+    if (!fcgi.MkTcpSocket("127.0.0.1", 9000)) {
       fprintf(stderr, "failed to create tcp socket\n");
       return 1;
     }
