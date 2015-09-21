@@ -104,6 +104,10 @@
 #include "wpad.h"
 #include "xattr.h"
 
+//#ifdef VOMS_AUTHZ
+#include "voms_authz/voms_authz.h"
+//#endif
+
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
 #else
@@ -1015,6 +1019,34 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
+  std::string voms_requirements;
+  XattrList xattrs;
+  if (catalog_manager_->LookupMetaXattrs(path, &xattrs))
+  {
+    xattrs.Get("user.voms_authz", &voms_requirements);
+    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from cvmfs.voms_authz xattr", voms_requirements.c_str());
+  }
+
+  const struct fuse_ctx *ctx = fuse_req_ctx(req);
+  pid_t pid = -1; // This will be set to ctx->pid if and only if we want secure downloads.
+  uid_t uid = ctx->uid;
+  gid_t gid = ctx->gid;
+
+  // Get VOMS information, if any, 
+//#ifdef VOMS_AUTHZ
+  voms_requirements = "/cms/uscms";
+  if (voms_requirements.size())
+  {
+    if (!CheckVOMSAuthz(ctx, voms_requirements))
+    {
+      remount_fence_->Leave();
+      fuse_reply_err(req, EPERM);
+      return;
+    }
+    pid = ctx->pid;
+  }
+//#endif
+
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
   // if ((fi->flags & 3) != O_RDONLY) {
@@ -1108,7 +1140,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
     volatile_repository_ ? cache::CacheManager::kTypeVolatile :
-                           cache::CacheManager::kTypeRegular);
+                           cache::CacheManager::kTypeRegular,
+    pid, uid, gid);
 
   if (fd >= 0) {
     if (perf::Xadd(no_open_files_, 1) <
@@ -1512,6 +1545,30 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     } else {
       attribute_value = "internal error: no hosts defined";
     }
+  } else if (attr == "user.secure_host") {
+    vector<string> host_chain;
+    vector<int> rtt;
+    unsigned current_host;
+    download_manager_->GetSecureHostInfo(&host_chain, &rtt, &current_host);
+    if (host_chain.size()) {
+      attribute_value = string(host_chain[current_host]);
+    } else {
+      attribute_value = "internal error: no hosts defined";
+    }
+  } else if (attr == "user.secure_host_list") {
+    vector<string> host_chain;
+    vector<int> rtt;
+    unsigned current_host;
+    download_manager_->GetSecureHostInfo(&host_chain, &rtt, &current_host);
+    if (host_chain.size()) {
+      attribute_value = host_chain[current_host];
+      for (unsigned i = 1; i < host_chain.size(); ++i) {
+        attribute_value +=
+          ";" + host_chain[(i+current_host) % host_chain.size()];
+      }
+    } else {
+      attribute_value = "internal error: no hosts defined";
+    }
   } else if (attr == "user.uptime") {
     time_t now = time(NULL);
     uint64_t uptime = now - boot_time_;
@@ -1823,6 +1880,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
+  string secure_hostname = "localhost";
   string proxies = "";
   string fallback_proxies = "";
   string dns_server = "";
@@ -1972,6 +2030,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
     hostname = parameter;
     hostname = ReplaceAll(hostname, "@org@", org);
     hostname = ReplaceAll(hostname, "@fqrn@", loader_exports->repository_name);
+  }
+  if (cvmfs::options_manager_->GetValue("CVMFS_SECURE_SERVER_URL", &parameter)) {
+    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
+    const string org = tokens[0];
+    secure_hostname = parameter;
+    secure_hostname = ReplaceAll(secure_hostname, "@org@", org);
+    secure_hostname = ReplaceAll(secure_hostname, "@fqrn@", loader_exports->repository_name);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
@@ -2316,6 +2381,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_);
   cvmfs::download_manager_->SetHostChain(hostname);
+  cvmfs::download_manager_->SetSecureHostChain(secure_hostname);
   if (!dns_server.empty()) {
     cvmfs::download_manager_->SetDnsServer(dns_server);
   }

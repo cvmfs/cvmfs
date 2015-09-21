@@ -765,11 +765,11 @@ int main(int argc, char *argv[]) {
       rpl.rlim_cur = nfiles;
       retval = setrlimit(RLIMIT_NOFILE, &rpl);
       if (retval != 0) {
-        LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
-                 "Failed to set maximum number of open files, "
-                 "insufficient permissions");
+        //LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
+        //         "Failed to set maximum number of open files, "
+         //        "insufficient permissions");
         // TODO(jblomer) detect valgrind and don't fail
-        return kFailPermission;
+        //return kFailPermission;
       }
     }
   }

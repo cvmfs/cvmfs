@@ -258,6 +258,28 @@ static void *MainTalk(void *data __attribute__((unused))) {
         host_str += "Active host " + StringifyInt(active_host) + ": " +
                     host_chain[active_host] + "\n";
         Answer(con_fd, host_str);
+      } else if (line == "secure host info") {
+        vector<string> host_chain;
+        vector<int> rtt;
+        unsigned active_host;
+
+        cvmfs::download_manager_->GetSecureHostInfo(&host_chain, &rtt, &active_host);
+        string host_str;
+        for (unsigned i = 0; i < host_chain.size(); ++i) {
+          host_str += "  [" + StringifyInt(i) + "] " + host_chain[i] + " (";
+          if (rtt[i] == download::DownloadManager::kProbeUnprobed)
+            host_str += "unprobed";
+          else if (rtt[i] == download::DownloadManager::kProbeDown)
+            host_str += "host down";
+          else if (rtt[i] == download::DownloadManager::kProbeGeo)
+            host_str += "geographically ordered";
+          else
+            host_str += StringifyInt(rtt[i]) + " ms";
+          host_str += ")\n";
+        }
+        host_str += "Active host " + StringifyInt(active_host) + ": " +
+                    host_chain[active_host] + "\n";
+        Answer(con_fd, host_str);
       } else if (line == "host probe") {
         cvmfs::download_manager_->ProbeHosts();
         Answer(con_fd, "OK\n");
@@ -278,6 +300,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           cvmfs::download_manager_->SetHostChain(hosts);
           Answer(con_fd, "OK\n");
         }
+        // TODO: allow setting of secure host chain.
       } else if (line == "proxy info") {
         vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
         unsigned active_group;

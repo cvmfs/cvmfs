@@ -55,6 +55,7 @@
 #include "sanitizer.h"
 #include "smalloc.h"
 #include "util.h"
+#include "voms_authz/voms_authz.h"
 
 using namespace std;  // NOLINT
 
@@ -776,6 +777,13 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   CURL *curl_handle = info->curl_handle;
   string url_prefix;
 
+  bool force_secure;
+  if (info->pid != -1)
+  {
+    ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid, info->cred_fname);
+    force_secure = true;
+  }
+
   pthread_mutex_lock(lock_options_);
   // Check if proxy group needs to be reset from backup to primary
   if (opt_timestamp_backup_proxies_ > 0) {
@@ -833,7 +841,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     }
   }
 
-  if (!opt_proxy_groups_ ||
+  if (force_secure || !opt_proxy_groups_ ||
       ((*opt_proxy_groups_)[opt_proxy_groups_current_][0].url == "DIRECT"))
   {
     info->proxy = "";
@@ -865,6 +873,9 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   if (info->probe_hosts && opt_host_chain_)
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
+
+  if (force_secure && opt_secure_host_chain_)
+    url_prefix = (*opt_secure_host_chain_)[opt_secure_host_chain_current_];
 
   string url = url_prefix + *(info->url);
   if (url.find("@proxy@") != string::npos) {
@@ -1046,6 +1057,13 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            info->url->c_str(), curl_error);
   UpdateStatistics(info->curl_handle);
 
+  if (info->cred_fname)
+  {
+    unlink(info->cred_fname);
+    delete info->cred_fname;
+    info->cred_fname = NULL;
+  }
+
   // Verification and error classification
   switch (curl_error) {
     case CURLE_OK:
@@ -1093,6 +1111,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->error_code = kFailOk;
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
+      info->error_code = kFailUnsupportedProtocol;
+      break;
     case CURLE_URL_MALFORMAT:
       info->error_code = kFailBadUrl;
       break;
@@ -1127,6 +1147,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       break;
   }
 
+  std::vector<std::string> *host_chain = info->secure ? opt_secure_host_chain_ : opt_host_chain_;
+
   // Determination if download should be repeated
   bool try_again = false;
   bool same_url_retry = CanRetry(info);
@@ -1139,7 +1161,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            (info->error_code == kFailHostConnection) ||
            (info->error_code == kFailHostHttp)) &&
          info->probe_hosts &&
-         opt_host_chain_ && (info->num_used_hosts < opt_host_chain_->size()))
+         host_chain && (info->num_used_hosts < host_chain->size()))
        )
     {
       try_again = true;
@@ -1155,8 +1177,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       if (!same_url_retry && (info->num_used_proxies >= opt_num_proxies_)) {
         // Check if this can be made a host fail-over
         if (info->probe_hosts &&
-            opt_host_chain_ &&
-            (info->num_used_hosts < opt_host_chain_->size()))
+            host_chain &&
+            (info->num_used_hosts < host_chain->size()))
         {
           // reset proxy group if not already performed by other handle
           if (opt_proxy_groups_) {
@@ -1325,6 +1347,9 @@ DownloadManager::DownloadManager() {
   opt_timeout_proxy_ = 0;
   opt_timeout_direct_ = 0;
   opt_low_speed_limit_ = 0;
+  opt_secure_host_chain_ = NULL;
+  opt_secure_host_chain_rtt_ = NULL;
+  opt_secure_host_chain_current_ = 0;
   opt_host_chain_ = NULL;
   opt_host_chain_rtt_ = NULL;
   opt_host_chain_current_ = 0;
@@ -1407,6 +1432,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   opt_proxy_groups_current_burned_ = 0;
   opt_num_proxies_ = 0;
   opt_host_chain_current_ = 0;
+  opt_secure_host_chain_current_ = 0;
 
   counters_ = new Counters(statistics);
 
@@ -1481,9 +1507,13 @@ void DownloadManager::Fini() {
 
   delete opt_host_chain_;
   delete opt_host_chain_rtt_;
+  delete opt_secure_host_chain_;
+  delete opt_secure_host_chain_rtt_;
   delete opt_proxy_groups_;
   opt_host_chain_ = NULL;
   opt_host_chain_rtt_ = NULL;
+  opt_secure_host_chain_ = NULL;
+  opt_secure_host_chain_rtt_ = NULL;
   opt_proxy_groups_ = NULL;
 
   curl_global_cleanup();
@@ -1696,6 +1726,33 @@ void DownloadManager::SetHostChain(const string &host_list) {
 
 
 /**
+ * Parses a list of ';'-separated hosts for the host chain.  The empty string
+ * removes the host list.
+ */
+void DownloadManager::SetSecureHostChain(const string &host_list) {
+  pthread_mutex_lock(lock_options_);
+  opt_timestamp_backup_host_ = 0;
+  delete opt_secure_host_chain_;
+  delete opt_secure_host_chain_rtt_;
+  opt_secure_host_chain_current_ = 0;
+
+  if (host_list == "") {
+    opt_secure_host_chain_ = NULL;
+    opt_secure_host_chain_rtt_ = NULL;
+    pthread_mutex_unlock(lock_options_);
+    return;
+  }
+
+  opt_secure_host_chain_ = new vector<string>(SplitString(host_list, ';'));
+  opt_secure_host_chain_rtt_ =
+    new vector<int>(opt_secure_host_chain_->size(), kProbeUnprobed);
+  // LogCvmfs(kLogDownload, kLogSyslog, "using host %s",
+  //          (*opt_secure_host_chain_)[0].c_str());
+  pthread_mutex_unlock(lock_options_);
+}
+
+
+/**
  * Retrieves the currently set chain of hosts, their round trip times, and the
  * currently used host.
  */
@@ -1711,6 +1768,22 @@ void DownloadManager::GetHostInfo(vector<string> *host_chain, vector<int> *rtt,
   pthread_mutex_unlock(lock_options_);
 }
 
+
+/**
+ * Retrieves the currently set chain of hosts, their round trip times, and the
+ * currently used host.
+ */
+void DownloadManager::GetSecureHostInfo(vector<string> *host_chain, vector<int> *rtt,
+                                  unsigned *current_host)
+{
+  pthread_mutex_lock(lock_options_);
+  if (opt_secure_host_chain_) {
+    *current_host = opt_secure_host_chain_current_;
+    *host_chain = *opt_secure_host_chain_;
+    *rtt = *opt_secure_host_chain_rtt_;
+  }
+  pthread_mutex_unlock(lock_options_);
+}
 
 /**
  * Jumps to the next proxy in the ring of forward proxy servers.
@@ -1800,6 +1873,14 @@ void DownloadManager::SwitchProxy(JobInfo *info) {
 
 
 /**
+ * Switches to the next secure host in the chain.  Currently a no-op
+ * TODO: implement
+ */
+void DownloadManager::SwitchSecureHost(JobInfo *info) {
+  return;
+}
+
+/**
  * Switches to the next host in the chain.  If info is set, switch only if the
  * current host is identical to the one used by info, otherwise another transfer
  * has already done the switch.
@@ -1855,6 +1936,13 @@ void DownloadManager::SwitchHost() {
   SwitchHost(NULL);
 }
 
+
+/**
+ * Probe and order our secure hosts; currently a no-op
+ */
+void DownloadManager::ProbeSecureHosts() {
+  return;
+}
 
 /**
  * Orders the hostlist according to RTT of downloading .cvmfschecksum.

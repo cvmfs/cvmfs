@@ -48,6 +48,7 @@ enum Failures {
   kFailBadData,
   kFailTooBig,
   kFailOther,
+  kFailUnsupportedProtocol,
 
   kFailNumEntries
 };  // Failures
@@ -68,7 +69,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[10] = "corrupted data received";
   texts[11] = "resource too big to download";
   texts[12] = "unknown network error";
-  texts[13] = "no text";
+  texts[13] = "Unsupported URL in protocol";
+  texts[14] = "no text";
   return texts[error];
 }
 
@@ -119,6 +121,11 @@ struct JobInfo {
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
+  bool secure;
+  pid_t pid;
+  uid_t uid;
+  gid_t gid;
+  char *cred_fname;
   Destination destination;
   struct {
     size_t size;
@@ -138,6 +145,11 @@ struct JobInfo {
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
+    pid = -1;
+    uid = -1;
+    gid = -1;
+    secure = false;
+    cred_fname = 0;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;
@@ -211,6 +223,7 @@ struct JobInfo {
   }
 
   ~JobInfo() {
+    delete cred_fname;
     if (wait_at[0] >= 0) {
       close(wait_at[0]);
       close(wait_at[1]);
@@ -322,9 +335,13 @@ class DownloadManager {
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
   void SetHostChain(const std::string &host_list);
+  void SetSecureHostChain(const std::string &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
+  void GetSecureHostInfo(std::vector<std::string> *host_chain,
+                   std::vector<int> *rtt, unsigned *current_host);
   void ProbeHosts();
+  void ProbeSecureHosts();
   bool ProbeGeo();
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list,
@@ -357,6 +374,7 @@ class DownloadManager {
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
+  void SwitchSecureHost(JobInfo *info);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
   void RebalanceProxiesUnlocked();
@@ -406,12 +424,15 @@ class DownloadManager {
 
   // Host list
   std::vector<std::string> *opt_host_chain_;
+  std::vector<std::string> *opt_secure_host_chain_;
   /**
    * Created by SetHostChain(), filled by probe_hosts.  Contains time to get
    * .cvmfschecksum in ms. -1 is unprobed, -2 is error.
    */
   std::vector<int> *opt_host_chain_rtt_;
   unsigned opt_host_chain_current_;
+  std::vector<int> *opt_secure_host_chain_rtt_;
+  unsigned opt_secure_host_chain_current_;
 
   // Proxy list
   std::vector< std::vector<ProxyInfo> > *opt_proxy_groups_;

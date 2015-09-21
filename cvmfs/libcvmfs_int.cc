@@ -305,6 +305,7 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   // Network initialization
   download_manager_ = new download::DownloadManager();
   download_manager_->Init(16, false, statistics);
+  // TODO: allow setting of secure host chain
   download_manager_->SetHostChain(opts.url);
   download_manager_->SetTimeout(opts.timeout,
                                 opts.timeout_direct);

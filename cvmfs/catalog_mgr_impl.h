@@ -330,6 +330,48 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
 
 
 /**
+ * Return any xattrs associated with the path in the filesystem.
+ *
+ * NOTE: Currently, just returns the xattrs of the filesystem's root path.
+ * The hope is that, in the future, it could return the union
+ * of all the ancestor catalogs.
+ */
+template <class CatalogT>
+bool AbstractCatalogManager<CatalogT>::LookupMetaXattrs(
+  const PathString & /*path*/,
+  XattrList *xattrs)
+{
+  PathString root_path("/");
+
+  EnforceSqliteMemLimit();
+  bool result;
+  ReadLock();
+
+  // Find catalog, possibly load nested
+  CatalogT *best_fit = FindCatalog(root_path);
+  CatalogT *catalog = best_fit;
+  if (MountSubtree(root_path, best_fit, NULL)) {
+    Unlock();
+    WriteLock();
+    // Check again to avoid race
+    best_fit = FindCatalog(root_path);
+    result = MountSubtree(root_path, best_fit, &catalog);
+    // DowngradeLock(); TODO
+    if (!result) {
+      Unlock();
+      return false;
+    }
+  }
+
+  perf::Inc(statistics_.n_lookup_xattrs);
+  result = catalog->LookupXattrsPath(root_path, xattrs);
+
+  Unlock();
+  return result;
+}
+
+
+/**
  * Do a listing of the specified directory.
  * @param path the path of the directory to list
  * @param listing the resulting DirectoryEntryList
