@@ -4,6 +4,7 @@
 #include "voms/voms_apic.h"
 #include "fuse/fuse_lowlevel.h"
 
+#include <dlfcn.h>
 #include <sys/fsuid.h>
 #include <limits.h>
 #include <time.h>
@@ -23,27 +24,38 @@ static time_t get_mono_time()
     return ts.tv_sec;
 }
 
+extern "C" {
+void (*g_VOMS_Destroy)(struct vomsdata *vd) = NULL;
+struct vomsdata * (*g_VOMS_Init)(char *voms, char *cert) = NULL;
+int (*g_VOMS_RetrieveFromFile)(FILE *file, int how, struct vomsdata *vd, int *error) = NULL;
+char * (*g_VOMS_ErrorMessage)(struct vomsdata *vd, int error, char *buffer, int len) = NULL;
+}
+
 class VOMSSessionCache {
 
 public:
 
     VOMSSessionCache()
-      : m_last_clean(get_mono_time())
+      : m_zombie(true),
+        m_last_clean(get_mono_time())
     {
         pthread_mutex_init(&m_mutex, NULL);
+        load_voms_library();
     }
 
     ~VOMSSessionCache()
     {
         for (KeyToVOMS::const_iterator it = m_map.begin(); it!=m_map.end(); it++)
         {
-            VOMS_Destroy(it->second.first);
+            (*g_VOMS_Destroy)(it->second.first);
         }
+        close_voms_library();
         pthread_mutex_destroy(&m_mutex);
     }
 
     bool get(pid_t pid, struct vomsdata *&vomsinfo)
     {
+        if (m_zombie) {return false;}
         time_t now = get_mono_time();
         KeyType mykey;
         if (!lookup(pid, mykey)) {return false;}
@@ -70,6 +82,7 @@ public:
     // If result is NULL, then the operation failed and errno is set.
     struct vomsdata *try_put(pid_t pid, struct vomsdata *voms_ptr)
     {
+        if (m_zombie) {return false;}
         KeyType mykey;
         if (!lookup(pid, mykey))
         {
@@ -83,7 +96,7 @@ public:
         pthread_mutex_unlock(&m_mutex);
         if (!result.second)
         {
-            VOMS_Destroy(voms_ptr);
+            (*g_VOMS_Destroy)(voms_ptr);
         }
         LogCvmfs(kLogVoms, kLogDebug, "Cached VOMS data for session %d, bday %llu.", mykey.first, mykey.second);
         return result.first->second.first;
@@ -171,17 +184,65 @@ private:
         {
             if (it->second.second < expiry)
             {
-                VOMS_Destroy(it->second.first);
+                (*g_VOMS_Destroy)(it->second.first);
                 m_map.erase(it++);
             }
             else {++it;}
         }
     }
 
+    void load_voms_library()
+    {
+        m_libvoms_handle = dlopen("libvomsapi.so.1", RTLD_LAZY);
+        if (!m_libvoms_handle)
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS library; VOMS authz will not be available.  %s", dlerror());
+            return;
+        }
+        if (!(g_VOMS_Init = reinterpret_cast<struct vomsdata*(*)(char *, char *)>(dlsym(m_libvoms_handle, "VOMS_Init"))))
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_Init from VOMS library: %s", dlerror());
+            return;
+        }
+        if (!(g_VOMS_Destroy = reinterpret_cast<void (*)(struct vomsdata *vd)>(dlsym(m_libvoms_handle, "VOMS_Destroy"))))
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_Destroy from VOMS library: %s", dlerror());
+            return;
+        }
+        if (!(g_VOMS_RetrieveFromFile = reinterpret_cast<int (*)(FILE *file, int how, struct vomsdata *vd, int *error)>(dlsym(m_libvoms_handle, "VOMS_RetrieveFromFile"))))
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_RetrieveFromFile from VOMS library: %s", dlerror());
+            return;
+        }
+        if (!(g_VOMS_ErrorMessage = reinterpret_cast<char * (*)(struct vomsdata *vd, int error, char *buffer, int len)>(dlsym(m_libvoms_handle, "VOMS_ErrorMessage"))))
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to load VOMS_ErrorMessage from VOMS library: %s", dlerror());
+            return;
+        }
+        LogCvmfs(kLogVoms, kLogDebug, "Successfully loaded VOMS library; VOMS authz will be available.");
+        m_zombie = false;
+    }
+
+    void close_voms_library()
+    {
+        if (m_libvoms_handle && dlclose(m_libvoms_handle))
+        {
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to unload VOMS library: %s", dlerror());
+        }
+        m_libvoms_handle = NULL;
+        g_VOMS_Init = NULL;
+        g_VOMS_Destroy = NULL;
+        g_VOMS_RetrieveFromFile = NULL;
+        g_VOMS_ErrorMessage = NULL;
+    }
+
+    bool m_zombie;
     time_t m_last_clean;
     pthread_mutex_t m_mutex;
 
     KeyToVOMS m_map;
+
+    void *m_libvoms_handle;
 };
 
 
@@ -210,15 +271,14 @@ GenerateVOMSData(const struct fuse_ctx *ctx)
         return NULL;
     }
 
-    struct vomsdata *voms_ptr = VOMS_Init(NULL, NULL);
+    struct vomsdata *voms_ptr = (*g_VOMS_Init)(NULL, NULL);
     int error = 0;
-    VOMS_SetVerificationType(VERIFY_NONE, voms_ptr, &error);
-    if (!VOMS_RetrieveFromFile(fp, RECURSE_CHAIN, voms_ptr, &error))
+    if (!(*g_VOMS_RetrieveFromFile)(fp, RECURSE_CHAIN, voms_ptr, &error))
     {
-        char *err_str = VOMS_ErrorMessage(voms_ptr, error, NULL, 0);
+        char *err_str = (*g_VOMS_ErrorMessage)(voms_ptr, error, NULL, 0);
         LogCvmfs(kLogVoms, kLogDebug, "Unable to parse VOMS file: %s\n", err_str);
         free(err_str);
-        VOMS_Destroy(voms_ptr);
+        (*g_VOMS_Destroy)(voms_ptr);
         return NULL;
     }
     return voms_ptr;
@@ -270,8 +330,12 @@ IsRoleMatching(const char *role1, const char *role2)
 bool
 CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
 {
-    // Break the authz into VOMS and roles.
+    if (g_VOMS_Init == NULL) {
+        LogCvmfs(kLogVoms, kLogDebug, "VOMS library not present; failing VOMS authz.");
+        return false;
+    }
 
+    // Break the authz into VOMS and roles.
     // We will compare the required auth against the cached session VOMS info.
     // Roles must match exactly; Sub-groups are authorized in their parent group.
 

@@ -1,8 +1,6 @@
 
 #include "voms_authz.h"
 
-#include "voms/voms_apic.h"
-
 #include <curl/curl.h>
 
 #include <stdio.h>
