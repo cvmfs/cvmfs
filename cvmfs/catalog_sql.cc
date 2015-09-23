@@ -127,6 +127,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 bool CatalogDatabase::InsertInitialValues(
   const std::string    &root_path,
   const bool            volatile_content,
+  const std::string    &voms_authz,
   const DirectoryEntry &root_entry)
 {
   assert(read_write());
@@ -156,6 +157,14 @@ bool CatalogDatabase::InsertInitialValues(
   if (volatile_content) {
     if (!this->SetProperty("volatile", 1)) {
       PrintSqlError("failed to insert volatile flag into the newly created "
+                    "catalog tables.");
+      return false;
+    }
+  }
+
+  if (voms_authz.size()) {
+    if (!this->SetProperty("voms_authz", voms_authz)) {
+      PrintSqlError("failed to insert VOMS authz flag into the newly created "
                     "catalog tables.");
       return false;
     }

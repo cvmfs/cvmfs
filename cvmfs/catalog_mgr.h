@@ -163,12 +163,6 @@ class AbstractCatalogManager : public SingleCopy {
   }
   bool LookupXattrs(const PathString &path, XattrList *xattrs);
 
-  // The 'meta' xattrs are taken from the root of the catalog; these are for
-  // attributes that need to be accessed a lot (like VOMS ACLs) and would
-  // be expensive to propagate to all files and directories.
-  bool LookupMetaXattrs(const PathString & /*path*/, XattrList *xattrs);
-
-
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
     PathString p;
@@ -189,6 +183,7 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t GetRevision() const;
   bool GetVolatileFlag() const;
   uint64_t GetTTL() const;
+  bool GetVOMSAuthz(std::string&) const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;
 

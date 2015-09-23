@@ -1020,11 +1020,9 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   std::string voms_requirements;
-  XattrList xattrs;
-  if (catalog_manager_->LookupMetaXattrs(path, &xattrs))
+  if (catalog_manager_->GetVOMSAuthz(voms_requirements))
   {
-    xattrs.Get("user.voms_authz", &voms_requirements);
-    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from cvmfs.voms_authz xattr", voms_requirements.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem properties", voms_requirements.c_str());
   }
 
   const struct fuse_ctx *ctx = fuse_req_ctx(req);
@@ -1034,7 +1032,6 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   // Get VOMS information, if any, 
 //#ifdef VOMS_AUTHZ
-  voms_requirements = "/cms/uscms";
   if (voms_requirements.size())
   {
     if (!CheckVOMSAuthz(ctx, voms_requirements))
@@ -1452,6 +1449,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
 
   string attribute_value;
+  std::string lookup_value;
 
   if (attr == "user.pid") {
     attribute_value = StringifyInt(pid_);
@@ -1495,6 +1493,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_manager_->GetRootHash().ToString();
+  } else if ((attr == "user.voms_authz") && catalog_manager_->GetVOMSAuthz(lookup_value)) {
+    attribute_value = lookup_value;
   } else if (attr == "user.tag") {
     attribute_value = *repository_tag_;
   } else if (attr == "user.expires") {
