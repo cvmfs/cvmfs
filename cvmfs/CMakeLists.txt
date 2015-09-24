@@ -501,6 +501,9 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_OCTOPUS)
   set (CVMFS_OCTOPUS_SOURCES
+    platform.h platform_linux.h platform_osx.h
+    smalloc.h
+    encrypt.h encrypt.cc
     util.h util.cc
     uuid.h uuid.cc
     logging.h logging_internal.h logging.cc
@@ -511,7 +514,7 @@ if (BUILD_OCTOPUS)
     webapi/octopus.cc)
 
   add_executable (cvmfs_octopus.fcgi ${CVMFS_OCTOPUS_SOURCES})
-  target_link_libraries(cvmfs_octopus.fcgi ${UUID_LIBRARIES} pthread)
+  target_link_libraries(cvmfs_octopus.fcgi ${OPENSSL_LIBRARIES} ${UUID_LIBRARIES} pthread)
 endif (BUILD_OCTOPUS)
 
 
