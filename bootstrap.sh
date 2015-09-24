@@ -3,7 +3,8 @@
 set -e
 
 CARES_VERSION=1.10.0
-CURL_VERSION=7.39.0
+CURL_VERSION=7.43.0
+NGHTTP_VERSION=1.0.5
 PACPARSER_VERSION=1.3.1
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
@@ -88,6 +89,7 @@ mkdir -p $externals_build_dir
 
 do_extract  "c-ares"      "c-ares-${CARES_VERSION}.tar.gz"
 do_extract  "libcurl"     "curl-${CURL_VERSION}.tar.gz"
+do_extract  "nghttp2"     "nghttp2-${NGHTTP_VERSION}.tar.gz"
 do_extract  "pacparser"   "pacparser-${PACPARSER_VERSION}.tar.gz"
 do_extract  "zlib"        "zlib-${ZLIB_VERSION}.tar.gz"
 do_extract  "sparsehash"  "sparsehash-${SPARSEHASH_VERSION}.tar.gz"
