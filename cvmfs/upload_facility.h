@@ -152,10 +152,13 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *
    * @param callback   (optional) this callback will be invoked once this parti-
    *                   cular streamed upload is committed.
+   * @param alt_path   (optional) a path where the uploader should also make this
+   *                   file available.
    * @return           a pointer to the initialized UploadStreamHandle
    */
   virtual UploadStreamHandle* InitStreamedUpload(
-                                       const CallbackTN   *callback = NULL) = 0;
+                                       const CallbackTN   *callback = NULL,
+                                       const std::string  &alt_path = "") = 0;
 
 
   /**

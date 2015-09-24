@@ -433,7 +433,7 @@ int S3Uploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
 }
 
 
-UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
+UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback, const std::string & /*alt_path*/) {
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
 

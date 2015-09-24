@@ -184,8 +184,9 @@ class Spooler : public Observable<SpoolerResult> {
    * processing parameters (like chunking and hash suffixes) accordingly.
    *
    * @param local_path  the location of the certificate file
+   * @param alt_path    the alternate location of the certificate file (if any)
    */
-  void ProcessCertificate(const std::string &local_path);
+  void ProcessCertificate(const std::string &local_path, const std::string &alt_catalog_path="");
 
 
   /**

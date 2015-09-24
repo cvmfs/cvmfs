@@ -1032,7 +1032,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
 
   // Get VOMS information, if any, 
 //#ifdef VOMS_AUTHZ
-  if (voms_requirements.size())
+  if ((ctx->uid != 0) && voms_requirements.size())
   {
     if (!CheckVOMSAuthz(ctx, voms_requirements))
     {
