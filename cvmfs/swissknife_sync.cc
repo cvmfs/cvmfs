@@ -592,6 +592,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   manifest->set_garbage_collectability(params.garbage_collectable);
+
+  std::string voms_authz;
+  if (catalog_manager.GetVOMSAuthz(voms_authz) && voms_authz.size()) {
+    manifest->set_alt_catalog_path(".cvmfsroot");
+  }
+
   g_download_manager->Fini();
 
   // finalize the spooler

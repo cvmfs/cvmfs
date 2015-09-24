@@ -829,8 +829,12 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   }
 
   // Upload catalog
+  std::string alt_path, voms_authz;
+  if (catalog->IsRoot() && GetVOMSAuthz(voms_authz) && voms_authz.size()) {
+    alt_path = ".cvmfsroot";
+  }
   spooler_->Upload(catalog->database_path() + ".compressed",
-                   "data/" + hash_catalog.MakePath());
+                   "data/" + hash_catalog.MakePath(), alt_path);
 
   // Update registered catalog hash in nested catalog
   if (catalog->HasParent()) {

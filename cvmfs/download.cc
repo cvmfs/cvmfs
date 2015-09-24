@@ -783,6 +783,13 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid, info->cred_fname);
     force_secure = true;
   }
+  else
+  {
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
+    const char *cadir = getenv("X509_CERT_DIR");
+    if (!cadir) {cadir = "/etc/grid-security/certificates";}
+    curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
+  }
 
   pthread_mutex_lock(lock_options_);
   // Check if proxy group needs to be reset from backup to primary

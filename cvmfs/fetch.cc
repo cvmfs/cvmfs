@@ -125,7 +125,7 @@ int Fetcher::Fetch(
 
   // Involve the download manager
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", name.c_str());
-  const string url = alt_url.size() ? alt_url : "/data/" + id.MakePath();
+  const string url = "/" + (alt_url.size() ? alt_url : "data/" + id.MakePath());
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   retval = cache_mgr_->StartTxn(id, size, txn);
   if (retval < 0) {

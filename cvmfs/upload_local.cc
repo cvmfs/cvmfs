@@ -110,10 +110,11 @@ void LocalUploader::FileUpload(
              tmp_path.c_str(), remote_path.c_str());
     atomic_inc32(&copy_errors_);
   }
-  if (alt_path.size() && ((retcode = symlink(remote_path.c_str(), alt_path.c_str())) != 0)) {
+  const std::string destination_path = upstream_path_ + "/" + alt_path;
+  if (alt_path.size() && ((0 == unlink(destination_path.c_str())) || (errno == ENOENT)) && ((retcode = symlink(remote_path.c_str(), destination_path.c_str())) != 0)) {
     LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to symlink file '%s' to its "
                                           "alternate path %s: %s (errno=%d)",
-             remote_path.c_str(), alt_path.c_str(), strerror(errno), errno);
+             remote_path.c_str(), destination_path.c_str(), strerror(errno), errno);
     atomic_inc32(&copy_errors_);
   }
   Respond(callback, UploaderResults(retcode, local_path));

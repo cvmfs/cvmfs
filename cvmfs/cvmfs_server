@@ -250,7 +250,7 @@ Supported Commands:
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
-                [-k path to existing keychain]
+                [-k path to existing keychain] [-V VOMS authorization]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
@@ -2419,7 +2419,7 @@ mkfs() {
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:vga:zs:k:" option; do
+  while getopts "w:u:o:mf:vga:zs:k:V:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2453,6 +2453,9 @@ mkfs() {
       ;;
       k)
         keys_import_location=$OPTARG
+      ;;
+      V)
+        voms_authz=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2574,11 +2577,17 @@ mkfs() {
     volatile_opt="-v"
     echo -n "(repository flagged volatile)... "
   fi
+  local voms_authz_opt=
+  if [ "x$voms_authz" != "x" ]; then
+    voms_authz_opt="-V $voms_authz"
+    echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
+  fi
   local user_shell="$(get_user_shell $name)"
   local create_cmd="$(__swissknife_cmd) create \
     -t $temp_dir                               \
     -r $upstream                               \
     -a $hash_algo $volatile_opt                \
+    $voms_authz_opt                            \
     -o ${temp_dir}/new_manifest"
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
