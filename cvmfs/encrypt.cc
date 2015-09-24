@@ -47,7 +47,7 @@ Key *Key::CreateFromFile(const string &path) {
     close(fd);
     return NULL;
   }
-  if (info.st_size > kMaxSize) {
+  if ((info.st_size == 0) || (info.st_size > kMaxSize)) {
     close(fd);
     return false;
   }
