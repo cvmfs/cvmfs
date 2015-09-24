@@ -72,6 +72,40 @@ TEST(T_Encrypt, None) {
 }
 
 
+TEST(T_Encrypt, Aes_256_Cbc) {
+  CipherAes256Cbc cipher;
+  UniquePtr<Key> k(Key::CreateRandomly(cipher.key_size()));
+  ASSERT_TRUE(k.IsValid());
+
+  string empty;
+  string dummy = "Hello, World!";
+  string ciphertext;
+  string plaintext;
+  bool retval;
+
+  retval = cipher.Encrypt(empty, *k, &ciphertext);
+  EXPECT_TRUE(retval);
+  retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
+  EXPECT_TRUE(retval);
+  EXPECT_EQ(empty, plaintext);
+
+  retval = cipher.Encrypt(dummy, *k, &ciphertext);
+  EXPECT_TRUE(retval);
+  retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
+  EXPECT_TRUE(retval);
+  EXPECT_EQ(dummy, plaintext);
+
+  retval = Cipher::Decrypt(ciphertext.substr(0, 1), *k, &plaintext);
+  EXPECT_EQ("", plaintext);
+  retval = Cipher::Decrypt(ciphertext.substr(0, 1 + cipher.block_size()),
+                           *k, &plaintext);
+  EXPECT_EQ("", plaintext);
+  retval = Cipher::Decrypt(ciphertext.substr(0, ciphertext.length()-1),
+                           *k, &plaintext);
+  EXPECT_EQ("", plaintext);
+}
+
+
 TEST(T_Encrypt, DecryptWrongEnvelope) {
   CipherNone cipher;
   UniquePtr<Key> k(Key::CreateRandomly(cipher.key_size()));

@@ -76,13 +76,18 @@ class CipherAes256Cbc : public Cipher {
  public:
   virtual std::string const name() { return "AES-256-CBC"; }
   virtual Algorithms const algorithm() { return kAes256Cbc; }
-  virtual unsigned const key_size() { return 256/8; }
-  virtual unsigned const iv_size() { return 128/8; }
-  virtual unsigned const block_size() { return 128/8; }
+  virtual unsigned const key_size() { return kKeySize; }
+  virtual unsigned const iv_size() { return kIvSize; }
+  virtual unsigned const block_size() { return kBlockSize; }
 
  protected:
   virtual std::string DoEncrypt(const std::string &plaintext, const Key &key);
   virtual std::string DoDecrypt(const std::string &ciphertext, const Key &key);
+
+ private:
+  static const unsigned kKeySize = 256/8;
+  static const unsigned kIvSize = 128/8;
+  static const unsigned kBlockSize = 128/8;
 };
 
 

@@ -6,12 +6,15 @@
 #include "encrypt.h"
 
 #include <fcntl.h>
+#include <openssl/evp.h>
 #include <openssl/rand.h>
 
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 
+#include "hash.h"
 #include "platform.h"
 #include "smalloc.h"
 #include "util.h"
@@ -146,14 +149,92 @@ bool Cipher::Decrypt(
 //------------------------------------------------------------------------------
 
 
-
 string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
-  return "";
+  assert(key.size() == kKeySize);
+  int retval;
+
+  // use hash over real time and monotonic time
+  struct timespec time_stamp[2];
+  retval = clock_gettime(CLOCK_REALTIME, &(time_stamp[0]));
+  assert(retval == 0);
+  retval = clock_gettime(CLOCK_MONOTONIC, &(time_stamp[1]));
+  assert(retval == 0);
+  shash::Md5 md5(reinterpret_cast<const char *>(&time_stamp),
+                 2 * sizeof(struct timespec));
+  // iv size happens to be md5 digest size
+  unsigned char *iv = md5.digest;
+
+  // See OpenSSL documentation as for the size.  Additionally, we prepend the
+  // initialization vector.
+  unsigned char *ciphertext = reinterpret_cast<unsigned char *>(
+    smalloc(kIvSize + 2 * kBlockSize + plaintext.size()));
+  memcpy(ciphertext, iv, kIvSize);
+  int cipher_len;
+  EVP_CIPHER_CTX ctx;
+  EVP_CIPHER_CTX_init(&ctx);
+  retval = EVP_EncryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
+  assert(retval == 1);
+  retval = EVP_EncryptUpdate(&ctx,
+             ciphertext + kIvSize, &cipher_len,
+             reinterpret_cast<const unsigned char *>(plaintext.data()),
+             plaintext.length());
+  assert(retval == 1);
+  retval = EVP_EncryptFinal_ex(&ctx, ciphertext + kIvSize + cipher_len,
+                               &cipher_len);
+  assert(retval == 1);
+  retval = EVP_CIPHER_CTX_cleanup(&ctx);
+  assert(retval == 1);
+
+  assert(cipher_len > 0);
+  string result(reinterpret_cast<char *>(ciphertext), kIvSize + cipher_len);
+  free(ciphertext);
+  return result;
 }
 
 
 string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
-  return "";
+  assert(key.size() == kKeySize);
+  int retval, retval_2;
+  if (ciphertext.size() < kIvSize)
+    return "";
+
+  const unsigned char *iv = reinterpret_cast<const unsigned char *>(
+    ciphertext.data());
+
+  // See OpenSSL documentation for the size
+  unsigned char *plaintext = reinterpret_cast<unsigned char *>(
+    smalloc(kBlockSize + ciphertext.size() - kIvSize));
+  int plaintext_len;
+  EVP_CIPHER_CTX ctx;
+  EVP_CIPHER_CTX_init(&ctx);
+  retval = EVP_DecryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
+  assert(retval == 1);
+  retval = EVP_DecryptUpdate(&ctx,
+             plaintext, &plaintext_len,
+             reinterpret_cast<const unsigned char *>(
+               ciphertext.data() + kIvSize),
+             ciphertext.length() - kIvSize);
+  if (retval != 1) {
+    free(plaintext);
+    retval = EVP_CIPHER_CTX_cleanup(&ctx);
+    assert(retval == 1);
+    return "";
+  }
+  retval = EVP_DecryptFinal_ex(&ctx, plaintext + plaintext_len, &plaintext_len);
+  retval_2 = EVP_CIPHER_CTX_cleanup(&ctx);
+  assert(retval_2 == 1);
+  if (retval != 1) {
+    free(plaintext);
+    return "";
+  }
+
+  if (plaintext_len == 0) {
+    free(plaintext);
+    return "";
+  }
+  string result(reinterpret_cast<char *>(plaintext), plaintext_len);
+  free(plaintext);
+  return result;
 }
 
 
