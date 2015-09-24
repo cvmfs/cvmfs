@@ -80,6 +80,7 @@ TEST(T_Encrypt, Aes_256_Cbc) {
   string empty;
   string dummy = "Hello, World!";
   string ciphertext;
+  string ciphertext_two;
   string plaintext;
   bool retval;
 
@@ -91,6 +92,10 @@ TEST(T_Encrypt, Aes_256_Cbc) {
 
   retval = cipher.Encrypt(dummy, *k, &ciphertext);
   EXPECT_TRUE(retval);
+  retval = cipher.Encrypt(dummy, *k, &ciphertext_two);
+  EXPECT_TRUE(retval);
+  // Initialization vector should differ
+  EXPECT_NE(ciphertext, ciphertext_two);
   retval = Cipher::Decrypt(ciphertext, *k, &plaintext);
   EXPECT_TRUE(retval);
   EXPECT_EQ(dummy, plaintext);
