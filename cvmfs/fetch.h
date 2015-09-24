@@ -79,7 +79,8 @@ class Fetcher : SingleCopy {
             const cache::CacheManager::ObjectType object_type,
             pid_t pid=-1,
             uid_t uid=-1,
-            gid_t gid=-1);
+            gid_t gid=-1,
+            const std::string &alt_url="");
 
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
   download::DownloadManager *download_mgr() { return download_mgr_; }

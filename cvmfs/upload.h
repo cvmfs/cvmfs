@@ -135,9 +135,11 @@ class Spooler : public Observable<SpoolerResult> {
    *                      backend storage
    * @param remote_path   the destination of the file to be copied in the
    *                      backend storage
+   * @param alt_path      a secondary destination where the file should be saved.
    */
   void Upload(const std::string &local_path,
-              const std::string &remote_path);
+              const std::string &remote_path,
+              const std::string &alt_path="");
 
   /**
    * Schedules a process job that compresses and hashes the provided file in

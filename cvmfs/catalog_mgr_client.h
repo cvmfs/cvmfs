@@ -83,7 +83,8 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
  private:
   LoadError LoadCatalogCas(const shash::Any &hash,
                            const std::string &name,
-                           std::string *catalog_path);
+                           std::string *catalog_path,
+                           const std::string &alt_catalog_path="");
 
   /**
    * Required for unpinning

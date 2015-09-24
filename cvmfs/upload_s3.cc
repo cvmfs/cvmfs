@@ -343,6 +343,7 @@ int S3Uploader::SelectBucket(const std::string &rem_filename) const {
 void S3Uploader::FileUpload(
   const std::string &local_path,
   const std::string &remote_path,
+  const std::string & /*alt_path*/,
   const CallbackTN  *callback
 ) {
   // Choose S3 account and bucket based on the target

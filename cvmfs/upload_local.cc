@@ -73,6 +73,7 @@ void LocalUploader::WorkerThread() {
 void LocalUploader::FileUpload(
   const std::string &local_path,
   const std::string &remote_path,
+  const std::string &alt_path,
   const CallbackTN   *callback
 ) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "FileUpload call started.");
@@ -107,6 +108,12 @@ void LocalUploader::FileUpload(
                                           "staging area to the final location: "
                                           "'%s'",
              tmp_path.c_str(), remote_path.c_str());
+    atomic_inc32(&copy_errors_);
+  }
+  if (alt_path.size() && ((retcode = symlink(remote_path.c_str(), alt_path.c_str())) != 0)) {
+    LogCvmfs(kLogSpooler, kLogVerboseMsg, "failed to symlink file '%s' to its "
+                                          "alternate path %s: %s (errno=%d)",
+             remote_path.c_str(), alt_path.c_str(), strerror(errno), errno);
     atomic_inc32(&copy_errors_);
   }
   Respond(callback, UploaderResults(retcode, local_path));

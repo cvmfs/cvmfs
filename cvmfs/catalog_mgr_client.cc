@@ -195,9 +195,11 @@ LoadError ClientCatalogManager::LoadCatalog(
   if (!catalog_path)
     return catalog::kLoadNew;
 
+  const std::string &alt_catalog_path = ensemble.manifest->alt_catalog_path();
+
   // Load new catalog
   catalog::LoadError load_retval =
-    LoadCatalogCas(ensemble.manifest->catalog_hash(), cvmfs_path, catalog_path);
+    LoadCatalogCas(ensemble.manifest->catalog_hash(), cvmfs_path, catalog_path, alt_catalog_path.size() ? alt_catalog_path : "");
   if (load_retval != catalog::kLoadNew)
     return load_retval;
   loaded_catalogs_[mountpoint] = ensemble.manifest->catalog_hash();
@@ -215,11 +217,12 @@ LoadError ClientCatalogManager::LoadCatalog(
 LoadError ClientCatalogManager::LoadCatalogCas(
   const shash::Any &hash,
   const string &name,
-  string *catalog_path)
+  string *catalog_path,
+  const std::string &alt_catalog_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-                           cache::CacheManager::kTypeCatalog);
+                           cache::CacheManager::kTypeCatalog, -1, -1, -1, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;

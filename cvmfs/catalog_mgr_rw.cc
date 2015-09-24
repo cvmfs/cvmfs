@@ -146,10 +146,13 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string manifest_path = dir_temp + "/manifest";
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
+  if (voms_authz.size()) {
+    manifest->set_alt_catalog_path(".cvmfsroot");
+  }
   manifest->set_garbage_collectability(garbage_collectable);
 
   // Upload catalog
-  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath());
+  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath(), manifest->alt_catalog_path());
   spooler->WaitForUpload();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
