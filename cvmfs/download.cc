@@ -777,19 +777,16 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   CURL *curl_handle = info->curl_handle;
   string url_prefix;
 
-  bool force_secure;
+  bool force_secure=false;
   if (info->pid != -1)
   {
     ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid, info->cred_fname);
     force_secure = true;
   }
-  else
-  {
-    curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
-    const char *cadir = getenv("X509_CERT_DIR");
-    if (!cadir) {cadir = "/etc/grid-security/certificates";}
-    curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
-  }
+  curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
+  const char *cadir = getenv("X509_CERT_DIR");
+  if (!cadir) {cadir = "/etc/grid-security/certificates";}
+  curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
 
   pthread_mutex_lock(lock_options_);
   // Check if proxy group needs to be reset from backup to primary
@@ -1067,8 +1064,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
   if (info->cred_fname)
   {
     unlink(info->cred_fname);
-    delete info->cred_fname;
+    free(info->cred_fname);
     info->cred_fname = NULL;
+    curl_easy_setopt(info->curl_handle, CURLOPT_SSLCERT, NULL);
+    curl_easy_setopt(info->curl_handle, CURLOPT_SSLKEY, NULL);
+    curl_easy_setopt(info->curl_handle, CURLOPT_FRESH_CONNECT, 0);
+    curl_easy_setopt(info->curl_handle, CURLOPT_FORBID_REUSE, 0);
   }
 
   // Verification and error classification

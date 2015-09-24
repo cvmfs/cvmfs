@@ -97,7 +97,12 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   certificate_hash = ensemble->manifest->certificate();
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {
-    certificate_url += "/" + certificate_hash.MakePath();
+    const std::string &alt_path = ensemble->manifest->alt_catalog_path();
+    if (alt_path.size()) {
+      certificate_url = base_url + "/" + alt_path + "cert";
+    } else {
+      certificate_url += "/" + certificate_hash.MakePath();
+    }
     retval_dl = download_manager->Fetch(&download_certificate);
     if (retval_dl != download::kFailOk) {
       result = kFailLoad;

@@ -14,8 +14,8 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid, char *&i
 {
     int fd = -1;
     FILE *fp = GetProxyFile(pid, uid, gid);
-    int fd_proxy = fileno(fp);
     if (fp == NULL) {return false;}
+    int fd_proxy = fileno(fp);
     if (info_fname) {delete info_fname; info_fname = NULL;}
     char fname[] = "/tmp/cvmfs_credential_XXXXXX";
     fd = mkstemp(fname);
@@ -54,12 +54,13 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid, char *&i
     info_fname = strdup(fname);
     fclose(fp);
     close(fd);
+    // We cannot rely on libcurl to pipeline, as cvmfs may
+    // bounce between different auth handles.
+    curl_easy_setopt(curl_handle, CURLOPT_FRESH_CONNECT, 1);
+    curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1);
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_SESSIONID_CACHE, 0);
     curl_easy_setopt(curl_handle, CURLOPT_SSLCERT, fname);
     curl_easy_setopt(curl_handle, CURLOPT_SSLKEY, fname);
-    curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
-    const char *cadir = getenv("X509_CERT_DIR");
-    if (!cadir) {cadir = "/etc/grid-security/certificates";}
-    curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
     return true;
 }
 
