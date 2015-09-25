@@ -58,7 +58,7 @@ public:
         time_t now = get_mono_time();
         KeyType mykey;
         if (!lookup(pid, mykey)) {return false;}
-        LogCvmfs(kLogVoms, kLogDebug, "PID %d maps to session %d, bday %llu", pid, mykey.first, mykey.second);
+        LogCvmfs(kLogVoms, kLogDebug, "PID %d maps to session %d, UID %d, GID %d, bday %llu", pid, mykey.pid, mykey.uid, mykey.gid, mykey.bday);
         pthread_mutex_lock(&m_mutex);
         if (now > m_last_clean + 100) {clean_tables();};
         KeyToVOMS::const_iterator iter = m_map.find(mykey);
@@ -67,7 +67,7 @@ public:
         {
             return false;
         }
-        LogCvmfs(kLogVoms, kLogDebug, "Session %d, bday %llu has cached VOMS data", mykey.first, mykey.second);
+        LogCvmfs(kLogVoms, kLogDebug, "Session %d, UID %d, GID %d, bday %llu has cached VOMS data", mykey.pid, mykey.uid, mykey.gid, mykey.bday);
         vomsinfo = iter->second.first;
         return true;
     }
@@ -97,13 +97,31 @@ public:
         {
             (*g_VOMS_Destroy)(voms_ptr);
         }
-        LogCvmfs(kLogVoms, kLogDebug, "Cached VOMS data for session %d, bday %llu.", mykey.first, mykey.second);
+        LogCvmfs(kLogVoms, kLogDebug, "Cached VOMS data for session %d, UID %d, GID %d, bday %llu.", mykey.pid, mykey.uid, mykey.gid, mykey.bday);
         return result.first->second.first;
     }
 
 private:
 
-    typedef std::pair<pid_t, unsigned long long> KeyType;
+    struct KeyType {
+      KeyType() : pid(-1), uid(-1), gid(-1), bday(0) {}
+      KeyType(pid_t p, uid_t u, gid_t g, unsigned long long b)
+       : pid(p), uid(u), gid(g), bday(b) {}
+
+      bool operator< (const KeyType & other) const {
+        return (pid < other.pid) ||
+               ((pid == other.pid) && ((uid < other.uid) ||
+                 ((uid == other.uid) && ((gid < other.gid) ||
+                   ((gid == other.gid) && (bday < other.bday))
+                 ))
+               ));
+      }
+
+      pid_t pid;
+      uid_t uid;
+      gid_t gid;
+      unsigned long long bday;
+    };
     typedef std::pair<struct vomsdata*, time_t> ValueType;
     typedef std::map<KeyType, ValueType> KeyToVOMS;
 
@@ -126,6 +144,18 @@ private:
             LogCvmfs(kLogVoms, kLogDebug, "Failed to open status file.");
             return false;
         }
+
+        int fd = fileno(fp);
+        struct stat st;
+        if (-1 == fstat(fd, &st))
+        {
+            fclose(fp);
+            LogCvmfs(kLogVoms, kLogDebug, "Failed to get stat information of running process.");
+            return false;
+        }
+        uid_t uid = st.st_uid;
+        gid_t gid = st.st_gid;
+
         pid_t sid;
         unsigned long long birthday;
         int result;
@@ -139,7 +169,7 @@ private:
             return false;
         }
 
-        KeyType pidkey(pid, birthday);
+        KeyType pidkey(pid, uid, gid, birthday);
 
         pthread_mutex_lock(&m_mutex);
         PidToSid::iterator it = m_pid_map.find(pidkey);
@@ -156,8 +186,10 @@ private:
                 LogCvmfs(kLogVoms, kLogDebug, "Failed to parse status file for sid %d: (errno=%d) %s, fscanf result %d", pid, errno, strerror(errno), result);
                 return false;
             }
-            mykey.first = sid;
-            mykey.second = birthday;
+            mykey.pid = sid;
+            mykey.bday = birthday;
+            mykey.uid = uid;
+            mykey.gid = gid;
             pthread_mutex_lock(&m_mutex);
             m_pid_map.insert(std::make_pair(pidkey, mykey));
             pthread_mutex_unlock(&m_mutex);
@@ -167,7 +199,7 @@ private:
             mykey = it->second;
         }
 
-        LogCvmfs(kLogVoms, kLogDebug, "Lookup key; sid=%d, bday=%d", sid, birthday);
+        LogCvmfs(kLogVoms, kLogDebug, "Lookup key; sid=%d, bday=%llu", sid, birthday);
         return true;
     }
 
