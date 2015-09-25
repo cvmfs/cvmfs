@@ -5,7 +5,6 @@
 #include "fuse/fuse_lowlevel.h"
 
 #include <dlfcn.h>
-#include <sys/fsuid.h>
 #include <limits.h>
 #include <time.h>
 #include <errno.h>

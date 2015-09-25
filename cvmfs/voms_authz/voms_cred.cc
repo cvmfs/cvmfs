@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
-#include <sys/fsuid.h>
+#include <sys/syscall.h>
 
 #include <cstring>
 
@@ -21,10 +21,18 @@ GetProxyFileFromEnv(pid_t pid, char *path, size_t pathLen)
         if (errno == 0) {errno = ERANGE;}
         return false;
     }
+    int olduid = geteuid();
+    // NOTE: we use the underlying syscall here as it is PER-THREAD
+    // while the glibc call is PER-PROCESS
+    //
+    // ALSO NOTE: we ignore return values of these syscalls; this code path
+    // will work if cvmfs is FUSE-mounted as an unprivileged user.
+    syscall(SYS_setresuid, -1, 0, -1);
     FILE *fp = fopen(path, "r");
     if (!fp)
     {
         LogCvmfs(kLogVoms, kLogDebug, "Failed to open environment file for pid %d.\n", pid);
+        syscall(SYS_setresuid, -1, olduid, -1);
         return false;
     }
 
@@ -47,6 +55,7 @@ GetProxyFileFromEnv(pid_t pid, char *path, size_t pathLen)
         c = fgetc(fp);
     }
     fclose(fp);
+    syscall(SYS_setresuid, -1, olduid, -1);
     if (set_env) {path[idx] = '\0';}
     return set_env;
 }
@@ -66,23 +75,21 @@ GetProxyFile(pid_t pid, uid_t uid, gid_t gid)
         }
     }
     LogCvmfs(kLogVoms, kLogDebug, "Looking for proxy in file %s.", path);
-    // Note - setfsuid is per-thread.
-    int olduid = setfsuid(uid);
-    if (olduid != static_cast<int>(uid))
-    {
-        errno = EPERM;
-        return NULL;
-    }
-    int oldgid = setfsgid(gid);
-    if (oldgid != static_cast<int>(gid))
-    {
-        setfsuid(olduid);
-        errno = EPERM;
-        return NULL;
-    }
+
+
+    int olduid = geteuid();
+    int oldgid = getegid();
+    // NOTE the sequencing: we must be eUID 0
+    // to change the UID and GID.
+    syscall(SYS_setresuid, -1, 0, -1);
+    syscall(SYS_setresgid, -1, gid, -1);
+    syscall(SYS_setresuid, -1, uid, -1);
+
     FILE *fp = fopen(path, "r");
-    setfsuid(olduid);
-    setfsuid(oldgid);
+    syscall(SYS_setresuid, -1, 0, -1);
+    syscall(SYS_setresgid, -1, oldgid, -1);
+    syscall(SYS_setresuid, -1, olduid, -1);
+
     return fp;
 }
 
