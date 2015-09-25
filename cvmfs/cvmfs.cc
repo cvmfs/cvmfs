@@ -475,12 +475,12 @@ static bool CheckVOMS(const fuse_ctx &fctx) {
   }
 
   // Get VOMS information, if any, 
-//#ifdef VOMS_AUTHZ
+#ifdef VOMS_AUTHZ
   if ((fctx.uid != 0) && voms_requirements.size())
   {
     return CheckVOMSAuthz(&fctx, voms_requirements);
   }
-//#endif
+#endif
   return true;
 }
 
@@ -1077,7 +1077,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   catalog::ClientCtx ctx(fctx->uid, fctx->gid, fctx->pid);
 
   // Get VOMS information, if any, 
-//#ifdef VOMS_AUTHZ
+#ifdef VOMS_AUTHZ
   if ((ctx.uid != 0) && voms_requirements.size())
   {
     if (!CheckVOMSAuthz(fctx, voms_requirements))
@@ -1087,7 +1087,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       return;
     }
   }
-//#endif
+#endif
 
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags

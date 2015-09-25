@@ -78,9 +78,11 @@ set (CVMFS2_DEBUG_SOURCES
   history_sqlite.h history_sqlite.cc
   quota_listener.h quota_listener.cc
   auto_umount.h auto_umount.cc
-  voms_authz/voms_authz.cc
   cvmfs.h cvmfs.cc
 )
+if (VOMS_FOUND)
+  set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES} voms_authz/voms_authz.cc)
+endif (VOMS_FOUND)
 
 set (CVMFS2_SOURCES
   ${CVMFS2_DEBUG_SOURCES}

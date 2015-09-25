@@ -3,7 +3,10 @@
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
+
+#ifndef __APPLE__
 #include <sys/syscall.h>
+#endif
 
 #include <cstring>
 
@@ -27,12 +30,16 @@ GetProxyFileFromEnv(pid_t pid, char *path, size_t pathLen)
     //
     // ALSO NOTE: we ignore return values of these syscalls; this code path
     // will work if cvmfs is FUSE-mounted as an unprivileged user.
+#ifndef __APPLE__
     syscall(SYS_setresuid, -1, 0, -1);
+#endif
     FILE *fp = fopen(path, "r");
     if (!fp)
     {
         LogCvmfs(kLogVoms, kLogDebug, "Failed to open environment file for pid %d.\n", pid);
+#ifndef __APPLE__
         syscall(SYS_setresuid, -1, olduid, -1);
+#endif
         return false;
     }
 
@@ -55,7 +62,9 @@ GetProxyFileFromEnv(pid_t pid, char *path, size_t pathLen)
         c = fgetc(fp);
     }
     fclose(fp);
+#ifndef __APPLE__
     syscall(SYS_setresuid, -1, olduid, -1);
+#endif
     if (set_env) {path[idx] = '\0';}
     return set_env;
 }
@@ -81,14 +90,18 @@ GetProxyFile(pid_t pid, uid_t uid, gid_t gid)
     int oldgid = getegid();
     // NOTE the sequencing: we must be eUID 0
     // to change the UID and GID.
+#ifndef __APPLE__
     syscall(SYS_setresuid, -1, 0, -1);
     syscall(SYS_setresgid, -1, gid, -1);
     syscall(SYS_setresuid, -1, uid, -1);
+#endif
 
     FILE *fp = fopen(path, "r");
+#ifndef __APPLE__
     syscall(SYS_setresuid, -1, 0, -1);
     syscall(SYS_setresgid, -1, oldgid, -1);
     syscall(SYS_setresuid, -1, olduid, -1);
+#endif
 
     return fp;
 }
