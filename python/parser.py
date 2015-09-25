@@ -1,11 +1,33 @@
+import math
+
 class Counter:
     def __init__(self, name, number, description):
         self.name = name
         self.description = description
         try:
-            self.number = int(number)
+            self.values = [int(number)]
         except ValueError:
-            self.number = 0
+            self.values = [0]
+
+    def sum(self):
+        counter = 0
+        for n in self.values:
+            counter += n
+        return counter
+
+    def avg(self):
+        return self.sum() / len(self.values)
+
+    def variance(self):
+        counter = 0
+        average = self.avg()
+        for n in self.values:
+            diff = n - average
+            counter += diff * diff
+        return counter / len(self.values)
+
+    def std(self):
+        return math.sqrt(self.variance())
 
 
 class Parser:
@@ -13,7 +35,6 @@ class Parser:
         self.counters = {}
         self.warm_cache = False
         self.repository = ""
-        self.num_files = 0
         if filename is not None:
             self.parse(filename)
 
@@ -34,12 +55,11 @@ class Parser:
             if len(params) == 3:
                 counter = Counter(params[0], params[1], params[2])
                 if counter.name in self.counters:
-                    self.counters[counter.name].number += counter.number
+                    self.counters[counter.name].values += counter.values
                 else:
                     self.counters[counter.name] = counter
 
     def parse(self, filename):
-        self.num_files += 1
         datafile = open(filename, "r")
         for line in datafile:
             self.__parseline(line)
@@ -49,7 +69,7 @@ class Parser:
         csv = open(filename, "w")
         csv.write(";" + self.repository)
         for counter in self.counters:
-            csv.write(counter.name + ";" + str(counter.number / self.num_files))
+            csv.write(counter.name + ";" + str(counter.avg()))
         csv.close()
 
     @staticmethod
@@ -58,9 +78,9 @@ class Parser:
         csv.write(";origin;external\n")
         for key in parser1.counters:
             csv.write(parser1.counters[key].name + ";" +
-                      str(parser1.counters[key].number / parser1.num_files)
+                      str(parser1.counters[key].avg())
                       + ";" +
-                      str(parser2.counters[key].number / parser2.num_files)
+                      str(parser2.counters[key].avg())
                       + "\n")
         csv.close()
 
@@ -81,9 +101,7 @@ class Parser:
             for repository_name in repository_names:
                 parser1 = parser_list1[repository_name]
                 parser2 = parser_list2[repository_name]
-                csv.write(str(parser1.counters[counter_name].number
-                              / parser1.num_files) + ";" +
-                          str(parser2.counters[counter_name].number
-                              / parser2.num_files) + ";")
+                csv.write(str(parser1.counters[counter_name].avg()) + ";" +
+                          str(parser2.counters[counter_name].avg()) + ";")
             csv.write("\n")
         csv.close()
