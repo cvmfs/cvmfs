@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/../common.sh
 
