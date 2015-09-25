@@ -236,6 +236,12 @@ static void *MainTalk(void *data __attribute__((unused))) {
           cvmfs::download_manager_->SetDnsServer(host);
           Answer(con_fd, "OK\n");
         }
+      } else if (line == "external URL info") {
+        std::string external_host = cvmfs::download_manager_->GetExternalHost();
+        if (external_host.size())
+          Answer(con_fd, "External data URL " + external_host);
+        else
+          Answer(con_fd, "No external URL configured.");
       } else if (line == "host info") {
         vector<string> host_chain;
         vector<int> rtt;
@@ -270,6 +276,14 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "host switch") {
         cvmfs::download_manager_->SwitchHost();
         Answer(con_fd, "OK\n");
+      } else if (line.substr(0, 16) == "external url set") {
+        if (line.length() < 18) {
+          Answer(con_fd, "Usage: external url set <URL>\n");
+        } else {
+          const std::string host = line.substr(17);
+          cvmfs::download_manager_->SetExternalHost(host);
+          Answer(con_fd, "OK\n");
+        }
       } else if (line.substr(0, 8) == "host set") {
         if (line.length() < 10) {
           Answer(con_fd, "Usage: host set <host list>\n");

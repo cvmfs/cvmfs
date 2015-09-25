@@ -76,6 +76,7 @@ Fetcher::ThreadLocalStorage *Fetcher::GetTls() {
 int Fetcher::Fetch(
   const shash::Any &id,
   const uint64_t size,
+  const bool external,
   const std::string &name,
   const cache::CacheManager::ObjectType object_type)
 {
@@ -121,7 +122,7 @@ int Fetcher::Fetch(
 
   // Involve the download manager
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", name.c_str());
-  const string url = "/data/" + id.MakePath();
+  const std::string url = external ? name : "/data/" + id.MakePath();
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   retval = cache_mgr_->StartTxn(id, size, txn);
   if (retval < 0) {
@@ -138,6 +139,7 @@ int Fetcher::Fetch(
   tls->download_job.destination_sink = &sink;
   tls->download_job.expected_hash = &id;
   tls->download_job.extra_info = &name;
+  tls->download_job.external = external;
   download_mgr_->Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {

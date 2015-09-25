@@ -167,6 +167,7 @@ class Catalog : public SingleCopy {
     return ((database_ != NULL) && database_->OwnsFile()) || managed_database_;
   }
 
+  bool GetExternalData() const;
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   uint64_t GetLastModified() const;
@@ -246,6 +247,7 @@ class Catalog : public SingleCopy {
 
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
+  bool GetExternalDataLocked() const; // For holders of lock_
 
  private:
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
@@ -259,6 +261,13 @@ class Catalog : public SingleCopy {
   bool volatile_flag_;
   const bool is_root_;
   bool managed_database_;
+
+  enum ExternalDataStatus {
+    Unknown,
+    None,
+    Present
+  };
+  mutable atomic_int32 external_data_status_;
 
   Catalog *parent_;
   NestedCatalogMap children_;

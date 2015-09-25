@@ -227,7 +227,8 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
     , is_chunked_file_(false)
-    , is_negative_(false) { }
+    , is_negative_(false)
+    , external_data_(false) { }
 
   inline DirectoryEntry()
     : cached_mtime_(0)
@@ -235,7 +236,8 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
     , is_chunked_file_(false)
-    , is_negative_(false) { }
+    , is_negative_(false)
+    , external_data_(false) { }
 
   inline explicit DirectoryEntry(SpecialDirents special_type)
     : cached_mtime_(0)
@@ -243,7 +245,8 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
     , is_chunked_file_(false)
-    , is_negative_(true) { assert(special_type == kDirentNegative); }
+    , is_negative_(true)
+    , external_data_(false) { assert(special_type == kDirentNegative); }
 
   inline SpecialDirents GetSpecial() const {
     return is_negative_ ? kDirentNegative : kDirentNormal;
@@ -279,6 +282,10 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline void set_is_chunked_file(const bool val) {
     is_chunked_file_ = val;
   }
+  void set_external_data(bool val) {
+    external_data_ = val;
+  }
+  bool external() const {return external_data_;}
 
  private:
    /**
@@ -296,6 +303,7 @@ class DirectoryEntry : public DirectoryEntryBase {
   bool is_nested_catalog_mountpoint_;
   bool is_chunked_file_;
   bool is_negative_;
+  bool external_data_;
 };
 
 

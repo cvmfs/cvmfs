@@ -63,6 +63,9 @@ Catalog::Catalog(const PathString &path,
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 
+  atomic_init32(&external_data_status_);
+  ExternalDataStatus status = Unknown;
+  atomic_write32(&external_data_status_, status);
   database_ = NULL;
   uid_map_ = NULL;
   gid_map_ = NULL;
@@ -228,6 +231,7 @@ bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
   bool found = sql_lookup_md5path_->FetchRow();
   if (found && (dirent != NULL)) {
     *dirent = sql_lookup_md5path_->GetDirent(this, expand_symlink);
+    dirent->set_external_data(GetExternalDataLocked());
     FixTransitionPoint(md5path, dirent);
   }
   sql_lookup_md5path_->Reset();
@@ -405,6 +409,39 @@ void Catalog::DropDatabaseFileOwnership() {
   if (NULL != database_) {
     database_->DropFileOwnership();
   }
+}
+
+
+bool Catalog::GetExternalDataLocked() const {
+  bool result;
+  ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
+  if (status == Present) {
+    result = true;
+  } else if (status == None) {
+    result = false;
+  } else {
+    bool attr = database().GetPropertyDefault<bool>("external_data", false);
+    atomic_write32(&external_data_status_, attr ? Present : None);
+    result = attr;
+  } 
+  return result;
+}
+
+bool Catalog::GetExternalData() const {
+  bool result;
+  ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
+  if (status == Present) {
+    result = true;
+  } else if (status == None) {
+    result = false;
+  } else {
+    pthread_mutex_lock(lock_);
+    bool attr = database().GetPropertyDefault<bool>("external_data", false);
+    pthread_mutex_unlock(lock_);
+    atomic_write32(&external_data_status_, attr ? Present : None);
+    result = attr;
+  } 
+  return result;
 }
 
 

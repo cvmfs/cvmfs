@@ -119,6 +119,7 @@ struct JobInfo {
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
+  bool external;
   Destination destination;
   struct {
     size_t size;
@@ -138,6 +139,7 @@ struct JobInfo {
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
+    external = false;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;
@@ -316,6 +318,8 @@ class DownloadManager {
   void Spawn();
   Failures Fetch(JobInfo *info);
 
+  void SetExternalHost(const std::string &host);
+  std::string GetExternalHost() const;
   void SetDnsServer(const std::string &address);
   void SetDnsParameters(const unsigned retries, const unsigned timeout_sec);
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
@@ -412,6 +416,12 @@ class DownloadManager {
    */
   std::vector<int> *opt_host_chain_rtt_;
   unsigned opt_host_chain_current_;
+
+  /**
+   * If data files are kept outside CVMFS (and stored by path instead of hash),
+   * then this is the prefix URL to find them.
+   */
+  std::string opt_external_host_;
 
   // Proxy list
   std::vector< std::vector<ProxyInfo> > *opt_proxy_groups_;
