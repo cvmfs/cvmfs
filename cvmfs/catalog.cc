@@ -231,7 +231,7 @@ bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
   bool found = sql_lookup_md5path_->FetchRow();
   if (found && (dirent != NULL)) {
     *dirent = sql_lookup_md5path_->GetDirent(this, expand_symlink);
-    dirent->set_external_data(GetExternalDataLocked());
+    dirent->set_external_data(GetExternalDataLocked() == Present);
     FixTransitionPoint(md5path, dirent);
   }
   sql_lookup_md5path_->Reset();
@@ -412,36 +412,41 @@ void Catalog::DropDatabaseFileOwnership() {
 }
 
 
-bool Catalog::GetExternalDataLocked() const {
-  bool result;
+Catalog::ExternalDataStatus Catalog::GetExternalDataLocked() const {
   ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
-  if (status == Present) {
-    result = true;
-  } else if (status == None) {
-    result = false;
-  } else {
-    bool attr = database().GetPropertyDefault<bool>("external_data", false);
-    atomic_write32(&external_data_status_, attr ? Present : None);
-    result = attr;
+  if (status == Unknown) {
+    bool attr = false;
+    if (database().HasProperty("external_data")) {
+      attr = database().GetProperty<int>("external_data");
+      status = attr ? Present : None;
+    } else {
+      status = parent_ ? parent_->GetExternalDataUnlocked() : Unspecified;
+    }
+    atomic_write32(&external_data_status_, status);
   } 
-  return result;
+  return status;
+}
+
+Catalog::ExternalDataStatus Catalog::GetExternalDataUnlocked() const {
+  ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
+  if (status == Unknown) {
+    pthread_mutex_lock(lock_);
+    bool attr = false;
+    if (database().HasProperty("external_data")) {
+      bool attr = database().GetProperty<int>("external_data");
+      status = attr ? Present : None;
+    } else {
+      status = parent_ ? parent_->GetExternalDataUnlocked() : Unspecified;
+    }
+    pthread_mutex_unlock(lock_);
+    atomic_write32(&external_data_status_, attr ? Present : None);
+  } 
+  return status;
 }
 
 bool Catalog::GetExternalData() const {
-  bool result;
-  ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
-  if (status == Present) {
-    result = true;
-  } else if (status == None) {
-    result = false;
-  } else {
-    pthread_mutex_lock(lock_);
-    bool attr = database().GetPropertyDefault<bool>("external_data", false);
-    pthread_mutex_unlock(lock_);
-    atomic_write32(&external_data_status_, attr ? Present : None);
-    result = attr;
-  } 
-  return result;
+  ExternalDataStatus status = GetExternalDataUnlocked();
+  return (status == Present);
 }
 
 

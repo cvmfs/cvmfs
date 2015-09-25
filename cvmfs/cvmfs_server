@@ -246,7 +246,7 @@ CernVM-FS Server Tool $(cvmfs_version_string)
 Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
-  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
+  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner] [-X (enable external data)]
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
@@ -2416,11 +2416,15 @@ mkfs() {
   local garbage_collectable=false
   local s3_config=""
   local keys_import_location
+  local external=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:vga:zs:k:" option; do
+  while getopts "Xw:u:o:mf:vga:zs:k:" option; do
     case $option in
+      X)
+        external=1
+      ;;
       w)
         stratum0=$OPTARG
       ;;
@@ -2566,6 +2570,10 @@ mkfs() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  local external_data_opt=""
+  if [ $external_data -eq 1 ]; then
+    external_data_opt="-X"
+  fi
 
   echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
@@ -2576,6 +2584,7 @@ mkfs() {
   fi
   local user_shell="$(get_user_shell $name)"
   local create_cmd="$(__swissknife_cmd) create \
+    $external_data_opt                         \
     -t $temp_dir                               \
     -r $upstream                               \
     -a $hash_algo $volatile_opt                \

@@ -71,6 +71,12 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
   SyncItem entry(parent_dir, filename, this, kItemFile);
+  if (entry.IsCatalogMarker()) {
+    char buf[128];
+    if ((-1 != lgetxattr(entry.GetScratchPath().c_str(), "user.external_data", buf, 128)) || (errno == ERANGE)) {
+      entry.SetExternalData();
+    }
+  }
   ProcessFile(&entry);
 }
 

@@ -247,7 +247,15 @@ class Catalog : public SingleCopy {
 
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
-  bool GetExternalDataLocked() const; // For holders of lock_
+
+  enum ExternalDataStatus {
+    Unknown,
+    None,
+    Present,
+    Unspecified,
+  };
+  ExternalDataStatus GetExternalDataUnlocked() const;
+  ExternalDataStatus GetExternalDataLocked() const; // For holders of lock_
 
  private:
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
@@ -262,11 +270,6 @@ class Catalog : public SingleCopy {
   const bool is_root_;
   bool managed_database_;
 
-  enum ExternalDataStatus {
-    Unknown,
-    None,
-    Present
-  };
   mutable atomic_int32 external_data_status_;
 
   Catalog *parent_;
