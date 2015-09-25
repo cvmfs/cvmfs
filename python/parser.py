@@ -78,10 +78,8 @@ class Parser:
         csv.write(";origin;external\n")
         for key in parser1.counters:
             csv.write(parser1.counters[key].name + ";" +
-                      str(parser1.counters[key].avg())
-                      + ";" +
-                      str(parser2.counters[key].avg())
-                      + "\n")
+                      str(parser1.counters[key].avg()) + ";" +
+                      str(parser2.counters[key].avg()) + "\n")
         csv.close()
 
     @staticmethod
