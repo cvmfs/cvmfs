@@ -15,7 +15,7 @@
  *
  * Macaroons are issued by the octopus lease server.  The lease server shares
  * separate keys with each of the release manager machines and with the storage
- * relay.  Leases are targeted for the storage array.  The release manager
+ * relay.  Leases are targeted for the storage relay.  The release manager
  * machine is seen as a third party that signes off the hash of the change pack.
  *
  * The following caveats are supported for the octopus server:

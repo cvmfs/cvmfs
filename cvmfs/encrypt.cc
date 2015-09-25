@@ -14,7 +14,6 @@
 #include <cstring>
 #include <ctime>
 
-#include "hash.h"
 #include "platform.h"
 #include "smalloc.h"
 #include "util.h"
@@ -149,49 +148,6 @@ bool Cipher::Decrypt(
 //------------------------------------------------------------------------------
 
 
-string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
-  assert(key.size() == kKeySize);
-  int retval;
-
-  // use hash over real time and monotonic time
-  struct timespec time_stamp[2];
-  retval = clock_gettime(CLOCK_REALTIME, &(time_stamp[0]));
-  assert(retval == 0);
-  retval = clock_gettime(CLOCK_MONOTONIC, &(time_stamp[1]));
-  assert(retval == 0);
-  shash::Md5 md5(reinterpret_cast<const char *>(&time_stamp),
-                 2 * sizeof(struct timespec));
-  // iv size happens to be md5 digest size
-  unsigned char *iv = md5.digest;
-
-  // See OpenSSL documentation as for the size.  Additionally, we prepend the
-  // initialization vector.
-  unsigned char *ciphertext = reinterpret_cast<unsigned char *>(
-    smalloc(kIvSize + 2 * kBlockSize + plaintext.size()));
-  memcpy(ciphertext, iv, kIvSize);
-  int cipher_len;
-  EVP_CIPHER_CTX ctx;
-  EVP_CIPHER_CTX_init(&ctx);
-  retval = EVP_EncryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
-  assert(retval == 1);
-  retval = EVP_EncryptUpdate(&ctx,
-             ciphertext + kIvSize, &cipher_len,
-             reinterpret_cast<const unsigned char *>(plaintext.data()),
-             plaintext.length());
-  assert(retval == 1);
-  retval = EVP_EncryptFinal_ex(&ctx, ciphertext + kIvSize + cipher_len,
-                               &cipher_len);
-  assert(retval == 1);
-  retval = EVP_CIPHER_CTX_cleanup(&ctx);
-  assert(retval == 1);
-
-  assert(cipher_len > 0);
-  string result(reinterpret_cast<char *>(ciphertext), kIvSize + cipher_len);
-  free(ciphertext);
-  return result;
-}
-
-
 string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
   assert(key.size() == kKeySize);
   int retval, retval_2;
@@ -238,16 +194,68 @@ string CipherAes256Cbc::DoDecrypt(const string &ciphertext, const Key &key) {
 }
 
 
-//------------------------------------------------------------------------------
+string CipherAes256Cbc::DoEncrypt(const string &plaintext, const Key &key) {
+  assert(key.size() == kKeySize);
+  int retval;
 
+  shash::Md5 md5(GenerateIv());
+  // iv size happens to be md5 digest size
+  unsigned char *iv = md5.digest;
 
-string CipherNone::DoEncrypt(const string &plaintext, const Key &key) {
-  return plaintext;
+  // See OpenSSL documentation as for the size.  Additionally, we prepend the
+  // initialization vector.
+  unsigned char *ciphertext = reinterpret_cast<unsigned char *>(
+    smalloc(kIvSize + 2 * kBlockSize + plaintext.size()));
+  memcpy(ciphertext, iv, kIvSize);
+  int cipher_len;
+  EVP_CIPHER_CTX ctx;
+  EVP_CIPHER_CTX_init(&ctx);
+  retval = EVP_EncryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, key.data(), iv);
+  assert(retval == 1);
+  retval = EVP_EncryptUpdate(&ctx,
+             ciphertext + kIvSize, &cipher_len,
+             reinterpret_cast<const unsigned char *>(plaintext.data()),
+             plaintext.length());
+  assert(retval == 1);
+  retval = EVP_EncryptFinal_ex(&ctx, ciphertext + kIvSize + cipher_len,
+                               &cipher_len);
+  assert(retval == 1);
+  retval = EVP_CIPHER_CTX_cleanup(&ctx);
+  assert(retval == 1);
+
+  assert(cipher_len > 0);
+  string result(reinterpret_cast<char *>(ciphertext), kIvSize + cipher_len);
+  free(ciphertext);
+  return result;
 }
+
+
+/**
+ * The block size of AES-256-CBC happens to be the same of the MD5 digest
+ * (128 bits)
+ */
+shash::Md5 CipherAes256Cbc::GenerateIv() {
+  // use hash over real time and monotonic time
+  struct timespec time_stamp[2];
+  int retval = clock_gettime(CLOCK_REALTIME, &(time_stamp[0]));
+  assert(retval == 0);
+  retval = clock_gettime(CLOCK_MONOTONIC, &(time_stamp[1]));
+  assert(retval == 0);
+  return shash::Md5(reinterpret_cast<const char *>(&time_stamp),
+                    2 * sizeof(struct timespec));
+}
+
+
+//------------------------------------------------------------------------------
 
 
 string CipherNone::DoDecrypt(const string &ciphertext, const Key &key) {
   return ciphertext;
+}
+
+
+string CipherNone::DoEncrypt(const string &plaintext, const Key &key) {
+  return plaintext;
 }
 
 }  // namespace cipher

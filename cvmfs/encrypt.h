@@ -1,5 +1,13 @@
 /**
  * This file is part of the CernVM File System
+ *
+ * Symmetric encryption/decryption of small pieces of text.  Plain text and
+ * cipher text are stored in std::string.  Uses cbc mode, there is no inherent
+ * integrity check.  The cipher text should only be used in a data structure
+ * that is itself protected by a digital signature, HMAC, or similar.
+ *
+ * The initialization vector is transferred together with the cipher text.  It
+ * is constructed from a hash over the real time and the monotonic clock.
  */
 
 #ifndef CVMFS_ENCRYPT_H_
@@ -7,13 +15,15 @@
 
 #include <string>
 
+#include "gtest/gtest_prod.h"
+#include "hash.h"
 #include "util.h"
 
 namespace cipher {
 
 enum Algorithms {
   kAes256Cbc = 0,
-  kNone,
+  kNone,  // needs to be last
 };
 
 
@@ -70,9 +80,11 @@ class Cipher {
 
 
 /**
- * Uses openssl EVP_... format.  The IV is created from the system time.
+ * Uses OpenSSL EVP_... format.  The IV is created from the system time.
  */
 class CipherAes256Cbc : public Cipher {
+  FRIEND_TEST(T_Encrypt, Aes_256_Cbc_Iv);
+
  public:
   virtual std::string const name() { return "AES-256-CBC"; }
   virtual Algorithms const algorithm() { return kAes256Cbc; }
@@ -85,6 +97,7 @@ class CipherAes256Cbc : public Cipher {
   virtual std::string DoDecrypt(const std::string &ciphertext, const Key &key);
 
  private:
+  shash::Md5 GenerateIv();
   static const unsigned kKeySize = 256/8;
   static const unsigned kIvSize = 128/8;
   static const unsigned kBlockSize = 128/8;
