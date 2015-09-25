@@ -429,7 +429,8 @@ bool cvmfs_context::GetDirentForPath(const PathString         &path,
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
   // Lookup inode in catalog TODO: not twice md5 calculation
-  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
+  catalog::ClientCtx ctx(geteuid(), getegid(), getpid());
+  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent, &ctx)) {
     md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
@@ -552,7 +553,8 @@ int cvmfs_context::ListDirectory(
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
-  if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
+  catalog::ClientCtx ctx(geteuid(), getegid(), getpid());
+  if (!catalog_manager_->ListingStat(path, &listing_from_catalog, &ctx)) {
     return -EIO;
   }
   for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
@@ -583,8 +585,9 @@ int cvmfs_context::Open(const char *c_path) {
              path.c_str());
 
     FileChunkList *chunks = new FileChunkList();
+    catalog::ClientCtx ctx(geteuid(), getegid(), getpid());
     if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
-                                          chunks) ||
+                                          chunks, &ctx) ||
         chunks->IsEmpty())
     {
       LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "

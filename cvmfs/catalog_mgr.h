@@ -41,6 +41,18 @@ enum LookupOptions {
   kLookupRawSymlink  = 0x10,
 };
 
+/**
+ * The context of the catalog operation.
+ * Represents a client this is performed on behalf of.
+ */
+struct ClientCtx {
+  ClientCtx(uid_t u, gid_t g, pid_t p) : uid(u), gid(g), pid(p) {}
+  ClientCtx() : uid(-1), gid(-1), pid(-1) {}
+  uid_t uid;
+  gid_t gid;
+  pid_t pid;
+};
+
 
 /**
  * Results upon loading a catalog file.
@@ -153,15 +165,15 @@ class AbstractCatalogManager : public SingleCopy {
   //  bool LookupInode(const inode_t inode, const LookupOptions options,
   //                   DirectoryEntry *entry);
   bool LookupPath(const PathString &path, const LookupOptions options,
-                  DirectoryEntry *entry);
+                  DirectoryEntry *entry, ClientCtx *);
   bool LookupPath(const std::string &path, const LookupOptions options,
-                  DirectoryEntry *entry)
+                  DirectoryEntry *entry, ClientCtx *ctx)
   {
     PathString p;
     p.Assign(&path[0], path.length());
-    return LookupPath(p, options, entry);
+    return LookupPath(p, options, entry, ctx);
   }
-  bool LookupXattrs(const PathString &path, XattrList *xattrs);
+  bool LookupXattrs(const PathString &path, XattrList *xattrs, const ClientCtx *);
 
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
@@ -169,11 +181,11 @@ class AbstractCatalogManager : public SingleCopy {
     p.Assign(&path[0], path.length());
     return Listing(p, listing);
   }
-  bool ListingStat(const PathString &path, StatEntryList *listing);
+  bool ListingStat(const PathString &path, StatEntryList *listing, const ClientCtx *);
 
   bool ListFileChunks(const PathString &path,
                       const shash::Algorithms interpret_hashes_as,
-                      FileChunkList *chunks);
+                      FileChunkList *chunks, const ClientCtx *);
   void SetOwnerMaps(const OwnerMap &uid_map, const OwnerMap &gid_map);
 
   Statistics statistics() const { return statistics_; }
@@ -215,7 +227,8 @@ class AbstractCatalogManager : public SingleCopy {
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
                                 std::string  *catalog_path,
-                                shash::Any   *catalog_hash) = 0;
+                                shash::Any   *catalog_hash,
+                                const ClientCtx *ctx) = 0;
   virtual void UnloadCatalog(const CatalogT *catalog) { }
   virtual void ActivateCatalog(CatalogT *catalog) { }
   const std::vector<CatalogT*>& GetCatalogs() const { return catalogs_; }
@@ -234,9 +247,9 @@ class AbstractCatalogManager : public SingleCopy {
                                   CatalogT *parent_catalog) = 0;
 
   CatalogT *MountCatalog(const PathString &mountpoint, const shash::Any &hash,
-                         CatalogT *parent_catalog);
+                         CatalogT *parent_catalog, const ClientCtx *ctx);
   bool MountSubtree(const PathString &path, const CatalogT *entry_point,
-                    CatalogT **leaf_catalog);
+                    CatalogT **leaf_catalog, const ClientCtx *ctx);
 
   bool AttachCatalog(const std::string &db_path, CatalogT *new_catalog);
   void DetachCatalog(CatalogT *catalog);

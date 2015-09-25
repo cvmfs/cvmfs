@@ -777,10 +777,6 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   CURL *curl_handle = info->curl_handle;
   string url_prefix;
 
-  if (info->pid != -1)
-  {
-    ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid, info->cred_fname);
-  }
   curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
   const char *cadir = getenv("X509_CERT_DIR");
   if (!cadir) {cadir = "/etc/grid-security/certificates";}
@@ -877,6 +873,11 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
 
   string url = url_prefix + *(info->url);
+  if ((info->pid != -1) && (url.substr(0, 5) == "https"))
+  {
+    ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid, info->cred_fname);
+  }
+
   if (url.find("@proxy@") != string::npos) {
     string replacement;
     if (proxy_template_forced_ != "") {

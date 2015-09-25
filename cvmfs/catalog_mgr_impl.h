@@ -91,7 +91,7 @@ template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::Init() {
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog");
   WriteLock();
-  bool attached = MountCatalog(PathString("", 0), shash::Any(), NULL);
+  bool attached = MountCatalog(PathString("", 0), shash::Any(), NULL, NULL);
   Unlock();
 
   if (!attached) {
@@ -112,7 +112,7 @@ LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
   LogCvmfs(kLogCatalog, kLogDebug,
            "remounting repositories (dry run %d)", dry_run);
   if (dry_run)
-    return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL);
+    return LoadCatalog(PathString("", 0), shash::Any(), NULL, NULL, NULL);
 
   WriteLock();
 
@@ -121,7 +121,8 @@ LoadError AbstractCatalogManager<CatalogT>::Remount(const bool dry_run) {
   const LoadError load_error = LoadCatalog(PathString("", 0),
                                            shash::Any(),
                                            &catalog_path,
-                                           &catalog_hash);
+                                           &catalog_hash,
+                                           NULL);
   if (load_error == kLoadNew) {
     inode_t old_inode_gauge = inode_gauge_;
     DetachAll();
@@ -179,7 +180,8 @@ void AbstractCatalogManager<CatalogT>::DetachNested() {
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
                                         const LookupOptions options,
-                                        DirectoryEntry *dirent)
+                                        DirectoryEntry *dirent,
+                                        ClientCtx *ctx)
 {
   // initialize as non-negative
   assert(dirent);
@@ -201,7 +203,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
   bool found = best_fit->LookupPath(path, dirent);
 
   // Possibly in a nested catalog
-  if (!found && MountSubtree(path, best_fit, NULL)) {
+  if (!found && MountSubtree(path, best_fit, NULL, ctx)) {
     LogCvmfs(kLogCatalog, kLogDebug, "looking up '%s' in a nested catalog",
              path.c_str());
     Unlock();
@@ -217,7 +219,7 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
                "entry not found, we may have to load nested catalogs");
 
       CatalogT *nested_catalog;
-      found = MountSubtree(path, best_fit, &nested_catalog);
+      found = MountSubtree(path, best_fit, &nested_catalog, ctx);
       // DowngradeLock(); TODO
 
       if (!found) {
@@ -299,7 +301,8 @@ bool AbstractCatalogManager<CatalogT>::LookupPath(const PathString &path,
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   const PathString &path,
-  XattrList *xattrs)
+  XattrList *xattrs,
+  const ClientCtx *ctx)
 {
   EnforceSqliteMemLimit();
   bool result;
@@ -308,12 +311,12 @@ bool AbstractCatalogManager<CatalogT>::LookupXattrs(
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(path, best_fit, NULL, ctx)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
-    result = MountSubtree(path, best_fit, &catalog);
+    result = MountSubtree(path, best_fit, &catalog, ctx);
     // DowngradeLock(); TODO
     if (!result) {
       Unlock();
@@ -375,7 +378,8 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
  */
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::ListingStat(const PathString &path,
-                                        StatEntryList *listing)
+                                        StatEntryList *listing,
+                                        const ClientCtx *fctx)
 {
   EnforceSqliteMemLimit();
   bool result;
@@ -384,12 +388,12 @@ bool AbstractCatalogManager<CatalogT>::ListingStat(const PathString &path,
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(path, best_fit, NULL, fctx)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
-    result = MountSubtree(path, best_fit, &catalog);
+    result = MountSubtree(path, best_fit, &catalog, fctx);
     // DowngradeLock(); TODO
     if (!result) {
       Unlock();
@@ -416,7 +420,8 @@ template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::ListFileChunks(
   const PathString &path,
   const shash::Algorithms interpret_hashes_as,
-  FileChunkList *chunks)
+  FileChunkList *chunks,
+  const ClientCtx *ctx)
 {
   EnforceSqliteMemLimit();
   bool result;
@@ -425,12 +430,12 @@ bool AbstractCatalogManager<CatalogT>::ListFileChunks(
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(path, best_fit, NULL, ctx)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
-    result = MountSubtree(path, best_fit, &catalog);
+    result = MountSubtree(path, best_fit, &catalog, ctx);
     if (!result) {
       Unlock();
       return false;
@@ -582,7 +587,8 @@ bool AbstractCatalogManager<CatalogT>::IsAttached(const PathString &root_path,
 template <class CatalogT>
 bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
                                           const CatalogT *entry_point,
-                                          CatalogT **leaf_catalog)
+                                          CatalogT **leaf_catalog,
+                                          const ClientCtx *ctx)
 {
   bool result = true;
   CatalogT *parent = (entry_point == NULL) ?
@@ -612,11 +618,11 @@ bool AbstractCatalogManager<CatalogT>::MountSubtree(const PathString &path,
       // (due to reloading root)
       if (i->hash.IsNull())
         return false;
-      new_nested = MountCatalog(i->path, i->hash, parent);
+      new_nested = MountCatalog(i->path, i->hash, parent, ctx);
       if (!new_nested)
         return false;
 
-      result = MountSubtree(path, new_nested, &parent);
+      result = MountSubtree(path, new_nested, &parent, ctx);
       break;
     }
   }
@@ -636,7 +642,8 @@ template <class CatalogT>
 CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
                                               const PathString &mountpoint,
                                               const shash::Any &hash,
-                                              CatalogT *parent_catalog)
+                                              CatalogT *parent_catalog,
+                                              const ClientCtx *ctx)
 {
   CatalogT *attached_catalog = NULL;
   if (IsAttached(mountpoint, &attached_catalog))
@@ -645,7 +652,7 @@ CatalogT *AbstractCatalogManager<CatalogT>::MountCatalog(
   string     catalog_path;
   shash::Any catalog_hash;
   const LoadError retval =
-    LoadCatalog(mountpoint, hash, &catalog_path, &catalog_hash);
+    LoadCatalog(mountpoint, hash, &catalog_path, &catalog_hash, ctx);
   if ((retval == kLoadFail) || (retval == kLoadNoSpace)) {
     LogCvmfs(kLogCatalog, kLogDebug, "failed to load catalog '%s' (%d - %s)",
              mountpoint.c_str(), retval, Code2Ascii(retval));
