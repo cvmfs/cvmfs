@@ -1106,6 +1106,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   fd = fetcher_->Fetch(
     dirent.checksum(),
     dirent.size(),
+    dirent.IsExternalFile(),
     string(path.GetChars(), path.GetLength()),
     volatile_repository_ ? cache::CacheManager::kTypeVolatile :
                            cache::CacheManager::kTypeRegular);
@@ -1202,6 +1203,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         chunk_fd.fd = fetcher_->Fetch(
           chunks.list->AtPtr(chunk_idx)->content_hash(),
           chunks.list->AtPtr(chunk_idx)->size(),
+          false, // For now, using chunks automatically disables external data
           verbose_path,
           volatile_repository_ ? cache::CacheManager::kTypeVolatile
                                : cache::CacheManager::kTypeRegular);
@@ -1488,6 +1490,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     } else {
       attribute_value = "DIRECT";
     }
+  } else if (attr == "user.external_host") {
+    attribute_value = download_manager_->GetExternalHost();
   } else if (attr == "user.host") {
     vector<string> host_chain;
     vector<int> rtt;
@@ -1597,7 +1601,8 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
-    "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0";
+    "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
+    "user.external_host\0";
   string attribute_list;
   if (hide_magic_xattrs_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
@@ -1669,6 +1674,7 @@ bool Pin(const string &path) {
       int fd = fetcher_->Fetch(
         chunks.AtPtr(i)->content_hash(),
         chunks.AtPtr(i)->size(),
+        false, // Chunking and external data is incompatible
         "Part of " + path,
         cache::CacheManager::kTypePinned);
       if (fd < 0) {
@@ -1685,7 +1691,7 @@ bool Pin(const string &path) {
   if (!retval)
     return false;
   int fd = fetcher_->Fetch(
-    dirent.checksum(), dirent.size(), path, cache::CacheManager::kTypePinned);
+    dirent.checksum(), dirent.size(), dirent.IsExternalFile(), path, cache::CacheManager::kTypePinned);
   if (fd < 0) {
     return false;
   }
@@ -1826,6 +1832,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string proxies = "";
   string fallback_proxies = "";
   string dns_server = "";
+  std::string external_host;
   string public_keys = "";
   string root_hash = "";
   string repository_tag = "";
@@ -1930,6 +1937,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
     fallback_proxies = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_URL", &parameter)) {
+    external_host = parameter;
+    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
+    const string org = tokens[0];
+    external_host = ReplaceAll(external_host, "@org@", org);
+    external_host = ReplaceAll(external_host, "@fqrn@", loader_exports->repository_name);
+  }
   if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
@@ -2322,6 +2336,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (follow_redirects) {
     cvmfs::download_manager_->EnableRedirects();
   }
+  cvmfs::download_manager_->SetExternalHost(external_host);
   cvmfs::download_manager_->SetTimeout(timeout, timeout_direct);
   cvmfs::download_manager_->SetLowSpeedLimit(low_speed_limit);
   cvmfs::download_manager_->SetProxyGroupResetDelay(proxy_reset_after);

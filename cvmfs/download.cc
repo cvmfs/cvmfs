@@ -863,7 +863,9 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   if (opt_dns_server_)
     curl_easy_setopt(curl_handle, CURLOPT_DNS_SERVERS, opt_dns_server_);
 
-  if (info->probe_hosts && opt_host_chain_)
+  if (info->external && opt_external_host_.size())
+    url_prefix = opt_external_host_;
+  else if (info->probe_hosts && opt_host_chain_)
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
 
   string url = url_prefix + *(info->url);
@@ -1589,6 +1591,26 @@ Failures DownloadManager::Fetch(JobInfo *info) {
   return result;
 }
 
+
+/**
+ * Sets the server to use in the case of an external host.
+ *
+ * NOTE: currently takes the option lock, which is a bit heavy for
+ * the use case.  Atomics would be better, but the UniquePtr class
+ * isn't currently thread-safe.
+ */
+void DownloadManager::SetExternalHost(const std::string &host) {
+  pthread_mutex_lock(lock_options_);
+  opt_external_host_ = host;
+  pthread_mutex_unlock(lock_options_);
+}
+
+std::string DownloadManager::GetExternalHost() const {
+  pthread_mutex_lock(lock_options_);
+  std::string result = opt_external_host_;
+  pthread_mutex_unlock(lock_options_);
+  return result;
+}
 
 /**
  * Sets a DNS server.  Only for testing as it cannot be reverted to the system
