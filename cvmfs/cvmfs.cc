@@ -1037,7 +1037,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     if (!CheckVOMSAuthz(ctx, voms_requirements))
     {
       remount_fence_->Leave();
-      fuse_reply_err(req, EPERM);
+      fuse_reply_err(req, EACCES);
       return;
     }
     pid = ctx->pid;
@@ -1545,30 +1545,6 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     } else {
       attribute_value = "internal error: no hosts defined";
     }
-  } else if (attr == "user.secure_host") {
-    vector<string> host_chain;
-    vector<int> rtt;
-    unsigned current_host;
-    download_manager_->GetSecureHostInfo(&host_chain, &rtt, &current_host);
-    if (host_chain.size()) {
-      attribute_value = string(host_chain[current_host]);
-    } else {
-      attribute_value = "internal error: no hosts defined";
-    }
-  } else if (attr == "user.secure_host_list") {
-    vector<string> host_chain;
-    vector<int> rtt;
-    unsigned current_host;
-    download_manager_->GetSecureHostInfo(&host_chain, &rtt, &current_host);
-    if (host_chain.size()) {
-      attribute_value = host_chain[current_host];
-      for (unsigned i = 1; i < host_chain.size(); ++i) {
-        attribute_value +=
-          ";" + host_chain[(i+current_host) % host_chain.size()];
-      }
-    } else {
-      attribute_value = "internal error: no hosts defined";
-    }
   } else if (attr == "user.uptime") {
     time_t now = time(NULL);
     uint64_t uptime = now - boot_time_;
@@ -1880,7 +1856,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
   string hostname = "localhost";
-  string secure_hostname = "localhost";
   string proxies = "";
   string fallback_proxies = "";
   string dns_server = "";
@@ -2030,13 +2005,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
     hostname = parameter;
     hostname = ReplaceAll(hostname, "@org@", org);
     hostname = ReplaceAll(hostname, "@fqrn@", loader_exports->repository_name);
-  }
-  if (cvmfs::options_manager_->GetValue("CVMFS_SECURE_SERVER_URL", &parameter)) {
-    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
-    const string org = tokens[0];
-    secure_hostname = parameter;
-    secure_hostname = ReplaceAll(secure_hostname, "@org@", org);
-    secure_hostname = ReplaceAll(secure_hostname, "@fqrn@", loader_exports->repository_name);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
@@ -2381,7 +2349,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_);
   cvmfs::download_manager_->SetHostChain(hostname);
-  cvmfs::download_manager_->SetSecureHostChain(secure_hostname);
   if (!dns_server.empty()) {
     cvmfs::download_manager_->SetDnsServer(dns_server);
   }

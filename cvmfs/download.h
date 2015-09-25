@@ -335,13 +335,9 @@ class DownloadManager {
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
   void SetHostChain(const std::string &host_list);
-  void SetSecureHostChain(const std::string &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
-  void GetSecureHostInfo(std::vector<std::string> *host_chain,
-                   std::vector<int> *rtt, unsigned *current_host);
   void ProbeHosts();
-  void ProbeSecureHosts();
   bool ProbeGeo();
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list,
@@ -374,7 +370,6 @@ class DownloadManager {
   bool ValidateGeoReply(const std::string &reply_order,
                         const unsigned expected_size,
                         std::vector<uint64_t> *reply_vals);
-  void SwitchSecureHost(JobInfo *info);
   void SwitchHost(JobInfo *info);
   void SwitchProxy(JobInfo *info);
   void RebalanceProxiesUnlocked();
@@ -424,15 +419,12 @@ class DownloadManager {
 
   // Host list
   std::vector<std::string> *opt_host_chain_;
-  std::vector<std::string> *opt_secure_host_chain_;
   /**
    * Created by SetHostChain(), filled by probe_hosts.  Contains time to get
    * .cvmfschecksum in ms. -1 is unprobed, -2 is error.
    */
   std::vector<int> *opt_host_chain_rtt_;
   unsigned opt_host_chain_current_;
-  std::vector<int> *opt_secure_host_chain_rtt_;
-  unsigned opt_secure_host_chain_current_;
 
   // Proxy list
   std::vector< std::vector<ProxyInfo> > *opt_proxy_groups_;
