@@ -75,11 +75,13 @@ class Parser:
     @staticmethod
     def to_csv_comparison(parser1, parser2, filename):
         csv = open(filename, "w")
-        csv.write(";origin;external\n")
+        csv.write(";origin_avg;origin_std;external_avg;external_std\n")
         for key in parser1.counters:
             csv.write(parser1.counters[key].name + ";" +
                       str(parser1.counters[key].avg()) + ";" +
-                      str(parser2.counters[key].avg()) + "\n")
+                      str(parser1.counters[key].std()) + ";" +
+                      str(parser2.counters[key].avg()) + ";" +
+                      str(parser2.counters[key].std()) + "\n")
         csv.close()
 
     @staticmethod
@@ -89,10 +91,10 @@ class Parser:
         csv = open(filename, "w")
         for repository_name in repository_names:
             pos = repository_name.rfind("/") + 1
-            csv.write(";" + repository_name[pos:] + ";")
+            csv.write(";" + repository_name[pos:] + ";;;")
         csv.write("\n")
         for i in range(0, len(parser_list1)):
-            csv.write(";origin;external")
+            csv.write(";origin_avg;origin_std;external_avg;external_std")
         csv.write("\n")
         for counter_name in counter_names:
             csv.write(counter_name + ";")
@@ -100,6 +102,8 @@ class Parser:
                 parser1 = parser_list1[repository_name]
                 parser2 = parser_list2[repository_name]
                 csv.write(str(parser1.counters[counter_name].avg()) + ";" +
-                          str(parser2.counters[counter_name].avg()) + ";")
+                          str(parser1.counters[counter_name].std()) + ";" +
+                          str(parser2.counters[counter_name].avg()) + ";" +
+                          str(parser2.counters[counter_name].std()) + ";")
             csv.write("\n")
         csv.close()
