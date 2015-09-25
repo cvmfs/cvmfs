@@ -70,7 +70,8 @@ class Parser:
         repository_names = sorted(parser_list1)
         csv = open(filename, "w")
         for repository_name in repository_names:
-            csv.write(";" + repository_name + ";")
+            pos = repository_name.rfind("/") + 1
+            csv.write(";" + repository_name[pos:] + ";")
         csv.write("\n")
         for i in range(0, len(parser_list1)):
             csv.write(";origin;external")
