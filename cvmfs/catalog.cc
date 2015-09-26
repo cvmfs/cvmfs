@@ -231,7 +231,9 @@ bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
   bool found = sql_lookup_md5path_->FetchRow();
   if (found && (dirent != NULL)) {
     *dirent = sql_lookup_md5path_->GetDirent(this, expand_symlink);
-    dirent->set_external_data(GetExternalDataLocked() == Present);
+    bool is_external = GetExternalDataLocked() == Present;
+    LogCvmfs(kLogCatalog, kLogDebug, "Entry data is external: %d.", is_external);
+    dirent->set_external_data(is_external);
     FixTransitionPoint(md5path, dirent);
   }
   sql_lookup_md5path_->Reset();

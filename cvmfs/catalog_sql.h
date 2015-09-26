@@ -47,7 +47,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   bool CreateEmptyDatabase();
   bool InsertInitialValues(const std::string     &root_path,
                            const bool             volatile_content,
-                           const bool             external_data,
+                           CatalogProperty        external_data,
                            const DirectoryEntry  &root_entry
                                              = DirectoryEntry(kDirentNegative));
 

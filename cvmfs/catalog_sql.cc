@@ -127,7 +127,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 bool CatalogDatabase::InsertInitialValues(
   const std::string    &root_path,
   const bool            volatile_content,
-  const bool            external_data,
+  CatalogProperty       external_data,
   const DirectoryEntry &root_entry)
 {
   assert(read_write());
@@ -162,8 +162,8 @@ bool CatalogDatabase::InsertInitialValues(
     }
   }
 
-  if (external_data) {
-    if (!this->SetProperty("external_data", static_cast<int>(external_data))) {
+  if (external_data != kUnset) {
+    if (!this->SetProperty("external_data", external_data == kYes ? 1 : 0)) {
       PrintSqlError("failed to set external data flag into the newly created "
                     "catalog tables.");
       return false;
