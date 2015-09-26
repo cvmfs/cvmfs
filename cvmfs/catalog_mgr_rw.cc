@@ -87,7 +87,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string     &dir_temp,
   const bool        volatile_content,
   const bool        garbage_collectable,
-  const bool        external_data,
+  CatalogProperty   external_data,
   upload::Spooler  *spooler)
 {
   // Create a new root catalog at file_path
@@ -520,7 +520,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
  * @param external_data whether data for this catalog is external to the repository
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint, const bool external_data)
+void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint, CatalogProperty external_data)
 {
   const string nested_root_path = MakeRelativePath(mountpoint);
 

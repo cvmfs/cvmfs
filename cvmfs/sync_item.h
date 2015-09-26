@@ -59,7 +59,7 @@ class SyncItem {
   inline bool IsSymlink()       const { return IsType(kItemSymlink);          }
   inline bool WasSymlink()      const { return WasType(kItemSymlink);         }
   inline bool IsNew()           const { return WasType(kItemNew);             }
-         bool IsExternalData()  const { return external_data_;                }
+  CatalogProperty IsExternalData() const { return external_data_;             }
 
   // TODO(reneme): code smell! This depends on the UnionEngine to call
   //                           MarkAsWhiteout(), before it potentially gives the
@@ -71,7 +71,7 @@ class SyncItem {
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
-  void SetExternalData() { if (IsCatalogMarker()) external_data_ = true; }
+  void SetExternalData(bool val) { if (IsCatalogMarker()) external_data_ = val ? kYes : kNo; }
 
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
@@ -154,7 +154,7 @@ class SyncItem {
   mutable EntryStat union_stat_;
   mutable EntryStat scratch_stat_;
 
-  bool external_data_;
+  CatalogProperty external_data_;
   bool whiteout_;
   std::string relative_parent_path_;
   std::string filename_;

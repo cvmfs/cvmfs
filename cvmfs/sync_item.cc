@@ -15,7 +15,7 @@ namespace publish {
 
 SyncItem::SyncItem() :
   union_engine_(NULL),
-  external_data_(false),
+  external_data_(kUnset),
   whiteout_(false),
   scratch_type_(static_cast<SyncItemType>(0)),
   rdonly_type_(static_cast<SyncItemType>(0))
@@ -27,7 +27,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    const SyncUnion    *union_engine,
                    const SyncItemType  entry_type) :
   union_engine_(union_engine),
-  external_data_(false),
+  external_data_(kUnset),
   whiteout_(false),
   relative_parent_path_(relative_parent_path),
   filename_(filename),
