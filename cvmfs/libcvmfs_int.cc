@@ -600,6 +600,7 @@ int cvmfs_context::Open(const char *c_path) {
   fd = fetcher_->Fetch(
     dirent.checksum(),
     dirent.size(),
+    dirent.external(),
     string(path.GetChars(), path.GetLength()),
     cache::CacheManager::kTypeRegular);
   atomic_inc64(&num_fs_open_);
@@ -646,6 +647,7 @@ int64_t cvmfs_context::Pread(
         chunk_fd->fd = fetcher_->Fetch(
           chunk_list->AtPtr(chunk_idx)->content_hash(),
           chunk_list->AtPtr(chunk_idx)->size(),
+          false,
           "no path info",
           cache::CacheManager::kTypeRegular);
         if (chunk_fd->fd < 0) {

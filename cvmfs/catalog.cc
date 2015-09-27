@@ -63,6 +63,9 @@ Catalog::Catalog(const PathString &path,
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 
+  atomic_init32(&external_data_status_);
+  ExternalDataStatus status = Unknown;
+  atomic_write32(&external_data_status_, status);
   database_ = NULL;
   uid_map_ = NULL;
   gid_map_ = NULL;
@@ -228,6 +231,9 @@ bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
   bool found = sql_lookup_md5path_->FetchRow();
   if (found && (dirent != NULL)) {
     *dirent = sql_lookup_md5path_->GetDirent(this, expand_symlink);
+    bool is_external = GetExternalDataLocked() == Present;
+    LogCvmfs(kLogCatalog, kLogDebug, "Entry data is external: %d.", is_external);
+    dirent->set_external_data(is_external);
     FixTransitionPoint(md5path, dirent);
   }
   sql_lookup_md5path_->Reset();
@@ -405,6 +411,44 @@ void Catalog::DropDatabaseFileOwnership() {
   if (NULL != database_) {
     database_->DropFileOwnership();
   }
+}
+
+
+Catalog::ExternalDataStatus Catalog::GetExternalDataLocked() const {
+  ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
+  if (status == Unknown) {
+    bool attr = false;
+    if (database().HasProperty("external_data")) {
+      attr = database().GetProperty<int>("external_data");
+      status = attr ? Present : None;
+    } else {
+      status = parent_ ? parent_->GetExternalDataUnlocked() : Unspecified;
+    }
+    atomic_write32(&external_data_status_, status);
+  } 
+  return status;
+}
+
+Catalog::ExternalDataStatus Catalog::GetExternalDataUnlocked() const {
+  ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
+  if (status == Unknown) {
+    pthread_mutex_lock(lock_);
+    bool attr = false;
+    if (database().HasProperty("external_data")) {
+      bool attr = database().GetProperty<int>("external_data");
+      status = attr ? Present : None;
+    } else {
+      status = parent_ ? parent_->GetExternalDataUnlocked() : Unspecified;
+    }
+    pthread_mutex_unlock(lock_);
+    atomic_write32(&external_data_status_, attr ? Present : None);
+  } 
+  return status;
+}
+
+bool Catalog::GetExternalData() const {
+  ExternalDataStatus status = GetExternalDataUnlocked();
+  return (status == Present);
 }
 
 

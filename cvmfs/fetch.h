@@ -75,6 +75,7 @@ class Fetcher : SingleCopy {
   ~Fetcher();
   int Fetch(const shash::Any &id,
             const uint64_t size,
+            const bool external,
             const std::string &name,
             const cache::CacheManager::ObjectType object_type);
 

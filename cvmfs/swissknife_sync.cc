@@ -109,6 +109,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
+  const bool external_data       = (args.count('X') > 0);
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
@@ -117,7 +118,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   // TODO(rmeusel): use UniquePtr
   manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(
-      dir_temp, volatile_content, garbage_collectable, spooler);
+      dir_temp, volatile_content, garbage_collectable, external_data ? kYes : kUnset, spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;
