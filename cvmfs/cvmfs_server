@@ -2614,7 +2614,7 @@ mkfs() {
   # When publishing an external repository, it is the user's responsibility to
   # stage the actual data files to the web server - not the publication function.
   # Hence, the following is guaranteed to not work.
-  if [ external_data -eq 0 ]; then
+  if [ $external_data -eq 0 ]; then
     cat $rdonly_dir/new_repository || die "fail (finish)"
   fi
 

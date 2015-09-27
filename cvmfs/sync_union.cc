@@ -65,76 +65,12 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 }
 
 
-static bool ProcessCatalogProperties(const std::string &scratch_path, bool &external_data) {
-  char buf[128];
-  external_data = false;
-  ssize_t retval;
-  if (-1 != (retval = lgetxattr(scratch_path.c_str(), "user.external_data", buf, 127))) {
-    if (retval == 0) {
-      LogCvmfs(kLogUnionFs, kLogWarning, "Extended attribute 'external_data' set on %s, "
-               "but no value provided.", scratch_path.c_str());
-      return false;
-    }
-    if ((retval != 1) || (buf[0] != '0' && buf[0] != '1')) {
-      LogCvmfs(kLogUnionFs, kLogWarning, "Extended attribute 'external_data' set on %s, "
-               "but value is not one of '0' or '1'.", scratch_path.c_str());
-      return false;
-    }
-    external_data = buf[0] == '1';
-    return true;
-  } else if (errno == ERANGE) {
-    LogCvmfs(kLogUnionFs, kLogWarning, "Value of extended attribute on path %s is too long; "
-             "must be '1' or '0'", scratch_path.c_str());
-    return false;
-  }
-  FILE *fp = fopen(scratch_path.c_str(), "r");
-  if (fp == NULL) {
-    LogCvmfs(kLogUnionFs, kLogWarning, "Unable to open catalog marker (%s): %s (errno=%d)",
-             scratch_path.c_str(), strerror(errno), errno);
-    return false;
-  }
-  size_t len = 0;
-  ssize_t read;
-  char *line = NULL;
-  bool retval2 = false;
-  while (1) {
-    read = getline(&line, &len, fp);
-    if (read == -1) {
-      if (errno == EINTR) {continue;}
-      else {
-        break;
-      }
-    }
-    if (line[read-1] == '\n') {line[read-1] = '\0';}
-    char *value;
-    if ((value = strcasestr(line, "external_data="))) {
-      if (strlen(value) != 1 || (value[0] != '0' && value[0] != '1')) {
-        LogCvmfs(kLogUnionFs, kLogWarning, "Attribute 'external_data' set in %s, "
-               "but value is not one of '0' or '1'.  Ignoring.", scratch_path.c_str());
-        continue;
-      }
-      retval2 = true;
-    }
-  }
-  free(line);
-  if (!feof(fp)) { // ERROR reading
-    LogCvmfs(kLogUnionFs, kLogWarning, "Unable to read from catalog marker (%s): %s (errno=%d)",
-             scratch_path.c_str(), strerror(errno), errno);
-  }
-  fclose(fp);
-  return retval2;
-}
-
 void SyncUnion::ProcessRegularFile(const string &parent_dir,
                                    const string &filename)
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
   SyncItem entry(parent_dir, filename, this, kItemFile);
-  bool external_data;
-  if (entry.IsCatalogMarker() && ProcessCatalogProperties(entry.GetScratchPath(), external_data)) {
-    entry.SetExternalData(external_data);
-  }
   ProcessFile(&entry);
 }
 
