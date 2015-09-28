@@ -139,6 +139,9 @@ bool Catalog::ReadCatalogCounters() {
   } else if (database().schema_revision() < 2) {
     statistics_loaded =
       counters_.ReadFromDatabase(database(), LegacyMode::kNoXattrs);
+  } else if (database().schema_revision() < 3) {
+    statistics_loaded =
+      counters_.ReadFromDatabase(database(), LegacyMode::kNoExternals);
   } else {
     statistics_loaded = counters_.ReadFromDatabase(database());
   }

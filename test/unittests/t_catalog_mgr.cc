@@ -20,7 +20,6 @@ using namespace std;  // NOLINT
 namespace catalog {
 
 class T_CatalogManager : public ::testing::Test {
-
  public:
   T_CatalogManager() : statistics_(), catalog_mgr_(&statistics_) { }
 
@@ -119,7 +118,7 @@ class T_CatalogManager : public ::testing::Test {
   }
 
  protected:
-  const static char *hashes[];
+  static const char *hashes[];
   perf::Statistics statistics_;
   MockCatalogManager catalog_mgr_;
 };
@@ -255,7 +254,7 @@ TEST_F(T_CatalogManager, FailListing) {
   EXPECT_EQ(0u, del.size());
   // even though the listing failed it should have loaded the nested catalog
   EXPECT_EQ(2, catalog_mgr_.GetNumCatalogs());
-  //trying now with the next nested catalog
+  // trying now with the next nested catalog
   EXPECT_FALSE(catalog_mgr_.Listing("/dir/dir/dir/dir/dir/fakedir", &del));
   EXPECT_EQ(0u, del.size());
   EXPECT_EQ(3, catalog_mgr_.GetNumCatalogs());
@@ -268,4 +267,4 @@ TEST_F(T_CatalogManager, Remount) {
   EXPECT_EQ(kLoadNew, catalog_mgr_.Remount(false));
 }
 
-}
+}  // namespace catalog
