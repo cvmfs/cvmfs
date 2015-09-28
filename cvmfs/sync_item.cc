@@ -15,7 +15,7 @@ static bool ProcessCatalogProperties(const std::string &scratch_path, bool &exte
   char buf[128];
   external_data = false;
   ssize_t retval;
-  if (-1 != (retval = lgetxattr(scratch_path.c_str(), "user.external_data", buf, 127))) {
+  if (-1 != (retval = platform_lgetxattr(scratch_path.c_str(), "user.external_data", buf, 127))) {
     if (retval == 0) {
       LogCvmfs(kLogFsTraversal, kLogWarning, "Extended attribute 'external_data' set on %s, "
                "but no value provided.", scratch_path.c_str());

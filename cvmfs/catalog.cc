@@ -14,6 +14,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "util.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -64,7 +65,7 @@ Catalog::Catalog(const PathString &path,
   assert(retval == 0);
 
   atomic_init32(&external_data_status_);
-  ExternalDataStatus status = Unknown;
+  ExternalDataStatus status = kExternalUnknown;
   atomic_write32(&external_data_status_, status);
   database_ = NULL;
   uid_map_ = NULL;
@@ -234,7 +235,7 @@ bool Catalog::LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
   bool found = sql_lookup_md5path_->FetchRow();
   if (found && (dirent != NULL)) {
     *dirent = sql_lookup_md5path_->GetDirent(this, expand_symlink);
-    bool is_external = GetExternalDataLocked() == Present;
+    bool is_external = GetExternalDataUnlocked() == kExternalPresent;
     LogCvmfs(kLogCatalog, kLogDebug, "Entry data is external: %d.", is_external);
     dirent->set_is_external_file(is_external);
     FixTransitionPoint(md5path, dirent);
@@ -417,41 +418,40 @@ void Catalog::DropDatabaseFileOwnership() {
 }
 
 
-Catalog::ExternalDataStatus Catalog::GetExternalDataLocked() const {
+Catalog::ExternalDataStatus Catalog::GetExternalDataUnlocked() const {
   ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
-  if (status == Unknown) {
+  if (status == kExternalUnknown) {
     bool attr = false;
     if (database().HasProperty("external_data")) {
       attr = database().GetProperty<int>("external_data");
-      status = attr ? Present : None;
+      status = attr ? kExternalPresent : kExternalNone;
     } else {
-      status = parent_ ? parent_->GetExternalDataUnlocked() : Unspecified;
+      status = parent_ ? parent_->GetExternalDataLocked() : kExternalUnspecified;
     }
     atomic_write32(&external_data_status_, status);
   } 
   return status;
 }
 
-Catalog::ExternalDataStatus Catalog::GetExternalDataUnlocked() const {
+Catalog::ExternalDataStatus Catalog::GetExternalDataLocked() const {
   ExternalDataStatus status = static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
-  if (status == Unknown) {
-    pthread_mutex_lock(lock_);
+  if (status == kExternalUnknown) {
+    MutexLockGuard guard(*lock_);
     bool attr = false;
     if (database().HasProperty("external_data")) {
       bool attr = database().GetProperty<int>("external_data");
-      status = attr ? Present : None;
+      status = attr ? kExternalPresent : kExternalNone;
     } else {
-      status = parent_ ? parent_->GetExternalDataUnlocked() : Unspecified;
+      status = parent_ ? parent_->GetExternalDataLocked() : kExternalUnspecified;
     }
-    pthread_mutex_unlock(lock_);
-    atomic_write32(&external_data_status_, attr ? Present : None);
+    atomic_write32(&external_data_status_, attr ? kExternalPresent : kExternalNone);
   } 
   return status;
 }
 
 bool Catalog::GetExternalData() const {
-  ExternalDataStatus status = GetExternalDataUnlocked();
-  return (status == Present);
+  ExternalDataStatus status = GetExternalDataLocked();
+  return (status == kExternalPresent);
 }
 
 
