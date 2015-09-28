@@ -78,7 +78,7 @@ void SyncMediator::Add(const SyncItem &entry) {
     // A file is a hard link if the link count is greater than 1
     if (entry.GetUnionLinkcount() > 1)
       InsertHardlink(entry);
-    else
+    else if (!entry.IsGraftMarker())
       AddFile(entry);
     return;
   }
@@ -92,6 +92,7 @@ void SyncMediator::Add(const SyncItem &entry) {
  * Touch an entry in the repository.
  */
 void SyncMediator::Touch(const SyncItem &entry) {
+  if (entry.IsGraftMarker()) {return;}
   if (entry.IsDirectory()) {
     TouchDirectory(entry);
     return;
@@ -585,6 +586,22 @@ void SyncMediator::AddFile(const SyncItem &entry) {
       entry.CreateBasicCatalogDirent(),
       default_xattrs,
       entry.relative_parent_path());
+  } else if (entry.HasGraftMarker()) {
+    if (!entry.IsValidGraft()) {
+      // Graft files are added to catalog immediately.
+      catalog_manager_->AddFile(
+        entry.CreateBasicCatalogDirent(),
+        default_xattrs, // TODO: For now, use default xattrs on grafted files.
+        entry.relative_parent_path());
+    } else {
+      // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
+      // the graft file is missing information.  It's not clear that continuing
+      // forward with the publish is the correct thing to do; abort for now.
+      LogCvmfs(kLogPublish, kLogStdout, "Encountered a grafted file (%s) with invalid"
+               " grafting information; check contents of .cvmfsgraft-* file.  Aborting publish.",
+               entry.GetRelativePath().c_str());
+      abort();
+    }
   } else {
     // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);

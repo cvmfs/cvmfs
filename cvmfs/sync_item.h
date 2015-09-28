@@ -22,6 +22,7 @@ enum SyncItemType {
   kItemFile,
   kItemSymlink,
   kItemNew,
+  kItemMarker,
   kItemUnknown
 };
 
@@ -59,12 +60,15 @@ class SyncItem {
   inline bool IsSymlink()       const { return IsType(kItemSymlink);          }
   inline bool WasSymlink()      const { return WasType(kItemSymlink);         }
   inline bool IsNew()           const { return WasType(kItemNew);             }
+  inline bool IsGraftMarker()   const { return IsType(kItemMarker);           }
 
   // TODO(reneme): code smell! This depends on the UnionEngine to call
   //                           MarkAsWhiteout(), before it potentially gives the
   //                           wrong result!
   inline bool IsWhiteout()      const { return whiteout_;                     }
   inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog";  }
+  bool HasGraftMarker() const { return graft_marker_present_; }
+  bool IsValidGraft() const { return valid_graft_; }
   bool IsOpaqueDirectory() const;
 
   inline shash::Any GetContentHash() const { return content_hash_; }
@@ -109,7 +113,9 @@ class SyncItem {
   SyncItemType GetScratchFiletype() const;
 
   inline bool IsType(const SyncItemType expected_type) const {
-    if (scratch_type_ == kItemUnknown) {
+    if (filename_.substr(0, 12) == ".cvmfsgraft-") {
+      scratch_type_ = kItemMarker;
+    } else if (scratch_type_ == kItemUnknown) {
       scratch_type_ = GetScratchFiletype();
     }
     return scratch_type_ == expected_type;
@@ -146,6 +152,9 @@ class SyncItem {
 
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
 
+  std::string GetGraftPath() const;
+  void CheckGraft();
+
   const SyncUnion *union_engine_;
 
   mutable EntryStat rdonly_stat_;
@@ -153,8 +162,11 @@ class SyncItem {
   mutable EntryStat scratch_stat_;
 
   bool whiteout_;
+  bool valid_graft_;
+  bool graft_marker_present_;
   std::string relative_parent_path_;
   std::string filename_;
+  ssize_t size_;
 
   mutable SyncItemType scratch_type_;
   mutable SyncItemType rdonly_type_;
