@@ -39,7 +39,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   rdonly_type_(kItemUnknown)
 {
   content_hash_.algorithm = shash::kAny;
-  CheckGraft();
+  if (IsRegularFile()) {CheckGraft();}
 }
 
 
@@ -194,9 +194,9 @@ std::string SyncItem::GetScratchPath() const {
 
 
 std::string SyncItem::GetGraftPath() const {
-  return (relative_parent_path_.empty()) ?
-      ".cvmfsgraft-" + filename_         :
-      relative_parent_path_ + (filename_.empty() ? "" : ("/.cvmfsgraft-" + filename_));
+  return union_engine_->scratch_path() + "/" + ((relative_parent_path_.empty()) ?
+      ".cvmfsgraft-" + filename_ :
+      relative_parent_path_ + (filename_.empty() ? "" : ("/.cvmfsgraft-" + filename_)));
 }
 
 void SyncItem::CheckGraft() {
@@ -245,7 +245,8 @@ void SyncItem::CheckGraft() {
       size_ = mysize;
     } else if (line == (value = strcasestr(line, "checksum="))) {
       value += 9;
-      shash::HexPtr hashP(value);
+      std::string hash_str = value;
+      shash::HexPtr hashP(hash_str);
       if (hashP.IsValid()) {
         content_hash_ = shash::MkFromHexPtr(hashP);
         found_checksum = true;
@@ -254,7 +255,7 @@ void SyncItem::CheckGraft() {
       }
       continue;
     } else if ((strlen(line) > 0) && (line[0] != '#')) {
-      LogCvmfs(kLogFsTraversal, kLogDebug, "Unknown graft attribute: %s.", line);
+      LogCvmfs(kLogFsTraversal, kLogStderr, "Unknown graft attribute: %s.", line);
     }
   }
   free(line);
