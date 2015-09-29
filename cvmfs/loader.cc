@@ -41,6 +41,12 @@
 #include "sanitizer.h"
 #include "util.h"
 
+// If valgrind headers are present on the build system,
+// then we can detect valgrind at runtime.
+#ifdef HAS_VALGRIND_HEADERS
+#include <valgrind/valgrind.h>
+#endif
+
 using namespace std;  // NOLINT
 
 namespace loader {
@@ -768,8 +774,13 @@ int main(int argc, char *argv[]) {
         LogCvmfs(kLogCvmfs, kLogStderr | kLogSyslogErr,
                  "Failed to set maximum number of open files, "
                  "insufficient permissions");
-        // TODO(jblomer) detect valgrind and don't fail
+#ifdef HAS_VALGRIND_HEADERS
+        if (!RUNNING_ON_VALGRIND) {
+          return kFailPermission;
+        }
+#else
         return kFailPermission;
+#endif
       }
     }
   }
