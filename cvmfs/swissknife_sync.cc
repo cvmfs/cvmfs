@@ -119,7 +119,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(
       dir_temp, volatile_content, garbage_collectable,
-      external_data ? kYes :` kUnset, spooler);
+      external_data ? kYes : kUnset, spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;
