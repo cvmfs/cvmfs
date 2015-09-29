@@ -11,33 +11,39 @@
 using namespace std;  // NOLINT
 
 
-static bool ProcessCatalogProperties(const std::string &scratch_path, bool &external_data) {
+static bool ProcessCatalogProperties(const std::string &scratch_path,
+                                     bool &external_data) {  // NOLINT
   char buf[128];
   external_data = false;
   ssize_t retval;
-  if (-1 != (retval = platform_lgetxattr(scratch_path.c_str(), "user.external_data", buf, 127))) {
+  if (-1 != (retval = platform_lgetxattr(scratch_path.c_str(),
+                                         "user.external_data", buf, 127)))
+  {
     if (retval == 0) {
-      LogCvmfs(kLogFsTraversal, kLogWarning, "Extended attribute 'external_data' set on %s, "
-               "but no value provided.", scratch_path.c_str());
+      LogCvmfs(kLogFsTraversal, kLogWarning, "Extended attribute "
+               "'external_data' set on %s, but no value provided.",
+               scratch_path.c_str());
       return false;
     }
     if ((retval != 1) || (buf[0] != '0' && buf[0] != '1')) {
-      LogCvmfs(kLogFsTraversal, kLogWarning, "Extended attribute 'external_data' set on %s, "
-               "but value is not one of '0' or '1'.", scratch_path.c_str());
+      LogCvmfs(kLogFsTraversal, kLogWarning, "Extended attribute "
+               "'external_data' set on %s, but value is not one of '0' or "
+               "'1'.", scratch_path.c_str());
       return false;
     }
     external_data = buf[0] == '1';
     return true;
   } else if (errno == ERANGE) {
-    LogCvmfs(kLogFsTraversal, kLogWarning, "Value of extended attribute on path %s is too long; "
-             "must be '1' or '0'", scratch_path.c_str());
+    LogCvmfs(kLogFsTraversal, kLogWarning, "Value of extended attribute on "
+             "path %s is too long; must be '1' or '0'", scratch_path.c_str());
     return false;
   }
-  LogCvmfs(kLogFsTraversal, kLogDebug, "Processing catalog marker %s.", scratch_path.c_str());
+  LogCvmfs(kLogFsTraversal, kLogDebug, "Processing catalog marker %s.",
+           scratch_path.c_str());
   FILE *fp = fopen(scratch_path.c_str(), "r");
   if (fp == NULL) {
-    LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to open catalog marker (%s): %s (errno=%d)",
-             scratch_path.c_str(), strerror(errno), errno);
+    LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to open catalog marker (%s):"
+             " %s (errno=%d)", scratch_path.c_str(), strerror(errno), errno);
     return false;
   }
   size_t len = 0;
@@ -47,8 +53,9 @@ static bool ProcessCatalogProperties(const std::string &scratch_path, bool &exte
   while (1) {
     read = getline(&line, &len, fp);
     if (read == -1) {
-      if (errno == EINTR) {continue;}
-      else {
+      if (errno == EINTR) {
+        continue;
+      } else {
         break;
       }
     }
@@ -57,8 +64,9 @@ static bool ProcessCatalogProperties(const std::string &scratch_path, bool &exte
     if ((value = strcasestr(line, "external_data="))) {
       value += 14;
       if (strlen(value) != 1 || (value[0] != '0' && value[0] != '1')) {
-        LogCvmfs(kLogFsTraversal, kLogWarning, "Attribute 'external_data' set in %s, "
-               "but value is not one of '0' or '1'.  Ignoring.", scratch_path.c_str());
+        LogCvmfs(kLogFsTraversal, kLogWarning, "Attribute 'external_data' set "
+               "in %s, but value is not one of '0' or '1'.  Ignoring.",
+               scratch_path.c_str());
         continue;
       }
       external_data = value[0] == '1';
@@ -66,9 +74,10 @@ static bool ProcessCatalogProperties(const std::string &scratch_path, bool &exte
     }
   }
   free(line);
-  if (!feof(fp)) { // ERROR reading
-    LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to read from catalog marker (%s): %s (errno=%d)",
-             scratch_path.c_str(), strerror(errno), errno);
+  if (!feof(fp)) {  // ERROR reading
+    LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to read from catalog marker"
+             " (%s): %s (errno=%d)", scratch_path.c_str(), strerror(errno),
+             errno);
   }
   fclose(fp);
   return retval2;
@@ -101,8 +110,11 @@ SyncItem::SyncItem(const string       &relative_parent_path,
 {
   content_hash_.algorithm = shash::kAny;
   bool external_data;
-  if (IsCatalogMarker() && ProcessCatalogProperties(GetScratchPath(), external_data)) {
-    LogCvmfs(kLogFsTraversal, kLogDebug, "Setting external data to %d in catalog.", external_data);
+  if (IsCatalogMarker() && ProcessCatalogProperties(GetScratchPath(),
+      external_data))
+  {
+    LogCvmfs(kLogFsTraversal, kLogDebug,
+             "Setting external data to %d in catalog.", external_data);
     SetExternalData(external_data);
   }
 }

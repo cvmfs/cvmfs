@@ -252,13 +252,15 @@ class Catalog : public SingleCopy {
   // The presence of 'unspecified' is used to calculate inheritance;
   // outside this object, the status should be returned as a boolean.
   enum ExternalDataStatus {
-    kExternalUnknown, // Database has not been queried about external data status.
-    kExternalNone, // External data property is explicitly disabled.
-    kExternalPresent, // External data is explicitly enabled.
-    kExternalUnspecified, // External data is not explicitly set in the database.
+    kExternalUnknown,  // Database has not been queried about external
+                       // data status.
+    kExternalNone,  // External data property is explicitly disabled.
+    kExternalPresent,  // External data is explicitly enabled.
+    kExternalUnspecified,  // External data is not explicitly set in the
+                           // database.
   };
   ExternalDataStatus GetExternalDataLocked() const;
-  ExternalDataStatus GetExternalDataUnlocked() const; // For holders of lock_
+  ExternalDataStatus GetExternalDataUnlocked() const;  // For holders of lock_
 
  private:
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,

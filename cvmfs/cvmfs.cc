@@ -1203,7 +1203,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
         chunk_fd.fd = fetcher_->Fetch(
           chunks.list->AtPtr(chunk_idx)->content_hash(),
           chunks.list->AtPtr(chunk_idx)->size(),
-          false, // For now, using chunks automatically disables external data
+          false,  // For now, using chunks automatically disables external data
           verbose_path,
           volatile_repository_ ? cache::CacheManager::kTypeVolatile
                                : cache::CacheManager::kTypeRegular);
@@ -1678,7 +1678,7 @@ bool Pin(const string &path) {
       int fd = fetcher_->Fetch(
         chunks.AtPtr(i)->content_hash(),
         chunks.AtPtr(i)->size(),
-        false, // Chunking and external data is incompatible
+        false,  // Chunking and external data is incompatible
         "Part of " + path,
         cache::CacheManager::kTypePinned);
       if (fd < 0) {
@@ -1695,7 +1695,8 @@ bool Pin(const string &path) {
   if (!retval)
     return false;
   int fd = fetcher_->Fetch(
-    dirent.checksum(), dirent.size(), dirent.IsExternalFile(), path, cache::CacheManager::kTypePinned);
+    dirent.checksum(), dirent.size(), dirent.IsExternalFile(), path,
+    cache::CacheManager::kTypePinned);
   if (fd < 0) {
     return false;
   }
@@ -1946,7 +1947,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
     const string org = tokens[0];
     external_host = ReplaceAll(external_host, "@org@", org);
-    external_host = ReplaceAll(external_host, "@fqrn@", loader_exports->repository_name);
+    external_host = ReplaceAll(external_host, "@fqrn@",
+                               loader_exports->repository_name);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;

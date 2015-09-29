@@ -520,7 +520,8 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
  * @param external_data whether data for this catalog is external to the repository
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint, CatalogProperty external_data)
+void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint,
+                                                 CatalogProperty external_data)
 {
   const string nested_root_path = MakeRelativePath(mountpoint);
 

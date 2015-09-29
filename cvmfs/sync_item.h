@@ -71,7 +71,9 @@ class SyncItem {
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
-  void SetExternalData(bool val) { if (IsCatalogMarker()) external_data_ = val ? kYes : kNo; }
+  void SetExternalData(bool val) {
+    if (IsCatalogMarker()) external_data_ = val ? kYes : kNo;
+  }
 
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
