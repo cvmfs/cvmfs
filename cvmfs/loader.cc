@@ -777,6 +777,8 @@ int main(int argc, char *argv[]) {
 #ifdef HAS_VALGRIND_HEADERS
         if (!RUNNING_ON_VALGRIND) {
           return kFailPermission;
+        } else {
+          LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: running under valgrind");
         }
 #else
         return kFailPermission;
