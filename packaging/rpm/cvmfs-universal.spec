@@ -1,6 +1,6 @@
 
 %{?suse_version:%define dist .suse%suse_version}
-%if 0%{?el6} || 0%{?el7} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20} || 0%{?fc21}
+%if 0%{?el6} || 0%{?el7} || 0%{?fedora}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
@@ -258,8 +258,8 @@ mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 %endif
 
-# Fix docdir on FC20, FC21
-%if 0%{?fc20} || 0%{?fc21}
+# Fix docdir on Fedora
+%if 0%{?fedora}
 rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
 %endif
 
