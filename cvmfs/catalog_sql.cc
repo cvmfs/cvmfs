@@ -311,6 +311,9 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   if (entry.IsChunkedFile())
     database_flags |= kFlagFileChunk;
 
+  if (entry.IsExternalFile())
+    database_flags |= kFlagFileExternal;
+
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
 

@@ -99,7 +99,9 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     retval = false;
   }
   if (diffs & Difference::kExternalFileFlag) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "external file flag differs");
+    LogCvmfs(kLogCvmfs, kLogStderr, "external file flag differs: %d / %d "
+             "(%s / %s)", a.IsExternalFile(), b.IsExternalFile(),
+             a.name().c_str(), b.name().c_str());
     retval = false;
   }
 
