@@ -1,4 +1,5 @@
 2.2.0:
+  * Detect valgrind if valgrind header is present on the system
   * Add make check target
   * Fix leak of temporary files in .cvmfsdirtab handling (CVM-818)
   * Allow geodb update for non-root users (CVM-895)
