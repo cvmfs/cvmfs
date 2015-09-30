@@ -119,7 +119,8 @@ LoadError ClientCatalogManager::LoadCatalog(
   // Load a particular catalog
   if (!hash.IsNull()) {
     cvmfs_path += " (" + hash.ToString() + ")";
-    LoadError load_error = LoadCatalogCas(hash, cvmfs_path, catalog_path, "", ctx);
+    LoadError load_error = LoadCatalogCas(hash, cvmfs_path, catalog_path, "",
+                                         ctx);
     if (load_error == catalog::kLoadNew)
       loaded_catalogs_[mountpoint] = hash;
     *catalog_hash = hash;
@@ -161,7 +162,8 @@ LoadError ClientCatalogManager::LoadCatalog(
              manifest_failure, manifest::Code2Ascii(manifest_failure));
 
     if (catalog_path) {
-      LoadError error = LoadCatalogCas(cache_hash, cvmfs_path, catalog_path, "", ctx);
+      LoadError error = LoadCatalogCas(cache_hash, cvmfs_path, catalog_path,
+                                       "", ctx);
       if (error != catalog::kLoadNew)
         return error;
     }
@@ -179,7 +181,8 @@ LoadError ClientCatalogManager::LoadCatalog(
   // Short way out, use cached copy
   if (ensemble.manifest->catalog_hash() == cache_hash) {
     if (catalog_path) {
-      LoadError error = LoadCatalogCas(cache_hash, cvmfs_path, catalog_path, "", ctx);
+      LoadError error = LoadCatalogCas(cache_hash, cvmfs_path, catalog_path,
+                                       "", ctx);
       if (error == catalog::kLoadNew) {
         loaded_catalogs_[mountpoint] = cache_hash;
         *catalog_hash = cache_hash;
@@ -200,7 +203,8 @@ LoadError ClientCatalogManager::LoadCatalog(
 
   // Load new catalog
   catalog::LoadError load_retval =
-    LoadCatalogCas(ensemble.manifest->catalog_hash(), cvmfs_path, catalog_path, alt_catalog_path.size() ? alt_catalog_path : "", ctx);
+    LoadCatalogCas(ensemble.manifest->catalog_hash(), cvmfs_path, catalog_path,
+                   alt_catalog_path.size() ? alt_catalog_path : "", ctx);
   if (load_retval != catalog::kLoadNew)
     return load_retval;
   loaded_catalogs_[mountpoint] = ensemble.manifest->catalog_hash();
@@ -224,7 +228,9 @@ LoadError ClientCatalogManager::LoadCatalogCas(
 {
   assert(hash.suffix == shash::kSuffixCatalog);
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-                           cache::CacheManager::kTypeCatalog, ctx ? ctx->pid : -1, ctx ? ctx->uid : -1, ctx ? ctx->gid : -1, alt_catalog_path);
+                           cache::CacheManager::kTypeCatalog,
+                           ctx ? ctx->pid : -1, ctx ? ctx->uid : -1,
+                           ctx ? ctx->gid : -1, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;

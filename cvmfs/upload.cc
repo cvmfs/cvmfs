@@ -66,8 +66,11 @@ void Spooler::ProcessHistory(const std::string &local_path) {
   file_processor_->Process(local_path, false, shash::kSuffixHistory);
 }
 
-void Spooler::ProcessCertificate(const std::string &local_path, const std::string &alt_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixCertificate, alt_path);
+void Spooler::ProcessCertificate(const std::string &local_path,
+    const std::string &alt_path)
+{
+  file_processor_->Process(local_path, false, shash::kSuffixCertificate,
+                           alt_path);
 }
 
 

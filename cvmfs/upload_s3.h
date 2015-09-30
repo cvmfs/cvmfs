@@ -54,7 +54,7 @@ class S3Uploader : public AbstractUploader {
                   const CallbackTN   *callback = NULL);
 
   UploadStreamHandle* InitStreamedUpload(const CallbackTN *callback = NULL,
-                                         const std::string &alt_path="");
+                                         const std::string &alt_path = "");
   void Upload(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
               const CallbackTN    *callback = NULL);

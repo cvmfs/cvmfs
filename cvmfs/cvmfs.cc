@@ -104,9 +104,7 @@
 #include "wpad.h"
 #include "xattr.h"
 
-//#ifdef VOMS_AUTHZ
 #include "voms_authz/voms_authz.h"
-//#endif
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -471,10 +469,11 @@ static bool CheckVOMS(const fuse_ctx &fctx) {
   std::string voms_requirements;
   if (catalog_manager_->GetVOMSAuthz(voms_requirements))
   {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem properties", voms_requirements.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
+             "properties", voms_requirements.c_str());
   }
 
-  // Get VOMS information, if any, 
+  // Get VOMS information, if any,
 #ifdef VOMS_AUTHZ
   if ((fctx.uid != 0) && voms_requirements.size())
   {
@@ -514,7 +513,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       *dirent = dirent_negative;
       return false;
     }
-    if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent, fctx ? &ctx : NULL)) {
+    if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent,
+                                     fctx ? &ctx : NULL))
+    {
       // Fix inodes
       dirent->set_inode(ino);
       inode_cache_->Insert(ino, *dirent);
@@ -526,7 +527,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // Non-NFS mode
   PathString path;
   if (ino == catalog_manager_->GetRootInode()) {
-    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent, &ctx);
+    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent,
+                                 &ctx);
     dirent->set_inode(ino);
     inode_cache_->Insert(ino, *dirent);
     return true;
@@ -578,7 +580,8 @@ static bool GetDirentForPath(const PathString &path,
 
   // Lookup inode in catalog TODO: not twice md5 calculation
   bool retval;
-  retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent, fctx ? &ctx : NULL);
+  retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent,
+                                        fctx ? &ctx : NULL);
   if (retval) {
     if (nfs_maps_) {
       // Fix inode
@@ -664,8 +667,11 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
         }
         if (!GetPathForInode(parent, &parent_path))
           goto lookup_reply_negative;
-        if (GetDirentForPath(GetParentPath(parent_path), &dirent, fuse_req_ctx(req)))
+        if (GetDirentForPath(GetParentPath(parent_path), &dirent,
+                             fuse_req_ctx(req)))
+        {
           goto lookup_reply_positive;
+        }
       }
     }
     // No entry for "." or no entry for ".."
@@ -907,7 +913,8 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   catalog::StatEntryList listing_from_catalog;
   const fuse_ctx *fctx = fuse_req_ctx(req);
   catalog::ClientCtx ctx(fctx->uid, fctx->gid, fctx->pid);
-  bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog, &ctx);
+  bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog,
+                                              &ctx);
 
   if (!retval) {
     remount_fence_->Leave();
@@ -1070,13 +1077,14 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   std::string voms_requirements;
   if (catalog_manager_->GetVOMSAuthz(voms_requirements))
   {
-    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem properties", voms_requirements.c_str());
+    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
+             "properties", voms_requirements.c_str());
   }
 
   const struct fuse_ctx *fctx = fuse_req_ctx(req);
   catalog::ClientCtx ctx(fctx->uid, fctx->gid, fctx->pid);
 
-  // Get VOMS information, if any, 
+  // Get VOMS information, if any,
 #ifdef VOMS_AUTHZ
   if ((ctx.uid != 0) && voms_requirements.size())
   {
@@ -1491,7 +1499,8 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       catalog::kLookupSole | catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
     catalog::ClientCtx ctx(fctx.uid, fctx.gid, fctx.pid);
-    retval = catalog_manager_->LookupPath(path, lookup_options, &raw_symlink, &ctx);
+    retval = catalog_manager_->LookupPath(path, lookup_options, &raw_symlink,
+                                          &ctx);
     assert(retval);
     d.set_symlink(raw_symlink.symlink());
   }
@@ -1547,7 +1556,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_manager_->GetRootHash().ToString();
-  } else if ((attr == "user.voms_authz") && catalog_manager_->GetVOMSAuthz(lookup_value)) {
+  } else if ((attr == "user.voms_authz") &&
+             catalog_manager_->GetVOMSAuthz(lookup_value))
+  {
     attribute_value = lookup_value;
   } else if (attr == "user.tag") {
     attribute_value = *repository_tag_;

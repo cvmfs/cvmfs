@@ -19,7 +19,7 @@ struct LocalStreamHandle : public UploadStreamHandle {
   LocalStreamHandle(const CallbackTN   *commit_callback,
                     const int           tmp_fd,
                     const std::string  &tmp_path,
-                    const std::string  &alt_path="") :
+                    const std::string  &alt_path = "") :
     UploadStreamHandle(commit_callback),
     file_descriptor(tmp_fd),
     temporary_path(tmp_path),
@@ -60,7 +60,7 @@ class LocalUploader : public AbstractUploader {
                   const CallbackTN   *callback = NULL);
 
   UploadStreamHandle* InitStreamedUpload(const CallbackTN *callback = NULL,
-                                         const std::string &alt_path="");
+                                         const std::string &alt_path = "");
   void Upload(UploadStreamHandle  *handle,
               CharBuffer          *buffer,
               const CallbackTN    *callback = NULL);

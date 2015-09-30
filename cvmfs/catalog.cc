@@ -422,7 +422,7 @@ bool Catalog::GetVOMSAuthz(std::string &voms_authz) const {
   bool result;
   pthread_mutex_lock(lock_);
   if (voms_authz_status_ == Present) {
-    voms_authz= voms_authz_;
+    voms_authz = voms_authz_;
     result = true;
   } else if (voms_authz_status_ == None) {
     result = false;
@@ -435,7 +435,7 @@ bool Catalog::GetVOMSAuthz(std::string &voms_authz) const {
       voms_authz_status_ = None;
     }
     result = voms_authz_status_ == Present;
-  } 
+  }
   pthread_mutex_unlock(lock_);
   return result;
 }

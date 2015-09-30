@@ -89,7 +89,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
-                      history, publish_timestamp, garbage_collectable, alt_catalog_path);
+                      history, publish_timestamp, garbage_collectable,
+                      alt_catalog_path);
 }
 
 

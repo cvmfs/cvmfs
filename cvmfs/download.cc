@@ -875,7 +875,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   string url = url_prefix + *(info->url);
   if ((info->pid != -1) && (url.substr(0, 5) == "https"))
   {
-    ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid, info->cred_fname);
+    ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
+                        info->cred_fname);
   }
 
   if (url.find("@proxy@") != string::npos) {

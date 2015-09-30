@@ -458,7 +458,7 @@ uint64_t AbstractCatalogManager<CatalogT>::GetRevision() const {
 }
 
 template <class CatalogT>
-bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string &authz) const {
+bool AbstractCatalogManager<CatalogT>::GetVOMSAuthz(std::string &authz) const {  //NOLINT
   ReadLock();
   const bool has_authz = GetRootCatalog()->GetVOMSAuthz(authz);
   Unlock();

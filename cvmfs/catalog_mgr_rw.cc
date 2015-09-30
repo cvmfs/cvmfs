@@ -152,7 +152,8 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   manifest->set_garbage_collectability(garbage_collectable);
 
   // Upload catalog
-  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath(), manifest->alt_catalog_path());
+  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath(),
+                  manifest->alt_catalog_path());
   spooler->WaitForUpload();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
@@ -553,7 +554,8 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   assert(NULL != new_catalog_db);
   retval = new_catalog_db->InsertInitialValues(nested_root_path,
                                                volatile_content,
-                                               "", // At this point, only root catalog gets VOMS authz
+                                               "",  // At this point, only root
+                                                    // catalog gets VOMS authz
                                                new_root_entry);
   assert(retval);
   // TODO(rmeusel): we need a way to attach a catalog directy from an open

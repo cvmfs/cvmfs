@@ -173,7 +173,8 @@ class AbstractCatalogManager : public SingleCopy {
     p.Assign(&path[0], path.length());
     return LookupPath(p, options, entry, ctx);
   }
-  bool LookupXattrs(const PathString &path, XattrList *xattrs, const ClientCtx *);
+  bool LookupXattrs(const PathString &path, XattrList *xattrs,
+                    const ClientCtx *);
 
   bool Listing(const PathString &path, DirectoryEntryList *listing);
   bool Listing(const std::string &path, DirectoryEntryList *listing) {
@@ -181,7 +182,8 @@ class AbstractCatalogManager : public SingleCopy {
     p.Assign(&path[0], path.length());
     return Listing(p, listing);
   }
-  bool ListingStat(const PathString &path, StatEntryList *listing, const ClientCtx *);
+  bool ListingStat(const PathString &path, StatEntryList *listing,
+                   const ClientCtx *);
 
   bool ListFileChunks(const PathString &path,
                       const shash::Algorithms interpret_hashes_as,
