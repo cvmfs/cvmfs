@@ -182,7 +182,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   XattrList empty_xattrs;
 
   /**
-   * It indicates whether this catalog supports balancing operations
+   * It indicates whether this catalog manager supports balancing operations
    */
   const bool is_balanceable_;
 
