@@ -20,7 +20,7 @@ find_or_install_yum_repo_key() {
   local key_path="$1"
   local sink="/dev/null"
   [ -f "$key_path" ] || sink="$key_path"
-  cat > $sink
+  cat > $sink || die "failed to write $key_path"
 }
 
 install_yum_repo_keys() {
