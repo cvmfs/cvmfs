@@ -37,18 +37,18 @@ cvmfs_run_test() {
   publish_repo "$repo"
 
   echo "Checking first iteration"
-  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 101
-  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 102
-  if check_catalog_presence "/dir3" "$repo"; then return 1001; fi
-  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 103
-  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 104
-  if ! check_catalog_presence "/" "$repo"; then return 1002; fi
-    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 105
-    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 106
-  if ! check_catalog_presence "/dir100" "$repo"; then return 1003; fi
-    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 107
-  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 108
-  if ! check_catalog_presence "/dir4" "$repo"; then return 1004; fi
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 1
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 2
+  if check_catalog_presence "/dir3" "$repo"; then return 3; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 4
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 5
+  if ! check_catalog_presence "/" "$repo"; then return 6; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 7
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 8
+  if ! check_catalog_presence "/dir100" "$repo"; then return 9; fi
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 10
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 11
+  if ! check_catalog_presence "/dir4" "$repo"; then return 12; fi
 
   start_transaction "$repo"
   add_files "$repo_dir/dir/dir30" 30
@@ -58,45 +58,45 @@ cvmfs_run_test() {
   publish_repo "$repo"
 
   echo "Checking second iteration"
-  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 201
-  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 202
-  if check_catalog_presence "/dir3" "$repo"; then return 2001; fi
-  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 203
-  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 204
-  if ! check_catalog_presence "/" "$repo"; then return 2002; fi
-    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 205
-    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 206
-  if ! check_catalog_presence "/dir100" "$repo"; then return 2003; fi
-    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 207
-  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 208
-  if ! check_catalog_presence "/dir4" "$repo"; then return 2004; fi
-    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 209
-    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 210
-  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 2005; fi
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 13
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 14
+  if check_catalog_presence "/dir3" "$repo"; then return 15; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 16
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 17
+  if ! check_catalog_presence "/" "$repo"; then return 18; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 19
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 20
+  if ! check_catalog_presence "/dir100" "$repo"; then return 21; fi
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 22
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 23
+  if ! check_catalog_presence "/dir4" "$repo"; then return 24; fi
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 25
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 26
+  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 27; fi
 
   start_transaction "$repo"
   add_files "$repo_dir/dir60" 60
   publish_repo "$repo"
 
   echo "Checking third iteration"
-  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 301
-  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 302
-  if check_catalog_presence "/dir3" "$repo"; then return 3001; fi
-  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 303
-  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 304
-  if ! check_catalog_presence "/" "$repo"; then return 3002; fi
-    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 305
-    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 306
-  if ! check_catalog_presence "/dir100" "$repo"; then return 3003; fi
-    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 307
-  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 308
-  if ! check_catalog_presence "/dir4" "$repo"; then return 3004; fi
-    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 309
-    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 310
-  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 3005; fi
-    [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 311
-    [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 312
-  if ! check_catalog_presence "/dir60" "$repo"; then return 3006; fi
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 28
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 29
+  if check_catalog_presence "/dir3" "$repo"; then return 30; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 31
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 32
+  if ! check_catalog_presence "/" "$repo"; then return 33; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 34
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 35
+  if ! check_catalog_presence "/dir100" "$repo"; then return 36; fi
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 37
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 38
+  if ! check_catalog_presence "/dir4" "$repo"; then return 39; fi
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 40
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 41
+  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 42; fi
+    [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 43
+    [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 44
+  if ! check_catalog_presence "/dir60" "$repo"; then return 45; fi
 
   start_transaction "$repo"
   for i in $(ls $repo_dir/dir60 | grep "file"); do
@@ -106,24 +106,24 @@ cvmfs_run_test() {
   publish_repo "$repo"
 
   echo "Checking fourth iteration"
-  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 401
-  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 402
-  if check_catalog_presence "/dir3" "$repo"; then return 4001; fi
-  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 403
-  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 404
-  if ! check_catalog_presence "/" "$repo"; then return 4002; fi
-    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 405
-    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 406
-  if ! check_catalog_presence "/dir100" "$repo"; then return 4003; fi
-    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 407
-  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 408
-  if ! check_catalog_presence "/dir4" "$repo"; then return 4004; fi
-    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 409
-    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 410
-  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 4005; fi
-  ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 411
-  ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 412
-  if check_catalog_presence "/dir60" "$repo"; then return 4006; fi
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 46
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 47
+  if check_catalog_presence "/dir3" "$repo"; then return 48; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 49
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 50
+  if ! check_catalog_presence "/" "$repo"; then return 51; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 52
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 53
+  if ! check_catalog_presence "/dir100" "$repo"; then return 54; fi
+    [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 55
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 56
+  if ! check_catalog_presence "/dir4" "$repo"; then return 57; fi
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 58
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 59
+  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 60; fi
+  ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 61
+  ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 62
+  if check_catalog_presence "/dir60" "$repo"; then return 63; fi
 
 
   start_transaction "$repo"
@@ -133,24 +133,24 @@ cvmfs_run_test() {
   publish_repo "$repo"
 
   echo "Checking fifth iteration"
-  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 501
-  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 502
-  if check_catalog_presence "/dir3" "$repo"; then return 5001; fi
-  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 503
-  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 504
-  if ! check_catalog_presence "/" "$repo"; then return 5002; fi
-    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 505
-    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 506
-  if ! check_catalog_presence "/dir100" "$repo"; then return 5003; fi
-  ! [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 507
-  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 508
-  if check_catalog_presence "/dir4" "$repo"; then return 5004; fi
-    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 509
-    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 510
-  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 5005; fi
-  ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 511
-  ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 512
-  if check_catalog_presence "/dir60" "$repo"; then return 5006; fi
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 64
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 65
+  if check_catalog_presence "/dir3" "$repo"; then return 66; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 67
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 68
+  if ! check_catalog_presence "/" "$repo"; then return 69; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 70
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 71
+  if ! check_catalog_presence "/dir100" "$repo"; then return 72; fi
+  ! [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 73
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 74
+  if check_catalog_presence "/dir4" "$repo"; then return 75; fi
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 76
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 77
+  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 78; fi
+  ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 79
+  ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 80
+  if check_catalog_presence "/dir60" "$repo"; then return 81; fi
 
   destroy_repo "$repo"
 }
