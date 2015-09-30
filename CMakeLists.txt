@@ -379,6 +379,12 @@ if (VOMS_FOUND)
   add_definitions(-DVOMS_AUTHZ)
 endif (VOMS_FOUND)
 
+find_package (Valgrind)
+if (VALGRIND_FOUND)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VALGRIND_INCLUDE_DIR})
+  add_definitions(-DHAS_VALGRIND_HEADERS)
+endif (VALGRIND_FOUND)
+
 if (ZLIB_BUILTIN)
   include (${ZLIB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   set (ZLIB_LIBRARIES "")
@@ -488,12 +494,11 @@ if (INSTALL_MOUNT_SCRIPTS)
 endif (INSTALL_MOUNT_SCRIPTS)
 
 #
-# compile the unit tests
+# compile the unit tests, if necessary
 #
-if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
-  enable_testing ()
-  add_subdirectory (test/unittests)
-endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+enable_testing ()
+add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+add_subdirectory (test/unittests)
 
 #
 # Documentation

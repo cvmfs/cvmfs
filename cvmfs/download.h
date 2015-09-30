@@ -95,18 +95,17 @@ struct Counters {
   perf::Counter *n_proxy_failover;
   perf::Counter *n_host_failover;
 
-  explicit Counters(perf::Statistics *statistics) {
-    sz_transferred_bytes = statistics->Register("download.sz_transferred_bytes",
+  Counters(perf::Statistics *statistics, const std::string &name) {
+    sz_transferred_bytes = statistics->Register(name + ".sz_transferred_bytes",
         "Number of transferred bytes");
-    sz_transfer_time = statistics->Register("download.sz_transfer_time",
+    sz_transfer_time = statistics->Register(name + ".sz_transfer_time",
         "Transfer time (miliseconds)");
-    n_requests = statistics->Register("download.n_requests",
+    n_requests = statistics->Register(name + ".n_requests",
         "Number of requests");
-    n_retries = statistics->Register("download.n_retries",
-        "Number of retries");
-    n_proxy_failover = statistics->Register("download.n_proxy_failover",
+    n_retries = statistics->Register(name + ".n_retries", "Number of retries");
+    n_proxy_failover = statistics->Register(name + ".n_proxy_failover",
         "Number of proxy failovers");
-    n_host_failover = statistics->Register("download.n_host_failover",
+    n_host_failover = statistics->Register(name + ".n_host_failover",
         "Number of host failovers");
   }
 };  // Counters
@@ -324,7 +323,7 @@ class DownloadManager {
   ~DownloadManager();
 
   void Init(const unsigned max_pool_handles, const bool use_system_proxy,
-      perf::Statistics * statistics);
+      perf::Statistics * statistics, const std::string &name = "download");
   void Fini();
   void Spawn();
   Failures Fetch(JobInfo *info);
