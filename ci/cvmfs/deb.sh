@@ -49,8 +49,7 @@ cd $copied_source
 
 echo "do the build..."
 dch -v $cvmfs_version -M "bumped upstream version number"
-cd debian
-pdebuild --buildresult $CVMFS_RESULT_LOCATION
+debuild -us -uc
 cd ${CVMFS_RESULT_LOCATION}
 
 # generating package map section for specific platform
