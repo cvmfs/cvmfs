@@ -2,10 +2,10 @@ cvmfs_test_name="Catalog balancer"
 cvmfs_test_autofs_on_startup=false
 
 add_files() {
-  local repo_dir=$1
+  local directory=$1
   local num_files=$2
-  mkdir -p "$repo_dir"
-  local body="$repo_dir/file"
+  mkdir -p "$directory"
+  local body="$directory/file"
 
   for i in $(seq 1 1 $num_files); do
     touch "$body$i"
