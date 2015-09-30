@@ -64,4 +64,4 @@ fi
 
 # clean up the source tree
 echo "cleaning up..."
-rm -fR ${CVMFS_SOURCE_LOCATION}/debian
+rm -fR $copied_source
