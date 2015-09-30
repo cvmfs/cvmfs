@@ -1,19 +1,25 @@
+/**
+ * This file is part of the CernVM File System.
+ *
+ * This file implements the parent-side portion of the
+ * communication with the cvmfs_cred_fetcher.
+ */
 
-#include <stdio.h>
 #include <errno.h>
 #include <limits.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <sys/un.h>
 #include <sys/wait.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 
 #ifndef __APPLE__
 #include <sys/syscall.h>
 #endif
 
 #include <cstring>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "../logging.h"
 #include "../util_concurrency.h"
@@ -27,8 +33,7 @@ ReportChildDeath(pid_t pid, int flags) {
     LogCvmfs(kLogVoms, kLogWarning, "Failed to get child process %d final "
              "status: %s (errno=%d)", pid, strerror(errno), errno);
     return;
-  }
-  else if (0 == retval) {
+  } else if (0 == retval) {
     LogCvmfs(kLogVoms, kLogWarning, "Internal state error: child process %d "
              "has closed its socket but OS thinks the process is still alive.",
              pid);
@@ -47,14 +52,17 @@ ReportChildDeath(pid_t pid, int flags) {
 
 // Manage helper forked process
 struct ProxyHelper {
-
   ProxyHelper() : m_subprocess(-1), m_max_files(1024) {
     pthread_mutex_init(&m_helper_mutex, NULL);
 
     rlimit rlim;
     if (-1 != getrlimit(RLIMIT_NOFILE, &rlim)) {
-      if ((rlim.rlim_cur != RLIM_INFINITY) && (m_max_files < rlim.rlim_cur)) {m_max_files = rlim.rlim_cur;}
-      if ((rlim.rlim_max != RLIM_INFINITY) && (m_max_files < rlim.rlim_max)) {m_max_files = rlim.rlim_max;}
+      if ((rlim.rlim_cur != RLIM_INFINITY) && (m_max_files < rlim.rlim_cur)) {
+        m_max_files = rlim.rlim_cur;
+      }
+      if ((rlim.rlim_max != RLIM_INFINITY) && (m_max_files < rlim.rlim_max)) {
+        m_max_files = rlim.rlim_max;
+      }
     }
 
     const char *path = getenv("PATH");
@@ -87,7 +95,7 @@ struct ProxyHelper {
     MutexLockGuard guard(m_helper_mutex);
     if (m_subprocess > 0) {
       InformChild(kChildExit, 0);  // Tell child process to exit with status 0.
-      // TODO: It may be beneficial to have a timeout here.
+      // TODO(bbockelm): It may be beneficial to have a timeout here.
       ReportChildDeath(m_subprocess, 0);
     }
   }
@@ -133,7 +141,7 @@ struct ProxyHelper {
 
   void ExecFetcher(int unix_sock) {
     dup2(unix_sock, 3);  // Always lives on FD 3.
-    for (rlim_t idx=4; idx<m_max_files; idx++) {
+    for (rlim_t idx=4; idx < m_max_files; idx++) {
       close(idx);
     }
     char *args[2];
@@ -152,7 +160,7 @@ struct ProxyHelper {
       if (it->size() + 20 > PATH_MAX) {continue;}
       memcpy(full_path, it->c_str(), it->size());
       full_path[it->size()] = '/';
-      strcpy(full_path+it->size()+1, executable_name);
+      strcpy(full_path+it->size()+1, executable_name); // NOLINT
       execv(full_path, args);
     }
     struct msghdr msg;
@@ -185,7 +193,8 @@ struct ProxyHelper {
     while (-1 == sendmsg(m_sock, &msg_send, MSG_NOSIGNAL) && errno == EINTR) {}
     if (errno) {
       int result = errno;
-      if (errno == ENOTCONN || errno == EPIPE) {  // Socket is disconnected; child has died.
+      // Socket is disconnected; child has died.
+      if (errno == ENOTCONN || errno == EPIPE) {
         ReportChildDeath(m_subprocess, WNOHANG);
         m_subprocess = -1;
       }
@@ -221,7 +230,8 @@ struct ProxyHelper {
     while (-1 == sendmsg(m_sock, &msg_send, MSG_NOSIGNAL) && errno == EINTR) {}
     if (errno) {
       int result = errno;
-      if (errno == ENOTCONN || errno == EPIPE) {  // Socket is disconnected; child has died.
+      // Socket is disconnected; child has died.
+      if (errno == ENOTCONN || errno == EPIPE) {
         ReportChildDeath(m_subprocess, WNOHANG);
         m_subprocess = -1;
       }
@@ -248,11 +258,12 @@ struct ProxyHelper {
     msg_recv.msg_controllen = CMSG_SPACE(sizeof(fd));
 
     errno = 0;
-    // TODO: Implement timeouts.
+    // TODO(bbockelm): Implement timeouts.
     while (-1 == recvmsg(m_sock, &msg_recv, NULL) && errno == EINTR) {}
     if (errno) {
       int result = errno;
-      if (errno == ENOTCONN || errno == EPIPE) {  // Socket is disconnected; child has died.
+      // Socket is disconnected; child has died.
+      if (errno == ENOTCONN || errno == EPIPE) {
         MutexLockGuard guard(m_helper_mutex);
         ReportChildDeath(m_subprocess, WNOHANG);
         m_subprocess = -1;
@@ -279,7 +290,7 @@ struct ProxyHelper {
       if ((cmsg->cmsg_level == SOL_SOCKET) &&
           (cmsg->cmsg_type  == SCM_RIGHTS))
       {
-        fd = *((int *) CMSG_DATA(cmsg));
+        fd = *(reinterpret_cast<int *>(CMSG_DATA(cmsg)));
         LogCvmfs(kLogVoms, kLogDebug, "Credential fetcher send back FD %d", fd);
       }
     }

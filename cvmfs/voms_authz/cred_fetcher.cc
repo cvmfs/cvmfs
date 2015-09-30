@@ -1,16 +1,24 @@
 
-#include "voms_cred.h"
+/**
+ * This file is part of the CernVM File System.
+ *
+ * This implements the credential fetcher server.
+ * Communicating over a dedicated file descriptor (3), this
+ * will pull credentials from a given external process.
+ */
 
 #include <errno.h>
-#include <stdio.h>
 #include <limits.h>
-#include <unistd.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <sys/un.h>
-#include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include <cstring>
+
+#include "voms_cred.h"
 
 static bool
 GetProxyFileFromEnv(pid_t pid, char *path, size_t pathLen)
@@ -18,7 +26,8 @@ GetProxyFileFromEnv(pid_t pid, char *path, size_t pathLen)
     static const char * const X509_USER_PROXY = "\0X509_USER_PROXY=";
     size_t X509_USER_PROXY_LEN = strlen(X509_USER_PROXY+1)+1;
 
-    if (snprintf(path, pathLen, "/proc/%d/environ", pid) >= static_cast<int>(pathLen))
+    if (snprintf(path, pathLen, "/proc/%d/environ", pid) >=
+        static_cast<int>(pathLen))
     {
         if (errno == 0) {errno = ERANGE;}
         return false;
@@ -29,8 +38,7 @@ GetProxyFileFromEnv(pid_t pid, char *path, size_t pathLen)
     seteuid(0);
 
     FILE *fp = fopen(path, "r");
-    if (!fp)
-    {
+    if (!fp) {
         fprintf(stderr, "Failed to open environment file for pid %d.\n", pid);
         seteuid(olduid);
         return false;
@@ -39,17 +47,13 @@ GetProxyFileFromEnv(pid_t pid, char *path, size_t pathLen)
     char c = '\0';
     size_t idx = 0, keyIdx = 0;
     bool set_env = false;
-    while (1)
-    {
+    while (1) {
         if (c == EOF) {break;}
-        if (keyIdx == X509_USER_PROXY_LEN)
-        {
+        if (keyIdx == X509_USER_PROXY_LEN) {
             if (idx >= pathLen - 1) {break;}
             if (c == '\0') {set_env = true; break;}
             path[idx++] = c;
-        }
-        else if (X509_USER_PROXY[keyIdx++] != c)
-        {
+        } else if (X509_USER_PROXY[keyIdx++] != c) {
             keyIdx = 0;
         }
         c = fgetc(fp);
@@ -68,8 +72,8 @@ GetProxyFileInternal(pid_t pid, uid_t uid, gid_t gid)
     char path[PATH_MAX];
     if (!GetProxyFileFromEnv(pid, path, PATH_MAX))
     {
-        fprintf(stderr, "Could not find proxy in environment; using default location "
-                "in /tmp/x509up_u%d.\n", uid);
+        fprintf(stderr, "Could not find proxy in environment; using default "
+                "location in /tmp/x509up_u%d.\n", uid);
         if (snprintf(path, PATH_MAX, "/tmp/x509up_u%d", uid) >= PATH_MAX)
         {
             if (errno == 0) {errno = ERANGE;}
@@ -98,9 +102,7 @@ GetProxyFileInternal(pid_t pid, uid_t uid, gid_t gid)
 
 
 int main(int argc, char *argv[]) {
-
   while (true) {
-
     struct msghdr msg_recv;
     memset(&msg_recv, '\0', sizeof(msg_recv));
     int command = 0;
@@ -120,7 +122,7 @@ int main(int argc, char *argv[]) {
     msg_recv.msg_iovlen = 4;
 
     errno = 0;
-    // TODO: Implement timeouts.
+    // TODO(bbockelm): Implement timeouts.
     while (-1 == recvmsg(3, &msg_recv, NULL) && errno == EINTR) {}
     if (errno) {
       fprintf(stderr, "Failed to receive messaage from child: %s (errno=%d)\n",
@@ -164,7 +166,7 @@ int main(int argc, char *argv[]) {
       cmsg->cmsg_level = SOL_SOCKET;
       cmsg->cmsg_type  = SCM_RIGHTS;
       cmsg->cmsg_len   = CMSG_LEN(sizeof(fd));
-      *((int*)CMSG_DATA(cmsg)) = fd;
+      *(reinterpret_cast<int*>(CMSG_DATA(cmsg))) = fd;
     }
 
     errno = 0;

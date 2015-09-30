@@ -1,3 +1,10 @@
+/**
+ * This file is part of the CernVM File System.
+ *
+ * This configures a given CURL handle to authenticate
+ * using a user's X509 credential.
+ */
+
 
 #include "voms_authz.h"
 
@@ -5,9 +12,9 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 
 #include <cstring>
 
@@ -35,7 +42,7 @@ LogOpenSSLErrors(const char *top_message) {
   }
   char error_buf[1024];
   LogCvmfs(kLogVoms, kLogWarning, "%s", top_message);
-  unsigned long next_err;
+  unsigned long next_err;  // NOLINT; this is the type expected by OpenSSL
   while ((next_err = ERR_get_error())) {
     ERR_error_string_n(next_err, error_buf, 1024);
     LogCvmfs(kLogVoms, kLogStderr, "%s", error_buf);
@@ -43,8 +50,8 @@ LogOpenSSLErrors(const char *top_message) {
 }
 
 static CURLcode sslctx_config_function(CURL *curl, void *sslctx, void *parm) {
-  sslctx_info * p = (sslctx_info *) parm;
-  SSL_CTX * ctx = (SSL_CTX *) sslctx ;
+  sslctx_info * p = reinterpret_cast<sslctx_info *>(parm);
+  SSL_CTX * ctx = reinterpret_cast<SSL_CTX *>(sslctx);
 
   if (parm == NULL) {return CURLE_OK;}
 
@@ -68,7 +75,8 @@ static CURLcode sslctx_config_function(CURL *curl, void *sslctx, void *parm) {
   // NOTE: SSL_CTX_use_certificate and _user_PrivateKey increase the ref count.
   // Hence, we must call free afterward.
   if (!SSL_CTX_use_certificate(ctx, cert)) {
-    LogOpenSSLErrors("Failed to set the user certificate in the SSL connection");
+    LogOpenSSLErrors("Failed to set the user certificate in the SSL "
+                     "connection");
     X509_free(cert);
     EVP_PKEY_free(pkey);
     sk_X509_free(chain);
@@ -82,7 +90,7 @@ static CURLcode sslctx_config_function(CURL *curl, void *sslctx, void *parm) {
     return CURLE_SSL_CERTPROBLEM;
   }
   EVP_PKEY_free(pkey);
- 
+
   if (!SSL_CTX_check_private_key(ctx)) {
     LogOpenSSLErrors("Provided certificate and key do not match");
     sk_X509_free(chain);
@@ -106,7 +114,7 @@ static CURLcode sslctx_config_function(CURL *curl, void *sslctx, void *parm) {
 
 bool
 ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
-                    char *&info_fname)
+                    char *&info_fname)  // NOLINT
 {
     if (info_fname) {delete info_fname; info_fname = NULL;}
 
@@ -120,14 +128,16 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
     curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1);
     curl_easy_setopt(curl_handle, CURLOPT_SSL_SESSIONID_CACHE, 0);
 
-    // Prefer to load credentials into memory and not bother with temporary files.
-    if (curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_FUNCTION, sslctx_config_function) == CURLE_OK) {
-
+    // Prefer to load credentials into memory and not bother with temporary
+    // files.
+    if (curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_FUNCTION,
+                         sslctx_config_function) == CURLE_OK)
+    {
       LogCvmfs(kLogVoms, kLogDebug, "Configuring in-memory OpenSSL callback");
 
       sslctx_info *parm = new sslctx_info;
 
-      STACK_OF(X509_INFO) *sk=NULL;
+      STACK_OF(X509_INFO) *sk = NULL;
       STACK_OF(X509) *certstack = sk_X509_new_null();
       parm->chain = certstack;
       if (certstack == NULL) {
@@ -162,7 +172,8 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
       if (parm->pkey == NULL) {
         sk_X509_free(certstack);
         fclose(fp);
-        LogCvmfs(kLogVoms, kLogStderr, "Credential did not contain a decrypted private key.");
+        LogCvmfs(kLogVoms, kLogStderr, "Credential did not contain a decrypted"
+                 " private key.");
         return false;
       }
 
@@ -170,16 +181,17 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
         EVP_PKEY_free(parm->pkey);
         sk_X509_free(certstack);
         fclose(fp);
-        LogCvmfs(kLogVoms, kLogStderr, "Credential file did not contain any actual credentials.");
+        LogCvmfs(kLogVoms, kLogStderr, "Credential file did not contain any "
+                 "actual credentials.");
         return false;
       } else {
-        LogCvmfs(kLogVoms, kLogDebug, "Certificate stack contains %d entries.", sk_X509_num(certstack));
+        LogCvmfs(kLogVoms, kLogDebug, "Certificate stack contains %d entries.",
+                 sk_X509_num(certstack));
       }
 
       curl_easy_setopt(curl_handle, CURLOPT_SSL_CTX_DATA, parm);
 
     } else {
-
       int fd_proxy = fileno(fp);
       char fname[] = "/tmp/cvmfs_credential_XXXXXX";
       fd = mkstemp(fname);
