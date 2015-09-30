@@ -236,6 +236,7 @@ include_directories (${INCLUDE_DIRECTORIES})
 
 if (BUILD_CVMFS)
 
+  add_executable (cvmfs_cred_fetcher voms_authz/cred_fetcher.cc voms_authz/voms_cred.h)
   add_executable (cvmfs2 ${CVMFS_LOADER_SOURCES})
   add_library (cvmfs_fuse_debug SHARED  ${CVMFS2_DEBUG_SOURCES})
   add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES})
@@ -435,7 +436,7 @@ endif (BUILD_SERVER)
 
 if (BUILD_CVMFS)
   install (
-    TARGETS      cvmfs2 cvmfs_fsck
+    TARGETS      cvmfs2 cvmfs_fsck cvmfs_cred_fetcher
     RUNTIME
     DESTINATION    bin
   )
