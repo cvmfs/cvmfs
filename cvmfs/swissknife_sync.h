@@ -12,12 +12,12 @@
 #include "upload.h"
 
 struct SyncParameters {
-  static const unsigned DEFAULT_MAX_WEIGHT = 100000;
-  static const unsigned DEFAULT_MIN_WEIGHT = 1000;
-  static const uint64_t DEFAULT_ENTRY_WARN_THRESHOLD = 500000;
-  static const size_t DEFAULT_MIN_FILE_CHUNK_SIZE = 4*1024*1024;
-  static const size_t DEFAULT_AVG_FILE_CHUNK_SIZE = 8*1024*1024;
-  static const size_t DEFAULT_MAX_FILE_CHUNK_SIZE = 16*1024*1024;
+  static const unsigned kDefaultMaxWeight = 100000;
+  static const unsigned kDefaultMinWeight = 1000;
+  static const uint64_t kDefaultEntryWarnThreshold = 500000;
+  static const size_t kDefaultMinFileChunkSize = 4*1024*1024;
+  static const size_t kDefaultAvgFileChunkSize = 8*1024*1024;
+  static const size_t kDefaultMaxFileChunkSize = 16*1024*1024;
 
   SyncParameters() :
     spooler(NULL),
@@ -30,15 +30,15 @@ struct SyncParameters {
     stop_for_catalog_tweaks(false),
     garbage_collectable(false),
     include_xattrs(false),
-    catalog_entry_warn_threshold(DEFAULT_ENTRY_WARN_THRESHOLD),
-    min_file_chunk_size(DEFAULT_MIN_FILE_CHUNK_SIZE),
-    avg_file_chunk_size(DEFAULT_AVG_FILE_CHUNK_SIZE),
-    max_file_chunk_size(DEFAULT_MAX_FILE_CHUNK_SIZE),
+    catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
+    min_file_chunk_size(kDefaultMinFileChunkSize),
+    avg_file_chunk_size(kDefaultAvgFileChunkSize),
+    max_file_chunk_size(kDefaultMaxFileChunkSize),
     manual_revision(0),
     max_concurrent_write_jobs(0),
     is_balanced(false),
-    max_weight(DEFAULT_MAX_WEIGHT),
-    min_weight(DEFAULT_MIN_WEIGHT) {}
+    max_weight(kDefaultMaxWeight),
+    min_weight(kDefaultMinWeight) {}
 
   upload::Spooler *spooler;
   std::string      dir_union;
