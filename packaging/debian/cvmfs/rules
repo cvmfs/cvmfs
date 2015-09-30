@@ -24,7 +24,7 @@ Makefile:
 build: build-stamp
 build-stamp: Makefile
 	dh_testdir
-	dh_auto_build
+	dh_auto_build --parallel
 	touch build-stamp
 
 clean:

@@ -47,9 +47,10 @@ echo "copy packaging meta information and get in place..."
 cp -r ${CVMFS_SOURCE_LOCATION}/packaging/debian/cvmfs ${copied_source}/debian
 cd $copied_source
 
-echo "do the build..."
+cpu_cores=$(get_number_of_cpu_cores)
+echo "do the build (with $cpu_cores cores)..."
 dch -v $cvmfs_version -M "bumped upstream version number"
-debuild -us -uc
+DEB_BUILD_OPTIONS=parallel=$cpu_cores debuild -us -uc # -us -uc == skip signing
 cd ${CVMFS_RESULT_LOCATION}
 
 # generating package map section for specific platform
