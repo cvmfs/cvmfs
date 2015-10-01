@@ -79,18 +79,18 @@ class CatalogBalancer {
   void Balance(catalog_t *catalog);
 
  private:
-     /**
-      * A VirtualNode is the abstract representation of an entry in a catalog.
-      * It is used by the CatalogBalancer to "virtually" represent the
-      * file-system tree of a concrete catalog and spot the nodes where
-      * a new catalog should be created.
-      *
-      * One of its main functions is to keep track of the current weight of a
-      * file or directory, i.e., the number of entries it contains. Concretely:
-      * - Normal files and symlinks: it is always one.
-      * - Normal directories: one plus the weight of each node it contains.
-      * - Directories which are catalog mount points: it is always one
-      */
+   /**
+    * A VirtualNode is the abstract representation of an entry in a catalog.
+    * It is used by the CatalogBalancer to "virtually" represent the
+    * file-system tree of a concrete catalog and spot the nodes where
+    * a new catalog should be created.
+    *
+    * One of its main functions is to keep track of the current weight of a
+    * file or directory, i.e., the number of entries it contains. Concretely:
+    * - Normal files and symlinks: it is always one.
+    * - Normal directories: one plus the weight of each node it contains.
+    * - Directories which are catalog mount points: it is always one
+    */
   struct VirtualNode {
     std::vector<VirtualNode> children;
     unsigned weight;
@@ -118,7 +118,6 @@ class CatalogBalancer {
   };
   typedef typename CatalogBalancer<CatalogMgrT>::VirtualNode virtual_node_t;
 
- private:
   void PartitionOptimally(VirtualNode *virtual_node);
   void AddCatalogMarker(std::string path);
   DirectoryEntryBase MakeEmptyDirectoryEntryBase(std::string name,
@@ -127,7 +126,6 @@ class CatalogBalancer {
   static VirtualNode *MaxChild(VirtualNode *virtual_node);
   void AddCatalog(VirtualNode *child_node);
 
- private:
   CatalogMgrT *catalog_mgr_;
 };
 
