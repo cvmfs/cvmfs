@@ -384,7 +384,7 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
-* Mon Sep 30 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+* Wed Sep 30 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
 - Drop explicit support for Fedora < 21
 - Use generic 'fedora' macro name where possible
 * Mon Aug 17 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
