@@ -26,7 +26,7 @@ cvmfs_run_test() {
 
   sudo bash -c "echo 'CVMFS_AUTOCATALOGS=true
   CVMFS_AUTOCATALOGS_MAX_WEIGHT=20
-  CVMFS_AUTOCATALOGS_MIN_WEIGHT=8' >> /etc/cvmfs/repositories.d/$repo/server.conf"
+  CVMFS_AUTOCATALOGS_MIN_WEIGHT=9' >> /etc/cvmfs/repositories.d/$repo/server.conf"
 
   start_transaction "$repo"
   add_files "$repo_dir" 25
@@ -151,6 +151,91 @@ cvmfs_run_test() {
   ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 79
   ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 80
   if check_catalog_presence "/dir60" "$repo"; then return 81; fi
+
+
+  start_transaction "$repo"
+  mkdir "$repo_dir/dir/dir30/dir"
+  add_files "$repo_dir/dir/dir30/dir/dir6" 6  # not a catalog
+  mkdir "$repo_dir/dir/dir30/dir/dir7"
+  add_files "$repo_dir/dir/dir30/dir/dir7" 7  # not a catalog
+  mkdir "$repo_dir/dir/dir30/dir/dir11"
+  add_files "$repo_dir/dir/dir30/dir/dir11" 11  # this one is a catalog
+  publish_repo "$repo"
+
+  echo "Checking sixth iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 82
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 83
+  if check_catalog_presence "/dir3" "$repo"; then return 84; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 85
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 86
+  if ! check_catalog_presence "/" "$repo"; then return 87; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 88
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 89
+  if ! check_catalog_presence "/dir100" "$repo"; then return 90; fi
+  ! [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 91
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 92
+  if check_catalog_presence "/dir4" "$repo"; then return 93; fi
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 94
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 95
+  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 96; fi
+  ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 97
+  ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 98
+  if check_catalog_presence "/dir60" "$repo"; then return 99; fi
+    [ -f "$repo_dir/dir/dir30/dir/.cvmfscatalog" ]          || return 94
+    [ -f "$repo_dir/dir/dir30/dir/.cvmfsautocatalog" ]      || return 95
+  if ! check_catalog_presence "/dir/dir30/dir" "$repo"; then return 96; fi
+    [ -f "$repo_dir/dir/dir30/dir/dir11/.cvmfscatalog" ]          || return 97
+    [ -f "$repo_dir/dir/dir30/dir/dir11/.cvmfsautocatalog" ]      || return 98
+  if ! check_catalog_presence "/dir/dir30/dir/dir11" "$repo"; then return 99; fi
+  ! [ -f "$repo_dir/dir/dir30/dir/dir6/.cvmfscatalog" ]          || return 100
+  ! [ -f "$repo_dir/dir/dir30/dir/dir6/.cvmfsautocatalog" ]      || return 101
+  if check_catalog_presence "/dir/dir30/dir/dir6" "$repo"; then return 102; fi
+  ! [ -f "$repo_dir/dir/dir30/dir/dir7/.cvmfscatalog" ]          || return 103
+  ! [ -f "$repo_dir/dir/dir30/dir/dir7/.cvmfsautocatalog" ]      || return 104
+  if check_catalog_presence "/dir/dir30/dir/dir7" "$repo"; then return 105; fi
+
+
+  start_transaction "$repo"
+  for i in $(ls $repo_dir/dir/dir30/dir/dir11 | grep "file"); do
+    rm "$repo_dir/dir/dir30/dir/dir11/$i"
+  done
+  add_files "$repo_dir/dir/dir30/dir/dir11" 5  # this should provoke an underflow
+  touch "$repo_dir/dir/dir30/dir/dir7/file8"  # with this extra file $repo_dir/dir/dir30/dir/dir7 could be a catalog
+  publish_repo "$repo"
+  # now there should be an overflow in $repo_dir/dir/dir30/dir and it should create a catalog in $repo_dir/dir/dir30/dir/dir7
+
+  echo "Checking seventh iteration"
+  ! [ -f "$repo_dir/dir3/.cvmfscatalog" ]                     || return 106
+  ! [ -f "$repo_dir/dir3/.cvmfsautocatalog" ]                 || return 107
+  if check_catalog_presence "/dir3" "$repo"; then return 108; fi
+  ! [ -f "$repo_dir/.cvmfscatalog" ]                          || return 109
+  ! [ -f "$repo_dir/.cvmfsautocatalog" ]                      || return 110
+  if ! check_catalog_presence "/" "$repo"; then return 111; fi
+    [ -f "$repo_dir/dir100/.cvmfscatalog" ]                   || return 112
+    [ -f "$repo_dir/dir100/.cvmfsautocatalog" ]               || return 113
+  if ! check_catalog_presence "/dir100" "$repo"; then return 114; fi
+  ! [ -f "$repo_dir/dir4/.cvmfscatalog" ]                     || return 115
+  ! [ -f "$repo_dir/dir4/.cvmfsautocatalog" ]                 || return 116
+  if check_catalog_presence "/dir4" "$repo"; then return 117; fi
+    [ -f "$repo_dir/dir/dir30/.cvmfscatalog" ]                || return 118
+    [ -f "$repo_dir/dir/dir30/.cvmfsautocatalog" ]            || return 119
+  if ! check_catalog_presence "/dir/dir30" "$repo"; then return 120; fi
+  ! [ -f "$repo_dir/dir60/.cvmfscatalog" ]                    || return 121
+  ! [ -f "$repo_dir/dir60/.cvmfsautocatalog" ]                || return 122
+  if check_catalog_presence "/dir60" "$repo"; then return 123; fi
+    [ -f "$repo_dir/dir/dir30/dir/.cvmfscatalog" ]          || return 124
+    [ -f "$repo_dir/dir/dir30/dir/.cvmfsautocatalog" ]      || return 125
+  if ! check_catalog_presence "/dir/dir30/dir" "$repo"; then return 126; fi
+  ! [ -f "$repo_dir/dir/dir30/dir/dir11/.cvmfscatalog" ]          || return 127
+  ! [ -f "$repo_dir/dir/dir30/dir/dir11/.cvmfsautocatalog" ]      || return 128
+  if check_catalog_presence "/dir/dir30/dir/dir11" "$repo"; then return 129; fi
+  ! [ -f "$repo_dir/dir/dir30/dir/dir6/.cvmfscatalog" ]          || return 130
+  ! [ -f "$repo_dir/dir/dir30/dir/dir6/.cvmfsautocatalog" ]      || return 131
+  if check_catalog_presence "/dir/dir30/dir/dir6" "$repo"; then return 132; fi
+    [ -f "$repo_dir/dir/dir30/dir/dir7/.cvmfscatalog" ]          || return 133
+    [ -f "$repo_dir/dir/dir30/dir/dir7/.cvmfsautocatalog" ]      || return 134
+  if ! check_catalog_presence "/dir/dir30/dir/dir7" "$repo"; then return 135; fi
+
 
   destroy_repo "$repo"
 }
