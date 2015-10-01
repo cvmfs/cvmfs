@@ -46,6 +46,7 @@ set (CVMFS_CLIENT_SOURCES
   globals.h globals.cc
   sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
+  uid_map.h
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_client.h catalog_mgr_client.cc
@@ -162,6 +163,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_traversal.h
   sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
+  uid_map.h
   catalog.h catalog.cc
   catalog_rw.h catalog_rw.cc
   catalog_mgr.h catalog_mgr_impl.h
