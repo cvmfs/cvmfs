@@ -33,7 +33,7 @@ CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
 
   DirectoryEntryBase deb;
   deb.name_ = NameString(name);
-  deb.mode_ = S_IFREG | S_IRWXU;
+  deb.mode_ = S_IFREG | S_IRUSR | S_IWUSR;
   deb.checksum_ = file_hash;
   deb.mtime_ = time(NULL);
   deb.uid_ = uid;
