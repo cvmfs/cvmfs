@@ -83,7 +83,7 @@ void SyncMediator::Add(const SyncItem &entry) {
     return;
   } else if (entry.IsGraftMarker()) {
     LogCvmfs(kLogPublish, kLogDebug, "Ignoring graft marker file.");
-    return; // Ignore markers.
+    return;  // Ignore markers.
   }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be added. "
@@ -594,14 +594,16 @@ void SyncMediator::AddFile(const SyncItem &entry) {
       // Graft files are added to catalog immediately.
       catalog_manager_->AddFile(
         entry.CreateBasicCatalogDirent(),
-        default_xattrs, // TODO: For now, use default xattrs on grafted files.
+        default_xattrs,  // TODO(bbockelm): For now, use default xattrs
+                         // on grafted files.
         entry.relative_parent_path());
     } else {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
       // the graft file is missing information.  It's not clear that continuing
       // forward with the publish is the correct thing to do; abort for now.
-      LogCvmfs(kLogPublish, kLogStdout, "Encountered a grafted file (%s) with invalid"
-               " grafting information; check contents of .cvmfsgraft-* file.  Aborting publish.",
+      LogCvmfs(kLogPublish, kLogStdout, "Encountered a grafted file (%s) with "
+               "invalid grafting information; check contents of .cvmfsgraft-*"
+               " file.  Aborting publish.",
                entry.GetRelativePath().c_str());
       abort();
     }

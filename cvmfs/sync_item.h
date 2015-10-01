@@ -166,7 +166,7 @@ class SyncItem {
   bool graft_marker_present_;
   std::string relative_parent_path_;
   std::string filename_;
-  ssize_t size_;
+  ssize_t graft_size_;
 
   mutable SyncItemType scratch_type_;
   mutable SyncItemType rdonly_type_;

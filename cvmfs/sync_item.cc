@@ -6,6 +6,8 @@
 
 #include <errno.h>
 
+#include <vector>
+
 #include "sync_mediator.h"
 
 using namespace std;  // NOLINT
@@ -18,7 +20,7 @@ SyncItem::SyncItem() :
   whiteout_(false),
   valid_graft_(false),
   graft_marker_present_(false),
-  size_(-1),
+  graft_size_(-1),
   scratch_type_(static_cast<SyncItemType>(0)),
   rdonly_type_(static_cast<SyncItemType>(0))
 {
@@ -34,7 +36,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   graft_marker_present_(false),
   relative_parent_path_(relative_parent_path),
   filename_(filename),
-  size_(-1),
+  graft_size_(-1),
   scratch_type_(entry_type),
   rdonly_type_(kItemUnknown)
 {
@@ -157,7 +159,8 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   dirent.mode_           = this->GetUnionStat().st_mode;
   dirent.uid_            = this->GetUnionStat().st_uid;
   dirent.gid_            = this->GetUnionStat().st_gid;
-  dirent.size_           = size_ > -1 ? size_ : this->GetUnionStat().st_size;
+  dirent.size_           = graft_size_ > -1 ? graft_size_ :
+                           this->GetUnionStat().st_size;
   dirent.mtime_          = this->GetUnionStat().st_mtime;
   dirent.checksum_       = this->GetContentHash();
 
@@ -194,9 +197,11 @@ std::string SyncItem::GetScratchPath() const {
 
 
 std::string SyncItem::GetGraftPath() const {
-  return union_engine_->scratch_path() + "/" + ((relative_parent_path_.empty()) ?
-      ".cvmfsgraft-" + filename_ :
-      relative_parent_path_ + (filename_.empty() ? "" : ("/.cvmfsgraft-" + filename_)));
+  return union_engine_->scratch_path() + "/" +
+      ((relative_parent_path_.empty()) ?
+        ".cvmfsgraft-" + filename_ :
+        relative_parent_path_ + (filename_.empty() ? "" :
+          ("/.cvmfsgraft-" + filename_)));
 }
 
 void SyncItem::CheckGraft() {
@@ -205,66 +210,63 @@ void SyncItem::CheckGraft() {
   std::string checksum_type;
   std::string checksum_value;
   std::string graftfile = GetGraftPath();
-  LogCvmfs(kLogFsTraversal, kLogDebug, "Checking potential graft path %s.", graftfile.c_str());
+  LogCvmfs(kLogFsTraversal, kLogDebug, "Checking potential graft path %s.",
+           graftfile.c_str());
   FILE *fp = fopen(graftfile.c_str(), "r");
   if (fp == NULL) {
     if (errno != ENOENT) {
-      LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to open graft file (%s): %s (errno=%d)",
+      LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to open graft file "
+               "(%s): %s (errno=%d)",
                graftfile.c_str(), strerror(errno), errno);
     }
     return;
   }
   graft_marker_present_ = true;
-  size_t len = 0;
-  ssize_t read;
-  char *line = NULL;
-  while (1) {
-    read = getline(&line, &len, fp);
-    if (read == -1) {
-      if (errno == EINTR) {continue;}
-      else {
-        break;
-      }
+  std::string line;
+  std::vector<std::string> contents;
+  while (GetLineFile(fp, &line)) {
+    std::string trimmed_line = Trim(line);
+
+    if (!trimmed_line.size()) {continue;}
+    if (trimmed_line[0] == '#') {continue;}
+
+    std::vector<std::string> info = SplitString(trimmed_line, '=', 2);
+
+    if (info.size() != 2) {
+      LogCvmfs(kLogFsTraversal, kLogWarning, "Invalid line in graft file: %s",
+               trimmed_line.c_str());
     }
-    if (line[read-1] == '\n') {line[read-1] = '\0';}
-    char *value;
-    if (line == (value = strcasestr(line, "size="))) {
-      value += 5;
-      size_t input_len = strlen(value);
-      char *endptr=NULL;
-      errno = 0;
-      long long mysize = strtoll(value, &endptr, 10);
-      if (input_len == 0 || endptr != (value+input_len)) {
-        LogCvmfs(kLogFsTraversal, kLogWarning, "size= line was passed no value.");
+    info[0] = Trim(info[0]);
+    info[1] = Trim(info[1]);
+    if (info[0] == "size") {
+      uint64_t tmp_size;
+      if (!String2Uint64Parse(info[1], &tmp_size)) {
+        LogCvmfs(kLogFsTraversal, kLogWarning, "Failed to parse value of %s "
+                 "to integer: %s (errno=%d)", trimmed_line.c_str(),
+                 strerror(errno), errno);
         continue;
       }
-      if (errno) {
-        LogCvmfs(kLogFsTraversal, kLogWarning, "Failed to parse value of %s to integer: %s (errno=%d)", line, strerror(errno), errno);
-        continue;
-      }
-      size_ = mysize;
-    } else if (line == (value = strcasestr(line, "checksum="))) {
-      value += 9;
-      std::string hash_str = value;
+      graft_size_ = tmp_size;
+    } else if (info[0] == "checksum") {
+      std::string hash_str = info[1];
       shash::HexPtr hashP(hash_str);
       if (hashP.IsValid()) {
         content_hash_ = shash::MkFromHexPtr(hashP);
         found_checksum = true;
       } else {
-        LogCvmfs(kLogFsTraversal, kLogWarning, "Invalid checksum value: %s.", value);
+        LogCvmfs(kLogFsTraversal, kLogWarning, "Invalid checksum value: %s.",
+                 info[1].c_str());
       }
       continue;
-    } else if ((strlen(line) > 0) && (line[0] != '#')) {
-      LogCvmfs(kLogFsTraversal, kLogStderr, "Unknown graft attribute: %s.", line);
     }
   }
-  free(line);
   if (!feof(fp)) {
-    LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to read from catalog marker (%s): %s (errno=%d)",
+    LogCvmfs(kLogFsTraversal, kLogWarning, "Unable to read from catalog "
+             "marker (%s): %s (errno=%d)",
              graftfile.c_str(), strerror(errno), errno);
   }
   fclose(fp);
-  valid_graft_ = (size_ > -1) && found_checksum;
+  valid_graft_ = (graft_size_ > -1) && found_checksum;
   return;
 }
 
