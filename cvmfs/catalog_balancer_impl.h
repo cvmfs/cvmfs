@@ -29,7 +29,7 @@ CatalogBalancer<CatalogMgrT>::MakeEmptyDirectoryEntryBase(
     string name, uid_t uid, gid_t gid) {
   shash::Algorithms algorithm = catalog_mgr_->spooler_->GetHashAlgorithm();
   shash::Any file_hash(algorithm);
-  shash::HashString("", &file_hash);
+  shash::HashString("x\x9c\x03\x00\x00\x00\x00\x01", &file_hash);
 
   DirectoryEntryBase deb;
   deb.name_ = NameString(name);
