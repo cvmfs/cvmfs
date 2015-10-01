@@ -584,6 +584,11 @@ void SyncMediator::AddFile(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (entry.IsSymlink() && !params_->dry_run) {
+    if (entry.HasGraftMarker()) {
+      LogCvmfs(kLogPublish, kLogWarning, "File (%s) has an associated graft, "
+               "but the file itself is a symlink.  Ignoring graft.",
+               entry.GetRelativePath().c_str());
+    }
     // Symlinks are completely stored in the catalog
     catalog_manager_->AddFile(
       entry.CreateBasicCatalogDirent(),
@@ -636,6 +641,13 @@ void SyncMediator::AddDirectory(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (!params_->dry_run) {
+
+    if (entry.HasGraftMarker()) {
+      LogCvmfs(kLogPublish, kLogWarning, "Directory (%s) has an associated "
+               "graft, but the file itself is a symlink.  Ignoring graft.",
+               entry.GetRelativePath().c_str());
+    }
+
     catalog_manager_->AddDirectory(entry.CreateBasicCatalogDirent(),
                                    entry.relative_parent_path());
   }
