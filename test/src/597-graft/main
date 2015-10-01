@@ -1,0 +1,48 @@
+
+cvmfs_test_name="Grafting"
+cvmfs_test_autofs_on_startup=false
+
+verify_grafting() {
+  local file1=$(cat /cvmfs/$CVMFS_TEST_REPO/file1)
+  local file2=$(cat /cvmfs/$CVMFS_TEST_REPO/file2)
+  if [ "x$file1 " == "x" ]; then
+    return 20
+  fi
+  if [ "x$file1" != "x$file2" ]; then
+    return 21
+  fi
+  return 0
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "Hello world" > /cvmfs/$CVMFS_TEST_REPO/file1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local hash=$(attr -qg hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/file1)
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/file2
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-file2
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-file2
+
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  verify_grafting
+  local verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+  
+  return 0
+}
+
