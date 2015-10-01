@@ -846,7 +846,8 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 }
 
 void WritableCatalogManager::DoBalance() {
-  const CatalogList &catalog_list = GetCatalogs();
+  CatalogList catalog_list = GetCatalogs();
+  reverse(catalog_list.begin(), catalog_list.end());
   for (unsigned i = 0; i < catalog_list.size(); ++i) {
     FixWeight(static_cast<WritableCatalog*>(catalog_list[i]));
   }
