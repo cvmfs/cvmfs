@@ -105,6 +105,8 @@ void CatalogBalancer<CatalogMgrT>::PartitionOptimally(
       virtual_node->weight -= (max_weight - 1);
     } else {
       // there is no possibility for this directory to be a catalog
+      LogCvmfs(kLogPublish, kLogStdout, "Couldn't create a nested catalog"
+      " in %s", virtual_node->path.c_str());
       break;
     }
   }
