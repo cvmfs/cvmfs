@@ -32,7 +32,7 @@ dnf -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
 
 # install convenience packages for development
 dnf -y install git tig iftop htop jq rubygems rubygem-bundler ruby-devel \
-               screen nc python-unittest2
+               screen nc python-unittest2 strace
 gem install fakes3
 
 # drop a FakeS3 default configuration for CVMFS server
