@@ -40,7 +40,8 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO -v || return $?
 
   local hash=$(attr -qg hash /var/spool/cvmfs/test.cern.ch/rdonly/internal/file)
-  local cache_file=/srv/cvmfs/$CVMFS_TEST_REPO/data/$(echo $hash | cut -b 1-2)/$(echo $hash | cut -b 3-)
+  local cache_fname=$(echo $hash | cut -b 1-2)/$(echo $hash | cut -b 3-)
+  local cache_file=/srv/cvmfs/$CVMFS_TEST_REPO/data/$cache_fname
   if [ ! -e "$cache_file" ]; then
     return 23
   fi
@@ -60,6 +61,7 @@ cvmfs_run_test() {
 
   rm -f /srv/cvmfs/$CVMFS_TEST_REPO/external/file
   rm -f "$cache_file"
+  rm -f /var/spool/cvmfs/test.cern.ch/cache/$CVMFS_TEST_REPO/$cache_fname
  
   cat /cvmfs/$CVMFS_TEST_REPO/external/file || return 0
   echo "External file /cvmfs/$CVMFS_TEST_REPO/external/file appears to be using internal data."

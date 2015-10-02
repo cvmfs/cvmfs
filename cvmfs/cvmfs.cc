@@ -2402,7 +2402,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::external_download_manager_ = new download::DownloadManager();
   cvmfs::external_download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_, "download-external");
-  cvmfs::external_download_manager_->SetHostChain(external_host);
+  cvmfs::external_download_manager_->SetHostChain(external_host.size() ?
+                                                  external_host : hostname);
   if (!dns_server.empty()) {
     cvmfs::external_download_manager_->SetDnsServer(dns_server);
   }
