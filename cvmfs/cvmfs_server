@@ -75,7 +75,7 @@ fi
 
 # Find the service binary (or detect systemd)
 minpidof() {
-  pidof $1 | tr " " "\n" | sort | head -n1
+  pidof $1 | tr " " "\n" | sort --numeric-sort | head -n1
 }
 SERVICE_BIN="false"
 if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
