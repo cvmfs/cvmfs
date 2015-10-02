@@ -1,7 +1,7 @@
 FROM        scratch
 MAINTAINER  Rene Meusel <rene.meusel@cern.ch>
 
-ADD         fedora22_x86_64.tar.gz /
+ADD         fedora22_i386.tar.gz /
 RUN         dnf -y update && dnf -y install                     \
                                         cmake                   \
                                         curl-devel              \

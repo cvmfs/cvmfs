@@ -122,6 +122,16 @@ config=$config
 EOF
 }
 
+get_number_of_cpu_cores() {
+  if is_linux; then
+    cat /proc/cpuinfo | grep -e '^processor' | wc -l
+  elif is_macos; then
+    sysctl -n hw.ncpu
+  else
+    echo "1"
+  fi
+}
+
 python_version() {
   python --version 2>&1 | grep -oh '[0-9]\+\.[0-9]\+.[0-9]\+'
 }
