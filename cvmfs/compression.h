@@ -36,6 +36,14 @@ enum StreamStates {
   kStreamEnd,
 };
 
+// Do not change order of algorithms.  Used as flags in the catalog
+enum Algorithms {
+  kZlibDefault = 0,
+  kNoCompression,
+  kAny,
+};
+
+Algorithms ParseCompressAlgorithm(const std::string &algorithm_option);
 
 void CompressInit(z_stream *strm);
 void DecompressInit(z_stream *strm);

@@ -22,6 +22,7 @@
 #include "shortstring.h"
 #include "smallhash.h"
 #include "util.h"
+#include "compression.h"
 
 /**
  * Describes a FileChunk as generated from the FileProcessor in collaboration
@@ -51,13 +52,14 @@ typedef BigVector<FileChunk> FileChunkList;
 
 struct FileChunkReflist {
   FileChunkReflist() : list(NULL) { }
-  FileChunkReflist(FileChunkList *l, const PathString &p) :
-    list(l), path(p) { }
+  FileChunkReflist(FileChunkList *l, const PathString &p, zlib::Algorithms alg = zlib::kZlibDefault) :
+    list(l), path(p), compression_alg(alg) { }
 
   unsigned FindChunkIdx(const uint64_t offset);
 
   FileChunkList *list;
   PathString path;
+  zlib::Algorithms compression_alg;
 };
 
 

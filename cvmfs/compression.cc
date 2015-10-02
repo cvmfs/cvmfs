@@ -126,6 +126,14 @@ namespace zlib {
 const unsigned kZChunk = 16384;
 const unsigned kBufferSize = 32768;
 
+Algorithms ParseCompressAlgorithm(const std::string &algorithm_option) {
+  if (algorithm_option == "default")
+    return kZlibDefault;
+  if (algorithm_option == "none")
+    return kNoCompression;
+  return kAny;
+}
+
 void CompressInit(z_stream *strm) {
   strm->zalloc = Z_NULL;
   strm->zfree = Z_NULL;

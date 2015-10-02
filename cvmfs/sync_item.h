@@ -70,6 +70,9 @@ class SyncItem {
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
+  
+  inline zlib::Algorithms GetCompressionAlg() const { return compression_alg_; }
+  inline void SetCompressionAlg(const zlib::Algorithms &alg) { compression_alg_ = alg; }
 
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
@@ -161,6 +164,9 @@ class SyncItem {
 
   // The hash of regular file's content
   shash::Any content_hash_;
+  
+  // The compression algorithm for the file
+  zlib::Algorithms compression_alg_;
 
   // Lazy evaluation and caching of results of file stats
   inline void StatRdOnly(const bool refresh = false) const {

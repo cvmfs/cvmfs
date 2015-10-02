@@ -107,6 +107,14 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
+  if (args.find('Z') != args.end()) {
+    compression_algorithm = zlib::ParseCompressAlgorithm(*args.find('Z')->second);
+    if (compression_algorithm == zlib::kAny) {
+      PrintError("unknown compression algorithm");
+      return 1;
+    }
+  }
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
 
@@ -514,6 +522,14 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
+  if (args.find('Z') != args.end()) {
+    compression_algorithm = zlib::ParseCompressAlgorithm(*args.find('Z')->second);
+    if (compression_algorithm == zlib::kAny) {
+      PrintError("unknown compression algorithm");
+      return 1;
+    }
+  }
 
   if (args.find('j') != args.end()) {
     params.catalog_entry_warn_threshold =
@@ -534,6 +550,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition spooler_definition(
     params.spooler_definition,
     hash_algorithm,
+    compression_algorithm,
     params.use_file_chunking,
     params.min_file_chunk_size,
     params.avg_file_chunk_size,

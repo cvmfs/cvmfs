@@ -63,8 +63,14 @@ void Chunk::Initialize() {
   zlib_context_.opaque   = Z_NULL;
   zlib_context_.next_in  = Z_NULL;
   zlib_context_.avail_in = 0;
-  const int zlib_retval = deflateInit(&zlib_context_, Z_DEFAULT_COMPRESSION);
-  assert(zlib_retval == 0);
+  if (compression_alg_ == zlib::kZlibDefault) {
+    const int zlib_retval = deflateInit(&zlib_context_, Z_DEFAULT_COMPRESSION);
+    assert(zlib_retval == 0);
+  } else if (compression_alg_ == zlib::kNoCompression) {
+    // Initialize the zlib library to no compression
+    const int zlib_retval = deflateInit(&zlib_context_, 0);
+    assert(zlib_retval == 0);
+  }
 
   zlib_initialized_         = true;
   content_hash_initialized_ = true;
