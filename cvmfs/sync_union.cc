@@ -213,54 +213,54 @@ bool ObtainSysAdminCapabilityInternal(cap_t caps) {
   const cap_value_t cap = CAP_SYS_ADMIN;
 
   if (!CAP_IS_SUPPORTED(cap)) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "System doesn't support CAP_SYS_ADMIN");
+    LogCvmfs(kLogUnionFs, kLogStderr, "System doesn't support CAP_SYS_ADMIN");
     return false;
   }
 
   if (caps == NULL) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "Failed to obtain capability state "
-                                     "of current process (errno: %d)",
-                                     errno);
+    LogCvmfs(kLogUnionFs, kLogStderr, "Failed to obtain capability state "
+                                      "of current process (errno: %d)",
+                                      errno);
     return false;
   }
 
   cap_flag_value_t cap_state;
   if (cap_get_flag(caps, cap, CAP_EFFECTIVE, &cap_state) != 0) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "Failed to check effective set for "
-                                     "CAP_SYS_ADMIN (errno: %d)",
-                                     errno);
+    LogCvmfs(kLogUnionFs, kLogStderr, "Failed to check effective set for "
+                                      "CAP_SYS_ADMIN (errno: %d)",
+                                      errno);
     return false;
   }
 
   if (cap_state == CAP_SET) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "CAP_SYS_ADMIN is already effective");
+    LogCvmfs(kLogUnionFs, kLogStderr, "CAP_SYS_ADMIN is already effective");
     return true;
   }
 
   if (cap_get_flag(caps, cap, CAP_PERMITTED, &cap_state) != 0) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "Failed to check permitted set for "
-                                     "CAP_SYS_ADMIN (errno: %d)",
-                                     errno);
+    LogCvmfs(kLogUnionFs, kLogStderr, "Failed to check permitted set for "
+                                      "CAP_SYS_ADMIN (errno: %d)",
+                                      errno);
     return false;
   }
 
   if (cap_state != CAP_SET) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "CAP_SYS_ADMIN cannot be obtained as it's "
-                                     "not in the permitted-set of the process");
+    LogCvmfs(kLogUnionFs, kLogStderr, "CAP_SYS_ADMIN cannot be obtained. It's "
+                                      "not in the process's permitted-set.");
     return false;
   }
 
   if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &cap, CAP_SET) != 0) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "Failed to set CAP_SYS_ADMIN as effective "
-                                     "for the current process (errno: %d)",
-                                     errno);
+    LogCvmfs(kLogUnionFs, kLogStderr, "Cannot set CAP_SYS_ADMIN as effective "
+                                      "for the current process (errno: %d)",
+                                      errno);
     return false;
   }
 
   if (cap_set_proc(caps) != 0) {
-    LogCvmfs(kLogUnionFs, kLogDebug, "Failed to reset capabilities for current "
-                                     "process (errno: %d)",
-                                     errno);
+    LogCvmfs(kLogUnionFs, kLogStderr, "Cannot reset capabilities for current "
+                                      "process (errno: %d)",
+                                      errno);
     return false;
   }
 
