@@ -38,8 +38,8 @@ fi
 
 # enable httpd on boot
 if ! systemctl status httpd > /dev/null 2>&1; then
-  systemctl enable httpd > /dev/null 2>&!
-  systemctl start  httpd > /dev/null 2>&!
+  systemctl enable httpd > /dev/null 2>&1
+  systemctl start  httpd > /dev/null 2>&1
 fi
 
 # load overlayfs kernel module on boot
