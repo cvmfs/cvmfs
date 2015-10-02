@@ -18,6 +18,9 @@ mkdir -p $mntpoint
 echo "$drive $mntpoint ext4 defaults 0 0" >> /etc/fstab
 mount $mntpoint
 
+# update packages
+dnf -y update
+
 # install necessary development packages
 dnf -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                fuse-libs libattr-devel openssl openssl-devel patch pkgconfig \
