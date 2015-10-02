@@ -28,11 +28,11 @@ dnf -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                shadow-utils util-linux-ng selinux-policy checkpolicy         \
                selinux-policy-devel hardlink selinux-policy-targeted         \
                python-devel initscripts bash coreutils grep sed sudo psmisc  \
-               curl attr httpd libcap-devel
+               curl attr httpd libcap-devel mod_wsgi
 
 # install convenience packages for development
 dnf -y install git tig iftop htop jq rubygems rubygem-bundler ruby-devel \
-               screen nc python-unittest2 strace
+               screen nc python-unittest2 strace lsof
 gem install fakes3
 
 # drop a FakeS3 default configuration for CVMFS server
