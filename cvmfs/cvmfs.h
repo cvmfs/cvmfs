@@ -41,6 +41,7 @@ extern pid_t pid_;
 extern std::string *mountpoint_;
 extern std::string *repository_name_;
 extern download::DownloadManager *download_manager_;
+extern download::DownloadManager *external_download_manager_;
 extern cache::CacheManager *cache_manager_;
 extern int max_cache_timeout_;
 extern bool foreground_;
