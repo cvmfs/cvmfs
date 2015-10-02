@@ -72,5 +72,22 @@ Vagrant.configure(2) do |config|
     fedora.vm.synced_folder '.', '/vagrant', nfs: true
 
     fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
+
+    config.vm.provider "virtualbox" do |vb|
+      vb.name = "cvmfs_fedora"
+      # Get disk path
+      line = `VBoxManage list systemproperties | grep "Default machine folder"`
+      vb_machine_folder = line.split(':')[1].strip()
+      second_disk = File.join(vb_machine_folder, vb.name, 'disk2.vdi')
+
+      # Create and attach disk
+      unless File.exist?(second_disk)
+        vb.customize ['createhd', '--filename', second_disk, '--format', 'VDI',
+                      '--size', 10 * 1024]
+      end
+      vb.customize ['storageattach', :id, '--storagectl', 'IDE Controller',
+                    '--port', 0, '--device', 1, '--type', 'hdd',
+                    '--medium', second_disk]
+    end
   end
 end

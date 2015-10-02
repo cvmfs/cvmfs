@@ -10,6 +10,17 @@ VAGRANT_WORKSPACE="/vagrant"
 export LANG="en_US.UTF-8"
 echo "LANG=\"$LANG\"" > /etc/sysconfig/i18n
 
+# create secondary hard drive as ext4 volume
+drive="/dev/sdb"
+mntpoint="/var/spool/cvmfs"
+mkfs.ext4 $drive
+mkdir -p $mntpoint
+echo "$drive $mntpoint ext4 defaults 0 0" >> /etc/fstab
+mount $mntpoint
+
+# update packages
+dnf -y update
+
 # install necessary development packages
 dnf -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                fuse-libs libattr-devel openssl openssl-devel patch pkgconfig \
@@ -38,8 +49,8 @@ fi
 
 # enable httpd on boot
 if ! systemctl status httpd > /dev/null 2>&1; then
-  systemctl enable httpd > /dev/null 2>&!
-  systemctl start  httpd > /dev/null 2>&!
+  systemctl enable httpd > /dev/null 2>&1
+  systemctl start  httpd > /dev/null 2>&1
 fi
 
 # load overlayfs kernel module on boot
