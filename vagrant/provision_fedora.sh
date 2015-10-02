@@ -10,6 +10,14 @@ VAGRANT_WORKSPACE="/vagrant"
 export LANG="en_US.UTF-8"
 echo "LANG=\"$LANG\"" > /etc/sysconfig/i18n
 
+# create secondary hard drive as ext4 volume
+drive="/dev/sdb"
+mntpoint="/var/spool/cvmfs"
+mkfs.ext4 $drive
+mkdir -p $mntpoint
+echo "$drive $mntpoint ext4 defaults 0 0" >> /etc/fstab
+mount $mntpoint
+
 # install necessary development packages
 dnf -y install libuuid-devel gcc gcc-c++ glibc-common cmake fuse fuse-devel  \
                fuse-libs libattr-devel openssl openssl-devel patch pkgconfig \
