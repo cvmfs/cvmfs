@@ -535,7 +535,7 @@ void SyncUnionOverlayfs::ProcessCharacterDevice(const std::string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, kItemCharacterDevice, this);
+  SyncItem entry(parent_dir, filename, this, kItemCharacterDevice);
   ProcessFile(&entry);
 }
 
