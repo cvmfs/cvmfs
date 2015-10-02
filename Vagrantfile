@@ -65,4 +65,12 @@ Vagrant.configure(2) do |config|
     ub.vm.network "private_network", ip: "192.168.33.12"
     ub.vm.synced_folder '.', '/vagrant', nfs: true
   end
+
+  config.vm.define "fedora" do |fedora|
+    fedora.vm.box = "box-cutter/fedora22"
+    fedora.vm.network "private_network", ip: "192.168.33.13"
+    fedora.vm.synced_folder '.', '/vagrant', nfs: true
+
+    fedora.vm.provision "shell", path: "vagrant/provision_fedora.sh"
+  end
 end
