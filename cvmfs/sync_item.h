@@ -152,7 +152,7 @@ class SyncItem {
 
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
 
-  std::string GetGraftPath() const;
+  std::string GetGraftMarkerPath() const;
   void CheckGraft();
 
   const SyncUnion *union_engine_;

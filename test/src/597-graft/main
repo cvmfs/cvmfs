@@ -6,7 +6,7 @@ verify_grafting() {
   testfname=$1
   local file1=$(cat /cvmfs/$CVMFS_TEST_REPO/file1)
   local file2=$(cat $testfname)
-  if [ "x$file1 " == "x" ]; then
+  if [ "x$file1" == "x" ]; then
     return 20
   fi
   if [ "x$file1" != "x$file2" ]; then

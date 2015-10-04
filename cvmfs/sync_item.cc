@@ -196,7 +196,7 @@ std::string SyncItem::GetScratchPath() const {
 }
 
 
-std::string SyncItem::GetGraftPath() const {
+std::string SyncItem::GetGraftMarkerPath() const {
   return union_engine_->scratch_path() + "/" +
       ((relative_parent_path_.empty()) ?
         ".cvmfsgraft-" + filename_ :
@@ -209,7 +209,7 @@ void SyncItem::CheckGraft() {
   bool found_checksum = false;
   std::string checksum_type;
   std::string checksum_value;
-  std::string graftfile = GetGraftPath();
+  std::string graftfile = GetGraftMarkerPath();
   LogCvmfs(kLogFsTraversal, kLogDebug, "Checking potential graft path %s.",
            graftfile.c_str());
   FILE *fp = fopen(graftfile.c_str(), "r");
