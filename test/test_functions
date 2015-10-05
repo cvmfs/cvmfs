@@ -1306,7 +1306,7 @@ display_timestamp() {
 # @param destination_directory
 cp_bin() {
   local destination_directory="$1"
-  sudo cp -R /bin/* $destination_directory  || return 1
+  sudo cp -LR /bin/* $destination_directory || return 1
   sudo chmod -R a+rw $destination_directory || return 2
   for f in $(find $destination_directory -type f); do
     sudo chmod 0444 $f || return 3
@@ -1318,8 +1318,8 @@ cp_bin() {
 # @param destination_directory
 cp_usrbin() {
   local destination_directory="$1"
-  sudo cp -R /usr/bin/* $destination_directory || return 1
-  sudo chmod -R a+rw $destination_directory    || return 2
+  sudo cp -LR /usr/bin/* $destination_directory || return 1
+  sudo chmod -R a+rw $destination_directory     || return 2
   for f in $(find $destination_directory -type f); do
     sudo chmod 0444 $f || return 3
   done
