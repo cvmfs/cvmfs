@@ -233,6 +233,20 @@ contains() {
 }
 
 
+uses_aufs() {
+  local repo_name="$1"
+  load_repo_config $repo_name
+  [ x"$CVMFS_UNION_FS_TYPE" = x"aufs" ]
+}
+
+
+uses_overlayfs() {
+  local repo_name="$1"
+  load_repo_config $repo_name
+  [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]
+}
+
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
