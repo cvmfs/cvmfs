@@ -64,6 +64,7 @@ Vagrant.configure(2) do |config|
     ub.vm.box = "ubuntu-trusty"
     ub.vm.network "private_network", ip: "192.168.33.12"
     ub.vm.synced_folder '.', '/vagrant', nfs: true
+    ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
   end
 
   config.vm.define "fedora" do |fedora|
