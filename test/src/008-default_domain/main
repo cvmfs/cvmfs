@@ -6,17 +6,17 @@ cvmfs_run_test() {
 
   cvmfs_mount atlas.cern.ch,lhcb.cern.ch,grid.cern.ch,cms.cern.ch || return 1
   
-  ls /cvmfs/atlas.cern.ch >> $logfile || return 2
-  ls /cvmfs/lhcb.cern.ch >> $logfile || return 3
-  ls /cvmfs/grid.cern.ch >> $logfile || return 4
-  ls /cvmfs/cms.cern.ch >> $logfile || return 5
+  ls /cvmfs/atlas.cern.ch || return 2
+  ls /cvmfs/lhcb.cern.ch || return 3
+  ls /cvmfs/grid.cern.ch || return 4
+  ls /cvmfs/cms.cern.ch || return 5
   
-  sudo cvmfs_config status >> $logfile 2>&1 || return 10
+  sudo cvmfs_config status || return 10
   
-  cvmfs_config showconfig grid >> $logfile 2>&1 || return 20
-  cvmfs_config showconfig atlas >> $logfile 2>&1 || return 21
-  cvmfs_config showconfig cms.cern.ch >> $logfile 2>&1 || return 22
-  sudo cvmfs_config chksetup >> $logfile 2>&1 || return 23
+  cvmfs_config showconfig grid || return 20
+  cvmfs_config showconfig atlas || return 21
+  cvmfs_config showconfig cms.cern.ch || return 22
+  sudo cvmfs_config chksetup || return 23
   
   return 0
 }

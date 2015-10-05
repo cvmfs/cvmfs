@@ -1,0 +1,285 @@
+cvmfs_test_name="Auto-Repair Bogus Mountpoints"
+cvmfs_test_autofs_on_startup=false
+
+
+mount_old_root_hash() {
+  local name=$1
+  local old_root_hash=$2
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local rd_only=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
+
+  load_repo_config $name
+
+  echo "create a manipulated client.local file with '$old_root_hash'"
+  local client_local="${CVMFS_SPOOL_DIR}/client.local"
+  local tampered_client_local="client.local.tampered"
+  cat $client_local | sed -e "s/^\(CVMFS_ROOT_HASH\)=.*$/\1=$old_root_hash/" > $tampered_client_local || return 1
+  sudo cp $tampered_client_local $client_local || return 2
+
+  echo "remount with the tampered root hash ($old_root_hash)"
+  sudo umount $repo_dir || return 3
+  sudo umount $rd_only  || return 4
+  sudo mount  $rd_only  || return 5
+  sudo mount  $repo_dir || return 6
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local rd_only=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "read repository configuration"
+  load_repo_config $CVMFS_TEST_REPO || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "filling the repository with contents of /bin"
+  cp_bin $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  cvmfs_server publish $CVMFS_TEST_REPO || return 2
+
+  echo "remember the root hash of this revision"
+  local old_root_hash
+  old_root_hash="$(attr -qg root_hash $rd_only)"
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "unmount union file system mountpoint"
+  sudo umount $repo_dir || return 3
+
+  echo "check the repository"
+  local check_log_1="check_1.log"
+  cvmfs_server check $CVMFS_TEST_REPO > $check_log_1 2>&1 || return 4
+
+  echo "check the error and warning messages"
+  cat $check_log_1 | grep -e "/cvmfs/${CVMFS_TEST_REPO} is not mounted"  || return 5
+  cat $check_log_1 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}" || return 6
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "unmount union file system mountpoint"
+  sudo umount $repo_dir || return 7
+
+  echo "unmount read-only cvmfs branch"
+  sudo umount $rd_only || return 8
+
+  echo "check the repository"
+  local check_log_2="check_2.log"
+  cvmfs_server check $CVMFS_TEST_REPO > $check_log_2 2>&1 || return 9
+
+  echo "check the error and warning messages"
+  cat $check_log_2 | grep -e "${CVMFS_TEST_REPO}/rdonly is not mounted"    || return 10
+  cat $check_log_2 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly" || return 11
+  cat $check_log_2 | grep -e "/cvmfs/${CVMFS_TEST_REPO} is not mounted"    || return 12
+  cat $check_log_2 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"   || return 13
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "remount union file system read/write"
+  sudo mount -o remount,rw $repo_dir || return 14
+
+  echo "open transaction"
+  local check_log_3="check_3.log"
+  start_transaction $CVMFS_TEST_REPO > $check_log_3 2>&1 || return 15
+
+  echo "check the error and warning messages"
+  cat $check_log_3 | grep -e "not in a transaction .* /cvmfs/${CVMFS_TEST_REPO} .* mounted read/write" || return 16
+  cat $check_log_3 | grep -e "Trying to remount /cvmfs/${CVMFS_TEST_REPO}"                             || return 17
+
+  echo "check if transaction is open"
+  [ -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 18
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "remount union file system read-only"
+  sudo mount -o remount,ro $repo_dir || return 19
+
+  echo "publish transaction (should fail)"
+  local check_log_4="check_4.log"
+  publish_repo $CVMFS_TEST_REPO > $check_log_4 2>&1 && return 20
+
+  echo "check the error and warning messages"
+  cat $check_log_4 | grep -e "is in a transaction .* /cvmfs/${CVMFS_TEST_REPO} .* not mounted read/write" || return 21
+  cat $check_log_4 | grep -e "${CVMFS_TEST_REPO} .* cannot be repaired"                                   || return 22
+
+  echo "check if transaction is still open"
+  [ -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 23
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "run abort to bring the repository back in shape"
+  local check_log_5="check_5.log"
+  abort_transaction $CVMFS_TEST_REPO > $check_log_5 2>&1 || return 24
+
+  echo "check the error and warning messages"
+  cat $check_log_5 | grep -e "is in a transaction .* /cvmfs/${CVMFS_TEST_REPO} .* not mounted read/write" || return 25
+  cat $check_log_5 | grep -e "Trying to remount /cvmfs/${CVMFS_TEST_REPO} read/write"                     || return 26
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "check the repository's integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 27
+
+  echo "create a fresh transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "create a snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 28
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "open transaction"
+  start_transaction $CVMFS_TEST_REPO || return 29
+
+  echo "umount both $repo_dir and $rd_only"
+  sudo umount $repo_dir || return 30
+  sudo umount $rd_only  || return 31
+
+  echo "publish transaction (should fail)"
+  local check_log_6="check_6.log"
+  publish_repo $CVMFS_TEST_REPO > $check_log_6 2>&1 && return 32
+
+  echo "check the error and warning messages"
+  cat $check_log_6 | grep -e "${CVMFS_TEST_REPO}/rdonly is not mounted" || return 33
+  cat $check_log_6 | grep -e "${CVMFS_TEST_REPO} .* cannot be repaired" || return 34
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "run abort to bring the repository back in shape"
+  local check_log_7="check_7.log"
+  abort_transaction $CVMFS_TEST_REPO > $check_log_7 2>&1 || return 35
+
+  echo "check the error and warning messages"
+  cat $check_log_7 | grep -e "${CVMFS_TEST_REPO}/rdonly is not mounted"                                   || return 36
+  cat $check_log_7 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly"                                || return 37
+  cat $check_log_7 | grep -e "/cvmfs/${CVMFS_TEST_REPO} is not mounted"                                   || return 38
+  cat $check_log_7 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"                                  || return 39
+  cat $check_log_7 | grep -e "is in a transaction .* /cvmfs/${CVMFS_TEST_REPO} .* not mounted read/write" || return 40
+  cat $check_log_7 | grep -e "Trying to remount /cvmfs/${CVMFS_TEST_REPO} read/write"                     || return 41
+
+  echo "check that repository is not in a transaction"
+  [ ! -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 42
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 43
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "remember current root hash"
+  old_root_hash="$(attr -qg root_hash $rd_only)"
+  echo "root hash: $old_root_hash"
+
+  echo "open transaction"
+  start_transaction $CVMFS_TEST_REPO || return 44
+
+  echo "publish transaction"
+  local check_log_8="check_8.log"
+  publish_repo $CVMFS_TEST_REPO > $check_log_8 2>&1 || return 45
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "check the current root hash"
+  local current_root_hash="$(attr -qg root_hash $rd_only)"
+  echo "current root hash: $current_root_hash"
+
+  echo "create a manipulated client.local file with '$old_root_hash' and remount"
+  mount_old_root_hash $CVMFS_TEST_REPO $old_root_hash || return $?
+
+  echo "check that the root hash was successfully tampered with"
+  local tampered_root_hash="$(attr -qg root_hash $rd_only)"
+  [ x"$tampered_root_hash" = x"$old_root_hash" ] || return 46
+
+  echo "open a transaction (should remount the repository)"
+  local check_log_9="check_9.log"
+  start_transaction $CVMFS_TEST_REPO > $check_log_9 2>&1 || return 47
+
+  echo "check the error and warning messages"
+  cat $check_log_9 | grep -e "${CVMFS_TEST_REPO} .* not based on .* published revision" || return 48
+  cat $check_log_9 | grep -e "Trying to remount .* to $current_root_hash"               || return 49
+
+  echo "add a couple of files"
+  mkdir ${repo_dir}/foobar                  || return 50
+  echo "foobar" > ${repo_dir}/foobar/foobar || return 51
+  touch ${repo_dir}/foobar/.cvmfscatalog    || return 52
+
+  echo "publish transaction"
+  publish_repo $CVMFS_TEST_REPO || return 53
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 54
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "check the current root hash"
+  old_root_hash="$current_root_hash"
+  local current_root_hash="$(attr -qg root_hash $rd_only)"
+  echo "old_root_hash:     $old_root_hash"
+  echo "current root hash: $current_root_hash"
+
+  echo "open transaction"
+  start_transaction $CVMFS_TEST_REPO || return 55
+
+  echo "create a manipulated client.local file with '$old_root_hash' and remount"
+  mount_old_root_hash $CVMFS_TEST_REPO $old_root_hash || return $?
+
+  echo "publish repository (should fail)"
+  local check_log_10="check_10.log"
+  publish_repo $CVMFS_TEST_REPO > $check_log_10 2>&1 && return 56
+
+  echo "check error and warning messages"
+  cat $check_log_10 | grep -e "${CVMFS_TEST_REPO} .* not based on .* published revision" || return 57
+  cat $check_log_10 | grep -e "${CVMFS_TEST_REPO} .* cannot be repaired"                 || return 58
+
+  echo "check if transaction is still open"
+  [ -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 59
+
+  echo "run abort to bring the repository back in shape"
+  local check_log_11="check_11.log"
+  abort_transaction $CVMFS_TEST_REPO > $check_log_11 2>&1 || return 60
+
+  echo "check error and warning messages"
+  cat $check_log_11 | grep -e "${CVMFS_TEST_REPO} .* not based on .* published revision"         || return 61
+  cat $check_log_11 | grep -e "Trying to remount .* to $current_root_hash"                       || return 62
+  cat $check_log_11 | grep -e "${CVMFS_TEST_REPO} .* in a transaction .* not mounted read/write" || return 63
+  cat $check_log_11 | grep -e "Trying to remount .* read/write"                                  || return 64
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "check if transaction is closed"
+  [ ! -e ${CVMFS_SPOOL_DIR}/in_transaction.lock ] || return 65
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 66
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "open transaction"
+  start_transaction $CVMFS_TEST_REPO || return 67
+
+  echo "remove everything from repo"
+  rm -fR ${repo_dir}/* || return 68
+
+  echo "publish transaction"
+  publish_repo $CVMFS_TEST_REPO || return 69
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 70
+
+  return 0
+}
+

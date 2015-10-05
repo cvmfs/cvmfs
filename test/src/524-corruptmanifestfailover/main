@@ -1,0 +1,57 @@
+cvmfs_test_name="Data Corruption in Manifest File"
+cvmfs_test_autofs_on_startup=false
+
+desaster_cleanup() {
+  local mnt_point=$1
+  local replica_name=$2
+  sudo umount $mnt_point > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local scratch_dir=$(pwd)
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  local mnt_point="$scratch_dir/mountpoint"
+  local cache_dir="$scratch_dir/cache"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_filled_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "create a replica of the fresh repository"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    || { desaster_cleanup $mnt_point $replica_name; return 2; }
+
+  echo "create a snapshot of the Stratum1 repository"
+  cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 3; }
+
+  echo "corrupt the repository manifest in the Stratum0 repository"
+  echo "<html><head>Hotel WiFi</head><body>Please Login</body></html>" > /srv/cvmfs/$CVMFS_TEST_REPO/.cvmfspublished || { desaster_cleanup $mnt_point $replica_name; return 4; }
+
+  echo "mount the repository on a local mountpoint with references to Stratum1 and Stratum0"
+  mkdir $mnt_point $cache_dir || { desaster_cleanup $mnt_point $replica_name; return 5; }
+  cat > private.conf << EOF
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_SERVER_URL="http://127.0.0.1/cvmfs/$CVMFS_TEST_REPO;http://127.0.0.1/cvmfs/$replica_name"
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
+EOF
+  cvmfs2 -d -o config=private.conf $CVMFS_TEST_REPO $mnt_point >> cvmfs2_output.log 2>&1 || { desaster_cleanup $mnt_point $replica_name; return 6; }
+
+  echo "try to access files in the repository"
+  for f in $(find $mnt_point -maxdepth 1 -type f); do
+    cat $f || { desaster_cleanup $mnt_point $replica_name; return 7; }
+  done
+
+  echo "clean up"
+  sudo umount $mnt_point || return 8
+  sudo cvmfs_server rmfs -f $replica_name || return 9
+
+  return 0
+}
+

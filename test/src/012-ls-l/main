@@ -9,7 +9,7 @@ cvmfs_run_test() {
   local lsout
   lsout=$(ls -l /cvmfs/sft.cern.ch 2>&1 1>/dev/null)
   if [ "x$lsout" != "x" ]; then
-    echo "$lsout" >> $logfile
+    echo "$lsout"
     return 2
   fi
 

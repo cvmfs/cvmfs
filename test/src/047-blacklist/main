@@ -1,0 +1,37 @@
+
+cvmfs_test_name="Certificate blacklist"
+
+cleanup_blacklist() {
+  sudo rm -f /etc/cvmfs/blacklist
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local retval=
+  cvmfs_mount grid.cern.ch || retval=1
+  cvmfs_umount grid.cern.ch || retval=2
+
+  sudo cvmfs_config wipecache
+
+  sudo touch /etc/cvmfs/blacklist
+  cvmfs_mount grid.cern.ch || retval=10
+  cvmfs_umount grid.cern.ch || retval=11
+
+  sudo cvmfs_config wipecache
+  sudo sh -c "cat > /etc/cvmfs/blacklist" <<EOF
+A7:D8:2A:0F:30:53:3C:60:4F:B0:3E:59:B6:D7:D1:97:9C:AA:EB:B4
+A0:1A:33:B5:C3:00:D5:D3:8F:C9:4A:4D:D4:A4:51:65:F4:20:A3:5B
+09:D9:09:04:9A:E2:1E:F3:9A:E2:EB:52:90:B6:17:9F:F3:F0:B3:57
+EOF
+
+  cvmfs_mount grid.cern.ch
+  if [ $? -eq 0 ]; then
+    echo "BLACKLIST NOT EFFETIVE"
+    retval=20
+  fi
+
+  cleanup_blacklist
+
+  return $retval
+}

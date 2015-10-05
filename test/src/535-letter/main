@@ -1,0 +1,52 @@
+
+cvmfs_test_name="Send and Receive Letters"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_url=$(get_repo_url $CVMFS_TEST_REPO)
+  local scratch_dir=$(pwd)
+
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log || return $?
+
+  local letter="I'm a signed letter"
+
+  local signed=$(cvmfs_swissknife letter -s \
+    -c /etc/cvmfs/keys/${CVMFS_TEST_REPO}.crt \
+    -k /etc/cvmfs/keys/${CVMFS_TEST_REPO}.key \
+    -f $CVMFS_TEST_REPO \
+    -t "$letter") || return 2
+
+  echo "Signed letter is $signed"
+
+  local verified="$(cvmfs_swissknife letter -v \
+    -m 3 \
+    -k /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    -r $repo_url \
+    -f $CVMFS_TEST_REPO \
+    -t $signed)" || return 3
+
+  echo "Verified letter is $verified"
+
+  if [ "x$letter" != "x$verified" ]; then
+    echo "Expected $letter"
+    return 4
+  fi
+
+  sleep 4
+  verified="$(cvmfs_swissknife letter -v \
+      -m 3 \
+      -k /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+      -r $repo_url \
+      -f $CVMFS_TEST_REPO \
+      -t $signed)"
+ echo "Verified letter is $verified" 
+  
+  if [ x"$letter" = x"$verified" ]; then
+    echo "Expected failure"
+    return 5
+  fi
+
+  return 0
+}

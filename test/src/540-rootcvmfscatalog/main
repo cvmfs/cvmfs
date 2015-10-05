@@ -1,0 +1,29 @@
+cvmfs_test_name="Forbid .cvmfscatalog in root directory"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "touch /cvmfs/$CVMFS_TEST_REPO/.cvmfscatalog"
+  sudo touch /cvmfs/$CVMFS_TEST_REPO/.cvmfscatalog || return 3
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO
+  if [ $? -eq 0 ]; then
+    echo "publish should not have succeeded"
+    return 4
+  fi
+
+  echo "abort transaction"
+  abort_transaction $CVMFS_TEST_REPO || return 5
+
+  return 0
+}
+

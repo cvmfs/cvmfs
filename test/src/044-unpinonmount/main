@@ -1,0 +1,16 @@
+
+cvmfs_test_name="Trigger unpin listener on mount"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount atlas.cern.ch || return 1
+  local catalog_size=$(sudo cvmfs_talk -i atlas.cern.ch cache size | cut -d, -f2 | awk '{print $2}' | tr -d [A-Z])
+  cvmfs_umount atlas.cern.ch || return 2
+
+  cvmfs_mount atlas.cern.ch "CVMFS_QUOTA_LIMIT=$((2*$catalog_size+2))" || return 3
+  ls /cvmfs/atlas.cern.ch || return 4
+  
+  return 0
+}
+

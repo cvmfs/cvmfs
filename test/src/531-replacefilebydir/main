@@ -1,0 +1,163 @@
+cvmfs_test_name="Replace Symlink/Regular File by Directory"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "Sie war sehr nett und hatte ne schöne Dauerkrause."              >  helge.schneider
+  echo "Ich küsste sie im Voraus und nahm sie mit nach Hause!"           >> helge.schneider
+  echo "Ich zeigte ihr den Keller und auch den Bügelraum."               >> helge.schneider
+  echo "Doch für all die schönen Zimmer interessierte sie sich kaum!"    >> helge.schneider
+                                                                         >> helge.schneider
+  echo "Es war das Bonbon aus Wurst das ihr Glück gebracht -tingeling -" >> helge.schneider
+  echo "Bonbon aus Wurst die ganze Nacht. Bonbon aus Wurst, riesengroß." >> helge.schneider
+  echo "Bonbon aus Wurst ganz famos - tingelingelin!"                    >> helge.schneider
+  echo ""                                                                >> helge.schneider
+  echo " - Helge Schneider"                                              >> helge.schneider
+
+  ln -s helge.schneider deutscher.kasper
+
+  popdir
+}
+
+replace_symlink_by_directory() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -f deutscher.kasper
+  mkdir -p deutscher.kasper
+
+  echo "Käsebrot"                                 >  deutscher.kasper/kaesebrot
+  echo ""                                         >> deutscher.kasper/kaesebrot
+  echo "Käsebrot – ist ein gutes Brot."           >> deutscher.kasper/kaesebrot
+  echo "Käsebrot – ist ein gutes Brot."           >> deutscher.kasper/kaesebrot
+  echo "Käsebrot – ist ein gutes Brot,"           >> deutscher.kasper/kaesebrot
+  echo "super sexy Käsebrot."                     >> deutscher.kasper/kaesebrot
+  echo ""                                         >> deutscher.kasper/kaesebrot
+  echo "[...]"                                    >> deutscher.kasper/kaesebrot
+  echo ""                                         >> deutscher.kasper/kaesebrot
+  echo "Butterbrot und Quark,"                    >> deutscher.kasper/kaesebrot
+  echo "schmecken sicher gut,"                    >> deutscher.kasper/kaesebrot
+  echo "doch das Käsebrot"                        >> deutscher.kasper/kaesebrot
+  echo "geht direkt ins Blut."                    >> deutscher.kasper/kaesebrot
+  echo ""                                         >> deutscher.kasper/kaesebrot
+  echo "[...]"                                    >> deutscher.kasper/kaesebrot
+  echo ""                                         >> deutscher.kasper/kaesebrot
+  echo "Schmeichelhaft – wie es da liegt"         >> deutscher.kasper/kaesebrot
+  echo "auf dem Tisch, neben Kakao."              >> deutscher.kasper/kaesebrot
+  echo "Käsebrot – ist ein gutes Brot."           >> deutscher.kasper/kaesebrot
+  echo ""                                         >> deutscher.kasper/kaesebrot
+  echo "[...]"                                    >> deutscher.kasper/kaesebrot
+  echo ""                                         >> deutscher.kasper/kaesebrot
+  echo "Zeitungsinserate liegen auf dem Tisch,"   >> deutscher.kasper/kaesebrot
+  echo "doch ein Stückchen Käse"                  >> deutscher.kasper/kaesebrot
+  echo "schmeckt auch gut zu Fisch."              >> deutscher.kasper/kaesebrot
+  echo ""                                         >> deutscher.kasper/kaesebrot
+  echo "  - Helge Schneider"                      >> deutscher.kasper/kaesebrot
+
+  popdir
+}
+
+replace_regular_file_by_directory() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -f helge.schneider
+  mkdir -p helge.schneider
+
+  echo "Sommer, Sonne, Kaktus. Playing Federball on the beach."           >  helge.schneider/sommersonnekaktus
+  echo "Blauer Himmer Gute Laune and a beautiful girl auf´m Schoß."       >> helge.schneider/sommersonnekaktus
+  echo ""                                                                 >> helge.schneider/sommersonnekaktus
+  echo "Never, never go to work, lieber holliday."                        >> helge.schneider/sommersonnekaktus
+  echo "Die Gitarre um Hals, schnell gekämmt, ja das is the way."         >> helge.schneider/sommersonnekaktus
+  echo ""                                                                 >> helge.schneider/sommersonnekaktus
+  echo "Sommer Sonne Kaktus, Paeja in the Bauch."                         >> helge.schneider/sommersonnekaktus
+  echo "Blauer Himmel Gute Laune, ja das is the Brauch."                  >> helge.schneider/sommersonnekaktus
+  echo ""                                                                 >> helge.schneider/sommersonnekaktus
+  echo "Sommer, Sonne, Kaktus no more come nach Haus."                    >> helge.schneider/sommersonnekaktus
+  echo "Sommer, Sonne Kaktus jaja der holiday is noch nich aus."          >> helge.schneider/sommersonnekaktus
+  echo ""                                                                 >> helge.schneider/sommersonnekaktus
+  echo "Never never go to work lieber plantschen und sich anzieh´n fein." >> helge.schneider/sommersonnekaktus
+  echo ""                                                                 >> helge.schneider/sommersonnekaktus
+  echo "   - Helge Schneider"                                             >> helge.schneider/sommersonnekaktus
+
+  popdir
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot (initial)"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  replace_symlink_by_directory $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  replace_symlink_by_directory $reference_dir || return 4
+
+  echo "creating CVMFS snapshot (replace symlink by directory)"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  replace_regular_file_by_directory $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  replace_regular_file_by_directory $reference_dir || return 4
+
+  echo "creating CVMFS snapshot (replace regular file by directory)"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  return 0
+}
+

@@ -7,11 +7,10 @@
 
 #include <pthread.h>
 
-#include <queue>
-#include <vector>
-#include <set>
-
 #include <cassert>
+#include <queue>
+#include <set>
+#include <vector>
 
 #include "atomic.h"
 #include "util.h"
@@ -38,8 +37,8 @@ class Lockable : SingleCopy {
  protected:
   Lockable() {
     const int retval = pthread_mutex_init(&mutex_, NULL);
-    assert (retval == 0);
-  };
+    assert(retval == 0);
+  }
 
  private:
   mutable pthread_mutex_t mutex_;
@@ -49,6 +48,46 @@ class Lockable : SingleCopy {
 //
 // -----------------------------------------------------------------------------
 //
+
+/**
+ * Used to allow for static polymorphism in the RAII template to statically
+ * decide which 'lock' functions to use, if we have more than one possiblity.
+ * (I.e. Read/Write locks)
+ * Note: Static Polymorphism - Strategy Pattern
+ *
+ * TODO: eventually replace this by C++11 typed enum
+ */
+struct _RAII_Polymorphism {
+  enum T {
+    None,
+    ReadLock,
+    WriteLock
+  };
+};
+
+
+/**
+ * Basic template wrapper class for any kind of RAII-like behavior.
+ * The user is supposed to provide a template specialization of Enter() and
+ * Leave(). On creation of the RAII object it will call Enter() respectively
+ * Leave() on destruction. The gold standard example is a LockGard (see below).
+ *
+ * Note: Resource Acquisition Is Initialization (Bjarne Stroustrup)
+ */
+template <typename T, _RAII_Polymorphism::T P = _RAII_Polymorphism::None>
+class RAII : SingleCopy {
+ public:
+  inline explicit RAII(T &object) : ref_(object)  { Enter(); }
+  inline explicit RAII(T *object) : ref_(*object) { Enter(); }
+  inline ~RAII()                         { Leave(); }
+
+ protected:
+  inline void Enter() { ref_.Lock();   }
+  inline void Leave() { ref_.Unlock(); }
+
+ private:
+  T &ref_;
+};
 
 
 /**
@@ -60,95 +99,44 @@ class Lockable : SingleCopy {
  * the LockGuard runs out of scope it will automatically release the lock. This
  * ensures a clean unlock in a lot of situations!
  *
- * Note: Resource Acquisition Is Initialization (Bjarne Stroustrup)
+ * TODO: C++11 replace this by a type alias to RAII
  */
 template <typename LockableT>
-class LockGuard : SingleCopy {
+class LockGuard : public RAII<LockableT> {
  public:
-  inline LockGuard(const LockableT &lock) :
-    ref_(lock) { ref_.Lock(); }
-  inline LockGuard(const LockableT *lock) :
-    ref_(*lock) { ref_.Lock(); }
-  inline ~LockGuard() { ref_.Unlock(); }
-
- private:
-  const LockableT &ref_;
+  inline explicit LockGuard(LockableT *object) : RAII<LockableT>(object) {}
 };
 
-/**
- * Used to allow for static polymorphism in the LockGuardAdapter to statically
- * decide which lock functions to use, if we have more than one possiblity.
- * (I.e. Read/Write locks)
- *
- * TODO: eventually replace this by C++11 typed enum
- */
-struct _LGA_Polymorphism {
-  enum T {
-    None,
-    ReadLock,
-    WriteLock
-  };
-};
 
-/**
- * Wraps lockable objects that do not conform to the Lock()/Unlock() interface
- * but use something different. For example pthread_mutex_t can be used with our
- * LockGuard template by the help of this little adapter template
- *
- * Additionally this adapter allows for static (say: compile time) polymorphism
- * to allow the use locks with multiple lock functions (i.e. pthread_rwlock_t)
- *
- * In order to implement new locking capabilities simply specialize the template
- * for your lock type and provide the needed adapter.
- */
-template <typename T,
-          _LGA_Polymorphism::T polymorph = _LGA_Polymorphism::None>
-class LockGuardAdapter : SingleCopy {
- public:
-  inline LockGuardAdapter(T &lock) : ref_(&lock) {};
-  inline LockGuardAdapter(T *lock) : ref_(lock)  {};
-  inline void Lock() const;
-  inline void Unlock() const;
+template <>
+inline void RAII<pthread_mutex_t>::Enter() { pthread_mutex_lock(&ref_);   }
+template <>
+inline void RAII<pthread_mutex_t>::Leave() { pthread_mutex_unlock(&ref_); }
+typedef RAII<pthread_mutex_t> MutexLockGuard;
 
- private:
-  mutable T *ref_;
-};
 
-template <> /// Locks a pthread_mutex_t
-inline void LockGuardAdapter<pthread_mutex_t>::Lock() const {
-  pthread_mutex_lock(ref_);
+template <>
+inline void RAII<pthread_rwlock_t,
+                 _RAII_Polymorphism::ReadLock>::Enter() {
+  pthread_rwlock_rdlock(&ref_);
 }
-template <> /// Unlocks a pthread_mutex_t
-inline void LockGuardAdapter<pthread_mutex_t>::Unlock() const {
-  pthread_mutex_unlock(ref_);
+template <>
+inline void RAII<pthread_rwlock_t,
+                 _RAII_Polymorphism::ReadLock>::Leave() {
+  pthread_rwlock_unlock(&ref_);
 }
-template <> /// Read-Locks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t,
-                             _LGA_Polymorphism::ReadLock>::Lock() const {
-  pthread_rwlock_rdlock(ref_);
+template <>
+inline void RAII<pthread_rwlock_t,
+                 _RAII_Polymorphism::WriteLock>::Enter() {
+  pthread_rwlock_wrlock(&ref_);
 }
-template <> /// Read-Unlocks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t,
-                             _LGA_Polymorphism::ReadLock>::Unlock() const {
-  pthread_rwlock_unlock(ref_);
+template <>
+inline void RAII<pthread_rwlock_t,
+                 _RAII_Polymorphism::WriteLock>::Leave() {
+  pthread_rwlock_unlock(&ref_);
 }
-template <> /// Write-Locks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t,
-                             _LGA_Polymorphism::WriteLock>::Lock() const {
-  pthread_rwlock_wrlock(ref_);
-}
-template <> /// Read-Unlocks a pthread_rwlock_t
-inline void LockGuardAdapter<pthread_rwlock_t,
-                             _LGA_Polymorphism::WriteLock>::Unlock() const {
-  pthread_rwlock_unlock(ref_);
-}
-
-// convenience typedefs to use special locks with the LockGuard template
-typedef LockGuard<LockGuardAdapter<pthread_mutex_t> > MutexLockGuard;
-typedef LockGuard<LockGuardAdapter<pthread_rwlock_t,
-                                   _LGA_Polymorphism::ReadLock> > ReadLockGuard;
-typedef LockGuard<LockGuardAdapter<pthread_rwlock_t,
-                                   _LGA_Polymorphism::WriteLock> > WriteLockGuard;
+typedef RAII<pthread_rwlock_t, _RAII_Polymorphism::ReadLock>  ReadLockGuard;
+typedef RAII<pthread_rwlock_t, _RAII_Polymorphism::WriteLock> WriteLockGuard;
 
 
 //
@@ -205,99 +193,100 @@ class Future : SingleCopy {
 //
 
 
+/**
+ * This counter can be counted up and down using the usual increment/decrement
+ * operators. It allows threads to wait for it to become zero as well as to
+ * block when a specified maximal value would be exceeded by an increment.
+ *
+ * Note: If a maximal value is specified on creation, the SynchronizingCounter
+ *       is assumed to never leave the interval [0, maximal_value]! Otherwise
+ *       the numerical limits of the specified template parameter define this
+ *       interval and an increment _never_ blocks.
+ *
+ * Caveat: This implementation uses a simple mutex mechanism and therefore might
+ *         become a scalability bottle neck!
+ */
+template <typename T>
+class SynchronizingCounter : SingleCopy {
+ public:
+  SynchronizingCounter() :
+    value_(T(0)), maximal_value_(T(0)) { Initialize(); }
+
+  explicit SynchronizingCounter(const T maximal_value)
+    : value_(T(0))
+    , maximal_value_(maximal_value)
+  {
+    assert(maximal_value > T(0));
+    Initialize();
+  }
+
+  ~SynchronizingCounter() { Destroy(); }
+
+  T Increment() {
+    MutexLockGuard l(mutex_);
+    WaitForFreeSlotUnprotected();
+    SetValueUnprotected(value_ + T(1));
+    return value_;
+  }
+
+  T Decrement() {
+    MutexLockGuard l(mutex_);
+    SetValueUnprotected(value_ - T(1));
+    return value_;
+  }
+
+  void WaitForZero() const {
+    MutexLockGuard l(mutex_);
+    while (value_ != T(0)) {
+      pthread_cond_wait(&became_zero_, &mutex_);
+    }
+    assert(value_ == T(0));
+  }
+
+  bool HasMaximalValue() const { return maximal_value_ != T(0); }
+  T      maximal_value() const { return maximal_value_;         }
+
+  T operator++()    { return Increment();        }
+  T operator++(int) { return Increment() - T(1); }
+  T operator--()    { return Decrement();        }
+  T operator--(int) { return Decrement() + T(1); }
+
+  operator T() const {
+    MutexLockGuard l(mutex_);
+    return value_;
+  }
+
+  SynchronizingCounter<T>& operator=(const T &other) {
+    MutexLockGuard l(mutex_);
+    SetValueUnprotected(other);
+    return *this;
+  }
+
+ protected:
+  void SetValueUnprotected(const T new_value);
+  void WaitForFreeSlotUnprotected();
+
+ private:
+  void Initialize();
+  void Destroy();
+
+ private:
+        T                 value_;
+  const T                 maximal_value_;
+
+  mutable pthread_mutex_t mutex_;
+  mutable pthread_cond_t  became_zero_;
+          pthread_cond_t  free_slot_;
+};
+
+
+//
+// -----------------------------------------------------------------------------
+//
+
+
 template <typename ParamT>
 class Observable;
-
-
-/**
- * Encapsulates a callback function that handles asynchronous responses.
- *
- * This is an abstract base class for two different callback function objects.
- * There are two specializations:
- *  --> 1. for static members or global C-like functions
- *  --> 2. for member functions of arbitrary objects
- */
-template <typename ParamT>
-class CallbackBase {
- public:
-  virtual ~CallbackBase() {}
-  virtual void operator()(const ParamT &value) const = 0;
-};
-
-/**
- * This callback function object can be used to call static members or global
- * functions with the following signature:
- * void <name>(ParamT <parameter>);
- *
- * TODO: One might use varidic templates once C++11 will be supported, in order
- *       to allow for more than one parameter to be passed to the callback.
- *
- * @param ParamT    the type of the parameter to be passed to the callback
- */
-template <typename ParamT>
-class Callback : public CallbackBase<ParamT> {
- public:
-  typedef void (*CallbackFunction)(const ParamT &value);
-
-  Callback(CallbackFunction function) : function_(function) {}
-  void operator()(const ParamT &value) const { function_(value); }
-
- private:
-  CallbackFunction function_;
-};
-
-/**
- * A BoundCallback can be used to call a member of an arbitrary object as a
- * callback.
- * The member must have the following interface:
- * void <DelegateT>::<member name>(ParamT <parameter>);
- *
- * Note: it is the responsibility of the user to ensure that the bound object
- *       for `delegate` remains alive in the whole time this callback might be
- *       invoked.
- *
- * @param ParamT      the type of the parameter to be passed to the callback
- * @param DelegateT   the <class name> of the object the member <member name>
- *                    should be invoked in
- */
-template <typename ParamT, class DelegateT>
-class BoundCallback : public CallbackBase<ParamT> {
- public:
-  typedef void (DelegateT::*CallbackMethod)(const ParamT &value);
-
-  BoundCallback(CallbackMethod method, DelegateT *delegate) :
-    delegate_(delegate),
-    method_(method) {}
-  BoundCallback(CallbackMethod method, DelegateT &delegate) :
-    delegate_(&delegate),
-    method_(method) {}
-
-  void operator()(const ParamT &value) const { (delegate_->*method_)(value); }
-
- private:
-  DelegateT*     delegate_;
-  CallbackMethod method_;
-};
-
-
-template <class ParamT>
-class Callbackable {
- public:
-  typedef CallbackBase<ParamT> callback_t;
-
- public:
-  // replace this stuff by C++11 lambdas!
-  template <class DelegateT>
-  static callback_t* MakeCallback(
-        typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
-        DelegateT *delegate) {
-    return new BoundCallback<ParamT, DelegateT>(method, delegate);
-  }
-  static callback_t* MakeCallback(
-        typename Callback<ParamT>::CallbackFunction function) {
-    return new Callback<ParamT>(function);
-  }
-};
 
 
 /**
@@ -321,12 +310,34 @@ class Callbackable {
 template <typename ParamT>
 class Observable : public Callbackable<ParamT>,
                    SingleCopy {
+ public:
+  typedef typename Callbackable<ParamT>::CallbackTN*  CallbackPtr;
  protected:
-  typedef typename Callbackable<ParamT>::callback_t*  callback_ptr;
-  typedef std::set<callback_ptr>                      Callbacks;
+  typedef std::set<CallbackPtr>                       Callbacks;
 
  public:
   virtual ~Observable();
+
+  /**
+   * Registers a method of a specific object as a listener to the Observable
+   * object. The method is invoked on the given delegate when the callback is
+   * fired by the observed object using NotifyListeners(). Since this is meant
+   * to be a closure, it also passes the third argument to the method being in-
+   * voked by the Observable object.
+   *
+   * @param DelegateT  the type of the delegate object
+   * @param method     a pointer to the method to be invoked by the callback
+   * @param delegate   a pointer to the object to invoke the callback on
+   * @param closure    something to be passed to `method`
+   * @return  a handle to the registered callback
+   */
+  template <class DelegateT, class ClosureDataT>
+  CallbackPtr RegisterListener(
+          typename BoundClosure<ParamT,
+                                DelegateT,
+                                ClosureDataT>::CallbackMethod   method,
+          DelegateT                                            *delegate,
+          ClosureDataT                                          data);
 
   /**
    * Registers a method of a specific object as a listener to the Observable
@@ -339,7 +350,7 @@ class Observable : public Callbackable<ParamT>,
    * @return  a handle to the registered callback
    */
   template <class DelegateT>
-  callback_ptr RegisterListener(
+  CallbackPtr RegisterListener(
           typename BoundCallback<ParamT, DelegateT>::CallbackMethod method,
           DelegateT *delegate);
 
@@ -351,7 +362,7 @@ class Observable : public Callbackable<ParamT>,
    * @param fn  a pointer to the function to be called by the callback
    * @return  a handle to the registered callback
    */
-  callback_ptr RegisterListener(typename Callback<ParamT>::CallbackFunction fn);
+  CallbackPtr RegisterListener(typename Callback<ParamT>::CallbackFunction fn);
 
   /**
    * Removes the given callback from the listeners group of this Observable.
@@ -359,7 +370,7 @@ class Observable : public Callbackable<ParamT>,
    * @param callback_object  a callback handle that was returned by
    *                         RegisterListener() before.
    */
-  void UnregisterListener(callback_ptr callback_object);
+  void UnregisterListener(CallbackPtr callback_object);
 
   /**
    * Removes all listeners from the Observable
@@ -367,9 +378,9 @@ class Observable : public Callbackable<ParamT>,
   void UnregisterListeners();
 
  protected:
-  Observable(); // don't instantiate this as a stand alone object
+  Observable();  // don't instantiate this as a stand alone object
 
-  void RegisterListener(callback_ptr callback_object);
+  void RegisterListener(CallbackPtr callback_object);
 
   /**
    * Notifies all registered listeners and passes them the provided argument
@@ -490,9 +501,18 @@ template <class WorkerT>
 class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
  public:
   // these data types must be defined by the worker class
-  typedef typename WorkerT::expected_data  expected_data_t;  //!< input data type
-  typedef typename WorkerT::returned_data  returned_data_t;  //!< output data type
-  typedef typename WorkerT::worker_context worker_context_t; //!< common context type
+  /**
+   * Input data type
+   */
+  typedef typename WorkerT::expected_data  expected_data_t;
+  /**
+   * Output data type
+   */
+  typedef typename WorkerT::returned_data  returned_data_t;
+  /**
+   * Common context type
+   */
+  typedef typename WorkerT::worker_context worker_context_t;
 
  protected:
   typedef std::vector<pthread_t>           WorkerThreads;
@@ -510,8 +530,8 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
     Job() :
       data(),
       is_death_sentence(true) {}
-    const DataT  data;              //!< job payload
-    const bool   is_death_sentence; //!< death sentence flag
+    const DataT  data;               //!< job payload
+    const bool   is_death_sentence;  //!< death sentence flag
   };
   typedef Job<expected_data_t> WorkerJob;
   typedef Job<returned_data_t> CallbackJob;
@@ -524,7 +544,7 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    * spawned.
    */
   struct RunBinding {
-    RunBinding(ConcurrentWorkers<WorkerT> *delegate) :
+    explicit RunBinding(ConcurrentWorkers<WorkerT> *delegate) :
       delegate(delegate) {}
     ConcurrentWorkers<WorkerT> *delegate;       //!< delegate to the Concurrent-
                                                 //!<  Workers master
@@ -535,8 +555,10 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
                      const worker_context_t     *worker_context) :
       RunBinding(delegate),
       worker_context(worker_context) {}
-    const worker_context_t     *worker_context; //!< WorkerT defined context ob-
-                                                //!<  jects for worker init.
+    /**
+     * WorkerT defined context objects for worker init.
+     */
+    const worker_context_t     *worker_context;
   };
 
  public:
@@ -609,7 +631,9 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
    *
    * @param data  the data to be returned back to the user
    */
-  inline void JobSuccessful(const returned_data_t& data) { JobDone(data, true); }
+  inline void JobSuccessful(const returned_data_t& data) {
+    JobDone(data, true);
+  }
 
   /**
    * Defines a job as failed.
@@ -689,11 +713,12 @@ class ConcurrentWorkers : public Observable<typename WorkerT::returned_data> {
 
  private:
   // general configuration
-  const size_t             number_of_workers_;    //!< number of concurrent
-                                                  //!<  worker threads
-  const worker_context_t  *worker_context_;       //!< the WorkerT defined context
-  const WorkerRunBinding   thread_context_;       //!< the thread context passed
-                                                  //!<  to newly spawned threads
+  const size_t number_of_workers_;  //!< number of concurrent worker threads
+  const worker_context_t *worker_context_;  //!< the WorkerT defined context
+  /**
+   * The thread context passed to newly spawned threads
+   */
+  WorkerRunBinding thread_context_;
 
   // status information
   bool                     initialized_;
@@ -794,8 +819,8 @@ class ConcurrentWorker : SingleCopy {
    *
    * @param data  the data to be processed.
    */
-  //void operator()(const expected_data &data); // do the actual job of the
-                                                // worker
+  // void operator()(const expected_data &data); // do the actual job of the
+                                                 // worker
 
  protected:
   ConcurrentWorker() : master_(NULL) {}
@@ -818,9 +843,9 @@ class ConcurrentWorker : SingleCopy {
 };
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #include "util_concurrency_impl.h"
 
-#endif /* CVMFS_UTIL_CONCURRENCY_H_ */
+#endif  // CVMFS_UTIL_CONCURRENCY_H_

@@ -1,0 +1,23 @@
+
+cvmfs_test_name="Auto unmount of stalled mountpoint after crash"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount atlas.cern.ch || return 1
+
+  cd /cvmfs/atlas.cern.ch || return 2
+  local pid=$(sudo cvmfs_talk -i atlas pid)
+  sudo kill -11 $pid || return 3
+
+  sleep 20
+  ls .
+  if [ $? -eq 0 ]; then
+    return 4
+  fi
+  cd $OLDPWD
+  ls /cvmfs/atlas.cern.ch || return 5
+
+  return 0
+}
+

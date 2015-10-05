@@ -4,24 +4,29 @@
 
 #include "upload_spooler_definition.h"
 
+#include <tbb/task_scheduler_init.h>
 #include <vector>
 
 #include "logging.h"
 #include "util.h"
 
-using namespace upload;
+namespace upload {
 
 SpoolerDefinition::SpoolerDefinition(
-                      const std::string& definition_string,
-                      const bool         use_file_chunking,
-                      const size_t       min_file_chunk_size,
-                      const size_t       avg_file_chunk_size,
-                      const size_t       max_file_chunk_size) :
+                      const std::string&       definition_string,
+                      const shash::Algorithms  hash_algorithm,
+                      const bool               use_file_chunking,
+                      const size_t             min_file_chunk_size,
+                      const size_t             avg_file_chunk_size,
+                      const size_t             max_file_chunk_size) :
   driver_type(Unknown),
+  hash_algorithm(hash_algorithm),
   use_file_chunking(use_file_chunking),
   min_file_chunk_size(min_file_chunk_size),
   avg_file_chunk_size(avg_file_chunk_size),
   max_file_chunk_size(max_file_chunk_size),
+  number_of_threads(tbb::task_scheduler_init::default_num_threads()),
+  number_of_concurrent_uploads(number_of_threads * 100),
   valid_(false)
 {
   // check if given file chunking values are sane
@@ -41,9 +46,12 @@ SpoolerDefinition::SpoolerDefinition(
   // recognize and configure the spooler driver
   if (upstream[0]        == "local") {
     driver_type = Local;
-  } else if (upstream[0] == "riak") {
-    driver_type = Riak;
+  } else if (upstream[0] == "S3") {
+    driver_type = S3;
+  } else if (upstream[0] == "mock") {
+    driver_type = Mock;  // for unit testing purpose only!
   } else {
+    driver_type = Unknown;
     LogCvmfs(kLogSpooler, kLogStderr, "unknown spooler driver: %s",
       upstream[0].c_str());
     return;
@@ -54,3 +62,5 @@ SpoolerDefinition::SpoolerDefinition(
   spooler_configuration = upstream[2];
   valid_ = true;
 }
+
+}  // namespace upload

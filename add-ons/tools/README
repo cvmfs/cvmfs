@@ -1,0 +1,8 @@
+  Catalog Inspection using Python
+  *******************************
+
+The scripts in this directory are supposed to be used as tools for debugging and
+inspection of CernVM-FS catalog hierarchies. They are explicitly _NOT_ intended
+for heavy production usage.
+The python module contained in cvmfs.py is meant to be a lean tool for easy
+catalog inspection in both an interactive and a scripted setting. 

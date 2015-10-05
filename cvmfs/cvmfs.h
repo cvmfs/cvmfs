@@ -5,18 +5,34 @@
 #ifndef CVMFS_CVMFS_H_
 #define CVMFS_CVMFS_H_
 
+#include <stdint.h>
 #include <time.h>
 #include <unistd.h>
-#include <stdint.h>
 
 #include <string>
 #include <vector>
 
 #include "catalog_mgr.h"
-#include "lru.h"
 #include "loader.h"
-
+#include "lru.h"
 #include "util.h"
+
+namespace cache {
+class CacheManager;
+}
+
+namespace download {
+class DownloadManager;
+}
+
+namespace perf {
+class Statistics;
+}
+
+namespace glue {
+class InodeTracker;
+}
+
 
 namespace cvmfs {
 
@@ -24,9 +40,13 @@ extern const loader::LoaderExports *loader_exports_;
 extern pid_t pid_;
 extern std::string *mountpoint_;
 extern std::string *repository_name_;
+extern download::DownloadManager *download_manager_;
+extern cache::CacheManager *cache_manager_;
 extern int max_cache_timeout_;
 extern bool foreground_;
 extern bool nfs_maps_;
+extern perf::Statistics *statistics_;
+extern glue::InodeTracker *inode_tracker_;
 
 bool Evict(const std::string &path);
 bool Pin(const std::string &path);
@@ -37,13 +57,7 @@ std::string GetOpenCatalogs();
 unsigned GetMaxTTL();  // in minutes
 void SetMaxTTL(const unsigned value);  // in minutes
 void ResetErrorCounters();
-void GetLruStatistics(lru::Statistics *inode_stats, lru::Statistics *path_stats,
-                      lru::Statistics *md5path_stats);
-std::string PrintInodeTrackerStatistics();
-std::string PrintInodeGeneration();
-catalog::Statistics GetCatalogStatistics();
-std::string GetCertificateStats();
-std::string GetFsStats();
+void UnregisterQuotaListener();
 
 }  // namespace cvmfs
 

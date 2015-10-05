@@ -1,0 +1,25 @@
+
+cvmfs_test_name="Warn on high inode watermark"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  # On 32 bit large inodes make the repository inaccessible
+  sudo rm -f /tmp/usyslog*
+  cvmfs_mount "lhcb.cern.ch" \
+    "CVMFS_INITIAL_GENERATION=4294967295" \
+    "CVMFS_USYSLOG=/tmp/usyslog" 
+  df | grep lhcb.cern.ch || return 2
+
+  sudo sh -c "cat /tmp/usyslog | grep 32bit"  
+  RETVAL=$?
+
+  sudo rm -f /tmp/usyslog*
+
+  if [ $RETVAL -ne 0 ]; then
+    return 3
+  fi
+
+  return 0
+}
+

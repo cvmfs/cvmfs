@@ -1,0 +1,74 @@
+
+cvmfs_test_name="Access repository tags by date"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local repo_url=$(get_repo_url $CVMFS_TEST_REPO)
+  local scratch_dir=$(pwd)
+
+  local stamp_zero=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER $scratch_dir/debug.log || return $?
+
+  sleep 2
+
+  # ============================================================================
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO -a first || return $?
+  local stamp_first=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+
+  sleep 2
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO -a second || return $?
+  local stamp_second=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+
+  sleep 2
+
+  # get rid of trunk, trunk-previous tags
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  start_transaction $CVMFS_TEST_REPO || return $?
+  publish_repo $CVMFS_TEST_REPO || return $?
+  sudo cvmfs_server list-tags $CVMFS_TEST_REPO || return $?
+
+  local conf="${scratch_dir}/test.conf"
+  local cachedir="${scratch_dir}/cache"
+  local mountpoint="${scratch_dir}/mountpoint"
+  local output="${scratch_dir}/output.log"
+  mkdir $cachedir $mountpoint || return 32
+  cat > $conf << EOF
+CVMFS_CACHE_BASE=$cachedir
+CVMFS_RELOAD_SOCKETS=$cachedir
+CVMFS_SERVER_URL=$repo_url
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
+CVMFS_REPOSITORY_DATE=$stamp_zero
+EOF
+
+  cvmfs2 -d -o config=$conf $CVMFS_TEST_REPO $mountpoint >> $output 2>&1
+  if [ $? -eq 0 ]; then
+    fusermount -u $mountpoint
+    return 34
+  fi
+
+  echo "CVMFS_REPOSITORY_DATE=$stamp_first" >> $conf
+  cvmfs2 -d -o config=$conf $CVMFS_TEST_REPO $mountpoint >> $output 2>&1 || return 35
+  local tag=$(attr -qg tag $mountpoint)
+  fusermount -u $mountpoint
+  if [ "x$tag" != "xfirst" ]; then
+    return 36
+  fi
+
+  echo "CVMFS_REPOSITORY_DATE=$stamp_second" >> $conf
+  cvmfs2 -d -o config=$conf $CVMFS_TEST_REPO $mountpoint >> $output 2>&1 || return 35
+  local tag=$(attr -qg tag $mountpoint)
+  fusermount -u $mountpoint
+  if [ "x$tag" != "xsecond" ]; then
+    return 37
+  fi
+
+  return 0
+}

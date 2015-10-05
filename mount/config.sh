@@ -22,60 +22,16 @@ cvmfs_getdomain() {
    echo $fqrn | sed 's/^[^\.]*\.\(.*\)/\1/'
 }
 
-
-repository_start() {
-  :
-}
-
-repository_stop() {
-  :
-}
-
-
 cvmfs_readconfig() {
   local fqrn; fqrn=$1
   local org; org=`cvmfs_getorg $fqrn`
   local domain; domain=`cvmfs_getdomain $fqrn`
 
-  if [ -f /etc/cvmfs/default.conf ]
-  then
-    . /etc/cvmfs/default.conf
-  else
-    return 1
-  fi
-
-  local file
-  for file in /etc/cernvm/default.conf \
-              /etc/cvmfs/site.conf \
-              /etc/cernvm/site.conf
-  do
-    if [ -f $file ]; then
-      eval `sed 's/=\$(.*)//g' $file |  sed -n -e  '/^[^+]/s/\([^=]*\)[=]\(.*\)/\1="\2"; /gp'`
-    fi
-  done
-
-  if [ -f /etc/cvmfs/default.local ]
-  then
-    . /etc/cvmfs/default.local
-  fi
-
-  if [ "x$domain" != "x" ];
-  then
-    for file in  /etc/cvmfs/domain.d/$domain.conf \
-                 /etc/cvmfs/domain.d/$domain.local
-    do
-      [ -f $file ] && . $file
-    done
-  fi
+  CVMFS_PARMS=$(cvmfs2 -o parse "$fqrn" /)
+  eval "$CVMFS_PARMS"
 
   if [ "x$fqrn" != "x" ]
   then
-    for file in  /etc/cvmfs/config.d/$fqrn.conf \
-                 /etc/cvmfs/config.d/$fqrn.local
-    do
-      [ -f $file ] && . $file
-    done
-
     if [ x"$CVMFS_SHARED_CACHE" = xyes ]; then
       CVMFS_CACHE_DIR="$CVMFS_CACHE_BASE/shared"
     else
@@ -92,17 +48,7 @@ cvmfs_getorigin() {
 
    local domain; domain=`cvmfs_getdomain $fqrn`
 
-   source=`grep -H "^[ ]*\(readonly\)\{0,1\}[ ]*${key}=" \
-      /etc/cvmfs/config.d/$fqrn.local \
-      /etc/cvmfs/config.d/$fqrn.conf \
-      /etc/cvmfs/domain.d/$domain.local \
-      /etc/cvmfs/domain.d/$domain.conf \
-      /etc/cvmfs/default.local \
-      /etc/cernvm/site.conf \
-      /etc/cvmfs/site.conf \
-      /etc/cernvm/default.conf \
-      /etc/cvmfs/default.conf \
-      2>/dev/null | head -n1 | cut -d":" -f1`
+   source=$(echo "$CVMFS_PARMS" | grep "^${key}=" | awk '{print $NF}')
    if [ "x$source" != "x" ]; then
       echo $source
       return 0

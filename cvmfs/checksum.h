@@ -12,9 +12,11 @@
 #define CHECKSUM_SIZE 4
 #define CHECKSUM_BLOCKSIZE 4096
 
-namespace hash {
+namespace shash {
   struct Any;
 }
+
+namespace checksum {
 
 /*
  * Write out a checksum file for a corresponding data stream.
@@ -38,7 +40,17 @@ namespace hash {
 class ChecksumFileWriter {
 
 public:
-  ChecksumFileWriter(const hash::Any &hash, bool sumonly=false);
+  /**
+   * Given an open file descriptor and an eventual file size, the
+   * ChecksumFileWriter will fallocate enough space to keep the per-block
+   * checksums in the same file.
+   *
+   * @param fd: Open file descriptor to data file.
+   * @param fsize: Eventual size of the data file.
+   * @param sumonly: Do not write out checksum data; instead, keep a running
+   * checksum-of-checksums.
+   */
+  ChecksumFileWriter(int fd, off_t fsize, bool sumonly=false);
   ~ChecksumFileWriter();
 
     /*
@@ -62,34 +74,38 @@ public:
      */
   int finalize(uint32_t &checksum);
 
-  const bool isGood() {return !error;}
+  const bool isGood() {return !m_error;}
 
 private:
-  void checksum(const unsigned char * buf, size_t len);
+  void checksum(const unsigned char * buf, size_t len, off_t off);
 
-  std::string filename;
-  unsigned char partial_buffer[CHECKSUM_BLOCKSIZE];
-  uint32_t running_sum;
-  int buffer_offset;
-  int fd;
-  bool error;
-  bool done;
+  unsigned char m_partial_buffer[CHECKSUM_BLOCKSIZE];
+  off_t m_size;
+  uint32_t m_running_sum;
+  int m_buffer_offset;
+  int m_fd;
+  bool m_error;
+  bool m_done;
 
 };
 
 /*
  * Verify the contents of a data stream
  */
-namespace ChecksumFileReader {
+class ChecksumFileReader {
+public:
 
-  /*
-   * Open a file for checksumming, based on the hash.
+  /**
+   * Given an open file descriptor to a data file, parse and read
+   * the checksum contents.
    *
-   * Returns 0 on success and negative otherwise.
+   * @param fd: Open file descriptor to data file.
+   * @param fsize: Size of the data contents of file; checksum information
+   *               is assumed to be immediately past the data.
    */
-int open(const hash::Any &hash);
+  ChecksumFileReader(int fd, off_t fsize);
 
-  /*
+  /**
    * Verify the contents of the buffer.
    *
    * If the buffer is not aligned to the 4K boundaries, then this
@@ -98,13 +114,19 @@ int open(const hash::Any &hash);
    * This will return 0 on success; negative otherwise.
    * 
    * Parameters:
-   *  - fd: File descriptor to data file in cache.
-   *  - fd2: File descriptor to checksum file.
    *  - buff: Data buffer to verify.
    *  - count: Size of data buffer.
    *  - off: Offset of data buffer in file.
    */
-int verify(int fd, int fd2, const unsigned char * buff, size_t count, off_t off);
+  int verify(const unsigned char * buff, size_t count, off_t off);
+
+  bool isGood() {return !m_error;}
+
+private:
+  bool m_error;
+  int m_fd;
+  off_t m_size;
+};
 
 }
 

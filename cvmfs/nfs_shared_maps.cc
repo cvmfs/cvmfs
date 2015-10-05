@@ -18,17 +18,18 @@
 
 #include "nfs_shared_maps.h"
 
-#include <stdint.h>
 #include <inttypes.h>
 #include <pthread.h>
+#include <stdint.h>
 
 #include <cassert>
 #include <cstdlib>
 
+#include "atomic.h"
 #include "duplex_sqlite3.h"
 #include "logging.h"
+#include "prng.h"
 #include "util.h"
-#include "atomic.h"
 
 using namespace std;  // NOLINT
 
@@ -78,6 +79,7 @@ struct BusyHandlerInfo {
   unsigned accumulated_ms;
 };
 BusyHandlerInfo *busy_handler_info_ = NULL;
+Prng *prng_;
 
 /**
  * Finds an inode by path
@@ -235,7 +237,7 @@ static int BusyHandler(void *data, int attempt) {
     return 0;
 
   const unsigned backoff_range_ms = 1 << attempt;
-  unsigned backoff_ms = random() % backoff_range_ms;
+  unsigned backoff_ms = prng_->Next(backoff_range_ms);
   if (handler_info->accumulated_ms + backoff_ms > handler_info->max_wait_ms)
     backoff_ms = handler_info->max_wait_ms - handler_info->accumulated_ms;
   if (backoff_ms > handler_info->max_backoff_ms)
@@ -279,7 +281,7 @@ bool Init(const string &db_dir, const uint64_t root_inode,
   }
   // Be prepared to wait for up to 1 minute for transactions to complete
   // Being stuck for a long time is far more favorable than failing
-  // TODO: another busy handler.  This one conflicts with SIGALRM
+  // TODO(jblomer): another busy handler.  This one conflicts with SIGALRM
   busy_handler_info_ = new BusyHandlerInfo();
   retval = sqlite3_busy_handler(db_, BusyHandler, busy_handler_info_);
   assert(retval == SQLITE_OK);
@@ -302,6 +304,9 @@ bool Init(const string &db_dir, const uint64_t root_inode,
   }
   sqlite3_finalize(stmt);
   stmt = NULL;
+
+  prng_ = new Prng();
+  prng_->InitLocaltime();
 
   // Prepare lookup and add-inode statements
   retval = sqlite3_prepare_v2(db_, kSQL_GetPath, kMaxDBSqlLen, &stmt_get_path_,
@@ -350,7 +355,9 @@ void Fini() {
   sqlite3_close_v2(db_);
   db_ = NULL;
 
+  delete prng_;
   delete busy_handler_info_;
+  prng_ = NULL;
   busy_handler_info_ = NULL;
 }
 

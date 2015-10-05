@@ -1,0 +1,266 @@
+
+cvmfs_test_name="Manage Nested Catalogs Using .cvmfsdirtab"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in_1() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create some basic directories
+  mkdir People
+  mkdir People/Germans People/Americans People/French People/Russians
+
+  # create a .cvmfsdirtab for these directories
+  echo "/People/Germans/*"   >  .cvmfsdirtab
+  echo "/People/Americans/*" >> .cvmfsdirtab
+  echo "/People/Russians/*"  >> .cvmfsdirtab
+
+  popdir
+}
+
+check_catalog_presence_1() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 1 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence / $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+produce_files_in_2() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create some directories for famous people
+  mkdir People/Germans/AlbertEinstein People/Germans/JohannWolfgangGoethe People/Germans/AngelaMerkel
+  mkdir People/Americans/SteveJobs People/Americans/GeorgeWashington People/Americans/ThomasEdison People/Americans/BarackObama
+  mkdir People/Russians/MikhailKalashnikov People/Russians/YuriGagarin People/Russians/VladimirVladimirovichPutin
+
+  # add some files to some of the directories
+  cp_bin People/Germans/AlbertEinstein
+  cp /etc/passwd People/Americans/BarackObama
+  cp_usrbin People/Russians/MikhailKalashnikov
+
+  # add a file in the French People Directory
+  echo "French Don't Believe in Directories" > People/French/NapoleonBonaparte
+
+  popdir
+}
+
+check_catalog_presence_2() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 11 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                                            $repo_name && \
+     check_catalog_presence /People/Germans/AlbertEinstein               $repo_name && \
+     check_catalog_presence /People/Germans/JohannWolfgangGoethe         $repo_name && \
+     check_catalog_presence /People/Germans/AngelaMerkel                 $repo_name && \
+     check_catalog_presence /People/Americans/SteveJobs                  $repo_name && \
+     check_catalog_presence /People/Americans/GeorgeWashington           $repo_name && \
+     check_catalog_presence /People/Americans/ThomasEdison               $repo_name && \
+     check_catalog_presence /People/Americans/BarackObama                $repo_name && \
+     check_catalog_presence /People/Russians/MikhailKalashnikov          $repo_name && \
+     check_catalog_presence /People/Russians/YuriGagarin                 $repo_name && \
+     check_catalog_presence /People/Russians/VladimirVladimirovichPutin  $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+produce_files_in_3() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create some directories for famous people
+  mkdir People/Germans/BorisBecker People/Germans/ReneMeusel
+
+  # add some files to some of the directories
+  echo ";-)" > People/Germans/ReneMeusel/disclaimer
+
+  # extend the .cvmfsdirtab with a non-existing directory
+  echo "/People/French/FrancoisHollande" >> .cvmfsdirtab
+
+  popdir
+}
+
+produce_files_in_4() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # repair the .cvmfsdirtab (remove last entry)
+  head -n $(( $(cat .cvmfsdirtab | wc -l) - 1 )) .cvmfsdirtab > .repaired_cvmfsdirtab
+  rm -f .cvmfsdirtab
+  mv .repaired_cvmfsdirtab .cvmfsdirtab
+
+  popdir
+}
+
+check_catalog_presence_4() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 13 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                                            $repo_name && \
+     check_catalog_presence /People/Germans/AlbertEinstein               $repo_name && \
+     check_catalog_presence /People/Germans/JohannWolfgangGoethe         $repo_name && \
+     check_catalog_presence /People/Germans/AngelaMerkel                 $repo_name && \
+     check_catalog_presence /People/Germans/BorisBecker                  $repo_name && \
+     check_catalog_presence /People/Germans/ReneMeusel                   $repo_name && \
+     check_catalog_presence /People/Americans/SteveJobs                  $repo_name && \
+     check_catalog_presence /People/Americans/GeorgeWashington           $repo_name && \
+     check_catalog_presence /People/Americans/ThomasEdison               $repo_name && \
+     check_catalog_presence /People/Americans/BarackObama                $repo_name && \
+     check_catalog_presence /People/Russians/MikhailKalashnikov          $repo_name && \
+     check_catalog_presence /People/Russians/YuriGagarin                 $repo_name && \
+     check_catalog_presence /People/Russians/VladimirVladimirovichPutin  $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+produce_files_in_5() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # remove some nested catalog markers
+  rm -f People/Germans/JohannWolfgangGoethe/.cvmfscatalog
+  rm -f People/Americans/GeorgeWashington/.cvmfscatalog
+  rm -f People/Americans/BarackObama/.cvmfscatalog
+
+  popdir
+}
+
+check_catalog_presence_5() {
+  local repo_name=$1
+
+  # catalog should have been recreated... should be the same as revision 4
+  check_catalog_presence_4 $repo_name
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "load repository configuration"
+  load_repo_config $CVMFS_TEST_REPO
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in_1 $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository (1)"
+  check_catalog_presence_1 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the repository"
+  produce_files_in_2 $repo_dir || return 2
+
+  echo "creating CVMFS snapshot"
+  local publish_log_1=publish_1.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository (2)"
+  check_catalog_presence_2 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 51
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the repository"
+  produce_files_in_3 $repo_dir || return 3
+
+  echo "creating CVMFS snapshot (should produce a warning)"
+  local publish_log_2=publish_2.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2 2>&1 || return $?
+
+  echo "look for the warning"
+  cat $publish_log_2 | grep -q "^WARNING.*FrancoisHollande" || return 4
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "repair the .cvmfsdirtab file"
+  produce_files_in_4 $repo_dir || return 5
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check if eventually the right catalogs are present in the repository (4)"
+  check_catalog_presence_4 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 52
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the repository"
+  produce_files_in_5 $repo_dir || return 6
+
+  echo "creating CVMFS snapshot (should produce warnings)"
+  local publish_log_3=publish_3.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_3 2>&1 || return $?
+
+  echo "look for the warnings"
+  cat $publish_log_3 | grep -q "^WARNING.*JohannWolfgangGoethe" || return 7
+  cat $publish_log_3 | grep -q "^WARNING.*GeorgeWashington"     || return 8
+  cat $publish_log_3 | grep -q "^WARNING.*BarackObama"          || return 9
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository (5)"
+  check_catalog_presence_5 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 53
+
+  return 0
+}
+

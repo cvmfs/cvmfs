@@ -1,0 +1,17 @@
+
+cvmfs_test_name="Enforce CVMFS_STRICT_MOUNT"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount "atlas.cern.ch" \
+    "CVMFS_STRICT_MOUNT=yes" || return 1
+  
+  ls /cvmfs/lhcb.cern.ch
+  RETVAL=$?
+  if [ $RETVAL -eq 0 ]; then
+    return 2
+  fi
+  return 0
+}
+

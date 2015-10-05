@@ -1,0 +1,12 @@
+cvmfs-keys (1.5-1) lucid; urgency=low
+
+  * Add egi and osg keys and config.  Add automated server ordering to
+    egi and osg config.
+
+ -- Dave Dykstra <dwd@fnal.gov>  Thu, 2 Jul 2014 12:00:00 +0000
+
+cvmfs-keys (1.4-1) lucid; urgency=low
+
+  * Initial release.
+
+ -- Rene Meusel <rene.meusel@cern.ch>  Mon, 11 Nov 2013 14:55:33 +0000

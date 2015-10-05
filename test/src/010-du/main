@@ -4,13 +4,12 @@ cvmfs_test_name="Recursive listing"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount sft.cern.ch || return 1
-  
-  sudo du -ch --max-depth=3 /cvmfs/sft.cern.ch >> $logfile 2>&1 || return 2
+  cvmfs_mount sft.cern.ch "CVMFS_MAX_RETRIES=3" || return 1
+
+  sudo du -ch --max-depth=3 /cvmfs/sft.cern.ch || return 2
   sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"
-  sleep 60
-  check_memory sft.cern.ch 50000 >> $logfile 2>&1
-  
+  sleep 120
+  check_memory sft.cern.ch 100000
+
   return 0
 }
-

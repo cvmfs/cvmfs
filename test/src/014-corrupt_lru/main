@@ -4,31 +4,33 @@ cvmfs_test_name="Recover from corrupted LRU DB"
 cvmfs_run_test() {
   logfile=$1
 
-  cvmfs_mount lhcb.cern.ch || return 1
+  local repo="atlas.cern.ch"
+
+  # Make sure that only a single repo uses the shared cache
+  cvmfs_mount ${repo} "CVMFS_CONFIG_REPOSITORY=" || return 1
 
   local cache_dir
   local cache_list
-  
-  cache_dir=$(get_cvmfs_cachedir lhcb.cern.ch)
+
+  cache_dir=$(get_cvmfs_cachedir ${repo})
   sudo [ -f ${cache_dir}/cachedb ] || return 2
-  ls /cvmfs/lhcb.cern.ch >> $logfile || return 3
-  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab >> $logfile || return 4
-  cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
+  ls /cvmfs/${repo} || return 3
+  cat /cvmfs/${repo}/.cvmfsdirtab || return 4
+  cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -q "automatic rebuild"; then
-    echo "$cache_list" >> $logfile
+    echo "$cache_list"
     return 5
   fi
-  
-  cvmfs_umount lhcb.cern.ch || 10
+
+  cvmfs_umount ${repo} || 10
   sudo sh -c "echo bla > ${cache_dir}/cachedb" || return 11
-  cvmfs_mount lhcb.cern.ch || return 12
-  cat /cvmfs/lhcb.cern.ch/.cvmfsdirtab >> $logfile || return 13
-  cache_list=$(sudo cvmfs_talk -i lhcb.cern.ch cache list)
+  cvmfs_mount ${repo} "CVMFS_CONFIG_REPOSITORY=" || return 12
+  cat /cvmfs/${repo}/.cvmfsdirtab || return 13
+  cache_list=$(sudo cvmfs_talk -i ${repo} cache list)
   if echo $cache_list | grep -v -q "automatic rebuild"; then
-    echo "$cache_list" >> $logfile
+    echo "$cache_list"
     return 14
   fi
 
   return 0
 }
-

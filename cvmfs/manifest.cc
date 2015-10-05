@@ -14,58 +14,6 @@ using namespace std;  // NOLINT
 
 namespace manifest {
 
-static void ParseKeyvalMem(const unsigned char *buffer,
-                           const unsigned buffer_size,
-                           map<char, string> *content)
-{
-  string line;
-  unsigned pos = 0;
-  while (pos < buffer_size) {
-    if (static_cast<char>(buffer[pos]) == '\n') {
-      if (line == "--")
-        return;
-
-      if (line != "") {
-        const string tail = (line.length() == 1) ? "" : line.substr(1);
-        // Special handling of 'Z' key because it can exist multiple times
-        if (line[0] != 'Z') {
-          (*content)[line[0]] = tail;
-        } else {
-          if (content->find(line[0]) == content->end()) {
-            (*content)[line[0]] = tail;
-          } else {
-            (*content)[line[0]] = (*content)[line[0]] + "|" + tail;
-          }
-        }
-      }
-      line = "";
-    } else {
-      line += static_cast<char>(buffer[pos]);
-    }
-    pos++;
-  }
-}
-
-
-static bool ParseKeyvalPath(const string &filename,
-                            map<char, string> *content)
-{
-  int fd = open(filename.c_str(), O_RDONLY);
-  if (fd < 0)
-    return false;
-
-  unsigned char buffer[4096];
-  int num_bytes = read(fd, buffer, sizeof(buffer));
-  close(fd);
-
-  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
-    return false;
-
-  ParseKeyvalMem(buffer, unsigned(num_bytes), content);
-  return true;
-}
-
-
 Manifest *Manifest::LoadMem(const unsigned char *buffer,
                             const unsigned length)
 {
@@ -89,18 +37,19 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   map<char, string>::const_iterator iter;
 
   // Required keys
-  hash::Any catalog_hash;
-  hash::Md5 root_path;
+  shash::Any catalog_hash;
+  shash::Md5 root_path;
   uint32_t ttl;
   uint64_t revision;
 
   iter = content.find('C');
   if ((iter = content.find('C')) == content.end())
     return NULL;
-  catalog_hash = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+  catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second),
+                              shash::kSuffixCatalog);
   if ((iter = content.find('R')) == content.end())
     return NULL;
-  root_path = hash::Md5(hash::HexPtr(iter->second));
+  root_path = shash::Md5(shash::HexPtr(iter->second));
   if ((iter = content.find('D')) == content.end())
     return NULL;
   ttl = String2Uint64(iter->second);
@@ -109,50 +58,49 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   revision = String2Uint64(iter->second);
 
   // Optional keys
-  hash::Any micro_catalog_hash;
+  uint64_t catalog_size = 0;
+  shash::Any micro_catalog_hash;
   string repository_name;
-  hash::Any certificate;
-  hash::Any history;
+  shash::Any certificate;
+  shash::Any history;
   uint64_t publish_timestamp = 0;
+  bool garbage_collectable = false;
 
+  if ((iter = content.find('B')) != content.end())
+    catalog_size = String2Uint64(iter->second);
   if ((iter = content.find('L')) != content.end())
-    micro_catalog_hash = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+    micro_catalog_hash = MkFromHexPtr(shash::HexPtr(iter->second),
+                                      shash::kSuffixMicroCatalog);
   if ((iter = content.find('N')) != content.end())
     repository_name = iter->second;
   if ((iter = content.find('X')) != content.end())
-    certificate = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+    certificate = MkFromHexPtr(shash::HexPtr(iter->second),
+                               shash::kSuffixCertificate);
   if ((iter = content.find('H')) != content.end())
-    history = hash::Any(hash::kSha1, hash::HexPtr(iter->second));
+    history = MkFromHexPtr(shash::HexPtr(iter->second),
+                           shash::kSuffixHistory);
   if ((iter = content.find('T')) != content.end())
     publish_timestamp = String2Uint64(iter->second);
+  if ((iter = content.find('G')) != content.end())
+    garbage_collectable = (iter->second == "yes");
 
-  // Z expands to a pipe-separated string of channel-hash pairs
-  vector<history::TagList::ChannelTag> channel_tops;
-  if ((iter = content.find('Z')) != content.end()) {
-    vector<string> elements = SplitString(iter->second, '|');
-    for (unsigned i = 0; i < elements.size(); ++i) {
-      assert(elements[i].length() > 2);
-      int channel_int = 16 * HexDigit2Int(elements[i][0]) +
-                        HexDigit2Int(elements[i][1]);
-      history::UpdateChannel channel =
-        static_cast<history::UpdateChannel>(channel_int);
-      channel_tops.push_back(history::TagList::ChannelTag(
-        channel, hash::Any(hash::kSha1, hash::HexPtr(elements[i].substr(2)))));
-    }
-  }
-
-  return new Manifest(catalog_hash, root_path, ttl, revision,
+  return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
-                      history, publish_timestamp, channel_tops);
+                      history, publish_timestamp, garbage_collectable);
 }
 
 
-Manifest::Manifest(const hash::Any &catalog_hash, const string &root_path) {
+Manifest::Manifest(const shash::Any &catalog_hash,
+                   const uint64_t catalog_size,
+                   const string &root_path)
+{
   catalog_hash_ = catalog_hash;
-  root_path_ = hash::Md5(hash::AsciiPtr(root_path));
+  catalog_size_ = catalog_size;
+  root_path_ = shash::Md5(shash::AsciiPtr(root_path));
   ttl_ = catalog::Catalog::kDefaultTTL;
   revision_ = 0;
   publish_timestamp_ = 0;
+  garbage_collectable_ = false;
 }
 
 
@@ -162,9 +110,11 @@ Manifest::Manifest(const hash::Any &catalog_hash, const string &root_path) {
 string Manifest::ExportString() const {
   string manifest =
     "C" + catalog_hash_.ToString() + "\n" +
+    "B" + StringifyInt(catalog_size_) + "\n" +
     "R" + root_path_.ToString() + "\n" +
     "D" + StringifyInt(ttl_) + "\n" +
-    "S" + StringifyInt(revision_) + "\n";
+    "S" + StringifyInt(revision_) + "\n" +
+    "G" + StringifyBool(garbage_collectable_) + "\n";
 
   if (!micro_catalog_hash_.IsNull())
     manifest += "L" + micro_catalog_hash_.ToString() + "\n";
@@ -176,11 +126,7 @@ string Manifest::ExportString() const {
     manifest += "H" + history_.ToString() + "\n";
   if (publish_timestamp_ > 0)
     manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
-
-  for (unsigned i = 0; i < channel_tops_.size(); ++i) {
-    manifest += "Z" + StringifyByteAsHex(channel_tops_[i].channel) +
-                channel_tops_[i].root_hash.ToString() + "\n";
-  }
+  // Reserved: Z -> for identification of channel tips
 
   return manifest;
 }
@@ -207,6 +153,72 @@ bool Manifest::Export(const std::string &path) const {
   fclose(fmanifest);
 
   return true;
+}
+
+
+/**
+ * Writes the cvmfschecksum.$repository file.  Atomic store.
+ */
+bool Manifest::ExportChecksum(const string &directory, const int mode) const {
+  string checksum_path = MakeCanonicalPath(directory) + "/cvmfschecksum." +
+                         repository_name_;
+  string checksum_tmp_path;
+  FILE *fchksum = CreateTempFile(checksum_path, mode, "w", &checksum_tmp_path);
+  if (fchksum == NULL)
+    return false;
+  string cache_checksum = catalog_hash_.ToString() + "T" +
+                          StringifyInt(publish_timestamp_);
+  int written = fwrite(&(cache_checksum[0]), 1, cache_checksum.length(),
+                       fchksum);
+  fclose(fchksum);
+  if (static_cast<unsigned>(written) != cache_checksum.length()) {
+    unlink(checksum_tmp_path.c_str());
+    return false;
+  }
+  int retval = rename(checksum_tmp_path.c_str(), checksum_path.c_str());
+  if (retval != 0) {
+    unlink(checksum_tmp_path.c_str());
+    return false;
+  }
+  return true;
+}
+
+
+/**
+ * Read the hash and the last-modified time stamp from the
+ * cvmfschecksum.$repository file in the given directory.
+ */
+bool Manifest::ReadChecksum(
+  const std::string &repo_name,
+  const std::string &directory,
+  shash::Any *hash,
+  uint64_t *last_modified)
+{
+  bool result = false;
+  const string checksum_path = directory + "/cvmfschecksum." + repo_name;
+  FILE *file_checksum = fopen(checksum_path.c_str(), "r");
+  char tmp[128];
+  int read_bytes;
+  if (file_checksum && (read_bytes = fread(tmp, 1, 128, file_checksum)) > 0) {
+    // Separate hash from timestamp
+    int separator_pos = 0;
+    for (; (separator_pos < read_bytes) && (tmp[separator_pos] != 'T');
+         ++separator_pos) { }
+    *hash = shash::MkFromHexPtr(shash::HexPtr(string(tmp, separator_pos)),
+                                shash::kSuffixCatalog);
+
+    // Get local last modified time
+    string str_modified;
+    if ((tmp[separator_pos] == 'T') && (read_bytes > (separator_pos+1))) {
+      str_modified = string(tmp+separator_pos+1,
+                            read_bytes-(separator_pos+1));
+      *last_modified = String2Uint64(str_modified);
+      result = true;
+    }
+  }
+  if (file_checksum) fclose(file_checksum);
+
+  return result;
 }
 
 }  // namespace manifest

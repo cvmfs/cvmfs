@@ -1,0 +1,7 @@
+--- block_allocator.cpp.orig	2013-11-07 17:29:17.000000000 -0400
++++ block_allocator.cpp	2013-11-07 23:09:04.000000000 -0400
+@@ -1,3 +1,4 @@
++#include <cstdlib>
+ #include <memory.h>
+ #include <algorithm>
+ #include "block_allocator.h"

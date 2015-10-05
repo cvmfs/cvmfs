@@ -1,0 +1,179 @@
+
+cvmfs_test_name="Defragment due to Wasted Row IDs"
+cvmfs_test_autofs_on_startup=false
+
+get_catalog_file_size() {
+  local repo_name="$1"
+  local catalog_path="$2"
+
+  cvmfs_server list-catalogs -xs $repo_name | grep -e "^.* $catalog_path$" | sed 's/^\([0-9]*\)B\s.*$/\1/'
+}
+
+
+get_and_decompress_root_catalog() {
+  local repo_name="$1"
+  local root_catalog="$(get_current_root_catalog $repo_name)C"
+  local object_url="$(get_object_url $repo_name $root_catalog)"
+  local sqlite_db="${root_catalog}.uncompressed"
+
+  wget --quiet $object_url                                             || return 1
+  cat $(basename $object_url) | cvmfs_swissknife zpipe -d > $sqlite_db || return 2
+  echo $sqlite_db
+}
+
+
+get_wasted_row_ids_in_root_catalog() {
+  local repo_name="$1"
+  local root_clg="$(get_and_decompress_root_catalog $repo_name)"
+
+  sqlite3 $root_clg "SELECT max(rowid) - count(*) FROM catalog;"
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create test repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "start transactions to create huge root catalog (in steps)"
+  # we create a repository in small steps in order to have control over the
+  # row IDs assigned to the entries in the different directories.
+  # while creating the repository row IDs will increase...
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "create a synthetically huge root catalog"
+  mkdir ${repo_dir}/foo || return 1
+  mkdir ${repo_dir}/bar || return 1
+  mkdir ${repo_dir}/baz || return 1
+  mkdir ${repo_dir}/mop || return 1
+  mkdir ${repo_dir}/pom || return 1
+  mkdir ${repo_dir}/lol || return 1
+  mkdir ${repo_dir}/wtf || return 1
+  mkdir ${repo_dir}/brb || return 1
+
+  echo "publish directory structure first"
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 7
+
+  # in each of the publishing steps the same amount of row IDs is created in
+  # each of the six directories. Thus, afterwards each directory will make up
+  # approximately one sixths (16%) of overall row ID count in the catalog
+
+  echo "second transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 8
+  cp_bin ${repo_dir}/foo                    || return 9
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 10
+
+  echo "third transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 11
+  cp_bin ${repo_dir}/bar                    || return 12
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 13
+
+  echo "fourth transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 14
+  cp_bin ${repo_dir}/baz                    || return 15
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 16
+
+  echo "fifth transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 17
+  cp_bin ${repo_dir}/mop                    || return 18
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 19
+
+  echo "sixth transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 20
+  cp_bin ${repo_dir}/pom                    || return 21
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 22
+
+  echo "seventh transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 23
+  cp_bin ${repo_dir}/lol                    || return 24
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 25
+
+  # create one last file which is guaranteed to get the highest row ID in the
+  # whole catalog
+
+  echo "eighth transaction"
+  start_transaction $CVMFS_TEST_REPO        || return 26
+  touch ${repo_dir}/biggest_row_id_sentinel || return 27
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 28
+
+  echo "find the file size of the root catalog"
+  local initial_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
+  echo "Catalog Size: $initial_root_size"
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  # now we are going to remove some of the files from the catalog.
+  # Note: we are staying below the thresholds of both free pages and wasted row
+  #       IDs, thus not causing a catalog defragmentation
+
+  echo "start next transaction to remove files from /bar"
+  start_transaction $CVMFS_TEST_REPO || return 29
+  rm -fR ${repo_dir}/bar             || return 30
+
+  echo "publish (shouldn't trigger defrag)"
+  local publish_log_1=publish_1.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1       || return 31
+  cat $publish_log_1 | grep -e '/ gets defragmented.*' && return 32
+
+  # we are recreating some files in /wtf to further increase the maximal row ID
+  # and to re-fill the free pages in the catalog
+  # Note: The files removed in the previous transaction created a hole in the
+  #       continuous row ID space of the catalog that was below the wasted row
+  #       ID threshold.
+
+  echo "start next transaction to create some files in /wtf"
+  start_transaction $CVMFS_TEST_REPO || return 33
+  cp_bin ${repo_dir}/wtf             || return 34
+
+  echo "publish (shouldn't trigger defrag either)"
+  local publish_log_2=publish_2.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2       || return 35
+  cat $publish_log_2 | grep -e '/ gets defragmented.*' && return 36
+
+  # now an additional delete of /foo should tear a second hole into the row ID
+  # space of the catalog (now exceeding the wasted row ID threshold)
+  # Note: Since we re-filled the empty pages of the catalog before, the free
+  #       page threshold should not be exceeded.
+
+  echo "start next transaction to remove files in /foo"
+  start_transaction $CVMFS_TEST_REPO || return 37
+  rm -fR ${repo_dir}/foo             || return 38
+
+  echo "publish repository (should trigger root catalog defragmentation)"
+  local publish_log_3=publish_3.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_3                 || return 39
+  cat $publish_log_3 | grep -e '/ gets defragmented.*wasted row' || return 40
+
+  # finally we fill up the previously freed pages again, to bring the overall
+  # catalog file size back to approximately the initial file size
+
+  echo "start next transaction to create some files in /brb"
+  start_transaction $CVMFS_TEST_REPO || return 41
+  cp_bin ${repo_dir}/brb             || return 42
+
+  echo "publish (shouldn't trigger defrag again)"
+  local publish_log_4=publish_4.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_4       || return 43
+  cat $publish_log_4 | grep -e '/ gets defragmented.*' && return 44
+
+  echo "check if root catalog is approximately the same size than before"
+  local second_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
+  local absdiff=$(( $second_root_size - $initial_root_size ))
+  echo "Catalog Size: $second_root_size"
+  [ $absdiff -lt 10240 ] || [ $absdiff -gt -10240 ] || return 45
+
+  echo "check that the Row IDs are actually dense now"
+  local wasted_row_ids="$(get_wasted_row_ids_in_root_catalog $CVMFS_TEST_REPO)"
+  [ $wasted_row_ids -eq 0 ] || return 46
+
+  echo "create a last transaction to check if defrag info is gone"
+  start_transaction $CVMFS_TEST_REPO                   || return 47
+  local publish_log_5=publish_5.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_5       || return 48
+  cat $publish_log_5 | grep -e '/ gets defragmented.*' && return 49
+
+  return 0
+}

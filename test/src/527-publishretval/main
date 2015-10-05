@@ -1,0 +1,29 @@
+cvmfs_test_name="Non zero return value on failed publish"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "removing vital file"
+  sudo rm -f /etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO
+  local retval=$?
+
+  echo "Return value is $retval"
+  if [ $retval -eq 0 ]; then
+    echo "error retval expected but retval was ok"
+    return 5
+  fi
+
+  return 0
+}
+

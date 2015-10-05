@@ -13,23 +13,31 @@
 
 #include <vector>
 
+#include "download.h"
 #include "logging.h"
-#include "swissknife_zpipe.h"
+#include "signature.h"
 #include "swissknife_check.h"
+#include "swissknife_gc.h"
+#include "swissknife_history.h"
+#include "swissknife_info.h"
+#include "swissknife_letter.h"
 #include "swissknife_lsrepo.h"
+#include "swissknife_migrate.h"
 #include "swissknife_pull.h"
+#include "swissknife_scrub.h"
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
-#include "swissknife_info.h"
-#include "swissknife_history.h"
-#include "swissknife_migrate.h"
+#include "swissknife_zpipe.h"
 
 using namespace std;  // NOLINT
-using namespace swissknife;
 
-vector<swissknife::Command *> command_list;
+namespace swissknife {
+vector<Command *> command_list;
+download::DownloadManager *g_download_manager;
+signature::SignatureManager *g_signature_manager;
+perf::Statistics *g_statistics;
 
-void swissknife::Usage() {
+void Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout,
     "CernVM-FS repository storage management commands\n"
     "Version %s\n"
@@ -63,23 +71,37 @@ void swissknife::Usage() {
   LogCvmfs(kLogCvmfs, kLogStdout, "");
 }
 
+}  // namespace swissknife
+
 
 int main(int argc, char **argv) {
-  command_list.push_back(new swissknife::CommandCreate());
-  command_list.push_back(new swissknife::CommandUpload());
-  command_list.push_back(new swissknife::CommandRemove());
-  command_list.push_back(new swissknife::CommandPeek());
-  command_list.push_back(new swissknife::CommandSync());
-  command_list.push_back(new swissknife::CommandTag());
-  command_list.push_back(new swissknife::CommandRollback());
-  command_list.push_back(new swissknife::CommandSign());
-  command_list.push_back(new swissknife::CommandCheck());
-  command_list.push_back(new swissknife::CommandListCatalogs());
-  command_list.push_back(new swissknife::CommandPull());
-  command_list.push_back(new swissknife::CommandZpipe());
-  command_list.push_back(new swissknife::CommandInfo());
-  command_list.push_back(new swissknife::CommandVersion());
-  command_list.push_back(new swissknife::CommandMigrate());
+  swissknife::g_download_manager = new download::DownloadManager();
+  swissknife::g_signature_manager = new signature::SignatureManager();
+  swissknife::g_statistics = new perf::Statistics();
+
+  swissknife::command_list.push_back(new swissknife::CommandCreate());
+  swissknife::command_list.push_back(new swissknife::CommandUpload());
+  swissknife::command_list.push_back(new swissknife::CommandRemove());
+  swissknife::command_list.push_back(new swissknife::CommandPeek());
+  swissknife::command_list.push_back(new swissknife::CommandSync());
+  swissknife::command_list.push_back(new swissknife::CommandApplyDirtab());
+  swissknife::command_list.push_back(new swissknife::CommandCreateTag());
+  swissknife::command_list.push_back(new swissknife::CommandRemoveTag());
+  swissknife::command_list.push_back(new swissknife::CommandListTags());
+  swissknife::command_list.push_back(new swissknife::CommandInfoTag());
+  swissknife::command_list.push_back(new swissknife::CommandRollbackTag());
+  swissknife::command_list.push_back(new swissknife::CommandEmptyRecycleBin());
+  swissknife::command_list.push_back(new swissknife::CommandSign());
+  swissknife::command_list.push_back(new swissknife::CommandLetter());
+  swissknife::command_list.push_back(new swissknife::CommandCheck());
+  swissknife::command_list.push_back(new swissknife::CommandListCatalogs());
+  swissknife::command_list.push_back(new swissknife::CommandPull());
+  swissknife::command_list.push_back(new swissknife::CommandZpipe());
+  swissknife::command_list.push_back(new swissknife::CommandInfo());
+  swissknife::command_list.push_back(new swissknife::CommandVersion());
+  swissknife::command_list.push_back(new swissknife::CommandMigrate());
+  swissknife::command_list.push_back(new swissknife::CommandScrub());
+  swissknife::command_list.push_back(new swissknife::CommandGc());
 
   if (argc < 2) {
     swissknife::Usage();
@@ -87,25 +109,26 @@ int main(int argc, char **argv) {
   }
   if ((string(argv[1]) == "--help")) {
     swissknife::Usage();
-		return 0;
-	}
+    return 0;
+  }
   if ((string(argv[1]) == "--version")) {
     swissknife::CommandVersion().Main(swissknife::ArgumentList());
     return 0;
   }
 
-  for (unsigned i = 0; i < command_list.size(); ++i) {
-    if (command_list[i]->GetName() == string(argv[1])) {
+  for (unsigned i = 0; i < swissknife::command_list.size(); ++i) {
+    if (swissknife::command_list[i]->GetName() == string(argv[1])) {
       swissknife::ArgumentList args;
       optind = 1;
       string option_string = "";
-      swissknife::ParameterList params = command_list[i]->GetParams();
+      swissknife::ParameterList params =
+        swissknife::command_list[i]->GetParams();
       for (unsigned j = 0; j < params.size(); ++j) {
         option_string.push_back(params[j].key());
         if (!params[j].switch_only())
           option_string.push_back(':');
       }
-      char c;
+      int c;
       while ((c = getopt(argc, argv, option_string.c_str())) != -1) {
         bool valid_option = false;
         for (unsigned j = 0; j < params.size(); ++j) {
@@ -133,10 +156,13 @@ int main(int argc, char **argv) {
           }
         }
       }
-      return command_list[i]->Main(args);
+      return swissknife::command_list[i]->Main(args);
     }
   }
 
+  delete swissknife::g_signature_manager;
+  delete swissknife::g_download_manager;
+  delete swissknife::g_statistics;
   swissknife::Usage();
   return 1;
 }

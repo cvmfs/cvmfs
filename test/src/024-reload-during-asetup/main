@@ -2,8 +2,8 @@
 cvmfs_test_name="Reload during overcommitted asetup"
 
 reload_cvmfs() {
-  while true; do
-    sudo cvmfs_config reload
+  while [ ! -f stop-reload ]; do
+    sudo cvmfs_config reload -c
     sleep 15
   done
 }
@@ -42,24 +42,24 @@ cvmfs_run_test() {
 
   # decrease the kernel cache timeout to safe some time
   sudo sh -c "echo \"CVMFS_KCACHE_TIMEOUT=5\" >> /etc/cvmfs/default.local" || return 3
-  sudo cvmfs_config umount >> $logfile 2>&1 || return 4
-  sudo cvmfs_config probe  >> $logfile 2>&1 || return 5
+  sudo cvmfs_config umount || return 4
+  sudo cvmfs_config probe  || return 5
 
   pidsfile=`mktemp` || return 6
 
   # do some concurrent asetup calls
-  echo "running with $num_asetup parallel tasks" >> $logfile
+  echo "running with $num_asetup parallel tasks"
   for i in $(seq 1 $num_asetup); do
-    asetup17X $pidsfile >> $logfile 2>&1 &
+    asetup17X $pidsfile &
     echo $! >> $pidsfile
   done
 
   # reload the catalog every now and than
-  reload_cvmfs >> $logfile 2>&1 &
+  reload_cvmfs &
   reload_pid=$!
 
   # always kill the detached processes
-  trap "kill -9 $(cat $pidsfile | tr '\n' " ") $reload_pid > /dev/null 2>&1; rm -f $pidsfile; exit" SIGHUP SIGINT SIGTERM
+  trap "kill -9 $(cat $pidsfile | tr '\n' " ") $reload_pid > /dev/null 2>&1; rm -f $pidsfile; exit" HUP INT TERM
 
   # wait for the find calls to succeed
   wait $(cat $pidsfile | tr '\n' " ")
@@ -67,15 +67,16 @@ cvmfs_run_test() {
   rm -f $pidsfile
 
   # stop the reload cycle, it seemed to work fine...
-  kill -9 $reload_pid
+  touch stop-reload
+  wait $reload_pid
 
   if [ $retval -ne 0 ]; then
-    echo "asetup failed with return code: $retval" >> $logfile
+    echo "asetup failed with return code: $retval"
     return 6
   fi
 
   local num_forget=$(sudo cvmfs_talk -i atlas.cern.ch internal affairs | grep -o "forget(): [0-9]*" | awk '{print $2}')
-  echo "Number of forget(): $num_forget" >> $logfile
+  echo "Number of forget(): $num_forget"
   if [ $num_forget -gt 50000 ]; then
     return 10
   fi

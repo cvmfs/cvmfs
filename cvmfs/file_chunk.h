@@ -9,18 +9,19 @@
 #ifndef CVMFS_FILE_CHUNK_H_
 #define CVMFS_FILE_CHUNK_H_
 
-#include <sys/types.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <sys/types.h>
 
-#include <vector>
 #include <string>
+#include <vector>
 
-#include "hash.h"
-#include "bigvector.h"
-#include "smallhash.h"
-#include "shortstring.h"
 #include "atomic.h"
+#include "bigvector.h"
+#include "hash.h"
+#include "shortstring.h"
+#include "smallhash.h"
+#include "util.h"
 
 /**
  * Describes a FileChunk as generated from the FileProcessor in collaboration
@@ -28,37 +29,33 @@
  */
 class FileChunk {
  public:
-  static const std::string kCasSuffix;
-
- public:
-  FileChunk() : content_hash_(hash::Any(hash::kSha1)), offset_(0), size_(0) { }
-  FileChunk(const hash::Any &hash,
-            const off_t      offset,
-            const size_t     size) :
+  FileChunk() : content_hash_(shash::Any(shash::kAny)), offset_(0), size_(0) { }
+  FileChunk(const shash::Any &hash,
+            const off_t       offset,
+            const size_t      size) :
     content_hash_(hash),
     offset_(offset),
     size_(size) { }
 
-  inline const hash::Any& content_hash() const { return content_hash_; }
-  inline off_t            offset()       const { return offset_; }
-  inline size_t           size()         const { return size_; }
+  inline const shash::Any& content_hash() const { return content_hash_; }
+  inline off_t             offset()       const { return offset_; }
+  inline size_t            size()         const { return size_; }
 
  protected:
-  hash::Any content_hash_; //!< content hash of the compressed file chunk
-  off_t     offset_;       //!< byte offset in the uncompressed input file
-  size_t    size_;         //!< uncompressed size of the data chunk
+  shash::Any content_hash_;  //!< content hash of the compressed file chunk
+  off_t      offset_;        //!< byte offset in the uncompressed input file
+  size_t     size_;          //!< uncompressed size of the data chunk
 };
 
 typedef BigVector<FileChunk> FileChunkList;
 
 struct FileChunkReflist {
-  FileChunkReflist() {
-    list = NULL;
-  }
-  FileChunkReflist(FileChunkList *l, PathString p) {
-    list = l;
-    path = p;
-  }
+  FileChunkReflist() : list(NULL) { }
+  FileChunkReflist(FileChunkList *l, const PathString &p) :
+    list(l), path(p) { }
+
+  unsigned FindChunkIdx(const uint64_t offset);
+
   FileChunkList *list;
   PathString path;
 };
@@ -66,12 +63,10 @@ struct FileChunkReflist {
 
 /**
  * Stores the chunk index of a file descriptor.  Needed for the Fuse module
+ * and for libcvmfs.
  */
 struct ChunkFd {
-  ChunkFd() {
-    fd = -1;
-    chunk_idx = 0;
-  }
+  ChunkFd() : fd(-1), chunk_idx(0) { }
   int fd;  // -1 or pointing to chunk_idx
   unsigned chunk_idx;
 };
@@ -101,6 +96,8 @@ struct ChunkTables {
     assert(retval == 0);
   }
 
+  static const unsigned kVersion = 2;
+
   int version;
   static const unsigned kNumHandleLocks = 128;
   SmallHashDynamic<uint64_t, ChunkFd> handle2fd;
@@ -111,6 +108,46 @@ struct ChunkTables {
   SmallHashDynamic<uint64_t, uint32_t> inode2references;
   uint64_t next_handle;
   pthread_mutex_t *lock;
+};
+
+
+/**
+ * Connects virtual file descriptors to FileChunkLists.  Used by libcvmfs.
+ * Tries to keep the file descriptors small because they need to fit within
+ * 29bit.  This class takes the ownership of the FileChunkList objects pointed
+ * to by the elements of fd_table_.
+ */
+class SimpleChunkTables : SingleCopy {
+ public:
+  /**
+   * While a chunked file is open, a single file descriptor is moved around the
+   * individual chunks.
+   */
+  struct OpenChunks {
+    OpenChunks() : chunk_fd(NULL) { }
+    ChunkFd *chunk_fd;
+    FileChunkReflist chunk_reflist;
+  };
+
+  SimpleChunkTables();
+  ~SimpleChunkTables();
+  int Add(FileChunkReflist chunks);
+  OpenChunks Get(int fd);
+  void Release(int fd);
+
+ private:
+  inline void Lock() {
+    int retval = pthread_mutex_lock(lock_);
+    assert(retval == 0);
+  }
+
+  inline void Unlock() {
+    int retval = pthread_mutex_unlock(lock_);
+    assert(retval == 0);
+  }
+
+  std::vector<OpenChunks> fd_table_;
+  pthread_mutex_t *lock_;
 };
 
 #endif  // CVMFS_FILE_CHUNK_H_

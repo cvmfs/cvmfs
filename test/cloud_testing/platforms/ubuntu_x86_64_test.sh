@@ -1,19 +1,47 @@
-#!/bin/sh
+#!/bin/bash
 
 # source the common platform independent functionality and option parsing
-script_location=$(dirname $(readlink --canonicalize $0))
+script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
 
-# run tests
-echo "running CernVM-FS test cases..."
+retval=0
+
+# running unittests
+run_unittests --gtest_shuffle \
+              --gtest_death_test_use_fork || retval=1
+
+
 cd ${SOURCE_DIRECTORY}/test
-./run.sh $TEST_LOGFILE -x src/004-davinci               \
-                          src/005-asetup                \
-                          src/007-testjobs              \
-                          src/016-perl_environment      \
-                          src/017-dns_timeout           \
-                          src/018-dns_injection         \
-                          src/019-faulty_proxy          \
-                          src/020-server_timeout        \
-                          src/024-reload-during-asetup  \
-                          src/5*
+echo "running CernVM-FS client test cases..."
+CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
+./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                              -x src/004-davinci                              \
+                                 src/005-asetup                               \
+                                 src/007-testjobs                             \
+                                 src/024-reload-during-asetup                 \
+                                 src/045-oasis                                \
+                                 --                                           \
+                                 src/0*                                       \
+                              || retval=1
+
+
+echo "running CernVM-FS server test cases..."
+CVMFS_TEST_CLASS_NAME=ServerIntegrationTests                                  \
+./run.sh $SERVER_TEST_LOGFILE -o ${SERVER_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                              -x src/523-corruptchunkfailover                 \
+                                 src/524-corruptmanifestfailover              \
+                                 src/577-garbagecollecthiddenstratum1revision \
+                                 src/579-garbagecollectstratum1legacytag      \
+                                 src/585-xattrs                               \
+                                 --                                           \
+                                 src/5*                                       \
+                              || retval=1
+
+
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
+
+exit $retval

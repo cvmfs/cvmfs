@@ -1,0 +1,23 @@
+
+cvmfs_test_name="Cleanup left-over pipes"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount "lhcb.cern.ch" "CVMFS_CONFIG_REPOSITORY=" || return 1
+  ls /cvmfs/lhcb.cern.ch || return 2
+
+  local cache_dir="$(get_cvmfs_cachedir)"
+  sudo mkfifo "${cache_dir}/pipe000" || return 5
+  sudo mkfifo "${cache_dir}/fifo000" || return 7
+
+  cvmfs_umount "lhcb.cern.ch" || return 3
+  cvmfs_mount "lhcb.cern.ch" || return 4
+  sudo stat ${cache_dir}/fifo000 || return 8
+  sudo stat ${cache_dir}/pipe000
+  if [ $? -eq 0 ]; then
+    return 6
+  fi
+
+  return 0
+}

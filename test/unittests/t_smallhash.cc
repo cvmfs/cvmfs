@@ -1,35 +1,39 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
+#include <inttypes.h>
 #include <pthread.h>
 
 #include <limits>
 
-#include "../../cvmfs/smallhash.h"
-#include "../../cvmfs/murmur.h"
-
 #include "../../cvmfs/hash.h"
+#include "../../cvmfs/murmur.h"
+#include "../../cvmfs/smallhash.h"
 
 static uint32_t hasher_int(const int &key) {
   return MurmurHash2(&key, sizeof(key), 0x07387a4f);
 }
 
-static uint32_t hasher_md5(const hash::Md5 &key) {
+static uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *((uint32_t *)key.digest + 1);
+  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 class T_Smallhash : public ::testing::Test {
  protected:
   virtual void SetUp() {
     smallhash_.Init(16, -1, hasher_int);
-    smallhash_md5_.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+    smallhash_md5_.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5);
     multihash_.Init(kNumHashmaps, -1, hasher_int);
     active_multihash = &multihash_;
 
     unsigned num_hashmaps = kNumHashmaps;
     EXPECT_EQ(num_hashmaps, multihash_.num_hashmaps());
 
-    srand (time(NULL));
+    srand(time(NULL));
   }
 
   uint32_t GetMultiSize() {
@@ -42,7 +46,7 @@ class T_Smallhash : public ::testing::Test {
   }
 
   static void *tf_insert(void *data) {
-    int ID = (long)data;
+    int ID = reinterpret_cast<uint64_t>(data);
 
     unsigned chunk = kNumElements/kNumThreads;
     for (unsigned i = chunk*ID; i < chunk*ID+chunk; ++i) {
@@ -52,7 +56,7 @@ class T_Smallhash : public ::testing::Test {
   }
 
   static void *tf_erase(void *data) {
-    int ID = (long)data;
+    int ID = reinterpret_cast<uint64_t>(data);
 
     unsigned chunk = kNumElements/kNumThreads;
     for (unsigned i = chunk*ID; i < chunk*ID+chunk; ++i) {
@@ -65,7 +69,7 @@ class T_Smallhash : public ::testing::Test {
   static const unsigned kNumHashmaps = 42;
   static const unsigned kNumThreads = 8;
   SmallHashDynamic<int, int> smallhash_;
-  SmallHashDynamic<hash::Md5, int> smallhash_md5_;
+  SmallHashDynamic<shash::Md5, int> smallhash_md5_;
   MultiHash<int, int> multihash_;
   static MultiHash<int, int> *active_multihash;
 };
@@ -85,8 +89,8 @@ TEST_F(T_Smallhash, Insert) {
 TEST_F(T_Smallhash, InsertMd5) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
-    hash::Md5 random_hash;
-    random_hash.Randomize();
+    shash::Md5 random_hash;
+    random_hash.Randomize(i);
     smallhash_md5_.Insert(random_hash, i);
   }
 
@@ -94,19 +98,19 @@ TEST_F(T_Smallhash, InsertMd5) {
 }
 
 
-TEST_F(T_Smallhash, InsertAndCopyMd5) {
+TEST_F(T_Smallhash, InsertAndCopyMd5Slow) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
-    hash::Md5 random_hash;
-    random_hash.Randomize();
+    shash::Md5 random_hash;
+    random_hash.Randomize(i);
     smallhash_md5_.Insert(random_hash, i);
   }
 
   const uint32_t max_collisions = std::numeric_limits<uint32_t>::max() / N;
   EXPECT_GT(max_collisions, smallhash_md5_.max_collisions_);
 
-  SmallHashDynamic<hash::Md5, int> new_smallhash_md5;
-  new_smallhash_md5.Init(16, hash::Md5(hash::AsciiPtr("!")), hasher_md5);
+  SmallHashDynamic<shash::Md5, int> new_smallhash_md5;
+  new_smallhash_md5.Init(16, shash::Md5(shash::AsciiPtr("!")), hasher_md5);
   new_smallhash_md5 = smallhash_md5_;
 
   EXPECT_EQ(N, smallhash_md5_.size());
@@ -163,7 +167,7 @@ TEST_F(T_Smallhash, Lookup) {
 }
 
 
-TEST_F(T_Smallhash, MultihashCycle) {
+TEST_F(T_Smallhash, MultihashCycleSlow) {
   unsigned N = kNumElements;
   for (unsigned i = 0; i < N; ++i) {
     multihash_.Insert(i, i);
@@ -208,7 +212,7 @@ TEST_F(T_Smallhash, MultihashMultithread) {
 
   pthread_t threads[kNumThreads];
   for (unsigned i = 0; i < kNumThreads; ++i) {
-    pthread_create(&threads[i], NULL, tf_insert, (void *)i);
+    pthread_create(&threads[i], NULL, tf_insert, reinterpret_cast<void *>(i));
   }
   for (unsigned i = 0; i < kNumThreads; ++i) {
     pthread_join(threads[i], NULL);
@@ -216,7 +220,7 @@ TEST_F(T_Smallhash, MultihashMultithread) {
   EXPECT_EQ(N, GetMultiSize());
 
   for (unsigned i = 0; i < kNumThreads; ++i) {
-    pthread_create(&threads[i], NULL, tf_erase, (void *)i);
+    pthread_create(&threads[i], NULL, tf_erase, reinterpret_cast<void *>(i));
   }
   for (unsigned i = 0; i < kNumThreads; ++i) {
     pthread_join(threads[i], NULL);

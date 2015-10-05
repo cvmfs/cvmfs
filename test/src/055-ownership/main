@@ -1,0 +1,37 @@
+
+cvmfs_test_name="Ownership of files and directories"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local cvmfs_user=$(sh -c '. /etc/cvmfs/default.conf && echo $CVMFS_USER')
+  local cvmfs_uid=$(getent passwd "$cvmfs_user" | cut -d: -f3)
+  local cvmfs_gid=$(getent passwd "$cvmfs_user" | cut -d: -f4)
+
+  cvmfs_mount grid.cern.ch || return 1
+  local discovered_uid=$(stat -c %u /cvmfs/grid.cern.ch)
+  local discovered_gid=$(stat -c %g /cvmfs/grid.cern.ch)
+
+  echo "$cvmfs_uid $cvmfs_gid $discovered_uid $discovered_gid"
+  if [ "x$cvmfs_uid" != "x$discovered_uid" ]; then
+    return 10
+  fi
+  if [ "x$cvmfs_gid" != "x$discovered_gid" ]; then
+    return 11
+  fi
+
+  cvmfs_umount grid.cern.ch
+  cvmfs_mount grid.cern.ch "CVMFS_CLAIM_OWNERSHIP=no" || return 20
+  discovered_uid=$(stat -c %u /cvmfs/grid.cern.ch)
+  discovered_gid=$(stat -c %g /cvmfs/grid.cern.ch)
+
+  echo "$cvmfs_uid $cvmfs_gid $discovered_uid $discovered_gid"
+  if [ "x$cvmfs_uid" = "x$discovered_uid" ]; then
+    return 30
+  fi
+  if [ "x$cvmfs_gid" = "x$discovered_gid" ]; then
+    return 31
+  fi
+
+  return 0
+}

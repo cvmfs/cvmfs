@@ -8,13 +8,16 @@
 #ifndef CVMFS_FS_TRAVERSAL_H_
 #define CVMFS_FS_TRAVERSAL_H_
 
+#include <errno.h>
+
 #include <cassert>
+#include <cstdlib>
 
-#include <string>
 #include <set>
+#include <string>
 
-#include "platform.h"
 #include "logging.h"
+#include "platform.h"
 #include "util.h"
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -42,6 +45,10 @@ class FileSystemTraversal {
   VoidCallback fn_leave_dir;
   VoidCallback fn_new_file;
   VoidCallback fn_new_symlink;
+  VoidCallback fn_new_socket;
+  VoidCallback fn_new_block_dev;
+  VoidCallback fn_new_character_dev;
+  VoidCallback fn_new_fifo;
 
   /**
    * Optional callback for all files during recursion to decide
@@ -78,18 +85,22 @@ class FileSystemTraversal {
    */
   FileSystemTraversal(T *delegate,
                       const std::string &relative_to_directory,
-                      const bool recurse)
+                      const bool recurse) :
+    fn_enter_dir(NULL),
+    fn_leave_dir(NULL),
+    fn_new_file(NULL),
+    fn_new_symlink(NULL),
+    fn_new_socket(NULL),
+    fn_new_block_dev(NULL),
+    fn_new_character_dev(NULL),
+    fn_new_fifo(NULL),
+    fn_ignore_file(NULL),
+    fn_new_dir_prefix(NULL),
+    fn_new_dir_postfix(NULL),
+    delegate_(delegate),
+    relative_to_directory_(relative_to_directory),
+    recurse_(recurse)
   {
-    delegate_ = delegate;
-    relative_to_directory_ = relative_to_directory;
-    recurse_ = recurse;
-    fn_enter_dir = NULL;
-    fn_leave_dir = NULL;
-    fn_new_file = NULL;
-    fn_new_symlink = NULL;
-    fn_ignore_file = NULL;
-    fn_new_dir_prefix = NULL;
-    fn_new_dir_postfix = NULL;
     Init();
   }
 
@@ -102,7 +113,11 @@ class FileSystemTraversal {
            fn_leave_dir != NULL ||
            fn_new_file != NULL ||
            fn_new_symlink != NULL ||
-           fn_new_dir_prefix != NULL);
+           fn_new_dir_prefix != NULL ||
+           fn_new_block_dev != NULL ||
+           fn_new_character_dev != NULL ||
+           fn_new_fifo != NULL ||
+           fn_new_socket != NULL);
 
     assert(relative_to_directory_.length() == 0 ||
            dir_path.substr(0, relative_to_directory_.length()) ==
@@ -125,7 +140,7 @@ class FileSystemTraversal {
 
   void DoRecursion(const std::string &parent_path, const std::string &dir_name)
     const
-	{
+  {
     DIR *dip;
     platform_dirent64 *dit;
     const std::string path = parent_path + ((!dir_name.empty()) ?
@@ -135,16 +150,29 @@ class FileSystemTraversal {
     LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "entering %s (%s -- %s)",
              path.c_str(), parent_path.c_str(), dir_name.c_str());
     dip = opendir(path.c_str());
-    assert(dip);
+    if (!dip) {
+      LogCvmfs(kLogFsTraversal, kLogStderr, "Failed to open %s (%d).\n"
+               "Please check directory permissions.",
+               path.c_str(), errno);
+      abort();
+    }
     Notify(fn_enter_dir, parent_path, dir_name);
 
-    // Walk through the open directory notifying the about contents
+    // Walk through the open directory notifying the user about contents
     while ((dit = platform_readdir(dip)) != NULL) {
-      // Check if filename should be ignored
-      if (std::string(dit->d_name) == "." || std::string(dit->d_name) == ".." ||
-          (fn_ignore_file != NULL && Notify(fn_ignore_file, path, dit->d_name)))
-      {
+      // Check if file should be ignored
+      if (std::string(dit->d_name) == "." || std::string(dit->d_name) == "..") {
         continue;
+      } else if (fn_ignore_file != NULL) {
+        if (Notify(fn_ignore_file, path, dit->d_name)) {
+          LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "ignoring %s/%s",
+                   path.c_str(), dit->d_name);
+          continue;
+        }
+      } else {
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg,
+                 "not ignoring %s/%s (fn_ignore_file not set)",
+                 path.c_str(), dit->d_name);
       }
 
       // Notify user about found directory entry
@@ -166,6 +194,23 @@ class FileSystemTraversal {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing symlink %s/%s",
                  path.c_str(), dit->d_name);
         Notify(fn_new_symlink, path, dit->d_name);
+      } else if (S_ISSOCK(info.st_mode)) {
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing socket %s/%s",
+                 path.c_str(), dit->d_name);
+        Notify(fn_new_socket, path, dit->d_name);
+      } else if (S_ISBLK(info.st_mode)) {
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing block-device %s/%s",
+                 path.c_str(), dit->d_name);
+        Notify(fn_new_block_dev, path, dit->d_name);
+      } else if (S_ISCHR(info.st_mode)) {
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing character-device "
+                                                  "%s/%s",
+                 path.c_str(), dit->d_name);
+        Notify(fn_new_character_dev, path, dit->d_name);
+      } else if (S_ISFIFO(info.st_mode)) {
+        LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing FIFO %s/%s",
+                 path.c_str(), dit->d_name);
+        Notify(fn_new_fifo, path, dit->d_name);
       } else {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "unknown file type %s/%s",
                  path.c_str(), dit->d_name);
@@ -179,8 +224,8 @@ class FileSystemTraversal {
   }
 
   inline bool Notify(const BoolCallback callback,
-        	           const std::string &parent_path,
-        	           const std::string &entry_name) const
+                     const std::string &parent_path,
+                     const std::string &entry_name) const
   {
     return (callback == NULL) ? true :
       (delegate_->*callback)(GetRelativePath(parent_path),
@@ -188,8 +233,8 @@ class FileSystemTraversal {
   }
 
   inline void Notify(const VoidCallback callback,
-        	           const std::string &parent_path,
-        	           const std::string &entry_name) const
+                     const std::string &parent_path,
+                     const std::string &entry_name) const
   {
     if (callback != NULL) {
       (delegate_->*callback)(GetRelativePath(parent_path),
@@ -199,16 +244,22 @@ class FileSystemTraversal {
 
   std::string GetRelativePath(const std::string &absolute_path) const {
     const unsigned int rel_dir_len = relative_to_directory_.length();
-    if (rel_dir_len >= absolute_path.length()) { return ""; }
-	  else if (rel_dir_len > 1) { return absolute_path.substr(rel_dir_len + 1); }
-	  else if (rel_dir_len == 0){ return absolute_path; }
-	  else if (relative_to_directory_ == "/") { return absolute_path.substr(1); }
-    else return "";
+    if (rel_dir_len >= absolute_path.length()) {
+      return "";
+    } else if (rel_dir_len > 1) {
+      return absolute_path.substr(rel_dir_len + 1);
+    } else if (rel_dir_len == 0) {
+      return absolute_path;
+    } else if (relative_to_directory_ == "/") {
+      return absolute_path.substr(1);
+    } else {
+      return "";
+    }
   }
 };  // FileSystemTraversal
 
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif
 
 #endif  // CVMFS_FS_TRAVERSAL_H_

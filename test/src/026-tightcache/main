@@ -1,0 +1,20 @@
+
+cvmfs_test_name="Recursive listing of ATLAS with small cache"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount "atlas.cern.ch,atlas-nightlies.cern.ch,atlas-condb.cern.ch" \
+    "CVMFS_QUOTA_LIMIT=2000" \
+    "CVMFS_CHECK_PERMISSIONS=no" || return 1
+
+  echo "Walking through /cvmfs/atlas.cern.ch"
+  find /cvmfs/atlas.cern.ch > /dev/null
+  local retval=$?
+  if [ $retval -ne 0 ]; then
+    echo "retval $retval"
+    return 2
+  fi
+
+  return 0
+}

@@ -6,8 +6,10 @@
 #define CVMFS_MANIFEST_H_
 
 #include <stdint.h>
-#include <string>
+
 #include <map>
+#include <string>
+
 #include "hash.h"
 #include "history.h"
 
@@ -21,32 +23,48 @@ class Manifest {
  public:
   static Manifest *LoadFile(const std::string &path);
   static Manifest *LoadMem(const unsigned char *buffer, const unsigned length);
-  Manifest(const hash::Any &catalog_hash, const std::string &root_path);
-  Manifest(const hash::Any &catalog_hash,
-           const hash::Md5 &root_path,
+  Manifest(const shash::Any &catalog_hash,
+           const uint64_t catalog_size,
+           const std::string &root_path);
+  Manifest(const shash::Any &catalog_hash,
+           const uint64_t catalog_size,
+           const shash::Md5 &root_path,
            const uint32_t ttl,
            const uint64_t revision,
-           const hash::Any &micro_catalog_hash,
+           const shash::Any &micro_catalog_hash,
            const std::string &repository_name,
-           const hash::Any certificate,
-           const hash::Any history,
+           const shash::Any certificate,
+           const shash::Any history,
            const uint64_t publish_timestamp,
-           const std::vector<history::TagList::ChannelTag> &channel_tops) :
-    catalog_hash_(catalog_hash), root_path_(root_path), ttl_(ttl),
-    revision_(revision), micro_catalog_hash_(micro_catalog_hash),
-    repository_name_(repository_name), certificate_(certificate),
-    history_(history), publish_timestamp_(publish_timestamp),
-    channel_tops_(channel_tops) { };
+           const bool garbage_collectable) :
+    catalog_hash_(catalog_hash),
+    catalog_size_(catalog_size),
+    root_path_(root_path),
+    ttl_(ttl),
+    revision_(revision),
+    micro_catalog_hash_(micro_catalog_hash),
+    repository_name_(repository_name),
+    certificate_(certificate),
+    history_(history),
+    publish_timestamp_(publish_timestamp),
+    garbage_collectable_(garbage_collectable) { }
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
+  bool ExportChecksum(const std::string &directory, const int mode) const;
+  static bool ReadChecksum(const std::string &repo_name,
+                           const std::string &directory,
+                           shash::Any *hash,
+                           uint64_t *last_modified);
+
+  shash::Algorithms GetHashAlgorithm() const { return catalog_hash_.algorithm; }
 
   void set_ttl(const uint32_t ttl) { ttl_ = ttl; }
   void set_revision(const uint64_t revision) { revision_ = revision; }
-  void set_certificate(const hash::Any &certificate) {
+  void set_certificate(const shash::Any &certificate) {
     certificate_ = certificate;
   }
-  void set_history(const hash::Any &history_db) {
+  void set_history(const shash::Any &history_db) {
     history_ = history_db;
   }
   void set_repository_name(const std::string &repository_name) {
@@ -55,29 +73,39 @@ class Manifest {
   void set_publish_timestamp(const uint32_t publish_timestamp) {
     publish_timestamp_ = publish_timestamp;
   }
-  void set_channel_tops(const std::vector<history::TagList::ChannelTag> &v) {
-    channel_tops_ = v;
+  void set_catalog_size(const uint64_t catalog_size) {
+    catalog_size_ = catalog_size;
+  }
+  void set_catalog_hash(const shash::Any &catalog_hash) {
+    catalog_hash_ = catalog_hash;
+  }
+  void set_garbage_collectability(const bool garbage_collectable) {
+    garbage_collectable_ = garbage_collectable;
   }
 
+  uint64_t revision() const { return revision_; }
   std::string repository_name() const { return repository_name_; }
-  hash::Md5 root_path() const { return root_path_; }
-  hash::Any catalog_hash() const { return catalog_hash_; }
-  hash::Any certificate() const { return certificate_; }
-  hash::Any history() const { return history_; }
+  shash::Md5 root_path() const { return root_path_; }
+  shash::Any catalog_hash() const { return catalog_hash_; }
+  uint64_t catalog_size() const { return catalog_size_; }
+  shash::Any certificate() const { return certificate_; }
+  shash::Any history() const { return history_; }
   uint64_t publish_timestamp() const { return publish_timestamp_; }
+  bool garbage_collectable() const { return garbage_collectable_; }
+
  private:
   static Manifest *Load(const std::map<char, std::string> &content);
-  hash::Any catalog_hash_;
-  hash::Md5 root_path_;
+  shash::Any catalog_hash_;
+  uint64_t catalog_size_;
+  shash::Md5 root_path_;
   uint32_t ttl_;
   uint64_t revision_;
-  hash::Any micro_catalog_hash_;
+  shash::Any micro_catalog_hash_;
   std::string repository_name_;
-  hash::Any certificate_;
-  hash::Any history_;
+  shash::Any certificate_;
+  shash::Any history_;
   uint64_t publish_timestamp_;
-  // ordered, newest releases first
-  std::vector<history::TagList::ChannelTag> channel_tops_;
+  bool garbage_collectable_;
 };  // class Manifest
 
 }  // namespace manifest

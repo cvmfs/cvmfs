@@ -6,29 +6,29 @@ cvmfs_run_test() {
 
   cvmfs_mount lhcb || 1
   
-  . /cvmfs/lhcb.cern.ch/etc/login.sh >> $logfile 2>&1 || return 1
-  ( time SetupProject.sh Davinci ) >> $logfile 2>&1 || return 2
+  . /cvmfs/lhcb.cern.ch/etc/login.sh || return 1
+  ( time SetupProject.sh Davinci ) || return 2
   sync
   sudo sh -c "echo 3 > /proc/sys/vm/drop_caches" || return 3
   
   start_time=$(date -u +%s)
-  ( time SetupProject.sh Davinci ) >> $logfile 2>&1 || return 4
+  ( time SetupProject.sh Davinci ) || return 4
   end_time=`date -u +%s`
-  check_time $start_time $end_time 180 >> $logfile 2>&1
+  check_time $start_time $end_time 180
 
   all_catalogs=$(sudo cvmfs_talk -i lhcb.cern.ch open catalogs | awk '{print $2}' | sort) || return 6
   uniq_catalogs=$(echo "$all_catalogs" | uniq) || return 7
 
   if [ "$all_catalogs" != "$uniq_catalogs" ]; then
     echo "Catalog mismatch!" >&2
-    echo "All catalogs: $all_catalogs" >> $logfile
-    echo "Unique catalogs: $uniq_catalogs" >> $logfile
+    echo "All catalogs: $all_catalogs"
+    echo "Unique catalogs: $uniq_catalogs"
     return 8
   fi
-  echo "All catalogs: $all_catalogs" >> $logfile
-  sudo cvmfs_talk -i lhcb.cern.ch internal affairs >> $logfile || return 9
+  echo "All catalogs: $all_catalogs"
+  sudo cvmfs_talk -i lhcb.cern.ch internal affairs || return 9
 
-  check_memory lhcb.cern.ch 50000 >> $logfile 2>&1
+  check_memory lhcb.cern.ch 65000
  
   return 0
 }

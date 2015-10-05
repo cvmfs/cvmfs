@@ -11,8 +11,8 @@ cvmfs_run_test() {
   uuid1=$(head -c10 /dev/urandom | sha1sum | awk '{print $1}')
   uuid2=$(head -c10 /dev/urandom | sha1sum | awk '{print $1}')
 
-  echo "configure cvmfs with an unreachable proxy for the test case" >> $logfile
+  echo "configure cvmfs with an unreachable proxy for the test case"
   cvmfs_mount "atlas.cern.ch" "CVMFS_HTTP_PROXY=http://$uuid1.cern.ch/cvmfsproxy:3128|http://$uuid2.cern.ch/proxy:3128|${CVMFS_TEST_PROXY}" || return 1
 
-  ls /cvmfs/atlas.cern.ch >> $logfile 2>&1 || return 2
+  ls /cvmfs/atlas.cern.ch || return 2
 }

@@ -1,0 +1,50 @@
+
+cvmfs_test_name="Fetch configuration from config repository"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  mount | grep grid.cern.ch
+  if [ $? -eq 0 ]; then
+    return 3
+  fi
+  mount | grep alice.cern.ch
+  if [ $? -eq 0 ]; then
+    return 4
+  fi
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" || return 2
+  mount | grep alice.cern.ch || return 5
+
+  cvmfs_umount grid.cern.ch || return 6
+  cvmfs_umount alice.cern.ch || return 6
+  [ -d /cvmfs/alice.cern.ch ] || return 7
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" || return 8
+  mount | grep alice.cern.ch || return 9
+
+  cvmfs_umount grid.cern.ch || return 15
+  cvmfs_umount alice.cern.ch || return 16
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=alice.cern.ch" \
+    "CVMFS_STRICT_MOUNT=yes" || return 17
+  mount | grep alice.cern.ch || return 18
+
+  cvmfs_umount grid.cern.ch || return 10
+  cvmfs_umount alice.cern.ch || return 11
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=notavail.cern.ch" || return 12
+  mount | grep grid.cern.ch || return 13
+
+  cvmfs_umount grid.cern.ch || return 20
+  mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d"
+  mkdir -p "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d"
+  echo "EXTERNAL_DOMAIN_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/domain.d/cern.ch.conf"
+  echo "EXTERNAL_REPO_PARAMETER=" > "$(pwd)/cvmfs-config.cern.ch/etc/cvmfs/config.d/grid.cern.ch.conf"
+
+  sudo sed -i -e "s,CVMFS_MOUNT_DIR=/cvmfs,CVMFS_MOUNT_DIR=$PWD," /etc/cvmfs/default.conf
+  local retval=0
+  cvmfs_mount grid.cern.ch "CVMFS_CONFIG_REPOSITORY=cvmfs-config.cern.ch"
+  ls /cvmfs/grid.cern.ch || retval=21
+  sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_DOMAIN_PARAMETER || retval=22
+  sudo cvmfs_talk -i grid.cern.ch parameters | grep EXTERNAL_REPO_PARAMETER || retval=23
+  sudo sed -i -e "s,CVMFS_MOUNT_DIR=$PWD,CVMFS_MOUNT_DIR=/cvmfs," /etc/cvmfs/default.conf
+
+  return $retval
+}

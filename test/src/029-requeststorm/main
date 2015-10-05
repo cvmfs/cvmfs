@@ -1,0 +1,45 @@
+
+cvmfs_test_name="DoS protection"
+
+cat_file() {
+  local logfile=$1
+  local file=$2
+  local times=$3
+
+  echo "repeating on file $file" >> $logfile
+  for i in $(seq 1 $times); do
+    date >> $logfile
+    cat $file >/dev/null 2>&1
+  done
+}
+
+load_catalog() {
+  local logfile=$1
+  local path=$2
+  local times=$3
+
+  echo "repeating on catalog $path" >> $logfile
+  for i in $(seq 1 $times); do
+    date >> $logfile
+    ls $path >/dev/null 2>&1
+  done
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount sft.cern.ch || return 1
+
+  local repeat=24
+
+  sudo cvmfs_talk -i sft.cern.ch proxy set "invalid"
+  seconds=$(stop_watch load_catalog $logfile /cvmfs/sft.cern.ch/lcg/external $repeat)
+  [ $seconds -lt 8 ] && return 2
+
+  seconds=$(stop_watch cat_file $logfile /cvmfs/sft.cern.ch/.cvmfsdirtab $repeat)
+  [ $seconds -lt 8 ] && return 3
+
+  return 0
+}
+

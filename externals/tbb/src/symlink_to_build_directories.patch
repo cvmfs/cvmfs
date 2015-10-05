@@ -1,0 +1,50 @@
+diff --git Makefile Makefile
+index d2e34fb..4de7562 100644
+--- Makefile
++++ Makefile
+@@ -67,8 +67,10 @@ examples: tbb tbbmalloc
+ clean: clean_examples
+ 	$(shell $(RM) $(work_dir)_release$(SLASH)*.* >$(NUL) 2>$(NUL))
+ 	$(shell $(RD) $(work_dir)_release >$(NUL) 2>$(NUL))
++	$(shell $(RM) build_release >$(NUL) 2>$(NUL))
+ 	$(shell $(RM) $(work_dir)_debug$(SLASH)*.* >$(NUL) 2>$(NUL))
+ 	$(shell $(RD) $(work_dir)_debug >$(NUL) 2>$(NUL))
++	$(shell $(RM) build_debug >$(NUL) 2>$(NUL))
+ 	@echo clean done
+ 
+ clean_examples:
+@@ -77,7 +79,9 @@ clean_examples:
+ mkdir:
+ 	$(shell $(MD) "$(work_dir)_release" >$(NUL) 2>$(NUL))
+ 	$(shell $(MD) "$(work_dir)_debug" >$(NUL) 2>$(NUL))
+-	@echo Created $(work_dir)_release and ..._debug directories
++	$(shell $(LN) "$(work_dir)_release" "build_release" >$(NUL) 2>$(NUL))
++	$(shell $(LN) "$(work_dir)_debug" "build_debug" >$(NUL) 2>$(NUL))
++	@echo Created $(work_dir)_release and ..._debug directories as well as symlinks to them
+ 
+ info:
+ 	@echo OS: $(tbb_os)
+diff --git build/linux.inc build/linux.inc
+index 5a9b25e..8451a1b 100644
+--- build/linux.inc
++++ build/linux.inc
+@@ -83,6 +83,7 @@ CP=cp
+ RM?=rm -f
+ RD?=rmdir
+ MD?=mkdir -p
++LN?=ln -s
+ NUL= /dev/null
+ SLASH=/
+ MAKE_VERSIONS=sh $(tbb_root)/build/version_info_linux.sh $(CPLUS) $(CPLUS_FLAGS) $(INCLUDES) >version_string.ver
+diff --git build/macos.inc build/macos.inc
+index b4bcae4..0a08841 100644
+--- build/macos.inc
++++ build/macos.inc
+@@ -83,6 +83,7 @@ CWD=$(shell pwd)
+ RM?=rm -f
+ RD?=rmdir
+ MD?=mkdir -p
++LN?=ln -s
+ NUL= /dev/null
+ SLASH=/
+ MAKE_VERSIONS=sh $(tbb_root)/build/version_info_macos.sh $(CPLUS) $(CPLUS_FLAGS) $(INCLUDES) >version_string.ver

@@ -1,0 +1,250 @@
+cvmfs_test_name="Handle Races of Publish Remount and File Descriptors"
+cvmfs_test_autofs_on_startup=false
+
+
+TEST_570_TAIL_1_PID=
+TEST_570_TAIL_2_PID=
+TEST_570_TAIL_3_PID=
+TEST_570_PUBL_1_PID=
+cleanup() {
+  echo "RUNNING DESASTER CLEANUP"
+
+  [ -z $TEST_570_TAIL_1_PID ] || sudo kill -9 $TEST_570_TAIL_1_PID
+  [ -z $TEST_570_TAIL_2_PID ] || sudo kill -9 $TEST_570_TAIL_2_PID
+  [ -z $TEST_570_TAIL_3_PID ] || sudo kill -9 $TEST_570_TAIL_3_PID
+  [ -z $TEST_570_PUBL_1_PID ] || sudo kill -9 $TEST_570_PUBL_1_PID
+}
+
+
+get_repository_revision() {
+  local name=$1
+  load_repo_config $name
+  local revision="$(attr -qg revision ${CVMFS_SPOOL_DIR}/rdonly)"
+  echo "$revision"
+}
+
+
+background_publish() {
+  local name=$1
+  local logfile=$2
+
+  publish_repo $name > $logfile
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  local dummy_file=${repo_dir}/dummy
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "starting transaction (1)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "put a dummy file into the repository"
+  echo "I am a crash test dummy" > $dummy_file
+
+  echo "changing directory to $repo_dir"
+  cd $repo_dir || return 1
+
+  echo "trying to publish (should fail)"
+  local publish_log_1="${scratch_dir}/publish_1.log"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 && return 2
+
+  echo "check for the correct error message"
+  cat $publish_log_1 | grep 'working directory.*release' || return 3
+
+  echo "check the repository revision (expected 1)"
+  [ $(get_repository_revision $CVMFS_TEST_REPO) -eq 1 ] || return 4
+
+  echo "changing directory back to $scratch_dir"
+  cd $scratch_dir || return 5
+
+  echo "retry the publishing (should succeed now)"
+  local publish_log_2="${scratch_dir}/publish_2.log" || return 6
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2
+
+  echo "check the repository revision (expected 2)"
+  [ $(get_repository_revision $CVMFS_TEST_REPO) -eq 2 ] || return 7
+
+  echo "check if the dummy file is there"
+  [ -f $dummy_file ] || return 8
+
+  echo "install a desaster cleanup function"
+  trap cleanup EXIT HUP INT TERM || return 9
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "open a file descriptor on $repo_dir (tail -f $dummy_file &)"
+  local tail_log_1="${scratch_dir}/tail_1.log"
+  tail -f $dummy_file > $tail_log_1 2>&1 &
+  local tail_1_pid=$!
+  TEST_570_TAIL_1_PID=$tail_1_pid
+  echo "PID: $tail_1_pid"
+
+  echo "starting transaction (2)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "check that the culprit process is running"
+  kill -0 $tail_1_pid || return 10
+
+  echo "trying to publish (should fail)"
+  local publish_log_3="${scratch_dir}/publish_3.log"
+  yes 'n' | publish_repo $CVMFS_TEST_REPO > $publish_log_3 && return 11
+
+  echo "check for the error message"
+  cat $publish_log_3 | grep 'WARNING.*open read-only' || return 12
+  cat $publish_log_3 | grep 'proceed anyway.*aborted' || return 13
+
+  echo "check the repository revision (expected 2)"
+  [ $(get_repository_revision $CVMFS_TEST_REPO) -eq 2 ] || return 14
+
+  echo "closing the file descriptor on $repo_dir"
+  kill $tail_1_pid || return 15
+  wait $tail_1_pid || true
+
+  echo "check that the culprit process is gone"
+  kill -0 $tail_1_pid && return 16
+
+  echo "retry the publishing (should succeed now)"
+  local publish_log_4="${scratch_dir}/publish_4.log"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_4 || return 17
+
+  echo "check the repository revision (expected 3)"
+  [ $(get_repository_revision $CVMFS_TEST_REPO) -eq 3 ] || return 18
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "starting transaction (3)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "open a file descriptor on $repo_dir (tail -f $dummy_file &)"
+  local tail_log_2="${scratch_dir}/tail_2.log"
+  tail -f $dummy_file > $tail_log_2 2>&1 &
+  local tail_2_pid=$!
+  TEST_570_TAIL_2_PID=$tail_2_pid
+  echo "PID: $tail_2_pid"
+
+  echo "check that the culprit process is running"
+  kill -0 $tail_2_pid || return 19
+
+  echo "trying to publish with forced remount (might confuse the culprit)"
+  local publish_log_5="${scratch_dir}/publish_5.log"
+  yes | publish_repo $CVMFS_TEST_REPO > $publish_log_5 || return 20
+
+  echo "check for the error message"
+  cat $publish_log_5 | grep 'WARNING.*open read-only' || return 21
+  cat $publish_log_5 | grep 'proceed anyway'          || return 22
+  cat $publish_log_5 | grep "$tail_2_pid"             || return 23
+  cat $publish_log_5 | grep 'proceed anyway.*aborted' && return 24
+
+  echo "check the repository revision (expected 4)"
+  [ $(get_repository_revision $CVMFS_TEST_REPO) -eq 4 ] || return 25
+
+  echo "closing the file descriptor on $repo_dir"
+  kill $tail_2_pid || return 26
+  wait $tail_2_pid || true
+
+  echo "check that the culprit process is gone"
+  kill -0 $tail_2_pid && return 27
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "start transaction (4)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "put some stuff in the repository"
+  mkdir ${repo_dir}/bin  || return 28
+  cp_bin ${repo_dir}/bin || return 29
+
+  echo "publish (try if repo is still functional)"
+  local publish_log_6="${scratch_dir}/publish_6.log"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_6 || return 30
+
+  echo "check the repository revision (expected 5)"
+  [ $(get_repository_revision $CVMFS_TEST_REPO) -eq 5 ] || return 31
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "start transaction (5)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "put some stuff in the repository"
+  local i=1
+  while [ $i -lt 10 ]; do
+    mkdir ${repo_dir}/bin${i}               || return 32
+    cp_bin ${repo_dir}/bin${i}              || return 33
+    touch ${repo_dir}/bin${i}/.cvmfscatalog || return 34
+    i=$(( $i + 1 ))
+  done
+
+  echo "run a publishing in the background"
+  local publish_log_7="${scratch_dir}/publish_7.log"
+  background_publish $CVMFS_TEST_REPO $publish_log_7 &
+  local publish_pid=$!
+  TEST_570_PUBL_1_PID=$publish_pid
+  echo "PID: $publish_pid"
+
+  echo "check if the publish is running"
+  kill -0 $publish_pid || return 35
+
+  echo "sleep for a second"
+  sleep 1 || return 36
+
+  echo "open a file descriptor on $repo_dir (tail -f $dummy_file &)"
+  local tail_log_3="${scratch_dir}/tail_3.log"
+  tail -f $dummy_file > $tail_log_3 2>&1 &
+  local tail_3_pid=$!
+  TEST_570_TAIL_3_PID=$tail_3_pid
+  echo "PID: $tail_3_pid"
+
+  echo "check that the culprit process is running"
+  kill -0 $tail_3_pid || return 37
+
+  echo "wait for the publishing to finish (successfully)"
+  wait $publish_pid || return 38
+
+  echo "check for the error message in the publish output"
+  cat $publish_log_7 | grep 'WARNING.*file descriptor' || return 39
+  cat $publish_log_7 | grep "$tail_3_pid"              || return 40
+  cat $publish_log_7 | grep 'Forcing remount'          || return 41
+
+  echo "check the repository revision (expected 6)"
+  [ $(get_repository_revision $CVMFS_TEST_REPO) -eq 6 ] || return 42
+
+  echo "closing the file descriptor on $repo_dir"
+  kill $tail_3_pid || return 43
+  wait $tail_3_pid || true
+
+  echo "check that the culprit process is gone"
+  kill -0 $tail_3_pid && return 44
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "start transaction (6)"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "remove some stuff from the repository"
+  rm -fR ${repo_dir}/bin* || return 45
+
+  echo "publish (try if repo is still functional)"
+  local publish_log_8="${scratch_dir}/publish_8.log"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_8 || return 46
+
+  echo "check the repository revision (expected 7)"
+  [ $(get_repository_revision $CVMFS_TEST_REPO) -eq 7 ] || return 47
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+  echo "disable the desaster cleanup"
+  trap - EXIT HUP INT TERM || return 48
+
+  return 0
+}
+

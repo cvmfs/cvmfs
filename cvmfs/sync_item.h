@@ -5,11 +5,13 @@
 #ifndef CVMFS_SYNC_ITEM_H_
 #define CVMFS_SYNC_ITEM_H_
 
+#include <cstring>
+#include <map>
 #include <string>
 
-#include "platform.h"
-#include "hash.h"
 #include "directory_entry.h"
+#include "hash.h"
+#include "platform.h"
 #include "sync_union.h"
 #include "util.h"
 
@@ -18,7 +20,9 @@ namespace publish {
 enum SyncItemType {
   kItemDir,
   kItemFile,
-  kItemSymlink
+  kItemSymlink,
+  kItemNew,
+  kItemUnknown
 };
 
 
@@ -42,22 +46,29 @@ class SyncItem {
    *  @param filename the name of the file ;-)
    *  @param entryType well...
    */
-  SyncItem() { };  // TODO: Remove
-  SyncItem(const std::string &relative_parent_path,
-           const std::string &filename,
-           const SyncItemType entry_type,
-           const SyncUnion *union_engine);
+  SyncItem();  // TODO(rmeusel): Remove
+  SyncItem(const std::string  &relative_parent_path,
+           const std::string  &filename,
+           const SyncUnion    *union_engine,
+           const SyncItemType  entry_type = kItemUnknown);
 
-  inline bool IsDirectory() const { return type_ == kItemDir; }
-  inline bool IsRegularFile() const { return type_ == kItemFile; }
-  inline bool IsSymlink() const { return type_ == kItemSymlink; }
-  inline bool IsWhiteout() const { return whiteout_; }
-  inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog"; }
+  inline bool IsDirectory()     const { return IsType(kItemDir);              }
+  inline bool WasDirectory()    const { return WasType(kItemDir);             }
+  inline bool IsRegularFile()   const { return IsType(kItemFile);             }
+  inline bool WasRegularFile()  const { return WasType(kItemFile);            }
+  inline bool IsSymlink()       const { return IsType(kItemSymlink);          }
+  inline bool WasSymlink()      const { return WasType(kItemSymlink);         }
+  inline bool IsNew()           const { return WasType(kItemNew);             }
+
+  // TODO(reneme): code smell! This depends on the UnionEngine to call
+  //                           MarkAsWhiteout(), before it potentially gives the
+  //                           wrong result!
+  inline bool IsWhiteout()      const { return whiteout_;                     }
+  inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog";  }
   bool IsOpaqueDirectory() const;
-  bool IsNew() const;
 
-  inline hash::Any GetContentHash() const { return content_hash_; }
-  inline void SetContentHash(const hash::Any &hash) { content_hash_ = hash; }
+  inline shash::Any GetContentHash() const { return content_hash_; }
+  inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
 
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
@@ -81,7 +92,7 @@ class SyncItem {
   inline platform_stat64 GetUnionStat() const {
     StatUnion();
     return union_stat_.stat;
-  };
+  }
 
   inline std::string filename() const { return filename_; }
   inline std::string relative_parent_path() const {
@@ -93,44 +104,77 @@ class SyncItem {
             (filename_ == other.filename_));
   }
 
+ protected:
+  SyncItemType GetRdOnlyFiletype() const;
+  SyncItemType GetScratchFiletype() const;
+
+  inline bool IsType(const SyncItemType expected_type) const {
+    if (scratch_type_ == kItemUnknown) {
+      scratch_type_ = GetScratchFiletype();
+    }
+    return scratch_type_ == expected_type;
+  }
+
+  inline bool WasType(const SyncItemType expected_type) const {
+    if (rdonly_type_ == kItemUnknown) {
+      rdonly_type_ = GetRdOnlyFiletype();
+    }
+    return rdonly_type_ == expected_type;
+  }
+
  private:
   /**
    * Structure to cache stat calls to the different file locations.
    */
   struct EntryStat {
-    EntryStat() : obtained(false), error_code(0) { }
+    EntryStat() : obtained(false), error_code(0) {
+      memset(&stat, 0, sizeof(stat));
+    }
+
+    inline SyncItemType GetSyncItemType() const {
+      assert(obtained);
+      if (S_ISDIR(stat.st_mode)) return kItemDir;
+      if (S_ISREG(stat.st_mode)) return kItemFile;
+      if (S_ISLNK(stat.st_mode)) return kItemSymlink;
+      return kItemUnknown;
+    }
 
     bool obtained;   /**< false at the beginning, true after first stat call */
     int error_code;  /**< errno value of the stat call */
     platform_stat64 stat;
   };
 
-  SyncItemType type_;
-  bool whiteout_;
-  std::string relative_parent_path_;
-  std::string filename_;
-  // The hash of regular file's content
-  hash::Any content_hash_;
+  SyncItemType GetGenericFiletype(const EntryStat &stat) const;
+
   const SyncUnion *union_engine_;
 
   mutable EntryStat rdonly_stat_;
   mutable EntryStat union_stat_;
   mutable EntryStat scratch_stat_;
 
+  bool whiteout_;
+  std::string relative_parent_path_;
+  std::string filename_;
+
+  mutable SyncItemType scratch_type_;
+  mutable SyncItemType rdonly_type_;
+
+  // The hash of regular file's content
+  shash::Any content_hash_;
+
   // Lazy evaluation and caching of results of file stats
-  inline void StatRdOnly() const {
-    if (rdonly_stat_.obtained) return;
-    StatGeneric(GetRdOnlyPath(), &rdonly_stat_);
+  inline void StatRdOnly(const bool refresh = false) const {
+    StatGeneric(GetRdOnlyPath(), &rdonly_stat_, refresh);
   }
-  inline void StatUnion() const {
-    if (union_stat_.obtained) return;
-    StatGeneric(GetUnionPath(), &union_stat_);
+  inline void StatUnion(const bool refresh = false) const {
+    StatGeneric(GetUnionPath(), &union_stat_, refresh);
   }
-  inline void StatOverlay() const {
-    if (scratch_stat_.obtained) return;
-    StatGeneric(GetScratchPath(), &scratch_stat_);
+  inline void StatScratch(const bool refresh = false) const {
+    StatGeneric(GetScratchPath(), &scratch_stat_, refresh);
   }
-  static void StatGeneric(const std::string &path, EntryStat *info);
+  static void StatGeneric(const std::string  &path,
+                          EntryStat          *info,
+                          const bool          refresh);
 };
 
 typedef std::map<std::string, SyncItem> SyncItemList;

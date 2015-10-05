@@ -1,0 +1,162 @@
+cvmfs_test_name="Recreate Repository Spool Area (Default Key Location)"
+cvmfs_test_autofs_on_startup=false
+
+inflate_file() {
+  local destination_file=$1
+  local source_file=$2
+  local desired_file_size=$3
+
+  touch $destination_file
+  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
+    cat $source_file >> $destination_file
+  done
+}
+
+produce_files_in() {
+	local working_dir=$1
+
+  pushdir $working_dir
+
+  # create some small files that most likely get not chunked
+  mkdir small_files
+  echo "Die Sonne tönt nach alter Weise"     > small_files/verse1
+  echo "In Brudersphären Wettgesang,"        > small_files/verse2
+  echo "Und ihre vorgeschriebne Reise"       > small_files/verse3
+  echo "Vollendet sie mit Donnergang."       > small_files/verse4
+  echo "Ihr Anblick gibt den Engeln Stärke," > small_files/verse5
+  echo "Wenn keiner sie ergründen mag;"      > small_files/verse6
+  echo "Die unbegreiflich hohen Werke"       > small_files/verse7
+  echo "Sind herrlich wie am ersten Tag."    > small_files/verse8
+
+  # create a full poem in one file that will get concatinated later
+  local bigtxtfile=small_files/heidenroeslein
+  touch $bigtxtfile
+  echo "Heidenröslein"                     >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo "Sah ein Knab' ein Röslein stehn, " >> $bigtxtfile
+  echo "Röslein auf der Heiden, "          >> $bigtxtfile
+  echo "War so jung und morgenschön, "     >> $bigtxtfile
+  echo "Lief er schnell es nah zu sehn, "  >> $bigtxtfile
+  echo "Sah's mit vielen Freuden. "        >> $bigtxtfile
+  echo "Röslein, Röslein, Röslein rot, "   >> $bigtxtfile
+  echo "Röslein auf der Heiden. "          >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo "Knabe sprach: ich breche diche, "  >> $bigtxtfile
+  echo "Röslein auf der Heiden! "          >> $bigtxtfile
+  echo "Röslein sprach: ich steche dich, " >> $bigtxtfile
+  echo "Daß du ewig denkst an mich, "      >> $bigtxtfile
+  echo "Und ich will's nicht leiden. "     >> $bigtxtfile
+  echo "Röslein, Röslein, Röslein rot, "   >> $bigtxtfile
+  echo "Röslein auf der Heiden. "          >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo "Und der wilde Knabe brach"         >> $bigtxtfile
+  echo "'s Röslein auf der Heiden; "       >> $bigtxtfile
+  echo "Röslein wehrte sich und stach, "   >> $bigtxtfile
+  echo "Half ihr doch kein Weh und Ach, "  >> $bigtxtfile
+  echo "Mußt' es eben leiden. "            >> $bigtxtfile
+  echo "Röslein, Röslein, Röslein rot, "   >> $bigtxtfile
+  echo "Röslein auf der Heiden."           >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo "  Johann Wolfgang von Goethe"      >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+  echo ""                                  >> $bigtxtfile
+
+  # create a big binary file that will get chunked
+  mkdir big_binary_file
+  touch big_binary_file/.cvmfscatalog
+  inflate_file big_binary_file/1megabyte /bin/ls 1000000
+  inflate_file big_binary_file/10megabyte big_binary_file/1megabyte 1000000
+  inflate_file big_binary_file/50megabyte big_binary_file/10megabyte 50000000
+
+  # create a big ascii text file that will get chunked
+  mkdir big_ascii_file
+  touch big_ascii_file/.cvmfscatalog
+  inflate_file big_ascii_file/einige_heidenroeslein $bigtxtfile 100000
+  inflate_file big_ascii_file/ein_paar_heidenroeslein big_ascii_file/einige_heidenroeslein 1000000
+  inflate_file big_ascii_file/ein_paar_mehr_heidenroeslein big_ascii_file/ein_paar_heidenroeslein 10000000
+  inflate_file big_ascii_file/viele_heidenroeslein big_ascii_file/ein_paar_mehr_heidenroeslein 60000000
+
+  popdir
+}
+
+
+remove_files_from() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -fR big_ascii_file
+  echo "Ich bin ein lustiger Astronaut" >> die_aerzte
+  inflate_file die_beste_band_der_welt die_aerzte 100000
+  inflate_file crackhead die_beste_band_der_welt 1000000
+
+  popdir
+}
+
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local spool_dir=/var/spool/cvmfs/$CVMFS_TEST_REPO
+  local config_dir=/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO
+  local keys_dir=/etc/cvmfs/keys/
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "unmounting repository"
+  sudo umount $repo_dir || return 4
+  sudo umount $spool_dir/rdonly || return 5
+
+  echo "deleting spool area"
+  sudo rm -fR $spool_dir || return 6
+
+  echo "deleting /etc/cvmfs/repositories.d/ entry"
+  sudo rm -fR $config_dir || return 7
+
+  echo "keeping repository keys at the same location"
+  # mkdir keys || return 8
+  # mv ${keys_dir}/$CVMFS_TEST_REPO.crt       \
+  #    ${keys_dir}/$CVMFS_TEST_REPO.key       \
+  #    ${keys_dir}/$CVMFS_TEST_REPO.masterkey \
+  #    ${keys_dir}/$CVMFS_TEST_REPO.pub       \
+  #    keys || return 9
+
+  echo "recreating repository spool area"
+  sudo cvmfs_server import \
+    -o $CVMFS_TEST_USER \
+    $CVMFS_TEST_REPO || return 10
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "creating new revision of recreated repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "doing some changes"
+  remove_files_from $repo_dir || return 11
+
+  echo "publish changes"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  return 0
+}
+

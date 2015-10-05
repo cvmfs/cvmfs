@@ -1,0 +1,74 @@
+cvmfs_test_name="Split a Huge Repository into Nested Catalogs"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "generating an artificial but more or less representative repo"
+  make_huge_repo $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  echo "--> redirecting publishing output to publish_output_1.log"
+  publish_repo $CVMFS_TEST_REPO > publish_output_1.log || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "find out how many file system items are in the repo"
+  local num_1
+  num_1=$(find $repo_dir | wc -l)
+  echo "found $num_1 file system entries"
+
+  echo "starting a new transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "creating nested catalog markers"
+  local num_nested_catalogs=0
+  for dir in $(find $repo_dir -maxdepth 1 -mindepth 1 -type d); do
+    touch $dir/.cvmfscatalog || return $?
+    num_nested_catalogs=$(( $num_nested_catalogs + 1 ))
+  done
+  echo "generated $num_nested_catalogs catalogs"
+
+  echo "creating nested catalogs by cvmfs_server publish"
+  echo "--> redirecting publishing output to publish_output_2.log"
+  publish_repo $CVMFS_TEST_REPO > publish_output_2.log || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if all nested catalogs are present"
+  for dir in $(find $repo_dir -maxdepth 1 -mindepth 1 -type d); do
+    local nested_root
+    nested_root=$(basename $dir)
+    echo -n "checking: /$nested_root ... "
+    check_catalog_presence "/$nested_root" $CVMFS_TEST_REPO || { echo "not found"; return 2; }
+    echo "found"
+  done
+
+  echo "check again for the number of file system entries"
+  local num_2
+  num_2=$(find $repo_dir | wc -l)
+  echo "found $num_2 file system entries"
+
+  echo "check if file system entries match"
+  local num_diff
+  num_diff=$(( $num_2 - $num_1 ))
+  if [ $num_diff -ne $num_nested_catalogs ]; then
+    echo "first there have been $num_1 entries, now there are $num_2"
+    return 3
+  fi
+
+  return 0
+}
+

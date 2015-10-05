@@ -7,32 +7,54 @@
 #include "cvmfs_config.h"
 #include "glue_buffer.h"
 
-#include <inttypes.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <limits.h>
-#include <errno.h>
-#ifdef __APPLE__
-#include <sys/types.h>
-#include <sys/sysctl.h>
-#include <libproc.h>
-#endif
-
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <cassert>
 
-#include <vector>
 #include <string>
+#include <vector>
 
+#include "logging.h"
 #include "platform.h"
 #include "smalloc.h"
-#include "logging.h"
 #include "util.h"
 
 using namespace std;  // NOLINT
 
 namespace glue {
+
+PathStore &PathStore::operator= (const PathStore &other) {
+  if (&other == this)
+    return *this;
+
+  delete string_heap_;
+  CopyFrom(other);
+  return *this;
+}
+
+
+PathStore::PathStore(const PathStore &other) {
+  CopyFrom(other);
+}
+
+
+void PathStore::CopyFrom(const PathStore &other) {
+  map_ = other.map_;
+
+  string_heap_ = new StringHeap(other.string_heap_->used());
+  shash::Md5 empty_path = map_.empty_key();
+  for (unsigned i = 0; i < map_.capacity(); ++i) {
+    if (map_.keys()[i] != empty_path) {
+      (map_.values() + i)->name =
+      string_heap_->AddString(map_.values()[i].name.length(),
+                              map_.values()[i].name.data());
+    }
+  }
+}
+
+
+//------------------------------------------------------------------------------
+
 
 void InodeTracker::InitLock() {
   lock_ =

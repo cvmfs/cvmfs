@@ -5,9 +5,9 @@ cvmfs_run_test() {
   logfile=$1
 
   cvmfs_mount atlas.cern.ch,lhcb.cern.ch || return 1
-  ls /cvmfs/atlas.cern.ch >> $logfile || return 2
-  ls /cvmfs/lhcb.cern.ch >> $logfile || return 3
-  
+  ls /cvmfs/atlas.cern.ch || return 2
+  ls /cvmfs/lhcb.cern.ch || return 3
+
   return 0
 }
 

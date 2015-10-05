@@ -1,9 +1,0 @@
-Q: Mount fails with "Fuse loop terminated (1)"
-A: Check if CVMFS_USER is in fuse group.
-   Check if /etc/fuse.conf contains user_allow_other followed
-   by a carriage return.
-
-Q: CernVM-FS doesn't mount anymore after automatically unmounted
-   by automount
-A: If the /etc/auto.master file is Quattor managed it removes the 
-   necessary line "/cvmfs/cern.ch /etc/auto.cvmfs" 

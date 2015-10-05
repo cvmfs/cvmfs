@@ -1,0 +1,389 @@
+cvmfs_test_name="Create a Series of Stratum1 snapshots"
+cvmfs_test_autofs_on_startup=false
+
+inflate_file() {
+  local destination_file=$1
+  local source_file=$2
+  local desired_file_size=$3
+
+  touch $destination_file
+  while [ $(stat -c %s $destination_file) -lt $desired_file_size ]; do
+    cat $source_file >> $destination_file
+  done
+}
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir poems
+
+  cat > poems/zueignung.txt << EOF
+Zueignung.
+
+Ihr naht euch wieder, schwankende Gestalten,
+Die früh sich einst dem trüben Blick gezeigt.
+Versuch ich wohl, euch diesmal festzuhalten?
+Fühl ich mein Herz noch jenem Wahn geneigt?
+Ihr drängt euch zu! nun gut, so mögt ihr walten,
+Wie ihr aus Dunst und Nebel um mich steigt;
+Mein Busen fühlt sich jugendlich erschüttert
+Vom Zauberhauch, der euren Zug umwittert.
+
+Ihr bringt mit euch die Bilder froher Tage,
+Und manche liebe Schatten steigen auf;
+Gleich einer alten, halbverklungnen Sage
+Kommt erste Lieb und Freundschaft mit herauf;
+Der Schmerz wird neu, es wiederholt die Klage
+Des Lebens labyrinthisch irren Lauf,
+Und nennt die Guten, die, um schöne Stunden
+Vom Glück getäuscht, vor mir hinweggeschwunden.
+
+Sie hören nicht die folgenden Gesänge,
+Die Seelen, denen ich die ersten sang;
+Zerstoben ist das freundliche Gedränge,
+Verklungen, ach! der erste Widerklang.
+Mein Lied ertönt der unbekannten Menge,
+Ihr Beifall selbst macht meinem Herzen bang,
+Und was sich sonst an meinem Lied erfreuet,
+Wenn es noch lebt, irrt in der Welt zerstreuet.
+
+Und mich ergreift ein längst entwöhntes Sehnen
+Nach jenem stillen, ernsten Geisterreich,
+Es schwebet nun in unbestimmten Tönen
+Mein lispelnd Lied, der Äolsharfe gleich,
+Ein Schauer faßt mich, Träne folgt den Tränen,
+Das strenge Herz, es fühlt sich mild und weich;
+Was ich besitze, seh ich wie im Weiten,
+Und was verschwand, wird mir zu Wirklichkeiten.
+
+   Johann Wolfgang von Goethe
+EOF
+
+  cat > poems/unordnung.txt << EOF
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung  unordn  g
+ordnung    ordnung
+EOF
+
+  # create a big binary file that will get chunked
+  mkdir big_binary
+  inflate_file big_binary/1megabyte /bin/ls 1000000
+  inflate_file big_binary/10megabyte big_binary/1megabyte 1000000
+  inflate_file big_binary/50megabyte big_binary/10megabyte 50000000
+  touch big_binary/.cvmfscatalog
+
+  # create a big ascii text file that will get chunked
+  mkdir big_ascii
+  inflate_file big_ascii/etwas_unordnung      poems/unordnung.txt 100000
+  inflate_file big_ascii/etwas_mehr_unordnung big_ascii/etwas_unordnung 1000000
+  inflate_file big_ascii/viel_unordnung       big_ascii/etwas_mehr_unordnung 10000000
+  inflate_file big_ascii/chaos                big_ascii/viel_unordnung 60000000
+  touch big_ascii/.cvmfscatalog
+
+  # create some nasty other stuff
+  ln big_ascii/viel_unordnung big_ascii/ganz_viel_unordnung
+  cp /bin/cp .
+  ln -s poems/unordnung.txt unordnung
+
+  popdir
+}
+
+produce_different_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir songs
+
+cat > songs/ottifanten.txt << EOF
+Kennt ihr schon die Ottifanten, diese kleinen Säcke?
+Ihr fragt wo sie geblieben sind, ich bracht sie um die Ecke!
+
+10 kleine Ottifanten klettern über Zäune
+die hab ich unter Strom gesetzt,
+da waren's nur noch Neune!
+
+9 kleine Ottifanten fuhren in den Schacht,
+ich hab den ganzen Berg gesprengt,
+da waren's nur noch Acht!
+
+8 kleine Ottifanten halfen mir beim schieben,
+da fuhr ich kurz im Rückwärtsgang,
+da waren's nur noch Sieben!
+
+7 kleinen Ottifanten schenkt ich ein Gewächs,
+das leider Ottifanten fraß,
+da waren's nur noch Sechs!
+
+6 kleine Ottifanten trafen auf die Schlümpfe,
+da wurde einer schlumpf-o-mann,
+da waren's nur noch Fünfe!
+
+5 kleine Ottifanten spielten gern Klavier,
+ich hab die Klappe zugeknallt,
+da waren's nur noch Vier!
+
+4 kleine Ottifanten nahm ich zum Jahrmarkt mit,
+einen schubs ich von der Achterbahn,
+da waren sie zu Dritt!
+
+3 kleinen Ottifanten kochte ich den Brei,
+den einen hab ich mitgekocht,
+da waren's nur noch Zwei!
+
+2 kleinen Ottifanten zeigt ich mein bestes Stück,
+der eine fiel sofort tot um
+nur einer blieb zurück!
+
+Einen hab ich noch, einen hab ich noch!!
+
+1 kleiner Ottifant der war jetzt ganz allene,
+Ein Glück das man jetzt klonen kann,
+da waren's wieder...na,na...zehne!
+
+    Otto Waalkes
+EOF
+
+cat > songs/verteidiger_des_bloedsinns.txt << EOF
+Ein schwerer Kampf steht uns bevor doch fürchten wir uns nicht
+Wir reiten schnell und lachen nur dem Feind ins Angesicht
+Wir stehen zusammen, tausend Mann, Brüder im Metall
+Und kämpfen für das heil’ge Ziel – des falschen Blödsinns Fall
+
+Die Schlacht sie tobt wie nie zuvor
+Und nun der Männerchor
+
+Wir sind Verteidiger des wahren Blödsinns
+Krieger in schwarz-rosa-gold
+Tod – dem falschen Blödsinn
+Eure Fröhlichkeit ist unser Sold
+Verteidiger des wahren Blödsinns
+Mit lachendem Herzen zieh’n wir in die Schlacht
+Tod – dem falschen Blödsinn
+Denn wer den Spaß hat, der hat die Macht
+
+Wir werden siegen oder sterben, das wahre Heldentum
+Wir bringen unserm Feind Verderben und reiten in den Ruhm
+Die Schlacht, sie macht die Nacht zum Tag, erhellt im Feuerschein
+Die Brüder kämpfen unverzagt – der Sieg wird unser sein!
+
+Die Schlacht sie tobt wie nie zuvor
+Und nun der Männerchor
+
+Wir sind Verteidiger des wahren Blödsinns
+Krieger in schwarz-rosa-gold
+Tod – dem falschen Blödsinn
+Eure Fröhlichkeit ist unser Sold
+Verteidiger des wahren Blödsinns
+Mit lachendem Herzen zieh’n wir in die Schlacht
+Tod – dem falschen Blödsinn
+Denn wer den Spaß hat, der hat die Macht
+
+Oh Freudengötter Gaudin, Ulkor – ich bin Euer Sohn
+Mein Leben liegt in Eurer Hand, ich knie vor Eurem Thron
+Verteidiger des Glaubens bin ich, unsrer Religion
+Des wahren Blödsinns Siegeszug – das ist meine Mission
+So blicke ich zu Euch empor
+Und lausche dem Männerchor
+
+Wir sind Verteidiger des wahren Blödsinns
+Krieger in schwarz-rosa-gold
+Tod – dem falschen Blödsinn
+Eure Fröhlichkeit ist unser Sold
+Verteidiger des wahren Blödsinns
+Mit lachendem Herzen zieh’n wir in die Schlacht
+Tod – dem falschen Blödsinn
+Denn wer den Spaß hat, der hat die Macht
+
+       JBO
+EOF
+
+  # create a big ascii text file that will get chunked
+  inflate_file songs/etwas_zueignung      poems/zueignung.txt            200000
+  inflate_file songs/etwas_mehr_zueignung songs/etwas_zueignung         2000000
+  inflate_file songs/viel_zueignung       songs/etwas_mehr_zueignung   20000000
+  inflate_file songs/chaos                songs/viel_zueignung        120000000
+
+  touch songs/.cvmfscatalog
+
+  # create some links
+  ln -s songs/ottifanten.txt Otto
+  ln -s songs/ottifanten.txt Waalkes
+  ln songs/chaos songs/hardlink_to_chaos
+
+  # remove some old stuff
+  rm -fR big_binary
+
+  popdir
+}
+
+produce_last_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -fR poems
+  rm -f unordnung
+  cp_bin many_small_binaries
+
+  popdir
+}
+
+check_stratum1_tmp_dir_emptiness() {
+  local tmp_dir="$1"
+  local tmp_dir_entries
+  echo "check stratum1 tmp directory"
+  tmp_dir_entries=$(ls $tmp_dir | wc -l)
+  echo "$tmp_dir contains: $tmp_dir_entries"
+  [ $tmp_dir_entries -eq 0 ]
+}
+
+desaster_cleanup() {
+  local mountpoint=$1
+  local replica_name=$2
+
+  sudo umount $mountpoint > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $replica_name > /dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  local mnt_point="$(pwd)/mountpount"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "create Stratum1 repository on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+    || { desaster_cleanup $mnt_point $replica_name; return 7; }
+
+  echo -n "get Stratum 1 spool directory: "
+  load_repo_config $replica_name
+  local s1_spool_tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  load_repo_config $CVMFS_TEST_REPO
+  echo "$s1_spool_tmp_dir"
+
+  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 9; }
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || { desaster_cleanup $mnt_point $replica_name; return 101; }
+
+  echo "mount the Stratum1 repository on a local mountpoint"
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 10; }
+
+  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 11; }
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 12; }
+
+  echo "putting some stuff in the new repository"
+  produce_different_files_in $repo_dir || { desaster_cleanup $mnt_point $replica_name; return 13; }
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_different_files_in $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 14; }
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 15; }
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "unmount the replica"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 16; }
+
+  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 17; }
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || { desaster_cleanup $mnt_point $replica_name; return 102; }
+
+  echo "remount the replica"
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 18; }
+
+  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 19; }
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 20; }
+
+  echo "putting some stuff in the new repository"
+  produce_last_files_in $repo_dir || { desaster_cleanup $mnt_point $replica_name; return 21; }
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_last_files_in $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 22; }
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 23; }
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "unmount the replica"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 24; }
+
+  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 25; }
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || { desaster_cleanup $mnt_point $replica_name; return 103; }
+
+  echo "remount the replica"
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 26; }
+
+  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 27; }
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "unmount the Stratum1 repository"
+  sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 28; }
+
+  echo "clean up"
+  sudo cvmfs_server rmfs -f $replica_name
+
+  return 0
+}
+

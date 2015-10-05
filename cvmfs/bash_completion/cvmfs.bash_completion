@@ -1,0 +1,185 @@
+# Bash completion script for cvmfs_config.
+#
+# Steve Traylen, <steve.traylen@cern.ch>, 13th January 2014
+#  -> cvmfs_config
+# Rene Meusel, <rene.meusel@cern.ch>, 21st January 2014
+#  -> cvmfs_server
+
+__local_repos()
+{
+    eval $(grep '^CVMFS_REPOSITORIES=' /etc/cvmfs/default.local)
+    __local_repos=$(echo $CVMFS_REPOSITORIES | sed 's/,/ /g' )
+    unset CVMFS_REPOSITORIES
+    echo $__local_repos
+}
+
+
+_cvmfs_config()
+{
+  local cur prev opts
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  local -r cmds="setup chksetup showconfig stat status probe reload umount bugreport"
+
+  case "${prev}" in
+    setup)
+      COMPREPLY=( $(compgen -W "nouser nocfgmod" ${cur}) )
+      return 0
+      ;;
+    showconfig)
+      COMPREPLY=( $(compgen -W "$(__local_repos)" ${cur}) )
+      return 0
+    ;;
+    stat)
+      case "${cur}" in
+       -*)
+         COMPREPLY=( $(compgen -W "-v" ${cur}) )
+         return 0
+         ;;
+       *)
+         COMPREPLY=( $(compgen -W "$(__local_repos)" ${cur} )  )
+         return 0
+         ;;
+      esac
+    ;;
+    reload)
+      case "${cur}" in
+       -*)
+         COMPREPLY=( $(compgen -W "-c" ${cur}) )
+         return 0
+         ;;
+       *)
+         COMPREPLY=( $(compgen -W "$(__local_repos)" ${cur})  )
+         return 0
+         ;;
+      esac
+    ;;
+  esac
+  COMPREPLY=( $(compgen -W "${cmds}" -- ${cur}) )
+  return 0
+
+}
+
+
+__hosted_repos() {
+  local predicate="$1"
+  local reply=
+  if [ x"$predicate" != x"" ]; then
+    reply=$(cvmfs_server list 2>/dev/null | awk "$predicate")
+  else
+    reply=$(cvmfs_server list 2>/dev/null)
+  fi
+  echo "$reply" | awk '{ print $1 }'
+}
+
+__tags() {
+  local reply=""
+  for repo in $(__hosted_repos '/stratum0/'); do
+    reply="$(cvmfs_server tag -lx $repo | awk '{print $1}') $reply"
+  done
+  echo $reply
+}
+
+
+_cvmfs_server()
+{
+  local cur cmd
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev_idx=$(( $COMP_CWORD - 1))
+  prev="${COMP_WORDS[$prev_idx]}"
+  cmd="${COMP_WORDS[1]}"
+
+  local -r cmds="mkfs add-replica import publish rollback rmfs \
+    resign list info tag check transaction abort snapshot migrate \
+    list-catalogs"
+
+  if [ $COMP_CWORD -le 1 ]; then
+    COMPREPLY=( $(compgen -W "${cmds}" -- ${cur}) )
+    return 0
+  fi
+
+  case "${cmd}" in
+    publish)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/ && /transaction/')" ${cur}) )
+      return 0
+      ;;
+
+    abort)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/ && /transaction/')" ${cur}) )
+      return 0
+      ;;
+
+    rollback)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/')" ${cur}) )
+      return 0
+      ;;
+
+    resign)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/')" ${cur}) )
+      return 0
+      ;;
+
+    tag)
+      case "$prev" in
+        -a|-r|-i)
+          COMPREPLY=( $(compgen -W "$(__tags)" ${cur}))
+          ;;
+        *)
+          COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/')" ${cur}) )
+          return 0
+      esac
+      ;;
+
+    transaction)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum0/ && !/transaction/')" ${cur}) )
+      return 0
+      ;;
+
+    migrate)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos '/INCOMPATIBLE/')" ${cur}) )
+      return 0
+      ;;
+
+    snapshot)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos '/stratum1/')" ${cur}) )
+      return 0
+      ;;
+
+    rmfs)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}) )
+      return 0
+      ;;
+
+    alterfs)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}) )
+      return 0
+      ;;
+
+    info)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}) )
+      return 0
+      ;;
+
+    list-catalogs)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}) )
+      return 0
+      ;;
+
+    check)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}) )
+      return 0
+      ;;
+
+    gc)
+      COMPREPLY=( $(compgen -W "$(__hosted_repos)" ${cur}))
+      return 0
+      ;;
+  esac
+}
+
+complete -F _cvmfs_config cvmfs_config
+complete -F _cvmfs_server cvmfs_server
+

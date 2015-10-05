@@ -44,78 +44,69 @@
 // If defined the cache is secured by a posix mutex
 #define LRU_CACHE_THREAD_SAFE
 
+#include <fuse/fuse_lowlevel.h>
 #include <inttypes.h>
 #include <stdint.h>
 
-#include <cstring>
-#include <cassert>
-
-#include <map>
 #include <algorithm>
+#include <cassert>
+#include <cstring>
 #include <functional>
+#include <map>
 #include <string>
 
-#include <fuse/fuse_lowlevel.h>
-
-#include "platform.h"
-#include "murmur.h"
-#include "logging.h"
-#include "smalloc.h"
+#include "atomic.h"
 #include "directory_entry.h"
 #include "hash.h"
-#include "atomic.h"
-#include "util.h"
+#include "logging.h"
+#include "murmur.h"
+#include "platform.h"
 #include "shortstring.h"
 #include "smallhash.h"
+#include "smalloc.h"
+#include "statistics.h"
+#include "util.h"
 
 namespace lru {
 
 /**
  * Counting of cache operations.
  */
-struct Statistics {
-  int64_t size;
-  atomic_int64 num_hit;
-  atomic_int64 num_miss;
-  atomic_int64 num_insert;
-  atomic_int64 num_insert_negative;
+struct Counters {
+  perf::Counter *sz_size;
+  perf::Counter *n_hit;
+  perf::Counter *n_miss;
+  perf::Counter *n_insert;
+  perf::Counter *n_insert_negative;
   uint64_t num_collisions;
   uint32_t max_collisions;
-  atomic_int64 num_update;
-  atomic_int64 num_replace;
-  atomic_int64 num_forget;
-  atomic_int64 num_drop;
-  atomic_int64 allocated;
+  perf::Counter *n_update;
+  perf::Counter *n_replace;
+  perf::Counter *n_forget;
+  perf::Counter *n_drop;
+  perf::Counter *sz_allocated;
 
-  Statistics() {
-    size = 0;
+  Counters(perf::Statistics *statistics, const std::string &name) {
+    sz_size = statistics->Register(name + ".sz_size", "Size for " + name);
     num_collisions = 0;
     max_collisions = 0;
-    atomic_init64(&num_hit);
-    atomic_init64(&num_miss);
-    atomic_init64(&num_insert);
-    atomic_init64(&num_insert_negative);
-    atomic_init64(&num_update);
-    atomic_init64(&num_replace);
-    atomic_init64(&num_forget);
-    atomic_init64(&num_drop);
-    atomic_init64(&allocated);
-  }
-
-  std::string Print() {
-    return "size: " + StringifyInt(size) + "  " +
-      "hits: " + StringifyInt(atomic_read64(&num_hit)) + "  " +
-      "misses: " + StringifyInt(atomic_read64(&num_miss)) + "  " +
-      "inserts(all): " + StringifyInt(atomic_read64(&num_insert)) + "  " +
-      "inserts(negative): " + StringifyInt(atomic_read64(&num_insert_negative))
-        + "  " +
-      "collisions: " + StringifyInt(num_collisions) + "  " +
-      "collisions(max): " + StringifyInt(max_collisions) + "  " +
-      "updates: " + StringifyInt(atomic_read64(&num_update)) + "  " +
-      "replacements: " + StringifyInt(atomic_read64(&num_replace)) + "  " +
-      "forgets: " + StringifyInt(atomic_read64(&num_forget)) + "  " +
-      "drops: " + StringifyInt(atomic_read64(&num_drop)) + "  " +
-      "allocated: " + StringifyInt(atomic_read64(&allocated) / 1024) + " KB\n";
+    n_hit = statistics->Register(name + ".n_hit", "Number of hits for " + name);
+    n_miss = statistics->Register(name + ".n_miss",
+        "Number of misses for " + name);
+    n_insert = statistics->Register(name + ".n_insert",
+        "Number of inserts for " + name);
+    n_insert_negative = statistics->Register(name + ".n_insert_negative",
+        "Number of negative inserts for " + name);
+    n_update = statistics->Register(name + ".n_update",
+        "Number of updates for " + name);
+    n_replace = statistics->Register(name + ".n_replace",
+        "Number of replaces for " + name);
+    n_forget = statistics->Register(name + ".n_forget",
+        "Number of forgets for " + name);
+    n_drop = statistics->Register(name + ".n_drop",
+        "Number of drops for " + name);
+    sz_allocated = statistics->Register(name + ".sz_allocated",
+        "Number of allocated bytes for " + name);
   }
 };
 
@@ -126,7 +117,7 @@ struct Statistics {
  * @param Value type of the value values
  */
 template<class Key, class Value>
-class LruCache {
+class LruCache : SingleCopy {
  private:
   // Forward declarations of private internal data structures
   template<class T> class ListEntry;
@@ -146,25 +137,7 @@ class LruCache {
     Value value;
   } CacheEntry;
 
-  //static uint64_t GetEntrySize() { return sizeof(Key) + sizeof(Value); }
-
-  // Internal data fields
-  unsigned int cache_gauge_;
-  unsigned int cache_size_;
-  static ConcreteMemoryAllocator *allocator_;
-
-  /**
-   * A doubly linked list to keep track of the least recently used data entries.
-   * New entries get pushed back to the list. If an entry is touched
-   * it is moved to the back of the list again.
-   * If the cache gets too long, the first element (the oldest) gets
-   * deleted to obtain some space.
-   */
-  ListEntryHead<Key> *lru_list_;
-  SmallHashFixed<Key, CacheEntry> cache_;
-#ifdef LRU_CACHE_THREAD_SAFE
-  pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
-#endif
+  // static uint64_t GetEntrySize() { return sizeof(Key) + sizeof(Value); }
 
   /**
    * A special purpose memory allocator for the cache entries.
@@ -175,13 +148,13 @@ class LruCache {
    *
    * @param T the type of object to be allocated by this MemoryAllocator
    */
-  template<class T> class MemoryAllocator {
+  template<class T> class MemoryAllocator : SingleCopy {
    public:
     /**
      * Creates a MemoryAllocator to handle a memory pool for objects of type T
      * @param num_slots the number of slots to be allocated for the given datatype T
      */
-    MemoryAllocator(const unsigned int num_slots) {
+    explicit MemoryAllocator(const unsigned int num_slots) {
       // how many bitmap chunks (chars) do we need?
       unsigned int num_bytes_bitmap = num_slots / 8;
       bits_per_block_ = 8 * sizeof(bitmap_[0]);
@@ -223,6 +196,19 @@ class LruCache {
      */
     inline bool IsFull() const { return num_free_slots_ == 0; }
 
+    T* Construct(const T object) {
+      T* mem = Allocate();
+      if (mem != NULL) {
+        new (static_cast<void*>(mem)) T(object);
+      }
+      return mem;
+    }
+
+    void Destruct(T *object) {
+      object->~T();
+      Deallocate(object);
+    }
+
     /**
      * Allocate a slot and returns a pointer to the memory.
      * @return a pointer to a chunk of the memory pool
@@ -241,7 +227,7 @@ class LruCache {
         unsigned bitmap_block = next_free_slot_ / bits_per_block_;
         while (~bitmap_[bitmap_block] == 0)
           bitmap_block = (bitmap_block + 1) % (num_slots_ / bits_per_block_);
-        // TODO: faster search inside the int
+        // TODO(jblomer): faster search inside the int
         next_free_slot_ = bitmap_block * bits_per_block_;
         while (this->GetBit(next_free_slot_))
           next_free_slot_++;
@@ -327,6 +313,12 @@ class LruCache {
       this->next = this;
       this->prev = this;
     }
+
+    ListEntry(const ListEntry<T> &other) {
+      next = (other.next == &other) ? this : other.next;
+      prev = (other.prev == &other) ? this : other.prev;
+    }
+
     virtual ~ListEntry() {}
 
     /**
@@ -388,34 +380,19 @@ class LruCache {
      * but not deleted.
      */
     virtual void RemoveFromList() = 0;
-  };
+
+   private:
+    // No assignment operator (enforced by linker error)
+    ListEntry<T>& operator=(const ListEntry<T> &other);
+  };  // template<class T> class ListEntry
 
   /**
    * Specialized ListEntry to contain a data entry of type T
    */
   template<class T> class ListEntryContent : public ListEntry<T> {
    public:
-    ListEntryContent(Key content) {
+    explicit ListEntryContent(T content) {
       content_ = content;
-    };
-
-    /**
-     * Overwritten the new operator of this class to redirect it to our own
-     * memory allocator.  This ensures that heap is not fragmented by loads of
-     * malloc and free calls.
-     */
-    static void* operator new(size_t size) {
-      assert(LruCache::allocator_ != NULL);
-      return (void *)LruCache::allocator_->Allocate();
-    }
-
-    /**
-     * Overwritten delete operator to redirect deallocation to our own memory
-     * allocator.
-     */
-    static void operator delete (void *p) {
-      assert(LruCache::allocator_ != NULL);
-      LruCache::allocator_->Deallocate(static_cast<ListEntryContent<T> *>(p));
     }
 
     inline bool IsListHead() const { return false; }
@@ -425,7 +402,7 @@ class LruCache {
      * See ListEntry base class.
      */
     inline void RemoveFromList() {
-      assert (!this->IsLonely());
+      assert(!this->IsLonely());
 
       // Remove this from list
       this->prev->next = this->next;
@@ -435,6 +412,7 @@ class LruCache {
       this->next = this;
       this->prev = this;
     }
+
    private:
     T content_;  /**< The data content of this ListEntry */
   };
@@ -446,6 +424,9 @@ class LruCache {
    */
   template<class T> class ListEntryHead : public ListEntry<T> {
    public:
+    explicit ListEntryHead(ConcreteMemoryAllocator *allocator) :
+      allocator_(allocator) {}
+
     virtual ~ListEntryHead() {
       this->clear();
     }
@@ -461,7 +442,7 @@ class LruCache {
       while (!entry->IsListHead()) {
         delete_me = entry;
         entry = entry->next;
-        delete delete_me;
+        allocator_->Destruct(static_cast<ConcreteListEntryContent*>(delete_me));
       }
 
       // Reset the list to lonely
@@ -478,7 +459,8 @@ class LruCache {
      * @return the ListEntryContent structure wrapped around the data object
      */
     inline ListEntryContent<T>* PushBack(T content) {
-      ListEntryContent<T> *new_entry = new ListEntryContent<T>(content);
+      ListEntryContent<T> *new_entry =
+        allocator_->Construct(ListEntryContent<T>(content));
       this->InsertAsPredecessor(new_entry);
       return new_entry;
     }
@@ -489,7 +471,7 @@ class LruCache {
      * @return the data object which resided in the first list entry
      */
     inline T PopFront() {
-      assert (!this->IsEmpty());
+      assert(!this->IsEmpty());
       return Pop(this->next);
     }
 
@@ -523,9 +505,13 @@ class LruCache {
       ListEntryContent<T> *popped = (ListEntryContent<T> *)popped_entry;
       popped->RemoveFromList();
       T result = popped->content();
-      delete popped_entry;
+      allocator_->Destruct(static_cast<ConcreteListEntryContent*>(
+        popped_entry));
       return result;
     }
+
+   private:
+    ConcreteMemoryAllocator *allocator_;
   };
 
  public:  // LruCache
@@ -533,22 +519,25 @@ class LruCache {
    * Create a new LRU cache object
    * @param cache_size the maximal size of the cache
    */
-  LruCache(const unsigned cache_size, const Key &empty_key,
-           uint32_t (*hasher)(const Key &key))
+  LruCache(const unsigned   cache_size,
+           const Key       &empty_key,
+           uint32_t (*hasher)(const Key &key),
+           perf::Statistics *statistics,
+           const std::string &name) :
+    counters_(statistics, name),
+    pause_(false),
+    cache_gauge_(0),
+    cache_size_(cache_size),
+    allocator_(cache_size),
+    lru_list_(&allocator_)
   {
     assert(cache_size > 0);
 
-    LruCache<Key, Value>::allocator_ = new ConcreteMemoryAllocator(cache_size);
-
-    cache_gauge_ = 0;
-    cache_size_ = cache_size;
-    statistics_.size = cache_size_;
-    //cache_ = Cache(cache_size_);
+    counters_.sz_size->Set(cache_size_);
+    // cache_ = Cache(cache_size_);
     cache_.Init(cache_size_, empty_key, hasher);
-    atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated() +
+    perf::Xadd(counters_.sz_allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
-    lru_list_ = new ListEntryHead<Key>();
-    pause_ = false;
 
 #ifdef LRU_CACHE_THREAD_SAFE
     int retval = pthread_mutex_init(&lock_, NULL);
@@ -562,8 +551,6 @@ class LruCache {
   }
 
   virtual ~LruCache() {
-    delete lru_list_;
-    delete LruCache<Key, Value>::allocator_;
 #ifdef LRU_CACHE_THREAD_SAFE
     pthread_mutex_destroy(&lock_);
 #endif
@@ -589,8 +576,8 @@ class LruCache {
     CacheEntry entry;
 
     // Check if we have to update an existent entry
-    if (this->DoLookup(key, entry)) {
-      atomic_inc64(&statistics_.num_update);
+    if (this->DoLookup(key, &entry)) {
+      perf::Inc(counters_.n_update);
       entry.value = value;
       cache_.Insert(key, entry);
       this->Touch(entry);
@@ -598,12 +585,12 @@ class LruCache {
       return false;
     }
 
-    atomic_inc64(&statistics_.num_insert);
+    perf::Inc(counters_.n_insert);
     // Check if we have to make some space in the cache a
     if (this->IsFull())
       this->DeleteOldest();
 
-    entry.list_entry = lru_list_->PushBack(key);
+    entry.list_entry = lru_list_.PushBack(key);
     entry.value = value;
 
     cache_.Insert(key, entry);
@@ -629,14 +616,14 @@ class LruCache {
     }
 
     CacheEntry entry;
-    if (DoLookup(key, entry)) {
+    if (DoLookup(key, &entry)) {
       // Hit
-      atomic_inc64(&statistics_.num_hit);
+      perf::Inc(counters_.n_hit);
       Touch(entry);
       *value = entry.value;
       found = true;
     } else {
-      atomic_inc64(&statistics_.num_miss);
+      perf::Inc(counters_.n_miss);
     }
 
     Unlock();
@@ -657,12 +644,12 @@ class LruCache {
     }
 
     CacheEntry entry;
-    if (this->DoLookup(key, entry)) {
+    if (this->DoLookup(key, &entry)) {
       found = true;
-      atomic_inc64(&statistics_.num_forget);
+      perf::Inc(counters_.n_forget);
 
       entry.list_entry->RemoveFromList();
-      delete entry.list_entry;
+      allocator_.Destruct(entry.list_entry);
       cache_.Erase(key);
       --cache_gauge_;
     }
@@ -680,11 +667,11 @@ class LruCache {
     this->Lock();
 
     cache_gauge_ = 0;
-    lru_list_->clear();
+    lru_list_.clear();
     cache_.Clear();
-    atomic_inc64(&statistics_.num_drop);
-    atomic_init64(&statistics_.allocated);
-    atomic_xadd64(&statistics_.allocated, allocator_->bytes_allocated() +
+    perf::Inc(counters_.n_drop);
+    counters_.sz_allocated->Set(0);
+    perf::Xadd(counters_.sz_allocated, allocator_.bytes_allocated() +
                   cache_.bytes_allocated());
 
     this->Unlock();
@@ -705,16 +692,16 @@ class LruCache {
   inline bool IsFull() const { return cache_gauge_ >= cache_size_; }
   inline bool IsEmpty() const { return cache_gauge_ == 0; }
 
-  Statistics statistics() {
+  Counters counters() {
     Lock();
-    cache_.GetCollisionStats(&statistics_.num_collisions,
-                             &statistics_.max_collisions);
+    cache_.GetCollisionStats(&counters_.num_collisions,
+                             &counters_.max_collisions);
     Unlock();
-    return statistics_;
+    return counters_;
   }
 
  protected:
-  Statistics statistics_;
+  Counters counters_;
 
  private:
   /**
@@ -724,8 +711,8 @@ class LruCache {
    *  @param entry a pointer to the entry structure
    *  @return true on successful lookup, false otherwise
    */
-  inline bool DoLookup(const Key &key, CacheEntry &entry) {
-    return cache_.Lookup(key, &entry);
+  inline bool DoLookup(const Key &key, CacheEntry *entry) {
+    return cache_.Lookup(key, entry);
   }
 
   /**
@@ -735,7 +722,7 @@ class LruCache {
    * @param entry the CacheEntry to be touched (CacheEntry is the internal wrapper data structure)
    */
   inline void Touch(const CacheEntry &entry) {
-    lru_list_->MoveToBack(entry.list_entry);
+    lru_list_.MoveToBack(entry.list_entry);
   }
 
   /**
@@ -744,8 +731,8 @@ class LruCache {
   inline void DeleteOldest() {
     assert(!this->IsEmpty());
 
-    atomic_inc64(&statistics_.num_replace);
-    Key delete_me = lru_list_->PopFront();
+    perf::Inc(counters_.n_replace);
+    Key delete_me = lru_list_.PopFront();
     cache_.Erase(delete_me);
 
     --cache_gauge_;
@@ -770,32 +757,45 @@ class LruCache {
   }
 
   bool pause_;  /**< Temporarily stops the cache in order to avoid poisoning */
+
+  // Internal data fields
+  unsigned int            cache_gauge_;
+  const unsigned int      cache_size_;
+  ConcreteMemoryAllocator allocator_;
+
+  /**
+   * A doubly linked list to keep track of the least recently used data entries.
+   * New entries get pushed back to the list. If an entry is touched
+   * it is moved to the back of the list again.
+   * If the cache gets too long, the first element (the oldest) gets
+   * deleted to obtain some space.
+   */
+  ListEntryHead<Key>              lru_list_;
+  SmallHashFixed<Key, CacheEntry> cache_;
+#ifdef LRU_CACHE_THREAD_SAFE
+  pthread_mutex_t lock_;  /**< Mutex to make cache thread safe. */
+#endif
 };  // class LruCache
 
-// initialize the static allocator field
-template<class Key, class Value>
-typename LruCache<Key, Value>::ConcreteMemoryAllocator
-  *LruCache<Key, Value>::allocator_ = NULL;
-
 // Hash functions
-static inline uint32_t hasher_md5(const hash::Md5 &key) {
+static inline uint32_t hasher_md5(const shash::Md5 &key) {
   // Don't start with the first bytes, because == is using them as well
-  return (uint32_t) *((uint32_t *)key.digest + 1);
+  return (uint32_t) *(reinterpret_cast<const uint32_t *>(key.digest) + 1);
 }
 
 static inline uint32_t hasher_inode(const fuse_ino_t &inode) {
   return MurmurHash2(&inode, sizeof(inode), 0x07387a4f);
 }
-//uint32_t hasher_md5(const hash::Md5 &key);
-//uint32_t hasher_inode(const fuse_ino_t &inode);
+// uint32_t hasher_md5(const shash::Md5 &key);
+// uint32_t hasher_inode(const fuse_ino_t &inode);
 
 
 class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 {
  public:
-  InodeCache(unsigned int cache_size) :
+  explicit InodeCache(unsigned int cache_size, perf::Statistics *statistics) :
     LruCache<fuse_ino_t, catalog::DirectoryEntry>(
-      cache_size, fuse_ino_t(-1), hasher_inode)
+      cache_size, fuse_ino_t(-1), hasher_inode, statistics, "inode_cache")
   {
   }
 
@@ -824,8 +824,9 @@ class InodeCache : public LruCache<fuse_ino_t, catalog::DirectoryEntry>
 
 class PathCache : public LruCache<fuse_ino_t, PathString> {
  public:
-  PathCache(unsigned int cache_size) :
-    LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode)
+  explicit PathCache(unsigned int cache_size, perf::Statistics *statistics) :
+    LruCache<fuse_ino_t, PathString>(cache_size, fuse_ino_t(-1), hasher_inode,
+        statistics, "path_cache")
   {
   }
 
@@ -853,48 +854,49 @@ class PathCache : public LruCache<fuse_ino_t, PathString> {
 
 
 class Md5PathCache :
-  public LruCache<hash::Md5, catalog::DirectoryEntry>
+  public LruCache<shash::Md5, catalog::DirectoryEntry>
 {
  public:
-  Md5PathCache(unsigned int cache_size) :
-    LruCache<hash::Md5, catalog::DirectoryEntry>(
-      cache_size, hash::Md5(hash::AsciiPtr("!")), hasher_md5)
+  explicit Md5PathCache(unsigned int cache_size, perf::Statistics *statistics) :
+    LruCache<shash::Md5, catalog::DirectoryEntry>(
+      cache_size, shash::Md5(shash::AsciiPtr("!")), hasher_md5, statistics,
+      "md5_path_cache")
   {
     dirent_negative_ = catalog::DirectoryEntry(catalog::kDirentNegative);
   }
 
-  bool Insert(const hash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
+  bool Insert(const shash::Md5 &hash, const catalog::DirectoryEntry &dirent) {
     LogCvmfs(kLogLru, kLogDebug, "insert md5 --> dirent: %s -> '%s'",
              hash.ToString().c_str(), dirent.name().c_str());
     const bool result =
-      LruCache<hash::Md5, catalog::DirectoryEntry>::Insert(hash, dirent);
+      LruCache<shash::Md5, catalog::DirectoryEntry>::Insert(hash, dirent);
     return result;
   }
 
-  bool InsertNegative(const hash::Md5 &hash) {
+  bool InsertNegative(const shash::Md5 &hash) {
     const bool result = Insert(hash, dirent_negative_);
     if (result)
-      atomic_inc64(&statistics_.num_insert_negative);
+      perf::Inc(counters_.n_insert_negative);
     return result;
   }
 
-  bool Lookup(const hash::Md5 &hash, catalog::DirectoryEntry *dirent) {
+  bool Lookup(const shash::Md5 &hash, catalog::DirectoryEntry *dirent) {
     const bool result =
-      LruCache<hash::Md5, catalog::DirectoryEntry>::Lookup(hash, dirent);
+      LruCache<shash::Md5, catalog::DirectoryEntry>::Lookup(hash, dirent);
     LogCvmfs(kLogLru, kLogDebug, "lookup md5 --> dirent: %s (%s)",
              hash.ToString().c_str(), result ? "hit" : "miss");
     return result;
   }
 
-  bool Forget(const hash::Md5 &hash) {
+  bool Forget(const shash::Md5 &hash) {
     LogCvmfs(kLogLru, kLogDebug, "forget md5: %s",
              hash.ToString().c_str());
-    return LruCache<hash::Md5, catalog::DirectoryEntry>::Forget(hash);
+    return LruCache<shash::Md5, catalog::DirectoryEntry>::Forget(hash);
   }
 
   void Drop() {
     LogCvmfs(kLogLru, kLogDebug, "dropping md5path cache");
-    LruCache<hash::Md5, catalog::DirectoryEntry>::Drop();
+    LruCache<shash::Md5, catalog::DirectoryEntry>::Drop();
   }
 
  private:

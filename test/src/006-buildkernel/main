@@ -4,20 +4,24 @@ cvmfs_test_name="Linux Kernel Compile"
 cvmfs_run_test() {
   logfile=$1
 
+  local build_log
+  build_log="$(pwd)/build_kernel.log"
+
   cvmfs_mount sft.cern.ch || return 1
 
   outdir=${CVMFS_TEST_SCRATCH}/kbuild
 
   rm -rf $outdir
   cd /cvmfs/sft.cern.ch/lcg/external/experimental/linux
-  ./compileKernel.sh 2.6.32.57 $outdir 8 >> $logfile 2>&1 || return 2
-  ./compileKernel.sh 2.6.32.57 $outdir 8 >> $logfile 2>&1 || return 3
-  sudo cvmfs_talk -i sft.cern.ch cleanup 0 >> $logfile || return 4
-  ./compileKernel.sh 2.6.32.57 $outdir 8 >> $logfile 2>&1 || return 5
+  echo "writing kernel compile output to $build_log"
+  ./compileKernel.sh 2.6.32.57 $outdir 8 >> $build_log || return 2
+  ./compileKernel.sh 2.6.32.57 $outdir 8 >> $build_log || return 3
+  sudo cvmfs_talk -i sft.cern.ch cleanup 0 || return 4
+  ./compileKernel.sh 2.6.32.57 $outdir 8 >> $build_log || return 5
 
-  ps aux | grep cvmfs2 | grep sft.cern.ch >> $logfile
-  check_memory sft.cern.ch 35000 >> $logfile 2>&1
-  cvmfs_config stat -v sft.cern.ch >> $logfile
+  ps aux | grep cvmfs2 | grep sft.cern.ch
+  check_memory sft.cern.ch 50000
+  cvmfs_config stat -v sft.cern.ch
 
   return 0
 }

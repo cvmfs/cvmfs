@@ -1,0 +1,2 @@
+Distributors and site administrators can drop *.conf config files here which are read after default.conf and before default.local.
+Please use 00- to 99- convention for naming your config file (e.g. 50-osg).  Please use reasonable numbers (not 00, 99).

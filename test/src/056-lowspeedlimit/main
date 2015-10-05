@@ -1,0 +1,33 @@
+
+cvmfs_test_name="Low speed limit"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount atlas.cern.ch "CVMFS_TIMEOUT=1" "CVMFS_TIMEOUT_DIRECT=1" "CVMFS_CONFIG_REPOSITORY=" || return 1
+  ls /cvmfs/atlas.cern.ch/repo || return 2
+
+  local cache_dir=$(cvmfs_config showconfig atlas.cern.ch | grep CVMFS_CACHE_DIR | cut -d= -f2)
+  cvmfs_umount atlas.cern.ch
+  local umount_result=$?
+  cat /proc/mounts
+
+  if [ $umount_result -ne 0 ]; then
+    return 5
+  fi
+
+  if [ "x$cache_dir" = x ]; then
+    return 20
+  fi
+  echo "Wiping out $cache_dir"
+  sudo rm -rf "$cache_dir"
+
+  # TODO: traffic shaping
+  cvmfs_mount atlas.cern.ch "CVMFS_TIMEOUT=1" "CVMFS_TIMEOUT_DIRECT=1" "CVMFS_CONFIG_REPOSITORY=" \
+     "CVMFS_LOW_SPEED_LIMIT=1073741824" && ls /cvmfs/atlas.cern.ch/repo
+  if [ $? -eq 0 ]; then
+    return 10
+  fi
+
+  return 0
+}

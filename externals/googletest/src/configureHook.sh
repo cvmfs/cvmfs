@@ -1,3 +1,3 @@
 #!/bin/sh
 
-cmake .
+CXXFLAGS="-DGTEST_HAS_TR1_TUPLE=0" cmake .

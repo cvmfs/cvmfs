@@ -1,5 +1,6 @@
 #!/bin/sh
 
-cp Makefile.127 Makefile
+cp Makefile.128 Makefile
 make clean
 make
+strip -S libz.a

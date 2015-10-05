@@ -5,23 +5,25 @@
 #ifndef CVMFS_CATALOG_COUNTERS_H_
 #define CVMFS_CATALOG_COUNTERS_H_
 
+#include <gtest/gtest_prod.h>
 #include <stdint.h>
+
 #include <map>
 #include <string>
-#include <gtest/gtest_prod.h>
 
 namespace swissknife {
-  class CommandCheck;
+class CommandCheck;
 }
 
 namespace catalog {
 
 class DirectoryEntry;
-class Database;
+class CatalogDatabase;
 
 struct LegacyMode {
-  enum Type { // TODO: C++11 typed enum
+  enum Type {  // TODO(rmeusel): C++11 typed enum
     kNoLegacy,
+    kNoXattrs,
     kLegacy
   };
 };
@@ -36,12 +38,18 @@ class TreeCountersBase {
  protected:
   typedef std::map<std::string, const FieldT*> FieldsMap;
   struct Fields {
-    Fields() : regular_files(0), symlinks(0), directories(0),
-               nested_catalogs(0), chunked_files(0), file_chunks(0),
-               file_size(0), chunked_file_size(0) {}
+    Fields()
+      : regular_files(0)
+      , symlinks(0)
+      , directories(0)
+      , nested_catalogs(0)
+      , chunked_files(0)
+      , file_chunks(0)
+      , file_size(0)
+      , chunked_file_size(0)
+      , xattrs(0) { }
 
     // typname U is another TreeCountersBase (eg: add DeltaCounters to Counters)
-
     template<typename U>
     void Add(const U &other) {
       Combine<U, 1>(other);
@@ -62,17 +70,19 @@ class TreeCountersBase {
       file_chunks       += factor * other.file_chunks;
       file_size         += factor * other.file_size;
       chunked_file_size += factor * other.chunked_file_size;
+      xattrs            += factor * other.xattrs;
     }
 
-    void FillFieldsMap(FieldsMap &map, const std::string &prefix) const {
-      map[prefix + "regular"]      = &regular_files;
-      map[prefix + "symlink"]      = &symlinks;
-      map[prefix + "dir"]          = &directories;
-      map[prefix + "nested"]       = &nested_catalogs;
-      map[prefix + "chunked"]      = &chunked_files;
-      map[prefix + "chunks"]       = &file_chunks;
-      map[prefix + "file_size"]    = &file_size;
-      map[prefix + "chunked_size"] = &chunked_file_size;
+    void FillFieldsMap(const std::string &prefix, FieldsMap *map) const {
+      (*map)[prefix + "regular"]      = &regular_files;
+      (*map)[prefix + "symlink"]      = &symlinks;
+      (*map)[prefix + "dir"]          = &directories;
+      (*map)[prefix + "nested"]       = &nested_catalogs;
+      (*map)[prefix + "chunked"]      = &chunked_files;
+      (*map)[prefix + "chunks"]       = &file_chunks;
+      (*map)[prefix + "file_size"]    = &file_size;
+      (*map)[prefix + "chunked_size"] = &chunked_file_size;
+      (*map)[prefix + "xattr"]        = &xattrs;
     }
 
     FieldT regular_files;
@@ -83,13 +93,14 @@ class TreeCountersBase {
     FieldT file_chunks;
     FieldT file_size;
     FieldT chunked_file_size;
+    FieldT xattrs;
   };
 
  public:
-  bool ReadFromDatabase(const Database         &database,
+  bool ReadFromDatabase(const CatalogDatabase  &database,
                         const LegacyMode::Type  legacy = LegacyMode::kNoLegacy);
-  bool WriteToDatabase(const Database     &database) const;
-  bool InsertIntoDatabase(const Database  &database) const;
+  bool WriteToDatabase(const CatalogDatabase     &database) const;
+  bool InsertIntoDatabase(const CatalogDatabase  &database) const;
 
   void SetZero();
 
@@ -107,7 +118,7 @@ class DeltaCounters : public TreeCountersBase<DeltaCounters_t> {
   friend class Counters;
 
  public:
-  void PopulateToParent(DeltaCounters &parent) const;
+  void PopulateToParent(DeltaCounters *parent) const;
   void Increment(const DirectoryEntry &dirent) { ApplyDelta(dirent,  1); }
   void Decrement(const DirectoryEntry &dirent) { ApplyDelta(dirent, -1); }
 
@@ -120,8 +131,8 @@ typedef uint64_t Counters_t;
 class Counters : public TreeCountersBase<Counters_t> {
  public:
   void ApplyDelta(const DeltaCounters &delta);
-  void AddAsSubtree(DeltaCounters &delta) const;
-  void MergeIntoParent(DeltaCounters &parent_delta) const;
+  void AddAsSubtree(DeltaCounters *delta) const;
+  void MergeIntoParent(DeltaCounters *parent_delta) const;
   Counters_t GetSelfEntries() const;
   Counters_t GetSubtreeEntries() const;
   Counters_t GetAllEntries() const;

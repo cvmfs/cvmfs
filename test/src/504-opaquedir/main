@@ -81,47 +81,47 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   # ============================================================================
 
-  echo "starting transaction to edit repository" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
 
-  echo "putting some stuff in the new repository" >> $logfile
-  produce_files_in $repo_dir >> $logfile 2>&1 || return 3
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
 
-  echo "putting exactly the same stuff in the scratch space for comparison" >> $logfile
-  produce_files_in $reference_dir >> $logfile 2>&1 || return 4
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
 
-  echo "creating CVMFS snapshot" >> $logfile
-  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
 
-  echo "compare the results of cvmfs to our reference copy" >> $logfile
-  compare_directories $repo_dir $reference_dir >> $logfile || return $?
-
-  # ============================================================================
-
-  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO" >> $logfile
-  start_transaction $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
-
-  echo "change stuff in the repository" >> $logfile
-  change_files_in $repo_dir >> $logfile 2>&1 || return $?
-
-  echo "change exactly the same stuff in the scratch space" >> $logfile 2>&1
-  change_files_in $reference_dir >> $logfile 2>&1 || return $?
-
-  echo "creating CVMFS snapshot" >> $logfile
-  publish_repo $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
-
-  echo "compare the changed directories" >> $logfile
-  compare_directories $repo_dir $reference_dir >> $logfile 2>&1 || return $?
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
 
   # ============================================================================
 
-  echo "check catalog integrity" >> $logfile
-  check_catalogs $CVMFS_TEST_REPO >> $logfile 2>&1 || return $?
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "change stuff in the repository"
+  change_files_in $repo_dir || return $?
+
+  echo "change exactly the same stuff in the scratch space"
+  change_files_in $reference_dir || return $?
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the changed directories"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  # ============================================================================
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   return 0
 }

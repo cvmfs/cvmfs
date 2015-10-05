@@ -1,0 +1,120 @@
+cvmfs_test_name="Warn on Huge Catalog Creation"
+cvmfs_test_autofs_on_startup=false
+
+generate_files_in() {
+  local path=$1
+  local num_files=$2
+  local i=0
+  local prev_dir=$(pwd)
+
+  cd $path
+
+  while [ $i -lt $num_files ]; do
+    head -c42 /dev/urandom > ${i}.bin
+    i=$(( $i + 1 ))
+  done
+
+  cd $prev_dir
+}
+
+configure_catalog_size_warning() {
+  local repo_name=$1
+  local warning_threshold=$2
+  local repo_conf_dir=/etc/cvmfs/repositories.d/$repo_name
+  local server_conf=${repo_conf_dir}/server.conf
+
+  sudo mv ${server_conf} ${server_conf}.old || return 101
+  sed -e "s/^\(CVMFS_CATALOG_ENTRY_WARN_THRESHOLD\)=[0-9]*$/\1=$warning_threshold/" \
+    ${server_conf}.old | sudo tee ${server_conf} > /dev/null || return 102
+  cat ${server_conf} | grep -q "^CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$warning_threshold$" || return 103
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "configure catalog size warning"
+  configure_catalog_size_warning $CVMFS_TEST_REPO 12000 || return 1
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "generate a lot of files"
+  mkdir ${repo_dir}/nested_1 ${repo_dir}/nested_2 ${repo_dir}/nested_3 ${repo_dir}/more || return 4
+  generate_files_in ${repo_dir}/nested_1/ 10000 || return 5
+  generate_files_in ${repo_dir}/nested_2/ 14000 || return 6
+  generate_files_in ${repo_dir}/nested_3/  7000 || return 7
+  generate_files_in ${repo_dir}/more/      7000 || return 8
+  touch ${repo_dir}/nested_1/.cvmfscatalog || return 9
+  touch ${repo_dir}/nested_2/.cvmfscatalog || return 10
+
+  echo "creating CVMFS snapshot"
+  local publish_log_1=publish_1.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "check for the warnings"
+  cat $publish_log_1 | grep --invert-match -q '^WARNING.*\/nested_1' || return 11
+  cat $publish_log_1 | grep                -q '^WARNING.*\/nested_2' || return 12
+  cat $publish_log_1 | grep --invert-match -q '^WARNING.*\/nested_3' || return 13
+  cat $publish_log_1 | grep --invert-match -q '^WARNING.*\/more'     || return 14
+  cat $publish_log_1 | grep                -q '^WARNING.*\/ '        || return 15
+
+  echo "fix warning for root catalog"
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "make /nested_3 a nested catalog"
+  touch ${repo_dir}/nested_3/.cvmfscatalog
+
+  echo "touch something in /nested_2 to force its reprocessing"
+  touch ${repo_dir}/nested_2/1.bin
+
+  echo "creating CVMFS snapshot"
+  local publish_log_2=publish_2.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_2 || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "check for the warnings"
+  cat $publish_log_2 | grep --invert-match -q '^WARNING.*\/nested_1' || return 16
+  cat $publish_log_2 | grep                -q '^WARNING.*\/nested_2' || return 17 # nested catalog 2 was not touched in this publish...
+  cat $publish_log_2 | grep --invert-match -q '^WARNING.*\/nested_3' || return 18
+  cat $publish_log_2 | grep --invert-match -q '^WARNING.*\/more'     || return 19
+  cat $publish_log_2 | grep --invert-match -q '^WARNING.*\/ '        || return 20 # root catalog now contains less entries (since nested_3 is a nested catalog) 
+
+  echo "configure catalog size warning to fix warning for /nested2"
+  configure_catalog_size_warning $CVMFS_TEST_REPO 15000 }} return 21
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "touch something in /nested_2 to force its reprocessing"
+  touch ${repo_dir}/nested_2/1.bin
+
+  echo "creating CVMFS snapshot"
+  local publish_log_3=publish_3.log
+  publish_repo $CVMFS_TEST_REPO > $publish_log_3 || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  echo "check for the warnings"
+  cat $publish_log_3 | grep --invert-match -q '^WARNING.*\/nested_1' || return 22
+  cat $publish_log_3 | grep --invert-match -q '^WARNING.*\/nested_2' || return 23
+  cat $publish_log_3 | grep --invert-match -q '^WARNING.*\/nested_3' || return 24
+  cat $publish_log_3 | grep --invert-match -q '^WARNING.*\/more'     || return 25
+  cat $publish_log_3 | grep --invert-match -q '^WARNING.*\/ '        || return 26
+
+  echo 
+
+  return 0
+}
+

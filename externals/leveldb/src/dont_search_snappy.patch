@@ -1,25 +1,25 @@
---- build_detect_platform.orig	2013-04-24 14:58:26.000000000 +0200
-+++ build_detect_platform	2013-04-24 14:59:00.000000000 +0200
-@@ -146,14 +146,14 @@
+--- build_detect_platform.orig	2013-08-15 13:32:42.000000000 +0200
++++ build_detect_platform	2013-08-15 13:34:01.000000000 +0200
+@@ -175,14 +175,14 @@
  
      # Test whether Snappy library is installed
      # http://code.google.com/p/snappy/
--    $CXX $CFLAGS -x c++ - -o /dev/null 2>/dev/null  <<EOF
+-    $CXX $CXXFLAGS -x c++ - -o $CXXOUTPUT 2>/dev/null  <<EOF
 -      #include <snappy.h>
 -      int main() {}
 -EOF
 -    if [ "$?" = 0 ]; then
 -        COMMON_FLAGS="$COMMON_FLAGS -DSNAPPY"
--        PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -lsnappy"
+-        PLATFORM_LIBS="$PLATFORM_LIBS -lsnappy"
 -    fi
-+#    $CXX $CFLAGS -x c++ - -o /dev/null 2>/dev/null  <<EOF
++#    $CXX $CXXFLAGS -x c++ - -o $CXXOUTPUT 2>/dev/null  <<EOF
 +#      #include <snappy.h>
 +#      int main() {}
 +#EOF
 +#    if [ "$?" = 0 ]; then
 +#        COMMON_FLAGS="$COMMON_FLAGS -DSNAPPY"
-+#        PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -lsnappy"
++#        PLATFORM_LIBS="$PLATFORM_LIBS -lsnappy"
 +#    fi
  
      # Test whether tcmalloc is available
-     $CXX $CFLAGS -x c++ - -o /dev/null -ltcmalloc 2>/dev/null  <<EOF
+     $CXX $CXXFLAGS -x c++ - -o $CXXOUTPUT -ltcmalloc 2>/dev/null  <<EOF

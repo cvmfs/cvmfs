@@ -1,22 +1,49 @@
 #!/bin/sh
 
 # source the common platform independent functionality and option parsing
-script_location=$(dirname $(readlink --canonicalize $0))
+script_location=$(cd "$(dirname "$0")"; pwd)
 . ${script_location}/common_test.sh
 
-# run tests
-echo "running CernVM-FS unit tests..."
-cvmfs_unittests --gtest_shuffle >> $UNITTEST_LOGFILE 2>&1 || die "fail"
+# format additional disks with ext4 and many inodes
+echo -n "formatting new disk partition... "
+disk_to_partition=/dev/vda
+partition=$(get_last_partition_number $disk_to_partition)
+format_partition_ext4 $disk_to_partition$partition || die "fail (formatting partition)"
+echo "done"
 
-echo "running CernVM-FS test cases..."
+# mount additional disk partitions on strategic cvmfs location
+echo -n "mounting new disk partition into cvmfs specific location... "
+mount_partition $disk_to_partition$partition /var/lib/cvmfs || die "fail (mounting /var/lib/cvmfs $?)"
+echo "done"
+
+# reset SELinux context
+echo -n "restoring SELinux context for /var/lib/cvmfs... "
+sudo restorecon -R /var/lib/cvmfs || die "fail"
+echo "done"
+
+retval=0
+
+# running unit test suite
+run_unittests --gtest_shuffle || retval=1
+
+
 cd ${SOURCE_DIRECTORY}/test
-./run.sh $TEST_LOGFILE -x src/004-davinci              \
-                          src/005-asetup               \
-                          src/007-testjobs             \
-                          src/016-perl_environment     \
-                          src/017-dns_timeout          \
-                          src/018-dns_injection        \
-                          src/019-faulty_proxy         \
-                          src/020-server_timeout       \
-                          src/024-reload-during-asetup \
-                          src/5*
+echo "running CernVM-FS client test cases..."
+CVMFS_TEST_CLASS_NAME=ClientIntegrationTests                                  \
+./run.sh $CLIENT_TEST_LOGFILE -o ${CLIENT_TEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                              -x src/004-davinci                              \
+                                 src/005-asetup                               \
+                                 src/007-testjobs                             \
+                                 src/024-reload-during-asetup                 \
+                                 --                                           \
+                                 src/0*                                       \
+                              || retval=1
+
+
+echo "running CernVM-FS migration test cases..."
+CVMFS_TEST_CLASS_NAME=MigrationTests                                              \
+./run.sh $MIGRATIONTEST_LOGFILE -o ${MIGRATIONTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX} \
+                                   migration_tests/*                              \
+                                || retval=1
+
+exit $retval

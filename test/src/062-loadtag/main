@@ -1,0 +1,10 @@
+
+cvmfs_test_name="Mount a given repository tag"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount cernvm-prod.cern.ch "CVMFS_REPOSITORY_TAG=HEAD" || return 1
+
+  return 0
+}

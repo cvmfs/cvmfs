@@ -1,0 +1,15 @@
+--- build/linux.inc.orig	2014-02-13 10:03:07.000000000 +0100
++++ build/linux.inc	2014-02-13 10:04:30.000000000 +0100
+@@ -51,7 +51,11 @@
+                 export arch:=ia64
+         endif
+         ifeq ($(uname_m),x86_64)
+-                export arch:=intel64
++                ifeq ($(shell getconf LONG_BIT),32)
++                        export arch:=ia32
++                else
++                        export arch:=intel64
++                endif                
+         endif
+         ifeq ($(uname_m),sparc64)
+                 export arch:=sparc

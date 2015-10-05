@@ -15,36 +15,38 @@
 #include "cvmfs_config.h"
 #include "talk.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/uio.h>
-#include <pthread.h>
-#include <unistd.h>
 #include <errno.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include <cassert>
 #include <cstdlib>
-
 #include <string>
 #include <vector>
 
-#include "platform.h"
-#include "tracer.h"
-#include "quota.h"
+#include "cache.h"
 #include "cvmfs.h"
-#include "util.h"
-#include "logging.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
-#include "shortstring.h"
-#include "lru.h"
-#include "nfs_maps.h"
+#include "glue_buffer.h"
 #include "loader.h"
-#include "options.h"
-#include "cache.h"
+#include "logging.h"
+#include "lru.h"
 #include "monitor.h"
+#include "nfs_maps.h"
+#include "options.h"
+#include "platform.h"
+#include "quota.h"
+#include "shortstring.h"
+#include "statistics.h"
+#include "tracer.h"
+#include "util.h"
+#include "wpad.h"
 
 using namespace std;  // NOLINT
 
@@ -52,9 +54,12 @@ namespace talk {
 
 const unsigned kMaxCommandSize = 512;
 
-string *cachedir_ = NULL;  /**< Stores the cache directory from cvmfs.
-                                Pipe files will be created here. */
+/**
+ * Stores the cache directory from cvmfs.  Pipe files will be created here.
+ */
+string *cachedir_ = NULL;
 string *socket_path_ = NULL;  /**< $cache_dir/cvmfs_io */
+OptionsManager *options_manager_ = NULL;
 int socket_fd_;
 pthread_t thread_talk_;
 bool spawned_;
@@ -82,7 +87,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
   socklen_t socket_size = sizeof(remote);
   int con_fd = -1;
   while (true) {
-    if (con_fd > 0) {
+    if (con_fd >= 0) {
       shutdown(con_fd, SHUT_RDWR);
       close(con_fd);
     }
@@ -109,11 +114,12 @@ static void *MainTalk(void *data __attribute__((unused))) {
         tracer::Flush();
         Answer(con_fd, "OK\n");
       } else if (line == "cache size") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          uint64_t size_unpinned = quota::GetSize();
-          uint64_t size_pinned = quota::GetSizePinned();
+          uint64_t size_unpinned = quota_mgr->GetSize();
+          uint64_t size_pinned = quota_mgr->GetSizePinned();
           const string size_str = "Current cache size is " +
             StringifyInt(size_unpinned / (1024*1024)) + "MB (" +
             StringifyInt(size_unpinned) + " Bytes), pinned: " +
@@ -122,35 +128,39 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, size_str);
         }
       } else if (line == "cache list") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls = quota::List();
+          vector<string> ls = quota_mgr->List();
           AnswerStringList(con_fd, ls);
         }
       } else if (line == "cache list pinned") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls_pinned = quota::ListPinned();
+          vector<string> ls_pinned = quota_mgr->ListPinned();
           AnswerStringList(con_fd, ls_pinned);
         }
       } else if (line == "cache list catalogs") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
-          vector<string> ls_catalogs = quota::ListCatalogs();
+          vector<string> ls_catalogs = quota_mgr->ListCatalogs();
           AnswerStringList(con_fd, ls_catalogs);
         }
       } else if (line.substr(0, 7) == "cleanup") {
-        if (quota::GetCapacity() == 0) {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
           Answer(con_fd, "Cache is unmanaged\n");
         } else {
           if (line.length() < 9) {
             Answer(con_fd, "Usage: cleanup <MB>\n");
           } else {
             const uint64_t size = String2Uint64(line.substr(8))*1024*1024;
-            if (quota::Cleanup(size)) {
+            if (quota_mgr->Cleanup(size)) {
               Answer(con_fd, "OK\n");
             } else {
               Answer(con_fd, "Not fully cleaned "
@@ -223,7 +233,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "Usage: nameserver set <host>\n");
         } else {
           const string host = line.substr(15);
-          download::SetDnsServer(host);
+          cvmfs::download_manager_->SetDnsServer(host);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "host info") {
@@ -231,14 +241,16 @@ static void *MainTalk(void *data __attribute__((unused))) {
         vector<int> rtt;
         unsigned active_host;
 
-        download::GetHostInfo(&host_chain, &rtt, &active_host);
+        cvmfs::download_manager_->GetHostInfo(&host_chain, &rtt, &active_host);
         string host_str;
         for (unsigned i = 0; i < host_chain.size(); ++i) {
           host_str += "  [" + StringifyInt(i) + "] " + host_chain[i] + " (";
-          if (rtt[i] == -1)
+          if (rtt[i] == download::DownloadManager::kProbeUnprobed)
             host_str += "unprobed";
-          else if (rtt[i] == -2)
+          else if (rtt[i] == download::DownloadManager::kProbeDown)
             host_str += "host down";
+          else if (rtt[i] == download::DownloadManager::kProbeGeo)
+            host_str += "geographically ordered";
           else
             host_str += StringifyInt(rtt[i]) + " ms";
           host_str += ")\n";
@@ -247,56 +259,87 @@ static void *MainTalk(void *data __attribute__((unused))) {
                     host_chain[active_host] + "\n";
         Answer(con_fd, host_str);
       } else if (line == "host probe") {
-        download::ProbeHosts();
+        cvmfs::download_manager_->ProbeHosts();
         Answer(con_fd, "OK\n");
+      } else if (line == "host probe geo") {
+        bool retval = cvmfs::download_manager_->ProbeGeo();
+        if (retval)
+          Answer(con_fd, "OK\n");
+        else
+          Answer(con_fd, "Failed\n");
       } else if (line == "host switch") {
-        download::SwitchHost();
+        cvmfs::download_manager_->SwitchHost();
         Answer(con_fd, "OK\n");
       } else if (line.substr(0, 8) == "host set") {
         if (line.length() < 10) {
           Answer(con_fd, "Usage: host set <host list>\n");
         } else {
           const string hosts = line.substr(9);
-          download::SetHostChain(hosts);
+          cvmfs::download_manager_->SetHostChain(hosts);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "proxy info") {
-        vector< vector<string> > proxy_chain;
+        vector< vector<download::DownloadManager::ProxyInfo> > proxy_chain;
         unsigned active_group;
-        download::GetProxyInfo(&proxy_chain, &active_group);
+        unsigned fallback_group;
+        cvmfs::download_manager_->GetProxyInfo(
+          &proxy_chain, &active_group, &fallback_group);
 
         string proxy_str;
         if (proxy_chain.size()) {
           proxy_str += "Load-balance groups:\n";
           for (unsigned i = 0; i < proxy_chain.size(); ++i) {
-            proxy_str += "[" + StringifyInt(i) + "] " +
-                         JoinStrings(proxy_chain[i], ", ") + "\n";
+            vector<string> urls;
+            for (unsigned j = 0; j < proxy_chain[i].size(); ++j) {
+              urls.push_back(proxy_chain[i][j].Print());
+            }
+            proxy_str +=
+              "[" + StringifyInt(i) + "] " + JoinStrings(urls, ", ") + "\n";
           }
           proxy_str += "Active proxy: [" + StringifyInt(active_group) + "] " +
-                       proxy_chain[active_group][0] + "\n";
+                       proxy_chain[active_group][0].url + "\n";
+          if (fallback_group < proxy_chain.size())
+            proxy_str += "First fallback group: [" +
+                         StringifyInt(fallback_group) + "]\n";
         } else {
           proxy_str = "No proxies defined\n";
         }
 
         Answer(con_fd, proxy_str);
       } else if (line == "proxy rebalance") {
-        download::RebalanceProxies();
+        cvmfs::download_manager_->RebalanceProxies();
         Answer(con_fd, "OK\n");
       } else if (line == "proxy group switch") {
-        download::SwitchProxyGroup();
+        cvmfs::download_manager_->SwitchProxyGroup();
         Answer(con_fd, "OK\n");
       } else if (line.substr(0, 9) == "proxy set") {
         if (line.length() < 11) {
           Answer(con_fd, "Usage: proxy set <proxy list>\n");
         } else {
-          const string proxies = line.substr(10);
-          download::SetProxyChain(proxies);
+          string proxies = line.substr(10);
+          proxies = download::ResolveProxyDescription(proxies,
+                                                      cvmfs::download_manager_);
+          if (proxies == "") {
+              Answer(con_fd, "Failed, no valid proxies\n");
+          } else {
+            cvmfs::download_manager_->SetProxyChain(
+              proxies, "", download::DownloadManager::kSetProxyRegular);
+            Answer(con_fd, "OK\n");
+          }
+        }
+      } else if (line.substr(0, 14) == "proxy fallback") {
+        if (line.length() < 15) {
+          Answer(con_fd, "Usage: proxy fallback <proxy list>\n");
+        } else {
+          string fallback_proxies = line.substr(15);
+          cvmfs::download_manager_->SetProxyChain(
+            "", fallback_proxies, download::DownloadManager::kSetProxyFallback);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "timeout info") {
         unsigned timeout;
         unsigned timeout_direct;
-        download::GetTimeout(&timeout, &timeout_direct);
+        cvmfs::download_manager_->GetTimeout(&timeout, &timeout_direct);
         string timeout_str =  "Timeout with proxy: ";
         if (timeout)
           timeout_str += StringifyInt(timeout) + "s\n";
@@ -315,7 +358,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
           uint64_t timeout;
           uint64_t timeout_direct;
           String2Uint64Pair(line.substr(12), &timeout, &timeout_direct);
-          download::SetTimeout(timeout, timeout_direct);
+          cvmfs::download_manager_->SetTimeout(timeout, timeout_direct);
           Answer(con_fd, "OK\n");
         }
       } else if (line == "open catalogs") {
@@ -323,46 +366,52 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "internal affairs") {
         int current;
         int highwater;
-        lru::Statistics inode_stats;
-        lru::Statistics path_stats;
-        lru::Statistics md5path_stats;
-        catalog::Statistics catalog_stats;
         string result;
 
-        result += "Inode Generation:\n  " + cvmfs::PrintInodeGeneration();
-        result += "File System Call Statistics:\n  " + cvmfs::GetFsStats();
+        // Manually setting the values of the ShortString counters
+        cvmfs::statistics_->Lookup("pathstring.n_instances")->
+            Set(PathString::num_instances());
+        cvmfs::statistics_->Lookup("pathstring.n_overflows")->
+            Set(PathString::num_overflows());
+        cvmfs::statistics_->Lookup("namestring.n_instances")->
+            Set(NameString::num_instances());
+        cvmfs::statistics_->Lookup("namestring.n_overflows")->
+            Set(NameString::num_overflows());
+        cvmfs::statistics_->Lookup("linkstring.n_instances")->
+            Set(LinkString::num_instances());
+        cvmfs::statistics_->Lookup("linkstring.n_overflows")->
+            Set(LinkString::num_overflows());
 
-        cvmfs::GetLruStatistics(&inode_stats, &path_stats, &md5path_stats);
-        result += "File Catalog Memory Cache:\n" +
-                  string("  inode cache:   ") + inode_stats.Print() +
-                  string("  path cache:    ") + path_stats.Print() +
-                  string("  md5path cache: ") + md5path_stats.Print();
-        result += string("  inode tracker: ") +
-                  cvmfs::PrintInodeTrackerStatistics();
+        // Manually setting the inode tracker numbers
+        glue::InodeTracker::Statistics inode_stats =
+          cvmfs::inode_tracker_->GetStatistics();
+        cvmfs::statistics_->Lookup("inode_tracker.n_insert")->Set(
+          atomic_read64(&inode_stats.num_inserts));
+        cvmfs::statistics_->Lookup("inode_tracker.n_remove")->Set(
+          atomic_read64(&inode_stats.num_removes));
+        cvmfs::statistics_->Lookup("inode_tracker.no_reference")->Set(
+          atomic_read64(&inode_stats.num_references));
+        cvmfs::statistics_->Lookup("inode_tracker.n_hit_inode")->Set(
+          atomic_read64(&inode_stats.num_hits_inode));
+        cvmfs::statistics_->Lookup("inode_tracker.n_hit_path")->Set(
+          atomic_read64(&inode_stats.num_hits_path));
+        cvmfs::statistics_->Lookup("inode_tracker.n_miss_path")->Set(
+          atomic_read64(&inode_stats.num_misses_path));
 
-        result += "File Catalogs:\n  " + cvmfs::GetCatalogStatistics().Print();
-        result += "Certificate cache:\n  " + cvmfs::GetCertificateStats();
-
-        result += "Path Strings:\n  instances: " +
-          StringifyInt(PathString::num_instances()) + "  overflows: " +
-          StringifyInt(PathString::num_overflows()) + "\n";
-        result += "Name Strings:\n  instances: " +
-          StringifyInt(NameString::num_instances()) + "  overflows: " +
-          StringifyInt(NameString::num_overflows()) + "\n";
-        result += "Symlink Strings:\n  instances: " +
-          StringifyInt(LinkString::num_instances()) + "  overflows: " +
-          StringifyInt(LinkString::num_overflows()) + "\n";
-
-        result += "\nCache Mode: ";
-        switch (cache::GetCacheMode()) {
-          case cache::kCacheReadWrite:
-            result += "read-write";
-            break;
-          case cache::kCacheReadOnly:
-            result += "read-only";
-            break;
-          default:
-            result += "unknown";
+        if (cvmfs::cache_manager_->id() == cache::kPosixCacheManager) {
+          cache::PosixCacheManager *cache_mgr =
+            reinterpret_cast<cache::PosixCacheManager *>(cvmfs::cache_manager_);
+          result += "\nCache Mode: ";
+          switch (cache_mgr->cache_mode()) {
+            case cache::PosixCacheManager::kCacheReadWrite:
+              result += "read-write";
+              break;
+            case cache::PosixCacheManager::kCacheReadOnly:
+              result += "read-only";
+              break;
+            default:
+              result += "unknown";
+          }
         }
         bool drainout_mode;
         bool maintenance_mode;
@@ -374,22 +423,6 @@ static void *MainTalk(void *data __attribute__((unused))) {
           result += "\nNFS Map Statistics:\n";
           result += nfs_maps::GetStatistics();
         }
-
-        result += "\nNetwork Statistics:\n";
-        result += download::GetStatistics().Print();
-        unsigned proxy_reset_delay, host_reset_delay;
-        time_t proxy_timestamp_failover, host_timestamp_failover;
-        download::GetProxyBackupInfo(&proxy_reset_delay,
-                                     &proxy_timestamp_failover);
-        download::GetHostBackupInfo(&host_reset_delay,
-                                    &host_timestamp_failover);
-        result += "Backup proxy group: " + ((proxy_timestamp_failover > 0) ?
-          ("Backup since " + StringifyTime(proxy_timestamp_failover, true)) :
-          "Primary") + "\n";
-        result += "Backup host: " + ((host_timestamp_failover > 0) ?
-          ("Backup since " + StringifyTime(host_timestamp_failover, true)) :
-          "Primary");
-        result += "\n\n";
 
         result += "SQlite Statistics:\n";
         sqlite3_status(SQLITE_STATUS_MALLOC_COUNT, &current, &highwater, 0);
@@ -427,6 +460,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
         result += "  Largest scratch allocation " + StringifyInt(highwater/1024)
                   + " KB\n";
 
+        result += "\nRaw Counters:\n" +
+          cvmfs::statistics_->PrintList(perf::Statistics::kPrintHeader);
+
         Answer(con_fd, result);
       } else if (line == "reset error counters") {
         cvmfs::ResetErrorCounters();
@@ -435,23 +471,24 @@ static void *MainTalk(void *data __attribute__((unused))) {
         const string pid_str = StringifyInt(cvmfs::pid_) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "pid cachemgr") {
-        const string pid_str = StringifyInt(quota::GetPid()) + "\n";
+        const string pid_str =
+          StringifyInt(cvmfs::cache_manager_->quota_mgr()->GetPid()) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "pid watchdog") {
         const string pid_str = StringifyInt(monitor::GetPid()) + "\n";
         Answer(con_fd, pid_str);
       } else if (line == "parameters") {
-        Answer(con_fd, options::Dump());
+        Answer(con_fd, options_manager_->Dump());
       } else if (line == "hotpatch history") {
         string history_str =
-          StringifyTime(cvmfs::loader_exports_->boot_time, false) +
+          StringifyTime(cvmfs::loader_exports_->boot_time, true) +
           "    (start of CernVM-FS loader " +
           cvmfs::loader_exports_->loader_version + ")\n";
         for (loader::EventList::const_iterator i =
              cvmfs::loader_exports_->history.begin(),
              iEnd = cvmfs::loader_exports_->history.end(); i != iEnd; ++i)
         {
-          history_str += StringifyTime((*i)->timestamp, false) +
+          history_str += StringifyTime((*i)->timestamp, true) +
             "    (loaded CernVM-FS Fuse Module " +
             (*i)->so_version + ")\n";
         }
@@ -463,8 +500,16 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "version patchlevel") {
         Answer(con_fd, string(CVMFS_PATCH_LEVEL) + "\n");
       } else if (line == "tear down to read-only") {
-        cache::TearDown2ReadOnly();
-        Answer(con_fd, "In read-only mode\n");
+        if (cvmfs::cache_manager_->id() != cache::kPosixCacheManager) {
+          Answer(con_fd, "not supported\n");
+        } else {
+          // hack
+          cvmfs::UnregisterQuotaListener();
+          cache::PosixCacheManager *cache_mgr =
+            reinterpret_cast<cache::PosixCacheManager *>(cvmfs::cache_manager_);
+          cache_mgr->TearDown2ReadOnly();
+          Answer(con_fd, "In read-only mode\n");
+        }
       } else {
         Answer(con_fd, "unknown command\n");
       }
@@ -478,11 +523,12 @@ static void *MainTalk(void *data __attribute__((unused))) {
 /**
  * Init the socket.
  */
-bool Init(const string &cachedir) {
+bool Init(const string &cachedir, OptionsManager *options_manager) {
   if (initialized_) return true;
   spawned_ = false;
   cachedir_ = new string(cachedir);
   socket_path_ = new string(cachedir + "/cvmfs_io." + *cvmfs::repository_name_);
+  options_manager_ = options_manager;
 
   socket_fd_ = MakeSocket(*socket_path_, 0660);
   if (socket_fd_ == -1)
@@ -519,7 +565,8 @@ void Fini() {
   result = unlink(socket_path_->c_str());
   if (result != 0) {
     LogCvmfs(kLogTalk, kLogSyslogWarn,
-             "Could not remove cvmfs_io socket from cache directory.");
+             "Could not remove cvmfs_io socket from cache directory (%d)",
+             errno);
   }
 
   delete cachedir_;

@@ -1,0 +1,90 @@
+
+cvmfs_test_name="Query Geo-API for server and fallback proxy order"
+
+get_first_proxyname() {
+    sudo cvmfs_talk -i grid.cern.ch proxy info|sed -n 's/^\[0\] //p'|sed 's/.*(//;s/,.*//'
+}
+
+get_second_proxyname() {
+    sudo cvmfs_talk -i grid.cern.ch proxy info|sed -n 's/^\[1\] //p'|sed 's/.*(//;s/,.*//'
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  # Only three stratum 1s, make sure FNAL is among them.
+  # Also make sure that they have large geographical distance
+  sudo sh -c 'echo "CVMFS_SERVER_URL=\"http://cvmfs02.grid.sinica.edu.tw:8000/cvmfs/@fqrn@;http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;http://cvmfs.fnal.gov:8000/cvmfs/@fqrn@\"" > /etc/cvmfs/config.d/grid.cern.ch.local' || return 100
+  sudo sh -c 'echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 101
+  sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 102
+  cvmfs_mount grid.cern.ch || return 1
+
+  sudo cvmfs_talk -i grid.cern.ch host probe geo || return 10
+  local geo_probe=$(attr -qg host_list /cvmfs/grid.cern.ch)
+
+  sudo cvmfs_talk -i grid.cern.ch host probe || return 2
+  local normal_probe=$(attr -qg host_list /cvmfs/grid.cern.ch)
+
+  echo "geo_probe: $geo_probe"
+  echo "normal_probe: $normal_probe"
+
+  if hostname -f | grep -q cern.ch; then
+    if [ "$geo_probe" != "http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch;http://cvmfs.fnal.gov:8000/cvmfs/grid.cern.ch;http://cvmfs02.grid.sinica.edu.tw:8000/cvmfs/grid.cern.ch" ]; then
+      return 20;
+    fi
+  else
+    echo "Warning: cannot check correct ordering of stratum 1s outside cern.ch domain"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  fi
+
+  # also test ordering of fallback proxies
+  local non_fallback_proxy=$(get_first_proxyname)
+  if [ "$non_fallback_proxy" != "DIRECT" ]; then
+    return 30
+  fi
+
+  cvmfs_umount grid.cern.ch
+  sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=\"http://cmsopsquid.cern.ch:3128;http://cmsbproxy.fnal.gov:3128\"" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 301
+  cvmfs_mount grid.cern.ch || return 3
+
+  sudo cvmfs_talk -i grid.cern.ch proxy info
+  sudo cvmfs_talk -i grid.cern.ch host probe geo || return 31
+  sudo cvmfs_talk -i grid.cern.ch proxy info
+  local first_fallback_proxy=$(get_first_proxyname)
+  echo "first_fallback_proxy: $first_fallback_proxy"
+  if [ -z "$first_fallback_proxy" ]; then
+    return 32
+  fi
+  if [ "$first_fallback_proxy" = "DIRECT" ]; then
+    # DIRECT is supposed to be removed when there's a fallback proxy
+    return 33
+  fi
+
+  sudo cvmfs_talk -i grid.cern.ch proxy fallback "http://cmsbproxy.fnal.gov:3128;http://cmsopsquid.cern.ch:3128" || return 34
+  sudo cvmfs_talk -i grid.cern.ch proxy info
+  sudo cvmfs_talk -i grid.cern.ch host probe geo || return 35
+  sudo cvmfs_talk -i grid.cern.ch proxy info
+  local second_fallback_proxy=$(get_first_proxyname)
+  echo "second_fallback_proxy: $second_fallback_proxy"
+
+  # make sure that the same one comes up as first no matter which order
+  #   they started in
+  if [ "$first_fallback_proxy" != "$second_fallback_proxy" ]; then
+    return 36
+  fi
+
+  sudo cvmfs_talk -i grid.cern.ch proxy set "http://ca-proxy.cern.ch:3128" || return 37
+  sudo cvmfs_talk -i grid.cern.ch proxy info
+  sudo cvmfs_talk -i grid.cern.ch host probe geo || return 38
+  sudo cvmfs_talk -i grid.cern.ch proxy info
+  local third_fallback_proxy=$(get_second_proxyname)
+  echo "third_fallback_proxy: $third_fallback_proxy"
+
+  # make sure that the ordering is unaffected by regular proxies
+  if [ "$third_fallback_proxy" != "$second_fallback_proxy" ]; then
+    return 39
+  fi
+
+  sudo rm -f /etc/cvmfs/config.d/grid.cern.ch.local
+  return 0
+}

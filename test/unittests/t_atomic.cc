@@ -1,3 +1,7 @@
+/**
+ * This file is part of the CernVM File System.
+ */
+
 #include <gtest/gtest.h>
 
 #include <pthread.h>
@@ -10,8 +14,8 @@ class T_Atomic : public ::testing::Test {
     atomic_init32(&atomic32_);
     atomic_init64(&atomic64_);
 
-    ASSERT_EQ (0, atomic32_);
-    ASSERT_EQ (0, atomic64_);
+    ASSERT_EQ(0, atomic32_);
+    ASSERT_EQ(0, atomic64_);
   }
 
 
@@ -47,6 +51,30 @@ class T_Atomic : public ::testing::Test {
   }
 
 
+  static void *concurrent_assigner32(void *atomic) {
+    const int cycles = T_Atomic::concurrent_writer_cycles;
+
+    atomic_int32 *atomic32 = static_cast<atomic_int32*>(atomic);
+    for (int i = 0; i < cycles; ++i) {
+      atomic_write32(atomic32, static_cast<int32_t>(i));
+    }
+
+    return atomic;
+  }
+
+
+  static void *concurrent_assigner64(void *atomic) {
+    const int cycles = T_Atomic::concurrent_writer_cycles;
+
+    atomic_int64 *atomic64 = static_cast<atomic_int64*>(atomic);
+    for (int i = 0; i < cycles; ++i) {
+      atomic_write64(atomic64, static_cast<int64_t>(i));
+    }
+
+    return atomic;
+  }
+
+
  protected:
   atomic_int32 atomic32_;
   atomic_int64 atomic64_;
@@ -60,8 +88,8 @@ TEST_F(T_Atomic, InitialReadAtomicInts) {
   const int32_t i32 = atomic_read32(&atomic32_);
   const int64_t i64 = atomic_read64(&atomic64_);
 
-  EXPECT_EQ (0, i32);
-  EXPECT_EQ (0, i64);
+  EXPECT_EQ(0, i32);
+  EXPECT_EQ(0, i64);
 }
 
 
@@ -78,8 +106,8 @@ TEST_F(T_Atomic, IncrementAtomicInts) {
     i32 = atomic_read32(&atomic32_);
     i64 = atomic_read64(&atomic64_);
 
-    EXPECT_EQ (i, i32);
-    EXPECT_EQ (i, i64);
+    EXPECT_EQ(i, i32);
+    EXPECT_EQ(i, i64);
   }
 }
 
@@ -94,8 +122,8 @@ TEST_F(T_Atomic, AddToAtomicInts) {
   const int32_t i32 = atomic_read32(&atomic32_);
   const int64_t i64 = atomic_read64(&atomic64_);
 
-  EXPECT_EQ (off1, i32);
-  EXPECT_EQ (off2, i64);
+  EXPECT_EQ(off1, i32);
+  EXPECT_EQ(off2, i64);
 }
 
 
@@ -112,8 +140,8 @@ TEST_F(T_Atomic, SubtractFromAtomicInts) {
   const int32_t i32 = atomic_read32(&atomic32_);
   const int64_t i64 = atomic_read64(&atomic64_);
 
-  EXPECT_EQ (off1 - off2, i32);
-  EXPECT_EQ (off2 - off1, i64);
+  EXPECT_EQ(off1 - off2, i32);
+  EXPECT_EQ(off2 - off1, i64);
 }
 
 
@@ -133,8 +161,8 @@ TEST_F(T_Atomic, DecrementAtomicInts) {
     i32 = atomic_read32(&atomic32_);
     i64 = atomic_read64(&atomic64_);
 
-    EXPECT_EQ (i, i32);
-    EXPECT_EQ (i, i64);
+    EXPECT_EQ(i, i32);
+    EXPECT_EQ(i, i64);
   }
 }
 
@@ -148,17 +176,88 @@ TEST_F(T_Atomic, CompareAndSetAtomicInts) {
 
   const int32_t res1   = atomic_cas32(&atomic32_, off2, off3);
   const int32_t value1 = atomic_read32(&atomic32_);
-  EXPECT_FALSE (res1);
-  EXPECT_EQ (off1, value1);
+  EXPECT_FALSE(res1);
+  EXPECT_EQ(off1, value1);
 
   const int32_t res2   = atomic_cas32(&atomic32_, off1, off3);
   const int32_t value2 = atomic_read32(&atomic32_);
-  EXPECT_TRUE (res2);
-  EXPECT_EQ (off3, value2);
+  EXPECT_TRUE(res2);
+  EXPECT_EQ(off3, value2);
 }
 
 
-TEST_F(T_Atomic, ConcurrentWriteOfAtomicInts) {
+TEST_F(T_Atomic, TransactionalAssignment) {
+  const int32_t value1 = 1337;
+  const int32_t value2 = 42;
+  const int32_t value3 = 128;
+
+  const int64_t value4 = 1247623;
+  const int64_t value5 = 53847432;
+  const int64_t value6 = 0xFFFFFFFF;
+
+  atomic_write32(&atomic32_, value1);
+  EXPECT_EQ(value1, atomic_read32(&atomic32_));
+
+  atomic_write32(&atomic32_, value2);
+  EXPECT_EQ(value2, atomic_read32(&atomic32_));
+
+  atomic_write32(&atomic32_, value3);
+  EXPECT_EQ(value3, atomic_read32(&atomic32_));
+
+  atomic_write64(&atomic64_, value4);
+  EXPECT_EQ(value4, atomic_read64(&atomic64_));
+
+  atomic_write64(&atomic64_, value5);
+  EXPECT_EQ(value5, atomic_read64(&atomic64_));
+
+  atomic_write64(&atomic64_, value6);
+  EXPECT_EQ(value6, atomic_read64(&atomic64_));
+}
+
+
+TEST_F(T_Atomic, ConcurrentTransactionalAssignmentsSlow) {
+  const int pthreads = 20;
+
+  pthread_t threads32[pthreads];
+  pthread_t threads64[pthreads];
+
+  int pthread_result;
+
+  for (int i = 0; i < pthreads; ++i) {
+    pthread_result = pthread_create(&threads32[i],
+                                     NULL,
+                                    &T_Atomic::concurrent_assigner32,
+                                     static_cast<void*>(&atomic32_));
+    ASSERT_EQ(0, pthread_result);
+  }
+
+  for (int i = 0; i < pthreads; ++i) {
+    pthread_join(threads32[i], NULL);
+  }
+
+  const int32_t result32 = atomic_read32(&atomic32_);
+  EXPECT_EQ(T_Atomic::concurrent_writer_cycles - 1, result32);
+
+  // ----
+
+  for (int i = 0; i < pthreads; ++i) {
+    pthread_result = pthread_create(&threads64[i],
+                                     NULL,
+                                    &T_Atomic::concurrent_assigner64,
+                                     static_cast<void*>(&atomic64_));
+    ASSERT_EQ(0, pthread_result);
+  }
+
+  for (int i = 0; i < pthreads; ++i) {
+    pthread_join(threads64[i], NULL);
+  }
+
+  const int64_t result64 = atomic_read64(&atomic64_);
+  EXPECT_EQ(T_Atomic::concurrent_writer_cycles - 1, result64);
+}
+
+
+TEST_F(T_Atomic, ConcurrentWriteOfAtomicIntsSlow) {
   const int pthreads = 100;
 
   pthread_t threads32[pthreads];
@@ -179,7 +278,7 @@ TEST_F(T_Atomic, ConcurrentWriteOfAtomicInts) {
   }
 
   const int32_t result32 = atomic_read32(&atomic32_);
-  EXPECT_EQ (T_Atomic::concurrent_writer_result * pthreads, result32);
+  EXPECT_EQ(T_Atomic::concurrent_writer_result * pthreads, result32);
 
   for (int i = 0; i < pthreads; ++i) {
     pthread_result = pthread_create(&threads64[i],
@@ -194,5 +293,5 @@ TEST_F(T_Atomic, ConcurrentWriteOfAtomicInts) {
   }
 
   const int64_t result64 = atomic_read64(&atomic64_);
-  EXPECT_EQ (T_Atomic::concurrent_writer_result * pthreads, result64);
+  EXPECT_EQ(T_Atomic::concurrent_writer_result * pthreads, result64);
 }

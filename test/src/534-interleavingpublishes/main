@@ -1,0 +1,79 @@
+cvmfs_test_name="Prevent Interleaving Publish Operations"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "filling the repository with contents of /bin"
+  cp_bin $repo_dir || return 1
+
+  echo "creating CVMFS snapshot (in the backgroud)"
+  cvmfs_server publish $CVMFS_TEST_REPO &
+  local first_publish_pid=$!
+  echo "PID: $first_publish_pid"
+
+  echo "try an (immediate) interleaving publish operation"
+  cvmfs_server publish $CVMFS_TEST_REPO &
+  local second_publish_pid=$!
+  echo "PID: $second_publish_pid"
+
+  echo "wait for the first publish process to successfully finish"
+  wait $first_publish_pid
+  local first_publish_ret=$?
+  wait $second_publish_pid
+  local second_publish_ret=$?
+  if [ $first_publish_ret -eq 0 ]; then
+    [ $second_publish_ret -ne 0 ] || return 2
+  else
+    [ $second_publish_ret -eq 0 ] || return 3
+  fi
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "create a new transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "filling the repository with contents of /bin again"
+  mkdir ${repo_dir}/new || return 4
+  cp_bin ${repo_dir}/new || return 5
+
+  echo "creating CVMFS snapshot (in the background)"
+  cvmfs_server publish $CVMFS_TEST_REPO &
+  local second_publish=$!
+  echo "PID: $second_publish"
+
+  echo "try an interleaving publish operation (with some delay)"
+  sleep 1
+  cvmfs_server publish $CVMFS_TEST_REPO
+  [ $? -ne 0 ] || return 6
+
+  echo "wait for the second publish process to successfully finish"
+  wait $second_publish
+  [ $? -eq 0 ] || return 7
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "create a new transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "republish to see if a second round still works"
+  publish_repo $CVMFS_TEST_REPO || return 4
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  return 0
+}
+

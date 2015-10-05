@@ -4,10 +4,21 @@
 script_location=$(dirname $(readlink --canonicalize $0))
 . ${script_location}/common_setup.sh
 
+echo -n "creating additional disk partitions... "
+disk_to_partition=/dev/vda
+free_disk_space=$(get_unpartitioned_space $disk_to_partition)
+cache_partition_size=16106127360 # 15 GiB
+if [ $free_disk_space -lt $cache_partition_size ]; then
+  die "fail (not enough unpartitioned disk space - $free_disk_space bytes)"
+fi
+create_partition $disk_to_partition $cache_partition_size || die "fail (creating partition)"
+echo "done"
+
 # install RPM packages
 echo "installing RPM packages... "
-install_rpm $KEYS_PACKAGE
+install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
+install_rpm $SERVER_PACKAGE   # only needed for tbb shared libs (unit tests)
 install_rpm $UNITTEST_PACKAGE
 
 # we need to disable SELinux for the x86 version of SLC5
@@ -27,3 +38,8 @@ echo "done"
 # install test dependencies
 echo "installing test dependencies..."
 install_from_repo gcc
+
+# rebooting the system (returning 0 value)
+echo "sleep 1 && reboot" > killme.sh
+sudo nohup sh < killme.sh &
+exit 0

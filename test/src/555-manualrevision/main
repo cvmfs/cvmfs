@@ -1,0 +1,63 @@
+cvmfs_test_name="Manually Setting the Repository Revision Number"
+cvmfs_test_autofs_on_startup=false
+
+check_revision() {
+  local repository=$1
+  local expected_revision=$2
+  local repository_revision=
+  local repo_url=$(get_repo_url $repository)
+
+  repository_revision=$(cvmfs_swissknife info -r $repo_url -v)
+  [ ! -z $repository_revision ] || return 1
+  if [ $expected_revision -ne $repository_revision ]; then
+    echo "expected: $expected_revision but found: $repository_revision"
+    return 1
+  fi
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local revision
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "check the revision (should be 2)"
+  check_revision $CVMFS_TEST_REPO 2 || return 1
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "creating CVMFS snapshot (manually setting revision to 42)"
+  publish_repo $CVMFS_TEST_REPO -n 42 || return $?
+
+  echo "check the revision (should be 42)"
+  check_revision $CVMFS_TEST_REPO 42 || return 2
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "creating CVMFS snapshot (manually setting revision to 42 again) expecting failure"
+  publish_repo $CVMFS_TEST_REPO -n 42 && return 3
+
+  echo "check the revision (should be 42)"
+  check_revision $CVMFS_TEST_REPO 42 || return 4
+
+  echo "creating CVMFS snapshot (manually setting revision to 10) expecting failure"
+  publish_repo $CVMFS_TEST_REPO -n 10 && return 5
+
+  echo "check the revision (should be 42)"
+  check_revision $CVMFS_TEST_REPO 42 || return 6
+
+  echo "creating CVMFS snapshot (no manual revision)"
+  publish_repo $CVMFS_TEST_REPO || return 7
+
+  echo "check the revision (should be 43)"
+  check_revision $CVMFS_TEST_REPO 43 || return 8
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}
+

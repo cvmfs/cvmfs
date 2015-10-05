@@ -14,7 +14,7 @@ prerelease=$4
 mkdir $packagedir/{BUILD,RPMS,SOURCES,SRPMS,TMP}
 
 cp ${rpmdir}/cvmfs-universal.spec $packagedir || exit 4
-cp ${rpmdir}/cvmfs.te $packagedir/SOURCES || exit 8
+cp ${rpmdir}/cvmfs.te ${rpmdir}/cvmfs.fc $packagedir/SOURCES || exit 8
 cp $tarball $packagedir/SOURCES || exit 5
 cd $packagedir || exit 6
 version=`basename $tarball | sed 's/^cvmfs-//' | sed 's/\.tar\.gz//'`
@@ -26,5 +26,5 @@ if [ $? -eq 0 ]; then
   sed -i -e "s/^%setup -q/%setup -q -n cvmfs-$version/" cvmfs-universal.spec || exit 7
 fi
 
-rpmbuild --define "%_topdir $packagedir" --define "%_tmppath ${packagedir}/TMP" -ba cvmfs-universal.spec
+rpmbuild --define="_topdir $packagedir" --define="_tmppath ${packagedir}/TMP" -ba cvmfs-universal.spec
 

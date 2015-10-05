@@ -6,8 +6,8 @@ cvmfs_run_test() {
 
   cvmfs_mount lhcb.cern.ch || return 1
   
-  stat /cvmfs/lhcb.cern.ch/lib/lhcb/GEANT4/GEANT4_v92r4/Makefile >> $logfile || return 2
-  stat /cvmfs/lhcb.cern.ch/lib/lhcb/GEANT4/GEANT4_v92r4p1/Makefile >> $logfile || return 3
+  stat /cvmfs/lhcb.cern.ch/lib/lhcb/GEANT4/GEANT4_v92r4/Makefile || return 2
+  stat /cvmfs/lhcb.cern.ch/lib/lhcb/GEANT4/GEANT4_v92r4p1/Makefile || return 3
   return 0
 }
 

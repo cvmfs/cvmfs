@@ -1,0 +1,40 @@
+
+cvmfs_test_name="Using config files from /etc/cvmfs/default.d/"
+
+create_config_files() {
+  sudo sh -c "echo CVMFS_KCACHE_TIMEOUT=2 > /etc/cvmfs/default.d/50-testA.conf" || return 1
+  sudo sh -c "echo CVMFS_KCACHE_TIMEOUT=3 > /etc/cvmfs/default.d/50-testB.conf" || return 2
+
+  return 0
+}
+
+cleanup_config_files() {
+  sudo rm -f /etc/cvmfs/default.d/50-test*
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local retval=0
+  create_config_files || retval=1
+
+  cvmfs_mount grid.cern.ch || retval=2
+  sudo cvmfs_talk -i grid.cern.ch parameters | grep CVMFS_KCACHE_TIMEOUT=3 | grep /etc/cvmfs/default.d/50-testB.conf || retval=3
+  cvmfs_config showconfig grid.cern.ch | grep CVMFS_KCACHE_TIMEOUT=3 | grep /etc/cvmfs/default.d/50-testB.conf || retval=4
+  cvmfs_umount grid.cern.ch || retval=5
+
+  cvmfs_mount grid.cern.ch "CVMFS_KCACHE_TIMEOUT=4" || retval=6
+  sudo cvmfs_talk -i grid.cern.ch parameters | grep CVMFS_KCACHE_TIMEOUT=4 | grep /etc/cvmfs/default.local || retval=7
+  cvmfs_config showconfig grid.cern.ch | grep CVMFS_KCACHE_TIMEOUT=4| grep /etc/cvmfs/default.local || retval=8
+  cvmfs_umount grid.cern.ch || retval=9
+
+  sudo mv /etc/cvmfs/default.d/50-testB.conf    /etc/cvmfs/default.d/50-testB.conf.disbled || retval=10
+
+  cvmfs_mount grid.cern.ch || retval=20
+  sudo cvmfs_talk -i grid.cern.ch parameters | grep CVMFS_KCACHE_TIMEOUT=2 | grep /etc/cvmfs/default.d/50-testA.conf || retval=21
+  cvmfs_config showconfig grid.cern.ch | grep CVMFS_KCACHE_TIMEOUT=2 | grep /etc/cvmfs/default.d/50-testA.conf || retval=22
+  cvmfs_umount grid.cern.ch || retval=23
+
+  cleanup_config_files
+  return $retval
+}

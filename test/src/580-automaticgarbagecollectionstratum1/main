@@ -1,0 +1,275 @@
+
+cvmfs_test_name="Automatic Garbage Collection on Stratum 1"
+cvmfs_test_autofs_on_startup=false
+
+unix_timestamp() {
+  date +%s
+}
+
+export CVMFS_TEST_580_LAST_PUBLISH=last_publish
+export CVMFS_TEST_580_THRESH_SECONDS=200
+export CVMFS_TEST_580_SECONDS_MARGIN=50
+
+create_revision() {
+  local repo_name=$1
+  local publish_log="$(mktemp ./publish.log.XXXXX)"
+
+  start_transaction $repo_name > /dev/null 2>&1    || return 1
+  publish_repo      $repo_name > $publish_log 2>&1 || return 2
+  unix_timestamp > $CVMFS_TEST_580_LAST_PUBLISH
+
+  echo "$(get_current_root_catalog $repo_name)C"
+}
+
+sleep_to_match_threshold() {
+  local last_publish=$(cat $CVMFS_TEST_580_LAST_PUBLISH)
+  local time_since_publish=$(( $(unix_timestamp) - $last_publish ))
+  local sleep_for=$(( $CVMFS_TEST_580_THRESH_SECONDS - $time_since_publish - $CVMFS_TEST_580_SECONDS_MARGIN ))
+  echo "sleep $sleep_for seconds ($time_since_publish)"
+  sleep $sleep_for
+
+}
+
+CVMFS_TEST_580_REPLICA_NAME=""
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $CVMFS_TEST_580_REPLICA_NAME ]; then
+    sudo cvmfs_server rmfs -f $CVMFS_TEST_580_REPLICA_NAME
+  fi
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local root_catalog0=""
+  local root_catalog1=""
+  local root_catalog2=""
+  local root_catalog3=""
+  local root_catalog4=""
+  local root_catalog5=""
+  local root_catalog6=""
+
+  local seconds_margin=$CVMFS_TEST_580_SECONDS_MARGIN
+  local thresh_seconds=$CVMFS_TEST_580_THRESH_SECONDS
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging ($(display_timestamp now))"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+  root_catalog0="$(get_current_root_catalog $CVMFS_TEST_REPO)C"
+
+  echo "disable automatic garbage collection on stratum 0"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 3
+
+  echo "register cleanup trap"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create a stratum1 replication (with enabled auto garbage collection)"
+  replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  CVMFS_TEST_580_REPLICA_NAME="$replica_name"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                  -z || return 4
+
+  echo "create an initial snapshot"
+  cvmfs_server snapshot $replica_name || return 5
+
+  echo "check if initial catalog is there (stratum 0)"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 6 # just created
+
+  echo "check if initial catalog is there (stratum 1)"
+  peek_backend $replica_name $root_catalog0 || return 7
+
+  echo "configure stratum 1 to automatically delete revisions older than $thresh_seconds seconds"
+  local replica_server_conf="/etc/cvmfs/repositories.d/${replica_name}/server.conf"
+  echo "CVMFS_AUTO_GC_TIMESPAN='$thresh_seconds seconds ago'" | sudo tee --append $replica_server_conf || return 8
+  cat $replica_server_conf || return 9
+
+  echo "create revision 1 ($(display_timestamp now))"
+  root_catalog1="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "create snapshot of revision 1"
+  cvmfs_server snapshot $replica_name || return 10
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 11
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 12
+  check_repository $replica_name -i    || return 13
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 14 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 15 # trunk
+  peek_backend $replica_name    $root_catalog0 || return 16 # trunk-previous
+  peek_backend $replica_name    $root_catalog1 || return 17 # trunk
+
+  sleep_to_match_threshold
+
+  echo "create revision 2 ($(display_timestamp now))"
+  root_catalog2="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "create snapshot of revision 2"
+  cvmfs_server snapshot $replica_name || return 18
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 19
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 20
+  check_repository $replica_name -i    || return 21
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 22 # sentinel revision
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 23 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 24 # trunk
+  peek_backend $replica_name    $root_catalog0 || return 25 # sentinel revision
+  peek_backend $replica_name    $root_catalog1 || return 26 # trunk-previous
+  peek_backend $replica_name    $root_catalog2 || return 27 # trunk
+
+  sleep_to_match_threshold
+
+  echo "create revision 3 ($(display_timestamp now))"
+  root_catalog3="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "create snapshot of revision 3"
+  cvmfs_server snapshot $replica_name || return 28
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 29
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 30
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 31
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 32 # sentinel revision
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 33 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 34 # trunk
+  peek_backend $replica_name    $root_catalog0 && return 35 # GC'ed
+  peek_backend $replica_name    $root_catalog1 || return 36 # sentinel revision
+  peek_backend $replica_name    $root_catalog2 || return 37 # trunk-previous
+  peek_backend $replica_name    $root_catalog3 || return 38 # trunk
+
+  sleep_to_match_threshold
+
+  echo "create revision 4 ($(display_timestamp now))"
+  root_catalog4="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "create snapshot of revision 4"
+  cvmfs_server snapshot $replica_name || return 39
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 40
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 41
+  check_repository $replica_name -i    || return 41
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 42
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 43
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 44 # sentinel revision
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 45 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 46 # trunk
+  peek_backend $replica_name    $root_catalog0 && return 47 # GC'ed
+  peek_backend $replica_name    $root_catalog1 && return 48 # GC'ed
+  peek_backend $replica_name    $root_catalog2 || return 49 # sentinel revision
+  peek_backend $replica_name    $root_catalog3 || return 50 # trunk-previous
+  peek_backend $replica_name    $root_catalog4 || return 51 # trunk
+
+  sleep_to_match_threshold
+
+  echo "create revision 5 ($(display_timestamp now))"
+  root_catalog5="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "create snapshot of revision 5"
+  cvmfs_server snapshot $replica_name || return 52
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 53
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 54
+  check_repository $replica_name -i    || return 55
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 56
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 57
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 58
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 59 # sentinel revision
+  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 60 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 61 # trunk
+  peek_backend $replica_name    $root_catalog0 && return 62 # GC'ed
+  peek_backend $replica_name    $root_catalog1 && return 63 # GC'ed
+  peek_backend $replica_name    $root_catalog2 && return 64 # GC'ed
+  peek_backend $replica_name    $root_catalog3 || return 65 # sentinel revision
+  peek_backend $replica_name    $root_catalog4 || return 66 # trunk-previous
+  peek_backend $replica_name    $root_catalog5 || return 67 # trunk
+
+  echo "disable automatic garbage collection on stratum 1"
+  disable_auto_garbage_collection $replica_name || return $?
+
+  sleep_to_match_threshold
+
+  echo "create revision 6 ($(display_timestamp now))"
+  root_catalog6="$(create_revision $CVMFS_TEST_REPO)"
+
+  echo "create snapshot of revision 6"
+  cvmfs_server snapshot $replica_name || return 70
+
+  echo "list named snapshots"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 71
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 72
+  check_repository $replica_name -i    || return 73
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return 74
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return 75
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return 76
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return 77
+  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return 78 # sentinel revision
+  peek_backend $CVMFS_TEST_REPO $root_catalog5 || return 79 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog6 || return 80 # trunk
+  peek_backend $replica_name    $root_catalog0 && return 81 # GC'ed
+  peek_backend $replica_name    $root_catalog1 && return 82 # GC'ed
+  peek_backend $replica_name    $root_catalog2 && return 83 # GC'ed
+  peek_backend $replica_name    $root_catalog3 || return 84 # auto-GC disabled
+  peek_backend $replica_name    $root_catalog4 || return 85 # sentinel revision
+  peek_backend $replica_name    $root_catalog5 || return 86 # trunk-previous
+  peek_backend $replica_name    $root_catalog6 || return 87 # trunk
+
+  echo "run a manual garbage collection (delete all but last two) on stratum 1"
+  cvmfs_server gc -f $replica_name || return 88
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 89
+  check_repository $replica_name -i    || return 90
+
+  echo "check catalogs"
+  peek_backend $CVMFS_TEST_REPO $root_catalog0 || return  91
+  peek_backend $CVMFS_TEST_REPO $root_catalog1 || return  92
+  peek_backend $CVMFS_TEST_REPO $root_catalog2 || return  93
+  peek_backend $CVMFS_TEST_REPO $root_catalog3 || return  94
+  peek_backend $CVMFS_TEST_REPO $root_catalog4 || return  95
+  peek_backend $CVMFS_TEST_REPO $root_catalog5 || return  96 # trunk-previous
+  peek_backend $CVMFS_TEST_REPO $root_catalog6 || return  97 # trunk
+  peek_backend $replica_name    $root_catalog0 && return  98 # GC'ed
+  peek_backend $replica_name    $root_catalog1 && return  99 # GC'ed
+  peek_backend $replica_name    $root_catalog2 && return 100 # GC'ed
+  peek_backend $replica_name    $root_catalog3 && return 101 # GC'ed
+  peek_backend $replica_name    $root_catalog4 && return 102 # GC'ed
+  peek_backend $replica_name    $root_catalog5 || return 103 # trunk-previous
+  peek_backend $replica_name    $root_catalog6 || return 104 # trunk
+
+  return 0
+}

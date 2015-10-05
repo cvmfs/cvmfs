@@ -2,15 +2,14 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "upload.h"
-#include "upload_file_chunker.h"
-
-#include "util_concurrency.h"
 
 #include <vector>
 
-using namespace upload;
+#include "util_concurrency.h"
 
+namespace upload {
 
 Spooler* Spooler::Construct(const SpoolerDefinition &spooler_definition) {
   Spooler *result = new Spooler(spooler_definition);
@@ -27,7 +26,11 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
 {}
 
 
-Spooler::~Spooler() {}
+Spooler::~Spooler() {
+  if (uploader_) {
+    uploader_->TearDown();
+  }
+}
 
 
 bool Spooler::Initialize() {
@@ -40,32 +43,12 @@ bool Spooler::Initialize() {
   }
 
   // configure the file processor context
-  file_processor_ = new FileProcessor(spooler_definition_,
-                                      uploader_.weak_ref());
+  file_processor_ = new FileProcessor(uploader_.weak_ref(),
+                                      spooler_definition_);
   file_processor_->RegisterListener(&Spooler::ProcessingCallback, this);
-
-  // initialize the file processor environment
-  if (! file_processor_->Initialize()) {
-    LogCvmfs(kLogSpooler, kLogWarning, "Failed to initialize concurrent "
-                                       "processing in Spooler.");
-    return false;
-  }
-
-  // configure the file chunking size restrictions
-  if (spooler_definition_.use_file_chunking) {
-    ChunkGenerator::SetFileChunkRestrictions(
-          spooler_definition_.min_file_chunk_size,
-          spooler_definition_.avg_file_chunk_size,
-          spooler_definition_.max_file_chunk_size);
-  }
 
   // all done...
   return true;
-}
-
-
-void Spooler::TearDown() {
-  WaitForTermination();
 }
 
 
@@ -76,7 +59,15 @@ void Spooler::Process(const std::string &local_path,
 
 
 void Spooler::ProcessCatalog(const std::string &local_path) {
-  file_processor_->Process(local_path, false, "C");
+  file_processor_->Process(local_path, false, shash::kSuffixCatalog);
+}
+
+void Spooler::ProcessHistory(const std::string &local_path) {
+  file_processor_->Process(local_path, false, shash::kSuffixHistory);
+}
+
+void Spooler::ProcessCertificate(const std::string &local_path) {
+  file_processor_->Process(local_path, false, shash::kSuffixCertificate);
 }
 
 
@@ -116,13 +107,8 @@ void Spooler::WaitForUpload() const {
 }
 
 
-void Spooler::WaitForTermination() const {
-  uploader_->WaitForUpload();
-  file_processor_->WaitForTermination();
-}
-
-
 unsigned int Spooler::GetNumberOfErrors() const {
-  return file_processor_->GetNumberOfErrors() +
-         uploader_->GetNumberOfErrors();
+  return uploader_->GetNumberOfErrors();
 }
+
+}  // namespace upload

@@ -1,0 +1,359 @@
+
+cvmfs_test_name="Garbage Collection With Partial History Preservation"
+cvmfs_test_autofs_on_startup=false
+
+get_file_hashes() {
+  local hashes="7a7b8c1a53908fcf59d5c3b6dfec71b69595d265
+bb32ded6fcae6139f2a77ea1c7ec6454cd1e1f6e
+eafdf64e6b502b46184f4e37b7c806e2ec57e7e0
+0e65bf413fbde0ebee028d3747b7dc4c02ae60b0
+a4f5077d7425ca05e67003e863dbf44db8e51873
+af59156fa51c8ca20d0fd1e3ff74598b713acd80
+3f3c454c63b9d097a3ebcf636a74fb5be56e326a
+aa8e2779787536e374b62eb9360cba759f3345e8
+8aed4ff614611dd21e0d5740bdff2109fa83093f
+5bcf3dab7feaa66fb9f23302f7052bf02f7c03a6
+ac1719a696faae9828d9f6645ce3b51faa06bcc4
+4b859d09f5c3b47cfb3c393705aad22eda1b51ff
+eb9e8f9601b9d476ac00ea53d7a98f819f1ece80
+f9482e1d275fe3adec7c3cd5dc02adbd255e7abb
+d284da5e616179cadc62c79db2ccee12a61e6859
+455aad768f80a17b2f2730078b192a19100a6065
+fa944244ed079beebc1484ea6e6c2c5bbcbc6a9f
+a6c444ac8fa179deff197e8c208acbd6c44a4809"
+  echo "$hashes"
+}
+
+get_file_hash() {
+  local file_number=$1
+  get_file_hashes | head -n $file_number | tail -n 1
+}
+
+create_repo_content() {
+  local repo_dir=$1
+  local revision=$2
+  local last_dir="$(pwd)"
+
+  cd $repo_dir
+
+  case "$revision" in
+    0)
+      mkdir -p dir1/sub1 dir1/sub2 dir1/sub3
+      touch dir1/sub1/.cvmfscatalog dir1/.cvmfscatalog
+      echo "moep" > dir1/sub2/file1
+      ;;
+    1)
+      mkdir -p dir2/sub1 dir2/sub2
+      mkdir -p dir1/sub4
+      touch dir1/sub4/.cvmfscatalog
+      echo "hallo" > dir2/sub2/welt
+      ;;
+    2)
+      mkdir -p dir2/sub3
+      mkdir -p dir3/sub1 dir3/sub2 dir3/sub3
+      touch dir3/sub1/.cvmfscatalog dir3/.cvmfscatalog
+      echo "foo" > dir3/foo
+      ;;
+    3)
+      echo "bar" > dir1/sub1/bar
+      echo "baz" > dir3/sub1/baz
+      touch dir1/sub2/.cvmfscatalog
+      ;;
+    4)
+      rm -f dir3/sub1/baz
+      rm -fR dir3
+      ;;
+    5)
+      echo "blow your" > dir1/sub2/mind
+      touch dir1/sub2/.cvmfscatalog
+      rm -fR dir1/sub4
+      ;;
+    6)
+      echo "not my business" > dir2/sub3/root
+      ;;
+    7)
+      mkdir -p dir3/sub1 dir3/sub2 dir3/sub3 dir3/sub4
+      touch dir3/sub1/.cvmfscatalog dir3/sub2/.cvmfscatalog dir3/sub3/.cvmfscatalog dir3/sub3/.cvmfscatalog
+      echo "this"      > dir3/sub1/file1
+      echo "is"        > dir3/sub1/file2
+      echo "a"         > dir3/sub1/file3
+      echo "fucking"   > dir3/sub1/file4
+      echo "boring"    > dir3/sub1/file5
+      echo "testcase"  > dir3/sub1/file6
+      ;;
+    8)
+      mkdir -p dir4/sub1 dir4/sub2 dir4/sub3
+      touch dir4/.cvmfscatalog
+      echo "I"         > dir4/sub1/a
+      echo "want"      > dir4/sub2/b
+      echo "holidays!" > dir4/sub3/c
+      ;;
+    9)
+      echo "this"      > dir3/sub1/file2
+      echo "changes"   > dir3/sub1/file5
+      echo "some"      > dir3/sub1/file3
+      echo "files..."  > dir3/sub1/file1
+      ;;
+    10)
+      rm -fR dir1/sub1
+      ;;
+    11)
+      mkdir -p dir1/sub1
+      cp_bin dir1/sub1
+      ;;
+    12)
+      echo "this"     > dir3/sub2/moep1
+      echo "changes"  > dir1/sub2/moep2
+      echo "some"     > dir3/sub3/moep3
+      echo "nested"   > dir4/sub2/moep4
+      echo "catalogs" > dir1/sub1/moep5
+      ;;
+    13)
+      rm -fR dir4/sub2
+      mkdir -p dir4/sub2/sub1 dir4/sub2/sub2
+      touch dir4/sub2/sub1/.cvmfscatalog dir4/sub2/sub2/.cvmfscatalog
+      ;;
+    14)
+      cp -R dir4 dir1/dir4
+      ;;
+    15)
+      rm -fR dir1
+      echo "I"        > dir2/sub1/foo1
+      echo "deleted"  > dir2/sub2/foo2
+      echo "a lot"    > dir3/sub1/foo3
+      echo "now!"     > dir3/sub2/foo4
+      ;;
+    16)
+      mkdir -p dir1/sub2 dir1/sub3
+      touch dir1/sub2/.cvmfscatalog
+      cp_bin dir1/sub2
+      ;;
+    17)
+      echo "That"     > dir1/sub3/bar1
+      echo "was"      > dir1/sub3/bar2
+      echo "a lot of" > dir1/sub3/bar3
+      echo "fun..."   > dir1/sub3/bar4
+      ;;
+  esac
+
+  cd $last_dir
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local revisions=17
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER and disabled auto-tagging"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -g -z || return $?
+
+  echo "disable automatic garbage collection"
+  disable_auto_garbage_collection $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo -n "create a series of commits... "
+  local catalogs=""
+  local i=0
+  local publish_log=publish.log
+  touch $publish_log
+  while [ $i -le $revisions ]; do
+    start_transaction $CVMFS_TEST_REPO || return 1
+
+    # create probe file and remove previous one
+    if [ $i -gt 0 ]; then
+      rm -f ${repo_dir}/file$(( $i - 1 ))
+    fi
+    echo $i > ${repo_dir}/file${i}
+
+    # create some repository content
+    create_repo_content $repo_dir $i
+
+    # publish repository (every fifths revision is tagged)
+    if [ $(echo "$i % 5" | bc) -eq 0 ]; then
+      publish_repo $CVMFS_TEST_REPO -a "revision_$i" >> $publish_log || return 2
+      echo -n "#"
+    else
+      publish_repo $CVMFS_TEST_REPO >> $publish_log || return 3
+      echo -n "."
+    fi
+
+    # keep track of all created catalogs
+    catalogs="$catalogs $(get_current_root_catalog $CVMFS_TEST_REPO)"
+
+    i=$(( $i + 1 ))
+    sleep 1
+  done
+  echo " done"
+
+  # ============================================================================
+
+  echo "list history of the repository"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return $?
+
+  echo "check that all catalogs are present"
+  for catalog in $catalogs; do
+    peek_backend $CVMFS_TEST_REPO "${catalog}C" || return 4
+  done
+
+  echo "check that all data objects are present"
+  for hash in $(get_file_hashes); do
+    peek_backend $CVMFS_TEST_REPO "$hash" || return 5
+  done
+
+  # ============================================================================
+
+  local preserve=$(( $revisions - 0 ))
+  echo "perform garbage collection with historic revision preservation = $preserve (nothing should get deleted)"
+  cvmfs_server gc -r $preserve -f $CVMFS_TEST_REPO || return 6
+
+  echo "check that all catalogs are present"
+  for catalog in $catalogs; do
+    peek_backend $CVMFS_TEST_REPO "${catalog}C" || return 4
+  done
+
+  echo "check that all data objects are present"
+  for hash in $(get_file_hashes); do
+    peek_backend $CVMFS_TEST_REPO "$hash" || return 5
+  done
+
+  # ============================================================================
+
+  preserve=$(( $revisions - 3 ))
+  echo "perform garbage collection with historic revision preservation = $preserve"
+  cvmfs_server gc -r $preserve -f $CVMFS_TEST_REPO || return 6
+
+  echo "check that the right catalogs are still present"
+  i=0
+  for catalog in $catalogs; do
+    local modo=$(echo "$i % 5" | bc)
+    if [ $i -ge $(( $revisions - $preserve )) ] || [ $modo -eq 0 ]; then
+      peek_backend $CVMFS_TEST_REPO "${catalog}C" || return 7
+    else
+      peek_backend $CVMFS_TEST_REPO "${catalog}C" && return 8
+    fi
+    i=$(( $i + 1 ))
+  done
+
+  echo "check that all data objects are still present"
+  i=0
+  for hash in $(get_file_hashes); do
+    local modo=$(echo "$i % 5" | bc)
+    if [ $i -ge $(( $revisions - $preserve )) ] || [ $modo -eq 0 ]; then
+      peek_backend $CVMFS_TEST_REPO "$hash" || return 9
+    else
+      peek_backend $CVMFS_TEST_REPO "$hash" && return 10
+    fi
+    i=$(( $i + 1 ))
+  done
+
+  echo "check if the repository is still sane"
+  check_repository $CVMFS_TEST_REPO -i -t revision_0  || return 11
+  check_repository $CVMFS_TEST_REPO -i -t revision_5  || return 11
+  check_repository $CVMFS_TEST_REPO -i -t revision_10 || return 11
+  check_repository $CVMFS_TEST_REPO -i -t revision_15 || return 11
+  check_repository $CVMFS_TEST_REPO -i                || return 11
+
+  # ============================================================================
+
+  preserve=$(( $revisions - 13 ))
+  echo "perform garbage collection with historic revision preservation = $preserve"
+  cvmfs_server gc -r $preserve -f $CVMFS_TEST_REPO || return 12
+
+  echo "check that the right catalogs are still present"
+  i=0
+  for catalog in $catalogs; do
+    local modo=$(echo "$i % 5" | bc)
+    if [ $i -ge $(( $revisions - $preserve )) ] || [ $modo -eq 0 ]; then
+      peek_backend $CVMFS_TEST_REPO "${catalog}C" || return 13
+    else
+      peek_backend $CVMFS_TEST_REPO "${catalog}C" && return 13
+    fi
+    i=$(( $i + 1 ))
+  done
+
+  echo "check that all data objects are still present"
+  i=0
+  for hash in $(get_file_hashes); do
+    local modo=$(echo "$i % 5" | bc)
+    if [ $i -ge $(( $revisions - $preserve )) ] || [ $modo -eq 0 ]; then
+      peek_backend $CVMFS_TEST_REPO "$hash" || return 14
+    else
+      peek_backend $CVMFS_TEST_REPO "$hash" && return 14
+    fi
+    i=$(( $i + 1 ))
+  done
+
+  echo "check if the repository is still sane"
+  check_repository $CVMFS_TEST_REPO -i -t revision_0  || return 15
+  check_repository $CVMFS_TEST_REPO -i -t revision_5  || return 15
+  check_repository $CVMFS_TEST_REPO -i -t revision_10 || return 15
+  check_repository $CVMFS_TEST_REPO -i -t revision_15 || return 15
+  check_repository $CVMFS_TEST_REPO -i                || return 15
+
+  # ============================================================================
+
+  echo "perform garbage collection with historic revision preservation = 0 (should only leave tagged revisions)"
+  cvmfs_server gc -r 0 -f $CVMFS_TEST_REPO || return 17
+
+  echo "check that the right catalogs are still present"
+  i=0
+  for catalog in $catalogs; do
+    if [ $(echo "$i % 5" | bc) -eq 0 ] || [ $i -ge 16 ]; then
+      peek_backend $CVMFS_TEST_REPO "${catalog}C" || return 18
+    else
+      peek_backend $CVMFS_TEST_REPO "${catalog}C" && return 19
+    fi
+    i=$(( $i + 1 ))
+  done
+
+  echo "check that all data objects are still present"
+  i=0
+  for hash in $(get_file_hashes); do
+    local modo=$(echo "$i % 5" | bc)
+    if [ $(echo "$i % 5" | bc) -eq 0 ] || [ $i -ge 16 ]; then
+      peek_backend $CVMFS_TEST_REPO "$hash" || return 20
+    else
+      peek_backend $CVMFS_TEST_REPO "$hash" && return 21
+    fi
+    i=$(( $i + 1 ))
+  done
+
+  echo "check if the repository is still sane"
+  check_repository $CVMFS_TEST_REPO -i -t revision_0  || return 22
+  check_repository $CVMFS_TEST_REPO -i -t revision_5  || return 22
+  check_repository $CVMFS_TEST_REPO -i -t revision_10 || return 22
+  check_repository $CVMFS_TEST_REPO -i -t revision_15 || return 22
+  check_repository $CVMFS_TEST_REPO -i                || return 22
+
+  # ============================================================================
+
+  echo "delete an intermediate tag"
+  cvmfs_server tag -r "revision_10" -f $CVMFS_TEST_REPO || return 24
+
+  echo "print tag list"
+  cvmfs_server tag -l $CVMFS_TEST_REPO || return 24
+
+  echo "run a garbage collection dry run"
+  cvmfs_server gc -l -d -f $CVMFS_TEST_REPO || return 25
+
+  echo "run garbage collection (should remove probe file 10)"
+  cvmfs_server gc -f $CVMFS_TEST_REPO || return 26
+
+  echo "check if all expected files are still there"
+  i=0
+  for hash in $(get_file_hashes); do
+    local modo=$(echo "$i % 5" | bc)
+    if [ $modo -eq 0 -a $i -ne 10 ] || [ $i -ge 16 ]; then
+      peek_backend $CVMFS_TEST_REPO "$hash" || return 27
+    else
+      peek_backend $CVMFS_TEST_REPO "$hash" && return 28
+    fi
+    i=$(( $i + 1 ))
+  done
+
+  return 0
+}

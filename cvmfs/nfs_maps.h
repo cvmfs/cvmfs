@@ -6,6 +6,7 @@
 #define CVMFS_NFS_MAPS_H_
 
 #include <string>
+
 #include "hash.h"
 #include "shortstring.h"
 

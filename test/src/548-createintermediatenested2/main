@@ -1,0 +1,256 @@
+
+cvmfs_test_name="Create Intermediate Nested Catalog (2)"
+cvmfs_test_autofs_on_startup=false
+
+# this test is basically the same as 547-createintermediatenested which is a re-
+# gression test for CVM-608. It defines all directories inside the (future)
+# nested catalog as nested catalogs. This lead to a different failure mode, thus
+# there are two regression tests.
+#
+# This test lead to an assertion during the repository publishing
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir dir1 # stays empty
+  mkdir dir2
+  mkdir dir3
+  mkdir dir4
+  mkdir dir5
+  mkdir dir6 # stays empty
+
+  create_big_file big_file1 50
+
+  mkdir dir2/ndir1
+  mkdir dir2/ndir2
+
+  mkdir dir3/ndir3
+
+  mkdir dir5/ndir4
+  mkdir dir5/ndir5
+  mkdir dir5/ndir6
+  create_big_file dir5/big_file2 50
+
+  mkdir dir2/ndir1/nndir1
+  mkdir dir2/ndir1/nndir2
+
+  mkdir dir5/ndir5/nndir3
+  mkdir dir5/ndir5/nndir4
+  create_big_file dir5/ndir5/big_file3 50
+
+  touch dir2/ndir1/foo
+  touch dir2/ndir1/bar
+  touch dir2/ndir1/nndir2/file
+
+  mkdir dir5/ndir5/nndir3/nnndir1
+  mkdir dir5/ndir5/nndir3/nnndir2
+  mkdir dir5/ndir5/nndir3/nnndir3
+  mkdir dir5/ndir5/nndir3/nnndir4
+  mkdir dir5/ndir5/nndir3/nnndir5
+  create_big_file dir5/ndir5/nndir3/big_file4 50
+
+  mkdir dir5/ndir5/nndir3/nnndir1/nnnndir1
+  mkdir dir5/ndir5/nndir3/nnndir1/nnnndir2
+  create_big_file dir5/ndir5/nndir3/big_file5 50
+
+  mkdir dir5/ndir5/nndir3/nnndir3/nnnndir3
+  mkdir dir5/ndir5/nndir3/nnndir3/nnnndir4
+  mkdir dir5/ndir5/nndir3/nnndir3/nnnndir5
+
+  echo "meaningless content" > dir4/meaningless_file
+  ln -s meaningless_file dir4/symlink_to_meaningless_file
+
+  echo "Reading this text is prohibited by federal law!" > dir5/ndir5/nndir3/outlaw
+  ln dir5/ndir5/nndir3/outlaw dir5/ndir5/nndir3/hardlinkToOutlaw1
+  ln dir5/ndir5/nndir3/outlaw dir5/ndir5/nndir3/hardlinkToOutlaw2
+  echo "NYPD! Stahp!" > dir5/ndir5/nndir3/NYPD
+
+  echo "Seltsam, im Nebel zu wandern!" > dir5/ndir5/nndir3/nnndir3/verse1
+  echo "Einsam ist jeder Busch und Stein," > dir5/ndir5/nndir3/nnndir4/verse2
+  echo "Kein Baum sieht den andern," > dir5/ndir5/nndir3/nnndir1/nnnndir1/verse3
+  echo "Jeder ist allein." > dir5/ndir5/nndir3/verse4
+
+  # create nested catalog markers
+  # touch dir5/ndir5/.cvmfscatalog
+  touch dir5/ndir5/nndir3/nnndir1/.cvmfscatalog
+  touch dir5/ndir5/nndir3/nnndir2/.cvmfscatalog
+  touch dir5/ndir5/nndir3/nnndir3/.cvmfscatalog
+  touch dir5/ndir5/nndir3/nnndir4/.cvmfscatalog
+  touch dir5/ndir5/nndir3/nnndir5/.cvmfscatalog
+
+  popdir
+}
+
+change_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create intermediate between root-catalog and nested catalogs
+  touch dir5/ndir5/.cvmfscatalog || return 201
+
+  popdir
+}
+
+change_files_again_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create intermediate between other nested catalogs
+  touch dir5/ndir5/nndir3/.cvmfscatalog || return 201
+
+  popdir
+}
+
+check_initial_nested_catalog_presence() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 6 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                          $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir1 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir2 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir3 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir4 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir5 $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+check_intermediate_nested_catalog_presence() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 7 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                          $repo_name && \
+     check_catalog_presence /dir5/ndir5                $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir1 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir2 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir3 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir4 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir5 $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+check_final_nested_catalog_presence() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 8 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                          $repo_name && \
+     check_catalog_presence /dir5/ndir5                $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3         $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir1 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir2 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir3 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir4 $repo_name && \
+     check_catalog_presence /dir5/ndir5/nndir3/nnndir5 $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  # ============================================================================
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if the right catalogs are present after the first stage"
+  check_initial_nested_catalog_presence $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "change stuff in the repository"
+  change_files_in $repo_dir || return $?
+
+  echo "change exactly the same stuff in the scratch space"
+  change_files_in $reference_dir || return $?
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the changed directories"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  # ============================================================================
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository"
+  check_intermediate_nested_catalog_presence $CVMFS_TEST_REPO || return $?
+
+  # ============================================================================
+
+  echo "init a new transaction to change something in repository $CVMFS_TEST_REPO"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "change other stuff in the repository"
+  change_files_again_in $repo_dir || return $?
+
+  echo "change exactly the same stuff in the scratch space"
+  change_files_again_in $reference_dir || return $?
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the changed directories"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  # ============================================================================
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository"
+  check_final_nested_catalog_presence $CVMFS_TEST_REPO || return $?
+
+  return 0
+}
+

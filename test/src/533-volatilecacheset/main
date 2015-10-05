@@ -1,0 +1,77 @@
+cvmfs_test_name="Volatile cache set"
+cvmfs_test_autofs_on_startup=false
+
+disaster_cleanup() {
+  local mountpoint_normal=$1
+  local mountpoint_volatile=$2
+
+  sudo umount $mountpoint_normal > /dev/null 2>&1
+  sudo umount $mountpoint_volatile > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO > /dev/null 2>&1
+  sudo cvmfs_server rmfs -f $CVMFS_TEST_REPO_MORE > /dev/null 2>&1
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  create_empty_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER NO -v || return $?
+
+  echo "ceating 20M in normal repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal01 bs=1024 count=10240
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO/normal02 bs=1024 count=10241
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "ceating 20M in volatile repository"
+  start_transaction $CVMFS_TEST_REPO_MORE || return $?
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO_MORE/volatile01 bs=1024 count=10242
+  dd if=/dev/zero of=/cvmfs/$CVMFS_TEST_REPO_MORE/volatile02 bs=1024 count=10243
+  publish_repo $CVMFS_TEST_REPO_MORE || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+  check_repository $CVMFS_TEST_REPO_MORE -i || return $?
+
+  echo "mount the repositories on a local mountpoint"
+  mkdir -p mountpoint_normal mountpoint_volatile cache
+  cat > private_normal.conf << EOF
+CVMFS_CACHE_BASE=$(pwd)/cache
+CVMFS_SHARED_CACHE=yes
+CVMFS_RELOAD_SOCKETS=$(pwd)/cache
+CVMFS_SERVER_URL=$(get_repo_url $CVMFS_TEST_REPO)
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub
+EOF
+    cat > private_volatile.conf << EOF
+CVMFS_CACHE_BASE=$(pwd)/cache
+CVMFS_SHARED_CACHE=yes
+CVMFS_RELOAD_SOCKETS=$(pwd)/cache
+CVMFS_SERVER_URL=$(get_repo_url $CVMFS_TEST_REPO_MORE)
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${CVMFS_TEST_REPO_MORE}.pub
+EOF
+  cvmfs2 -d -o config=private_normal.conf $CVMFS_TEST_REPO $(pwd)/mountpoint_normal >> cvmfs2_output.log 2>&1 || { disaster_cleanup mountpoint_normal mountpoint_volatile; return 10; }
+  cvmfs2 -d -o config=private_volatile.conf $CVMFS_TEST_REPO_MORE $(pwd)/mountpoint_volatile >> cvmfs2_output.log 2>&1 || { disaster_cleanup mountpoint_normal mountpoint_volatile; return 11; }
+
+  cat mountpoint_normal/* > /dev/null || return 12
+  cat mountpoint_volatile/* >/dev/null || return 13
+
+  sudo cvmfs_talk -p cache/shared/cvmfs_io.$CVMFS_TEST_REPO cache list > cachelist
+  if ! grep normal cachelist || ! grep volatile cachelist; then
+    disaster_cleanup mountpoint_normal mountpoint_volatile
+    return 14
+  fi
+
+  sudo cvmfs_talk -p cache/shared/cvmfs_io.$CVMFS_TEST_REPO cleanup 20
+  sudo cvmfs_talk -p cache/shared/cvmfs_io.$CVMFS_TEST_REPO cache list > cachelist
+  disaster_cleanup mountpoint_normal mountpoint_volatile
+
+  if grep volatile cachelist; then
+    return 15
+  fi
+  sqlite3 cache/shared/cachedb 'SELECT * FROM cache_catalog;'
+
+  return 0
+}
+

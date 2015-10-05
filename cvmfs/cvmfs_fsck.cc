@@ -10,27 +10,26 @@
 
 #include "cvmfs_config.h"
 
-#include <sys/stat.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <unistd.h>
-#include <dirent.h>
-#include <stdio.h>
-#include <fcntl.h>
-#include <errno.h>
 
-#include <cstring>
+#include <cstdio>
 #include <cstdlib>
-
+#include <cstring>
 #include <string>
 
-#include "platform.h"
-#include "util.h"
-#include "hash.h"
 #include "atomic.h"
 #include "compression.h"
-#include "smalloc.h"
+#include "hash.h"
 #include "logging.h"
+#include "platform.h"
+#include "smalloc.h"
+#include "util.h"
 
 using namespace std;  // NOLINT
 
@@ -180,13 +179,14 @@ static void *MainCheck(void *data __attribute__((unused))) {
     platform_disable_kcache(fd_src);
 
     // Compress every file and calculate SHA-1 of stream
-    hash::Any hash(hash::kSha1);
+    shash::Any expected_hash = shash::MkFromHexPtr(shash::HexPtr(hash_name));
+    shash::Any hash(expected_hash.algorithm);
     if (!zlib::CompressFd2Null(fd_src, &hash)) {
       LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not compress %s",
                path.c_str());
       atomic_inc32(&g_num_err_operational);
     } else {
-      if (hash.ToString() != hash_name) {
+      if (hash != expected_hash) {
         if (g_fix_errors) {
           const string quarantaine_path = "./quarantaine/" + hash_name;
           bool fixed = false;
@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
   atomic_init32(&g_modified_cache);
   g_current_dir = new string();
 
-  char c;
+  int c;
   while ((c = getopt(argc, argv, "hvpfj:")) != -1) {
     switch (c) {
       case 'h':
@@ -308,7 +308,8 @@ int main(int argc, char **argv) {
   atomic_init32(&g_num_err_unfixed);
   atomic_init32(&g_num_err_operational);
   atomic_init32(&g_num_tmp_catalog);
-  pthread_t *workers = (pthread_t *)smalloc(g_num_threads * sizeof(pthread_t));
+  pthread_t *workers = reinterpret_cast<pthread_t *>(
+    smalloc(g_num_threads * sizeof(pthread_t)));
   if (!g_verbose)
     LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak, "Verifying: ");
   for (int i = 0; i < g_num_threads; ++i) {
@@ -331,7 +332,7 @@ int main(int argc, char **argv) {
            atomic_read32(&g_num_files));
 
   if (atomic_read32(&g_num_tmp_catalog) > 0)
-    LogCvmfs(kLogCvmfs, kLogStdout, "Temorary file catalogs were found.");
+    LogCvmfs(kLogCvmfs, kLogStdout, "Temporary file catalogs were found.");
 
   if (atomic_read32(&g_force_rebuild)) {
     if (unlink("cachedb") == 0) {

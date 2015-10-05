@@ -1,0 +1,12 @@
+Source: cvmfs-keys
+Maintainer: Jakob Blomer <jblomer@cern.ch>
+Section: utils
+Priority: extra
+Standards-Version: 3.9.3.1
+Build-Depends: debhelper (>= 9), make
+Homepage: http://cernvm.cern.ch/portal/filesystem
+
+Package: cvmfs-keys
+Architecture: all 
+Depends: curl ${misc:Depends}
+Description: CernVM File System Public Keys

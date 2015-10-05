@@ -1,0 +1,169 @@
+cvmfs_test_name="Replace Directory by Symlink/Regular File"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir rainald.grebe grebe.rainald
+
+  echo "Es gibt Länder, wo was los is"                                             >  rainald.grebe/brandenburg
+  echo "Es gibt Länder, wo richtig was los ist und es gibt"                        >> rainald.grebe/brandenburg
+  echo "BRANDENBURG BRANDENBURG "                                                  >> rainald.grebe/brandenburg
+  echo "In BRANDENBURG in BRANDENBURG ist wieder jemand gegen einen Baum gegurkt!" >> rainald.grebe/brandenburg
+  echo "Was soll man auch machen mit 17, 18 in BRANDENBURG?"                       >> rainald.grebe/brandenburg
+  echo "Es ist nicht alles Chanel es ist meistens Schlecker."                      >> rainald.grebe/brandenburg
+  echo "Kein Wunder, dass so viele von hier weggehen."                             >> rainald.grebe/brandenburg
+  echo "Aus BRANDENBURG."                                                          >> rainald.grebe/brandenburg
+  echo "Da stehen 3 Nazis auf dem Hügel und finden keinen zum verprügeln!"         >> rainald.grebe/brandenburg
+  echo "In BRANDENBURG, BRANDENBURG!"                                              >> rainald.grebe/brandenburg
+  echo "Ich fühl mich so leer, ich fühl mich BRANDENBURG."                         >> rainald.grebe/brandenburg
+  echo "In BERLIN bin ich einer von 3 millionen!"                                  >> rainald.grebe/brandenburg
+  echo "In BRANDENBURG kann ich bald alleine wohnen!"                              >> rainald.grebe/brandenburg
+  echo "BRANDENBURG "                                                              >> rainald.grebe/brandenburg
+  echo "Im Adlon ist Brad Pitt und der Washington, Dancel!"                        >> rainald.grebe/brandenburg
+  echo "Im Autohaus in Schwedt ein Achim Menzel!"                                  >> rainald.grebe/brandenburg
+  echo "BRANDENBURG"                                                               >> rainald.grebe/brandenburg
+  echo "BERLIN"                                                                    >> rainald.grebe/brandenburg
+  echo "HALELLUJA BERLIN"                                                          >> rainald.grebe/brandenburg
+  echo "HALELLUJA BERLIN"                                                          >> rainald.grebe/brandenburg
+  echo "alle wollen da hin!"                                                       >> rainald.grebe/brandenburg
+  echo ""                                                                          >> rainald.grebe/brandenburg
+  echo "   - Rainald Grebe"                                                        >> rainald.grebe/brandenburg
+
+  echo "Kennst du das Land mit den Pelikanen?"         >  grebe.rainald/sachsen
+  echo "Kennst du das Land mit den Lianen?"            >> grebe.rainald/sachsen
+  echo "Kennst du das Land, wo die Datteln wachsen?"   >> grebe.rainald/sachsen
+  echo ""                                              >> grebe.rainald/sachsen
+  echo "Kennst du das Land mit den Pinienkernen?"      >> grebe.rainald/sachsen
+  echo "Du kennst es nicht, du wirst es kennenlernen"  >> grebe.rainald/sachsen
+  echo "Wo die krossen Mädchen auf den Palmen wachsen" >> grebe.rainald/sachsen
+  echo ""                                              >> grebe.rainald/sachsen
+  echo "Kennst du das Land? Es liegt im Süden"         >> grebe.rainald/sachsen
+  echo "von Lappland - und Schweden"                   >> grebe.rainald/sachsen
+  echo "Wo Finnen, Färöer und Grönen"                  >> grebe.rainald/sachsen
+  echo "Sich verwöhnen und relaxen?"                   >> grebe.rainald/sachsen
+  echo ""                                              >> grebe.rainald/sachsen
+  echo "Das ist Sachsen"                               >> grebe.rainald/sachsen
+  echo ""                                              >> grebe.rainald/sachsen
+  echo "   - Rainald Grebe"                            >> grebe.rainald/sachsen
+
+  popdir
+}
+
+replace_directory_by_file() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -fR rainald.grebe
+
+  echo "Finanzkrise, Finanzkrise, Finanzkrise"    >> rainald.grebe
+  echo "Erderwärmung, Erderwärmung, Erderwärmung" >> rainald.grebe
+  echo "Terrorismus, Terrorismus, Terrorismus"    >> rainald.grebe
+  echo "Piraten, Piraten, Piraten"                >> rainald.grebe
+  echo "Da vergeht der Spaß,"                     >> rainald.grebe
+  echo "was soll man da machen?"                  >> rainald.grebe
+  echo "Ja was, ja was, ja was?"                  >> rainald.grebe
+  echo ""                                         >> rainald.grebe
+  echo "Urlaub in Deutschland,"                   >> rainald.grebe
+  echo "Urlaub in Deutschland,"                   >> rainald.grebe
+  echo "Urlaub in der Regiooon"                   >> rainald.grebe
+  echo "Sechs Wochen Oderbruch"                   >> rainald.grebe
+  echo "Ich freu mich schon"                      >> rainald.grebe
+  echo ""                                         >> rainald.grebe
+  echo "Urlaub in Deutschland,"                   >> rainald.grebe
+  echo "das Gute liegt so nah"                    >> rainald.grebe
+  echo "In den Städten hängen Plaketten"          >> rainald.grebe
+  echo "Goethe war hier, Goethe war da"           >> rainald.grebe
+  echo ""                                         >> rainald.grebe
+  echo "   - Rainald Grebe"                       >> rainald.grebe
+
+  popdir
+}
+
+replace_directory_by_symlink() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  rm -fR grebe.rainald
+  ln -s rainald.grebe grebe.rainald
+
+  popdir
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  replace_directory_by_file $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  replace_directory_by_file $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  replace_directory_by_symlink $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  replace_directory_by_symlink $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  return 0
+}
+

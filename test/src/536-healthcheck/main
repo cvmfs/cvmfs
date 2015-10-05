@@ -1,0 +1,109 @@
+cvmfs_test_name="Repository Health Check (Disabled Auto-Repair)"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local rd_only=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
+
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  local server_conf="/etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf"
+  sudo sed -i "s/^\(CVMFS_AUTO_REPAIR_MOUNTPOINT\)=.*\$/\1=false/" $server_conf
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "filling the repository with contents of /bin"
+  cp_bin $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  cvmfs_server publish $CVMFS_TEST_REPO || return 2
+
+  echo "remember the root hash of this revision"
+  local old_root_hash
+  old_root_hash="$(attr -qg root_hash $rd_only)"
+
+  echo "unmount union file system mountpoint"
+  sudo umount $repo_dir || return 3
+
+  echo "check the repository (failure is expected)"
+  cvmfs_server check $CVMFS_TEST_REPO 2>&1 | grep -q "$repo_dir is not mounted" || return 4
+
+  echo "unmount read-only cvmfs branch"
+  sudo umount $rd_only || return 5
+
+  echo "check the repository (failure is expected)"
+  cvmfs_server check $CVMFS_TEST_REPO 2>&1 | grep -q "$rd_only is not mounted" || return 6
+
+  echo "mount union file system mountpoint"
+  sudo mount $repo_dir || return 7
+
+  echo "try to open transaction (failure is expected)"
+  cvmfs_server transaction $CVMFS_TEST_REPO 2>&1 | grep -q "$rd_only is not mounted" || return 8
+
+  echo "repair the repository state"
+  sudo umount $repo_dir || return 9
+  sudo mount $rd_only   || return 10
+  sudo mount $repo_dir  || return 11
+
+  echo "open a transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "remount $repo_dir as read-only"
+  sudo mount -o remount,ro $repo_dir || return 12
+
+  echo "try to publish (failure is expected)"
+  cvmfs_server publish $CVMFS_TEST_REPO 2>&1 | grep -q "$CVMFS_TEST_REPO is in a transaction but" || return 13
+
+  echo "repair the state of the mountpoint"
+  sudo mount -o remount,rw $repo_dir || return 14
+
+  echo "publish repository"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "remount $repo_dir as read/write"
+  sudo mount -o remount,rw $repo_dir || return 15
+
+  echo "try to open transaction (failure is expected)"
+  cvmfs_server transaction $CVMFS_TEST_REPO 2>&1 | grep -q "$CVMFS_TEST_REPO is not in a transaction but" || return 16
+
+  echo "repair the state of the mountpoint"
+  sudo mount -o remount,ro $repo_dir || return 17
+
+  echo "remount previous revision $old_root_hash"
+  local latest_root_hash
+  latest_root_hash="$(attr -qg root_hash $rd_only)"
+  local client_config="/var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
+  sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${old_root_hash}/" $client_config
+  sudo umount $repo_dir || return 18
+  sudo umount $rd_only  || return 19
+  sudo mount $rd_only   || return 20
+  sudo mount $repo_dir  || return 21
+
+  echo "create a transaction (should fail)"
+  start_transaction $CVMFS_TEST_REPO 2>&1 | grep -q "$CVMFS_TEST_REPO is not based on the newest" || return 22
+
+  echo "repair the root hash ($latest_root_hash)"
+  sed -i -e "s/CVMFS_ROOT_HASH=.*/CVMFS_ROOT_HASH=${latest_root_hash}/" $client_config
+  sudo umount $repo_dir || return 23
+  sudo umount $rd_only  || return 24
+  sudo mount $rd_only   || return 25
+  sudo mount $repo_dir  || return 26
+
+  echo "create a fresh transaction"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "create a snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check repository integrity"
+  check_repository $CVMFS_TEST_REPO -i || return 18
+
+  return 0
+}
+

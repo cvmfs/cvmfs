@@ -1,0 +1,2 @@
+/var/lib/cvmfs       -d gen_context(system_u:object_r:cvmfs_cache_t,s0)
+/var/lib/cvmfs(/.*)?    gen_context(unconfined_u:object_r:cvmfs_cache_t,s0)

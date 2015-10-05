@@ -9,46 +9,95 @@
 #include "cvmfs_config.h"
 #include "util.h"
 
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/file.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/select.h>
 #include <arpa/inet.h>
-#include <sys/wait.h>
-#include <sys/mman.h>
-#include <time.h>
-#include <inttypes.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <grp.h>
+#include <inttypes.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <signal.h>
+#include <sys/file.h>
+#include <sys/mman.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 
-#include <cctype>
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
+#include <algorithm>
 #include <cassert>
-
-#include <string>
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <map>
 #include <set>
+#include <string>
 
-#include "platform.h"
-#include "hash.h"
-#include "smalloc.h"
-#include "logging.h"
 #include "fs_traversal.h"
+#include "hash.h"
+#include "logging.h"
+#include "platform.h"
+#include "smalloc.h"
 
 using namespace std;  // NOLINT
 
 #ifdef CVMFS_NAMESPACE_GUARD
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
+
+const char b64_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+  'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+  'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3',
+  '4', '5', '6', '7', '8', '9', '+', '/'};
+
+/**
+ * Decode Base64
+ */
+const signed char db64_table[] =
+  { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, -1, -1, 63,
+    52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1,  0, -1, -1,
+    -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
+    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1,
+    -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1,
+
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+  };
+
+static pthread_mutex_t getumask_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+namespace {
+
+/**
+ * Used for cas  insensitive HasSuffix
+ */
+struct IgnoreCaseComperator {
+  IgnoreCaseComperator() { }
+  bool operator() (const std::string::value_type a,
+                   const std::string::value_type b) const
+  {
+    return std::tolower(a) == std::tolower(b);
+  }
+};
+
+}  // anonymous namespace
 
 /**
  * Removes a trailing "/" from a path.
@@ -124,6 +173,23 @@ NameString GetFileName(const PathString &path) {
 }
 
 
+bool IsAbsolutePath(const std::string &path) {
+  return (!path.empty() && path[0] == '/');
+}
+
+
+bool IsHttpUrl(const std::string &path) {
+  if (path.length() < 7) {
+    return false;
+  }
+
+  std::string prefix = path.substr(0, 7);
+  std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+
+  return prefix == "http://";
+}
+
+
 /**
  * Abort() on failure
  */
@@ -195,7 +261,7 @@ int ConnectSocket(const string &path) {
   if (connect(socket_fd, (struct sockaddr *)&sock_addr,
               sizeof(sock_addr.sun_family) + sizeof(sock_addr.sun_path)) < 0)
   {
-    //LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
+    // LogCvmfs(kLogCvmfs, kLogStderr, "ERROR %d", errno);
     close(socket_fd);
     return -1;
   }
@@ -259,6 +325,17 @@ void Nonblock2Block(int filedes) {
   int flags = fcntl(filedes, F_GETFL);
   assert(flags != -1);
   int retval = fcntl(filedes, F_SETFL, flags & ~O_NONBLOCK);
+  assert(retval != -1);
+}
+
+
+/**
+ * Changes a blocking file descriptor to a non-blocking one.
+ */
+void Block2Nonblock(int filedes) {
+  int flags = fcntl(filedes, F_GETFL);
+  assert(flags != -1);
+  int retval = fcntl(filedes, F_SETFL, flags | O_NONBLOCK);
   assert(retval != -1);
 }
 
@@ -347,7 +424,18 @@ bool DirectoryExists(const std::string &path) {
 
 
 /**
- * The mkdir -p command.
+ * Checks if the symlink file path exists.
+ */
+bool SymlinkExists(const string &path) {
+  platform_stat64 info;
+  return ((platform_lstat(path.c_str(), &info) == 0) &&
+          S_ISLNK(info.st_mode));
+}
+
+
+/**
+ * The mkdir -p command.  Additionally checks if the directory is writable
+ * if it exists.
  */
 bool MkdirDeep(const std::string &path, const mode_t mode) {
   if (path == "") return false;
@@ -355,15 +443,18 @@ bool MkdirDeep(const std::string &path, const mode_t mode) {
   int retval = mkdir(path.c_str(), mode);
   if (retval == 0) return true;
 
-  if (errno == EEXIST) {
-    platform_stat64 info;
-    if ((platform_lstat(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode))
-      return true;
-    return false;
+  if ((errno == ENOENT) && (MkdirDeep(GetParentPath(path), mode))) {
+    return MkdirDeep(path, mode);
   }
 
-  if ((errno == ENOENT) && (MkdirDeep(GetParentPath(path), mode))) {
-    return mkdir(path.c_str(), mode) == 0;
+  if (errno == EEXIST) {
+    platform_stat64 info;
+    if ((platform_stat(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode)) {
+      // Check writability
+      retval = utimes(path.c_str(), NULL);
+      if (retval == 0)
+        return true;
+    }
   }
 
   return false;
@@ -383,14 +474,15 @@ bool MakeCacheDirectories(const string &path, const mode_t mode) {
 
   platform_stat64 stat_info;
   if (platform_stat(this_path.c_str(), &stat_info) != 0) {
-    if (mkdir(this_path.c_str(), mode) != 0) return false;
     this_path = canonical_path + "/txn";
-    if (mkdir(this_path.c_str(), mode) != 0) return false;
-    for (int i = 0; i < 0xff; i++) {
+    if (!MkdirDeep(this_path, mode))
+      return false;
+    for (int i = 0; i <= 0xff; i++) {
       char hex[3];
       snprintf(hex, sizeof(hex), "%02x", i);
       this_path = canonical_path + "/" + string(hex);
-      if (mkdir(this_path.c_str(), mode) != 0) return false;
+      if (!MkdirDeep(this_path, mode))
+        return false;
     }
   }
   return true;
@@ -498,6 +590,28 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
 
 
 /**
+ * Create a directory with a unique name.
+ */
+string CreateTempDir(const std::string &path_prefix) {
+  string dir = path_prefix + ".XXXXXX";
+  char *tmp_dir = strdupa(dir.c_str());
+  tmp_dir = mkdtemp(tmp_dir);
+  if (tmp_dir == NULL)
+    return "";
+  return string(tmp_dir);
+}
+
+
+/**
+ * Get the current working directory of the running process
+ */
+std::string GetCurrentWorkingDirectory() {
+  char cwd[PATH_MAX];
+  return (getcwd(cwd, sizeof(cwd)) != NULL) ? std::string(cwd) : std::string();
+}
+
+
+/**
  * Helper class that provides callback funtions for the file system traversal.
  */
 class RemoveTreeHelper {
@@ -524,9 +638,9 @@ class RemoveTreeHelper {
  */
 bool RemoveTree(const string &path) {
   platform_stat64 info;
-  platform_lstat(path.c_str(), &info);
-  if (errno == ENOENT)
-    return true;
+  int retval = platform_lstat(path.c_str(), &info);
+  if (retval != 0)
+    return errno == ENOENT;
   if (!S_ISDIR(info.st_mode))
     return false;
 
@@ -535,6 +649,7 @@ bool RemoveTree(const string &path) {
                                                   true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_socket = &RemoveTreeHelper::RemoveFile;
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
   traversal.Recurse(path);
   bool result = remove_tree_helper->success;
@@ -563,7 +678,78 @@ vector<string> FindFiles(const string &dir, const string &suffix) {
     }
   }
   closedir(dirp);
+  sort(result.begin(), result.end());
   return result;
+}
+
+
+/**
+ * Name -> UID from passwd database
+ */
+bool GetUidOf(const std::string &username, uid_t *uid, gid_t *main_gid) {
+  char buf[16*1024];
+  struct passwd pwd;
+  struct passwd *result = NULL;
+  getpwnam_r(username.c_str(), &pwd, buf, sizeof(buf), &result);
+  if (result == NULL)
+    return false;
+  *uid = result->pw_uid;
+  *main_gid = result->pw_gid;
+  return true;
+}
+
+
+/**
+ * Name -> GID from groups database
+ */
+bool GetGidOf(const std::string &groupname, gid_t *gid) {
+  char buf[16*1024];
+  struct group grp;
+  struct group *result;
+  getgrnam_r(groupname.c_str(), &grp, buf, sizeof(buf), &result);
+  if (result == NULL)
+    return false;
+  *gid = result->gr_gid;
+  return true;
+}
+
+/**
+ * read the current umask of this process
+ * Note: umask query is guarded by a global mutex. Hence, always use
+ *       this function and beware of scalability bottlenecks
+ */
+mode_t GetUmask() {
+  LockMutex(&getumask_mutex);
+  const mode_t my_umask = umask(0);
+  umask(my_umask);
+  UnlockMutex(&getumask_mutex);
+  return my_umask;
+}
+
+
+/**
+ * Adds gid to the list of supplementary groups
+ */
+bool AddGroup2Persona(const gid_t gid) {
+  int ngroups = getgroups(0, NULL);
+  if (ngroups < 0)
+    return false;
+  gid_t *groups = static_cast<gid_t *>(smalloc((ngroups+1) * sizeof(gid_t)));
+  int retval = getgroups(ngroups, groups);
+  if (retval < 0) {
+    free(groups);
+    return false;
+  }
+  for (int i = 0; i < ngroups; ++i) {
+    if (groups[i] == gid) {
+      free(groups);
+      return true;
+    }
+  }
+  groups[ngroups] = gid;
+  retval = setgroups(ngroups+1, groups);
+  free(groups);
+  return retval == 0;
 }
 
 
@@ -615,6 +801,28 @@ string StringifyTime(const time_t seconds, const bool utc) {
 }
 
 
+/**
+ * Current time in format Wed, 01 Mar 2006 12:00:00 GMT
+ */
+std::string RfcTimestamp() {
+  const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
+    "Aug", "Sep", "Oct", "Nov", "Dec"};
+  const char *day_of_week[] =
+    {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+
+  struct tm timestamp;
+  time_t now = time(NULL);
+  gmtime_r(&now, &timestamp);
+
+  char buffer[30];
+  snprintf(buffer, sizeof(buffer), "%s, %02d %s %d %02d:%02d:%02d %s",
+    day_of_week[timestamp.tm_wday], timestamp.tm_mday,
+    months[timestamp.tm_mon], timestamp.tm_year + 1900,
+    timestamp.tm_hour, timestamp.tm_min, timestamp.tm_sec,
+    timestamp.tm_zone);
+  return string(buffer);
+}
+
 string StringifyTimeval(const timeval value) {
   char buffer[64];
   int64_t msec = value.tv_sec * 1000;
@@ -625,10 +833,35 @@ string StringifyTimeval(const timeval value) {
 }
 
 
-string StringifyIpv4(const uint32_t ip4_address) {
-  struct in_addr in_addr;
-  in_addr.s_addr = ip4_address;
-  return string(inet_ntoa(in_addr));
+/**
+ * Parses a timstamp of the form YYYY-MM-DDTHH:MM:SSZ
+ * Return 0 on error
+ */
+time_t IsoTimestamp2UtcTime(const std::string &iso8601) {
+  time_t utc_time = 0;
+  unsigned length = iso8601.length();
+
+  if (length != 20)
+    return utc_time;
+  if ((iso8601[4] != '-') || (iso8601[7] != '-') || (iso8601[10] != 'T') ||
+      (iso8601[13] != ':') || (iso8601[16] != ':') || (iso8601[19] != 'Z'))
+  {
+    return utc_time;
+  }
+
+  struct tm tm_wl;
+  memset(&tm_wl, 0, sizeof(struct tm));
+  tm_wl.tm_year = String2Int64(iso8601.substr(0, 4))-1900;
+  tm_wl.tm_mon = String2Int64(iso8601.substr(5, 2)) - 1;
+  tm_wl.tm_mday = String2Int64(iso8601.substr(8, 2));
+  tm_wl.tm_hour = String2Int64(iso8601.substr(11, 2));
+  tm_wl.tm_min = String2Int64(iso8601.substr(14, 2));
+  tm_wl.tm_sec = String2Int64(iso8601.substr(17, 2));
+  utc_time = timegm(&tm_wl);
+  if (utc_time < 0)
+    return 0;
+
+  return utc_time;
 }
 
 
@@ -643,14 +876,6 @@ uint64_t String2Uint64(const string &value) {
   uint64_t result;
   sscanf(value.c_str(), "%"PRIu64, &result);
   return result;
-}
-
-
-int HexDigit2Int(const char digit) {
-  if ((digit >= '0') && (digit <= '9')) return digit - '0';
-  if ((digit >= 'A') && (digit <= 'F')) return 10 + digit - 'A';
-  if ((digit >= 'a') && (digit <= 'f')) return 10 + digit - 'a';
-  return -1;
 }
 
 
@@ -678,12 +903,16 @@ bool HasPrefix(const string &str, const string &prefix,
 }
 
 
-bool IsNumeric(const std::string &str) {
-  for (unsigned i = 0; i < str.length(); ++i) {
-    if ((str[i] < '0') || (str[i] > '9'))
-      return false;
-  }
-  return true;
+bool HasSuffix(
+  const std::string &str,
+  const std::string &suffix,
+  const bool ignore_case)
+{
+  if (suffix.size() > str.size()) return false;
+  const IgnoreCaseComperator icmp;
+  return (ignore_case)
+    ? std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(), icmp)
+    : std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
 }
 
 
@@ -734,6 +963,55 @@ string JoinStrings(const vector<string> &strings, const string &joint) {
 }
 
 
+void ParseKeyvalMem(const unsigned char *buffer, const unsigned buffer_size,
+                    map<char, string> *content)
+{
+  string line;
+  unsigned pos = 0;
+  while (pos < buffer_size) {
+    if (static_cast<char>(buffer[pos]) == '\n') {
+      if (line == "--")
+        return;
+
+      if (line != "") {
+        const string tail = (line.length() == 1) ? "" : line.substr(1);
+        // Special handling of 'Z' key because it can exist multiple times
+        if (line[0] != 'Z') {
+          (*content)[line[0]] = tail;
+        } else {
+          if (content->find(line[0]) == content->end()) {
+            (*content)[line[0]] = tail;
+          } else {
+            (*content)[line[0]] = (*content)[line[0]] + "|" + tail;
+          }
+        }
+      }
+      line = "";
+    } else {
+      line += static_cast<char>(buffer[pos]);
+    }
+    pos++;
+  }
+}
+
+
+bool ParseKeyvalPath(const string &filename, map<char, string> *content) {
+  int fd = open(filename.c_str(), O_RDONLY);
+  if (fd < 0)
+    return false;
+
+  unsigned char buffer[4096];
+  int num_bytes = read(fd, buffer, sizeof(buffer));
+  close(fd);
+
+  if ((num_bytes <= 0) || (unsigned(num_bytes) >= sizeof(buffer)))
+    return false;
+
+  ParseKeyvalMem(buffer, unsigned(num_bytes), content);
+  return true;
+}
+
+
 double DiffTimeSeconds(struct timeval start, struct timeval end) {
   // Time substraction, from GCC documentation
   if (end.tv_usec < start.tv_usec) {
@@ -772,7 +1050,7 @@ bool GetLineFile(FILE *f, std::string *line) {
       break;
     line->push_back(c);
   }
-  return retval != EOF;
+  return (retval != EOF) || !line->empty();
 }
 
 
@@ -785,7 +1063,7 @@ bool GetLineFd(const int fd, std::string *line) {
       break;
     line->push_back(c);
   }
-  return retval == 1;
+  return (retval == 1) || !line->empty();
 }
 
 
@@ -827,6 +1105,9 @@ string ReplaceAll(const string &haystack, const string &needle,
   string result(haystack);
   size_t pos = 0;
   const unsigned needle_size = needle.size();
+  if (needle == "")
+    return result;
+
   while ((pos = result.find(needle, pos)) != string::npos)
     result.replace(pos, needle_size, replace_by);
   return result;
@@ -894,13 +1175,15 @@ void Daemonize() {
 }
 
 
-bool ExecuteBinary(      int                       *fd_stdin,
-                         int                       *fd_stdout,
-                         int                       *fd_stderr,
-                   const std::string               &binary_path,
-                   const std::vector<std::string>  &argv,
-                   const bool                       double_fork,
-                         pid_t                     *child_pid) {
+bool ExecuteBinary(
+  int *fd_stdin,
+  int *fd_stdout,
+  int *fd_stderr,
+  const std::string &binary_path,
+  const std::vector<std::string> &argv,
+  const bool double_fork,
+  pid_t *child_pid
+) {
   int pipe_stdin[2];
   int pipe_stdout[2];
   int pipe_stderr[2];
@@ -925,7 +1208,8 @@ bool ExecuteBinary(      int                       *fd_stdin,
                    map_fildes,
                    true,
                    double_fork,
-                   child_pid)) {
+                   child_pid))
+  {
     ClosePipe(pipe_stdin);
     ClosePipe(pipe_stdout);
     ClosePipe(pipe_stderr);
@@ -947,12 +1231,12 @@ bool ExecuteBinary(      int                       *fd_stdin,
  * read from stdout.  Quit shell simply by closing stderr, stdout, and stdin.
  */
 bool Shell(int *fd_stdin, int *fd_stdout, int *fd_stderr) {
-  const bool double_fork = false;
+  const bool double_fork = true;
   return ExecuteBinary(fd_stdin, fd_stdout, fd_stderr, "/bin/sh",
                        vector<string>(), double_fork);
 }
 
-struct ForkFailures { // TODO: C++11 (type safe enum)
+struct ForkFailures {  // TODO(rmeusel): C++11 (type safe enum)
   enum Names {
     kSendPid,
     kUnknown,
@@ -1006,7 +1290,8 @@ bool ManagedExec(const vector<string>  &command_line,
                  const map<int, int>   &map_fildes,
                  const bool             drop_credentials,
                  const bool             double_fork,
-                       pid_t           *child_pid) {
+                       pid_t           *child_pid)
+{
   assert(command_line.size() >= 1);
 
   Pipe pipe_fork;
@@ -1099,7 +1384,7 @@ bool ManagedExec(const vector<string>  &command_line,
   assert(retcode);
   if (status_code != ForkFailures::kSendPid) {
     close(pipe_fork.read_end);
-    LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%s)",
+    LogCvmfs(kLogCvmfs, kLogDebug, "managed execve failed (%s)",
              ForkFailures::ToString(status_code).c_str());
     return false;
   }
@@ -1114,14 +1399,16 @@ bool ManagedExec(const vector<string>  &command_line,
   close(pipe_fork.read_end);
   LogCvmfs(kLogCvmfs, kLogDebug, "execve'd %s (PID: %d)",
            command_line[0].c_str(),
-           (int)buf_child_pid);
+           static_cast<int>(buf_child_pid));
   return true;
 }
 
+
 // -----------------------------------------------------------------------------
 
+
 void StopWatch::Start() {
-  assert (!running_);
+  assert(!running_);
 
   gettimeofday(&start_, NULL);
   running_ = true;
@@ -1129,7 +1416,7 @@ void StopWatch::Start() {
 
 
 void StopWatch::Stop() {
-  assert (running_);
+  assert(running_);
 
   gettimeofday(&end_, NULL);
   running_ = false;
@@ -1144,7 +1431,7 @@ void StopWatch::Reset() {
 
 
 double StopWatch::GetTime() const {
-  assert (!running_);
+  assert(!running_);
 
   return DiffTimeSeconds(start_, end_);
 }
@@ -1162,6 +1449,91 @@ void SafeSleepMs(const unsigned ms) {
 }
 
 
+static inline void Base64Block(const unsigned char input[3], const char *table,
+                               char output[4])
+{
+  output[0] = table[(input[0] & 0xFD) >> 2];
+  output[1] = table[((input[0] & 0x03) << 4) | ((input[1] & 0xF0) >> 4)];
+  output[2] = table[((input[1] & 0x0F) << 2) | ((input[2] & 0xD0) >> 6)];
+  output[3] = table[input[2] & 0x3F];
+}
+
+
+string Base64(const string &data) {
+  string result;
+  result.reserve((data.length()+3)*4/3);
+  unsigned pos = 0;
+  const unsigned char *data_ptr =
+    reinterpret_cast<const unsigned char *>(data.data());
+  const unsigned length = data.length();
+  while (pos+2 < length) {
+    char encoded_block[4];
+    Base64Block(data_ptr+pos, b64_table, encoded_block);
+    result.append(encoded_block, 4);
+    pos += 3;
+  }
+  if (length % 3 != 0) {
+    unsigned char input[3];
+    input[0] = data_ptr[pos];
+    input[1] = ((length % 3) == 2) ? data_ptr[pos+1] : 0;
+    input[2] = 0;
+    char encoded_block[4];
+    Base64Block(input, b64_table, encoded_block);
+    result.append(encoded_block, 2);
+    result.push_back(((length % 3) == 2) ? encoded_block[2] : '=');
+    result.push_back('=');
+  }
+
+  return result;
+}
+
+
+static bool Debase64Block(const unsigned char input[4],
+                          const signed char *d_table,
+                          unsigned char output[3])
+{
+  int32_t dec[4];
+  for (int i = 0; i < 4; ++i) {
+    dec[i] = db64_table[input[i]];
+    if (dec[i] < 0) return false;
+  }
+
+  output[0] = (dec[0] << 2) | (dec[1] >> 4);
+  output[1] = ((dec[1] & 0x0F) << 4) | (dec[2] >> 2);
+  output[2] = ((dec[2] & 0x03) << 6) | dec[3];
+  return true;
+}
+
+
+bool Debase64(const string &data, string *decoded) {
+  decoded->clear();
+  decoded->reserve((data.length()+4)*3/4);
+  unsigned pos = 0;
+  const unsigned char *data_ptr =
+    reinterpret_cast<const unsigned char *>(data.data());
+  const unsigned length = data.length();
+  if (length == 0) return true;
+  if ((length % 4) != 0)
+    return false;
+
+  while (pos < length) {
+    unsigned char decoded_block[3];
+    bool retval = Debase64Block(data_ptr+pos, db64_table, decoded_block);
+    if (!retval)
+      return false;
+    decoded->append(reinterpret_cast<char *>(decoded_block), 3);
+    pos += 4;
+  }
+
+  for (int i = 0; i < 2; ++i) {
+    pos--;
+    if (data[pos] == '=')
+      decoded->erase(decoded->length()-1);
+  }
+  return true;
+}
+
+
 MemoryMappedFile::MemoryMappedFile(const std::string &file_path) :
   file_path_(file_path),
   file_descriptor_(-1),
@@ -1176,7 +1548,7 @@ MemoryMappedFile::~MemoryMappedFile() {
 }
 
 bool MemoryMappedFile::Map() {
-  assert (!mapped_);
+  assert(!mapped_);
 
   // open the file
   int fd;
@@ -1222,7 +1594,7 @@ bool MemoryMappedFile::Map() {
 }
 
 void MemoryMappedFile::Unmap() {
-  assert (mapped_);
+  assert(mapped_);
 
   if (mapped_file_ == NULL) {
     return;
@@ -1234,7 +1606,7 @@ void MemoryMappedFile::Unmap() {
   {
     LogCvmfs(kLogUtility, kLogStderr, "failed to unmap %s", file_path_.c_str());
     const bool munmap_failed = false;
-    assert (munmap_failed);
+    assert(munmap_failed);
   }
 
   // reset (resettable) data
@@ -1245,7 +1617,6 @@ void MemoryMappedFile::Unmap() {
   LogCvmfs(kLogUtility, kLogVerboseMsg, "munmap'ed %s", file_path_.c_str());
 }
 
-
 #ifdef CVMFS_NAMESPACE_GUARD
-}
+}  // namespace CVMFS_NAMESPACE_GUARD
 #endif

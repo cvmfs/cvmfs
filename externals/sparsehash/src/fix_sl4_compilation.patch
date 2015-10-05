@@ -1,0 +1,40 @@
+--- src/google/sparsehash/sparsehashtable.h.orig	2014-01-15 23:16:47.000000000 +0100
++++ src/google/sparsehash/sparsehashtable.h	2014-01-15 21:05:07.000000000 +0100
+@@ -528,7 +528,7 @@
+     check_use_deleted("set_deleted()");
+     bool retval = !test_deleted(it);
+     // &* converts from iterator to value-type.
+-    set_key(&(*it), key_info.delkey);
++    set_key_sl4fix(&(*it), key_info.delkey);
+     return retval;
+   }
+   // Set it so test_deleted is false.  true if object used to be deleted.
+@@ -546,7 +546,7 @@
+   bool set_deleted(const_iterator &it) {
+     check_use_deleted("set_deleted()");
+     bool retval = !test_deleted(it);
+-    set_key(const_cast<pointer>(&(*it)), key_info.delkey);
++    set_key_sl4fix(const_cast<pointer>(&(*it)), key_info.delkey);
+     return retval;
+   }
+   // Set it so test_deleted is false.  true if object used to be deleted.
+@@ -1182,7 +1182,7 @@
+     typename ExtractKey::result_type get_key(const_reference v) const {
+       return ExtractKey::operator()(v);
+     }
+-    void set_key(pointer v, const key_type& k) const {
++    void set_key_sl4fix(pointer v, const key_type& k) const {
+       SetKey::operator()(v, k);
+     }
+     bool equals(const key_type& a, const key_type& b) const {
+@@ -1204,8 +1204,8 @@
+   typename ExtractKey::result_type get_key(const_reference v) const {
+     return key_info.get_key(v);
+   }
+-  void set_key(pointer v, const key_type& k) const {
+-    key_info.set_key(v, k);
++  void set_key_sl4fix(pointer v, const key_type& k) const {
++    key_info.set_key_sl4fix(v, k);
+   }
+ 
+  private:

@@ -1,0 +1,319 @@
+
+cvmfs_test_name="Advanced Nested Catalogs Managagement Using .cvmfsdirtab"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in_1() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create some basic directories
+  mkdir People
+  mkdir People/Germans People/Americans People/French People/Russians
+  mkdir People/Germans/Scientists People/Germans/Musicians People/Germans/Politicians
+  mkdir People/Americans/Engineers People/Americans/Heros
+  mkdir People/Russians/Poets People/Russians/Admirals People/Russians/Musicians
+
+  mkdir Machines
+  mkdir Machines/Linux_x86_64 Machines/Linux_x86 Machines/Linux_arm Machines/Linux_ia64
+  mkdir Machines/Linux_x86_64/2.6.11 Machines/Linux_x86_64/2.6.23 Machines/Linux_x86_64/3.2.10
+  mkdir Machines/Linux_x86/2.4.10 Machines/Linux_x86/2.6.11 Machines/Linux_x86/3.2.32
+  mkdir Machines/Linux_arm/3.0.0
+
+
+  # create a .cvmfsdirtab for these directories
+  echo "/People/Germans/*/*" >  .cvmfsdirtab
+  echo "/Machines/Linux*/*"  >> .cvmfsdirtab
+
+  popdir
+}
+
+check_catalog_presence_1() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 8 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                              $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/2.6.11  $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/2.6.23  $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/3.2.10  $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/2.4.10     $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/2.6.11     $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/3.2.32     $repo_name && \
+     check_catalog_presence /Machines/Linux_arm/3.0.0      $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+produce_files_in_2() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  # create some directories for celebrities
+  mkdir People/Germans/Scientists/AlbertEinstein
+  mkdir People/Germans/Scientists/JohannesKepler
+  mkdir People/Germans/Musicians/RichardWagner
+  mkdir People/Germans/Musicians/GeorgFriedrichHaendel
+  mkdir People/Germans/Politicians/AngelaMerkel
+
+  mkdir People/Americans/Engineers/ThomasEdison
+  mkdir People/Americans/Heros/Superman
+  mkdir People/Americans/Heros/Batman
+
+  mkdir People/Russians/Poets/IvanBarkov
+  mkdir People/Russians/Poets/LeoTolstoy
+  mkdir People/Russians/Admirals/VladimirChernavin
+  mkdir People/Russians/Admirals/AlexeiGrigoryevichOrlov
+  mkdir People/Russians/Musicians/PussyRiot
+  mkdir People/Russians/Musicians/AnatolyLyadov
+  mkdir People/Russians/Musicians/GeorgySviridov
+
+  # create some files for other celebrities
+  head -n1337 /dev/urandom > People/Germans/Scientists/ErwinBuenning
+  head -n1337 /dev/urandom > People/Germans/Scientists/RobertKoch
+  head -n1337 /dev/urandom > People/Germans/Politicians/HorstSeehofer
+  head -n1337 /dev/urandom > People/French/BrigitteBardot
+  head -n1337 /dev/urandom > People/Russians/Musicians/PyotrIlyichTchaikovsky
+
+  popdir
+}
+
+check_catalog_presence_2() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 13 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                                                $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/2.6.11                    $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/2.6.23                    $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/3.2.10                    $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/2.4.10                       $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/2.6.11                       $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/3.2.32                       $repo_name && \
+     check_catalog_presence /Machines/Linux_arm/3.0.0                        $repo_name && \
+     check_catalog_presence /People/Germans/Scientists/AlbertEinstein        $repo_name && \
+     check_catalog_presence /People/Germans/Scientists/JohannesKepler        $repo_name && \
+     check_catalog_presence /People/Germans/Musicians/RichardWagner          $repo_name && \
+     check_catalog_presence /People/Germans/Musicians/GeorgFriedrichHaendel  $repo_name && \
+     check_catalog_presence /People/Germans/Politicians/AngelaMerkel         $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+produce_files_in_3() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "/People/*/Musicians/*" >> .cvmfsdirtab
+
+  popdir
+}
+
+check_catalog_presence_3() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 16 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                                                 $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/2.6.11                     $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/2.6.23                     $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/3.2.10                     $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/2.4.10                        $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/2.6.11                        $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/3.2.32                        $repo_name && \
+     check_catalog_presence /Machines/Linux_arm/3.0.0                         $repo_name && \
+     check_catalog_presence /People/Germans/Scientists/AlbertEinstein         $repo_name && \
+     check_catalog_presence /People/Germans/Scientists/JohannesKepler         $repo_name && \
+     check_catalog_presence /People/Germans/Musicians/RichardWagner           $repo_name && \
+     check_catalog_presence /People/Germans/Musicians/GeorgFriedrichHaendel   $repo_name && \
+     check_catalog_presence /People/Germans/Politicians/AngelaMerkel          $repo_name && \
+     check_catalog_presence /People/Russians/Musicians/PussyRiot              $repo_name && \
+     check_catalog_presence /People/Russians/Musicians/AnatolyLyadov          $repo_name && \
+     check_catalog_presence /People/Russians/Musicians/GeorgySviridov         $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+produce_files_in_4() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo "/People/*" >> .cvmfsdirtab
+
+  popdir
+}
+
+check_catalog_presence_4() {
+  local repo_name=$1
+
+  if [ $(get_catalog_count $repo_name) -ne 20 ]; then
+    return 101
+  fi
+
+  if check_catalog_presence /                                                 $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/2.6.11                     $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/2.6.23                     $repo_name && \
+     check_catalog_presence /Machines/Linux_x86_64/3.2.10                     $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/2.4.10                        $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/2.6.11                        $repo_name && \
+     check_catalog_presence /Machines/Linux_x86/3.2.32                        $repo_name && \
+     check_catalog_presence /Machines/Linux_arm/3.0.0                         $repo_name && \
+     check_catalog_presence /People/Germans                                   $repo_name && \
+     check_catalog_presence /People/Germans/Scientists/AlbertEinstein         $repo_name && \
+     check_catalog_presence /People/Germans/Scientists/JohannesKepler         $repo_name && \
+     check_catalog_presence /People/Germans/Musicians/RichardWagner           $repo_name && \
+     check_catalog_presence /People/Germans/Musicians/GeorgFriedrichHaendel   $repo_name && \
+     check_catalog_presence /People/Germans/Politicians/AngelaMerkel          $repo_name && \
+     check_catalog_presence /People/Russians                                  $repo_name && \
+     check_catalog_presence /People/Russians/Musicians/PussyRiot              $repo_name && \
+     check_catalog_presence /People/Russians/Musicians/AnatolyLyadov          $repo_name && \
+     check_catalog_presence /People/Russians/Musicians/GeorgySviridov         $repo_name && \
+     check_catalog_presence /People/French                                    $repo_name && \
+     check_catalog_presence /People/Americans                                 $repo_name; then
+    return 0
+  else
+    return 102
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "load repository configuration"
+  load_repo_config $CVMFS_TEST_REPO
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in_1 $repo_dir || return 1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository"
+  check_catalog_presence_1 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in_2 $repo_dir || return 2
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository"
+  check_catalog_presence_2 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in_3 $repo_dir || return 3
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository"
+  check_catalog_presence_3 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in_4 $repo_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if eventually the right catalogs are present in the repository"
+  check_catalog_presence_4 $CVMFS_TEST_REPO || return $?
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  # ============================================================================
+
+  echo "start a transaction to check dirtab efficiency"
+  start_transaction $CVMFS_TEST_REPO || return 5
+
+  echo "run 'cvmfs_swissknife dirtab'"
+  load_repo_config $CVMFS_TEST_REPO
+  local spool_dir="$CVMFS_SPOOL_DIR"
+  local base_hash=$(attr -qg root_hash ${spool_dir}/rdonly)
+  cvmfs_swissknife dirtab -x                    \
+      -d /cvmfs/${CVMFS_TEST_REPO}/.cvmfsdirtab \
+      -b $base_hash                             \
+      -w $CVMFS_STRATUM0                        \
+      -t ${spool_dir}/tmp                       \
+      -u /cvmfs/${CVMFS_TEST_REPO}              \
+      -s ${spool_dir}/scratch || return 6
+
+  echo "check that 'cvmfs_swissknife dirtab' doesn't open all catalogs"
+  local pipe_path="${CVMFS_CACHE_BASE}/${CVMFS_TEST_REPO}/cvmfs_io.${CVMFS_TEST_REPO}"
+  local open_catalogs="sudo cvmfs_talk -p $pipe_path open catalogs"
+  $open_catalogs > /dev/null                || return 7
+  [ $($open_catalogs | wc -l) -eq 5 ]       || return 8
+  $open_catalogs | grep '/People/French'    || return 9
+  $open_catalogs | grep '/People/Germans'   || return 10
+  $open_catalogs | grep '/People/Russians'  || return 11
+  $open_catalogs | grep '/People/Americans' || return 12
+
+  echo "abort transaction"
+  abort_transaction $CVMFS_TEST_REPO || return 13
+
+  echo "check that the temporary scratch directory is empty"
+  [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
+
+  return 0
+}
+

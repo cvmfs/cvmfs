@@ -1,0 +1,67 @@
+############################################
+# CVMFS Spooler Location - Quick Reference #
+############################################
+
+This directory is used by the CernVM-FS Server tools for book keeping of repos-
+itories on the release manager machine or respectively the stratum 0.
+
+WE STRONGLY DISCOURAGE ANY MANUAL INTERVENTION IN THE DIRECTORIES BELOW!!
+
+The directory `/var/spool/cvmfs` contains a sub-directory for each repository
+managed on this release manager machine. These sub-directories are named with
+the fully qualified name of the correlated repository.
+
+/var/spool/cvmfs
+             |
+             +--> foo.cern.ch
+             |
+             +--> bar.desy.de
+             |
+             +--> ...
+
+Each of these repository-specific directories house a number of administrative
+structures. A user should not need to interact with them, nevertheless we
+provide a quick overview over their purpose in this README.
+Since CernVM-FS Server 2.1.x the server tools incorporate a CernVM-FS client
+that reflects the current state of the maintained repository. Hence, everything 
+that has been published is stored solely in CernVM-FS's backend storage and be-
+comes visible through a CernVM-FS client only.
+Utilizing a union file system (AUFS) we allow for file system updates directly
+on top of the CernVM-FS client. Hence, a CernVM-FS Server does not directly
+mount the CernVM-FS client in /cvmfs/foo.cern.ch but through a a writable AUFS
+overlay (copy-on-write semantics).
+
+Below is an overview over the contents of the sub-directories found here:
+/var/spool/cvmfs/foo.cern.ch/<object>
+
+-> rdonly/         The mount point of the CernVM-FS client for foo.cern.ch. This
+                   reflects the current content of the repository as it would be
+                   seen by any ordinary CernVM-FS client.
+     
+-> scratch/        The writable space of the AUFS overlay. Every modification
+                   applied to /cvmfs/foo.cern.ch after starting a transaction
+                   with `cvmfs_server transaction` is scratched in this direc-
+                   tory. In idle state, this directory should be empty. If a
+                   transaction was successfully published, `cvmfs_server publish`
+                   will automatically flush this directory.
+     
+-> cache/          This houses the cache for the CernVM-FS client mounted at
+                   rdonly/, it contains the same structures as a normal CernVM-
+                   FS client cache.
+     
+-> tmp/            Some `cvmfs_server` actions need scratch space to put tempo-
+                   rary files. If no cvmfs_server command is running, this
+                   directory is supposed to be empty.
+
+-> client.local    The configuration file for the CernVM-FS client mounted at
+                   rdonly/. Usually this should contain a CVMFS_ROOT_HASH with
+                   the root catalog hash of the latest published revision.
+
+-> in_transaction/ This is a flag directory that is created when invoking
+                   `cvmfs_server transaction`. It just states that the reposi-
+                   tory is currently in a transaction.
+
+-> is_publishing/  Before running the actual publishing process during the run
+                   of `cvmfs_server publish` this flag directory is created. It
+                   is used to safe-guard potential concurrent publishing actions
+                   from one another.

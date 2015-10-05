@@ -3,10 +3,11 @@ cvmfs_test_name="Simulate CVMFS Development"
 cvmfs_test_autofs_on_startup=false
 
 # cvmfs source tarballs to be downloaded and used as test data
-cvmfs_versions="http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.1/cvmfs-2.1.1.tar.gz
-http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.2/cvmfs-2.1.2.tar.gz
-http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.3/cvmfs-2.1.3.tar.gz
-http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.4/cvmfs-2.1.4.tar.gz"
+# TODO: replace this by upcoming CVMFS versions...
+cvmfs_versions="http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.11/cvmfs-2.1.11.tar.gz
+http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.12/cvmfs-2.1.12.tar.gz
+http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.14/cvmfs-2.1.14.tar.gz
+http://ecsft.cern.ch/dist/cvmfs/cvmfs-2.1.15/cvmfs-2.1.15.tar.gz"
 
 
 # retrieve the URL at a given index (dash workaround)
@@ -69,8 +70,8 @@ configure_nested_catalogs() {
       rm -f $working_dir/cvmfs/.cvmfscatalog
       ;;
     2)
-      touch $working_dir/test/HTTP/.cvmfscatalog
-      touch $working_dir/test/LWP/.cvmfscatalog
+      touch $working_dir/test/cloud_testing/platforms/.cvmfscatalog
+      touch $working_dir/test/cloud_testing/steering/.cvmfscatalog
       rm -f $working_dir/test/.cvmfscatalog
       ;;
     3)
@@ -78,8 +79,8 @@ configure_nested_catalogs() {
       rm -f $working_dir/externals/zlib/.cvmfscatalog
       rm -f $working_dir/externals/sqlite3/.cvmfscatalog
       rm -f $working_dir/cvmfs/.cvmfscatalog
-      rm -f $working_dir/test/HTTP/.cvmfscatalog
-      rm -f $working_dir/test/LWP/.cvmfscatalog
+      rm -f $working_dir/test/cloud_testing/steering/.cvmfscatalog
+      rm -f $working_dir/test/cloud_testing/platforms/.cvmfscatalog
       ;;
   esac
 }
@@ -127,12 +128,12 @@ check_catalog_configuration() {
       if [ $(get_catalog_count $repo_name) -ne 6 ]; then
         return 2
       fi
-      if check_catalog_presence /                  $repo_name && \
-         check_catalog_presence /externals         $repo_name && \
-         check_catalog_presence /externals/zlib    $repo_name && \
-         check_catalog_presence /externals/sqlite3 $repo_name && \
-         check_catalog_presence /test/HTTP         $repo_name && \
-         check_catalog_presence /test/LWP          $repo_name
+      if check_catalog_presence /                             $repo_name && \
+         check_catalog_presence /externals                    $repo_name && \
+         check_catalog_presence /externals/zlib               $repo_name && \
+         check_catalog_presence /externals/sqlite3            $repo_name && \
+         check_catalog_presence /test/cloud_testing/platforms $repo_name && \
+         check_catalog_presence /test/cloud_testing/steering  $repo_name
       then
         return 0
       else
@@ -183,8 +184,8 @@ copy_version() {
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
-  echo "check catalog integrity"
-  check_catalogs $CVMFS_TEST_REPO || return $?
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "check if requested nested catalogs are present"
   check_catalog_configuration $version $repo_name || return $?
@@ -198,16 +199,16 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
-  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER" >> $logfile
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER >> $logfile 2>&1 || return $?
-  
-  echo "downloading some previous versions of the CVMFS code as test data..." >> $logfile
-  download_and_untar_cvmfs_versions >> $logfile 2>&1 || return $?
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  echo "do the business" >> $logfile 2>&1
+  echo "downloading some previous versions of the CVMFS code as test data..."
+  download_and_untar_cvmfs_versions || return $?
+
+  echo "do the business"
   for i in 0 1 2 3
   do
-    copy_version $i $repo_dir $CVMFS_TEST_REPO $reference_dir >> $logfile 2>&1 || return $?
+    copy_version $i $repo_dir $CVMFS_TEST_REPO $reference_dir || return $?
   done
 
   return 0

@@ -35,36 +35,54 @@
 #include <set>
 #include <string>
 
+#include "catalog_mgr_ro.h"
 #include "catalog_rw.h"
-#include "catalog_mgr.h"
+#include "upload_spooler_result.h"
+#include "xattr.h"
 
+class XattrList;
 namespace upload {
 class Spooler;
 }
+
+namespace download {
+class DownloadManager;
+}
+
 namespace manifest {
 class Manifest;
 }
 
+namespace perf {
+class Statistics;
+}
+
 namespace catalog {
 
-class WritableCatalogManager : public AbstractCatalogManager {
+class WritableCatalogManager : public SimpleCatalogManager {
  public:
-  WritableCatalogManager(const hash::Any   &base_hash,
+  WritableCatalogManager(const shash::Any  &base_hash,
                          const std::string &stratum0,
                          const std::string &dir_temp,
-                         upload::Spooler   *spooler);
+                         upload::Spooler   *spooler,
+                         download::DownloadManager *download_manager,
+                         uint64_t catalog_entry_warn_threshold,
+                         perf::Statistics *statistics);
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
+                                              const bool volatile_content,
+                                              const bool garbage_collectable,
                                               upload::Spooler   *spooler);
-
-  bool Init();
 
   // DirectoryEntry handling
   void AddFile(const DirectoryEntryBase &entry,
-               const std::string &parent_directory) {
-    AddFile(DirectoryEntry(entry), parent_directory);
+               const XattrList &xattrs,
+               const std::string &parent_directory)
+  {
+    AddFile(DirectoryEntry(entry), xattrs, parent_directory);
   }
   void AddChunkedFile(const DirectoryEntryBase &entry,
+                      const XattrList &xattrs,
                       const std::string &parent_directory,
                       const FileChunkList &file_chunks);
   void RemoveFile(const std::string &file_path);
@@ -76,47 +94,38 @@ class WritableCatalogManager : public AbstractCatalogManager {
   void RemoveDirectory(const std::string &directory_path);
 
   // Hardlink group handling
-  void AddHardlinkGroup(DirectoryEntryBaseList &entries,
+  void AddHardlinkGroup(const DirectoryEntryBaseList &entries,
+                        const XattrList &xattrs,
                         const std::string &parent_directory);
   void ShrinkHardlinkGroup(const std::string &remove_path);
 
   // Nested catalog handling
   void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
+  bool IsTransitionPoint(const std::string &path);
 
   /**
    * TODO
    */
   void PrecalculateListings();
 
-  manifest::Manifest *Commit(const bool stop_for_tweaks);
+  manifest::Manifest *Commit(const bool     stop_for_tweaks,
+                             const uint64_t manual_revision);
 
  protected:
   void EnforceSqliteMemLimit() { }
 
-  LoadError LoadCatalog(const PathString &mountpoint,
-                        const hash::Any  &hash,
-                        std::string      *catalog_path,
-                        hash::Any        *catalog_hash);
-  Catalog* CreateCatalog(const PathString &mountpoint,
-                         const hash::Any  &catalog_hash,
+  Catalog *CreateCatalog(const PathString &mountpoint,
+                         const shash::Any &catalog_hash,
                          Catalog *parent_catalog);
+  void ActivateCatalog(Catalog *catalog);
 
   void AddFile(const DirectoryEntry  &entry,
+               const XattrList       &xattrs,
                const std::string     &parent_directory);
 
  private:
   bool FindCatalog(const std::string &path, WritableCatalog **result);
-
-  /**
-   * Makes the given path relative to the catalog structure
-   * Pathes coming out here can be used for lookups in catalogs
-   * @param relativePath the path to be mangled
-   * @return the mangled path
-   */
-	inline std::string MakeRelativePath(const std::string &relative_path) const {
-    return (relative_path == "") ? "" : "/" + relative_path;
-  }
 
   /**
    * Traverses all open catalogs and determines which catalogs need updated
@@ -126,25 +135,31 @@ class WritableCatalogManager : public AbstractCatalogManager {
   void GetModifiedCatalogs(WritableCatalogList *result) const {
     const unsigned int number_of_dirty_catalogs =
       GetModifiedCatalogsRecursively(GetRootCatalog(), result);
-    assert (number_of_dirty_catalogs <= result->size());
+    assert(number_of_dirty_catalogs <= result->size());
   }
   int GetModifiedCatalogsRecursively(const Catalog *catalog,
                                      WritableCatalogList *result) const;
 
-  hash::Any SnapshotCatalog(WritableCatalog *catalog) const;
+  shash::Any SnapshotCatalog(WritableCatalog *catalog) const;
+  void CatalogUploadCallback(const upload::SpoolerResult &result);
 
  private:
   inline void SyncLock() { pthread_mutex_lock(sync_lock_); }
   inline void SyncUnlock() { pthread_mutex_unlock(sync_lock_); }
 
   // defined in catalog_mgr_rw.cc
-  const static std::string kCatalogFilename;
+  static const std::string kCatalogFilename;
 
-  pthread_mutex_t  *sync_lock_;  // private lock of WritableCatalogManager
-  hash::Any         base_hash_;
-  std::string       stratum0_;
-  std::string       dir_temp_;
-  upload::Spooler  *spooler_;
+  // private lock of WritableCatalogManager
+  pthread_mutex_t *sync_lock_;
+  upload::Spooler *spooler_;
+
+  uint64_t catalog_entry_warn_threshold_;
+
+  /**
+   * Directories don't have extended attributes at this point.
+   */
+  XattrList empty_xattrs;
 };  // class WritableCatalogManager
 
 }  // namespace catalog

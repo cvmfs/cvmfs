@@ -3,9 +3,11 @@ cvmfs_test_name="DNS Timeout"
 
 do_faulty_mount() {
   cvmfs_mount $repo \
+              "CVMFS_CONFIG_REPOSITORY=" \
               "CVMFS_DNS_SERVER=127.0.0.1" \
               "CVMFS_TIMEOUT=3" \
-              "CVMFS_TIMEOUT_DIRECT=3"
+              "CVMFS_TIMEOUT_DIRECT=3" \
+              "CVMFS_MAX_RETRIES=0"
 }
 
 cvmfs_run_test() {
@@ -15,28 +17,41 @@ cvmfs_run_test() {
   local retcode=0
   local server_pid=0
 
-  echo "trying to mount $repo first" >> $logfile
+  echo "restarting autofs"
+  autofs_switch off || return 10
+  autofs_switch on  || return 11
+
+  echo "trying to mount $repo first"
   cvmfs_mount $repo || return 1
 
-  echo "unmounting and cleaning" >> $logfile
+  echo "unmounting and cleaning"
   cvmfs_clean || return 2
 
-  echo "starting mocked and silent DNS server" >> $logfile
+  echo "starting mocked and silent DNS server"
   server_pid=$(open_silent_port UDP 53 $logfile)
 
-  echo "silent DNS server running as PID $server_pid" >> $logfile
+  echo "silent DNS server running as PID $server_pid"
 
-  echo "trying to mount again with unresponsive DNS" >> $logfile
+  echo "trying to mount again with unresponsive DNS"
   local seconds
   seconds=$(stop_watch do_faulty_mount)
+  echo "timeout was $timeout seconds"
 
-  if [ $seconds -gt 8 ]; then
-    echo "timeout was too long: $seconds (expected at most 8)" >> $logfile
-    retcode=5
+  num_host=$(cvmfs_config showconfig $repo |grep CVMFS_SERVER_URL | tr \; \\n  | wc -l)
+
+  # DNS Timeout for proxies is hard-coded to 2 attempts with 3 second timeout
+  # for the first attempt and up to 6 seconds for the second attempt. In the
+  # beginning, there is a single request to resolve all the proxies.
+  # Resolving the hosts is cut off by the CVMFS_TIMEOUT setting.
+  # Two extra seconds for measurement uncertainties.
+  local expected_max=$(($num_host*3 + 9 + 2))
+  if [ $seconds -gt $expected_max ]; then
+    echo "timeout was too long: $seconds (expected at most $expected_max)"
+    CVMFS_TIME_WARNING_FLAG=1
   fi
 
-  echo "killing the mocked DNS server" >> $logfile
-  sudo kill -9 $server_pid >> $logfile 2>&1 || retcode=6
+  echo "killing the mocked DNS server"
+  sudo kill $server_pid || retcode=6
 
   return $retcode
 }

@@ -1,0 +1,243 @@
+
+cvmfs_test_name="Migrating CernVM-FS 2.0 Repository to 2.1.x"
+cvmfs_test_autofs_on_startup=false
+
+
+get_talk_pipe() {
+  local mountpoint="$1"
+  local repo_name="$2"
+  local cache="$(get_cache_directory $mountpoint)"
+  echo "${cache}/${repo_name}/cvmfs_io.${repo_name}"
+}
+
+get_apache_config_filename() {
+  local repo_name="$1"
+  echo "${repo_name}.conf"
+}
+
+
+mock_apache_access_to_legacy_repo() {
+  local legacy_repo_name="$1"
+  local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+  local legacy_repo_url="$(get_local_repo_url $legacy_repo_name)"
+
+  echo -n "configuring apache to serve the legacy repository... "
+create_apache_config_file $apache_config_file << EOF
+# Created by test case 550.  Don't touch.
+Alias /cvmfs/${legacy_repo_name} ${legacy_repo_storage}/pub/catalogs
+<Directory "${legacy_repo_storage}/pub/catalogs">
+  Options -MultiViews +FollowSymLinks
+  AllowOverride All
+  $(get_compatible_apache_allow_from_all_config)
+
+  EnableMMAP Off
+  EnableSendFile Off
+  AddType application/x-cvmfs .cvmfspublished .cvmfswhitelist
+  FileETag INode MTime Size
+  ExpiresActive On
+  ExpiresDefault "access plus 3 days"
+  ExpiresByType text/html "access plus 5 minutes"
+  ExpiresByType application/x-cvmfs "access plus 1 minutes"
+</Directory>
+EOF
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+  curl --output /dev/null --silent --head --fail "$legacy_repo_url/.cvmfspublished" || die "fail (404 on .cvmfspublished)"
+  echo "done"
+}
+
+
+stop_mocked_apache_access() {
+  local legacy_repo_name="$1"
+  local apache_config_file="$(get_apache_config_filename $legacy_repo_name)"
+  local legacy_repo_url="$(get_repo_url $legacy_repo_name)"
+  echo -n "shutting down mocked legacy repository... "
+  remove_apache_config_file "$apache_config_file"
+  apache_switch off > /dev/null
+  apache_switch on  > /dev/null
+  curl --output /dev/null --silent --head --fail "$legacy_repo_url/.cvmfspublished" && die "fail (.cvmfspublished still reachable)"
+  echo "done"
+}
+
+
+initiate_reload() {
+  local mountpoint="$1"
+  local repo_name="$2"
+  local talk_pipe="$(get_talk_pipe $mountpoint $repo_name)"
+  cvmfs_talk -p $talk_pipe remount
+}
+
+
+TEST550_MAX_WAITING_TIMEOUT=300
+wait_for_revision() {
+  local mountpoint="$1"
+  local repo_name="$2"
+  local expected_revision="$3"
+  local talk_pipe="$(get_talk_pipe $mountpoint $repo_name)"
+  local waited=0
+  local revision=0
+  local interval=5
+
+  echo -n "waiting for revision $expected_revision to become picked up by $mountpoint ..."
+  while [ $waited -lt $TEST550_MAX_WAITING_TIMEOUT ] && [ $revision -ne $expected_revision ]; do
+    ls $mountpoint > /dev/null 2>&1 || return 2
+    revision="$(cvmfs_talk -p $talk_pipe revision)"
+    if [ x"$revision" = x"$expected_revision" ]; then
+      echo " done"
+      return 0
+    fi
+    echo -n "."
+    sleep $interval
+    waited=$(( $waited + $interval ))
+  done
+  echo " Timeout!"
+  return 1
+}
+
+
+TEST550_LEGACY_STORAGE=""
+TEST550_APACHE_CONF=""
+TEST550_REPLICA_NAME=""
+TEST550_S0_MOUNTPOINT=""
+TEST550_S1_MOUNTPOINT=""
+TEST550_NEW_REPO_NAME=""
+cleanup() {
+  [ -z "$TEST550_LEGACY_STORAGE" ] || sudo rm -fR $TEST550_LEGACY_STORAGE
+  [ -z "$TEST550_APACHE_CONF" ]    || remove_apache_config_file $TEST550_APACHE_CONF
+  [ -z "$TEST550_REPLICA_NAME" ]   || sudo cvmfs_server rmfs -f $TEST550_REPLICA_NAME
+  [ -z "$TEST550_S0_MOUNTPOINT" ]  || sudo umount $TEST550_S0_MOUNTPOINT
+  [ -z "$TEST550_S1_MOUNTPOINT" ]  || sudo umount $TEST550_S1_MOUNTPOINT
+  [ -z "$TEST550_NEW_REPO_NAME" ]  || sudo cvmfs_server rmfs -f $TEST550_NEW_REPO_NAME
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local script_location=$2
+  local guinea_pig_location="${script_location}/../../common/guinea_pig_repo_20"
+  local legacy_repo_name="testmigration.cern.ch"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+  local legacy_repo_url="$(get_local_repo_url $legacy_repo_name)"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+  local replica_url="$(get_repo_url $replica_name)"
+  local key_location="/etc/cvmfs/keys"
+  local s0_mnt="$(pwd)/s0"
+  local s1_mnt="$(pwd)/s1"
+
+  echo "make sure there are no legacy repo leftovers from previous tests"
+  cleanup_legacy_repo_leftovers "$legacy_repo_name"
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo -n "resurrect legacy repository... "
+  TEST550_LEGACY_STORAGE="$legacy_repo_storage"
+  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                              || return $?
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-2.tar.gz" "$legacy_repo_name" || return $?
+  echo "done"
+
+  echo "start apache to serve the legacy repository"
+  TEST550_APACHE_CONF=$(get_apache_config_filename $legacy_repo_name)
+  mock_apache_access_to_legacy_repo "$legacy_repo_name"
+
+  echo "creating a stratum1 replication"
+  TEST550_REPLICA_NAME="$replica_name"
+  create_stratum1 $replica_name                           \
+                  $CVMFS_TEST_USER                        \
+                  $legacy_repo_url                        \
+                  ${key_location}/${legacy_repo_name}.pub \
+    || return 2
+
+  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  sudo cvmfs_server snapshot $replica_name || return 3
+
+  echo "mount the stratum0 and the stratum1 repository on local mountpoints"
+  TEST550_S0_MOUNTPOINT="$s0_mnt"
+  do_local_mount $s0_mnt $legacy_repo_name $legacy_repo_url || return 4
+  TEST550_S1_MOUNTPOINT="$s1_mnt"
+  do_local_mount $s1_mnt $legacy_repo_name $replica_url     || return 5
+
+  echo "try a listing"
+  ls -lisa $s0_mnt $s1_mnt || return 6
+
+  echo "publish revision 3"
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-3.tar.gz" "$legacy_repo_name" || return $?
+
+  echo "snapshot the new revision"
+  sudo cvmfs_server snapshot $replica_name || return 7
+
+  echo "trigger the clients to apply the new revision"
+  initiate_reload "$s0_mnt" "$legacy_repo_name" || return 8
+  initiate_reload "$s1_mnt" "$legacy_repo_name" || return 9
+
+  echo "wait for the clients to pick up revision 3"
+  wait_for_revision "$s0_mnt" "$legacy_repo_name" 3 || return 10
+  wait_for_revision "$s1_mnt" "$legacy_repo_name" 3 || return 11
+
+  echo "try another listing"
+  ls -lisa $s0_mnt $s1_mnt || return 12
+  [ -d ${s0_mnt}/dir1 ] && [ -d ${s0_mnt}/dir2 ] && [ -d ${s0_mnt}/dir3 ] && \
+  [ -d ${s0_mnt}/dir4 ] && [ -d ${s0_mnt}/dir5 ] && [ -d ${s0_mnt}/dir6 ] && \
+  [ -d ${s1_mnt}/dir1 ] && [ -d ${s1_mnt}/dir2 ] && [ -d ${s1_mnt}/dir3 ] && \
+  [ -d ${s1_mnt}/dir4 ] && [ -d ${s1_mnt}/dir5 ] && [ -d ${s1_mnt}/dir6 ] || return 12
+
+  echo "stop serving the old repository - migration imminent"
+  stop_mocked_apache_access "$legacy_repo_name"
+
+  echo "fast forward to revision 6"
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-6.tar.gz" "$legacy_repo_name" || return $?
+
+  echo "run the repository migration"
+  TEST550_NEW_REPO_NAME="$legacy_repo_name"
+  sudo mv $legacy_repo_storage/pub/data $legacy_repo_storage         || return 13
+  sudo ln -s $legacy_repo_storage/data $legacy_repo_storage/pub/data || return 13
+  sudo cp $legacy_repo_storage/pub/catalogs/.cvmfspublished         \
+          $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
+          $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
+          $legacy_repo_storage || return 13
+  sudo cvmfs_server import \
+    -o $CVMFS_TEST_USER    \
+    -l                     \
+    -s                     \
+    -g                     \
+    $legacy_repo_name || return 14
+
+  echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
+  ls -lisa /cvmfs/${legacy_repo_name} || return 15
+
+  echo "do a snapshot on stratum 1 that spans from CernVM-FS 2.1.x to 2.0"
+  sudo cvmfs_server snapshot $replica_name || return 16
+
+  echo "trigger the clients to apply the new (2.1.x) revision"
+  initiate_reload "$s0_mnt" "$legacy_repo_name" || return 17
+  initiate_reload "$s1_mnt" "$legacy_repo_name" || return 18
+
+  echo "wait for the clients to pick up revision 7"
+  wait_for_revision "$s0_mnt" "$legacy_repo_name" 7 || return 19
+  wait_for_revision "$s1_mnt" "$legacy_repo_name" 7 || return 20
+
+  echo "try a final listing"
+  ls -lisa $s0_mnt $s1_mnt || return 21
+  [ -d ${s0_mnt}/dir1 ] && [ -d ${s0_mnt}/dir2 ] && [ -d ${s0_mnt}/dir3 ] && \
+  [ -d ${s0_mnt}/dir4 ] && [ -d ${s0_mnt}/dir5 ] && [ -d ${s0_mnt}/dir6 ] && \
+  [ -d ${s0_mnt}/dir7 ] && \
+  [ -d ${s1_mnt}/dir1 ] && [ -d ${s1_mnt}/dir2 ] && [ -d ${s1_mnt}/dir3 ] && \
+  [ -d ${s1_mnt}/dir4 ] && [ -d ${s1_mnt}/dir5 ] && [ -d ${s1_mnt}/dir6 ] && \
+  [ -d ${s1_mnt}/dir7 ] || return 21
+  local big_file="/cvmfs/${legacy_repo_name}/dir6/bigfile"
+  local big_sha1="$(cat $big_file | sha1sum | head -c40)"
+  [ x"181e8566ef9ef4063a00e56ec82cc99682ac795c" = x"$big_sha1" ] || return 22
+
+  echo "run a new transaction"
+  start_transaction "$legacy_repo_name"  || return 23
+  cp_bin /cvmfs/${legacy_repo_name}/dir7 || return 24
+  touch $big_file                        || return 25
+  publish_repo "$legacy_repo_name"       || return 26
+
+  echo "check if big file is still the same content hash (now it should be chunked)"
+  local big_sha1_2="$(cat $big_file | sha1sum | head -c40)"
+  [ x"$big_sha1" = x"$big_sha1_2" ] || return 27
+
+  return 0
+}

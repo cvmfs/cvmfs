@@ -6,19 +6,12 @@
 
 #include "checksum.h"
 #include "hash.h"
+#include "platform.h"
 
-#include <stdio.h>
 #include <errno.h>
-#include <string.h>
 #include <fcntl.h>
-
-std::string cache_path;
-
-std::string
-__attribute__((weak))
-GetPathInCache(const hash::Any &hash) {
-  return cache_path + "/" + hash.MakePath(1, 2);
-}
+#include <stdio.h>
+#include <string.h>
 
 // Note we made READ_BUFFER unaligned with the size of the checksum blocks
 // Hopefully this will help prevent against any alignment assumptions.
@@ -26,25 +19,42 @@ GetPathInCache(const hash::Any &hash) {
 
 int main(int argc, char *argv[]) {
   if (argc != 3) {
-    fprintf(stderr, "Usage: %s cvmfs_cache_path hash\n", argv[0]);
+    fprintf(stderr, "Usage: %s cvmfs_cache_path /cvmfs/repo/path\n", argv[0]);
     return 1;
   }
-  cache_path = argv[1];
+  std::string cache_path = argv[1];
+  std::string file_path = argv[2];
 
-  hash::Any hash(hash::kSha1, hash::HexPtr(argv[2]));
+  std::string hash_value;
+  if (!platform_getxattr(file_path.c_str(), "user.hash", &hash_value))
+  {
+    fprintf(stderr, "Failed to determine file's (%s) hash: %s (errno=%d)\n",
+            file_path.c_str(), strerror(errno), errno);
+    return 1;
+  }
+  shash::Any hash(shash::kSha1, shash::HexPtr(hash_value));
 
-  ChecksumFileWriter writer(hash, true);
-
-  std::string path = GetPathInCache(hash);
-  int fd = open(path.c_str(), O_RDONLY);
+  std::string path = cache_path + "/" + hash.MakePathWithoutSuffix();
+  int fd = open(path.c_str(), O_RDWR);
   if (fd < 0) {
     fprintf(stderr, "Failed to open file %s for checksumming (errno=%d, %s)\n",
             path.c_str(), errno, strerror(errno));
     return errno;
   }
+  struct stat st;
+  if (-1 == stat(file_path.c_str(), &st)) {
+    fprintf(stderr, "Failed to stat cache file (%s): %s (errno=%d).\n",
+            file_path.c_str(), strerror(errno), errno);
+    return errno;
+  }
+
+  checksum::ChecksumFileWriter writer(fd, st.st_size, false);
+
   int result;
   unsigned char buffer[READ_BUFFER];
-  while ((result = read(fd, buffer, READ_BUFFER)) > 0) {
+  errno = 0;
+  while (((result = read(fd, buffer, READ_BUFFER)) > 0) && (errno == EINTR)) {
+    if (errno) {continue;}
     writer.stream(buffer, result);
   }
   if (result < 0) {
@@ -57,6 +67,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Checksum calculation failed for %s\n", path.c_str());
     return 1;
   }
+  close(fd);
   printf("Calculated CRC32 checksum: %u\n", crc32);
   return 0;
 }
+

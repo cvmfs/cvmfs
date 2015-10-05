@@ -2,19 +2,20 @@
  * This file is part of the CernVM File System.
  */
 
+#include "cvmfs_config.h"
 #include "loader_talk.h"
 
+#include <errno.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <errno.h>
 
-#include <cstdlib>
 #include <cassert>
+#include <cstdlib>
 
+#include "loader.h"
 #include "logging.h"
 #include "util.h"
-#include "loader.h"
 
 using namespace std;  // NOLINT
 
@@ -50,7 +51,7 @@ static void *MainTalk(void *data __attribute__((unused))) {
   socklen_t socket_size = sizeof(remote);
   int con_fd = -1;
   while (true) {
-    if (con_fd > 0) {
+    if (con_fd >= 0) {
       shutdown(con_fd, SHUT_RDWR);
       close(con_fd);
     }
@@ -73,8 +74,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
       SendMsg2Socket(con_fd, "~");
       (void)send(con_fd, &retval, sizeof(retval), MSG_NOSIGNAL);
       if (retval != kFailOk) {
-        LogCvmfs(kLogCvmfs, kLogSyslogErr, "reloading Fuse module failed (%d)",
-                 retval);
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "reloading Fuse module failed "
+                                           "(%d - %s)",
+                 retval, Code2Ascii(static_cast<Failures>(retval)));
         abort();
       }
       SetLogMicroSyslog("");

@@ -1,8 +1,13 @@
+__i686.get_pc_thunk.bx
+__i686.get_pc_thunk.cx
 cvmfs_init
 cvmfs_fini
+cvmfs_attach_repo
+cvmfs_detach_repo
 cvmfs_remount
 cvmfs_set_log_fn
 cvmfs_open
+cvmfs_pread
 cvmfs_close
 cvmfs_readlink
 cvmfs_stat

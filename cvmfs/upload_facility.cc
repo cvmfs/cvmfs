@@ -5,46 +5,54 @@
 #include "upload_facility.h"
 
 #include "upload_local.h"
-#include "upload_riak.h"
+#include "upload_s3.h"
+#include "util.h"
 
-using namespace upload;
+namespace upload {
 
 void AbstractUploader::RegisterPlugins() {
   RegisterPlugin<LocalUploader>();
-  RegisterPlugin<RiakUploader>();
+  RegisterPlugin<S3Uploader>();
 }
 
 
-AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition) :
-  spooler_definition_(spooler_definition)
-{}
+AbstractUploader::AbstractUploader(const SpoolerDefinition& spooler_definition)
+  : spooler_definition_(spooler_definition)
+  , torn_down_(false)
+  , jobs_in_flight_(spooler_definition.number_of_concurrent_uploads) { }
 
 
 bool AbstractUploader::Initialize() {
-  return true;
+  // late initialization of the writer_thread_ field. This is necessary, since
+  // AbstractUploader::WriteThread is pure virtual and relies on a concrete sub-
+  // class being initialized before the writer_thread_ starts running
+  tbb::tbb_thread thread(&ThreadProxy<AbstractUploader>,
+                          this,
+                         &AbstractUploader::WriteThread);
+
+  // tbb::tbb_thread assignment operator 'moves' the thread handle so _does not_
+  // 'copy' the operating system thread construct. The assertions check for this
+  // behaviour.
+  assert(!writer_thread_.joinable());
+  writer_thread_ = thread;
+  assert(writer_thread_.joinable());
+  assert(!thread.joinable());
+
+  // wait for the thread to call back...
+  return thread_started_executing_.Get();
 }
 
 
-void AbstractUploader::TearDown() {}
-
-
-void AbstractUploader::WaitForUpload() const {}
-
-
-void AbstractUploader::DisablePrecaching() {}
-
-
-void AbstractUploader::EnablePrecaching() {}
-
-
-void AbstractUploader::Respond(const callback_t  *callback,
-                               const int          return_code,
-                               const std::string  local_path) {
-  if (callback == NULL) {
-    return;
-  }
-
-  const UploaderResults result(return_code, local_path);
-  (*callback)(result);
-  delete callback;
+void AbstractUploader::TearDown() {
+  assert(!torn_down_);
+  upload_queue_.push(UploadJob());  // Termination signal
+  writer_thread_.join();
+  torn_down_ = true;
 }
+
+
+void AbstractUploader::WaitForUpload() const {
+  jobs_in_flight_.WaitForZero();
+}
+
+}  // namespace upload

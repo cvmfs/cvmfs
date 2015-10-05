@@ -1,0 +1,5 @@
+include ("${EXTERNALS_LIB_LOCATION}/CMake-Register_External_Lib.txt")
+
+set (PYTHON_GEOIP_LIB "${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so")
+
+register_external_lib (python-geoip ${PYTHON_GEOIP_BUILTIN_LOCATION} ${PYTHON_GEOIP_LIB})

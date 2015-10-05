@@ -24,20 +24,21 @@
  * for internal bookkeeping which should be ignored.
  *
  * Classes that derive from UnionSync implement the specifics of a concrete
- * union file system (e.g. AUFS1).
+ * union file system (e.g. AUFS, overlayfs).
  */
 
 #ifndef CVMFS_SYNC_UNION_H_
 #define CVMFS_SYNC_UNION_H_
 
-#include <string>
+#include <inttypes.h>
+
 #include <set>
+#include <string>
 
 namespace publish {
 
 class SyncItem;
 class SyncMediator;
-
 
 /**
  * Interface definition of repository synchronization based on
@@ -119,7 +120,7 @@ class SyncUnion {
    * @param filename the filename
    */
   virtual void ProcessRegularFile(const std::string &parent_dir,
-	                                const std::string &filename);
+                                  const std::string &filename);
 
   /**
    * Callback when a directory is found.
@@ -154,13 +155,19 @@ class SyncUnion {
   virtual void LeaveDirectory(const std::string &parent_dir,
                               const std::string &dir_name);
 
+
+  /**
+   * Called to actually process the file entry.
+   * @param entry the SyncItem corresponding to the union file to be processed
+   */
+  virtual void ProcessFile(SyncItem *entry);
+
  private:
-  void ProcessFile(SyncItem &entry);
 };  // class SyncUnion
 
 
 /**
- * Syncing a CVMFS repository by the help of an overlayed AUFS
+ * Syncing a cvmfs repository by the help of an overlayed AUFS
  * read-write volume.
  */
 class SyncUnionAufs : public SyncUnion {
@@ -183,6 +190,42 @@ class SyncUnionAufs : public SyncUnion {
   std::set<std::string> ignore_filenames_;
   std::string whiteout_prefix_;
 };  // class SyncUnionAufs
+
+
+/**
+ * Syncing a cvmfs repository by the help of an overlayed overlayfs
+ * read-write volume.
+ */
+class SyncUnionOverlayfs : public SyncUnion {
+ public:
+  SyncUnionOverlayfs(SyncMediator *mediator,
+                     const std::string &rdonly_path,
+                     const std::string &union_path,
+                     const std::string &scratch_path);
+
+  void Traverse();
+  void ProcessFileHardlinkCallback(const std::string &parent_dir,
+                                   const std::string &filename);
+  static bool ReadlinkEquals(std::string const &path,
+                             std::string const &compare_value);
+  static bool XattrEquals(std::string const &path, std::string const &attr_name,
+                          std::string const &compare_value);
+
+ protected:
+  bool IsWhiteoutEntry(const SyncItem &entry) const;
+  bool IsOpaqueDirectory(const SyncItem &directory) const;
+  bool IgnoreFilePredicate(const std::string &parent_dir,
+                           const std::string &filename);
+  std::string UnwindWhiteoutFilename(const std::string &filename) const;
+  std::set<std::string> GetIgnoreFilenames() const;
+  virtual void ProcessFile(SyncItem *entry);
+
+ private:
+  bool IsWhiteoutSymlinkPath(const std::string &path) const;
+  bool IsOpaqueDirPath(const std::string &path) const;
+  std::set<std::string> hardlink_lower_files_;
+  uint64_t hardlink_lower_inode_;
+};  // class SyncUnionOverlayfs
 
 }  // namespace publish
 

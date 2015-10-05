@@ -1,0 +1,32 @@
+
+cvmfs_test_name="Export CVMFS_FQRN"
+
+create_config_files() {
+  sudo sh -c "echo 'echo fqrn-\$CVMFS_FQRN > /tmp/cvmfs_fqrn' > /etc/cvmfs/default.d/50-testfqrn.conf" || return 1
+
+  return 0
+}
+
+cleanup_config_files() {
+  sudo rm -f /etc/cvmfs/default.d/50-test*
+  sudo rm -f /tmp/cvmfs_fqrn
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local retval=0
+  create_config_files || return 1
+
+  cvmfs_mount grid.cern.ch || retval=2
+  if [ $retval -eq 0 ]; then
+    if [ "x$(cat /tmp/cvmfs_fqrn)" != "xfqrn-grid.cern.ch" ]; then
+      echo "/tmp/cvmfs_fqrn has wrong content:"
+      cat /tmp/cvmfs_fqrn
+      retval=3
+    fi
+  fi
+
+  cleanup_config_files
+  return $retval
+}

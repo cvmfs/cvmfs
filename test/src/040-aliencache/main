@@ -1,0 +1,36 @@
+
+cvmfs_test_name="Alien cache"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  local tmpdir=$(sudo mktemp -d /var/lib/cvmfs/tmp.XXXXXXXX)
+  [ x"$tmpdir" = x"" ] && return 9
+  echo "tmpdir is $tmpdir"
+  sudo chown cvmfs:cvmfs $tmpdir
+  sudo cvmfs2 __MK_ALIEN_CACHE__ "$tmpdir" $(id -u cvmfs) $(id -g cvmfs) || return 2  
+
+  cvmfs_mount "atlas.cern.ch" \
+    "CVMFS_ALIEN_CACHE=$tmpdir" \
+    "CVMFS_QUOTA_LIMIT=-1" \
+    "CVMFS_SHARED_CACHE=no" || return 2
+  
+  ls /cvmfs/atlas.cern.ch || return 3
+  cvmfs_umount atlas.cern.ch
+
+  local files=$(sudo find $tmpdir -type f | wc -l)
+  sudo rm -rf "$tmpdir"
+  if [ $files -eq 0 ]; then
+    return 5
+  fi
+
+  local cachedir=$(cvmfs_config showconfig atlas.cern.ch | grep CVMFS_CACHE_DIR | cut -d" " -f1 | cut -d= -f2)
+  local subdirs=$(sudo find $cachedir -mindepth 1 -maxdepth 1 -type d ! -name "nfs_maps*" | wc -l)
+  if [ "$subdirs" != 0 ]; then
+    sudo ls $cachedir
+    return 4
+  fi
+ 
+  return 0
+}
+

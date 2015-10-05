@@ -1,0 +1,93 @@
+
+cvmfs_test_name="Defragment due to Free Database Pages"
+cvmfs_test_autofs_on_startup=false
+
+get_catalog_file_size() {
+  local repo_name="$1"
+  local catalog_path="$2"
+
+  cvmfs_server list-catalogs -xs $repo_name | grep -e "^.* $catalog_path$" | sed 's/^\([0-9]*\)B\s.*$/\1/'
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create test repository"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "start transaction to create huge root catalog"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "create a synthetically huge root catalog"
+  mkdir ${repo_dir}/foo  || return 1
+  mkdir ${repo_dir}/bar  || return 2
+  mkdir ${repo_dir}/baz  || return 3
+  cp_bin ${repo_dir}/foo || return 4
+  cp_bin ${repo_dir}/bar || return 5
+  cp_bin ${repo_dir}/baz || return 6
+
+  echo "produce a large file in the root catalog"
+  dd if=/dev/urandom of=${repo_dir}/big_file count=50 bs=1MiB || return 6
+
+  echo "create a first snapshot of the root catalog"
+  publish_repo $CVMFS_TEST_REPO > /dev/null || return 7
+
+  echo "find the file size of the root catalog"
+  local initial_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
+  echo "Catalog Size: $initial_root_size"
+
+  echo "start next transaction to split root catalog"
+  start_transaction $CVMFS_TEST_REPO || return 8
+
+  echo "place .cvmfscatalog files"
+  touch ${repo_dir}/foo/.cvmfscatalog || return 9
+  touch ${repo_dir}/baz/.cvmfscatalog || return 10
+
+  echo "publish repository (should trigger root catalog defragmatation)"
+  local publish_log_1="publish_1.log"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return 11
+  cat $publish_log_1 | grep '/ gets defragmented'     || return 11
+
+  echo "check if root catalog is smaller than before (including safety margin)"
+  local second_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
+  echo "Catalog Size: $second_root_size"
+  [ $second_root_size -lt $(( $initial_root_size - 4096 )) ] || return 12
+
+  echo "get file size of nested catalog at /foo"
+  local intial_nested_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/foo')
+  echo "Nested Catalog Size: $intial_nested_size"
+
+  echo "open third transaction the cause another defragmentation"
+  start_transaction $CVMFS_TEST_REPO || return 13
+
+  echo "delete content of /bar and /foo"
+  rm -fR ${repo_dir}/bar/*
+  rm -fR ${repo_dir}/foo/*
+  touch ${repo_dir}/foo/.cvmfscatalog
+
+  echo "create next revision (again expecting defragmentations)"
+  [ $(publish_repo $CVMFS_TEST_REPO | grep 'gets defragmented.*free pages' | wc -l) -eq 2 ] || return 14
+
+  echo "check sizes of catalogs (including safety margin)"
+  local third_root_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/')
+  local second_nested_size=$(get_catalog_file_size $CVMFS_TEST_REPO '/foo')
+  echo "Catalog Size: $third_root_size"
+  echo "Nested Catalog Size: $second_nested_size"
+  [ $third_root_size    -lt $(( $second_root_size   - 4096 )) ] || return 15
+  [ $second_nested_size -lt $(( $intial_nested_size - 4096 )) ] || return 16
+
+  echo "open last transaction (does not cause a defragmentation)"
+  start_transaction $CVMFS_TEST_REPO || return 17
+
+  echo "add some stuff"
+  mkdir ${repo_dir}/bam
+  cp_bin ${repo_dir}/bam
+  cp_bin ${repo_dir}/foo
+
+  echo "publish last revision (addition should not trigger defragmentation)"
+  [ $(publish_repo $CVMFS_TEST_REPO | grep -e 'gets defragmented.*free pages' | wc -l) -eq 0 ] || return 18
+
+  return 0
+}

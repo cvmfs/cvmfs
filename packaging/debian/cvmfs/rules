@@ -1,0 +1,92 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+# TODO:
+#  -> Support debian multiarch
+#       CMake's GNUInstallDirs supports multiarch beginning from CMake 2.8.8...
+#       Recipe to migrate:
+#         1. uncomment the two lines below this comment
+#         2. uncomment appropriate lines in the debian/control file
+#         3. replace 'usr/lib/<libname>' by 'usr/lib/*/<libname>'
+#            in debian/*.install and debian/*.dirs files
+#
+#DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+#DEB_CONFIGURE_EXTRA_FLAGS += --libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH)
+
+Makefile: 
+	dh_testdir
+	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr
+
+build: build-stamp
+build-stamp: Makefile
+	dh_testdir
+	dh_auto_build
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+	
+	# Add here commands to clean up after the build process.
+	
+	dh_clean
+
+debian/%.install: debian/%.install.in
+	sed "s/@CVMFS_VERSION@/$(shell dpkg-parsechangelog | sed -n -e 's/^Version: \([0-9]\.[0-9]\.[0-9][0-9]*\).*/\1/p')/g" $< > $@
+
+install: build debian/cvmfs.install debian/cvmfs-server.install debian/cvmfs-unittests.install
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	
+	# Add here commands to install the package into debian/gentoo.
+	dh_auto_install --destdir=${CURDIR}/debian/tmp
+	rm -rf ${CURDIR}/debian/tmp/etc/cvmfs/keys/*
+	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/config.d/*.conf
+	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/domain.d/*.conf
+	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/default.d/*.conf
+	rm -f ${CURDIR}/debian/tmp/etc/cvmfs/serverorder.sh
+	dh_install --fail-missing --sourcedir=${CURDIR}/debian/tmp
+
+# Build architecture-independent files here.
+binary-indep: build install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+#       dh_installdebconf
+	dh_installdocs
+	dh_installexamples
+	dh_installmenu
+#       dh_installlogrotate
+#       dh_installemacsen
+#       dh_installpam
+#       dh_installmime
+#	dh_installinit -- defaults 21 
+	dh_installcron
+	dh_installman
+	dh_installinfo
+#        dh_undocumented
+	dh_installchangelogs ChangeLog
+	dh_link
+#	dh_strip
+	dh_compress
+	dh_fixperms --exclude cvmfs_suid_helper
+	dh_makeshlibs
+	dh_installdeb
+#        dh_perl
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install
