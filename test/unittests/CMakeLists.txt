@@ -201,8 +201,13 @@ include_directories (${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
+<<<<<<< HEAD
 else (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
+=======
+  add_dependencies (${PROJECT_TEST_NAME} googletest)
+  add_dependencies (${PROJECT_TEST_NAME} libvjson)
+>>>>>>> restructure JsonDocument class a bit, add unit test stub
 endif (BUILD_UNITTESTS)
 
 add_dependencies (${PROJECT_TEST_NAME} googletest)
