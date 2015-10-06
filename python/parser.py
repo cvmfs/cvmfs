@@ -10,7 +10,7 @@ class Counter:
             self.values = [0]
 
     def sum(self):
-        counter = 0
+        counter = 0.0
         for n in self.values:
             counter += n
         return counter
@@ -19,7 +19,7 @@ class Counter:
         return self.sum() / len(self.values)
 
     def variance(self):
-        counter = 0
+        counter = 0.0
         average = self.avg()
         for n in self.values:
             diff = n - average
@@ -78,10 +78,10 @@ class Parser:
         csv.write(";origin_avg;origin_std;external_avg;external_std\n")
         for key in parser1.counters:
             csv.write(parser1.counters[key].name + ";" +
-                      str(parser1.counters[key].avg()) + ";" +
-                      str(parser1.counters[key].std()) + ";" +
-                      str(parser2.counters[key].avg()) + ";" +
-                      str(parser2.counters[key].std()) + "\n")
+                      str(parser1.counters[key].avg()).replace(".", ",") + ";" +
+                      str(parser1.counters[key].std()).replace(".", ",") + ";" +
+                      str(parser2.counters[key].avg()).replace(".", ",") + ";" +
+                      str(parser2.counters[key].std()).replace(".", ",") + "\n")
         csv.close()
 
     @staticmethod
@@ -101,9 +101,9 @@ class Parser:
             for repository_name in repository_names:
                 parser1 = parser_list1[repository_name]
                 parser2 = parser_list2[repository_name]
-                csv.write(str(parser1.counters[counter_name].avg()) + ";" +
-                          str(parser1.counters[counter_name].std()) + ";" +
-                          str(parser2.counters[counter_name].avg()) + ";" +
-                          str(parser2.counters[counter_name].std()) + ";")
+                csv.write(str(parser1.counters[counter_name].avg()).replace(".", ",") + ";" +
+                          str(parser1.counters[counter_name].std()).replace(".", ",") + ";" +
+                          str(parser2.counters[counter_name].avg()).replace(".", ",") + ";" +
+                          str(parser2.counters[counter_name].std()).replace(".", ",") + ";")
             csv.write("\n")
         csv.close()
