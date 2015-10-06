@@ -5,6 +5,8 @@
 #ifndef CVMFS_JSON_DOCUMENT_H_
 #define CVMFS_JSON_DOCUMENT_H_
 
+#include <string>
+
 #include "json.h"
 #include "util/single_copy.h"
 
@@ -12,21 +14,21 @@ typedef struct json_value JSON;
 
 class JsonDocument : SingleCopy {
  public:
-  JsonDocument();
+  static JsonDocument *Create(const std::string &text);
 
-  /**
-   * Parses a JSON string in buffer.
-   * Note: the used JSON library 'vjson' is a destructive parser and therefore
-   *       alters the content of the provided buffer!
-   *
-   * @param buffer  pointer to the buffer containing the JSON string to parse
-   * @return        true if parsing was successful
-   */
-  bool Parse(char *buffer);
+  std::string PrintCanonical();
+  std::string PrintPretty();
 
   inline const JSON* root() const { return root_; }
+  inline bool IsValid() const { return root_ != NULL; }
 
  private:
+  static const unsigned kDefaultBlockSize = 2048;  // 2kB
+  static const unsigned kMaxTextSize = 1024*1024;  // 1MB
+
+  JsonDocument();
+  bool Parse(const std::string &text);
+
   block_allocator  allocator_;
   JSON            *root_;
 };

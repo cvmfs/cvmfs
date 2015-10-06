@@ -48,6 +48,7 @@ set(CVMFS_UNITTEST_FILES
   t_hash_filters.cc
   t_header_lists.cc
   t_history.cc
+  t_json.cc
   t_libcvmfs.cc
   t_lru.cc
   t_manifest.cc
@@ -130,6 +131,7 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/hash.cc ${CVMFS_SOURCE_DIR}/hash.h
   ${CVMFS_SOURCE_DIR}/history_sql.cc
   ${CVMFS_SOURCE_DIR}/history_sqlite.cc
+  ${CVMFS_SOURCE_DIR}/json_document.cc ${CVMFS_SOURCE_DIR}/json_document.h
   ${CVMFS_SOURCE_DIR}/libcvmfs.cc ${CVMFS_SOURCE_DIR}/libcvmfs.h
   ${CVMFS_SOURCE_DIR}/libcvmfs_int.cc ${CVMFS_SOURCE_DIR}/libcvmfs_int.h
   ${CVMFS_SOURCE_DIR}/logging.cc ${CVMFS_SOURCE_DIR}/logging.h ${CVMFS_SOURCE_DIR}/logging_internal.h
@@ -205,8 +207,13 @@ include_directories (${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
+<<<<<<< HEAD
 else (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
+=======
+  add_dependencies (${PROJECT_TEST_NAME} googletest)
+  add_dependencies (${PROJECT_TEST_NAME} libvjson)
+>>>>>>> restructure JsonDocument class a bit, add unit test stub
 endif (BUILD_UNITTESTS)
 
 add_dependencies (${PROJECT_TEST_NAME} googletest)
@@ -287,7 +294,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
                              ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
-                             pthread dl)
+                             ${VJSON_ARCHIVE} pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
