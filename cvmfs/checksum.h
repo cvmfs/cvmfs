@@ -77,12 +77,18 @@ public:
   const bool isGood() {return !m_error;}
 
 private:
-  void checksum(const unsigned char * buf, size_t len, off_t off);
+  void checksum(const unsigned char * buf, size_t len);
 
   unsigned char m_partial_buffer[CHECKSUM_BLOCKSIZE];
   off_t m_size;
+
+  /**
+   * Number of checksum blocks that have been written this far.
+   */
+  off_t m_count;
+
   uint32_t m_running_sum;
-  int m_buffer_offset;
+  size_t m_buffer_offset;
   int m_fd;
   bool m_error;
   bool m_done;
@@ -123,8 +129,21 @@ public:
   bool isGood() {return !m_error;}
 
 private:
+
+  /**
+   * Denotes an error has occurred; if set, no further computations
+   * or writing will be performed.
+   */
   bool m_error;
+
+  /**
+   * FD for the data file.
+   */
   int m_fd;
+
+  /**
+   * Location of start of checksum data in file.
+   */
   off_t m_size;
 };
 

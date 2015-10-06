@@ -63,8 +63,8 @@ pwrite_full(int fd, void *in_buf, size_t len, off_t offset) {
 
 
 ChecksumFileWriter::ChecksumFileWriter(int fd, off_t fsize, bool sumonly)
-  : m_size(fsize), m_running_sum(CRC_INITIAL_VAL), m_buffer_offset(0), m_fd(fd),
-    m_error(true), m_done(false)
+  : m_size(fsize), m_count(0), m_running_sum(CRC_INITIAL_VAL),
+    m_buffer_offset(0), m_fd(fd), m_error(true), m_done(false)
 {
   memset(m_partial_buffer, '\0', CHECKSUM_BLOCKSIZE);
   char header[CHECKSUM_HEADERSIZE];
@@ -81,9 +81,9 @@ ChecksumFileWriter::ChecksumFileWriter(int fd, off_t fsize, bool sumonly)
     LogCvmfs(kLogChecksum, kLogDebug, "Checksum file not open.");
     return;
   }
-  off_t block_size = (m_size / CHECKSUM_BLOCKSIZE + 1) * sizeof(uint32_t);
+  off_t block_size = ((m_size - 1) / CHECKSUM_BLOCKSIZE + 1) * sizeof(uint32_t);
   int retval;
-  if ((retval = posix_fallocate(m_fd, m_size, CHECKSUM_HEADERSIZE + block_size + 1))) {
+  if ((retval = posix_fallocate(m_fd, m_size, CHECKSUM_HEADERSIZE + block_size))) {
     LogCvmfs(kLogChecksum, kLogDebug, "Could not pre-allocate checksum data: "
              "%s (errno=%d)", strerror(errno), errno);
     return;
@@ -106,23 +106,25 @@ ChecksumFileWriter::finalize(uint32_t &hash) {
     memset(m_partial_buffer + m_buffer_offset, '\0',
            CHECKSUM_BLOCKSIZE - m_buffer_offset);
     checksum(m_partial_buffer, CHECKSUM_BLOCKSIZE);
+    m_buffer_offset = 0;
   }
   if (m_error) {return -1;}
   hash = m_running_sum;
+  m_done = true;
   return 0;
 }
 
 
 ChecksumFileWriter::~ChecksumFileWriter() {
   uint32_t hash;
-  finalize(hash);
+  if (!m_done) {finalize(hash);}
 }
 
 
 // Note -- len here is assumed to be aligned to CHECKSUM_BLOCKSIZE by stream
 // below.
 void
-ChecksumFileWriter::checksum(const uint8_t * buf, size_t len, off_t off) {
+ChecksumFileWriter::checksum(const uint8_t * buf, size_t len) {
 
   if (unlikely(m_error)) {return;}
 
@@ -138,8 +140,7 @@ ChecksumFileWriter::checksum(const uint8_t * buf, size_t len, off_t off) {
       c_count, &m_running_sum, CRC32C_POLYNOMIAL)) {
     m_error = true;
   }
-  off_t off2 = m_size + CHECKSUM_HEADERSIZE +
-               (off / CHECKSUM_BLOCKSIZE)*sizeof(uint32_t);
+  off_t off2 = m_size + CHECKSUM_HEADERSIZE + m_count * sizeof(uint32_t);
   if (m_fd >= 0 && pwrite_full(m_fd, &sums[0], c_count*CHECKSUM_SIZE, off2) !=
                    c_count*CHECKSUM_SIZE)
   {
@@ -147,17 +148,17 @@ ChecksumFileWriter::checksum(const uint8_t * buf, size_t len, off_t off) {
              "(errno=%d)", strerror(errno), errno);
     m_error = true;
   }
+  m_count += c_count;
 }
 
 
 int
 ChecksumFileWriter::stream(const unsigned char *buf, size_t len) {
-
   if (unlikely(m_error)) {return -1;}
 
   if (m_buffer_offset) {
-    int to_copy = CHECKSUM_BLOCKSIZE - m_buffer_offset;
-    if (static_cast<size_t>(to_copy) > len) {to_copy = len;}
+    size_t to_copy = CHECKSUM_BLOCKSIZE - m_buffer_offset;
+    if (to_copy > len) {to_copy = len;}
 
     memcpy(m_partial_buffer + m_buffer_offset, buf, to_copy);
     m_buffer_offset += to_copy;
@@ -236,7 +237,8 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
   if (pread_full(m_fd, sums_ptr, sum_byte_count, sum_byte_offset) != 
       sum_byte_count) 
   {
-    LogCvmfs(kLogChecksum, kLogDebug, "Failed to read checksum file");
+    LogCvmfs(kLogChecksum, kLogDebug, "Failed to read checksum file: %s"
+             " (errno=%d)", strerror(errno), errno);
     return (errno ? -errno : -EIO);
   }
 
@@ -252,7 +254,7 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
   if (off != cfd_begin) {  // FUSE ought to align our accesses... libcvmfs may not!
     if (pread_full(m_fd, data_buf, CHECKSUM_BLOCKSIZE, cfd_begin) < 0) {
       LogCvmfs(kLogChecksum, kLogDebug, "Failed to read data file for "
-               "beginning buffer");
+               "beginning buffer: %s (errno=%d)", strerror(errno), errno);
       return (errno ? -errno : -EIO);
     }
     if (bulk_verify_crc(data_buf, CHECKSUM_BLOCKSIZE,
@@ -278,15 +280,15 @@ ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
   //LogCvmfs(kLogChecksum, kLogDebug, "End byte: %d", end);
   if (end < cfd_end) {
     memset(data_buf, '\0', CHECKSUM_BLOCKSIZE);
-    size_t left_to_read = cfd_end - end; 
-    size_t leftover_bytes = CHECKSUM_BLOCKSIZE - left_to_read;
+    size_t left_to_read = ((cfd_end > m_size) ? m_size : cfd_end) - end;
+    size_t leftover_bytes = end % CHECKSUM_BLOCKSIZE;
     memcpy(data_buf, buf + len - leftover_bytes, leftover_bytes);
     int res;
     if ((res = pread_full(m_fd, data_buf + leftover_bytes, left_to_read, end))
         < 0)
     {
       LogCvmfs(kLogChecksum, kLogDebug, "Failed to read data file for ending"
-               " buffer");
+               " buffer: %s (errno=%d)", strerror(errno), errno);
       return (errno ? -errno : -EIO);
     }
     //LogCvmfs(kLogChecksum, kLogDebug, "Read %d bytes starting at %d", res,
