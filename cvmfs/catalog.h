@@ -29,7 +29,9 @@ class CommandMigrate;
 
 namespace catalog {
 
+template <class CatalogT>
 class AbstractCatalogManager;
+
 class Catalog;
 
 class Counters;
@@ -86,7 +88,7 @@ class InodeAnnotation {
  * Read-only catalog. A sub-class provides read-write access.
  */
 class Catalog : public SingleCopy {
-  friend class AbstractCatalogManager;
+  friend class AbstractCatalogManager<Catalog>;
   friend class SqlLookup;                   // for mangled inode and uid maps
   friend class swissknife::CommandMigrate;  // for catalog version migration
 

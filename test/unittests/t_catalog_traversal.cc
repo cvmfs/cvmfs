@@ -274,23 +274,23 @@ class T_CatalogTraversal : public ::testing::Test {
         break;
       case 3:
         MakeBranch("/00/11", revision);
-        root_catalog->RegisterChild(GetBranchHead("/00/10", 2));
+        root_catalog->RegisterNestedCatalog(GetBranchHead("/00/10", 2));
         break;
       case 4:
         MakeBranch("/00/12", revision);
         MakeBranch("/00/11", revision);
-        root_catalog->RegisterChild(GetBranchHead("/00/10", 2));
+        root_catalog->RegisterNestedCatalog(GetBranchHead("/00/10", 2));
         break;
       case 5:
         MakeBranch("/00/13", revision);
-        root_catalog->RegisterChild(GetBranchHead("/00/10", 2));
-        root_catalog->RegisterChild(GetBranchHead("/00/11", 4));
-        root_catalog->RegisterChild(GetBranchHead("/00/12", 4));
+        root_catalog->RegisterNestedCatalog(GetBranchHead("/00/10", 2));
+        root_catalog->RegisterNestedCatalog(GetBranchHead("/00/11", 4));
+        root_catalog->RegisterNestedCatalog(GetBranchHead("/00/12", 4));
         break;
       case 6:
-        root_catalog->RegisterChild(GetBranchHead("/00/11", 4));
-        root_catalog->RegisterChild(GetBranchHead("/00/12", 4));
-        root_catalog->RegisterChild(GetBranchHead("/00/13", 5));
+        root_catalog->RegisterNestedCatalog(GetBranchHead("/00/11", 4));
+        root_catalog->RegisterNestedCatalog(GetBranchHead("/00/12", 4));
+        root_catalog->RegisterNestedCatalog(GetBranchHead("/00/13", 5));
         dummy_catalog_hierarchy = root_catalog;  // sets current repo HEAD
         break;
       default:

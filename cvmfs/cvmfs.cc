@@ -2270,7 +2270,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailNfsMaps;
     }
     if (!nfs_maps::Init(inode_cache_dir,
-                        catalog::AbstractCatalogManager::kInodeOffset+1,
+                        catalog::ClientCatalogManager::kInodeOffset+1,
                         rebuild_cachedb, nfs_shared))
     {
       *g_boot_error = "Failed to initialize NFS maps";

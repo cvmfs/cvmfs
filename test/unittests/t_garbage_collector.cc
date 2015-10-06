@@ -437,7 +437,7 @@ class T_GarbageCollector : public ::testing::Test {
 
   MockCatalog* ReuseCatalog(MockCatalog *legacy_catalog,
                             MockCatalog *additional_parent_catalog) {
-    additional_parent_catalog->RegisterChild(legacy_catalog);
+    additional_parent_catalog->RegisterNestedCatalog(legacy_catalog);
     return legacy_catalog;
   }
 

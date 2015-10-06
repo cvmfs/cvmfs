@@ -7,7 +7,7 @@
 set -e
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
-. ${SCRIPT_LOCATION}/common.sh
+. ${SCRIPT_LOCATION}/../common.sh
 
 if [ $# -lt 2 ]; then
   echo "Usage: $0 <CernVM-FS source directory> <build result location> [<nightly build number>]"
@@ -66,9 +66,11 @@ else
   echo "creating release: $cvmfs_version"
 fi
 
-echo "building..."
+default_arch=$(get_default_compiler_arch)
+echo "building ($default_arch)..."
 rpmbuild --define="_topdir $CVMFS_RESULT_LOCATION"        \
          --define="_tmppath ${CVMFS_RESULT_LOCATION}/TMP" \
+         --target="$default_arch"                         \
          -ba $spec_file
 
 # generating package map section for specific platform

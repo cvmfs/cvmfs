@@ -59,4 +59,10 @@ Vagrant.configure(2) do |config|
     slc6.vm.provision "shell", path: "vagrant/provision_slc6.sh"
     slc6.vm.provision :reload
   end
+
+  config.vm.define "ubuntu" do |ub|
+    ub.vm.box = "ubuntu-trusty"
+    ub.vm.network "private_network", ip: "192.168.33.12"
+    ub.vm.synced_folder '.', '/vagrant', nfs: true
+  end
 end

@@ -24,6 +24,7 @@ set(CVMFS_UNITTEST_FILES
   t_polymorphic_construction.cc
   t_catalog_counters.cc
   t_catalog_traversal.cc
+  t_catalog_mgr.cc
   t_fs_traversal.cc
   t_pipe.cc
   t_prng.cc
@@ -167,8 +168,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/cache.cc
   ${CVMFS_SOURCE_DIR}/quota.h
   ${CVMFS_SOURCE_DIR}/quota.cc
-  ${CVMFS_SOURCE_DIR}/catalog_mgr.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr.h
+  ${CVMFS_SOURCE_DIR}/catalog_mgr_impl.h
   ${CVMFS_SOURCE_DIR}/catalog_mgr_client.cc
   ${CVMFS_SOURCE_DIR}/catalog_mgr_client.h
   ${CVMFS_SOURCE_DIR}/backoff.h
@@ -208,8 +209,15 @@ include_directories (${INCLUDE_DIRECTORIES})
 
 if (BUILD_UNITTESTS)
   add_executable (${PROJECT_TEST_NAME} ${CVMFS_UNITTEST_SOURCES})
-  add_dependencies (${PROJECT_TEST_NAME} googletest)
+else (BUILD_UNITTESTS)
+  add_executable (${PROJECT_TEST_NAME} EXCLUDE_FROM_ALL ${CVMFS_UNITTEST_SOURCES})
 endif (BUILD_UNITTESTS)
+
+add_dependencies (${PROJECT_TEST_NAME} googletest)
+add_dependencies (${PROJECT_TEST_NAME} sparsehash)
+add_dependencies (${PROJECT_TEST_NAME} libsha2)
+add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
+add_dependencies (check ${PROJECT_TEST_NAME})
 
 if (BUILD_UNITTESTS_DEBUG)
   add_executable (${PROJECT_TEST_DEBUG_NAME} ${CVMFS_UNITTEST_DEBUG_SOURCES})
@@ -220,27 +228,25 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # add optional dependencies
 #
-if (BUILD_UNITTESTS)
-  if (LIBCURL_BUILTIN)
-    add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
-  endif (LIBCURL_BUILTIN)
+if (LIBCURL_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
+endif (LIBCURL_BUILTIN)
 
-  if (SQLITE3_BUILTIN)
-    add_dependencies (${PROJECT_TEST_NAME} sqlite3)
-  endif (SQLITE3_BUILTIN)
+if (SQLITE3_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} sqlite3)
+endif (SQLITE3_BUILTIN)
 
-  if (ZLIB_BUILTIN)
-    add_dependencies (${PROJECT_TEST_NAME} zlib)
-  endif (ZLIB_BUILTIN)
+if (ZLIB_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} zlib)
+endif (ZLIB_BUILTIN)
 
-  if (PACPARSER_BUILTIN)
-    add_dependencies (${PROJECT_TEST_NAME} libpacparser)
-  endif (PACPARSER_BUILTIN)
+if (PACPARSER_BUILTIN)
+  add_dependencies (${PROJECT_TEST_NAME} libpacparser)
+endif (PACPARSER_BUILTIN)
 
-  if (TBB_PRIVATE_LIB)
-    add_dependencies (${PROJECT_TEST_NAME} libtbb)
-  endif (TBB_PRIVATE_LIB)
-endif (BUILD_UNITTESTS)
+if (TBB_PRIVATE_LIB)
+  add_dependencies (${PROJECT_TEST_NAME} libtbb)
+endif (TBB_PRIVATE_LIB)
 
 if (BUILD_UNITTESTS_DEBUG)
   if (LIBCURL_BUILTIN)
@@ -269,9 +275,7 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # set build flags
 #
-if (BUILD_UNITTESTS)
-  set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
-endif (BUILD_UNITTESTS)
+set_target_properties (${PROJECT_TEST_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_LD_FLAGS}")
 
 if (BUILD_UNITTESTS_DEBUG)
   set_target_properties (${PROJECT_TEST_DEBUG_NAME} PROPERTIES COMPILE_FLAGS "${CVMFS_UNITTESTS_DEBUG_CFLAGS}" LINK_FLAGS "${CVMFS_UNITTESTS_DEBUG_LD_FLAGS}")
@@ -286,9 +290,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
                              ${SHA2_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} pthread dl)
 
-if (BUILD_UNITTESTS)
-  target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
-endif (BUILD_UNITTESTS)
+target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 
 if (BUILD_UNITTESTS_DEBUG)
   target_link_libraries (${PROJECT_TEST_DEBUG_NAME} ${UNITTEST_LINK_LIBRARIES})
@@ -313,9 +315,3 @@ if (INSTALL_UNITTESTS_DEBUG)
   )
 endif (INSTALL_UNITTESTS_DEBUG)
 
-#
-# Integrate the test running into CMake
-#
-if (BUILD_UNITTESTS)
-  add_test (NAME unittests COMMAND ${PROJECT_TEST_NAME})
-endif (BUILD_UNITTESTS)

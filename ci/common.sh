@@ -24,6 +24,28 @@ is_suse() {
   [ -f /etc/SuSE-release ]
 }
 
+is_redhat() {
+  [ -f /etc/redhat-release ]
+}
+
+get_redhat_version() {
+  cat /etc/redhat-release | sed -e 's/^.* \([0-9]\+\)\..*$/\1/'
+}
+
+get_package_type() {
+  which dpkg > /dev/null 2>&1 && echo "deb" && return 0
+  which rpm  > /dev/null 2>&1 && echo "rpm" && return 0
+  [ x"$(uname)" = x"Darwin" ] && echo "pkg" && return 0
+  return 1
+}
+
+get_default_compiler_arch() {
+  local compiler=""
+  which gcc   > /dev/null 2>&1 && compiler="gcc"
+  which clang > /dev/null 2>&1 && compiler="clang"
+  [ ! -z $compiler ] && $compiler -dumpmachine | grep -ohe '^[^-]\+'
+}
+
 get_cvmfs_version_from_cmake() {
   local source_directory="$1"
   cat ${source_directory}/CMakeLists.txt | grep '## CVMFS_VERSION' | awk '{print $3}'
@@ -51,32 +73,35 @@ create_cvmfs_source_tarball() {
   local tar_name
   tar_name="$(basename $destination_path | sed -e 's/\(.*\)\.tar\.gz$/\1/')"
 
-  cd "$source_directory"
-  git archive --prefix ${tar_name}/ \
-              --format tar          \
-                                    \
-              HEAD                  \
-              AUTHORS               \
-              CMakeLists.txt        \
-              COPYING               \
-              CPackLists.txt        \
-              ChangeLog             \
-              INSTALL               \
-              NEWS                  \
-              README                \
-              InstallerResources    \
-              add-ons               \
-              bootstrap.sh          \
-              cmake                 \
-              config_cmake.h.in     \
-              cvmfs                 \
-              doc                   \
-              externals             \
-              keys                  \
-              mount                 \
-              test | gzip -c > $destination_path || true
+  # create a temp directory to tar up
+  # old `git archive` versions don't support --prefix
+  local tmpd=$(mktemp -d)
+  mkdir ${tmpd}/${tar_name}
+  cd $tmpd
+  cp -R ${source_directory}/AUTHORS            \
+        ${source_directory}/CMakeLists.txt     \
+        ${source_directory}/COPYING            \
+        ${source_directory}/CPackLists.txt     \
+        ${source_directory}/ChangeLog          \
+        ${source_directory}/INSTALL            \
+        ${source_directory}/NEWS               \
+        ${source_directory}/README             \
+        ${source_directory}/InstallerResources \
+        ${source_directory}/add-ons            \
+        ${source_directory}/bootstrap.sh       \
+        ${source_directory}/cmake              \
+        ${source_directory}/config_cmake.h.in  \
+        ${source_directory}/cvmfs              \
+        ${source_directory}/doc                \
+        ${source_directory}/externals          \
+        ${source_directory}/keys               \
+        ${source_directory}/mount              \
+        ${source_directory}/test               \
+        $tar_name
+  tar czf $destination_path $tar_name || true
   local retval=$?
-  cd "$prev_dir"
+  cd ..
+  rm -fR $tmpd
 
   return $retval
 }
