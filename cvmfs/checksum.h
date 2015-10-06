@@ -67,13 +67,19 @@ public:
 private:
   void checksum(const unsigned char * buf, size_t len);
 
-  std::string filename;
-  unsigned char partial_buffer[CHECKSUM_BLOCKSIZE];
-  uint32_t running_sum;
-  int buffer_offset;
-  int fd;
-  bool error;
-  bool done;
+  unsigned char m_partial_buffer[CHECKSUM_BLOCKSIZE];
+  off_t m_size;
+
+  /**
+   * Number of checksum blocks that have been written this far.
+   */
+  off_t m_count;
+
+  uint32_t m_running_sum;
+  size_t m_buffer_offset;
+  int m_fd;
+  bool m_error;
+  bool m_done;
 
 };
 
@@ -104,7 +110,28 @@ int open(const hash::Any &hash);
    *  - count: Size of data buffer.
    *  - off: Offset of data buffer in file.
    */
-int verify(int fd, int fd2, const unsigned char * buff, size_t count, off_t off);
+  int verify(const unsigned char * buff, size_t count, off_t off);
+
+  bool isGood() {return !m_error;}
+
+private:
+
+  /**
+   * Denotes an error has occurred; if set, no further computations
+   * or writing will be performed.
+   */
+  bool m_error;
+
+  /**
+   * FD for the data file.
+   */
+  int m_fd;
+
+  /**
+   * Location of start of checksum data in file.
+   */
+  off_t m_size;
+};
 
 }
 
