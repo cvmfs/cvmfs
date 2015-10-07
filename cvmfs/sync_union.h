@@ -115,6 +115,7 @@ class SyncUnion {
                                    const std::string &filename) = 0;
 
   bool IsInitialized() const { return initialized_; }
+  bool SupportsHardlinks() const { return false; }
 
  protected:
   std::string rdonly_path_;
@@ -188,6 +189,7 @@ class SyncUnionAufs : public SyncUnion {
                 const std::string &scratch_path);
 
   void Traverse();
+  bool SupportsHardlinks() const { return true; }
 
  protected:
   bool IsWhiteoutEntry(const SyncItem &entry) const;
