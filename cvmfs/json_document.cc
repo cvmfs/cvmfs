@@ -5,6 +5,8 @@
 #include "json_document.h"
 
 #include <cassert>
+#include <cstdlib>
+#include <cstring>
 
 #include "logging.h"
 
@@ -22,11 +24,19 @@ JsonDocument *JsonDocument::Create(const string &text) {
 
 JsonDocument::JsonDocument() :
   allocator_(kDefaultBlockSize),
-  root_(NULL) {}
+  root_(NULL),
+  raw_text_(NULL)
+{ }
+
+
+JsonDocument::~JsonDocument() {
+  if (raw_text_)
+    free(raw_text_);
+}
+
 
 /**
- * Parses a JSON string in text.  The text should not be very long because it
- * needs to be copied to the stack.
+ * Parses a JSON string in text.
  *
  * @return        true if parsing was successful
  */
@@ -34,15 +44,14 @@ bool JsonDocument::Parse(const string &text) {
   assert(root_ == NULL);
 
   // The used JSON library 'vjson' is a destructive parser and therefore
-  // alters the content of the provided buffer!
-  if (text.length() > kMaxTextSize)
-    return false;
-  char *buffer = strdupa(text.c_str());
+  // alters the content of the provided buffer.  The buffer must persist as
+  // name and string values from JSON nodes just point into it.
+  raw_text_ = strdup(text.c_str());
 
   char *error_pos  = 0;
   char *error_desc = 0;
   int   error_line = 0;
-  JSON *root = json_parse(buffer,
+  JSON *root = json_parse(raw_text_,
                           &error_pos,
                           &error_desc,
                           &error_line,
@@ -61,6 +70,22 @@ bool JsonDocument::Parse(const string &text) {
 }
 
 
+string JsonDocument::PrintArray(JSON *first_child, PrintOptions print_options) {
+  string result = "[";
+  JSON *value = first_child;
+  if (value != NULL) {
+    result += PrintValue(value, print_options);
+    value = value->next_sibling;
+  }
+  while (value != NULL) {
+    result += print_options.with_whitespace ? ", " : ",";
+    result += PrintValue(value, print_options);
+    value = value->next_sibling;
+  }
+  return result + "]";
+}
+
+
 /**
  * JSON string in a canonical format:
  *   - No whitespaces
@@ -71,6 +96,34 @@ bool JsonDocument::Parse(const string &text) {
 string JsonDocument::PrintCanonical() {
   if (!root_)
     return "";
+  PrintOptions print_options;
+  return PrintObject(root_->first_child, print_options);
+}
+
+
+string JsonDocument::PrintObject(JSON *first_child, PrintOptions print_options)
+{
+  string result = "{";
+  if (print_options.with_whitespace) {
+    result += "\n";
+    print_options.num_indent += 2;
+  }
+  JSON *value = first_child;
+  if (value != NULL) {
+    result += PrintValue(value, print_options);
+    value = value->next_sibling;
+  }
+  while (value != NULL) {
+    result += print_options.with_whitespace ? ",\n" : ",";
+    result += PrintValue(value, print_options);
+    value = value->next_sibling;
+  }
+  if (print_options.with_whitespace) {
+    result += "\n";
+    for (unsigned i = 2; i < print_options.num_indent; ++i)
+      result.push_back(' ');
+  }
+  return result + "}";
 }
 
 
@@ -80,4 +133,45 @@ string JsonDocument::PrintCanonical() {
 string JsonDocument::PrintPretty() {
   if (!root_)
     return "";
+  PrintOptions print_options;
+  print_options.with_whitespace = true;
+  return PrintObject(root_->first_child, print_options);
+}
+
+
+std::string JsonDocument::PrintValue(JSON *value, PrintOptions print_options) {
+  assert(value);
+  assert(value->name);
+
+  string result;
+  for (unsigned i = 0; i < print_options.num_indent; ++i)
+    result.push_back(' ');
+  result += "\"" + string(value->name) + "\":";
+  if (print_options.with_whitespace)
+    result += " ";
+  switch (value->type) {
+    case JSON_NULL:
+      result += "null";
+      break;
+    case JSON_OBJECT:
+      result += PrintObject(value->first_child, print_options);
+    case JSON_ARRAY:
+      result += PrintArray(value->first_child, print_options);
+    case JSON_STRING:
+      // TODO(jblomer): escaping
+      result += "\"" + string(value->string_value) + "\"";
+      break;
+    case JSON_INT:
+      result += StringifyInt(value->int_value);
+      break;
+    case JSON_FLOAT:
+      result += StringifyDouble(value->float_value);
+      break;
+    case JSON_BOOL:
+      result += value->int_value ? "true" : "false";
+      break;
+    default:
+      abort();
+  }
+  return result;
 }

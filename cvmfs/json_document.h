@@ -15,6 +15,7 @@ typedef struct json_value JSON;
 class JsonDocument : SingleCopy {
  public:
   static JsonDocument *Create(const std::string &text);
+  ~JsonDocument();
 
   std::string PrintCanonical();
   std::string PrintPretty();
@@ -24,13 +25,22 @@ class JsonDocument : SingleCopy {
 
  private:
   static const unsigned kDefaultBlockSize = 2048;  // 2kB
-  static const unsigned kMaxTextSize = 1024*1024;  // 1MB
+
+  struct PrintOptions {
+    PrintOptions() : with_whitespace(false), num_indent(0) { }
+    bool with_whitespace;
+    unsigned num_indent;
+  };
 
   JsonDocument();
   bool Parse(const std::string &text);
+  std::string PrintValue(JSON *value, PrintOptions print_options);
+  std::string PrintArray(JSON *first_child, PrintOptions print_options);
+  std::string PrintObject(JSON *first_child, PrintOptions print_options);
 
   block_allocator  allocator_;
   JSON            *root_;
+  char            *raw_text_;
 };
 
 #endif  // CVMFS_JSON_DOCUMENT_H_
