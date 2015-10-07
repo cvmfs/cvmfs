@@ -59,6 +59,11 @@ cvmfs_run_test() {
   echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file5
   echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file5
 
+  # Verify that directories do not graft
+  mkdir /cvmfs/$CVMFS_TEST_REPO/subdir2
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-subdir2
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-subdir2
+
   #export CVMFS_LOG_LEVEL=4
   publish_repo $CVMFS_TEST_REPO -v || return $?
 
@@ -73,9 +78,13 @@ cvmfs_run_test() {
     return 22
   fi
 
+  if [ ! -d /cvmfs/$CVMFS_TEST_REPO/subdir2 ]; then
+    return 23
+  fi
+
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
-  
+
   return 0
 }
 

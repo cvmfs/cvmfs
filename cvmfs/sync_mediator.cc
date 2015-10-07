@@ -641,10 +641,9 @@ void SyncMediator::AddDirectory(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (!params_->dry_run) {
-
     if (entry.HasGraftMarker()) {
       LogCvmfs(kLogPublish, kLogWarning, "Directory (%s) has an associated "
-               "graft, but the file itself is a symlink.  Ignoring graft.",
+               "graft, but the file itself is a directory.  Ignoring graft.",
                entry.GetRelativePath().c_str());
     }
 

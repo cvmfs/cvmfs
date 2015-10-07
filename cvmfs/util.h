@@ -163,16 +163,6 @@ std::string RfcTimestamp();
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
-
-/**
- * Parse a string into a a uint64_t.
- *
- * Unlike String2Uint64, this:
- *   - Checks to make sure the full string is parsed
- *   - Can indicate an error occurred. 
- *
- * If an error occurs, this returns false and sets errno appropriately.
- */
 bool String2Uint64Parse(const std::string &value, uint64_t *result);
 
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);

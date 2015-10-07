@@ -879,11 +879,22 @@ uint64_t String2Uint64(const string &value) {
 }
 
 
+/**
+ * Parse a string into a a uint64_t.
+ *
+ * Unlike String2Uint64, this:
+ *   - Checks to make sure the full string is parsed
+ *   - Can indicate an error occurred.
+ *
+ * If an error occurs, this returns false and sets errno appropriately.
+ */
 bool String2Uint64Parse(const std::string &value, uint64_t *result) {
   char *endptr = NULL;
   errno = 0;
   long long myval = strtoll(value.c_str(), &endptr, 10);  // NOLINT
-  if ((value.size() == 0) || (endptr != (value.c_str() + value.size()))) {
+  if ((value.size() == 0) || (endptr != (value.c_str() + value.size())) ||
+      (myval < 0))
+  {
     errno = EINVAL;
     return false;
   }
