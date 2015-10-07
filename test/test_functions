@@ -236,6 +236,20 @@ contains() {
 }
 
 
+uses_aufs() {
+  local repo_name="$1"
+  load_repo_config $repo_name
+  [ x"$CVMFS_UNION_FS_TYPE" = x"aufs" ]
+}
+
+
+uses_overlayfs() {
+  local repo_name="$1"
+  load_repo_config $repo_name
+  [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]
+}
+
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
@@ -1289,17 +1303,30 @@ display_timestamp() {
   date --date="$timestamp"
 }
 
+# this copies all top-level files from source to destination ignoring symlinks
+# Note: Using the content of /bin or /usr/bin as integration test guinea pig was
+#       never a good idea. This is pretty much technical debt for this poor
+#       decision.
+_cp_bindir() {
+  local source_directory="$1"
+  local destination_directory="$2"
+
+  for f in $(find ${source_directory}/ -maxdepth 1 -type f); do
+    sudo cp $f $destination_directory || return 1
+  done
+  sudo chmod -R a+rw $destination_directory || return 2
+
+  for f in $(find $destination_directory -type f); do
+    sudo chmod 0444 $f || return 3
+  done
+}
 
 # copy all content of /bin/* into a given directory (for server testing purposes)
 #
 # @param destination_directory
 cp_bin() {
   local destination_directory="$1"
-  sudo cp -R /bin/* $destination_directory  || return 1
-  sudo chmod -R a+rw $destination_directory || return 2
-  for f in $(find $destination_directory -type f); do
-    sudo chmod 0444 $f || return 3
-  done
+  _cp_bindir "/bin" "$destination_directory"
 }
 
 # copy all content of /usr/bin/* into a given directory (for server testing purposes)
@@ -1307,11 +1334,7 @@ cp_bin() {
 # @param destination_directory
 cp_usrbin() {
   local destination_directory="$1"
-  sudo cp -R /usr/bin/* $destination_directory || return 1
-  sudo chmod -R a+rw $destination_directory    || return 2
-  for f in $(find $destination_directory -type f); do
-    sudo chmod 0444 $f || return 3
-  done
+  _cp_bindir "/usr/bin" "$destination_directory"
 }
 
 
