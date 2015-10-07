@@ -879,6 +879,34 @@ uint64_t String2Uint64(const string &value) {
 }
 
 
+/**
+ * Parse a string into a a uint64_t.
+ *
+ * Unlike String2Uint64, this:
+ *   - Checks to make sure the full string is parsed
+ *   - Can indicate an error occurred.
+ *
+ * If an error occurs, this returns false and sets errno appropriately.
+ */
+bool String2Uint64Parse(const std::string &value, uint64_t *result) {
+  char *endptr = NULL;
+  errno = 0;
+  long long myval = strtoll(value.c_str(), &endptr, 10);  // NOLINT
+  if ((value.size() == 0) || (endptr != (value.c_str() + value.size())) ||
+      (myval < 0))
+  {
+    errno = EINVAL;
+    return false;
+  }
+  if (errno) {
+    return false;
+  }
+  if (result) {
+    *result = myval;
+  }
+  return true;
+}
+
 void String2Uint64Pair(const string &value, uint64_t *a, uint64_t *b) {
   sscanf(value.c_str(), "%"PRIu64" %"PRIu64, a, b);
 }
@@ -1044,7 +1072,12 @@ string GetLineMem(const char *text, const int text_size) {
 bool GetLineFile(FILE *f, std::string *line) {
   int retval;
   line->clear();
-  while ((retval = fgetc(f)) != EOF) {
+  while (true) {
+    retval = fgetc(f);
+    if (ferror(f) && (errno == EINTR)) {
+      clearerr(f);
+      continue;
+    } else if (retval == EOF) {break;}
     char c = retval;
     if (c == '\n')
       break;
@@ -1058,7 +1091,11 @@ bool GetLineFd(const int fd, std::string *line) {
   int retval;
   char c;
   line->clear();
-  while ((retval = read(fd, &c, 1)) == 1) {
+  while (true) {
+    retval = read(fd, &c, 1);
+    if (retval == 0) {break;}
+    if ((retval == -1) && (errno == EINTR)) {continue;}
+    if (retval == -1) {break;}
     if (c == '\n')
       break;
     line->push_back(c);

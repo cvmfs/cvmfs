@@ -1,0 +1,90 @@
+
+cvmfs_test_name="Grafting"
+cvmfs_test_autofs_on_startup=false
+
+verify_grafting() {
+  testfname=$1
+  local file1=$(cat /cvmfs/$CVMFS_TEST_REPO/file1)
+  local file2=$(cat $testfname)
+  if [ "x$file1" == "x" ]; then
+    return 20
+  fi
+  if [ "x$file1" != "x$file2" ]; then
+    return 21
+  fi
+  return 0
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "Hello world" > /cvmfs/$CVMFS_TEST_REPO/file1
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  local hash=$(attr -qg hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/file1)
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/file2
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-file2
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-file2
+
+  #export CVMFS_LOG_LEVEL=4
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  echo "Contents of file2: `cat /cvmfs/$CVMFS_TEST_REPO/file2`"
+  verify_grafting /cvmfs/$CVMFS_TEST_REPO/file2
+  local verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  # Verify grafting works in sub-catalogs
+  mkdir -p /cvmfs/$CVMFS_TEST_REPO/subdir/
+  touch /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfscatalog
+  echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/subdir/file3
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file3
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file3
+
+  # Verify that symlinks do not graft
+  echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/subdir/file4
+  ln -s /cvmfs/$CVMFS_TEST_REPO/subdir/file4 /cvmfs/$CVMFS_TEST_REPO/subdir/file5
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file5
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/subdir/.cvmfsgraft-file5
+
+  # Verify that directories do not graft
+  mkdir /cvmfs/$CVMFS_TEST_REPO/subdir2
+  echo "checksum=$hash" > /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-subdir2
+  echo "size=12" >> /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-subdir2
+
+  #export CVMFS_LOG_LEVEL=4
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  echo "Contents of file2: `cat /cvmfs/$CVMFS_TEST_REPO/subdir/file3`"
+  verify_grafting /cvmfs/$CVMFS_TEST_REPO/subdir/file3
+  local verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  if [ ! -L /cvmfs/$CVMFS_TEST_REPO/subdir/file5 ]; then
+    return 22
+  fi
+
+  if [ ! -d /cvmfs/$CVMFS_TEST_REPO/subdir2 ]; then
+    return 23
+  fi
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  return 0
+}
+

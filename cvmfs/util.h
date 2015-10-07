@@ -163,6 +163,8 @@ std::string RfcTimestamp();
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
+bool String2Uint64Parse(const std::string &value, uint64_t *result);
+
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
