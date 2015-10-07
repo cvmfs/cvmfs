@@ -281,8 +281,33 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem *entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessFile(%s)",
            entry->filename().c_str());
 
+  CheckForBrokenHardlink(entry);
+  MaskFileHardlinks(entry);
 
   SyncUnion::ProcessFile(entry);
+}
+
+
+void SyncUnionOverlayfs::CheckForBrokenHardlink(SyncItem *entry) const {
+  if (!entry->IsNew() && entry->GetRdOnlyLinkcount() > 1) {
+    LogCvmfs(kLogPublish, kLogStderr, "OverlayFS has copied-up a file (%s) "
+                                      "with existing hardlinks in lowerdir "
+                                      "(linkcount %d). OverlayFS cannot handle "
+                                      "hardlinks and would produce "
+                                      "inconsistencies. Aborting..." ,
+             entry->GetUnionPath().c_str(), entry->GetRdOnlyLinkcount());
+    abort();
+  }
+}
+
+void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
+  assert(entry->IsRegularFile() || entry->IsSymlink());
+  if (entry->GetUnionLinkcount() > 1) {
+    LogCvmfs(kLogPublish, kLogStderr, "Warning: Found file with linkcount > 1 "
+                                      "(%s). We will break up these hardlinks.",
+                                      entry->GetUnionPath().c_str());
+    entry->MaskHardlink();
+  }
 }
 
 

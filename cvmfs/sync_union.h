@@ -235,6 +235,9 @@ class SyncUnionOverlayfs : public SyncUnion {
   std::set<std::string> GetIgnoreFilenames() const;
   virtual void ProcessFile(SyncItem *entry);
 
+  void CheckForBrokenHardlink(SyncItem *entry) const;
+  void MaskFileHardlinks(SyncItem *entry) const;
+
   bool ObtainSysAdminCapability() const;
 
  private:
