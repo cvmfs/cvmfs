@@ -61,6 +61,13 @@ class SyncUnion {
   virtual ~SyncUnion() {}
 
   /**
+   * Initialize internal state of the synchronisation. This needs to be called
+   * before running anything else.
+   * Note: should be up-called!
+   */
+  virtual bool Initialize();
+
+  /**
    * Main routine, process scratch space
    */
   virtual void Traverse() = 0;
@@ -106,6 +113,8 @@ class SyncUnion {
    */
   virtual bool IgnoreFilePredicate(const std::string &parent_dir,
                                    const std::string &filename) = 0;
+
+  bool IsInitialized() const { return initialized_; }
 
  protected:
   std::string rdonly_path_;
@@ -163,6 +172,7 @@ class SyncUnion {
   virtual void ProcessFile(SyncItem *entry);
 
  private:
+  bool initialized_;
 };  // class SyncUnion
 
 
@@ -203,26 +213,33 @@ class SyncUnionOverlayfs : public SyncUnion {
                      const std::string &union_path,
                      const std::string &scratch_path);
 
+  bool Initialize();
+
   void Traverse();
   void ProcessFileHardlinkCallback(const std::string &parent_dir,
                                    const std::string &filename);
   static bool ReadlinkEquals(std::string const &path,
                              std::string const &compare_value);
-  static bool XattrEquals(std::string const &path, std::string const &attr_name,
-                          std::string const &compare_value);
+  static bool HasXattr(std::string const &path, std::string const &attr_name);
 
  protected:
   bool IsWhiteoutEntry(const SyncItem &entry) const;
   bool IsOpaqueDirectory(const SyncItem &directory) const;
+  bool IsWhiteoutSymlinkPath(const std::string &path) const;
+
   bool IgnoreFilePredicate(const std::string &parent_dir,
                            const std::string &filename);
+  void ProcessCharacterDevice(const std::string &parent_dir,
+                              const std::string &filename);
   std::string UnwindWhiteoutFilename(const std::string &filename) const;
   std::set<std::string> GetIgnoreFilenames() const;
   virtual void ProcessFile(SyncItem *entry);
 
+  bool ObtainSysAdminCapability() const;
+
  private:
-  bool IsWhiteoutSymlinkPath(const std::string &path) const;
   bool IsOpaqueDirPath(const std::string &path) const;
+
   std::set<std::string> hardlink_lower_files_;
   uint64_t hardlink_lower_inode_;
 };  // class SyncUnionOverlayfs

@@ -21,6 +21,7 @@ enum SyncItemType {
   kItemDir,
   kItemFile,
   kItemSymlink,
+  kItemCharacterDevice,
   kItemNew,
   kItemUnknown
 };
@@ -66,6 +67,10 @@ class SyncItem {
   inline bool IsWhiteout()      const { return whiteout_;                     }
   inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog";  }
   bool IsOpaqueDirectory() const;
+
+  inline bool IsCharacterDevice() const {
+    return scratch_type_ == kItemCharacterDevice;
+  }
 
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }

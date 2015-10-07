@@ -178,7 +178,11 @@ class FileSystemTraversal {
       // Notify user about found directory entry
       platform_stat64 info;
       int retval = platform_lstat((path + "/" + dit->d_name).c_str(), &info);
-      assert(retval == 0);
+      if (retval != 0) {
+        LogCvmfs(kLogFsTraversal, kLogStderr, "failed to lstat '%s' errno: %d",
+                 (path + "/" + dit->d_name).c_str(), errno);
+        abort();
+      }
       if (S_ISDIR(info.st_mode)) {
         LogCvmfs(kLogFsTraversal, kLogVerboseMsg, "passing directory %s/%s",
                  path.c_str(), dit->d_name);
