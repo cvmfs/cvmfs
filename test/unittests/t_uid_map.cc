@@ -107,6 +107,7 @@ TYPED_TEST(T_UidMap, Initialize) {
   EXPECT_TRUE(map.IsValid());
   EXPECT_FALSE(map.HasDefault());
   EXPECT_TRUE(map.IsEmpty());
+  EXPECT_FALSE(map.HasEffect());
 }
 
 
@@ -118,6 +119,7 @@ TYPED_TEST(T_UidMap, Insert) {
   EXPECT_FALSE(map.HasDefault());
   EXPECT_EQ(2u, map.RuleCount());
   EXPECT_FALSE(map.IsEmpty());
+  EXPECT_TRUE(map.HasEffect());
 }
 
 
@@ -149,8 +151,10 @@ TYPED_TEST(T_UidMap, Contains) {
 TYPED_TEST(T_UidMap, Empty) {
   TypeParam map;
   EXPECT_TRUE(map.IsEmpty());
+  EXPECT_FALSE(map.HasEffect());
   map.SetDefault(TestFixture::v(42));
-  EXPECT_FALSE(map.IsEmpty());
+  EXPECT_TRUE(map.IsEmpty());
+  EXPECT_TRUE(map.HasEffect());
 }
 
 
