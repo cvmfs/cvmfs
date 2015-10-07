@@ -20,6 +20,7 @@
 #include "hash.h"
 #include "shortstring.h"
 #include "sql.h"
+#include "uid_map.h"
 #include "util.h"
 #include "xattr.h"
 
@@ -37,7 +38,7 @@ class Catalog;
 class Counters;
 
 typedef std::vector<Catalog *> CatalogList;
-typedef std::map<uint64_t, uint64_t> OwnerMap;  // used to map uid/gid
+typedef IntegerMap<uint64_t> OwnerMap;  // used to map uid/gid
 
 
 /**

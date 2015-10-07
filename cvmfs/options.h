@@ -101,16 +101,6 @@ class OptionsManager {
    */
   std::string Dump();
 
-  /**
-   * Parse a configuration file whose variables' values are positive integers
-   *
-   * @param  path absolute path to the configuration file
-   * @param  map map to store the generated key-value
-   * @return true if the file exists, is readable and all values can be parsed
-   *         to integers
-   */
-  bool ParseUIntMap(const std::string &path, std::map<uint64_t, uint64_t> *map);
-
  protected:
   /**
     * The ConfigValue structure contains a concrete value of a variable, as well
