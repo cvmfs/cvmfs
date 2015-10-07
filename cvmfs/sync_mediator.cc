@@ -192,6 +192,8 @@ manifest::Manifest *SyncMediator::Commit() {
   params_->spooler->WaitForUpload();
 
   if (!hardlink_queue_.empty()) {
+    assert(handle_hardlinks_);
+
     LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
     params_->spooler->UnregisterListeners();
     params_->spooler->RegisterListener(&SyncMediator::PublishHardlinksCallback,
@@ -247,6 +249,8 @@ manifest::Manifest *SyncMediator::Commit() {
 
 
 void SyncMediator::InsertHardlink(const SyncItem &entry) {
+  assert(handle_hardlinks_);
+
   uint64_t inode = entry.GetUnionInode();
   LogCvmfs(kLogPublish, kLogVerboseMsg, "found hardlink %"PRIu64" at %s",
            inode, entry.GetUnionPath().c_str());
@@ -270,6 +274,8 @@ void SyncMediator::InsertLegacyHardlink(const SyncItem &entry) {
   // As we are looking through all files in one directory here, there might be
   // completely untouched hardlink groups, which we can safely skip.
   // Finally we have to see if the hardlink is already part of this group
+
+  assert(handle_hardlinks_);
 
   if (entry.GetUnionLinkcount() < 2)
     return;
@@ -312,6 +318,8 @@ void SyncMediator::InsertLegacyHardlink(const SyncItem &entry) {
  * or edited ones.
  */
 void SyncMediator::CompleteHardlinks(const SyncItem &entry) {
+  assert(handle_hardlinks_);
+
   // If no hardlink in this directory was changed, we can skip this
   if (GetHardlinkMap().empty())
     return;
@@ -660,6 +668,8 @@ void SyncMediator::TouchDirectory(const SyncItem &entry) {
  * added to the catalogs.
  */
 void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
+  assert(handle_hardlinks_);
+
   for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
   {
@@ -693,6 +703,8 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 
 
 void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
+  assert(handle_hardlinks_);
+
   // Create a DirectoryEntry list out of the hardlinks
   catalog::DirectoryEntryBaseList hardlinks;
   for (SyncItemList::const_iterator i = group.hardlinks.begin(),
