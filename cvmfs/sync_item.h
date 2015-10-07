@@ -90,6 +90,17 @@ class SyncItem {
 
   void MarkAsWhiteout(const std::string &actual_filename);
 
+  /**
+   * Union file systems (i.e. OverlayFS) might not properly support hardlinks,
+   * forcing us to ignore them during publishing. A 'masked hardlink' will be
+   * treated as a normal file (linkcount == 1). Hence, any created hardlinks
+   * will be broken up into individual files with differing inodes.
+   */
+  inline void MaskHardlink() { masked_hardlink_ = true; }
+  inline bool HasHardlinks() const {
+    return !masked_hardlink_ && GetUnionLinkcount() > 1;
+  }
+
   unsigned int GetRdOnlyLinkcount() const;
   uint64_t GetRdOnlyInode() const;
   unsigned int GetUnionLinkcount() const;
@@ -158,6 +169,7 @@ class SyncItem {
   mutable EntryStat scratch_stat_;
 
   bool whiteout_;
+  bool masked_hardlink_;
   std::string relative_parent_path_;
   std::string filename_;
 
