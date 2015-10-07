@@ -29,6 +29,7 @@ File::File(const std::string    &path,
   chunk_detector_(chunk_detector)
 {
   chunks_to_commit_ = 0;  // tbb::atomic has no init constructor
+  LogCvmfs(kLogCatalog, kLogStderr, "%s: %d Adding compression alg: %d for path %s", __FILE__, __LINE__, compression_alg_, path.c_str());
   CreateInitialChunk();
 }
 
@@ -71,6 +72,7 @@ void File::CreateInitialChunk() {
   assert(chunks_.size() == 0);
 
   const off_t offset = 0;
+  LogCvmfs(kLogCatalog, kLogStderr, "%s: %d Adding compression alg: %d", __FILE__, __LINE__, compression_alg_);
   Chunk *new_chunk   = new Chunk(this, offset, hash_algorithm_, compression_alg_);
 
   if (might_become_chunked_) {
@@ -111,6 +113,7 @@ Chunk* File::CreateNextChunk(const off_t offset) {
   // will start at 'offset'
   latest_chunk->set_size(offset - latest_chunk->offset());
   Chunk *predecessor = latest_chunk;
+  LogCvmfs(kLogCatalog, kLogStderr, "%s: %d Adding compression alg: %d", __FILE__, __LINE__, compression_alg_);
   AddChunk(new Chunk(this, offset, hash_algorithm_, compression_alg_));
 
   return predecessor;

@@ -1074,6 +1074,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables_->Lock();
       // Check again to avoid race
       if (!chunk_tables_->inode2chunks.Contains(ino)) {
+        LogCvmfs(kLogCatalog, kLogStderr, "%s: %d Adding compression alg: %d", __FILE__, __LINE__, dirent.compression_algorithm());
         chunk_tables_->inode2chunks.Insert(ino, FileChunkReflist(chunks, path, dirent.compression_algorithm()));
         chunk_tables_->inode2references.Insert(ino, 1);
       } else {

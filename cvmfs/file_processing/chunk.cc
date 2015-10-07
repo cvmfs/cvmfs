@@ -57,19 +57,11 @@ void Chunk::Initialize() {
 
   content_hash_context_.buffer = smalloc(content_hash_context_.size);
   shash::Init(content_hash_context_);
-
-  zlib_context_.zalloc   = Z_NULL;
-  zlib_context_.zfree    = Z_NULL;
-  zlib_context_.opaque   = Z_NULL;
-  zlib_context_.next_in  = Z_NULL;
-  zlib_context_.avail_in = 0;
+  
   if (compression_alg_ == zlib::kZlibDefault) {
-    const int zlib_retval = deflateInit(&zlib_context_, Z_DEFAULT_COMPRESSION);
-    assert(zlib_retval == 0);
+    compressor_ = new zlib::ZlibCompressor();
   } else if (compression_alg_ == zlib::kNoCompression) {
-    // Initialize the zlib library to no compression
-    const int zlib_retval = deflateInit(&zlib_context_, 0);
-    assert(zlib_retval == 0);
+    compressor_ = new zlib::EchoCompressor();
   }
 
   zlib_initialized_         = true;
@@ -84,10 +76,6 @@ void Chunk::Finalize() {
   free(content_hash_context_.buffer);
   content_hash_context_.buffer = NULL;
 
-  assert(zlib_context_.avail_in == 0);
-  const int retcode = deflateEnd(&zlib_context_);
-  assert(retcode == Z_OK);
-
   if (current_deflate_buffer_ != NULL) {
     ScheduleWrite(current_deflate_buffer_);
     current_deflate_buffer_ = NULL;
@@ -96,7 +84,8 @@ void Chunk::Finalize() {
   if (deferred_write_) {
     FlushDeferredWrites();
   }
-
+  
+  delete compressor_;
   done_ = true;
 }
 
@@ -126,7 +115,7 @@ Chunk::Chunk(const Chunk &other) :
   assert(!other.done_);
   assert(!other.HasUploadStreamHandle());
   assert(other.bytes_written_ == 0);
-  assert(other.zlib_context_.avail_in == 0);
+  //assert(other.zlib_context_.avail_in == 0);
 
   current_deflate_buffer_ = other.current_deflate_buffer_->Clone();
 
@@ -135,9 +124,10 @@ Chunk::Chunk(const Chunk &other) :
          other.content_hash_context_.buffer,
          content_hash_context_.size);
 
-  const int retval = deflateCopy(&zlib_context_,
-                                 const_cast<z_streamp>(&other.zlib_context_));
-  assert(retval == Z_OK);
+  //const int retval = deflateCopy(&zlib_context_,
+  //                               const_cast<z_streamp>(&other.zlib_context_));
+  //assert(retval == Z_OK);
+  compressor_ = other.compressor_->Clone();
   zlib_initialized_ = true;
 }
 

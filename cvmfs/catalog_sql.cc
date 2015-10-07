@@ -278,6 +278,7 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
     
+  LogCvmfs(kLogCatalog, kLogStderr, "%s: %d Adding compression alg: %d", __FILE__, __LINE__, entry.compression_algorithm());
   database_flags |= entry.compression_algorithm() << kFlagPosCompress;
 
   return database_flags;
