@@ -388,13 +388,12 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
 
 
 /**
- * Wrapper around lgetxattr to read the value of the specified
- * xattr and return true if it is equal to the supplied value,
- * or false otherwise (including if any errors occur)
+ * Checks if a given file path has a specified extended attribute attached.
  *
- * @param[in] path to the symbolic link
- * @param[in] name of the attribute for which to compare the value
- * @param[in] value to compare to xattr value
+ * @param[in] path       to the file to be checked
+ * @param[in] attr_name  fully qualified name of the extend attribute
+ *                       (i.e. trusted.overlay.opaque)
+ * @return               true if attribute is found
  */
 bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
