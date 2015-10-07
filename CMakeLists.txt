@@ -400,7 +400,6 @@ endif (NOT MACOSX)
 
 find_package (OpenSSL REQUIRED)
 find_package (UUID REQUIRED)
-find_package (LibCAP REQUIRED)
 set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${OPENSSL_INCLUDE_DIR})
 
 if (GOOGLETEST_BUILTIN)
@@ -471,6 +470,7 @@ endif (BUILD_SERVER OR BUILD_UNITTESTS)
 
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   find_package(PythonLibs REQUIRED)
+  find_package(LibCAP REQUIRED)
   find_program(UNZIP_EXE NAMES unzip)
   if (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
     message(FATAL_ERROR "unzip utility missing. Please install unzip...")
