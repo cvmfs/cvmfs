@@ -111,9 +111,7 @@ class SyncMediator {
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
   typedef std::vector<HardlinkGroup> HardlinkGroupList;
 
-  void RegisterUnionEngine(SyncUnion *engine) {
-    union_engine_ = engine;
-  }
+  void RegisterUnionEngine(SyncUnion *engine);
 
   void PrintChangesetNotice(const ChangesetAction action,
                             const std::string &extra_info) const;
@@ -174,6 +172,8 @@ class SyncMediator {
 
   catalog::WritableCatalogManager *catalog_manager_;
   SyncUnion *union_engine_;
+
+  bool handle_hardlinks_;
 
   /**
    * Hardlinks are supported as long as they all reside in the same directory.

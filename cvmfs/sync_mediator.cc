@@ -29,6 +29,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
   catalog_manager_(catalog_manager),
   union_engine_(NULL),
+  handle_hardlinks_(false),
   params_(params),
   changed_items_(0)
 {
@@ -45,6 +46,11 @@ SyncMediator::~SyncMediator() {
   pthread_mutex_destroy(&lock_file_queue_);
 }
 
+
+void SyncMediator::RegisterUnionEngine(SyncUnion *engine) {
+  union_engine_     = engine;
+  handle_hardlinks_ = engine->SupportsHardlinks();
+}
 
 /**
  * Add an entry to the repository.
@@ -76,7 +82,7 @@ void SyncMediator::Add(const SyncItem &entry) {
     }
 
     // A file is a hard link if the link count is greater than 1
-    if (entry.GetUnionLinkcount() > 1)
+    if (entry.HasHardlinks())
       InsertHardlink(entry);
     else
       AddFile(entry);
@@ -150,6 +156,10 @@ void SyncMediator::Replace(const SyncItem &entry) {
 
 
 void SyncMediator::EnterDirectory(const SyncItem &entry) {
+  if (!handle_hardlinks_) {
+    return;
+  }
+
   HardlinkGroupMap new_map;
   hardlink_stack_.push(new_map);
 }
@@ -157,6 +167,10 @@ void SyncMediator::EnterDirectory(const SyncItem &entry) {
 
 void SyncMediator::LeaveDirectory(const SyncItem &entry)
 {
+  if (!handle_hardlinks_) {
+    return;
+  }
+
   CompleteHardlinks(entry);
   AddLocalHardlinkGroups(GetHardlinkMap());
   hardlink_stack_.pop();
@@ -600,7 +614,7 @@ void SyncMediator::RemoveFile(const SyncItem &entry) {
   PrintChangesetNotice(kRemove, entry.GetUnionPath());
 
   if (!params_->dry_run) {
-    if (entry.GetRdOnlyLinkcount() > 1) {
+    if (handle_hardlinks_ && entry.GetRdOnlyLinkcount() > 1) {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
                entry.GetUnionPath().c_str());
       catalog_manager_->ShrinkHardlinkGroup(entry.GetRelativePath());
