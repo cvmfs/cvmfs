@@ -3873,6 +3873,11 @@ publish() {
     if [ -z "$tag_name" ] && [ x"$CVMFS_AUTO_TAG" = x"true" ]; then
       local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
       tag_name="generic-$timestamp"
+      local tag_name_number=1
+      while tag -x -i $tag_name $name > /dev/null 2>&1; do
+        tag_name="generic_$tag_name_number-$timestamp"
+        tag_name_number=$(( $tag_name_number + 1 ))
+      done
       echo "Using auto tag '$tag_name'"
     fi
 
