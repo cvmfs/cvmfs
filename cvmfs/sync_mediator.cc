@@ -29,6 +29,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
   catalog_manager_(catalog_manager),
   union_engine_(NULL),
+  handle_hardlinks_(false),
   params_(params),
   changed_items_(0)
 {
@@ -45,6 +46,11 @@ SyncMediator::~SyncMediator() {
   pthread_mutex_destroy(&lock_file_queue_);
 }
 
+
+void SyncMediator::RegisterUnionEngine(SyncUnion *engine) {
+  union_engine_     = engine;
+  handle_hardlinks_ = engine->SupportsHardlinks();
+}
 
 /**
  * Add an entry to the repository.
@@ -76,7 +82,7 @@ void SyncMediator::Add(const SyncItem &entry) {
     }
 
     // A file is a hard link if the link count is greater than 1
-    if (entry.GetUnionLinkcount() > 1)
+    if (entry.HasHardlinks())
       InsertHardlink(entry);
     else
       AddFile(entry);
@@ -150,6 +156,10 @@ void SyncMediator::Replace(const SyncItem &entry) {
 
 
 void SyncMediator::EnterDirectory(const SyncItem &entry) {
+  if (!handle_hardlinks_) {
+    return;
+  }
+
   HardlinkGroupMap new_map;
   hardlink_stack_.push(new_map);
 }
@@ -157,6 +167,10 @@ void SyncMediator::EnterDirectory(const SyncItem &entry) {
 
 void SyncMediator::LeaveDirectory(const SyncItem &entry)
 {
+  if (!handle_hardlinks_) {
+    return;
+  }
+
   CompleteHardlinks(entry);
   AddLocalHardlinkGroups(GetHardlinkMap());
   hardlink_stack_.pop();
@@ -178,6 +192,8 @@ manifest::Manifest *SyncMediator::Commit() {
   params_->spooler->WaitForUpload();
 
   if (!hardlink_queue_.empty()) {
+    assert(handle_hardlinks_);
+
     LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
     params_->spooler->UnregisterListeners();
     params_->spooler->RegisterListener(&SyncMediator::PublishHardlinksCallback,
@@ -233,6 +249,8 @@ manifest::Manifest *SyncMediator::Commit() {
 
 
 void SyncMediator::InsertHardlink(const SyncItem &entry) {
+  assert(handle_hardlinks_);
+
   uint64_t inode = entry.GetUnionInode();
   LogCvmfs(kLogPublish, kLogVerboseMsg, "found hardlink %"PRIu64" at %s",
            inode, entry.GetUnionPath().c_str());
@@ -256,6 +274,8 @@ void SyncMediator::InsertLegacyHardlink(const SyncItem &entry) {
   // As we are looking through all files in one directory here, there might be
   // completely untouched hardlink groups, which we can safely skip.
   // Finally we have to see if the hardlink is already part of this group
+
+  assert(handle_hardlinks_);
 
   if (entry.GetUnionLinkcount() < 2)
     return;
@@ -298,6 +318,8 @@ void SyncMediator::InsertLegacyHardlink(const SyncItem &entry) {
  * or edited ones.
  */
 void SyncMediator::CompleteHardlinks(const SyncItem &entry) {
+  assert(handle_hardlinks_);
+
   // If no hardlink in this directory was changed, we can skip this
   if (GetHardlinkMap().empty())
     return;
@@ -600,7 +622,7 @@ void SyncMediator::RemoveFile(const SyncItem &entry) {
   PrintChangesetNotice(kRemove, entry.GetUnionPath());
 
   if (!params_->dry_run) {
-    if (entry.GetRdOnlyLinkcount() > 1) {
+    if (handle_hardlinks_ && entry.GetRdOnlyLinkcount() > 1) {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
                entry.GetUnionPath().c_str());
       catalog_manager_->ShrinkHardlinkGroup(entry.GetRelativePath());
@@ -646,6 +668,8 @@ void SyncMediator::TouchDirectory(const SyncItem &entry) {
  * added to the catalogs.
  */
 void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
+  assert(handle_hardlinks_);
+
   for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
   {
@@ -679,6 +703,8 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 
 
 void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
+  assert(handle_hardlinks_);
+
   // Create a DirectoryEntry list out of the hardlinks
   catalog::DirectoryEntryBaseList hardlinks;
   for (SyncItemList::const_iterator i = group.hardlinks.begin(),

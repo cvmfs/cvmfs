@@ -16,6 +16,7 @@ namespace publish {
 SyncItem::SyncItem() :
   union_engine_(NULL),
   whiteout_(false),
+  masked_hardlink_(false),
   scratch_type_(static_cast<SyncItemType>(0)),
   rdonly_type_(static_cast<SyncItemType>(0))
 {
@@ -144,8 +145,10 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   // inode and parent inode is determined at runtime of client
   dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
   dirent.parent_inode_   = catalog::DirectoryEntry::kInvalidInode;
-  // TODO(rmeusel): is this a good idea here?
-  dirent.linkcount_      = this->GetUnionStat().st_nlink;
+
+  // this might mask the actual link count in case hardlinks are not supported
+  // (i.e. on setups using OverlayFS)
+  dirent.linkcount_      = HasHardlinks() ? this->GetUnionStat().st_nlink : 1;
 
   dirent.mode_           = this->GetUnionStat().st_mode;
   dirent.uid_            = this->GetUnionStat().st_uid;

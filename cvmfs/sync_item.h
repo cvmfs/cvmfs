@@ -21,6 +21,7 @@ enum SyncItemType {
   kItemDir,
   kItemFile,
   kItemSymlink,
+  kItemCharacterDevice,
   kItemNew,
   kItemUnknown
 };
@@ -67,6 +68,10 @@ class SyncItem {
   inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog";  }
   bool IsOpaqueDirectory() const;
 
+  inline bool IsCharacterDevice() const {
+    return scratch_type_ == kItemCharacterDevice;
+  }
+
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
@@ -84,6 +89,17 @@ class SyncItem {
   std::string GetScratchPath() const;
 
   void MarkAsWhiteout(const std::string &actual_filename);
+
+  /**
+   * Union file systems (i.e. OverlayFS) might not properly support hardlinks,
+   * forcing us to ignore them during publishing. A 'masked hardlink' will be
+   * treated as a normal file (linkcount == 1). Hence, any created hardlinks
+   * will be broken up into individual files with differing inodes.
+   */
+  inline void MaskHardlink() { masked_hardlink_ = true; }
+  inline bool HasHardlinks() const {
+    return !masked_hardlink_ && GetUnionLinkcount() > 1;
+  }
 
   unsigned int GetRdOnlyLinkcount() const;
   uint64_t GetRdOnlyInode() const;
@@ -153,6 +169,7 @@ class SyncItem {
   mutable EntryStat scratch_stat_;
 
   bool whiteout_;
+  bool masked_hardlink_;
   std::string relative_parent_path_;
   std::string filename_;
 
