@@ -96,8 +96,7 @@ class SyncUnion {
    * @param filename the filename as in the scratch directory
    * @return the original filename of the scratched out file in CVMFS repository
    */
-  virtual std::string UnwindWhiteoutFilename(const std::string &filename)
-          const = 0;
+  virtual std::string UnwindWhiteoutFilename(const SyncItem &entry) const = 0;
 
   /**
    * Union file systems use opaque directories to fully support rmdir
@@ -184,7 +183,7 @@ class SyncUnion {
    * Called to actually process the file entry.
    * @param entry the SyncItem corresponding to the union file to be processed
    */
-  virtual void ProcessFile(SyncItem *entry);
+  virtual void ProcessFile(SyncItem &entry);
 
  private:
   bool initialized_;
@@ -210,7 +209,7 @@ class SyncUnionAufs : public SyncUnion {
   bool IsOpaqueDirectory(const SyncItem &directory) const;
   bool IgnoreFilePredicate(const std::string &parent_dir,
                            const std::string &filename);
-  std::string UnwindWhiteoutFilename(const std::string &filename) const;
+  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
 
  private:
   std::set<std::string> ignore_filenames_;
@@ -232,8 +231,6 @@ class SyncUnionOverlayfs : public SyncUnion {
   bool Initialize();
 
   void Traverse();
-  void ProcessFileHardlinkCallback(const std::string &parent_dir,
-                                   const std::string &filename);
   static bool ReadlinkEquals(std::string const &path,
                              std::string const &compare_value);
   static bool HasXattr(std::string const &path, std::string const &attr_name);
@@ -247,12 +244,12 @@ class SyncUnionOverlayfs : public SyncUnion {
                            const std::string &filename);
   void ProcessCharacterDevice(const std::string &parent_dir,
                               const std::string &filename);
-  std::string UnwindWhiteoutFilename(const std::string &filename) const;
+  std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
   std::set<std::string> GetIgnoreFilenames() const;
-  virtual void ProcessFile(SyncItem *entry);
+  virtual void ProcessFile(SyncItem &entry);
 
-  void CheckForBrokenHardlink(SyncItem *entry) const;
-  void MaskFileHardlinks(SyncItem *entry) const;
+  void CheckForBrokenHardlink(SyncItem &entry) const;
+  void MaskFileHardlinks(SyncItem &entry) const;
 
   bool ObtainSysAdminCapability() const;
 

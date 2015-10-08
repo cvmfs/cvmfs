@@ -54,7 +54,7 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
-  SyncItem entry(parent_dir, dir_name, this, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
 
   if (entry.IsNew()) {
     mediator_->Add(entry);
@@ -78,8 +78,8 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, this, kItemFile);
-  ProcessFile(&entry);
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemFile);
+  ProcessFile(entry);
 }
 
 
@@ -88,12 +88,12 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
-  SyncItem entry(parent_dir, link_name, this, kItemSymlink);
-  ProcessFile(&entry);
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
+  ProcessFile(entry);
 }
 
 
-void SyncUnion::ProcessFile(SyncItem *entry) {
+void SyncUnion::ProcessFile(SyncItem &entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry->filename().c_str());
   // Process whiteout prefix
@@ -105,16 +105,15 @@ void SyncUnion::ProcessFile(SyncItem *entry) {
     entry->MarkAsWhiteout(actual_filename);
     mediator_->Remove(*entry);
   } else {
-    // Process normal file
-    if (entry->IsNew()) {
+    if (entry.IsNew()) {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg, "processing file [%s] as new (add)",
-               entry->filename().c_str());
-      mediator_->Add(*entry);
+               entry.filename().c_str());
+      mediator_->Add(entry);
     } else {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg,
                "processing file [%s] as existing (touch)",
-               entry->filename().c_str());
-      mediator_->Touch(*entry);
+               entry.filename().c_str());
+      mediator_->Touch(entry);
     }
   }
 }
@@ -123,7 +122,7 @@ void SyncUnion::ProcessFile(SyncItem *entry) {
 void SyncUnion::EnterDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, this, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   mediator_->EnterDirectory(entry);
 }
 
@@ -131,7 +130,7 @@ void SyncUnion::EnterDirectory(const string &parent_dir,
 void SyncUnion::LeaveDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, this, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   mediator_->LeaveDirectory(entry);
 }
 
@@ -283,9 +282,9 @@ bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
 }
 
 
-void SyncUnionOverlayfs::ProcessFile(SyncItem *entry) {
+void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessFile(%s)",
-           entry->filename().c_str());
+           entry.filename().c_str());
 
   CheckForBrokenHardlink(entry);
   MaskFileHardlinks(entry);
@@ -294,44 +293,25 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem *entry) {
 }
 
 
-void SyncUnionOverlayfs::CheckForBrokenHardlink(SyncItem *entry) const {
-  if (!entry->IsNew() && entry->GetRdOnlyLinkcount() > 1) {
+void SyncUnionOverlayfs::CheckForBrokenHardlink(SyncItem &entry) const {
+  if (!entry.IsNew() && entry.GetRdOnlyLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr, "OverlayFS has copied-up a file (%s) "
                                       "with existing hardlinks in lowerdir "
                                       "(linkcount %d). OverlayFS cannot handle "
                                       "hardlinks and would produce "
                                       "inconsistencies. Aborting..." ,
-             entry->GetUnionPath().c_str(), entry->GetRdOnlyLinkcount());
+             entry.GetUnionPath().c_str(), entry.GetRdOnlyLinkcount());
     abort();
   }
 }
 
-void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
-  assert(entry->IsRegularFile() || entry->IsSymlink());
-  if (entry->GetUnionLinkcount() > 1) {
+void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem &entry) const {
+  assert(entry.IsRegularFile() || entry.IsSymlink());
+  if (entry.GetUnionLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr, "Warning: Found file with linkcount > 1 "
                                       "(%s). We will break up these hardlinks.",
-                                      entry->GetUnionPath().c_str());
-    entry->MaskHardlink();
-  }
-}
-
-
-void SyncUnionOverlayfs::ProcessFileHardlinkCallback(const string &parent_dir,
-                                                     const string &filename)
-{
-  LogCvmfs(kLogUnionFs, kLogDebug,
-           "SyncUnionOverlayfs::ProcessFileHardlinkCallback(%s, %s)",
-           parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, this, kItemFile);
-  if (entry.GetRdOnlyLinkcount() > 1) {
-    if (hardlink_lower_inode_ == entry.GetRdOnlyInode()) {
-      LogCvmfs(kLogUnionFs, kLogDebug,
-               "SyncUnionOverlayfs::ProcessFileHardlinkCallback "
-               "have member of inode group %u: %s/%s",
-               hardlink_lower_inode_, parent_dir.c_str(), filename.c_str());
-      hardlink_lower_files_.insert(entry.filename());
-    }
+                                      entry.GetUnionPath().c_str());
+    entry.MaskHardlink();
   }
 }
 
@@ -460,9 +440,8 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 }
 
 
-string SyncUnionOverlayfs::UnwindWhiteoutFilename(const string &filename) const
-{
-  return filename;
+string SyncUnionOverlayfs::UnwindWhiteoutFilename(const SyncItem &entry) const {
+  return entry.filename();
 }
 
 
@@ -478,8 +457,8 @@ void SyncUnionOverlayfs::ProcessCharacterDevice(const std::string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug,
            "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, this, kItemCharacterDevice);
-  ProcessFile(&entry);
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
+  ProcessFile(entry);
 }
 
 }  // namespace publish
