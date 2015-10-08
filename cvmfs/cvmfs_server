@@ -507,9 +507,10 @@ check_aufs() {
 # of if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
+  local conf_gz="/proc/config.gz"
   /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
   /sbin/modprobe -q overlay   || test -d /sys/module/overlay || \
-  test x"$(zgrep OVERLAY_FS /proc/config.gz | awk -F = '{print $2}')" = xy
+  [ x"$(zgrep OVERLAY_FS $conf_gz 2>/dev/null | awk -F = '{print $2}')" = x"y" ]
 }
 
 # check if at least one of the supported union file systems is available
