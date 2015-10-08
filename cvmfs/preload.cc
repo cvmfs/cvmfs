@@ -9,11 +9,11 @@
 #include <string>
 
 #include "download.h"
-#include "swissknife_pull.h"
-#include "swissknife.h"
 #include "logging.h"
 #include "signature.h"
 #include "statistics.h"
+#include "swissknife.h"
+#include "swissknife_pull.h"
 #include "util.h"
 
 
@@ -52,7 +52,8 @@ int main(int argc, char *argv[]) {
   // first create the alien cache
   int retval = MkdirDeep(alien_cache_dir, 0770);
   if (!retval) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create %s", alien_cache_dir.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create %s",
+      alien_cache_dir.c_str());
     return 1;
   }
   retval = MakeCacheDirectories(alien_cache_dir, 0770);
