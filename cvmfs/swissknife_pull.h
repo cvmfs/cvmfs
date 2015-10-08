@@ -30,6 +30,7 @@ class CommandPull : public Command {
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('t', "timeout (s)"));
     r.push_back(Parameter::Optional('a', "number of retries"));
+    r.push_back(Parameter::Optional('d', "directory for path specification"));
     r.push_back(Parameter::Switch('p', "pull catalog history, too"));
     r.push_back(Parameter::Switch('c', "preload cache instead of stratum 1"));
     return r;

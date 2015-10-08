@@ -23,6 +23,7 @@
 
 #include "atomic.h"
 #include "catalog.h"
+#include "dirtab.h"
 #include "download.h"
 #include "hash.h"
 #include "history_sqlite.h"
@@ -97,6 +98,7 @@ int                  pipe_chunks[2];
 // required for concurrent reading
 pthread_mutex_t      lock_pipe = PTHREAD_MUTEX_INITIALIZER;
 unsigned             retries = 3;
+catalog::RelaxedPathFilter   *pathfilter = NULL;
 atomic_int64         overall_chunks;
 atomic_int64         overall_new;
 atomic_int64         chunk_queue;
@@ -234,6 +236,16 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   // Check if the catalog already exists
   if (Peek(catalog_hash)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog up to date");
+    return true;
+  }
+
+  // Check if the catalog matches the pathfilter
+  if (path != ""              &&  // necessary to load the root catalog
+      pathfilter              &&
+      pathfilter->IsValid()   &&
+     !pathfilter->IsMatching(path)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog in '%s' does not match"
+             " the path specification", path.c_str());
     return true;
   }
 
@@ -401,6 +413,9 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     timeout = String2Uint64(*args.find('t')->second);
   if (args.find('a') != args.end())
     retries = String2Uint64(*args.find('a')->second);
+  if (args.find('d') != args.end()) {
+    pathfilter = catalog::RelaxedPathFilter::Create(*args.find('d')->second);
+  }
   if (args.find('p') != args.end())
     pull_history = true;
   pthread_t *workers =
@@ -486,7 +501,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
 
   // Fetch tag list
-  if (!ensemble.manifest->history().IsNull()) {
+  if (!ensemble.manifest->history().IsNull() && !preload_cache) {
     shash::Any history_hash = ensemble.manifest->history();
     const string history_url = *stratum0_url + "/data/"
                                              + history_hash.MakePath();
@@ -611,6 +626,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   g_signature_manager->Fini();
   g_download_manager->Fini();
   delete spooler;
+  delete pathfilter;
   return result;
 }
 
