@@ -15,17 +15,7 @@
 #define likely(x)    __builtin_expect (!!(x), 1)
 #define unlikely(x)  __builtin_expect (!!(x), 0)
 
-namespace cache {
-
-// In the case of cvmfs_swissknife, we end up creating a reference
-// to ChecksumFileWriter - but never use it to write a file.
-//
-// To prevent having to link in the cache module (and most of the rest of
-// CVMFS), we define a weak symbol here.
-std::string
-__attribute__((weak))
-GetPathInCache(const hash::Any &) {return "";}
-}
+using namespace checksum;
 
 
 static int
@@ -51,18 +41,19 @@ pread_full(int fd, void *in_buf, size_t len, off_t off) {
 
 
 static int
-write_full(int fd, void *in_buf, size_t len) {
+pwrite_full(int fd, void *in_buf, size_t len, off_t offset) {
   if (len == 0) return 0;
 
   char *buf = static_cast<char *>(in_buf);
   ssize_t counter = 0;
   ssize_t res;
   errno = 0;
-  while (((res = write(fd, buf, len)) >= 0) && (errno != EINTR)) {
+  while (((res = pwrite(fd, buf, len, offset)) >= 0) && (errno != EINTR)) {
     if (res > 0) {
       buf += res;
       len -= res;
       counter += res;
+      offset += res;
     }
     if (len == 0) {return counter;}
   }
@@ -81,8 +72,8 @@ ChecksumFileWriter::ChecksumFileWriter(int fd, off_t fsize, bool sumonly)
   header[0] = '\1';
   if (sumonly) {
     if (!calculate_crc(reinterpret_cast<unsigned char *>(header),
-        CHECKSUM_HEADERSIZE, &running_sum, CRC32C_POLYNOMIAL)) {
-      error = false;
+        CHECKSUM_HEADERSIZE, &m_running_sum, CRC32C_POLYNOMIAL)) {
+      m_error = false;
     }
     return;
   }
@@ -130,7 +121,8 @@ ChecksumFileWriter::~ChecksumFileWriter() {
 }
 
 
-// Note -- len here is assumed to be aligned to CHECKSUM_BLOCKSIZE by stream below.
+// Note -- len here is assumed to be aligned to CHECKSUM_BLOCKSIZE by stream
+// below.
 void
 ChecksumFileWriter::checksum(const uint8_t * buf, size_t len) {
 
@@ -173,9 +165,9 @@ ChecksumFileWriter::stream(const unsigned char *buf, size_t len) {
     buf += to_copy;
     len -= to_copy;
 
-    if (buffer_offset == CHECKSUM_BLOCKSIZE) {
-      checksum(partial_buffer, CHECKSUM_BLOCKSIZE);
-      buffer_offset = 0;
+    if (m_buffer_offset == CHECKSUM_BLOCKSIZE) {
+      checksum(m_partial_buffer, CHECKSUM_BLOCKSIZE);
+      m_buffer_offset = 0;
     }
     // ELSE: we copied buf completely into partial_buffer and
     // len = 0
@@ -187,47 +179,45 @@ ChecksumFileWriter::stream(const unsigned char *buf, size_t len) {
   }
   if (len) {
     buf += data_len;
-    memcpy(partial_buffer, buf, len);
-    buffer_offset = len;
+    memcpy(m_partial_buffer, buf, len);
+    m_buffer_offset = len;
   }
-  return !error ? 0 : -1;
+  return !m_error ? 0 : -1;
 }
 
 
-int
-ChecksumFileReader::open(const hash::Any &hash)
+ChecksumFileReader::ChecksumFileReader(int fd, off_t fsize)
+  : m_error(true), m_fd(fd), m_size(fsize)
 {
-  std::string filename = cache::GetPathInCache(hash)+CHECKSUM_SUFFIX;
-  int cfd;
-  if ((cfd = ::open(filename.c_str(), O_RDONLY)) >= 0) {
-    char header[CHECKSUM_HEADERSIZE];
-    if (pread_full(cfd, header, CHECKSUM_HEADERSIZE, 0) == CHECKSUM_HEADERSIZE) {
-      if ((header[0] == '\1') && (header[1] == '\0') && (header[2] == '\0') && (header[3] == '\0')) {
-        return cfd;
-      } else {
-        LogCvmfs(kLogChecksum, kLogDebug, "invalid checksum header for %s", filename.c_str());
-      }
+  char header[CHECKSUM_HEADERSIZE];
+  if (pread_full(m_fd, header, CHECKSUM_HEADERSIZE, m_size) == 
+      CHECKSUM_HEADERSIZE)
+  {
+    if ((header[0] == '\1') && (header[1] == '\0') && (header[2] == '\0') &&
+        (header[3] == '\0'))
+    {
+      m_error = false;
     } else {
-      LogCvmfs(kLogChecksum, kLogDebug, "could not read checksum file %s (errno=%d, %s)",
-               filename.c_str(), errno, strerror(errno));
+      LogCvmfs(kLogChecksum, kLogDebug, "Invalid checksum header");
     }
-    close(cfd);
   } else {
-    LogCvmfs(kLogChecksum, kLogDebug, "could not open checksum file %s (errno=%d, %s)",
-             filename.c_str(), errno, strerror(errno));
+    LogCvmfs(kLogChecksum, kLogDebug, "Could not read checksum file: %s "
+             "(errno=%d)", strerror(errno), errno);
   }
-  return -EIO;
 }
 
 
 int
-ChecksumFileReader::verify(int fd, int cfd, const unsigned char *buf, size_t len, off_t off) {
+ChecksumFileReader::verify(const unsigned char *buf, size_t len, off_t off) {
 
-  if (len == (size_t)-1) {return errno ? -errno : -EIO;}
+  if (len == (size_t)-1) {
+    return errno ? -errno : -EIO;
+  }
 
   crc32_error_t error_info;
 
-  uint8_t data_buf[CHECKSUM_BLOCKSIZE]; memset(data_buf, '\0', CHECKSUM_BLOCKSIZE);
+  uint8_t data_buf[CHECKSUM_BLOCKSIZE];
+  memset(data_buf, '\0', CHECKSUM_BLOCKSIZE);
 
   off_t cfd_begin = (off / CHECKSUM_BLOCKSIZE) * CHECKSUM_BLOCKSIZE;
   off_t cfd_end = ((off+len) % CHECKSUM_BLOCKSIZE == 0) ?
@@ -271,7 +261,10 @@ ChecksumFileReader::verify(int fd, int cfd, const unsigned char *buf, size_t len
         sums_ptr, CRC32C_POLYNOMIAL,
         CHECKSUM_BLOCKSIZE,
         &error_info)) {
-      LogCvmfs(kLogChecksum, kLogDebug, "Checksum failed verification for beginning buffer - got %d; expected %d; at data block starting at %d", error_info.got_crc, error_info.expected_crc, error_info.bad_data - data_buf);
+      LogCvmfs(kLogChecksum, kLogDebug, "Checksum failed verification for "
+               "beginning buffer - got %d; expected %d; at data block "
+               "starting at %d", error_info.got_crc, error_info.expected_crc,
+               error_info.bad_data - data_buf);
       return -EIO;
     }
     buf += CHECKSUM_BLOCKSIZE - (off - cfd_begin);
@@ -317,8 +310,14 @@ ChecksumFileReader::verify(int fd, int cfd, const unsigned char *buf, size_t len
   if (cfd_begin == cfd_end) {return 0;}
 
   // Bulk verify remainder.
-  if (bulk_verify_crc(reinterpret_cast<const uint8_t *>(buf), len, sums_ptr + (read_beginning ? 1 : 0), CRC32C_POLYNOMIAL,CHECKSUM_BLOCKSIZE, &error_info)) {
-    LogCvmfs(kLogChecksum, kLogDebug, "Bulk checksum failed verification; got %d, expected %d at data block starting at %d", error_info.got_crc, error_info.expected_crc, error_info.bad_data - buf);
+  if (bulk_verify_crc(reinterpret_cast<const uint8_t *>(buf), len,
+                      sums_ptr + (read_beginning ? 1 : 0),
+                     CRC32C_POLYNOMIAL, CHECKSUM_BLOCKSIZE, &error_info))
+  {
+    LogCvmfs(kLogChecksum, kLogDebug, "Bulk checksum failed verification; got"
+             " %d, expected %d at data block starting at %d",
+             error_info.got_crc, error_info.expected_crc,
+             error_info.bad_data - buf);
     return -EIO;
   }
 

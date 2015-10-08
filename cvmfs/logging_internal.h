@@ -63,7 +63,7 @@ enum LogSource {
   kLogUtility,
   kLogGlueBuffer,
   kLogHistory,
-  kLogChecksum
+  kLogChecksum,
   kLogUnionFs,
   kLogPathspec,
   kLogUploadS3,

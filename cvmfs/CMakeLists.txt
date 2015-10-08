@@ -103,7 +103,8 @@ set (TEST_CHECKSUM_SOURCES
   checksum.h checksum.cc
   bulk_crc32.c bulk_crc32.h
   crc32c_tables.h crc32_zlib_polynomial_tables.h
-  hash.h
+  hash.h hash.cc
+  logging.cc logging.h logging_internal.h
 )
 
 set (CVMFS_FSCK_SOURCES
@@ -112,10 +113,10 @@ set (CVMFS_FSCK_SOURCES
   smalloc.h
   atomic.h
   duplex_zlib.h compression.cc compression.h
-  prng.h
   checksum.h checksum.cc
   bulk_crc32.c bulk_crc32.h
   crc32c_tables.h crc32_zlib_polynomial_tables.h
+  prng.h
   hash.cc hash.h
   util.cc util.h
   statistics.h statistics.cc
@@ -371,6 +372,7 @@ if (BUILD_LIBCVMFS)
   add_dependencies (test_libcvmfs libcvmfs)
 
   add_executable( test_checksum ${TEST_CHECKSUM_SOURCES} )
+  target_link_libraries( test_checksum ${OPENSSL_LIBRARIES} ${SHA2_ARCHIVE} )
 
 endif (BUILD_LIBCVMFS)
 

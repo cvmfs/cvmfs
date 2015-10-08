@@ -6,19 +6,12 @@
 
 #include "checksum.h"
 #include "hash.h"
+#include "platform.h"
 
-#include <stdio.h>
 #include <errno.h>
-#include <string.h>
 #include <fcntl.h>
-
-std::string cache_path;
-
-std::string
-__attribute__((weak))
-GetPathInCache(const hash::Any &hash) {
-  return cache_path + "/" + hash.MakePath(1, 2);
-}
+#include <stdio.h>
+#include <string.h>
 
 // Note we made READ_BUFFER unaligned with the size of the checksum blocks
 // Hopefully this will help prevent against any alignment assumptions.
@@ -123,6 +116,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Checksum calculation failed for %s\n", path.c_str());
     return 1;
   }
+  close(fd);
   printf("Calculated CRC32 checksum: %u\n", crc32);
   return 0;
 }
+
