@@ -35,9 +35,10 @@
 #include <set>
 #include <string>
 
+#include "sync_item.h"
+
 namespace publish {
 
-class SyncItem;
 class SyncMediator;
 
 /**
@@ -71,6 +72,19 @@ class SyncUnion {
    * Main routine, process scratch space
    */
   virtual void Traverse() = 0;
+
+  /**
+   * This produces a SyncItem and initialises it accordingly. This is the only
+   * way client code can generate SyncItems to make sure it is always set up
+   * properly (see SyncItem::SyncItem() for further details).
+   * @param relative_parent_path  the directory path the SyncItem resides in
+   * @param filename              file/directory name of directory entry
+   * @param entry_type            type of the item in the union directory
+   * @return                      a SyncItem object wrapping the dirent
+   */
+  SyncItem CreateSyncItem(const std::string  &relative_parent_path,
+                          const std::string  &filename,
+                          const SyncItemType  entry_type) const;
 
   inline std::string rdonly_path() const { return rdonly_path_; }
   inline std::string union_path() const { return union_path_; }

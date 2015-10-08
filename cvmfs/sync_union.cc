@@ -14,10 +14,8 @@
 #include "fs_traversal.h"
 #include "logging.h"
 #include "platform.h"
-#include "sync_item.h"
 #include "sync_mediator.h"
 #include "util.h"
-#include "xattr.h"
 
 using namespace std;  // NOLINT
 
@@ -40,6 +38,14 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
 bool SyncUnion::Initialize() {
   initialized_ = true;
   return true;
+}
+
+
+SyncItem SyncUnion::CreateSyncItem(const std::string  &relative_parent_path,
+                                   const std::string  &filename,
+                                   const SyncItemType  entry_type) const {
+  SyncItem entry(relative_parent_path, filename, this, entry_type);
+  return entry;
 }
 
 
