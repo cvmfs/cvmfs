@@ -293,10 +293,18 @@ void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessFile(%s)",
            entry.filename().c_str());
 
+  SyncUnion::ProcessFile(entry);
+}
+
+
+void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem &entry) const {
+  SyncUnion::PreprocessSyncItem(entry);
+  if (entry.IsWhiteout() || entry.IsDirectory()) {
+    return;
+  }
+
   CheckForBrokenHardlink(entry);
   MaskFileHardlinks(entry);
-
-  SyncUnion::ProcessFile(entry);
 }
 
 

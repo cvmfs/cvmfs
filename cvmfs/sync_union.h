@@ -244,6 +244,8 @@ class SyncUnionOverlayfs : public SyncUnion {
   static bool HasXattr(std::string const &path, std::string const &attr_name);
 
  protected:
+  void PreprocessSyncItem(SyncItem &entry) const;
+
   bool IsWhiteoutEntry(const SyncItem &entry) const;
   bool IsOpaqueDirectory(const SyncItem &directory) const;
   bool IsWhiteoutSymlinkPath(const std::string &path) const;
