@@ -70,10 +70,20 @@ class Dirtab {
    */
   Dirtab();
 
+  virtual ~Dirtab() {}
+
   /**
-   * Create a Dirtab from a given .cvmfsdirtab file path.
+   * Returns an already filled Dirtab
+   *
+   * @param dirtab_path path of the dirtab file that will be used to fill
+   *                    the Dirtab object
+   * @return the already filled Dirtab
    */
-  explicit Dirtab(const std::string &dirtab_path);
+  static Dirtab* Create(const std::string &dirtab_path) {
+    Dirtab *dt = new Dirtab();
+    dt->Open(dirtab_path);
+    return dt;
+  }
 
   /**
    * Parses the content of a .cvmfsdirtab file. This is called by the filepath-
@@ -113,8 +123,13 @@ class Dirtab {
   bool   IsValid() const { return valid_; }
 
  protected:
+  /**
+   * Fill a Dirtab from a given .cvmfsdirtab file path.
+   */
+  bool Open(const std::string &dirtab_path);
   bool Parse(FILE *dirtab_file);
   bool ParseLine(const std::string &line);
+  virtual bool ParsePathspec(const std::string &pathspec_str, bool negation);
   void AddRule(const Rule &rule);
 
  private:
@@ -130,6 +145,18 @@ class Dirtab {
   bool  valid_;
   Rules positive_rules_;
   Rules negative_rules_;
+};
+
+
+class RelaxedPathFilter : public Dirtab {
+ public:
+   static RelaxedPathFilter* Create(const std::string &dirtab_path) {
+    RelaxedPathFilter *dt = new RelaxedPathFilter();
+    dt->Open(dirtab_path);
+    return dt;
+  }
+ protected:
+  bool ParsePathspec(const std::string &pathspec_str, bool negation);
 };
 
 }  // namespace catalog
