@@ -360,12 +360,12 @@ void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
   // created directory
   FileSystemTraversal<SyncMediator> traversal(
     this, union_engine_->scratch_path(), true);
-  traversal.fn_enter_dir = &SyncMediator::EnterAddedDirectoryCallback;
-  traversal.fn_leave_dir = &SyncMediator::LeaveAddedDirectoryCallback;
-  traversal.fn_new_file = &SyncMediator::AddFileCallback;
-  traversal.fn_new_symlink = &SyncMediator::AddSymlinkCallback;
+  traversal.fn_enter_dir      = &SyncMediator::EnterAddedDirectoryCallback;
+  traversal.fn_leave_dir      = &SyncMediator::LeaveAddedDirectoryCallback;
+  traversal.fn_new_file       = &SyncMediator::AddFileCallback;
+  traversal.fn_new_symlink    = &SyncMediator::AddSymlinkCallback;
   traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
-  traversal.fn_ignore_file = &SyncMediator::IgnoreFileCallback;
+  traversal.fn_ignore_file    = &SyncMediator::IgnoreFileCallback;
   traversal.Recurse(entry.GetScratchPath());
 }
 
