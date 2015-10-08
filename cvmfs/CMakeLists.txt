@@ -202,6 +202,51 @@ set (CVMFS_SUID_HELPER_SOURCES
   cvmfs_suid_helper.cc
 )
 
+set (CVMFS_PRELOADER_SOURCES
+  download.cc download.h
+  logging.cc logging.h
+  swissknife.h
+  swissknife_pull.cc swissknife_pull.h
+  signature.cc signature.h
+  statistics.cc statistics.h
+  duplex_curl.h duplex_cares.h
+  catalog_sql.cc catalog_sql.h
+  sql.cc sql.h
+  util.cc util.h
+  hash.cc hash.h
+  upload_facility.cc upload_facility.h
+  pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
+  pathspec/pathspec.cc pathspec/pathspec.h
+  util_concurrency.cc util_concurrency.h
+  file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
+  file_processing/char_buffer.h
+  file_processing/chunk.h file_processing/chunk.cc
+  file_processing/chunk_detector.h file_processing/chunk_detector.cc
+  file_processing/file.h file_processing/file.cc
+  file_processing/io_dispatcher.h file_processing/io_dispatcher.cc
+  file_processing/processor.h file_processing/processor.cc
+  file_processing/file_processor.h file_processing/file_processor.cc
+  upload_s3.cc upload_s3.h
+  s3fanout.cc s3fanout.h
+  options.cc options.h
+  compression.cc compression.h
+  upload_spooler_definition.cc upload_spooler_definition.h
+  history_sql.cc history_sql.h
+  history_sqlite.cc history_sqlite.h
+  xattr.cc xattr.h
+  globals.cc globals.h
+  manifest.cc manifest.h
+  manifest_fetch.cc manifest_fetch.h
+  upload.cc upload.h
+  upload_local.cc upload_local.h
+  whitelist.cc whitelist.h
+  sanitizer.cc sanitizer.h
+  dns.cc dns.h
+  dirtab.cc dirtab.h
+  catalog.cc catalog.h
+  preload.cc
+)
+
 #
 # configure some compiler flags for proper build
 #
@@ -425,6 +470,37 @@ if (BUILD_SERVER)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
 
+if (BUILD_PRELOADER)
+  add_executable (cvmfs_preload ${CVMFS_PRELOADER_SOURCES})
+
+  if (LIBCURL_BUILTIN)
+    add_dependencies (cvmfs_preload libcares libcurl)
+    set (PRELOADER_LIBS ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
+    set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${PRELOADER_LIBS} )
+  endif (LIBCURL_BUILTIN)
+
+  if (PACPARSER_BUILTIN)
+    add_dependencies (cvmfs_preload libpacparser)
+    set (PRELOADER_LIBS ${PACPARSER_ARCHIVE} ${PRELOADER_LIBS} )
+  endif (PACPARSER_BUILTIN)
+
+  if (SQLITE3_BUILTIN)
+    add_dependencies (cvmfs_preload sqlite3)
+    set (PRELOADER_LIBS ${SQLITE3_ARCHIVE}  ${PRELOADER_LIBS} )
+  endif (SQLITE3_BUILTIN)
+
+  if (ZLIB_BUILTIN)
+    add_dependencies (cvmfs_preload zlib)
+    set (PRELOADER_LIBS ${ZLIB_ARCHIVE} ${PRELOADER_LIBS} )
+  endif (ZLIB_BUILTIN)
+
+  if (SPARSEHASH_BUILTIN)
+    add_dependencies (cvmfs_preload sparsehash)
+  endif (SPARSEHASH_BUILTIN)
+
+  target_link_libraries(cvmfs_preload ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
+endif (BUILD_PRELOADER)
+
 #
 # installation
 #
@@ -536,3 +612,11 @@ if (BUILD_SERVER)
   )
 
 endif (BUILD_SERVER)
+
+if (BUILD_PRELOADER)
+  install(
+    TARGETS      cvmfs_preload
+    RUNTIME
+    DESTINATION    bin
+  )
+endif (BUILD_PRELOADER)
