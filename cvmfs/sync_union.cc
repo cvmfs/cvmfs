@@ -45,7 +45,19 @@ SyncItem SyncUnion::CreateSyncItem(const std::string  &relative_parent_path,
                                    const std::string  &filename,
                                    const SyncItemType  entry_type) const {
   SyncItem entry(relative_parent_path, filename, this, entry_type);
+  PreprocessSyncItem(entry);
   return entry;
+}
+
+
+void SyncUnion::PreprocessSyncItem(SyncItem &entry) const {
+  if (IsWhiteoutEntry(entry)) {
+    entry.MarkAsWhiteout(UnwindWhiteoutFilename(entry));
+  }
+
+  if (IsOpaqueDirectory(entry)) {
+    entry.MarkAsOpaqueDirectory();
+  }
 }
 
 
@@ -95,15 +107,9 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 
 void SyncUnion::ProcessFile(SyncItem &entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
-           entry->filename().c_str());
-  // Process whiteout prefix
-  if (IsWhiteoutEntry(*entry)) {
-    string actual_filename = UnwindWhiteoutFilename(entry->filename());
-    LogCvmfs(kLogUnionFs, kLogVerboseMsg,
-             "processing file [%s] as whiteout of [%s] (remove)",
-             entry->filename().c_str(), actual_filename.c_str());
-    entry->MarkAsWhiteout(actual_filename);
-    mediator_->Remove(*entry);
+           entry.filename().c_str());
+  if (entry.IsWhiteout()) {
+    mediator_->Remove(entry);
   } else {
     if (entry.IsNew()) {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg, "processing file [%s] as new (add)",
@@ -183,7 +189,8 @@ bool SyncUnionAufs::IsOpaqueDirectory(const SyncItem &directory) const {
 }
 
 
-string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {
+string SyncUnionAufs::UnwindWhiteoutFilename(const SyncItem &entry) const {
+  const std::string &filename = entry.filename();
   return filename.substr(whiteout_prefix_.length());
 }
 

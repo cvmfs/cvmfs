@@ -138,6 +138,14 @@ class SyncUnion {
   SyncMediator *mediator_;
 
   /**
+   * Allow for preprocessing steps before emiting any SyncItems from SyncUnion.
+   * This can be overridden by sub-classes but should always be up-called. Typi-
+   * cally this sets whiteout and opaque-directory flags or handles hardlinks.
+   * @param entry  the SyncItem to be pre-processed
+   */
+  virtual void PreprocessSyncItem(SyncItem &entry) const;
+
+  /**
    * Callback when a regular file is found.
    * @param parent_dir the relative directory path
    * @param filename the filename

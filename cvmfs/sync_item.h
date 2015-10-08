@@ -12,7 +12,6 @@
 #include "directory_entry.h"
 #include "hash.h"
 #include "platform.h"
-#include "sync_union.h"
 #include "util.h"
 
 namespace publish {
@@ -26,6 +25,7 @@ enum SyncItemType {
   kItemUnknown
 };
 
+class SyncUnion;
 
 /**
  * Every directory entry emitted by the FileSystemTraversal is wrapped in a
@@ -39,34 +39,38 @@ enum SyncItemType {
  * details.
  */
 class SyncItem {
- public:
+ private:
   /**
-   *  create a new SyncItem (is normally not required for normal usage
-   *                         as the RecursionEngine provides you with DirEntries)
-   *  @param dirPath the RELATIVE path to the file
-   *  @param filename the name of the file ;-)
-   *  @param entryType well...
+   * create a new SyncItem
+   * Note: SyncItems cannot be created by any using code. SyncUnion will take
+   *       care of their creating through a factory method to make sure they
+   *       are initialised correctly (whiteout, hardlink handling, ...)
+   *
+   * @param dirPath the RELATIVE path to the file
+   * @param filename the name of the file ;-)
+   * @param entryType well...
    */
-  SyncItem();  // TODO(rmeusel): Remove
   SyncItem(const std::string  &relative_parent_path,
            const std::string  &filename,
            const SyncUnion    *union_engine,
-           const SyncItemType  entry_type = kItemUnknown);
+           const SyncItemType  entry_type);
 
-  inline bool IsDirectory()     const { return IsType(kItemDir);              }
-  inline bool WasDirectory()    const { return WasType(kItemDir);             }
-  inline bool IsRegularFile()   const { return IsType(kItemFile);             }
-  inline bool WasRegularFile()  const { return WasType(kItemFile);            }
-  inline bool IsSymlink()       const { return IsType(kItemSymlink);          }
-  inline bool WasSymlink()      const { return WasType(kItemSymlink);         }
-  inline bool IsNew()           const { return WasType(kItemNew);             }
+  friend class SyncUnion;
 
-  // TODO(reneme): code smell! This depends on the UnionEngine to call
-  //                           MarkAsWhiteout(), before it potentially gives the
-  //                           wrong result!
-  inline bool IsWhiteout()      const { return whiteout_;                     }
-  inline bool IsCatalogMarker() const { return filename_ == ".cvmfscatalog";  }
-  bool IsOpaqueDirectory() const;
+ public:
+  SyncItem();
+
+  inline bool IsDirectory()       const { return IsType(kItemDir);             }
+  inline bool WasDirectory()      const { return WasType(kItemDir);            }
+  inline bool IsRegularFile()     const { return IsType(kItemFile);            }
+  inline bool WasRegularFile()    const { return WasType(kItemFile);           }
+  inline bool IsSymlink()         const { return IsType(kItemSymlink);         }
+  inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
+  inline bool IsNew()             const { return WasType(kItemNew);            }
+
+  inline bool IsWhiteout()        const { return whiteout_;                    }
+  inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
+  inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
 
   inline bool IsCharacterDevice() const {
     return scratch_type_ == kItemCharacterDevice;
@@ -89,6 +93,7 @@ class SyncItem {
   std::string GetScratchPath() const;
 
   void MarkAsWhiteout(const std::string &actual_filename);
+  void MarkAsOpaqueDirectory();
 
   /**
    * Union file systems (i.e. OverlayFS) might not properly support hardlinks,
@@ -169,6 +174,7 @@ class SyncItem {
   mutable EntryStat scratch_stat_;
 
   bool whiteout_;
+  bool opaque_;
   bool masked_hardlink_;
   std::string relative_parent_path_;
   std::string filename_;
