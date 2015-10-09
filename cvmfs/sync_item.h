@@ -29,14 +29,16 @@ class SyncUnion;
 
 /**
  * Every directory entry emitted by the FileSystemTraversal is wrapped in a
- * SyncItem structure.
- * This class represents potentially three concrete files:
- *   - <read-only path>/<filename>
- *   - <scratch (read-write) branch>/<filename>
- *   - <union volume path>/<filename>
- * The main purpose of this class is to cache stat calls to the underlying
- * files in the different locations as well as hiding some implementation
- * details.
+ * SyncItem structure by the factory method SyncUnion::CreateSyncItem().
+ *
+ * Since we are dealing with a union file system setup, this class represents
+ * potentially three concrete files:
+ *   - <read-only path>/<filename>                 | cf. rdonly_stat_
+ *   - <scratch (read-write) branch>/<filename>    | cf. scratch_stat_
+ *   - <union volume path>/<filename>              | cf. union_stat_
+ *
+ * This class caches stat calls to the underlying files in different branches of
+ * the union file system and hides some interpretation details.
  */
 class SyncItem {
   // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem)
@@ -62,6 +64,12 @@ class SyncItem {
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
 
+  /**
+   * Generates a DirectoryEntry that can be directly stored into a catalog db.
+   * Note: this sets the inode fields to kInvalidInode as well as the link
+   *       count to 1 if MaskHardlink() has been called before (cf. OverlayFS)
+   * @return  a DirectoryEntry structure to be written into a catalog
+   */
   catalog::DirectoryEntryBase CreateBasicCatalogDirent() const;
 
   inline std::string GetRelativePath() const {
@@ -112,6 +120,13 @@ class SyncItem {
   SyncItemType GetRdOnlyFiletype() const;
   SyncItemType GetScratchFiletype() const;
 
+  /**
+   * Checks if the SyncItem _is_ the given file type (file, dir, symlink, ...)
+   * in the union file system volume. Hence: After the publish operation, the
+   * file will be this type in CVMFS.
+   * @param expected_type  the file type to be checked against
+   * @return               true if file type matches the expected type
+   */
   inline bool IsType(const SyncItemType expected_type) const {
     if (scratch_type_ == kItemUnknown) {
       scratch_type_ = GetScratchFiletype();
@@ -119,6 +134,13 @@ class SyncItem {
     return scratch_type_ == expected_type;
   }
 
+  /**
+   * Checks if the SyncItem _was_ the given file type (file, dir, symlink, ...)
+   * in CVMFS (or the lower layer of the union file system). Hence: Before the
+   * current transaction the file _was_ this type in CVMFS.
+   * @param expected_type  the file type to be checked against
+   * @return               true if file type was the expected type in CVMFS
+   */
   inline bool WasType(const SyncItemType expected_type) const {
     if (rdonly_type_ == kItemUnknown) {
       rdonly_type_ = GetRdOnlyFiletype();
@@ -166,15 +188,15 @@ class SyncItem {
 
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
 
-  const SyncUnion *union_engine_;
+  const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
 
   mutable EntryStat rdonly_stat_;
   mutable EntryStat union_stat_;
   mutable EntryStat scratch_stat_;
 
-  bool whiteout_;
-  bool opaque_;
-  bool masked_hardlink_;
+  bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
+  bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
+  bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
   std::string relative_parent_path_;
   std::string filename_;
 
