@@ -105,7 +105,7 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 }
 
 
-void SyncUnion::ProcessFile(SyncItem &entry) {
+void SyncUnion::ProcessFile(const SyncItem &entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
            entry.filename().c_str());
   if (entry.IsWhiteout()) {
@@ -286,14 +286,6 @@ bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
   const bool result = ObtainSysAdminCapabilityInternal(caps);
   cap_free(caps);
   return result;
-}
-
-
-void SyncUnionOverlayfs::ProcessFile(SyncItem &entry) {
-  LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessFile(%s)",
-           entry.filename().c_str());
-
-  SyncUnion::ProcessFile(entry);
 }
 
 

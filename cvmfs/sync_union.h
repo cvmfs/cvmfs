@@ -191,7 +191,7 @@ class SyncUnion {
    * Called to actually process the file entry.
    * @param entry the SyncItem corresponding to the union file to be processed
    */
-  virtual void ProcessFile(SyncItem &entry);
+  void ProcessFile(const SyncItem &entry);
 
  private:
   bool initialized_;
@@ -256,7 +256,6 @@ class SyncUnionOverlayfs : public SyncUnion {
                               const std::string &filename);
   std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
   std::set<std::string> GetIgnoreFilenames() const;
-  virtual void ProcessFile(SyncItem &entry);
 
   void CheckForBrokenHardlink(SyncItem &entry) const;
   void MaskFileHardlinks(SyncItem &entry) const;
