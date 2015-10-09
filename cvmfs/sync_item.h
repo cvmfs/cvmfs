@@ -52,14 +52,11 @@ class SyncItem {
   inline bool IsSymlink()         const { return IsType(kItemSymlink);         }
   inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
   inline bool IsNew()             const { return WasType(kItemNew);            }
+  inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
-
-  inline bool IsCharacterDevice() const {
-    return scratch_type_ == kItemCharacterDevice;
-  }
 
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
@@ -157,6 +154,7 @@ class SyncItem {
       if (S_ISDIR(stat.st_mode)) return kItemDir;
       if (S_ISREG(stat.st_mode)) return kItemFile;
       if (S_ISLNK(stat.st_mode)) return kItemSymlink;
+      if (S_ISCHR(stat.st_mode)) return kItemCharacterDevice;
       return kItemUnknown;
     }
 
