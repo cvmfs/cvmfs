@@ -142,8 +142,11 @@ class SyncUnion {
    * This can be overridden by sub-classes but should always be up-called. Typi-
    * cally this sets whiteout and opaque-directory flags or handles hardlinks.
    * @param entry  the SyncItem to be pre-processed
+   *               (pointer parameter for google style guide compliance [1])
+   * [1] https://google-styleguide.googlecode.com/svn/trunk/
+   *             cppguide.html#Function_Parameter_Ordering
    */
-  virtual void PreprocessSyncItem(SyncItem &entry) const;
+  virtual void PreprocessSyncItem(SyncItem *entry) const;
 
   /**
    * Callback when a regular file is found.
@@ -244,7 +247,7 @@ class SyncUnionOverlayfs : public SyncUnion {
   static bool HasXattr(std::string const &path, std::string const &attr_name);
 
  protected:
-  void PreprocessSyncItem(SyncItem &entry) const;
+  void PreprocessSyncItem(SyncItem *entry) const;
 
   bool IsWhiteoutEntry(const SyncItem &entry) const;
   bool IsOpaqueDirectory(const SyncItem &directory) const;
@@ -257,8 +260,8 @@ class SyncUnionOverlayfs : public SyncUnion {
   std::string UnwindWhiteoutFilename(const SyncItem &entry) const;
   std::set<std::string> GetIgnoreFilenames() const;
 
-  void CheckForBrokenHardlink(SyncItem &entry) const;
-  void MaskFileHardlinks(SyncItem &entry) const;
+  void CheckForBrokenHardlink(const SyncItem &entry) const;
+  void MaskFileHardlinks(SyncItem *entry) const;
 
   bool ObtainSysAdminCapability() const;
 

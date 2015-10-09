@@ -45,18 +45,18 @@ SyncItem SyncUnion::CreateSyncItem(const std::string  &relative_parent_path,
                                    const std::string  &filename,
                                    const SyncItemType  entry_type) const {
   SyncItem entry(relative_parent_path, filename, this, entry_type);
-  PreprocessSyncItem(entry);
+  PreprocessSyncItem(&entry);
   return entry;
 }
 
 
-void SyncUnion::PreprocessSyncItem(SyncItem &entry) const {
-  if (IsWhiteoutEntry(entry)) {
-    entry.MarkAsWhiteout(UnwindWhiteoutFilename(entry));
+void SyncUnion::PreprocessSyncItem(SyncItem *entry) const {
+  if (IsWhiteoutEntry(*entry)) {
+    entry->MarkAsWhiteout(UnwindWhiteoutFilename(*entry));
   }
 
-  if (IsOpaqueDirectory(entry)) {
-    entry.MarkAsOpaqueDirectory();
+  if (IsOpaqueDirectory(*entry)) {
+    entry->MarkAsOpaqueDirectory();
   }
 }
 
@@ -289,18 +289,18 @@ bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
 }
 
 
-void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem &entry) const {
+void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem *entry) const {
   SyncUnion::PreprocessSyncItem(entry);
-  if (entry.IsWhiteout() || entry.IsDirectory()) {
+  if (entry->IsWhiteout() || entry->IsDirectory()) {
     return;
   }
 
-  CheckForBrokenHardlink(entry);
+  CheckForBrokenHardlink(*entry);
   MaskFileHardlinks(entry);
 }
 
 
-void SyncUnionOverlayfs::CheckForBrokenHardlink(SyncItem &entry) const {
+void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
   if (!entry.IsNew() && entry.GetRdOnlyLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr, "OverlayFS has copied-up a file (%s) "
                                       "with existing hardlinks in lowerdir "
@@ -312,13 +312,13 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(SyncItem &entry) const {
   }
 }
 
-void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem &entry) const {
-  assert(entry.IsRegularFile() || entry.IsSymlink());
-  if (entry.GetUnionLinkcount() > 1) {
+void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
+  assert(entry->IsRegularFile() || entry->IsSymlink());
+  if (entry->GetUnionLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr, "Warning: Found file with linkcount > 1 "
                                       "(%s). We will break up these hardlinks.",
-                                      entry.GetUnionPath().c_str());
-    entry.MaskHardlink();
+                                      entry->GetUnionPath().c_str());
+    entry->MaskHardlink();
   }
 }
 
