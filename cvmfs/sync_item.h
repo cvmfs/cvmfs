@@ -92,10 +92,6 @@ class SyncItem {
   uint64_t GetRdOnlyInode() const;
   unsigned int GetUnionLinkcount() const;
   uint64_t GetUnionInode() const;
-  inline platform_stat64 GetUnionStat() const {
-    StatUnion();
-    return union_stat_.stat;
-  }
 
   inline std::string filename() const { return filename_; }
   inline std::string relative_parent_path() const {
@@ -108,6 +104,11 @@ class SyncItem {
   }
 
  protected:
+  inline platform_stat64 GetUnionStat() const {
+    StatUnion();
+    return union_stat_.stat;
+  }
+
   SyncItemType GetRdOnlyFiletype() const;
   SyncItemType GetScratchFiletype() const;
 
