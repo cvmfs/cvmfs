@@ -39,22 +39,7 @@ class SyncUnion;
  * details.
  */
 class SyncItem {
- private:
-  /**
-   * create a new SyncItem
-   * Note: SyncItems cannot be created by any using code. SyncUnion will take
-   *       care of their creating through a factory method to make sure they
-   *       are initialised correctly (whiteout, hardlink handling, ...)
-   *
-   * @param dirPath the RELATIVE path to the file
-   * @param filename the name of the file ;-)
-   * @param entryType well...
-   */
-  SyncItem(const std::string  &relative_parent_path,
-           const std::string  &filename,
-           const SyncUnion    *union_engine,
-           const SyncItemType  entry_type);
-
+  // only SyncUnion can create SyncItems (see SyncUnion::CreateSyncItem)
   friend class SyncUnion;
 
  public:
@@ -144,6 +129,21 @@ class SyncItem {
   }
 
  private:
+  /**
+   * create a new SyncItem
+   * Note: SyncItems cannot be created by any using code. SyncUnion will take
+   *       care of their creating through a factory method to make sure they
+   *       are initialised correctly (whiteout, hardlink handling, ...)
+   *
+   * @param dirPath the RELATIVE path to the file
+   * @param filename the name of the file ;-)
+   * @param entryType well...
+   */
+  SyncItem(const std::string  &relative_parent_path,
+           const std::string  &filename,
+           const SyncUnion    *union_engine,
+           const SyncItemType  entry_type);
+
   /**
    * Structure to cache stat calls to the different file locations.
    */
