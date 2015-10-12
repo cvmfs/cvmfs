@@ -75,55 +75,42 @@ tbb::task* ChunkProcessingTask::execute() {
 void ChunkProcessingTask::Crunch(const unsigned char  *data,
                                  const size_t          bytes,
                                  const bool            finalize) {
-  z_stream          &stream = chunk_->zlib_context();
+  //z_stream          &stream = chunk_->zlib_context();
   shash::ContextPtr &ch_ctx = chunk_->content_hash_context();
+  
+  CharBuffer outbuf;
+  size_t outsize;
+  
+  // Do the actual deflate
+  chunk_->get_compressor()->Deflate(outbuf, outsize, data, bytes, finalize);
+  
+  size_t output_left = outsize;
 
-  // estimate how much space we are going to need approximately
-  const size_t max_output_size = deflateBound(&stream, bytes);
-
-  // state the input data in the zlib stream for the next compression step
-  stream.avail_in = bytes;
-  // sry, but zlib forces me...
-  stream.next_in  = const_cast<unsigned char*>(data);
-  const int flush = (finalize) ? Z_FINISH : Z_NO_FLUSH;
-
-  int retcode = -1;
-  while (true) {
-    // obtain a destination CharBuffer for the compression results from the
-    // currently processed Chunk.
-    CharBuffer *compress_buffer = chunk_->GetDeflateBuffer(max_output_size);
+  // Loop through the output, copying data to the deflate buffer
+  while (output_left > 0) {
+    CharBuffer *compress_buffer = chunk_->GetDeflateBuffer(output_left);
     assert(compress_buffer != NULL);
     assert(compress_buffer->free_bytes() > 0);
-
-    // initialize the zlib stream with the characteristics of the output buffer
-    const CharBuffer::pointer_t output_start =
-      compress_buffer->free_space_ptr();
-    const size_t output_space = compress_buffer->free_bytes();
-    stream.avail_out = output_space;
-    stream.next_out = output_start;
-
-    // do the compression step
-    retcode = deflate(&stream, flush);
-    assert(retcode == Z_OK || retcode == Z_STREAM_END);
-
-    // check if zlib produced any bytes, update the used_bytes information in
-    // the compression buffer and update the running content hash with the fresh
-    // data
-    const size_t bytes_produced = output_space - stream.avail_out;
+    
+    size_t bytes_to_copy = std::min(compress_buffer->free_bytes(), output_left);
+    
+    LogCvmfs(kLogCatalog, kLogStderr, "%s:%d Copying %d of %d bytes to output.", __FILE__, __LINE__, bytes_to_copy, output_left);
+    
+    // Copy the deflated data to the buffer 
+    const CharBuffer::pointer_t output_start = compress_buffer->free_space_ptr();
+    memcpy( output_start, outbuf.ptr() + (outsize - output_left), 
+            bytes_to_copy);
+    
+    // Update the hash
     compress_buffer->SetUsedBytes(
-      compress_buffer->used_bytes() + bytes_produced);
-    shash::Update(output_start, bytes_produced, ch_ctx);
-
-    // check if the compression for the given input data has finished and stop
-    // the compression loop
-    if ((flush == Z_NO_FLUSH && retcode == Z_OK && stream.avail_in == 0) ||
-        (flush == Z_FINISH   && retcode == Z_STREAM_END))
-    {
-      break;
-    }
-
-    assert(stream.avail_out == 0);
+      compress_buffer->used_bytes() + bytes_to_copy);
+    shash::Update(output_start, bytes_to_copy, ch_ctx);
+            
+    output_left -= bytes_to_copy;
+    
+    
   }
+
 }
 
 

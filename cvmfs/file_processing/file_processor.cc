@@ -94,6 +94,7 @@ void FileProcessor::FileDone(File *file) {
            file->bulk_chunk()->content_hash().ToString().c_str(),
            file->hash_suffix());
   assert(file->hash_suffix() == file->bulk_chunk()->content_hash().suffix);
+  LogCvmfs(kLogCatalog, kLogStderr, "%s: %d Adding compression alg: %d", __FILE__, __LINE__, compression_alg_);
   NotifyListeners(SpoolerResult(0,
                                 file->path(),
                                 file->bulk_chunk()->content_hash(),

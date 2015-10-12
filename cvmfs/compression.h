@@ -13,6 +13,7 @@
 
 #include "duplex_zlib.h"
 #include "sink.h"
+#include "file_processing/char_buffer.h"
 
 namespace shash {
 struct Any;
@@ -41,6 +42,47 @@ enum Algorithms {
   kZlibDefault = 0,
   kNoCompression,
   kAny,
+};
+
+/** 
+  * Abstract Compression class which is inhereited by implementations of 
+  * compression engines such as zlib...
+  */
+class Compressor {
+  public:
+    Compressor() {};
+    virtual ~Compressor() {};
+    virtual int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
+            const unsigned char* inbuf, const size_t inbufsize, 
+            const bool flush) { return 0; };
+    virtual size_t DeflateBound(const size_t bytes) { return bytes; };
+    virtual Compressor* Clone();
+};
+
+class ZlibCompressor: public Compressor {
+  public:
+    ZlibCompressor();
+    ZlibCompressor(const ZlibCompressor &other);
+    ~ZlibCompressor();
+    int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
+            const unsigned char* inbuf, const size_t inbufsize, 
+            const bool flush);
+    size_t DeflateBound(const size_t bytes);
+    Compressor* Clone();
+    
+  protected:
+    z_stream stream_;
+  
+};
+
+class EchoCompressor: public Compressor {
+  public:
+    EchoCompressor();
+    int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
+            const unsigned char* inbuf, const size_t inbufsize, 
+            const bool flush);
+    size_t DeflateBound(const size_t bytes) { return bytes; };
+    Compressor* Clone();
 };
 
 Algorithms ParseCompressAlgorithm(const std::string &algorithm_option);
