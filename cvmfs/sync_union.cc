@@ -204,7 +204,7 @@ SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
 
 bool SyncUnionOverlayfs::Initialize() {
   // trying to obtain CAP_SYS_ADMIN to read 'trusted' xattrs in the scratch
-  // directory of an OverlayFS installation if necessary
+  // directory of an OverlayFS installation
   return ObtainSysAdminCapability() && SyncUnion::Initialize();
 }
 

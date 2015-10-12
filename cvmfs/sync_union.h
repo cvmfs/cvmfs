@@ -247,7 +247,6 @@ class SyncUnionOverlayfs : public SyncUnion {
 
   std::set<std::string> hardlink_lower_files_;
   uint64_t hardlink_lower_inode_;
-
 };  // class SyncUnionOverlayfs
 
 }  // namespace publish
