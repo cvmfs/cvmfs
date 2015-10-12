@@ -17,6 +17,9 @@ PREV_DIR="$(pwd)"
 mkdir -p $WORKSPACE
 cd $WORKSPACE
 
+# update installed packages
+yum -y --exclude='kernel*' update
+
 # install cvmfs-release RPM
 if ! rpm -q cvmfs-release > /dev/null 2>&1; then
   echo "installing cvmfs-release package"
@@ -32,9 +35,6 @@ if ! rpm -q kernel | grep -q 'aufs'; then
   echo "installing custom AUFS enabled kernel"
   yum -y --disablerepo='*' --enablerepo='cernvm-kernel' install kernel kernel-headers
 fi
-
-# update installed packages
-yum -y --exclude='kernel*' update
 
 # activate EPEL to get as much of the fun stuff as possible
 yum -y install epel-release
