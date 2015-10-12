@@ -15,6 +15,7 @@ struct SyncParameters {
   SyncParameters() :
     spooler(NULL),
     union_fs_type("aufs"),
+    needs_cap_sys_admin(false),
     print_changeset(false),
     dry_run(false),
     mucatalogs(false),
@@ -40,6 +41,7 @@ struct SyncParameters {
   std::string      manifest_path;
   std::string      spooler_definition;
   std::string      union_fs_type;
+  bool             needs_cap_sys_admin;
   bool             print_changeset;
   bool             dry_run;
   bool             mucatalogs;
@@ -208,6 +210,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('g', "repo is garbage collectable"));
     r.push_back(Parameter::Switch('p', "enable file chunking"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
+    r.push_back(Parameter::Switch('A', "acquire CAP_SYS_ADMIN on start up"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('a',
       "desired average chunk size in bytes"));

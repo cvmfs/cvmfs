@@ -3961,6 +3961,10 @@ publish() {
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi
+    if [ "x$CVMFS_UNION_FS_TYPE" = "xoverlayfs"    ] && \
+       [ "$(get_overlayfs_type)" = "$OFS_POST_V22" ]; then
+      sync_command="$sync_command -A" # acquire CAP_SYS_ADMIN
+    fi
     if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
       sync_command="$sync_command -p \
        -l $CVMFS_MIN_CHUNK_SIZE \

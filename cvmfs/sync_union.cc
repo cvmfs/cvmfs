@@ -196,16 +196,19 @@ bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
 SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
                                        const string &rdonly_path,
                                        const string &union_path,
-                                       const string &scratch_path)
+                                       const string &scratch_path,
+                                       const bool needs_cap_sys_admin)
   : SyncUnion(mediator, rdonly_path, union_path, scratch_path)
   , hardlink_lower_inode_(0)
+  , needs_cap_sys_admin_(needs_cap_sys_admin)
 {}
 
 
 bool SyncUnionOverlayfs::Initialize() {
   // trying to obtain CAP_SYS_ADMIN to read 'trusted' xattrs in the scratch
-  // directory of an OverlayFS installation
-  return ObtainSysAdminCapability() && SyncUnion::Initialize();
+  // directory of an OverlayFS installation if necessary
+  return (! needs_cap_sys_admin_ || ObtainSysAdminCapability())
+    && SyncUnion::Initialize();
 }
 
 
