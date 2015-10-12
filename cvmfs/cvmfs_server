@@ -527,8 +527,7 @@ get_available_union_fs() {
   fi
 }
 
-# gets the system file system name of the overlayfs
-# apparently this differs from version to version... sigh!
+# gets the system's file system name of OverlayFS (overlay vs. overlayfs)
 get_overlayfs_name() {
   check_overlayfs || die "overlayfs is not installed!"
   if /sbin/modprobe -q overlayfs || [ -d /sys/module/overlayfs ]; then
