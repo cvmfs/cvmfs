@@ -132,6 +132,7 @@ class cvmfs_context : SingleCopy {
     unsigned       timeout;
     unsigned       timeout_direct;
     std::string    url;
+    std::string    external_url;
     std::string    proxies;
     std::string    fallback_proxies;
     std::string    tracefile;  // unused
@@ -206,7 +207,9 @@ class cvmfs_context : SingleCopy {
   catalog::ClientCatalogManager *catalog_manager_;
   signature::SignatureManager *signature_manager_;
   download::DownloadManager *download_manager_;
+  download::DownloadManager *external_download_manager_;
   cvmfs::Fetcher *fetcher_;
+  cvmfs::Fetcher *external_fetcher_;
   lru::Md5PathCache *md5path_cache_;
 
   atomic_int64 num_fs_open_;
@@ -230,6 +233,7 @@ class cvmfs_context : SingleCopy {
   int fd_lockfile;
 
   bool download_ready_;
+  bool external_download_ready_;
   bool signature_ready_;
   bool catalog_ready_;
   bool pathcache_ready_;

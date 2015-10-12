@@ -175,6 +175,14 @@ DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
 }
 
 
+DirectoryEntry DirectoryEntryTestFactory::ExternalFile() {
+  DirectoryEntry dirent;
+  dirent.mode_ = 33188;
+  dirent.is_external_file_ = true;
+  return dirent;
+}
+
+
 DirectoryEntry DirectoryEntryTestFactory::Directory() {
   DirectoryEntry dirent;
   dirent.mode_ = 16893;

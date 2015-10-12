@@ -310,7 +310,8 @@ class DownloadManager {
   ~DownloadManager();
 
   void Init(const unsigned max_pool_handles, const bool use_system_proxy,
-      perf::Statistics * statistics, const std::string &name = "download");
+      perf::Statistics * statistics, const std::string &name = "download",
+      bool external=false);
   void Fini();
   void Spawn();
   Failures Fetch(JobInfo *info);
@@ -402,6 +403,12 @@ class DownloadManager {
   bool enable_info_header_;
   bool opt_ipv4_only_;
   bool follow_redirects_;
+
+  /**
+   * If data files are kept outside CVMFS (and stored by path instead of hash),
+   * then this is set to true
+   */
+  bool external_data_;
 
   // Host list
   std::vector<std::string> *opt_host_chain_;

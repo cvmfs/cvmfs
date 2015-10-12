@@ -55,6 +55,7 @@ class DirectoryEntryTestFactory {
   static catalog::DirectoryEntry Directory();
   static catalog::DirectoryEntry Symlink();
   static catalog::DirectoryEntry ChunkedFile();
+  static catalog::DirectoryEntry ExternalFile();
   static catalog::DirectoryEntry Make(const Metadata &metadata);
 };
 

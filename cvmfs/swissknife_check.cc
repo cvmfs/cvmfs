@@ -98,6 +98,12 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
              a.symlink().c_str(), b.symlink().c_str());
     retval = false;
   }
+  if (diffs & Difference::kExternalFileFlag) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "external file flag differs: %d / %d "
+             "(%s / %s)", a.IsExternalFile(), b.IsExternalFile(),
+             a.name().c_str(), b.name().c_str());
+    retval = false;
+  }
 
   return retval;
 }
@@ -205,7 +211,9 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
     }
 
     // Check if the chunk is there
-    if (!entries[i].checksum().IsNull() && check_chunks) {
+    if (check_chunks &&
+        !entries[i].checksum().IsNull() && !entries[i].IsExternalFile())
+    {
       string chunk_path = "data/" + entries[i].checksum().MakePath();
       if (entries[i].IsDirectory())
         chunk_path += shash::kSuffixMicroCatalog;
@@ -306,6 +314,22 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     if (entries[i].HasXattrs()) {
       computed_counters->self.xattrs++;
+    }
+
+    if (entries[i].IsExternalFile()) {
+      computed_counters->self.externals++;
+      computed_counters->self.external_file_size += entries[i].size();
+      if (!entries[i].IsRegular()) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "only regular files can be external: %s", full_path.c_str());
+        retval = false;
+      }
+      if (!catalog->GetExternalData()) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "File (%s) is marked as external but catalog does not "
+                 "support this.", full_path.c_str());
+        retval = false;
+      }
     }
 
     // checking file chunk integrity
