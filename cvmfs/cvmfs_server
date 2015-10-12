@@ -130,6 +130,10 @@ if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
         # attach gdb and provide a prompt WITHOUT actual running the program
         CVMFS_SERVER_SWISSKNIFE_DEBUG="gdb --quiet --args cvmfs_swissknife_debug"
       ;;
+      3)
+        # do not attach gdb just run debug version
+        CVMFS_SERVER_SWISSKNIFE_DEBUG="cvmfs_swissknife_debug"
+      ;;
     esac
   else
     echo -e "WARNING: compile with CVMFS_SERVER_DEBUG to allow for debug mode!\nFalling back to release mode...."
