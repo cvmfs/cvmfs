@@ -1641,8 +1641,7 @@ sign_manifest() {
     -n $name                            \
     -m $unsigned_manifest               \
     -t ${CVMFS_SPOOL_DIR}/tmp           \
-    -r $CVMFS_UPSTREAM_STORAGE" 
-    # >/dev/null
+    -r $CVMFS_UPSTREAM_STORAGE" >/dev/null
 }
 
 
@@ -2592,8 +2591,7 @@ mkfs() {
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
   fi
-  $user_shell "$create_cmd"      || die "fail! (cannot init repo)"
-  #$user_shell "$create_cmd" > /dev/null        || die "fail! (cannot init repo)"
+  $user_shell "$create_cmd" > /dev/null        || die "fail! (cannot init repo)"
   sign_manifest $name ${temp_dir}/new_manifest || die "fail! (cannot sign repo)"
   echo "done"
 
@@ -2608,12 +2606,10 @@ mkfs() {
   health_check $name
 
   echo -n "Initial commit... "
-  #transaction $name > /dev/null  || die "fail (transaction)"
-  transaction $name || die "fail (transaction)"
+  transaction $name > /dev/null  || die "fail (transaction)"
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   chown $cvmfs_user /cvmfs/${name}/new_repository
-  #publish $name > /dev/null      || die "fail (publish)"
-  publish $name      || die "fail (publish)"
+  publish $name > /dev/null      || die "fail (publish)"
   cat $rdonly_dir/new_repository || die "fail (finish)"
 
   print_new_repository_notice $name $cvmfs_user

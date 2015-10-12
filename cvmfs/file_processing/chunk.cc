@@ -116,7 +116,6 @@ Chunk::Chunk(const Chunk &other) :
   assert(!other.done_);
   assert(!other.HasUploadStreamHandle());
   assert(other.bytes_written_ == 0);
-  //assert(other.zlib_context_.avail_in == 0);
 
   current_deflate_buffer_ = other.current_deflate_buffer_->Clone();
 
@@ -125,9 +124,6 @@ Chunk::Chunk(const Chunk &other) :
          other.content_hash_context_.buffer,
          content_hash_context_.size);
 
-  //const int retval = deflateCopy(&zlib_context_,
-  //                               const_cast<z_streamp>(&other.zlib_context_));
-  //assert(retval == Z_OK);
   compressor_ = other.compressor_->Clone();
   zlib_initialized_ = true;
 }

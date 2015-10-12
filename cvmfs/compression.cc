@@ -810,7 +810,6 @@ Compressor* ZlibCompressor::Clone() {
   assert(retcode == Z_OK);
   retcode = deflateCopy(const_cast<z_streamp>(&other->stream_), &stream_);
   assert(retcode == Z_OK);
-  LogCvmfs(kLogCatalog, kLogStderr, "%s:%d Cloning ZlibCompressor", __FILE__, __LINE__);
   return other;
   
   
@@ -826,7 +825,6 @@ int ZlibCompressor::Deflate(upload::CharBuffer &outbuf, size_t &outbufsize,
   const int flush_int = (flush) ? Z_FINISH : Z_NO_FLUSH;
   upload::CharBuffer* big_buf = new upload::CharBuffer(0);
   int retcode = 0;
-  LogCvmfs(kLogCatalog, kLogStderr, "%s:%d Called Deflate with object = %p, inputsize = %d", __FILE__, __LINE__, this, inbufsize);
   
   do {
     
@@ -849,9 +847,6 @@ int ZlibCompressor::Deflate(upload::CharBuffer &outbuf, size_t &outbufsize,
     assert(retcode == Z_OK || retcode == Z_STREAM_END);
     
     big_buf->SetUsedBytes(big_buf->used_bytes() + (output_space - stream_.avail_out));
-    LogCvmfs(kLogCatalog, kLogStderr, "%s:%d Needed space = %d, Used space = %d, flush_int = %d", __FILE__, __LINE__, needed_space, big_buf->used_bytes(), flush_int);
-    
-    
     
   } while(!(flush_int == Z_NO_FLUSH && retcode == Z_OK && stream_.avail_in == 0) && !(flush_int == Z_FINISH  && retcode == Z_STREAM_END));
   
@@ -864,8 +859,6 @@ int ZlibCompressor::Deflate(upload::CharBuffer &outbuf, size_t &outbufsize,
   assert(stream_.avail_in == 0);
   
   outbufsize = outbuf.used();
-  
-  LogCvmfs(kLogCatalog, kLogStderr, "%s:%d Returning buffer of size %d, avail_out = %d, total_out = %d", __FILE__, __LINE__, outbufsize, stream_.avail_out, stream_.total_out);
   
   return retcode;
   

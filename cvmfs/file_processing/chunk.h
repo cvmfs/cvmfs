@@ -102,7 +102,6 @@ class Chunk {
 
   shash::ContextPtr& content_hash_context() { return content_hash_context_; }
   const shash::Any&  content_hash() const { return content_hash_; }
-  //z_stream&          zlib_context() { return zlib_context_; }
   zlib::Compressor*   get_compressor() { return compressor_; }
 
   UploadStreamHandle* upload_stream_handle() const {
@@ -147,7 +146,6 @@ class Chunk {
    */
   std::vector<CharBuffer*> deferred_buffers_;
 
-  //z_stream                 zlib_context_;
   bool                     zlib_initialized_;
   zlib::Algorithms         compression_alg_;
 

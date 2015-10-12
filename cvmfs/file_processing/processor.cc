@@ -75,7 +75,6 @@ tbb::task* ChunkProcessingTask::execute() {
 void ChunkProcessingTask::Crunch(const unsigned char  *data,
                                  const size_t          bytes,
                                  const bool            finalize) {
-  //z_stream          &stream = chunk_->zlib_context();
   shash::ContextPtr &ch_ctx = chunk_->content_hash_context();
   
   CharBuffer outbuf;
@@ -93,8 +92,6 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
     assert(compress_buffer->free_bytes() > 0);
     
     size_t bytes_to_copy = std::min(compress_buffer->free_bytes(), output_left);
-    
-    LogCvmfs(kLogCatalog, kLogStderr, "%s:%d Copying %d of %d bytes to output.", __FILE__, __LINE__, bytes_to_copy, output_left);
     
     // Copy the deflated data to the buffer 
     const CharBuffer::pointer_t output_start = compress_buffer->free_space_ptr();

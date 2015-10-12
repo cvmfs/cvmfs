@@ -475,14 +475,12 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   }
 
   if (result.IsChunked()) {
-    LogCvmfs(kLogCatalog, kLogStderr, "%s: %d Adding compression alg: %d", __FILE__, __LINE__, item.GetCompressionAlg());
     catalog_manager_->AddChunkedFile(
       item.CreateBasicCatalogDirent(),
       *xattrs,
       item.relative_parent_path(),
       result.file_chunks);
   } else {
-    LogCvmfs(kLogCatalog, kLogStderr, "%s: %d Adding compression alg: %d", __FILE__, __LINE__, item.GetCompressionAlg());
     catalog_manager_->AddFile(
       item.CreateBasicCatalogDirent(),
       *xattrs,

@@ -115,7 +115,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "Compression algorithm is %d", compression_algorithm);
+  
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
 
@@ -531,7 +531,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
-  LogCvmfs(kLogCatalog, kLogVerboseMsg, "Compression algorithm is %d", compression_algorithm);
+  
   if (args.find('j') != args.end()) {
     params.catalog_entry_warn_threshold =
       String2Uint64(*args.find('j')->second);
