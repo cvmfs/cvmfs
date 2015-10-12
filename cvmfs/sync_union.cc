@@ -440,7 +440,8 @@ bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
 
 
 bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
-  return (IsOpaqueDirPath(directory.GetScratchPath()));
+  const std::string path = directory.GetScratchPath();
+  return DirectoryExists(path) && IsOpaqueDirPath(path);
 }
 
 
