@@ -224,10 +224,16 @@ bool SyncUnionOverlayfs::Initialize() {
 bool ObtainSysAdminCapabilityInternal(cap_t caps) {
   const cap_value_t cap = CAP_SYS_ADMIN;
 
+  // do sanity-check if supported in <sys/capability.h> otherwise just pray...
+  // Note: CAP_SYS_ADMIN is a rather common capability and is very likely to be
+  //       supported by all our target systems. If it is not, one of the next
+  //       commands will fail with a less descriptive error message.
+  #ifdef CAP_IS_SUPPORTED
   if (!CAP_IS_SUPPORTED(cap)) {
     LogCvmfs(kLogUnionFs, kLogStderr, "System doesn't support CAP_SYS_ADMIN");
     return false;
   }
+  #endif
 
   if (caps == NULL) {
     LogCvmfs(kLogUnionFs, kLogStderr, "Failed to obtain capability state "
