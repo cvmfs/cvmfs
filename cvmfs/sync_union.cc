@@ -301,7 +301,9 @@ void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem *entry) const {
 
 
 void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
-  if (!entry.IsNew() && entry.GetRdOnlyLinkcount() > 1) {
+  if (!entry.IsNew()        &&
+      !entry.WasDirectory() &&
+       entry.GetRdOnlyLinkcount() > 1) {
     LogCvmfs(kLogPublish, kLogStderr, "OverlayFS has copied-up a file (%s) "
                                       "with existing hardlinks in lowerdir "
                                       "(linkcount %d). OverlayFS cannot handle "
