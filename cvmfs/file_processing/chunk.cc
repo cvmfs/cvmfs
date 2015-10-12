@@ -86,6 +86,7 @@ void Chunk::Finalize() {
   }
   
   delete compressor_;
+  compressor_ = 0;
   done_ = true;
 }
 

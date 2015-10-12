@@ -44,6 +44,14 @@ class Chunk {
   {
     Initialize();
   }
+  ~Chunk() { 
+    if (!IsFullyProcessed()) 
+      Finalize(); 
+      
+    if (compressor_)
+      delete compressor_;
+    
+  };
 
   bool IsInitialized()         const { return zlib_initialized_ &&
                                               content_hash_initialized_;     }

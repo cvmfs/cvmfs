@@ -805,7 +805,10 @@ ZlibCompressor::ZlibCompressor() {
 Compressor* ZlibCompressor::Clone() {
   ZlibCompressor* other = new ZlibCompressor();
   assert(stream_.avail_in == 0);
-  int retcode = deflateCopy(&stream_, const_cast<z_streamp>(&other->stream_));
+  // Delete the other stream
+  int retcode = deflateEnd(&other->stream_);
+  assert(retcode == Z_OK);
+  retcode = deflateCopy(const_cast<z_streamp>(&other->stream_), &stream_);
   assert(retcode == Z_OK);
   LogCvmfs(kLogCatalog, kLogStderr, "%s:%d Cloning ZlibCompressor", __FILE__, __LINE__);
   return other;
