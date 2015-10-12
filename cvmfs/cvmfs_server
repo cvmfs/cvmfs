@@ -1763,8 +1763,8 @@ _setcap_if_needed() {
 }
 
 # grants CAP_SYS_ADMIN to cvmfs_swissknife if it is necessary
-# Note: OverlayFS >= v22 uses trusted extended attributes that are not readable
-#       by a normal unprivileged process
+# Note: OverlayFS uses trusted extended attributes that are not readable by a
+#       normal unprivileged process
 ensure_swissknife_suid() {
   local unionfs="$1"
   local sk_bin="/usr/bin/$CVMFS_SERVER_SWISSKNIFE"
@@ -1773,8 +1773,7 @@ ensure_swissknife_suid() {
 
   # check if we need CAP_SYS_ADMIN for cvmfs_swissknife...
   is_root || die "need to be root for granting CAP_SYS_ADMIN to $sk_bin"
-  [ x"$unionfs" = x"overlayfs" ]                  || return 0
-  [ x"$(get_overlayfs_type)" = x"$OFS_POST_V22" ] || return 0
+  [ x"$unionfs" = x"overlayfs" ] || return 0
 
   # ... yes, obviously we need CAP_SYS_ADMIN for cvmfs_swissknife
   _setcap_if_needed "$sk_bin"     "$cap" || return 1
@@ -3960,10 +3959,6 @@ publish() {
       $log_level $tweaks_option $verbosity"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
-    fi
-    if [ "x$CVMFS_UNION_FS_TYPE" = "xoverlayfs"    ] && \
-       [ "$(get_overlayfs_type)" = "$OFS_POST_V22" ]; then
-      sync_command="$sync_command -A" # acquire CAP_SYS_ADMIN
     fi
     if [ "x$CVMFS_USE_FILE_CHUNKING" = "xtrue" ]; then
       sync_command="$sync_command -p \

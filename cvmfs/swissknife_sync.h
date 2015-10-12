@@ -15,7 +15,6 @@ struct SyncParameters {
   SyncParameters() :
     spooler(NULL),
     union_fs_type("aufs"),
-    needs_cap_sys_admin(false),
     print_changeset(false),
     dry_run(false),
     mucatalogs(false),
@@ -41,7 +40,6 @@ struct SyncParameters {
   std::string      manifest_path;
   std::string      spooler_definition;
   std::string      union_fs_type;
-  bool             needs_cap_sys_admin;
   bool             print_changeset;
   bool             dry_run;
   bool             mucatalogs;

@@ -213,8 +213,7 @@ class SyncUnionOverlayfs : public SyncUnion {
   SyncUnionOverlayfs(SyncMediator *mediator,
                      const std::string &rdonly_path,
                      const std::string &union_path,
-                     const std::string &scratch_path,
-                     const bool needs_cap_sys_admin);
+                     const std::string &scratch_path);
 
   bool Initialize();
 
@@ -249,7 +248,6 @@ class SyncUnionOverlayfs : public SyncUnion {
   std::set<std::string> hardlink_lower_files_;
   uint64_t hardlink_lower_inode_;
 
-  const bool needs_cap_sys_admin_;
 };  // class SyncUnionOverlayfs
 
 }  // namespace publish

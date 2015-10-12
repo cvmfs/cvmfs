@@ -480,7 +480,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   params.manifest_path = *args.find('o')->second;
   params.spooler_definition = *args.find('r')->second;
 
-  params.needs_cap_sys_admin = (args.count('A') > 0);
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
   if (args.find('x') != args.end()) params.print_changeset = true;
@@ -565,8 +564,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     sync = new publish::SyncUnionOverlayfs(&mediator,
                                            params.dir_rdonly,
                                            params.dir_union,
-                                           params.dir_scratch,
-                                           params.needs_cap_sys_admin);
+                                           params.dir_scratch);
   } else if (params.union_fs_type == "aufs") {
     sync = new publish::SyncUnionAufs(&mediator,
                                       params.dir_rdonly,
