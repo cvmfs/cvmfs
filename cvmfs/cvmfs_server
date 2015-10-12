@@ -1875,7 +1875,7 @@ check_tag_existence() {
     -t ${CVMFS_SPOOL_DIR}/tmp                 \
     -p /etc/cvmfs/keys/${repository_name}.pub \
     -f $repository_name                       \
-    -n "$tag" 2>&1 | grep -qv "does not exist" > /dev/null
+    -n "$tag" > /dev/null 2>&1
 }
 
 
