@@ -11,6 +11,7 @@ RUN         dnf -y update && dnf -y install                     \
                                         git                     \
                                         hardlink                \
                                         libattr-devel           \
+                                        libcap-devel            \
                                         libuuid-devel           \
                                         make                    \
                                         nfs-utils               \
