@@ -86,7 +86,7 @@ container_dir="${SCRIPT_LOCATION}/docker/${CVMFS_DOCKER_IMAGE}"
 if ! sudo docker images $image_name | grep -q "$image_name"; then
   bootstrap_image "$image_name" "$container_dir"
 elif [ $(image_creation $image_name) -lt $(image_recipe $container_dir) ]; then
-  echo -n "removing outdated docker image '$image_name'..."
+  echo -n "removing outdated docker image '$image_name'... "
   sudo docker rmi "$image_name" > /dev/null || die "fail"
   echo "done"
   bootstrap_image "$image_name" "$container_dir"
