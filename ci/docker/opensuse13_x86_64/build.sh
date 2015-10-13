@@ -25,6 +25,7 @@ mkdir -p $DESTINATION
 echo "running essential build script in a SuSE container..."
 docker run --volume ${DESTINATION}:/chroot    \
            --volume ${SCRIPT_LOCATION}:/build \
+           --rm=true                          \
            opensuse:latest /build/build_internal.sh
 
 echo "package up the base image..."
