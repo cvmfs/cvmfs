@@ -64,6 +64,25 @@ die() {
   exit 1
 }
 
+runs_under_parrot() {
+  [ "x$PARROT_ENABLED" = "xTRUE" ]
+}
+
+is_root() {
+  [ $(id -u) -eq 0 ]
+}
+
+as_root() {
+  if is_root; then
+    $@
+  elif ! runs_under_parrot; then
+    sudo $@
+  else
+    echo "##################################################"
+    echo "# Warning: cannot run sudo in parrot environment #"
+    echo "##################################################"
+  fi
+}
 
 # Find the service binary (or detect systemd)
 minpidof() {
@@ -1806,4 +1825,19 @@ remove_local_mount() {
 
   sudo umount $mountpoint
   rm -fR $cache $mountpoint
+}
+
+drop_file_system_caches() {
+  as_root sh -c "echo 3 > /proc/sys/vm/drop_caches"
+}
+
+print_internal_affairs() {
+  local repo_name="$1"
+
+  if runs_under_parrot; then
+    echo "cvmfs_talk is not available with parrot environment"
+    return 0
+  fi
+
+  as_root cvmfs_talk -i $repo_name internal affairs
 }
