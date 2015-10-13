@@ -242,7 +242,6 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   // Check if the catalog matches the pathfilter
   if (path != ""              &&  // necessary to load the root catalog
       pathfilter              &&
-      pathfilter->IsValid()   &&
      !pathfilter->IsMatching(path)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog in '%s' does not match"
              " the path specification", path.c_str());
@@ -415,6 +414,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     retries = String2Uint64(*args.find('a')->second);
   if (args.find('d') != args.end()) {
     pathfilter = catalog::RelaxedPathFilter::Create(*args.find('d')->second);
+    assert(pathfilter->IsValid());
   }
   if (args.find('p') != args.end())
     pull_history = true;
@@ -500,7 +500,10 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     spooler->RegisterListener(&SpoolerOnUpload);
   }
 
-  // Fetch tag list
+  // Fetch tag list.
+  // If we are just preloading the cache it is not strictly necessarily to
+  // download the entire tag list
+  // TODO(molina): add user option to download tags when preloading the cache
   if (!ensemble.manifest->history().IsNull() && !preload_cache) {
     shash::Any history_hash = ensemble.manifest->history();
     const string history_url = *stratum0_url + "/data/"
