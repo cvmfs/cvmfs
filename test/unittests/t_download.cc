@@ -82,7 +82,6 @@ class TestSink : public cvmfs::Sink {
 //------------------------------------------------------------------------------
 
 
-// A placeholder test for future unit testing of the download module
 TEST_F(T_Download, File) {
   string dest_path;
   FILE *fdest = CreateTemporaryFile(&dest_path);
@@ -94,6 +93,28 @@ TEST_F(T_Download, File) {
   download_mgr.Fetch(&info);
   EXPECT_EQ(info.error_code, kFailOk);
   fclose(fdest);
+}
+
+
+TEST_F(T_Download, Multiple) {
+  string dest_path;
+  FILE *fdest = CreateTemporaryFile(&dest_path);
+  ASSERT_TRUE(fdest != NULL);
+  UnlinkGuard unlink_guard(dest_path);
+
+  DownloadManager second_mgr;
+  second_mgr.Init(8, false, /* use_system_proxy */ &statistics, "second");
+
+  JobInfo info(&foo_url, false /* compressed */, false /* probe hosts */,
+               fdest,  NULL);
+  JobInfo info2(&foo_url, false /* compressed */, false /* probe hosts */,
+                fdest,  NULL);
+  download_mgr.Fetch(&info);
+  second_mgr.Fetch(&info2);
+  EXPECT_EQ(info.error_code, kFailOk);
+  EXPECT_EQ(info2.error_code, kFailOk);
+  fclose(fdest);
+  second_mgr.Fini();
 }
 
 

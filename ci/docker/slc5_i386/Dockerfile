@@ -1,9 +1,8 @@
-FROM        centos:5
+FROM        scratch
 MAINTAINER  Rene Meusel <rene.meusel@cern.ch>
 
-RUN         yum -y update && yum -y install epel-release
+ADD         slc5_i386.tar.gz /
 RUN         yum -y update && yum -y install                     \
-                                        autofs                  \
                                         buildsys-macros         \
                                         cmake                   \
                                         curl-devel              \
@@ -11,26 +10,20 @@ RUN         yum -y update && yum -y install                     \
                                         fuse-devel              \
                                         gcc                     \
                                         gcc-c++                 \
-                                        gdb                     \
                                         git                     \
-                                        glibc.i686              \
                                         hardlink                \
-                                        httpd                   \
                                         libattr-devel           \
+                                        libcap-devel            \
                                         make                    \
-                                        mock                    \
-                                        nfs-utils               \
                                         openssl-devel           \
-                                        perl-IO-Interface       \
                                         python-devel            \
                                         rpm-build               \
-                                        screen                  \
                                         SysVinit                \
-                                        tree                    \
                                         selinux-policy-devel    \
                                         selinux-policy-targeted \
+                                        which                   \
                                         zlib-devel
 
-RUN         useradd sftnight && usermod -a -G mock sftnight
+RUN         useradd sftnight
 USER        sftnight
 WORKDIR     /home/sftnight

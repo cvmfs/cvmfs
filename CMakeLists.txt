@@ -373,6 +373,12 @@ else (SQLITE3_BUILTIN)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
 endif (SQLITE3_BUILTIN)
 
+find_package (Valgrind)
+if (VALGRIND_FOUND)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VALGRIND_INCLUDE_DIR})
+  add_definitions(-DHAS_VALGRIND_HEADERS)
+endif (VALGRIND_FOUND)
+
 if (ZLIB_BUILTIN)
   include (${ZLIB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   set (ZLIB_LIBRARIES "")
@@ -464,6 +470,7 @@ endif (BUILD_SERVER OR BUILD_UNITTESTS)
 
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   find_package(PythonLibs REQUIRED)
+  find_package(LibCAP REQUIRED)
   find_program(UNZIP_EXE NAMES unzip)
   if (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
     message(FATAL_ERROR "unzip utility missing. Please install unzip...")
@@ -482,12 +489,11 @@ if (INSTALL_MOUNT_SCRIPTS)
 endif (INSTALL_MOUNT_SCRIPTS)
 
 #
-# compile the unit tests
+# compile the unit tests, if necessary
 #
-if (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
-  enable_testing ()
-  add_subdirectory (test/unittests)
-endif (BUILD_UNITTESTS OR BUILD_UNITTESTS_DEBUG)
+enable_testing ()
+add_custom_target (check ${CMAKE_CTEST_COMMAND} -VV)
+add_subdirectory (test/unittests)
 
 #
 # Documentation

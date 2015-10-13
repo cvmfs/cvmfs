@@ -1,4 +1,10 @@
 2.2.0:
+  * Fix auto tag creation for fast successive publish runs (CVM-795)
+  * Fix systemd detection in cvmfs_server on systems with multiple running
+    systemd processes like Fedora 22
+  * Fix rpm for Fedora > 21, drop explicit support for fedora < 21
+  * Detect valgrind if valgrind header is present on the system
+  * Add make check target
   * Fix leak of temporary files in .cvmfsdirtab handling (CVM-818)
   * Allow geodb update for non-root users (CVM-895)
   * Don't commit exisiting files to local storage backend in server (CVM-894)
