@@ -158,6 +158,7 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   dirent.size_           = this->GetUnionStat().st_size;
   dirent.mtime_          = this->GetUnionStat().st_mtime;
   dirent.checksum_       = this->GetContentHash();
+  dirent.compression_alg_= this->GetCompressionAlg();
 
   dirent.name_.Assign(filename_.data(), filename_.length());
 

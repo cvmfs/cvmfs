@@ -126,6 +126,14 @@ namespace zlib {
 const unsigned kZChunk = 16384;
 const unsigned kBufferSize = 32768;
 
+Algorithms ParseCompressAlgorithm(const std::string &algorithm_option) {
+  if (algorithm_option == "default")
+    return kZlibDefault;
+  if (algorithm_option == "none")
+    return kNoCompression;
+  return kAny;
+}
+
 void CompressInit(z_stream *strm) {
   strm->zalloc = Z_NULL;
   strm->zfree = Z_NULL;
@@ -778,5 +786,121 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
 
   return true;
 }
+
+Compressor* Compressor::Clone() {
+  return new Compressor();
+}
+
+ZlibCompressor::ZlibCompressor() {
+  stream_.zalloc   = Z_NULL;
+  stream_.zfree    = Z_NULL;
+  stream_.opaque   = Z_NULL;
+  stream_.next_in  = Z_NULL;
+  stream_.avail_in = 0;
+  const int zlib_retval = deflateInit(&stream_, Z_DEFAULT_COMPRESSION);
+  assert(zlib_retval == 0);
+}
+
+
+Compressor* ZlibCompressor::Clone() {
+  ZlibCompressor* other = new ZlibCompressor();
+  assert(stream_.avail_in == 0);
+  // Delete the other stream
+  int retcode = deflateEnd(&other->stream_);
+  assert(retcode == Z_OK);
+  retcode = deflateCopy(const_cast<z_streamp>(&other->stream_), &stream_);
+  assert(retcode == Z_OK);
+  return other;
+  
+  
+}
+
+int ZlibCompressor::Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
+            const unsigned char* inbuf, const size_t inbufsize, 
+            const bool flush) 
+{
+  // Adding compression
+  stream_.avail_in = inbufsize;
+  stream_.next_in = const_cast<unsigned char*>(inbuf);
+  const int flush_int = (flush) ? Z_FINISH : Z_NO_FLUSH;
+  upload::CharBuffer* big_buf = new upload::CharBuffer(0);
+  int retcode = 0;
+  
+  do {
+    
+    // Create a new buffer, big enough to hold the old big_buf, and whhatever
+    // else needs to be deflated
+    size_t needed_space = DeflateBound(stream_.avail_in);
+    upload::CharBuffer* tmp_buf = new upload::CharBuffer(big_buf->used_bytes() + needed_space);
+    memcpy(tmp_buf->free_space_ptr(), big_buf->ptr(), big_buf->used_bytes());
+    tmp_buf->SetUsedBytes(big_buf->used_bytes());
+    delete big_buf;
+    big_buf = tmp_buf;
+    
+    // Set the output buffer
+    size_t output_space = big_buf->free_bytes();
+    stream_.avail_out = output_space;
+    stream_.next_out = big_buf->free_space_ptr();
+    
+    // Deflate and make sure stream is fully deflated
+    retcode = deflate(&stream_, flush_int);
+    assert(retcode == Z_OK || retcode == Z_STREAM_END);
+    
+    big_buf->SetUsedBytes(big_buf->used_bytes() + (output_space - stream_.avail_out));
+    
+  } while(!(flush_int == Z_NO_FLUSH && retcode == Z_OK && stream_.avail_in == 0) && !(flush_int == Z_FINISH  && retcode == Z_STREAM_END));
+  
+  //outbuf = *big_buf;
+  outbuf.Allocate(big_buf->used());
+  memcpy(outbuf.free_space_ptr(), big_buf->ptr(), big_buf->used());
+  outbuf.SetUsedBytes(big_buf->used());
+  delete big_buf;
+  
+  assert(stream_.avail_in == 0);
+  
+  outbufsize = outbuf.used();
+  
+  return retcode;
+  
+  
+}
+
+ZlibCompressor::~ZlibCompressor() {
+  
+  int retcode = deflateEnd(&stream_);
+  assert(retcode == Z_OK);
+  
+}
+
+size_t ZlibCompressor::DeflateBound(const size_t bytes) {
+  // Call zlib's deflate bound
+  return deflateBound(&stream_, bytes);
+  
+}
+    
+
+EchoCompressor::EchoCompressor() {
+      
+}
+
+Compressor* EchoCompressor::Clone() {
+  return new EchoCompressor();
+}
+
+int EchoCompressor::Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
+            const unsigned char* inbuf, const size_t inbufsize, 
+            const bool flush) 
+{
+  
+  outbufsize = inbufsize;
+  outbuf.Allocate(inbufsize);
+  memcpy(outbuf.free_space_ptr(), inbuf, inbufsize);
+  return 0;
+}
+
+
+
+
+
 
 }  // namespace zlib
