@@ -37,6 +37,11 @@ image_creation() {
   date +%s --date "$(sudo docker inspect --format='{{.Created}}' $image_name)"
 }
 
+_time_from_git() {
+  local relative_path="$1"
+  date +%s --date "$(git log -1 --format=%ai -- $relative_path)"
+}
+
 # retrieves the last-changed timestamp for a specific docker image recipe
 # @param recipe_dir  the directory of the docker image recipe to check
 # @return            last modified timestamp in Unix epoch
