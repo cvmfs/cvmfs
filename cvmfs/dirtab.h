@@ -147,7 +147,10 @@ class Dirtab {
   Rules negative_rules_;
 };
 
-
+/**
+ * A RelaxedPathFilter includes in the Dirtab not only the actual path it
+ * represents, but all its parent pathes
+ */
 class RelaxedPathFilter : public Dirtab {
  public:
   static RelaxedPathFilter* Create(const std::string &dirtab_path) {

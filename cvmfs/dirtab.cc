@@ -176,7 +176,6 @@ bool RelaxedPathFilter::ParsePathspec(const std::string &pathspec_str,
   bool success = true;
   std::string current_pathspec_str = pathspec_str;
   while (current_pathspec_str.length() > 0) {
-    printf("CHECKING THE FOLLOWING PATH: '%s'\n", current_pathspec_str.c_str());
     if (!Dirtab::ParsePathspec(current_pathspec_str, false))
       success = false;
     int new_length = current_pathspec_str.find_last_of("/");
