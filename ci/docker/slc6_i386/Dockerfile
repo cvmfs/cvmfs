@@ -11,6 +11,7 @@ RUN         yum -y update && yum -y install                     \
                                         git                     \
                                         hardlink                \
                                         libattr-devel           \
+                                        libcap-devel            \
                                         libuuid-devel           \
                                         make                    \
                                         openssl-devel           \

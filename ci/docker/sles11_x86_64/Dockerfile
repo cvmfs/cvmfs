@@ -11,6 +11,7 @@ RUN        zypper -n update && zypper -n install   \
                                   gcc-c++          \
                                   git              \
                                   libattr-devel    \
+                                  libcap-devel     \
                                   libcurl-devel    \
                                   libopenssl-devel \
                                   libuuid-devel    \

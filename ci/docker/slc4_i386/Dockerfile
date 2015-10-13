@@ -38,6 +38,7 @@ RUN        yum -y update && yum -y install                      \
                                         gzip                    \
                                         initscripts             \
                                         libattr-devel           \
+                                        libcap-devel            \
                                         make                    \
                                         openssl                 \
                                         openssl-devel           \

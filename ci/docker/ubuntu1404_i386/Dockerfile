@@ -10,6 +10,7 @@ RUN         apt-get -y update && apt-get -y install         \
                                               devscripts    \
                                               git           \
                                               libattr1-dev  \
+                                              libcap-dev    \
                                               libfuse-dev   \
                                               libssl-dev    \
                                               pkg-config    \
