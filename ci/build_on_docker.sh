@@ -42,8 +42,11 @@ image_creation() {
 # @return            last modified timestamp in Unix epoch
 image_recipe() {
   local recipe_dir="$1"
-  local dockerfile_epoch="$(stat --format="%Y" ${recipe_dir}/Dockerfile)"
-  local buildfile_epoch="$(stat --format="%Y" ${recipe_dir}/build.sh)"
+  local owd="$(pwd)"
+  cd ${recipe_dir}
+  local dockerfile_epoch="$(git log -1 --format=%at -- Dockerfile)"
+  local buildfile_epoch="$(git log -1 --format=%at -- build.sh)"
+  cd $owd
   [ $dockerfile_epoch -gt $buildfile_epoch ] && echo $dockerfile_epoch \
                                              || echo $buildfile_epoch
 }
