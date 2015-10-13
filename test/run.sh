@@ -125,7 +125,7 @@ setup_environment() {
   fi
 
   # if we are not inside a docker
-  if [ x"$CVMFS_TEST_DOCKER" = xno ]; then
+  if [ x"$CVMFS_TEST_DOCKER" = xno ] && ! runs_under_parrot; then
     # configure autofs to the test's needs
     service_switch autofs restart || true
     local timeout=10 # wait until autofs restarts (possible race >.<)
