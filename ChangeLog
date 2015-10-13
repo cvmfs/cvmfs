@@ -1,4 +1,7 @@
 2.2.0:
+  * Add auto-balancer for catalogs (experimental) with server parameters
+    CVMFS_AUTOCATALOGS, CVMFS_AUTOCATALOGS_MAX_WEIGHT, 
+    CVMFS_AUTOCATALOGS_MIN_WEIGHT
   * Fix auto tag creation for fast successive publish runs (CVM-795)
   * Fix systemd detection in cvmfs_server on systems with multiple running
     systemd processes like Fedora 22
