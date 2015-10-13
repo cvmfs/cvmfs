@@ -48,20 +48,21 @@ enum Algorithms {
   * Abstract Compression class which is inhereited by implementations of 
   * compression engines such as zlib...
   */
-class Compressor {
+class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   public:
-    Compressor() {};
+    Compressor(const Algorithms &alg) {};
     virtual ~Compressor() {};
     virtual int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
             const unsigned char* inbuf, const size_t inbufsize, 
-            const bool flush) { return 0; };
+            const bool flush) =0;
     virtual size_t DeflateBound(const size_t bytes) { return bytes; };
-    virtual Compressor* Clone();
+    virtual Compressor* Clone() =0;
+    static void RegisterPlugins();
 };
 
 class ZlibCompressor: public Compressor {
   public:
-    ZlibCompressor();
+    ZlibCompressor(const Algorithms &alg);
     ZlibCompressor(const ZlibCompressor &other);
     ~ZlibCompressor();
     int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
@@ -69,6 +70,7 @@ class ZlibCompressor: public Compressor {
             const bool flush);
     size_t DeflateBound(const size_t bytes);
     Compressor* Clone();
+    static bool WillHandle(const zlib::Algorithms &alg);
     
   protected:
     z_stream stream_;
@@ -77,15 +79,16 @@ class ZlibCompressor: public Compressor {
 
 class EchoCompressor: public Compressor {
   public:
-    EchoCompressor();
+    EchoCompressor(const Algorithms &alg);
     int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
             const unsigned char* inbuf, const size_t inbufsize, 
             const bool flush);
     size_t DeflateBound(const size_t bytes) { return bytes; };
     Compressor* Clone();
+    static bool WillHandle(const zlib::Algorithms &alg);
 };
 
-Algorithms ParseCompressAlgorithm(const std::string &algorithm_option);
+Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option);
 
 void CompressInit(z_stream *strm);
 void DecompressInit(z_stream *strm);

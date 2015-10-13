@@ -115,7 +115,6 @@ struct Counters {
  */
 struct JobInfo {
   const std::string *url;
-  //bool compressed;
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
@@ -135,7 +134,6 @@ struct JobInfo {
   // Default initialization of fields
   void Init() {
     url = NULL;
-    //compressed = false;
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
@@ -167,11 +165,7 @@ struct JobInfo {
   {
     Init();
     url = u;
-    //compressed = c;
-    if (c)
-      compression_alg = zlib::kZlibDefault;
-    else
-      compression_alg = zlib::kNoCompression;
+    compression_alg = c ? zlib::kZlibDefault : zlib::kNoCompression;
     probe_hosts = ph;
     destination = kDestinationPath;
     destination_path = p;
@@ -182,11 +176,7 @@ struct JobInfo {
   {
     Init();
     url = u;
-    //compressed = c;
-    if (c)
-      compression_alg = zlib::kZlibDefault;
-    else
-      compression_alg = zlib::kNoCompression;
+    compression_alg = c ? zlib::kZlibDefault : zlib::kNoCompression;
     probe_hosts = ph;
     destination = kDestinationFile;
     destination_file = f;
@@ -197,11 +187,7 @@ struct JobInfo {
   {
     Init();
     url = u;
-    //compressed = c;
-    if (c)
-      compression_alg = zlib::kZlibDefault;
-    else
-      compression_alg = zlib::kNoCompression;
+    compression_alg = c ? zlib::kZlibDefault : zlib::kNoCompression;
     probe_hosts = ph;
     destination = kDestinationMem;
     expected_hash = h;
@@ -211,11 +197,7 @@ struct JobInfo {
   {
     Init();
     url = u;
-    //compressed = c;
-    if (c)
-      compression_alg = zlib::kZlibDefault;
-    else
-      compression_alg = zlib::kNoCompression;
+    compression_alg = c ? zlib::kZlibDefault : zlib::kNoCompression;
     probe_hosts = ph;
     destination = kDestinationSink;
     destination_sink = s;

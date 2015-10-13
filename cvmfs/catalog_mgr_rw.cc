@@ -106,7 +106,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   root_entry.gid_               = getgid();
   root_entry.checksum_          = shash::Any(hash_algorithm);
   root_entry.linkcount_         = 2;
-  root_entry.compression_alg_   = zlib::kZlibDefault;
+  root_entry.compression_algorithm_   = zlib::kZlibDefault;
   string root_path = "";
 
   // Create the database schema and the inital root entry

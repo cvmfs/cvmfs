@@ -81,7 +81,7 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
   size_t outsize;
   
   // Do the actual deflate
-  chunk_->get_compressor()->Deflate(outbuf, outsize, data, bytes, finalize);
+  chunk_->compressor()->Deflate(outbuf, outsize, data, bytes, finalize);
   
   size_t output_left = outsize;
 

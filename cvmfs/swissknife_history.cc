@@ -40,7 +40,7 @@ void CommandTag::InsertCommonParameters(ParameterList *r) {
   r->push_back(Parameter::Optional(
     'e', "hash algorithm to use (default SHA1)"));
   r->push_back(Parameter::Switch('L', "follow HTTP redirects"));
-  r->push_back(Parameter::Switch('Z', "Compression Algorithm"));
+  r->push_back(Parameter::Optional('Z', "Compression Algorithm"));
 }
 
 
@@ -83,7 +83,7 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
   const zlib::Algorithms compression_alg =
     (args.find('Z') == args.end())
     ? zlib::kZlibDefault
-    : zlib::ParseCompressAlgorithm(*args.find('Z')->second);
+    : zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
 
   // Sanity checks
   if (hash_algo == shash::kAny) {

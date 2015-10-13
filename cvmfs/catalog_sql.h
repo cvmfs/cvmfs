@@ -189,7 +189,7 @@ class SqlDirent : public Sql {
   static const int kFlagPosHash             = 8;
   // Compression methods, 3 bits starting at 2^11
   // compression methods.  Corresponds to zlib::Algorithms 
-  static const int kFlagPosCompress         = 11;
+  static const int kFlagPosCompression         = 11;
 
  protected:
   /**
@@ -201,7 +201,7 @@ class SqlDirent : public Sql {
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
   void StoreHashAlgorithm(const shash::Algorithms algo, unsigned *flags) const;
   shash::Algorithms RetrieveHashAlgorithm(const unsigned flags) const;
-  zlib::Algorithms RetrieveCompressAlgorithm(const unsigned flags) const;
+  zlib::Algorithms RetrieveCompressionAlgorithm(const unsigned flags) const;
 
   /**
    * The hardlink information (hardlink group ID and linkcount) is saved in one

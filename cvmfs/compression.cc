@@ -126,7 +126,7 @@ namespace zlib {
 const unsigned kZChunk = 16384;
 const unsigned kBufferSize = 32768;
 
-Algorithms ParseCompressAlgorithm(const std::string &algorithm_option) {
+Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
   if (algorithm_option == "default")
     return kZlibDefault;
   if (algorithm_option == "none")
@@ -787,11 +787,24 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
   return true;
 }
 
-Compressor* Compressor::Clone() {
-  return new Compressor();
+// Abstract functions for Compressor
+void Compressor::RegisterPlugins() {
+  RegisterPlugin<ZlibCompressor>();
+  RegisterPlugin<EchoCompressor>();
 }
 
-ZlibCompressor::ZlibCompressor() {
+
+/**
+  * ZlibCompressor functions
+  */
+
+bool ZlibCompressor::WillHandle(const zlib::Algorithms &alg) {
+  return alg == kZlibDefault;
+}
+
+ZlibCompressor::ZlibCompressor(const Algorithms &alg):
+  Compressor(alg)
+  {
   stream_.zalloc   = Z_NULL;
   stream_.zfree    = Z_NULL;
   stream_.opaque   = Z_NULL;
@@ -803,7 +816,7 @@ ZlibCompressor::ZlibCompressor() {
 
 
 Compressor* ZlibCompressor::Clone() {
-  ZlibCompressor* other = new ZlibCompressor();
+  ZlibCompressor* other = new ZlibCompressor(zlib::kZlibDefault);
   assert(stream_.avail_in == 0);
   // Delete the other stream
   int retcode = deflateEnd(&other->stream_);
@@ -879,12 +892,18 @@ size_t ZlibCompressor::DeflateBound(const size_t bytes) {
 }
     
 
-EchoCompressor::EchoCompressor() {
+EchoCompressor::EchoCompressor(const zlib::Algorithms &alg):
+  Compressor(alg)
+{
       
 }
 
+bool EchoCompressor::WillHandle(const zlib::Algorithms &alg) {
+  return alg == kNoCompression;
+}
+
 Compressor* EchoCompressor::Clone() {
-  return new EchoCompressor();
+  return new EchoCompressor(zlib::kNoCompression);
 }
 
 int EchoCompressor::Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 

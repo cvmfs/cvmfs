@@ -109,7 +109,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
   zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
   if (args.find('Z') != args.end()) {
-    compression_algorithm = zlib::ParseCompressAlgorithm(*args.find('Z')->second);
+    compression_algorithm = zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
     if (compression_algorithm == zlib::kAny) {
       PrintError("unknown compression algorithm");
       return 1;
@@ -525,7 +525,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
   zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
   if (args.find('Z') != args.end()) {
-    compression_algorithm = zlib::ParseCompressAlgorithm(*args.find('Z')->second);
+    compression_algorithm = zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
     if (compression_algorithm == zlib::kAny) {
       PrintError("unknown compression algorithm");
       return 1;

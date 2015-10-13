@@ -58,11 +58,10 @@ void Chunk::Initialize() {
   content_hash_context_.buffer = smalloc(content_hash_context_.size);
   shash::Init(content_hash_context_);
   
-  if (compression_alg_ == zlib::kZlibDefault) {
-    compressor_ = new zlib::ZlibCompressor();
-  } else if (compression_alg_ == zlib::kNoCompression) {
-    compressor_ = new zlib::EchoCompressor();
-  }
+  // Uses PolymorphicConstruction class from util.h, which
+  // has a Construct function to create the appropriate object
+  // from a parameter, a zlib::Algorithms in this case
+  compressor_ = zlib::Compressor::Construct(compression_algorithm_);
 
   zlib_initialized_         = true;
   content_hash_initialized_ = true;
@@ -84,9 +83,7 @@ void Chunk::Finalize() {
   if (deferred_write_) {
     FlushDeferredWrites();
   }
-  
-  delete compressor_;
-  compressor_ = 0;
+
   done_ = true;
 }
 

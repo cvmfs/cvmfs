@@ -16,6 +16,7 @@
 #include "../hash.h"
 #include "char_buffer.h"
 #include "../compression.h"
+#include "../util.h"
 
 namespace upload {
 
@@ -37,21 +38,13 @@ class Chunk {
   Chunk(File* file, const off_t offset, shash::Algorithms hash_algorithm, zlib::Algorithms compression_alg) :
     file_(file), file_offset_(offset), chunk_size_(0),
     is_bulk_chunk_(false), is_fully_defined_(false), deferred_write_(false),
-    zlib_initialized_(false), compression_alg_(compression_alg), content_hash_context_(hash_algorithm),
+    zlib_initialized_(false), compression_algorithm_(compression_alg), content_hash_context_(hash_algorithm),
     content_hash_(hash_algorithm, shash::kSuffixPartial),
     content_hash_initialized_(false), upload_stream_handle_(NULL),
     current_deflate_buffer_(NULL), bytes_written_(0)
   {
     Initialize();
   }
-  ~Chunk() { 
-    if (!IsFullyProcessed()) 
-      Finalize(); 
-      
-    if (compressor_)
-      delete compressor_;
-    
-  };
 
   bool IsInitialized()         const { return zlib_initialized_ &&
                                               content_hash_initialized_;     }
@@ -102,7 +95,7 @@ class Chunk {
 
   shash::ContextPtr& content_hash_context() { return content_hash_context_; }
   const shash::Any&  content_hash() const { return content_hash_; }
-  zlib::Compressor*   get_compressor() { return compressor_; }
+  zlib::Compressor*   compressor() { return compressor_.weak_ref(); }
 
   UploadStreamHandle* upload_stream_handle() const {
     return upload_stream_handle_;
@@ -147,7 +140,7 @@ class Chunk {
   std::vector<CharBuffer*> deferred_buffers_;
 
   bool                     zlib_initialized_;
-  zlib::Algorithms         compression_alg_;
+  zlib::Algorithms         compression_algorithm_;
 
   shash::ContextPtr        content_hash_context_;
   shash::Any               content_hash_;
@@ -170,7 +163,7 @@ class Chunk {
   /**
    * Compressor
    */
-   zlib::Compressor              *compressor_;
+   UniquePtr<zlib::Compressor>  compressor_;
 };
 
 typedef std::vector<Chunk*> ChunkVector;

@@ -134,7 +134,7 @@ class DirectoryEntryBase {
   }
   
   inline zlib::Algorithms compression_algorithm() const {
-    return compression_alg_;
+    return compression_algorithm_;
   }
 
   /**
@@ -194,7 +194,7 @@ class DirectoryEntryBase {
   shash::Any checksum_;
   
   // The compression algorithm
-  zlib::Algorithms compression_alg_;
+  zlib::Algorithms compression_algorithm_;
 };
 
 
