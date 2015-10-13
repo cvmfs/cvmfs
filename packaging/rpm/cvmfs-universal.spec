@@ -134,6 +134,7 @@ CernVM-FS static client library for pure user-space use
 Summary: CernVM-FS server tools
 Group: Application/System
 BuildRequires: python-devel
+BuildRequires: libcap-devel
 BuildRequires: unzip
 %if 0%{?suse_version}
 Requires: insserv
@@ -151,6 +152,7 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
+Requires: libcap
 
 Conflicts: cvmfs-server < 2.1
 
