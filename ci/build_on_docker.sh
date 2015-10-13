@@ -70,6 +70,7 @@ bootstrap_image() {
 
 # check if docker is installed
 which docker > /dev/null 2>&1 || die "docker is not installed"
+which git    > /dev/null 2>&1 || die "git is not installed"
 
 # check if the docker container specification exists in ci/docker
 image_name="cvmfs/${CVMFS_DOCKER_IMAGE}"
