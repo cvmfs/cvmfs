@@ -152,6 +152,10 @@ class SyncMediator {
   bool IgnoreFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
 
+  SyncItem CreateSyncItem(const std::string  &relative_parent_path,
+                          const std::string  &filename,
+                          const SyncItemType  entry_type) const;
+
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);

@@ -17,6 +17,7 @@
 #include "fs_traversal.h"
 #include "hash.h"
 #include "smalloc.h"
+#include "sync_union.h"
 #include "upload.h"
 #include "util.h"
 #include "util_concurrency.h"
@@ -340,7 +341,7 @@ void SyncMediator::CompleteHardlinks(const SyncItem &entry) {
 void SyncMediator::LegacyRegularHardlinkCallback(const string &parent_dir,
                                                  const string &file_name)
 {
-  SyncItem entry(parent_dir, file_name, union_engine_, kItemFile);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
   InsertLegacyHardlink(entry);
 }
 
@@ -348,7 +349,7 @@ void SyncMediator::LegacyRegularHardlinkCallback(const string &parent_dir,
 void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
                                                   const string &file_name)
 {
-  SyncItem entry(parent_dir, file_name, union_engine_, kItemSymlink);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSymlink);
   InsertLegacyHardlink(entry);
 }
 
@@ -360,12 +361,12 @@ void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
   // created directory
   FileSystemTraversal<SyncMediator> traversal(
     this, union_engine_->scratch_path(), true);
-  traversal.fn_enter_dir = &SyncMediator::EnterAddedDirectoryCallback;
-  traversal.fn_leave_dir = &SyncMediator::LeaveAddedDirectoryCallback;
-  traversal.fn_new_file = &SyncMediator::AddFileCallback;
-  traversal.fn_new_symlink = &SyncMediator::AddSymlinkCallback;
+  traversal.fn_enter_dir      = &SyncMediator::EnterAddedDirectoryCallback;
+  traversal.fn_leave_dir      = &SyncMediator::LeaveAddedDirectoryCallback;
+  traversal.fn_new_file       = &SyncMediator::AddFileCallback;
+  traversal.fn_new_symlink    = &SyncMediator::AddSymlinkCallback;
   traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
-  traversal.fn_ignore_file = &SyncMediator::IgnoreFileCallback;
+  traversal.fn_ignore_file    = &SyncMediator::IgnoreFileCallback;
   traversal.Recurse(entry.GetScratchPath());
 }
 
@@ -373,7 +374,7 @@ void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
 bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
                                         const std::string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, union_engine_, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   AddDirectory(entry);
   return true;  // The recursion engine should recurse deeper here
 }
@@ -382,7 +383,7 @@ bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
 void SyncMediator::AddFileCallback(const std::string &parent_dir,
                                    const std::string &file_name)
 {
-  SyncItem entry(parent_dir, file_name, union_engine_, kItemFile);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
   Add(entry);
 }
 
@@ -390,7 +391,7 @@ void SyncMediator::AddFileCallback(const std::string &parent_dir,
 void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
                                       const std::string &link_name)
 {
-  SyncItem entry(parent_dir, link_name, union_engine_, kItemSymlink);
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
   Add(entry);
 }
 
@@ -398,7 +399,7 @@ void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
 void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
                                                const std::string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, union_engine_, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   EnterDirectory(entry);
 }
 
@@ -406,7 +407,7 @@ void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
 void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
                                                const std::string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, union_engine_, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   LeaveDirectory(entry);
 }
 
@@ -432,7 +433,7 @@ void SyncMediator::RemoveDirectoryRecursively(const SyncItem &entry) {
 void SyncMediator::RemoveFileCallback(const std::string &parent_dir,
                                       const std::string &file_name)
 {
-  SyncItem entry(parent_dir, file_name, union_engine_, kItemFile);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
   Remove(entry);
 }
 
@@ -440,7 +441,7 @@ void SyncMediator::RemoveFileCallback(const std::string &parent_dir,
 void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
                                          const std::string &link_name)
 {
-  SyncItem entry(parent_dir, link_name, union_engine_, kItemSymlink);
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
   Remove(entry);
 }
 
@@ -448,7 +449,7 @@ void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
 void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
                                            const std::string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, union_engine_, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   RemoveDirectoryRecursively(entry);
 }
 
@@ -460,10 +461,18 @@ bool SyncMediator::IgnoreFileCallback(const std::string &parent_dir,
     return true;
   }
 
-  SyncItem entry(parent_dir, file_name, union_engine_);
-  return union_engine_->IsWhiteoutEntry(entry);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemUnknown);
+  return entry.IsWhiteout();
 }
 
+
+SyncItem SyncMediator::CreateSyncItem(const std::string  &relative_parent_path,
+                                      const std::string  &filename,
+                                      const SyncItemType  entry_type) const {
+  return union_engine_->CreateSyncItem(relative_parent_path,
+                                       filename,
+                                       entry_type);
+}
 
 void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   LogCvmfs(kLogPublish, kLogVerboseMsg,
