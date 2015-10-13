@@ -49,8 +49,8 @@ image_recipe() {
   local recipe_dir="$1"
   local owd="$(pwd)"
   cd ${recipe_dir}
-  local dockerfile_epoch="$(git log -1 --format=%at -- Dockerfile)"
-  local buildfile_epoch="$(git log -1 --format=%at -- build.sh)"
+  local dockerfile_epoch="$(_time_from_git Dockerfile)"
+  local buildfile_epoch="$(_time_from_git build.sh)"
   cd $owd
   [ $dockerfile_epoch -gt $buildfile_epoch ] && echo $dockerfile_epoch \
                                              || echo $buildfile_epoch
