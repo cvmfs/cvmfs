@@ -134,6 +134,7 @@ CernVM-FS static client library for pure user-space use
 Summary: CernVM-FS server tools
 Group: Application/System
 BuildRequires: python-devel
+BuildRequires: libcap-devel
 BuildRequires: unzip
 %if 0%{?suse_version}
 Requires: insserv
@@ -151,6 +152,7 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
+Requires: libcap
 
 Conflicts: cvmfs-server < 2.1
 
@@ -384,6 +386,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Oct 13 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Add libcap dependency for cvmfs-server
 * Wed Sep 30 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
 - Drop explicit support for Fedora < 21
 - Use generic 'fedora' macro name where possible
