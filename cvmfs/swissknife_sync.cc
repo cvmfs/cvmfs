@@ -482,6 +482,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
+  if (args.find('A') != args.end()) params.is_balanced = true;
   if (args.find('x') != args.end()) params.print_changeset = true;
   if (args.find('y') != args.end()) params.dry_run = true;
   if (args.find('m') != args.end()) params.mucatalogs = true;
@@ -498,6 +499,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
+
+  if (args.find('X') != args.end())
+    params.max_weight = String2Uint64(*args.find('X')->second);
+  if (args.find('M') != args.end())
+    params.min_weight = String2Uint64(*args.find('M')->second);
 
   if (args.find('p') != args.end()) {
     params.use_file_chunking = true;
@@ -556,7 +562,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, g_download_manager,
                     params.catalog_entry_warn_threshold,
-                    g_statistics);
+                    g_statistics,
+                    params.is_balanced,
+                    params.max_weight,
+                    params.min_weight);
   catalog_manager.Init();
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;

@@ -8,16 +8,14 @@
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
-#include "catalog_mgr.h"
 
-#include <inttypes.h>
+#include "catalog_mgr.h"
 
 #include <cassert>
 #include <string>
 
 #include "logging.h"
 #include "shortstring.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "xattr.h"
 
