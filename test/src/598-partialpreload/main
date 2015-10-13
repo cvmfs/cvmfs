@@ -48,12 +48,11 @@ cvmfs_run_test() {
 /ctlg3/**
 EOF
 
-  cvmfs_preload "http://localhost/cvmfs/$repo_name"        \
-                "$preload_dir"                             \
-                "/etc/cvmfs/keys/$repo_name.pub"           \
-                "$repo_name"                               \
-                "$tmpdir"                                  \
-                "$(pwd)/pathspec"                         || return $?
+  cvmfs_preload -u "http://localhost/cvmfs/$repo_name"        \
+                -r "$preload_dir"                             \
+                -k "/etc/cvmfs/keys/$repo_name.pub"           \
+                -m "$repo_name"                               \
+                -d "$(pwd)/pathspec"                         || return $?
 
   echo "Create a local configuration file in $(pwd)/local.conf"
   mkdir cache
