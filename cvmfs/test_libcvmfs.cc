@@ -109,7 +109,7 @@ cvmfs_context* cvmfs_test_attach(const char *repo_name)
     const char *repo_options =
       "repo_name=%s.cern.ch,url=http://cvmfs-stratum-one.cern.ch/opt/%s;"
       "http://cernvmfs.gridpp.rl.ac.uk/opt/%s;http://cvmfs.racf.bnl.gov/opt/%s,"
-      "pubkey=/etc/cvmfs/keys/cern.ch.pub";
+      "pubkey=/etc/cvmfs/keys/cern.ch/cern.ch.pub";
     char options[TEST_LINE_MAX];
     snprintf(options, TEST_LINE_MAX, repo_options, repo_name, repo_name,
              repo_name, repo_name);

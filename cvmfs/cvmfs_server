@@ -74,8 +74,11 @@ else # RedHat based
 fi
 
 # Find the service binary (or detect systemd)
+minpidof() {
+  pidof $1 | tr " " "\n" | sort --numeric-sort | head -n1
+}
 SERVICE_BIN="false"
-if ! pidof systemd > /dev/null 2>&1 || [ $(pidof systemd) -ne 1 ]; then
+if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
   if [ -x /sbin/service ]; then
     SERVICE_BIN="/sbin/service"
   elif [ -x /usr/sbin/service ]; then
@@ -126,6 +129,10 @@ if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
       2)
         # attach gdb and provide a prompt WITHOUT actual running the program
         CVMFS_SERVER_SWISSKNIFE_DEBUG="gdb --quiet --args cvmfs_swissknife_debug"
+      ;;
+      3)
+        # do not attach gdb just run debug version
+        CVMFS_SERVER_SWISSKNIFE_DEBUG="cvmfs_swissknife_debug"
       ;;
     esac
   else
@@ -504,9 +511,10 @@ check_aufs() {
 # of if overlayfs is compiled in
 # @return   0 if the overlayfs kernel module is loaded
 check_overlayfs() {
+  local conf_gz="/proc/config.gz"
   /sbin/modprobe -q overlayfs || test -d /sys/module/overlayfs || \
   /sbin/modprobe -q overlay   || test -d /sys/module/overlay || \
-  test x"$(zgrep OVERLAY_FS /proc/config.gz | awk -F = '{print $2}')" = xy
+  [ x"$(zgrep OVERLAY_FS $conf_gz 2>/dev/null | awk -F = '{print $2}')" = x"y" ]
 }
 
 # check if at least one of the supported union file systems is available
@@ -535,6 +543,20 @@ get_overlayfs_name() {
   else
     die "cannot determine overlayfs name"
   fi
+}
+
+# guess the installed OverlayFS version since starting from OverlayFS V22 it
+# requires to specify a 'workdir' and uses character devices for whiteouts
+# TODO: Is there a better way than guessing based on the kernel version?
+OFS_PRE_V22=1
+OFS_POST_V22=2
+get_overlayfs_type() {
+  ofs_name="$(get_overlayfs_name)"
+  vermagic="$(modinfo --field vermagic $ofs_name)"
+  krnl_version="$(echo "$vermagic" | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')"
+  ofs_type=OFS_POST_V22
+  if compare_versions "$krnl_version" -lt 3.18.0; then ofs_type=$OFS_PRE_V22; fi
+  echo "$ofs_type"
 }
 
 
@@ -1857,7 +1879,7 @@ check_tag_existence() {
     -t ${CVMFS_SPOOL_DIR}/tmp                 \
     -p /etc/cvmfs/keys/${repository_name}.pub \
     -f $repository_name                       \
-    -n "$tag" 2>&1 | grep -qv "does not exist" > /dev/null
+    -n "$tag" > /dev/null 2>&1
 }
 
 
@@ -2103,9 +2125,14 @@ setup_and_mount_new_repository() {
     if has_selinux && try_mount_remount_cycle_overlayfs; then
       selinux_context=",context=\"system_u:object_r:default_t:s0\""
     fi
+    if [ x"$(get_overlayfs_type)" = x"$OFS_POST_V22" ]; then
+      ofs_workdir=",workdir=${ofs_workdir}"
+    else
+      ofs_workdir=""
+    fi
     cat >> /etc/fstab << EOF
 cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
-${overlayfs_name}_$name /cvmfs/$name $overlayfs_name upperdir=${scratch_dir},lowerdir=${rdonly_dir},workdir=${ofs_workdir},ro$selinux_context 0 0 # added by CernVM-FS for $name
+${overlayfs_name}_$name /cvmfs/$name $overlayfs_name upperdir=${scratch_dir},lowerdir=${rdonly_dir}$ofs_workdir,ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   else
     echo -n "(aufs) "
@@ -3870,6 +3897,11 @@ publish() {
     if [ -z "$tag_name" ] && [ x"$CVMFS_AUTO_TAG" = x"true" ]; then
       local timestamp=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
       tag_name="generic-$timestamp"
+      local tag_name_number=1
+      while check_tag_existence $name $tag_name; do
+        tag_name="generic_$tag_name_number-$timestamp"
+        tag_name_number=$(( $tag_name_number + 1 ))
+      done
       echo "Using auto tag '$tag_name'"
     fi
 

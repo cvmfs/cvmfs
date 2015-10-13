@@ -83,5 +83,6 @@ sudo docker run --volume=${CVMFS_SOURCE_LOCATION}:${docker_source_location} \
                 --volume=${CVMFS_RESULT_LOCATION}:${docker_build_location}  \
                 --privileged=true                                           \
                 --env="CVMFS_BUILD_ARCH=$CVMFS_BUILD_ARCH"                  \
+                --env="CVMFS_CI_PLATFORM_LABEL=$CVMFS_DOCKER_IMAGE"         \
                 $image_name                                                 \
                 $docker_build_script $args

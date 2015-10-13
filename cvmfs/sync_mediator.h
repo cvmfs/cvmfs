@@ -111,9 +111,7 @@ class SyncMediator {
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
   typedef std::vector<HardlinkGroup> HardlinkGroupList;
 
-  void RegisterUnionEngine(SyncUnion *engine) {
-    union_engine_ = engine;
-  }
+  void RegisterUnionEngine(SyncUnion *engine);
 
   void PrintChangesetNotice(const ChangesetAction action,
                             const std::string &extra_info) const;
@@ -154,6 +152,10 @@ class SyncMediator {
   bool IgnoreFileCallback(const std::string &parent_dir,
                           const std::string &file_name);
 
+  SyncItem CreateSyncItem(const std::string  &relative_parent_path,
+                          const std::string  &filename,
+                          const SyncItemType  entry_type) const;
+
   // Called by Upload Spooler
   void PublishFilesCallback(const upload::SpoolerResult &result);
   void PublishHardlinksCallback(const upload::SpoolerResult &result);
@@ -174,6 +176,8 @@ class SyncMediator {
 
   catalog::WritableCatalogManager *catalog_manager_;
   SyncUnion *union_engine_;
+
+  bool handle_hardlinks_;
 
   /**
    * Hardlinks are supported as long as they all reside in the same directory.

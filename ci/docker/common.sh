@@ -20,7 +20,7 @@ find_or_install_yum_repo_key() {
   local key_path="$1"
   local sink="/dev/null"
   [ -f "$key_path" ] || sink="$key_path"
-  cat > $sink
+  cat > $sink || die "failed to write $key_path"
 }
 
 install_yum_repo_keys() {
@@ -55,7 +55,7 @@ AkK/8oUACgkQtQgG0wyY/52z1ACgkkxNdhHKbEol3Kwka1tICWHMIwIAn3PWJQR0
 C1MV1+CnT8UupHzxy6J7
 =IUD3
 -----END PGP PUBLIC KEY BLOCK-----
-  EOF
+EOF
 
   find_or_install_yum_repo_key /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7 << EOF
 -----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -88,7 +88,7 @@ pL+4bs52jzuGwTMT7gOR5MzD+vT0fVS7Xm8MjOxvZgbHsAgzyFGlI1ggUQmU7lu3
 uPNL0eRx4S1G4Jn5
 =OGYX
 -----END PGP PUBLIC KEY BLOCK-----
-  EOF
+EOF
 
   find_or_install_yum_repo_key /etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-20 << EOF
 -----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -120,7 +120,7 @@ zasvA0Wp12xIyJpeJwe6TNNR9lLDkj9fhvLUH0o+6bPyHas4hrhcZsQa/trSyiiS
 XFz25bVz+AZ0b3aEcABLDCpG8nMOPiSSE6uccRAlW7muFOw=
 =EJ/7
 -----END PGP PUBLIC KEY BLOCK-----
-  EOF
+EOF
 
   find_or_install_yum_repo_key /etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-21 << EOF
 -----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -152,7 +152,7 @@ pFVvYFP4OxLEwh6OYZj9qfaw445ryqfcxSNzZ3m+VSwHuZ049v7u8fndZ8TREVXx
 hdjPHxjtaiJ1R0Zb4ZvycUcDLl2Xc1CRJAMVvFJcg1SNrGs=
 =xtMc
 -----END PGP PUBLIC KEY BLOCK-----
-  EOF
+EOF
 
   find_or_install_yum_repo_key /etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-22 << EOF
 -----BEGIN PGP PUBLIC KEY BLOCK-----

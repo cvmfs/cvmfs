@@ -99,6 +99,11 @@ XattrList *XattrList::Deserialize(
 }
 
 
+bool XattrList::Has(const string &key) const {
+  return xattrs_.find(key) != xattrs_.end();
+}
+
+
 bool XattrList::Get(const string &key, string *value) const {
   assert(value);
   map<string, string>::const_iterator iter = xattrs_.find(key);

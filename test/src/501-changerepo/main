@@ -27,6 +27,20 @@ change_files_in() {
 
   pushdir $working_dir
 
+  if uses_overlayfs $CVMFS_TEST_REPO; then
+    # OverlayFS would break hard links when copying up 'hardlinkToFile'
+    # therefore we do it proactively here
+    cp hardlinkToFile hardlinkToFile1
+    rm -f hardlinkToFile
+  elif uses_aufs $CVMFS_TEST_REPO; then
+    # AUFS is handling this hardlink use case correctly
+    mv hardlinkToFile hardlinkToFile1
+  else
+    echo "Which union file system?"
+    popdir
+    return 1
+  fi
+
   echo "additional meaningless content" >> file
 
   mkdir newdirectory
@@ -36,12 +50,10 @@ change_files_in() {
   rm -fR bar
   rm -f symlinkToClever
 
-  ln hardlinkToFile hardlinkToFile2
-  ln hardlinkToFile hardlinkToFile3
+  ln hardlinkToFile1 hardlinkToFile2
+  ln hardlinkToFile1 hardlinkToFile3
 
   ln -s hardlinkToFile3 symlinkToHardlinkToFile3
-
-  mv hardlinkToFile hardlinkToFile1
 
   echo "deeply hidden content" > newdirectory/foo/bar
   echo "another uselese blubb" > foo/bar/renemeusel
