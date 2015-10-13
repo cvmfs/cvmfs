@@ -8,6 +8,7 @@
 #define CVMFS_PLATFORM_LINUX_H_
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
+#include <sys/xattr.h>
 #include <attr/xattr.h>  // NOLINT(build/include_alpha)
 #include <dirent.h>
 #include <errno.h>

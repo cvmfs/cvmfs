@@ -72,6 +72,7 @@ TEST_F(T_Xattr, CreateFromFile) {
   ASSERT_TRUE(from_file2.IsValid());
   EXPECT_EQ(default_attrs + 1, from_file2->ListKeys().size());
   EXPECT_TRUE(from_file2->Get("user.test", &value));
+  EXPECT_TRUE(from_file2->Has("user.test"));
   EXPECT_EQ("value", value);
 
 #ifndef __APPLE__
@@ -84,10 +85,13 @@ TEST_F(T_Xattr, CreateFromFile) {
   ASSERT_TRUE(from_file3.IsValid());
   EXPECT_EQ(default_attrs + 3, from_file3->ListKeys().size());
   EXPECT_TRUE(from_file3->Get("user.test", &value));
+  EXPECT_TRUE(from_file3->Has("user.test"));
   EXPECT_EQ("value", value);
   EXPECT_TRUE(from_file3->Get("user.test2", &value));
+  EXPECT_TRUE(from_file3->Has("user.test2"));
   EXPECT_EQ("value2", value);
   EXPECT_TRUE(from_file3->Get(long_string, &value));
+  EXPECT_TRUE(from_file3->Has(long_string));
   EXPECT_EQ(long_string, value);
 #endif
 }
@@ -106,10 +110,13 @@ TEST_F(T_Xattr, Deserialize) {
   EXPECT_EQ(3U, xattr_list->ListKeys().size());
   string value;
   EXPECT_TRUE(xattr_list->Get("keya", &value));
+  EXPECT_TRUE(xattr_list->Has("keya"));
   EXPECT_EQ("valuea", value);
   EXPECT_TRUE(xattr_list->Get("keyb", &value));
+  EXPECT_TRUE(xattr_list->Has("keyb"));
   EXPECT_EQ("valueb", value);
   EXPECT_TRUE(xattr_list->Get("empty_key", &value));
+  EXPECT_TRUE(xattr_list->Has("empty_key"));
   EXPECT_EQ("", value);
 }
 
@@ -156,6 +163,14 @@ TEST_F(T_Xattr, DeserializeInvalid) {
   EXPECT_TRUE(xl7.IsValid());
 
   free(buf);
+}
+
+
+TEST_F(T_Xattr, Has) {
+  string value;
+  EXPECT_TRUE(default_list.Has("keya"));
+  EXPECT_TRUE(default_list.Has("empty_key"));
+  EXPECT_FALSE(default_list.Has("not here"));
 }
 
 
@@ -224,9 +239,11 @@ TEST_F(T_Xattr, Set) {
 
 TEST_F(T_Xattr, Remove) {
   string value;
+  EXPECT_TRUE(default_list.Has("keya"));
   EXPECT_TRUE(default_list.Get("keya", &value));
   EXPECT_TRUE(default_list.Remove("keya"));
   EXPECT_FALSE(default_list.Get("keya", &value));
+  EXPECT_FALSE(default_list.Has("keya"));
   EXPECT_FALSE(default_list.Remove("keya"));
 }
 

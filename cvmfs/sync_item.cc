@@ -7,6 +7,7 @@
 #include <errno.h>
 
 #include "sync_mediator.h"
+#include "sync_union.h"
 
 using namespace std;  // NOLINT
 
@@ -16,6 +17,8 @@ namespace publish {
 SyncItem::SyncItem() :
   union_engine_(NULL),
   whiteout_(false),
+  opaque_(false),
+  masked_hardlink_(false),
   scratch_type_(static_cast<SyncItemType>(0)),
   rdonly_type_(static_cast<SyncItemType>(0))
 {
@@ -27,6 +30,8 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    const SyncItemType  entry_type) :
   union_engine_(union_engine),
   whiteout_(false),
+  opaque_(false),
+  masked_hardlink_(false),
   relative_parent_path_(relative_parent_path),
   filename_(filename),
   scratch_type_(entry_type),
@@ -96,6 +101,12 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
 }
 
 
+void SyncItem::MarkAsOpaqueDirectory() {
+  assert(IsDirectory());
+  opaque_ = true;
+}
+
+
 unsigned int SyncItem::GetRdOnlyLinkcount() const {
   StatRdOnly();
   return rdonly_stat_.stat.st_nlink;
@@ -130,22 +141,16 @@ void SyncItem::StatGeneric(const string  &path,
 }
 
 
-bool SyncItem::IsOpaqueDirectory() const {
-  if (!IsDirectory()) {
-    return false;
-  }
-  return union_engine_->IsOpaqueDirectory(*this);
-}
-
-
 catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   catalog::DirectoryEntryBase dirent;
 
   // inode and parent inode is determined at runtime of client
   dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
   dirent.parent_inode_   = catalog::DirectoryEntry::kInvalidInode;
-  // TODO(rmeusel): is this a good idea here?
-  dirent.linkcount_      = this->GetUnionStat().st_nlink;
+
+  // this might mask the actual link count in case hardlinks are not supported
+  // (i.e. on setups using OverlayFS)
+  dirent.linkcount_      = HasHardlinks() ? this->GetUnionStat().st_nlink : 1;
 
   dirent.mode_           = this->GetUnionStat().st_mode;
   dirent.uid_            = this->GetUnionStat().st_uid;
