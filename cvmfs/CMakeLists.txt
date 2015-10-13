@@ -498,7 +498,14 @@ if (BUILD_PRELOADER)
     add_dependencies (cvmfs_preload sparsehash)
   endif (SPARSEHASH_BUILTIN)
 
-  target_link_libraries(cvmfs_preload ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
+  if (TBB_PRIVATE_LIB)
+    add_dependencies (cvmfs_swissknife libtbb)
+  endif (TBB_PRIVATE_LIB)
+
+  add_dependencies (cvmfs_preload libsha2)
+  add_dependencies (cvmfs_preload libvjson)
+
+  target_link_libraries(cvmfs_preload ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
 endif (BUILD_PRELOADER)
 
 #
