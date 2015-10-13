@@ -386,6 +386,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Oct 13 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Add libcap dependency for cvmfs-server
 * Wed Sep 30 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
 - Drop explicit support for Fedora < 21
 - Use generic 'fedora' macro name where possible
