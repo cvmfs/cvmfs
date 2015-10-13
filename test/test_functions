@@ -270,6 +270,8 @@ uses_overlayfs() {
 
 
 cvmfs_clean() {
+  runs_under_parrot && return 0
+
   sudo cvmfs_config umount > /dev/null || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
   sudo rm -f /etc/cvmfs/default.local
@@ -292,6 +294,8 @@ cvmfs_clean() {
 cvmfs_mount() {
   repositories=$1
   shift 1
+
+  runs_under_parrot && return 0
 
   sudo sh -c "echo \"CVMFS_REPOSITORIES=$repositories\" > /etc/cvmfs/default.local" || return 100
   sudo sh -c "echo \"CVMFS_HTTP_PROXY=\\\"${CVMFS_TEST_PROXY}\\\"\" >> /etc/cvmfs/default.local" || return 100
@@ -429,6 +433,8 @@ check_time() {
 check_memory() {
   local instance=$1
   local limit=$2
+
+  runs_under_parrot && return 0
 
   local pid=$(attr -qg pid /cvmfs/$instance)             || return 100
   local rss="$(sudo cat /proc/$pid/status | grep VmRSS)" || return 101
