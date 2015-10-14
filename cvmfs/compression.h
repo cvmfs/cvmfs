@@ -52,8 +52,15 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   public:
     Compressor(const Algorithms &alg) {};
     virtual ~Compressor() {};
-    virtual int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
-            const unsigned char* inbuf, const size_t inbufsize, 
+    /**
+      * Deflate funciton.  
+      * Upon return:
+      *   returns: true - if done compressing, false otherwise
+      *   inbufsize: the remaining input to read in.
+      *   outbufsize: The number of bytes used in the outbuf
+      */
+    virtual bool Deflate(unsigned char *outbuf, size_t& outbufsize, 
+            unsigned char*& inbuf, size_t& inbufsize, 
             const bool flush) =0;
     virtual size_t DeflateBound(const size_t bytes) { return bytes; };
     virtual Compressor* Clone() =0;
@@ -65,8 +72,10 @@ class ZlibCompressor: public Compressor {
     ZlibCompressor(const Algorithms &alg);
     ZlibCompressor(const ZlibCompressor &other);
     ~ZlibCompressor();
-    int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
-            const unsigned char* inbuf, const size_t inbufsize, 
+    
+
+    bool Deflate(unsigned char *outbuf, size_t& outbufsize, 
+            unsigned char*& inbuf, size_t& inbufsize, 
             const bool flush);
     size_t DeflateBound(const size_t bytes);
     Compressor* Clone();
@@ -80,8 +89,8 @@ class ZlibCompressor: public Compressor {
 class EchoCompressor: public Compressor {
   public:
     EchoCompressor(const Algorithms &alg);
-    int Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
-            const unsigned char* inbuf, const size_t inbufsize, 
+    bool Deflate(unsigned char *outbuf, size_t& outbufsize, 
+            unsigned char*& inbuf, size_t& inbufsize, 
             const bool flush);
     size_t DeflateBound(const size_t bytes) { return bytes; };
     Compressor* Clone();

@@ -76,34 +76,34 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
                                  const size_t          bytes,
                                  const bool            finalize) {
   shash::ContextPtr &ch_ctx = chunk_->content_hash_context();
-  
-  CharBuffer outbuf;
-  size_t outsize;
-  
-  // Do the actual deflate
-  chunk_->compressor()->Deflate(outbuf, outsize, data, bytes, finalize);
-  
-  size_t output_left = outsize;
-
+  // We need to make a copy 
+  unsigned char* running_data = const_cast<unsigned char*>(data);
+  size_t running_inputsize = bytes;
+  bool done = false;
   // Loop through the output, copying data to the deflate buffer
-  while (output_left > 0) {
-    CharBuffer *compress_buffer = chunk_->GetDeflateBuffer(output_left);
+  while (done == false) {
+    
+    // Request however much the compressor thinks we need
+    CharBuffer *compress_buffer = chunk_->GetDeflateBuffer(chunk_->compressor()->DeflateBound(running_inputsize));
     assert(compress_buffer != NULL);
     assert(compress_buffer->free_bytes() > 0);
     
-    size_t bytes_to_copy = std::min(compress_buffer->free_bytes(), output_left);
+    size_t outbufsize = compress_buffer->free_bytes();
+    unsigned char* output_start = compress_buffer->free_space_ptr();
     
-    // Copy the deflated data to the buffer 
-    const CharBuffer::pointer_t output_start = compress_buffer->free_space_ptr();
-    memcpy( output_start, outbuf.ptr() + (outsize - output_left), 
-            bytes_to_copy);
+    // Do a single deflate
+    done = chunk_->compressor()->Deflate( output_start, outbufsize, running_data, running_inputsize, finalize);
+    
+    // Now:
+    //  outbufsize is the number of bytes used
+    //  running_inputsize is the number of bytes left to be read in
+    //  running_data is a pointer to the next part of input
+    //  
+    compress_buffer->SetUsedBytes(compress_buffer->used_bytes() + outbufsize);
     
     // Update the hash
-    compress_buffer->SetUsedBytes(
-      compress_buffer->used_bytes() + bytes_to_copy);
-    shash::Update(output_start, bytes_to_copy, ch_ctx);
+    shash::Update(output_start, outbufsize, ch_ctx);
             
-    output_left -= bytes_to_copy;
     
     
   }

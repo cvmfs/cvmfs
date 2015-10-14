@@ -828,53 +828,28 @@ Compressor* ZlibCompressor::Clone() {
   
 }
 
-int ZlibCompressor::Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
-            const unsigned char* inbuf, const size_t inbufsize, 
-            const bool flush) 
+bool ZlibCompressor::Deflate(unsigned char *outbuf, size_t& outbufsize, 
+        unsigned char*& inbuf, size_t& inbufsize, 
+        const bool flush) 
 {
   // Adding compression
   stream_.avail_in = inbufsize;
-  stream_.next_in = const_cast<unsigned char*>(inbuf);
+  stream_.next_in = inbuf;
   const int flush_int = (flush) ? Z_FINISH : Z_NO_FLUSH;
-  upload::CharBuffer* big_buf = new upload::CharBuffer(0);
   int retcode = 0;
   
-  do {
-    
-    // Create a new buffer, big enough to hold the old big_buf, and whhatever
-    // else needs to be deflated
-    size_t needed_space = DeflateBound(stream_.avail_in);
-    upload::CharBuffer* tmp_buf = new upload::CharBuffer(big_buf->used_bytes() + needed_space);
-    memcpy(tmp_buf->free_space_ptr(), big_buf->ptr(), big_buf->used_bytes());
-    tmp_buf->SetUsedBytes(big_buf->used_bytes());
-    delete big_buf;
-    big_buf = tmp_buf;
-    
-    // Set the output buffer
-    size_t output_space = big_buf->free_bytes();
-    stream_.avail_out = output_space;
-    stream_.next_out = big_buf->free_space_ptr();
-    
-    // Deflate and make sure stream is fully deflated
-    retcode = deflate(&stream_, flush_int);
-    assert(retcode == Z_OK || retcode == Z_STREAM_END);
-    
-    big_buf->SetUsedBytes(big_buf->used_bytes() + (output_space - stream_.avail_out));
-    
-  } while(!(flush_int == Z_NO_FLUSH && retcode == Z_OK && stream_.avail_in == 0) && !(flush_int == Z_FINISH  && retcode == Z_STREAM_END));
+  stream_.avail_out = outbufsize;
+  stream_.next_out = outbuf;
   
-  //outbuf = *big_buf;
-  outbuf.Allocate(big_buf->used());
-  memcpy(outbuf.free_space_ptr(), big_buf->ptr(), big_buf->used());
-  outbuf.SetUsedBytes(big_buf->used());
-  delete big_buf;
+  // Deflate in zlib!
+  retcode = deflate(&stream_, flush_int);
+  assert(retcode == Z_OK || retcode == Z_STREAM_END);
   
-  assert(stream_.avail_in == 0);
-  
-  outbufsize = outbuf.used();
-  
-  return retcode;
-  
+  outbufsize -= stream_.avail_out;
+  inbuf = stream_.next_in;
+  inbufsize = stream_.avail_in;
+    
+  return (flush_int == Z_NO_FLUSH && retcode == Z_OK && stream_.avail_in == 0) || (flush_int == Z_FINISH  && retcode == Z_STREAM_END);
   
 }
 
@@ -906,15 +881,27 @@ Compressor* EchoCompressor::Clone() {
   return new EchoCompressor(zlib::kNoCompression);
 }
 
-int EchoCompressor::Deflate(upload::CharBuffer &outbuf, size_t &outbufsize, 
-            const unsigned char* inbuf, const size_t inbufsize, 
-            const bool flush) 
+bool EchoCompressor::Deflate(unsigned char *outbuf, size_t& outbufsize, 
+        unsigned char*& inbuf, size_t& inbufsize, 
+        const bool flush) 
 {
   
-  outbufsize = inbufsize;
-  outbuf.Allocate(inbufsize);
-  memcpy(outbuf.free_space_ptr(), inbuf, inbufsize);
-  return 0;
+  size_t bytes_to_copy = min(outbufsize, inbufsize);
+  memcpy(outbuf, inbuf, bytes_to_copy);
+  
+  // Check if we are done, ie, we memcpy'd all of the input bytes
+  bool done = false;
+  if (bytes_to_copy == inbufsize)
+    done = true;
+  else
+    done = false;
+    
+  // Update the return variables
+  inbuf += bytes_to_copy;
+  outbufsize = bytes_to_copy;
+  inbufsize = inbufsize - bytes_to_copy;
+    
+  return done;
 }
 
 
