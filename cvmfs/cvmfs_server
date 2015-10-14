@@ -554,7 +554,7 @@ get_overlayfs_type() {
   ofs_name="$(get_overlayfs_name)"
   vermagic="$(modinfo --field vermagic $ofs_name)"
   krnl_version="$(echo "$vermagic" | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')"
-  ofs_type=OFS_POST_V22
+  ofs_type=$OFS_POST_V22
   if compare_versions "$krnl_version" -lt 3.18.0; then ofs_type=$OFS_PRE_V22; fi
   echo "$ofs_type"
 }
