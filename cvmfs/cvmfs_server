@@ -1961,6 +1961,7 @@ CVMFS_HASH_ALGORITHM=$hash_algo
 CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
+CVMFS_AUTOCATALOGS=false
 EOF
 
   # append GC specific configuration
@@ -3943,6 +3944,15 @@ publish() {
        -l $CVMFS_MIN_CHUNK_SIZE \
        -a $CVMFS_AVG_CHUNK_SIZE \
        -h $CVMFS_MAX_CHUNK_SIZE"
+    fi
+    if [ "x$CVMFS_AUTOCATALOGS" = "xtrue" ]; then
+      sync_command="$sync_command -A"
+    fi
+    if [ "x$CVMFS_AUTOCATALOGS_MAX_WEIGHT" != "x" ]; then
+      sync_command="$sync_command -X $CVMFS_AUTOCATALOGS_MAX_WEIGHT"
+    fi
+    if [ "x$CVMFS_AUTOCATALOGS_MIN_WEIGHT" != "x" ]; then
+      sync_command="$sync_command -M $CVMFS_AUTOCATALOGS_MIN_WEIGHT"
     fi
     if [ "x$CVMFS_IGNORE_XDIR_HARDLINKS" = "xtrue" ]; then
       sync_command="$sync_command -i"
