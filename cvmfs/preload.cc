@@ -36,7 +36,7 @@ void Usage() {
 }
 }  // namespace swissknife
 
-const string CERN_PUBLIC_KEY =
+const char CERN_PUBLIC_KEY[] =
   "-----BEGIN PUBLIC KEY-----\n"
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAukBusmYyFW8KJxVMmeCj\n"
   "N7vcU1mERMpDhPTa5PgFROSViiwbUsbtpP9CvfxB/KU1gggdbtWOTZVTQqA3b+p8\n"
@@ -47,7 +47,42 @@ const string CERN_PUBLIC_KEY =
   "HQIDAQAB\n"
   "-----END PUBLIC KEY-----\n";
 
-char check_parameters(const string &params, swissknife::ArgumentList *args) {
+const char CERN_IT1_PUBLIC_KEY[] =
+  "-----BEGIN PUBLIC KEY-----\n"
+  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo8uKvscgW7FNxzb65Uhm\n"
+  "yr8jPJiyrl2kVzb/hhgdfN14C0tCbfFoE6ciuZFg+9ytLeiL9pzM96gSC+atIFl4\n"
+  "7wTgtAFO1W4PtDQBwA/IG2bnwvNrzk19ob0JYhjZlS9tYKeh7TKCub55+vMwcEbP\n"
+  "urzo3WSNCzJngiGMh1vM5iSlGLpCdSGzdwxLGwc1VjRM7q3KAd7M7TJCynKqXZPX\n"
+  "R2xiD6I/p4xv39AnwphCFSmDh0MWE1WeeNHIiiveikvvN+l8d/ZNASIDhKNCsz6o\n"
+  "aFDsGXvjGy7dg43YzjSSYSFGUnONtl5Fe6y4bQZj1LEPbeInW334MAbMwYF4LKma\n"
+  "yQIDAQAB\n"
+  "-----END PUBLIC KEY-----\n";
+
+const char CERN_IT2_PUBLIC_KEY[] =
+  "-----BEGIN PUBLIC KEY-----\n"
+  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkX6+mj6/X5yLV9uHt56l\n"
+  "ZK1uLMueEULUhSCRrLj+9qz3EBMsANCjzfdabllKqWX/6qIfqppKVBwScF38aRnC\n"
+  "vhlVGYtDgiqM1tfa1tA6BF7HUZQ1R1lU01tP0iYGhNTlTfY+fMAZDeerGDckT8cl\n"
+  "NAQuICFUKy6w6aar8Sf3mpUC/hXVD2QUESmFgQ0SZhhW3eIB1xEoRxW0ieO6AidF\n"
+  "qxmAxrB4H4+7i9O+B7Wf0VJQLSzP5bvIzx7xoqs3aUlnuzGFOaI8zypMvSvycSUb\n"
+  "xhLsYbTgnlqSI/SPehMeQeEirhhKPaA+TsVSvxuqCJNoQ/wPBEG0HR+XkTsO9/sH\n"
+  "FQIDAQAB\n"
+  "-----END PUBLIC KEY-----\n";
+
+const char CERN_IT3_PUBLIC_KEY[] =
+  "-----BEGIN PUBLIC KEY-----\n"
+  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAosLXrVkA4p6IjQj6rUNM\n"
+  "odr9oWB1nL3tWPKyPhS7mqAg+J4EW9m4ka/98PXi6jS/b1i/QLP9oGXlxJpugT1E\n"
+  "jaKh/I0tY7Cvf19mX3uoyS4omWRqZqopQdeLOvuqiCip23YyO3lK4Yzkq1E58JGi\n"
+  "WLGe5UJ8kY8Bko79dGNsHsU01pAaI0QN/fSmwhHQqfpMv62cAkqB9GSilRalxf3+\n"
+  "mDtJhYBdaDKbB5+QDqh40HcH838H+GcQLXxdT5ogdchjeldZJzsTwEhRq3yDcYr3\n"
+  "ie6ocWVLchQx9CKpxPufRTEpuo3BPMqdTxhZJZWPG27I/FSWnUmd0auirFY51Rw6\n"
+  "9wIDAQAB\n"
+  "-----END PUBLIC KEY-----\n";
+
+
+static char check_parameters(const string &params,
+                                   swissknife::ArgumentList *args) {
   for (unsigned i = 0; i < params.length(); ++i) {
     char param = params[i];
     if (args->find(param) == args->end()) {
@@ -55,6 +90,20 @@ char check_parameters(const string &params, swissknife::ArgumentList *args) {
     }
   }
   return '\0';
+}
+
+static void create_pk_file(const string &path,
+                           const char content[],
+                           int content_size) {
+  int retval;
+  FILE *pk_file = fopen(path.c_str(), "w");
+  assert(pk_file);
+  retval = fwrite(content, sizeof(char), content_size, pk_file);
+  assert(retval);
+  retval = fclose(pk_file);
+  assert(retval == 0);
+  retval = chmod(path.c_str(), 0644);
+  assert(retval == 0);
 }
 
 int main(int argc, char *argv[]) {
@@ -104,18 +153,24 @@ int main(int argc, char *argv[]) {
 
   // if there is no specified public key file we dump the cern.ch public key in
   // the temporary directory
-  string cern_pk_path = *args['x'] + "/cern.ch.pub";
   if (args.find('k') == args.end()) {
-    FILE *cern_pk_file = fopen(cern_pk_path.c_str(), "w");
-    assert(cern_pk_file);
-    retval = fwrite(CERN_PUBLIC_KEY.c_str(), sizeof(char),
-                    CERN_PUBLIC_KEY.length(), cern_pk_file);
-    assert(retval);
-    retval = fclose(cern_pk_file);
-    assert(retval == 0);
-    retval = chmod(cern_pk_path.c_str(), 0644);
-    assert(retval == 0);
-    args['k'] = &cern_pk_path;
+    string cern_pk_base_path = *args['x'];
+    string cern_pk_path      = cern_pk_base_path + "/cern.ch.pub";
+    string cern_pk_it1_path  = cern_pk_base_path + "/cern-it1.cern.ch.pub";
+    string cern_pk_it2_path  = cern_pk_base_path + "/cern-it2.cern.ch.pub";
+    string cern_pk_it3_path  = cern_pk_base_path + "/cern-it3.cern.ch.pub";
+    create_pk_file(cern_pk_path, CERN_PUBLIC_KEY, sizeof(CERN_PUBLIC_KEY));
+    create_pk_file(cern_pk_it1_path, CERN_IT1_PUBLIC_KEY,
+      sizeof(CERN_IT1_PUBLIC_KEY));
+    create_pk_file(cern_pk_it2_path, CERN_IT2_PUBLIC_KEY,
+      sizeof(CERN_IT2_PUBLIC_KEY));
+    create_pk_file(cern_pk_it3_path, CERN_IT3_PUBLIC_KEY,
+      sizeof(CERN_IT3_PUBLIC_KEY));
+    char path_separator = ':';
+    args['k'] = new string(cern_pk_path     + path_separator +
+                           cern_pk_it1_path + path_separator +
+                           cern_pk_it2_path + path_separator +
+                           cern_pk_it3_path);
   }
 
   // now launch swissknife_pull
