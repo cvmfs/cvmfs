@@ -178,7 +178,7 @@ bool RelaxedPathFilter::ParsePathspec(const std::string &pathspec_str,
   while (current_pathspec_str.length() > 0) {
     if (!Dirtab::ParsePathspec(current_pathspec_str, false))
       success = false;
-    int new_length = current_pathspec_str.find_last_of("/");
+    size_t new_length = current_pathspec_str.find_last_of("/");
     current_pathspec_str = current_pathspec_str.substr(0, new_length);
   }
 
