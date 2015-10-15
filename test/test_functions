@@ -637,16 +637,11 @@ create_big_file() {
 # - file size
 # - parent directory
 # - symlink destination (when applicable)
-# - uid and gid can be specified
 #
 # @param directory          the directory to be listed
-# @param uid                specify a UID for the file owner (optional)
-# @param gid                specify a GID for the file owner (optional)
 # @return                   a custom directory listing
 create_listing() {
   local directory=$1
-  local uid=$2
-  local gid=$3
   local lst
 
   lst=$(ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
@@ -684,14 +679,14 @@ create_listing() {
     # print out file information
     printf $1                     " ";
     printf $2                     " ";
-    printf (uid == "" ? $3 : uid) " ";
-    printf (gid == "" ? $4 : gid) " ";
+    printf $3                     " ";
+    printf $4                     " ";
     printf $6;
 
     if(first == "l") printf " " $7 " " $8;
     if(first != "d") printf " " $5;
     printf "\n"
-  }' uid=$uid gid=$gid base_dir=$directory)
+  }' base_dir=$directory)
 
   echo -e "$lst"
 }
