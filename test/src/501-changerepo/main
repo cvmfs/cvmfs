@@ -3,23 +3,23 @@ cvmfs_test_name="Change Repository"
 cvmfs_test_autofs_on_startup=false
 
 produce_files_in() {
-	local working_dir=$1
+  local working_dir=$1
 
-	pushdir $working_dir
+  pushdir $working_dir
 
-	echo "meaningless file content" > file
-	echo "more clever file content" > clever
+  echo "meaningless file content" > file
+  echo "more clever file content" > clever
 
-	mkdir foo
-	mkdir bar
+  mkdir foo
+  mkdir bar
 
-	mkdir foo/bar
-	mkdir bar/foo
+  mkdir foo/bar
+  mkdir bar/foo
 
-	ln file hardlinkToFile
-	ln -s clever symlinkToClever
+  ln file hardlinkToFile
+  ln -s clever symlinkToClever
 
-	popdir
+  popdir
 }
 
 change_files_in() {
