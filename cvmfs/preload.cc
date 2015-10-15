@@ -10,6 +10,7 @@
 
 #include <string>
 
+#include "compression.h"
 #include "download.h"
 #include "logging.h"
 #include "signature.h"
@@ -36,7 +37,7 @@ void Usage() {
 }
 }  // namespace swissknife
 
-const char CERN_PUBLIC_KEY[] =
+const char gCernPublicKey[] =
   "-----BEGIN PUBLIC KEY-----\n"
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAukBusmYyFW8KJxVMmeCj\n"
   "N7vcU1mERMpDhPTa5PgFROSViiwbUsbtpP9CvfxB/KU1gggdbtWOTZVTQqA3b+p8\n"
@@ -47,7 +48,7 @@ const char CERN_PUBLIC_KEY[] =
   "HQIDAQAB\n"
   "-----END PUBLIC KEY-----\n";
 
-const char CERN_IT1_PUBLIC_KEY[] =
+const char gCernIt1PublicKey[] =
   "-----BEGIN PUBLIC KEY-----\n"
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo8uKvscgW7FNxzb65Uhm\n"
   "yr8jPJiyrl2kVzb/hhgdfN14C0tCbfFoE6ciuZFg+9ytLeiL9pzM96gSC+atIFl4\n"
@@ -58,7 +59,7 @@ const char CERN_IT1_PUBLIC_KEY[] =
   "yQIDAQAB\n"
   "-----END PUBLIC KEY-----\n";
 
-const char CERN_IT2_PUBLIC_KEY[] =
+const char gCernIt2PublicKey[] =
   "-----BEGIN PUBLIC KEY-----\n"
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkX6+mj6/X5yLV9uHt56l\n"
   "ZK1uLMueEULUhSCRrLj+9qz3EBMsANCjzfdabllKqWX/6qIfqppKVBwScF38aRnC\n"
@@ -69,7 +70,7 @@ const char CERN_IT2_PUBLIC_KEY[] =
   "FQIDAQAB\n"
   "-----END PUBLIC KEY-----\n";
 
-const char CERN_IT3_PUBLIC_KEY[] =
+const char gCernIt3PublicKey[] =
   "-----BEGIN PUBLIC KEY-----\n"
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAosLXrVkA4p6IjQj6rUNM\n"
   "odr9oWB1nL3tWPKyPhS7mqAg+J4EW9m4ka/98PXi6jS/b1i/QLP9oGXlxJpugT1E\n"
@@ -81,7 +82,7 @@ const char CERN_IT3_PUBLIC_KEY[] =
   "-----END PUBLIC KEY-----\n";
 
 
-static char check_parameters(const string &params,
+static char CheckParameters(const string &params,
                                    swissknife::ArgumentList *args) {
   for (unsigned i = 0; i < params.length(); ++i) {
     char param = params[i];
@@ -92,19 +93,6 @@ static char check_parameters(const string &params,
   return '\0';
 }
 
-static void create_pk_file(const string &path,
-                           const char content[],
-                           int content_size) {
-  int retval;
-  FILE *pk_file = fopen(path.c_str(), "w");
-  assert(pk_file);
-  retval = fwrite(content, sizeof(char), content_size, pk_file);
-  assert(retval);
-  retval = fclose(pk_file);
-  assert(retval == 0);
-  retval = chmod(path.c_str(), 0644);
-  assert(retval == 0);
-}
 
 int main(int argc, char *argv[]) {
   if (argc < 7) {
@@ -128,7 +116,7 @@ int main(int argc, char *argv[]) {
   // check all mandatory parameters are included
   string necessary_params = "urm";
   char result;
-  if ((result = check_parameters(necessary_params, &args)) != '\0') {
+  if ((result = CheckParameters(necessary_params, &args)) != '\0') {
     printf("Argument not included but necessary: -%c\n\n", result);
     swissknife::Usage();
     return 2;
@@ -153,19 +141,25 @@ int main(int argc, char *argv[]) {
 
   // if there is no specified public key file we dump the cern.ch public key in
   // the temporary directory
+  string cern_pk_base_path = *args['x'];
+  string cern_pk_path      = cern_pk_base_path + "/cern.ch.pub";
+  string cern_pk_it1_path  = cern_pk_base_path + "/cern-it1.cern.ch.pub";
+  string cern_pk_it2_path  = cern_pk_base_path + "/cern-it2.cern.ch.pub";
+  string cern_pk_it3_path  = cern_pk_base_path + "/cern-it3.cern.ch.pub";
+  bool keys_created = false;
   if (args.find('k') == args.end()) {
-    string cern_pk_base_path = *args['x'];
-    string cern_pk_path      = cern_pk_base_path + "/cern.ch.pub";
-    string cern_pk_it1_path  = cern_pk_base_path + "/cern-it1.cern.ch.pub";
-    string cern_pk_it2_path  = cern_pk_base_path + "/cern-it2.cern.ch.pub";
-    string cern_pk_it3_path  = cern_pk_base_path + "/cern-it3.cern.ch.pub";
-    create_pk_file(cern_pk_path, CERN_PUBLIC_KEY, sizeof(CERN_PUBLIC_KEY));
-    create_pk_file(cern_pk_it1_path, CERN_IT1_PUBLIC_KEY,
-      sizeof(CERN_IT1_PUBLIC_KEY));
-    create_pk_file(cern_pk_it2_path, CERN_IT2_PUBLIC_KEY,
-      sizeof(CERN_IT2_PUBLIC_KEY));
-    create_pk_file(cern_pk_it3_path, CERN_IT3_PUBLIC_KEY,
-      sizeof(CERN_IT3_PUBLIC_KEY));
+    keys_created = true;
+    assert(CopyMem2Path(reinterpret_cast<const unsigned char*>(gCernPublicKey),
+      sizeof(gCernPublicKey), cern_pk_path));
+    assert(CopyMem2Path(
+      reinterpret_cast<const unsigned char*>(gCernIt1PublicKey),
+      sizeof(gCernIt1PublicKey), cern_pk_it1_path));
+    assert(CopyMem2Path(
+      reinterpret_cast<const unsigned char*>(gCernIt2PublicKey),
+      sizeof(gCernIt2PublicKey), cern_pk_it2_path));
+    assert(CopyMem2Path(
+      reinterpret_cast<const unsigned char*>(gCernIt3PublicKey),
+      sizeof(gCernIt3PublicKey), cern_pk_it3_path));
     char path_separator = ':';
     args['k'] = new string(cern_pk_path     + path_separator +
                            cern_pk_it1_path + path_separator +
@@ -180,5 +174,14 @@ int main(int argc, char *argv[]) {
 
   // load the command
   args['c'] = NULL;
-  return swissknife::CommandPull().Main(args);
+  retval = swissknife::CommandPull().Main(args);
+
+  if (keys_created) {
+    unlink(cern_pk_path.c_str());
+    unlink(cern_pk_it1_path.c_str());
+    unlink(cern_pk_it2_path.c_str());
+    unlink(cern_pk_it3_path.c_str());
+  }
+
+  return retval;
 }
