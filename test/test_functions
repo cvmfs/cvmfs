@@ -250,6 +250,18 @@ uses_overlayfs() {
 }
 
 
+break_hardlink() {
+  local path="$1"
+  local tmp_file="$(mktemp)"
+  local linkcount="$(stat --format=%h $path)"
+
+  echo "Note: breaking up hardlink to '$path' linkcount: $linkcount"
+  cp -f $path $tmp_file
+  rm -f $path
+  mv    $tmp_file $path
+}
+
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
