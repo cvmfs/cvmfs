@@ -27,20 +27,9 @@ change_files_in() {
 
   pushdir $working_dir
 
-  if uses_overlayfs $CVMFS_TEST_REPO; then
-    # OverlayFS would break hard links when copying up 'hardlinkToFile'
-    # therefore we do it proactively here
-    cp hardlinkToFile hardlinkToFile1
-    rm -f hardlinkToFile
-  elif uses_aufs $CVMFS_TEST_REPO; then
-    # AUFS is handling this hardlink use case correctly
-    mv hardlinkToFile hardlinkToFile1
-  else
-    echo "Which union file system?"
-    popdir
-    return 1
-  fi
+  mv hardlinkToFile hardlinkToFile1
 
+  uses_overlayfs $CVMFS_TEST_REPO && break_hardlink file
   echo "additional meaningless content" >> file
 
   mkdir newdirectory
@@ -87,7 +76,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "compare the results of cvmfs to our reference copy"
-  compare_directories $repo_dir $reference_dir|| return $?
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
@@ -104,7 +93,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "compare the changed directories"
-  compare_directories $repo_dir $reference_dir || return $?
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
