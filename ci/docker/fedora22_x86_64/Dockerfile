@@ -8,6 +8,8 @@ RUN         dnf -y update && dnf -y install                     \
                                         fuse-devel              \
                                         gcc                     \
                                         gcc-c++                 \
+                                        git                     \
+                                        hardlink                \
                                         libattr-devel           \
                                         libuuid-devel           \
                                         make                    \

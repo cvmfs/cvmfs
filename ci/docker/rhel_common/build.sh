@@ -43,7 +43,7 @@ cat > $YUM_REPO_CFG << EOF
 name=$SYSTEM_NAME base system packages
 baseurl=$REPO_BASE_URL
 gpgkey=$GPG_KEY_PATHS
-gpgcheck=0
+gpgcheck=1
 enabled=0
 EOF
 
