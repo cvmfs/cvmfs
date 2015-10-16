@@ -136,11 +136,12 @@ cvmfs_run_test() {
   echo "putting exactly the same stuff in the scratch space for comparison"
   produce_files_in $reference_dir || return 4
 
-  echo "creating CVMFS snapshot"
-  publish_repo $CVMFS_TEST_REPO || return $?
+  local publish_log_1="publish_1.log"
+  echo "creating CVMFS snapshot (logging into $publish_log_1)"
+  publish_repo $CVMFS_TEST_REPO > $publish_log_1 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
-  compare_directories $repo_dir $reference_dir || return $?
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
@@ -171,7 +172,7 @@ cvmfs_run_test() {
   do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || { desaster_cleanup $mnt_point $replica_name; return 10; }
 
   echo "check if the Stratum1 repository contains exactly the same as the reference copy"
-  compare_directories $mnt_point $reference_dir || { desaster_cleanup $mnt_point $replica_name; return 11; }
+  compare_directories $mnt_point $reference_dir $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 11; }
 
   echo "unmount the Stratum1 repository"
   sudo umount $mnt_point || { desaster_cleanup $mnt_point $replica_name; return 12; }
