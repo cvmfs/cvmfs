@@ -22,6 +22,26 @@ JsonDocument *JsonDocument::Create(const string &text) {
 }
 
 
+string JsonDocument::EscapeString(const string &input) {
+  string escaped;
+  escaped.reserve(input.length());
+  
+  for (unsigned i = 0, s = input.length(); i < s; ++i) {
+    if (input[i] == '\\') {
+      escaped.push_back('\\');
+      escaped.push_back('\\');
+    }
+    else if (input[i] == '"') {
+      escaped.push_back('\\');
+      escaped.push_back('"');
+    } else {
+      escaped.push_back(input[i]);
+    }
+  }
+  return escaped;
+}
+
+
 JsonDocument::JsonDocument() :
   allocator_(kDefaultBlockSize),
   root_(NULL),
@@ -72,15 +92,24 @@ bool JsonDocument::Parse(const string &text) {
 
 string JsonDocument::PrintArray(JSON *first_child, PrintOptions print_options) {
   string result = "[";
+  if (print_options.with_whitespace) {
+    result += "\n";
+    print_options.num_indent += 2;
+  }
   JSON *value = first_child;
   if (value != NULL) {
     result += PrintValue(value, print_options);
     value = value->next_sibling;
   }
   while (value != NULL) {
-    result += print_options.with_whitespace ? ", " : ",";
+    result += print_options.with_whitespace ? ",\n" : ",";
     result += PrintValue(value, print_options);
     value = value->next_sibling;
+  }
+  if (print_options.with_whitespace) {
+    result += "\n";
+    for (unsigned i = 2; i < print_options.num_indent; ++i)
+      result.push_back(' ');
   }
   return result + "]";
 }
@@ -89,9 +118,9 @@ string JsonDocument::PrintArray(JSON *first_child, PrintOptions print_options) {
 /**
  * JSON string in a canonical format:
  *   - No whitespaces
- *   - Variable names in quotes
+ *   - Variable names and strings in quotes
  *
- * Can be used as a cacnonical representation to sign or encrypt a JSON text.
+ * Can be used as a canonical representation to sign or encrypt a JSON text.
  */
 string JsonDocument::PrintCanonical() {
   if (!root_)
@@ -141,25 +170,27 @@ string JsonDocument::PrintPretty() {
 
 std::string JsonDocument::PrintValue(JSON *value, PrintOptions print_options) {
   assert(value);
-  assert(value->name);
 
   string result;
   for (unsigned i = 0; i < print_options.num_indent; ++i)
     result.push_back(' ');
-  result += "\"" + string(value->name) + "\":";
-  if (print_options.with_whitespace)
-    result += " ";
+  if (value->name) {
+    result += "\"" + EscapeString(value->name) + "\":";
+    if (print_options.with_whitespace)
+      result += " ";
+  }
   switch (value->type) {
     case JSON_NULL:
       result += "null";
       break;
     case JSON_OBJECT:
       result += PrintObject(value->first_child, print_options);
+      break;
     case JSON_ARRAY:
       result += PrintArray(value->first_child, print_options);
+      break;
     case JSON_STRING:
-      // TODO(jblomer): escaping
-      result += "\"" + string(value->string_value) + "\"";
+      result += "\"" + EscapeString(value->string_value) + "\"";
       break;
     case JSON_INT:
       result += StringifyInt(value->int_value);

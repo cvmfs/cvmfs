@@ -37,6 +37,7 @@ class JsonDocument : SingleCopy {
   std::string PrintValue(JSON *value, PrintOptions print_options);
   std::string PrintArray(JSON *first_child, PrintOptions print_options);
   std::string PrintObject(JSON *first_child, PrintOptions print_options);
+  std::string EscapeString(const std::string &input);
 
   block_allocator  allocator_;
   JSON            *root_;
