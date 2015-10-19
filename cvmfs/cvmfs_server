@@ -2737,17 +2737,23 @@ add_replica() {
   fi
 
   # upstream generation (defaults to local upstream)
-  local stratum1=""
   if [ x"$upstream" = x"" ]; then
     if [ x"$s3_config" != x"" ]; then
-      [ x"$stratum1_url" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
       upstream=$(make_s3_upstream $alias_name $s3_config)
-      stratum1=$(mangle_s3_cvmfs_url $alias_name "$stratum1_url")
     else
       upstream=$(make_local_upstream $alias_name)
-      stratum1="http://localhost/cvmfs/${alias_name}"
-      [ ! -z "$stratum1_url" ] && stratum1="$stratum1_url"
     fi
+  fi
+
+  # stratum1 URL generation (defaults to local URL)
+  local stratum1=""
+  if [ x"$s3_config" != x"" ]; then
+    [ x"$stratum1_url" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
+    stratum1=$(mangle_s3_cvmfs_url $alias_name "$stratum1_url")
+  elif [ x"stratum1_url" = x"" ]; then
+    stratum1="http://localhost/cvmfs/${alias_name}"
+  else
+    stratum1="$stratum1_url"
   fi
 
   # additional configuration
