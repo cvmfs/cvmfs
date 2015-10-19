@@ -11,8 +11,7 @@ cleanup() {
 
 cvmfs_run_test() {
   local working_dir="$(pwd)"
-  local repo_name="local.preloadtest"
-  local repo_dir="/cvmfs/$repo_name"
+  local repo_dir="/cvmfs/$CVMFS_TEST_REPO"
   local preload_dir="$working_dir/preloadcache"
   rm -rf "$preload_dir"
   mkdir -p "$preload_dir"
@@ -20,10 +19,10 @@ cvmfs_run_test() {
   mkdir -p "$tmpdir"
   mkdir -p "$repo_dir"
 
-  create_empty_repo "$repo_name" $(whoami)
-  start_transaction "$repo_name"
+  create_empty_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER"
+  start_transaction "$CVMFS_TEST_REPO"
 
-  echo "Populating the repository $repo_name"
+  echo "Populating the repository $CVMFS_TEST_REPO"
   mkdir "$repo_dir/dir"
   mkdir "$repo_dir/dir/ctlg1"
   touch "$repo_dir/dir/ctlg1/.cvmfscatalog"
@@ -38,8 +37,8 @@ cvmfs_run_test() {
   echo "Dummy content 3" > "$repo_dir/ctlg3/FILE3"
 
   echo "Dummy content 4" > "$repo_dir/FILE4"
-  publish_repo "$repo_name"
-  check_repository $repo_name -i || return $?
+  publish_repo "$CVMFS_TEST_REPO"
+  check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "Populating the cache in $preload_dir"
   cat > pathspec << EOF
@@ -48,10 +47,10 @@ cvmfs_run_test() {
 /ctlg3/**
 EOF
 
-  cvmfs_preload -u "http://localhost/cvmfs/$repo_name"        \
+  cvmfs_preload -u "http://localhost/cvmfs/$CVMFS_TEST_REPO"  \
                 -r "$preload_dir"                             \
-                -k "/etc/cvmfs/keys/$repo_name.pub"           \
-                -m "$repo_name"                               \
+                -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub"     \
+                -m "$CVMFS_TEST_REPO"                         \
                 -d "$(pwd)/pathspec"                         || return $?
 
   echo "Create a local configuration file in $(pwd)/local.conf"
@@ -63,20 +62,18 @@ CVMFS_RELOAD_SOCKETS=$(pwd)/cache
 CVMFS_ALIEN_CACHE=$preload_dir
 CVMFS_SERVER_URL=NOAVAIL
 CVMFS_HTTP_PROXY=NOAVAIL
-CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$repo_name.pub
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
 EOF
 
   REPO_MOUNTPOINT="$(pwd)/mnt"
   mkdir "$REPO_MOUNTPOINT"
   echo "Mount the repository in $REPO_MOUNTPOINT to verify it"
   trap cleanup EXIT HUP INT TERM || return 101
-  cvmfs2 -o debug,config=$(pwd)/local.conf $repo_name $REPO_MOUNTPOINT  || return $?
+  cvmfs2 -o debug,config=$(pwd)/local.conf $CVMFS_TEST_REPO $REPO_MOUNTPOINT  || return $?
 
   # check everything is alright
     [ -f "$REPO_MOUNTPOINT/dir/ctlg1/FILE1" ]      || return 1
   ! [ -f "$REPO_MOUNTPOINT/dir/ctlg2/FILE2" ]      || return 2
     [ -f "$REPO_MOUNTPOINT/ctlg3/FILE3" ]          || return 3
     [ -f "$REPO_MOUNTPOINT/FILE4" ]                || return 4
-
-  destroy_repo "$repo_name"
 }
