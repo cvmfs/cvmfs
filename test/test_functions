@@ -250,6 +250,18 @@ uses_overlayfs() {
 }
 
 
+break_hardlink() {
+  local path="$1"
+  local tmp_file="$(mktemp)"
+  local linkcount="$(stat --format=%h $path)"
+
+  echo "Note: breaking up hardlink to '$path' linkcount: $linkcount"
+  cp -f $path $tmp_file
+  rm -f $path
+  mv    $tmp_file $path
+}
+
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
@@ -625,16 +637,13 @@ create_big_file() {
 # - file size
 # - parent directory
 # - symlink destination (when applicable)
-# - uid and gid can be specified
 #
 # @param directory          the directory to be listed
-# @param uid                specify a UID for the file owner (optional)
-# @param gid                specify a GID for the file owner (optional)
+# @param show_linkcount     yes be default, otherwise linkcount is left out
 # @return                   a custom directory listing
 create_listing() {
   local directory=$1
-  local uid=$2
-  local gid=$3
+  local show_linkcount=$2
   local lst
 
   lst=$(ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
@@ -671,15 +680,18 @@ create_listing() {
 
     # print out file information
     printf $1                     " ";
-    printf $2                     " ";
-    printf (uid == "" ? $3 : uid) " ";
-    printf (gid == "" ? $4 : gid) " ";
+    if (show_linkcount == "yes")
+    {
+      printf $2                   " ";
+    }
+    printf $3                     " ";
+    printf $4                     " ";
     printf $6;
 
     if(first == "l") printf " " $7 " " $8;
     if(first != "d") printf " " $5;
     printf "\n"
-  }' uid=$uid gid=$gid base_dir=$directory)
+  }' base_dir=$directory show_linkcount=$show_linkcount)
 
   echo -e "$lst"
 }
@@ -690,13 +702,21 @@ create_listing() {
 #
 # @param dir1    the directory to probe
 # @param dir2    the ground truth directory
+# @param repo    the underlying repository name (optional - to detect overlayfs)
 # @return        != 0 to indicate inequality, 0 means success
 compare_directories() {
   local dir1=$1
   local dir2=$2
+  local repo_name=$3
+  local show_linkcount="yes"
 
-  listing1=$(create_listing $dir1)
-  listing2=$(create_listing $dir2)
+  if [ ! -z $repo_name ] && uses_overlayfs $repo_name; then
+    echo "NOTE: $repo_name is based on OverlayFS - ignoring link counts"
+    show_linkcount="no"
+  fi
+
+  listing1=$(create_listing $dir1 $show_linkcount)
+  listing2=$(create_listing $dir2 $show_linkcount)
 
   echo "check if directory structure and file meta data fits"
   local listingFile1="listing_$(basename $dir1)"
