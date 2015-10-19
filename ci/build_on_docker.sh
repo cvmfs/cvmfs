@@ -42,6 +42,21 @@ _time_from_git() {
   date +%s --date "$(git log -1 --format=%ai -- $relative_path)"
 }
 
+_max() {
+  local lhs="$1"
+  local rhs="$2"
+  [ $lhs -gt $rhs ] && echo $lhs || echo $rhs
+}
+
+_max_time_from_git() {
+  local directory_path="$1"
+  local max_epoch=0
+  for f in $(find $directory_path -mindepth 1); do
+    max_epoch="$(_max $max_epoch $(_time_from_git $f))"
+  done
+  echo $max_epoch
+}
+
 # retrieves the last-changed timestamp for a specific docker image recipe
 # @param recipe_dir  the directory of the docker image recipe to check
 # @return            last modified timestamp in Unix epoch
@@ -49,11 +64,13 @@ image_recipe() {
   local recipe_dir="$1"
   local owd="$(pwd)"
   cd ${recipe_dir}
-  local dockerfile_epoch="$(_time_from_git Dockerfile)"
-  local buildfile_epoch="$(_time_from_git build.sh)"
+  local recipe_epoch="$(_max_time_from_git .)"
+  cd ..
+  for d in $(find . -maxdepth 1 -mindepth 1 -type d -name '*_common'); do
+    recipe_epoch="$(_max $recipe_epoch $(_max_time_from_git $d))"
+  done
   cd $owd
-  [ $dockerfile_epoch -gt $buildfile_epoch ] && echo $dockerfile_epoch \
-                                             || echo $buildfile_epoch
+  echo $recipe_epoch
 }
 
 bootstrap_image() {

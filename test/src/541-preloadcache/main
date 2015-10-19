@@ -100,8 +100,8 @@ EOF
   trap cleanup EXIT HUP INT TERM || return 15
 
   cvmfs2 -o config=$(pwd)/local.conf $CVMFS_TEST_REPO $CVMFS_TEST_541_MOUNTPOINT || return 20
-  compare_directories $repo_dir $reference_dir                  || return 21
-  compare_directories $CVMFS_TEST_541_MOUNTPOINT $reference_dir || return 22
+  compare_directories $repo_dir                  $reference_dir $CVMFS_TEST_REPO || return 21
+  compare_directories $CVMFS_TEST_541_MOUNTPOINT $reference_dir $CVMFS_TEST_REPO || return 22
 
   return 0
 }

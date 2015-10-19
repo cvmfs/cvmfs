@@ -23,6 +23,6 @@ RUN         yum -y update && yum -y install                     \
                                         which                   \
                                         zlib-devel
 
-RUN         useradd sftnight && usermod -a -G mock sftnight
+RUN         useradd sftnight
 USER        sftnight
 WORKDIR     /home/sftnight

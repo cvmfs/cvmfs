@@ -531,8 +531,7 @@ get_available_union_fs() {
   fi
 }
 
-# gets the system file system name of the overlayfs
-# apparently this differs from version to version... sigh!
+# gets the system's file system name of OverlayFS (overlay vs. overlayfs)
 get_overlayfs_name() {
   check_overlayfs || die "overlayfs is not installed!"
   if /sbin/modprobe -q overlayfs || [ -d /sys/module/overlayfs ]; then
@@ -554,7 +553,7 @@ get_overlayfs_type() {
   ofs_name="$(get_overlayfs_name)"
   vermagic="$(modinfo --field vermagic $ofs_name)"
   krnl_version="$(echo "$vermagic" | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')"
-  ofs_type=OFS_POST_V22
+  ofs_type=$OFS_POST_V22
   if compare_versions "$krnl_version" -lt 3.18.0; then ofs_type=$OFS_PRE_V22; fi
   echo "$ofs_type"
 }
@@ -1759,6 +1758,32 @@ EOF
   return 0
 }
 
+_setcap_if_needed() {
+  local binary_path="$1"
+  local capability="$2"
+  [ -x $binary_path ]                           || return 0
+  getcap "$binary_path" | grep -q "$capability" && return 0
+  setcap "${capability}+p" "$binary_path"
+}
+
+# grants CAP_SYS_ADMIN to cvmfs_swissknife if it is necessary
+# Note: OverlayFS uses trusted extended attributes that are not readable by a
+#       normal unprivileged process
+ensure_swissknife_suid() {
+  local unionfs="$1"
+  local sk_bin="/usr/bin/$CVMFS_SERVER_SWISSKNIFE"
+  local sk_dbg_bin="/usr/bin/${CVMFS_SERVER_SWISSKNIFE}_debug"
+  local cap="cap_sys_admin"
+
+  # check if we need CAP_SYS_ADMIN for cvmfs_swissknife...
+  is_root || die "need to be root for granting CAP_SYS_ADMIN to $sk_bin"
+  [ x"$unionfs" = x"overlayfs" ] || return 0
+
+  # ... yes, obviously we need CAP_SYS_ADMIN for cvmfs_swissknife
+  _setcap_if_needed "$sk_bin"     "$cap" || return 1
+  _setcap_if_needed "$sk_dbg_bin" "$cap" || return 2
+}
+
 
 # cvmfs requires a couple of apache modules to be enabled when running on
 # an ubuntu machine. This enables these modules on an ubuntu installation
@@ -2523,6 +2548,7 @@ mkfs() {
   check_cvmfs2_client               || die "cvmfs client missing"
   check_autofs_on_cvmfs             && die "Autofs on /cvmfs has to be disabled"
   lower_hardlink_restrictions
+  ensure_swissknife_suid $unionfs   || die "Need CAP_SYS_ADMIN for cvmfs_swissknife"
   if is_local_upstream $upstream; then
     check_apache                    || die "Apache must be installed and running"
     ensure_enabled_apache_modules
