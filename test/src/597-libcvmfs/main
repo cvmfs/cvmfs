@@ -15,10 +15,9 @@ cvmfs_run_test() {
     local repo_name="$base_name$i"
     local repo_dir="/cvmfs/$repo_name"
 
-    create_repo "$repo_name" $CVMFS_TEST_USER
+    create_empty_repo "$repo_name" $CVMFS_TEST_USER
     start_transaction "$repo_name"
 
-    rm $repo_dir/*  # cleanup the repository before starting
     mkdir "$repo_dir/main"
     echo "$i" > "$repo_dir/main/mainfile"
 
