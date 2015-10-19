@@ -17,7 +17,7 @@ cvmfs_run_test() {
   local base_name="$CVMFS_TEST_597_REPO_PREFIX"
 
   echo "compiling libcvmfs test binary..."
-  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -lcrypto -luuid -lrt
+  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -lcrypto -luuid -lrt || return 1
 
   echo "register cleanup trap"
   trap cleanup EXIT HUP INT TERM || return $?
@@ -28,18 +28,18 @@ cvmfs_run_test() {
     local repo_dir="/cvmfs/$repo_name"
 
     CVMFS_TEST_597_REPO_COUNT=$(( $CVMFS_TEST_597_REPO_COUNT + 1 ))
-    create_empty_repo "$repo_name" $CVMFS_TEST_USER
-    start_transaction "$repo_name"
+    create_empty_repo "$repo_name" $CVMFS_TEST_USER || return 2
+    start_transaction "$repo_name"                  || return 3
 
-    mkdir "$repo_dir/main"
-    echo "$i" > "$repo_dir/main/mainfile"
+    mkdir "$repo_dir/main"                || return 4
+    echo "$i" > "$repo_dir/main/mainfile" || return 5
 
-    mkdir "$repo_dir/list"
+    mkdir "$repo_dir/list" || return 6
     for j in $(seq 1 $i); do
-      touch "$repo_dir/list/file$j"
+      touch "$repo_dir/list/file$j" || return 7
     done
 
-    publish_repo "$repo_name"
+    publish_repo "$repo_name" || return 8
   done
 
   echo "check libcvmfs with the generated binary"
