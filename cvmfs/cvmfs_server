@@ -1469,10 +1469,15 @@ health_check() {
   fi
 
   # check configuration for harzardous AUFS setup
-  if [ $quiet -eq 0 ] && find_hazardous_aufs_config $name; then
-    echo "WARNING: AUFS config is vulnerable to kernel deadlocks. Please store "
-    echo "         the scratch space and the cvmfs client cache on different "
-    echo "         partitions. (Silence this with CVMFS_AUFS_WARNING=false)"
+  if [ $quiet -eq 0 ] && find_hazardous_union_file_system_config $name; then
+    echo "WARNING: Union filesystem config is vulnerable to kernel deadlocks."
+    echo "         Please store the scratch space and the CVMFS client cache on"
+    echo "         different partitions."
+    echo ""
+    echo "         This can be silenced with either"
+    echo "             CVMFS_AUFS_WARNING=false"
+    echo "         or  CVMFS_OVERLAYFS_WARNING=false"
+    echo ""
     echo " Scratch Space: ${CVMFS_SPOOL_DIR}/scratch"
     echo " Client Cache:  ${CVMFS_CACHE_BASE}"
     echo ""
