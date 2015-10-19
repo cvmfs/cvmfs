@@ -5,7 +5,7 @@ cvmfs_run_test() {
   local workdir="$2"
   # compile the source first
   local bin_name="597-test"
-  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -luuid -lrt
+  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -lcrypto -luuid -lrt
 
   apache_switch on
   local num_repos=5
