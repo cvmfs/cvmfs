@@ -9,7 +9,7 @@ cvmfs_run_test() {
 
   apache_switch on
   local num_repos=5
-  local base_name="local.libcvmfs_test_"
+  local base_name="test.cern.ch.libcvmfs_"
   for i in $(seq 1 $num_repos); do
     local repo_name="$base_name$i"
     local repo_dir="/cvmfs/$repo_name"
