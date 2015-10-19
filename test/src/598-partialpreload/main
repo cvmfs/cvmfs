@@ -1,28 +1,11 @@
 cvmfs_test_name="Partial preload"
 cvmfs_test_autofs_on_startup=false
 
-cleanup() {
-  echo "running cleanup()"
-  if [ ! -z $REPO_MOUNTPOINT ]; then
-    sudo fusermount -u $REPO_MOUNTPOINT
-    sudo umount        $REPO_MOUNTPOINT
-  fi
-}
+produce_files_in() {
+  local working_dir=$1
 
-cvmfs_run_test() {
-  local working_dir="$(pwd)"
-  local repo_dir="/cvmfs/$CVMFS_TEST_REPO"
-  local preload_dir="$working_dir/preloadcache"
-  rm -rf "$preload_dir"
-  mkdir -p "$preload_dir"
-  local tmpdir="$preload_dir/tmpdir"
-  mkdir -p "$tmpdir"
-  mkdir -p "$repo_dir"
+  pushdir $working_dir
 
-  create_empty_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER"
-  start_transaction "$CVMFS_TEST_REPO"
-
-  echo "Populating the repository $CVMFS_TEST_REPO"
   mkdir "$repo_dir/dir"
   mkdir "$repo_dir/dir/ctlg1"
   touch "$repo_dir/dir/ctlg1/.cvmfscatalog"
@@ -37,7 +20,40 @@ cvmfs_run_test() {
   echo "Dummy content 3" > "$repo_dir/ctlg3/FILE3"
 
   echo "Dummy content 4" > "$repo_dir/FILE4"
-  publish_repo "$CVMFS_TEST_REPO"
+
+  popdir
+}
+
+cleanup() {
+  echo "running cleanup()"
+  if [ ! -z $REPO_MOUNTPOINT ]; then
+    sudo fusermount -u $REPO_MOUNTPOINT
+    sudo umount        $REPO_MOUNTPOINT
+  fi
+}
+
+cvmfs_run_test() {
+  local working_dir="$(pwd)"
+  local repo_dir="/cvmfs/$CVMFS_TEST_REPO"
+  local preload_dir="$working_dir/preloadcache"
+  local tmpdir="$preload_dir/tmpdir"
+
+  echo -n "checking if cvmfs_preload is available..."
+  which cvmfs_preload 2>&1 >/dev/null || return 1
+
+  echo "prepare environment"
+  mkdir -p "$tmpdir"      || return 2
+  mkdir -p "$preload_dir" || return 3
+
+  echo "create empty repository $CVMFS_TEST_REPO"
+  create_empty_repo "$CVMFS_TEST_REPO" "$CVMFS_TEST_USER" || return 4
+
+  echo "Populating the repository $CVMFS_TEST_REPO"
+  start_transaction "$CVMFS_TEST_REPO" || return 5
+  produce_files_in $repo_dir           || return 6
+  publish_repo "$CVMFS_TEST_REPO"      || return 7
+
+  echo "check that everything is fine with the repository"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "Populating the cache in $preload_dir"
@@ -47,6 +63,7 @@ cvmfs_run_test() {
 /ctlg3/**
 EOF
 
+  echo "preloading the cache"
   cvmfs_preload -u "http://localhost/cvmfs/$CVMFS_TEST_REPO"  \
                 -r "$preload_dir"                             \
                 -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub"     \
@@ -54,7 +71,7 @@ EOF
                 -d "$(pwd)/pathspec"                         || return $?
 
   echo "Create a local configuration file in $(pwd)/local.conf"
-  mkdir cache
+  mkdir cache || return 8
   cat > local.conf << EOF
 CVMFS_CACHE_BASE=$(pwd)/cache
 CVMFS_QUOTA_LIMIT=-1
@@ -65,13 +82,13 @@ CVMFS_HTTP_PROXY=NOAVAIL
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
 EOF
 
+  echo "Mount the repository in $REPO_MOUNTPOINT to verify it"
   REPO_MOUNTPOINT="$(pwd)/mnt"
   mkdir "$REPO_MOUNTPOINT"
-  echo "Mount the repository in $REPO_MOUNTPOINT to verify it"
   trap cleanup EXIT HUP INT TERM || return 101
   cvmfs2 -o debug,config=$(pwd)/local.conf $CVMFS_TEST_REPO $REPO_MOUNTPOINT  || return $?
 
-  # check everything is alright
+  echo "check everything is alright"
     [ -f "$REPO_MOUNTPOINT/dir/ctlg1/FILE1" ]      || return 1
   ! [ -f "$REPO_MOUNTPOINT/dir/ctlg2/FILE2" ]      || return 2
     [ -f "$REPO_MOUNTPOINT/ctlg3/FILE3" ]          || return 3
