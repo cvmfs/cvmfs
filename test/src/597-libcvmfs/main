@@ -1,41 +1,47 @@
 cvmfs_test_name="Libcvmfs test"
 cvmfs_test_autofs_on_startup=false
 
+CVMFS_TEST_597_REPO_COUNT=0
+CVMFS_TEST_597_REPO_PREFIX="test.cern.ch.libcvmfs_"
+cleanup() {
+  echo "running cleanup()"
+  for i in $(seq 1 $CVMFS_TEST_597_REPO_COUNT); do
+    destroy_repo "$CVMFS_TEST_597_REPO_PREFIX$i"
+  done
+}
+
 cvmfs_run_test() {
   local workdir="$2"
-  # compile the source first
   local bin_name="597-test"
-  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -luuid -lrt
-
-  apache_switch on
   local num_repos=5
-  local base_name="local.libcvmfs_test_"
+  local base_name="$CVMFS_TEST_597_REPO_PREFIX"
+
+  echo "compiling libcvmfs test binary..."
+  g++ -o "$bin_name" -DDEBUGMSG "$workdir/main.cc" -lcvmfs -pthread -ldl -lssl -lcrypto -luuid -lrt || return 1
+
+  echo "register cleanup trap"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "creating $num_repos local test repositories"
   for i in $(seq 1 $num_repos); do
     local repo_name="$base_name$i"
     local repo_dir="/cvmfs/$repo_name"
 
-    create_repo "$repo_name" $(whoami)
-    start_transaction "$repo_name"
+    CVMFS_TEST_597_REPO_COUNT=$(( $CVMFS_TEST_597_REPO_COUNT + 1 ))
+    create_empty_repo "$repo_name" $CVMFS_TEST_USER || return 2
+    start_transaction "$repo_name"                  || return 3
 
-    rm $repo_dir/*  # cleanup the repository before starting
-    mkdir "$repo_dir/main"
-    echo "$i" > "$repo_dir/main/mainfile"
+    mkdir "$repo_dir/main"                || return 4
+    echo "$i" > "$repo_dir/main/mainfile" || return 5
 
-    mkdir "$repo_dir/list"
+    mkdir "$repo_dir/list" || return 6
     for j in $(seq 1 $i); do
-      touch "$repo_dir/list/file$j"
+      touch "$repo_dir/list/file$j" || return 7
     done
 
-    publish_repo "$repo_name"
+    publish_repo "$repo_name" || return 8
   done
 
-  # check libcvmfs with the generated binary
-  "./$bin_name" "$base_name" "$num_repos"
-  return_code=$?
-
-  for i in $(seq 1 $num_repos); do
-    destroy_repo "$base_name$i"
-  done
-
-  return $return_code
+  echo "check libcvmfs with the generated binary"
+  ./$bin_name "$base_name" "$num_repos"
 }
