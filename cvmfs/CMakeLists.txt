@@ -510,6 +510,24 @@ if (BUILD_PRELOADER)
 endif (BUILD_PRELOADER)
 
 #
+# Generate a bash self-extracting script for the cvmfs_preload target
+#
+if (BUILD_PRELOADER)
+  set (PRELOADER_EXEC cvmfs_preload.sh)
+  set (PRELOADER_TAR_GZ cvmfs_preload.tar.gz)
+  add_custom_command (
+    TARGET cvmfs_preload POST_BUILD
+    COMMAND sh -c "cp ${TBB_BUILD_LOCATION}/build_release/libtbb_cvmfs.so.2 ${TBB_BUILD_LOCATION}/build_release/libtbbmalloc_cvmfs.so.2 ."
+    COMMAND sh -c "tar czf ${PRELOADER_TAR_GZ} cvmfs_preload libtbbmalloc_cvmfs.so.2 libtbb_cvmfs.so.2"
+    COMMAND sh -c "cat ${CMAKE_SOURCE_DIR}/cvmfs/cvmfs_preload.sh ${PRELOADER_TAR_GZ} > ${PRELOADER_EXEC}"
+    COMMAND sh -c "chmod +x ${PRELOADER_EXEC}"
+    COMMAND sh -c "rm -f ${PRELOADER_TAR} ${PRELOADER_TAR_GZ} ./libtbbmalloc_cvmfs.so.2 ./libtbb_cvmfs.so.2"
+    COMMENT "Generating the cvmfs_preload self-extracting script"
+    VERBATIM
+  )
+endif (BUILD_PRELOADER)
+
+#
 # installation
 #
 
