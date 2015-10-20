@@ -1,0 +1,157 @@
+cvmfs_test_name="Create Stratum0/Stratum1 with custom Upstream String"
+cvmfs_test_autofs_on_startup=false
+
+make_upstream() {
+  local type_name=$1
+  local tmp_dir=$2
+  local config_string=$3
+  echo "$type_name,$tmp_dir,$config_string"
+}
+
+make_local_upstream() {
+  local repo_name=$1
+  make_upstream "local" "/srv/cvmfs/${repo_name}/data/txn" "/srv/cvmfs/${repo_name}"
+}
+
+make_s3_upstream() {
+  local repo_name=$1
+  local s3_config=$2
+  make_upstream "S3" "/var/spool/cvmfs/${repo_name}/tmp" "${repo_name}@${s3_config}"
+}
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir poems
+
+  cat > poems/zueignung.txt << EOF
+Der Kabeljau
+Das Meer ist weit, das Meer ist blau,
+im Wasser schwimmt ein Kabeljau.
+Da kömmt ein Hai von ungefähr,
+ich glaub’ von links, ich weiß nicht mehr,
+verschluckt den Fisch mit Haut und Haar,
+das ist zwar traurig, aber wahr. ---
+Das Meer ist weit, das Meer ist blau,
+im Wasser schwimmt kein Kabeljau.
+
+   Heinz Erhardt
+EOF
+
+  cat > poems/unordnung.txt << EOF
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung    ordnung
+ordnung  unordn  g
+ordnung    ordnung
+EOF
+
+  ln -s poems/unordnung.txt unordnung
+
+  popdir
+}
+
+CVMFS_TEST_556_REPLICA_NAME=
+CVMFS_TEST_556_MOUNTPOINT=
+cleanup() {
+  echo "running cleanup()"
+  [ -z $CVMFS_TEST_556_MOUNTPOINT   ] || sudo umount $CVMFS_TEST_556_MOUNTPOINT
+  [ -z $CVMFS_TEST_556_REPLICA_NAME ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_556_REPLICA_NAME
+}
+
+check_stratum1_tmp_dir_emptiness() {
+  local tmp_dir="$1"
+  local tmp_dir_entries
+  echo "check stratum1 tmp directory"
+  tmp_dir_entries=$(ls $tmp_dir | wc -l)
+  echo "$tmp_dir contains: $tmp_dir_entries"
+  [ $tmp_dir_entries -eq 0 ]
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  local mnt_point="$(pwd)/mountpount"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  local s0upstream=
+  if [ -z $CVMFS_TEST_S3_CONFIG ]; then
+    s0upstream=$(make_local_upstream $CVMFS_TEST_REPO)
+    s1upstream=$(make_local_upstream $replica_name)
+  else
+    s0upstream=$(make_s3_upstream $CVMFS_TEST_REPO $CVMFS_TEST_S3_CONFIG)
+    s1upstream=$(make_s3_upstream $replica_name $CVMFS_TEST_S3_CONFIG)
+  fi
+
+  echo "Using the following 'custom' upstream strings"
+  echo "  Stratum0 Upstream: $s0upstream"
+  echo "  Stratum1 Upstream: $s1upstream"
+
+  echo "install a desaster cleanup trap"
+  trap cleanup EXIT HUP INT TERM
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "NO" -u "$s0upstream" || return $?
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  echo "create Stratum1 repository on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+  CVMFS_TEST_556_REPLICA_NAME=$replica_name
+  create_stratum1 $replica_name                          \
+                  $CVMFS_TEST_USER                       \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                  -u "$s1upstream" || return 7
+
+  echo -n "get Stratum 1 spool directory: "
+  load_repo_config $replica_name
+  local s1_spool_tmp_dir="${CVMFS_SPOOL_DIR}/tmp"
+  load_repo_config $CVMFS_TEST_REPO
+  echo "$s1_spool_tmp_dir"
+
+  echo "create a Snapshot of the Stratum0 repository in the just created Stratum1 replica"
+  sudo cvmfs_server snapshot $replica_name || return 9
+
+  echo "check that Stratum1 spooler tmp dir is empty"
+  check_stratum1_tmp_dir_emptiness $s1_spool_tmp_dir || return 101
+
+  echo "mount the Stratum1 repository on a local mountpoint"
+  CVMFS_TEST_556_MOUNTPOINT=$mnt_point
+  do_local_mount $mnt_point $CVMFS_TEST_REPO $(get_repo_url $replica_name) || return 10
+
+  echo "check if the Stratum1 repository contains exactly the same as the reference copy"
+  compare_directories $mnt_point $reference_dir || return 11
+
+  return 0
+}
+
