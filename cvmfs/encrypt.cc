@@ -14,9 +14,11 @@
 #include <cstring>
 #include <ctime>
 
+#include "hash.h"
 #include "platform.h"
 #include "smalloc.h"
 #include "util.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -84,6 +86,47 @@ bool Key::SaveToFile(const std::string &path) {
   int nbytes = write(fd, data_, size_);
   close(fd);
   return (nbytes >= 0) && (static_cast<unsigned>(nbytes) == size_);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+MemoryKeyDatabase::MemoryKeyDatabase() {
+  lock_ =
+    reinterpret_cast<pthread_mutex_t *>(smalloc(sizeof(pthread_mutex_t)));
+  int retval = pthread_mutex_init(lock_, NULL);
+  assert(retval == 0);
+}
+
+
+MemoryKeyDatabase::~MemoryKeyDatabase() {
+  pthread_mutex_destroy(lock_);
+  free(lock_);
+}
+
+
+bool MemoryKeyDatabase::StoreNew(const Key *key, string *id) {
+  MutexLockGuard mutex_guard(lock_);
+  // TODO(jblomer): is this good enough for random keys? Salting? KDF2?
+  shash::Any hash(shash::kSha256);
+  HashMem(key->data(), key->size(), &hash);
+  *id = "H" + hash.ToString();
+  map<string, const Key *>::const_iterator i = database_.find(*id);
+  if (i != database_.end())
+    return false;
+
+  database_[*id] = key;
+  return true;
+}
+
+
+const Key *MemoryKeyDatabase::Find(const string &id) {
+  MutexLockGuard mutex_guard(lock_);
+  map<string, const Key *>::const_iterator i = database_.find(id);
+  if (i != database_.end())
+    return i->second;
+  return NULL;
 }
 
 

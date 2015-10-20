@@ -13,6 +13,9 @@
 #ifndef CVMFS_ENCRYPT_H_
 #define CVMFS_ENCRYPT_H_
 
+#include "pthread.h"
+
+#include <map>
 #include <string>
 
 #include "gtest/gtest_prod.h"
@@ -47,6 +50,30 @@ class Key : SingleCopy {
   Key() : data_(NULL), size_(0)  { }
   unsigned char *data_;
   unsigned size_;
+};
+
+
+/**
+ * Allows to access keys by identifiers.  This might at some point move into a
+ * separate compilation unit.
+ */
+class AbstractKeyDatabase {
+ public:
+  virtual bool StoreNew(const Key *key, std::string *id) = 0;
+  virtual const Key *Find(const std::string &id) = 0;
+};
+
+
+class MemoryKeyDatabase : SingleCopy, public AbstractKeyDatabase {
+ public:
+  MemoryKeyDatabase();
+  ~MemoryKeyDatabase();
+  virtual bool StoreNew(const Key *key, std::string *id);
+  virtual const Key *Find(const std::string &id);
+
+ private:
+  pthread_mutex_t *lock_;
+  std::map<std::string, const Key *> database_;
 };
 
 
