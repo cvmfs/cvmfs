@@ -29,13 +29,11 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
   scratch_path_(scratch_path),
   union_path_(union_path),
   mediator_(mediator),
-  initialized_(false)
-{
-  mediator_->RegisterUnionEngine(this);
-}
+  initialized_(false) {}
 
 
 bool SyncUnion::Initialize() {
+  mediator_->RegisterUnionEngine(this);
   initialized_ = true;
   return true;
 }

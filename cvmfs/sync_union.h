@@ -128,7 +128,7 @@ class SyncUnion {
                                    const std::string &filename) = 0;
 
   bool IsInitialized() const { return initialized_; }
-  bool SupportsHardlinks() const { return false; }
+  virtual bool SupportsHardlinks() const { return false; }
 
  protected:
   std::string rdonly_path_;
