@@ -2594,7 +2594,14 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo $autotagging $garbage_collectable || die "fail"
+  create_config_files_for_new_repository "$name"        \
+                                         "$upstream"    \
+                                         "$stratum0"    \
+                                         "$cvmfs_user"  \
+                                         "$unionfs"     \
+                                         "$hash_algo"   \
+                                         "$autotagging" \
+                                         "$garbage_collectable" || die "fail"
   if is_local_upstream $upstream; then
     reload_apache > /dev/null
   fi
@@ -3022,7 +3029,14 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs sha1 true false || die "fail!"
+  create_config_files_for_new_repository "$name"       \
+                                         "$upstream"   \
+                                         "$stratum0"   \
+                                         "$cvmfs_user" \
+                                         "$unionfs"    \
+                                         "sha1"        \
+                                         "true"        \
+                                         "false" || die "fail!"
   echo "done"
 
   # import the old repository security keys
