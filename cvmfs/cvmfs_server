@@ -1333,27 +1333,11 @@ foreclose_legacy_cvmfs() {
   return $found_something
 }
 
-
-# checks if the configuration of a given repository is vulnerable to a kernel
-# deadlock bug of AUFS.
-#
-# @param name  the name of the repository to check
-# @return      0 if config is vulnerable
-find_hazardous_aufs_config() {
-  local name=$1
-
+_has_vulnerable_aufs_version() {
   # threshold definitions
   local aufs_minimum_required="20130300"
   local krnl_minimum_required="3.10.0"
   local krnl_sl6_minimal_fixed="431.29.2"
-
-  # check if we are actually dealing with AUFS or if the warning message is
-  # silenced... in these cases no more checks are needed
-  load_repo_config $name
-  if [ x"$CVMFS_UNION_FS_TYPE" != x"aufs"  ] || \
-     [ x"$CVMFS_AUFS_WARNING"  =  x"false" ]; then
-    return 1
-  fi
 
   # find the AUFS release date (if available)
   # 1. try using modinfo
@@ -1394,7 +1378,42 @@ find_hazardous_aufs_config() {
     fi
   fi
 
-  # at this point, we have a potential AUFS kernel deadlock vulnerability if
+  # the AUFS version is most likely vulnerable for the known kernel deadlock
+  return 0
+}
+
+_has_vulnerable_overlayfs_version() {
+  return 0 # to our knowledge all OverlayFS versions are currently vulnerable
+}
+
+# checks if the configuration of a given repository is vulnerable to a kernel
+# deadlock bug of AUFS or OverlayFS. (see CVM-651 for further details)
+#
+# @param name  the name of the repository to check
+# @return      0 if config is vulnerable
+find_hazardous_union_file_system_config() {
+  local name=$1
+
+  load_repo_config $name
+
+  # check if we are dealing with a vulnerable union file system or if the
+  # warning message is silenced... in these cases no more checks are needed
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"aufs" ]; then
+    if [ x"$CVMFS_AUFS_WARNING" = x"false" ] || \
+       ! _has_vulnerable_aufs_version; then
+      return 1
+    fi
+  fi
+
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    if [ x"$CVMFS_OVERLAYFS_WARNING" = x"false"  ] || \
+       ! _has_vulnerable_overlayfs_version; then
+      return 1
+    fi
+  fi
+
+
+  # at this point, we have a potential kernel deadlock vulnerability if
   # cache and scratch directory are on the same partition
   local cache_dir="$CVMFS_CACHE_BASE"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
@@ -1450,10 +1469,15 @@ health_check() {
   fi
 
   # check configuration for harzardous AUFS setup
-  if [ $quiet -eq 0 ] && find_hazardous_aufs_config $name; then
-    echo "WARNING: AUFS config is vulnerable to kernel deadlocks. Please store "
-    echo "         the scratch space and the cvmfs client cache on different "
-    echo "         partitions. (Silence this with CVMFS_AUFS_WARNING=false)"
+  if [ $quiet -eq 0 ] && find_hazardous_union_file_system_config $name; then
+    echo "WARNING: Union filesystem config is vulnerable to kernel deadlocks."
+    echo "         Please store the scratch space and the CVMFS client cache on"
+    echo "         different partitions."
+    echo ""
+    echo "         This can be silenced with either"
+    echo "             CVMFS_AUFS_WARNING=false"
+    echo "         or  CVMFS_OVERLAYFS_WARNING=false"
+    echo ""
     echo " Scratch Space: ${CVMFS_SPOOL_DIR}/scratch"
     echo " Client Cache:  ${CVMFS_CACHE_BASE}"
     echo ""
