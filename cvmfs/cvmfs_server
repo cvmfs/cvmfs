@@ -1728,13 +1728,17 @@ make_s3_upstream() {
   make_upstream "S3" "/var/spool/cvmfs/${repo_name}/tmp" "${repo_name}@${s3_config}"
 }
 
+mangle_local_cvmfs_url() {
+  local repo_name=$1
+  echo "http://localhost/cvmfs/${repo_name}"
+}
+
 mangle_s3_cvmfs_url() {
   local repo_name=$1
   local s3_url="$2"
   [ $(echo -n "$s3_url" | tail -c1) = "/" ] || s3_url="${s3_url}/"
   echo "${s3_url}${repo_name}"
 }
-
 
 # lowers restrictions of hardlink creation if needed
 # allows AUFS to properly whiteout files without root privileges
@@ -2526,13 +2530,18 @@ mkfs() {
   # upstream generation (defaults to local upstream)
   if [ x"$upstream" = x"" ]; then
     if [ x"$s3_config" != x"" ]; then
-      [ x"$stratum0" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
       upstream=$(make_s3_upstream $name $s3_config)
-      stratum0=$(mangle_s3_cvmfs_url $name "$stratum0")
     else
       upstream=$(make_local_upstream $name)
-      [ x"$stratum0" = x"" ] && stratum0="http://localhost/cvmfs/$name"
     fi
+  fi
+
+  # stratum0 URL generation (defaults to local URL)
+  if [ x"$s3_config" != x"" ]; then
+    [ x"$stratum0" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
+    stratum0=$(mangle_s3_cvmfs_url $name "$stratum0")
+  elif [ x"$stratum0" = x"" ]; then
+    stratum0="$(mangle_local_cvmfs_url $name)"
   fi
 
   # sanity checks
@@ -2585,7 +2594,14 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs $hash_algo $autotagging $garbage_collectable || die "fail"
+  create_config_files_for_new_repository "$name"        \
+                                         "$upstream"    \
+                                         "$stratum0"    \
+                                         "$cvmfs_user"  \
+                                         "$unionfs"     \
+                                         "$hash_algo"   \
+                                         "$autotagging" \
+                                         "$garbage_collectable" || die "fail"
   if is_local_upstream $upstream; then
     reload_apache > /dev/null
   fi
@@ -2750,8 +2766,8 @@ add_replica() {
   if [ x"$s3_config" != x"" ]; then
     [ x"$stratum1_url" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
     stratum1=$(mangle_s3_cvmfs_url $alias_name "$stratum1_url")
-  elif [ x"stratum1_url" = x"" ]; then
-    stratum1="http://localhost/cvmfs/${alias_name}"
+  elif [ x"$stratum1_url" = x"" ]; then
+    stratum1="$(mangle_local_cvmfs_url $alias_name)"
   else
     stratum1="$stratum1_url"
   fi
@@ -2958,7 +2974,7 @@ import() {
   name=$(get_repository_name $1)
 
   # default values
-  [ x"$stratum0" = x ] && stratum0="http://localhost/cvmfs/$name"
+  [ x"$stratum0" = x ] && stratum0="$(mangle_local_cvmfs_url $name)"
   [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
   [ x"$unionfs"  = x ] && unionfs="$(get_available_union_fs)"
 
@@ -3013,7 +3029,14 @@ import() {
 
   # create the configuration for the new repository
   echo -n "Creating configuration files... "
-  create_config_files_for_new_repository $name $upstream $stratum0 $cvmfs_user $unionfs sha1 true false || die "fail!"
+  create_config_files_for_new_repository "$name"       \
+                                         "$upstream"   \
+                                         "$stratum0"   \
+                                         "$cvmfs_user" \
+                                         "$unionfs"    \
+                                         "sha1"        \
+                                         "true"        \
+                                         "false" || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -4763,7 +4786,7 @@ migrate_2_1_15() {
   echo "--> updating server.conf"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
   sed -i -e "s/^CVMFS_CREATOR_VERSION=.*/CVMFS_CREATOR_VERSION=$destination_version/" $server_conf
-  echo "CVMFS_STRATUM1=http://localhost/cvmfs/${name}" >> $server_conf
+  echo "CVMFS_STRATUM1=$(mangle_local_cvmfs_url $name)" >> $server_conf
 
   # reload (updated) repository information
   load_repo_config $name
