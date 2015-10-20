@@ -2766,7 +2766,7 @@ add_replica() {
   if [ x"$s3_config" != x"" ]; then
     [ x"$stratum1_url" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
     stratum1=$(mangle_s3_cvmfs_url $alias_name "$stratum1_url")
-  elif [ x"stratum1_url" = x"" ]; then
+  elif [ x"$stratum1_url" = x"" ]; then
     stratum1="$(mangle_local_cvmfs_url $alias_name)"
   else
     stratum1="$stratum1_url"
