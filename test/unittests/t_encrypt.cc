@@ -57,6 +57,18 @@ TEST(T_Encrypt, KeyFiles) {
 }
 
 
+TEST(T_Encrypt, MemoryKeyDatabase) {
+  MemoryKeyDatabase database;
+  UniquePtr<Key> k(Key::CreateRandomly(32));
+  string id;
+  EXPECT_TRUE(database.StoreNew(k.weak_ref(), &id));
+  EXPECT_FALSE(database.StoreNew(k.weak_ref(), &id));
+  EXPECT_EQ(NULL, database.Find("not available"));
+  const Key *found = database.Find(id);
+  EXPECT_EQ(k.weak_ref(), found);
+}
+
+
 TEST(T_Encrypt, DecryptWrongEnvelope) {
   CipherNone cipher;
   UniquePtr<Key> k(Key::CreateRandomly(cipher.key_size()));
