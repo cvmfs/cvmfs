@@ -322,6 +322,14 @@ void Database<DerivedT>::DropFileOwnership() {
            database_.filename().c_str());
 }
 
+
+template <class DerivedT>
+unsigned Database<DerivedT>::GetModifiedRowCount() const {
+  const int modified_rows = sqlite3_total_changes(sqlite_db());
+  assert(modified_rows >= 0);
+  return static_cast<unsigned>(modified_rows);
+}
+
 /**
  * Used to check if the database needs cleanup
  */
