@@ -513,15 +513,21 @@ endif (BUILD_PRELOADER)
 # Generate a bash self-extracting script for the cvmfs_preload target
 #
 if (BUILD_PRELOADER)
+  find_library (GSSAPI_KRB5_LOCATION gssapi_krb5)
+  find_library (KRB5_LOCATION krb5)
+  find_library (K5CRYPTO_LOCATION k5crypto)
+  find_library (KRB5SUPPORT_LOCATION krb5support)
+  find_library (KEYUTILS_LOCATION keyutils)
   set (PRELOADER_EXEC cvmfs_preload.sh)
   set (PRELOADER_TAR_GZ cvmfs_preload.tar.gz)
+  string (REPLACE ";" " " OPENSSL_LIBRARIES_SPLIT "${OPENSSL_LIBRARIES}")
   add_custom_command (
     TARGET cvmfs_preload POST_BUILD
-    COMMAND sh -c "cp ${TBB_BUILD_LOCATION}/build_release/libtbb_cvmfs.so.2 ${TBB_BUILD_LOCATION}/build_release/libtbbmalloc_cvmfs.so.2 ."
-    COMMAND sh -c "tar czf ${PRELOADER_TAR_GZ} cvmfs_preload libtbbmalloc_cvmfs.so.2 libtbb_cvmfs.so.2"
+    COMMAND sh -c "cp -L ${TBB_BUILD_LOCATION}/build_release/libtbb_cvmfs.so.2 ${TBB_BUILD_LOCATION}/build_release/libtbbmalloc_cvmfs.so.2 ${OPENSSL_LIBRARIES_SPLIT} ${GSSAPI_KRB5_LOCATION} ${KRB5_LOCATION} ${K5CRYPTO_LOCATION} ${KRB5SUPPORT_LOCATION} ${KEYUTILS_LOCATION} ."
+    COMMAND sh -c "set -x && ls &&  tar czf ${PRELOADER_TAR_GZ} cvmfs_preload libtbbmalloc_cvmfs.so.2 libtbb_cvmfs.so.2 libssl.so libcrypto.so libgssapi_krb5.so libkrb5.so libk5crypto.so libkrb5support.so libkeyutils.so"
     COMMAND sh -c "cat ${CMAKE_SOURCE_DIR}/cvmfs/cvmfs_preload.sh ${PRELOADER_TAR_GZ} > ${PRELOADER_EXEC}"
     COMMAND sh -c "chmod +x ${PRELOADER_EXEC}"
-    COMMAND sh -c "rm -f ${PRELOADER_TAR} ${PRELOADER_TAR_GZ} ./libtbbmalloc_cvmfs.so.2 ./libtbb_cvmfs.so.2"
+    COMMAND sh -c "rm -f ${PRELOADER_TAR} ${PRELOADER_TAR_GZ} libtbbmalloc_cvmfs.so.2 libtbb_cvmfs.so.2 libcrypto.so libssl.so libgssapi_krb5.so libkrb5.so libk5crypto.so libkrb5support.so libkeyutils.so"
     COMMENT "Generating the cvmfs_preload self-extracting script"
     VERBATIM
   )
