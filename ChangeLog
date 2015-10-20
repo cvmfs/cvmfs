@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix URL option parsing for S3 backend in cvmfs_server
   * Add cvmfs_preload binary (CVM-912)
   * Add auto-balancer for catalogs (experimental) with server parameters
     CVMFS_AUTOCATALOGS, CVMFS_AUTOCATALOGS_MAX_WEIGHT, 
