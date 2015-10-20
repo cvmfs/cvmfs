@@ -436,13 +436,7 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
       pending_catalogs_.erase(i);
     }
 
-    atomic_inc32(&catalogs_processed_);
-    const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
-                                    catalog_count_;
-    LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] migrated and uploaded %sC %s",
-             processed,
-             result.content_hash.ToString().c_str(),
-             catalog->root_path().c_str());
+    PrintStatusMessage(catalog, result.content_hash, "migrated and uploaded");
 
     // The catalog is completely processed... fill the hash-future to allow the
     // processing of parent catalogs
@@ -450,6 +444,20 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
     //       should not be used anymore!
     catalog->new_catalog_hash.Set(result.content_hash);
   }
+}
+
+
+void CommandMigrate::PrintStatusMessage(const PendingCatalog *catalog,
+                                        const shash::Any     &content_hash,
+                                        const std::string    &message) {
+  atomic_inc32(&catalogs_processed_);
+  const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
+                                  catalog_count_;
+  LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] %s %sC %s",
+           processed,
+           message.c_str(),
+           content_hash.ToString().c_str(),
+           catalog->root_path().c_str());
 }
 
 

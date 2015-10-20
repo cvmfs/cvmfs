@@ -276,6 +276,10 @@ class CommandMigrate : public Command {
   void MigrationCallback(PendingCatalog *const &data);
   void UploadCallback(const upload::SpoolerResult &result);
 
+  void PrintStatusMessage(const PendingCatalog *catalog,
+                          const shash::Any     &content_hash,
+                          const std::string    &message);
+
   template <class MigratorT>
   bool DoMigrationAndCommit(const std::string                   &manifest_path,
                             typename MigratorT::worker_context  *context);
