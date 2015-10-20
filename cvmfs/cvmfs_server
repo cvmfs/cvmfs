@@ -2526,13 +2526,18 @@ mkfs() {
   # upstream generation (defaults to local upstream)
   if [ x"$upstream" = x"" ]; then
     if [ x"$s3_config" != x"" ]; then
-      [ x"$stratum0" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
       upstream=$(make_s3_upstream $name $s3_config)
-      stratum0=$(mangle_s3_cvmfs_url $name "$stratum0")
     else
       upstream=$(make_local_upstream $name)
-      [ x"$stratum0" = x"" ] && stratum0="http://localhost/cvmfs/$name"
     fi
+  fi
+
+  # stratum0 URL generation (defaults to local URL)
+  if [ x"$s3_config" != x"" ]; then
+    [ x"$stratum0" = x"" ] && die "Please specify the HTTP-URL for S3 (add option -w)"
+    stratum0=$(mangle_s3_cvmfs_url $name "$stratum0")
+  elif [ x"$stratum0" = x"" ]; then
+    stratum0="http://localhost/cvmfs/${name}"
   fi
 
   # sanity checks
