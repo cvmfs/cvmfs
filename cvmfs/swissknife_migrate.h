@@ -93,6 +93,9 @@ class CommandMigrate : public Command {
 
     CatalogStatistics                 statistics;
 
+    // Note: As soon as the `was_updated` future is set to 'true', both
+    //       `new_catalog_hash` and `new_catalog_size` are assumed to be set
+    //       accordingly. If it is set to 'false' they will be ignored.
     Future<bool>                      was_updated;
     shash::Any                        new_catalog_hash;
     size_t                            new_catalog_size;
