@@ -174,7 +174,8 @@ class PosixCacheManager : public CacheManager {
   virtual CacheManagerIds id() { return kPosixCacheManager; }
 
   static PosixCacheManager *Create(const std::string &cache_path,
-                                   const bool alien_cache);
+                                   const bool alien_cache,
+                                   const bool workaround_rename_ = false);
   virtual ~PosixCacheManager() { }
   virtual bool AcquireQuotaManager(QuotaManager *quota_mgr);
 
@@ -231,7 +232,7 @@ class PosixCacheManager : public CacheManager {
     : cache_path_(cache_path)
     , txn_template_path_(cache_path_ + "/txn/fetchXXXXXX")
     , alien_cache_(alien_cache)
-    , alien_cache_on_nfs_(false)
+    , workaround_rename_(false)
     , cache_mode_(kCacheReadWrite)
     , reports_correct_filesize_(true)
   {
@@ -245,7 +246,7 @@ class PosixCacheManager : public CacheManager {
   std::string cache_path_;
   std::string txn_template_path_;
   bool alien_cache_;
-  bool alien_cache_on_nfs_;
+  bool workaround_rename_;
   CacheModes cache_mode_;
 
   /**

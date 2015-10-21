@@ -1831,6 +1831,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string repository_tag = "";
   string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
+  bool server_cache_mode = false;  // currently means: no rename in the cache
   string trusted_certs = "";
   string proxy_template = "";
   catalog::OwnerMap uid_map;
@@ -1965,6 +1966,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       && cvmfs::options_manager_->IsOn(parameter))
   {
     cvmfs::hide_magic_xattrs_ = true;
+  }
+  if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_CACHE_MODE", &parameter)
+      && cvmfs::options_manager_->IsOn(parameter))
+  {
+    server_cache_mode = true;
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
@@ -2200,8 +2206,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailCacheDir;
     }
   }
-  cvmfs::cache_manager_ =
-    cache::PosixCacheManager::Create(alien_cache, alien_cache != ".");
+  cvmfs::cache_manager_ = cache::PosixCacheManager::Create(
+    alien_cache, alien_cache != ".", server_cache_mode);
   if (cvmfs::cache_manager_ == NULL) {
     *g_boot_error = "Failed to setup cache in " + alien_cache +
                     ": " + strerror(errno);
