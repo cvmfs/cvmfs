@@ -388,7 +388,7 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
   }
 
   if (!data->HasChanges()) {
-    PrintStatusMessage(data, data->GetOldContentHash(), "perserved");
+    PrintStatusMessage(data, data->GetOldContentHash(), "preserved");
     data->was_updated.Set(false);
     return;
   }
