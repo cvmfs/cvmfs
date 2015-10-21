@@ -175,7 +175,7 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
-    skeleton migrate list-catalogs update-geodb gc catalog-chown"
+    skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -4909,6 +4909,9 @@ _run_catalog_migration() {
 }
 
 
+################################################################################
+
+
 catalog_chown() {
   local uid_map
   local gid_map
@@ -4949,6 +4952,61 @@ catalog_chown() {
                               -k $CVMFS_PUBLIC_KEY           \
                               -i $uid_map                    \
                               -j $gid_map                    \
+                              -s"
+
+  _run_catalog_migration "$name" "$migrate_command"
+}
+
+
+################################################################################
+
+
+eliminate_hardlinks() {
+  local name=
+  local force=0
+
+  # parameter handling
+  OPTIND=1
+  while getopts "f" option; do
+    case $option in
+      f)
+        force=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command eliminate-hardlinks: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  # get repository name
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $@)
+  check_repository_existence "$name"
+
+  load_repo_config $name
+
+  if [ $force -ne 1 ]; then
+    echo "This will break up all hardlink relationships that are currently"
+    echo "present in '$name'. This process cannot be undone!"
+    echo ""
+    echo -n "Are you sure? (y/N): "
+
+    local reply="n"
+    read reply
+    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+      echo "aborted."
+      exit 1
+    fi
+  fi
+
+  local migrate_command="$(__swissknife_cmd dbg) migrate     \
+                              -v 'hardlink'                  \
+                              -r $CVMFS_STRATUM0             \
+                              -n $name                       \
+                              -u $CVMFS_UPSTREAM_STORAGE     \
+                              -k $CVMFS_PUBLIC_KEY           \
                               -s"
 
   _run_catalog_migration "$name" "$migrate_command"
