@@ -47,9 +47,6 @@ cvmfs_run_test() {
     -s                                               \
     -g || return 4
 
-  echo "make sure that we are not suffering from the exdev bug"
-  apply_server_cache_config $legacy_repo_name
-
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
   ls -lisa /cvmfs/${legacy_repo_name} || return 5
 
