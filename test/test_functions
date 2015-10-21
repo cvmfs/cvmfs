@@ -1260,11 +1260,6 @@ plant_legacy_repository_revision() {
     [ -f ${legacy_repo_storage}/.cvmfspublished ]           || return 106
     [ -f ${legacy_repo_storage}/.cvmfswhitelist ]           || return 107
     sudo touch ${legacy_repo_storage}/.cvmfs_master_replica || return 108
-    if [ x"$repo_owner" != x"" ]; then
-      sudo chown -R $repo_owner ${legacy_repo_storage}/data            || return 109
-      sudo chown    $repo_owner ${legacy_repo_storage}/.cvmfspublished || return 110
-      sudo chown    $repo_owner ${legacy_repo_storage}                 || return 111
-    fi
   fi
 
   _resign_legacy_repository "$legacy_repo_name" || return 109

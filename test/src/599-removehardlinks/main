@@ -70,7 +70,7 @@ cvmfs_run_test() {
   local import_log="import.log"
   echo "import the just planted repository (logging into ${import_log})"
   TEST599_NEW_REPO_NAME="$legacy_repo_name"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER $legacy_repo_name > $import_log 2>&1 || return 2
+  sudo cvmfs_server import -o $CVMFS_TEST_USER -g $legacy_repo_name > $import_log 2>&1 || return 2
 
   local uid_map=uid.map
   local gid_map=gid.map
