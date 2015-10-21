@@ -64,6 +64,11 @@ cvmfs_run_test() {
   start_transaction $legacy_repo_name || return $?
   publish_repo      $legacy_repo_name || return $?
 
+  if uses_overlayfs $legacy_repo_name; then
+    echo "we are running on OverlayFS. We need to erase all hardlinks now..."
+    sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name || return 101
+  fi
+
   # cheate a new repository revision of the migrated catalogs
   echo "create a new repository revision"
   local big_file="${repo_dir}/dir6/bigfile"

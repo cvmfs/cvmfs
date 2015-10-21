@@ -49,6 +49,11 @@ cvmfs_run_test() {
     -s                                           \
     -g > $import_log 2>&1 || return 4
 
+  if uses_overlayfs $legacy_repo_name; then
+    echo "we are running on OverlayFS. We need to erase all hardlinks now..."
+    sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name || return 101
+  fi
+
   echo "get all data chunks in the legacy repository"
   local data_chunks="$(cat $resurrect_log | grep -o '[0-9a-f]\{2\}\/[0-9a-f]\+$' | sed 's/\///g')"
 
