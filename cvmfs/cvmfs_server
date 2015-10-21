@@ -3130,6 +3130,18 @@ import() {
   # reset trap and finish
   trap - EXIT HUP INT QUIT TERM
   print_new_repository_notice $name $cvmfs_user
+
+  # print warning if OverlayFS is used for repository management
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    echo ""
+    echo "WARNING: You are using OverlayFS which cannot handle hard links."
+    echo "         If the imported repository '${name}' used to be based on"
+    echo "         AUFS, please run the following command NOW to remove hard"
+    echo "         links from the catalogs:"
+    echo ""
+    echo "    cvmfs_server eliminate-hardlinks ${name}"
+    echo ""
+  fi
 }
 
 
