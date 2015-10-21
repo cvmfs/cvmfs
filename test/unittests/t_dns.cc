@@ -701,7 +701,8 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
   time_t before = time(NULL);
   Host host = quick_resolver->Resolve("a.root-servers.net");
   time_t after = time(NULL);
-  EXPECT_EQ(host.status(), kFailInvalidResolvers);
+  EXPECT_TRUE((host.status() == kFailInvalidResolvers) || 
+              (host.status() == kFailTimeout));
   EXPECT_LE(after-before, 1);
 }
 
