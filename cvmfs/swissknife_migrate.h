@@ -265,6 +265,8 @@ class CommandMigrate : public Command {
 
    protected:
     bool RunMigration(PendingCatalog *data) const;
+
+    bool CheckDatabaseSchemaCompatibility(PendingCatalog *data) const;
     bool BreakUpHardlinks(PendingCatalog *data) const;
   };
 

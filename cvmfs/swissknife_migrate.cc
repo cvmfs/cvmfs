@@ -1822,7 +1822,18 @@ std::string CommandMigrate::ChownMigrationWorker::GenerateMappingStatement(
 
 bool CommandMigrate::HardlinkRemovalMigrationWorker::RunMigration(
                                                    PendingCatalog *data) const {
-  return BreakUpHardlinks(data);
+  return CheckDatabaseSchemaCompatibility(data) &&
+         BreakUpHardlinks(data);
+}
+
+
+bool CommandMigrate::CheckDatabaseSchemaCompatibility(
+                                                   PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &clg = data->old_catalog->database();
+  return clg.schema_version() >= 2.4 - catalog::CatalogDatabase::kSchemaEpsilon;
 }
 
 
