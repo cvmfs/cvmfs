@@ -669,8 +669,9 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
         nameservers.push_back("[" + tokens[1] + "]:53");
       else
         nameservers.push_back(tokens[1] + ":53");
-    } else if (tokens[0] == "search") {
-      domains.push_back(tokens[1]);
+    } else if ((tokens[0] == "search") || (tokens[0] == "domain")) {
+      for (unsigned i = 1; i < tokens.size(); ++i)
+        domains.push_back(tokens[i]);
     }
   }
   fclose(f);
@@ -686,10 +687,7 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
 }
 
 
-// TODO(reneme): it is not entirely clear what is the error condition here. In
-//               particular this behaves differently on OS X and Linux. For now
-//               I just disable the test case.
-TEST_F(T_Dns, DISABLED_CaresResolverBadResolver) {
+TEST_F(T_Dns, CaresResolverBadResolver) {
   UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
   ASSERT_TRUE(quick_resolver.IsValid());
 
@@ -700,7 +698,8 @@ TEST_F(T_Dns, DISABLED_CaresResolverBadResolver) {
   time_t before = time(NULL);
   Host host = quick_resolver->Resolve("a.root-servers.net");
   time_t after = time(NULL);
-  EXPECT_EQ(host.status(), kFailInvalidResolvers);
+  EXPECT_TRUE((host.status() == kFailInvalidResolvers) ||
+              (host.status() == kFailTimeout));
   EXPECT_LE(after-before, 1);
 }
 
