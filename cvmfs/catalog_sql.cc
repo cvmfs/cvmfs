@@ -50,10 +50,12 @@ const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 
 // ChangeLog
-//   0 --> 1: add size column to nested catalog table,
-//            add schema_revision property
-//   1 --> 2: add xattr column to catalog table
-//            add self_xattrs and subtree_xattrs statistics counters
+//   0 --> 1 (Jan  6 2014 - Git: 3667fe7a669d0d65e07275b753a7c6f23fc267df):
+//           * add size column to nested catalog table
+//           * add schema_revision property
+//   1 --> 2 (Jan 22 2014 - Git: 85e6680e52cfe56dc1213a5ad74a5cc62fd50ead):
+//           * add xattr column to catalog table
+//           * add self_xattrs and subtree_xattrs statistics counters
 const unsigned CatalogDatabase::kLatestSchemaRevision = 2;
 
 
