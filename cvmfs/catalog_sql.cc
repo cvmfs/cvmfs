@@ -24,8 +24,31 @@ namespace catalog {
  * compatible catalog structure when updating the schema revisions here!
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  */
+
+// ChangeLog
+// 2.5 (Jun 26 2013 - Git: e79baec22c6abd6ddcdf8f8d7d33921027a052ab)
+//     * add (backward compatible) schema revision - see below
+//     * add statistics counters for chunked files
+//       Note: this was retrofitted and needed a catalog migration step
+//
+// 2.4 (Aug 15 2012 - Git: 17de8fc782b5b8dc4404dda925627b5ec2b552e1)
+// 2.3 (Aug 15 2012 - Git: ab77688cdb2f851af3fe983bf3694dc2465e65be)
+// 2.2 (never existed)
+// 2.1 (Aug  7 2012 - Git: beba36c12d2b1123ffbb169f865a861e570adc68)
+//     * add 'chunks' table for file chunks
+//     * add 'statistics' table for accumulative counters
+//     * rename 'inode' field to 'hardlinks'
+//       * containing both hardlink group ID and linkcount
+//     * .cvmfscatalog files become first-class entries in the catalogs
+//
+// 2.0 (Aug  6 2012 - Git: c8a81ede603e57fbe4324b6ab6bc8c41e3a2fa5f)
+//     * beginning of CernVM-FS 2.1.x branch ('modern' era)
+//
+// 1.x (earlier - based on SVN :-) )
+//     * pre-historic times
 const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
+
 // ChangeLog
 //   0 --> 1: add size column to nested catalog table,
 //            add schema_revision property
