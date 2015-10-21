@@ -209,5 +209,16 @@ cvmfs_run_test() {
   echo "check if there are hardlinks again (not expected)"
   [ $(count_hardlinks $repo_dir) -eq 0 ] || return 24
 
+  # ============================================================================
+
+  echo "open a transaction to check if migration is failing"
+  start_transaction $legacy_repo_name || return 25
+
+  echo "try to do a catalog migration (should fail)"
+  sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name && return 26
+
+  echo "abort transaction"
+  abort_transaction $legacy_repo_name || return 27
+
   return 0
 }
