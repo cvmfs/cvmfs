@@ -687,9 +687,6 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
 }
 
 
-// TODO(reneme): it is not entirely clear what is the error condition here. In
-//               particular this behaves differently on OS X and Linux. For now
-//               I just disable the test case.
 TEST_F(T_Dns, CaresResolverBadResolver) {
   UniquePtr<CaresResolver> quick_resolver(CaresResolver::Create(false, 0, 100));
   ASSERT_TRUE(quick_resolver.IsValid());
@@ -701,7 +698,7 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
   time_t before = time(NULL);
   Host host = quick_resolver->Resolve("a.root-servers.net");
   time_t after = time(NULL);
-  EXPECT_TRUE((host.status() == kFailInvalidResolvers) || 
+  EXPECT_TRUE((host.status() == kFailInvalidResolvers) ||
               (host.status() == kFailTimeout));
   EXPECT_LE(after-before, 1);
 }
