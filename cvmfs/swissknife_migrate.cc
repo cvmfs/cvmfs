@@ -34,7 +34,7 @@ CommandMigrate::CommandMigrate() :
 ParameterList CommandMigrate::GetParams() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v',
-    "migration base version ( 2.0.x | 2.1.7 | chown )"));
+    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink )"));
   r.push_back(Parameter::Mandatory('r',
     "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Mandatory('u', "upstream definition string"));
