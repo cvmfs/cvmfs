@@ -472,41 +472,41 @@ if (BUILD_SERVER)
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)
-  add_executable (cvmfs_preload ${CVMFS_PRELOADER_SOURCES})
+  add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_preload libcares libcurl)
+    add_dependencies (cvmfs_preload_bin libcares libcurl)
     set (PRELOADER_LIBS ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
     set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${PRELOADER_LIBS} )
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_preload libpacparser)
+    add_dependencies (cvmfs_preload_bin libpacparser)
     set (PRELOADER_LIBS ${PACPARSER_ARCHIVE} ${PRELOADER_LIBS} )
   endif (PACPARSER_BUILTIN)
 
   if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_preload sqlite3)
+    add_dependencies (cvmfs_preload_bin sqlite3)
     set (PRELOADER_LIBS ${SQLITE3_ARCHIVE}  ${PRELOADER_LIBS} )
   endif (SQLITE3_BUILTIN)
 
   if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_preload zlib)
+    add_dependencies (cvmfs_preload_bin zlib)
     set (PRELOADER_LIBS ${ZLIB_ARCHIVE} ${PRELOADER_LIBS} )
   endif (ZLIB_BUILTIN)
 
   if (SPARSEHASH_BUILTIN)
-    add_dependencies (cvmfs_preload sparsehash)
+    add_dependencies (cvmfs_preload_bin sparsehash)
   endif (SPARSEHASH_BUILTIN)
 
   if (TBB_PRIVATE_LIB)
     add_dependencies (cvmfs_swissknife libtbb)
   endif (TBB_PRIVATE_LIB)
 
-  add_dependencies (cvmfs_preload libsha2)
-  add_dependencies (cvmfs_preload libvjson)
+  add_dependencies (cvmfs_preload_bin libsha2)
+  add_dependencies (cvmfs_preload_bin libvjson)
 
-  target_link_libraries(cvmfs_preload ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
+  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
 endif (BUILD_PRELOADER)
 
 #
@@ -518,14 +518,14 @@ if (BUILD_PRELOADER)
   find_library (K5CRYPTO_LOCATION k5crypto)
   find_library (KRB5SUPPORT_LOCATION krb5support)
   find_library (KEYUTILS_LOCATION keyutils)
-  set (PRELOADER_EXEC cvmfs_preload.sh)
+  set (PRELOADER_EXEC cvmfs_preload)
   set (PRELOADER_TAR_GZ cvmfs_preload.tar.gz)
   string (REPLACE ";" " " OPENSSL_LIBRARIES_SPLIT "${OPENSSL_LIBRARIES}")
   add_custom_command (
-    TARGET cvmfs_preload POST_BUILD
+    TARGET cvmfs_preload_bin POST_BUILD
     COMMAND sh -c "cp -L ${TBB_BUILD_LOCATION}/build_release/libtbb_cvmfs.so.2 ${TBB_BUILD_LOCATION}/build_release/libtbbmalloc_cvmfs.so.2 ${OPENSSL_LIBRARIES_SPLIT} ${GSSAPI_KRB5_LOCATION} ${KRB5_LOCATION} ${K5CRYPTO_LOCATION} ${KRB5SUPPORT_LOCATION} ${KEYUTILS_LOCATION} ."
-    COMMAND sh -c "set -x && ls &&  tar czf ${PRELOADER_TAR_GZ} cvmfs_preload libtbbmalloc_cvmfs.so.2 libtbb_cvmfs.so.2 libssl.so libcrypto.so libgssapi_krb5.so libkrb5.so libk5crypto.so libkrb5support.so libkeyutils.so"
-    COMMAND sh -c "cat ${CMAKE_SOURCE_DIR}/cvmfs/cvmfs_preload.sh ${PRELOADER_TAR_GZ} > ${PRELOADER_EXEC}"
+    COMMAND sh -c "tar czf ${PRELOADER_TAR_GZ} cvmfs_preload_bin libtbbmalloc_cvmfs.so.2 libtbb_cvmfs.so.2 libssl.so libcrypto.so libgssapi_krb5.so libkrb5.so libk5crypto.so libkrb5support.so libkeyutils.so"
+    COMMAND sh -c "cat ${CMAKE_SOURCE_DIR}/cvmfs/cvmfs_preload ${PRELOADER_TAR_GZ} > ${PRELOADER_EXEC}"
     COMMAND sh -c "chmod +x ${PRELOADER_EXEC}"
     COMMAND sh -c "rm -f ${PRELOADER_TAR} ${PRELOADER_TAR_GZ} libtbbmalloc_cvmfs.so.2 libtbb_cvmfs.so.2 libcrypto.so libssl.so libgssapi_krb5.so libkrb5.so libk5crypto.so libkrb5support.so libkeyutils.so"
     COMMENT "Generating the cvmfs_preload self-extracting script"
@@ -647,8 +647,8 @@ endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)
   install(
-    TARGETS      cvmfs_preload
-    RUNTIME
+    FILES      ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_preload
     DESTINATION    bin
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 endif (BUILD_PRELOADER)

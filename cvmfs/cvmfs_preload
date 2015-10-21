@@ -8,7 +8,7 @@ tail -n+"$ARCHIVE" "$0" | tar xz -C "$TMPDIR" || echo "Couldn't extract the tar 
 LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$TMPDIR"
 
 # execute the command
-$TMPDIR/cvmfs_preload $@ || echo "Failed to execute cvmfs_preload"
+$TMPDIR/cvmfs_preload_bin $@ || echo "Failed to execute cvmfs_preload"
 
 rm -rf "$TMPDIR"
 
