@@ -1187,7 +1187,8 @@ cleanup_legacy_repo_leftovers() {
 _resign_legacy_repository() {
   local repo_name="$1"
   local repo_storage="$(get_local_repo_storage $repo_name)"
-  local legacy_repo_storage="${repo_storage}/pub/catalogs"
+  local legacy_repo_storage="${repo_storage}"
+  [ -d ${repo_storage}/pub ] && legacy_repo_storage="${legacy_repo_storage}/pub/catalogs" # for 2.0.x style repositories
   local tmp_dir="$(pwd)/tmp"
   local upstream="local,${legacy_repo_storage}/data/txn,${legacy_repo_storage}"
 
@@ -1198,15 +1199,15 @@ _resign_legacy_repository() {
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$repo_name" >> ${whitelist}.unsigned
-  openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${repo_name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
+  openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${repo_name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned || return 2
   local hash;
   hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
-  openssl rsautl -inkey /etc/cvmfs/keys/${repo_name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
-  cat ${whitelist}.unsigned ${whitelist}.signature | sudo tee ${legacy_repo_storage}/.cvmfswhitelist > /dev/null
-  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
+  openssl rsautl -inkey /etc/cvmfs/keys/${repo_name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature || return 3
+  cat ${whitelist}.unsigned ${whitelist}.signature | sudo tee ${legacy_repo_storage}/.cvmfswhitelist > /dev/null       || return 4
+  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash                                                 || return 5
 }
 
 
@@ -1235,20 +1236,40 @@ plant_tarball() {
 #       it expects a repo keychain to be planted in /etc/keys/${legacy_repo_name}
 # @param tarball           path to the tarball containing the legacy repo
 # @param legacy_repo_name  FQRN of the repository to be planted
-# @param verbose           print verbose output
+# @param repo_owner        user ID that is supposed to own the repository
 plant_legacy_repository_revision() {
   local tarball="$1"
   local legacy_repo_name="$2"
-  local verbose="$3"
+  local repo_owner="$3"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
 
   plant_tarball "$tarball" "$verbose"                                  || return 104
-  [ -d ${legacy_repo_storage}/pub ]                                    || return 105
-  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
-  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
-  sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
-  _resign_legacy_repository "$legacy_repo_name"                        || return 109
+
+  # figure out if we just planted a CVMFS 2.0.x repository or something newer
+  local is_cvmfs_20=0
+  [ -d ${legacy_repo_storage}/pub ] && is_cvmfs_20=1
+
+  # do a couple of sanity checks and adjustments
+  if [ $is_cvmfs_20 -eq 1 ]; then
+    [ -d ${legacy_repo_storage}/pub ]                                    || return 105
+    [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
+    [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
+    sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
+  else
+    [ -d ${legacy_repo_storage}/data ]                      || return 105
+    [ -f ${legacy_repo_storage}/.cvmfspublished ]           || return 106
+    [ -f ${legacy_repo_storage}/.cvmfswhitelist ]           || return 107
+    sudo touch ${legacy_repo_storage}/.cvmfs_master_replica || return 108
+    if [ x"$repo_owner" != x"" ]; then
+      sudo chown -R $repo_owner ${legacy_repo_storage}/data            || return 109
+      sudo chown    $repo_owner ${legacy_repo_storage}/.cvmfspublished || return 110
+      sudo chown    $repo_owner ${legacy_repo_storage}                 || return 111
+    fi
+  fi
+
+  _resign_legacy_repository "$legacy_repo_name" || return 109
 }
+
 
 
 # creates a path into the CAS of CVMFS server

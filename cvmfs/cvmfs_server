@@ -4853,8 +4853,51 @@ migrate() {
 ################################################################################
 
 
+_run_catalog_migration() {
+  local name="$1"
+  local migration_command="$2"
+
+  load_repo_config $name
+
+  # more sanity checks
+  is_stratum0 $name       || die "This is not a stratum 0 repository"
+  is_root $name           || die "Permission denied: Only root can do that"
+  is_in_transaction $name && die "Repository is already in a transaction"
+  health_check $name
+
+  # all following commands need an open repository transaction and are supposed
+  # to commit or abort it after performing the catalog migration.
+  echo "Opening repository transaction"
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open repository transaction"
+
+  # run the catalog migration operation (must run as root!)
+  echo "Starting catalog migration"
+  local tmp_dir=${CVMFS_SPOOL_DIR}/tmp
+  local manifest=${tmp_dir}/manifest
+  migration_command="${migration_command} -t $tmp_dir -o $manifest"
+  sh -c "$migration_command" || die "Fail (executed command: $migration_command)"
+
+  # check if the catalog migration created a new revision
+  if [ ! -f $manifest ]; then
+    echo "Catalog migration finished without any changes"
+    return 0
+  fi
+
+  # finalizing transaction
+  local trunk_hash=$(grep "^C" $manifest | tr -d C)
+  echo "Flushing file system buffers"
+  sync
+
+  # committing newly created revision
+  echo "Signing new manifest"
+  chown $CVMFS_USER $manifest        || die "chmod of new manifest failed";
+  sign_manifest $name $manifest      || die "Signing failed";
+  set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
+}
+
+
 catalog_chown() {
-  local names
   local uid_map
   local gid_map
 
@@ -4886,48 +4929,17 @@ catalog_chown() {
 
   load_repo_config $name
 
-  # more sanity checks
-  is_stratum0 $name       || die "This is not a stratum 0 repository"
-  is_root $name           || die "Permission denied: Only root can do that"
-  is_in_transaction $name && die "Repository is already in a transaction"
-  health_check $name
-
-  # all following commands need an open repository transaction and are supposed
-  # to commit or abort it after performing the catalog chmod.
-  echo "Opening repository transaction"
-  trap "close_transaction $name 0" EXIT HUP INT TERM
-  open_transaction $name || die "Failed to open repository transaction"
-
-  # run the catalog level chmod operation
-  echo "Starting catalog chown"
-
-  local tmp_dir=${CVMFS_SPOOL_DIR}/tmp
-  local manifest=${tmp_dir}/manifest
   local migrate_command="$(__swissknife_cmd dbg) migrate     \
                               -v 'chown'                     \
                               -r $CVMFS_STRATUM0             \
                               -n $name                       \
                               -u $CVMFS_UPSTREAM_STORAGE     \
-                              -t $tmp_dir                    \
                               -k $CVMFS_PUBLIC_KEY           \
-                              -o $manifest                   \
                               -i $uid_map                    \
                               -j $gid_map                    \
                               -s"
-  sh -c "$migrate_command" || die "Fail (executed command: $migrate_command)"
-  local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
-  # finalizing transaction
-  echo "Flushing file system buffers"
-  sync
-
-  # committing newly created revision
-  echo "Signing new manifest"
-  chown $CVMFS_USER $manifest        || die "chmod of new manifest failed";
-  sign_manifest $name $manifest      || die "Signing failed";
-  set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
-
-  return
+  _run_catalog_migration "$name" "$migrate_command"
 }
 
 

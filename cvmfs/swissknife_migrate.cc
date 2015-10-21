@@ -1827,8 +1827,9 @@ bool CommandMigrate::HardlinkRemovalMigrationWorker::RunMigration(
 }
 
 
-bool CommandMigrate::CheckDatabaseSchemaCompatibility(
-                                                   PendingCatalog *data) const {
+bool
+CommandMigrate::HardlinkRemovalMigrationWorker::CheckDatabaseSchemaCompatibility
+                                                  (PendingCatalog *data) const {
   assert(data->old_catalog != NULL);
   assert(data->new_catalog == NULL);
 
