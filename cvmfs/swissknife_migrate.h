@@ -316,6 +316,7 @@ class CommandMigrate : public Command {
   CatalogStatisticsList  catalog_statistics_list_;
   unsigned int           catalog_count_;
   atomic_int32           catalogs_processed_;
+  bool                   has_committed_new_revision_;
 
   uid_t                  uid_;
   gid_t                  gid_;

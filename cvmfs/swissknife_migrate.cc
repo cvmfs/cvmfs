@@ -22,6 +22,7 @@ catalog::DirectoryEntry  CommandMigrate::nested_catalog_marker_;
 CommandMigrate::CommandMigrate() :
   file_descriptor_limit_(8192),
   catalog_count_(0),
+  has_committed_new_revision_(false),
   uid_(0),
   gid_(0),
   root_catalog_(NULL)
@@ -226,7 +227,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
 
   // Analyze collected statistics
-  if (collect_catalog_statistics) {
+  if (collect_catalog_statistics && has_committed_new_revision_) {
     LogCvmfs(kLogCatalog, kLogStdout, "\nCollected statistics results:");
     AnalyzeCatalogStatistics();
   }
@@ -336,6 +337,7 @@ bool CommandMigrate::DoMigrationAndCommit(
       Error("Manifest export failed.\nAborting...");
       return false;
     }
+    has_committed_new_revision_ = true;
   } else {
     LogCvmfs(kLogCatalog, kLogStdout,
              "\nNo catalogs migrated, skipping the commit...");
