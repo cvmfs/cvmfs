@@ -34,7 +34,7 @@ CommandMigrate::CommandMigrate() :
 ParameterList CommandMigrate::GetParams() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v',
-    "migration base version ( 2.0.x | 2.1.7 | chown )"));
+    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink )"));
   r.push_back(Parameter::Mandatory('r',
     "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Mandatory('u', "upstream definition string"));
@@ -214,6 +214,12 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                                  gid_map);
     migration_succeeded =
       DoMigrationAndCommit<ChownMigrationWorker>(manifest_path, &context);
+  } else if (migration_base == "hardlink") {
+    HardlinkRemovalMigrationWorker::worker_context
+      context(temporary_directory_, collect_catalog_statistics);
+    migration_succeeded =
+      DoMigrationAndCommit<HardlinkRemovalMigrationWorker>( manifest_path,
+                                                           &context);
   } else {
     const std::string err_msg = "Unknown migration base: " + migration_base;
     Error(err_msg);
@@ -1808,6 +1814,73 @@ std::string CommandMigrate::ChownMigrationWorker::GenerateMappingStatement(
 
   stmt += ";";
   return stmt;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+bool CommandMigrate::HardlinkRemovalMigrationWorker::RunMigration(
+                                                   PendingCatalog *data) const {
+  return CheckDatabaseSchemaCompatibility(data) &&
+         BreakUpHardlinks(data);
+}
+
+
+bool
+CommandMigrate::HardlinkRemovalMigrationWorker::CheckDatabaseSchemaCompatibility
+                                                  (PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &clg = data->old_catalog->database();
+  return clg.schema_version() >= 2.4 - catalog::CatalogDatabase::kSchemaEpsilon;
+}
+
+
+bool CommandMigrate::HardlinkRemovalMigrationWorker::BreakUpHardlinks(
+                                                   PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &db =
+                                     GetWritable(data->old_catalog)->database();
+
+  if (!db.BeginTransaction()) {
+    return false;
+  }
+
+  // CernVM-FS catalogs do not contain inodes directly but they are assigned by
+  // the CVMFS catalog at runtime. Hardlinks are treated with so-called hardlink
+  // group IDs to indicate hardlink relationships that need to be respected at
+  // runtime by assigning identical inodes accordingly.
+  //
+  // This updates all directory entries of a given catalog that have a linkcount
+  // greater than 1 and are flagged as a 'file'. Note: Symlinks are flagged both
+  // as 'file' and as 'symlink', hence they are updated implicitly as well.
+  //
+  // The 'hardlinks' field in the catalog contains two 32 bit integers:
+  //   * the linkcount in the lower 32 bits
+  //   * the (so called) hardlink group ID in the higher 32 bits
+  //
+  // Files that have a linkcount of exactly 1 do not have any hardlinks and have
+  // the (implicit) hardlink group ID '0'. Hence, 'hardlinks == 1' means that a
+  // file doesn't have any hardlinks (linkcount = 1) and doesn't need treatment
+  // here.
+  //
+  // Files that have hardlinks (linkcount > 1) will have a very large integer in
+  // their 'hardlinks' field (hardlink group ID > 0 in higher 32 bits). Those
+  // files will be treated by setting their 'hardlinks' field to 1, effectively
+  // clearing all hardlink information from the directory entry.
+  const std::string stmt = "UPDATE OR ABORT catalog "
+                           "SET hardlinks = 1 "
+                           "WHERE flags & :file_flag "
+                           "  AND hardlinks > 1;";
+  catalog::Sql hardlink_removal_sql(db, stmt);
+  hardlink_removal_sql.BindInt64(1, catalog::SqlDirent::kFlagFile);
+  hardlink_removal_sql.Execute();
+
+  return db.CommitTransaction();
 }
 
 }  // namespace swissknife

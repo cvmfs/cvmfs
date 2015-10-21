@@ -254,6 +254,22 @@ class CommandMigrate : public Command {
     const std::string gid_map_statement_;
   };
 
+  class HardlinkRemovalMigrationWorker :
+    public AbstractMigrationWorker<HardlinkRemovalMigrationWorker>
+  {
+    friend class AbstractMigrationWorker<HardlinkRemovalMigrationWorker>;
+
+   public:
+    explicit HardlinkRemovalMigrationWorker(const worker_context *context) :
+      AbstractMigrationWorker<HardlinkRemovalMigrationWorker>(context) {}
+
+   protected:
+    bool RunMigration(PendingCatalog *data) const;
+
+    bool CheckDatabaseSchemaCompatibility(PendingCatalog *data) const;
+    bool BreakUpHardlinks(PendingCatalog *data) const;
+  };
+
  public:
   CommandMigrate();
   ~CommandMigrate() { }

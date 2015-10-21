@@ -314,7 +314,10 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
                                       "with existing hardlinks in lowerdir "
                                       "(linkcount %d). OverlayFS cannot handle "
                                       "hardlinks and would produce "
-                                      "inconsistencies. Aborting..." ,
+                                      "inconsistencies. \n\n"
+                                      "Consider running this command: \n"
+                                      "  cvmfs_server eliminate-hardlinks\n\n"
+                                      "Aborting..." ,
              entry.GetUnionPath().c_str(), entry.GetRdOnlyLinkcount());
     abort();
   }

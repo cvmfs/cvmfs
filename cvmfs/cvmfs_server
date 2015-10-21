@@ -175,7 +175,7 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
-    skeleton migrate list-catalogs update-geodb gc catalog-chown"
+    skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -3130,6 +3130,18 @@ import() {
   # reset trap and finish
   trap - EXIT HUP INT QUIT TERM
   print_new_repository_notice $name $cvmfs_user
+
+  # print warning if OverlayFS is used for repository management
+  if [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]; then
+    echo ""
+    echo "WARNING: You are using OverlayFS which cannot handle hard links."
+    echo "         If the imported repository '${name}' used to be based on"
+    echo "         AUFS, please run the following command NOW to remove hard"
+    echo "         links from the catalogs:"
+    echo ""
+    echo "    cvmfs_server eliminate-hardlinks ${name}"
+    echo ""
+  fi
 }
 
 
@@ -4853,8 +4865,54 @@ migrate() {
 ################################################################################
 
 
+_run_catalog_migration() {
+  local name="$1"
+  local migration_command="$2"
+
+  load_repo_config $name
+
+  # more sanity checks
+  is_stratum0 $name       || die "This is not a stratum 0 repository"
+  is_root $name           || die "Permission denied: Only root can do that"
+  is_in_transaction $name && die "Repository is already in a transaction"
+  health_check $name
+
+  # all following commands need an open repository transaction and are supposed
+  # to commit or abort it after performing the catalog migration.
+  echo "Opening repository transaction"
+  trap "close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open repository transaction"
+
+  # run the catalog migration operation (must run as root!)
+  echo "Starting catalog migration"
+  local tmp_dir=${CVMFS_SPOOL_DIR}/tmp
+  local manifest=${tmp_dir}/manifest
+  migration_command="${migration_command} -t $tmp_dir -o $manifest"
+  sh -c "$migration_command" || die "Fail (executed command: $migration_command)"
+
+  # check if the catalog migration created a new revision
+  if [ ! -f $manifest ]; then
+    echo "Catalog migration finished without any changes"
+    return 0
+  fi
+
+  # finalizing transaction
+  local trunk_hash=$(grep "^C" $manifest | tr -d C)
+  echo "Flushing file system buffers"
+  sync
+
+  # committing newly created revision
+  echo "Signing new manifest"
+  chown $CVMFS_USER $manifest        || die "chmod of new manifest failed";
+  sign_manifest $name $manifest      || die "Signing failed";
+  set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
+}
+
+
+################################################################################
+
+
 catalog_chown() {
-  local names
   local uid_map
   local gid_map
 
@@ -4886,48 +4944,72 @@ catalog_chown() {
 
   load_repo_config $name
 
-  # more sanity checks
-  is_stratum0 $name       || die "This is not a stratum 0 repository"
-  is_root $name           || die "Permission denied: Only root can do that"
-  is_in_transaction $name && die "Repository is already in a transaction"
-  health_check $name
-
-  # all following commands need an open repository transaction and are supposed
-  # to commit or abort it after performing the catalog chmod.
-  echo "Opening repository transaction"
-  trap "close_transaction $name 0" EXIT HUP INT TERM
-  open_transaction $name || die "Failed to open repository transaction"
-
-  # run the catalog level chmod operation
-  echo "Starting catalog chown"
-
-  local tmp_dir=${CVMFS_SPOOL_DIR}/tmp
-  local manifest=${tmp_dir}/manifest
   local migrate_command="$(__swissknife_cmd dbg) migrate     \
                               -v 'chown'                     \
                               -r $CVMFS_STRATUM0             \
                               -n $name                       \
                               -u $CVMFS_UPSTREAM_STORAGE     \
-                              -t $tmp_dir                    \
                               -k $CVMFS_PUBLIC_KEY           \
-                              -o $manifest                   \
                               -i $uid_map                    \
                               -j $gid_map                    \
                               -s"
-  sh -c "$migrate_command" || die "Fail (executed command: $migrate_command)"
-  local trunk_hash=$(grep "^C" $manifest | tr -d C)
 
-  # finalizing transaction
-  echo "Flushing file system buffers"
-  sync
+  _run_catalog_migration "$name" "$migrate_command"
+}
 
-  # committing newly created revision
-  echo "Signing new manifest"
-  chown $CVMFS_USER $manifest        || die "chmod of new manifest failed";
-  sign_manifest $name $manifest      || die "Signing failed";
-  set_ro_root_hash $name $trunk_hash || die "Root hash update failed";
 
-  return
+################################################################################
+
+
+eliminate_hardlinks() {
+  local name=
+  local force=0
+
+  # parameter handling
+  OPTIND=1
+  while getopts "f" option; do
+    case $option in
+      f)
+        force=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command eliminate-hardlinks: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  # get repository name
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $@)
+  check_repository_existence "$name"
+
+  load_repo_config $name
+
+  if [ $force -ne 1 ]; then
+    echo "This will break up all hardlink relationships that are currently"
+    echo "present in '$name'. This process cannot be undone!"
+    echo ""
+    echo -n "Are you sure? (y/N): "
+
+    local reply="n"
+    read reply
+    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+      echo "aborted."
+      exit 1
+    fi
+  fi
+
+  local migrate_command="$(__swissknife_cmd dbg) migrate     \
+                              -v 'hardlink'                  \
+                              -r $CVMFS_STRATUM0             \
+                              -n $name                       \
+                              -u $CVMFS_UPSTREAM_STORAGE     \
+                              -k $CVMFS_PUBLIC_KEY           \
+                              -s"
+
+  _run_catalog_migration "$name" "$migrate_command"
 }
 
 
