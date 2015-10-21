@@ -1260,9 +1260,10 @@ plant_legacy_repository_revision() {
   local tarball="$1"
   local legacy_repo_name="$2"
   local repo_owner="$3"
+  local verbose="$4"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
 
-  plant_tarball "$tarball" "$verbose"                                  || return 104
+  plant_tarball "$tarball" "$verbose" || return 104
 
   # figure out if we just planted a CVMFS 2.0.x repository or something newer
   local is_cvmfs_20=0

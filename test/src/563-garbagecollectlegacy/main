@@ -29,9 +29,10 @@ cvmfs_run_test() {
   echo -n "resurrect legacy repository... "
   local resurrect_log="resurrect.log"
   TEST519_LEGACY_STORAGE="$legacy_repo_storage"
-  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                                                              || return $?
+  plant_tarball "${guinea_pig_location}/keys.tar.gz" || return $?
   plant_legacy_repository_revision "${guinea_pig_location}/revision-6.tar.gz" \
                                    "$legacy_repo_name"                        \
+                                   "$CVMFS_TEST_USER"                         \
                                    "verbose" > $resurrect_log 2>&1 || return $?
   echo "done"
 
