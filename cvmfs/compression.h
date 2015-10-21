@@ -53,7 +53,7 @@ enum Algorithms {
   * Defalte, DefalteBound, Clone, and WillHandle functions.  For information on 
   * the WillHandle function, read up on the PolymorphicConstruction class.
   * The new sub-class must be listed in the implemention of the 
-  * Compressor::RegsiterPlugins function.
+  * Compressor::RegisterPlugins function.
   * 
   */
 class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
