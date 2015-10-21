@@ -128,7 +128,7 @@ cvmfs_run_test() {
   respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
 
   echo "importing repository to recreate the backend infrastructure"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER $CVMFS_TEST_REPO || return 9
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 9
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
@@ -145,7 +145,7 @@ cvmfs_run_test() {
   respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend || return $?
 
   echo "importing repository with a provided keychain"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER -k $(pwd)/$repo_keychain $CVMFS_TEST_REPO || return 11
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -k $(pwd)/$repo_keychain || return 11
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
@@ -166,7 +166,7 @@ cvmfs_run_test() {
   respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
 
   echo "importing repository (should fail due to whitelist)"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER $CVMFS_TEST_REPO && return 14
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER && return 14
 
   echo "(temporarily) moving the masterkey"
   local masterkey="/etc/cvmfs/keys/${CVMFS_TEST_REPO}.masterkey"
@@ -174,13 +174,13 @@ cvmfs_run_test() {
   sudo mv $masterkey $hidden_masterkey || return 15
 
   echo "importing repository (should fail due to missing masterkey)"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER -r $CVMFS_TEST_REPO && return 16
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r && return 16
 
   echo "moving the masterkey back in place"
   sudo mv $hidden_masterkey $masterkey || return 17
 
   echo "importing repository and create a fresh whitelist"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER -r $CVMFS_TEST_REPO || return 18
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r || return 18
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?

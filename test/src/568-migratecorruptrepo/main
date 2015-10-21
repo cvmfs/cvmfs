@@ -40,12 +40,10 @@ cvmfs_run_test() {
           $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
           $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
           $legacy_repo_storage || return 3
-  sudo cvmfs_server import \
-    -o $CVMFS_TEST_USER    \
-    -l                     \
-    -s                     \
-    -g                     \
-    $legacy_repo_name > $migration_log 2>&1 || return 4
+  import_repo $legacy_repo_name $CVMFS_TEST_USER \
+    -l                                           \
+    -s                                           \
+    -g > $migration_log 2>&1 || return 4
 
   echo "look for the expected notes and warnings in the output"
   cat "$migration_log" | grep '^NOTE: fixed.*transition point.*nested_mountpoint_out_of_sync' || return 5
