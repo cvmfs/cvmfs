@@ -670,7 +670,8 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
       else
         nameservers.push_back(tokens[1] + ":53");
     } else if (tokens[0] == "search") {
-      domains.push_back(tokens[1]);
+      for (unsigned i = 1; i < tokens.size(); ++i)
+        domains.push_back(tokens[i]);
     }
   }
   fclose(f);
