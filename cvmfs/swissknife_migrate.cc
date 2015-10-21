@@ -22,6 +22,7 @@ catalog::DirectoryEntry  CommandMigrate::nested_catalog_marker_;
 CommandMigrate::CommandMigrate() :
   file_descriptor_limit_(8192),
   catalog_count_(0),
+  has_committed_new_revision_(false),
   uid_(0),
   gid_(0),
   root_catalog_(NULL)
@@ -226,7 +227,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
 
   // Analyze collected statistics
-  if (collect_catalog_statistics) {
+  if (collect_catalog_statistics && has_committed_new_revision_) {
     LogCvmfs(kLogCatalog, kLogStdout, "\nCollected statistics results:");
     AnalyzeCatalogStatistics();
   }
@@ -318,22 +319,28 @@ bool CommandMigrate::DoMigrationAndCommit(
     return false;
   }
 
-  // Commit the new (migrated) repository revision...
-  LogCvmfs(kLogCatalog, kLogStdout,
-           "\nCommitting migrated repository revision...");
-  const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash.Get();
-  const std::string &root_catalog_path = root_catalog->root_path();
-  const size_t root_catalog_size = root_catalog->new_catalog_size.Get();
-  manifest::Manifest manifest(root_catalog_hash, root_catalog_size,
-                              root_catalog_path);
-  const catalog::Catalog* new_catalog = (root_catalog->HasNew())
-                                        ? root_catalog->new_catalog
-                                        : root_catalog->old_catalog;
-  manifest.set_ttl(new_catalog->GetTTL());
-  manifest.set_revision(new_catalog->GetRevision());
-  if (!manifest.Export(manifest_path)) {
-    Error("Manifest export failed.\nAborting...");
-    return false;
+  if (root_catalog->was_updated.Get()) {
+    // Commit the new (migrated) repository revision...
+    LogCvmfs(kLogCatalog, kLogStdout,
+             "\nCommitting migrated repository revision...");
+    const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash;
+    const std::string &root_catalog_path = root_catalog->root_path();
+    const size_t root_catalog_size = root_catalog->new_catalog_size;
+    manifest::Manifest manifest(root_catalog_hash, root_catalog_size,
+                                root_catalog_path);
+    const catalog::Catalog* new_catalog = (root_catalog->HasNew())
+                                          ? root_catalog->new_catalog
+                                          : root_catalog->old_catalog;
+    manifest.set_ttl(new_catalog->GetTTL());
+    manifest.set_revision(new_catalog->GetRevision());
+    if (!manifest.Export(manifest_path)) {
+      Error("Manifest export failed.\nAborting...");
+      return false;
+    }
+    has_committed_new_revision_ = true;
+  } else {
+    LogCvmfs(kLogCatalog, kLogStdout,
+             "\nNo catalogs migrated, skipping the commit...");
   }
 
   // Get rid of the open root catalog
@@ -382,6 +389,12 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
     return;
   }
 
+  if (!data->HasChanges()) {
+    PrintStatusMessage(data, data->GetOldContentHash(), "preserved");
+    data->was_updated.Set(false);
+    return;
+  }
+
   const string &path = (data->HasNew()) ? data->new_catalog->database_path()
                                         : data->old_catalog->database_path();
 
@@ -400,7 +413,7 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
     exit(2);
     return;
   }
-  data->new_catalog_size.Set(new_catalog_size);
+  data->new_catalog_size = new_catalog_size;
 
   // Schedule the compression and upload of the catalog
   spooler_->ProcessCatalog(path);
@@ -436,20 +449,29 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
       pending_catalogs_.erase(i);
     }
 
-    atomic_inc32(&catalogs_processed_);
-    const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
-                                    catalog_count_;
-    LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] migrated and uploaded %sC %s",
-             processed,
-             result.content_hash.ToString().c_str(),
-             catalog->root_path().c_str());
+    PrintStatusMessage(catalog, result.content_hash, "migrated and uploaded");
 
-    // The catalog is completely processed... fill the hash-future to allow the
-    // processing of parent catalogs
+    // The catalog is completely processed... fill the content_hash to allow the
+    // processing of parent catalogs (Notified by 'was_updated'-future)
     // NOTE: From now on, this PendingCatalog structure could be deleted and
     //       should not be used anymore!
-    catalog->new_catalog_hash.Set(result.content_hash);
+    catalog->new_catalog_hash = result.content_hash;
+    catalog->was_updated.Set(true);
   }
+}
+
+
+void CommandMigrate::PrintStatusMessage(const PendingCatalog *catalog,
+                                        const shash::Any     &content_hash,
+                                        const std::string    &message) {
+  atomic_inc32(&catalogs_processed_);
+  const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
+                                  catalog_count_;
+  LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] %s %sC %s",
+           processed,
+           message.c_str(),
+           content_hash.ToString().c_str(),
+           catalog->root_path().c_str());
 }
 
 
@@ -615,9 +637,14 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
     PendingCatalog    *nested_catalog  = *i;
-    const std::string &root_path       = nested_catalog->root_path();
-    const shash::Any   catalog_hash    = nested_catalog->new_catalog_hash.Get();
-    const size_t       catalog_size    = nested_catalog->new_catalog_size.Get();
+
+    if (!nested_catalog->was_updated.Get()) {
+      continue;
+    }
+
+    const std::string &root_path    = nested_catalog->root_path();
+    const shash::Any   catalog_hash = nested_catalog->new_catalog_hash;
+    const size_t       catalog_size = nested_catalog->new_catalog_size;
 
     // insert the updated nested catalog reference into the new catalog
     const bool retval =
