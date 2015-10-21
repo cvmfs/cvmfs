@@ -41,23 +41,41 @@ enum StreamStates {
 enum Algorithms {
   kZlibDefault = 0,
   kNoCompression,
-  kAny,
+  kUnknown,
 };
 
 /** 
   * Abstract Compression class which is inhereited by implementations of 
   * compression engines such as zlib...
+  *
+  * In order to add a new compression method, you simply need to add a new class
+  * which is a sub-class of the Compressor.  The subclass needs to implement the
+  * Defalte, DefalteBound, Clone, and WillHandle functions.  For information on 
+  * the WillHandle function, read up on the PolymorphicConstruction class.
+  * The new sub-class must be listed in the implemention of the 
+  * Compressor::RegsiterPlugins function.
+  * 
   */
 class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   public:
     Compressor(const Algorithms &alg) {};
     virtual ~Compressor() {};
     /**
-      * Deflate funciton.  
+      * Deflate funciton.  The arguments and returns closely match the input
+      * and output of the zlib deflate function.
+      * Input:
+      *   - outbuf - Ouput buffer to write the compressed data.
+      *   - outbufsize - Size of the output buffer
+      *   - inbuf - Input data to be compressed
+      *   - inbufsize - Size of the input buffer
+      *   - flush - Whether the compression stream should be flushed / finished
       * Upon return:
       *   returns: true - if done compressing, false otherwise
-      *   inbufsize: the remaining input to read in.
-      *   outbufsize: The number of bytes used in the outbuf
+      *   - outbuf - output buffer pointer (unchanged from input)
+      *   - outbufsize - The number of bytes used in the outbuf
+      *   - inbuf - Pointer to the next byte of input to read in
+      *   - inbufsize - the remaining bytes of input to read in.
+      *   - flush - unchanged from input
       */
     virtual bool Deflate(unsigned char *outbuf, size_t& outbufsize, 
             unsigned char*& inbuf, size_t& inbufsize, 

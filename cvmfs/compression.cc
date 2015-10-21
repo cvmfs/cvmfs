@@ -131,7 +131,7 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
     return kZlibDefault;
   if (algorithm_option == "none")
     return kNoCompression;
-  return kAny;
+  return kUnknown;
 }
 
 void CompressInit(z_stream *strm) {
