@@ -73,6 +73,15 @@ class CommandMigrate : public Command {
     inline bool IsRoot() const { return old_catalog->IsRoot(); }
     inline bool HasNew() const { return new_catalog != NULL;   }
 
+    inline bool HasChanges() const {
+      return (new_catalog != NULL ||
+              old_catalog->database().GetModifiedRowCount() > 0);
+    }
+
+    inline shash::Any GetOldContentHash() const {
+      return old_catalog->hash();
+    }
+
     bool                              success;
 
     const catalog::Catalog           *old_catalog;
@@ -84,8 +93,9 @@ class CommandMigrate : public Command {
 
     CatalogStatistics                 statistics;
 
-    Future<shash::Any>                new_catalog_hash;
-    Future<size_t>                    new_catalog_size;
+    Future<bool>                      was_updated;
+    shash::Any                        new_catalog_hash;
+    size_t                            new_catalog_size;
   };
 
   class PendingCatalogMap : public std::map<std::string, const PendingCatalog*>,
