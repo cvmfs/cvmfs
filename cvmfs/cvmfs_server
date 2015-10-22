@@ -94,13 +94,6 @@ is_systemd() {
   [ x"$SERVICE_BIN" = x"false" ]
 }
 
-# Find the fuser binary
-if [ -x /sbin/fuser ]; then
-  fuser="/sbin/fuser" # RHEL
-else
-  fuser="/bin/fuser"  # Ubuntu, SuSe, Gentoo
-fi
-
 # standard values
 CVMFS_DEFAULT_USE_FILE_CHUNKING=true
 CVMFS_DEFAULT_MIN_CHUNK_SIZE=4194304
@@ -2176,9 +2169,9 @@ If you go for production, backup you software signing keys in /etc/cvmfs/keys/!"
 }
 
 
-generate_fuser_report_for_mountpoint() {
+generate_lsof_report_for_mountpoint() {
   local mountpoint="$1"
-  $fuser -v -m "$mountpoint" 2>&1 | grep -v "^Cannot stat file" || true
+  lsof | grep $mountpoint | awk '{print $1,$2,$3,$NF}' | column -t || true
 }
 
 
@@ -2191,10 +2184,10 @@ WARNING! There are open read-only file descriptors in /cvmfs/$name
       We can anyway perform the requested operation, but this will most likely
       break other processes with open file descriptors on /cvmfs/$name!
 
-      The following fuser report might show the processes with open file handles
+      The following lsof report might show the processes with open file handles
       "
 
-  generate_fuser_report_for_mountpoint "/cvmfs/${name}"
+  generate_lsof_report_for_mountpoint "/cvmfs/${name}"
 
   echo -n "\
 
@@ -2215,9 +2208,9 @@ file_descriptor_warning() {
   local name=$1
 
   echo "WARNING: Open file descriptors on /cvmfs/$name (possible race!)"
-  echo "         The following fuser report might show the culprit:"
+  echo "         The following lsof report might show the culprit:"
   echo
-  generate_fuser_report_for_mountpoint "/cvmfs/${name}"
+  generate_lsof_report_for_mountpoint "/cvmfs/${name}"
   echo
 }
 
