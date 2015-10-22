@@ -200,18 +200,22 @@ cvmfs_version_string() {
   fi
   echo $version_string
 }
-# makes sure that a version is always of the form x.y.z
+# makes sure that a version is always of the form x.y.z-b
 normalize_version() {
   local version_string="$1"
   while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
     version_string="${version_string}.0"
   done
+  while [ $(echo "$version_string" | grep -o '-' | wc -l) -lt 1 ]; do
+    version_string="${version_string}-1"
+  done
   echo "$version_string"
 }
-version_major() { echo $1 | cut --delimiter=. --fields=1; }
-version_minor() { echo $1 | cut --delimiter=. --fields=2; }
-version_patch() { echo $1 | cut --delimiter=. --fields=3; }
-prepend_zeros() { printf %05d "$1"; }
+version_major() { echo $1 | cut --delimiter=. --fields=1 | grep -oe '^[0-9]\+'; }
+version_minor() { echo $1 | cut --delimiter=. --fields=2 | grep -oe '^[0-9]\+'; }
+version_patch() { echo $1 | cut --delimiter=. --fields=3 | grep -oe '^[0-9]\+'; }
+version_build() { echo $1 | cut --delimiter=- --fields=2 | grep -oe '^[0-9]\+'; }
+prepend_zeros() { printf %03d "$1"; }
 compare_versions() {
   local lhs="$(normalize_version $1)"
   local comparison_operator=$2
@@ -220,11 +224,13 @@ compare_versions() {
   local lhs1=$(prepend_zeros $(version_major $lhs))
   local lhs2=$(prepend_zeros $(version_minor $lhs))
   local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local lhs4=$(prepend_zeros $(version_build $lhs))
   local rhs1=$(prepend_zeros $(version_major $rhs))
   local rhs2=$(prepend_zeros $(version_minor $rhs))
   local rhs3=$(prepend_zeros $(version_patch $rhs))
+  local rhs4=$(prepend_zeros $(version_build $rhs))
 
-  [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
+  [ $lhs1$lhs2$lhs3$lhs4 $comparison_operator $rhs1$rhs2$rhs3$rhs4 ]
 }
 version_greater_or_equal() {
   local needle=$1
@@ -236,7 +242,7 @@ version_lower_or_equal() {
 }
 version_equal() {
   local needle=$1
-  [ "$(cvmfs_version_string)" = "$needle" ]
+  compare_versions "$(cvmfs_version_string)" = "$needle"
 }
 
 # prints some help information optionally followed by an error message
@@ -341,11 +347,13 @@ load_repo_config() {
   fi
 }
 
-# retrieves (or guesses) the version of CernVM-FS that was used to create the
-# repository whose server.conf is currently sourced
-# Note: this assumes that server.conf is already sourced!
+# retrieves (or guesses) the version of CernVM-FS that was used to create this
+# repository.
+# @param name  the name of the repository to be checked
 repository_creator_version() {
-  local version=$CVMFS_CREATOR_VERSION
+  local name="$1"
+  load_repo_config $name
+  local version="$CVMFS_CREATOR_VERSION"
   if [ x"$version" = x ]; then
     version="2.1.6" # 2.1.6 was the last version, that did not store the creator
                     # version... therefore this has to be handled as "<= 2.1.6"
@@ -370,7 +378,7 @@ mangle_version_string() {
 # only called by check_repository_compatibility()!
 # @param creator  the creator version of the (incompatible) repository
 # @param nokill   (optional) see check_repository_compatibility()
-repo_is_incompatible() {
+_repo_is_incompatible() {
   local creator=$1
   # if 'nokill' is set, be silent and just return 1
   if [ $# -gt 1 ]; then
@@ -392,8 +400,9 @@ Please run \`cvmfs_server migrate\` to update your repository before proceeding.
 # Note: this assumes that server.conf was already sourced!
 # @param nokill  (optional) if not set -> `exit 1` on incompatibility
 check_repository_compatibility() {
-  local creator=$(repository_creator_version)
-  local nokill=$1
+  local name="$1"
+  local nokill=$2
+  local creator=$(repository_creator_version $name)
   if version_equal "$creator"; then
     return 0 # trivial case... no update of CernVM-FS taken place
   fi
@@ -425,7 +434,7 @@ least CernVM-FS $creator to manipulate this repository."
   # Note: I tried to make this code as verbose as possible
   #
   if [ "$creator" = "2.1.6" ] && version_greater_or_equal "2.1.7"; then
-    repo_is_incompatible "$creator" $nokill
+    _repo_is_incompatible "$creator" $nokill
     return $?
   fi
 
@@ -435,19 +444,19 @@ least CernVM-FS $creator to manipulate this repository."
      [ "$creator" = "2.1.13" ] || [ "$creator" = "2.1.14" ];
   then
     if version_greater_or_equal "2.1.15"; then
-      repo_is_incompatible "$creator" $nokill
+      _repo_is_incompatible "$creator" $nokill
       return $?
     fi
   fi
 
-  if [ "$creator" = "2.1.15"  ] || [ "$creator" = "2.1.16"  ] || \
-     [ "$creator" = "2.1.17"  ] || [ "$creator" = "2.1.18" ] || \
+  if [ "$creator" = "2.1.15" ] || [ "$creator" = "2.1.16" ] || \
+     [ "$creator" = "2.1.17" ] || [ "$creator" = "2.1.18" ] || \
      [ "$creator" = "2.1.19" ];
   then
     if version_greater_or_equal "2.1.20" && \
-       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] &&
+       is_stratum1 $name                 && \
        is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-      repo_is_incompatible "$creator" $nokill
+      _repo_is_incompatible "$creator" $nokill
       return $?
     fi
   fi
@@ -3195,7 +3204,7 @@ rmfs() {
     load_repo_config $name
 
     # check if repository is compatible to the installed CernVM-FS version
-    check_repository_compatibility
+    check_repository_compatibility $name
 
     # sanity checks
     [ x"$CVMFS_SPOOL_DIR"        = x ] && { echo "Spool directory for $name is undefined";  retcode=1; continue; }
@@ -3265,7 +3274,7 @@ resign() {
     load_repo_config $name
 
     # check if repository is compatible to the installed CernVM-FS version
-    check_repository_compatibility
+    check_repository_compatibility $name
 
     # do it!
     create_whitelist $name $CVMFS_USER \
@@ -3327,7 +3336,7 @@ list_catalogs() {
   health_check $name $silence_warnings
 
   # check if repository is compatible to the installed CernVM-FS version
-  check_repository_compatibility
+  check_repository_compatibility $name
 
   # do it!
   local user_shell="$(get_user_shell $name)"
@@ -3363,7 +3372,7 @@ info() {
 
   # do it!
   echo "Repository name: $name"
-  echo "Created by CernVM-FS $(mangle_version_string $(repository_creator_version))"
+  echo "Created by CernVM-FS $(mangle_version_string $(repository_creator_version $name))"
   local replication_allowed="yes"
   is_master_replica $name || replication_allowed="no"
   echo "Stratum1 Replication Allowed: $replication_allowed"
@@ -3634,7 +3643,7 @@ check() {
   health_check $name
 
   # check if repository is compatible to the installed CernVM-FS version
-  check_repository_compatibility
+  check_repository_compatibility $name
 
   upstream=$CVMFS_UPSTREAM_STORAGE
   stratum0=$CVMFS_STRATUM0
@@ -3683,10 +3692,10 @@ list() {
 
     # figure out the schema version of the repository
     local version_info=""
-    local creator_version=$(repository_creator_version)
+    local creator_version=$(repository_creator_version $name)
     if ! version_equal $creator_version; then
       local compatible=""
-      if ! check_repository_compatibility "nokill"; then
+      if ! check_repository_compatibility $name "nokill"; then
         compatible=" INCOMPATIBLE"
       fi
       version_info="(created by$compatible CernVM-FS $(mangle_version_string $creator_version))"
@@ -3777,7 +3786,7 @@ transaction() {
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
-    check_repository_compatibility
+    check_repository_compatibility $name
     if [ $force -eq 0 ]; then
       is_in_transaction $name && { echo "Repository $name is already in a transaction"; retcode=1; continue; }
     fi
@@ -3839,7 +3848,7 @@ abort() {
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
-    check_repository_compatibility
+    check_repository_compatibility $name
     is_in_transaction $name || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
@@ -3950,7 +3959,7 @@ publish() {
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
-    check_repository_compatibility
+    check_repository_compatibility $name
     check_expiry $name $stratum0   || { echo "Repository whitelist for $name is expired!"; retcode=1; continue; }
     is_in_transaction $name        || { echo "Repository $name is not in a transaction"; retcode=1; continue; }
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
@@ -4173,7 +4182,7 @@ rollback() {
 
   # more sanity checks
   is_owner_or_root $name || die "Permission denied: Repository $name is owned by $user"
-  check_repository_compatibility
+  check_repository_compatibility $name
   check_expiry $name $stratum0  || die "Repository whitelist is expired!"
   is_in_transaction $name && die "Cannot rollback a repository in a transaction"
   is_cwd_on_path "/cvmfs/$name" && die "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'." || true
@@ -4508,7 +4517,7 @@ snapshot() {
 
     # more sanity checks
     is_owner_or_root $alias_name || { echo "Permission denied: Repository $alias_name is owned by $user"; retcode=1; continue; }
-    check_repository_compatibility
+    check_repository_compatibility $alias_name
     [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
     gc_timespan="$(get_auto_garbage_collection_timespan $alias_name)" || { retcode=1; continue; }
     if is_local_upstream $CVMFS_UPSTREAM_STORAGE && is_root && check_apache; then
@@ -4617,6 +4626,7 @@ snapshot() {
 
 migrate_2_1_6() {
   local name=$1
+  local destination_version="2.1.7"
 
   # get repository information
   load_repo_config $name
@@ -4648,7 +4658,7 @@ migrate_2_1_6() {
     cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
-CVMFS_CREATOR_VERSION=2.1.7
+CVMFS_CREATOR_VERSION=$destination_version
 CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
 CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
 CVMFS_USER=$CVMFS_USER
@@ -4669,7 +4679,7 @@ EOF
     cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # Created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
-CVMFS_CREATOR_VERSION=2.1.7
+CVMFS_CREATOR_VERSION=$destination_version
 CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
 CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
 CVMFS_USER=$CVMFS_USER
@@ -4826,33 +4836,35 @@ migrate() {
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
-    check_repository_compatibility "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
+    check_repository_compatibility $name "nokill" && { echo "Repository '$name' is already up-to-date."; continue; }
     health_check $name
 
+    creator="$(repository_creator_version $name)"
+
     # do the migrations...
-    if [ $(repository_creator_version) = "2.1.6" ]; then
+    if [ x"$creator" = x"2.1.6" ]; then
       migrate_2_1_6 $name
     fi
 
-    if [ $(repository_creator_version) = "2.1.7" -o  \
-         $(repository_creator_version) = "2.1.8" -o  \
-         $(repository_creator_version) = "2.1.9" -o  \
-         $(repository_creator_version) = "2.1.10" -o \
-         $(repository_creator_version) = "2.1.11" -o \
-         $(repository_creator_version) = "2.1.12" -o \
-         $(repository_creator_version) = "2.1.13" -o \
-         $(repository_creator_version) = "2.1.14" ];
+    if [ x"$creator" = x"2.1.7" -o  \
+         x"$creator" = x"2.1.8" -o  \
+         x"$creator" = x"2.1.9" -o  \
+         x"$creator" = x"2.1.10" -o \
+         x"$creator" = x"2.1.11" -o \
+         x"$creator" = x"2.1.12" -o \
+         x"$creator" = x"2.1.13" -o \
+         x"$creator" = x"2.1.14" ];
     then
       migrate_2_1_7 $name
     fi
 
-    if [ $(repository_creator_version) = "2.1.15" -o \
-         $(repository_creator_version) = "2.1.16" -o \
-         $(repository_creator_version) = "2.1.17" -o \
-         $(repository_creator_version) = "2.1.18" -o \
-         $(repository_creator_version) = "2.1.19" ] &&
-       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] &&
-       is_local_upstream $CVMFS_UPSTREAM_STORAGE;
+    if [ x"$creator" = x"2.1.15" -o   \
+         x"$creator" = x"2.1.16" -o   \
+         x"$creator" = x"2.1.17" -o   \
+         x"$creator" = x"2.1.18" -o   \
+         x"$creator" = x"2.1.19" ] && \
+         is_stratum1 $name         && \
+         is_local_upstream $CVMFS_UPSTREAM_STORAGE;
     then
       migrate_2_1_15 $name
     fi
