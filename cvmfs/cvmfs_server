@@ -440,12 +440,12 @@ least CernVM-FS $creator to manipulate this repository."
     fi
   fi
 
-  if [ "$creator" = "2.1.15"  ] || [ "$creator" = "2.1.16"  ] || \
-     [ "$creator" = "2.1.17"  ] || [ "$creator" = "2.1.18" ] || \
+  if [ "$creator" = "2.1.15" ] || [ "$creator" = "2.1.16" ] || \
+     [ "$creator" = "2.1.17" ] || [ "$creator" = "2.1.18" ] || \
      [ "$creator" = "2.1.19" ];
   then
-    if version_greater_or_equal "2.1.20" && \
-       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] &&
+    if version_greater_or_equal "2.1.20"         && \
+       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] && \
        is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
       _repo_is_incompatible "$creator" $nokill
       return $?
