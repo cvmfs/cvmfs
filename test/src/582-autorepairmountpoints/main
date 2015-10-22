@@ -126,6 +126,31 @@ cvmfs_run_test() {
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+  echo "unmount union file system mountpoint"
+  sudo umount $repo_dir || return 106
+
+  echo "unmount read-only cvmfs branch"
+  sudo umount $rd_only || return 107
+
+  echo "mount the union file system again (without CVMFS mounted underneath)"
+  sudo mount $repo_dir || return 108
+
+  echo "check the repository"
+  local check_log_2_1="check_2.1.log"
+  cvmfs_server check $CVMFS_TEST_REPO > $check_log_2_1 2>&1 || return 109
+
+  echo "check the error and warning messages"
+  cat $check_log_2_1 | grep -e "${CVMFS_TEST_REPO}/rdonly is not mounted"    || return 110
+  cat $check_log_2_1 | grep -e "Only.*lower.*branch is broken"               || return 111
+  cat $check_log_2_1 | grep -e "Trying.*umount.* /cvmfs/${CVMFS_TEST_REPO}"  || return 112
+  cat $check_log_2_1 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly" || return 113
+  cat $check_log_2_1 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"   || return 114
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 115
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
   echo "remount union file system read/write"
   sudo mount -o remount,rw $repo_dir || return 14
 
