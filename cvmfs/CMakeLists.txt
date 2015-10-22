@@ -472,41 +472,52 @@ if (BUILD_SERVER)
 endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)
-  add_executable (cvmfs_preload ${CVMFS_PRELOADER_SOURCES})
+  add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
 
   if (LIBCURL_BUILTIN)
-    add_dependencies (cvmfs_preload libcares libcurl)
+    add_dependencies (cvmfs_preload_bin libcares libcurl)
     set (PRELOADER_LIBS ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
     set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${PRELOADER_LIBS} )
   endif (LIBCURL_BUILTIN)
 
   if (PACPARSER_BUILTIN)
-    add_dependencies (cvmfs_preload libpacparser)
+    add_dependencies (cvmfs_preload_bin libpacparser)
     set (PRELOADER_LIBS ${PACPARSER_ARCHIVE} ${PRELOADER_LIBS} )
   endif (PACPARSER_BUILTIN)
 
   if (SQLITE3_BUILTIN)
-    add_dependencies (cvmfs_preload sqlite3)
+    add_dependencies (cvmfs_preload_bin sqlite3)
     set (PRELOADER_LIBS ${SQLITE3_ARCHIVE}  ${PRELOADER_LIBS} )
   endif (SQLITE3_BUILTIN)
 
   if (ZLIB_BUILTIN)
-    add_dependencies (cvmfs_preload zlib)
+    add_dependencies (cvmfs_preload_bin zlib)
     set (PRELOADER_LIBS ${ZLIB_ARCHIVE} ${PRELOADER_LIBS} )
   endif (ZLIB_BUILTIN)
 
   if (SPARSEHASH_BUILTIN)
-    add_dependencies (cvmfs_preload sparsehash)
+    add_dependencies (cvmfs_preload_bin sparsehash)
   endif (SPARSEHASH_BUILTIN)
 
   if (TBB_PRIVATE_LIB)
     add_dependencies (cvmfs_swissknife libtbb)
   endif (TBB_PRIVATE_LIB)
 
-  add_dependencies (cvmfs_preload libsha2)
-  add_dependencies (cvmfs_preload libvjson)
+  add_dependencies (cvmfs_preload_bin libsha2)
+  add_dependencies (cvmfs_preload_bin libvjson)
 
-  target_link_libraries(cvmfs_preload ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
+  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
+endif (BUILD_PRELOADER)
+
+#
+# Generate a bash self-extracting script for the cvmfs_preload target
+#
+if (BUILD_PRELOADER)
+  add_custom_command (
+    TARGET cvmfs_preload_bin POST_BUILD
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/cvmfs_preload_builder.sh ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Generating the cvmfs_preload self-extracting script"
+  )
 endif (BUILD_PRELOADER)
 
 #
@@ -623,8 +634,8 @@ endif (BUILD_SERVER)
 
 if (BUILD_PRELOADER)
   install(
-    TARGETS      cvmfs_preload
-    RUNTIME
+    FILES      ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_preload
     DESTINATION    bin
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 endif (BUILD_PRELOADER)
