@@ -24,12 +24,46 @@ mount_old_root_hash() {
 }
 
 
+add_bin_to() {
+  local path="$1"
+
+  pushdir $path
+  cp_bin . || return 1
+  popdir
+}
+
+
+do_some_changes_to() {
+  local path="$1"
+
+  pushdir $path
+
+  mkdir foobar                  || return 1
+  echo "foobar" > foobar/foobar || return 2
+  touch foobar/.cvmfscatalog    || return 3
+
+  popdir
+}
+
+
+remove_everything_from() {
+  local path="$1"
+
+  pushdir $path
+  rm -fR ./*
+  popdir
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local rd_only=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
 
   local scratch_dir=$(pwd)
+  local reference_dir="${scratch_dir}/reference"
+
+  echo "create a local reference directory"
+  mkdir $reference_dir || return 101
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -41,7 +75,10 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "filling the repository with contents of /bin"
-  cp_bin $repo_dir || return 1
+  add_bin_to $repo_dir || return 1
+
+  echo "filling the reference dir with contents of /bin"
+  add_bin_to $reference_dir || return 101
 
   echo "creating CVMFS snapshot"
   cvmfs_server publish $CVMFS_TEST_REPO || return 2
@@ -209,9 +246,10 @@ cvmfs_run_test() {
   cat $check_log_9 | grep -e "Trying to remount .* to $current_root_hash"               || return 49
 
   echo "add a couple of files"
-  mkdir ${repo_dir}/foobar                  || return 50
-  echo "foobar" > ${repo_dir}/foobar/foobar || return 51
-  touch ${repo_dir}/foobar/.cvmfscatalog    || return 52
+  do_some_changes_to $repo_dir || return 50
+
+  echo "add a couple of files to the reference dir as well"
+  do_some_changes_to $reference_dir || return 51
 
   echo "publish transaction"
   publish_repo $CVMFS_TEST_REPO || return 53
@@ -270,7 +308,10 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return 67
 
   echo "remove everything from repo"
-  rm -fR ${repo_dir}/* || return 68
+  remove_everything_from $repo_dir || return 68
+
+  echo "remove everything from reference dir"
+  remove_everything_from $reference_dir || return 69
 
   echo "publish transaction"
   publish_repo $CVMFS_TEST_REPO || return 69
