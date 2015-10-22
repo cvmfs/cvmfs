@@ -4920,7 +4920,7 @@ migrate() {
          x"$creator" = x"2.1.18" -o                                   \
          x"$creator" = x"2.1.19" -o                                   \
          x"$creator" = x"2.1.20" ]                                 || \
-       [ x"$creator" = x"2.2.0" -a -z "$CVMFS_SERVER_CACHE_MODE" ] && \
+       [ x"$creator" = x"2.2.0-0" -a -z "$CVMFS_SERVER_CACHE_MODE" ] && \
          is_stratum0 $name;
     then
       migrate_2_1_20 $name
