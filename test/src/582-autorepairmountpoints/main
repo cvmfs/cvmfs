@@ -100,6 +100,9 @@ cvmfs_run_test() {
   cat $check_log_1 | grep -e "/cvmfs/${CVMFS_TEST_REPO} is not mounted"  || return 5
   cat $check_log_1 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}" || return 6
 
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 106
+
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "unmount union file system mountpoint"
@@ -117,6 +120,9 @@ cvmfs_run_test() {
   cat $check_log_2 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly" || return 11
   cat $check_log_2 | grep -e "/cvmfs/${CVMFS_TEST_REPO} is not mounted"    || return 12
   cat $check_log_2 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"   || return 13
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 113
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -160,6 +166,9 @@ cvmfs_run_test() {
   cat $check_log_5 | grep -e "is in a transaction .* /cvmfs/${CVMFS_TEST_REPO} .* not mounted read/write" || return 25
   cat $check_log_5 | grep -e "Trying to remount /cvmfs/${CVMFS_TEST_REPO} read/write"                     || return 26
 
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 126
+
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "check the repository's integrity"
@@ -173,6 +182,9 @@ cvmfs_run_test() {
 
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 28
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 128
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -210,6 +222,9 @@ cvmfs_run_test() {
 
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 43
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 143
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -253,6 +268,9 @@ cvmfs_run_test() {
 
   echo "publish transaction"
   publish_repo $CVMFS_TEST_REPO || return 53
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 153
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -302,6 +320,9 @@ cvmfs_run_test() {
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 66
 
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 166
+
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "open transaction"
@@ -314,12 +335,15 @@ cvmfs_run_test() {
   remove_everything_from $reference_dir || return 69
 
   echo "publish transaction"
-  publish_repo $CVMFS_TEST_REPO || return 69
+  publish_repo $CVMFS_TEST_REPO || return 70
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 71
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "check repository integrity"
-  check_repository $CVMFS_TEST_REPO -i || return 70
+  check_repository $CVMFS_TEST_REPO -i || return 72
 
   return 0
 }
