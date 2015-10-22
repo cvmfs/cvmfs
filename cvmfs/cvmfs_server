@@ -4846,13 +4846,13 @@ migrate() {
       migrate_2_1_7 $name
     fi
 
-    if [ $(repository_creator_version) = "2.1.15" -o \
-         $(repository_creator_version) = "2.1.16" -o \
-         $(repository_creator_version) = "2.1.17" -o \
-         $(repository_creator_version) = "2.1.18" -o \
-         $(repository_creator_version) = "2.1.19" ] &&
-       [ "$CVMFS_REPOSITORY_TYPE" = "stratum1" ] &&
-       is_local_upstream $CVMFS_UPSTREAM_STORAGE;
+    if [ $(repository_creator_version) = "2.1.15" -o   \
+         $(repository_creator_version) = "2.1.16" -o   \
+         $(repository_creator_version) = "2.1.17" -o   \
+         $(repository_creator_version) = "2.1.18" -o   \
+         $(repository_creator_version) = "2.1.19" ] && \
+         is_stratum1 $name                          && \
+         is_local_upstream $CVMFS_UPSTREAM_STORAGE;
     then
       migrate_2_1_15 $name
     fi
