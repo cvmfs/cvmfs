@@ -30,10 +30,10 @@ void Usage() {
     LogCvmfs(kLogCvmfs, kLogStderr, "Usage:\n"
     "cvmfs_preload -u <Stratum 0 URL>\n"
     "              -r <alien cache directory>\n"
-    "              -k <public key>\n"
-    "              -m <fully qualified repository name>\n"
-    "              -x <directory for temporary files>\n"
-    "              -d <path to dirtab file>\n\n");
+    "              [-d <path to dirtab file>]\n"
+    "              [-k <public key>]\n"
+    "              [-m <fully qualified repository name>]\n"
+    "              [-x <directory for temporary files>]\n\n");
 }
 }  // namespace swissknife
 
@@ -114,12 +114,19 @@ int main(int argc, char *argv[]) {
   }
 
   // check all mandatory parameters are included
-  string necessary_params = "urm";
+  string necessary_params = "ur";
   char result;
   if ((result = CheckParameters(necessary_params, &args)) != '\0') {
     printf("Argument not included but necessary: -%c\n\n", result);
     swissknife::Usage();
     return 2;
+  }
+
+  if (args.find('m') == args.end()) {
+    string fqrn = GetFileName(*args['u']);
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: guessing fqrn from URL: %s",
+             fqrn.c_str());
+    args['m'] = new string(fqrn);
   }
 
   if (args.find('x') == args.end())

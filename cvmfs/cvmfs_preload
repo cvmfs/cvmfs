@@ -5,13 +5,14 @@ ARCHIVE=`awk '/^__ARCHIVE_BELOW__/ {print NR + 1; exit 0; }' $0`
 
 tail -n+"$ARCHIVE" "$0" | tar xz -C "$TMPDIR" || echo "Couldn't extract the tar file"
 
-LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$TMPDIR"
+LD_LIBRARY_PATH="$TMPDIR:$LD_LIBRARY_PATH"
 
 # execute the command
-$TMPDIR/cvmfs_preload_bin $@ || echo "Failed to execute cvmfs_preload"
+$TMPDIR/cvmfs_preload_bin $@
+RETVAL=$?
 
 rm -rf "$TMPDIR"
 
-exit 0
+exit $RETVAL
 
 __ARCHIVE_BELOW__
