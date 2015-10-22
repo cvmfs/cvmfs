@@ -4620,6 +4620,7 @@ snapshot() {
 
 migrate_2_1_6() {
   local name=$1
+  local destination_version="2.1.7"
 
   # get repository information
   load_repo_config $name
@@ -4651,7 +4652,7 @@ migrate_2_1_6() {
     cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
-CVMFS_CREATOR_VERSION=2.1.7
+CVMFS_CREATOR_VERSION=$destination_version
 CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
 CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
 CVMFS_USER=$CVMFS_USER
@@ -4672,7 +4673,7 @@ EOF
     cat > /etc/cvmfs/repositories.d/${name}/server.conf << EOF
 # Created by cvmfs_server.
 # migrated from version $(mangle_version_string "2.1.6").
-CVMFS_CREATOR_VERSION=2.1.7
+CVMFS_CREATOR_VERSION=$destination_version
 CVMFS_REPOSITORY_NAME=$CVMFS_REPOSITORY_NAME
 CVMFS_REPOSITORY_TYPE=$CVMFS_REPOSITORY_TYPE
 CVMFS_USER=$CVMFS_USER
