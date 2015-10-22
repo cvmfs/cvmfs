@@ -1391,6 +1391,8 @@ health_check() {
   local name=$1
   local quiet=${2-0}
   local repair_in_txn=${3-0}
+  local rdonly_broken=0
+  local rw_broken=0
 
   load_repo_config $name
 
@@ -1414,14 +1416,30 @@ health_check() {
   if ! is_mounted "${CVMFS_SPOOL_DIR}/rdonly"; then
     echo "${CVMFS_SPOOL_DIR}/rdonly is not mounted properly." >&2
     __health_check_print_repair_info $name $repair_in_txn
-    echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
-    cvmfs_suid_helper rdonly_mount $name > /dev/null && echo "success" || { echo "fail"; exit 1; }
+    rdonly_broken=1
   fi
 
   # check mounted union file system
   if ! is_mounted "/cvmfs/$name"; then
     echo "/cvmfs/$name is not mounted properly." >&2
     __health_check_print_repair_info $name $repair_in_txn
+    rw_broken=1
+  fi
+
+  # try to repair the mountpoints
+  if [ $rdonly_broken -eq 1 ]; then
+    if [ $rw_broken -eq 0 ]; then
+      echo "Only the lower union file system branch is broken" >&2
+      echo -n "Note: Trying to umount /cvmfs/${name}... "
+      cvmfs_suid_helper rw_umount $name && echo "success" || { echo "fail"; exit 1; }
+      rw_broken=1 # will be fixed downstream
+    fi
+
+    echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
+    cvmfs_suid_helper rdonly_mount $name > /dev/null && echo "success" || { echo "fail"; exit 1; }
+  fi
+
+  if [ $rw_broken -eq 1 ]; then
     echo -n "Note: Trying to mount /cvmfs/${name}... "
     cvmfs_suid_helper rw_mount $name && echo "success" || { echo "fail"; exit 1; }
   fi
