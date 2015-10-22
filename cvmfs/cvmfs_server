@@ -1370,8 +1370,8 @@ __health_check_print_repair_info() {
 
   load_repo_config $name
 
-  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" != x"true" ]; then
-    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT != true)" >&2
+  if [ x"$CVMFS_AUTO_REPAIR_MOUNTPOINT" = x"false" ]; then
+    echo "Auto-Repair is disabled (CVMFS_AUTO_REPAIR_MOUNTPOINT = false)" >&2
     exit 1
   fi
 
