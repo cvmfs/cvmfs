@@ -8,13 +8,13 @@ VAGRANT_WORKSPACE="/vagrant"
 apt-get update
 
 # install required packages
-apt-get install -y apache2 attr autofs autotools-dev bash cmake coreutils     \
-                   curl debhelper debianutils debootstrap docker.io fuse g++  \
-                   gawk gcc gdb grep gzip initscripts insserv libattr1-dev    \
-                   libc-bin libc6-dev libcap-dev libfuse-dev libfuse2         \
-                   libssl-dev make openssl patch perl pkg-config psmisc       \
-                   python-dev python-lzma sed sudo sysvinit-utils unzip uuid  \
-                   uuid-dev yum zlib1g
+apt-get install -y apache2 attr autofs autotools-dev bash cmake coreutils curl \
+                   debhelper debianutils debootstrap docker.io fuse g++ gawk   \
+                   gcc gdb grep gzip initscripts insserv libattr1-dev libc-bin \
+                   libc6-dev libcap-dev libfuse-dev libfuse2 libssl-dev make   \
+                   openssl patch perl pkg-config psmisc python-dev python-lzma \
+                   sed sqlite3 sudo sysvinit-utils unzip uuid uuid-dev yum     \
+                   zlib1g
 
 # install some convenience packages
 apt-get install -y git tig iftop htop jq screen python-unittest2
