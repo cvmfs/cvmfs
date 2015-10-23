@@ -154,6 +154,9 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
+  echo "check for sqlite3 utility"
+  which sqlite3 || return 1
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
