@@ -387,6 +387,9 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Fri Oct 23 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Fix dependency for Fedora 22
+- Add lsof dependency for cvmfs-server
 * Tue Oct 13 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
 - Add libcap dependency for cvmfs-server
 * Wed Sep 30 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
