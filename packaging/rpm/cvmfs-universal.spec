@@ -153,6 +153,7 @@ Requires: attr
 Requires: openssl
 Requires: httpd
 Requires: libcap
+Requires: lsof
 
 Conflicts: cvmfs-server < 2.1
 

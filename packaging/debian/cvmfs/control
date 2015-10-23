@@ -18,7 +18,7 @@ Description: CernVM File System
 Package: cvmfs-server
 Architecture: i386 amd64 arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
-Depends: insserv, initscripts, bash, coreutils, grep, sed, sudo, psmisc, curl, gzip, attr, openssl, apache2, libcap2
+Depends: insserv, initscripts, bash, coreutils, grep, sed, sudo, psmisc, curl, gzip, attr, openssl, apache2, libcap2, lsof
 Conflicts: cvmfs-server (< 2.1)
 #Multi-Arch: same   (preparation for multiarch support)
 Homepage: http://cernvm.cern.ch
