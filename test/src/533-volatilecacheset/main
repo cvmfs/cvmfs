@@ -14,6 +14,8 @@ disaster_cleanup() {
 cvmfs_run_test() {
   logfile=$1
 
+  which sqlite3 || return 1
+
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
   create_empty_repo $CVMFS_TEST_REPO_MORE $CVMFS_TEST_USER NO -v || return $?
 
