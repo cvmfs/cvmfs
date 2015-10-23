@@ -13,8 +13,9 @@ apt-get install -y apache2 attr autofs autotools-dev bash bc cmake coreutils   \
                    gawk gcc gdb grep gzip initscripts insserv                  \
                    libapache2-mod-wsgi libattr1-dev libc-bin libc6-dev         \
                    libcap-dev libfuse-dev libfuse2 libssl-dev make openssl     \
-                   patch perl pkg-config psmisc python-dev python-lzma sed     \
-                   sqlite3 sudo sysvinit-utils unzip uuid uuid-dev yum zlib1g
+                   default-jre-headless patch perl pkg-config psmisc           \
+                   python-dev python-lzma sed sqlite3 sudo sysvinit-utils      \
+                   unzip uuid uuid-dev yum zlib1g
 
 # install some convenience packages
 apt-get install -y git tig iftop htop jq screen python-unittest2
