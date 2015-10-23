@@ -168,7 +168,8 @@ bool Database<DerivedT>::Configure() {
   // unexpected open read-write file descriptors in the cache directory like
   // etilqs_<number>.
   if (!read_write_) {
-    return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute();
+    return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute() &&
+           Sql(sqlite_db() , "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }
   return true;
 }
