@@ -91,7 +91,7 @@ Requires: shadow-utils
 Requires: SysVinit
 Requires: e2fsprogs
   %else
-    %if 0%{?fc21}
+    %if 0%{?fc21} || 0%{?fc22}
 Requires: procps-ng
     %else
 Requires: sysvinit-tools
