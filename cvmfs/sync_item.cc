@@ -93,6 +93,8 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
     rdonly_type_  = GetRdOnlyFiletype();
     scratch_type_ = GetRdOnlyFiletype();
   } else {
+    rdonly_type_  = kItemUnknown;
+    scratch_type_ = kItemUnknown;
     PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not "
                  "found in repository.");
   }
