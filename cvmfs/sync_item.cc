@@ -88,16 +88,22 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
 
   // Find the entry in the repository
   StatRdOnly(true);  // <== refreshing the stat (filename might have changed)
-  if (rdonly_stat_.error_code != 0) {
+
+  const SyncItemType deleted_type = (rdonly_stat_.error_code == 0)
+                                        ? GetRdOnlyFiletype()
+                                        : kItemUnknown;
+
+  rdonly_type_  = deleted_type;
+  scratch_type_ = deleted_type;
+
+  if (deleted_type == kItemUnknown) {
+    // Marking a SyncItem as 'whiteout' but no file to be removed found: This
+    // should not happen (actually AUFS prevents users from creating whiteouts)
+    // but can be provoked through an AUFS 'bug' (see test 593 or CVM-880).
+    // --> Warn the user, continue with kItemUnknown and cross your fingers!
     PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not "
                  "found in repository.");
-    abort();
-    return;
   }
-
-  // What is deleted?
-  rdonly_type_  = GetRdOnlyFiletype();
-  scratch_type_ = GetRdOnlyFiletype();
 }
 
 
