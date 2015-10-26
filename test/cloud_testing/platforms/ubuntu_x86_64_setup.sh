@@ -37,6 +37,7 @@ echo "installing DEB packages... "
 install_deb "$CONFIG_PACKAGES"
 install_deb $CLIENT_PACKAGE
 install_deb $SERVER_PACKAGE
+install_deb $DEVEL_PACKAGE
 install_deb $UNITTEST_PACKAGE
 
 # installing WSGI apache module
