@@ -25,7 +25,7 @@ Homepage: http://cernvm.cern.ch
 Description: CernVM File System Server
  HTTP File System Repository Server for Distributing Software to CernVM.
 
-Package: cvmfs-devel
+Package: cvmfs-dev
 Architecture: i386 amd64 arm64
 #Pre-Depends: ${misc:Pre-Depends}   (preparation for multiarch support)
 Depends: openssl
