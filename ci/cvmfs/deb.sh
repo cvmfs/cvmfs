@@ -59,7 +59,7 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
   generate_package_map "$CVMFS_CI_PLATFORM_LABEL"                           \
                        "$(basename $(find . -name 'cvmfs_*.deb'))"          \
                        "$(basename $(find . -name 'cvmfs-server*.deb'))"    \
-                       ""                                                   \
+                       "$(basename $(find . -name 'cvmfs-devel*.deb'))"     \
                        "$(basename $(find . -name 'cvmfs-unittests*.deb'))" \
                        "$CVMFS_CONFIG_PACKAGE"
 fi
