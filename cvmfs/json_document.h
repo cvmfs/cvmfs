@@ -22,6 +22,8 @@ class JsonDocument : SingleCopy {
 
   inline const JSON* root() const { return root_; }
   inline bool IsValid() const { return root_ != NULL; }
+  
+  static std::string EscapeString(const std::string &input);
 
  private:
   static const unsigned kDefaultBlockSize = 2048;  // 2kB
@@ -37,7 +39,6 @@ class JsonDocument : SingleCopy {
   std::string PrintValue(JSON *value, PrintOptions print_options);
   std::string PrintArray(JSON *first_child, PrintOptions print_options);
   std::string PrintObject(JSON *first_child, PrintOptions print_options);
-  std::string EscapeString(const std::string &input);
 
   block_allocator  allocator_;
   JSON            *root_;
