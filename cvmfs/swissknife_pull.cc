@@ -43,10 +43,7 @@ namespace {
 
 /**
  * This just stores an shash::Any in a predictable way to send it through a
- * POSIX pipe that is not type safe. It breaks good object oriented practises
- * like information hiding.
- *
- * TODO(rene): no words for that... just get rid of it!
+ * POSIX pipe.
  */
 class ChunkJob {
  public:
@@ -478,6 +475,14 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
              "CernVM-FS: using trusted certificates in %s",
              JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
   }
+  
+  // Check if we have a replica-ready server
+  retval = g_download_manager->Fetch(&download_sentinel);
+  if (retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "This is not a CernVM-FS server for replication");
+    goto fini;
+  }
 
   m_retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
                            g_signature_manager, g_download_manager, &ensemble);
@@ -543,14 +548,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     Store(history_path, history_hash);
     WaitForStorage();
     unlink(history_path.c_str());
-  }
-
-  // Check if we have a replica-ready server
-  retval = g_download_manager->Fetch(&download_sentinel);
-  if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "This is not a CernVM-FS server for replication");
-    goto fini;
   }
 
   // Starting threads
