@@ -33,6 +33,7 @@ void Usage() {
     "              [-d <path to dirtab file>]\n"
     "              [-k <public key>]\n"
     "              [-m <fully qualified repository name>]\n"
+    "              [-n <num of parallel download threads>]\n"
     "              [-x <directory for temporary files>]\n\n");
 }
 }  // namespace swissknife
