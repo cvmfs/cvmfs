@@ -9,7 +9,7 @@ bin_dir="$1"
 src_dir="$2"
 
 ldd "$bin_dir/cvmfs_preload_bin" | grep "=> /" | awk '{print $3}' | xargs -I '{}' cp -v '{}' "$tmpdir"
-rm -f "${tmpdir}"/libdl.so.* "${tmpdir}"/libc.so.*
+rm -f "${tmpdir}"/libdl.so.* "${tmpdir}"/libc.so.* "${tmpdir}"/libpthread.so.*
 cp "$bin_dir/cvmfs_preload_bin" "$tmpdir"
 
 # compress the files
