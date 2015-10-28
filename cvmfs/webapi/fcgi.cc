@@ -114,7 +114,8 @@ string FastCgi::DumpParams() {
 
 
 /**
- * Like CGI applications, exit_code != 0 indicates a failed request.
+ * Like CGI applications, exit_code != 0 indicates a failed request that is not
+ * handled through HTTP error return codes.
  */
 void FastCgi::EndRequest(uint32_t exit_code) {
   if (request_id_ == -1)
@@ -599,6 +600,15 @@ void FastCgi::ReplyUnknownType(int fd_transport, unsigned char received_type) {
   reply.raw_header.type = kTypeUnknown;
   reply.body.type = received_type;
   write(fd_transport, &reply, sizeof(reply));
+}
+
+
+void FastCgi::ReturnBadRequest(const std::string &reason) {
+  const string response = "HTTP/1.0 400 Bad Request\r\n"
+    "Content-type: text/plain\r\n\r\n" +
+    reason;
+  SendData(response, true);
+  EndRequest(0);
 }
 
 

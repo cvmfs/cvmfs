@@ -501,6 +501,7 @@ endif (BUILD_LIBCVMFS)
 
 if (BUILD_OCTOPUS)
   set (CVMFS_OCTOPUS_SOURCES
+	  sanitizer.h sanitizer.cc
     hash.h hash.cc
     platform.h platform_linux.h platform_osx.h
     smalloc.h
