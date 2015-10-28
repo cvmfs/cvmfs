@@ -128,6 +128,11 @@ int main(int argc, char *argv[]) {
   if (args.find('x') == args.end())
     args['x'] = new string(*args['r'] + "/txn");
 
+  const string dirtab =
+    (args.find('d') == args.end()) ?  "/dev/null" : *args['d'];
+  const string cache_directory = *args['r'];
+  const string fqrn = *args['m'];
+
   // first create the alien cache
   string *alien_cache_dir = args['r'];
   retval = MkdirDeep(*alien_cache_dir, 0770);
@@ -178,6 +183,11 @@ int main(int argc, char *argv[]) {
   // load the command
   args['c'] = NULL;
   retval = swissknife::CommandPull().Main(args);
+
+  // Copy dirtab file
+  if (retval == 0) {
+    CopyPath2Path(dirtab, cache_directory + "/dirtab." + fqrn);
+  }
 
   if (keys_created) {
     unlink(cern_pk_path.c_str());
