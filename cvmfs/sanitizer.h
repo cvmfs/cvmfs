@@ -82,6 +82,16 @@ class PositiveIntegerSanitizer : public IntegerSanitizer {
                         std::string                  *filtered_output) const;
 };
 
+
+/**
+ * There could be more on the whitelist but this is already sufficient for the
+ * octopus web service.
+ */
+class UriSanitizer : public InputSanitizer {
+ public:
+  UriSanitizer() : InputSanitizer("az AZ 09 - _ /") { }
+};
+
 }  // namespace sanitizer
 
 #ifdef CVMFS_NAMESPACE_GUARD

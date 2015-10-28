@@ -9,6 +9,7 @@
 #include <string>
 
 #include "../pathspec/pathspec.h"
+#include "../sanitizer.h"
 
 using namespace std;  // NOLINT
 
@@ -29,6 +30,7 @@ int main(int argc, char **argv) {
   FastCgi::Event event;
   string request_uri;
   string content;
+  sanitizer::UriSanitizer uri_sanitizer;
   while ((event = fcgi.NextEvent(&buf, &length, &id)) != FastCgi::kEventExit) {
     switch (event) {
       case FastCgi::kEventAbortReq:
@@ -39,9 +41,13 @@ int main(int argc, char **argv) {
         break;
 
       case FastCgi::kEventStdin:
-        fprintf(f, "%s", fcgi.DumpParams().c_str());
-        fflush(f);
+        //fprintf(f, "%s", fcgi.DumpParams().c_str());
+        //fflush(f);
         fcgi.GetParam("REQUEST_URI", &request_uri);
+        if (!uri_sanitizer.IsValid("")) {
+          fcgi.ReturnBadRequest("Invalid URI");
+          break;
+        }
         content = "Content-type: text/html\n\n<html>" +
                   request_uri + "</html>\n";
         fcgi.SendData(content, true);

@@ -61,6 +61,7 @@ class FastCgi {
   void EndRequest(uint32_t exit_code);
   bool SendData(const std::string &data, bool finish);
   bool SendError(const std::string &data, bool finish);
+  void ReturnBadRequest(const std::string &reason);
   Event NextEvent(unsigned char **buf, unsigned *length, uint64_t *id);
 
   bool GetParam(const std::string &key, std::string *value);

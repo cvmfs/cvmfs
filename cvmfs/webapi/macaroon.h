@@ -13,11 +13,11 @@
  * Macaroons are tamper-proof authorization tokens with attenuations and
  * third-party caveats.
  *
- * Macaroons are issued by the release manager machine to get a lease and by the
- * octopus lease server in form of a lease.  The lease server shares separate
- * keys with each of the release manager machines and with the storage relay.
- * Leases are targeted for the storage relay.  The release manager machine is
- * seen as a third party that signs off the hash of the change pack.
+ * Macaroons are issued by the octopus lease server in form of a lease.  The 
+ * lease server shares separate keys with each of the release manager machines
+ * and with the storage relay.  Leases are targeted for the storage relay.  The 
+ * release manager machine is seen as a third party that signs off the hash of 
+ * the change pack.
  *
  * The following caveats are supported for the octopus server:
  *  - expiry time
