@@ -94,6 +94,20 @@ static char CheckParameters(const string &params,
   return '\0';
 }
 
+static bool HasDirtabChanged(const string &dirtab_src, const string &dirtab_dst)
+{
+  bool retval;
+  shash::Any hash_src(shash::kMd5);
+  shash::Any hash_dst(shash::kMd5);
+  retval = shash::HashFile(dirtab_src, &hash_src);
+  if (!retval)
+    return true;
+  retval = shash::HashFile(dirtab_dst, &hash_dst);
+  if (!retval)
+    return true;
+  return hash_src != hash_dst;
+}
+
 
 int main(int argc, char *argv[]) {
   int retval;
@@ -128,10 +142,11 @@ int main(int argc, char *argv[]) {
   if (args.find('x') == args.end())
     args['x'] = new string(*args['r'] + "/txn");
 
-  const string dirtab =
-    (args.find('d') == args.end()) ?  "/dev/null" : *args['d'];
   const string cache_directory = *args['r'];
   const string fqrn = *args['m'];
+  const string dirtab =
+    (args.find('d') == args.end()) ?  "/dev/null" : *args['d'];
+  const string dirtab_in_cache = cache_directory + "/dirtab." + fqrn;
 
   // first create the alien cache
   string *alien_cache_dir = args['r'];
@@ -181,12 +196,16 @@ int main(int argc, char *argv[]) {
   swissknife::g_statistics = new perf::Statistics();
 
   // load the command
+  if (HasDirtabChanged(dirtab, dirtab_in_cache)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: new dirtab, forced run");
+    args['z'] = NULL;  // look into existing catalogs, too
+  }
   args['c'] = NULL;
   retval = swissknife::CommandPull().Main(args);
 
   // Copy dirtab file
   if (retval == 0) {
-    CopyPath2Path(dirtab, cache_directory + "/dirtab." + fqrn);
+    CopyPath2Path(dirtab, dirtab_in_cache);
   }
 
   if (keys_created) {
