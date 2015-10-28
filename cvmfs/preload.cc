@@ -95,11 +95,6 @@ static char CheckParameters(const string &params,
 
 
 int main(int argc, char *argv[]) {
-  if (argc < 7) {
-    printf("Not enough arguments: %d\n\n", argc);
-    swissknife::Usage();
-    return 1;
-  }
   int retval;
 
   // load some default arguments
