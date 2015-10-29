@@ -22,19 +22,22 @@
 
 using namespace std;  // NOLINT
 
+const char *kVersion = "0.2 (Preview)";
+
 namespace swissknife {
 download::DownloadManager *g_download_manager;
 signature::SignatureManager *g_signature_manager;
 perf::Statistics *g_statistics;
 void Usage() {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Usage:\n"
+    LogCvmfs(kLogCvmfs, kLogStderr, "Version: %s\n\n"
+    "Usage:\n"
     "cvmfs_preload -u <Stratum 0 URL>\n"
     "              -r <alien cache directory>\n"
     "              [-d <path to dirtab file>]\n"
     "              [-k <public key>]\n"
     "              [-m <fully qualified repository name>]\n"
     "              [-n <num of parallel download threads>]\n"
-    "              [-x <directory for temporary files>]\n\n");
+    "              [-x <directory for temporary files>]\n\n", kVersion);
 }
 }  // namespace swissknife
 
