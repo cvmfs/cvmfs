@@ -12,6 +12,10 @@
 
 namespace catalog {
 
+// TODO(jblomer): Dirtab and RelaxedPathFilter can use static inhertiance.  It
+// is clear at compile time which one should be used.  They are not on a
+// critical path though.
+
 /**
  * A Dirtab is handling the parsing and processing of the .cvmfsdirtab file.
  * The .cvmfsdirtab contains a list of Pathspecs that define where CernVM-FS
@@ -49,7 +53,6 @@ class Dirtab {
   static const char kCommentMarker  = '#';
   static const char kNegationMarker = '!';
 
- public:
   /**
    * A Rule represents a single line from a .cvmfsdirtab file. It wraps the
    * parsed Pathspec for the path pattern in this line and stores if this Path-
@@ -64,7 +67,6 @@ class Dirtab {
 
   typedef std::vector<Rule> Rules;
 
- public:
   /**
    * Creates an empty Dirtab (mainly for testing purposes)
    */
@@ -87,7 +89,8 @@ class Dirtab {
 
   /**
    * Parses the content of a .cvmfsdirtab file. This is called by the filepath-
-   * constructor or can be used on an empty Dirtab for testing purposes.
+   * constructor or can be used on an empty Dirtab for testing purposes and in
+   * inherited classes.
    *
    * @param dirtab  a string containing the full content of a .cvmfsdirtab file
    * @return        true on successful parsing
@@ -102,7 +105,7 @@ class Dirtab {
    * @param path  the path string to be matched against this Dirtab
    * @return      true if path string is matching this Dirtab
    */
-  bool IsMatching(const std::string &path) const;
+  virtual bool IsMatching(const std::string &path) const;
 
   /**
    * Matches a given path string against all negative rules in this Dirtab. This
@@ -112,7 +115,7 @@ class Dirtab {
    * @param path  the path string to be checked for opposition of this Dirtab
    * @return      true if (at least) one negative rule matches
    */
-  bool IsOpposing(const std::string &path) const;
+  virtual bool IsOpposing(const std::string &path) const;
 
   const Rules& positive_rules() const { return positive_rules_; }
   const Rules& negative_rules() const { return negative_rules_; }
@@ -147,19 +150,43 @@ class Dirtab {
   Rules negative_rules_;
 };
 
+
 /**
- * A RelaxedPathFilter includes in the Dirtab not only the actual path it
- * represents, but all its parent pathes
+ * A RelaxedPathFilter works similar to a Dirtab but it matches more generously:
+ * in addition to the actual paths it represents, all parent paths are matched.
+ * Sub paths of given paths are matched, too.
+ *
+ * For instance:
+ *   /software/releases
+ *   ! /software/releases/misc
+ *   ! /software/releases/experimental/misc
+ *
+ * Results in the following positive matches
+ *   /, /software, /software/releases, /software/releases/v1, 
+ *   /software/releases/experimental
+ * and in the following non-matches
+ *   /software/apps, /software/releases/misc, /software/releases/misc/external,
+ *   /software/releases/experimental/misc, 
+ *   /software/releases/experimental/misc/foo
+ *
+ * It is used by cvmfs_preload as a specification of a partial subtree for
+ * synchronization with a cache directory.
  */
 class RelaxedPathFilter : public Dirtab {
  public:
-  static RelaxedPathFilter* Create(const std::string &dirtab_path) {
-    RelaxedPathFilter *dt = new RelaxedPathFilter();
-    dt->Open(dirtab_path);
-    return dt;
-  }
+  static RelaxedPathFilter* Create(const std::string &dirtab_path);
+  virtual bool IsMatching(const std::string &path) const;
+  virtual bool IsOpposing(const std::string &path) const;
+
  protected:
-  bool ParsePathspec(const std::string &pathspec_str, bool negation);
+  virtual bool ParsePathspec(const std::string &pathspec_str, bool negation);
+
+ private:
+  /**
+   * Represents the entries in the provided dirtab file without parent paths.
+   * It is necessary to match sub paths against the provided dirtab.
+   */
+  Dirtab exact_dirtab_;
 };
 
 }  // namespace catalog

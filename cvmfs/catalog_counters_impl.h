@@ -10,6 +10,15 @@
 namespace catalog {
 
 template<typename FieldT>
+FieldT TreeCountersBase<FieldT>::Get(const std::string &key) const {
+  FieldsMap map = GetFieldsMap();
+  if (map.find(key) != map.end())
+    return *map[key];
+  return FieldT(0);
+}
+
+
+template<typename FieldT>
 typename TreeCountersBase<FieldT>::FieldsMap
     TreeCountersBase<FieldT>::GetFieldsMap() const
 {

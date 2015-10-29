@@ -357,7 +357,8 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
 
   // Traverse the chunks
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-           "  Processing chunks: ");
+           "  Processing chunks [%"PRIu64" registered chunks]: ",
+           catalog->GetNumChunks());
   retval = catalog->AllChunksBegin();
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
@@ -373,7 +374,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
     SafeSleepMs(100);
   }
   LogCvmfs(kLogCvmfs, kLogStdout, " fetched %"PRId64" new chunks out of "
-           "%"PRId64" processed chunks",
+           "%"PRId64" unique chunks",
            atomic_read64(&overall_new)-gauge_new,
            atomic_read64(&overall_chunks)-gauge_chunks);
 
