@@ -218,7 +218,7 @@ int CommandMigrate::Main(const ArgumentList &args) {
     HardlinkRemovalMigrationWorker::worker_context
       context(temporary_directory_, collect_catalog_statistics);
     migration_succeeded =
-      DoMigrationAndCommit<HardlinkRemovalMigrationWorker>( manifest_path,
+      DoMigrationAndCommit<HardlinkRemovalMigrationWorker>(manifest_path,
                                                            &context);
   } else {
     const std::string err_msg = "Unknown migration base: " + migration_base;

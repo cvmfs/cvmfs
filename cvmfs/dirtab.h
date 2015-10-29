@@ -154,7 +154,8 @@ class Dirtab {
 /**
  * A RelaxedPathFilter works similar to a Dirtab but it matches more generously:
  * in addition to the actual paths it represents, all parent paths are matched.
- * Sub paths of given paths are matched, too.
+ * Sub paths of given paths are matched, too.  In contrast to Dirtab, trailing
+ * slashes of path specifications are ignored.
  *
  * For instance:
  *   /software/releases
@@ -162,11 +163,11 @@ class Dirtab {
  *   ! /software/releases/experimental/misc
  *
  * Results in the following positive matches
- *   /, /software, /software/releases, /software/releases/v1, 
+ *   /software, /software/releases, /software/releases/v1,
  *   /software/releases/experimental
  * and in the following non-matches
  *   /software/apps, /software/releases/misc, /software/releases/misc/external,
- *   /software/releases/experimental/misc, 
+ *   /software/releases/experimental/misc,
  *   /software/releases/experimental/misc/foo
  *
  * It is used by cvmfs_preload as a specification of a partial subtree for

@@ -5,6 +5,8 @@
 #ifndef CVMFS_CATALOG_COUNTERS_IMPL_H_
 #define CVMFS_CATALOG_COUNTERS_IMPL_H_
 
+#include <string>
+
 #include "catalog_sql.h"
 
 namespace catalog {

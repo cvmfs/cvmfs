@@ -11,6 +11,7 @@
 class T_Dirtab : public ::testing::Test {
  protected:
   catalog::Dirtab dirtab;
+  catalog::RelaxedPathFilter path_filter;
 };
 
 TEST_F(T_Dirtab, Initialize) {
@@ -270,8 +271,8 @@ TEST_F(T_Dirtab, MultiDirectoryWildcardsInNegativeRules) {
   EXPECT_FALSE(dirtab.IsOpposing("/usr/local/src/test.hpp"));
 }
 
+
 TEST_F(T_Dirtab, RelaxedPathFilter) {
-  catalog::RelaxedPathFilter path_filter;
   path_filter.Parse("# positive\n"
                     "/usr/include/*\n"
                     "/bin/bash\n"
@@ -301,7 +302,6 @@ TEST_F(T_Dirtab, RelaxedPathFilter) {
 
 
 TEST_F(T_Dirtab, RelaxedPathFilterSubtrees) {
-  catalog::RelaxedPathFilter path_filter;
   path_filter.Parse("# positive\n"
                     "/software/releases\n"
                     "# negatives\n"
@@ -319,4 +319,20 @@ TEST_F(T_Dirtab, RelaxedPathFilterSubtrees) {
   EXPECT_FALSE(path_filter.IsMatching("/software/releases/experimental/misc"));
   EXPECT_FALSE(
     path_filter.IsMatching("/software/releases/experimental/misc/foo"));
+}
+
+
+TEST_F(T_Dirtab, RelaxedPathFilterTrailingSlash) {
+  path_filter.Parse("# positive:\n"
+                    "/usr/bin/\n"
+                    "# negative:\n"
+                    "! *.exe/\n"
+                    "! /usr/misc/\n");
+
+  EXPECT_TRUE(path_filter.IsValid());
+
+  EXPECT_TRUE(path_filter.IsMatching("/usr/bin"));
+  EXPECT_TRUE(path_filter.IsMatching("/usr/bin/bash"));
+  EXPECT_FALSE(path_filter.IsMatching("/usr/misc"));
+  EXPECT_FALSE(path_filter.IsMatching("/usr/bin/root.exe"));
 }
