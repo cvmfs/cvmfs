@@ -148,6 +148,10 @@ int main(int argc, char *argv[]) {
     (args.find('d') == args.end()) ?  "/dev/null" : *args['d'];
   const string dirtab_in_cache = cache_directory + "/dirtab." + fqrn;
 
+  // Default network parameters: 5 seconds timeout, 2 retries
+  args['t'] = new string("5");
+  args['a'] = new string("2");
+
   // first create the alien cache
   string *alien_cache_dir = args['r'];
   retval = MkdirDeep(*alien_cache_dir, 0770);

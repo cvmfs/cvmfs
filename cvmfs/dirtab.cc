@@ -174,11 +174,6 @@ bool Dirtab::IsOpposing(const std::string &path) const {
 
 RelaxedPathFilter *RelaxedPathFilter::Create(const std::string &dirtab_path) {
   RelaxedPathFilter *dt = new RelaxedPathFilter();
-  bool retval = dt->exact_dirtab_.Parse(dirtab_path);
-  if (!retval) {
-    delete dt;
-    return NULL;
-  }
   dt->Open(dirtab_path);
   return dt;
 }
