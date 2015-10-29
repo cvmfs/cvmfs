@@ -222,9 +222,9 @@ bool SyncUnionOverlayfs::Initialize() {
 
 
 bool ObtainSysAdminCapabilityInternal(cap_t caps) {
-  /* const */ cap_value_t cap = CAP_SYS_ADMIN; // is non-const as cap_set_flag()
-                                               // expects a non-const pointer
-                                               // on RHEL 5 and older
+  /*const*/ cap_value_t cap = CAP_SYS_ADMIN;  // is non-const as cap_set_flag()
+                                              // expects a non-const pointer
+                                              // on RHEL 5 and older
 
   // do sanity-check if supported in <sys/capability.h> otherwise just pray...
   // Note: CAP_SYS_ADMIN is a rather common capability and is very likely to be

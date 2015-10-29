@@ -308,10 +308,12 @@ TEST_F(T_Dirtab, RelaxedPathFilterSubtrees) {
                     "! /software/releases/misc\n"
                     "! /software/releases/experimental/misc\n");
 
-  EXPECT_TRUE(path_filter.Parse("/software"));
-  EXPECT_TRUE(path_filter.Parse("/software/releases"));
-  EXPECT_TRUE(path_filter.Parse("/software/releases/v1"));
-  EXPECT_TRUE(path_filter.Parse("/software/releases/experimental"));
+  EXPECT_TRUE(path_filter.IsValid());
+
+  EXPECT_TRUE(path_filter.IsMatching("/software"));
+  EXPECT_TRUE(path_filter.IsMatching("/software/releases"));
+  EXPECT_TRUE(path_filter.IsMatching("/software/releases/v1"));
+  EXPECT_TRUE(path_filter.IsMatching("/software/releases/experimental"));
 
   EXPECT_FALSE(path_filter.IsMatching("/software/apps"));
   EXPECT_FALSE(path_filter.IsMatching("/software/releases/misc"));

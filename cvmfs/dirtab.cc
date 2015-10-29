@@ -219,6 +219,11 @@ bool RelaxedPathFilter::IsOpposing(const std::string &path) const {
 }
 
 
+bool RelaxedPathFilter::Parse(const std::string &dirtab) {
+  return Dirtab::Parse(dirtab) & exact_dirtab_.Parse(dirtab);
+}
+
+
 bool RelaxedPathFilter::ParsePathspec(const std::string &pathspec_str,
                                       bool negation) {
   std::string relaxed_spec(pathspec_str);

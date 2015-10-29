@@ -95,7 +95,7 @@ class Dirtab {
    * @param dirtab  a string containing the full content of a .cvmfsdirtab file
    * @return        true on successful parsing
    */
-  bool Parse(const std::string &dirtab);
+  virtual bool Parse(const std::string &dirtab);
 
   /**
    * Matches a given path string against this Dirtab. The path is considered a
@@ -176,6 +176,7 @@ class Dirtab {
 class RelaxedPathFilter : public Dirtab {
  public:
   static RelaxedPathFilter* Create(const std::string &dirtab_path);
+  virtual bool Parse(const std::string &dirtab);
   virtual bool IsMatching(const std::string &path) const;
   virtual bool IsOpposing(const std::string &path) const;
 
