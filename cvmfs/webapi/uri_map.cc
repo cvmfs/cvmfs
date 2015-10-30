@@ -5,6 +5,8 @@
 #include "cvmfs_config.h"
 #include "uri_map.h"
 
+#include <cassert>
+
 #include "fcgi.h"
 
 using namespace std;  // NOLINT
@@ -33,18 +35,16 @@ WebRequest *WebRequest::CreateFromCgiHeaders(FastCgi *fcgi) {
 //------------------------------------------------------------------------------
 
 
-bool UriMap::Register(const string &uri_spec, UriHandler *handler) {
+void UriMap::Register(const string &uri_spec, UriHandler *handler) {
   Pathspec path_spec(uri_spec);
-  if (!path_spec.IsValid() || !path_spec.IsAbsolute())
-    return false;
+  assert(path_spec.IsValid() && path_spec.IsAbsolute());
   rules_.push_back(Match(path_spec, handler));
-  return true;
 }
 
 
 UriHandler *UriMap::Route(const std::string &uri) {
   for (unsigned i = 0; i < rules_.size(); ++i) {
-    if (rules_[i].uri_spec.IsMatching(uri))
+    if (rules_[i].uri_spec.IsPrefixMatching(uri))
       return rules_[i].handler;
   }
   return NULL;
