@@ -505,7 +505,8 @@ if (BUILD_OCTOPUS)
     logging.h logging_internal.h logging.cc
     pathspec/pathspec.h pathspec/pathspec.cc
     pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
-    webapi/fcgi.h webapi/fcgi.cc
+    webapi/uri_map.h webapi/uri_map.cc
+		webapi/fcgi.h webapi/fcgi.cc
     webapi/macaroon.h webapi/macaroon.cc
     webapi/octopus.cc)
 

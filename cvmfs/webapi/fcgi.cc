@@ -604,9 +604,9 @@ void FastCgi::ReplyUnknownType(int fd_transport, unsigned char received_type) {
 
 
 void FastCgi::ReturnBadRequest(const std::string &reason) {
-  const string response = "HTTP/1.0 400 Bad Request\r\n"
+  const string response = "Status: 400 Bad Request\r\n"
     "Content-type: text/plain\r\n\r\n" +
-    reason;
+    reason + "\n";
   SendData(response, true);
   EndRequest(0);
 }

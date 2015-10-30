@@ -14,6 +14,8 @@ Pathspec::Pathspec(const std::string &spec) :
   regex_(NULL),
   relaxed_regex_compiled_(false),
   relaxed_regex_(NULL),
+  prefix_regex_compiled_(false),
+  prefix_regex_(NULL),
   glob_string_compiled_(false),
   glob_string_sequence_compiled_(false),
   valid_(true),
@@ -39,6 +41,8 @@ Pathspec::Pathspec(const Pathspec &other) :
   regex_(NULL),                    // duplicated and needs to be re-compiled
   relaxed_regex_compiled_(false),  // Note: the copy-constructed object will
   relaxed_regex_(NULL),            //       perform a lazy evaluation again
+  prefix_regex_compiled_(false),
+  prefix_regex_(NULL),
   glob_string_compiled_(other.glob_string_compiled_),
   glob_string_(other.glob_string_),
   glob_string_sequence_compiled_(other.glob_string_sequence_compiled_),
@@ -113,6 +117,18 @@ bool Pathspec::IsMatching(const std::string &query_path) const {
          IsPathspecMatching(query_path);
 }
 
+bool Pathspec::IsPrefixMatching(const std::string &query_path) const {
+  assert(IsValid());
+  assert(IsAbsolute());
+
+  if (query_path.empty()) {
+    return false;
+  }
+
+  const bool query_is_absolute = (query_path[0] == kSeparator);
+  return (query_is_absolute && IsPathspecPrefixMatching(query_path));
+}
+
 bool Pathspec::IsMatchingRelaxed(const std::string &query_path) const {
   assert(IsValid());
 
@@ -125,6 +141,10 @@ bool Pathspec::IsMatchingRelaxed(const std::string &query_path) const {
 
 bool Pathspec::IsPathspecMatching(const std::string &query_path) const {
   return ApplyRegularExpression(query_path, GetRegularExpression());
+}
+
+bool Pathspec::IsPathspecPrefixMatching(const std::string &query_path) const {
+  return ApplyRegularExpression(query_path, GetPrefixRegularExpression());
 }
 
 bool Pathspec::IsPathspecMatchingRelaxed(const std::string &query_path) const {
@@ -156,6 +176,20 @@ regex_t* Pathspec::GetRegularExpression() const {
   return regex_;
 }
 
+regex_t* Pathspec::GetPrefixRegularExpression() const {
+  if (!prefix_regex_compiled_) {
+    const bool is_relaxed = false;
+    const bool is_prefix = true;
+    const std::string regex = GenerateRegularExpression(is_relaxed, is_prefix);
+    LogCvmfs(kLogPathspec, kLogDebug, "compiled regex: %s", regex.c_str());
+
+    prefix_regex_ = CompileRegularExpression(regex);
+    prefix_regex_compiled_ = true;
+  }
+
+  return prefix_regex_;
+}
+
 regex_t* Pathspec::GetRelaxedRegularExpression() const {
   if (!relaxed_regex_compiled_) {
     const bool is_relaxed = true;
@@ -170,7 +204,10 @@ regex_t* Pathspec::GetRelaxedRegularExpression() const {
   return relaxed_regex_;
 }
 
-std::string Pathspec::GenerateRegularExpression(const bool is_relaxed) const {
+std::string Pathspec::GenerateRegularExpression(
+  const bool is_relaxed,
+  const bool is_prefix) const
+{
   // start matching at the first character
   std::string regex = "^";
 
@@ -189,10 +226,16 @@ std::string Pathspec::GenerateRegularExpression(const bool is_relaxed) const {
     }
   }
 
-  // a path might end with a trailing slash
-  // (pathspec does not distinguish files and directories)
-  regex += kSeparator;
-  regex += "?$";
+  if (is_prefix) {
+    regex += "($|";
+    regex += kSeparator;
+    regex += ".*$)";
+  } else {
+    // a path might end with a trailing slash
+    // (pathspec does not distinguish files and directories)
+    regex += kSeparator;
+    regex += "?$";
+  }
 
   return regex;
 }

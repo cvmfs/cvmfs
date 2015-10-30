@@ -71,13 +71,23 @@ class Pathspec {
   ~Pathspec();
 
   /**
-   * Matches an exact path string. Directory boundaries are taken into accound
+   * Matches an exact path string. Directory boundaries are taken into account
    * Say: wildcards do not match beyond a singly directory tree level.
    *
    * @param query_path   the path to be matched against this Pathstring
    * @return             true if the path matches
    */
   bool IsMatching(const std::string &query_path) const;
+
+
+  /**
+   * Matches if the Pathspec is a prefix path of query_path. Directory
+   * boundaries are taken into account.  Only works for absolute PathSpec.
+   *
+   * @param query_path   the path to be matched against this Pathstring
+   * @return             true if the path matches
+   */
+  bool IsPrefixMatching(const std::string &query_path) const;
 
   /**
    * Matches path strings similar to shell pattern matching (case...esac).
@@ -132,15 +142,18 @@ class Pathspec {
                         std::string::const_iterator *itr);
 
   bool IsPathspecMatching(const std::string &query_path) const;
+  bool IsPathspecPrefixMatching(const std::string &query_path) const;
   bool IsPathspecMatchingRelaxed(const std::string &query_path) const;
 
   bool ApplyRegularExpression(const std::string  &query_path,
                                     regex_t      *regex) const;
 
   regex_t* GetRegularExpression() const;
+  regex_t* GetPrefixRegularExpression() const;
   regex_t* GetRelaxedRegularExpression() const;
 
-  std::string GenerateRegularExpression(const bool is_relaxed = false) const;
+  std::string GenerateRegularExpression(const bool is_relaxed = false,
+                                        const bool is_prefix = false) const;
   regex_t* CompileRegularExpression(const std::string &regex) const;
 
   void PrintRegularExpressionError(const int error_code) const;
@@ -158,6 +171,9 @@ class Pathspec {
 
   mutable bool                relaxed_regex_compiled_;
   mutable regex_t            *relaxed_regex_;
+
+  mutable bool                prefix_regex_compiled_;
+  mutable regex_t            *prefix_regex_;
 
   mutable bool                glob_string_compiled_;
   mutable std::string         glob_string_;
