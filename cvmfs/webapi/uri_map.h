@@ -67,7 +67,7 @@ class UriHandler {
  */
 class UriMap {
  public:
-  bool Register(const std::string &uri_spec, UriHandler *handler);
+  void Register(const std::string &uri_spec, UriHandler *handler);
   UriHandler *Route(const std::string &uri);
 
  private:

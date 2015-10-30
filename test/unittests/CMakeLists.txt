@@ -80,10 +80,12 @@ set(CVMFS_UNITTEST_FILES
   t_unique_ptr.cc
   t_upload_facility.cc
   t_uploaders.cc
+  t_uri_map.cc
   t_util.cc
   t_util_concurrency.cc
   t_uuid.cc
   t_wpad.cc
+  t_xattr.cc
 )
 
 #
@@ -179,6 +181,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/util/string.cc ${CVMFS_SOURCE_DIR}/util/string.h
   ${CVMFS_SOURCE_DIR}/util_concurrency.cc ${CVMFS_SOURCE_DIR}/util_concurrency.h ${CVMFS_SOURCE_DIR}/util_concurrency_impl.h
   ${CVMFS_SOURCE_DIR}/uuid.cc ${CVMFS_SOURCE_DIR}/uuid.h
+	${CVMFS_SOURCE_DIR}/webapi/fcgi.h
+	${CVMFS_SOURCE_DIR}/webapi/fcgi.cc
+	${CVMFS_SOURCE_DIR}/webapi/uri_map.h
+	${CVMFS_SOURCE_DIR}/webapi/uri_map.cc
   ${CVMFS_SOURCE_DIR}/whitelist.cc
   ${CVMFS_SOURCE_DIR}/wpad.cc ${CVMFS_SOURCE_DIR}/wpad.h
   ${CVMFS_SOURCE_DIR}/xattr.cc ${CVMFS_SOURCE_DIR}/xattr.h
