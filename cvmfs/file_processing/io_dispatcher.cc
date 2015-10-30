@@ -58,7 +58,8 @@ void IoDispatcher::ScheduleCommit(Chunk* chunk) {
 
   // Finalize the streamed upload for the committed Chunk
   uploader_->ScheduleCommit(chunk->upload_stream_handle(),
-                            chunk->content_hash());
+                            chunk->content_hash(),
+                            chunk->get_compression_algorithm());
 }
 
 

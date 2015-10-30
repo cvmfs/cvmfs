@@ -116,6 +116,7 @@ class EchoCompressor: public Compressor {
 };
 
 Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option);
+std::string CompressionAlgToId(const Algorithms compression_algorithm);
 
 void CompressInit(z_stream *strm);
 void DecompressInit(z_stream *strm);
