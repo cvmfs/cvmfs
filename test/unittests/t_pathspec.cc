@@ -376,6 +376,33 @@ TEST(T_Pathspec, MatchWithPlaceholders) {
 }
 
 
+TEST(T_Pathspec, MatchPrefix) {
+  const Pathspec p1("/hallo/welt");
+  const Pathspec p2("/hallo/*/welt");
+  const Pathspec p3("relative");
+
+  EXPECT_TRUE(p1.IsValid());
+  EXPECT_TRUE(p2.IsValid());
+  EXPECT_TRUE(p3.IsValid());
+
+  EXPECT_TRUE(p1.IsPrefixMatching("/hallo/welt"));
+  EXPECT_TRUE(p1.IsPrefixMatching("/hallo/welt/"));
+  EXPECT_TRUE(p1.IsPrefixMatching("/hallo/welt/foo"));
+  EXPECT_TRUE(p1.IsPrefixMatching("/hallo/welt/foo/bar"));
+  EXPECT_FALSE(p1.IsPrefixMatching("hallo/welt/foo/bar"));
+  EXPECT_FALSE(p1.IsPrefixMatching("/hallo/foo/bar"));
+  EXPECT_FALSE(p1.IsPrefixMatching("/hallo/welT/foo/bar"));
+  EXPECT_FALSE(p1.IsPrefixMatching("/hallo/welten"));
+
+  EXPECT_TRUE(p2.IsPrefixMatching("/hallo/foo/welt"));
+  EXPECT_TRUE(p2.IsPrefixMatching("/hallo/foo/welt/bar"));
+  EXPECT_TRUE(p2.IsPrefixMatching("/hallo//welt/bar"));
+  EXPECT_FALSE(p2.IsPrefixMatching("/hallo/welt/bar"));
+
+  EXPECT_DEATH(p3.IsPrefixMatching("/a/b/c"), ".*");
+}
+
+
 TEST(T_Pathspec, ComparePathspecs) {
   const Pathspec p1("/hallo/welt");
   const Pathspec p2("/hallo/welt");

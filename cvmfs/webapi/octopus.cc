@@ -8,13 +8,12 @@
 #include <cstdlib>
 #include <string>
 
-#include "../pathspec/pathspec.h"
 #include "../sanitizer.h"
 
 using namespace std;  // NOLINT
 
 int main(int argc, char **argv) {
-  FILE *f = fopen("/tmp/mycgi.log", "w");
+  //FILE *f = fopen("/tmp/mycgi.log", "w");
   FastCgi fcgi;
   if (!fcgi.IsFcgi()) {
     printf("not in FastCGI context, starting localhost:9000\n");
@@ -41,10 +40,12 @@ int main(int argc, char **argv) {
         break;
 
       case FastCgi::kEventStdin:
-        //fprintf(f, "%s", fcgi.DumpParams().c_str());
-        //fflush(f);
+        /*fprintf(f, "%s", fcgi.DumpParams().c_str());
+        fprintf(f, "LENGTH: %d\n", length);
+        fprintf(f, "%s", string((char *)buf, length).c_str());
+        fflush(f);*/
         fcgi.GetParam("REQUEST_URI", &request_uri);
-        if (!uri_sanitizer.IsValid("")) {
+        if (!uri_sanitizer.IsValid(request_uri)) {
           fcgi.ReturnBadRequest("Invalid URI");
           break;
         }
