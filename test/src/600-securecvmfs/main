@@ -42,6 +42,7 @@ generate_certs() {
 
   set -x
   echo "/DC=org/DC=Open Science Grid/O=OSG Test/OU=Services/CN=$HOSTNAME" > /etc/grid-security/vomsdir/cvmfs/$HOSTNAME.lsc
+  echo "/DC=org/DC=Open Science Grid/O=OSG Test/CN=OSG Test CA" >> /etc/grid-security/vomsdir/cvmfs/$HOSTNAME.lsc
 
   voms-proxy-info -file $certs_dir/vomsproxy.pem -all
 
@@ -64,10 +65,49 @@ cvmfs_run_test() {
   local script_location=$2
   local scratch_dir=$(pwd)
 
+  # Generate repo first - check will fail after apache change below until we
+  # change the default URL.
+  [ -z "$TEST600_HTTPS_CONFIG" ] || sudo rm -f $TEST600_HTTPS_CONFIG
+  echo "restarting apache"
+  apache_switch off
+  apache_switch on
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -V /cvmfs || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  # ( . ${script_location}/../../common/migration_tests/common.sh; install_packages gridsite voms-clients-cpp )
+
   echo "set a trap for system directory cleanup"
-  trap cleanup EXIT HUP INT TERM
+  #trap cleanup EXIT HUP INT TERM
 
   generate_certs $script_location
+  cp $script_location/test600.cvmfs.secure.conf $TEST600_HTTPS_CONFIG
+  sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST600_HTTPS_CONFIG
+  cp $script_location/gacl /srv/cvmfs/$CVMFS_TEST_REPO/data/.gacl
+  echo "restarting apache"
+  apache_switch off
+  apache_switch on
 
-  return 0
+  sed -i "s|CVMFS_SERVER_URL=http://localhost/cvmfs/$CVMFS_TEST_REPO|CVMFS_SERVER_URL=https://$HOSTNAME:8443/cvmfs/$CVMFS_TEST_REPO|" /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
+  umount /cvmfs/$CVMFS_TEST_REPO
+  umount /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
+  # Remove any cached files to make sure we reload over https.
+  rm -rf /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO
+  cvmfs2 $CVMFS_TEST_REPO /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly -o rw,allow_other,config=/etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf,cvmfs_suid,dev,suid || return $?
+  mount /cvmfs/$CVMFS_TEST_REPO
+  export X509_USER_PROXY=$(pwd)/certs/vomsproxy.pem
+  cp $(pwd)/certs/vomsproxy.pem $(pwd)/certs/vomsproxy.pem.nobody
+  chown nobody: $(pwd)/certs/vomsproxy.pem.nobody
+  cat $X509_USER_PROXY
+  sudo -u nobody /bin/sh -c "X509_USER_PROXY=$PWD/certs/vomsproxy.pem.nobody cat /cvmfs/$CVMFS_TEST_REPO/hello_world" > /dev/null || return $?
+  # This should work because the above and below are in the same session id.
+  sudo -u nobody /bin/sh -c "cat /cvmfs/$CVMFS_TEST_REPO/hello_world" > /dev/null || return $?
+  sudo -u nobody setsid /bin/sh -c "cat /cvmfs/$CVMFS_TEST_REPO/hello_world" > /dev/null || return 0
+
+  # Last line should have resulted in an IO error.
+  return 1
 }
