@@ -615,11 +615,7 @@ void SyncMediator::AddFile(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (entry.IsSymlink() && !params_->dry_run) {
-    if (entry.HasGraftMarker()) {
-      LogCvmfs(kLogPublish, kLogWarning, "File (%s) has an associated graft, "
-               "but the file itself is a symlink.  Ignoring graft.",
-               entry.GetRelativePath().c_str());
-    }
+    assert(!entry.HasGraftMarker());
     // Symlinks are completely stored in the catalog
     catalog_manager_->AddFile(
       entry.CreateBasicCatalogDirent(),
@@ -637,7 +633,7 @@ void SyncMediator::AddFile(const SyncItem &entry) {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
       // the graft file is missing information.  It's not clear that continuing
       // forward with the publish is the correct thing to do; abort for now.
-      LogCvmfs(kLogPublish, kLogStdout, "Encountered a grafted file (%s) with "
+      LogCvmfs(kLogPublish, kLogStderr, "Encountered a grafted file (%s) with "
                "invalid grafting information; check contents of .cvmfsgraft-*"
                " file.  Aborting publish.",
                entry.GetRelativePath().c_str());
@@ -672,11 +668,7 @@ void SyncMediator::AddDirectory(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (!params_->dry_run) {
-    if (entry.HasGraftMarker()) {
-      LogCvmfs(kLogPublish, kLogWarning, "Directory (%s) has an associated "
-               "graft, but the file itself is a directory.  Ignoring graft.",
-               entry.GetRelativePath().c_str());
-    }
+    assert(!entry.HasGraftMarker());
 
     catalog_manager_->AddDirectory(entry.CreateBasicCatalogDirent(),
                                    entry.relative_parent_path());

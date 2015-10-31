@@ -43,6 +43,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   rdonly_type_(kItemUnknown)
 {
   content_hash_.algorithm = shash::kAny;
+  // Note: graft marker for non-regular files are silently ignored
   if (IsRegularFile()) {CheckGraft();}
 }
 

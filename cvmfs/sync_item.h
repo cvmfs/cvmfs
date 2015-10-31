@@ -207,8 +207,8 @@ class SyncItem {
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
-  bool valid_graft_;                  /**< ??? */
-  bool graft_marker_present_;         /**< ??? */
+  bool valid_graft_;                  /**< checksum and size in graft marker */
+  bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 
   std::string relative_parent_path_;
   std::string filename_;
