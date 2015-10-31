@@ -1931,10 +1931,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string repository_tag = "";
   string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
+  bool server_cache_mode = false;  // currently means: no rename in the cache
   string trusted_certs = "";
   string proxy_template = "";
-  map<uint64_t, uint64_t> uid_map;
-  map<uint64_t, uint64_t> gid_map;
+  catalog::OwnerMap uid_map;
+  catalog::OwnerMap gid_map;
   uint64_t initial_generation = 0;
   cvmfs::Uuid *uuid;
   bool use_geo_api = false;
@@ -2066,6 +2067,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   {
     cvmfs::hide_magic_xattrs_ = true;
   }
+  if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_CACHE_MODE", &parameter)
+      && cvmfs::options_manager_->IsOn(parameter))
+  {
+    server_cache_mode = true;
+  }
   if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
     const string org = tokens[0];
@@ -2089,14 +2095,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
     alien_cache = parameter;
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_UID_MAP", &parameter)) {
-    retval = cvmfs::options_manager_->ParseUIntMap(parameter, &uid_map);
+    retval = uid_map.Read(parameter);
     if (!retval) {
       *g_boot_error = "failed to parse uid map " + parameter;
       return loader::kFailOptions;
     }
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_GID_MAP", &parameter)) {
-    retval = cvmfs::options_manager_->ParseUIntMap(parameter, &gid_map);
+    gid_map.Read(parameter);
     if (!retval) {
       *g_boot_error = "failed to parse gid map " + parameter;
       return loader::kFailOptions;
@@ -2300,8 +2306,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailCacheDir;
     }
   }
-  cvmfs::cache_manager_ =
-    cache::PosixCacheManager::Create(alien_cache, alien_cache != ".");
+  cvmfs::cache_manager_ = cache::PosixCacheManager::Create(
+    alien_cache, alien_cache != ".", server_cache_mode);
   if (cvmfs::cache_manager_ == NULL) {
     *g_boot_error = "Failed to setup cache in " + alien_cache +
                     ": " + strerror(errno);

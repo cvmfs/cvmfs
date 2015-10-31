@@ -8,7 +8,10 @@ RUN         dnf -y update && dnf -y install                     \
                                         fuse-devel              \
                                         gcc                     \
                                         gcc-c++                 \
+                                        git                     \
+                                        hardlink                \
                                         libattr-devel           \
+                                        libcap-devel            \
                                         libuuid-devel           \
                                         make                    \
                                         nfs-utils               \

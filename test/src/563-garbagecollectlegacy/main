@@ -29,9 +29,10 @@ cvmfs_run_test() {
   echo -n "resurrect legacy repository... "
   local resurrect_log="resurrect.log"
   TEST519_LEGACY_STORAGE="$legacy_repo_storage"
-  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                                                              || return $?
+  plant_tarball "${guinea_pig_location}/keys.tar.gz" || return $?
   plant_legacy_repository_revision "${guinea_pig_location}/revision-6.tar.gz" \
                                    "$legacy_repo_name"                        \
+                                   "$CVMFS_TEST_USER"                         \
                                    "verbose" > $resurrect_log 2>&1 || return $?
   echo "done"
 
@@ -44,12 +45,15 @@ cvmfs_run_test() {
           $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
           $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
           $legacy_repo_storage || return 3
-  sudo cvmfs_server import \
-    -o $CVMFS_TEST_USER    \
-    -l                     \
-    -s                     \
-    -g                     \
-    $legacy_repo_name > $import_log 2>&1 || return 4
+  import_repo $legacy_repo_name $CVMFS_TEST_USER \
+    -l                                           \
+    -s                                           \
+    -g > $import_log 2>&1 || return 4
+
+  if uses_overlayfs $legacy_repo_name; then
+    echo "we are running on OverlayFS. We need to erase all hardlinks now..."
+    sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name || return 101
+  fi
 
   echo "get all data chunks in the legacy repository"
   local data_chunks="$(cat $resurrect_log | grep -o '[0-9a-f]\{2\}\/[0-9a-f]\+$' | sed 's/\///g')"

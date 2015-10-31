@@ -8,19 +8,12 @@
 
 #include <alloca.h>
 #include <errno.h>
+#include <sys/capability.h>
 #include <unistd.h>
-
-// lgetxattr is only required for overlayfs which does not exist on OS X
-#ifdef __APPLE__
-#define lgetxattr(...) (-1)
-#else
-#include <attr/xattr.h>
-#endif
 
 #include "fs_traversal.h"
 #include "logging.h"
 #include "platform.h"
-#include "sync_item.h"
 #include "sync_mediator.h"
 #include "util.h"
 
@@ -35,9 +28,34 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
   rdonly_path_(rdonly_path),
   scratch_path_(scratch_path),
   union_path_(union_path),
-  mediator_(mediator)
-{
+  mediator_(mediator),
+  initialized_(false) {}
+
+
+bool SyncUnion::Initialize() {
   mediator_->RegisterUnionEngine(this);
+  initialized_ = true;
+  return true;
+}
+
+
+SyncItem SyncUnion::CreateSyncItem(const std::string  &relative_parent_path,
+                                   const std::string  &filename,
+                                   const SyncItemType  entry_type) const {
+  SyncItem entry(relative_parent_path, filename, this, entry_type);
+  PreprocessSyncItem(&entry);
+  return entry;
+}
+
+
+void SyncUnion::PreprocessSyncItem(SyncItem *entry) const {
+  if (IsWhiteoutEntry(*entry)) {
+    entry->MarkAsWhiteout(UnwindWhiteoutFilename(*entry));
+  }
+
+  if (IsOpaqueDirectory(*entry)) {
+    entry->MarkAsOpaqueDirectory();
+  }
 }
 
 
@@ -46,7 +64,7 @@ bool SyncUnion::ProcessDirectory(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessDirectory(%s, %s)",
            parent_dir.c_str(), dir_name.c_str());
-  SyncItem entry(parent_dir, dir_name, this, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
 
   if (entry.IsNew()) {
     mediator_->Add(entry);
@@ -70,8 +88,8 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, this, kItemFile);
-  ProcessFile(&entry);
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemFile);
+  ProcessFile(entry);
 }
 
 
@@ -80,33 +98,26 @@ void SyncUnion::ProcessSymlink(const string &parent_dir,
 {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessSymlink(%s, %s)",
            parent_dir.c_str(), link_name.c_str());
-  SyncItem entry(parent_dir, link_name, this, kItemSymlink);
-  ProcessFile(&entry);
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
+  ProcessFile(entry);
 }
 
 
-void SyncUnion::ProcessFile(SyncItem *entry) {
+void SyncUnion::ProcessFile(const SyncItem &entry) {
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessFile(%s)",
-           entry->filename().c_str());
-  // Process whiteout prefix
-  if (IsWhiteoutEntry(*entry)) {
-    string actual_filename = UnwindWhiteoutFilename(entry->filename());
-    LogCvmfs(kLogUnionFs, kLogVerboseMsg,
-             "processing file [%s] as whiteout of [%s] (remove)",
-             entry->filename().c_str(), actual_filename.c_str());
-    entry->MarkAsWhiteout(actual_filename);
-    mediator_->Remove(*entry);
+           entry.filename().c_str());
+  if (entry.IsWhiteout()) {
+    mediator_->Remove(entry);
   } else {
-    // Process normal file
-    if (entry->IsNew()) {
+    if (entry.IsNew()) {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg, "processing file [%s] as new (add)",
-               entry->filename().c_str());
-      mediator_->Add(*entry);
+               entry.filename().c_str());
+      mediator_->Add(entry);
     } else {
       LogCvmfs(kLogUnionFs, kLogVerboseMsg,
                "processing file [%s] as existing (touch)",
-               entry->filename().c_str());
-      mediator_->Touch(*entry);
+               entry.filename().c_str());
+      mediator_->Touch(entry);
     }
   }
 }
@@ -115,7 +126,7 @@ void SyncUnion::ProcessFile(SyncItem *entry) {
 void SyncUnion::EnterDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, this, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   mediator_->EnterDirectory(entry);
 }
 
@@ -123,7 +134,7 @@ void SyncUnion::EnterDirectory(const string &parent_dir,
 void SyncUnion::LeaveDirectory(const string &parent_dir,
                                const string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, this, kItemDir);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   mediator_->LeaveDirectory(entry);
 }
 
@@ -150,14 +161,16 @@ SyncUnionAufs::SyncUnionAufs(SyncMediator *mediator,
 
 
 void SyncUnionAufs::Traverse() {
+  assert(this->IsInitialized());
+
   FileSystemTraversal<SyncUnionAufs> traversal(this, scratch_path(), true);
 
-  traversal.fn_enter_dir = &SyncUnionAufs::EnterDirectory;
-  traversal.fn_leave_dir = &SyncUnionAufs::LeaveDirectory;
-  traversal.fn_new_file = &SyncUnionAufs::ProcessRegularFile;
-  traversal.fn_ignore_file = &SyncUnionAufs::IgnoreFilePredicate;
+  traversal.fn_enter_dir      = &SyncUnionAufs::EnterDirectory;
+  traversal.fn_leave_dir      = &SyncUnionAufs::LeaveDirectory;
+  traversal.fn_new_file       = &SyncUnionAufs::ProcessRegularFile;
+  traversal.fn_ignore_file    = &SyncUnionAufs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
-  traversal.fn_new_symlink = &SyncUnionAufs::ProcessSymlink;
+  traversal.fn_new_symlink    = &SyncUnionAufs::ProcessSymlink;
 
   traversal.Recurse(scratch_path());
 }
@@ -174,7 +187,8 @@ bool SyncUnionAufs::IsOpaqueDirectory(const SyncItem &directory) const {
 }
 
 
-string SyncUnionAufs::UnwindWhiteoutFilename(const string &filename) const {
+string SyncUnionAufs::UnwindWhiteoutFilename(const SyncItem &entry) const {
+  const std::string &filename = entry.filename();
   return filename.substr(whiteout_prefix_.length());
 }
 
@@ -192,138 +206,147 @@ bool SyncUnionAufs::IgnoreFilePredicate(const string &parent_dir,
 SyncUnionOverlayfs::SyncUnionOverlayfs(SyncMediator *mediator,
                                        const string &rdonly_path,
                                        const string &union_path,
-                                       const string &scratch_path) :
-  SyncUnion(mediator, rdonly_path, union_path, scratch_path)
-{
-  hardlink_lower_inode_ = 0;
+                                       const string &scratch_path)
+  : SyncUnion(mediator, rdonly_path, union_path, scratch_path)
+  , hardlink_lower_inode_(0)
+{}
+
+
+bool SyncUnionOverlayfs::Initialize() {
+  // trying to obtain CAP_SYS_ADMIN to read 'trusted' xattrs in the scratch
+  // directory of an OverlayFS installation
+  return ObtainSysAdminCapability() && SyncUnion::Initialize();
 }
 
 
-void SyncUnionOverlayfs::ProcessFile(SyncItem *entry) {
-  LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnionOverlayfs::ProcessFile(%s)",
-           entry->filename().c_str());
+bool ObtainSysAdminCapabilityInternal(cap_t caps) {
+  /*const*/ cap_value_t cap = CAP_SYS_ADMIN; // is non-const as cap_set_flag()
+                                             // expects a non-const pointer
+                                             // on RHEL 5 and older
 
-  // If lower-level file exists and has multiple hard links, warn user
-  if (!entry->IsNew() && entry->GetRdOnlyLinkcount() > 1) {
-    LogCvmfs(kLogPublish, kLogVerboseMsg, "OverlayFS have copied-up file %s "
-             "with existing hardlinks in lowerdir.",
-             entry->GetUnionPath().c_str());
+  // do sanity-check if supported in <sys/capability.h> otherwise just pray...
+  // Note: CAP_SYS_ADMIN is a rather common capability and is very likely to be
+  //       supported by all our target systems. If it is not, one of the next
+  //       commands will fail with a less descriptive error message.
+  #ifdef CAP_IS_SUPPORTED
+  if (!CAP_IS_SUPPORTED(cap)) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "System doesn't support CAP_SYS_ADMIN");
+    return false;
+  }
+  #endif
 
-    hardlink_lower_inode_ = entry->GetRdOnlyInode();
-    hardlink_lower_files_.clear();
+  if (caps == NULL) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "Failed to obtain capability state "
+                                      "of current process (errno: %d)",
+                                      errno);
+    return false;
+  }
 
-    string rdonly_parent_dir = GetParentPath(entry->GetRdOnlyPath());
-    string scratch_parent_dir = GetParentPath(entry->GetScratchPath());
-    string union_parent_dir = GetParentPath(entry->GetUnionPath());
+  cap_flag_value_t cap_state;
+  if (cap_get_flag(caps, cap, CAP_EFFECTIVE, &cap_state) != 0) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "Failed to check effective set for "
+                                      "CAP_SYS_ADMIN (errno: %d)",
+                                      errno);
+    return false;
+  }
 
-    // Find all hardlinks in lowerdir corresponding to this entry
-    // (only check this dir since we don't allow cross-dir hardlinks in CVMFS)
-    FileSystemTraversal<SyncUnionOverlayfs>
-      traversal(this, rdonly_path(), false);
-    traversal.fn_new_file = &SyncUnionOverlayfs::ProcessFileHardlinkCallback;
-    traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessFileHardlinkCallback;
-    traversal.Recurse(rdonly_parent_dir);
+  if (cap_state == CAP_SET) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "CAP_SYS_ADMIN is already effective");
+    return true;
+  }
 
-    // Should now have hardlink_lower_files_ populated with the files
-    // in this hardlink group
-    if (hardlink_lower_files_.size() != entry->GetRdOnlyLinkcount()) {
-      LogCvmfs(kLogUnionFs, kLogWarning, "Found %u entries in hardlink group "
-               "for %s in overlayfs lowerdir directory %s, "
-               "was expecting %u (do the hardlinks span directories?)",
-               hardlink_lower_files_.size(),
-               entry->GetRdOnlyPath().c_str(),
-               rdonly_parent_dir.c_str(),
-               entry->GetRdOnlyLinkcount());
-    } else {
-      LogCvmfs(kLogUnionFs, kLogDebug, "Found %u entries in hardlink group "
-               "for %s in overlayfs lowerdir directory %s, as expected.",
-               hardlink_lower_files_.size(),
-               entry->GetRdOnlyPath().c_str(),
-               GetParentPath(entry->GetRdOnlyPath()).c_str());
-      // have the expected number of entries in the hardlink group,
-      // check if they are all present in the scratch layer (upperdir)
-      for (set<string>::iterator i = hardlink_lower_files_.begin(),
-           iend = hardlink_lower_files_.end(); i != iend; ++i)
-      {
-        string filename = *i;
+  if (cap_get_flag(caps, cap, CAP_PERMITTED, &cap_state) != 0) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "Failed to check permitted set for "
+                                      "CAP_SYS_ADMIN (errno: %d)",
+                                      errno);
+    return false;
+  }
 
-        string scratch_path = scratch_parent_dir + "/" + filename;
-        string union_path = union_parent_dir + "/" + filename;
-        platform_stat64 scratch_stat;
-        LogCvmfs(kLogUnionFs, kLogDebug, "Checking file %s",
-                 scratch_path.c_str());
-        if (platform_lstat(scratch_path.c_str(), &scratch_stat) < 0) {
-          if (errno == ENOENT) {
-            // file is not present in scratch, warn, and/or abort
-            LogCvmfs(kLogUnionFs, kLogWarning,
-  "[WARNING] a file in the OverlayFS lowerdir (%s) has multiple\n"
-  "hard links, at least one of which (%s)\n"
-  "has been modified in CernVM-FS.  Due to a limitation in OverlayFS, after\n"
-  "this sync the modified file would no longer be part of its previous \n"
-  "hardlink group (CernVM-FS inode %"PRIu64").\n"
-  "The sync operation will now be aborted so that this issue can be corrected\n"
-  "manually -- you must explicitly include all files belonging to this\n"
-  "hardlink group in the CernVM-FS transaction (e.g. by touching them if you\n"
-  "wish to break the link or linking them if you wish to preserve it).\n"
-  "\n"
-  "To restore only this hardlink, you could run:\n"
-  "rm %s && ln %s %s\n"
-  "\n"
-  "To find all files that are part of this hardlink group, use:\n"
-  "find %s -inum %"PRIu64"\n"
-  "\n"
-  "To restore all hardlinks in this group, try something like:\n"
-  "for file in $(find %s -inum %"PRIu64"); do rm ${file} && ln %s ${file}; done"
-  "\n\n"
-  "Once you have corrected the issue, run `cvmfs_server publish` again\n",
-                     filename.c_str(),
-                     entry->GetUnionPath().c_str(),
-                     entry->GetRdOnlyInode(),
-                     union_path.c_str(),
-                     entry->GetUnionPath().c_str(), union_path.c_str(),
-                     union_parent_dir.c_str(), entry->GetRdOnlyInode(),
-                     union_parent_dir.c_str(), entry->GetRdOnlyInode(),
-                     entry->GetUnionPath().c_str());  // LogCvmfs
-            abort();
-          }  // error == ENOENT
-        }  // platform_lstat < 0
-      }  // for hardlink_lower_files_
-    }  // hardlink_lower_files_.size() == entry->GetRdOnlyLinkcount()
-  }  // Is hardlink
+  if (cap_state != CAP_SET) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "CAP_SYS_ADMIN cannot be obtained. It's "
+                                      "not in the process's permitted-set.");
+    return false;
+  }
 
-  SyncUnion::ProcessFile(entry);
+  if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &cap, CAP_SET) != 0) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "Cannot set CAP_SYS_ADMIN as effective "
+                                      "for the current process (errno: %d)",
+                                      errno);
+    return false;
+  }
+
+  if (cap_set_proc(caps) != 0) {
+    LogCvmfs(kLogUnionFs, kLogStderr, "Cannot reset capabilities for current "
+                                      "process (errno: %d)",
+                                      errno);
+    return false;
+  }
+
+  LogCvmfs(kLogUnionFs, kLogDebug, "Successfully obtained CAP_SYS_ADMIN");
+  return true;
 }
 
 
-void SyncUnionOverlayfs::ProcessFileHardlinkCallback(const string &parent_dir,
-                                                     const string &filename)
-{
-  LogCvmfs(kLogUnionFs, kLogDebug,
-           "SyncUnionOverlayfs::ProcessFileHardlinkCallback(%s, %s)",
-           parent_dir.c_str(), filename.c_str());
-  SyncItem entry(parent_dir, filename, this, kItemFile);
-  if (entry.GetRdOnlyLinkcount() > 1) {
-    if (hardlink_lower_inode_ == entry.GetRdOnlyInode()) {
-      LogCvmfs(kLogUnionFs, kLogDebug,
-               "SyncUnionOverlayfs::ProcessFileHardlinkCallback "
-               "have member of inode group %u: %s/%s",
-               hardlink_lower_inode_, parent_dir.c_str(), filename.c_str());
-      hardlink_lower_files_.insert(entry.filename());
-    }
+bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
+  cap_t caps = cap_get_proc();
+  const bool result = ObtainSysAdminCapabilityInternal(caps);
+  cap_free(caps);
+  return result;
+}
+
+
+void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem *entry) const {
+  SyncUnion::PreprocessSyncItem(entry);
+  if (entry->IsWhiteout() || entry->IsDirectory()) {
+    return;
+  }
+
+  CheckForBrokenHardlink(*entry);
+  MaskFileHardlinks(entry);
+}
+
+
+void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
+  if (!entry.IsNew()        &&
+      !entry.WasDirectory() &&
+       entry.GetRdOnlyLinkcount() > 1) {
+    LogCvmfs(kLogPublish, kLogStderr, "OverlayFS has copied-up a file (%s) "
+                                      "with existing hardlinks in lowerdir "
+                                      "(linkcount %d). OverlayFS cannot handle "
+                                      "hardlinks and would produce "
+                                      "inconsistencies. \n\n"
+                                      "Consider running this command: \n"
+                                      "  cvmfs_server eliminate-hardlinks\n\n"
+                                      "Aborting..." ,
+             entry.GetUnionPath().c_str(), entry.GetRdOnlyLinkcount());
+    abort();
+  }
+}
+
+void SyncUnionOverlayfs::MaskFileHardlinks(SyncItem *entry) const {
+  assert(entry->IsRegularFile() || entry->IsSymlink());
+  if (entry->GetUnionLinkcount() > 1) {
+    LogCvmfs(kLogPublish, kLogStderr, "Warning: Found file with linkcount > 1 "
+                                      "(%s). We will break up these hardlinks.",
+                                      entry->GetUnionPath().c_str());
+    entry->MaskHardlink();
   }
 }
 
 
 void SyncUnionOverlayfs::Traverse() {
+  assert(this->IsInitialized());
+
   FileSystemTraversal<SyncUnionOverlayfs>
     traversal(this, scratch_path(), true);
 
-  traversal.fn_enter_dir = &SyncUnionOverlayfs::EnterDirectory;
-  traversal.fn_leave_dir = &SyncUnionOverlayfs::LeaveDirectory;
-  traversal.fn_new_file = &SyncUnionOverlayfs::ProcessRegularFile;
-  traversal.fn_ignore_file = &SyncUnionOverlayfs::IgnoreFilePredicate;
-  traversal.fn_new_dir_prefix = &SyncUnionOverlayfs::ProcessDirectory;
-  traversal.fn_new_symlink = &SyncUnionOverlayfs::ProcessSymlink;
+  traversal.fn_enter_dir          = &SyncUnionOverlayfs::EnterDirectory;
+  traversal.fn_leave_dir          = &SyncUnionOverlayfs::LeaveDirectory;
+  traversal.fn_new_file           = &SyncUnionOverlayfs::ProcessRegularFile;
+  traversal.fn_new_character_dev  = &SyncUnionOverlayfs::ProcessCharacterDevice;
+  traversal.fn_ignore_file        = &SyncUnionOverlayfs::IgnoreFilePredicate;
+  traversal.fn_new_dir_prefix     = &SyncUnionOverlayfs::ProcessDirectory;
+  traversal.fn_new_symlink        = &SyncUnionOverlayfs::ProcessSymlink;
 
   LogCvmfs(kLogUnionFs, kLogVerboseMsg, "OverlayFS starting traversal "
            "recursion for scratch_path=[%s]",
@@ -369,43 +392,46 @@ bool SyncUnionOverlayfs::ReadlinkEquals(string const &path,
 
 
 /**
- * Wrapper around lgetxattr to read the value of the specified
- * xattr and return true if it is equal to the supplied value,
- * or false otherwise (including if any errors occur)
+ * Checks if a given file path has a specified extended attribute attached.
  *
- * @param[in] path to the symbolic link
- * @param[in] name of the attribute for which to compare the value
- * @param[in] value to compare to xattr value
+ * @param[in] path       to the file to be checked
+ * @param[in] attr_name  fully qualified name of the extend attribute
+ *                       (i.e. trusted.overlay.opaque)
+ * @return               true if attribute is found
  */
-bool SyncUnionOverlayfs::XattrEquals(string const &path,
-                                     string const &attr_name,
-                                     string const &compare_value)
-{
-  const size_t buf_len = compare_value.length()+1;
-  char *buf = static_cast<char *>(alloca(buf_len+1));
+bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
+  // TODO(reneme): it is quite heavy-weight to allocate an object that contains
+  //               an std::map<> just to check if an xattr is there...
+  UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
+  assert (xattrs);
 
-  ssize_t len = lgetxattr(path.c_str(), attr_name.c_str(), buf, buf_len-1);
-  if (len != -1) {
-    buf[len] = '\0';
-  } else {
-    // Error
-    LogCvmfs(kLogUnionFs, kLogDebug, "failed to read xattr %s from %s: %d\n",
-             attr_name.c_str(), path.c_str(), errno);
-    buf[0] = '\0';
+  std::vector<std::string> attrs = xattrs->ListKeys();
+  std::vector<std::string>::const_iterator i    = attrs.begin();
+  std::vector<std::string>::const_iterator iend = attrs.end();
+  LogCvmfs(kLogCvmfs, kLogDebug, "Attrs:");
+  for (; i != iend; ++i) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Attr: %s", i->c_str());
   }
 
-  return string(buf) == compare_value;
+  return xattrs && xattrs->Has(attr_name);
 }
 
 
 bool SyncUnionOverlayfs::IsWhiteoutEntry(const SyncItem &entry) const {
-  return (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
+  /**
+   * There seem to be two versions of overlayfs out there and in production:
+   * 1. whiteouts are 'character device' files
+   * 2. whiteouts are symlinks pointing to '(overlay-whiteout)'
+   */
+  return entry.IsCharacterDevice() ||
+        (entry.IsSymlink() && IsWhiteoutSymlinkPath(entry.GetScratchPath()));
 }
 
 
 bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
-  bool is_whiteout = ReadlinkEquals(path, "(overlay-whiteout)") &&
-                     XattrEquals(path.c_str(), "trusted.overlay.whiteout", "y");
+  const bool is_whiteout = ReadlinkEquals(path, "(overlay-whiteout)");
+  // TODO(reneme): check for the xattr trusted.overlay.whiteout
+  //         Note: This requires CAP_SYS_ADMIN or root... >.<
   if (is_whiteout) {
     LogCvmfs(kLogUnionFs, kLogDebug, "OverlayFS [%s] is whiteout symlink",
              path.c_str());
@@ -418,12 +444,13 @@ bool SyncUnionOverlayfs::IsWhiteoutSymlinkPath(const string &path) const {
 
 
 bool SyncUnionOverlayfs::IsOpaqueDirectory(const SyncItem &directory) const {
-  return (IsOpaqueDirPath(directory.GetScratchPath()));
+  const std::string path = directory.GetScratchPath();
+  return DirectoryExists(path) && IsOpaqueDirPath(path);
 }
 
 
 bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
-  bool is_opaque = XattrEquals(path.c_str(), "trusted.overlay.opaque", "y");
+  bool is_opaque = HasXattr(path.c_str(), "trusted.overlay.opaque");
   if (is_opaque) {
     LogCvmfs(kLogUnionFs, kLogDebug, "OverlayFS [%s] has opaque xattr",
              path.c_str());
@@ -432,9 +459,8 @@ bool SyncUnionOverlayfs::IsOpaqueDirPath(const string &path) const {
 }
 
 
-string SyncUnionOverlayfs::UnwindWhiteoutFilename(const string &filename) const
-{
-  return filename;
+string SyncUnionOverlayfs::UnwindWhiteoutFilename(const SyncItem &entry) const {
+  return entry.filename();
 }
 
 
@@ -443,6 +469,15 @@ bool SyncUnionOverlayfs::IgnoreFilePredicate(const string &parent_dir,
 {
   // no files need to be ignored for OverlayFS
   return false;
+}
+
+void SyncUnionOverlayfs::ProcessCharacterDevice(const std::string &parent_dir,
+                                                const std::string &filename) {
+  LogCvmfs(kLogUnionFs, kLogDebug,
+           "SyncUnionOverlayfs::ProcessCharacterDevice(%s, %s)",
+           parent_dir.c_str(), filename.c_str());
+  SyncItem entry = CreateSyncItem(parent_dir, filename, kItemCharacterDevice);
+  ProcessFile(entry);
 }
 
 }  // namespace publish

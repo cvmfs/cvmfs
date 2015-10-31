@@ -7,6 +7,7 @@
 #include <errno.h>
 
 #include "sync_mediator.h"
+#include "sync_union.h"
 
 using namespace std;  // NOLINT
 
@@ -16,6 +17,8 @@ namespace publish {
 SyncItem::SyncItem() :
   union_engine_(NULL),
   whiteout_(false),
+  opaque_(false),
+  masked_hardlink_(false),
   scratch_type_(static_cast<SyncItemType>(0)),
   rdonly_type_(static_cast<SyncItemType>(0))
 {
@@ -27,6 +30,8 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    const SyncItemType  entry_type) :
   union_engine_(union_engine),
   whiteout_(false),
+  opaque_(false),
+  masked_hardlink_(false),
   relative_parent_path_(relative_parent_path),
   filename_(filename),
   scratch_type_(entry_type),
@@ -83,16 +88,28 @@ void SyncItem::MarkAsWhiteout(const std::string &actual_filename) {
 
   // Find the entry in the repository
   StatRdOnly(true);  // <== refreshing the stat (filename might have changed)
-  if (rdonly_stat_.error_code != 0) {
+
+  const SyncItemType deleted_type = (rdonly_stat_.error_code == 0)
+                                        ? GetRdOnlyFiletype()
+                                        : kItemUnknown;
+
+  rdonly_type_  = deleted_type;
+  scratch_type_ = deleted_type;
+
+  if (deleted_type == kItemUnknown) {
+    // Marking a SyncItem as 'whiteout' but no file to be removed found: This
+    // should not happen (actually AUFS prevents users from creating whiteouts)
+    // but can be provoked through an AUFS 'bug' (see test 593 or CVM-880).
+    // --> Warn the user, continue with kItemUnknown and cross your fingers!
     PrintWarning("'" + GetRelativePath() + "' should be deleted, but was not "
                  "found in repository.");
-    abort();
-    return;
   }
+}
 
-  // What is deleted?
-  rdonly_type_  = GetRdOnlyFiletype();
-  scratch_type_ = GetRdOnlyFiletype();
+
+void SyncItem::MarkAsOpaqueDirectory() {
+  assert(IsDirectory());
+  opaque_ = true;
 }
 
 
@@ -130,22 +147,16 @@ void SyncItem::StatGeneric(const string  &path,
 }
 
 
-bool SyncItem::IsOpaqueDirectory() const {
-  if (!IsDirectory()) {
-    return false;
-  }
-  return union_engine_->IsOpaqueDirectory(*this);
-}
-
-
 catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
   catalog::DirectoryEntryBase dirent;
 
   // inode and parent inode is determined at runtime of client
   dirent.inode_          = catalog::DirectoryEntry::kInvalidInode;
   dirent.parent_inode_   = catalog::DirectoryEntry::kInvalidInode;
-  // TODO(rmeusel): is this a good idea here?
-  dirent.linkcount_      = this->GetUnionStat().st_nlink;
+
+  // this might mask the actual link count in case hardlinks are not supported
+  // (i.e. on setups using OverlayFS)
+  dirent.linkcount_      = HasHardlinks() ? this->GetUnionStat().st_nlink : 1;
 
   dirent.mode_           = this->GetUnionStat().st_mode;
   dirent.uid_            = this->GetUnionStat().st_uid;

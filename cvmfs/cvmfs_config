@@ -73,7 +73,7 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI CVMFS_CLAIM_OWNERSHIP \
-          CVMFS_HIDE_MAGIC_XATTRS CVMFS_SYSTEMD_NOKILL"
+          CVMFS_HIDE_MAGIC_XATTRS CVMFS_SYSTEMD_NOKILL CVMFS_SERVER_CACHE_MODE"
 required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_RELOAD_SOCKETS \
                CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
@@ -261,46 +261,36 @@ cvmfs_chksetup() {
     fi
   fi
 
-  for path in /etc/auto.master /etc/autofs/auto.master; do
+  # No autofs integration on OS X
+  if [ "$sys_arch" = "Linux" ]; then
+    for path in /etc/auto.master /etc/autofs/auto.master; do
       if [ -f $path ]; then
-          AUTOMASTER=$path
-          break;
+        AUTOMASTER=$path
+        break;
       fi
-  done
-  if [ -z "$AUTOMASTER" ]; then
+    done
+    if [ -z "$AUTOMASTER" ]; then
       echo "Error: unable to find auto.master in any of the supplied paths!"
       num_errors=$(($num_errors+1))
       AUTOMASTER=/dev/null
-  fi
-  # Check that /etc/auto.cvmfs is referenced in auto.master
-  # Check that /etc/auto.cvmfs is executable on Linux
-  local global_mount_dir
-  global_mount_dir=$CVMFS_MOUNT_DIR
-  case $sys_arch in
-    Linux )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" $AUTOMASTER 2> /dev/null; then
-        if ! check_is_on CVMFS_NFS_SOURCE; then
-          echo "Warning: CernVM-FS map is not referenced from autofs master map"
-          num_warnings=$(($num_warnings+1))
-        fi
-      fi
-
-      # Check that /etc/auto.cvmfs is executable
-      if [ ! -x /etc/auto.cvmfs ]; then
-        echo "Error: /etc/auto.cvmfs is not executable"
-        num_errors=$(($num_errors+1))
-      fi ;;
-
-    Darwin )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+/etc/auto_cvmfs" $AUTOMASTER 2> /dev/null; then
+    fi
+    # Check that /etc/auto.cvmfs is referenced in auto.master
+    # Check that /etc/auto.cvmfs is executable on Linux
+    local global_mount_dir
+    global_mount_dir=$CVMFS_MOUNT_DIR
+    if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" $AUTOMASTER 2> /dev/null; then
+      if ! check_is_on CVMFS_NFS_SOURCE; then
         echo "Warning: CernVM-FS map is not referenced from autofs master map"
         num_warnings=$(($num_warnings+1))
-      fi ;;
+      fi
+    fi
 
-    * )
-      echo "Architecture $sys_arch is not supported"
-      exit 1 ;;
-  esac
+    # Check that /etc/auto.cvmfs is executable
+    if [ ! -x /etc/auto.cvmfs ]; then
+      echo "Error: /etc/auto.cvmfs is not executable"
+      num_errors=$(($num_errors+1))
+    fi
+  fi
 
   # Check that cvmfs user exists
   if ! check_cvmfs_user; then
@@ -1438,20 +1428,20 @@ reload_service() {
 
 
 configure_autofs() {
-  for path in /etc/auto.master /etc/autofs/auto.master; do
-    if [ -f $path ]; then
-      AUTOMASTER=$path
-      break;
-    fi
-  done
-  if [ -z "$AUTOMASTER" ]; then
-    echo "Error: unable to find auto.master in any of the supplied paths!"
-    num_errors=$(($num_errors+1))
-    AUTOMASTER=/dev/null
-  fi
   case $sys_arch in
     Linux )
-      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" $AUTOMASTER #Still needed or needs to be adjusted?
+      for path in /etc/auto.master /etc/autofs/auto.master; do
+        if [ -f $path ]; then
+          AUTOMASTER=$path
+          break;
+        fi
+      done
+      if [ -z "$AUTOMASTER" ]; then
+        echo "Error: unable to find auto.master in any of the supplied paths!"
+        num_errors=$(($num_errors+1))
+        AUTOMASTER=/dev/null
+      fi
+      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" $AUTOMASTER # Still needed or needs to be adjusted?
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
       if ! grep -q "^$cvmfs_map" $AUTOMASTER; then
         echo "$cvmfs_map" >> $AUTOMASTER

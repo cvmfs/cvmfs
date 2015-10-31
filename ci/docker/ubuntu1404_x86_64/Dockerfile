@@ -8,7 +8,9 @@ RUN         apt-get -y update && apt-get -y install         \
                                               cmake         \
                                               debhelper     \
                                               devscripts    \
+                                              git           \
                                               libattr1-dev  \
+                                              libcap-dev    \
                                               libfuse-dev   \
                                               libssl-dev    \
                                               pkg-config    \

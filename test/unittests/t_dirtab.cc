@@ -269,3 +269,32 @@ TEST_F(T_Dirtab, MultiDirectoryWildcardsInNegativeRules) {
   EXPECT_FALSE(dirtab.IsOpposing("/usr/local/src/test.h"));
   EXPECT_FALSE(dirtab.IsOpposing("/usr/local/src/test.hpp"));
 }
+
+TEST_F(T_Dirtab, RelaxedPathFilter) {
+  catalog::RelaxedPathFilter pathFilter;
+  pathFilter.Parse("# positive\n"
+                   "/usr/include/*\n"
+                   "/bin/bash\n"
+                   "# negatives\n"
+                   "! /usr/local/bin/*\n");
+
+  // here the RelaxedPathFilter will positively match the following:
+  // /usr, /usr/include, /usr/include/*
+  // /bin, /bin/bash
+  EXPECT_EQ(6u, pathFilter.RuleCount());
+  EXPECT_EQ(5u, pathFilter.PositiveRuleCount());
+  EXPECT_EQ(1u, pathFilter.NegativeRuleCount());
+
+  EXPECT_TRUE(pathFilter.IsMatching("/bin/bash"));
+  EXPECT_TRUE(pathFilter.IsMatching("/bin"));
+  EXPECT_FALSE(pathFilter.IsMatching("/bin/foo"));
+  EXPECT_TRUE(pathFilter.IsMatching("/usr/include/stdio.h"));
+  EXPECT_TRUE(pathFilter.IsMatching("/usr/include"));
+  EXPECT_TRUE(pathFilter.IsMatching("/usr"));
+  EXPECT_FALSE(pathFilter.IsMatching("/"));
+  EXPECT_FALSE(pathFilter.IsMatching(""));
+
+  EXPECT_TRUE(pathFilter.IsOpposing("/usr/local/bin/foo"));
+  EXPECT_FALSE(pathFilter.IsOpposing("/usr/local/bin"));
+  EXPECT_FALSE(pathFilter.IsOpposing("/usr/local"));
+}

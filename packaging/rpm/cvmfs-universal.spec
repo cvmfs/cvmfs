@@ -1,6 +1,6 @@
 
 %{?suse_version:%define dist .suse%suse_version}
-%if 0%{?el6} || 0%{?el7} || 0%{?fc17} || 0%{?fc18} || 0%{?fc19} || 0%{?fc20} || 0%{?fc21}
+%if 0%{?el6} || 0%{?el7} || 0%{?fedora}
 %define selinux_cvmfs 1
 %define selinux_variants mls strict targeted
 %endif
@@ -91,7 +91,7 @@ Requires: shadow-utils
 Requires: SysVinit
 Requires: e2fsprogs
   %else
-    %if 0%{?fc21}
+    %if 0%{?fc21} || 0%{?fc22}
 Requires: procps-ng
     %else
 Requires: sysvinit-tools
@@ -134,6 +134,7 @@ CernVM-FS static client library for pure user-space use
 Summary: CernVM-FS server tools
 Group: Application/System
 BuildRequires: python-devel
+BuildRequires: libcap-devel
 BuildRequires: unzip
 %if 0%{?suse_version}
 Requires: insserv
@@ -151,6 +152,8 @@ Requires: gzip
 Requires: attr
 Requires: openssl
 Requires: httpd
+Requires: libcap
+Requires: lsof
 
 Conflicts: cvmfs-server < 2.1
 
@@ -258,8 +261,8 @@ mkdir -p %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 mv $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version} %RPM_BUILD_ROOT/usr/share/doc/package/%{name}
 %endif
 
-# Fix docdir on FC20, FC21
-%if 0%{?fc20} || 0%{?fc21}
+# Fix docdir on Fedora
+%if 0%{?fedora}
 rm -rf $RPM_BUILD_ROOT/usr/share/doc/%{name}-%{version}
 %endif
 
@@ -384,6 +387,14 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Fri Oct 23 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Fix dependency for Fedora 22
+- Add lsof dependency for cvmfs-server
+* Tue Oct 13 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Add libcap dependency for cvmfs-server
+* Wed Sep 30 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Drop explicit support for Fedora < 21
+- Use generic 'fedora' macro name where possible
 * Mon Aug 17 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
 - Avoid rm -f /var/lib/cvmfs-server/geo/* in preuninstall
 * Wed Jan 07 2015 Jakob Blomer <jblomer@cern.ch> - 2.1.20

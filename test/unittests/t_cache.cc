@@ -671,7 +671,7 @@ TEST_F(T_CacheManager, Rename) {
   EXPECT_EQ(-ENOENT, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
 
   EXPECT_TRUE(CopyPath2Path(path_one, path_null));
-  cache_mgr_->alien_cache_on_nfs_ = true;
+  cache_mgr_->workaround_rename_ = true;
   EXPECT_EQ(0, cache_mgr_->Rename(path_null.c_str(), path_one.c_str()));
   EXPECT_FALSE(FileExists(path_null));
   EXPECT_TRUE(FileExists(path_one));

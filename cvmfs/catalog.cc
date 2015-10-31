@@ -601,8 +601,8 @@ void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
 
 
 void Catalog::SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map) {
-  uid_map_ = (uid_map && !uid_map->empty()) ? uid_map : NULL;
-  gid_map_ = (gid_map && !gid_map->empty()) ? gid_map : NULL;
+  uid_map_ = (uid_map && uid_map->HasEffect()) ? uid_map : NULL;
+  gid_map_ = (gid_map && gid_map->HasEffect()) ? gid_map : NULL;
 }
 
 

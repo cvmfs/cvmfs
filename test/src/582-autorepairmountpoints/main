@@ -24,12 +24,46 @@ mount_old_root_hash() {
 }
 
 
+add_bin_to() {
+  local path="$1"
+
+  pushdir $path
+  cp_bin . || return 1
+  popdir
+}
+
+
+do_some_changes_to() {
+  local path="$1"
+
+  pushdir $path
+
+  mkdir foobar                  || return 1
+  echo "foobar" > foobar/foobar || return 2
+  touch foobar/.cvmfscatalog    || return 3
+
+  popdir
+}
+
+
+remove_everything_from() {
+  local path="$1"
+
+  pushdir $path
+  rm -fR ./*
+  popdir
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local rd_only=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
 
   local scratch_dir=$(pwd)
+  local reference_dir="${scratch_dir}/reference"
+
+  echo "create a local reference directory"
+  mkdir $reference_dir || return 101
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -41,7 +75,10 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "filling the repository with contents of /bin"
-  cp_bin $repo_dir || return 1
+  add_bin_to $repo_dir || return 1
+
+  echo "filling the reference dir with contents of /bin"
+  add_bin_to $reference_dir || return 101
 
   echo "creating CVMFS snapshot"
   cvmfs_server publish $CVMFS_TEST_REPO || return 2
@@ -63,6 +100,9 @@ cvmfs_run_test() {
   cat $check_log_1 | grep -e "/cvmfs/${CVMFS_TEST_REPO} is not mounted"  || return 5
   cat $check_log_1 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}" || return 6
 
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 106
+
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "unmount union file system mountpoint"
@@ -80,6 +120,34 @@ cvmfs_run_test() {
   cat $check_log_2 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly" || return 11
   cat $check_log_2 | grep -e "/cvmfs/${CVMFS_TEST_REPO} is not mounted"    || return 12
   cat $check_log_2 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"   || return 13
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 113
+
+  # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+  echo "unmount union file system mountpoint"
+  sudo umount $repo_dir || return 106
+
+  echo "unmount read-only cvmfs branch"
+  sudo umount $rd_only || return 107
+
+  echo "mount the union file system again (without CVMFS mounted underneath)"
+  sudo mount $repo_dir || return 108
+
+  echo "check the repository"
+  local check_log_2_1="check_2.1.log"
+  cvmfs_server check $CVMFS_TEST_REPO > $check_log_2_1 2>&1 || return 109
+
+  echo "check the error and warning messages"
+  cat $check_log_2_1 | grep -e "${CVMFS_TEST_REPO}/rdonly is not mounted"    || return 110
+  cat $check_log_2_1 | grep -e "Only.*lower.*branch is broken"               || return 111
+  cat $check_log_2_1 | grep -e "Trying.*umount.* /cvmfs/${CVMFS_TEST_REPO}"  || return 112
+  cat $check_log_2_1 | grep -e "Trying to mount .*${CVMFS_TEST_REPO}/rdonly" || return 113
+  cat $check_log_2_1 | grep -e "Trying to mount /cvmfs/${CVMFS_TEST_REPO}"   || return 114
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 115
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -123,6 +191,9 @@ cvmfs_run_test() {
   cat $check_log_5 | grep -e "is in a transaction .* /cvmfs/${CVMFS_TEST_REPO} .* not mounted read/write" || return 25
   cat $check_log_5 | grep -e "Trying to remount /cvmfs/${CVMFS_TEST_REPO} read/write"                     || return 26
 
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 126
+
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "check the repository's integrity"
@@ -136,6 +207,9 @@ cvmfs_run_test() {
 
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 28
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 128
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -174,6 +248,9 @@ cvmfs_run_test() {
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 43
 
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 143
+
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "remember current root hash"
@@ -209,12 +286,16 @@ cvmfs_run_test() {
   cat $check_log_9 | grep -e "Trying to remount .* to $current_root_hash"               || return 49
 
   echo "add a couple of files"
-  mkdir ${repo_dir}/foobar                  || return 50
-  echo "foobar" > ${repo_dir}/foobar/foobar || return 51
-  touch ${repo_dir}/foobar/.cvmfscatalog    || return 52
+  do_some_changes_to $repo_dir || return 50
+
+  echo "add a couple of files to the reference dir as well"
+  do_some_changes_to $reference_dir || return 51
 
   echo "publish transaction"
   publish_repo $CVMFS_TEST_REPO || return 53
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 153
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -264,21 +345,30 @@ cvmfs_run_test() {
   echo "check repository integrity"
   check_repository $CVMFS_TEST_REPO -i || return 66
 
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 166
+
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "open transaction"
   start_transaction $CVMFS_TEST_REPO || return 67
 
   echo "remove everything from repo"
-  rm -fR ${repo_dir}/* || return 68
+  remove_everything_from $repo_dir || return 68
+
+  echo "remove everything from reference dir"
+  remove_everything_from $reference_dir || return 69
 
   echo "publish transaction"
-  publish_repo $CVMFS_TEST_REPO || return 69
+  publish_repo $CVMFS_TEST_REPO || return 70
+
+  echo "compare repository to reference directory"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return 71
 
   # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
   echo "check repository integrity"
-  check_repository $CVMFS_TEST_REPO -i || return 70
+  check_repository $CVMFS_TEST_REPO -i || return 72
 
   return 0
 }

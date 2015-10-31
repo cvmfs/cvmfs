@@ -8,16 +8,14 @@
 #define __STDC_FORMAT_MACROS
 
 #include "cvmfs_config.h"
-#include "catalog_mgr.h"
 
-#include <inttypes.h>
+#include "catalog_mgr.h"
 
 #include <cassert>
 #include <string>
 
 #include "logging.h"
 #include "shortstring.h"
-#include "smalloc.h"
 #include "statistics.h"
 #include "xattr.h"
 
@@ -349,12 +347,12 @@ bool AbstractCatalogManager<CatalogT>::Listing(const PathString &path,
   // Find catalog, possibly load nested
   CatalogT *best_fit = FindCatalog(path);
   CatalogT *catalog = best_fit;
-  if (MountSubtree(path, best_fit, NULL)) {
+  if (MountSubtree(path, best_fit, NULL, NULL)) {
     Unlock();
     WriteLock();
     // Check again to avoid race
     best_fit = FindCatalog(path);
-    result = MountSubtree(path, best_fit, &catalog);
+    result = MountSubtree(path, best_fit, &catalog, NULL);
     // DowngradeLock(); TODO
     if (!result) {
       Unlock();

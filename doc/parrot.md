@@ -2,7 +2,7 @@
 
 In case you want to access CernVM-FS repositories but the fuse module is not installed neither do you have the permissions to install it yourself, the [parrot](http://ccl.cse.nd.edu/software/parrot) toolkit provides you a means to "mount" CernVM-FS on Linux in pure user space.  Parrot sandboxes your application in a similar way `gdb` sandboxes your application.  But instead of debugging the application, parrot transparently rewrites file system calls and can effectively provide /cvmfs to your application.
 
-This page provides examples on how to start an application in a parrot+cvmfs sandbox.  We recommend the precompiled parrot from the [cctools 5.2.0 package](http://ccl.cse.nd.edu/software/downloadfiles.php).  At the end of the page, there are instructions on how to compile parrot+cvmfs from sources.
+This page provides examples on how to start an application in a parrot+cvmfs sandbox.  We recommend the precompiled parrot from the [cctools 5.2.3 package](http://ccl.cse.nd.edu/software/downloadfiles.php).  At the end of the page, there are instructions on how to compile parrot+cvmfs from sources.
 
 
 ## Basics

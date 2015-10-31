@@ -29,16 +29,54 @@ CVMFS_RESULT_LOCATION="$2"
 CVMFS_DOCKER_IMAGE="$3"
 shift 3
 
-# check if docker is installed
-which docker > /dev/null 2>&1 || die "docker is not installed"
+# retrieves the image creation time of a docker image in epoch
+# @param image_name  the full name of the docker image
+# @return            creation time in Unix epoch
+image_creation() {
+  local image_name="$1"
+  date +%s --date "$(sudo docker inspect --format='{{.Created}}' $image_name)"
+}
 
-# check if the docker container specification exists in ci/docker
-image_name="cvmfs/${CVMFS_DOCKER_IMAGE}"
-container_dir="${SCRIPT_LOCATION}/docker/${CVMFS_DOCKER_IMAGE}"
-[ -d $container_dir ] || die "container $CVMFS_DOCKER_IMAGE not found"
+_time_from_git() {
+  local relative_path="$1"
+  date +%s --date "$(git log -1 --format=%ai -- $relative_path)"
+}
 
-# bootstrap the docker container if necessary
-if ! sudo docker images $image_name | grep -q "$image_name"; then
+_max() {
+  local lhs="$1"
+  local rhs="$2"
+  [ $lhs -gt $rhs ] && echo $lhs || echo $rhs
+}
+
+_max_time_from_git() {
+  local directory_path="$1"
+  local max_epoch=0
+  for f in $(find $directory_path -mindepth 1); do
+    max_epoch="$(_max $max_epoch $(_time_from_git $f))"
+  done
+  echo $max_epoch
+}
+
+# retrieves the last-changed timestamp for a specific docker image recipe
+# @param recipe_dir  the directory of the docker image recipe to check
+# @return            last modified timestamp in Unix epoch
+image_recipe() {
+  local recipe_dir="$1"
+  local owd="$(pwd)"
+  cd ${recipe_dir}
+  local recipe_epoch="$(_max_time_from_git .)"
+  cd ..
+  for d in $(find . -maxdepth 1 -mindepth 1 -type d -name '*_common'); do
+    recipe_epoch="$(_max $recipe_epoch $(_max_time_from_git $d))"
+  done
+  cd $owd
+  echo $recipe_epoch
+}
+
+bootstrap_image() {
+  local image_name="$1"
+  local container_dir="$2"
+
   echo "bootstrapping docker image for ${image_name}..."
   build_workdir=$(mktemp -d)
   old_wordir=$(pwd)
@@ -50,6 +88,25 @@ if ! sudo docker images $image_name | grep -q "$image_name"; then
   [ $? -eq 0 ] || die "Failed to build docker image '$image_name'"
   cd $old_wordir
   rm -fR $build_workdir
+}
+
+# check if docker is installed
+which docker > /dev/null 2>&1 || die "docker is not installed"
+which git    > /dev/null 2>&1 || die "git is not installed"
+
+# check if the docker container specification exists in ci/docker
+image_name="cvmfs/${CVMFS_DOCKER_IMAGE}"
+container_dir="${SCRIPT_LOCATION}/docker/${CVMFS_DOCKER_IMAGE}"
+[ -d $container_dir ] || die "container $CVMFS_DOCKER_IMAGE not found"
+
+# bootstrap the docker container if non-existent or recreate if outdated
+if ! sudo docker images $image_name | grep -q "$image_name"; then
+  bootstrap_image "$image_name" "$container_dir"
+elif [ $(image_creation $image_name) -lt $(image_recipe $container_dir) ]; then
+  echo -n "removing outdated docker image '$image_name'... "
+  sudo docker rmi "$image_name" > /dev/null || die "fail"
+  echo "done"
+  bootstrap_image "$image_name" "$container_dir"
 fi
 
 # parse the command line arguments (keep quotation marks)
@@ -81,7 +138,9 @@ done
 echo "++ $docker_build_script $args"
 sudo docker run --volume=${CVMFS_SOURCE_LOCATION}:${docker_source_location} \
                 --volume=${CVMFS_RESULT_LOCATION}:${docker_build_location}  \
+                --rm=true                                                   \
                 --privileged=true                                           \
                 --env="CVMFS_BUILD_ARCH=$CVMFS_BUILD_ARCH"                  \
+                --env="CVMFS_CI_PLATFORM_LABEL=$CVMFS_DOCKER_IMAGE"         \
                 $image_name                                                 \
                 $docker_build_script $args

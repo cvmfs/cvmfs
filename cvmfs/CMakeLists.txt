@@ -46,6 +46,7 @@ set (CVMFS_CLIENT_SOURCES
   globals.h globals.cc
   sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
+  uid_map.h
   catalog.h catalog.cc
   catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_client.h catalog_mgr_client.cc
@@ -168,11 +169,13 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_traversal.h
   sql.h sql_impl.h sql.cc
   catalog_sql.h catalog_sql.cc
+  uid_map.h
   catalog.h catalog.cc
   catalog_rw.h catalog_rw.cc
   catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_ro.h catalog_mgr_ro.cc
   catalog_mgr_rw.h catalog_mgr_rw.cc
+  catalog_balancer.h catalog_balancer_impl.h
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
   dirtab.h dirtab.cc
   history.h
@@ -204,6 +207,51 @@ set (CVMFS_SUID_HELPER_SOURCES
   platform.h platform_osx.h platform_linux.h
   sanitizer.h sanitizer.cc
   cvmfs_suid_helper.cc
+)
+
+set (CVMFS_PRELOADER_SOURCES
+  download.cc download.h
+  logging.cc logging.h
+  swissknife.h
+  swissknife_pull.cc swissknife_pull.h
+  signature.cc signature.h
+  statistics.cc statistics.h
+  duplex_curl.h duplex_cares.h
+  catalog_sql.cc catalog_sql.h
+  sql.cc sql.h
+  util.cc util.h
+  hash.cc hash.h
+  upload_facility.cc upload_facility.h
+  pathspec/pathspec_pattern.cc pathspec/pathspec_pattern.h
+  pathspec/pathspec.cc pathspec/pathspec.h
+  util_concurrency.cc util_concurrency.h
+  file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
+  file_processing/char_buffer.h
+  file_processing/chunk.h file_processing/chunk.cc
+  file_processing/chunk_detector.h file_processing/chunk_detector.cc
+  file_processing/file.h file_processing/file.cc
+  file_processing/io_dispatcher.h file_processing/io_dispatcher.cc
+  file_processing/processor.h file_processing/processor.cc
+  file_processing/file_processor.h file_processing/file_processor.cc
+  upload_s3.cc upload_s3.h
+  s3fanout.cc s3fanout.h
+  options.cc options.h
+  compression.cc compression.h
+  upload_spooler_definition.cc upload_spooler_definition.h
+  history_sql.cc history_sql.h
+  history_sqlite.cc history_sqlite.h
+  xattr.cc xattr.h
+  globals.cc globals.h
+  manifest.cc manifest.h
+  manifest_fetch.cc manifest_fetch.h
+  upload.cc upload.h
+  upload_local.cc upload_local.h
+  whitelist.cc whitelist.h
+  sanitizer.cc sanitizer.h
+  dns.cc dns.h
+  dirtab.cc dirtab.h
+  catalog.cc catalog.h
+  preload.cc
 )
 
 #
@@ -396,7 +444,7 @@ if (BUILD_SERVER)
   set_target_properties (cvmfs_swissknife PROPERTIES COMPILE_FLAGS "${CVMFS_SWISSKNIFE_CFLAGS}" LINK_FLAGS "${CVMFS_SWISSKNIFE_LD_FLAGS}")
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
-  target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
+  target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
 
   if (BUILD_SERVER_DEBUG)
     add_executable (cvmfs_swissknife_debug ${CVMFS_SWISSKNIFE_DEBUG_SOURCES})
@@ -426,9 +474,58 @@ if (BUILD_SERVER)
       message (WARNING "Debug libraries of TBB were not found. Using the release versions instead.")
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
-    target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
+    target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS} ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} ${CAP_LIBRARIES} pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
+
+if (BUILD_PRELOADER)
+  add_executable (cvmfs_preload_bin ${CVMFS_PRELOADER_SOURCES})
+
+  if (LIBCURL_BUILTIN)
+    add_dependencies (cvmfs_preload_bin libcares libcurl)
+    set (PRELOADER_LIBS ${CARES_ARCHIVE} ${PRELOADER_LIBS} )
+    set (PRELOADER_LIBS ${LIBCURL_ARCHIVE} ${PRELOADER_LIBS} )
+  endif (LIBCURL_BUILTIN)
+
+  if (PACPARSER_BUILTIN)
+    add_dependencies (cvmfs_preload_bin libpacparser)
+    set (PRELOADER_LIBS ${PACPARSER_ARCHIVE} ${PRELOADER_LIBS} )
+  endif (PACPARSER_BUILTIN)
+
+  if (SQLITE3_BUILTIN)
+    add_dependencies (cvmfs_preload_bin sqlite3)
+    set (PRELOADER_LIBS ${SQLITE3_ARCHIVE}  ${PRELOADER_LIBS} )
+  endif (SQLITE3_BUILTIN)
+
+  if (ZLIB_BUILTIN)
+    add_dependencies (cvmfs_preload_bin zlib)
+    set (PRELOADER_LIBS ${ZLIB_ARCHIVE} ${PRELOADER_LIBS} )
+  endif (ZLIB_BUILTIN)
+
+  if (SPARSEHASH_BUILTIN)
+    add_dependencies (cvmfs_preload_bin sparsehash)
+  endif (SPARSEHASH_BUILTIN)
+
+  if (TBB_PRIVATE_LIB)
+    add_dependencies (cvmfs_swissknife libtbb)
+  endif (TBB_PRIVATE_LIB)
+
+  add_dependencies (cvmfs_preload_bin libsha2)
+  add_dependencies (cvmfs_preload_bin libvjson)
+
+  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} ${SHA2_ARCHIVE} pthread dl)
+endif (BUILD_PRELOADER)
+
+#
+# Generate a bash self-extracting script for the cvmfs_preload target
+#
+if (BUILD_PRELOADER)
+  add_custom_command (
+    TARGET cvmfs_preload_bin POST_BUILD
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/cvmfs_preload_builder.sh ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Generating the cvmfs_preload self-extracting script"
+  )
+endif (BUILD_PRELOADER)
 
 #
 # installation
@@ -541,3 +638,11 @@ if (BUILD_SERVER)
   )
 
 endif (BUILD_SERVER)
+
+if (BUILD_PRELOADER)
+  install(
+    FILES      ${CMAKE_CURRENT_BINARY_DIR}/cvmfs_preload
+    DESTINATION    bin
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+  )
+endif (BUILD_PRELOADER)

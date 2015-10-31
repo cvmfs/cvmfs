@@ -386,12 +386,14 @@ int PosixCacheManager::CommitTxn(void *txn) {
 
 PosixCacheManager *PosixCacheManager::Create(
   const string &cache_path,
-  const bool alien_cache)
+  const bool alien_cache,
+  const bool workaround_rename)
 {
   UniquePtr<PosixCacheManager> cache_manager(
     new PosixCacheManager(cache_path, alien_cache));
   assert(cache_manager.IsValid());
 
+  cache_manager->workaround_rename_ = workaround_rename;
   if (cache_manager->alien_cache_) {
     if (!MakeCacheDirectories(cache_path, 0770)) {
       return NULL;
@@ -402,7 +404,7 @@ PosixCacheManager *PosixCacheManager::Create(
     if ((statfs(cache_path.c_str(), &cache_buf) == 0) &&
         (cache_buf.f_type == NFS_SUPER_MAGIC))
     {
-      cache_manager->alien_cache_on_nfs_ = true;
+      cache_manager->workaround_rename_ = true;
       LogCvmfs(kLogCache, kLogDebug | kLogSyslog,
              "Alien cache is on NFS.");
     }
@@ -514,7 +516,7 @@ int64_t PosixCacheManager::Pread(
 
 int PosixCacheManager::Rename(const char *oldpath, const char *newpath) {
   int result;
-  if (!alien_cache_on_nfs_) {
+  if (workaround_rename_ == false) {
     result = rename(oldpath, newpath);
     if (result < 0)
       return -errno;
