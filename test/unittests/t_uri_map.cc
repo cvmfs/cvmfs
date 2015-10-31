@@ -14,8 +14,7 @@ class TestUriHandler : public UriHandler {
  public:
   explicit TestUriHandler(FastCgi *fcgi) : UriHandler(fcgi) { }
   virtual ~TestUriHandler() { }
-  virtual void OnRequest(const uint64_t id, const WebRequest &request) { }
-  virtual void OnData(const uint64_t id, unsigned char **buf, unsigned *length)
+  virtual void OnData(const uint64_t id, unsigned char *buf, unsigned length)
     { }
 };
 
