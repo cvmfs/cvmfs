@@ -1,4 +1,5 @@
 2.2.0:
+  * Add support for grafting of files (CVM-908)
   * Make CVMFS_AUTO_REPAIR_MOUNTPOINT the default (CVM-889)
   * Fix mount point auto repair when only the read-only branch is broken (CVM-918)
   * Fix URL option parsing for S3 backend in cvmfs_server
