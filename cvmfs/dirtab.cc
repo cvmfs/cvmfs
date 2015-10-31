@@ -221,24 +221,16 @@ bool RelaxedPathFilter::Parse(const std::string &dirtab) {
 
 bool RelaxedPathFilter::ParsePathspec(const std::string &pathspec_str,
                                       bool negation) {
-  std::string relaxed_spec(pathspec_str);
-  // Ignore trailing slashes
-  if ((relaxed_spec.size() > 1) &&
-      (relaxed_spec[relaxed_spec.size() - 1] == Pathspec::kSeparator))
-  {
-    relaxed_spec = relaxed_spec.substr(0, relaxed_spec.size() - 1);
-  }
-
   if (negation) {
-    return Dirtab::ParsePathspec(relaxed_spec, true);
+    return Dirtab::ParsePathspec(pathspec_str, true);
   }
   bool success = true;
-  std::string current_relaxed_spec = relaxed_spec;
-  while (current_relaxed_spec.length() > 0) {
-    if (!Dirtab::ParsePathspec(current_relaxed_spec, false))
+  std::string current_pathspec_str(pathspec_str);
+  while (current_pathspec_str.length() > 0) {
+    if (!Dirtab::ParsePathspec(current_pathspec_str, false))
       success = false;
-    size_t new_length = current_relaxed_spec.find_last_of("/");
-    current_relaxed_spec = current_relaxed_spec.substr(0, new_length);
+    size_t new_length = current_pathspec_str.find_last_of("/");
+    current_pathspec_str = current_pathspec_str.substr(0, new_length);
   }
 
   return success;
