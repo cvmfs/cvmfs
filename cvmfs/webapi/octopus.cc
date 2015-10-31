@@ -9,6 +9,7 @@
 #include <string>
 
 #include "../sanitizer.h"
+#include "uri_map.h"
 
 using namespace std;  // NOLINT
 
@@ -22,6 +23,10 @@ int main(int argc, char **argv) {
       return 1;
     }
   }
+
+  UriMap uri_map;
+  uri_map.Register("/*/api/v1/lease", NULL);
+  UriHandler *handler;
 
   unsigned char *buf;
   unsigned length;
@@ -49,10 +54,16 @@ int main(int argc, char **argv) {
           fcgi.ReturnBadRequest("Invalid URI");
           break;
         }
-        content = "Content-type: text/html\n\n<html>" +
+        handler = uri_map.Route(request_uri);
+        if (handler != NULL) {
+          handler->OnData(id, buf, length);
+        } else {
+          fcgi.ReturnNotFound();
+        }
+        /*content = "Content-type: text/html\n\n<html>" +
                   request_uri + "</html>\n";
         fcgi.SendData(content, true);
-        fcgi.EndRequest(0);
+        fcgi.EndRequest(0);*/
         break;
 
       default:

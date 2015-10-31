@@ -612,6 +612,13 @@ void FastCgi::ReturnBadRequest(const std::string &reason) {
 }
 
 
+void FastCgi::ReturnNotFound() {
+  const string response = "Status: 404 Not Found\r\n";
+  SendData(response, true);
+  EndRequest(0);
+}
+
+
 /**
  * The HTTP body.  Indicate the end of the stream with finish.
  */
