@@ -43,10 +43,7 @@ namespace {
 
 /**
  * This just stores an shash::Any in a predictable way to send it through a
- * POSIX pipe that is not type safe. It breaks good object oriented practises
- * like information hiding.
- *
- * TODO(rene): no words for that... just get rid of it!
+ * POSIX pipe.
  */
 class ChunkJob {
  public:
@@ -104,6 +101,7 @@ atomic_int64         overall_new;
 atomic_int64         chunk_queue;
 bool                 preload_cache = false;
 string              *preload_cachedir = NULL;
+bool                 inspect_existing_catalogs = false;
 
 }  // anonymous namespace
 
@@ -228,6 +226,43 @@ static void *MainWorker(void *data) {
 }
 
 
+static bool Pull(const shash::Any &catalog_hash, const std::string &path);
+static bool PullRecursion(catalog::Catalog *catalog, const std::string &path) {
+  assert(catalog);
+
+  // Previous catalogs
+  if (pull_history) {
+    shash::Any previous_catalog = catalog->GetPreviousRevision();
+    if (previous_catalog.IsNull()) {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Start of catalog, no more history");
+    } else {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
+               previous_catalog.ToString().c_str());
+      bool retval = Pull(previous_catalog, path);
+      if (!retval)
+        return false;
+    }
+  }
+
+  // Nested catalogs (in a nested code block because goto fail...)
+  {
+    const catalog::Catalog::NestedCatalogList &nested_catalogs =
+      catalog->ListNestedCatalogs();
+    for (catalog::Catalog::NestedCatalogList::const_iterator i =
+         nested_catalogs.begin(), iEnd = nested_catalogs.end();
+         i != iEnd; ++i)
+    {
+      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
+               i->path.c_str());
+      bool retval = Pull(i->hash, i->path.ToString());
+      if (!retval)
+        return false;
+    }
+  }
+
+  return true;
+}
+
 static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
   int retval;
   download::Failures dl_retval;
@@ -235,6 +270,24 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
 
   // Check if the catalog already exists
   if (Peek(catalog_hash)) {
+    // Preload: dirtab changed
+    if (inspect_existing_catalogs) {
+      if (!preload_cache) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "to be implemented: -t without -c");
+        abort();
+      }
+      catalog::Catalog *catalog = catalog::Catalog::AttachFreely(
+        path, MakePath(catalog_hash), catalog_hash);
+      if (catalog == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to attach catalog %s",
+                 catalog_hash.ToString().c_str());
+        return false;
+      }
+      bool retval = PullRecursion(catalog, path);
+      delete catalog;
+      return retval;
+    }
+
     LogCvmfs(kLogCvmfs, kLogStdout, "  Catalog up to date");
     return true;
   }
@@ -304,7 +357,8 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
 
   // Traverse the chunks
   LogCvmfs(kLogCvmfs, kLogStdout | kLogNoLinebreak,
-           "  Processing chunks: ");
+           "  Processing chunks [%"PRIu64" registered chunks]: ",
+           catalog->GetNumChunks());
   retval = catalog->AllChunksBegin();
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
@@ -320,39 +374,11 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
     SafeSleepMs(100);
   }
   LogCvmfs(kLogCvmfs, kLogStdout, " fetched %"PRId64" new chunks out of "
-           "%"PRId64" processed chunks",
+           "%"PRId64" unique chunks",
            atomic_read64(&overall_new)-gauge_new,
            atomic_read64(&overall_chunks)-gauge_chunks);
 
-  // Previous catalogs
-  if (pull_history) {
-    shash::Any previous_catalog = catalog->GetPreviousRevision();
-    if (previous_catalog.IsNull()) {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Start of catalog, no more history");
-    } else {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from historic catalog %s",
-               previous_catalog.ToString().c_str());
-      retval = Pull(previous_catalog, path);
-      if (!retval)
-        return false;
-    }
-  }
-
-  // Nested catalogs (in a nested code block because goto fail...)
-  {
-    const catalog::Catalog::NestedCatalogList &nested_catalogs =
-      catalog->ListNestedCatalogs();
-    for (catalog::Catalog::NestedCatalogList::const_iterator i =
-         nested_catalogs.begin(), iEnd = nested_catalogs.end();
-         i != iEnd; ++i)
-    {
-      LogCvmfs(kLogCvmfs, kLogStdout, "Replicating from catalog at %s",
-               i->path.c_str());
-      retval = Pull(i->hash, i->path.ToString());
-      if (!retval)
-        return false;
-    }
-  }
+  retval = PullRecursion(catalog, path);
 
   delete catalog;
   unlink(file_catalog.c_str());
@@ -418,6 +444,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   }
   if (args.find('p') != args.end())
     pull_history = true;
+  if (args.find('z') != args.end())
+    inspect_existing_catalogs = true;
   pthread_t *workers =
     reinterpret_cast<pthread_t *>(smalloc(sizeof(pthread_t) * num_parallel));
   typedef std::vector<history::History::Tag> TagVector;
@@ -477,6 +505,14 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout,
              "CernVM-FS: using trusted certificates in %s",
              JoinStrings(SplitString(trusted_certs, ':'), ", ").c_str());
+  }
+
+  // Check if we have a replica-ready server
+  retval = g_download_manager->Fetch(&download_sentinel);
+  if (retval != download::kFailOk) {
+    LogCvmfs(kLogCvmfs, kLogStderr,
+             "This is not a CernVM-FS server for replication");
+    goto fini;
   }
 
   m_retval = manifest::Fetch(*stratum0_url, repository_name, 0, NULL,
@@ -543,14 +579,6 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     Store(history_path, history_hash);
     WaitForStorage();
     unlink(history_path.c_str());
-  }
-
-  // Check if we have a replica-ready server
-  retval = g_download_manager->Fetch(&download_sentinel);
-  if (retval != download::kFailOk) {
-    LogCvmfs(kLogCvmfs, kLogStderr,
-             "This is not a CernVM-FS server for replication");
-    goto fini;
   }
 
   // Starting threads

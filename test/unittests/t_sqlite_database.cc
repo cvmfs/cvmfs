@@ -903,7 +903,7 @@ TEST_F(T_SQLite_Wrapper, CountModifiedRows) {
   ASSERT_NE(static_cast<DummyDatabase*>(NULL), db1);
   EXPECT_EQ(1u, DummyDatabase::instances);
   EXPECT_TRUE(db1->read_write());
-  EXPECT_EQ(2u, db1->GetModifiedRowCount()); // creation adds schema revision
+  EXPECT_EQ(2u, db1->GetModifiedRowCount());  // creation adds schema revision
                                               // information to the database
   delete db1;
   EXPECT_EQ(0u, DummyDatabase::instances);

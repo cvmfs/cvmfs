@@ -16,6 +16,7 @@ Make sure the right version of parrot is executed by checking `parrot_run -v`.  
 Export the following environment variables:
 
     export PARROT_CVMFS_REPO="<default-repositories>"
+    export PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES=yes
     export HTTP_PROXY='<SITE HTTP PROXY>'  # or 'DIRECT;' if not on a cluster or grid site
 
 Test parrot with

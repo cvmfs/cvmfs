@@ -22,18 +22,22 @@
 
 using namespace std;  // NOLINT
 
+const char *kVersion = "0.2 (Preview)";
+
 namespace swissknife {
 download::DownloadManager *g_download_manager;
 signature::SignatureManager *g_signature_manager;
 perf::Statistics *g_statistics;
 void Usage() {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Usage:\n"
+    LogCvmfs(kLogCvmfs, kLogStderr, "Version: %s\n\n"
+    "Usage:\n"
     "cvmfs_preload -u <Stratum 0 URL>\n"
     "              -r <alien cache directory>\n"
     "              [-d <path to dirtab file>]\n"
     "              [-k <public key>]\n"
     "              [-m <fully qualified repository name>]\n"
-    "              [-x <directory for temporary files>]\n\n");
+    "              [-n <num of parallel download threads>]\n"
+    "              [-x <directory for temporary files>]\n\n", kVersion);
 }
 }  // namespace swissknife
 
@@ -93,13 +97,22 @@ static char CheckParameters(const string &params,
   return '\0';
 }
 
+static bool HasDirtabChanged(const string &dirtab_src, const string &dirtab_dst)
+{
+  bool retval;
+  shash::Any hash_src(shash::kMd5);
+  shash::Any hash_dst(shash::kMd5);
+  retval = shash::HashFile(dirtab_src, &hash_src);
+  if (!retval)
+    return true;
+  retval = shash::HashFile(dirtab_dst, &hash_dst);
+  if (!retval)
+    return true;
+  return hash_src != hash_dst;
+}
+
 
 int main(int argc, char *argv[]) {
-  if (argc < 7) {
-    printf("Not enough arguments: %d\n\n", argc);
-    swissknife::Usage();
-    return 1;
-  }
   int retval;
 
   // load some default arguments
@@ -131,6 +144,16 @@ int main(int argc, char *argv[]) {
 
   if (args.find('x') == args.end())
     args['x'] = new string(*args['r'] + "/txn");
+
+  const string cache_directory = *args['r'];
+  const string fqrn = *args['m'];
+  const string dirtab =
+    (args.find('d') == args.end()) ?  "/dev/null" : *args['d'];
+  const string dirtab_in_cache = cache_directory + "/dirtab." + fqrn;
+
+  // Default network parameters: 5 seconds timeout, 2 retries
+  args['t'] = new string("5");
+  args['a'] = new string("2");
 
   // first create the alien cache
   string *alien_cache_dir = args['r'];
@@ -180,8 +203,17 @@ int main(int argc, char *argv[]) {
   swissknife::g_statistics = new perf::Statistics();
 
   // load the command
+  if (HasDirtabChanged(dirtab, dirtab_in_cache)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: new dirtab, forced run");
+    args['z'] = NULL;  // look into existing catalogs, too
+  }
   args['c'] = NULL;
   retval = swissknife::CommandPull().Main(args);
+
+  // Copy dirtab file
+  if (retval == 0) {
+    CopyPath2Path(dirtab, dirtab_in_cache);
+  }
 
   if (keys_created) {
     unlink(cern_pk_path.c_str());

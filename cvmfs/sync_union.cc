@@ -11,6 +11,8 @@
 #include <sys/capability.h>
 #include <unistd.h>
 
+#include <vector>
+
 #include "fs_traversal.h"
 #include "logging.h"
 #include "platform.h"
@@ -220,9 +222,9 @@ bool SyncUnionOverlayfs::Initialize() {
 
 
 bool ObtainSysAdminCapabilityInternal(cap_t caps) {
-  /*const*/ cap_value_t cap = CAP_SYS_ADMIN; // is non-const as cap_set_flag()
-                                             // expects a non-const pointer
-                                             // on RHEL 5 and older
+  /*const*/ cap_value_t cap = CAP_SYS_ADMIN;  // is non-const as cap_set_flag()
+                                              // expects a non-const pointer
+                                              // on RHEL 5 and older
 
   // do sanity-check if supported in <sys/capability.h> otherwise just pray...
   // Note: CAP_SYS_ADMIN is a rather common capability and is very likely to be
@@ -403,7 +405,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
   //               an std::map<> just to check if an xattr is there...
   UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
-  assert (xattrs);
+  assert(xattrs);
 
   std::vector<std::string> attrs = xattrs->ListKeys();
   std::vector<std::string>::const_iterator i    = attrs.begin();

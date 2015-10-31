@@ -33,6 +33,11 @@ class CommandPull : public Command {
     r.push_back(Parameter::Optional('d', "directory for path specification"));
     r.push_back(Parameter::Switch('p', "pull catalog history, too"));
     r.push_back(Parameter::Switch('c', "preload cache instead of stratum 1"));
+    // Required for preloading client cache with a dirtab.  If the dirtab
+    // changes, the existence of a catalog does not anymore indicate if
+    // everything in the corresponding subtree is already fetched, too.
+    r.push_back(
+      Parameter::Switch('z', "look into all catalogs even if already present"));
     return r;
   }
   int Main(const ArgumentList &args);
