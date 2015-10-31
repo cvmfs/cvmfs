@@ -613,7 +613,7 @@ void FastCgi::ReturnBadRequest(const std::string &reason) {
 
 
 void FastCgi::ReturnNotFound() {
-  const string response = "Status: 404 Not Found\r\n";
+  const string response = "Status: 404 Not Found\r\n\r\n";
   SendData(response, true);
   EndRequest(0);
 }
