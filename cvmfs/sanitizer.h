@@ -85,11 +85,11 @@ class PositiveIntegerSanitizer : public IntegerSanitizer {
 
 /**
  * There could be more on the whitelist but this is already sufficient for the
- * octopus web service.
+ * octopus web service.  It includes the whitelist for valid repositories.
  */
 class UriSanitizer : public InputSanitizer {
  public:
-  UriSanitizer() : InputSanitizer("az AZ 09 - _ /") { }
+  UriSanitizer() : InputSanitizer("az AZ 09 . - _ /") { }
 };
 
 }  // namespace sanitizer

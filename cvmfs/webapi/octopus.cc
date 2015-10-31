@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   }
 
   UriMap uri_map;
-  uri_map.Register("/*/api/v1/lease", NULL);
+  uri_map.Register("/cvmfs/*/api/v1/lease", NULL);
   UriHandler *handler;
 
   unsigned char *buf;

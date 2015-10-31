@@ -23,10 +23,12 @@ class T_UriMap : public ::testing::Test {
   virtual void SetUp() {
     h1 = new TestUriHandler(NULL);
     h2 = new TestUriHandler(NULL);
+    h3 = new TestUriHandler(NULL);
     map_.Register("/v1/tickets", h1);
     map_.Register("/v1/ticket/?*", h1);
     map_.Register("/v1/tickets/foo", h2);
     map_.Register("/v1/status", h2);
+    map_.Register("/*/api/v1/lease", h3);
   }
 
   virtual void TearDown() {
@@ -37,6 +39,7 @@ class T_UriMap : public ::testing::Test {
   UriMap map_;
   TestUriHandler *h1;
   TestUriHandler *h2;
+  TestUriHandler *h3;
 };
 
 
@@ -61,4 +64,6 @@ TEST_F(T_UriMap, Simple) {
 
   EXPECT_EQ(h2, map_.Route("/v1/status"));
   EXPECT_EQ(h2, map_.Route("/v1/status/foo/bar"));
+
+  EXPECT_EQ(h3, map_.Route("/alice.cern.ch/api/v1/lease"));
 }
