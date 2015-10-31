@@ -771,6 +771,21 @@ TEST_F(T_Util, String2Int64) {
   EXPECT_EQ(static_cast<int64_t>(234), String2Int64("0234"));
 }
 
+TEST_F(T_Util, String2Uint64Parse) {
+  uint64_t result;
+  EXPECT_TRUE(String2Uint64Parse("0", NULL));
+  EXPECT_TRUE(String2Uint64Parse("0", &result));
+  EXPECT_EQ(0U, result);
+  EXPECT_TRUE(String2Uint64Parse("-0", &result));
+  EXPECT_EQ(0U, result);
+  EXPECT_TRUE(String2Uint64Parse("1234567890", &result));
+  EXPECT_EQ(1234567890U, result);
+  EXPECT_FALSE(String2Uint64Parse("", &result));
+  EXPECT_FALSE(String2Uint64Parse("1a", &result));
+  EXPECT_FALSE(String2Uint64Parse("a1", &result));
+  EXPECT_FALSE(String2Uint64Parse("-1", &result));
+}
+
 TEST_F(T_Util, String2Uint64Pair) {
   uint64_t a;
   uint64_t b;

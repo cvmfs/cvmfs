@@ -88,10 +88,13 @@ void SyncMediator::Add(const SyncItem &entry) {
     else
       AddFile(entry);
     return;
+  } else if (entry.IsGraftMarker()) {
+    LogCvmfs(kLogPublish, kLogDebug, "Ignoring graft marker file.");
+    return;  // Ignore markers.
   }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be added. "
-               "Unregcognized file type.");
+               "Unrecognized file type.");
 }
 
 
@@ -99,6 +102,7 @@ void SyncMediator::Add(const SyncItem &entry) {
  * Touch an entry in the repository.
  */
 void SyncMediator::Touch(const SyncItem &entry) {
+  if (entry.IsGraftMarker()) {return;}
   if (entry.IsDirectory()) {
     TouchDirectory(entry);
     return;
@@ -117,7 +121,7 @@ void SyncMediator::Touch(const SyncItem &entry) {
   }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be touched. "
-               "Unregcognized file type.");
+               "Unrecognied file type.");
 }
 
 
@@ -143,7 +147,7 @@ void SyncMediator::Remove(const SyncItem &entry) {
   }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be deleted. "
-               "Unregcognized file type.");
+               "Unrecognized file type.");
 }
 
 
@@ -614,11 +618,30 @@ void SyncMediator::AddFile(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (entry.IsSymlink() && !params_->dry_run) {
+    assert(!entry.HasGraftMarker());
     // Symlinks are completely stored in the catalog
     catalog_manager_->AddFile(
       entry.CreateBasicCatalogDirent(),
       default_xattrs,
       entry.relative_parent_path());
+  } else if (entry.HasGraftMarker()) {
+    if (entry.IsValidGraft()) {
+      // Graft files are added to catalog immediately.
+      catalog_manager_->AddFile(
+        entry.CreateBasicCatalogDirent(),
+        default_xattrs,  // TODO(bbockelm): For now, use default xattrs
+                         // on grafted files.
+        entry.relative_parent_path());
+    } else {
+      // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
+      // the graft file is missing information.  It's not clear that continuing
+      // forward with the publish is the correct thing to do; abort for now.
+      LogCvmfs(kLogPublish, kLogStderr, "Encountered a grafted file (%s) with "
+               "invalid grafting information; check contents of .cvmfsgraft-*"
+               " file.  Aborting publish.",
+               entry.GetRelativePath().c_str());
+      abort();
+    }
   } else {
     // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);
@@ -648,6 +671,8 @@ void SyncMediator::AddDirectory(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (!params_->dry_run) {
+    assert(!entry.HasGraftMarker());
+
     catalog_manager_->AddDirectory(entry.CreateBasicCatalogDirent(),
                                    entry.relative_parent_path());
   }

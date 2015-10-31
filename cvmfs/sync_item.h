@@ -22,6 +22,7 @@ enum SyncItemType {
   kItemSymlink,
   kItemCharacterDevice,
   kItemNew,
+  kItemMarker,
   kItemUnknown
 };
 
@@ -55,10 +56,14 @@ class SyncItem {
   inline bool WasSymlink()        const { return WasType(kItemSymlink);        }
   inline bool IsNew()             const { return WasType(kItemNew);            }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
+  inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
+
+  bool HasGraftMarker()           const { return graft_marker_present_;        }
+  bool IsValidGraft()             const { return valid_graft_;                 }
 
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
@@ -128,7 +133,9 @@ class SyncItem {
    * @return               true if file type matches the expected type
    */
   inline bool IsType(const SyncItemType expected_type) const {
-    if (scratch_type_ == kItemUnknown) {
+    if (filename_.substr(0, 12) == ".cvmfsgraft-") {
+      scratch_type_ = kItemMarker;
+    } else if (scratch_type_ == kItemUnknown) {
       scratch_type_ = GetScratchFiletype();
     }
     return scratch_type_ == expected_type;
@@ -188,6 +195,9 @@ class SyncItem {
 
   SyncItemType GetGenericFiletype(const EntryStat &stat) const;
 
+  std::string GetGraftMarkerPath() const;
+  void CheckGraft();
+
   const SyncUnion *union_engine_;     /**< this SyncUnion created this object */
 
   mutable EntryStat rdonly_stat_;
@@ -197,8 +207,12 @@ class SyncItem {
   bool whiteout_;                     /**< SyncUnion marked this as whiteout  */
   bool opaque_;                       /**< SyncUnion marked this as opaque dir*/
   bool masked_hardlink_;              /**< SyncUnion masked out the linkcount */
+  bool valid_graft_;                  /**< checksum and size in graft marker */
+  bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
+
   std::string relative_parent_path_;
   std::string filename_;
+  ssize_t graft_size_;
 
   mutable SyncItemType scratch_type_;
   mutable SyncItemType rdonly_type_;
