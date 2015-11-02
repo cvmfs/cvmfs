@@ -23,7 +23,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
-const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", "-sha3", ""};
+const char *kAlgorithmIds[] =
+  {"", "", "-rmd160", "-sha256", "-sha3", "-shake128", ""};
 
 
 bool HexPtr::IsValid() const {
@@ -70,6 +71,8 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
     return kSha256;
   if (algorithm_option == "sha3")
     return kSha3;
+  if (algorithm_option == "shake128")
+    return kShake128;
   return kAny;
 }
 
@@ -89,6 +92,8 @@ Any MkFromHexPtr(const HexPtr hex, const char suffix) {
     result = Any(kSha256, hex);
   if ((length == 2*kDigestSizes[kSha3] + kAlgorithmIdSizes[kSha3]))
     result = Any(kSha3, hex);
+  if ((length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128]))
+    result = Any(kShake128, hex);
 
   result.suffix = suffix;
   return result;
@@ -109,6 +114,7 @@ unsigned GetContextSize(const Algorithms algorithm) {
     case kSha256:
       return sizeof(mbedtls_sha256_context);
     case kSha3:
+    case kShake128:
       return sizeof(Keccak_HashInstance);
     default:
       LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
@@ -145,6 +151,12 @@ void Init(ContextPtr context) {
         reinterpret_cast<Keccak_HashInstance *>(context.buffer));
       assert(keccak_result == SUCCESS);
       break;
+    case kShake128:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashInitialize_SHAKE128(
+        reinterpret_cast<Keccak_HashInstance *>(context.buffer));
+      assert(keccak_result == SUCCESS);
+      break;
     default:
       abort();  // Undefined hash
   }
@@ -177,6 +189,7 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
         buffer, buffer_length);
       break;
     case kSha3:
+    case kShake128:
       assert(context.size == sizeof(Keccak_HashInstance));
       keccak_result = Keccak_HashUpdate(reinterpret_cast<Keccak_HashInstance *>(
                         context.buffer), buffer, buffer_length * 8);
@@ -216,6 +229,15 @@ void Final(ContextPtr context, Any *any_digest) {
       keccak_result = Keccak_HashFinal(reinterpret_cast<Keccak_HashInstance *>(
                         context.buffer), any_digest->digest);
       assert(keccak_result == SUCCESS);
+      break;
+    case kShake128:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashFinal(reinterpret_cast<Keccak_HashInstance *>(
+                        context.buffer), NULL);
+      assert(keccak_result == SUCCESS);
+      keccak_result =
+        Keccak_HashSqueeze(reinterpret_cast<Keccak_HashInstance *>(
+          context.buffer), any_digest->digest, kDigestSizes[kShake128] * 8);
       break;
     default:
       abort();  // Undefined hash
