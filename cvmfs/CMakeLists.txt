@@ -179,6 +179,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   xattr.h xattr.cc
 
   swissknife_zpipe.h swissknife_zpipe.cc
+	swissknife_hash.h swissknife_hash.cc
   swissknife_check.h swissknife_check.cc
   swissknife_lsrepo.h swissknife_lsrepo.cc
   swissknife_pull.h swissknife_pull.cc
@@ -490,13 +491,13 @@ if (BUILD_SERVER)
       message (WARNING "Debug libraries of TBB were not found. Using the release versions instead.")
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
-    target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS} 
-		                         ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} 
-														 ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} 
-														 ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE} 
-														 ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE} 
-														 ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE} 
-														 ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES} 
+    target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS}
+		                         ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
+														 ${CURL_LIBRARIES} ${ZLIB_LIBRARIES}
+														 ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE}
+														 ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}
+														 ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE}
+														 ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}
 														 pthread dl)
   endif (BUILD_SERVER_DEBUG)
 endif (BUILD_SERVER)
@@ -537,10 +538,10 @@ if (BUILD_PRELOADER)
 	add_dependencies (cvmfs_preload_bin libsha3)
   add_dependencies (cvmfs_preload_bin libvjson)
 
-  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} 
-	                        ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES} 
-													${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} 
-													${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY} 
+  target_link_libraries(cvmfs_preload_bin ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
+	                        ${CURL_LIBRARIES} ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES}
+													${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
+													${ZLIB_ARCHIVE} ${TBB_LIBRARIES} ${RT_LIBRARY}
 													${VJSON_ARCHIVE} ${SHA2_ARCHIVE} ${SHA3_ARCHIVE}
 													pthread dl)
 endif (BUILD_PRELOADER)
