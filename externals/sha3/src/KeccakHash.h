@@ -23,6 +23,10 @@ typedef unsigned char BitSequence;
 typedef size_t DataLength;
 typedef enum { SUCCESS = 0, FAIL = 1, BAD_HASHLEN = 2 } HashReturn;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     Keccak_SpongeInstance sponge;
     unsigned int fixedOutputLength;
@@ -106,5 +110,9 @@ HashReturn Keccak_HashFinal(Keccak_HashInstance *hashInstance, BitSequence *hash
   * @return SUCCESS if successful, FAIL otherwise.
   */
 HashReturn Keccak_HashSqueeze(Keccak_HashInstance *hashInstance, BitSequence *data, DataLength databitlen);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -16,6 +16,10 @@ http://creativecommons.org/publicdomain/zero/1.0/
 #ifndef _SnP_Relaned_h_
 #define _SnP_Relaned_h_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Function to XOR data given as bytes into the state.
   * The bits to modify are restricted to be consecutive and to be in the same lane.
   * The bit positions that are affected by this function are
@@ -245,5 +249,9 @@ void SnP_ExtractAndXORLanes(const void *state, unsigned char *data, unsigned int
             } \
         } \
     }
+    
+#ifdef __cplusplus
+}
+#endif    
 
 #endif

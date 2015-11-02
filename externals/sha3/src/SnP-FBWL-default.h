@@ -18,9 +18,17 @@ http://creativecommons.org/publicdomain/zero/1.0/
 
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 size_t SnP_FBWL_Absorb_Default(void *state, unsigned int laneCount, const unsigned char *data, size_t dataByteLen, unsigned char trailingBits);
 size_t SnP_FBWL_Squeeze_Default(void *state, unsigned int laneCount, unsigned char *data, size_t dataByteLen);
 size_t SnP_FBWL_Wrap_Default(void *state, unsigned int laneCount, const unsigned char *dataIn, unsigned char *dataOut, size_t dataByteLen, unsigned char trailingBits);
 size_t SnP_FBWL_Unwrap_Default(void *state, unsigned int laneCount, const unsigned char *dataIn, unsigned char *dataOut, size_t dataByteLen, unsigned char trailingBits);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

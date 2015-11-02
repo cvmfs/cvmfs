@@ -13,6 +13,7 @@
 #include <cstdio>
 
 #include "sha2.h"
+#include "KeccakHash.h"
 
 using namespace std;  // NOLINT
 
@@ -22,7 +23,7 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
-const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", ""};
+const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", "-sha3", ""};
 
 
 bool HexPtr::IsValid() const {
@@ -67,6 +68,8 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
     return kRmd160;
   if (algorithm_option == "sha256")
     return kSha256;
+  if (algorithm_option == "sha3")
+    return kSha3;
   return kAny;
 }
 
@@ -84,6 +87,8 @@ Any MkFromHexPtr(const HexPtr hex, const char suffix) {
     result = Any(kRmd160, hex);
   if ((length == 2*kDigestSizes[kSha256] + kAlgorithmIdSizes[kSha256]))
     result = Any(kSha256, hex);
+  if ((length == 2*kDigestSizes[kSha3] + kAlgorithmIdSizes[kSha3]))
+    result = Any(kSha3, hex);
 
   result.suffix = suffix;
   return result;
@@ -102,7 +107,9 @@ unsigned GetContextSize(const Algorithms algorithm) {
     case kRmd160:
       return sizeof(RIPEMD160_CTX);
     case kSha256:
-      return sizeof(sha256_ctx);
+      return sizeof(mbedtls_sha256_context);
+    case kSha3:
+      return sizeof(Keccak_HashInstance);
     default:
       LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
                "context for unspecified hash. Aborting...");
@@ -111,6 +118,7 @@ unsigned GetContextSize(const Algorithms algorithm) {
 }
 
 void Init(ContextPtr context) {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -125,8 +133,17 @@ void Init(ContextPtr context) {
       RIPEMD160_Init(reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
     case kSha256:
-      assert(context.size == sizeof(sha256_ctx));
-      sha256_init(reinterpret_cast<sha256_ctx *>(context.buffer));
+      assert(context.size == sizeof(mbedtls_sha256_context));
+      mbedtls_sha256_init(
+        reinterpret_cast<mbedtls_sha256_context *>(context.buffer));
+      mbedtls_sha256_starts(
+        reinterpret_cast<mbedtls_sha256_context *>(context.buffer), false);
+      break;
+    case kSha3:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashInitialize_SHA3_256(
+        reinterpret_cast<Keccak_HashInstance *>(context.buffer));
+      assert(keccak_result == SUCCESS);
       break;
     default:
       abort();  // Undefined hash
@@ -136,6 +153,7 @@ void Init(ContextPtr context) {
 void Update(const unsigned char *buffer, const unsigned buffer_length,
             ContextPtr context)
 {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -153,9 +171,16 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
                        buffer, buffer_length);
       break;
     case kSha256:
-      assert(context.size == sizeof(sha256_ctx));
-      sha256_update(reinterpret_cast<sha256_ctx *>(context.buffer),
-                    buffer, buffer_length);
+      assert(context.size == sizeof(mbedtls_sha256_context));
+      mbedtls_sha256_update(
+        reinterpret_cast<mbedtls_sha256_context *>(context.buffer),
+        buffer, buffer_length);
+      break;
+    case kSha3:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashUpdate(reinterpret_cast<Keccak_HashInstance *>(
+                        context.buffer), buffer, buffer_length * 8);
+      assert(keccak_result == SUCCESS);
       break;
     default:
       abort();  // Undefined hash
@@ -163,6 +188,7 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
 }
 
 void Final(ContextPtr context, Any *any_digest) {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -180,9 +206,16 @@ void Final(ContextPtr context, Any *any_digest) {
                       reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
     case kSha256:
-      assert(context.size == sizeof(sha256_ctx));
-      sha256_final(reinterpret_cast<sha256_ctx *>(context.buffer),
-                   any_digest->digest);
+      assert(context.size == sizeof(mbedtls_sha256_context));
+      mbedtls_sha256_finish(
+        reinterpret_cast<mbedtls_sha256_context *>(context.buffer),
+        any_digest->digest);
+      break;
+    case kSha3:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashFinal(reinterpret_cast<Keccak_HashInstance *>(
+                        context.buffer), any_digest->digest);
+      assert(keccak_result == SUCCESS);
       break;
     default:
       abort();  // Undefined hash

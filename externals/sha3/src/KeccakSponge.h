@@ -32,6 +32,10 @@ http://creativecommons.org/publicdomain/zero/1.0/
 #define ALIGN
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
   * Structure that contains the sponge instance attributes for use with the
   * Keccak_Sponge* functions.
@@ -109,5 +113,9 @@ int Keccak_SpongeAbsorbLastFewBits(Keccak_SpongeInstance *spongeInstance, unsign
   * @return Zero if successful, 1 otherwise.
   */
 int Keccak_SpongeSqueeze(Keccak_SpongeInstance *spongeInstance, unsigned char *data, size_t dataByteLen);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -23,6 +23,10 @@ http://creativecommons.org/publicdomain/zero/1.0/
 #define KeccakF_stateSizeInBytes (KeccakF_width/8)
 #define KeccakF_1600
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void KeccakF1600_Initialize( void );
 void KeccakF1600_StateInitialize(void *state);
 void KeccakF1600_StateXORBytes(void *state, const unsigned char *data, unsigned int offset, unsigned int length);
@@ -36,5 +40,9 @@ size_t KeccakF1600_FBWL_Absorb(void *state, unsigned int laneCount, const unsign
 size_t KeccakF1600_FBWL_Squeeze(void *state, unsigned int laneCount, unsigned char *data, size_t dataByteLen);
 size_t KeccakF1600_FBWL_Wrap(void *state, unsigned int laneCount, const unsigned char *dataIn, unsigned char *dataOut, size_t dataByteLen, unsigned char trailingBits);
 size_t KeccakF1600_FBWL_Unwrap(void *state, unsigned int laneCount, const unsigned char *dataIn, unsigned char *dataOut, size_t dataByteLen, unsigned char trailingBits);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -38,6 +38,7 @@ enum Algorithms {
   kSha1,
   kRmd160,
   kSha256,
+  kSha3,
   kAny,
 };
 
@@ -54,7 +55,7 @@ const char kSuffixCertificate  = 'X';
  * Corresponds to Algorithms.  "Any" is the maximum of all the other
  * digest sizes.
  */
-const unsigned kDigestSizes[] = {16, 20, 20, 32, 32};
+const unsigned kDigestSizes[] = {16, 20, 20, 32, 32, 32};
 const unsigned kMaxDigestSize = 32;
 /**
  * Hex representations of hashes with the same length need a suffix
@@ -63,13 +64,13 @@ const unsigned kMaxDigestSize = 32;
  */
 extern const char *kAlgorithmIds[];
 // in hash.cc: const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", ""};
-const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 7, 0};
+const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 7, 5, 0};
 const unsigned kMaxAlgorithmIdentifierSize = 7;
 
 /**
  * Corresponds to Algorithms.  There is no block size for Any
  */
-const unsigned kBlockSizes[] = {64, 64, 64, 64};
+const unsigned kBlockSizes[] = {64, 64, 64, 136, 64};
 
 
 /**
@@ -376,6 +377,7 @@ struct Md5 : public Digest<16, kMd5> {
 struct Sha1 : public Digest<20, kSha1> { };
 struct Rmd160 : public Digest<20, kRmd160> { };
 struct Sha256 : public Digest<32, kSha256> { };
+struct Sha3 : public Digest<32, kSha3> { };
 
 /**
  * Any as such must not be used except for digest storage.
