@@ -22,10 +22,10 @@ class MerkleCatalogTreeIterator(cvmfs.CatalogTreeIterator):
 
 
 def usage():
-    print sys.argv[0] + "<repo url/path> <download destination> [<history depth>]"
+    print sys.argv[0] + " <repo url/path> <download destination> [<history depth>]"
     print "Downloads the whole catalog graph of a given repository."
     print "The optional <history depth> puts a threshold on how many historic"
-    print "catalog tree revisions should be downloaded (default: all)"
+    print "catalog tree revisions should be downloaded (default: 0 i.e. all)"
 
 if len(sys.argv) < 3 or len(sys.argv) > 4:
     usage()
