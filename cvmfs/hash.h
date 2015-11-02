@@ -17,6 +17,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <cctype>
 #include <string>
 
 #include "logging.h"
@@ -238,6 +239,37 @@ struct Digest {
     assert(result.length() == string_length);
     return result;
   }
+
+ /**
+  * Generates a hexified repesentation of the digest including the identifier
+  * string for newly added hashes.  Output is in the form of
+  * 'openssl x509 fingerprint', e.g. 00:AA:BB:...-SHA3
+  *
+  * @param with_suffix  append the hash suffix (C,H,X, ...) to the result
+  * @return             a string representation of the digest
+  */
+ std::string ToFingerprint(const bool with_suffix = false) const {
+   Hex hex(this);
+   const bool     use_suffix  = with_suffix && HasSuffix();
+   const unsigned string_length =
+     hex.length() + kDigestSizes[algorithm] - 1 + use_suffix;
+   std::string result(string_length, 0);
+
+   unsigned l = hex.length();
+   for (unsigned int hex_i = 0, result_i = 0; hex_i < l; ++hex_i, ++result_i) {
+     result[result_i] = toupper(hex[hex_i]);
+     if ((hex_i < 2 * kDigestSizes[algorithm] - 1) && (hex_i % 2 == 1)) {
+       result[++result_i] = ':';
+     }
+   }
+
+   if (use_suffix) {
+     result[string_length - 1] = suffix;
+   }
+
+   assert(result.length() == string_length);
+   return result;
+ }
 
   /**
    * Convenience method to generate a string representation of the digest.

@@ -429,6 +429,50 @@ TEST(T_Shash, ToStringWithSuffix) {
 }
 
 
+TEST(T_Shash, ToFingerprint) {
+  shash::Any md5(
+    shash::kMd5, shash::HexPtr("9fd52a9f04d1ac6735403d16d755c94a"), 'H');
+  EXPECT_EQ("9F:D5:2A:9F:04:D1:AC:67:35:40:3D:16:D7:55:C9:4A",
+            md5.ToFingerprint(false));
+  EXPECT_EQ("9F:D5:2A:9F:04:D1:AC:67:35:40:3D:16:D7:55:C9:4AH",
+            md5.ToFingerprint(true));
+
+  shash::Any
+    sha1(shash::kSha1,
+         shash::HexPtr("cf95c182bb9214bcb9a23fed6658c60d061b45b5"), 'F');
+  EXPECT_EQ("CF:95:C1:82:BB:92:14:BC:B9:A2:3F:ED:66:58:C6:0D:06:1B:45:B5",
+            sha1.ToFingerprint(false));
+  EXPECT_EQ("CF:95:C1:82:BB:92:14:BC:B9:A2:3F:ED:66:58:C6:0D:06:1B:45:B5F",
+            sha1.ToFingerprint(true));
+
+  shash::Any
+    rmd160(shash::kRmd160,
+           shash::HexPtr("5a6e43fe25f5988160a07ff1fb200b29e6c10ad0"), 'M');
+  EXPECT_EQ("5A:6E:43:FE:25:F5:98:81:60:A0:7F:F1:FB:20:0B:29:E6:C1:0A:D0"
+            "-RMD160", rmd160.ToFingerprint(false));
+  EXPECT_EQ("5A:6E:43:FE:25:F5:98:81:60:A0:7F:F1:FB:20:0B:29:E6:C1:0A:D0"
+            "-RMD160M", rmd160.ToFingerprint(true));
+
+  shash::Any sha256(shash::kSha256, shash::HexPtr(
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a595d878162130f7486f8a5aa"), 'Q');
+  EXPECT_EQ("EA:99:BE:F9:23:DD:71:7D:F9:30:96:39:B9:48:0B:BD:F1:4F:1D:2A:59:5D:"
+            "87:81:62:13:0F:74:86:F8:A5:AA-SHA256",
+            sha256.ToFingerprint(false));
+  EXPECT_EQ("EA:99:BE:F9:23:DD:71:7D:F9:30:96:39:B9:48:0B:BD:F1:4F:1D:2A:59:5D:"
+            "87:81:62:13:0F:74:86:F8:A5:AA-SHA256Q",
+            sha256.ToFingerprint(true));
+
+  shash::Any sha3(shash::kSha3, shash::HexPtr(
+    "ea99bef923dd717df9309639b9480bbdf14f1d2a595d878162130f7486f8a5aa"), 'C');
+  EXPECT_EQ("EA:99:BE:F9:23:DD:71:7D:F9:30:96:39:B9:48:0B:BD:F1:4F:1D:2A:59:5D:"
+            "87:81:62:13:0F:74:86:F8:A5:AA-SHA3",
+            sha3.ToFingerprint(false));
+  EXPECT_EQ("EA:99:BE:F9:23:DD:71:7D:F9:30:96:39:B9:48:0B:BD:F1:4F:1D:2A:59:5D:"
+            "87:81:62:13:0F:74:86:F8:A5:AA-SHA3C",
+            sha3.ToFingerprint(true));
+}
+
+
 TEST(T_Shash, InitializeAnyWithSuffix) {
   shash::Any hash_md5(
     shash::kMd5, shash::HexPtr("9fd52a9f04d1ac6735403d16d755c94a"), 'H');
