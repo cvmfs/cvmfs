@@ -16,6 +16,7 @@
 
 /* compress or decompress from stdin to stdout */
 int swissknife::CommandHash::Main(const swissknife::ArgumentList &args) {
+  bool fingerprint = (args.find('f') != args.end());
   shash::Any hash(shash::ParseHashAlgorithm(*args.find('a')->second));
 
   shash::ContextPtr context_ptr(hash.algorithm);
@@ -28,7 +29,8 @@ int swissknife::CommandHash::Main(const swissknife::ArgumentList &args) {
     shash::Update(buf, n, context_ptr);
   }
   shash::Final(context_ptr, &hash);
-  LogCvmfs(kLogCvmfs, kLogStdout, "%s", hash.ToString().c_str());
+  LogCvmfs(kLogCvmfs, kLogStdout, "%s", fingerprint ?
+           hash.ToFingerprint().c_str() : hash.ToString().c_str());
 
   return 0;
 }

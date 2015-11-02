@@ -21,6 +21,7 @@ class CommandHash : public Command {
   ParameterList GetParams() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('a', "hash algorithm"));
+    r.push_back(Parameter::Switch('f', "print in fingerprint representation"));
     return r;
   }
   int Main(const ArgumentList &args);
