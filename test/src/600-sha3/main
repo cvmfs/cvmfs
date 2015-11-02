@@ -54,7 +54,7 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   find /cvmfs/$CVMFS_TEST_REPO -type f -exec cat {} \; >/dev/null || return 10
-  sudo find /var/spool/cvmfs/$CVMFS_TEST_REPO/cache -type f | grep sha256 || return 11
+  sudo find /var/spool/cvmfs/$CVMFS_TEST_REPO/cache -type f | grep sha3 || return 11
 
   local mnt_point="$(pwd)/mountpoint"
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
@@ -74,7 +74,7 @@ cvmfs_run_test() {
   check_repository $replica_name -i || { desaster_cleanup $mnt_point $replica_name; return $?; }
 
   echo "changing hash algorithm to sha1"
-  sudo sed -i -e 's/CVMFS_HASH_ALGORITHM=sha256/CVMFS_HASH_ALGORITHM=sha1/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
+  sudo sed -i -e 's/CVMFS_HASH_ALGORITHM=sha3/CVMFS_HASH_ALGORITHM=sha1/' /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/server.conf
   start_transaction $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 20; }
   echo sha1-hashed > /cvmfs/$CVMFS_TEST_REPO/sha1-hashed
   publish_repo $CVMFS_TEST_REPO || { desaster_cleanup $mnt_point $replica_name; return 21; }
@@ -83,7 +83,7 @@ cvmfs_run_test() {
   echo "checking if the hash algorithm was changed"
   local manifest_url="$(get_repo_url $CVMFS_TEST_REPO)/.cvmfspublished"
   echo "Manifest URL: $manifest_url"
-  [ -z $(curl "$manifest_url" | grep -e '^C.*sha256$') ] || { desaster_cleanup $mnt_point $replica_name; return 23; }
+  [ -z $(curl "$manifest_url" | grep -e '^C.*sha3$') ] || { desaster_cleanup $mnt_point $replica_name; return 23; }
 
   echo "replicating mixed hashes"
   sudo cvmfs_server snapshot $replica_name || { desaster_cleanup $mnt_point $replica_name; return 24; }
