@@ -71,7 +71,7 @@ const unsigned kMaxAlgorithmIdentifierSize = 7;
 /**
  * Corresponds to Algorithms.  There is no block size for Any
  */
-const unsigned kBlockSizes[] = {64, 64, 64, 136, 64};
+const unsigned kBlockSizes[] = {64, 64, 64, 64, 136};
 
 
 /**

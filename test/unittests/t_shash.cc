@@ -1056,3 +1056,48 @@ TEST(T_Shash, GreaterThan) {
     sha3("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
     sha3("0000000000000000000000000000000000000000000000000000000000000000"));
 }
+
+TEST(T_Shash, Hmac) {
+  const unsigned char *fox = reinterpret_cast<const unsigned char *>(
+    "The quick brown fox jumps over the lazy dog");
+  unsigned len_fox = strlen("The quick brown fox jumps over the lazy dog");
+  const unsigned char *question = reinterpret_cast<const unsigned char *>(
+    "what do ya want for nothing?");
+  unsigned len_question = strlen("what do ya want for nothing?");
+
+  shash::Any md5(shash::kMd5);
+  shash::Any sha1(shash::kSha1);
+  shash::Any rmd160(shash::kRmd160);
+  shash::Any sha256(shash::kSha256);
+  // HMAC construction not really necessary for sha3
+  shash::Any sha3(shash::kSha3);
+
+  shash::Hmac("", NULL, 0, &md5);
+  EXPECT_EQ("74e6f7298a9c2d168935f58c001bad88", md5.ToString());
+  shash::Hmac("", NULL, 0, &sha1);
+  EXPECT_EQ("fbdb1d1b18aa6c08324b7d64b71fb76370690e1d", sha1.ToString());
+  shash::Hmac("", NULL, 0, &rmd160);
+  EXPECT_EQ(
+    "44d86b658a3e7cbc1a2010848b53e35c917720ca-rmd160", rmd160.ToString());
+  shash::Hmac("", NULL, 0, &sha256);
+  EXPECT_EQ(
+    "b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad-sha256",
+    sha256.ToString());
+
+ shash::Hmac("key", fox, len_fox, &md5);
+ EXPECT_EQ("80070713463e7749b90c2dc24911e275", md5.ToString());
+ shash::Hmac("key", fox, len_fox, &sha1);
+ EXPECT_EQ("de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9", sha1.ToString());
+ shash::Hmac("key", fox, len_fox, &rmd160);
+ EXPECT_EQ(
+   "50278a77d4d7670561ab72e867383aef6ce50b3e-rmd160", rmd160.ToString());
+ shash::Hmac("key", fox, len_fox, &sha256);
+ EXPECT_EQ(
+   "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8-sha256",
+   sha256.ToString());
+
+  shash::Hmac("Jefe", question, len_question, &sha3);
+  EXPECT_EQ(
+    "c7d4072e788877ae3596bbb0da73b887c9171f93095b294ae857fbe2645e1ba5-sha3",
+    sha3.ToString());
+}
