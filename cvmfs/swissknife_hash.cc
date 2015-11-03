@@ -14,7 +14,7 @@
 #include "hash.h"
 #include "logging.h"
 
-/* compress or decompress from stdin to stdout */
+// Hash stdin and print the digest to stdout
 int swissknife::CommandHash::Main(const swissknife::ArgumentList &args) {
   bool fingerprint = (args.find('f') != args.end());
   shash::Any hash(shash::ParseHashAlgorithm(*args.find('a')->second));
