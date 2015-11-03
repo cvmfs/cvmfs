@@ -57,24 +57,30 @@ const char kSuffixCertificate  = 'X';
  * Corresponds to Algorithms.  "Any" is the maximum of all the other
  * digest sizes.
  */
-const unsigned kDigestSizes[] = {16, 20, 20, 32, 32, 20, 32};
+const unsigned kDigestSizes[] =
+  {16,  20,   20,     32,     32,       20,       32};
+// Md5  Sha1  Rmd160  Sha256  Sha3-256  Shake128  Any
 const unsigned kMaxDigestSize = 32;
+
 /**
  * Hex representations of hashes with the same length need a suffix
  * to be distinguished from each other.  They should all have one but
- * for backwards compatibility MD5 and SHA-1 have none.
+ * for backwards compatibility MD5 and SHA-1 have none.  Initialized in hash.cc
+ * like const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", ...
  */
 extern const char *kAlgorithmIds[];
-// in hash.cc: const char *kAlgorithmIds[] = {"", "", "-rmd160", "-sha256", ...
-const unsigned kAlgorithmIdSizes[] = {0, 0, 7, 7, 5, 9, 0};
+const unsigned kAlgorithmIdSizes[] =
+  {0,   0,    7,       7,       5,     9,         0};
+// Md5  Sha1  -rmd160  -sha256  -sha3  -shake128  Any
 const unsigned kMaxAlgorithmIdentifierSize = 9;
 
 /**
  * Corresponds to Algorithms.  There is no block size for Any.
  * Is an HMAC for SHAKE well-defined?
  */
-const unsigned kBlockSizes[] = {64, 64, 64, 64, 136, 168};
-
+const unsigned kBlockSizes[] =
+  {64,  64,   64,     64,     136,  168};
+// Md5  Sha1  Rmd160  Sha256  Sha3  Shake128
 
 /**
  * Distinguishes between interpreting a string as hex hash and hashing over
