@@ -66,15 +66,20 @@ void Spooler::ProcessHistory(const std::string &local_path) {
   file_processor_->Process(local_path, false, shash::kSuffixHistory);
 }
 
-void Spooler::ProcessCertificate(const std::string &local_path) {
-  file_processor_->Process(local_path, false, shash::kSuffixCertificate);
+void Spooler::ProcessCertificate(const std::string &local_path,
+    const std::string &alt_path)
+{
+  file_processor_->Process(local_path, false, shash::kSuffixCertificate,
+                           alt_path);
 }
 
 
 void Spooler::Upload(const std::string &local_path,
-                     const std::string &remote_path) {
+                     const std::string &remote_path,
+                     const std::string &alt_path) {
   uploader_->Upload(local_path,
                     remote_path,
+                    alt_path,
                     AbstractUploader::MakeCallback(&Spooler::UploadingCallback,
                                                    this));
 }

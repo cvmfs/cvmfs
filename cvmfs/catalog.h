@@ -170,6 +170,7 @@ class Catalog : public SingleCopy {
 
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
+  bool GetVOMSAuthz(std::string &) const;
   uint64_t GetLastModified() const;
   uint64_t GetNumEntries() const;
   uint64_t GetNumChunks() const;
@@ -272,6 +273,14 @@ class Catalog : public SingleCopy {
   NestedCatalogMap children_;
   mutable NestedCatalogList nested_catalog_cache_;
   mutable bool              nested_catalog_cache_dirty_;
+
+  enum VomsAuthzLookup {
+    Unknown,
+    None,
+    Present
+  };
+  mutable VomsAuthzLookup voms_authz_status_;
+  mutable std::string voms_authz_;
 
   bool initialized_;
   InodeRange inode_range_;

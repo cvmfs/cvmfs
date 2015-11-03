@@ -36,7 +36,8 @@ class Manifest {
            const shash::Any certificate,
            const shash::Any history,
            const uint64_t publish_timestamp,
-           const bool garbage_collectable) :
+           const bool garbage_collectable,
+           const std::string &alt_catalog_path) :
     catalog_hash_(catalog_hash),
     catalog_size_(catalog_size),
     root_path_(root_path),
@@ -44,6 +45,7 @@ class Manifest {
     revision_(revision),
     micro_catalog_hash_(micro_catalog_hash),
     repository_name_(repository_name),
+    alt_catalog_path_(alt_catalog_path),
     certificate_(certificate),
     history_(history),
     publish_timestamp_(publish_timestamp),
@@ -82,6 +84,9 @@ class Manifest {
   void set_garbage_collectability(const bool garbage_collectable) {
     garbage_collectable_ = garbage_collectable;
   }
+  void set_alt_catalog_path(const std::string &alt_path) {
+    alt_catalog_path_ = alt_path;
+  }
 
   uint64_t revision() const { return revision_; }
   std::string repository_name() const { return repository_name_; }
@@ -92,6 +97,7 @@ class Manifest {
   shash::Any history() const { return history_; }
   uint64_t publish_timestamp() const { return publish_timestamp_; }
   bool garbage_collectable() const { return garbage_collectable_; }
+  const std::string &alt_catalog_path() const { return alt_catalog_path_; }
 
  private:
   static Manifest *Load(const std::map<char, std::string> &content);
@@ -102,6 +108,7 @@ class Manifest {
   uint64_t revision_;
   shash::Any micro_catalog_hash_;
   std::string repository_name_;
+  std::string alt_catalog_path_;
   shash::Any certificate_;
   shash::Any history_;
   uint64_t publish_timestamp_;

@@ -61,6 +61,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   uint64_t catalog_size = 0;
   shash::Any micro_catalog_hash;
   string repository_name;
+  std::string alt_catalog_path;
   shash::Any certificate;
   shash::Any history;
   uint64_t publish_timestamp = 0;
@@ -73,6 +74,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
                                       shash::kSuffixMicroCatalog);
   if ((iter = content.find('N')) != content.end())
     repository_name = iter->second;
+  if ((iter = content.find('A')) != content.end())
+    alt_catalog_path = iter->second;
   if ((iter = content.find('X')) != content.end())
     certificate = MkFromHexPtr(shash::HexPtr(iter->second),
                                shash::kSuffixCertificate);
@@ -86,7 +89,8 @@ Manifest *Manifest::Load(const map<char, string> &content) {
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
-                      history, publish_timestamp, garbage_collectable);
+                      history, publish_timestamp, garbage_collectable,
+                      alt_catalog_path);
 }
 
 
@@ -120,6 +124,8 @@ string Manifest::ExportString() const {
     manifest += "L" + micro_catalog_hash_.ToString() + "\n";
   if (repository_name_ != "")
     manifest += "N" + repository_name_ + "\n";
+  if (alt_catalog_path_ != "")
+    manifest += "A" + alt_catalog_path_ + "\n";
   if (!certificate_.IsNull())
     manifest += "X" + certificate_.ToString() + "\n";
   if (!history_.IsNull())
