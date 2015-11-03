@@ -124,7 +124,6 @@ docker_build_script="${docker_source_location}/ci/$(basename $build_script)"
 [ -f $build_script ] || die "build script $build_script not found"
 [ -x $build_script ] || die "build script $build_script not executable"
 
-args="${docker_source_location} ${docker_build_location}"
 while [ $# -gt 0 ]; do
   if echo "$1" | grep -q "[[:space:]]"; then
     args="$args \"$1\""
