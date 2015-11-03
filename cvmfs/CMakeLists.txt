@@ -252,6 +252,7 @@ set (CVMFS_PRELOADER_SOURCES
   dns.cc dns.h
   dirtab.cc dirtab.h
   catalog.cc catalog.h
+  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
   preload.cc
 )
 
