@@ -28,6 +28,7 @@
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
+#include "swissknife_hash.h"
 
 using namespace std;  // NOLINT
 
@@ -97,6 +98,7 @@ int main(int argc, char **argv) {
   swissknife::command_list.push_back(new swissknife::CommandListCatalogs());
   swissknife::command_list.push_back(new swissknife::CommandPull());
   swissknife::command_list.push_back(new swissknife::CommandZpipe());
+  swissknife::command_list.push_back(new swissknife::CommandHash());
   swissknife::command_list.push_back(new swissknife::CommandInfo());
   swissknife::command_list.push_back(new swissknife::CommandVersion());
   swissknife::command_list.push_back(new swissknife::CommandMigrate());

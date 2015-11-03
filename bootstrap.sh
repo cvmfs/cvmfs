@@ -100,6 +100,7 @@ do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 do_copy     "sqlite3"
 do_copy     "vjson"
 do_copy     "sha2"
+do_copy     "sha3"
 
 patch_external "leveldb"     "dont_search_snappy.patch"           \
                              "dont_search_tcmalloc.patch"

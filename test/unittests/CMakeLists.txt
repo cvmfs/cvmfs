@@ -216,6 +216,7 @@ endif (BUILD_UNITTESTS)
 add_dependencies (${PROJECT_TEST_NAME} googletest)
 add_dependencies (${PROJECT_TEST_NAME} sparsehash)
 add_dependencies (${PROJECT_TEST_NAME} libsha2)
+add_dependencies (${PROJECT_TEST_NAME} libsha3)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
 add_dependencies (check ${PROJECT_TEST_NAME})
 
@@ -270,6 +271,7 @@ if (BUILD_UNITTESTS_DEBUG)
   endif (TBB_PRIVATE_LIB)
   
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha2)
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha3)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -288,7 +290,8 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${SHA2_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} pthread dl)
+                             ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} 
+                             pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 

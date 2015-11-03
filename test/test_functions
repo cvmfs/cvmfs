@@ -1218,9 +1218,10 @@ _resign_legacy_repository() {
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$repo_name" >> ${whitelist}.unsigned
-  openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${repo_name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned || return 2
+  openssl x509 -in /etc/cvmfs/keys/${repo_name}.crt -outform der | \
+    cvmfs_swissknife hash -a sha1 -f >> ${whitelist}.unsigned || return 2
   local hash;
-  hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
+  hash=`cat ${whitelist}.unsigned | cvmfs_swissknife hash -a sha1`
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash

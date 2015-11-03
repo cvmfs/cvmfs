@@ -1523,24 +1523,11 @@ create_whitelist() {
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='+30 days' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$name" >> ${whitelist}.unsigned
-  if [ "x$CVMFS_HASH_ALGORITHM" = "xrmd160" ]; then
-    fingerprint="$(openssl x509 -fingerprint -rmd160 -in /etc/cvmfs/keys/${name}.crt | grep 'RIPEMD160 Fingerprint' | sed 's/RIPEMD160 Fingerprint=//')-RMD160"
-    echo "$fingerprint" >> ${whitelist}.unsigned
-  elif [ "x$CVMFS_HASH_ALGORITHM" = "xsha256" ]; then
-    fingerprint="$(openssl x509 -fingerprint -sha256 -in /etc/cvmfs/keys/${name}.crt | grep 'SHA256 Fingerprint' | sed 's/SHA256 Fingerprint=//')-SHA256"
-    echo "$fingerprint" >> ${whitelist}.unsigned
-  else
-    openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
-  fi
+  openssl x509 -in /etc/cvmfs/keys/${name}.crt -outform der | \
+    __swissknife hash -a $CVMFS_HASH_ALGORITHM -f >> ${whitelist}.unsigned
 
   local hash;
-  if [ "x$CVMFS_HASH_ALGORITHM" = "xrmd160" ]; then
-    hash="`openssl rmd160 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`-rmd160"
-  elif [ "x$CVMFS_HASH_ALGORITHM" = "xsha256" ]; then
-    hash="`cat ${whitelist}.unsigned | sha256sum | tr -d '\n' | head -c64`-sha256"
-  else
-    hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
-  fi
+  hash="`cat ${whitelist}.unsigned | __swissknife hash -a $CVMFS_HASH_ALGORITHM`"
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash

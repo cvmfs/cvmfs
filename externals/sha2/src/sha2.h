@@ -1,108 +1,141 @@
-/*
- * FIPS 180-2 SHA-224/256/384/512 implementation
- * Last update: 02/02/2007
- * Issue date:  04/30/2005
+/**
+ * \file mbedtls_sha256.h
  *
- * Copyright (C) 2005, 2007 Olivier Gay <olivier.gay@a3.epfl.ch>
- * All rights reserved.
+ * \brief SHA-224 and SHA-256 cryptographic hash function
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the project nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
+ *  SPDX-License-Identifier: Apache-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may
+ *  not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  This file is part of mbed TLS (https://tls.mbed.org)
  */
+#ifndef MBEDTLS_SHA256_H
+#define MBEDTLS_SHA256_H
 
-#ifndef SHA2_H
-#define SHA2_H
+//#if !defined(MBEDTLS_CONFIG_FILE)
+//#include "config.h"
+//#else
+//#include MBEDTLS_CONFIG_FILE
+//#endif
 
-#define SHA224_DIGEST_SIZE ( 224 / 8)
-#define SHA256_DIGEST_SIZE ( 256 / 8)
-#define SHA384_DIGEST_SIZE ( 384 / 8)
-#define SHA512_DIGEST_SIZE ( 512 / 8)
+#include <stddef.h>
+#include <stdint.h>
 
-#define SHA256_BLOCK_SIZE  ( 512 / 8)
-#define SHA512_BLOCK_SIZE  (1024 / 8)
-#define SHA384_BLOCK_SIZE  SHA512_BLOCK_SIZE
-#define SHA224_BLOCK_SIZE  SHA256_BLOCK_SIZE
-
-#ifndef SHA2_TYPES
-#define SHA2_TYPES
-typedef unsigned char uint8;
-typedef unsigned int  uint32;
-typedef unsigned long long uint64;
-#endif
+#if !defined(MBEDTLS_SHA256_ALT)
+// Regular implementation
+//
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct {
-    unsigned int tot_len;
-    unsigned int len;
-    unsigned char block[2 * SHA256_BLOCK_SIZE];
-    uint32 h[8];
-} sha256_ctx;
+/**
+ * \brief          SHA-256 context structure
+ */
+typedef struct
+{
+    uint32_t total[2];          /*!< number of bytes processed  */
+    uint32_t state[8];          /*!< intermediate digest state  */
+    unsigned char buffer[64];   /*!< data block being processed */
+    int is224;                  /*!< 0 => SHA-256, else SHA-224 */
+}
+mbedtls_sha256_context;
 
-typedef struct {
-    unsigned int tot_len;
-    unsigned int len;
-    unsigned char block[2 * SHA512_BLOCK_SIZE];
-    uint64 h[8];
-} sha512_ctx;
+/**
+ * \brief          Initialize SHA-256 context
+ *
+ * \param ctx      SHA-256 context to be initialized
+ */
+void mbedtls_sha256_init( mbedtls_sha256_context *ctx );
 
-typedef sha512_ctx sha384_ctx;
-typedef sha256_ctx sha224_ctx;
+/**
+ * \brief          Clear SHA-256 context
+ *
+ * \param ctx      SHA-256 context to be cleared
+ */
+void mbedtls_sha256_free( mbedtls_sha256_context *ctx );
 
-void sha224_init(sha224_ctx *ctx);
-void sha224_update(sha224_ctx *ctx, const unsigned char *message,
-                   unsigned int len);
-void sha224_final(sha224_ctx *ctx, unsigned char *digest);
-void sha224(const unsigned char *message, unsigned int len,
-            unsigned char *digest);
+/**
+ * \brief          Clone (the state of) a SHA-256 context
+ *
+ * \param dst      The destination context
+ * \param src      The context to be cloned
+ */
+void mbedtls_sha256_clone( mbedtls_sha256_context *dst,
+                           const mbedtls_sha256_context *src );
 
-void sha256_init(sha256_ctx * ctx);
-void sha256_update(sha256_ctx *ctx, const unsigned char *message,
-                   unsigned int len);
-void sha256_final(sha256_ctx *ctx, unsigned char *digest);
-void sha256(const unsigned char *message, unsigned int len,
-            unsigned char *digest);
+/**
+ * \brief          SHA-256 context setup
+ *
+ * \param ctx      context to be initialized
+ * \param is224    0 = use SHA256, 1 = use SHA224
+ */
+void mbedtls_sha256_starts( mbedtls_sha256_context *ctx, int is224 );
 
-void sha384_init(sha384_ctx *ctx);
-void sha384_update(sha384_ctx *ctx, const unsigned char *message,
-                   unsigned int len);
-void sha384_final(sha384_ctx *ctx, unsigned char *digest);
-void sha384(const unsigned char *message, unsigned int len,
-            unsigned char *digest);
+/**
+ * \brief          SHA-256 process buffer
+ *
+ * \param ctx      SHA-256 context
+ * \param input    buffer holding the  data
+ * \param ilen     length of the input data
+ */
+void mbedtls_sha256_update( mbedtls_sha256_context *ctx, const unsigned char *input,
+                    size_t ilen );
 
-void sha512_init(sha512_ctx *ctx);
-void sha512_update(sha512_ctx *ctx, const unsigned char *message,
-                   unsigned int len);
-void sha512_final(sha512_ctx *ctx, unsigned char *digest);
-void sha512(const unsigned char *message, unsigned int len,
-            unsigned char *digest);
+/**
+ * \brief          SHA-256 final digest
+ *
+ * \param ctx      SHA-256 context
+ * \param output   SHA-224/256 checksum result
+ */
+void mbedtls_sha256_finish( mbedtls_sha256_context *ctx, unsigned char output[32] );
+
+/* Internal use */
+void mbedtls_sha256_process( mbedtls_sha256_context *ctx, const unsigned char data[64] );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* !SHA2_H */
+#else  /* MBEDTLS_SHA256_ALT */
+#include "sha256_alt.h"
+#endif /* MBEDTLS_SHA256_ALT */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * \brief          Output = SHA-256( input buffer )
+ *
+ * \param input    buffer holding the  data
+ * \param ilen     length of the input data
+ * \param output   SHA-224/256 checksum result
+ * \param is224    0 = use SHA256, 1 = use SHA224
+ */
+void mbedtls_sha256( const unsigned char *input, size_t ilen,
+           unsigned char output[32], int is224 );
+
+/**
+ * \brief          Checkup routine
+ *
+ * \return         0 if successful, or 1 if the test failed
+ */
+int mbedtls_sha256_self_test( int verbose );
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* mbedtls_sha256.h */
