@@ -96,9 +96,6 @@ class Chunk {
   shash::ContextPtr& content_hash_context() { return content_hash_context_; }
   const shash::Any&  content_hash() const { return content_hash_; }
   zlib::Compressor*   compressor() { return compressor_.weak_ref(); }
-  const zlib::Algorithms get_compression_algorithm() const { 
-    return compression_algorithm_; 
-  }
 
   UploadStreamHandle* upload_stream_handle() const {
     return upload_stream_handle_;

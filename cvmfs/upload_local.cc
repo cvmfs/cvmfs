@@ -54,8 +54,7 @@ void LocalUploader::WorkerThread() {
                job.callback);
         break;
       case UploadJob::Commit:
-        FinalizeStreamedUpload( job.stream_handle, job.content_hash, 
-                                job.compression_algorithm);
+        FinalizeStreamedUpload(job.stream_handle, job.content_hash);
         break;
       case UploadJob::Terminate:
         running = false;
@@ -178,9 +177,7 @@ void LocalUploader::Upload(UploadStreamHandle  *handle,
 
 
 void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
-                                           const shash::Any    &content_hash,
-                                           const zlib::Algorithms 
-                                           compression_algorithm) {
+                                           const shash::Any    &content_hash) {
   int retval = 0;
   LocalStreamHandle *local_handle = static_cast<LocalStreamHandle*>(handle);
 
@@ -195,7 +192,7 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
     return;
   }
 
-  const std::string final_path = "data/" + content_hash.MakePath() + "@" + zlib::CompressionAlgToId(compression_algorithm);
+  const std::string final_path = "data/" + content_hash.MakePath();
   if (!Peek(final_path)) {
     retval = Move(local_handle->temporary_path, final_path);
     if (retval != 0) {

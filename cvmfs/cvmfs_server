@@ -1572,7 +1572,7 @@ create_whitelist() {
   chown $user $whitelist
 
   rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
-  __swissknife upload -i $whitelist -o .cvmfswhitelist\@1 -r $spooler_definition
+  __swissknife upload -i $whitelist -o .cvmfswhitelist -r $spooler_definition
   rm -f $whitelist
   echo "done"
 }
@@ -1608,7 +1608,7 @@ get_expiry_from_string() {
 get_expiry() {
   local name=$1
   local stratum0=$2
-  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist\@1 'noproxy')"
+  get_expiry_from_string "$(get_item $name $stratum0/.cvmfswhitelist 'noproxy')"
 }
 
 

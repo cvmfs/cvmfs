@@ -148,7 +148,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   manifest->set_garbage_collectability(garbage_collectable);
 
   // Upload catalog
-  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath() + "@" + CompressionAlgToId(zlib::kZlibDefault));
+  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath());
   spooler->WaitForUpload();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
@@ -825,7 +825,7 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 
   // Upload catalog
   spooler_->Upload(catalog->database_path() + ".compressed",
-                   "data/" + hash_catalog.MakePath() + "@" + CompressionAlgToId(zlib::kZlibDefault));
+                   "data/" + hash_catalog.MakePath());
 
   // Update registered catalog hash in nested catalog
   if (catalog->HasParent()) {

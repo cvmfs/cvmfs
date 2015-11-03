@@ -134,11 +134,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   spooler->WaitForUpload();
   delete spooler;
-  
-  // Add the compression alg to the manifest
-  std::string new_manifest_path = manifest_path + "@" + CompressionAlgToId(zlib::kNoCompression);
 
-  if (!manifest->Export(new_manifest_path)) {
+  if (!manifest->Export(manifest_path)) {
     PrintError("Failed to create new repository");
     delete manifest;
     return 5;

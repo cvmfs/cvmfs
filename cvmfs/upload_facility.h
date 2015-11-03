@@ -84,10 +84,9 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
       type(Upload), stream_handle(handle), buffer(buffer), callback(callback) {}
 
     UploadJob(UploadStreamHandle  *handle,
-              const shash::Any    &content_hash,
-              const zlib::Algorithms compression_algorithm) :
+              const shash::Any    &content_hash) :
       type(Commit), stream_handle(handle), buffer(NULL), callback(NULL),
-      content_hash(content_hash), compression_algorithm(compression_algorithm) {}
+      content_hash(content_hash) {}
 
     UploadJob() :
       type(Terminate), stream_handle(NULL), buffer(NULL), callback(NULL) {}
@@ -101,10 +100,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
     // type=Commit specific fields
     shash::Any           content_hash;
-    
-    // type=Commit specific fields
-    zlib::Algorithms     compression_algorithm;
-    
   };
 
  public:
@@ -194,13 +189,11 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *
    * @param handle        Pointer to a previously acquired UploadStreamHandle
    * @param content_hash  the content hash of the full uploaded data Chunk
-   * @param compression_algorithm The compression algorithm used for this chunk
    */
   void ScheduleCommit(UploadStreamHandle   *handle,
-                      const shash::Any     &content_hash,
-                      const zlib::Algorithms compression_algorithm) {
+                      const shash::Any     &content_hash) {
     ++jobs_in_flight_;
-    upload_queue_.push(UploadJob(handle, content_hash, compression_algorithm));
+    upload_queue_.push(UploadJob(handle, content_hash));
   }
 
 

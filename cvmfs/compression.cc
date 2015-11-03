@@ -18,7 +18,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
-#include <sstream>
 
 #include "hash.h"
 #include "logging.h"
@@ -133,13 +132,6 @@ Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
   if (algorithm_option == "none")
     return kNoCompression;
   return kUnknown;
-}
-
-std::string CompressionAlgToId(const Algorithms compression_algorithm) {
-  ostringstream convert;
-  convert << compression_algorithm;
-  return convert.str();
-  
 }
 
 void CompressInit(z_stream *strm) {

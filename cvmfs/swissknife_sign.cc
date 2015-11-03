@@ -120,7 +120,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     return 2;
   }
 
-  manifest_path += "@" + CompressionAlgToId(zlib::kNoCompression);
+
   LogCvmfs(kLogCvmfs, kLogStdout, "Signing %s", manifest_path.c_str());
   {
     // Load Manifest
@@ -197,9 +197,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     fclose(fmanifest);
 
     // Upload manifest
-    std::string manifest_file(".cvmfspublished");
-    manifest_file += + "@" + CompressionAlgToId(zlib::kNoCompression);
-    spooler->Upload(manifest_path, manifest_file);
+    spooler->Upload(manifest_path, ".cvmfspublished");
     spooler->WaitForUpload();
 
     unlink(manifest_path.c_str());

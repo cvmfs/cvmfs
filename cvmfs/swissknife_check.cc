@@ -628,8 +628,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   // Validate Manifest
-  const string certificate_path = "data/" + manifest->certificate().MakePath() +
-                                  "@" + CompressionAlgToId(zlib::kZlibDefault);
+  const string certificate_path = "data/" + manifest->certificate().MakePath();
   if (!Exists(certificate_path)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to find certificate (%s)",
              certificate_path.c_str());

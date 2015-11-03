@@ -866,11 +866,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   if (info->probe_hosts && opt_host_chain_)
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
 
-  // Add the compression algorithm id to the end
   string url = url_prefix + *(info->url);
-  if (info->compression_alg != zlib::kUnknown) {
-    url += "@" + zlib::CompressionAlgToId(info->compression_alg);
-  }
   if (url.find("@proxy@") != string::npos) {
     string replacement;
     if (proxy_template_forced_ != "") {
@@ -1876,7 +1872,7 @@ void DownloadManager::ProbeHosts() {
   // Stopwatch, two times to fill caches first
   unsigned i, retries;
   string url;
-  JobInfo info(&url, zlib::kUnknown, false, NULL);
+  JobInfo info(&url, false, false, NULL);
   for (retries = 0; retries < 2; ++retries) {
     for (i = 0; i < host_chain.size(); ++i) {
       url = host_chain[i] + "/.cvmfspublished";
@@ -1966,7 +1962,7 @@ bool DownloadManager::ProbeGeo() {
     string url = host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/" + host_list;
     LogCvmfs(kLogDownload, kLogDebug,
              "requesting ordered server list from %s", url.c_str());
-    JobInfo info(&url, zlib::kUnknown, false, NULL);
+    JobInfo info(&url, false, false, NULL);
     Failures result = Fetch(&info);
     if (result == kFailOk) {
       string order(info.destination_mem.data, info.destination_mem.size);

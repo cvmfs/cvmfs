@@ -144,7 +144,7 @@ struct JobInfo {
     destination_path = NULL;
     destination_sink = NULL;
     expected_hash = NULL;
-    compression_alg = zlib::kUnknown;
+    compression_alg = zlib::kZlibDefault;
     extra_info = NULL;
 
     curl_handle = NULL;
