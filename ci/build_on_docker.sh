@@ -117,10 +117,6 @@ fi
 build_script="$1"
 shift 1
 
-docker_source_location="/srv/source"
-docker_build_location="/srv/build"
-docker_build_script="${docker_source_location}/ci/$(basename $build_script)"
-
 [ -f $build_script ] || die "build script $build_script not found"
 [ -x $build_script ] || die "build script $build_script not executable"
 
@@ -135,11 +131,11 @@ done
 
 # run provided script inside the docker container
 echo "++ $docker_build_script $args"
-sudo docker run --volume=${CVMFS_SOURCE_LOCATION}:${docker_source_location} \
-                --volume=${CVMFS_RESULT_LOCATION}:${docker_build_location}  \
+sudo docker run --volume=${CVMFS_SOURCE_LOCATION}:${CVMFS_SOURCE_LOCATION}  \
+                --volume=${CVMFS_RESULT_LOCATION}:${CVMFS_RESULT_LOCATION}  \
                 --rm=true                                                   \
                 --privileged=true                                           \
                 --env="CVMFS_BUILD_ARCH=$CVMFS_BUILD_ARCH"                  \
                 --env="CVMFS_CI_PLATFORM_LABEL=$CVMFS_DOCKER_IMAGE"         \
                 $image_name                                                 \
-                $docker_build_script $args
+                $build_script $args
