@@ -22,12 +22,10 @@ CPPLINT="${REPO_ROOT}/cpplint.py"
 
 # define locations and file extensions of source files
 SOURCE_DIRS="cvmfs mount test/unittests"
-SOURCE_EXTS="h hpp cc cpp c"
 
 ################################################################################
 
 cd $REPO_ROOT
-EXTS_REGEX=".*\.\($(echo $SOURCE_EXTS | sed -e 's/\s\+/\\\|/g')\)\$"
-FILE_LIST="$(find $SOURCE_DIRS -type f -not -name '\._*' | grep -e "$EXTS_REGEX")"
+FILE_LIST="$(find $SOURCE_DIRS -type f -not -name '\._*' -and \( -name '*.h' -or -name '*.cc' -or -name '*.hpp' -or -name '*.c' \))"
 python $CPPLINT ${FILE_LIST} 2>&1 | tee ${SCRIPT_OUTPUT}
 
