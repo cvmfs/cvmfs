@@ -81,6 +81,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
                                               const bool garbage_collectable,
+                                              const std::string &voms_authz,
                                               upload::Spooler   *spooler);
 
   // DirectoryEntry handling

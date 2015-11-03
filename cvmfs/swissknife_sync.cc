@@ -108,7 +108,11 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     }
   }
   const bool volatile_content    = (args.count('v') > 0);
-  const bool garbage_collectable = (args.count('z') > 0);
+  const bool garbage_collectable = (args.count('g') > 0);
+  std::string voms_authz;
+  if (args.find('V') != args.end()) {
+    voms_authz = *args.find('V')->second;
+  }
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
@@ -117,7 +121,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   // TODO(rmeusel): use UniquePtr
   manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(
-      dir_temp, volatile_content, garbage_collectable, spooler);
+      dir_temp, volatile_content, garbage_collectable, voms_authz, spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;
@@ -352,7 +356,8 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     // a new directory and thus not in any catalog yet.
     catalog::DirectoryEntry dirent;
     const bool lookup_success =
-      catalog_manager->LookupPath(candidate_rel, catalog::kLookupSole, &dirent);
+      catalog_manager->LookupPath(candidate_rel, catalog::kLookupSole, &dirent,
+                                  NULL);
     if (!lookup_success) {
       LogCvmfs(kLogCatalog, kLogDebug, "Didn't find '%s' in catalogs, could "
                                        "be a new directory and nested catalog.",
@@ -490,6 +495,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
   if (args.find('g') != args.end()) params.garbage_collectable = true;
+  if (args.find('V') != args.end()) params.voms_authz = *args.find('V')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
@@ -603,6 +609,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
 
   manifest->set_garbage_collectability(params.garbage_collectable);
+
+  std::string voms_authz;
+  if (catalog_manager.GetVOMSAuthz(voms_authz) && voms_authz.size()) {
+    manifest->set_alt_catalog_path(".cvmfsroot");
+  }
+
   g_download_manager->Fini();
 
   // finalize the spooler

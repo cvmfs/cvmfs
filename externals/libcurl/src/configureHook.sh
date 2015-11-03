@@ -34,7 +34,7 @@ sh configure CPPFLAGS="$CPPFLAGS -I${PWD}/${cares_location} -D_FILE_OFFSET_BITS=
   --enable-symbol-hiding \
   --disable-tls-srp \
   --disable-ntlm-wb \
-  --without-ssl \
+  --with-ssl \
   --without-winssl \
   --without-darwinssl \
   --without-gnutls \
