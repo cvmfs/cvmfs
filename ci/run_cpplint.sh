@@ -9,6 +9,11 @@ set -e
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/common.sh
 
+SCRIPT_OUTPUT=
+if [ "x$1" != "x" ]; then
+  SCRIPT_OUTPUT="$1"
+fi
+
 REPO_ROOT="$(get_repository_root)"
 CPPLINT="${REPO_ROOT}/cpplint.py"
 
@@ -23,4 +28,6 @@ SOURCE_EXTS="h hpp cc cpp c"
 
 cd $REPO_ROOT
 EXTS_REGEX=".*\.\($(echo $SOURCE_EXTS | sed -e 's/\s\+/\\\|/g')\)\$"
-python $CPPLINT $(find $SOURCE_DIRS -type f | grep -e "$EXTS_REGEX")
+FILE_LIST="$(find $SOURCE_DIRS -type f -not -name '\._*' | grep -e "$EXTS_REGEX")"
+python $CPPLINT ${FILE_LIST} 2>&1 | tee ${SCRIPT_OUTPUT}
+
