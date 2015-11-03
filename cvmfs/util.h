@@ -32,8 +32,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+const unsigned kPageSize = 4096;
 const size_t kMaxPathLength = 256;
-
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
