@@ -11,11 +11,11 @@ set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 set(CVMFS_UNITTEST_FILES
   # test steering
   main.cc
-  
+
   # test utility functions
   testutil.cc testutil.h
   env.cc env.h
-  
+
   t_atomic.cc
   t_smallhash.cc
   t_bigvector.cc
@@ -31,7 +31,7 @@ set(CVMFS_UNITTEST_FILES
   t_buffer.cc
   t_chunk_detectors.cc
   t_upload_facility.cc
-  t_uploaders.cc
+  # t_uploaders.cc
   t_file_processing.cc
   t_async_reader.cc
   t_test_utils.cc
@@ -78,7 +78,7 @@ set(CVMFS_UNITTEST_FILES
 # unit test source files
 #
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
-set (CVMFS_UNITTEST_SOURCES 
+set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_UNITTEST_FILES}
 
@@ -190,6 +190,9 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.h
+  ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
+  ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
+  ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
@@ -269,7 +272,7 @@ if (BUILD_UNITTESTS_DEBUG)
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
-  
+
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha2)
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha3)
 endif (BUILD_UNITTESTS_DEBUG)
@@ -290,7 +293,7 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} 
+                             ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
                              pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})

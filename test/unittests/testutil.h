@@ -170,6 +170,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
 
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
+                          const std::string  &alt_path,
                           const CallbackTN   *callback = NULL) {
     assert(AbstractMockUploader::not_implemented);
   }
@@ -543,7 +544,8 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
                                 std::string  *catalog_path,
-                                shash::Any   *catalog_hash);
+                                shash::Any   *catalog_hash,
+                                const catalog::ClientCtx *c);
 
   virtual MockCatalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,

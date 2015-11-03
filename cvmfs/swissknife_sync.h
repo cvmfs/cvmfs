@@ -64,6 +64,7 @@ struct SyncParameters {
   size_t           max_file_chunk_size;
   uint64_t         manual_revision;
   uint64_t         max_concurrent_write_jobs;
+  std::string      voms_authz;
   bool             is_balanced;
   unsigned         max_weight;
   unsigned         min_weight;
@@ -93,6 +94,8 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Switch('v', "repository containing volatile files"));
     r.push_back(Parameter::Switch(
       'z', "mark new repository as garbage collectable"));
+    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+                                         "(default: none)"));
     return r;
   }
   int Main(const ArgumentList &args);
@@ -220,6 +223,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('d', "pause publishing to allow for "
                                           "catalog tweaks"));
     r.push_back(Parameter::Switch('g', "repo is garbage collectable"));
+    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+                                         "(default: none)"));
     r.push_back(Parameter::Switch('p', "enable file chunking"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));

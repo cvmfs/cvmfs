@@ -95,6 +95,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string     &dir_temp,
   const bool        volatile_content,
   const bool        garbage_collectable,
+  const std::string &voms_authz,
   upload::Spooler  *spooler)
 {
   // Create a new root catalog at file_path
@@ -122,6 +123,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
     if (!new_clg_db.IsValid() ||
         !new_clg_db->InsertInitialValues(root_path,
                                           volatile_content,
+                                          voms_authz,
                                           root_entry))
     {
       LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
@@ -152,10 +154,14 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string manifest_path = dir_temp + "/manifest";
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
+  if (voms_authz.size()) {
+    manifest->set_alt_catalog_path(".cvmfsroot");
+  }
   manifest->set_garbage_collectability(garbage_collectable);
 
   // Upload catalog
-  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath());
+  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath(),
+                  manifest->alt_catalog_path());
   spooler->WaitForUpload();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
@@ -187,12 +193,12 @@ bool WritableCatalogManager::FindCatalog(const string &path,
   assert(best_fit != NULL);
   Catalog *catalog = NULL;
   bool retval = MountSubtree(PathString(path.data(), path.length()),
-                             best_fit, &catalog);
+                             best_fit, &catalog, NULL);
   if (!retval)
     return false;
 
   catalog::DirectoryEntry dummy;
-  bool found = LookupPath(path, kLookupSole, &dummy);
+  bool found = LookupPath(path, kLookupSole, &dummy, NULL);
   if (!found || !catalog->IsWritable())
     return false;
 
@@ -507,7 +513,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
     retval = catalog->FindNested(transition_path, &nested_hash, &nested_size);
     assert(retval);
     Catalog *nested_catalog;
-    nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
+    nested_catalog = MountCatalog(transition_path, nested_hash, catalog, NULL);
     assert(nested_catalog != NULL);
 
     // update nested catalog root in the child catalog
@@ -556,6 +562,8 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   assert(NULL != new_catalog_db);
   retval = new_catalog_db->InsertInitialValues(nested_root_path,
                                                volatile_content,
+                                               "",  // At this point, only root
+                                                    // catalog gets VOMS authz
                                                new_root_entry);
   assert(retval);
   // TODO(rmeusel): we need a way to attach a catalog directy from an open
@@ -831,8 +839,12 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
   }
 
   // Upload catalog
+  std::string alt_path, voms_authz;
+  if (catalog->IsRoot() && GetVOMSAuthz(voms_authz) && voms_authz.size()) {
+    alt_path = ".cvmfsroot";
+  }
   spooler_->Upload(catalog->database_path() + ".compressed",
-                   "data/" + hash_catalog.MakePath());
+                   "data/" + hash_catalog.MakePath(), alt_path);
 
   // Update registered catalog hash in nested catalog
   if (catalog->HasParent()) {

@@ -68,7 +68,8 @@ enum LogSource {
   kLogUploadS3,
   kLogS3Fanout,
   kLogGc,
-  kLogDns
+  kLogDns,
+  kLogVoms
 };
 
 const int kLogVerboseMsg = kLogStdout | kLogShowSource | kLogVerbose;
