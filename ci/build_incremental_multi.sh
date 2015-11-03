@@ -48,6 +48,7 @@ cmake -DBUILD_SERVER=$build_server       \
       -DBUILD_SERVER_DEBUG=$build_server \
       -DBUILD_UNITTESTS=yes              \
       -DBUILD_LIBCVMFS=$build_libcvmfs   \
+      -DBUILD_PRELOAD=yes                \
       $CVMFS_SOURCE_LOCATION
 
 echo "building using make ($CVMFS_CONCURRENT_BUILD_JOBS concurrent jobs)..."
