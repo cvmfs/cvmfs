@@ -23,12 +23,14 @@ CPPLINT="${REPO_ROOT}/cpplint.py"
 PYTHON_VERSION_STR=$(python -V 2>&1)
 if [ $? -ne 0 ]; then
   echo "WARNING: python missing, skipping linter"
+  cat /dev/null > ${SCRIPT_OUTPUT}
   exit 0
 fi
 PYTHON_MAJOR=$(echo $PYTHON_VERSION_STR | awk '{print $2}' | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION_STR | awk '{print $2}' | cut -d. -f2)
 if [ $PYTHON_MAJOR -lt 2 -o $PYTHON_MAJOR -eq 2 -a $PYTHON_MINOR -lt 4 ]; then
   echo "WARNING: python too old (< 2.4), skipping linter"
+  cat /dev/null > ${SCRIPT_OUTPUT}
   exit 0
 fi
 
@@ -39,5 +41,5 @@ SOURCE_DIRS="cvmfs mount test/unittests"
 
 cd $REPO_ROOT
 FILE_LIST="$(find $SOURCE_DIRS -type f -not -name '\._*' -and \( -name '*.h' -or -name '*.cc' -or -name '*.hpp' -or -name '*.c' \))"
-python $CPPLINT ${FILE_LIST} 2>&1 | tee ${SCRIPT_OUTPUT}
+python $CPPLINT ${FILE_LIST} | tee ${SCRIPT_OUTPUT}
 
