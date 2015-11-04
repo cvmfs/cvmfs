@@ -32,8 +32,11 @@ libsha3.a: $(OBJECT_FILES)
 	ar cru libsha3.a $(OBJECT_FILES)
 	ranlib libsha3.a
 
-KeccakF-1600-$(ARCH).o: $(SOURCES_GENERIC) $(SOURCES_64OPT)
-	$(CC) $(CFLAGS) -o KeccakF-1600-$(ARCH).o -c 64opt/KeccakF-1600-opt64.c
+KeccakF-1600-64opt.o: $(SOURCES_GENERIC) $(SOURCES_64OPT)
+	$(CC) $(CFLAGS) -o KeccakF-1600-64opt.o -c 64opt/KeccakF-1600-opt64.c
+
+KeccakF-1600-32BI.o: $(SOURCES_GENERIC) $(SOURCES_32BI)
+	$(CC) $(CFLAGS) -o KeccakF-1600-32BI.o -c 32BI/KeccakF-1600-inplace32BI.c
 
 KeccakHash.o: $(SOURCES_GENERIC)
 	$(CC) $(CFLAGS) -c KeccakHash.c
