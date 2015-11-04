@@ -125,8 +125,11 @@ while [ $# -gt 0 ]; do
 done
 
 # run provided script inside the docker container
+uid=$(id -u)
+gid=$(id -g)
 echo "++ $docker_build_script $args"
 sudo docker run --volume=${CVMFS_WORKSPACE}:${CVMFS_WORKSPACE}        \
+                --user=${uid}:${gid}                                  \
                 --rm=true                                             \
                 --privileged=true                                     \
                 --env="CVMFS_BUILD_ARCH=$CVMFS_BUILD_ARCH"            \
