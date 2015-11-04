@@ -1192,11 +1192,11 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
   close(fd_stderr);
 
   // wait for the child process to terminate
-  const unsigned int timeout = 1000;
+  const unsigned int timeout = 5000;  // 5s
   unsigned int counter = 0;
   while (counter < timeout && kill(child_pid, 0) == 0) {
-    usleep(5000);
-    ++counter;
+    SafeSleepMs(50);
+    counter += 50;
   }
   EXPECT_LT(counter, timeout) << "detached process did not terminate in time";
 }
