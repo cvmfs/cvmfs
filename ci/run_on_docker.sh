@@ -99,7 +99,7 @@ if ! sudo docker images $image_name | grep -q "$image_name"; then
   bootstrap_image "$image_name" "$container_dir"
 elif [ $(image_creation $image_name) -lt $(image_recipe $container_dir) ]; then
   echo -n "removing outdated docker image '$image_name'... "
-  sudo docker rmi "$image_name" > /dev/null || die "fail"
+  sudo docker rmi -f "$image_name" > /dev/null || die "fail"
   echo "done"
   bootstrap_image "$image_name" "$container_dir"
 fi
@@ -125,8 +125,11 @@ while [ $# -gt 0 ]; do
 done
 
 # run provided script inside the docker container
+uid=$(id -u)
+gid=$(id -g)
 echo "++ $docker_build_script $args"
 sudo docker run --volume=${CVMFS_WORKSPACE}:${CVMFS_WORKSPACE}        \
+                --user=${uid}:${gid}                                  \
                 --rm=true                                             \
                 --privileged=true                                     \
                 --env="CVMFS_BUILD_ARCH=$CVMFS_BUILD_ARCH"            \
