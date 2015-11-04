@@ -9,6 +9,7 @@ RUN        zypper -n update && zypper -n install   \
                                   fuse-devel       \
                                   gcc              \
                                   gcc-c++          \
+                                  gdb              \
                                   git              \
                                   libattr-devel    \
                                   libcap-devel     \
