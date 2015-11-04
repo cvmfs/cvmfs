@@ -11,23 +11,18 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 . ${SCRIPT_LOCATION}/common.sh
 
 if [ $# -lt 4 ]; then
-  echo "Usage: $0 <CernVM-FS source directory> <build result location>"
-  echo "<docker image name> <build script invocation with OPTIONAL parameters>"
+  echo "Usage: $0 <workspace>" "<docker image name>"
+  echo "<build script invocation with OPTIONAL parameters>"
   echo
   echo "This script runs a build script inside a docker container. The docker "
   echo "image is generated on demand - i.e. look into ci/docker for available"
   echo "docker image blueprints."
-  echo
-  echo "NOTE: Don't specify the source and build directory for the build script"
-  echo "      this will be passed automatically. Any optional parameters may"
-  echo "      be passed as usual."
   exit 1
 fi
 
-CVMFS_SOURCE_LOCATION="$1"
-CVMFS_RESULT_LOCATION="$2"
-CVMFS_DOCKER_IMAGE="$3"
-shift 3
+CVMFS_WORKSPACE="$1"
+CVMFS_DOCKER_IMAGE="$2"
+shift 2
 
 # retrieves the image creation time of a docker image in epoch
 # @param image_name  the full name of the docker image
@@ -131,11 +126,10 @@ done
 
 # run provided script inside the docker container
 echo "++ $docker_build_script $args"
-sudo docker run --volume=${CVMFS_SOURCE_LOCATION}:${CVMFS_SOURCE_LOCATION}  \
-                --volume=${CVMFS_RESULT_LOCATION}:${CVMFS_RESULT_LOCATION}  \
-                --rm=true                                                   \
-                --privileged=true                                           \
-                --env="CVMFS_BUILD_ARCH=$CVMFS_BUILD_ARCH"                  \
-                --env="CVMFS_CI_PLATFORM_LABEL=$CVMFS_DOCKER_IMAGE"         \
-                $image_name                                                 \
+sudo docker run --volume=${CVMFS_WORKSPACE}:${CVMFS_WORKSPACE}        \
+                --rm=true                                             \
+                --privileged=true                                     \
+                --env="CVMFS_BUILD_ARCH=$CVMFS_BUILD_ARCH"            \
+                --env="CVMFS_CI_PLATFORM_LABEL=$CVMFS_DOCKER_IMAGE"   \
+                $image_name                                           \
                 $build_script $args
