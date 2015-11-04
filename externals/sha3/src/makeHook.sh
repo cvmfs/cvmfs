@@ -2,7 +2,7 @@
 
 if [ ! -f ~arch ]; then
   echo '#include <stdio.h>
-    int main(){printf("%d", sizeof(long));return 0;}' | gcc -x c -
+    int main(){printf("%d", sizeof(long));return 0;}' | cc -x c -
   SIZEOF_LONG=$(./a.out)
   rm -f a.out
   case $SIZEOF_LONG in
@@ -14,6 +14,9 @@ if [ ! -f ~arch ]; then
     ;;
   esac
 fi
+
+rm -f SnP-interface.h
+ln -s $(cat ~arch)/SnP-interface.h SnP-interface.h
 
 make clean
 make ARCH=$(cat ~arch)
