@@ -9,6 +9,7 @@ RUN         yum -y update && yum -y install                     \
                                         fuse-devel              \
                                         gcc                     \
                                         gcc-c++                 \
+                                        gdb                     \
                                         git                     \
                                         hardlink                \
                                         libattr-devel           \
