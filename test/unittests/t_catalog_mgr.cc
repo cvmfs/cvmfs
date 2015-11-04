@@ -274,7 +274,9 @@ TEST_F(T_CatalogManager, Balance) {
   // minimum weight = 1: not used here
   // balance weight = 3: This parameter will be used, we won't check the others
   // because here only the actual balancing process is tested
+  SetLogVerbosity(kLogDiscrete);
   balancer.Balance(NULL);
+  SetLogVerbosity(kLogNormal);
 
   // it should now create nested catalogs in:
   //    - /dir/dir

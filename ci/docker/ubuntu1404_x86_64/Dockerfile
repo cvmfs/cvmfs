@@ -8,6 +8,7 @@ RUN         apt-get -y update && apt-get -y install         \
                                               cmake         \
                                               debhelper     \
                                               devscripts    \
+                                              gdb           \
                                               git           \
                                               libattr1-dev  \
                                               libcap-dev    \

@@ -64,7 +64,7 @@ do_copy() {
   print_hint "Copying $library_name"
 
   mkdir -p $dest_dir
-  cp $library_dir/src/* $dest_dir
+  cp -r $library_dir/src/* $dest_dir
 }
 
 patch_external() {
