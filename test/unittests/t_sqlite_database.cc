@@ -912,7 +912,7 @@ TEST_F(T_SQLite_Wrapper, CountModifiedRows) {
   ASSERT_NE(static_cast<DummyDatabase*>(NULL), db2);
   EXPECT_EQ(1u, DummyDatabase::instances);
   EXPECT_TRUE(db2->read_write());
-  EXPECT_EQ(0u, db1->GetModifiedRowCount());
+  EXPECT_EQ(0u, db2->GetModifiedRowCount());
 
   EXPECT_TRUE(db2->SetProperty("foo", 1337));
   EXPECT_TRUE(db2->SetProperty("bar", 42));
@@ -923,17 +923,17 @@ TEST_F(T_SQLite_Wrapper, CountModifiedRows) {
 
   const unsigned entries = 30;
   {
-    sqlite::Sql insert(db1->sqlite_db(), "INSERT INTO foobar (foo, bar) "
+    sqlite::Sql insert(db2->sqlite_db(), "INSERT INTO foobar (foo, bar) "
                                          "VALUES (:f, :b);");
 
-    EXPECT_TRUE(db1->BeginTransaction());
+    EXPECT_TRUE(db2->BeginTransaction());
     for (unsigned i = 0; i < entries; ++i) {
       EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
       EXPECT_TRUE(insert.BindText(2, "this is a very useless text!!"));
       EXPECT_TRUE(insert.Execute());
       EXPECT_TRUE(insert.Reset());
     }
-    EXPECT_TRUE(db1->CommitTransaction());
+    EXPECT_TRUE(db2->CommitTransaction());
   }
 
   EXPECT_EQ(2u + entries, db2->GetModifiedRowCount());
