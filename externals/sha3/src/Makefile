@@ -1,12 +1,15 @@
 all: libsha3.a
 
-ARCH = 64opt
+# ARCH = 64opt (set by makeHook.sh)
 
 SOURCES_64OPT = 64opt/KeccakF-1600-opt64.c \
   64opt/KeccakF-1600-64.macros \
   64opt/KeccakF-1600-unrolling.macros \
   64opt/KeccakF-1600-opt64-settings.h \
   64opt/SnP-interface.h
+
+SOURCES_32BI = 32BI/KeccakF-1600-inplace32BI.c \
+  32BI/SnP-interface.h
 
 SOURCES_GENERIC = KeccakF-1600-interface.h \
   KeccakHash.c \
