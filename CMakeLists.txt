@@ -28,20 +28,6 @@ set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MI
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 #
-# Set install prefix to /usr.  Cvmfs is not relocatable.
-#
-if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  SET(CMAKE_INSTALL_PREFIX
-    "/usr" CACHE PATH "/usr install prefix" FORCE
-  )
-else (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  if (NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr")
-    Message("Warning: CernVM-FS is not relotable and expects to be installed under /usr")
-  endif ()
-endif (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-
-
-#
 # detect the operating system and the distribution we are compiling on
 #
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
