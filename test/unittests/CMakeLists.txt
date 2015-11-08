@@ -229,25 +229,27 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # add optional dependencies
 #
-if (LIBCURL_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
-endif (LIBCURL_BUILTIN)
+if (BUILD_UNITTESTS)
+  if (LIBCURL_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
+  endif (LIBCURL_BUILTIN)
 
-if (SQLITE3_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} sqlite3)
-endif (SQLITE3_BUILTIN)
+  if (SQLITE3_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} sqlite3)
+  endif (SQLITE3_BUILTIN)
 
-if (ZLIB_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} zlib)
-endif (ZLIB_BUILTIN)
+  if (ZLIB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} zlib)
+  endif (ZLIB_BUILTIN)
 
-if (PACPARSER_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} libpacparser)
-endif (PACPARSER_BUILTIN)
+  if (PACPARSER_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libpacparser)
+  endif (PACPARSER_BUILTIN)
 
-if (TBB_PRIVATE_LIB)
-  add_dependencies (${PROJECT_TEST_NAME} libtbb)
-endif (TBB_PRIVATE_LIB)
+  if (TBB_PRIVATE_LIB)
+    add_dependencies (${PROJECT_TEST_NAME} libtbb)
+  endif (TBB_PRIVATE_LIB)
+endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
   if (LIBCURL_BUILTIN)
