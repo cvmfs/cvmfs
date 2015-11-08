@@ -107,6 +107,20 @@ endif (MACOSX)
 message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
 
 #
+# set the system configuration directory depending on CMAKE_INSTALL_PREFIX
+# Note: Found here http://osdir.com/ml/kde-commits/2011-05/msg01375.html
+#
+if (NOT DEFINED SYSCONF_INSTALL_DIR)
+  if ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+    set (SYSCONF_INSTALL_DIR "/etc") # conform to LFSH
+  else ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+    set(SYSCONF_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/etc")
+  endif ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+else (NOT DEFINED SYSCONF_INSTALL_DIR)
+  set (SYSCONF_INSTALL_DIR "${SYSCONF_INSTALL_DIR}" CACHE STRING "The sysconfig install dir")
+endif (NOT DEFINED SYSCONF_INSTALL_DIR)
+
+#
 # Workaround for Debian packaging debhelper trying to pass -D_FORTIFY_SOURCE=2
 # through CPPFLAGS that is not officially supported by CMake. Hence, debhelper
 # appends CPPFLAGS to CFLAGS which breaks the build of the c-ares external.
