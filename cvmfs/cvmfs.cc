@@ -101,6 +101,7 @@
 #include "util.h"
 #include "util_concurrency.h"
 #include "uuid.h"
+#include "voms_authz/voms_cred.h"
 #include "wpad.h"
 #include "xattr.h"
 
@@ -2766,6 +2767,9 @@ static int AltProcessFlavor(int argc, char **argv) {
   }
   if (strcmp(argv[1], "__wpad__") == 0) {
     return download::MainResolveProxyDescription(argc, argv);
+  }
+  if (strcmp(argv[1], "__cred_fetcher__") == 0) {
+    return CredentialsFetcher::MainCredentialsFetcher(argc, argv);
   }
   return 1;
 }
