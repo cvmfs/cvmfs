@@ -100,6 +100,7 @@ endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
 if (MACOSX)
   set (CMAKE_INSTALL_LIBDIR "lib")
   set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
+  set (CMAKE_MACOSX_RPATH false)
 else (MACOSX) # --> Linux
   if (DEBIAN OR ARCHLINUX)
     if (ARCHLINUX)
