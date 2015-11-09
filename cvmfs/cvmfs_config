@@ -85,6 +85,39 @@ required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
 var_list="$parm_list $switch_list"
 
+# makes sure that a version is always of the form x.y.z-b
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  while [ $(echo "$version_string" | grep -o '-' | wc -l) -lt 1 ]; do
+    version_string="${version_string}-1"
+  done
+  echo "$version_string"
+}
+version_major() { echo $1 | cut -d. -f1 | grep -oe '^[0-9]\+'; }
+version_minor() { echo $1 | cut -d. -f2 | grep -oe '^[0-9]\+'; }
+version_patch() { echo $1 | cut -d. -f3 | grep -oe '^[0-9]\+'; }
+version_build() { echo $1 | cut -d- -f2 | grep -oe '^[0-9]\+'; }
+prepend_zeros() { printf %03d "$1"; }
+compare_versions() {
+  local lhs="$(normalize_version $1)"
+  local comparison_operator=$2
+  local rhs="$(normalize_version $3)"
+
+  local lhs1=$(prepend_zeros $(version_major $lhs))
+  local lhs2=$(prepend_zeros $(version_minor $lhs))
+  local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local lhs4=$(prepend_zeros $(version_build $lhs))
+  local rhs1=$(prepend_zeros $(version_major $rhs))
+  local rhs2=$(prepend_zeros $(version_minor $rhs))
+  local rhs3=$(prepend_zeros $(version_patch $rhs))
+  local rhs4=$(prepend_zeros $(version_build $rhs))
+
+  [ $lhs1$lhs2$lhs3$lhs4 $comparison_operator $rhs1$rhs2$rhs3$rhs4 ]
+}
+
 cvmfs_config_usage() {
  echo "Common configuration tasks for CernVM-FS"
  echo "Usage: $0 <command>"
