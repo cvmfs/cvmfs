@@ -129,6 +129,8 @@ uid=$(id -u)
 gid=$(id -g)
 echo "++ $docker_build_script $args"
 sudo docker run --volume=${CVMFS_WORKSPACE}:${CVMFS_WORKSPACE}        \
+                --volume=/etc/passwd:/etc/passwd                      \
+                --volume=/etc/group:/etc/group                        \
                 --user=${uid}:${gid}                                  \
                 --rm=true                                             \
                 --privileged=true                                     \
