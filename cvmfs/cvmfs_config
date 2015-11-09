@@ -1,8 +1,14 @@
 #!/bin/bash
 # Common configuration tasks for CernVM-FS
 
+SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
+INSTALL_BASE=$(echo "$SCRIPT_LOCATION" | sed -e 's/^\(.*\)\/bin$/\1/')
+SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_BASE}/sbin" )"
+
 if [ -f /etc/cvmfs/config.sh ]; then
   . /etc/cvmfs/config.sh
+elif [ -f ${INSTALL_BASE}/etc/cvmfs/config.sh ]; then
+  . ${INSTALL_BASE}/etc/cvmfs/config.sh
 else
   echo "/etc/cvmfs/config.sh missing"
   exit 1
@@ -79,6 +85,39 @@ required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
 var_list="$parm_list $switch_list"
 
+# makes sure that a version is always of the form x.y.z-b
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  while [ $(echo "$version_string" | grep -o '-' | wc -l) -lt 1 ]; do
+    version_string="${version_string}-1"
+  done
+  echo "$version_string"
+}
+version_major() { echo $1 | cut -d. -f1 | grep -oe '^[0-9]\+'; }
+version_minor() { echo $1 | cut -d. -f2 | grep -oe '^[0-9]\+'; }
+version_patch() { echo $1 | cut -d. -f3 | grep -oe '^[0-9]\+'; }
+version_build() { echo $1 | cut -d- -f2 | grep -oe '^[0-9]\+'; }
+prepend_zeros() { printf %03d "$1"; }
+compare_versions() {
+  local lhs="$(normalize_version $1)"
+  local comparison_operator=$2
+  local rhs="$(normalize_version $3)"
+
+  local lhs1=$(prepend_zeros $(version_major $lhs))
+  local lhs2=$(prepend_zeros $(version_minor $lhs))
+  local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local lhs4=$(prepend_zeros $(version_build $lhs))
+  local rhs1=$(prepend_zeros $(version_major $rhs))
+  local rhs2=$(prepend_zeros $(version_minor $rhs))
+  local rhs3=$(prepend_zeros $(version_patch $rhs))
+  local rhs4=$(prepend_zeros $(version_build $rhs))
+
+  [ $lhs1$lhs2$lhs3$lhs4 $comparison_operator $rhs1$rhs2$rhs3$rhs4 ]
+}
+
 cvmfs_config_usage() {
  echo "Common configuration tasks for CernVM-FS"
  echo "Usage: $0 <command>"
@@ -153,6 +192,15 @@ cvmfs_setup() {
   mkdir -p /var/lib/cvmfs
   chown cvmfs:cvmfs /var/lib/cvmfs
 
+  # symlink configuration into /etc on OS X (>= 10.11)
+  if [ x"$sys_arch" = x"Darwin" ] && \
+     compare_versions $(sw_vers -productVersion) -ge "10.11"; then
+    if [ ! -e /etc/cvmfs           ] && \
+       [   -e /usr/local/etc/cvmfs ]; then
+      ln -s /usr/local/etc/cvmfs /etc/cvmfs
+    fi
+  fi
+
   # if group fuse exists, add user cvmfs
   if check_group "fuse"; then
     if ! add_user_to_group_fuse; then
@@ -199,7 +247,7 @@ cvmfs_chksetup() {
   local binary
   for binary in cvmfs2 cvmfs_fsck cvmfs_talk
   do
-    if ! test -f /usr/bin/$binary; then
+    if ! test -f ${INSTALL_BASE}/bin/$binary; then
       echo "Error: $binary not found"
       num_errors=$(($num_errors+1))
     fi
@@ -213,8 +261,8 @@ cvmfs_chksetup() {
   for library in $cvmfs_libs
   do
     foundlib=0
-    for libdir in /usr/lib /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/lib/i386-linux-gnu; do
-      if test -f ${libdir}/${library}; then
+    for libdir in lib lib64 lib/x86_64-linux-gnu lib/i386-linux-gnu; do
+      if test -f ${INSTALL_BASE}/${libdir}/${library}; then
         foundlib=1
       fi
     done
@@ -227,12 +275,12 @@ cvmfs_chksetup() {
   # Check mount helper
   local tools
   if [ "$sys_arch" = "Darwin" ]; then
-    tools="/sbin/mount_cvmfs"
+    tools="${SBIN_BASE}/mount_cvmfs"
   elif [ "$sys_arch" = "Linux" ]; then
-    if [ -d /sbin ]; then
-      tools="/sbin/mount.cvmfs"
+    if [ -d ${SBIN_BASE} ]; then
+      tools="${SBIN_BASE}/mount.cvmfs"
     else
-      tools="/usr/bin/mount.cvmfs"
+      tools="${INSTALL_BASE}/bin/mount.cvmfs"
     fi
   fi
 
@@ -244,6 +292,12 @@ cvmfs_chksetup() {
       num_errors=$(($num_errors+1))
     fi
   done
+
+  # Check that CVMFS_USER is set
+  if [ x"$CVMFS_USER" = x"" ]; then
+    echo "CVMFS_USER variable is empty"
+    num_errors=$(($num_errors+1))
+  fi
 
   # Fusermount (not necessary under Mac OS X)
   if [ "$sys_arch" = "Linux" ]; then

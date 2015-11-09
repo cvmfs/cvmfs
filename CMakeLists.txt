@@ -28,20 +28,6 @@ set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MI
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 #
-# Set install prefix to /usr.  Cvmfs is not relocatable.
-#
-if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  SET(CMAKE_INSTALL_PREFIX
-    "/usr" CACHE PATH "/usr install prefix" FORCE
-  )
-else (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  if (NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr")
-    Message("Warning: CernVM-FS is not relotable and expects to be installed under /usr")
-  endif ()
-endif (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-
-
-#
 # detect the operating system and the distribution we are compiling on
 #
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -99,7 +85,7 @@ endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
 #
 if (MACOSX)
   set (CMAKE_INSTALL_LIBDIR "lib")
-  set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
+  set (CMAKE_MOUNT_INSTALL_BINDIR "${CMAKE_INSTALL_PREFIX}/sbin")
   set (CMAKE_MACOSX_RPATH false)
 else (MACOSX) # --> Linux
   if (DEBIAN OR ARCHLINUX)
@@ -119,6 +105,20 @@ else (MACOSX) # --> Linux
   endif (DEBIAN OR ARCHLINUX)
 endif (MACOSX)
 message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
+
+#
+# set the system configuration directory depending on CMAKE_INSTALL_PREFIX
+# Note: Found here http://osdir.com/ml/kde-commits/2011-05/msg01375.html
+#
+if (NOT DEFINED SYSCONF_INSTALL_DIR)
+  if ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+    set (SYSCONF_INSTALL_DIR "/etc") # conform to LFSH
+  else ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+    set(SYSCONF_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/etc")
+  endif ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+else (NOT DEFINED SYSCONF_INSTALL_DIR)
+  set (SYSCONF_INSTALL_DIR "${SYSCONF_INSTALL_DIR}" CACHE STRING "The sysconfig install dir")
+endif (NOT DEFINED SYSCONF_INSTALL_DIR)
 
 #
 # Workaround for Debian packaging debhelper trying to pass -D_FORTIFY_SOURCE=2
