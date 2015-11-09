@@ -1,6 +1,10 @@
 #!/bin/bash
 # Common configuration tasks for CernVM-FS
 
+SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
+INSTALL_BASE=$(echo "$SCRIPT_LOCATION" | sed -e 's/^\(.*\)\/bin$/\1/')
+SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_BASE}/sbin" )"
+
 if [ -f /etc/cvmfs/config.sh ]; then
   . /etc/cvmfs/config.sh
 else
@@ -199,7 +203,7 @@ cvmfs_chksetup() {
   local binary
   for binary in cvmfs2 cvmfs_fsck cvmfs_talk
   do
-    if ! test -f /usr/bin/$binary; then
+    if ! test -f ${INSTALL_BASE}/bin/$binary; then
       echo "Error: $binary not found"
       num_errors=$(($num_errors+1))
     fi
@@ -213,8 +217,8 @@ cvmfs_chksetup() {
   for library in $cvmfs_libs
   do
     foundlib=0
-    for libdir in /usr/lib /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/lib/i386-linux-gnu; do
-      if test -f ${libdir}/${library}; then
+    for libdir in lib lib64 lib/x86_64-linux-gnu lib/i386-linux-gnu; do
+      if test -f ${INSTALL_BASE}/${libdir}/${library}; then
         foundlib=1
       fi
     done
@@ -227,12 +231,12 @@ cvmfs_chksetup() {
   # Check mount helper
   local tools
   if [ "$sys_arch" = "Darwin" ]; then
-    tools="/sbin/mount_cvmfs"
+    tools="${SBIN_BASE}/mount_cvmfs"
   elif [ "$sys_arch" = "Linux" ]; then
-    if [ -d /sbin ]; then
-      tools="/sbin/mount.cvmfs"
+    if [ -d ${SBIN_BASE} ]; then
+      tools="${SBIN_BASE}/mount.cvmfs"
     else
-      tools="/usr/bin/mount.cvmfs"
+      tools="${INSTALL_BASE}/bin/mount.cvmfs"
     fi
   fi
 
