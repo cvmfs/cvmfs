@@ -85,6 +85,7 @@ cvmfs_run_test() {
   #trap cleanup EXIT HUP INT TERM
 
   generate_certs $script_location
+  # requires mod_gridsite from the gridsite package
   cp $script_location/test600.cvmfs.secure.conf $TEST600_HTTPS_CONFIG
   sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST600_HTTPS_CONFIG
   cp $script_location/gacl /srv/cvmfs/$CVMFS_TEST_REPO/data/.gacl

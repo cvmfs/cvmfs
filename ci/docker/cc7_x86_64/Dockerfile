@@ -9,6 +9,7 @@ RUN         yum -y update && yum -y install                     \
                                         gcc                     \
                                         gcc-c++                 \
                                         git                     \
+                                        gridsite                \
                                         hardlink                \
                                         libattr-devel           \
                                         libcap-devel            \
