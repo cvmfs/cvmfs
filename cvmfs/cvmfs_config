@@ -249,6 +249,12 @@ cvmfs_chksetup() {
     fi
   done
 
+  # Check that CVMFS_USER is set
+  if [ x"$CVMFS_USER" = x"" ]; then
+    echo "CVMFS_USER variable is empty"
+    num_errors=$(($num_errors+1))
+  fi
+
   # Fusermount (not necessary under Mac OS X)
   if [ "$sys_arch" = "Linux" ]; then
     if [ ! -x $fusermount ]; then
