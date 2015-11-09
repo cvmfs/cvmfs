@@ -192,6 +192,15 @@ cvmfs_setup() {
   mkdir -p /var/lib/cvmfs
   chown cvmfs:cvmfs /var/lib/cvmfs
 
+  # symlink configuration into /etc on OS X (>= 10.11)
+  if [ x"$sys_arch" = x"Darwin" ] && \
+     compare_versions $(sw_vers -productVersion) -ge "10.11"; then
+    if [ ! -e /etc/cvmfs           ] && \
+       [   -e /usr/local/etc/cvmfs ]; then
+      ln -s /usr/local/etc/cvmfs /etc/cvmfs
+    fi
+  fi
+
   # if group fuse exists, add user cvmfs
   if check_group "fuse"; then
     if ! add_user_to_group_fuse; then
