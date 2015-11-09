@@ -1192,7 +1192,7 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
   close(fd_stderr);
 
   // wait for the child process to terminate
-  const unsigned int timeout = 60000;  // 60s
+  const unsigned int timeout = 120000;  // 2 minutes
   unsigned int counter = 0;
   while (counter < timeout && kill(child_pid, 0) == 0) {
     SafeSleepMs(50);
