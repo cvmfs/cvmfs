@@ -507,7 +507,11 @@ int64_t PosixCacheManager::Pread(
   uint64_t size,
   uint64_t offset)
 {
-  int64_t result = pread(fd, buf, size, offset);
+  int64_t result;
+  do {
+    errno = 0;
+    result = pread(fd, buf, size, offset);
+  } while ((result == -1) && (errno == EINTR));
   if (result < 0)
     return -errno;
   return result;

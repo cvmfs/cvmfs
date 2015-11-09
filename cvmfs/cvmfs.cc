@@ -2515,7 +2515,7 @@ static void Spawn() {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = cvmfs::AlarmReload;
-    sa.sa_flags = SA_SIGINFO;
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
     sigfillset(&sa.sa_mask);
     retval = sigaction(SIGALRM, &sa, NULL);
     assert(retval == 0);
