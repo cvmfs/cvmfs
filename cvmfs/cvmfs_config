@@ -7,6 +7,8 @@ SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_
 
 if [ -f /etc/cvmfs/config.sh ]; then
   . /etc/cvmfs/config.sh
+elif [ -f ${INSTALL_BASE}/etc/cvmfs/config.sh ]; then
+  . ${INSTALL_BASE}/etc/cvmfs/config.sh
 else
   echo "/etc/cvmfs/config.sh missing"
   exit 1
