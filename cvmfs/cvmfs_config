@@ -85,6 +85,8 @@ required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
 var_list="$parm_list $switch_list"
 
+cvmfs_fs_bundle="/Library/Filesystems/cvmfs.fs/Contents/Resources" # Mac OS X
+
 # makes sure that a version is always of the form x.y.z-b
 normalize_version() {
   local version_string="$1"
@@ -192,12 +194,25 @@ cvmfs_setup() {
   mkdir -p /var/lib/cvmfs
   chown cvmfs:cvmfs /var/lib/cvmfs
 
-  # symlink configuration into /etc on OS X (>= 10.11)
+  # put workarounds for OS X (>= 10.11) in place (SIP related)
   if [ x"$sys_arch" = x"Darwin" ] && \
      compare_versions $(sw_vers -productVersion) -ge "10.11"; then
+    # symlink configuration files into /etc
     if [ ! -e /etc/cvmfs           ] && \
        [   -e /usr/local/etc/cvmfs ]; then
       ln -s /usr/local/etc/cvmfs /etc/cvmfs
+    fi
+
+    # create a (minimal) file system bundle for `mount -t cvmfs` support
+    # Note: the `mount` utility in OS X 10.11.1 doesn't find the installed mount
+    #       helper in `/usr/local/sbin`. When disabling SIP and symlinking the
+    #       mount helper into `/sbin` it would work. Not sure if that is to be
+    #       considered a bug or a feature...
+    #       Currently the bundle creation below is considered a work around!
+    if [ ! -e ${cvmfs_fs_bundle}/mount_cvmfs ] && \
+       [   -e /usr/local/sbin/mount_cvmfs ]; then
+      mkdir -p $cvmfs_fs_bundle
+      ln -s /usr/local/sbin/mount_cvmfs ${cvmfs_fs_bundle}/mount_cvmfs
     fi
   fi
 
@@ -275,7 +290,11 @@ cvmfs_chksetup() {
   # Check mount helper
   local tools
   if [ "$sys_arch" = "Darwin" ]; then
-    tools="${SBIN_BASE}/mount_cvmfs"
+    if compare_versions $(sw_vers -productVersion) -ge "10.11"; then
+      tools="${cvmfs_fs_bundle}/mount_cvmfs"
+    else
+      tools="${SBIN_BASE}/mount_cvmfs"
+    fi
   elif [ "$sys_arch" = "Linux" ]; then
     if [ -d ${SBIN_BASE} ]; then
       tools="${SBIN_BASE}/mount.cvmfs"
