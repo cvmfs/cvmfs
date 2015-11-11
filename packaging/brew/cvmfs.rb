@@ -30,16 +30,38 @@ class Cvmfs < Formula
     EOS
   end
 
-  test do
-    # `test do` will create, run in and delete a temporary directory.
+  def test
+    system bin/"cvmfs2", "--version"
+
+    # brew runs tests inside a `sandbox-exec` environment which prevents us
+    # from mounting a FUSE-based file system. If the test case is run with
+    # `brew test --no-sandbox cvmfs` the commented code below works fine.
     #
-    # This test will fail and we won't accept that! It's enough to just replace
-    # "false" with the main program this formula installs, but it'd be nice if you
-    # were more thorough. Run the test with `brew test cvmfs`. Options passed
-    # to `brew install` such as `--HEAD` also need to be provided to `brew test`.
+    # TODO(rmeusel): How to tell `brew` to not run this test in sandbox-exec
+    #                --> enable the more sophisticated test later
     #
-    # The installed folder is not in the path, so use the entire path to any
-    # executables being tested: `system "#{bin}/program", "do", "something"`.
-    system "false"
+    # cfg_file   = testpath/"private_mount.conf"
+    # cache_dir  = testpath/"cache"
+    # mountpoint = testpath/"mountpoint"
+    # Dir.mkdir "#{cache_dir}"
+    # Dir.mkdir "#{mountpoint}"
+    # cfg_file.write <<-EOS.undent
+    #   CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@
+    #   CVMFS_HTTP_PROXY=DIRECT
+    #   CVMFS_CACHE_BASE=#{cache_dir}
+    #   CVMFS_RELOAD_SOCKETS=#{cache_dir}
+    #   CVMFS_PUBLIC_KEY=#{etc}/cvmfs/keys/cern.ch/cern.ch.pub
+    # EOS
+    # system "cvmfs2", "-o", "config=#{cfg_file}", "atlas.cern.ch", "#{mountpoint}"
+    # Timeout.timeout(30) do
+    #   while true do
+    #     if Dir.entries(mountpoint).length > 2
+    #       break
+    #     else
+    #       sleep(1)
+    #     end
+    #   end
+    # end
+    # system "umount", "#{mountpoint}"
   end
 end
