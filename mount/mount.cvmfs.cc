@@ -238,7 +238,7 @@ static std::string GetCvmfsBinary() {
   const vector<string>::const_iterator iend = paths.end();
   for (; i != iend; ++i) {
     const std::string cvmfs2 = *i + "/cvmfs2";
-    if (FileExists(cvmfs2)) {
+    if (FileExists(cvmfs2) || SymlinkExists(cvmfs2)) {
       result = cvmfs2;
       break;
     }
