@@ -584,7 +584,7 @@ if (BUILD_CVMFS)
     install (
         FILES         bash_completion/cvmfs.bash_completion
         RENAME        cvmfs
-        DESTINATION   /etc/bash_completion.d
+        DESTINATION   ${SYSCONF_INSTALL_DIR}/bash_completion.d
         PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endif (INSTALL_BASH_COMPLETION)
@@ -632,7 +632,7 @@ if (BUILD_SERVER)
 
   install(
     FILES      cvmfs_server_hooks.sh.demo
-    DESTINATION    "/etc/cvmfs"
+    DESTINATION    "${SYSCONF_INSTALL_DIR}/cvmfs"
     PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
   )
 
