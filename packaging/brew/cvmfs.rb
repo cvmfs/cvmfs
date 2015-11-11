@@ -11,6 +11,7 @@ class Cvmfs < Formula
 
   depends_on "cmake" => :build
   depends_on "openssl"
+  depends_on :osxfuse
 
   def install
     # Remove unrecognized options if warned by configure
