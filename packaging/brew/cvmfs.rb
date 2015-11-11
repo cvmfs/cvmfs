@@ -8,6 +8,7 @@ class Cvmfs < Formula
   url "file:///Users/rmeusel/Documents/CERN/cvmfs/dist/source.tar.gz"
   sha256 ""
   version "2.2.0-0"
+  head "https://github.com/cvmfs/cvmfs.git"
 
   depends_on "cmake" => :build
   depends_on "openssl"
