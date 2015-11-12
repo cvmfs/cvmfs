@@ -7,7 +7,19 @@ if [ ! -f ~arch ]; then
   rm -f a.out
   case $SIZEOF_LONG in
     8)
-      echo 64opt > ~arch
+      echo 'int main() { \
+#ifdef __x86_64__ \
+return 0; \
+#endif
+return 1;}' | cc -x c -
+      ./a.out
+      x86_64=$?
+      rm -f a.out
+      if [ $x86_64 -eq 0 ]; then
+        echo 64opt > ~arch
+      else
+        echo 64compact > ~arch
+      fi
     ;;
     4)
       echo 32BI > ~arch
