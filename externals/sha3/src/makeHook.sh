@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ ! -f ~arch ]; then
+if [ ! -f arch ]; then
   echo '#include <stdio.h>
     int main(){printf("%d", sizeof(long));return 0;}' | cc -x c -
   SIZEOF_LONG=$(./a.out)
@@ -16,21 +16,21 @@ return 1;}' | cc -x c -
       x86_64=$?
       rm -f a.out
       if [ $x86_64 -eq 0 ]; then
-        echo 64opt > ~arch
+        echo 64opt > arch
       else
-        echo 64compact > ~arch
+        echo 64compact > arch
       fi
     ;;
     4)
-      echo 32BI > ~arch
+      echo 32BI > arch
     ;;
   esac
 fi
 
 rm -f SnP-interface.h
-ln -s $(cat ~arch)/SnP-interface.h SnP-interface.h
+ln -s $(cat arch)/SnP-interface.h SnP-interface.h
 
 make clean
-make ARCH=$(cat ~arch)
+make ARCH=$(cat arch)
 strip -S libsha3.a
 
