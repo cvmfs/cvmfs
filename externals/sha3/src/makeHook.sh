@@ -7,9 +7,9 @@ if [ ! -f ~arch ]; then
   rm -f a.out
   case $SIZEOF_LONG in
     8)
-      echo 'int main() { \
-#ifdef __x86_64__ \
-return 0; \
+      echo 'int main() {
+#ifdef __x86_64__
+return 0;
 #endif
 return 1;}' | cc -x c -
       ./a.out
