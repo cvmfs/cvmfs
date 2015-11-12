@@ -204,13 +204,18 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
         // 5XX returned by host
         info->error_code = kFailHostHttp;
       } else if ((header_line.length() > i+2) && (header_line[i] == '4') &&
-                 (header_line[i+1] == '0') && (header_line[i+2] == '4'))
+                 (header_line[i+1] == '0'))
       {
-        // 404: the stratum 1 does not have the newest files
-        info->error_code = kFailHostHttp;
-      } else {
-        info->error_code = (info->proxy == "") ? kFailHostHttp :
-                                                 kFailProxyHttp;
+        if (header_line[i+2] == '4') {
+          LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr,
+                   "%s not found on server", info->url->c_str());
+          info->error_code = kFailHostHttp;
+        } else if (header_line[i+2] == '3') {
+          info->error_code = kFailHostHttp;
+        } else {
+          info->error_code = (info->proxy == "") ? kFailHostHttp :
+                                                   kFailProxyHttp;
+        }
       }
       return 0;
     }
@@ -1139,6 +1144,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
         info->error_code = kFailHostConnection;
       break;
     case CURLE_TOO_MANY_REDIRECTS:
+      info->error_code = kFailHostConnection;
+      break;
+    case CURLE_SSL_CACERT:
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "SSL certificate cannot"
+               "be authenticated with known CA certificates. "
+               "X509_CERT_DIR might point to the wrong directory.");
       info->error_code = kFailHostConnection;
       break;
     case CURLE_ABORTED_BY_CALLBACK:
