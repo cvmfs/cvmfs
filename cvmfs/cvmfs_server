@@ -2953,8 +2953,17 @@ import() {
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
   [ -d $storage_location ] || die "Did not find repository storage to import at $storage_location"
-  [ -f "${storage_location}/.cvmfspublished" ] && \
-  [ -d "${storage_location}/data" ] || die "$storage_location does not seem to be a repository storage"
+  [ -f "${storage_location}/.cvmfspublished" ] || die "${storage_location}/.cvmfspublished missing"
+  [ -d "${storage_location}/data"     ] || die "${storage_location}/data missing"
+  [ -d "${storage_location}/data/txn" ] || die "${storage_location}/data/txn missing"
+  i=0
+  while [ $i -lt 256 ]; do
+    subdir=$(printf "%02x" $i)
+    [ -d ${storage_location}/data/${subdir} ] || die "${storage_location}/data/XX incomplete [XX = $subdir]"
+    i=$(($i+1))
+  done
+  echo "done"
+
   if [ $recreate_whitelist -eq 0 ]; then
     [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
     local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
