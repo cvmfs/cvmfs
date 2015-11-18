@@ -190,6 +190,55 @@ cvmfs_run_test() {
 
   # ============================================================================
 
+  echo "removing repository again"
+  destroy_repo $CVMFS_TEST_REPO || return 19
+
+  echo "planting the repository with the tampered whitelist"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
+
+  echo "tamper with the backend storage (rename .../data)"
+  repo_storage=$(get_local_repo_storage $CVMFS_TEST_REPO)
+  sudo mv ${repo_storage}/data ${repo_storage}/dataX || return 20
+
+  echo "importing repository (should fail due to missing data dir)"
+  local import_log_1="import_1.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_1 2>&1 && return 21
+
+  echo "tamper with the backend storage (rename .../data/txn)"
+  sudo mv ${repo_storage}/dataX    ${repo_storage}/data      || return 22
+  sudo mv ${repo_storage}/data/txn ${repo_storage}/data/txnX || return 23
+
+  echo "importing repository (should fail due to missing data/txn dir)"
+  local import_log_2="import_2.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_2 2>&1 && return 24
+
+  echo "tamper with the backend storage (rename .../data/01)"
+  sudo mv ${repo_storage}/data/txnX ${repo_storage}/data/txn || return 25
+  sudo mv ${repo_storage}/data/01   ${repo_storage}/data/01X || return 26
+
+  echo "importing repository (should fail due to missing data/01 dir)"
+  local import_log_3="import_3.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_3 2>&1 && return 27
+
+  echo "check error messages"
+  cat $import_log_1 | grep 'data missing'              || return 28
+  cat $import_log_2 | grep 'txn missing'               || return 29
+  cat $import_log_3 | grep 'XX incomplete' | grep '01' || return 30
+
+  echo "repair the backend storage"
+  sudo mv ${repo_storage}/data/01X ${repo_storage}/data/01 || return 31
+
+  echo "importing repository and create a fresh whitelist"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r || return 32
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
   echo "open transaction to change something"
   start_transaction $CVMFS_TEST_REPO || return $?
 
