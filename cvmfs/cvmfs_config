@@ -1166,13 +1166,14 @@ cvmfs_bugreport() {
     Linux )
       commands=( 'uname -a' 'cat /etc/issue' 'hostname -f' 'ifconfig -a' 'cvmfs2 --version' \
                  'ls -lR /var/run/cvmfs' 'grep cvmfs2 /var/log/messages' 'grep cvmfs2 /var/log/syslog' \
+                 'journalctl -alm /usr/bin/cvmfs2' \
                  "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
                  'cvmfs_config probe' 'mount' 'df -h' 'ps -ef' \
                  'cvmfs_config status' 'cvmfs_config showconfig' \
                  'cvmfs_config chksetup' 'cvmfs_config stat -v' 'cvmfs_talk internal affairs' \
                  'cat /etc/fuse.conf'  'ls -la /usr/bin/fusermount' 'ls -la /bin/fusermount' \
                  'cat /etc/auto.master' 'cat /etc/autofs/auto.master' 'cat /etc/sysconfig/autofs' \
-                 'cat /etc/default/autofs' 'cat /etc/conf.d/autofs' \
+                 'cat /etc/default/autofs' 'cat /etc/conf.d/autofs' 'journalctl -almu autofs.service' \
                  'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' 'cat /proc/cpuinfo' \
                  'cat /etc/hosts' 'free -m' )
       ;;
