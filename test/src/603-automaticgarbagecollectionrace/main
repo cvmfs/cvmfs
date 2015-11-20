@@ -1,0 +1,42 @@
+
+cvmfs_test_name="Automatic Garbage Collection Preserves Re-added Objects"
+cvmfs_test_autofs_on_startup=false
+
+#
+# Regression Test for Automatic Garbage Collection
+#
+# Both 2.1.20 and the server pre-release of 2.2.0 might delete data objects that
+# have just been added to the repository when running automatic GC. For that the
+# affected data object must have been present in the repository before and later
+# re-added after a period where it was not present in the repository.
+#
+# The scenario is as follows (revision timeline):
+#
+#                         auto-GC                         currently publishing
+#                        threshold                        transaction (8)
+#                            |                                   |
+#     1        2        3    |   4        5        6        7    |   8
+# ----#--------:--------:----|---:--------:--------:--------:----|---:->
+#  already    contains the   |   doesn't contain the object X    | new revision
+#   swept       object X     |                                   | containing X
+#  earlier                   |                                   | again
+#
+# The publish operation has created (and uploaded) all objects for the upcoming
+# revision 8 but it is not yet committed (.cvmfspublished not updated yet). Now
+# the automatic garbage collection runs with a threshold so that revisions 4-8
+# are preserved and revisions 2 and 3 are swept.
+# Object X is referenced in revision 2 and/or 3 but not in 4-7. However it has
+# been re-added in revision 8 and is therefore _not_ garbage.
+#
+# In the affected CVMFS versions auto-GC will only consider revisions 4-7 for
+# preservation but NOT revision 8. Hence, it will not mark object X as 'needed'.
+# Since object X is referenced by the condemned revisions 2 and/or 3 it will be
+# removed even though revision 8 has a reference to it.
+#
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+
+  return 1
+}
