@@ -302,6 +302,8 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
 
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
+  
+  database_flags |= entry.compression_algorithm() << kFlagPosCompression;
 
   return database_flags;
 }
@@ -321,6 +323,14 @@ shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
   in_flags++;
   assert(in_flags < shash::kAny);
   return static_cast<shash::Algorithms>(in_flags);
+}
+
+
+zlib::Algorithms SqlDirent::RetrieveCompressionAlgorithm(const unsigned flags) const {
+  // 3 bits, so use 7 (111) to only pull out the flags we want
+  unsigned in_flags = (( 7 << kFlagPosCompression) & flags) >> kFlagPosCompression;
+  return static_cast<zlib::Algorithms>(in_flags);
+  
 }
 
 
@@ -561,6 +571,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.has_xattrs_       = RetrieveInt(15) != 0;
     result.checksum_         =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
+    result.compression_algorithm_  = RetrieveCompressionAlgorithm(database_flags);
 
     if (g_claim_ownership) {
       result.uid_             = g_uid;
