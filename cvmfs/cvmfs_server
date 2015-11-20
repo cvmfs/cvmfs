@@ -2971,6 +2971,7 @@ import() {
   done
   for item in $needed_items; do
     [ -e $item ] || die "$item missing"
+    [ $chown_backend -ne 0 ] || [ x"$cvmfs_user" = x"$(stat -c%U $item)" ] || die "$item not owned by $cvmfs_user"
   done
 
   if [ $recreate_whitelist -eq 0 ]; then
