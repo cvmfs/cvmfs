@@ -239,6 +239,34 @@ cvmfs_run_test() {
 
   # ============================================================================
 
+  echo "removing repository again"
+  destroy_repo $CVMFS_TEST_REPO || return 33
+
+  echo "planting the repository with the tampered whitelist"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
+
+  echo "tamper with the backend storage (chown .../data/76)"
+  repo_storage=$(get_local_repo_storage $CVMFS_TEST_REPO)
+  sudo chown 1337 ${repo_storage}/data/76 || return 34
+
+  echo "importing repository (should fail due to not owning .../data/76)"
+  local import_log_4="import_4.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_4 2>&1 && return 35
+
+  echo "check error messages"
+  cat $import_log_4 | grep '/76 not owned by' || return 36
+
+  echo "importing repository chown-ing the backend and create a fresh whitelist"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r -g || return 37
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
   echo "open transaction to change something"
   start_transaction $CVMFS_TEST_REPO || return $?
 
