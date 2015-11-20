@@ -220,13 +220,13 @@ cvmfs_run_test() {
   local import_log_3="import_3.log"
   import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_3 2>&1 && return 27
 
-  echo "check error messages"
-  cat $import_log_1 | grep 'data missing'              || return 28
-  cat $import_log_2 | grep 'txn missing'               || return 29
-  cat $import_log_3 | grep 'XX incomplete' | grep '01' || return 30
-
   echo "repair the backend storage"
   sudo mv ${repo_storage}/data/01X ${repo_storage}/data/01 || return 31
+
+  echo "check error messages"
+  cat $import_log_1 | grep 'data missing' || return 28
+  cat $import_log_2 | grep 'txn missing'  || return 29
+  cat $import_log_3 | grep '/01 missing'  || return 30
 
   echo "importing repository and create a fresh whitelist"
   import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r || return 32
