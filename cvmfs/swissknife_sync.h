@@ -93,6 +93,8 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Switch('v', "repository containing volatile files"));
     r.push_back(Parameter::Switch(
       'z', "mark new repository as garbage collectable"));
+    r.push_back(Parameter::Optional(
+      'Z', "compression algorithm (default: zlib)"));
     return r;
   }
   int Main(const ArgumentList &args);
@@ -112,6 +114,8 @@ class CommandUpload : public Command {
     r.push_back(Parameter::Mandatory('o', "destination path"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
+    r.push_back(Parameter::Optional(
+      'Z', "compression algorithm (default: zlib)"));
     return r;
   }
   int Main(const ArgumentList &args);
@@ -234,6 +238,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
+    r.push_back(Parameter::Optional(
+      'Z', "compression algorithm (default: zlib)"));
     return r;
   }
   int Main(const ArgumentList &args);

@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "bigvector.h"
+#include "compression.h"
 #include "hash.h"
 #include "platform.h"
 #include "shortstring.h"
@@ -141,6 +142,10 @@ class DirectoryEntryBase {
     has_xattrs_ = has_xattrs;
   }
 
+  inline zlib::Algorithms compression_algorithm() const {
+    return compression_algorithm_;
+  }
+
   /**
    * Converts to a stat struct as required by many Fuse callbacks.
    * @return the struct stat for this DirectoryEntry
@@ -196,6 +201,9 @@ class DirectoryEntryBase {
   // it can be computed just using the file contents.  We therefore put it in
   // this base class.
   shash::Any checksum_;
+
+  // The compression algorithm
+  zlib::Algorithms compression_algorithm_;
 };
 
 

@@ -228,8 +228,8 @@ static std::string GetCvmfsBinary() {
 #ifdef __APPLE__
   int major, minor, patch;
   platform_get_os_version(&major, &minor, &patch);
-  if (major == 10 && minor >= 11) {    // OS X El Capitan came with SIP, forcing
-    paths.push_back("/usr/local/bin"); // us to become relocatable
+  if (major == 10 && minor >= 11) {     // OS X El Capitan came with SIP,
+    paths.push_back("/usr/local/bin");  // forcing us to become relocatable
   }
 #endif
 
