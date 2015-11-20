@@ -76,38 +76,36 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
                                  const size_t          bytes,
                                  const bool            finalize) {
   shash::ContextPtr &ch_ctx = chunk_->content_hash_context();
-  // We need to make a copy 
+  // We need to make a copy
   unsigned char* running_data = const_cast<unsigned char*>(data);
   size_t running_inputsize = bytes;
   bool done = false;
   // Loop through the output, copying data to the deflate buffer
   while (done == false) {
-    
     // Request however much the compressor thinks we need
-    CharBuffer *compress_buffer = chunk_->GetDeflateBuffer(chunk_->compressor()->DeflateBound(running_inputsize));
+    size_t deflate_bound =
+      chunk_->compressor()->DeflateBound(running_inputsize);
+    CharBuffer *compress_buffer = chunk_->GetDeflateBuffer(deflate_bound);
     assert(compress_buffer != NULL);
     assert(compress_buffer->free_bytes() > 0);
-    
+
     size_t outbufsize = compress_buffer->free_bytes();
     unsigned char* output_start = compress_buffer->free_space_ptr();
-    
+
     // Do a single deflate
-    done = chunk_->compressor()->Deflate( output_start, outbufsize, running_data, running_inputsize, finalize);
-    
+    done = chunk_->compressor()->Deflate(
+      output_start, outbufsize, running_data, running_inputsize, finalize);
+
     // Now:
     //  outbufsize is the number of bytes used
     //  running_inputsize is the number of bytes left to be read in
     //  running_data is a pointer to the next part of input
-    //  
+    //
     compress_buffer->SetUsedBytes(compress_buffer->used_bytes() + outbufsize);
-    
+
     // Update the hash
     shash::Update(output_start, outbufsize, ch_ctx);
-            
-    
-    
   }
-
 }
 
 

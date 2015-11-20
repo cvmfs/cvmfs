@@ -12,11 +12,11 @@
 #include <string>
 #include <vector>
 
+#include "../compression.h"
 #include "../duplex_zlib.h"
 #include "../hash.h"
-#include "char_buffer.h"
-#include "../compression.h"
 #include "../util.h"
+#include "char_buffer.h"
 
 namespace upload {
 
@@ -35,13 +35,24 @@ class File;
  */
 class Chunk {
  public:
-  Chunk(File* file, const off_t offset, shash::Algorithms hash_algorithm, zlib::Algorithms compression_alg) :
-    file_(file), file_offset_(offset), chunk_size_(0),
-    is_bulk_chunk_(false), is_fully_defined_(false), deferred_write_(false),
-    zlib_initialized_(false), compression_algorithm_(compression_alg), content_hash_context_(hash_algorithm),
-    content_hash_(hash_algorithm, shash::kSuffixPartial),
-    content_hash_initialized_(false), upload_stream_handle_(NULL),
-    current_deflate_buffer_(NULL), bytes_written_(0)
+  Chunk(File* file,
+        const off_t offset,
+        shash::Algorithms hash_algorithm,
+        zlib::Algorithms compression_alg)
+        : file_(file)
+        , file_offset_(offset)
+        , chunk_size_(0)
+        , is_bulk_chunk_(false)
+        , is_fully_defined_(false)
+        , deferred_write_(false)
+        , zlib_initialized_(false)
+        , compression_algorithm_(compression_alg)
+        , content_hash_context_(hash_algorithm)
+        , content_hash_(hash_algorithm, shash::kSuffixPartial)
+        , content_hash_initialized_(false)
+        , upload_stream_handle_(NULL)
+        , current_deflate_buffer_(NULL)
+        , bytes_written_(0)
   {
     Initialize();
   }
@@ -159,11 +170,11 @@ class Chunk {
    */
   size_t                   bytes_written_;
   tbb::atomic<size_t>      compressed_size_;  ///< size of the compressed data
-  
+
   /**
    * Compressor
    */
-   UniquePtr<zlib::Compressor>  compressor_;
+  UniquePtr<zlib::Compressor>  compressor_;
 };
 
 typedef std::vector<Chunk*> ChunkVector;

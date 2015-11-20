@@ -593,7 +593,8 @@ int cvmfs_context::Open(const char *c_path) {
       return -EIO;
     }
 
-    fd = chunk_tables_.Add(FileChunkReflist(chunks, path, dirent.compression_algorithm()));
+    fd = chunk_tables_.Add(
+      FileChunkReflist(chunks, path, dirent.compression_algorithm()));
     return fd | kFdChunked;
   }
 
@@ -632,7 +633,8 @@ int64_t cvmfs_context::Pread(
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
-    zlib::Algorithms compression_alg = open_chunks.chunk_reflist.compression_alg;
+    zlib::Algorithms compression_alg =
+      open_chunks.chunk_reflist.compression_alg;
     if (chunk_list == NULL)
       return -EBADF;
 

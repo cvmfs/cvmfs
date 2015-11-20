@@ -188,13 +188,12 @@ static void *MainCheck(void *data __attribute__((unused))) {
     } else {
       if (hash != expected_hash) {
         // If the hashes don't match, try hashing the uncompressed file
-        if(!shash::HashFile(relative_path, &hash)) {
+        if (!shash::HashFile(relative_path, &hash)) {
           LogCvmfs(kLogCvmfs, kLogStdout, "Error: could not hash %s",
                    path.c_str());
           atomic_inc32(&g_num_err_operational);
         }
         if (hash != expected_hash) {
-        
           if (g_fix_errors) {
             const string quarantaine_path = "./quarantaine/" + hash_name;
             bool fixed = false;
@@ -228,8 +227,9 @@ static void *MainCheck(void *data __attribute__((unused))) {
               atomic_inc32(&g_num_err_unfixed);
             }
           } else {
-            LogCvmfs(kLogCvmfs, kLogStdout, "Error: %s has compressed checksum %s"
-                     ", delete this file from cache directory!",
+            LogCvmfs(kLogCvmfs, kLogStdout,
+                     "Error: %s has compressed checksum %s, "
+                     "delete this file from cache directory!",
                      path.c_str(), hash.ToString().c_str());
             atomic_inc32(&g_num_err_unfixed);
           }

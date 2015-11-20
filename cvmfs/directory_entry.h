@@ -16,11 +16,11 @@
 #include <vector>
 
 #include "bigvector.h"
+#include "compression.h"
 #include "hash.h"
 #include "platform.h"
 #include "shortstring.h"
 #include "util.h"
-#include "compression.h"
 
 namespace publish {
 class SyncItem;
@@ -141,7 +141,7 @@ class DirectoryEntryBase {
   inline void set_has_xattrs(const bool has_xattrs) {
     has_xattrs_ = has_xattrs;
   }
-  
+
   inline zlib::Algorithms compression_algorithm() const {
     return compression_algorithm_;
   }
@@ -201,7 +201,7 @@ class DirectoryEntryBase {
   // it can be computed just using the file contents.  We therefore put it in
   // this base class.
   shash::Any checksum_;
-  
+
   // The compression algorithm
   zlib::Algorithms compression_algorithm_;
 };

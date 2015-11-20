@@ -109,13 +109,14 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
   zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
   if (args.find('Z') != args.end()) {
-    compression_algorithm = zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+    compression_algorithm =
+      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
     if (compression_algorithm == zlib::kUnknown) {
       PrintError("unknown compression algorithm");
       return 1;
     }
   }
-  
+
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
 
@@ -532,13 +533,14 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   }
   zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
   if (args.find('Z') != args.end()) {
-    compression_algorithm = zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+    compression_algorithm =
+      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
     if (compression_algorithm == zlib::kUnknown) {
       PrintError("unknown compression algorithm");
       return 1;
     }
   }
-  
+
   if (args.find('j') != args.end()) {
     params.catalog_entry_warn_threshold =
       String2Uint64(*args.find('j')->second);

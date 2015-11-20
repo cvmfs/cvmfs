@@ -1071,7 +1071,9 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
 
       // Decompress memory in a single run
-      if ((info->destination == kDestinationMem) && (info->compression_alg == zlib::kZlibDefault)) {
+      if ((info->destination == kDestinationMem) &&
+          (info->compression_alg == zlib::kZlibDefault))
+      {
         void *buf;
         uint64_t size;
         bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,

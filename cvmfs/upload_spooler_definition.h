@@ -7,8 +7,8 @@
 
 #include <string>
 
-#include "hash.h"
 #include "compression.h"
+#include "hash.h"
 
 namespace upload {
 

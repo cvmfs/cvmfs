@@ -10,8 +10,8 @@
 #include <string>
 #include <vector>
 
-#include "../hash.h"
 #include "../compression.h"
+#include "../hash.h"
 #include "../platform.h"
 #include "char_buffer.h"
 #include "chunk_detector.h"

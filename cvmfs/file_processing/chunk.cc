@@ -57,7 +57,7 @@ void Chunk::Initialize() {
 
   content_hash_context_.buffer = smalloc(content_hash_context_.size);
   shash::Init(content_hash_context_);
-  
+
   // Uses PolymorphicConstruction class from util.h, which
   // has a Construct function to create the appropriate object
   // from a parameter, a zlib::Algorithms in this case

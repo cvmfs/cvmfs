@@ -79,7 +79,7 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
     (args.find('f') == args.end())
     ? ""
     : *args.find('f')->second;
-  
+
   const zlib::Algorithms compression_alg =
     (args.find('Z') == args.end())
     ? zlib::kZlibDefault

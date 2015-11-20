@@ -1074,7 +1074,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables_->Lock();
       // Check again to avoid race
       if (!chunk_tables_->inode2chunks.Contains(ino)) {
-        chunk_tables_->inode2chunks.Insert(ino, FileChunkReflist(chunks, path, dirent.compression_algorithm()));
+        chunk_tables_->inode2chunks.Insert(
+          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm()));
         chunk_tables_->inode2references.Insert(ino, 1);
       } else {
         uint32_t refctr;
@@ -1170,7 +1171,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
   catalog::DirectoryEntry dirent;
   found = GetDirentForInode(ino, &dirent);
   if (!found) {
-    // TODO: Better error handling
+    // TODO(jblomer): Better error handling
     return;
   }
 
@@ -1697,7 +1698,8 @@ bool Pin(const string &path) {
   if (!retval)
     return false;
   int fd = fetcher_->Fetch(
-    dirent.checksum(), dirent.size(), path, dirent.compression_algorithm(), cache::CacheManager::kTypePinned);
+    dirent.checksum(), dirent.size(), path, dirent.compression_algorithm(),
+    cache::CacheManager::kTypePinned);
   if (fd < 0) {
     return false;
   }

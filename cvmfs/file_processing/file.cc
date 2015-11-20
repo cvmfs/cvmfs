@@ -71,7 +71,7 @@ void File::CreateInitialChunk() {
   assert(chunks_.size() == 0);
 
   const off_t offset = 0;
-  Chunk *new_chunk   = new Chunk(this, offset, hash_algorithm_, compression_alg_);
+  Chunk *new_chunk = new Chunk(this, offset, hash_algorithm_, compression_alg_);
 
   if (might_become_chunked_) {
     // for a potentially chunked file, the initial chunk needs to defer the
