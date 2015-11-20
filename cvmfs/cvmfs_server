@@ -123,14 +123,9 @@ if [ $CVMFS_SERVER_DEBUG -ne 0 ]; then
         # attach gdb and provide a prompt WITHOUT actual running the program
         CVMFS_SERVER_SWISSKNIFE_DEBUG="gdb --quiet --args cvmfs_swissknife_debug"
       ;;
-<<<<<<< HEAD
       3)
         # do not attach gdb just run debug version
         CVMFS_SERVER_SWISSKNIFE_DEBUG="cvmfs_swissknife_debug"
-=======
-      3) 
-        CVMFS_SERVER_SWISSKNIFE_DEBUG="valgrind --trace-children=yes -v --leak-check=full cvmfs_swissknife_debug"
->>>>>>> 0f2a56849e792a4ccfa448ea3ca97028b038e9b8
       ;;
     esac
   else
@@ -261,7 +256,7 @@ Supported Commands:
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
-                [-k path to existing keychain] 
+                [-k path to existing keychain]
                 [-Z compression algorithm (default: zlib)]
                 <fully qualified repository name>
                 Creates a new repository with a given name
@@ -1608,7 +1603,7 @@ sign_manifest() {
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
 
-  $user_shell "$(__swissknife_cmd dbg) sign \
+  $user_shell "$(__swissknife_cmd) sign \
     -c /etc/cvmfs/keys/${name}.crt      \
     -k /etc/cvmfs/keys/${name}.key      \
     -n $name                            \

@@ -795,16 +795,15 @@ void Compressor::RegisterPlugins() {
 
 
 /**
-  * ZlibCompressor functions
-  */
-
+ * ZlibCompressor functions
+ */
 bool ZlibCompressor::WillHandle(const zlib::Algorithms &alg) {
   return alg == kZlibDefault;
 }
 
-ZlibCompressor::ZlibCompressor(const Algorithms &alg):
-  Compressor(alg)
-  {
+ZlibCompressor::ZlibCompressor(const Algorithms &alg)
+  : Compressor(alg)
+{
   stream_.zalloc   = Z_NULL;
   stream_.zfree    = Z_NULL;
   stream_.opaque   = Z_NULL;

@@ -61,22 +61,22 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   explicit Compressor(const Algorithms &alg) {}
   virtual ~Compressor() {}
   /**
-    * Deflate funciton.  The arguments and returns closely match the input
-    * and output of the zlib deflate function.
-    * Input:
-    *   - outbuf - Ouput buffer to write the compressed data.
-    *   - outbufsize - Size of the output buffer
-    *   - inbuf - Input data to be compressed
-    *   - inbufsize - Size of the input buffer
-    *   - flush - Whether the compression stream should be flushed / finished
-    * Upon return:
-    *   returns: true - if done compressing, false otherwise
-    *   - outbuf - output buffer pointer (unchanged from input)
-    *   - outbufsize - The number of bytes used in the outbuf
-    *   - inbuf - Pointer to the next byte of input to read in
-    *   - inbufsize - the remaining bytes of input to read in.
-    *   - flush - unchanged from input
-    */
+   * Deflate funciton.  The arguments and returns closely match the input
+   * and output of the zlib deflate function.
+   * Input:
+   *   - outbuf - Ouput buffer to write the compressed data.
+   *   - outbufsize - Size of the output buffer
+   *   - inbuf - Input data to be compressed
+   *   - inbufsize - Size of the input buffer
+   *   - flush - Whether the compression stream should be flushed / finished
+   * Upon return:
+   *   returns: true - if done compressing, false otherwise
+   *   - outbuf - output buffer pointer (unchanged from input)
+   *   - outbufsize - The number of bytes used in the outbuf
+   *   - inbuf - Pointer to the next byte of input to read in
+   *   - inbufsize - the remaining bytes of input to read in.
+   *   - flush - unchanged from input
+   */
   virtual bool Deflate(unsigned char *outbuf, size_t& outbufsize,
           unsigned char*& inbuf, size_t& inbufsize,
           const bool flush) = 0;

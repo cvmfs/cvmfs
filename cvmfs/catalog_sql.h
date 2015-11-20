@@ -188,8 +188,8 @@ class SqlDirent : public Sql {
   // hashes
   static const int kFlagPosHash             = 8;
   // Compression methods, 3 bits starting at 2^11
-  // compression methods.  Corresponds to zlib::Algorithms
-  static const int kFlagPosCompression         = 11;
+  // Corresponds to zlib::Algorithms
+  static const int kFlagPosCompression      = 11;
 
  protected:
   /**
