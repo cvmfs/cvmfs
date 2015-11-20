@@ -2950,6 +2950,14 @@ import() {
     check_aufs                      || die "aufs kernel module missing"
   fi
 
+  # repository owner dialog
+  local cvmfs_user=$(get_cvmfs_owner $name $owner)
+  check_user $cvmfs_user || die "No user $cvmfs_user"
+  [ x"$file_ownership" = x ] && file_ownership="$(id -u $cvmfs_user):$(id -g $cvmfs_user)"
+  echo $file_ownership | grep -q "^[0-9][0-9]*:[0-9][0-9]*$" || die "Unrecognized file ownership: $file_ownership | expected: <uid>:<gid>"
+  local cvmfs_uid=$(echo $file_ownership | cut -d: -f1)
+  local cvmfs_gid=$(echo $file_ownership | cut -d: -f2)
+
   # investigate the given repository storage for sanity
   local storage_location=$(get_upstream_config $upstream)
   [ -d $storage_location ] || die "Did not find repository storage to import at $storage_location"
@@ -2971,14 +2979,6 @@ import() {
   else
     [ -f ${keys_location}/${master_key} ] || die "no master key found for whitelist recreation"
   fi
-
-  # repository owner dialog
-  local cvmfs_user=$(get_cvmfs_owner $name $owner)
-  check_user $cvmfs_user || die "No user $cvmfs_user"
-  [ x"$file_ownership" = x ] && file_ownership="$(id -u $cvmfs_user):$(id -g $cvmfs_user)"
-  echo $file_ownership | grep -q "^[0-9][0-9]*:[0-9][0-9]*$" || die "Unrecognized file ownership: $file_ownership | expected: <uid>:<gid>"
-  local cvmfs_uid=$(echo $file_ownership | cut -d: -f1)
-  local cvmfs_gid=$(echo $file_ownership | cut -d: -f2)
 
   # set up desaster cleanup
   IMPORT_DESASTER_REPO_NAME="$name"
