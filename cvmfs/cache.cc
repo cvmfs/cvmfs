@@ -641,9 +641,13 @@ void PosixCacheManager::TearDown2ReadOnly() {
 int64_t PosixCacheManager::Write(const void *buf, uint64_t size, void *txn) {
   Transaction *transaction = reinterpret_cast<Transaction *>(txn);
 
-  if ((transaction->expected_size != kSizeUnknown) && (transaction->size + size > transaction->expected_size)) {
-    LogCvmfs(kLogCache, kLogDebug, "Transaction size (%d) > expected size (%d)", transaction->size + size, transaction->expected_size);
-    return -ENOSPC;
+  if (transaction->expected_size != kSizeUnknown) {
+    if (transaction->size + size > transaction->expected_size) {
+      LogCvmfs(kLogCache, kLogDebug,
+               "Transaction size (%"PRIu64") > expected size (%"PRIu64")",
+               transaction->size + size, transaction->expected_size);
+      return -ENOSPC;
+    }
   }
 
   uint64_t written = 0;
