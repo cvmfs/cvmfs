@@ -150,6 +150,11 @@ void WritableCatalog::AddEntry(
   DirectoryEntry effective_entry(entry);
   effective_entry.set_has_xattrs(!xattrs.IsEmpty());
 
+  if (effective_entry.IsRegular() && GetExternalData()) {
+    LogCvmfs(kLogCatalog, kLogDebug, "Entry is set as external data.");
+    effective_entry.set_is_external_file(true);
+  }
+
   bool retval =
     sql_insert_->BindPathHash(path_hash) &&
     sql_insert_->BindParentPathHash(parent_hash) &&

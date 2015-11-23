@@ -81,6 +81,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
                                               const bool garbage_collectable,
+                                              CatalogProperty external_data,
                                               upload::Spooler   *spooler);
 
   // DirectoryEntry handling
@@ -109,7 +110,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void ShrinkHardlinkGroup(const std::string &remove_path);
 
   // Nested catalog handling
-  void CreateNestedCatalog(const std::string &mountpoint);
+  void CreateNestedCatalog(const std::string &mountpoint,
+                           CatalogProperty external_data);
   void RemoveNestedCatalog(const std::string &mountpoint);
   bool IsTransitionPoint(const std::string &path);
 

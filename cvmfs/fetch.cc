@@ -121,7 +121,7 @@ int Fetcher::Fetch(
 
   // Involve the download manager
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", name.c_str());
-  const string url = "/data/" + id.MakePath();
+  const std::string url = external_ ? name : "/data/" + id.MakePath();
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   retval = cache_mgr_->StartTxn(id, size, txn);
   if (retval < 0) {
@@ -176,8 +176,11 @@ Fetcher::Fetcher(
   cache::CacheManager *cache_mgr,
   download::DownloadManager *download_mgr,
   BackoffThrottle *backoff_throttle,
-  perf::Statistics *statistics)
-  : lock_queues_download_(NULL)
+  perf::Statistics *statistics,
+  const std::string &name,
+  bool external)
+  : external_(external)
+  , lock_queues_download_(NULL)
   , lock_tls_blocks_(NULL)
   , cache_mgr_(cache_mgr)
   , download_mgr_(download_mgr)
@@ -194,7 +197,7 @@ Fetcher::Fetcher(
     smalloc(sizeof(pthread_mutex_t)));
   retval = pthread_mutex_init(lock_tls_blocks_, NULL);
   assert(retval == 0);
-  n_downloads = statistics->Register("fetch.n_downloads",
+  n_downloads = statistics->Register(name + ".n_downloads",
     "overall number of downloaded files (incl. catalogs, chunks)");
 }
 

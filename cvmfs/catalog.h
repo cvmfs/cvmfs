@@ -168,6 +168,7 @@ class Catalog : public SingleCopy {
     return ((database_ != NULL) && database_->OwnsFile()) || managed_database_;
   }
 
+  bool GetExternalData() const;
   uint64_t GetTTL() const;
   uint64_t GetRevision() const;
   uint64_t GetLastModified() const;
@@ -255,6 +256,20 @@ class Catalog : public SingleCopy {
   void FixTransitionPoint(const shash::Md5 &md5path,
                           DirectoryEntry *dirent) const;
 
+  // Represents the status of the external data bit in the catalog
+  // The presence of 'unspecified' is used to calculate inheritance;
+  // outside this object, the status should be returned as a boolean.
+  enum ExternalDataStatus {
+    kExternalUnknown,  // Database has not been queried about external
+                       // data status.
+    kExternalNone,  // External data property is explicitly disabled.
+    kExternalPresent,  // External data is explicitly enabled.
+    kExternalUnspecified,  // External data is not explicitly set in the
+                           // database.
+  };
+  ExternalDataStatus GetExternalDataLocked() const;
+  ExternalDataStatus GetExternalDataUnlocked() const;  // For holders of lock_
+
  private:
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                    DirectoryEntry *dirent) const;
@@ -267,6 +282,8 @@ class Catalog : public SingleCopy {
   bool volatile_flag_;
   const bool is_root_;
   bool managed_database_;
+
+  mutable atomic_int32 external_data_status_;
 
   Catalog *parent_;
   NestedCatalogMap children_;
