@@ -19,12 +19,12 @@ export DH_VERBOSE=1
 
 Makefile: 
 	dh_testdir
-	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no -DBUILD_LIBCVMFS=no -DCMAKE_INSTALL_PREFIX:PATH=/usr
+	dh_auto_configure -- -DBUILD_SERVER=yes -DBUILD_SERVER_DEBUG=yes -DBUILD_UNITTESTS=yes -DINSTALL_UNITTESTS=yes -DINSTALL_PUBLIC_KEYS=no -DBUILD_LIBCVMFS=yes -DCMAKE_INSTALL_PREFIX:PATH=/usr
 
 build: build-stamp
 build-stamp: Makefile
 	dh_testdir
-	dh_auto_build
+	dh_auto_build --parallel
 	touch build-stamp
 
 clean:

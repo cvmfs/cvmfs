@@ -28,6 +28,7 @@ cleanup() {
   echo "cleaning up the build environment..."
   umount ${DESTINATION}/dev  || true
   umount ${DESTINATION}/proc || true
+  umount ${DESTINATION}/sys  || true
   rm -f $YUM_REPO_CFG        || true
   rm -fR $DESTINATION        || true
 }
@@ -43,7 +44,7 @@ cat > $YUM_REPO_CFG << EOF
 name=$SYSTEM_NAME base system packages
 baseurl=$REPO_BASE_URL
 gpgkey=$GPG_KEY_PATHS
-gpgcheck=0
+gpgcheck=1
 enabled=0
 EOF
 
@@ -77,7 +78,9 @@ echo "do generic system setup..."
 cp /etc/resolv.conf ${DESTINATION}/etc/resolv.conf
 echo "NETWORKING=yes" > ${DESTINATION}/etc/sysconfig/network
 chroot $DESTINATION ln -f /usr/share/zoneinfo/Etc/UTC /etc/localtime
+mkdir -p ${DESTINATION}/dev ${DESTINATION}/sys ${DESTINATION}/proc
 mount --bind /dev ${DESTINATION}/dev
+mount -t sysfs sys ${DESTINATION}/sys/
 
 echo "recreating RPM database with chroot'ed RPM version..."
 rm -fR $rpm_db_dir && mkdir -p $rpm_db_dir
@@ -90,6 +93,7 @@ chroot $DESTINATION yum clean all
 rm -f ${DESTINATION}/etc/resolv.conf
 umount ${DESTINATION}/dev  || true # ignore failing umount
 umount ${DESTINATION}/proc || true # ignore failing umount
+umount ${DESTINATION}/sys  || true # ignore failing umount
 
 echo "packaging up the image..."
 tar -czf $TARBALL_NAME -C $DESTINATION .

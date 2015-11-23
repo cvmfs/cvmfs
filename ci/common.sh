@@ -110,16 +110,28 @@ generate_package_map() {
   local platform="$1"
   local client="$2"
   local server="$3"
-  local unittests="$4"
-  local config="$5"
+  local devel="$4"
+  local unittests="$5"
+  local config="$6"
 
   cat > pkgmap.${platform} << EOF
 [$platform]
 client=$client
 server=$server
+devel=$devel
 unittests=$unittests
 config=$config
 EOF
+}
+
+get_number_of_cpu_cores() {
+  if is_linux; then
+    cat /proc/cpuinfo | grep -e '^processor' | wc -l
+  elif is_macos; then
+    sysctl -n hw.ncpu
+  else
+    echo "1"
+  fi
 }
 
 python_version() {

@@ -128,7 +128,7 @@ cvmfs_run_test() {
   respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
 
   echo "importing repository to recreate the backend infrastructure"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER $CVMFS_TEST_REPO || return 9
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return 9
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
@@ -145,7 +145,7 @@ cvmfs_run_test() {
   respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend || return $?
 
   echo "importing repository with a provided keychain"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER -k $(pwd)/$repo_keychain $CVMFS_TEST_REPO || return 11
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -k $(pwd)/$repo_keychain || return 11
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
@@ -166,7 +166,7 @@ cvmfs_run_test() {
   respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
 
   echo "importing repository (should fail due to whitelist)"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER $CVMFS_TEST_REPO && return 14
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER && return 14
 
   echo "(temporarily) moving the masterkey"
   local masterkey="/etc/cvmfs/keys/${CVMFS_TEST_REPO}.masterkey"
@@ -174,13 +174,90 @@ cvmfs_run_test() {
   sudo mv $masterkey $hidden_masterkey || return 15
 
   echo "importing repository (should fail due to missing masterkey)"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER -r $CVMFS_TEST_REPO && return 16
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r && return 16
 
   echo "moving the masterkey back in place"
   sudo mv $hidden_masterkey $masterkey || return 17
 
   echo "importing repository and create a fresh whitelist"
-  sudo cvmfs_server import -o $CVMFS_TEST_USER -r $CVMFS_TEST_REPO || return 18
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r || return 18
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
+  echo "removing repository again"
+  destroy_repo $CVMFS_TEST_REPO || return 19
+
+  echo "planting the repository with the tampered whitelist"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
+
+  echo "tamper with the backend storage (rename .../data)"
+  repo_storage=$(get_local_repo_storage $CVMFS_TEST_REPO)
+  sudo mv ${repo_storage}/data ${repo_storage}/dataX || return 20
+
+  echo "importing repository (should fail due to missing data dir)"
+  local import_log_1="import_1.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_1 2>&1 && return 21
+
+  echo "tamper with the backend storage (rename .../data/txn)"
+  sudo mv ${repo_storage}/dataX    ${repo_storage}/data      || return 22
+  sudo mv ${repo_storage}/data/txn ${repo_storage}/data/txnX || return 23
+
+  echo "importing repository (should fail due to missing data/txn dir)"
+  local import_log_2="import_2.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_2 2>&1 && return 24
+
+  echo "tamper with the backend storage (rename .../data/01)"
+  sudo mv ${repo_storage}/data/txnX ${repo_storage}/data/txn || return 25
+  sudo mv ${repo_storage}/data/01   ${repo_storage}/data/01X || return 26
+
+  echo "importing repository (should fail due to missing data/01 dir)"
+  local import_log_3="import_3.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_3 2>&1 && return 27
+
+  echo "repair the backend storage"
+  sudo mv ${repo_storage}/data/01X ${repo_storage}/data/01 || return 31
+
+  echo "check error messages"
+  cat $import_log_1 | grep 'data missing' || return 28
+  cat $import_log_2 | grep 'txn missing'  || return 29
+  cat $import_log_3 | grep '/01 missing'  || return 30
+
+  echo "importing repository and create a fresh whitelist"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r || return 32
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
+  echo "removing repository again"
+  destroy_repo $CVMFS_TEST_REPO || return 33
+
+  echo "planting the repository with the tampered whitelist"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
+
+  echo "tamper with the backend storage (chown .../data/76)"
+  repo_storage=$(get_local_repo_storage $CVMFS_TEST_REPO)
+  sudo chown 1337 ${repo_storage}/data/76 || return 34
+
+  echo "importing repository (should fail due to not owning .../data/76)"
+  local import_log_4="import_4.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_4 2>&1 && return 35
+
+  echo "check error messages"
+  cat $import_log_4 | grep '/76 not owned by' || return 36
+
+  echo "importing repository chown-ing the backend and create a fresh whitelist"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r -g || return 37
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?

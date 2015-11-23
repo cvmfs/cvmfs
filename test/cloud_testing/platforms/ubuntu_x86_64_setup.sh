@@ -37,6 +37,7 @@ echo "installing DEB packages... "
 install_deb "$CONFIG_PACKAGES"
 install_deb $CLIENT_PACKAGE
 install_deb $SERVER_PACKAGE
+install_deb $DEVEL_PACKAGE
 install_deb $UNITTEST_PACKAGE
 
 # installing WSGI apache module
@@ -58,6 +59,7 @@ echo "done"
 # install test dependencies
 echo "installing test dependencies..."
 install_from_repo gcc                           || die "fail (installing gcc)"
+install_from_repo g++                           || die "fail (installing g++)"
 install_from_repo make                          || die "fail (installing make)"
 install_from_repo sqlite3                       || die "fail (installing sqlite3)"
 install_from_repo linux-image-extra-$(uname -r) || die "fail (installing AUFS)"

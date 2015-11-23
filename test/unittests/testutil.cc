@@ -168,9 +168,14 @@ shash::Any h(const std::string &hash, const shash::Suffix suffix) {
 
 namespace catalog {
 
-DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
+DirectoryEntry DirectoryEntryTestFactory::RegularFile(const string &name,
+                                                      unsigned size,
+                                                      shash::Any hash) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
+  dirent.name_ = NameString(name);
+  dirent.checksum_ = hash;
+  dirent.size_ = size;
   return dirent;
 }
 
@@ -182,25 +187,39 @@ DirectoryEntry DirectoryEntryTestFactory::ExternalFile() {
   return dirent;
 }
 
-
-DirectoryEntry DirectoryEntryTestFactory::Directory() {
+DirectoryEntry DirectoryEntryTestFactory::Directory(
+    const string &name,
+    unsigned size,
+    shash::Any hash,
+    bool is_nested_catalog_mountpoint) 
+{
   DirectoryEntry dirent;
   dirent.mode_ = 16893;
+  dirent.name_ = NameString(name);
+  dirent.checksum_ = hash;
+  dirent.size_ = size;
+  dirent.is_nested_catalog_mountpoint_ = is_nested_catalog_mountpoint;
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::Symlink() {
+DirectoryEntry DirectoryEntryTestFactory::Symlink(const string &name,
+                                                  unsigned size,
+                                                  const string &symlink_path) {
   DirectoryEntry dirent;
   dirent.mode_ = 41471;
+  dirent.name_ = NameString(name);
+  dirent.size_ = size;
+  dirent.symlink_ = LinkString(symlink_path);
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
+DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
   dirent.is_chunked_file_ = true;
+  dirent.checksum_ = content_hash;
   return dirent;
 }
 
@@ -266,7 +285,7 @@ void MockCatalog::RemoveChild(MockCatalog *child) {
   }
 }
 
-MockCatalog* MockCatalog::FindSubtree(const PathString &path) const {
+MockCatalog* MockCatalog::FindSubtree(const PathString &path) {
   for (unsigned i = 0; i < active_children_.size(); ++i) {
     if (active_children_[i].path == path)
       return active_children_[i].child;
@@ -291,7 +310,7 @@ bool MockCatalog::ListingPath(const PathString &path,
   unsigned initial_size = listing->size();
   shash::Md5 path_hash(path.GetChars(), path.GetLength());
   for (unsigned i = 0; i < files_.size(); ++i) {
-    if (files_[i].parent_hash == path_hash)
+    if (files_[i].parent_hash == path_hash && files_[i].name != "")
       listing->push_back(files_[i].ToDirectoryEntry());
   }
   return listing->size() > initial_size;
@@ -304,6 +323,17 @@ void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);
+
+  // update the directory entries in both catalogs
+  string path = child->root_path();
+  File *mountpoint = FindFile(path);
+  if (mountpoint != NULL) {
+    mountpoint->is_nested_catalog_mountpoint = true;
+  }
+  File *child_mountpoint = child->FindFile(path);
+  if (child_mountpoint != NULL) {
+    child_mountpoint->is_nested_catalog_mountpoint = true;
+  }
 }
 
 void MockCatalog::AddChild(MockCatalog *child) {
@@ -383,7 +413,7 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
     MockCatalog *catalog = it->second;
     *catalog_hash = catalog->hash();
   } else {
-    MockCatalog * catalog = new MockCatalog(mountpoint.ToString(),
+    MockCatalog *catalog = new MockCatalog(mountpoint.ToString(),
                                            hash, 4096, 1, 0,
                                            true, NULL, NULL);
     catalog_map_[mountpoint] = catalog;
@@ -398,9 +428,10 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   const uint64_t    catalog_size = 0;
   const std::string root_path    = "";
-  manifest::Manifest* manifest = new manifest::Manifest(MockCatalog::root_hash,
-                                                        catalog_size,
-                                                        root_path);
+  manifest::Manifest* manifest = new manifest::Manifest(
+      MockCatalog::root_hash,
+      catalog_size,
+      root_path);
   manifest->set_history(MockHistory::root_hash);
   return manifest;
 }

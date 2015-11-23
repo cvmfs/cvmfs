@@ -10,9 +10,11 @@ RUN         yum -y update && yum -y install                     \
                                         fuse-devel              \
                                         gcc                     \
                                         gcc-c++                 \
+                                        gdb                     \
                                         git                     \
                                         hardlink                \
                                         libattr-devel           \
+                                        libcap-devel            \
                                         make                    \
                                         openssl-devel           \
                                         python-devel            \

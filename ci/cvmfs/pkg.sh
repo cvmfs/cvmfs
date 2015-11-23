@@ -85,5 +85,6 @@ if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
                        "$(basename $(find . -regex '.*cvmfs-[0-9].*\.pkg'))" \
                        ""                                                    \
                        ""                                                    \
+                       ""                                                    \
                        ""
 fi

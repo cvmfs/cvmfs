@@ -72,6 +72,7 @@ set(CVMFS_UNITTEST_FILES
   t_manifest.cc
   t_tracer.cc
   t_file_chunk.cc
+  t_platforms.cc
 )
 
 #
@@ -216,6 +217,7 @@ endif (BUILD_UNITTESTS)
 add_dependencies (${PROJECT_TEST_NAME} googletest)
 add_dependencies (${PROJECT_TEST_NAME} sparsehash)
 add_dependencies (${PROJECT_TEST_NAME} libsha2)
+add_dependencies (${PROJECT_TEST_NAME} libsha3)
 add_test (NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME} --gtest_filter=-*Slow)
 add_dependencies (check ${PROJECT_TEST_NAME})
 
@@ -228,25 +230,27 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # add optional dependencies
 #
-if (LIBCURL_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
-endif (LIBCURL_BUILTIN)
+if (BUILD_UNITTESTS)
+  if (LIBCURL_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
+  endif (LIBCURL_BUILTIN)
 
-if (SQLITE3_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} sqlite3)
-endif (SQLITE3_BUILTIN)
+  if (SQLITE3_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} sqlite3)
+  endif (SQLITE3_BUILTIN)
 
-if (ZLIB_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} zlib)
-endif (ZLIB_BUILTIN)
+  if (ZLIB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} zlib)
+  endif (ZLIB_BUILTIN)
 
-if (PACPARSER_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} libpacparser)
-endif (PACPARSER_BUILTIN)
+  if (PACPARSER_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libpacparser)
+  endif (PACPARSER_BUILTIN)
 
-if (TBB_PRIVATE_LIB)
-  add_dependencies (${PROJECT_TEST_NAME} libtbb)
-endif (TBB_PRIVATE_LIB)
+  if (TBB_PRIVATE_LIB)
+    add_dependencies (${PROJECT_TEST_NAME} libtbb)
+  endif (TBB_PRIVATE_LIB)
+endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
   if (LIBCURL_BUILTIN)
@@ -270,6 +274,7 @@ if (BUILD_UNITTESTS_DEBUG)
   endif (TBB_PRIVATE_LIB)
   
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha2)
+  add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha3)
 endif (BUILD_UNITTESTS_DEBUG)
 
 #
@@ -288,7 +293,8 @@ set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_
                              ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${SHA2_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} pthread dl)
+                             ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} 
+                             pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
 

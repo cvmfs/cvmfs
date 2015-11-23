@@ -32,8 +32,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+const unsigned kPageSize = 4096;
 const size_t kMaxPathLength = 256;
-
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
@@ -163,6 +163,8 @@ std::string RfcTimestamp();
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
+bool String2Uint64Parse(const std::string &value, uint64_t *result);
+
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);

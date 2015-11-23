@@ -28,20 +28,6 @@ set (CernVM-FS_VERSION_STRING "${CernVM-FS_VERSION_MAJOR}.${CernVM-FS_VERSION_MI
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 #
-# Set install prefix to /usr.  Cvmfs is not relocatable.
-#
-if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  SET(CMAKE_INSTALL_PREFIX
-    "/usr" CACHE PATH "/usr install prefix" FORCE
-  )
-else (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  if (NOT ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr")
-    Message("Warning: CernVM-FS is not relotable and expects to be installed under /usr")
-  endif ()
-endif (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-
-
-#
 # detect the operating system and the distribution we are compiling on
 #
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -99,7 +85,8 @@ endif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm.*$")
 #
 if (MACOSX)
   set (CMAKE_INSTALL_LIBDIR "lib")
-  set (CMAKE_MOUNT_INSTALL_BINDIR "/sbin")
+  set (CMAKE_MOUNT_INSTALL_BINDIR "${CMAKE_INSTALL_PREFIX}/sbin")
+  set (CMAKE_MACOSX_RPATH false)
 else (MACOSX) # --> Linux
   if (DEBIAN OR ARCHLINUX)
     if (ARCHLINUX)
@@ -118,6 +105,20 @@ else (MACOSX) # --> Linux
   endif (DEBIAN OR ARCHLINUX)
 endif (MACOSX)
 message ("Installing shared libraries to: ${CMAKE_INSTALL_LIBDIR}")
+
+#
+# set the system configuration directory depending on CMAKE_INSTALL_PREFIX
+# Note: Found here http://osdir.com/ml/kde-commits/2011-05/msg01375.html
+#
+if (NOT DEFINED SYSCONF_INSTALL_DIR)
+  if ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+    set (SYSCONF_INSTALL_DIR "/etc") # conform to LFSH
+  else ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+    set(SYSCONF_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/etc")
+  endif ("${CMAKE_INSTALL_PREFIX}" STREQUAL "/usr")
+else (NOT DEFINED SYSCONF_INSTALL_DIR)
+  set (SYSCONF_INSTALL_DIR "${SYSCONF_INSTALL_DIR}" CACHE STRING "The sysconfig install dir")
+endif (NOT DEFINED SYSCONF_INSTALL_DIR)
 
 #
 # Workaround for Debian packaging debhelper trying to pass -D_FORTIFY_SOURCE=2
@@ -170,6 +171,7 @@ else (MACOSX)
   option (BUILD_LIBCVMFS        "Build the CernVM-FS client library"                               ON)
   option (BUILD_SERVER          "Build writer's end programs"                                      ON)
 endif(MACOSX)
+option (BUILD_PRELOADER         "Build the alien cache pre-loader"                                 OFF)
 option (BUILD_SERVER_DEBUG      "Build writer's end programs with debug symbols and debug outputs" OFF)
 option (BUILD_UNITTESTS         "Build the CernVM-FS unit test set"                                OFF)
 option (BUILD_UNITTESTS_DEBUG   "Build the CernVM-FS unit test set with verbose output and -g"     OFF)
@@ -207,6 +209,7 @@ set (SPARSEHASH_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_sparsehash"
 set (LEVELDB_BUILTIN_LOCATION     "${EXTERNALS_BUILD_LOCATION}/build_leveldb")
 set (VJSON_BUILTIN_LOCATION       "${EXTERNALS_BUILD_LOCATION}/build_vjson")
 set (SHA2_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha2")
+set (SHA3_BUILTIN_LOCATION        "${EXTERNALS_BUILD_LOCATION}/build_sha3")
 set (GOOGLETEST_BUILTIN_LOCATION  "${EXTERNALS_BUILD_LOCATION}/build_googletest")
 set (LIBGEOIP_BUILTIN_LOCATION    "${EXTERNALS_BUILD_LOCATION}/build_libgeoip")
 set (PYTHON_GEOIP_BUILTIN_LOCATION "${EXTERNALS_BUILD_LOCATION}/build_python-geoip")
@@ -373,6 +376,12 @@ else (SQLITE3_BUILTIN)
   set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${SQLITE3_INCLUDE_DIR})
 endif (SQLITE3_BUILTIN)
 
+find_package (Valgrind)
+if (VALGRIND_FOUND)
+  set (INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES} ${VALGRIND_INCLUDE_DIR})
+  add_definitions(-DHAS_VALGRIND_HEADERS)
+endif (VALGRIND_FOUND)
+
 if (ZLIB_BUILTIN)
   include (${ZLIB_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
   set (ZLIB_LIBRARIES "")
@@ -382,7 +391,7 @@ else (ZLIB_BUILTIN)
 endif (ZLIB_BUILTIN)
 
 include (${SHA2_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
-
+include (${SHA3_BUILTIN_LOCATION}/CVMFS-CMakeLists.txt)
 
 if (NOT MACOSX)
   set (HAVE_LIB_RT TRUE)
@@ -464,6 +473,7 @@ endif (BUILD_SERVER OR BUILD_UNITTESTS)
 
 if (BUILD_SERVER OR BUILD_SERVER_DEBUG)
   find_package(PythonLibs REQUIRED)
+  find_package(LibCAP REQUIRED)
   find_program(UNZIP_EXE NAMES unzip)
   if (${UNZIP_EXE} STREQUAL "UNZIP_EXE-NOTFOUND")
     message(FATAL_ERROR "unzip utility missing. Please install unzip...")
