@@ -236,6 +236,28 @@ static void *MainTalk(void *data __attribute__((unused))) {
           cvmfs::download_manager_->SetDnsServer(host);
           Answer(con_fd, "OK\n");
         }
+      } else if (line == "external host info") {
+        vector<string> host_chain;
+        vector<int> rtt;
+        unsigned active_host;
+
+        cvmfs::external_download_manager_->GetHostInfo(&host_chain, &rtt, &active_host);
+        string host_str;
+        for (unsigned i = 0; i < host_chain.size(); ++i) {
+          host_str += "  [" + StringifyInt(i) + "] " + host_chain[i] + " (";
+          if (rtt[i] == download::DownloadManager::kProbeUnprobed)
+            host_str += "unprobed";
+          else if (rtt[i] == download::DownloadManager::kProbeDown)
+            host_str += "host down";
+          else if (rtt[i] == download::DownloadManager::kProbeGeo)
+            host_str += "geographically ordered";
+          else
+            host_str += StringifyInt(rtt[i]) + " ms";
+          host_str += ")\n";
+        }
+        host_str += "Active host " + StringifyInt(active_host) + ": " +
+                    host_chain[active_host] + "\n";
+        Answer(con_fd, host_str);
       } else if (line == "host info") {
         vector<string> host_chain;
         vector<int> rtt;
@@ -270,6 +292,14 @@ static void *MainTalk(void *data __attribute__((unused))) {
       } else if (line == "host switch") {
         cvmfs::download_manager_->SwitchHost();
         Answer(con_fd, "OK\n");
+      } else if (line.substr(0, 16) == "external host set") {
+        if (line.length() < 18) {
+          Answer(con_fd, "Usage: external host set <URL>\n");
+        } else {
+          const std::string host = line.substr(17);
+          cvmfs::external_download_manager_->SetHostChain(host);
+          Answer(con_fd, "OK\n");
+        }
       } else if (line.substr(0, 8) == "host set") {
         if (line.length() < 10) {
           Answer(con_fd, "Usage: host set <host list>\n");

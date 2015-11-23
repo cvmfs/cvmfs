@@ -99,7 +99,9 @@ bool CommandCheck::CompareEntries(const catalog::DirectoryEntry &a,
     retval = false;
   }
   if (diffs & Difference::kExternalFileFlag) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "external file flag differs");
+    LogCvmfs(kLogCvmfs, kLogStderr, "external file flag differs: %d / %d "
+             "(%s / %s)", a.IsExternalFile(), b.IsExternalFile(),
+             a.name().c_str(), b.name().c_str());
     retval = false;
   }
 
@@ -320,6 +322,12 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
       if (!entries[i].IsRegular()) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "only regular files can be external: %s", full_path.c_str());
+        retval = false;
+      }
+      if (!catalog->GetExternalData()) {
+        LogCvmfs(kLogCvmfs, kLogStderr,
+                 "File (%s) is marked as external but catalog does not "
+                 "support this.", full_path.c_str());
         retval = false;
       }
     }
