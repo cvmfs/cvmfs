@@ -316,7 +316,7 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
 
     if (entries[i].IsExternalFile()) {
       computed_counters->self.externals++;
-      computed_counters->seld.external_file_size += entries[i].size();
+      computed_counters->self.external_file_size += entries[i].size();
       if (!entries[i].IsRegular()) {
         LogCvmfs(kLogCvmfs, kLogStderr,
                  "only regular files can be external: %s", full_path.c_str());
