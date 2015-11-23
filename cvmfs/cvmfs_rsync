@@ -1,0 +1,87 @@
+#!/bin/bash
+# Rsync directories into cvmfs.
+
+ME=cvmfs_rsync
+
+usage()
+{
+    echo "$ME [rsync_options] srcdir /cvmfs/reponame[/destsubdir]" >&2
+    echo "  Rsync to cvmfs repositories.  Avoids .cvmfscatalog files while allowing"
+    echo "  directories containing them to be deleted when their source goes away." >&2
+    exit 1
+}
+
+if [ $# -lt 2 ]; then
+    usage
+fi
+
+# readlink -m canonicalizes paths, removing extra slashes, etc.
+DEST="`readlink -m ${@:$#}`"
+let IDX="$# - 1"
+SRC="${@:$IDX:1}"
+let IDX-=1
+RSYNC_OPTIONS="${@:1:$IDX} --exclude .cvmfscatalog"
+
+DESTWITHOUTCVMFS="${DEST#/cvmfs/}"
+if [ "DESTWITHOUTCVMFS" = "$DEST" ]; then
+    echo "$ME: destination does not begin with /cvmfs/" >&2
+    usage
+fi
+
+REPO="${DESTWITHOUTCVMFS%%/*}"
+if [ -z "$REPO" ]; then
+    echo "$ME: no reponame given" >&2
+    usage
+fi
+
+DESTSUBDIR="${DESTWITHOUTCVMFS%*/}"
+
+if [[ "$SRC" =~ ^[^/]*: ]]; then
+    echo "$ME: srcdir must be locally mounted, not a remote host, sorry" >&2
+    usage
+fi
+
+if [ -f /cvmfs/$REPO/.cvmfsdirtab ]; then
+    DESTDIR="$DEST"
+    if [ "${SRC%/}" = "$SRC" ]; then
+        # there's no trailing slash, so rsync will append $SRC basename to $DEST
+        DESTDIR="$DEST/${SRC##*/}"
+    fi
+    # look for entries that match under $DESTSUBDIR and expand them to
+    #   see if any of them have .cvmfscatalog files in directories
+    #   that have gone away from the source.
+    grep -vE '^(!|#)' /cvmfs/$REPO/.cvmfsdirtab|while read PAT; do
+        FULLPAT="/cvmfs/$REPO$PAT"
+        PATSLASHES="${FULLPAT//[^\/]}"
+        let NPATFIELDS="${#PATSLASHES} + 1"
+        DESTSLASHES="${DESTDIR//[^\/]}"
+        let NDESTFIELDS="${#DESTSLASHES} + 1"
+        MATCHPAT="$FULLPAT"
+        if [ $NPATFIELDS -gt $NDESTFIELDS ]; then
+            MATCHPAT="`echo "$FULLPAT"|cut -d/ -f-$NDESTFIELDS`"
+        fi
+        if [ "${DESTDIR#$MATCHPAT}" != "$DESTDIR" ]; then
+            # $PAT matches $DESTDIR, look in all matching directories
+            let NDESTFIELDS+=1
+            SUBPAT="`echo "$FULLPAT"|cut -d/ -f$NDESTFIELDS-`"
+            if [ -n "$SUBPAT" ]; then
+                SUBPAT="/$SUBPAT"
+            fi
+            for D in `echo $DESTDIR$SUBPAT 2>/dev/null`; do
+                SRCSUBD="${D#$DESTDIR/}"
+                if [ "$SRCSUBD" = "$D" ]; then
+                    # it didn't really match, the .cvmfsdirtab pattern
+                    #  included other directories outside of this one
+                    # (shouldn't happen because of $SUBPAT, but just in case)
+                    continue
+                fi
+                if [ -f $D/.cvmfscatalog ] && [ ! -d $SRC/$SRCSUBD ]; then
+                    echo "removing .cvmfscatalog from deleted ${D#$DEST/}"
+                    rm -f $D/.cvmfscatalog
+                fi
+            done
+        fi
+    done
+fi
+
+exec rsync $RSYNC_OPTIONS $SRC $DEST
