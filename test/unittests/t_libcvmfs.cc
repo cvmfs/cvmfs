@@ -28,8 +28,10 @@ class T_Libcvmfs : public ::testing::Test {
       first_test = false;
     }
 
+    previous_working_directory_ = GetCurrentWorkingDirectory();
+
     cvmfs_set_log_fn(cvmfs_log_ignore);
-    tmp_path_ = CreateTempDir("/tmp/cvmfs_test", 0700);
+    tmp_path_ = CreateTempDir("./cvmfs_ut_libcvmfs");
     ASSERT_NE("", tmp_path_);
     opt_cache_ = "quota_limit=0,quota_threshold=0,rebuild_cachedb,"
                  "cache_directory=" + tmp_path_;
@@ -44,6 +46,8 @@ class T_Libcvmfs : public ::testing::Test {
     if (tmp_path_ != "")
       RemoveTree(tmp_path_);
     cvmfs_set_log_fn(NULL);
+
+    EXPECT_EQ(0, chdir(previous_working_directory_.c_str()));
   }
 
   // Other tests might have initialized sqlite3.  This cannot happen in real
@@ -52,6 +56,12 @@ class T_Libcvmfs : public ::testing::Test {
   // within the library can still be tested in the tests following the first
   // one.
   static bool first_test;
+
+  // Libcvmfs chdir()s internally. This must be reverted since the unit tests
+  // depend on the binary's working directory for sandboxing temporary files.
+  // We note the working directory before executing any test code and chdir()
+  // back to it in the test's TearDown().
+  string previous_working_directory_;
 
   string tmp_path_;
   string alien_path_;
@@ -85,6 +95,8 @@ TEST_F(T_Libcvmfs, InitFailures) {
 
   retval = cvmfs_init("");
   ASSERT_EQ(LIBCVMFS_FAIL_MKCACHE, retval);
+
+  sqlite3_shutdown();
 }
 
 

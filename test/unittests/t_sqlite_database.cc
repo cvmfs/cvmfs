@@ -134,7 +134,7 @@ class T_SQLite_Wrapper : public ::testing::Test {
   }
 };
 
-const std::string T_SQLite_Wrapper::sandbox = "/tmp/cvmfs_ut_sqlite_wrapper";
+const std::string T_SQLite_Wrapper::sandbox = "./cvmfs_ut_sqlite_wrapper";
 
 
 TEST_F(T_SQLite_Wrapper, Initialize) {}
@@ -336,6 +336,38 @@ TEST_F(T_SQLite_Wrapper, PropertyWithoutReopen) {
   EXPECT_EQ(1337,    db1->GetProperty<int>("int"));
   EXPECT_LT(13.36,   db1->GetProperty<float>("float"));
   EXPECT_GT(13.38,   db1->GetProperty<double>("float"));
+
+  delete db1;
+  EXPECT_EQ(0u, DummyDatabase::instances);
+}
+
+
+TEST_F(T_SQLite_Wrapper, GetDefaultPropertyWithoutReopen) {
+  const std::string dbp = GetDatabaseFilename();
+
+  DummyDatabase *db1 = DummyDatabase::Create(dbp);
+  ASSERT_NE(static_cast<DummyDatabase*>(NULL), db1);
+
+  EXPECT_TRUE(db1->SetProperty("foo",   "bar"));
+  EXPECT_TRUE(db1->SetProperty("file",  dbp));
+  EXPECT_TRUE(db1->SetProperty("int",   1337));
+  EXPECT_TRUE(db1->SetProperty("float", 13.37));
+
+  EXPECT_EQ("bar", db1->GetPropertyDefault<std::string>("foo",  "0"));
+  EXPECT_EQ(dbp,   db1->GetPropertyDefault<std::string>("file", "1"));
+  EXPECT_EQ(1337,  db1->GetPropertyDefault<int>("int",           2));
+  EXPECT_LT(13.36, db1->GetPropertyDefault<float>("float",       3));
+  EXPECT_GT(13.38, db1->GetPropertyDefault<double>("float",      4));
+  EXPECT_NE(42,    db1->GetPropertyDefault<int>("int",          42));
+
+  EXPECT_FALSE(db1->HasProperty("moep"));
+  EXPECT_FALSE(db1->HasProperty("baz"));
+
+  EXPECT_EQ("tok!", db1->GetPropertyDefault<std::string>("moep", "tok!"));
+  EXPECT_EQ(1337,   db1->GetPropertyDefault<int>("moep",         1337));
+  EXPECT_LT(13.36,  db1->GetPropertyDefault<double>("moep",      13.37));
+  EXPECT_GT(13.38f, db1->GetPropertyDefault<float>("moep",       13.37f));
+  EXPECT_EQ(0,      db1->GetPropertyDefault<double>("baz",       0));
 
   delete db1;
   EXPECT_EQ(0u, DummyDatabase::instances);
@@ -861,4 +893,98 @@ TEST_F(T_SQLite_Wrapper, DropFileOwnership) {
 
   EXPECT_EQ(0u, DummyDatabase::instances);
   EXPECT_TRUE(FileExists(file_name3));
+}
+
+
+TEST_F(T_SQLite_Wrapper, CountModifiedRows) {
+  const std::string dbp = GetDatabaseFilename();
+
+  DummyDatabase *db1 = DummyDatabase::Create(dbp);
+  ASSERT_NE(static_cast<DummyDatabase*>(NULL), db1);
+  EXPECT_EQ(1u, DummyDatabase::instances);
+  EXPECT_TRUE(db1->read_write());
+  EXPECT_EQ(2u, db1->GetModifiedRowCount());  // creation adds schema revision
+                                              // information to the database
+  delete db1;
+  EXPECT_EQ(0u, DummyDatabase::instances);
+
+  DummyDatabase *db2 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
+  ASSERT_NE(static_cast<DummyDatabase*>(NULL), db2);
+  EXPECT_EQ(1u, DummyDatabase::instances);
+  EXPECT_TRUE(db2->read_write());
+  EXPECT_EQ(0u, db2->GetModifiedRowCount());
+
+  EXPECT_TRUE(db2->SetProperty("foo", 1337));
+  EXPECT_TRUE(db2->SetProperty("bar", 42));
+  EXPECT_EQ(2u, db2->GetModifiedRowCount());
+
+  EXPECT_EQ(1337, db2->GetProperty<int>("foo"));
+  EXPECT_EQ(2u, db2->GetModifiedRowCount());
+
+  const unsigned entries = 30;
+  {
+    sqlite::Sql insert(db2->sqlite_db(), "INSERT INTO foobar (foo, bar) "
+                                         "VALUES (:f, :b);");
+
+    EXPECT_TRUE(db2->BeginTransaction());
+    for (unsigned i = 0; i < entries; ++i) {
+      EXPECT_TRUE(insert.BindTextTransient(1, "foobar!" + StringifyInt(i)));
+      EXPECT_TRUE(insert.BindText(2, "this is a very useless text!!"));
+      EXPECT_TRUE(insert.Execute());
+      EXPECT_TRUE(insert.Reset());
+    }
+    EXPECT_TRUE(db2->CommitTransaction());
+  }
+
+  EXPECT_EQ(2u + entries, db2->GetModifiedRowCount());
+
+  delete db2;
+  EXPECT_EQ(0u, DummyDatabase::instances);
+
+  DummyDatabase *db3 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadOnly);
+  ASSERT_NE(static_cast<DummyDatabase*>(NULL), db3);
+  EXPECT_EQ(1u, DummyDatabase::instances);
+
+  EXPECT_EQ(0u, db3->GetModifiedRowCount());
+  {
+    sqlite::Sql read(db3->sqlite_db(), "SELECT * FROM foobar;");
+    unsigned count = 0;
+    while (read.FetchRow()) {
+      ++count;
+      read.Retrieve<std::string>(1);
+    }
+    EXPECT_EQ(entries, count);
+  }
+  EXPECT_EQ(0u, db3->GetModifiedRowCount());
+
+  delete db3;
+  EXPECT_EQ(0u, DummyDatabase::instances);
+
+  DummyDatabase *db4 = DummyDatabase::Open(dbp, DummyDatabase::kOpenReadWrite);
+  ASSERT_NE(static_cast<DummyDatabase*>(NULL), db4);
+  EXPECT_EQ(1u, DummyDatabase::instances);
+
+  EXPECT_EQ(0u, db4->GetModifiedRowCount());
+  db4->SetProperty("foo", 27);
+  EXPECT_EQ(1u, db4->GetModifiedRowCount());
+
+  {
+    sqlite::Sql update(db4->sqlite_db(), "UPDATE foobar SET bar = 'moep!' "
+                                         "WHERE foo = 'foobar!5';");
+    EXPECT_TRUE(db4->BeginTransaction());
+    update.Execute();
+    EXPECT_TRUE(db4->CommitTransaction());
+  }
+  EXPECT_EQ(2u, db4->GetModifiedRowCount());
+
+  {
+    sqlite::Sql erase(db4->sqlite_db(), "DELETE FROM foobar;");
+    EXPECT_TRUE(db4->BeginTransaction());
+    erase.Execute();
+    EXPECT_TRUE(db4->CommitTransaction());
+  }
+  EXPECT_EQ(2u + entries, db4->GetModifiedRowCount());
+
+  delete db4;
+  EXPECT_EQ(0u, DummyDatabase::instances);
 }

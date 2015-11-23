@@ -15,7 +15,11 @@
 // Revision Changelog
 // 13: revision introduced
 // 14: fix expand_path for absolute paths, add mountpoint to cvmfs_context
-#define LIBCVMFS_REVISION 14
+// 15: remove counting of open file descriptors
+// 16: remove unnecessary free
+// 17: apply new classes around the cache manager
+// 18: add cvmfs_pread and support for chunked files
+#define LIBCVMFS_REVISION 18
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -103,6 +107,13 @@ void cvmfs_set_log_fn( void (*log_fn)(const char *msg) );
  * \return read-only file descriptor, -1 on failure (sets errno)
  */
 int cvmfs_open(cvmfs_context *ctx, const char *path);
+
+/**
+ * Reads from a file descriptor returned by cvmfs_open.  File descriptors that
+ * have bit 31 set indicate chunked files.
+ */
+ssize_t cvmfs_pread(cvmfs_context *ctx,
+                    int fd, void *buf, size_t size, off_t off);
 
 /* Closes a file previously opened with cvmfs_open().
  *

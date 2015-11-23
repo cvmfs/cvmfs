@@ -24,7 +24,7 @@ TEST(T_Uuid, Unique) {
 
 TEST(T_Uuid, Create) {
   string path;
-  FILE *f = CreateTempFile("/tmp/cvmfstest", 0600, "w", &path);
+  FILE *f = CreateTempFile("./cvmfs_ut_uuid", 0600, "w", &path);
   ASSERT_TRUE(f != NULL);
   fclose(f);
   unlink(path.c_str());
@@ -44,7 +44,7 @@ TEST(T_Uuid, Create) {
 
 TEST(T_Uuid, FromCache) {
   string path;
-  FILE *f = CreateTempFile("/tmp/cvmfstest", 0600, "w", &path);
+  FILE *f = CreateTempFile("./cvmfs_ut_uuid", 0600, "w", &path);
   ASSERT_TRUE(f != NULL);
   fprintf(f, "unique");
   fclose(f);
@@ -62,7 +62,7 @@ TEST(T_Uuid, FailWrite) {
 
 TEST(T_Uuid, FailRead) {
   string path;
-  FILE *f = CreateTempFile("/tmp/cvmfstest", 0600, "w", &path);
+  FILE *f = CreateTempFile("./cvmfs_ut_uuid", 0600, "w", &path);
   ASSERT_TRUE(f != NULL);
   fclose(f);
   UnlinkGuard unlink_guard(path);

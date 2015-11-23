@@ -17,6 +17,7 @@
 #include "fs_traversal.h"
 #include "hash.h"
 #include "smalloc.h"
+#include "sync_union.h"
 #include "upload.h"
 #include "util.h"
 #include "util_concurrency.h"
@@ -29,6 +30,7 @@ SyncMediator::SyncMediator(catalog::WritableCatalogManager *catalog_manager,
                            const SyncParameters *params) :
   catalog_manager_(catalog_manager),
   union_engine_(NULL),
+  handle_hardlinks_(false),
   params_(params),
   changed_items_(0)
 {
@@ -45,6 +47,11 @@ SyncMediator::~SyncMediator() {
   pthread_mutex_destroy(&lock_file_queue_);
 }
 
+
+void SyncMediator::RegisterUnionEngine(SyncUnion *engine) {
+  union_engine_     = engine;
+  handle_hardlinks_ = engine->SupportsHardlinks();
+}
 
 /**
  * Add an entry to the repository.
@@ -76,15 +83,18 @@ void SyncMediator::Add(const SyncItem &entry) {
     }
 
     // A file is a hard link if the link count is greater than 1
-    if (entry.GetUnionLinkcount() > 1)
+    if (entry.HasHardlinks())
       InsertHardlink(entry);
     else
       AddFile(entry);
     return;
+  } else if (entry.IsGraftMarker()) {
+    LogCvmfs(kLogPublish, kLogDebug, "Ignoring graft marker file.");
+    return;  // Ignore markers.
   }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be added. "
-               "Unregcognized file type.");
+               "Unrecognized file type.");
 }
 
 
@@ -92,6 +102,7 @@ void SyncMediator::Add(const SyncItem &entry) {
  * Touch an entry in the repository.
  */
 void SyncMediator::Touch(const SyncItem &entry) {
+  if (entry.IsGraftMarker()) {return;}
   if (entry.IsDirectory()) {
     TouchDirectory(entry);
     return;
@@ -110,7 +121,7 @@ void SyncMediator::Touch(const SyncItem &entry) {
   }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be touched. "
-               "Unregcognized file type.");
+               "Unrecognied file type.");
 }
 
 
@@ -136,7 +147,7 @@ void SyncMediator::Remove(const SyncItem &entry) {
   }
 
   PrintWarning("'" + entry.GetRelativePath() + "' cannot be deleted. "
-               "Unregcognized file type.");
+               "Unrecognized file type.");
 }
 
 
@@ -150,6 +161,10 @@ void SyncMediator::Replace(const SyncItem &entry) {
 
 
 void SyncMediator::EnterDirectory(const SyncItem &entry) {
+  if (!handle_hardlinks_) {
+    return;
+  }
+
   HardlinkGroupMap new_map;
   hardlink_stack_.push(new_map);
 }
@@ -157,6 +172,10 @@ void SyncMediator::EnterDirectory(const SyncItem &entry) {
 
 void SyncMediator::LeaveDirectory(const SyncItem &entry)
 {
+  if (!handle_hardlinks_) {
+    return;
+  }
+
   CompleteHardlinks(entry);
   AddLocalHardlinkGroups(GetHardlinkMap());
   hardlink_stack_.pop();
@@ -178,6 +197,8 @@ manifest::Manifest *SyncMediator::Commit() {
   params_->spooler->WaitForUpload();
 
   if (!hardlink_queue_.empty()) {
+    assert(handle_hardlinks_);
+
     LogCvmfs(kLogPublish, kLogStdout, "Processing hardlinks...");
     params_->spooler->UnregisterListeners();
     params_->spooler->RegisterListener(&SyncMediator::PublishHardlinksCallback,
@@ -226,6 +247,9 @@ manifest::Manifest *SyncMediator::Commit() {
     return NULL;
   }
 
+  if (catalog_manager_->IsBalanceable()) {
+    catalog_manager_->Balance();
+  }
   catalog_manager_->PrecalculateListings();
   return catalog_manager_->Commit(params_->stop_for_catalog_tweaks,
                                   params_->manual_revision);
@@ -233,6 +257,8 @@ manifest::Manifest *SyncMediator::Commit() {
 
 
 void SyncMediator::InsertHardlink(const SyncItem &entry) {
+  assert(handle_hardlinks_);
+
   uint64_t inode = entry.GetUnionInode();
   LogCvmfs(kLogPublish, kLogVerboseMsg, "found hardlink %"PRIu64" at %s",
            inode, entry.GetUnionPath().c_str());
@@ -256,6 +282,8 @@ void SyncMediator::InsertLegacyHardlink(const SyncItem &entry) {
   // As we are looking through all files in one directory here, there might be
   // completely untouched hardlink groups, which we can safely skip.
   // Finally we have to see if the hardlink is already part of this group
+
+  assert(handle_hardlinks_);
 
   if (entry.GetUnionLinkcount() < 2)
     return;
@@ -298,6 +326,8 @@ void SyncMediator::InsertLegacyHardlink(const SyncItem &entry) {
  * or edited ones.
  */
 void SyncMediator::CompleteHardlinks(const SyncItem &entry) {
+  assert(handle_hardlinks_);
+
   // If no hardlink in this directory was changed, we can skip this
   if (GetHardlinkMap().empty())
     return;
@@ -318,7 +348,7 @@ void SyncMediator::CompleteHardlinks(const SyncItem &entry) {
 void SyncMediator::LegacyRegularHardlinkCallback(const string &parent_dir,
                                                  const string &file_name)
 {
-  SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
   InsertLegacyHardlink(entry);
 }
 
@@ -326,7 +356,7 @@ void SyncMediator::LegacyRegularHardlinkCallback(const string &parent_dir,
 void SyncMediator::LegacySymlinkHardlinkCallback(const string &parent_dir,
                                                   const string &file_name)
 {
-  SyncItem entry(parent_dir, file_name, kItemSymlink, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemSymlink);
   InsertLegacyHardlink(entry);
 }
 
@@ -338,12 +368,12 @@ void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
   // created directory
   FileSystemTraversal<SyncMediator> traversal(
     this, union_engine_->scratch_path(), true);
-  traversal.fn_enter_dir = &SyncMediator::EnterAddedDirectoryCallback;
-  traversal.fn_leave_dir = &SyncMediator::LeaveAddedDirectoryCallback;
-  traversal.fn_new_file = &SyncMediator::AddFileCallback;
-  traversal.fn_new_symlink = &SyncMediator::AddSymlinkCallback;
+  traversal.fn_enter_dir      = &SyncMediator::EnterAddedDirectoryCallback;
+  traversal.fn_leave_dir      = &SyncMediator::LeaveAddedDirectoryCallback;
+  traversal.fn_new_file       = &SyncMediator::AddFileCallback;
+  traversal.fn_new_symlink    = &SyncMediator::AddSymlinkCallback;
   traversal.fn_new_dir_prefix = &SyncMediator::AddDirectoryCallback;
-  traversal.fn_ignore_file = &SyncMediator::IgnoreFileCallback;
+  traversal.fn_ignore_file    = &SyncMediator::IgnoreFileCallback;
   traversal.Recurse(entry.GetScratchPath());
 }
 
@@ -351,7 +381,7 @@ void SyncMediator::AddDirectoryRecursively(const SyncItem &entry) {
 bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
                                         const std::string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   AddDirectory(entry);
   return true;  // The recursion engine should recurse deeper here
 }
@@ -360,7 +390,7 @@ bool SyncMediator::AddDirectoryCallback(const std::string &parent_dir,
 void SyncMediator::AddFileCallback(const std::string &parent_dir,
                                    const std::string &file_name)
 {
-  SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
   Add(entry);
 }
 
@@ -368,7 +398,7 @@ void SyncMediator::AddFileCallback(const std::string &parent_dir,
 void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
                                       const std::string &link_name)
 {
-  SyncItem entry(parent_dir, link_name, kItemSymlink, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
   Add(entry);
 }
 
@@ -376,7 +406,7 @@ void SyncMediator::AddSymlinkCallback(const std::string &parent_dir,
 void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
                                                const std::string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   EnterDirectory(entry);
 }
 
@@ -384,7 +414,7 @@ void SyncMediator::EnterAddedDirectoryCallback(const std::string &parent_dir,
 void SyncMediator::LeaveAddedDirectoryCallback(const std::string &parent_dir,
                                                const std::string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   LeaveDirectory(entry);
 }
 
@@ -410,7 +440,7 @@ void SyncMediator::RemoveDirectoryRecursively(const SyncItem &entry) {
 void SyncMediator::RemoveFileCallback(const std::string &parent_dir,
                                       const std::string &file_name)
 {
-  SyncItem entry(parent_dir, file_name, kItemFile, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemFile);
   Remove(entry);
 }
 
@@ -418,7 +448,7 @@ void SyncMediator::RemoveFileCallback(const std::string &parent_dir,
 void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
                                          const std::string &link_name)
 {
-  SyncItem entry(parent_dir, link_name, kItemSymlink, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, link_name, kItemSymlink);
   Remove(entry);
 }
 
@@ -426,7 +456,7 @@ void SyncMediator::RemoveSymlinkCallback(const std::string &parent_dir,
 void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
                                            const std::string &dir_name)
 {
-  SyncItem entry(parent_dir, dir_name, kItemDir, union_engine_);
+  SyncItem entry = CreateSyncItem(parent_dir, dir_name, kItemDir);
   RemoveDirectoryRecursively(entry);
 }
 
@@ -434,9 +464,22 @@ void SyncMediator::RemoveDirectoryCallback(const std::string &parent_dir,
 bool SyncMediator::IgnoreFileCallback(const std::string &parent_dir,
                                       const std::string &file_name)
 {
-  return union_engine_->IgnoreFilePredicate(parent_dir, file_name);
+  if (union_engine_->IgnoreFilePredicate(parent_dir, file_name)) {
+    return true;
+  }
+
+  SyncItem entry = CreateSyncItem(parent_dir, file_name, kItemUnknown);
+  return entry.IsWhiteout();
 }
 
+
+SyncItem SyncMediator::CreateSyncItem(const std::string  &relative_parent_path,
+                                      const std::string  &filename,
+                                      const SyncItemType  entry_type) const {
+  return union_engine_->CreateSyncItem(relative_parent_path,
+                                       filename,
+                                       entry_type);
+}
 
 void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
   LogCvmfs(kLogPublish, kLogVerboseMsg,
@@ -575,11 +618,30 @@ void SyncMediator::AddFile(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (entry.IsSymlink() && !params_->dry_run) {
+    assert(!entry.HasGraftMarker());
     // Symlinks are completely stored in the catalog
     catalog_manager_->AddFile(
       entry.CreateBasicCatalogDirent(),
       default_xattrs,
       entry.relative_parent_path());
+  } else if (entry.HasGraftMarker()) {
+    if (entry.IsValidGraft()) {
+      // Graft files are added to catalog immediately.
+      catalog_manager_->AddFile(
+        entry.CreateBasicCatalogDirent(),
+        default_xattrs,  // TODO(bbockelm): For now, use default xattrs
+                         // on grafted files.
+        entry.relative_parent_path());
+    } else {
+      // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
+      // the graft file is missing information.  It's not clear that continuing
+      // forward with the publish is the correct thing to do; abort for now.
+      LogCvmfs(kLogPublish, kLogStderr, "Encountered a grafted file (%s) with "
+               "invalid grafting information; check contents of .cvmfsgraft-*"
+               " file.  Aborting publish.",
+               entry.GetRelativePath().c_str());
+      abort();
+    }
   } else {
     // Push the file to the spooler, remember the entry for the path
     pthread_mutex_lock(&lock_file_queue_);
@@ -595,7 +657,7 @@ void SyncMediator::RemoveFile(const SyncItem &entry) {
   PrintChangesetNotice(kRemove, entry.GetUnionPath());
 
   if (!params_->dry_run) {
-    if (entry.GetRdOnlyLinkcount() > 1) {
+    if (handle_hardlinks_ && entry.GetRdOnlyLinkcount() > 1) {
       LogCvmfs(kLogPublish, kLogVerboseMsg, "remove %s from hardlink group",
                entry.GetUnionPath().c_str());
       catalog_manager_->ShrinkHardlinkGroup(entry.GetRelativePath());
@@ -609,6 +671,8 @@ void SyncMediator::AddDirectory(const SyncItem &entry) {
   PrintChangesetNotice(kAdd, entry.GetUnionPath());
 
   if (!params_->dry_run) {
+    assert(!entry.HasGraftMarker());
+
     catalog_manager_->AddDirectory(entry.CreateBasicCatalogDirent(),
                                    entry.relative_parent_path());
   }
@@ -641,6 +705,8 @@ void SyncMediator::TouchDirectory(const SyncItem &entry) {
  * added to the catalogs.
  */
 void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
+  assert(handle_hardlinks_);
+
   for (HardlinkGroupMap::const_iterator i = hardlinks.begin(),
        iEnd = hardlinks.end(); i != iEnd; ++i)
   {
@@ -674,6 +740,8 @@ void SyncMediator::AddLocalHardlinkGroups(const HardlinkGroupMap &hardlinks) {
 
 
 void SyncMediator::AddHardlinkGroup(const HardlinkGroup &group) {
+  assert(handle_hardlinks_);
+
   // Create a DirectoryEntry list out of the hardlinks
   catalog::DirectoryEntryBaseList hardlinks;
   for (SyncItemList::const_iterator i = group.hardlinks.begin(),

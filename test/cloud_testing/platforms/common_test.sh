@@ -10,6 +10,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #    SOURCE_DIRECTORY      location of the CernVM-FS sources
 #    SERVER_PACKAGE        location of the CernVM-FS server package to test
 #    CLIENT_PACKAGE        location of the CernVM-FS client package to test
+#    DEVEL_PACKAGE         location of the CernVM-FS devel package to test
 #    LOG_DIRECTORY         location of the test log files to be created
 #
 # Additionally the following configuration variables will be defined:
@@ -23,6 +24,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 SOURCE_DIRECTORY=""
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
+DEVEL_PACKAGE=""
 LOG_DIRECTORY=""
 
 FAKE_S3_PORT=13337
@@ -47,7 +49,7 @@ usage() {
 
 
 # parse script parameters (same for all platforms)
-while getopts "t:s:c:l:" option; do
+while getopts "t:s:c:d:l:" option; do
   case $option in
     t)
       SOURCE_DIRECTORY=$OPTARG
@@ -57,6 +59,9 @@ while getopts "t:s:c:l:" option; do
       ;;
     c)
       CLIENT_PACKAGE=$OPTARG
+      ;;
+    d)
+      DEVEL_PACKAGE=$OPTARG
       ;;
     l)
       LOG_DIRECTORY=$OPTARG
@@ -72,7 +77,8 @@ done
 if [ x$SOURCE_DIRECTORY      = "x" ] ||
    [ x$LOG_DIRECTORY         = "x" ] ||
    [ x$SERVER_PACKAGE        = "x" ] ||
-   [ x$CLIENT_PACKAGE        = "x" ]; then
+   [ x$CLIENT_PACKAGE        = "x" ] ||
+   [ x$DEVEL_PACKAGE         = "x" ]; then
   echo "missing parameter(s), cannot run platform dependent test script"
   exit 100
 fi
@@ -91,51 +97,3 @@ if [ $(id --user --name) != "sftnight" ]; then
   echo "test cases need to run under user 'sftnight'... aborting"
   exit 3
 fi
-
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#
-
-create_fakes3_config() {
-  [ ! -f $FAKE_S3_CONFIG ] || sudo rm -f $FAKE_S3_CONFIG
-  sudo tee $FAKE_S3_CONFIG > /dev/null << EOF
-CVMFS_S3_HOST=localhost
-CVMFS_S3_PORT=$FAKE_S3_PORT
-CVMFS_S3_ACCESS_KEY=not
-CVMFS_S3_SECRET_KEY=important
-CVMFS_S3_BUCKETS_PER_ACCOUNT=1
-CVMFS_S3_MAX_NUMBER_OF_PARALLEL_CONNECTIONS=10
-CVMFS_S3_BUCKET=$FAKE_S3_BUCKET
-EOF
-}
-
-
-start_fakes3() {
-  local logfile=$1
-
-  [ ! -d $FAKE_S3_STORAGE ] || sudo rm -fR $FAKE_S3_STORAGE > /dev/null 2>&1 || return 1
-  sudo mkdir -p $FAKE_S3_STORAGE                            > /dev/null 2>&1 || return 2
-  create_fakes3_config                                      > /dev/null 2>&1 || return 3
-  run_background_service $logfile "sudo fakes3 --port $FAKE_S3_PORT --root $FAKE_S3_STORAGE"
-}
-
-
-check_result() {
-  local res=$1
-  if [ $res -ne 0 ]; then
-    echo "Failed!"
-  else
-    echo "OK"
-  fi
-}
-
-
-run_unittests() {
-  echo -n "running CernVM-FS unit tests... "
-  local xml_output="${UNITTEST_LOGFILE}${XUNIT_OUTPUT_SUFFIX}"
-  cvmfs_unittests --gtest_output="xml:$xml_output" $@ >> $UNITTEST_LOGFILE 2>&1
-  local ut_retval=$?
-  check_result $ut_retval
-
-  return $ut_retval
-}

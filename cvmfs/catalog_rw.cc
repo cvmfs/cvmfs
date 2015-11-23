@@ -294,11 +294,7 @@ void WritableCatalog::RemoveFileChunks(const std::string &entry_path) {
  * Sets the last modified time stamp of this catalog to current time.
  */
 void WritableCatalog::UpdateLastModified() {
-  const time_t now = time(NULL);
-  const string sql = "INSERT OR REPLACE INTO properties "
-     "(key, value) VALUES ('last_modified', '" + StringifyInt(now) + "');";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("last_modified", static_cast<uint64_t>(time(NULL)));
 }
 
 
@@ -306,19 +302,12 @@ void WritableCatalog::UpdateLastModified() {
  * Increments the revision of the catalog in the database.
  */
 void WritableCatalog::IncrementRevision() {
-  const string sql =
-    "UPDATE properties SET value=value+1 WHERE key='revision';";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  SetRevision(GetRevision() + 1);
 }
 
 
 void WritableCatalog::SetRevision(const uint64_t new_revision) {
-  const string sql =
-    "UPDATE properties SET value=" + StringifyInt(new_revision) +
-    " WHERE key='revision';";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("revision", new_revision);
 }
 
 
@@ -326,10 +315,7 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
  * Sets the content hash of the previous catalog revision.
  */
 void WritableCatalog::SetPreviousRevision(const shash::Any &hash) {
-  const string sql = "INSERT OR REPLACE INTO properties "
-    "(key, value) VALUES ('previous_revision', '" + hash.ToString() + "');";
-  bool retval = Sql(database(), sql).Execute();
-  assert(retval);
+  database().SetProperty("previous_revision", hash.ToString());
 }
 
 
@@ -391,7 +377,9 @@ void WritableCatalog::MoveToNestedRecursively(
   // After creating a new nested catalog we have to move all elements
   // now contained by the new one.  List and move them recursively.
   DirectoryEntryList listing;
-  bool retval = ListingPath(PathString(directory), &listing);
+  const bool resolve_magic_symlinks = false;
+  bool retval = ListingPath(PathString(directory), &listing,
+                            resolve_magic_symlinks);
   assert(retval);
 
   // Go through the listing
@@ -420,7 +408,8 @@ void WritableCatalog::MoveToNestedRecursively(
       MoveToNestedRecursively(full_path, new_nested_catalog,
                               grand_child_mountpoints);
     } else if (i->IsChunkedFile()) {
-      MoveFileChunksToNested(full_path, new_nested_catalog);
+      MoveFileChunksToNested(full_path, i->hash_algorithm(),
+                             new_nested_catalog);
     }
 
     // Remove the entry from the current catalog
@@ -451,12 +440,12 @@ void WritableCatalog::MoveCatalogsToNested(
 
 
 void WritableCatalog::MoveFileChunksToNested(
-  const std::string  &full_path,
-  WritableCatalog    *new_nested_catalog)
+  const std::string       &full_path,
+  const shash::Algorithms  algorithm,
+  WritableCatalog         *new_nested_catalog)
 {
   FileChunkList chunks;
-  // Moving opaque chunks, we don't care about the hash algorithm
-  ListPathChunks(PathString(full_path), shash::kAny, &chunks);
+  ListPathChunks(PathString(full_path), algorithm, &chunks);
   assert(chunks.size() > 0);
 
   for (unsigned i = 0; i < chunks.size(); ++i) {

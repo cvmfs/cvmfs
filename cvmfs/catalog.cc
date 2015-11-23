@@ -177,14 +177,10 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   // Get root prefix
   if (IsRoot()) {
-    Sql sql_root_prefix(database(), "SELECT value FROM properties "
-                                    "WHERE key='root_prefix';");
-    if (sql_root_prefix.FetchRow()) {
-      root_prefix_.Assign(
-        reinterpret_cast<const char *>(
-          sql_root_prefix.RetrieveText(0)),
-        strlen(reinterpret_cast<const char *>(
-          sql_root_prefix.RetrieveText(0))));
+    if (database_->HasProperty("root_prefix")) {
+      const std::string root_prefix =
+                             database_->GetProperty<std::string>("root_prefix");
+      root_prefix_.Assign(root_prefix.data(), root_prefix.size());
       LogCvmfs(kLogCatalog, kLogDebug,
                "found root prefix %s in root catalog file %s",
                root_prefix_.c_str(), db_path.c_str());
@@ -195,10 +191,8 @@ bool Catalog::OpenDatabase(const string &db_path) {
   }
 
   // Get volatile content flag
-  Sql sql_volatile_flag(database(), "SELECT value FROM properties "
-                        "WHERE key='volatile';");
-  if (sql_volatile_flag.FetchRow())
-    volatile_flag_ = sql_volatile_flag.RetrieveInt(0);
+  volatile_flag_ = database_->GetPropertyDefault<bool>("volatile",
+                                                       volatile_flag_);
 
   // Read Catalog Counter Statistics
   if (!ReadCatalogCounters()) {
@@ -214,37 +208,6 @@ bool Catalog::OpenDatabase(const string &db_path) {
 
   initialized_ = true;
   return true;
-}
-
-
-/**
- * Performs a lookup on this Catalog for a given inode
- * @param inode the inode to perform the lookup for
- * @param dirent this will be set to the found entry
- * @param parent_md5path this will be set to the hash of the parent path
- * @return true if lookup was successful, false otherwise
- */
-bool Catalog::LookupInode(const inode_t inode, DirectoryEntry *dirent,
-                          shash::Md5 *parent_md5path) const
-{
-  assert(IsInitialized());
-
-  pthread_mutex_lock(lock_);
-  sql_lookup_inode_->BindRowId(GetRowIdFromInode(inode));
-  const bool found = sql_lookup_inode_->FetchRow();
-
-  // Retrieve the DirectoryEntry if needed
-  if (found && (dirent != NULL))
-      *dirent = sql_lookup_inode_->GetDirent(this);
-
-  // Retrieve the path_hash of the parent path if needed
-  if (parent_md5path != NULL)
-      *parent_md5path = sql_lookup_inode_->GetParentPathHash();
-
-  sql_lookup_inode_->Reset();
-  pthread_mutex_unlock(lock_);
-
-  return found;
 }
 
 
@@ -353,17 +316,19 @@ bool Catalog::ListingMd5PathStat(const shash::Md5 &md5path,
  * Returns only struct stat values
  * @param path_hash the MD5 hash of the path of the directory to list
  * @param listing will be set to the resulting DirectoryEntryList
+ * @param expand_symlink defines if magic symlinks should be resolved
  * @return true on successful listing, false otherwise
  */
 bool Catalog::ListingMd5Path(const shash::Md5 &md5path,
-                             DirectoryEntryList *listing) const
+                             DirectoryEntryList *listing,
+                             const bool expand_symlink) const
 {
   assert(IsInitialized());
 
   pthread_mutex_lock(lock_);
   sql_listing_->BindPathHash(md5path);
   while (sql_listing_->FetchRow()) {
-    DirectoryEntry dirent = sql_listing_->GetDirent(this);
+    DirectoryEntry dirent = sql_listing_->GetDirent(this, expand_symlink);
     FixTransitionPoint(md5path, &dirent);
     listing->push_back(dirent);
   }
@@ -379,8 +344,8 @@ bool Catalog::AllChunksBegin() {
 }
 
 
-bool Catalog::AllChunksNext(shash::Any *hash, ChunkTypes *type) {
-  return sql_all_chunks_->Next(hash, type);
+bool Catalog::AllChunksNext(shash::Any *hash) {
+  return sql_all_chunks_->Next(hash);
 }
 
 
@@ -444,31 +409,29 @@ void Catalog::DropDatabaseFileOwnership() {
 
 
 uint64_t Catalog::GetTTL() const {
-  const string sql = "SELECT value FROM properties WHERE key='TTL';";
-
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
   const uint64_t result =
-    (stmt.FetchRow()) ?  stmt.RetrieveInt64(0) : kDefaultTTL;
+    database().GetPropertyDefault<uint64_t>("TTL", kDefaultTTL);
   pthread_mutex_unlock(lock_);
-
   return result;
 }
 
 
 uint64_t Catalog::GetRevision() const {
-  const string sql = "SELECT value FROM properties WHERE key='revision';";
-
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
-  const uint64_t result = (stmt.FetchRow()) ? stmt.RetrieveInt64(0) : 0;
+  const uint64_t result =
+    database().GetPropertyDefault<uint64_t>("revision", 0);
   pthread_mutex_unlock(lock_);
-
   return result;
 }
 
 uint64_t Catalog::GetLastModified() const {
   return database().GetProperty<int>("last_modified");
+}
+
+
+uint64_t Catalog::GetNumChunks() const {
+  return counters_.Get("self_regular") + counters_.Get("self_chunks");
 }
 
 
@@ -485,17 +448,13 @@ uint64_t Catalog::GetNumEntries() const {
 
 
 shash::Any Catalog::GetPreviousRevision() const {
-  const string sql =
-    "SELECT value FROM properties WHERE key='previous_revision';";
-
-  shash::Any result;
   pthread_mutex_lock(lock_);
-  Sql stmt(database(), sql);
-  if (stmt.FetchRow())
-    result = stmt.RetrieveHashHex(0, shash::kSuffixCatalog);
+  const std::string hash_string =
+    database().GetPropertyDefault<std::string>("previous_revision", "");
   pthread_mutex_unlock(lock_);
-
-  return result;
+  return (!hash_string.empty())
+    ? shash::MkFromHexPtr(shash::HexPtr(hash_string), shash::kSuffixCatalog)
+    : shash::Any();
 }
 
 
@@ -624,8 +583,8 @@ void Catalog::SetInodeAnnotation(InodeAnnotation *new_annotation) {
 
 
 void Catalog::SetOwnerMaps(const OwnerMap *uid_map, const OwnerMap *gid_map) {
-  uid_map_ = (uid_map && !uid_map->empty()) ? uid_map : NULL;
-  gid_map_ = (gid_map && !gid_map->empty()) ? gid_map : NULL;
+  uid_map_ = (uid_map && uid_map->HasEffect()) ? uid_map : NULL;
+  gid_map_ = (gid_map && gid_map->HasEffect()) ? gid_map : NULL;
 }
 
 

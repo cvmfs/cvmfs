@@ -236,14 +236,14 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   }
 
   // parse dirtab file
-  catalog::Dirtab dirtab(dirtab_file);
-  if (!dirtab.IsValid()) {
+  catalog::Dirtab *dirtab = catalog::Dirtab::Create(dirtab_file);
+  if (!dirtab->IsValid()) {
     LogCvmfs(kLogCatalog, kLogStderr, "Invalid or not readable dirtab '%s'",
              dirtab_file.c_str());
     return 1;
   }
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "Found %d rules in dirtab '%s'",
-           dirtab.RuleCount(), dirtab_file.c_str());
+           dirtab->RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
   g_download_manager->Init(1, true, g_statistics);
@@ -261,9 +261,10 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   catalog_manager.Init();
 
   vector<string> new_nested_catalogs;
-  DetermineNestedCatalogCandidates(dirtab, &catalog_manager,
+  DetermineNestedCatalogCandidates(*dirtab, &catalog_manager,
                                    &new_nested_catalogs);
   const bool success = CreateCatalogMarkers(new_nested_catalogs);
+  delete dirtab;
 
   return (success) ? 0 : 1;
 }
@@ -482,6 +483,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (args.find('f') != args.end())
     params.union_fs_type = *args.find('f')->second;
+  if (args.find('A') != args.end()) params.is_balanced = true;
   if (args.find('x') != args.end()) params.print_changeset = true;
   if (args.find('y') != args.end()) params.dry_run = true;
   if (args.find('m') != args.end()) params.mucatalogs = true;
@@ -498,6 +500,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     }
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
+
+  if (args.find('X') != args.end())
+    params.max_weight = String2Uint64(*args.find('X')->second);
+  if (args.find('M') != args.end())
+    params.min_weight = String2Uint64(*args.find('M')->second);
 
   if (args.find('p') != args.end()) {
     params.use_file_chunking = true;
@@ -556,7 +563,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     catalog_manager(params.base_hash, params.stratum0, params.dir_temp,
                     params.spooler, g_download_manager,
                     params.catalog_entry_warn_threshold,
-                    g_statistics);
+                    g_statistics,
+                    params.is_balanced,
+                    params.max_weight,
+                    params.min_weight);
   catalog_manager.Init();
   publish::SyncMediator mediator(&catalog_manager, &params);
   publish::SyncUnion *sync;
@@ -576,6 +586,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 3;
   }
 
+  if (!sync->Initialize()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Initialization of the synchronisation "
+                                    "engine failed");
+    return 4;
+  }
+
   sync->Traverse();
 
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
@@ -583,7 +599,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!manifest.IsValid()) {
     PrintError("something went wrong during sync");
-    return 4;
+    return 5;
   }
 
   manifest->set_garbage_collectability(params.garbage_collectable);
@@ -595,7 +611,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   if (!manifest->Export(params.manifest_path)) {
     PrintError("Failed to create new repository");
-    return 5;
+    return 6;
   }
 
   return 0;

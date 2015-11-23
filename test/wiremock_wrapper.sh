@@ -38,7 +38,7 @@ wait_for_local_port() {
   local timeout=$initial_timeout
 
   echo -n "waiting for port ${port}... "
-  while ! nc -z localhost $port && [ $timeout -gt 0 ]; do
+  while ! netstat -plnt 2>&1 | grep -q ":$port" && [ $timeout -gt 0 ]; do
     timeout=$(( $timeout - 1 ))
     sleep 1
   done

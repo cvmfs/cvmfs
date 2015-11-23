@@ -27,7 +27,8 @@ CVMFS_TEST_UNIONFS=${CVMFS_TEST_UNIONFS:=} # union filesystem type to test
 CVMFS_TEST_SRVDEBUG=${CVMFS_TEST_SRVDEBUG:=}
 CVMFS_TEST_HASHALGO=${CVMFS_TEST_HASHALGO:=sha1}
 CVMFS_TEST_S3_CONFIG=${CVMFS_TEST_S3_CONFIG:=}
-CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}
+CVMFS_TEST_HTTP_BASE=${CVMFS_TEST_HTTP_BASE:=}
+CVMFS_TEST_STRATUM0=${CVMFS_TEST_STRATUM0:=}   # backward compatibility! use CVMFS_TEST_HTTP_BASE instead
 CVMFS_TEST_SERVER_CACHE=${CVMFS_TEST_SERVER_CACHE:=}
 
 # These OPT variables are for the benchmark options under the benchmarks folder
@@ -38,8 +39,18 @@ CVMFS_OPT_ITERATIONS=${CVMFS_OPT_ITERATIONS:=1}
 CVMFS_OPT_TEST_TYPE=${CVMFS_OPT_TEST_TYPE:=callgrind} # callgrind / memcheck
 CVMFS_OPT_CONFIG_FILE=${CVMFS_OPT_CONFIG_FILE:=}
 CVMFS_OPT_OUTPUT_DIR=${CVMFS_OPT_OUTPUT_DIR:=/tmp/cvmfs_benchmarks}
-CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=/var/lib/cvmfs/benchmark}
+CVMFS_OPT_CACHEDIR=${CVMFS_OPT_CACHEDIR:=~/.benchmark}
+CVMFS_OPT_PARALLEL_RUNS=${CVMFS_OPT_PARALLEL_RUNS:=1}
 CVMFS_OPT_MTAB_MODIFIED="false"
+
+# backward compatibility.
+#     CVMFS_TEST_STRATUM0 was replaced by CVMFS_TEST_HTTP_BASE to better reflect
+#     the purpose of this variable. Please don't use CVMFS_TEST_STRATUM0 anymore
+if [ -z "$CVMFS_TEST_HTTP_BASE" ] && [ ! -z "$CVMFS_TEST_STRATUM0" ]; then
+  echo "Warning: You are using the deprecated CVMFS_TEST_STRATUM0 variable."
+  echo "         Please consider switching to CVMFS_TEST_HTTP_BASE"
+  CVMFS_TEST_HTTP_BASE="$CVMFS_TEST_STRATUM0"
+fi
 
 
 if [ -f /.dockerinit ]; then
@@ -55,8 +66,11 @@ die() {
 
 
 # Find the service binary (or detect systemd)
+minpidof() {
+  pidof $1 | tr " " "\n" | sort --numeric-sort | head -n1
+}
 SERVICE_BIN="false"
-if ! pidof systemd > /dev/null 2>&1 || [ $(pidof systemd) -ne 1 ]; then
+if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
   if [ -x /sbin/service ]; then
     SERVICE_BIN="/sbin/service"
   elif [ -x /usr/sbin/service ]; then
@@ -222,6 +236,32 @@ contains() {
 }
 
 
+uses_aufs() {
+  local repo_name="$1"
+  load_repo_config $repo_name
+  [ x"$CVMFS_UNION_FS_TYPE" = x"aufs" ]
+}
+
+
+uses_overlayfs() {
+  local repo_name="$1"
+  load_repo_config $repo_name
+  [ x"$CVMFS_UNION_FS_TYPE" = x"overlayfs" ]
+}
+
+
+break_hardlink() {
+  local path="$1"
+  local tmp_file="$(mktemp)"
+  local linkcount="$(stat --format=%h $path)"
+
+  echo "Note: breaking up hardlink to '$path' linkcount: $linkcount"
+  cp -f $path $tmp_file
+  rm -f $path
+  mv    $tmp_file $path
+}
+
+
 cvmfs_clean() {
   sudo cvmfs_config umount > /dev/null || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
@@ -229,7 +269,7 @@ cvmfs_clean() {
   sudo sh -c "rm -f /etc/cvmfs/config.d/*"
   sudo sh -c "cat /dev/null > $CVMFS_TEST_SYSLOG_TARGET"
 
-  timeout=60
+  local timeout=60
   while $(pgrep -u cvmfs cvmfs2 > /dev/null); do
     if [ $timeout -eq 0 ]; then
       return 101
@@ -270,17 +310,27 @@ cvmfs_mount() {
 
 
 cvmfs_umount() {
-  repositories=$1
+  local repositories=$1
+  local times=5
+  local result=-1
 
   for r in $(echo $repositories | tr , " "); do
-    sudo umount /cvmfs/$r
-    local result=$?
+    while (( result != 0 && times > 0  )); do
+      sudo umount /cvmfs/$r > /dev/null 2>&1
+      result=$?
+      times=$(( $times - 1 ))
+      if [ $result -ne 0 ] && [ $times -gt 0 ]; then
+        echo "Failed to umount. Trying again..."
+        sleep 1
+      fi
+    done
+
     if [ $result -ne 0 ]; then
       lsof /cvmfs/$r
       return 200
     fi
 
-    timeout=5
+    local timeout=5
     while cat /proc/mounts | grep -q " /cvmfs/$r "; do
       if [ $timeout -eq 0 ]; then
         return 101
@@ -300,10 +350,9 @@ has_selinux() {
 
 
 get_cvmfs_cachedir() {
-  repository=$1
+  local repository=$1
 
-  local cache_dir
-  cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
+  local cache_dir=$(cvmfs_config showconfig $repository | grep CVMFS_CACHE_DIR | awk '{print $1}' | cut -d= -f2)
   if [ "x$cache_dir" = "x" ]; then
     echo "Failed to figure out cache directory"
     exit 1
@@ -353,11 +402,11 @@ reset_test_warning_flags() {
 
 
 check_time() {
-  start_time=$1
-  end_time=$2
-  limit=$3
+  local start_time=$1
+  local end_time=$2
+  local limit=$3
 
-  diff_time=$(($end_time-$start_time))
+  local diff_time=$(($end_time-$start_time))
 
   if [ $diff_time -gt $limit ]; then
     echo "Time limit exceeded" >&2
@@ -371,17 +420,17 @@ check_time() {
 
 
 check_memory() {
-  instance=$1
-  limit=$2
+  local instance=$1
+  local limit=$2
 
-  pid=$(attr -qg pid /cvmfs/$instance)             || return 100
-  rss="$(sudo cat /proc/$pid/status | grep VmRSS)" || return 101
-  rss_kb=$(echo $rss | awk '{print $2}')
+  local pid=$(attr -qg pid /cvmfs/$instance)             || return 100
+  local rss="$(sudo cat /proc/$pid/status | grep VmRSS)" || return 101
+  local rss_kb=$(echo $rss | awk '{print $2}')
 
   if [ $rss_kb -gt $limit ]; then
     local inode_tracker="$(sudo cvmfs_talk -i $instance internal affairs | grep 'inode tracker')"
-    local inserts=$(echo "$inode_tracker" | grep -o "inserts: [0-9]*" | grep -o "[0-9]*$")
-    local removes=$(echo "$inode_tracker" | grep -o "removes: [0-9]*" | grep -o "[0-9]*$")
+    local inserts=$(sudo cvmfs_talk -i $instance internal affairs | grep '^inode_tracker.n_insert' | cut -d\| -f2)
+    local removes=$(sudo cvmfs_talk -i $instance internal affairs | grep '^inode_tracker.n_remove' | cut -d\| -f2)
     local elements=$(( $inserts - $removes ))
 
     echo "Memory limit of $limit kB was exceeded by $instance which used $rss_kb kB"
@@ -414,6 +463,18 @@ has_repo() {
 }
 
 
+apply_server_cache_config() {
+  local repo=$1
+  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
+  [ x"$CVMFS_TEST_SERVER_CACHE" != x"" ] || return 0
+
+  local cache_base=$(echo "$CVMFS_TEST_SERVER_CACHE" | sed 's/\//\\\//g')
+  # will take effect _after_ the first publish operation...
+  sudo sed -i "s/^\(CVMFS_CACHE_BASE\)=.*\$/\1=${cache_base}/"     $client_conf || return 1
+  sudo sed -i "s/^\(CVMFS_RELOAD_SOCKETS\)=.*\$/\1=${cache_base}/" $client_conf || return 2
+}
+
+
 create_repo() {
   local repo=$1
   local uid=$2
@@ -437,9 +498,9 @@ create_repo() {
     echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG"
   fi
-  if [ x"$CVMFS_TEST_STRATUM0" != x"" ]; then
-    echo "  Stratum0: $CVMFS_TEST_STRATUM0"
-    stratum0=" -w $CVMFS_TEST_STRATUM0"
+  if [ x"$CVMFS_TEST_HTTP_BASE" != x"" ]; then
+    echo "  Stratum0: $CVMFS_TEST_HTTP_BASE"
+    stratum0=" -w $CVMFS_TEST_HTTP_BASE"
   fi
   if [ x"$CVMFS_TEST_UNIONFS" != x"" ]; then
     echo "  UnionFS: $CVMFS_TEST_UNIONFS"
@@ -453,13 +514,7 @@ create_repo() {
                          $extra_options $repo || return 102
 
   local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
-
-  if [ x"$CVMFS_TEST_SERVER_CACHE" != x"" ]; then
-    local cache_base=$(echo "$CVMFS_TEST_SERVER_CACHE" | sed 's/\//\\\//g')
-    # will take effect _after_ the first publish operation...
-    sudo sed -i "s/^CVMFS_CACHE_BASE=.*\$/CVMFS_CACHE_BASE=${cache_base}/"         $client_conf
-    sudo sed -i "s/^CVMFS_RELOAD_SOCKETS=.*\$/CVMFS_RELOAD_SOCKETS=${cache_base}/" $client_conf
-  fi
+  apply_server_cache_config $repo || return 103
 
   if [ x$debug_log != x -a x$debug_log != xNO ]; then
     echo "CVMFS_DEBUGLOG=$debug_log" | sudo tee -a $client_conf
@@ -535,6 +590,31 @@ make_huge_repo() {
 }
 
 
+import_repo() {
+  local repo=$1
+  local uid=$2
+  shift 2
+  local extra_options="$*"
+
+  echo "Importing repository $repo..."
+  local unionfs=""
+  if [ x"$CVMFS_TEST_UNIONFS" != x"" ]; then
+    echo "  UnionFS: $CVMFS_TEST_UNIONFS"
+    unionfs=" -f $CVMFS_TEST_UNIONFS"
+  fi
+  sudo cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
+
+  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
+  apply_server_cache_config $repo || return 103
+}
+
+
+get_stratum1_name() {
+  local repo_name="$1"
+  echo "$repo_name.$(date +%s%N | md5sum | head -c6).replica"
+}
+
+
 create_stratum1() {
   local replica_name=$1
   local uid=$2
@@ -543,15 +623,15 @@ create_stratum1() {
   shift 4
   local additional_parameters="$*"
   local s3_config=""
-  # TODO: Re-enable this as soon as Stratum1 is supported
-  #       with an S3 backend
-  # if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
-  #   echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
-  #   s3_config=" -s $CVMFS_TEST_S3_CONFIG"
-  # fi
+  if [ x"$CVMFS_TEST_S3_CONFIG" != x"" ]; then
+    local stratum1_url="$CVMFS_TEST_HTTP_BASE"
+    [ ! -z "$stratum1_url" ] || die "\$CVMFS_TEST_HTTP_BASE needs to be set for S3 tests to work!"
+    echo "  S3 Config: $CVMFS_TEST_S3_CONFIG"
+    echo "  Stratum1:  $stratum1_url"
+    s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
+  fi
   sudo cvmfs_server add-replica -o $CVMFS_TEST_USER    \
                                 -n $replica_name       \
-                                -a                     \
                                 $s3_config             \
                                 $additional_parameters \
                                 $stratum0_url          \
@@ -576,16 +656,13 @@ create_big_file() {
 # - file size
 # - parent directory
 # - symlink destination (when applicable)
-# - uid and gid can be specified
 #
 # @param directory          the directory to be listed
-# @param uid                specify a UID for the file owner (optional)
-# @param gid                specify a GID for the file owner (optional)
+# @param show_linkcount     yes be default, otherwise linkcount is left out
 # @return                   a custom directory listing
 create_listing() {
   local directory=$1
-  local uid=$2
-  local gid=$3
+  local show_linkcount=$2
   local lst
 
   lst=$(ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
@@ -622,15 +699,18 @@ create_listing() {
 
     # print out file information
     printf $1                     " ";
-    printf $2                     " ";
-    printf (uid == "" ? $3 : uid) " ";
-    printf (gid == "" ? $4 : gid) " ";
+    if (show_linkcount == "yes")
+    {
+      printf $2                   " ";
+    }
+    printf $3                     " ";
+    printf $4                     " ";
     printf $6;
 
     if(first == "l") printf " " $7 " " $8;
     if(first != "d") printf " " $5;
     printf "\n"
-  }' uid=$uid gid=$gid base_dir=$directory)
+  }' base_dir=$directory show_linkcount=$show_linkcount)
 
   echo -e "$lst"
 }
@@ -641,13 +721,21 @@ create_listing() {
 #
 # @param dir1    the directory to probe
 # @param dir2    the ground truth directory
+# @param repo    the underlying repository name (optional - to detect overlayfs)
 # @return        != 0 to indicate inequality, 0 means success
 compare_directories() {
   local dir1=$1
   local dir2=$2
+  local repo_name=$3
+  local show_linkcount="yes"
 
-  listing1=$(create_listing $dir1)
-  listing2=$(create_listing $dir2)
+  if [ ! -z $repo_name ] && uses_overlayfs $repo_name; then
+    echo "NOTE: $repo_name is based on OverlayFS - ignoring link counts"
+    show_linkcount="no"
+  fi
+
+  listing1=$(create_listing $dir1 $show_linkcount)
+  listing2=$(create_listing $dir2 $show_linkcount)
 
   echo "check if directory structure and file meta data fits"
   local listingFile1="listing_$(basename $dir1)"
@@ -737,7 +825,7 @@ check_catalog_presence() {
   local catalog_path=$1
   local repo_name=$2
 
-  cvmfs_server list-catalogs -x $repo_name | grep -x -q $catalog_path
+  cvmfs_server list-catalogs -x $repo_name | grep -x $catalog_path > /dev/null 2>&1
   return $?
 }
 
@@ -816,7 +904,7 @@ publish_repo() {
   shift 1
 
   # parse the command line arguments (keep quotation marks)
-  args="-v"
+  local args="-v"
   while [ $# -gt 0 ]; do
     if echo "$1" | grep -q "[[:space:]]"; then
       args="$args \"$1\""
@@ -1062,8 +1150,8 @@ get_local_repo_url() {
 
 get_s3_repo_url() {
   local repo_name="$1"
-  local s3_stratum0_url="$CVMFS_TEST_STRATUM0"
-  [ x"$s3_stratum0_url" != x"" ] || die "\$CVMFS_TEST_STRATUM0 needs to be set for S3 tests to work!"
+  local s3_stratum0_url="$CVMFS_TEST_HTTP_BASE"
+  [ x"$s3_stratum0_url" != x"" ] || die "\$CVMFS_TEST_HTTP_BASE needs to be set for S3 tests to work!"
   [ $(echo -n "$s3_stratum0_url" | tail -c1) = "/" ] || s3_stratum0_url="${s3_stratum0_url}/"
   echo "${s3_stratum0_url}${repo_name}"
 }
@@ -1118,7 +1206,8 @@ cleanup_legacy_repo_leftovers() {
 _resign_legacy_repository() {
   local repo_name="$1"
   local repo_storage="$(get_local_repo_storage $repo_name)"
-  local legacy_repo_storage="${repo_storage}/pub/catalogs"
+  local legacy_repo_storage="${repo_storage}"
+  [ -d ${repo_storage}/pub ] && legacy_repo_storage="${legacy_repo_storage}/pub/catalogs" # for 2.0.x style repositories
   local tmp_dir="$(pwd)/tmp"
   local upstream="local,${legacy_repo_storage}/data/txn,${legacy_repo_storage}"
 
@@ -1129,15 +1218,16 @@ _resign_legacy_repository() {
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$repo_name" >> ${whitelist}.unsigned
-  openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${repo_name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
+  openssl x509 -in /etc/cvmfs/keys/${repo_name}.crt -outform der | \
+    cvmfs_swissknife hash -a sha1 -f >> ${whitelist}.unsigned || return 2
   local hash;
-  hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
+  hash=`cat ${whitelist}.unsigned | cvmfs_swissknife hash -a sha1`
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
-  openssl rsautl -inkey /etc/cvmfs/keys/${repo_name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
-  cat ${whitelist}.unsigned ${whitelist}.signature | sudo tee ${legacy_repo_storage}/.cvmfswhitelist > /dev/null
-  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
+  openssl rsautl -inkey /etc/cvmfs/keys/${repo_name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature || return 3
+  cat ${whitelist}.unsigned ${whitelist}.signature | sudo tee ${legacy_repo_storage}/.cvmfswhitelist > /dev/null       || return 4
+  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash                                                 || return 5
 }
 
 
@@ -1166,20 +1256,36 @@ plant_tarball() {
 #       it expects a repo keychain to be planted in /etc/keys/${legacy_repo_name}
 # @param tarball           path to the tarball containing the legacy repo
 # @param legacy_repo_name  FQRN of the repository to be planted
-# @param verbose           print verbose output
+# @param repo_owner        user ID that is supposed to own the repository
 plant_legacy_repository_revision() {
   local tarball="$1"
   local legacy_repo_name="$2"
-  local verbose="$3"
+  local repo_owner="$3"
+  local verbose="$4"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
 
-  plant_tarball "$tarball" "$verbose"                                  || return 104
-  [ -d ${legacy_repo_storage}/pub ]                                    || return 105
-  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
-  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
-  sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
-  _resign_legacy_repository "$legacy_repo_name"                        || return 109
+  plant_tarball "$tarball" "$verbose" || return 104
+
+  # figure out if we just planted a CVMFS 2.0.x repository or something newer
+  local is_cvmfs_20=0
+  [ -d ${legacy_repo_storage}/pub ] && is_cvmfs_20=1
+
+  # do a couple of sanity checks and adjustments
+  if [ $is_cvmfs_20 -eq 1 ]; then
+    [ -d ${legacy_repo_storage}/pub ]                                    || return 105
+    [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
+    [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
+    sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
+  else
+    [ -d ${legacy_repo_storage}/data ]                      || return 105
+    [ -f ${legacy_repo_storage}/.cvmfspublished ]           || return 106
+    [ -f ${legacy_repo_storage}/.cvmfswhitelist ]           || return 107
+    sudo touch ${legacy_repo_storage}/.cvmfs_master_replica || return 108
+  fi
+
+  _resign_legacy_repository "$legacy_repo_name" || return 109
 }
+
 
 
 # creates a path into the CAS of CVMFS server
@@ -1254,17 +1360,30 @@ display_timestamp() {
   date --date="$timestamp"
 }
 
+# this copies all top-level files from source to destination ignoring symlinks
+# Note: Using the content of /bin or /usr/bin as integration test guinea pig was
+#       never a good idea. This is pretty much technical debt for this poor
+#       decision.
+_cp_bindir() {
+  local source_directory="$1"
+  local destination_directory="$2"
+
+  for f in $(find ${source_directory}/ -maxdepth 1 -type f); do
+    sudo cp $f $destination_directory || return 1
+  done
+  sudo chmod -R a+rw $destination_directory || return 2
+
+  for f in $(find $destination_directory -type f); do
+    sudo chmod 0444 $f || return 3
+  done
+}
 
 # copy all content of /bin/* into a given directory (for server testing purposes)
 #
 # @param destination_directory
 cp_bin() {
   local destination_directory="$1"
-  sudo cp -R /bin/* $destination_directory  || return 1
-  sudo chmod -R a+rw $destination_directory || return 2
-  for f in $(find $destination_directory -type f); do
-    sudo chmod 0444 $f || return 3
-  done
+  _cp_bindir "/bin" "$destination_directory"
 }
 
 # copy all content of /usr/bin/* into a given directory (for server testing purposes)
@@ -1272,11 +1391,7 @@ cp_bin() {
 # @param destination_directory
 cp_usrbin() {
   local destination_directory="$1"
-  sudo cp -R /usr/bin/* $destination_directory || return 1
-  sudo chmod -R a+rw $destination_directory    || return 2
-  for f in $(find $destination_directory -type f); do
-    sudo chmod 0444 $f || return 3
-  done
+  _cp_bindir "/usr/bin" "$destination_directory"
 }
 
 
@@ -1302,7 +1417,7 @@ wait_fqrn_mount() {
 
 # runs the command once, mounting and unmounting the repository
 single_execution() {
-  cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 & #> /dev/null 2>&1 &
+  cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
   wait_fqrn_mount
   ( cvmfs_run_benchmark )
   local code=$?
@@ -1333,15 +1448,25 @@ EOF
 
 }
 
+clean_benchmark_cache() {
+  local cachedir="${CVMFS_OPT_CACHEDIR}/${FQRN}"
+  if [ -d "$cachedir" ] && [ "x$cachedir" != x ]; then
+  list=$(ls $cachedir | grep -P "^[0-9a-f]{2}$")
+    for dir in $list; do
+      rm -f "$cachedir/$dir"/*
+    done
+  fi
+}
 
 # sets the valgrind options depending on the test type
 #
 # @param test_type  concrete test to execute
 set_valgrind_options() {
+  local option="$1"
   local CVMFS_OPT_CALLGRIND="--tool=callgrind --dump-before=fuse_session_loop_mt --dump-after=fuse_session_loop_mt --dsymutil=yes --log-file=${FQRN}.callgrind.log -v"
-  local CVMFS_OPT_MEMCHECK="--tool=memcheck --xml=yes --xml-file=${FQRN}.memcheck.xml --trace-children=yes --child-silent-after-fork=yes --leak-check=yes --log-file=${FQRN}.memcheck.log -v"
+  local CVMFS_OPT_MEMCHECK="--tool=memcheck --xml=yes --xml-file=${FQRN}.memcheck.xml --leak-check=yes --log-file=${FQRN}.memcheck.log -v"
   OPTIONS=""
-  case $CVMFS_OPT_TEST_TYPE in
+  case $option in
     callgrind)
       OPTIONS=$CVMFS_OPT_CALLGRIND
     ;;
@@ -1357,20 +1482,20 @@ set_valgrind_options() {
 # @param workspace  absolute path to the directory where the benchmark will put the files in
 setup_benchmark_environment() {
   local workspace="$1"
-  mkdir -p /cvmfs/$FQRN
+  local me=$(whoami)
   mkdir -p "$CVMFS_OPT_OUTPUT_DIR/$FQRN"
   mkdir -p $workspace/cache
 
-  # cleaning the cache
-  local cachedir="${CVMFS_OPT_CACHEDIR}/${FQRN}"
-  if [ -d "$cachedir" ] && [ "x$cachedir" != x ]; then
-    rm -rf $cachedir/*
-  fi
+  # make sure the user can execute /bin/fusermount, write into /dev/fuse and write into /cvmfs/<repo>
+  sudo chmod 666 /dev/fuse
+  sudo chmod 4755 /bin/fusermount
+  sudo mkdir -p /cvmfs/$FQRN
+  sudo chown $me /cvmfs/$FQRN
 
   # mtab trick
   if [ ! -h /etc/mtab ]; then
-    mv /etc/mtab /etc/mtab.save
-    ln -s /proc/mounts /etc/mtab
+    sudo sh -c "mv /etc/mtab /etc/mtab.save"
+    sudo sh -c "ln -s /proc/mounts /etc/mtab"
     CVMFS_OPT_MTAB_MODIFIED="true"
   fi
 
@@ -1378,14 +1503,12 @@ setup_benchmark_environment() {
   if [ ! -d "$CVMFS_OPT_CACHEDIR" ]; then
     mkdir -p "$CVMFS_OPT_CACHEDIR"
     has_selinux
-    selinux=$?
+    local selinux=$?
     if [ "$selinux" -eq 0 ]; then
       chcon -Rv --type=cvmfs_cache_t $CVMFS_OPT_CACHEDIR
     fi
   else
-    if [ x"$CVMFS_OPT_CACHEDIR" != x ]; then
-      rm -rf "$CVMFS_OPT_CACHEDIR"/*
-    fi
+    clean_benchmark_cache
   fi
 
   # create a cvmfs.conf file or use a custom one
@@ -1452,7 +1575,7 @@ statistics_daemon() {
   touch $dump_file
   while [ -f /proc/${PID}/smaps ]; do
     # memory in KB
-    echo 0 $(awk '/Rss/ {print "+", $2}' /proc/${PID}/smaps) | bc >> $dump_file
+    echo 0 $(sudo awk '/Rss/ {print "+", $2}' /proc/${PID}/smaps) | bc >> $dump_file
     sleep 2
   done
 }
@@ -1478,19 +1601,35 @@ execute_statistics_loop() {
   local code=0
   local iteration=1
   local PID=0
-  local daemon=0
+  local processes=()
   local memory_file="memory.stat"
 
   while (( iteration <= $CVMFS_OPT_ITERATIONS && code == 0 )); do
     local start_time=$(date +%s)
+    # cleaning the cache if necessary before executing the actual benchmark
+    if [ x"$CVMFS_OPT_WARM_CACHE" != x"yes" ]; then
+      clean_benchmark_cache
+    fi
 
     cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN 2>&1 &
     PID=$!
     wait_fqrn_mount
-    statistics_daemon $memory_file $PID &
-    daemon=$!
-    ( cvmfs_run_benchmark )
-    code=$?
+    statistics_daemon $memory_file $PID >/dev/null 2>&1 & # it kills himself when there is no cvmfs process
+
+    for i in $(seq 1 1 $CVMFS_OPT_PARALLEL_RUNS); do
+      ( cvmfs_run_benchmark ) > /tmp/$FQRN.log.$i 2>&1 &
+      processes[$i]=$!
+    done
+
+    for pid in ${processes[@]}; do
+      wait $pid
+      local retval=$?
+      if [ $retval -ne 0 ]; then
+        code=$retval
+        echo "One thread failed in $FQRN. Check /tmp/$FQRN.log"
+      fi
+    done
+
     local end_time=$(date +%s)
     local total_time=$(( end_time - start_time )) # in seconds
 
@@ -1517,7 +1656,15 @@ execute_benchmark_loop() {
   local code=0
   local count=$CVMFS_OPT_ITERATIONS
 
+  valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
+  PID=$!
+  wait_fqrn_mount
+
   while (( count > 0 && code == 0 )); do
+    # cleaning the cache if necessary before executing the actual benchmark
+    if [ x"$CVMFS_OPT_WARM_CACHE" != x"yes" ]; then
+      clean_benchmark_cache
+    fi
     benchmark_log "Starting iteration ${iteration}"
     ( cvmfs_run_benchmark )
     code=$?
@@ -1525,23 +1672,32 @@ execute_benchmark_loop() {
     iteration=$(( iteration + 1 ))
   done
 
+  create_info_file
+
   if [ "$code" -ne 0 ]; then
     benchmark_log "Problem executing the tests. Aborting"
     benchmark_log $(lsof /cvmfs/${FQRN})
     exit 100
   fi
+
+  benchmark_log "Iterations finished. Unmounting cvmfs"
+  cvmfs_umount $FQRN
+  wait $PID
 }
 
 
 # runs a benchmark $CVMFS_OPT_ITERATIONS times
 run_benchmark() {
   local statistics_file="$FQRN.data"
-  set_valgrind_options
 
   # use or not warm cache
   if [ x"$CVMFS_OPT_WARM_CACHE" = x"yes" ]; then
     benchmark_log "Starting initial execution"
     single_execution
+    local code=$?
+    if [ $code -ne 0 ]; then
+      die "Failed in the warm cache execution"
+    fi
   else
     benchmark_log "Using cold cache"
   fi
@@ -1550,20 +1706,24 @@ run_benchmark() {
   if [ x"$CVMFS_OPT_TALK_STATISTICS" = x"yes" ]; then
     benchmark_log "Executing the statistics collection"
     execute_statistics_loop
+    local code=$?
+    if [ $code -ne 0 ]; then
+      die "Failed in the statistics collection"
+    fi
   fi
 
   if [ x"$CVMFS_OPT_VALGRIND" = x"yes" ]; then
-    benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
-    benchmark_log "Running valgrind with the following parameters: $OPTIONS"
-    benchmark_log "Launching the job $CVMFS_OPT_ITERATIONS times"
-    valgrind $OPTIONS cvmfs2 -f -o config=cvmfs.conf,disable_watchdog,simple_options_parsing $FQRN /cvmfs/$FQRN &
-    PID=$!
-    wait_fqrn_mount
-    execute_benchmark_loop
-    create_info_file
-    benchmark_log "Iterations finished. Unmounting cvmfs"
-    cvmfs_umount $FQRN
-    wait $PID
+    for tool in $CVMFS_OPT_TEST_TYPE; do
+      set_valgrind_options $tool
+      benchmark_log "Starting loading the profiler and mounting in /cvmfs/${FQRN}"
+      benchmark_log "Running valgrind with the following parameters: $OPTIONS"
+      benchmark_log "Launching the job $CVMFS_OPT_ITERATIONS times"
+      execute_benchmark_loop
+      local code=$?
+      if [ $code -ne 0 ]; then
+        die "Failed in Valgrind"
+      fi
+    done
   fi
 }
 
@@ -1574,7 +1734,7 @@ collect_benchmark_results() {
 
   # undo the mtab trick
   if [ x"$CVMFS_OPT_MTAB_MODIFIED" = x"true" ]; then
-    mv /etc/mtab.save /etc/mtab
+    sudo mv /etc/mtab.save /etc/mtab
   fi
 
   # collect the results
@@ -1669,4 +1829,44 @@ export_xunit_xml() {
     xunit_testcase "$xml_file" "$testcase" "$logfile"
   done
   xunit_epilogue "$xml_file"
+}
+
+
+get_cache_directory() {
+  local mountpoint="$1"
+  echo "${mountpoint}c"
+}
+
+do_local_mount() {
+  local mountpoint="$1"
+  local repo_name="$2"
+  local repo_url="$3"
+  local config_file="$4"
+  local cache="$(get_cache_directory $mountpoint)"
+  local config="$(mktemp ${mountpoint}.conf.XXXXX)"
+  local output="$(mktemp ${mountpoint}.log.XXXXX)"
+
+  mkdir $mountpoint $cache
+  if [ -z $config_file ]; then
+    cat > $config << EOF
+CVMFS_CACHE_BASE=$cache
+CVMFS_RELOAD_SOCKETS=$cache
+CVMFS_SERVER_URL=$repo_url
+CVMFS_HTTP_PROXY=DIRECT
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${repo_name}.pub
+CVMFS_KCACHE_TIMEOUT=15
+EOF
+  else
+    cat $config_file > $config
+  fi
+
+  cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
+}
+
+remove_local_mount() {
+  local mountpoint="$1"
+  local cache="$(get_cache_directory $mountpoint)"
+
+  sudo umount $mountpoint
+  rm -fR $cache $mountpoint
 }

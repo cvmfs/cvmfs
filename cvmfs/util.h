@@ -32,8 +32,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+const unsigned kPageSize = 4096;
 const size_t kMaxPathLength = 256;
-
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
@@ -140,7 +140,8 @@ bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path);
 std::string CreateTempPath(const std::string &path_prefix, const int mode);
-std::string CreateTempDir(const std::string &path_prefix, const int mode);
+std::string CreateTempDir(const std::string &path_prefix);
+std::string GetCurrentWorkingDirectory();
 int TryLockFile(const std::string &path);
 int LockFile(const std::string &path);
 void UnlockFile(const int filedes);
@@ -159,18 +160,16 @@ std::string StringifyDouble(const double value);
 std::string StringifyTime(const time_t seconds, const bool utc);
 std::string StringifyTimeval(const timeval value);
 std::string RfcTimestamp();
-std::string StringifyIpv4(const uint32_t ip_address);
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
-uint64_t HexString2Uint64(const std::string &value);
-int HexDigit2Int(const char digit);
+bool String2Uint64Parse(const std::string &value, uint64_t *result);
+
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
 bool HasSuffix(const std::string &str, const std::string &suffix,
                const bool ignore_case);
-bool IsNumeric(const std::string &str);
 
 std::vector<std::string> SplitString(const std::string &str,
                                      const char delim,

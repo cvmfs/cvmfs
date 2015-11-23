@@ -114,8 +114,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
 int S3FanoutManager::CallbackCurlSocket(CURL *easy, curl_socket_t s, int action,
                                         void *userp, void *socketp) {
   S3FanoutManager *s3fanout_mgr = static_cast<S3FanoutManager *>(userp);
-  int ajobs = 0;
-  sem_getvalue(&s3fanout_mgr->available_jobs_, &ajobs);
+  const int ajobs = *s3fanout_mgr->available_jobs_;
   LogCvmfs(kLogS3Fanout, kLogDebug, "CallbackCurlSocket called with easy "
            "handle %p, socket %d, action %d, up %d, "
            "sp %d, fds_inuse %d, jobs %d",
@@ -203,7 +202,12 @@ void *S3FanoutManager::MainUpload(void *data) {
 
       s3fanout::Failures init_failure = s3fanout_mgr->InitializeRequest(info,
                                                                         handle);
-      assert(init_failure == s3fanout::kFailOk);
+      if (init_failure != s3fanout::kFailOk) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to initialize CURL handle "
+                                           "(error: %d - %s | errno: %d)",
+                 init_failure, Code2Ascii(init_failure), errno);
+        abort();
+      }
       s3fanout_mgr->SetUrlOptions(info);
 
       curl_multi_add_handle(s3fanout_mgr->curl_multi_, handle);
@@ -285,7 +289,7 @@ void *S3FanoutManager::MainUpload(void *data) {
         } else {
           // Return easy handle into pool and write result back
           s3fanout_mgr->ReleaseCurlHandle(info, easy_handle);
-          sem_post(&s3fanout_mgr->available_jobs_);
+          s3fanout_mgr->available_jobs_->Decrement();
 
           pthread_mutex_lock(s3fanout_mgr->jobs_completed_lock_);
           s3fanout_mgr->jobs_completed_.push_back(info);
@@ -561,15 +565,24 @@ Failures S3FanoutManager::InitializeRequest(JobInfo *info, CURL *handle) const {
                      &content_md5);
     } else if (info->origin == kOriginPath) {
       bool hashretval = shash::HashFile(info->origin_path, &content_md5);
-      if (!hashretval)
+      if (!hashretval) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to hash file %s (errno: %d)",
+                 info->origin_path.c_str(), errno);
         return kFailLocalIO;
+      }
       int64_t file_size = GetFileSize(info->origin_path);
-      if (file_size == -1)
+      if (file_size == -1) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to stat file %s (errno: %d)",
+                 info->origin_path.c_str(), errno);
         return kFailLocalIO;
+      }
       assert(info->origin_file == NULL);
       info->origin_file = fopen(info->origin_path.c_str(), "r");
-      if (info->origin_file == NULL)
+      if (info->origin_file == NULL) {
+        LogCvmfs(kLogS3Fanout, kLogStderr, "failed to open file %s (errno: %d)",
+                 info->origin_path.c_str(), errno);
         return kFailLocalIO;
+      }
       retval = curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,
                                 static_cast<curl_off_t>(file_size));
       assert(retval == CURLE_OK);
@@ -768,7 +781,13 @@ bool S3FanoutManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->http_headers = NULL;
     s3fanout::Failures init_failure = InitializeRequest(info,
                                                         info->curl_handle);
-    assert(init_failure == s3fanout::kFailOk);
+
+    if (init_failure != s3fanout::kFailOk) {
+      LogCvmfs(kLogS3Fanout, kLogStderr, "Failed to initialize CURL handle "
+                                         "(error: %d - %s | errno: %d)",
+               init_failure, Code2Ascii(init_failure), errno);
+      abort();
+    }
     SetUrlOptions(info);
     // Reset origin
     if (info->origin == kOriginMem)
@@ -890,7 +909,8 @@ void S3FanoutManager::Init(const unsigned int max_pool_handles) {
   watch_fds_max_ = 4*pool_max_handles_;
 
   max_available_jobs_ = 4*pool_max_handles_;
-  assert(sem_init(&available_jobs_, 1, max_available_jobs_) == 0);
+  available_jobs_ = new Semaphore(max_available_jobs_);
+  assert(NULL != available_jobs_);
 
   opt_timeout_ = 20;
   statistics_ = new Statistics();
@@ -968,7 +988,7 @@ void S3FanoutManager::Fini() {
   delete statistics_;
   statistics_ = NULL;
 
-  sem_destroy(&available_jobs_);
+  delete available_jobs_;
 
   curl_global_cleanup();
 }
@@ -1045,7 +1065,7 @@ int S3FanoutManager::PopCompletedJobs(std::vector<s3fanout::JobInfo*> *jobs) {
  * Push new job to be uploaded to the S3 cloud storage.
  */
 int S3FanoutManager::PushNewJob(JobInfo *info) {
-  sem_wait(&available_jobs_);
+  available_jobs_->Increment();
 
   pthread_mutex_lock(jobs_todo_lock_);
   jobs_todo_.push_back(info);

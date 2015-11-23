@@ -1,4 +1,43 @@
 2.2.0:
+  * Add support for grafting of files (CVM-908)
+  * Make CVMFS_AUTO_REPAIR_MOUNTPOINT the default (CVM-889)
+  * Fix mount point auto repair when only the read-only branch is broken (CVM-918)
+  * Fix URL option parsing for S3 backend in cvmfs_server
+  * Add quasi-static cvmfs_preload binary (CVM-912, CVM-914)
+  * Add auto-balancer for catalogs (experimental) with server parameters
+    CVMFS_AUTOCATALOGS, CVMFS_AUTOCATALOGS_MAX_WEIGHT, 
+    CVMFS_AUTOCATALOGS_MIN_WEIGHT
+  * Fix auto tag creation for fast successive publish runs (CVM-795)
+  * Fix systemd detection in cvmfs_server on systems with multiple running
+    systemd processes like Fedora 22
+  * Fix rpm for Fedora > 21, drop explicit support for fedora < 21
+  * Detect valgrind if valgrind header is present on the system
+  * Add make check target
+  * Fix leak of temporary files in .cvmfsdirtab handling (CVM-818)
+  * Allow geodb update for non-root users (CVM-895)
+  * Don't commit exisiting files to local storage backend in server (CVM-894)
+  * Fix stale lock file on server machine crash (CVM-810)
+  * Fix crash for invalid spooler definition (CVM-891)
+  * Fix leak of temporary files in the S3 backend (CVM-881)
+  * Add -s <S3 config file> switch to add-replica command
+  * Fix rare crashes on publish due to false whiteout handling (CVM-880)
+  * Fix moving of magic symlinks into nested catalogs (CVM-874)
+  * Prepare OS X mount helper for osxfuse 3
+  * Fix stack trace generation on OS X
+  * Tune OS X Fuse mount options
+  * Add support for chunked files in libcvmfs (CVM-687)
+  * Fix rare race that can result in a hanging reload
+  * Fix memory and file descriptor leak in the download manager during reload
+  * Add support for SHA-256, SHA3-256, SHAKE128 with 160 output bits
+  * Add listing of /var/run/cvmfs to bugreport tarball (CVM-868)
+  * Prevent ctrl+c during cvmfs_config reload (CVM-869)
+  * Avoid use of attr utility in the server (CVM-853)
+  * Build GeoIP libraries for the server only (CVM-854)
+  * Add catalog-chown command to cvmfs_server (CVM-836)
+  * Handle import of repositories with an expired whitelist (CVM-780)
+  * Fix leak of temporary files during garbage collection (CVM-846)
+  * Fix verification of partial file chunks in cvmfs_server (CVM-842)
+  * Remove counting of open file descriptors from libcvmfs
   * Fix resolving absolute symlinks into the same repository in libcvmfs
     (regression)
   * Add CVMFS_MAX_IPADDR_PER_PROXY parameter to avoid very long fail-over

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 usage() {
   echo "$0 <logfile> [-o xUnit XML output] [-x <exclusion list> --] [test list]"
@@ -22,13 +22,17 @@ date >> $logfile
 shift
 test_exclusions=0
 xml_output=""
-while getopts "xo:" option; do
+debug=""
+while getopts "xo:d" option; do
   case $option in
     x)
       test_exclusions=1
     ;;
     o)
       xml_output="$OPTARG"
+    ;;
+    d)
+      debug="-x"
     ;;
     ?)
       usage
@@ -70,7 +74,11 @@ report_failure() {
   local workdir=$2
   echo $message
   if [ x$workdir != x ]; then
-    sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
+    if [ x$PARROT_ENABLED = "xTRUE" ]; then
+      cp $CVMFS_TEST_SYSLOG_TARGET $workdir
+    else
+      sudo cp $CVMFS_TEST_SYSLOG_TARGET $workdir
+    fi
   fi
   num_failures=$(($num_failures+1))
 }
@@ -88,6 +96,14 @@ report_skipped() {
   local message="$1"
   echo $message
   num_skipped=$(($num_skipped+1))
+}
+
+clean_workdir() {
+  if [ x$PARROT_ENABLED = "xTRUE" ]; then
+    rm -rf "$workdir" >> $logfile
+  else
+    sudo rm -rf "$workdir" >> $logfile
+  fi
 }
 
 # makes sure the test environment for the test case is sane
@@ -207,13 +223,13 @@ do
 
   # run the test
   test_start=$(get_millisecond_epoch)
-  sh -c ". ./test_functions                     && \
-         . $t/main                              && \
-         cd $workdir                            && \
-         cvmfs_run_test $logfile $(pwd)/${t}    && \
-         retval=\$?                             && \
-         retval=\$(mangle_test_retval \$retval) && \
-         exit \$retval" >> $logfile 2>&1
+  bash $debug -c ". ./test_functions                     && \
+                  . $t/main                              && \
+                  cd $workdir                            && \
+                  cvmfs_run_test $logfile $(pwd)/${t}    && \
+                  retval=\$?                             && \
+                  retval=\$(mangle_test_retval \$retval) && \
+                  exit \$retval" >> $logfile 2>&1
   RETVAL=$?
   test_end=$(get_millisecond_epoch)
   test_time_elapsed=$(( ( $test_end - $test_start ) ))
@@ -230,26 +246,26 @@ do
   # check the final test result
   case $RETVAL in
     0)
-      sudo rm -rf "$workdir" >> $logfile
+      clean_workdir
       report_passed "Test passed" >> $logfile
       touch ${scratchdir}/success
       echo "OK"
       ;;
     $CVMFS_MEMORY_WARNING)
-      sudo rm -rf "$workdir" >> $logfile
+      clean_workdir
       report_warning "Memory limit exceeded!" >> $logfile
       touch ${scratchdir}/memorywarning
       echo "Memory Warning!"
       ;;
     $CVMFS_TIME_WARNING)
-      sudo rm -rf "$workdir" >> $logfile
+      clean_workdir
       report_warning "Time limit exceeded!" >> $logfile
       tail -n 50 /var/log/messages /var/log.syslog >> $logfile 2>/dev/null
       touch ${scratchdir}/timewarning
       echo "Time Warning!"
       ;;
     $CVMFS_GENERAL_WARNING)
-      sudo rm -rf "$workdir" >> $logfile
+      clean_workdir
       report_warning "Test case finished with warnings!" >> $logfile
       touch ${scratchdir}/generalwarning
       echo "Warning!"

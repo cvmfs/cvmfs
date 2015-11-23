@@ -54,6 +54,7 @@ echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
+install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 
 # installing WSGI apache module
@@ -78,7 +79,7 @@ install_from_repo rubygems
 install_from_repo java
 
 # install ruby gem for FakeS3
-install_ruby_gem fakes3
+install_ruby_gem fakes3 0.2.0  # latest is 0.2.1 (23.07.2015) that didn't work.
 
 # increase open file descriptor limits
 echo -n "increasing ulimit -n ... "

@@ -76,19 +76,23 @@ class T_GarbageCollector : public ::testing::Test {
   void SetUp() {
     dice_.InitLocaltime();
     SetupDummyCatalogs();
+    uploader_ = GC_MockUploader::MockConstruct();
   }
 
   void TearDown() {
     MockCatalog::Reset();
     MockHistory::Reset();
     EXPECT_EQ(0u, MockCatalog::instances);
+    ASSERT_NE(static_cast<GC_MockUploader*>(NULL), uploader_);
+    uploader_->TearDown();
+    delete uploader_;
   }
 
   GcConfiguration GetStandardGarbageCollectorConfiguration() {
-    MyGarbageCollector::Configuration config;
+    GcConfiguration config;
     config.keep_history_depth = 1;
     config.dry_run            = false;
-    config.uploader           = GC_MockUploader::MockConstruct();
+    config.uploader           = uploader_;
     config.object_fetcher     = &object_fetcher_;
     return config;
   }
@@ -433,7 +437,7 @@ class T_GarbageCollector : public ::testing::Test {
 
   MockCatalog* ReuseCatalog(MockCatalog *legacy_catalog,
                             MockCatalog *additional_parent_catalog) {
-    additional_parent_catalog->RegisterChild(legacy_catalog);
+    additional_parent_catalog->RegisterNestedCatalog(legacy_catalog);
     return legacy_catalog;
   }
 
@@ -460,6 +464,7 @@ class T_GarbageCollector : public ::testing::Test {
  private:
   Prng               dice_;
   MockObjectFetcher  object_fetcher_;
+  GC_MockUploader   *uploader_;
 };
 
 const std::string T_GarbageCollector::fqrn = "test.cern.ch";

@@ -97,6 +97,7 @@ class TreeCountersBase {
   };
 
  public:
+  FieldT Get(const std::string &key) const;
   bool ReadFromDatabase(const CatalogDatabase  &database,
                         const LegacyMode::Type  legacy = LegacyMode::kNoLegacy);
   bool WriteToDatabase(const CatalogDatabase     &database) const;

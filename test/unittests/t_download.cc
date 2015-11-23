@@ -8,7 +8,11 @@
 
 #include <cstdio>
 
+#include "../../cvmfs/compression.h"
 #include "../../cvmfs/download.h"
+#include "../../cvmfs/hash.h"
+#include "../../cvmfs/prng.h"
+#include "../../cvmfs/sink.h"
 #include "../../cvmfs/statistics.h"
 #include "../../cvmfs/util.h"
 
@@ -21,7 +25,7 @@ class T_Download : public ::testing::Test {
   virtual void SetUp() {
     download_mgr.Init(8, false, /* use_system_proxy */
         &statistics);
-    ffoo = CreateTempFile("/tmp/cvmfstest", 0600, "w+", &foo_path);
+    ffoo = CreateTemporaryFile(&foo_path);
     assert(ffoo);
     foo_url = "file://" + foo_path;
   }
@@ -32,6 +36,11 @@ class T_Download : public ::testing::Test {
     unlink(foo_path.c_str());
   }
 
+  FILE *CreateTemporaryFile(std::string *path) const {
+    return CreateTempFile(GetCurrentWorkingDirectory() + "/cvmfs_ut_download",
+                          0600, "w+", path);
+  }
+
   perf::Statistics statistics;
   DownloadManager download_mgr;
   FILE *ffoo;
@@ -40,13 +49,42 @@ class T_Download : public ::testing::Test {
 };
 
 
+class TestSink : public cvmfs::Sink {
+ public:
+  TestSink() {
+    FILE *f = CreateTempFile("./cvmfs_ut_download", 0600, "w+", &path);
+    assert(f);
+    fd = dup(fileno(f));
+    assert(f >= 0);
+    fclose(f);
+  }
+
+  virtual int64_t Write(const void *buf, uint64_t size) {
+    return write(fd, buf, size);
+  }
+
+  virtual int Reset() {
+    int retval = ftruncate(fd, 0);
+    assert(retval == 0);
+    return 0;
+  }
+
+  ~TestSink() {
+    close(fd);
+    unlink(path.c_str());
+  }
+
+  int fd;
+  string path;
+};
+
+
 //------------------------------------------------------------------------------
 
 
-// A placeholder test for future unit testing of the download module
 TEST_F(T_Download, File) {
   string dest_path;
-  FILE *fdest = CreateTempFile("/tmp/cvmfstest", 0600, "w+", &dest_path);
+  FILE *fdest = CreateTemporaryFile(&dest_path);
   ASSERT_TRUE(fdest != NULL);
   UnlinkGuard unlink_guard(dest_path);
 
@@ -58,9 +96,31 @@ TEST_F(T_Download, File) {
 }
 
 
+TEST_F(T_Download, Multiple) {
+  string dest_path;
+  FILE *fdest = CreateTemporaryFile(&dest_path);
+  ASSERT_TRUE(fdest != NULL);
+  UnlinkGuard unlink_guard(dest_path);
+
+  DownloadManager second_mgr;
+  second_mgr.Init(8, false, /* use_system_proxy */ &statistics, "second");
+
+  JobInfo info(&foo_url, false /* compressed */, false /* probe hosts */,
+               fdest,  NULL);
+  JobInfo info2(&foo_url, false /* compressed */, false /* probe hosts */,
+                fdest,  NULL);
+  download_mgr.Fetch(&info);
+  second_mgr.Fetch(&info2);
+  EXPECT_EQ(info.error_code, kFailOk);
+  EXPECT_EQ(info2.error_code, kFailOk);
+  fclose(fdest);
+  second_mgr.Fini();
+}
+
+
 TEST_F(T_Download, LocalFile2Mem) {
   string dest_path;
-  FILE *fdest = CreateTempFile("/tmp/cvmfstest", 0600, "w+", &dest_path);
+  FILE *fdest = CreateTemporaryFile(&dest_path);
   ASSERT_TRUE(fdest != NULL);
   UnlinkGuard unlink_guard(dest_path);
   char buf = '1';
@@ -73,6 +133,52 @@ TEST_F(T_Download, LocalFile2Mem) {
   ASSERT_EQ(info.error_code, kFailOk);
   ASSERT_EQ(info.destination_mem.size, 1U);
   EXPECT_EQ(info.destination_mem.data[0], '1');
+}
+
+
+TEST_F(T_Download, LocalFile2Sink) {
+  string dest_path;
+  FILE *fdest = CreateTemporaryFile(&dest_path);
+  ASSERT_TRUE(fdest != NULL);
+  UnlinkGuard unlink_guard(dest_path);
+  char buf = '1';
+  fwrite(&buf, 1, 1, fdest);
+  fflush(fdest);
+
+  TestSink test_sink;
+  string url = "file://" + dest_path;
+  JobInfo info(&url, false /* compressed */, false /* probe hosts */,
+               &test_sink, NULL /* expected hash */);
+  download_mgr.Fetch(&info);
+  EXPECT_EQ(info.error_code, kFailOk);
+  EXPECT_EQ(1, pread(test_sink.fd, &buf, 1, 0));
+  EXPECT_EQ('1', buf);
+
+  rewind(fdest);
+  Prng prng;
+  prng.InitLocaltime();
+  unsigned N = 16*1024;
+  unsigned size = N*sizeof(uint32_t);
+  uint32_t rnd_buf[N];  // 64kB
+  for (unsigned i = 0; i < N; ++i)
+    rnd_buf[i] = prng.Next(2147483647);
+  shash::Any checksum(shash::kMd5);
+  EXPECT_TRUE(
+    zlib::CompressMem2File(reinterpret_cast<const unsigned char *>(rnd_buf),
+                           size, fdest, &checksum));
+  fclose(fdest);
+
+  TestSink test_sink2;
+  JobInfo info2(&url, true /* compressed */, false /* probe hosts */,
+                &test_sink2, &checksum /* expected hash */);
+  download_mgr.Fetch(&info2);
+  EXPECT_EQ(info2.error_code, kFailOk);
+  EXPECT_EQ(size, GetFileSize(test_sink2.path));
+
+  uint32_t validation[N];
+  EXPECT_EQ(static_cast<int>(size),
+    pread(test_sink2.fd, &validation, size, 0));
+  EXPECT_EQ(0, memcmp(validation, rnd_buf, size));
 }
 
 

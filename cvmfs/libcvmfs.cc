@@ -394,7 +394,6 @@ static int expand_path(
                "%s --> %s (mountpoint=%s)",
                path, ln_buf, ctx->mountpoint().c_str());
       errno = ENOENT;
-      free(ln_buf);
       return -1;
     }
   } else {
@@ -450,6 +449,23 @@ int cvmfs_open(cvmfs_context *ctx, const char *path) {
   }
   return rc;
 }
+
+
+ssize_t cvmfs_pread(
+  cvmfs_context *ctx,
+  int fd,
+  void *buf,
+  size_t size,
+  off_t off)
+{
+  ssize_t nbytes = ctx->Pread(fd, buf, size, off);
+  if (nbytes < 0) {
+    errno = -nbytes;
+    return -1;
+  }
+  return nbytes;
+}
+
 
 int cvmfs_close(cvmfs_context *ctx, int fd)
 {

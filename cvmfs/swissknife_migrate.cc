@@ -22,6 +22,7 @@ catalog::DirectoryEntry  CommandMigrate::nested_catalog_marker_;
 CommandMigrate::CommandMigrate() :
   file_descriptor_limit_(8192),
   catalog_count_(0),
+  has_committed_new_revision_(false),
   uid_(0),
   gid_(0),
   root_catalog_(NULL)
@@ -33,7 +34,7 @@ CommandMigrate::CommandMigrate() :
 ParameterList CommandMigrate::GetParams() {
   ParameterList r;
   r.push_back(Parameter::Mandatory('v',
-    "migration base version ( 2.0.x | 2.1.7 )"));
+    "migration base version ( 2.0.x | 2.1.7 | chown | hardlink )"));
   r.push_back(Parameter::Mandatory('r',
     "repository URL (absolute local path or remote URL)"));
   r.push_back(Parameter::Mandatory('u', "upstream definition string"));
@@ -46,6 +47,8 @@ ParameterList CommandMigrate::GetParams() {
     "group id to be used for this repository"));
   r.push_back(Parameter::Optional('n', "fully qualified repository name"));
   r.push_back(Parameter::Optional('k', "repository master key(s)"));
+  r.push_back(Parameter::Optional('i', "UID map for chown"));
+  r.push_back(Parameter::Optional('j', "GID map for chown"));
   r.push_back(Parameter::Switch('f', "fix nested catalog transition points"));
   r.push_back(Parameter::Switch('l', "disable linkcount analysis of files"));
   r.push_back(Parameter::Switch('s',
@@ -95,6 +98,12 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                              "";
   const std::string &repo_keys          = (args.count('k') > 0)      ?
                                              *args.find('k')->second :
+                                             "";
+  const std::string &uid_map_path       = (args.count('i') > 0)      ?
+                                             *args.find('i')->second :
+                                             "";
+  const std::string &gid_map_path       = (args.count('j') > 0)      ?
+                                             *args.find('j')->second :
                                              "";
   const bool fix_transition_points      = (args.count('f') > 0);
   const bool analyze_file_linkcounts    = (args.count('l') == 0);
@@ -167,17 +176,9 @@ int CommandMigrate::Main(const ArgumentList &args) {
   // Do the actual migration step
   bool migration_succeeded = false;
   if (migration_base == "2.0.x") {
-    if (uid.empty()) {
-      Error("Please provide a user ID");
+    if (!ReadPersona(uid, gid)) {
       return 1;
     }
-    if (gid.empty()) {
-      Error("Please provide a group ID");
-      return 1;
-    }
-
-    uid_ = String2Int64(uid);
-    gid_ = String2Int64(gid);
 
     // Generate and upload a nested catalog marker
     if (!GenerateNestedCatalogMarkerChunk()) {
@@ -200,6 +201,25 @@ int CommandMigrate::Main(const ArgumentList &args) {
                                                 collect_catalog_statistics);
     migration_succeeded =
       DoMigrationAndCommit<MigrationWorker_217>(manifest_path, &context);
+  } else if (migration_base == "chown") {
+    UidMap uid_map;
+    GidMap gid_map;
+    if (!ReadPersonaMaps(uid_map_path, gid_map_path, &uid_map, &gid_map)) {
+      Error("Failed to read UID and/or GID map");
+      return 1;
+    }
+    ChownMigrationWorker::worker_context context(temporary_directory_,
+                                                 collect_catalog_statistics,
+                                                 uid_map,
+                                                 gid_map);
+    migration_succeeded =
+      DoMigrationAndCommit<ChownMigrationWorker>(manifest_path, &context);
+  } else if (migration_base == "hardlink") {
+    HardlinkRemovalMigrationWorker::worker_context
+      context(temporary_directory_, collect_catalog_statistics);
+    migration_succeeded =
+      DoMigrationAndCommit<HardlinkRemovalMigrationWorker>(manifest_path,
+                                                           &context);
   } else {
     const std::string err_msg = "Unknown migration base: " + migration_base;
     Error(err_msg);
@@ -213,13 +233,59 @@ int CommandMigrate::Main(const ArgumentList &args) {
   }
 
   // Analyze collected statistics
-  if (collect_catalog_statistics) {
+  if (collect_catalog_statistics && has_committed_new_revision_) {
     LogCvmfs(kLogCatalog, kLogStdout, "\nCollected statistics results:");
     AnalyzeCatalogStatistics();
   }
 
   LogCvmfs(kLogCatalog, kLogStdout, "\nCatalog Migration succeeded");
   return 0;
+}
+
+
+bool CommandMigrate::ReadPersona(const std::string &uid,
+                                   const std::string &gid) {
+  if (uid.empty()) {
+    Error("Please provide a user ID");
+    return false;
+  }
+  if (gid.empty()) {
+    Error("Please provide a group ID");
+    return false;
+  }
+
+  uid_ = String2Int64(uid);
+  gid_ = String2Int64(gid);
+  return true;
+}
+
+
+
+bool CommandMigrate::ReadPersonaMaps(const std::string &uid_map_path,
+                                     const std::string &gid_map_path,
+                                           UidMap      *uid_map,
+                                           GidMap      *gid_map) const {
+  if (!uid_map->Read(uid_map_path) || !uid_map->IsValid()) {
+    Error("Failed to read UID map");
+    return false;
+  }
+
+  if (!gid_map->Read(gid_map_path) || !gid_map->IsValid()) {
+    Error("Failed to read GID map");
+    return false;
+  }
+
+  if (uid_map->RuleCount() == 0 && !uid_map->HasDefault()) {
+    Error("UID map appears to be empty");
+    return false;
+  }
+
+  if (gid_map->RuleCount() == 0 && !gid_map->HasDefault()) {
+    Error("GID map appears to be empty");
+    return false;
+  }
+
+  return true;
 }
 
 
@@ -259,22 +325,28 @@ bool CommandMigrate::DoMigrationAndCommit(
     return false;
   }
 
-  // Commit the new (migrated) repository revision...
-  LogCvmfs(kLogCatalog, kLogStdout,
-           "\nCommitting migrated repository revision...");
-  const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash.Get();
-  const std::string &root_catalog_path = root_catalog->root_path();
-  const size_t root_catalog_size = root_catalog->new_catalog_size.Get();
-  manifest::Manifest manifest(root_catalog_hash, root_catalog_size,
-                              root_catalog_path);
-  const catalog::Catalog* new_catalog = (root_catalog->HasNew())
-                                        ? root_catalog->new_catalog
-                                        : root_catalog->old_catalog;
-  manifest.set_ttl(new_catalog->GetTTL());
-  manifest.set_revision(new_catalog->GetRevision());
-  if (!manifest.Export(manifest_path)) {
-    Error("Manifest export failed.\nAborting...");
-    return false;
+  if (root_catalog->was_updated.Get()) {
+    // Commit the new (migrated) repository revision...
+    LogCvmfs(kLogCatalog, kLogStdout,
+             "\nCommitting migrated repository revision...");
+    const shash::Any  &root_catalog_hash = root_catalog->new_catalog_hash;
+    const std::string &root_catalog_path = root_catalog->root_path();
+    const size_t root_catalog_size = root_catalog->new_catalog_size;
+    manifest::Manifest manifest(root_catalog_hash, root_catalog_size,
+                                root_catalog_path);
+    const catalog::Catalog* new_catalog = (root_catalog->HasNew())
+                                          ? root_catalog->new_catalog
+                                          : root_catalog->old_catalog;
+    manifest.set_ttl(new_catalog->GetTTL());
+    manifest.set_revision(new_catalog->GetRevision());
+    if (!manifest.Export(manifest_path)) {
+      Error("Manifest export failed.\nAborting...");
+      return false;
+    }
+    has_committed_new_revision_ = true;
+  } else {
+    LogCvmfs(kLogCatalog, kLogStdout,
+             "\nNo catalogs migrated, skipping the commit...");
   }
 
   // Get rid of the open root catalog
@@ -323,6 +395,12 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
     return;
   }
 
+  if (!data->HasChanges()) {
+    PrintStatusMessage(data, data->GetOldContentHash(), "preserved");
+    data->was_updated.Set(false);
+    return;
+  }
+
   const string &path = (data->HasNew()) ? data->new_catalog->database_path()
                                         : data->old_catalog->database_path();
 
@@ -341,7 +419,7 @@ void CommandMigrate::MigrationCallback(PendingCatalog *const &data) {
     exit(2);
     return;
   }
-  data->new_catalog_size.Set(new_catalog_size);
+  data->new_catalog_size = new_catalog_size;
 
   // Schedule the compression and upload of the catalog
   spooler_->ProcessCatalog(path);
@@ -377,20 +455,29 @@ void CommandMigrate::UploadCallback(const upload::SpoolerResult &result) {
       pending_catalogs_.erase(i);
     }
 
-    atomic_inc32(&catalogs_processed_);
-    const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
-                                    catalog_count_;
-    LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] migrated and uploaded %sC %s",
-             processed,
-             result.content_hash.ToString().c_str(),
-             catalog->root_path().c_str());
+    PrintStatusMessage(catalog, result.content_hash, "migrated and uploaded");
 
-    // The catalog is completely processed... fill the hash-future to allow the
-    // processing of parent catalogs
+    // The catalog is completely processed... fill the content_hash to allow the
+    // processing of parent catalogs (Notified by 'was_updated'-future)
     // NOTE: From now on, this PendingCatalog structure could be deleted and
     //       should not be used anymore!
-    catalog->new_catalog_hash.Set(result.content_hash);
+    catalog->new_catalog_hash = result.content_hash;
+    catalog->was_updated.Set(true);
   }
+}
+
+
+void CommandMigrate::PrintStatusMessage(const PendingCatalog *catalog,
+                                        const shash::Any     &content_hash,
+                                        const std::string    &message) {
+  atomic_inc32(&catalogs_processed_);
+  const unsigned int processed = (atomic_read32(&catalogs_processed_) * 100) /
+                                  catalog_count_;
+  LogCvmfs(kLogCatalog, kLogStdout, "[%d%%] %s %sC %s",
+           processed,
+           message.c_str(),
+           content_hash.ToString().c_str(),
+           catalog->root_path().c_str());
 }
 
 
@@ -556,9 +643,14 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::
   PendingCatalogList::const_iterator iend = data->nested_catalogs.end();
   for (; i != iend; ++i) {
     PendingCatalog    *nested_catalog  = *i;
-    const std::string &root_path       = nested_catalog->root_path();
-    const shash::Any   catalog_hash    = nested_catalog->new_catalog_hash.Get();
-    const size_t       catalog_size    = nested_catalog->new_catalog_size.Get();
+
+    if (!nested_catalog->was_updated.Get()) {
+      continue;
+    }
+
+    const std::string &root_path    = nested_catalog->root_path();
+    const shash::Any   catalog_hash = nested_catalog->new_catalog_hash;
+    const size_t       catalog_size = nested_catalog->new_catalog_size;
 
     // insert the updated nested catalog reference into the new catalog
     const bool retval =
@@ -635,6 +727,15 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
 const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 2;
+
+
+template<class DerivedT>
+catalog::WritableCatalog*
+CommandMigrate::AbstractMigrationWorker<DerivedT>::GetWritable(
+                                        const catalog::Catalog *catalog) const {
+  return dynamic_cast<catalog::WritableCatalog*>(const_cast<catalog::Catalog*>(
+    catalog));
+}
 
 
 CommandMigrate::MigrationWorker_20x::MigrationWorker_20x(
@@ -1638,11 +1739,148 @@ bool CommandMigrate::MigrationWorker_217::CommitDatabaseTransaction
 }
 
 
-catalog::WritableCatalog* CommandMigrate::MigrationWorker_217::GetWritable(
-  const catalog::Catalog *catalog) const
-{
-  return dynamic_cast<catalog::WritableCatalog*>(const_cast<catalog::Catalog*>(
-    catalog));
+//------------------------------------------------------------------------------
+
+
+CommandMigrate::ChownMigrationWorker::ChownMigrationWorker(
+                                                const worker_context *context)
+  : AbstractMigrationWorker<ChownMigrationWorker>(context)
+  , uid_map_statement_(GenerateMappingStatement(context->uid_map, "uid"))
+  , gid_map_statement_(GenerateMappingStatement(context->gid_map, "gid"))
+{}
+
+bool CommandMigrate::ChownMigrationWorker::RunMigration(
+                                                   PendingCatalog *data) const {
+  return ApplyPersonaMappings(data);
+}
+
+
+bool CommandMigrate::ChownMigrationWorker::ApplyPersonaMappings(
+                                                   PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &db =
+                                     GetWritable(data->old_catalog)->database();
+
+  if (!db.BeginTransaction()) {
+    return false;
+  }
+
+  catalog::Sql uid_sql(db, uid_map_statement_);
+  if (!uid_sql.Execute()) {
+    Error("Failed to update UIDs", uid_sql, data);
+    return false;
+  }
+
+  catalog::Sql gid_sql(db, gid_map_statement_);
+  if (!gid_sql.Execute()) {
+    Error("Failed to update GIDs", gid_sql, data);
+    return false;
+  }
+
+  return db.CommitTransaction();
+}
+
+
+template <class MapT>
+std::string CommandMigrate::ChownMigrationWorker::GenerateMappingStatement(
+                                             const MapT         &map,
+                                             const std::string  &column) const {
+  assert(map.RuleCount() > 0 || map.HasDefault());
+
+  std::string stmt = "UPDATE OR ABORT catalog SET " + column + " = ";
+
+  if (map.RuleCount() == 0) {
+    // map everything to the same value (just a simple UPDATE clause)
+    stmt += StringifyInt(map.GetDefault());
+  } else {
+    // apply multiple ID mappings (UPDATE clause with CASE statement)
+    stmt += "CASE " + column + " ";
+    typedef typename MapT::map_type::const_iterator map_iterator;
+          map_iterator i    = map.GetRuleMap().begin();
+    const map_iterator iend = map.GetRuleMap().end();
+    for (; i != iend; ++i) {
+      stmt += "WHEN " + StringifyInt(i->first) +
+             " THEN " + StringifyInt(i->second) + " ";
+    }
+
+    // add a default (if provided) or leave unchanged if no mapping fits
+    stmt += (map.HasDefault())
+                ? "ELSE " + StringifyInt(map.GetDefault()) + " "
+                : "ELSE " + column + " ";
+    stmt += "END";
+  }
+
+  stmt += ";";
+  return stmt;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+bool CommandMigrate::HardlinkRemovalMigrationWorker::RunMigration(
+                                                   PendingCatalog *data) const {
+  return CheckDatabaseSchemaCompatibility(data) &&
+         BreakUpHardlinks(data);
+}
+
+
+bool
+CommandMigrate::HardlinkRemovalMigrationWorker::CheckDatabaseSchemaCompatibility
+                                                  (PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &clg = data->old_catalog->database();
+  return clg.schema_version() >= 2.4 - catalog::CatalogDatabase::kSchemaEpsilon;
+}
+
+
+bool CommandMigrate::HardlinkRemovalMigrationWorker::BreakUpHardlinks(
+                                                   PendingCatalog *data) const {
+  assert(data->old_catalog != NULL);
+  assert(data->new_catalog == NULL);
+
+  const catalog::CatalogDatabase &db =
+                                     GetWritable(data->old_catalog)->database();
+
+  if (!db.BeginTransaction()) {
+    return false;
+  }
+
+  // CernVM-FS catalogs do not contain inodes directly but they are assigned by
+  // the CVMFS catalog at runtime. Hardlinks are treated with so-called hardlink
+  // group IDs to indicate hardlink relationships that need to be respected at
+  // runtime by assigning identical inodes accordingly.
+  //
+  // This updates all directory entries of a given catalog that have a linkcount
+  // greater than 1 and are flagged as a 'file'. Note: Symlinks are flagged both
+  // as 'file' and as 'symlink', hence they are updated implicitly as well.
+  //
+  // The 'hardlinks' field in the catalog contains two 32 bit integers:
+  //   * the linkcount in the lower 32 bits
+  //   * the (so called) hardlink group ID in the higher 32 bits
+  //
+  // Files that have a linkcount of exactly 1 do not have any hardlinks and have
+  // the (implicit) hardlink group ID '0'. Hence, 'hardlinks == 1' means that a
+  // file doesn't have any hardlinks (linkcount = 1) and doesn't need treatment
+  // here.
+  //
+  // Files that have hardlinks (linkcount > 1) will have a very large integer in
+  // their 'hardlinks' field (hardlink group ID > 0 in higher 32 bits). Those
+  // files will be treated by setting their 'hardlinks' field to 1, effectively
+  // clearing all hardlink information from the directory entry.
+  const std::string stmt = "UPDATE OR ABORT catalog "
+                           "SET hardlinks = 1 "
+                           "WHERE flags & :file_flag "
+                           "  AND hardlinks > 1;";
+  catalog::Sql hardlink_removal_sql(db, stmt);
+  hardlink_removal_sql.BindInt64(1, catalog::SqlDirent::kFlagFile);
+  hardlink_removal_sql.Execute();
+
+  return db.CommitTransaction();
 }
 
 }  // namespace swissknife

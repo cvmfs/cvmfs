@@ -1,8 +1,14 @@
 #!/bin/bash
 # Common configuration tasks for CernVM-FS
 
+SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
+INSTALL_BASE=$(echo "$SCRIPT_LOCATION" | sed -e 's/^\(.*\)\/bin$/\1/')
+SBIN_BASE="$( [ x"$INSTALL_BASE" = x"/usr" ] && echo "/sbin" || echo "${INSTALL_BASE}/sbin" )"
+
 if [ -f /etc/cvmfs/config.sh ]; then
   . /etc/cvmfs/config.sh
+elif [ -f ${INSTALL_BASE}/etc/cvmfs/config.sh ]; then
+  . ${INSTALL_BASE}/etc/cvmfs/config.sh
 else
   echo "/etc/cvmfs/config.sh missing"
   exit 1
@@ -20,6 +26,9 @@ case $sys_arch in
     elif [ -x /sbin/rc-service ] ; then
       # OpenRC
       service="/sbin/rc-service"
+    elif [ -x /usr/bin/systemctl ] ; then
+      # archlinux
+      service="/usr/bin/systemctl"
     fi
     if [ -x /sbin/pidof ]; then
       pidof="/sbin/pidof"
@@ -70,11 +79,46 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI CVMFS_CLAIM_OWNERSHIP \
-          CVMFS_HIDE_MAGIC_XATTRS CVMFS_SYSTEMD_NOKILL"
+          CVMFS_HIDE_MAGIC_XATTRS CVMFS_SYSTEMD_NOKILL CVMFS_SERVER_CACHE_MODE"
 required_list="CVMFS_USER CVMFS_NFILES CVMFS_MOUNT_DIR CVMFS_STRICT_MOUNT CVMFS_RELOAD_SOCKETS \
                CVMFS_QUOTA_LIMIT CVMFS_CACHE_BASE CVMFS_SERVER_URL CVMFS_HTTP_PROXY \
                CVMFS_TIMEOUT CVMFS_TIMEOUT_DIRECT CVMFS_SHARED_CACHE CVMFS_CHECK_PERMISSIONS"
 var_list="$parm_list $switch_list"
+
+cvmfs_fs_bundle="/Library/Filesystems/cvmfs.fs/Contents/Resources" # Mac OS X
+
+# makes sure that a version is always of the form x.y.z-b
+normalize_version() {
+  local version_string="$1"
+  while [ $(echo "$version_string" | grep -o '\.' | wc -l) -lt 2 ]; do
+    version_string="${version_string}.0"
+  done
+  while [ $(echo "$version_string" | grep -o '-' | wc -l) -lt 1 ]; do
+    version_string="${version_string}-1"
+  done
+  echo "$version_string"
+}
+version_major() { echo $1 | cut -d. -f1 | grep -oe '^[0-9]\+'; }
+version_minor() { echo $1 | cut -d. -f2 | grep -oe '^[0-9]\+'; }
+version_patch() { echo $1 | cut -d. -f3 | grep -oe '^[0-9]\+'; }
+version_build() { echo $1 | cut -d- -f2 | grep -oe '^[0-9]\+'; }
+prepend_zeros() { printf %03d "$1"; }
+compare_versions() {
+  local lhs="$(normalize_version $1)"
+  local comparison_operator=$2
+  local rhs="$(normalize_version $3)"
+
+  local lhs1=$(prepend_zeros $(version_major $lhs))
+  local lhs2=$(prepend_zeros $(version_minor $lhs))
+  local lhs3=$(prepend_zeros $(version_patch $lhs))
+  local lhs4=$(prepend_zeros $(version_build $lhs))
+  local rhs1=$(prepend_zeros $(version_major $rhs))
+  local rhs2=$(prepend_zeros $(version_minor $rhs))
+  local rhs3=$(prepend_zeros $(version_patch $rhs))
+  local rhs4=$(prepend_zeros $(version_build $rhs))
+
+  [ $lhs1$lhs2$lhs3$lhs4 $comparison_operator $rhs1$rhs2$rhs3$rhs4 ]
+}
 
 cvmfs_config_usage() {
  echo "Common configuration tasks for CernVM-FS"
@@ -150,6 +194,28 @@ cvmfs_setup() {
   mkdir -p /var/lib/cvmfs
   chown cvmfs:cvmfs /var/lib/cvmfs
 
+  # put workarounds for OS X (>= 10.11) in place (SIP related)
+  if [ x"$sys_arch" = x"Darwin" ] && \
+     compare_versions $(sw_vers -productVersion) -ge "10.11"; then
+    # symlink configuration files into /etc
+    if [ ! -e /etc/cvmfs           ] && \
+       [   -e /usr/local/etc/cvmfs ]; then
+      ln -s /usr/local/etc/cvmfs /etc/cvmfs
+    fi
+
+    # create a (minimal) file system bundle for `mount -t cvmfs` support
+    # Note: the `mount` utility in OS X 10.11.1 doesn't find the installed mount
+    #       helper in `/usr/local/sbin`. When disabling SIP and symlinking the
+    #       mount helper into `/sbin` it would work. Not sure if that is to be
+    #       considered a bug or a feature...
+    #       Currently the bundle creation below is considered a work around!
+    if [ ! -e ${cvmfs_fs_bundle}/mount_cvmfs ] && \
+       [   -e /usr/local/sbin/mount_cvmfs ]; then
+      mkdir -p $cvmfs_fs_bundle
+      ln -s /usr/local/sbin/mount_cvmfs ${cvmfs_fs_bundle}/mount_cvmfs
+    fi
+  fi
+
   # if group fuse exists, add user cvmfs
   if check_group "fuse"; then
     if ! add_user_to_group_fuse; then
@@ -196,7 +262,7 @@ cvmfs_chksetup() {
   local binary
   for binary in cvmfs2 cvmfs_fsck cvmfs_talk
   do
-    if ! test -f /usr/bin/$binary; then
+    if ! test -f ${INSTALL_BASE}/bin/$binary; then
       echo "Error: $binary not found"
       num_errors=$(($num_errors+1))
     fi
@@ -210,8 +276,8 @@ cvmfs_chksetup() {
   for library in $cvmfs_libs
   do
     foundlib=0
-    for libdir in /usr/lib /usr/lib64 /usr/lib/x86_64-linux-gnu /usr/lib/i386-linux-gnu; do
-      if test -f ${libdir}/${library}; then
+    for libdir in lib lib64 lib/x86_64-linux-gnu lib/i386-linux-gnu; do
+      if test -f ${INSTALL_BASE}/${libdir}/${library}; then
         foundlib=1
       fi
     done
@@ -224,9 +290,17 @@ cvmfs_chksetup() {
   # Check mount helper
   local tools
   if [ "$sys_arch" = "Darwin" ]; then
-    tools="/sbin/mount_cvmfs"
+    if compare_versions $(sw_vers -productVersion) -ge "10.11"; then
+      tools="${cvmfs_fs_bundle}/mount_cvmfs"
+    else
+      tools="${SBIN_BASE}/mount_cvmfs"
+    fi
   elif [ "$sys_arch" = "Linux" ]; then
-    tools="/sbin/mount.cvmfs"
+    if [ -d ${SBIN_BASE} ]; then
+      tools="${SBIN_BASE}/mount.cvmfs"
+    else
+      tools="${INSTALL_BASE}/bin/mount.cvmfs"
+    fi
   fi
 
   local tool
@@ -237,6 +311,12 @@ cvmfs_chksetup() {
       num_errors=$(($num_errors+1))
     fi
   done
+
+  # Check that CVMFS_USER is set
+  if [ x"$CVMFS_USER" = x"" ]; then
+    echo "CVMFS_USER variable is empty"
+    num_errors=$(($num_errors+1))
+  fi
 
   # Fusermount (not necessary under Mac OS X)
   if [ "$sys_arch" = "Linux" ]; then
@@ -254,35 +334,36 @@ cvmfs_chksetup() {
     fi
   fi
 
-  # Check that /etc/auto.cvmfs is referenced in /etc/auto.master
-  # Check that /etc/auto.cvmfs is executable on Linux
-  local global_mount_dir
-  global_mount_dir=$CVMFS_MOUNT_DIR
-  case $sys_arch in
-    Linux )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" /etc/auto.master 2> /dev/null; then
-        if ! check_is_on CVMFS_NFS_SOURCE; then
-          echo "Warning: CernVM-FS map is not referenced from autofs master map"
-          num_warnings=$(($num_warnings+1))
-        fi
+  # No autofs integration on OS X
+  if [ "$sys_arch" = "Linux" ]; then
+    for path in /etc/auto.master /etc/autofs/auto.master; do
+      if [ -f $path ]; then
+        AUTOMASTER=$path
+        break;
       fi
-
-      # Check that /etc/auto.cvmfs is executable
-      if [ ! -x /etc/auto.cvmfs ]; then
-        echo "Error: /etc/auto.cvmfs is not executable"
-        num_errors=$(($num_errors+1))
-      fi ;;
-
-    Darwin )
-      if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+/etc/auto_cvmfs" /etc/auto_master 2> /dev/null; then
+    done
+    if [ -z "$AUTOMASTER" ]; then
+      echo "Error: unable to find auto.master in any of the supplied paths!"
+      num_errors=$(($num_errors+1))
+      AUTOMASTER=/dev/null
+    fi
+    # Check that /etc/auto.cvmfs is referenced in auto.master
+    # Check that /etc/auto.cvmfs is executable on Linux
+    local global_mount_dir
+    global_mount_dir=$CVMFS_MOUNT_DIR
+    if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" $AUTOMASTER 2> /dev/null; then
+      if ! check_is_on CVMFS_NFS_SOURCE; then
         echo "Warning: CernVM-FS map is not referenced from autofs master map"
         num_warnings=$(($num_warnings+1))
-      fi ;;
+      fi
+    fi
 
-    * )
-      echo "Architecture $sys_arch is not supported"
-      exit 1 ;;
-  esac
+    # Check that /etc/auto.cvmfs is executable
+    if [ ! -x /etc/auto.cvmfs ]; then
+      echo "Error: /etc/auto.cvmfs is not executable"
+      num_errors=$(($num_errors+1))
+    fi
+  fi
 
   # Check that cvmfs user exists
   if ! check_cvmfs_user; then
@@ -876,8 +957,6 @@ cvmfs_reload() {
     return $?
   fi
 
-  # Avoid deadlock if cwd is on cvmfs
-  cd /
   # Organized reload of all repositories
   if [ ! -d "$CVMFS_RELOAD_SOCKETS" ]; then
     local mount_list
@@ -890,6 +969,10 @@ cvmfs_reload() {
     return 0
   fi
 
+  if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+    # Ensure that we capture the config repository as well
+    cd "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" 2>/dev/null
+  fi
   mkdir "$CVMFS_RELOAD_SOCKETS/cvmfs.pause" 2>/dev/null
   if [ $? -ne 0 ]; then
     echo "Another reload process has not finished yet"
@@ -907,8 +990,11 @@ cvmfs_reload() {
     touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64 -w0)
   done
 
-  rm -f "${CVMFS_RELOAD_SOCKETS}/pid.*" "${CVMFS_RELOAD_SOCKETS}/guard_files*"
+  # Avoid deadlock if cwd is on cvmfs
   cd /
+
+  rm -f "${CVMFS_RELOAD_SOCKETS}/pid.*" "${CVMFS_RELOAD_SOCKETS}/guard_files*"
+  trap "echo ' *** reloading CernVM-FS repositories must not be interrupted at this point *** '" HUP INT QUIT TERM
   local m
   for m in $mount_list
   do
@@ -916,6 +1002,7 @@ cvmfs_reload() {
     get_attr fqrn ${m}; fqrn=$attr_value
     get_attr pid ${m}; pid=$attr_value
     if [ -z "$fqrn" ] || [ -z "$pid" ]; then
+      # This repository must have been unmounted just now
       cd /
       continue
     fi
@@ -1078,20 +1165,21 @@ cvmfs_bugreport() {
   case $sys_arch in
     Linux )
       commands=( 'uname -a' 'cat /etc/issue' 'hostname -f' 'ifconfig -a' 'cvmfs2 --version' \
-                 'grep cvmfs2 /var/log/messages' 'grep cvmfs2 /var/log/syslog' \
+                 'ls -lR /var/run/cvmfs' 'grep cvmfs2 /var/log/messages' 'grep cvmfs2 /var/log/syslog' \
                  "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
                  'cvmfs_config probe' 'mount' 'df -h' 'ps -ef' \
                  'cvmfs_config status' 'cvmfs_config showconfig' \
                  'cvmfs_config chksetup' 'cvmfs_config stat -v' 'cvmfs_talk internal affairs' \
                  'cat /etc/fuse.conf'  'ls -la /usr/bin/fusermount' 'ls -la /bin/fusermount' \
-                 'cat /etc/auto.master' 'cat /etc/sysconfig/autofs' 'cat /etc/default/autofs' \
+                 'cat /etc/auto.master' 'cat /etc/autofs/auto.master' 'cat /etc/sysconfig/autofs' \
+                 'cat /etc/default/autofs' 'cat /etc/conf.d/autofs' \
                  'cat /etc/fstab' 'cat /etc/exports' 'cat /proc/mounts' 'cat /proc/cpuinfo' \
                  'cat /etc/hosts' 'free -m' )
       ;;
 
     Darwin )
       commands=( 'uname -a' 'sw_vers' 'hostname -f' 'ifconfig -a' 'cvmfs2 --version' \
-                 'grep cvmfs2 /var/log/system.log' 'grep cvmfs2 /var/log/kernel.log' \
+                 'ls -lR /var/run/cvmfs' 'grep cvmfs2 /var/log/system.log' 'grep cvmfs2 /var/log/kernel.log' \
                   "eval find ${CVMFS_CACHE_BASE} -maxdepth 1 -exec ls -lah \{\} \;" \
                   'cvmfs_config probe' 'cvmfs_config status' 'cvmfs_talk internal affairs' \
                   'mount' 'df -h' 'ps -ef' 'cvmfs_config showconfig' 'cvmfs_config chksetup' \
@@ -1231,9 +1319,13 @@ add_user_to_group_fuse() {
 check_auto_mounter() {
   case $sys_arch in
     Linux )
-      $service autofs status > /dev/null 2>&1
-      return $? ;;
-
+        if [[ $service == *systemctl ]]; then
+            $service status autofs >/dev/null 2>&1
+            return $?
+        else
+            $service autofs status > /dev/null 2>&1
+            return $?
+        fi ;;
     Darwin )
       ps aux | grep autofsd | grep -v grep &> /dev/null
       return $? ;;
@@ -1378,14 +1470,55 @@ activate_service() {
 }
 
 
+reload_service() {
+  local svc=$1
+
+  case $sys_arch in
+    Linux )
+      if [ -e /usr/bin/systemctl ]; then
+        /usr/bin/systemctl reload -q ${svc}.service
+      elif [ -e /sbin/service -o -e /usr/sbin/service ]; then
+        local servicebin=/sbin/service
+        if [ ! -e $servicebin ]; then
+          servicebin=/usr/sbin/service
+        fi
+        $servicebin $svc reload >/dev/null 2>&1
+      else
+        echo "Utility to manage services missing"
+        exit 1
+      fi
+    ;;
+    Darwin )
+      # Not supported at this point
+      :
+    ;;
+    * )
+      echo "Architecture $sys_arch is not supported"
+      exit 1
+    ;;
+  esac
+}
+
+
 configure_autofs() {
   case $sys_arch in
     Linux )
-      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" /etc/auto.master #Still needed or needs to be adjusted?
+      for path in /etc/auto.master /etc/autofs/auto.master; do
+        if [ -f $path ]; then
+          AUTOMASTER=$path
+          break;
+        fi
+      done
+      if [ -z "$AUTOMASTER" ]; then
+        echo "Error: unable to find auto.master in any of the supplied paths!"
+        num_errors=$(($num_errors+1))
+        AUTOMASTER=/dev/null
+      fi
+      sed -i "/^\/mnt\/cvmfs \/etc\/auto.cvmfs/d" $AUTOMASTER # Still needed or needs to be adjusted?
       local cvmfs_map="$CVMFS_MOUNT_DIR /etc/auto.cvmfs"
-      if ! grep -q "^$cvmfs_map" /etc/auto.master; then
-        echo "$cvmfs_map" >> /etc/auto.master
-        $pidof automount > /dev/null && $service autofs reload > /dev/null || true
+      if ! grep -q "^$cvmfs_map" $AUTOMASTER; then
+        echo "$cvmfs_map" >> $AUTOMASTER
+        $pidof automount > /dev/null && reload_service autofs || true
       fi ;;
 
    Darwin )

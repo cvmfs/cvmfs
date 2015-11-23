@@ -1,0 +1,224 @@
+
+cvmfs_test_name="Remove Hardlinks From Legacy Repository"
+cvmfs_test_autofs_on_startup=false
+
+count_hardlinks() {
+  local path="$1"
+  local hardlinked_symlinks=$(find $path -type l \! -links 1 | wc -l)
+  local hardlinked_files=$(find $path -type f \! -links 1    | wc -l)
+  echo $(( $hardlinked_files + $hardlinked_symlinks ))
+}
+
+add_hardlinks_to() {
+  local path="$1"
+  pushdir $path
+
+  echo "foobar" > foobar
+  ln foobar hardlink_foobar_1
+  ln foobar hardlink_foobar_2
+  ln -s foobar symlink_foobar_1
+  ln -s foobar symlink_foobar_2
+  ln symlink_foobar_1 hardlink_symlink_foobar_1 # :o)
+
+  popdir
+}
+
+do_changes_to() {
+  local path="$1"
+  pushdir $path
+
+  mkdir bin                        || return 1
+  cp_bin bin                       || return 2
+  rm -fR needs_migration           || return 3
+  rm -fR needs_commit_due_to_child || return 4
+
+  popdir
+}
+
+TEST599_LEGACY_STORAGE=""
+TEST599_NEW_REPO_NAME=""
+cleanup() {
+  [ -z "$TEST599_NEW_REPO_NAME" ]  || sudo cvmfs_server rmfs -f $TEST599_NEW_REPO_NAME
+  [ -z "$TEST599_LEGACY_STORAGE" ] || sudo rm -fR $TEST599_LEGACY_STORAGE
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  local guinea_pig_location="${script_location}/../../common/legacy_aufs_repo_21"
+  local legacy_repo_name="legacy_aufs.cern.ch"
+  local repo_dir="/cvmfs/${legacy_repo_name}"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+
+  echo "make sure there are no legacy repo leftovers from previous tests"
+  cleanup_legacy_repo_leftovers "$legacy_repo_name"
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo -n "resurrect legacy repository... "
+  TEST599_LEGACY_STORAGE="$legacy_repo_storage"
+  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                                                     || return $?
+  sudo chown $CVMFS_TEST_USER /etc/cvmfs/keys/${legacy_repo_name}.*                                                      || return 1
+  plant_legacy_repository_revision "${guinea_pig_location}/legacy_aufs_repo.tar.gz" "$legacy_repo_name" $CVMFS_TEST_USER || return $?
+  echo "done"
+
+  # ============================================================================
+
+  local import_log="import.log"
+  echo "import the just planted repository (logging into ${import_log})"
+  TEST599_NEW_REPO_NAME="$legacy_repo_name"
+  import_repo $legacy_repo_name $CVMFS_TEST_USER -g > $import_log 2>&1 || return 2
+
+  local uid_map=uid.map
+  local gid_map=gid.map
+  echo "* $(id -u $CVMFS_TEST_USER)" > $uid_map
+  echo "* $(id -g $CVMFS_TEST_USER)" > $gid_map
+  echo "chown the repository contents on catalog level ($uid_map | $gid_map)"
+  sudo cvmfs_server catalog-chown -u $uid_map -g $gid_map $legacy_repo_name || return 100
+
+  echo "check if repostory is sane"
+  check_repository $legacy_repo_name -i || return 3
+
+  if uses_overlayfs $legacy_repo_name; then
+    echo "check if OverlayFS warning is present"
+    cat $import_log | grep -e 'Warning'                          || return 101
+    cat $import_log | grep -e 'using OverlayFS'                  || return 101
+    cat $import_log | grep -e 'AUFS'                             || return 101
+    cat $import_log | grep -e 'cvmfs_server eliminate-hardlinks' || return 101
+  fi
+
+  echo "count the number of hardlinked files (expecting 18)"
+  [ $(count_hardlinks $repo_dir) -eq 18 ] || return 4
+
+  # ============================================================================
+
+  local migration_log_1="migration_1.log"
+  echo "run the repository migration (logging into ${migration_log_1})"
+  sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name > $migration_log_1 2>&1 || return 5
+
+  echo "check if repostory is still sane"
+  check_repository $legacy_repo_name -i || return 6
+
+  echo "check if the right catalogs were migrated"
+  cat $migration_log_1 | grep -e '.*preserved.*/doesnt_need_migration/doesnt_need_migration_either'    || return 102
+  cat $migration_log_1 | grep -e '.*preserved.*/needs_migration/doesnt_need_migration'                 || return 103
+  cat $migration_log_1 | grep -e '.*preserved.*/doesnt_need_migration'                                 || return 104
+  cat $migration_log_1 | grep -e '.*migrated and uploaded.*/needs_commit_due_to_child/needs_migration' || return 105
+  cat $migration_log_1 | grep -e '.*migrated and uploaded.*/needs_migration'                           || return 106
+  cat $migration_log_1 | grep -e '.*migrated and uploaded.*/needs_commit_due_to_child'                 || return 107
+  cat $migration_log_1 | grep -e '.*migrated and uploaded.*C[^/]\+$'                                   || return 108
+
+  echo "count the number of hardlinked files (expecting 0)"
+  [ $(count_hardlinks $repo_dir) -eq 0 ] || return 7
+
+  # ============================================================================
+
+  echo "create a new revision"
+  start_transaction $legacy_repo_name || return 8
+
+  echo "add some hardlinks"
+  add_hardlinks_to $repo_dir || return 9
+
+  echo "publish revision"
+  publish_repo $legacy_repo_name || return 10
+
+  echo "check if repostory is still sane"
+  check_repository $legacy_repo_name -i || return 11
+
+  echo "check if there are hardlinks again"
+  local expected_hardlinks=0
+  if uses_overlayfs $legacy_repo_name; then
+    echo "We are on OverlayFS (expecting 0)"
+  else
+    echo "We are not on OverlayFS (expecting 5)"
+    expected_hardlinks=5
+  fi
+  [ $(count_hardlinks $repo_dir) -eq $expected_hardlinks ] || return 12
+
+  # ============================================================================
+
+  local migration_log_2="migration_2.log"
+  echo "run the repository migration (logging into ${migration_log_2})"
+  sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name > $migration_log_2 2>&1 || return 13
+
+  echo "check if repostory is still sane"
+  check_repository $legacy_repo_name -i || return 14
+
+  echo "check if the right catalogs were migrated"
+  cat $migration_log_2 | grep -e '.*preserved.*/doesnt_need_migration/doesnt_need_migration_either' || return 112
+  cat $migration_log_2 | grep -e '.*preserved.*/needs_migration/doesnt_need_migration'              || return 113
+  cat $migration_log_2 | grep -e '.*preserved.*/doesnt_need_migration'                              || return 114
+  cat $migration_log_2 | grep -e '.*preserved.*/needs_commit_due_to_child/needs_migration'          || return 115
+  cat $migration_log_2 | grep -e '.*preserved.*/needs_migration'                                    || return 116
+  cat $migration_log_2 | grep -e '.*preserved.*/needs_commit_due_to_child'                          || return 117
+
+  if uses_overlayfs $legacy_repo_name; then
+    cat $migration_log_2 | grep -e '.*preserved.*C[^/]\+$'                                          || return 118
+  else
+    cat $migration_log_2 | grep -e '.*migrated and uploaded.*C[^/]\+$'                              || return 118
+  fi
+
+  echo "count the number of hardlinked files (expecting 0)"
+  [ $(count_hardlinks $repo_dir) -eq 0 ] || return 15
+
+  # ============================================================================
+
+  local root_clg_hash=$(get_current_root_catalog $legacy_repo_name)
+  echo "current repository root catalog is: $root_clg_hash"
+
+  local migration_log_3="migration_3.log"
+  echo "run the repository migration (logging into ${migration_log_3})"
+  sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name > $migration_log_3 2>&1 || return 16
+
+  echo "check if repostory is still sane"
+  check_repository $legacy_repo_name -i || return 17
+
+  echo "check if the right catalogs were migrated"
+  cat $migration_log_3 | grep -e '.*preserved.*/doesnt_need_migration/doesnt_need_migration_either' || return 122
+  cat $migration_log_3 | grep -e '.*preserved.*/needs_migration/doesnt_need_migration'              || return 123
+  cat $migration_log_3 | grep -e '.*preserved.*/doesnt_need_migration'                              || return 124
+  cat $migration_log_3 | grep -e '.*preserved.*/needs_commit_due_to_child/needs_migration'          || return 125
+  cat $migration_log_3 | grep -e '.*preserved.*/needs_migration'                                    || return 126
+  cat $migration_log_3 | grep -e '.*preserved.*/needs_commit_due_to_child'                          || return 127
+  cat $migration_log_3 | grep -e '.*preserved.*C[^/]\+$'                                            || return 128
+
+  echo "check that no revision was created (no new root catalog)"
+  [ x"$root_clg_hash" = x"$(get_current_root_catalog $legacy_repo_name)" ] || return 18
+
+  echo "count the number of hardlinked files (expecting 0)"
+  [ $(count_hardlinks $repo_dir) -eq 0 ] || return 19
+
+  # ============================================================================
+
+  echo "create another revision"
+  start_transaction $legacy_repo_name || return 20
+
+  echo "make some changes"
+  do_changes_to $repo_dir || return 21
+
+  local publish_log="publish.log"
+  echo "publish revision (log: $publish_log)"
+  publish_repo $legacy_repo_name > $publish_log || return 22
+
+  echo "check if repostory is still sane"
+  check_repository $legacy_repo_name -i || return 23
+
+  echo "check if there are hardlinks again (not expected)"
+  [ $(count_hardlinks $repo_dir) -eq 0 ] || return 24
+
+  # ============================================================================
+
+  echo "open a transaction to check if migration is failing"
+  start_transaction $legacy_repo_name || return 25
+
+  echo "try to do a catalog migration (should fail)"
+  sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name && return 26
+
+  echo "abort transaction"
+  abort_transaction $legacy_repo_name || return 27
+
+  return 0
+}

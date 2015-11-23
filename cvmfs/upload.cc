@@ -27,7 +27,9 @@ Spooler::Spooler(const SpoolerDefinition &spooler_definition) :
 
 
 Spooler::~Spooler() {
-  uploader_->TearDown();
+  if (uploader_) {
+    uploader_->TearDown();
+  }
 }
 
 
@@ -62,6 +64,10 @@ void Spooler::ProcessCatalog(const std::string &local_path) {
 
 void Spooler::ProcessHistory(const std::string &local_path) {
   file_processor_->Process(local_path, false, shash::kSuffixHistory);
+}
+
+void Spooler::ProcessCertificate(const std::string &local_path) {
+  file_processor_->Process(local_path, false, shash::kSuffixCertificate);
 }
 
 

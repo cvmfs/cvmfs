@@ -47,12 +47,13 @@
 #include <vector>
 
 #include "atomic.h"
-#include "backoff.h"
 #include "cache.h"
+#include "catalog_mgr_client.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "download.h"
 #include "duplex_sqlite3.h"
+#include "fetch.h"
 #include "globals.h"
 #include "hash.h"
 #include "libcvmfs.h"
@@ -65,8 +66,8 @@
 #include "shortstring.h"
 #include "signature.h"
 #include "smalloc.h"
+#include "sqlitevfs.h"
 #include "statistics.h"
-#include "tracer.h"
 #include "util.h"
 #include "wpad.h"
 
@@ -110,33 +111,38 @@ void cvmfs_globals::Destroy() {
   assert(cvmfs_globals::instance == NULL);
 }
 
-cvmfs_globals::cvmfs_globals() :
-  sqlite_scratch(NULL),
-  sqlite_page_cache(NULL),
-  options_ready_(false),
-  lock_created_(false),
-  cache_ready_(false),
-  quota_ready_(false) {}
+cvmfs_globals::cvmfs_globals()
+  : statistics_(new perf::Statistics())
+  , cache_mgr_(NULL)
+  , uid_(0)
+  , gid_(0)
+  , fd_lockfile_(-1)
+  , libcrypto_locks_(NULL)
+  , sqlite_page_cache(NULL)
+  , lock_created_(false)
+  , vfs_registered_(false)
+  { }
 
 cvmfs_globals::~cvmfs_globals() {
+  if (vfs_registered_)
+    sqlite::UnregisterVfsRdOnly();
+
+  delete cache_mgr_;
+  cache_mgr_ = NULL;
+
   if (lock_created_) {
     UnlockFile(fd_lockfile_);
   }
 
-  if (cache_ready_) {
-    cache::Fini();
+  if (libcrypto_locks_) {
+    CRYPTO_set_locking_callback(NULL);
+    for (int i = 0; i < CRYPTO_num_locks(); ++i)
+      pthread_mutex_destroy(&(libcrypto_locks_[i]));
+    OPENSSL_free(libcrypto_locks_);
   }
-
-  if (quota_ready_) {
-    quota::Fini();
-  }
-
-  CRYPTO_set_locking_callback(NULL);
-  for (int i = 0; i < CRYPTO_num_locks(); ++i)
-    pthread_mutex_destroy(&(libcrypto_locks_[i]));
-  OPENSSL_free(libcrypto_locks_);
 
   sqlite3_shutdown();
+  delete statistics_;
 }
 
 int cvmfs_globals::Setup(const options &opts) {
@@ -148,22 +154,16 @@ int cvmfs_globals::Setup(const options &opts) {
   }
   uid_ = getuid();
   gid_ = getgid();
-  options_ready_ = true;
 
   int retval;
 
   // Tune SQlite3
-  sqlite_scratch = smalloc(8192*16);  // 8 KB for 8 threads (2 slots per thread)
   sqlite_page_cache = smalloc(1280*3275);  // 4MB
-  retval = sqlite3_config(SQLITE_CONFIG_SCRATCH, sqlite_scratch, 8192, 16);
-  assert(retval == SQLITE_OK);
   retval = sqlite3_config(SQLITE_CONFIG_PAGECACHE, sqlite_page_cache,
                           1280, 3275);
   assert(retval == SQLITE_OK);
   // 4 KB
   retval = sqlite3_config(SQLITE_CONFIG_LOOKASIDE, 32, 128);
-  assert(retval == SQLITE_OK);
-  retval = sqlite3_vfs_register(sqlite3_vfs_find("unix-none"), 1);
   assert(retval == SQLITE_OK);
 
   // Libcrypto
@@ -222,21 +222,6 @@ int cvmfs_globals::Setup(const options &opts) {
   }
   lock_created_ = true;
 
-  // Init quota / managed cache (currently unused)
-  LogCvmfs(kLogCvmfs, kLogDebug, "unlimited cache size, unmanaged cache");
-  const uint64_t quota_limit      = 0;
-  const uint64_t quota_threshold  = 0;
-  const bool     rebuild_database = false;
-  // Initialization of the quota manager takes a file lock
-  if (!quota::Init(lock_directory_, quota_limit, quota_threshold,
-                   rebuild_database))
-  {
-    PrintError("Failed to initialize lru cache");
-    return LIBCVMFS_FAIL_INITQUOTA;
-  }
-  quota::Spawn();
-  quota_ready_ = true;
-
   if (opts.alien_cachedir != "") {
     cache_directory_ = opts.alien_cachedir;
   }
@@ -252,14 +237,18 @@ int cvmfs_globals::Setup(const options &opts) {
   }
   // Creates a set of cache directories (256 directories named 00..ff) if not
   // using alien cachdir
-  if (!cache::Init(cache_directory_,
-                   opts.alien_cache || opts.alien_cachedir != ""))
-  {
+  cache_mgr_ = cache::PosixCacheManager::Create(
+    cache_directory_, opts.alien_cache || opts.alien_cachedir != "");
+  if (cache_mgr_ == NULL) {
     PrintError("Failed to setup cache in " + cache_directory_ +
                ": " + strerror(errno));
     return LIBCVMFS_FAIL_INITCACHE;
   }
-  cache_ready_ = true;
+
+  retval = sqlite::RegisterVfsRdOnly(
+    cache_mgr_, statistics_, sqlite::kVfsOptDefault);
+  assert(retval);
+  vfs_registered_ = true;
 
   cvmfs::pid_ = getpid();
 
@@ -345,11 +334,15 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
     }
   }
 
+  fetcher_ = new cvmfs::Fetcher(
+    cvmfs_globals::Instance()->cache_mgr(),
+    download_manager_,
+    &backoff_throttle_,
+    statistics_);
+
   // Load initial file catalog
-  catalog_manager_ = new cache::CatalogManager(repository_name_,
-                                               signature_manager_,
-                                               download_manager_,
-                                               statistics);
+  catalog_manager_ = new catalog::ClientCatalogManager(
+    repository_name_, fetcher_, signature_manager_, statistics_);
   bool clg_mgr_init;
   if (!opts.root_hash.empty()) {
     const shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(opts.root_hash),
@@ -373,33 +366,38 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
       statistics);
   pathcache_ready_ = true;
 
-  if (!opts.tracefile.empty()) {
-    tracer::Init(8192, 7000, opts.tracefile);
-  } else {
-    tracer::InitNull();
-  }
-  tracer_ready_ = true;
-
   return 0;
 }
 
-cvmfs_context::cvmfs_context(const options &opts) :
-  cfg_(opts),
-  repository_name_(opts.repo_name),
-  boot_time_(time(NULL)),
-  md5path_cache_(NULL),
-  backoff_throttle_(new BackoffThrottle),
-  fd_lockfile(-1),
-  download_ready_(false),
-  signature_ready_(false),
-  catalog_ready_(false),
-  pathcache_ready_(false),
-  tracer_ready_(false)
+cvmfs_context::cvmfs_context(const options &opts)
+  : statistics_(NULL)
+  , cfg_(opts)
+  , repository_name_(opts.repo_name)
+  , pid_(0)
+  , boot_time_(time(NULL))
+  , catalog_manager_(NULL)
+  , signature_manager_(NULL)
+  , download_manager_(NULL)
+  , fetcher_(NULL)
+  , md5path_cache_(NULL)
+  , fd_lockfile(-1)
+  , download_ready_(false)
+  , signature_ready_(false)
+  , catalog_ready_(false)
+  , pathcache_ready_(false)
 {
   InitRuntimeCounters();
 }
 
 cvmfs_context::~cvmfs_context() {
+  delete fetcher_;
+  fetcher_ = NULL;
+
+  if (catalog_ready_) {
+    delete catalog_manager_;
+    catalog_manager_ = NULL;
+  }
+
   if (download_ready_) {
     download_manager_->Fini();
     delete download_manager_;
@@ -412,22 +410,10 @@ cvmfs_context::~cvmfs_context() {
     signature_manager_ = NULL;
   }
 
-  if (catalog_ready_) {
-    delete catalog_manager_;
-    catalog_manager_ = NULL;
-  }
-
   if (pathcache_ready_) {
     delete md5path_cache_;
     md5path_cache_ = NULL;
   }
-
-  if (tracer_ready_) {
-    tracer::Fini();
-  }
-
-  delete backoff_throttle_;
-  backoff_throttle_ = NULL;
 }
 
 bool cvmfs_context::GetDirentForPath(const PathString         &path,
@@ -591,24 +577,37 @@ int cvmfs_context::Open(const char *c_path) {
     return -ENOENT;
   }
 
-  const bool volatile_content = false;
-  fd = cache::FetchDirent(dirent, string(path.GetChars(), path.GetLength()),
-                          volatile_content, download_manager_);
+  if (dirent.IsChunkedFile()) {
+    LogCvmfs(kLogCvmfs, kLogDebug,
+             "chunked file %s opened (download delayed to read() call)",
+             path.c_str());
+
+    FileChunkList *chunks = new FileChunkList();
+    if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
+                                          chunks) ||
+        chunks->IsEmpty())
+    {
+      LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
+               "'chunked', but no chunks found.", path.c_str());
+      atomic_inc32(&num_io_error_);
+      return -EIO;
+    }
+
+    fd = chunk_tables_.Add(FileChunkReflist(chunks, path));
+    return fd | kFdChunked;
+  }
+
+  fd = fetcher_->Fetch(
+    dirent.checksum(),
+    dirent.size(),
+    string(path.GetChars(), path.GetLength()),
+    cache::CacheManager::kTypeRegular);
   atomic_inc64(&num_fs_open_);
 
   if (fd >= 0) {
-    if ((atomic_xadd32(&open_files_, 1) <
-        (static_cast<int>(max_open_files_)) - kNumReservedFd) ||
-        max_open_files_ == 0)
-    {
-      LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
-               path.c_str(), fd);
-      return fd;
-    } else {
-      if (close(fd) == 0) atomic_dec32(&open_files_);
-      LogCvmfs(kLogCvmfs, kLogSyslogErr, "open file descriptor limit exceeded");
-      return -EMFILE;
-    }
+    LogCvmfs(kLogCvmfs, kLogDebug, "file %s opened (fd %d)",
+             path.c_str(), fd);
+    return fd;
   } else {
     LogCvmfs(kLogCvmfs, kLogDebug | kLogSyslogErr,
              "failed to open path: %s, CAS key %s, error code %d",
@@ -618,18 +617,90 @@ int cvmfs_context::Open(const char *c_path) {
     }
   }
 
-  // Prevent Squid DoS
-  backoff_throttle_->Throttle();
-
   atomic_inc32(&num_io_error_);
   return fd;
 }
 
+int64_t cvmfs_context::Pread(
+  int fd,
+  void *buf,
+  uint64_t size,
+  uint64_t off)
+{
+  if (fd & kFdChunked) {
+    const int chunk_handle = fd & ~kFdChunked;
+    SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
+    FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
+    if (chunk_list == NULL)
+      return -EBADF;
+
+    // Fetch all needed chunks and read the requested data
+    unsigned chunk_idx = open_chunks.chunk_reflist.FindChunkIdx(off);
+    uint64_t overall_bytes_fetched = 0;
+    off_t offset_in_chunk = off - chunk_list->AtPtr(chunk_idx)->offset();
+    do {
+      // Open file descriptor to chunk
+      ChunkFd *chunk_fd = open_chunks.chunk_fd;
+      if ((chunk_fd->fd == -1) || (chunk_fd->chunk_idx != chunk_idx)) {
+        if (chunk_fd->fd != -1) fetcher_->cache_mgr()->Close(chunk_fd->fd);
+        chunk_fd->fd = fetcher_->Fetch(
+          chunk_list->AtPtr(chunk_idx)->content_hash(),
+          chunk_list->AtPtr(chunk_idx)->size(),
+          "no path info",
+          cache::CacheManager::kTypeRegular);
+        if (chunk_fd->fd < 0) {
+          chunk_fd->fd = -1;
+          return -EIO;
+        }
+        chunk_fd->chunk_idx = chunk_idx;
+      }
+
+      LogCvmfs(kLogCvmfs, kLogDebug, "reading from chunk fd %d",
+               chunk_fd->fd);
+      // Read data from chunk
+      const size_t bytes_to_read = size - overall_bytes_fetched;
+      const size_t remaining_bytes_in_chunk =
+        chunk_list->AtPtr(chunk_idx)->size() - offset_in_chunk;
+      size_t bytes_to_read_in_chunk =
+        std::min(bytes_to_read, remaining_bytes_in_chunk);
+      const int64_t bytes_fetched = fetcher_->cache_mgr()->Pread(
+        chunk_fd->fd,
+        reinterpret_cast<char *>(buf) + overall_bytes_fetched,
+        bytes_to_read_in_chunk,
+        offset_in_chunk);
+
+      if (bytes_fetched < 0) {
+        LogCvmfs(kLogCvmfs, kLogSyslogErr, "read err no %d (%s)",
+                 bytes_fetched,
+                 open_chunks.chunk_reflist.path.ToString().c_str());
+        return -bytes_fetched;
+      }
+      overall_bytes_fetched += bytes_fetched;
+
+      // Proceed to the next chunk to keep on reading data
+      ++chunk_idx;
+      offset_in_chunk = 0;
+    } while ((overall_bytes_fetched < size) &&
+             (chunk_idx < chunk_list->size()));
+    return overall_bytes_fetched;
+  } else {
+    return fetcher_->cache_mgr()->Pread(fd, buf, size, off);
+  }
+}
+
 int cvmfs_context::Close(int fd) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_close on file number: %d", fd);
-
-  if (close(fd) == 0) atomic_dec32(&open_files_);
-
+  if (fd & kFdChunked) {
+    const int chunk_handle = fd & ~kFdChunked;
+    SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
+    if (open_chunks.chunk_reflist.list == NULL)
+      return -EBADF;
+    if (open_chunks.chunk_fd->fd != -1)
+      cvmfs_globals::Instance()->cache_mgr()->Close(open_chunks.chunk_fd->fd);
+    chunk_tables_.Release(chunk_handle);
+  } else {
+    cvmfs_globals::Instance()->cache_mgr()->Close(fd);
+  }
   return 0;
 }
 
@@ -648,6 +719,5 @@ void cvmfs_context::InitRuntimeCounters() {
   atomic_init64(&num_fs_readlink_);
   atomic_init32(&num_io_error_);
 
-  atomic_init32(&open_files_);
   atomic_init32(&open_dirs_);
 }

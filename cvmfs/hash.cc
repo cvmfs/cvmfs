@@ -12,6 +12,9 @@
 
 #include <cstdio>
 
+#include "sha2.h"
+#include "KeccakHash.h"
+
 using namespace std;  // NOLINT
 
 #ifdef CVMFS_NAMESPACE_GUARD
@@ -20,7 +23,8 @@ namespace CVMFS_NAMESPACE_GUARD {
 
 namespace shash {
 
-const char *kAlgorithmIds[] = {"", "", "-rmd160", ""};
+const char *kAlgorithmIds[] =
+  {"", "", "-rmd160", "-sha256", "-sha3", "-shake128", ""};
 
 
 bool HexPtr::IsValid() const {
@@ -47,7 +51,7 @@ bool HexPtr::IsValid() const {
         if (*c != kAlgorithmIds[j][i-hex_length])
           break;
       }
-      if (i == l)
+      if ((i == l) && (l == hex_length + algo_id_length))
         return true;
       i = hex_length;
       c = str->data() + i;
@@ -63,6 +67,12 @@ Algorithms ParseHashAlgorithm(const string &algorithm_option) {
     return kSha1;
   if (algorithm_option == "rmd160")
     return kRmd160;
+  if (algorithm_option == "sha256")
+    return kSha256;
+  if (algorithm_option == "sha3")
+    return kSha3;
+  if (algorithm_option == "shake128")
+    return kShake128;
   return kAny;
 }
 
@@ -75,9 +85,15 @@ Any MkFromHexPtr(const HexPtr hex, const char suffix) {
     result = Any(kMd5, hex);
   if (length == 2*kDigestSizes[kSha1])
     result = Any(kSha1, hex);
-  // TODO(jblomer) compare -rmd160
+  // TODO(jblomer) compare -rmd160, -sha256
   if ((length == 2*kDigestSizes[kRmd160] + kAlgorithmIdSizes[kRmd160]))
     result = Any(kRmd160, hex);
+  if ((length == 2*kDigestSizes[kSha256] + kAlgorithmIdSizes[kSha256]))
+    result = Any(kSha256, hex);
+  if ((length == 2*kDigestSizes[kSha3] + kAlgorithmIdSizes[kSha3]))
+    result = Any(kSha3, hex);
+  if ((length == 2*kDigestSizes[kShake128] + kAlgorithmIdSizes[kShake128]))
+    result = Any(kShake128, hex);
 
   result.suffix = suffix;
   return result;
@@ -95,6 +111,11 @@ unsigned GetContextSize(const Algorithms algorithm) {
       return sizeof(SHA_CTX);
     case kRmd160:
       return sizeof(RIPEMD160_CTX);
+    case kSha256:
+      return sizeof(mbedtls_sha256_context);
+    case kSha3:
+    case kShake128:
+      return sizeof(Keccak_HashInstance);
     default:
       LogCvmfs(kLogHash, kLogDebug | kLogSyslogErr, "tried to generate hash "
                "context for unspecified hash. Aborting...");
@@ -103,6 +124,7 @@ unsigned GetContextSize(const Algorithms algorithm) {
 }
 
 void Init(ContextPtr context) {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -116,6 +138,25 @@ void Init(ContextPtr context) {
       assert(context.size == sizeof(RIPEMD160_CTX));
       RIPEMD160_Init(reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
       break;
+    case kSha256:
+      assert(context.size == sizeof(mbedtls_sha256_context));
+      mbedtls_sha256_init(
+        reinterpret_cast<mbedtls_sha256_context *>(context.buffer));
+      mbedtls_sha256_starts(
+        reinterpret_cast<mbedtls_sha256_context *>(context.buffer), false);
+      break;
+    case kSha3:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashInitialize_SHA3_256(
+        reinterpret_cast<Keccak_HashInstance *>(context.buffer));
+      assert(keccak_result == SUCCESS);
+      break;
+    case kShake128:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashInitialize_SHAKE128(
+        reinterpret_cast<Keccak_HashInstance *>(context.buffer));
+      assert(keccak_result == SUCCESS);
+      break;
     default:
       abort();  // Undefined hash
   }
@@ -124,6 +165,7 @@ void Init(ContextPtr context) {
 void Update(const unsigned char *buffer, const unsigned buffer_length,
             ContextPtr context)
 {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -140,12 +182,26 @@ void Update(const unsigned char *buffer, const unsigned buffer_length,
       RIPEMD160_Update(reinterpret_cast<RIPEMD160_CTX *>(context.buffer),
                        buffer, buffer_length);
       break;
+    case kSha256:
+      assert(context.size == sizeof(mbedtls_sha256_context));
+      mbedtls_sha256_update(
+        reinterpret_cast<mbedtls_sha256_context *>(context.buffer),
+        buffer, buffer_length);
+      break;
+    case kSha3:
+    case kShake128:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashUpdate(reinterpret_cast<Keccak_HashInstance *>(
+                        context.buffer), buffer, buffer_length * 8);
+      assert(keccak_result == SUCCESS);
+      break;
     default:
       abort();  // Undefined hash
   }
 }
 
 void Final(ContextPtr context, Any *any_digest) {
+  HashReturn keccak_result;
   switch (context.algorithm) {
     case kMd5:
       assert(context.size == sizeof(MD5_CTX));
@@ -161,6 +217,27 @@ void Final(ContextPtr context, Any *any_digest) {
       assert(context.size == sizeof(RIPEMD160_CTX));
       RIPEMD160_Final(any_digest->digest,
                       reinterpret_cast<RIPEMD160_CTX *>(context.buffer));
+      break;
+    case kSha256:
+      assert(context.size == sizeof(mbedtls_sha256_context));
+      mbedtls_sha256_finish(
+        reinterpret_cast<mbedtls_sha256_context *>(context.buffer),
+        any_digest->digest);
+      break;
+    case kSha3:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashFinal(reinterpret_cast<Keccak_HashInstance *>(
+                        context.buffer), any_digest->digest);
+      assert(keccak_result == SUCCESS);
+      break;
+    case kShake128:
+      assert(context.size == sizeof(Keccak_HashInstance));
+      keccak_result = Keccak_HashFinal(reinterpret_cast<Keccak_HashInstance *>(
+                        context.buffer), NULL);
+      assert(keccak_result == SUCCESS);
+      keccak_result =
+        Keccak_HashSqueeze(reinterpret_cast<Keccak_HashInstance *>(
+          context.buffer), any_digest->digest, kDigestSizes[kShake128] * 8);
       break;
     default:
       abort();  // Undefined hash
@@ -182,53 +259,59 @@ void HashMem(const unsigned char *buffer, const unsigned buffer_size,
 }
 
 
+void HashString(const std::string &content, Any *any_digest) {
+  HashMem(reinterpret_cast<const unsigned char *>(content.data()),
+          content.length(), any_digest);
+}
+
+
 void Hmac(
   const string &key,
   const unsigned char *buffer,
   const unsigned buffer_size,
   Any *any_digest
 ) {
-    Algorithms algorithm = any_digest->algorithm;
-    assert(algorithm != kAny);
+  Algorithms algorithm = any_digest->algorithm;
+  assert(algorithm != kAny);
 
-    const unsigned block_size = kBlockSizes[algorithm];
-    unsigned char key_block[block_size];
-    memset(key_block, 0, block_size);
-    if (key.length() > block_size) {
-      Any hash_key(algorithm);
-      HashMem(reinterpret_cast<const unsigned char *>(key.data()),
-              key.length(), &hash_key);
-      memcpy(key_block, hash_key.digest, kDigestSizes[algorithm]);
-    } else {
-      if (key.length() > 0)
-        memcpy(key_block, key.data(), key.length());
-    }
-
-    unsigned char pad_block[block_size];
-    // Inner hash
-    Any hash_inner(algorithm);
-    ContextPtr context_inner(algorithm);
-    context_inner.buffer = alloca(context_inner.size);
-    Init(context_inner);
-    for (unsigned i = 0; i < block_size; ++i)
-      pad_block[i] = key_block[i] ^ 0x36;
-    Update(pad_block, block_size, context_inner);
-    Update(buffer, buffer_size, context_inner);
-    Final(context_inner, &hash_inner);
-
-    // Outer hash
-    ContextPtr context_outer(algorithm);
-    context_outer.buffer = alloca(context_outer.size);
-    Init(context_outer);
-    for (unsigned i = 0; i < block_size; ++i)
-      pad_block[i] = key_block[i] ^ 0x5c;
-    Update(pad_block, block_size, context_outer);
-    Update(hash_inner.digest, kDigestSizes[algorithm], context_outer);
-
-    Final(context_outer, any_digest);
+  const unsigned block_size = kBlockSizes[algorithm];
+  unsigned char key_block[block_size];
+  memset(key_block, 0, block_size);
+  if (key.length() > block_size) {
+    Any hash_key(algorithm);
+    HashMem(reinterpret_cast<const unsigned char *>(key.data()),
+            key.length(), &hash_key);
+    memcpy(key_block, hash_key.digest, kDigestSizes[algorithm]);
+  } else {
+    if (key.length() > 0)
+      memcpy(key_block, key.data(), key.length());
   }
 
-bool HashFile(const std::string filename, Any *any_digest) {
+  unsigned char pad_block[block_size];
+  // Inner hash
+  Any hash_inner(algorithm);
+  ContextPtr context_inner(algorithm);
+  context_inner.buffer = alloca(context_inner.size);
+  Init(context_inner);
+  for (unsigned i = 0; i < block_size; ++i)
+    pad_block[i] = key_block[i] ^ 0x36;
+  Update(pad_block, block_size, context_inner);
+  Update(buffer, buffer_size, context_inner);
+  Final(context_inner, &hash_inner);
+
+  // Outer hash
+  ContextPtr context_outer(algorithm);
+  context_outer.buffer = alloca(context_outer.size);
+  Init(context_outer);
+  for (unsigned i = 0; i < block_size; ++i)
+    pad_block[i] = key_block[i] ^ 0x5c;
+  Update(pad_block, block_size, context_outer);
+  Update(hash_inner.digest, kDigestSizes[algorithm], context_outer);
+
+  Final(context_outer, any_digest);
+}
+
+bool HashFile(const std::string &filename, Any *any_digest) {
   FILE *file = fopen(filename.c_str(), "r");
   if (file == NULL)
     return false;

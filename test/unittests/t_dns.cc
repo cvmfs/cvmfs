@@ -29,7 +29,7 @@ class T_Dns : public ::testing::Test {
       CaresResolver::Create(true /* ipv4_only */, 1 /* retries */, 2000);
     ASSERT_TRUE(ipv4_resolver);
 
-    fhostfile = CreateTempFile("/tmp/cvmfstest", 0600, "w", &hostfile);
+    fhostfile = CreateTempFile("./cvmfs_ut_dns", 0600, "w", &hostfile);
     ASSERT_TRUE(fhostfile);
     hostfile_resolver = HostfileResolver::Create(hostfile, false);
     ASSERT_TRUE(hostfile_resolver);
@@ -669,8 +669,9 @@ TEST_F(T_Dns, CaresResolverReadConfig) {
         nameservers.push_back("[" + tokens[1] + "]:53");
       else
         nameservers.push_back(tokens[1] + ":53");
-    } else if (tokens[0] == "search") {
-      domains.push_back(tokens[1]);
+    } else if ((tokens[0] == "search") || (tokens[0] == "domain")) {
+      for (unsigned i = 1; i < tokens.size(); ++i)
+        domains.push_back(tokens[i]);
     }
   }
   fclose(f);
@@ -697,7 +698,8 @@ TEST_F(T_Dns, CaresResolverBadResolver) {
   time_t before = time(NULL);
   Host host = quick_resolver->Resolve("a.root-servers.net");
   time_t after = time(NULL);
-  EXPECT_EQ(host.status(), kFailInvalidResolvers);
+  EXPECT_TRUE((host.status() == kFailInvalidResolvers) ||
+              (host.status() == kFailTimeout));
   EXPECT_LE(after-before, 1);
 }
 
@@ -716,7 +718,7 @@ TEST_F(T_Dns, CaresResolverTimeout) {
   time_t after = time(NULL);
   // C-ares oddity: why is it kFailInvalidResolvers in CaresResolverBadResolver?
   EXPECT_EQ(host.status(), kFailTimeout);
-  EXPECT_LE(after-before, 2);
+  EXPECT_LE(after-before, 3);
 }
 
 

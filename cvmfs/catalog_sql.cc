@@ -24,13 +24,38 @@ namespace catalog {
  * compatible catalog structure when updating the schema revisions here!
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  */
+
+// ChangeLog
+// 2.5 (Jun 26 2013 - Git: e79baec22c6abd6ddcdf8f8d7d33921027a052ab)
+//     * add (backward compatible) schema revision - see below
+//     * add statistics counters for chunked files
+//       Note: this was retrofitted and needed a catalog migration step
+//
+// 2.4 (Aug 15 2012 - Git: 17de8fc782b5b8dc4404dda925627b5ec2b552e1)
+// 2.3 (Aug 15 2012 - Git: ab77688cdb2f851af3fe983bf3694dc2465e65be)
+// 2.2 (never existed)
+// 2.1 (Aug  7 2012 - Git: beba36c12d2b1123ffbb169f865a861e570adc68)
+//     * add 'chunks' table for file chunks
+//     * add 'statistics' table for accumulative counters
+//     * rename 'inode' field to 'hardlinks'
+//       * containing both hardlink group ID and linkcount
+//     * .cvmfscatalog files become first-class entries in the catalogs
+//
+// 2.0 (Aug  6 2012 - Git: c8a81ede603e57fbe4324b6ab6bc8c41e3a2fa5f)
+//     * beginning of CernVM-FS 2.1.x branch ('modern' era)
+//
+// 1.x (earlier - based on SVN :-) )
+//     * pre-historic times
 const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
+
 // ChangeLog
-//   0 --> 1: add size column to nested catalog table,
-//            add schema_revision property
-//   1 --> 2: add xattr column to catalog table
-//            add self_xattrs and subtree_xattrs statistics counters
+//   0 --> 1 (Jan  6 2014 - Git: 3667fe7a669d0d65e07275b753a7c6f23fc267df):
+//           * add size column to nested catalog table
+//           * add schema_revision property
+//   1 --> 2 (Jan 22 2014 - Git: 85e6680e52cfe56dc1213a5ad74a5cc62fd50ead):
+//           * add xattr column to catalog table
+//           * add self_xattrs and subtree_xattrs statistics counters
 const unsigned CatalogDatabase::kLatestSchemaRevision = 2;
 
 
@@ -543,16 +568,10 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     } else {
       result.uid_              = RetrieveInt64(13);
       result.gid_              = RetrieveInt64(14);
-      if (catalog->uid_map_) {
-        OwnerMap::const_iterator i = catalog->uid_map_->find(result.uid_);
-        if (i != catalog->uid_map_->end())
-          result.uid_ = i->second;
-      }
-      if (catalog->gid_map_) {
-        OwnerMap::const_iterator i = catalog->gid_map_->find(result.gid_);
-        if (i != catalog->gid_map_->end())
-          result.gid_ = i->second;
-      }
+      if (catalog->uid_map_)
+        result.uid_ = catalog->uid_map_->Map(result.uid_);
+      if (catalog->gid_map_)
+        result.gid_ = catalog->gid_map_->Map(result.gid_);
     }
   }
 
@@ -1021,15 +1040,21 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
     StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
 
+  // TODO(reneme): this depends on shash::kSuffix* being a char!
+  //               it should be more generic or replaced entirely
+  // TODO(reneme): this is practically the same as SqlListContentHashes and
+  //               should be consolidated
   string sql = "SELECT DISTINCT hash, "
   "CASE WHEN flags & " + StringifyInt(SqlDirent::kFlagFile) + " THEN " +
-    StringifyInt(kChunkFile) + " " +
+    StringifyInt(shash::kSuffixNone) + " " +
   "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
-    StringifyInt(kChunkMicroCatalog) + " END " +
+    StringifyInt(shash::kSuffixMicroCatalog) + " END " +
   "AS chunk_type, " + flags2hash +
   "FROM catalog WHERE hash IS NOT NULL";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
-    sql += " UNION SELECT DISTINCT chunks.hash, " + StringifyInt(kChunkPiece) +
+    sql +=
+      " UNION "
+      "SELECT DISTINCT chunks.hash, " + StringifyInt(shash::kSuffixPartial) +
       ", " + flags2hash + "FROM chunks, catalog WHERE "
       "chunks.md5path_1=catalog.md5path_1 AND "
       "chunks.md5path_2=catalog.md5path_2";
@@ -1044,14 +1069,14 @@ bool SqlAllChunks::Open() {
 }
 
 
-bool SqlAllChunks::Next(shash::Any *hash, ChunkTypes *type) {
-  if (FetchRow()) {
-    *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
-                             shash::kSuffixPartial);
-    *type = static_cast<ChunkTypes>(RetrieveInt(1));
-    return true;
+bool SqlAllChunks::Next(shash::Any *hash) {
+  if (!FetchRow()) {
+    return false;
   }
-  return false;
+
+  *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
+                              static_cast<shash::Suffix>(RetrieveInt(1)));
+  return true;
 }
 
 

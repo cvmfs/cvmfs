@@ -168,7 +168,8 @@ bool Database<DerivedT>::Configure() {
   // unexpected open read-write file descriptors in the cache directory like
   // etilqs_<number>.
   if (!read_write_) {
-    return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute();
+    return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute() &&
+           Sql(sqlite_db() , "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }
   return true;
 }
@@ -178,21 +179,24 @@ template <class DerivedT>
 bool Database<DerivedT>::FileReadAhead() {
   // Read-ahead into file system buffers
   // TODO(jblomer): mmap, re-readahead
-  int fd_readahead = open(filename().c_str(), O_RDONLY);
-  if (fd_readahead < 0) {
-    LogCvmfs(kLogSql, kLogDebug, "failed to open %s for read-ahead (%d)",
-             filename().c_str(), errno);
-    return false;
-  }
-
-  const int retval = platform_readahead(fd_readahead);
-  close(fd_readahead);
-  if (retval != 0) {
-    LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
-             "failed to read-ahead %s (%d)", filename().c_str(), errno);
-    // Read-ahead is known to fail on tmpfs.  Don't consider it as a fatal
-    // error.
-    // return false;
+  assert(filename().length() > 1);
+  int fd_readahead;
+  if (filename()[0] != '@') {
+    fd_readahead = open(filename().c_str(), O_RDONLY);
+    if (fd_readahead < 0) {
+      LogCvmfs(kLogSql, kLogDebug, "failed to open %s for read-ahead (%d)",
+               filename().c_str(), errno);
+      return false;
+    }
+    const int retval = platform_readahead(fd_readahead);
+    close(fd_readahead);
+    if (retval != 0) {
+      LogCvmfs(kLogSql, kLogDebug | kLogSyslogWarn,
+               "failed to read-ahead %s (%d)", filename().c_str(), errno);
+      // Read-ahead is known to fail on tmpfs.  Don't consider it as a fatal
+      // error.
+      // return false;
+    }
   }
 
   return true;
@@ -280,6 +284,14 @@ T Database<DerivedT>::GetProperty(const std::string &key) const {
 
 template <class DerivedT>
 template <typename T>
+T Database<DerivedT>::GetPropertyDefault(const std::string &key,
+                                         const T default_value) const {
+  return (HasProperty(key)) ? GetProperty<T>(key)
+                            : default_value;
+}
+
+template <class DerivedT>
+template <typename T>
 bool Database<DerivedT>::SetProperty(const std::string &key,
                                      const T            value) {
   assert(set_property_);
@@ -309,6 +321,14 @@ void Database<DerivedT>::DropFileOwnership() {
   database_.DropFileOwnership();
   LogCvmfs(kLogSql, kLogDebug, "Database object dropped ownership of '%s'",
            database_.filename().c_str());
+}
+
+
+template <class DerivedT>
+unsigned Database<DerivedT>::GetModifiedRowCount() const {
+  const int modified_rows = sqlite3_total_changes(sqlite_db());
+  assert(modified_rows >= 0);
+  return static_cast<unsigned>(modified_rows);
 }
 
 /**
@@ -369,6 +389,11 @@ inline bool Sql::Bind(const int index, const unsigned int value) {
 }
 
 template <>
+inline bool Sql::Bind(const int index, const uint64_t value) {
+  return this->BindInt64(index, value);
+}
+
+template <>
 inline bool Sql::Bind(const int index, const sqlite3_int64 value) {
   return this->BindInt64(index, value);
 }
@@ -400,8 +425,18 @@ inline int Sql::Retrieve(const int index) {
 }
 
 template <>
+inline bool Sql::Retrieve(const int index) {
+  return static_cast<bool>(this->RetrieveInt(index));
+}
+
+template <>
 inline sqlite3_int64 Sql::Retrieve(const int index) {
   return this->RetrieveInt64(index);
+}
+
+template <>
+inline uint64_t Sql::Retrieve(const int index) {
+  return static_cast<uint64_t>(this->RetrieveInt64(index));
 }
 
 template <>

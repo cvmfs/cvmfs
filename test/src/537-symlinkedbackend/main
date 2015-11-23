@@ -22,6 +22,14 @@ produce_files_in() {
 	popdir
 }
 
+CVMFS_TEST_537_REPO_CREATED=0
+CVMFS_TEST_537_SELINUX_DISABLED=0
+cleanup() {
+  echo "running cleanup..."
+  [ $CVMFS_TEST_537_REPO_CREATED     -eq 0 ] || destroy_repo $CVMFS_TEST_REPO
+  [ $CVMFS_TEST_537_SELINUX_DISABLED -eq 0 ] || sudo setenforce 1
+}
+
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
@@ -44,14 +52,18 @@ cvmfs_run_test() {
   mkdir $symlink_destination || return 2
   sudo ln --symbolic $symlink_destination $backend_dir || return 3
 
+  echo "register cleanup trap"
+  trap cleanup EXIT HUP INT TERM || return $?
+
   if has_selinux; then
     echo "make sure that SELinux does not interfere"
-    sudo setsebool httpd_enable_homedirs true || return 6
-    selinux_disabled=1
+    CVMFS_TEST_537_SELINUX_DISABLED=1
+    sudo setenforce 0 || return 6
   fi
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+  CVMFS_TEST_537_REPO_CREATED=1
 
   echo "check that repository backend is redirected"
   [ -f ${symlink_destination}/.cvmfspublished ] || return 4
@@ -72,24 +84,12 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "compare the results of cvmfs to our reference copy"
-  compare_directories $repo_dir $reference_dir|| return $?
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
 
   # ============================================================================
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
-
-  # ============================================================================
-
-  echo "remove 'unusual' repository before successful test result"
-  destroy_repo $CVMFS_TEST_REPO || return 5
-
-  # ============================================================================
-
-  if [ $selinux_disabled -ne 0 ]; then
-    echo "reverting SELinux config"
-    sudo setsebool httpd_enable_homedirs false || return 7
-  fi
 
   return 0
 }

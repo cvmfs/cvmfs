@@ -1,64 +1,10 @@
 import time
 import glob
 import argparse
+
 from influxdb.influxdb08 import InfluxDBClient
 
-
-class DatabaseCreationException(Exception):
-    pass
-
-
-class DatabaseUpdateException(Exception):
-    pass
-
-
-class DatabaseGraphGenerationException(Exception):
-    pass
-
-
-class GraphCreationException(Exception):
-    pass
-
-
-class Counter:
-    def __init__(self, name, number, description):
-        self.name = name
-        self.number = number
-        self.description = description
-
-
-class Parser:
-    def __init__(self):
-        self.counters = {}
-        self.warm_cache = False
-        self.repository = ""
-
-    @staticmethod
-    def parse_boolean(string):
-        return string == "yes" or string == "true" \
-                         or string == "TRUE" or string == "True"
-
-    def __parseline(self, line):
-        if line[0] == "#":
-            parameter = line[1:-1].replace(" ", "").split("=")
-            if parameter[0] == "warm_cache":
-                self.warm_cache = Parser.parse_boolean(parameter[1])
-            elif parameter[0] == "repo":
-                self.repository = parameter[1].split(".")[0]
-        else:
-            params = line.strip().split("|")
-            if len(params) == 3:
-                counter = Counter(params[0], int(params[1]), params[2])
-                self.counters[counter.name] = counter
-
-    def parse(self, filename):
-        datafile = open(filename, "r")
-        for line in datafile:
-            self.__parseline(line)
-        datafile.close()
-
-    def all_counters(self):
-        return self.counters.values()
+from parser import Parser
 
 
 class Database:
@@ -84,13 +30,12 @@ class Database:
         json_body = [{
                         "name": repository,
                         "columns": ["time"],
-                        "points": []
+                        "points": [[current_time]]
                      }]
 
-        json_body[0]["points"].append([current_time])
         for counter in counters.values():
             json_body[0]["columns"].append(counter.name)
-            json_body[0]["points"][0].append(counter.number)
+            json_body[0]["points"][0].append(int(counter.avg()))
         client.write_points(json_body)
 
 

@@ -592,12 +592,22 @@ string CreateTempPath(const std::string &path_prefix, const int mode) {
 /**
  * Create a directory with a unique name.
  */
-string CreateTempDir(const std::string &path_prefix, const int mode) {
-  char *tmp_dir = strdupa((path_prefix + ".XXXXXX").c_str());
+string CreateTempDir(const std::string &path_prefix) {
+  string dir = path_prefix + ".XXXXXX";
+  char *tmp_dir = strdupa(dir.c_str());
   tmp_dir = mkdtemp(tmp_dir);
   if (tmp_dir == NULL)
     return "";
   return string(tmp_dir);
+}
+
+
+/**
+ * Get the current working directory of the running process
+ */
+std::string GetCurrentWorkingDirectory() {
+  char cwd[PATH_MAX];
+  return (getcwd(cwd, sizeof(cwd)) != NULL) ? std::string(cwd) : std::string();
 }
 
 
@@ -639,6 +649,7 @@ bool RemoveTree(const string &path) {
                                                   true);
   traversal.fn_new_file = &RemoveTreeHelper::RemoveFile;
   traversal.fn_new_symlink = &RemoveTreeHelper::RemoveFile;
+  traversal.fn_new_socket = &RemoveTreeHelper::RemoveFile;
   traversal.fn_leave_dir = &RemoveTreeHelper::RemoveDir;
   traversal.Recurse(path);
   bool result = remove_tree_helper->success;
@@ -822,13 +833,6 @@ string StringifyTimeval(const timeval value) {
 }
 
 
-string StringifyIpv4(const uint32_t ip4_address) {
-  struct in_addr in_addr;
-  in_addr.s_addr = ip4_address;
-  return string(inet_ntoa(in_addr));
-}
-
-
 /**
  * Parses a timstamp of the form YYYY-MM-DDTHH:MM:SSZ
  * Return 0 on error
@@ -875,20 +879,33 @@ uint64_t String2Uint64(const string &value) {
 }
 
 
-uint64_t HexString2Uint64(const string &value) {
-  uint64_t result;
-  sscanf(value.c_str(), "%"PRIx64, &result);
-  return result;
+/**
+ * Parse a string into a a uint64_t.
+ *
+ * Unlike String2Uint64, this:
+ *   - Checks to make sure the full string is parsed
+ *   - Can indicate an error occurred.
+ *
+ * If an error occurs, this returns false and sets errno appropriately.
+ */
+bool String2Uint64Parse(const std::string &value, uint64_t *result) {
+  char *endptr = NULL;
+  errno = 0;
+  long long myval = strtoll(value.c_str(), &endptr, 10);  // NOLINT
+  if ((value.size() == 0) || (endptr != (value.c_str() + value.size())) ||
+      (myval < 0))
+  {
+    errno = EINVAL;
+    return false;
+  }
+  if (errno) {
+    return false;
+  }
+  if (result) {
+    *result = myval;
+  }
+  return true;
 }
-
-
-int HexDigit2Int(const char digit) {
-  if ((digit >= '0') && (digit <= '9')) return digit - '0';
-  if ((digit >= 'A') && (digit <= 'F')) return 10 + digit - 'A';
-  if ((digit >= 'a') && (digit <= 'f')) return 10 + digit - 'a';
-  return -1;
-}
-
 
 void String2Uint64Pair(const string &value, uint64_t *a, uint64_t *b) {
   sscanf(value.c_str(), "%"PRIu64" %"PRIu64, a, b);
@@ -924,15 +941,6 @@ bool HasSuffix(
   return (ignore_case)
     ? std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(), icmp)
     : std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
-}
-
-
-bool IsNumeric(const std::string &str) {
-  for (unsigned i = 0; i < str.length(); ++i) {
-    if ((str[i] < '0') || (str[i] > '9'))
-      return false;
-  }
-  return true;
 }
 
 
@@ -1064,7 +1072,12 @@ string GetLineMem(const char *text, const int text_size) {
 bool GetLineFile(FILE *f, std::string *line) {
   int retval;
   line->clear();
-  while ((retval = fgetc(f)) != EOF) {
+  while (true) {
+    retval = fgetc(f);
+    if (ferror(f) && (errno == EINTR)) {
+      clearerr(f);
+      continue;
+    } else if (retval == EOF) {break;}
     char c = retval;
     if (c == '\n')
       break;
@@ -1078,7 +1091,11 @@ bool GetLineFd(const int fd, std::string *line) {
   int retval;
   char c;
   line->clear();
-  while ((retval = read(fd, &c, 1)) == 1) {
+  while (true) {
+    retval = read(fd, &c, 1);
+    if (retval == 0) {break;}
+    if ((retval == -1) && (errno == EINTR)) {continue;}
+    if (retval == -1) {break;}
     if (c == '\n')
       break;
     line->push_back(c);
@@ -1125,6 +1142,9 @@ string ReplaceAll(const string &haystack, const string &needle,
   string result(haystack);
   size_t pos = 0;
   const unsigned needle_size = needle.size();
+  if (needle == "")
+    return result;
+
   while ((pos = result.find(needle, pos)) != string::npos)
     result.replace(pos, needle_size, replace_by);
   return result;
@@ -1401,7 +1421,7 @@ bool ManagedExec(const vector<string>  &command_line,
   assert(retcode);
   if (status_code != ForkFailures::kSendPid) {
     close(pipe_fork.read_end);
-    LogCvmfs(kLogQuota, kLogDebug, "managed execve failed (%s)",
+    LogCvmfs(kLogCvmfs, kLogDebug, "managed execve failed (%s)",
              ForkFailures::ToString(status_code).c_str());
     return false;
   }

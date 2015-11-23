@@ -6,11 +6,15 @@
 #ifdef __APPLE__
   #include <sys/sysctl.h>
 #endif
+#include <syslog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <fstream>  // TODO(jblomer): remove me
+#include <map>
 #include <sstream>  // TODO(jblomer): remove me
 
+#include "../../cvmfs/hash.h"
 #include "../../cvmfs/manifest.h"
 #include "testutil.h"
 
@@ -67,6 +71,23 @@ pid_t GetParentPid(const pid_t pid) {
 
   return parent_pid;
 }
+
+
+unsigned GetNoUsedFds() {
+  // Syslog file descriptor could still be open
+  closelog();
+
+  unsigned result = 0;
+  int max_fd = getdtablesize();
+  assert(max_fd >= 0);
+  for (unsigned fd = 0; fd < unsigned(max_fd); ++fd) {
+    int retval = fcntl(fd, F_GETFD, 0);
+    if (retval != -1)
+      result++;
+  }
+  return result;
+}
+
 
 /**
  * Traverses the $PATH environment variable to find the absolute path of a given
@@ -147,31 +168,66 @@ shash::Any h(const std::string &hash, const shash::Suffix suffix) {
 
 namespace catalog {
 
-DirectoryEntry DirectoryEntryTestFactory::RegularFile() {
+DirectoryEntry DirectoryEntryTestFactory::RegularFile(const string &name,
+                                                      unsigned size,
+                                                      shash::Any hash) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
+  dirent.name_ = NameString(name);
+  dirent.checksum_ = hash;
+  dirent.size_ = size;
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::Directory() {
+DirectoryEntry DirectoryEntryTestFactory::Directory(
+    const string &name,
+    unsigned size,
+    shash::Any hash,
+    bool is_nested_catalog_mountpoint) {
   DirectoryEntry dirent;
   dirent.mode_ = 16893;
+  dirent.name_ = NameString(name);
+  dirent.checksum_ = hash;
+  dirent.size_ = size;
+  dirent.is_nested_catalog_mountpoint_ = is_nested_catalog_mountpoint;
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::Symlink() {
+DirectoryEntry DirectoryEntryTestFactory::Symlink(const string &name,
+                                                  unsigned size,
+                                                  const string &symlink_path) {
   DirectoryEntry dirent;
   dirent.mode_ = 41471;
+  dirent.name_ = NameString(name);
+  dirent.size_ = size;
+  dirent.symlink_ = LinkString(symlink_path);
   return dirent;
 }
 
 
-DirectoryEntry DirectoryEntryTestFactory::ChunkedFile() {
+DirectoryEntry DirectoryEntryTestFactory::ChunkedFile(shash::Any content_hash) {
   DirectoryEntry dirent;
   dirent.mode_ = 33188;
   dirent.is_chunked_file_ = true;
+  dirent.checksum_ = content_hash;
+  return dirent;
+}
+
+catalog::DirectoryEntry catalog::DirectoryEntryTestFactory::Make(
+    const Metadata& metadata) {
+  DirectoryEntry dirent;
+  dirent.name_       = NameString(metadata.name);
+  dirent.mode_       = metadata.mode;
+  dirent.uid_        = metadata.uid;
+  dirent.gid_        = metadata.gid;
+  dirent.size_       = metadata.size;
+  dirent.mtime_      = metadata.mtime;
+  dirent.symlink_    = LinkString(metadata.symlink);
+  dirent.linkcount_  = metadata.linkcount;
+  dirent.has_xattrs_ = metadata.has_xattrs;
+  dirent.checksum_   = metadata.checksum;
   return dirent;
 }
 
@@ -210,20 +266,83 @@ MockCatalog* MockCatalog::AttachFreely(const std::string  &root_path,
   return new_catalog;
 }
 
-void MockCatalog::RegisterChild(MockCatalog *child) {
+void MockCatalog::RemoveChild(MockCatalog *child) {
+  std::vector<NestedCatalog>::iterator iter = active_children_.begin();
+  while (iter != active_children_.end()) {
+    if (iter->hash == child->hash()) {
+      active_children_.erase(iter);
+      return;
+    }
+    iter++;
+  }
+}
+
+MockCatalog* MockCatalog::FindSubtree(const PathString &path) {
+  for (unsigned i = 0; i < active_children_.size(); ++i) {
+    if (active_children_[i].path == path)
+      return active_children_[i].child;
+  }
+  return NULL;
+}
+
+bool MockCatalog::LookupPath(const PathString &path,
+                catalog::DirectoryEntry *dirent) const {
+  shash::Md5 md5_path(path.GetChars(), path.GetLength());
+  for (unsigned i = 0; i < files_.size(); ++i) {
+    if (files_[i].path_hash == md5_path) {
+      *dirent = files_[i].ToDirectoryEntry();
+      return true;
+    }
+  }
+  return false;
+}
+
+bool MockCatalog::ListingPath(const PathString &path,
+                 catalog::DirectoryEntryList *listing) const {
+  unsigned initial_size = listing->size();
+  shash::Md5 path_hash(path.GetChars(), path.GetLength());
+  for (unsigned i = 0; i < files_.size(); ++i) {
+    if (files_[i].parent_hash == path_hash && files_[i].name != "")
+      listing->push_back(files_[i].ToDirectoryEntry());
+  }
+  return listing->size() > initial_size;
+}
+
+void MockCatalog::RegisterNestedCatalog(MockCatalog *child) {
   NestedCatalog nested;
   nested.path  = PathString(child->root_path());
   nested.hash  = child->hash();
   nested.child = child;
   nested.size  = child->catalog_size();
   children_.push_back(nested);
+
+  // update the directory entries in both catalogs
+  string path = child->root_path();
+  File *mountpoint = FindFile(path);
+  if (mountpoint != NULL) {
+    mountpoint->is_nested_catalog_mountpoint = true;
+  }
+  File *child_mountpoint = child->FindFile(path);
+  if (child_mountpoint != NULL) {
+    child_mountpoint->is_nested_catalog_mountpoint = true;
+  }
+}
+
+void MockCatalog::AddChild(MockCatalog *child) {
+  NestedCatalog nested;
+  nested.path  = PathString(child->root_path());
+  nested.hash  = child->hash();
+  nested.child = child;
+  nested.size  = child->catalog_size();
+  active_children_.push_back(nested);
 }
 
 void MockCatalog::AddFile(const shash::Any   &content_hash,
-                          const size_t        file_size) {
-  MockCatalog::File f;
-  f.hash = content_hash;
-  f.size = file_size;
+                          const size_t        file_size,
+                          const string        &parent_path,
+                          const string        &name)
+{
+  MockCatalog::File f(content_hash, file_size, parent_path, name);
   files_.push_back(f);
 }
 
@@ -261,19 +380,56 @@ const MockCatalog::HashVector& MockCatalog::GetReferencedObjects() const {
 //------------------------------------------------------------------------------
 
 
+MockCatalog* catalog::MockCatalogManager::CreateCatalog(
+                               const PathString  &mountpoint,
+                               const shash::Any  &catalog_hash,
+                               MockCatalog *parent_catalog)
+{
+  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
+  if (it != catalog_map_.end()) {
+    return it->second;
+  }
+  bool is_root = parent_catalog == NULL;
+  return new MockCatalog(mountpoint.ToString(), catalog_hash, 4096, 1,
+                         0, is_root, parent_catalog, NULL);
+}
+
+catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
+                                                  const PathString &mountpoint,
+                                                  const shash::Any &hash,
+                                                  string  *catalog_path,
+                                                  shash::Any *catalog_hash)
+{
+  map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
+  if (it != catalog_map_.end() && catalog_hash != NULL) {
+    MockCatalog *catalog = it->second;
+    *catalog_hash = catalog->hash();
+  } else {
+    MockCatalog *catalog = new MockCatalog(mountpoint.ToString(),
+                                           hash, 4096, 1, 0,
+                                           true, NULL, NULL);
+    catalog_map_[mountpoint] = catalog;
+  }
+  return kLoadNew;
+}
+
+
+//------------------------------------------------------------------------------
+
+
 manifest::Manifest* MockObjectFetcher::FetchManifest() {
   const uint64_t    catalog_size = 0;
   const std::string root_path    = "";
-  manifest::Manifest* manifest = new manifest::Manifest(MockCatalog::root_hash,
-                                                        catalog_size,
-                                                        root_path);
+  manifest::Manifest* manifest = new manifest::Manifest(
+      MockCatalog::root_hash,
+      catalog_size,
+      root_path);
   manifest->set_history(MockHistory::root_hash);
   return manifest;
 }
 
-bool MockObjectFetcher::Fetch(const shash::Any    &object_hash,
-                              const shash::Suffix  hash_suffix,
-                              std::string         *file_path) {
+bool MockObjectFetcher::Fetch(const shash::Any &object_hash,
+                              std::string      *file_path) {
   assert(file_path != NULL);
   *file_path = object_hash.ToString();
   return true;

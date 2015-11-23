@@ -70,7 +70,7 @@ Pathspec& Pathspec::operator=(const Pathspec &other) {
 
 
 void Pathspec::Parse(const std::string &spec) {
-  // parsing is done using std::string iterators to walk through th entire
+  // parsing is done using std::string iterators to walk through the entire
   // pathspec parameter. Thus, all parsing methods receive references to these
   // iterators and increment itr as they pass along.
         std::string::const_iterator itr = spec.begin();

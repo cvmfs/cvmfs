@@ -23,20 +23,11 @@
 #include "duplex_curl.h"
 #include "hash.h"
 #include "prng.h"
+#include "sink.h"
 #include "statistics.h"
 
 
 namespace download {
-
-/**
- * Where to store downloaded data.
- */
-enum Destination {
-  kDestinationMem = 1,
-  kDestinationFile,
-  kDestinationPath,
-  kDestinationNone
-};  // Destination
 
 /**
  * Possible return values.
@@ -82,6 +73,18 @@ inline const char *Code2Ascii(const Failures error) {
 }
 
 
+/**
+ * Where to store downloaded data.
+ */
+enum Destination {
+  kDestinationMem = 1,
+  kDestinationFile,
+  kDestinationPath,
+  kDestinationSink,
+  kDestinationNone
+};  // Destination
+
+
 struct Counters {
   perf::Counter *sz_transferred_bytes;
   perf::Counter *sz_transfer_time;  // measured in miliseconds
@@ -90,18 +93,17 @@ struct Counters {
   perf::Counter *n_proxy_failover;
   perf::Counter *n_host_failover;
 
-  explicit Counters(perf::Statistics *statistics) {
-    sz_transferred_bytes = statistics->Register("download.sz_transferred_bytes",
+  Counters(perf::Statistics *statistics, const std::string &name) {
+    sz_transferred_bytes = statistics->Register(name + ".sz_transferred_bytes",
         "Number of transferred bytes");
-    sz_transfer_time = statistics->Register("download.sz_transfer_time",
+    sz_transfer_time = statistics->Register(name + ".sz_transfer_time",
         "Transfer time (miliseconds)");
-    n_requests = statistics->Register("download.n_requests",
+    n_requests = statistics->Register(name + ".n_requests",
         "Number of requests");
-    n_retries = statistics->Register("download.n_retries",
-        "Number of retries");
-    n_proxy_failover = statistics->Register("download.n_proxy_failover",
+    n_retries = statistics->Register(name + ".n_retries", "Number of retries");
+    n_proxy_failover = statistics->Register(name + ".n_proxy_failover",
         "Number of proxy failovers");
-    n_host_failover = statistics->Register("download.n_host_failover",
+    n_host_failover = statistics->Register(name + ".n_host_failover",
         "Number of host failovers");
   }
 };  // Counters
@@ -124,6 +126,7 @@ struct JobInfo {
   } destination_mem;
   FILE *destination_file;
   const std::string *destination_path;
+  cvmfs::Sink *destination_sink;
   const shash::Any *expected_hash;
   const std::string *extra_info;
 
@@ -139,6 +142,7 @@ struct JobInfo {
     destination_mem.data = NULL;
     destination_file = NULL;
     destination_path = NULL;
+    destination_sink = NULL;
     expected_hash = NULL;
     extra_info = NULL;
 
@@ -185,6 +189,17 @@ struct JobInfo {
     compressed = c;
     probe_hosts = ph;
     destination = kDestinationMem;
+    expected_hash = h;
+  }
+  JobInfo(const std::string *u, const bool c, const bool ph,
+          cvmfs::Sink *s, const shash::Any *h)
+  {
+    Init();
+    url = u;
+    compressed = c;
+    probe_hosts = ph;
+    destination = kDestinationSink;
+    destination_sink = s;
     expected_hash = h;
   }
   JobInfo(const std::string *u, const bool ph) {
@@ -295,7 +310,7 @@ class DownloadManager {
   ~DownloadManager();
 
   void Init(const unsigned max_pool_handles, const bool use_system_proxy,
-      perf::Statistics * statistics);
+      perf::Statistics * statistics, const std::string &name = "download");
   void Fini();
   void Spawn();
   Failures Fetch(JobInfo *info);

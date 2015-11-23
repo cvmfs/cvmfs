@@ -69,7 +69,15 @@ static bool CheckFuse() {
   string fuse_device;
   int retval;
 #ifdef __APPLE__
-  retval = system("/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs");
+  if (FileExists("/Library/Filesystems/osxfuse.fs/Contents/Resources/"
+                 "load_osxfuse"))
+  {
+    // OS X Fuse 3
+    retval = system("/Library/Filesystems/osxfuse.fs/Contents/Resources/"
+                    "load_osxfuse");
+  } else {
+    retval = system("/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs");
+  }
   if (retval != 0) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed loading OSX Fuse");
     return false;
@@ -209,6 +217,34 @@ static bool GetCvmfsUser(string *cvmfs_user) {
   }
   *cvmfs_user = param;  // No sanitation; due to PAM, username can be anything
   return true;
+}
+
+
+static std::string GetCvmfsBinary() {
+  std::string result;
+  vector<string> paths;
+  paths.push_back("/usr/bin");
+
+#ifdef __APPLE__
+  int major, minor, patch;
+  platform_get_os_version(&major, &minor, &patch);
+  if (major == 10 && minor >= 11) {    // OS X El Capitan came with SIP, forcing
+    paths.push_back("/usr/local/bin"); // us to become relocatable
+  }
+#endif
+
+  // TODO(reneme): C++11 range based for loop
+        vector<string>::const_iterator i    = paths.begin();
+  const vector<string>::const_iterator iend = paths.end();
+  for (; i != iend; ++i) {
+    const std::string cvmfs2 = *i + "/cvmfs2";
+    if (FileExists(cvmfs2) || SymlinkExists(cvmfs2)) {
+      result = cvmfs2;
+      break;
+    }
+  }
+
+  return result;
 }
 
 
@@ -382,7 +418,11 @@ int main(int argc, char **argv) {
   if (options_manager_.IsDefined("CVMFS_DEBUGLOG"))
     AddMountOption("debug", &mount_options);
 
-  const string cvmfs_binary = "/usr/bin/cvmfs2";
+  const string cvmfs_binary = GetCvmfsBinary();
+  if (cvmfs_binary.empty()) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to locate the cvmfs2 binary");
+    return 1;
+  }
 
   // Dry run early exit
   if (dry_run) {

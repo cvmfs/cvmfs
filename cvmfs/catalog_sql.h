@@ -36,17 +36,6 @@ namespace catalog {
 
 class Catalog;
 
-/**
- * Content-addressable chunks can be entire files, micro catalogs (ending L) or
- * pieces of large files (ending P).  Micro catalogs are currently not
- * implemented.
- */
-enum ChunkTypes {
-  kChunkFile = 0,
-  kChunkMicroCatalog,
-  kChunkPiece,
-};
-
 
 class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
  public:
@@ -113,13 +102,16 @@ class Sql : public sqlite::Sql {
     const shash::Algorithms  hash_algo,
     const char               hash_suffix = shash::kSuffixNone) const
   {
+    // Note: SQLite documentation advises to first define the data type of BLOB
+    //       by calling sqlite3_column_XXX() on the column and _afterwards_ get
+    //       the number of bytes using sqlite3_column_bytes().
+    //
+    //  See: https://www.sqlite.org/c3ref/column_blob.html
+    const unsigned char *buffer = static_cast<const unsigned char *>(
+      RetrieveBlob(idx_column));
     const int byte_count = RetrieveBytes(idx_column);
-    if (byte_count > 0) {
-      const unsigned char *buffer = static_cast<const unsigned char *>(
-        RetrieveBlob(idx_column));
-      return shash::Any(hash_algo, buffer, byte_count, hash_suffix);
-    }
-    return shash::Any(hash_algo);
+    return (byte_count > 0) ? shash::Any(hash_algo, buffer, hash_suffix)
+                            : shash::Any(hash_algo);
   }
 
   /**
@@ -519,7 +511,7 @@ class SqlAllChunks : public Sql {
  public:
   explicit SqlAllChunks(const CatalogDatabase &database);
   bool Open();
-  bool Next(shash::Any *hash, ChunkTypes *type);
+  bool Next(shash::Any *hash);
   bool Close();
 };
 

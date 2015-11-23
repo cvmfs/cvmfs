@@ -8,6 +8,7 @@
 #define CVMFS_PLATFORM_LINUX_H_
 
 #include <sys/types.h>  // contains ssize_t needed inside <attr/xattr.h>
+#include <sys/xattr.h>
 #include <attr/xattr.h>  // NOLINT(build/include_alpha)
 #include <dirent.h>
 #include <errno.h>
@@ -21,6 +22,7 @@
 #include <sys/prctl.h>
 #include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -291,6 +293,16 @@ inline const char* platform_getexepath() {
     }
   }
   return buf;
+}
+
+inline void platform_get_os_version(int32_t *major,
+                                    int32_t *minor,
+                                    int32_t *patch) {
+  struct utsname uts_info;
+  const int res = uname(&uts_info);
+  assert(res == 0);
+  const int matches = sscanf(uts_info.release, "%u.%u.%u", major, minor, patch);
+  assert(matches == 3 && "failed to read version string");
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

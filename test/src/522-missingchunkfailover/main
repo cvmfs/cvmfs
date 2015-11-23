@@ -11,7 +11,7 @@ desaster_cleanup() {
 cvmfs_run_test() {
   logfile=$1
   local scratch_dir=$(pwd)
-  local replica_name="$CVMFS_TEST_REPO.replic"
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
   local mnt_point="$scratch_dir/mountpoint"
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"

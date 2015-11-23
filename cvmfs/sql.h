@@ -112,6 +112,8 @@ class Database : SingleCopy {
   template <typename T>
   T GetProperty(const std::string &key) const;
   template <typename T>
+  T GetPropertyDefault(const std::string &key, const T default_value) const;
+  template <typename T>
   bool SetProperty(const std::string &key, const T value);
   bool HasProperty(const std::string &key) const;
 
@@ -120,6 +122,13 @@ class Database : SingleCopy {
   float               schema_version()  const { return schema_version_;       }
   unsigned            schema_revision() const { return schema_revision_;      }
   bool                read_write()      const { return read_write_;           }
+
+  /**
+   * Provides the number of rows modified by INSERT, UPDATE or DELETE statements
+   * that have been run against this database since it was opened.
+   * @return  number of rows modified by all executed manipulating statements
+   */
+  unsigned GetModifiedRowCount() const;
 
   /**
    * Figures out the ratio of free SQLite memory pages in the SQLite database
@@ -338,6 +347,15 @@ class Sql {
   int RetrieveType(const int idx_column) const {
     return sqlite3_column_type(statement_, idx_column);
   }
+
+  /**
+   * Determines the number of bytes necessary to store the column's data as a
+   * string. This might involve type conversions and depends on which other
+   * RetrieveXXX methods were called on the same column index before!
+   *
+   * See SQLite documentation for sqlite_column_bytes() for details:
+   *   https://www.sqlite.org/c3ref/column_blob.html
+   */
   int RetrieveBytes(const int idx_column) const {
     return sqlite3_column_bytes(statement_, idx_column);
   }
