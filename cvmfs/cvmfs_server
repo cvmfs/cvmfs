@@ -4037,6 +4037,10 @@ publish() {
     echo "Tagging $name"
     $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
 
+    # finalizing transaction
+    echo "Flushing file system buffers"
+    sync
+
     # committing newly created revision
     echo "Signing new manifest"
     sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
@@ -4054,10 +4058,6 @@ publish() {
                -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
       sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     fi
-
-    # finalizing transaction
-    echo "Flushing file system buffers"
-    sync
 
     # check again for open file descriptors (potential race condition)
     if has_file_descriptors_on_mount_point $name && \
