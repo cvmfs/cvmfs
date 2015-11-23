@@ -14,6 +14,7 @@
 
 #include <ctime>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include "../../cvmfs/shortstring.h"
@@ -737,8 +738,17 @@ TEST_F(T_Util, StringifyTime) {
 
 TEST_F(T_Util, RfcTimestamp) {
   char *curr_locale = setlocale(LC_TIME, NULL);
+  char *format = "%a, %e %h %Y %H:%M:%S %z";
   setlocale(LC_TIME, "C");
-  EXPECT_EQ(GetRfcTimeString(), RfcTimestamp());
+  struct tm tm1;
+  struct tm tm2;
+  string str1 = GetRfcTimeString();
+  string str2 = RfcTimestamp();
+  strptime(str1.c_str(), format, &tm1);
+  strptime(str2.c_str(), format, &tm2);
+  time_t time1 = mktime(&tm1);
+  time_t time2 = mktime(&tm2);
+  EXPECT_GT(time1, time2 - 2000);  // two seconds less of tolerance
   setlocale(LC_TIME, curr_locale);
 }
 
