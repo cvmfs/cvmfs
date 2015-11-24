@@ -73,9 +73,11 @@ class Fetcher : SingleCopy {
           BackoffThrottle *backoff_throttle,
           perf::Statistics *statistics);
   ~Fetcher();
+  // TODO(jblomer): reduce number of arguments
   int Fetch(const shash::Any &id,
             const uint64_t size,
             const std::string &name,
+            const zlib::Algorithms compression_algorithm,
             const cache::CacheManager::ObjectType object_type);
 
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
