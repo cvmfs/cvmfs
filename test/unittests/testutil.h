@@ -96,6 +96,7 @@ static inline upload::SpoolerDefinition MockSpoolerDefinition() {
   return upload::SpoolerDefinition("mock," + std::string(g_sandbox_path) + "," +
                                              std::string(g_sandbox_tmp_dir),
                                    shash::kSha1,
+                                   zlib::kZlibDefault,
                                    true,
                                    min_chunk_size,
                                    avg_chunk_size,
