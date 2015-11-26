@@ -20,12 +20,9 @@ CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
 pkg_basedir=${CVMFS_SOURCE_LOCATION}/packaging/mac
-pmdoc_template=${pkg_basedir}/cvmfs.pmdoc.template
-pmdoc=${pkg_basedir}/cvmfs.pmdoc
 pkg_install_dir=${CVMFS_RESULT_LOCATION}/CVMFS_Package
 
 # sanity checks
-[ ! -d $pmdoc ]           || die "source tree seems to be built before ($pmdoc exists)"
 [ ! -d $pkg_install_dir ] || die "build directory was used before ($pkg_install_dir exists)"
 
 # retrieve the upstream version string from CVMFS
@@ -63,19 +60,6 @@ fi
 echo "Installing cvmfs to $pkg_install_dir ..."
 make install DESTDIR=$pkg_install_dir || die "failed to install"
 
-echo "Creating $pmdoc from $pmdoc_template ..."
-output_package="${CVMFS_RESULT_LOCATION}/${cvmfs_build_tag}.pkg"
-cp -a ${pmdoc_template} ${pmdoc}
-sed -i -e "s/@PackageOutput@/$(echo $output_package | sed -e "s,/,\\\\/,g")/g" $pmdoc/*.xml
-sed -i -e "s/@PackageInput@/$(echo $pkg_install_dir | sed -e "s,/,\\\\/,g")/g" $pmdoc/*.xml
-
-echo "Creating package $output_package ..."
-cd $pkg_basedir
-$package_maker --doc $pmdoc       \
-               --verbose          \
-               --root-volume-only \
-               --out $output_package || die "Package creation failed!"
-cd ${CVMFS_RESULT_LOCATION}
 
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
