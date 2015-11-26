@@ -52,10 +52,10 @@ echo "detected upstream version: $cvmfs_version"
 
 # check if there is an OpenSSL installed via brew
 OPENSSL_INCLUDE=""
-brew_openssl_keg=/usr/local/opt/openssl/include
+brew_openssl_keg=/usr/local/opt/openssl
 if [ -d $brew_openssl_keg ]; then
   echo "using homebrew'ed OpenSSL at $brew_openssl_keg"
-  OPENSSL_INCLUDE="-DOPENSSL_INCLUDE_DIR=$brew_openssl_keg"
+  OPENSSL_INCLUDE="-DOPENSSL_ROOT_DIR=$brew_openssl_keg"
 fi
 
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
