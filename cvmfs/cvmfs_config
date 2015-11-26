@@ -194,25 +194,29 @@ cvmfs_setup() {
   mkdir -p /var/lib/cvmfs
   chown cvmfs:cvmfs /var/lib/cvmfs
 
-  # put workarounds for OS X (>= 10.11) in place (SIP related)
-  if [ x"$sys_arch" = x"Darwin" ] && \
-     compare_versions $(sw_vers -productVersion) -ge "10.11"; then
+  # put workarounds for OS X in place (CernVM-FS poor-man's relocatability)
+  if [ x"$sys_arch" = x"Darwin" ]; then
     # symlink configuration files into /etc
     if [ ! -e /etc/cvmfs           ] && \
        [   -e /usr/local/etc/cvmfs ]; then
       ln -s /usr/local/etc/cvmfs /etc/cvmfs
     fi
 
-    # create a (minimal) file system bundle for `mount -t cvmfs` support
-    # Note: the `mount` utility in OS X 10.11.1 doesn't find the installed mount
-    #       helper in `/usr/local/sbin`. When disabling SIP and symlinking the
-    #       mount helper into `/sbin` it would work. Not sure if that is to be
-    #       considered a bug or a feature...
-    #       Currently the bundle creation below is considered a work around!
     if [ ! -e ${cvmfs_fs_bundle}/mount_cvmfs ] && \
+       [ ! -e /sbin/mount_cvmfs              ] && \
        [   -e /usr/local/sbin/mount_cvmfs ]; then
-      mkdir -p $cvmfs_fs_bundle
-      ln -s /usr/local/sbin/mount_cvmfs ${cvmfs_fs_bundle}/mount_cvmfs
+      if compare_versions $(sw_vers -productVersion) -ge "10.11"; then
+        # create a (minimal) file system bundle for `mount -t cvmfs` support
+        # Note: the `mount` utility in OS X 10.11.1 doesn't find the installed
+        #       mount helper in `/usr/local/sbin`. When disabling SIP and sym-
+        #       linking the mount helper into `/sbin` it would work. Not sure if
+        #       that is to be considered a bug or a feature...
+        #       Currently the bundle creation below is considered a work around!
+        mkdir -p $cvmfs_fs_bundle
+        ln -s /usr/local/sbin/mount_cvmfs ${cvmfs_fs_bundle}/mount_cvmfs
+      else
+        ln -s /usr/local/sbin/mount_cvmfs /sbin/mount_cvmfs
+      fi
     fi
   fi
 
