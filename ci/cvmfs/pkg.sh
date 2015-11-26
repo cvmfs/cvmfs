@@ -25,6 +25,7 @@ CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 #       preinstall script takes care of checking for outdated versions.
 #       Previously it was ch.cern.cvmfs.CVMFS_Package.pkg
 CVMFS_PKG_IDENTIFIER="ch.cern.cvmfs.pkg"
+CVMFS_INSTALL_PREFIX="/usr/local"
 
 pkg_basedir=${CVMFS_SOURCE_LOCATION}/packaging/mac
 pkg_install_dir=${CVMFS_RESULT_LOCATION}/CVMFS_Package
@@ -46,11 +47,11 @@ fi
 
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
 cd $CVMFS_RESULT_LOCATION
-cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr/local \
-      -DBUILD_SERVER=no                      \
-      -DBUILD_SERVER_DEBUG=no                \
-      -DBUILD_UNITTESTS=no                   \
-      $OPENSSL_INCLUDE                       \
+cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX \
+      -DBUILD_SERVER=no                                 \
+      -DBUILD_SERVER_DEBUG=no                           \
+      -DBUILD_UNITTESTS=no                              \
+      $OPENSSL_INCLUDE                                  \
       $CVMFS_SOURCE_LOCATION
 make -j $(get_number_of_cpu_cores)
 
