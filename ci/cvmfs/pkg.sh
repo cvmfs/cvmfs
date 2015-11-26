@@ -32,12 +32,21 @@ pkg_install_dir=${CVMFS_RESULT_LOCATION}/CVMFS_Package
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
 echo "detected upstream version: $cvmfs_version"
 
+# check if there is an OpenSSL installed via brew
+OPENSSL_INCLUDE=""
+brew_openssl_keg=/usr/local/opt/openssl/include
+if [ -d $brew_openssl_keg ]; then
+  echo "using homebrew'ed OpenSSL at $brew_openssl_keg"
+  OPENSSL_INCLUDE="-DOPENSSL_INCLUDE_DIR=$brew_openssl_keg"
+fi
+
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
 cd $CVMFS_RESULT_LOCATION
 cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr \
       -DBUILD_SERVER=no                \
       -DBUILD_SERVER_DEBUG=no          \
       -DBUILD_UNITTESTS=no             \
+      $OPENSSL_INCLUDE                 \
       $CVMFS_SOURCE_LOCATION
 make
 
