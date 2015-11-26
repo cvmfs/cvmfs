@@ -28,7 +28,11 @@ pkg_install_dir=${CVMFS_RESULT_LOCATION}/CVMFS_Package
 [ ! -d $pmdoc ]           || die "source tree seems to be built before ($pmdoc exists)"
 [ ! -d $pkg_install_dir ] || die "build directory was used before ($pkg_install_dir exists)"
 
-echo "building CernVM-FS in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
+# retrieve the upstream version string from CVMFS
+cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
+echo "detected upstream version: $cvmfs_version"
+
+echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
 cd $CVMFS_RESULT_LOCATION
 cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr \
       -DBUILD_SERVER=no                \
@@ -36,10 +40,6 @@ cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr \
       -DBUILD_UNITTESTS=no             \
       $CVMFS_SOURCE_LOCATION
 make
-
-# retrieve the upstream version string from CVMFS
-cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
-echo "detected upstream version: $cvmfs_version"
 
 # generate the release tag for either a nightly build or a release
 cvmfs_build_tag="cvmfs-${cvmfs_version}"
