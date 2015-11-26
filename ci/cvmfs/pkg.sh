@@ -42,11 +42,11 @@ fi
 
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
 cd $CVMFS_RESULT_LOCATION
-cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr \
-      -DBUILD_SERVER=no                \
-      -DBUILD_SERVER_DEBUG=no          \
-      -DBUILD_UNITTESTS=no             \
-      $OPENSSL_INCLUDE                 \
+cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr/local \
+      -DBUILD_SERVER=no                      \
+      -DBUILD_SERVER_DEBUG=no                \
+      -DBUILD_UNITTESTS=no                   \
+      $OPENSSL_INCLUDE                       \
       $CVMFS_SOURCE_LOCATION
 make -j $(get_number_of_cpu_cores)
 
