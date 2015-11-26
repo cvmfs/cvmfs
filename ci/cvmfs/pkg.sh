@@ -48,7 +48,7 @@ cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr \
       -DBUILD_UNITTESTS=no             \
       $OPENSSL_INCLUDE                 \
       $CVMFS_SOURCE_LOCATION
-make
+make -j $(get_number_of_cpu_cores)
 
 # generate the release tag for either a nightly build or a release
 cvmfs_build_tag="cvmfs-${cvmfs_version}"
