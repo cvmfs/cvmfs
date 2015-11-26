@@ -19,6 +19,13 @@ CVMFS_SOURCE_LOCATION="$1"
 CVMFS_RESULT_LOCATION="$2"
 CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 
+# this uniquely identifies a package in OSX for example to distinguish between
+# fresh installations and updates. Keep that consistent!
+# Note: It has changed with the transition from PackageMaker to pkgbuild and the
+#       preinstall script takes care of checking for outdated versions.
+#       Previously it was ch.cern.cvmfs.CVMFS_Package.pkg
+CVMFS_PKG_IDENTIFIER="ch.cern.cvmfs.pkg"
+
 pkg_basedir=${CVMFS_SOURCE_LOCATION}/packaging/mac
 pkg_install_dir=${CVMFS_RESULT_LOCATION}/CVMFS_Package
 
