@@ -31,7 +31,9 @@ pkg_basedir=${CVMFS_SOURCE_LOCATION}/packaging/mac
 pkg_install_dir=${CVMFS_RESULT_LOCATION}/CVMFS_Package
 
 # sanity checks
-[ ! -d $pkg_install_dir ] || die "build directory was used before ($pkg_install_dir exists)"
+[ ! -d $pkg_install_dir ]           || die "build directory was used before ($pkg_install_dir exists)"
+which pkgbuild     > /dev/null 2>&1 || die "didn't find 'pkgbuild' utility"
+which productbuild > /dev/null 2>&1 || die "didn't find 'productbuild' utility"
 
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
