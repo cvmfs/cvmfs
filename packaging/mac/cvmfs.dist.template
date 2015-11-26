@@ -15,7 +15,6 @@
 
     <background file="cvmfs_retina.tif" alignment="bottomleft" mime-type="image/tiff" scaling="none" />
     <conclusion file="conclusion.rtf" mime-type="text/richtext" />
-    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true" />
     <license file="license.txt" mime-type="text/plain" />
     <os-version min="10.9" />
 
