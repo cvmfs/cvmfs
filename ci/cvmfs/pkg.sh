@@ -29,12 +29,22 @@ CVMFS_PKG_IDENTIFIER="ch.cern.cvmfs.pkg"
 CVMFS_INSTALL_PREFIX="/usr/local"
 
 pkg_basedir=${CVMFS_SOURCE_LOCATION}/packaging/mac
-pkg_install_dir=${CVMFS_RESULT_LOCATION}/CVMFS_Package
+pkg_install_dir=${CVMFS_RESULT_LOCATION}/build
+pkg_resource_dir=${CVMFS_RESULT_LOCATION}/resources
+pkg_build_dir=${CVMFS_RESULT_LOCATION}/package
 
 # sanity checks
 [ ! -d $pkg_install_dir ]           || die "build directory was used before ($pkg_install_dir exists)"
+[ ! -d $pkg_build_dir ]             || die "build directory was used before ($pkg_build_dir exists)"
+[ ! -d $pkg_resource_dir ]          || die "build directory was used before ($pkg_resource_dir exists)"
 which pkgbuild     > /dev/null 2>&1 || die "didn't find 'pkgbuild' utility"
 which productbuild > /dev/null 2>&1 || die "didn't find 'productbuild' utility"
+which tiffutil     > /dev/null 2>&1 || die "didn't find 'tiffutil' utility"
+
+# setup environment
+mkdir -p $pkg_install_dir
+mkdir -p $pkg_build_dir
+mkdir -p $pkg_resource_dir
 
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
@@ -79,6 +89,21 @@ pkgbuild --root             ${pkg_install_dir}/${CVMFS_INSTALL_PREFIX} \
          --version          $cvmfs_version                             \
          --install-location $CVMFS_INSTALL_PREFIX                      \
          $cvmfs_package
+
+echo "generating product package build environment..."
+cvmfs_dist_file="${pkg_build_dir}/cvmfs.dist"
+expand_template ${pkg_basedir}/cvmfs.dist.template > $cvmfs_dist_file
+cp ${pkg_basedir}/resources/* ${pkg_resource_dir}
+tiffutil -cat ${pkg_resource_dir}/cvmfs.png    \
+              ${pkg_resource_dir}/cvmfs@2x.png \
+         -out ${pkg_resource_dir}/cvmfs_retina.tif
+
+echo "packaging up the production CernVM-FS package..."
+product_package="${pkg_build_dir}/${cvmfs_build_tag}.pkg"
+productbuild --distribution $cvmfs_dist_file  \
+             --resources    $pkg_resource_dir \
+             --package-path $pkg_build_dir    \
+             $product_package
 
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
