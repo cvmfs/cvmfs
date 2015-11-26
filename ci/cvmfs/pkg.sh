@@ -29,9 +29,9 @@ CVMFS_PKG_IDENTIFIER="ch.cern.cvmfs.pkg"
 CVMFS_INSTALL_PREFIX="/usr/local"
 
 pkg_basedir=${CVMFS_SOURCE_LOCATION}/packaging/mac
-pkg_install_dir=${CVMFS_RESULT_LOCATION}/build
-pkg_resource_dir=${CVMFS_RESULT_LOCATION}/resources
-pkg_build_dir=${CVMFS_RESULT_LOCATION}/package
+pkg_install_dir=${CVMFS_RESULT_LOCATION}/pkg_install
+pkg_resource_dir=${CVMFS_RESULT_LOCATION}/pkg_resources
+pkg_build_dir=${CVMFS_RESULT_LOCATION}/pkg_result
 
 # sanity checks
 [ ! -d $pkg_install_dir ]           || die "build directory was used before ($pkg_install_dir exists)"
