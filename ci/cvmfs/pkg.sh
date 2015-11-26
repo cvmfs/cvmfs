@@ -24,6 +24,7 @@ CVMFS_NIGHTLY_BUILD_NUMBER="${3-0}"
 # Note: It has changed with the transition from PackageMaker to pkgbuild and the
 #       preinstall script takes care of checking for outdated versions.
 #       Previously it was ch.cern.cvmfs.CVMFS_Package.pkg
+CVMFS_CORE_PKG_IDENTIFIER="ch.cern.cvmfs.pkg.Core"
 CVMFS_PKG_IDENTIFIER="ch.cern.cvmfs.pkg"
 CVMFS_INSTALL_PREFIX="/usr/local"
 
@@ -67,16 +68,17 @@ else
   echo "creating release: $cvmfs_build_tag"
 fi
 
-# echo "Installing cvmfs to $pkg_install_dir ..."
+echo "Installing cvmfs to $pkg_install_dir ..."
 make install DESTDIR=$pkg_install_dir || die "failed to install"
 
 echo "packaging up CernVM-FS ${cvmfs_version}..."
+cvmfs_package="${pkg_build_dir}/${cvmfs_build_tag}-core.pkg"
 pkgbuild --root             ${pkg_install_dir}/${CVMFS_INSTALL_PREFIX} \
          --scripts          ${pkg_basedir}/scripts                     \
-         --identifier       $CVMFS_PKG_IDENTIFIER                      \
+         --identifier       $CVMFS_CORE_PKG_IDENTIFIER                 \
          --version          $cvmfs_version                             \
          --install-location $CVMFS_INSTALL_PREFIX                      \
-         ${CVMFS_RESULT_LOCATION}/${cvmfs_build_tag}.pkg
+         $cvmfs_package
 
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
