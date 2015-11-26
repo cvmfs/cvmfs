@@ -37,16 +37,6 @@ cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr \
       $CVMFS_SOURCE_LOCATION
 make
 
-echo "Looking for PackageMaker ..."
-package_maker=""
-if which packagemaker > /dev/null 2>&1; then
-  package_maker="$(which packagemaker)"
-else
-  package_maker=/Applications/PackageMaker.app/Contents/MacOS/PackageMaker
-fi
-[ -x $package_maker ] || die "PackageMaker not found/executable"
-echo "PackageMaker found in $package_maker"
-
 # retrieve the upstream version string from CVMFS
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
 echo "detected upstream version: $cvmfs_version"
