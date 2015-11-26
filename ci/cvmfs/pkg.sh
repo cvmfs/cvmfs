@@ -59,7 +59,7 @@ make -j $(get_number_of_cpu_cores)
 cvmfs_build_tag="cvmfs-${cvmfs_version}"
 if [ $CVMFS_NIGHTLY_BUILD_NUMBER -gt 0 ]; then
   git_hash="$(get_cvmfs_git_revision $CVMFS_SOURCE_LOCATION)"
-  cvmfs_build_tag="${cvmfs_build_tag}.0-${CVMFS_NIGHTLY_BUILD_NUMBER}-git-${git_hash}"
+  cvmfs_build_tag="${cvmfs_build_tag}-0.${CVMFS_NIGHTLY_BUILD_NUMBER}-git-${git_hash}"
   echo "creating nightly build '$cvmfs_build_tag'"
 else
   echo "creating release: $cvmfs_build_tag"
