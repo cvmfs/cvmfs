@@ -1551,9 +1551,9 @@ configure_sudoers() {
     sudo sed -i .cvmfs_backup -e "/# added by CernVM-FS/d" /etc/sudoers
     sudo cat >> /etc/sudoers << EOF
 %everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/sudo # added by CernVM-FS
-cvmfs ALL= NOPASSWD: /usr/bin/cvmfs2 # added by CernVM-FS
-cvmfs ALL= NOPASSWD: /usr/bin/cvmfs2_debug # added by CernVM-FS
-%everyone ALL=(cvmfs:cvmfs) NOPASSWD: /usr/bin/cvmfs_talk -i * mountpoint # added by CernVM-FS
+cvmfs ALL= NOPASSWD: ${INSTALL_BASE}/bin/cvmfs2 # added by CernVM-FS
+cvmfs ALL= NOPASSWD: ${INSTALL_BASE}/bin/cvmfs2_debug # added by CernVM-FS
+%everyone ALL=(cvmfs:cvmfs) NOPASSWD: ${INSTALL_BASE}/bin/cvmfs_talk -i * mountpoint # added by CernVM-FS
 %everyone ALL=(cvmfs:cvmfs) NOPASSWD: /bin/mkdir # added by CernVM-FS
 cvmfs ALL= NOPASSWD: /usr/sbin/sysctl -w kern.maxfilesperproc=* kern.maxfiles=* # added by CernVM-FS
 %everyone ALL= NOPASSWD: /bin/mkdir -p /var/run/cvmfs # added by CernVM-FS
