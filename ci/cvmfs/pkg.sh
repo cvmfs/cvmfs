@@ -65,9 +65,16 @@ else
   echo "creating release: $cvmfs_build_tag"
 fi
 
-echo "Installing cvmfs to $pkg_install_dir ..."
+# echo "Installing cvmfs to $pkg_install_dir ..."
 make install DESTDIR=$pkg_install_dir || die "failed to install"
 
+echo "packaging up CernVM-FS ${cvmfs_version}..."
+pkgbuild --root             ${pkg_install_dir}/${CVMFS_INSTALL_PREFIX} \
+         --scripts          ${pkg_basedir}/scripts                     \
+         --identifier       $CVMFS_PKG_IDENTIFIER                      \
+         --version          $cvmfs_version                             \
+         --install-location $CVMFS_INSTALL_PREFIX                      \
+         ${CVMFS_RESULT_LOCATION}/${cvmfs_build_tag}.pkg
 
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
