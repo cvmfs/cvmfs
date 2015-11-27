@@ -46,8 +46,8 @@ clean_legacy_directories() {
 clean_and_rescue_legacy_configuration() {
   log "cleaning up legacy configuration..."
   if [ -L /etc/cvmfs ] &&
-     [ x"$(readlink /etc/cvmfs)" -eq x"/usr/local/etc/cvmfs" ]; then
-    log "configuration already points at /usr/local/etc/cvmfs. do nothing."
+     [ x"$(readlink /etc/cvmfs)" = x"/usr/local/etc/cvmfs" ]; then
+    log "configuration already points to /usr/local/etc/cvmfs. do nothing."
     return 0
   fi
 
