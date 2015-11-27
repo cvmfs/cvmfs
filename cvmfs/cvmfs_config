@@ -991,7 +991,7 @@ cvmfs_reload() {
   # can be remounted
   for m in $mount_list
   do
-    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64 -w0)
+    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap)
   done
 
   # Avoid deadlock if cwd is on cvmfs
@@ -1011,7 +1011,7 @@ cvmfs_reload() {
       continue
     fi
     echo "Pausing ${fqrn} on ${m}"
-    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64 -w0) && cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap) && cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
       awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
     cd /
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
@@ -1053,7 +1053,7 @@ cvmfs_reload() {
 
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
     if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
-      touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64 -w0)
+      touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     fi
     for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
       kill -s USR1 $(cat $pidfile)
@@ -1620,6 +1620,20 @@ runas() {
 
     Darwin )
       sudo -u $user $cmd ;;
+  esac
+}
+
+
+base64_nowrap() {
+  case $sys_arch in
+    Linux )
+      base64 -w0
+      ;;
+    Darwin )
+      base64 -b0
+      ;;
+    *)
+      echo "mooh"
   esac
 }
 
