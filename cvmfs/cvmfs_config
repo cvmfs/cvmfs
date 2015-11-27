@@ -1625,15 +1625,13 @@ runas() {
 
 
 base64_nowrap() {
-  case $sys_arch in
+  case $(uname) in
     Linux )
       base64 -w0
       ;;
     Darwin )
       base64 -b0
       ;;
-    *)
-      echo "mooh"
   esac
 }
 
