@@ -25,12 +25,3 @@ provided by OSXFuse to install the
 package, before you retry the installation of cvmfs." &> /dev/null
   exit 1
 fi
-
-# check if a previous version of CernVM-FS is installed in /usr/bin which would
-# conflict with the new installation path. In order to support El Capitan, we
-# were forced to move the CernVM-FS binaries to /usr/local/bin.
-if [ -x /usr/bin/cvmfs2   ] ||
-   [ -x /sbin/mount_cvmfs ]; then
-  echo "found CernVM-FS to be installed in /usr/bin. Aborting!" >&2
-  exit 1
-fi
