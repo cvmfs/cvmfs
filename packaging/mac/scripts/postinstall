@@ -12,119 +12,20 @@ log() {
 
 die() {
   local msg="$1"
-  echo "$msg" >> $postinstall_log
+  log "$msg"
   exit 1
 }
 
-clean_legacy_binaries() {
-  log "cleaning up legacy binaries..."
-  for binary in /usr/bin/cvmfs2               \
-                /usr/bin/cvmfs_config         \
-                /usr/bin/cvmfs_talk           \
-                /usr/bin/cvmfs_fsck           \
-                /sbin/mount_cvmfs             \
-                /usr/lib/libcvmfs_fuse*.dylib \
-                /etc/auto_cvmfs; do
-    if [ -f $binary ]; then
-      rm -f "$binary"
-      log "found and removed legacy binary '$binary'"
-    fi
-  done
-}
-
-clean_legacy_directories() {
-  log "cleaning up legacy directories..."
-  for directory in /etc/bash_completion.d/cvmfs \
-                   /usr/share/doc/cvmfs-*; do
-    if [ -d $directory ]; then
-      rm -fR "$directory"
-      log "found and removed legacy directory '$directory'"
-    fi
-  done
-}
-
-clean_and_rescue_legacy_configuration() {
-  log "cleaning up legacy configuration..."
-  if [ -L /etc/cvmfs ] &&
-     [ x"$(readlink /etc/cvmfs)" = x"/usr/local/etc/cvmfs" ]; then
-    log "configuration already points to /usr/local/etc/cvmfs. do nothing."
-    return 0
-  fi
-
-  if [ ! -e /etc/cvmfs ]; then
-    log "no legacy configuration found. do nothing."
-    return 0
-  fi
-
-  # detect and remove all configuration files of previous CernVM-FS installs
-  # Note: This deletes only the configuration files that have been shipped with
-  #       CernVM-FS. Everything user-added stays intact.
-  for conf_file in /etc/cvmfs/config.d/atlas-nightlies.cern.ch.conf            \
-                   /etc/cvmfs/config.d/cms.cern.ch.conf                        \
-                   /etc/cvmfs/config.d/grid.cern.ch.conf                       \
-                   /etc/cvmfs/config.sh                                        \
-                   /etc/cvmfs/default.conf                                     \
-                   /etc/cvmfs/default.d/50-cern.conf                           \
-                   /etc/cvmfs/default.d/60-egi.conf                            \
-                   /etc/cvmfs/default.d/README                                 \
-                   /etc/cvmfs/domain.d/cern.ch.conf                            \
-                   /etc/cvmfs/domain.d/egi.eu.conf                             \
-                   /etc/cvmfs/domain.d/opensciencegrid.org.conf                \
-                   /etc/cvmfs/keys/cern.ch/cern-it1.cern.ch.pub                \
-                   /etc/cvmfs/keys/cern.ch/cern-it2.cern.ch.pub                \
-                   /etc/cvmfs/keys/cern.ch/cern-it3.cern.ch.pub                \
-                   /etc/cvmfs/keys/cern.ch/cern.ch.pub                         \
-                   /etc/cvmfs/keys/egi.eu/egi.eu.pub                           \
-                   /etc/cvmfs/keys/opensciencegrid.org/opensciencegrid.org.pub \
-                   /etc/cvmfs/serverorder.sh; do
-    if [ -f $conf_file ]; then
-      rm -f "$conf_file"
-      log "found and removed legacy configuration file '$conf_file'"
-    fi
-  done
-
-  # rescue all configuration files that have been added by the user
-  for conf_file in $(find /etc/cvmfs -type f); do
-    log "found and rescued user added configuration file '$conf_file'"
-    mv $conf_file /usr/local/$conf_file
-  done
-
-  # remove legacy configuration directory
-  rm -fR /etc/cvmfs
-  log "removed legacy configuration directory"
-}
-
-clean_legacy_sudoers() {
-  log "cleaning up legacy sudoers configuration..."
-  if cat /etc/sudoers | grep -q '# added by CernVM-FS'; then
-    local doomed_sudoers="$(cat /etc/sudoers | grep '# added by CernVM-FS')"
-    sed -i .cvmfs_backup -e "/# added by CernVM-FS/d" /etc/sudoers
-    log "found and removed the following legacy sudoers configurations:"
-    log "-----"
-    log "$doomed_sudoers"
-    log "-----"
-  fi
-}
+[ -x $cvmfs_cfg ] || die "Could not find cvmfs_config script!"
 
 export PATH="$PATH:/usr/local/bin"
 
 log "running postinstall script for CernVM-FS"
-date >> $postinstall_log
+log "$(date)"
 log "----------------------------------------"
 log "\$PATH: $PATH"
 log ""
 log ""
-
-# this cleans out left-overs from CernVM-FS versions prior to 2.2.0 as they used
-# to be installed into /usr/... in contrast to newer versions that are compliant
-# with Apple's "System Integrity Protection" that has been introduced with OS X
-# El Capitan.
-clean_legacy_binaries
-clean_legacy_directories
-clean_and_rescue_legacy_configuration
-clean_legacy_sudoers
-
-[ -x $cvmfs_cfg ] || die "Could not find cvmfs_config script!"
 
 $cvmfs_cfg setup >> $postinstall_log 2>&1 || die "Configuring cvmfs failed."
 [ ! -d /var/run/cvmfs ] || $cvmfs_cfg reload >> $postinstall_log 2>&1
