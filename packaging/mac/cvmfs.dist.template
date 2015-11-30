@@ -18,7 +18,7 @@
     <license file="license.txt" mime-type="text/plain" />
     <os-version min="10.9" />
 
-    <required-bundles description="CernVM-FS depends on OSXFuse to be installed on the system." all="false">
+    <required-bundles description="CernVM-FS depends on OSXFuse to be installed on the system. Available here: https://osxfuse.github.io/" all="false">
         <bundle id="com.github.osxfuse.pkg.Core" path="/Library/Filesystems/osxfusefs.fs" search="true" />
         <bundle id="com.github.osxfuse.pkg.Core" path="/Library/Filesystems/osxfuse.fs" search="true" />
     </required-bundles>
