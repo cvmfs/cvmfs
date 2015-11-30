@@ -154,6 +154,7 @@ Requires: openssl
 Requires: httpd
 Requires: libcap
 Requires: lsof
+Requires: rsync
 
 Conflicts: cvmfs-server < 2.1
 
