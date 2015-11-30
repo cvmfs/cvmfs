@@ -97,6 +97,9 @@ productbuild --distribution $cvmfs_dist_file  \
              --package-path $pkg_build_dir    \
              $product_package
 
+echo "removing intermediate CernVM-FS package..."
+rm -f $cvmfs_package
+
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
   echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
