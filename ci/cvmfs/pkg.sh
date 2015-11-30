@@ -103,10 +103,10 @@ rm -f $cvmfs_package
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
   echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
-  generate_package_map "$CVMFS_CI_PLATFORM_LABEL"                            \
-                       "$(basename $(find . -regex '.*cvmfs-[0-9].*\.pkg'))" \
-                       ""                                                    \
-                       ""                                                    \
-                       ""                                                    \
+  generate_package_map "$CVMFS_CI_PLATFORM_LABEL" \
+                       "${cvmfs_build_tag}.pkg"   \
+                       ""                         \
+                       ""                         \
+                       ""                         \
                        ""
 fi
