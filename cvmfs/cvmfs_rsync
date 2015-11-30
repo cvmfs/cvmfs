@@ -35,57 +35,33 @@ if [ -z "$REPO" ]; then
     usage
 fi
 
-DESTSUBDIR="${DESTWITHOUTCVMFS%*/}"
-
 if [[ "$SRC" =~ ^[^/]*: ]]; then
     echo "$ME: srcdir must be locally mounted, not a remote host, sorry" >&2
     usage
 fi
 
-if [ -f /cvmfs/$REPO/.cvmfsdirtab ]; then
-    DESTDIR="$DEST"
-    if [ "${SRC%/}" = "$SRC" ]; then
-        # there's no trailing slash, so rsync will append $SRC basename to $DEST
-        DESTDIR="$DEST/${SRC##*/}"
-    fi
-    # look for entries that match under $DESTSUBDIR and expand them to
-    #   see if any of them have .cvmfscatalog or .cvmfsautocatalog files
-    #   in directories that have gone away from the source.
-    grep -vE '^(!|#)' /cvmfs/$REPO/.cvmfsdirtab|while read PAT; do
-        FULLPAT="/cvmfs/$REPO$PAT"
-        PATSLASHES="${FULLPAT//[^\/]}"
-        let NPATFIELDS="${#PATSLASHES} + 1"
-        DESTSLASHES="${DESTDIR//[^\/]}"
-        let NDESTFIELDS="${#DESTSLASHES} + 1"
-        MATCHPAT="$FULLPAT"
-        if [ $NPATFIELDS -gt $NDESTFIELDS ]; then
-            MATCHPAT="`echo "$FULLPAT"|cut -d/ -f-$NDESTFIELDS`"
-        fi
-        if [ "${DESTDIR#$MATCHPAT}" != "$DESTDIR" ]; then
-            # $PAT matches $DESTDIR, look in all matching directories
-            let NDESTFIELDS+=1
-            SUBPAT="`echo "$FULLPAT"|cut -d/ -f$NDESTFIELDS-`"
-            if [ -n "$SUBPAT" ]; then
-                SUBPAT="/$SUBPAT"
-            fi
-            # enable dotglob because .cvmfsdirtab matches dots
-            for D in `shopt -s dotglob;echo $DESTDIR$SUBPAT 2>/dev/null`; do
-                SRCSUBD="${D#$DESTDIR/}"
-                if [ "$SRCSUBD" = "$D" ]; then
-                    # it didn't really match, the .cvmfsdirtab pattern
-                    #  included other directories outside of this one
-                    # (shouldn't happen because of $SUBPAT, but just in case)
-                    continue
-                fi
-                for F in .cvmfscatalog .cvmfsautocatalog; do
-                    if [ -f $D/$F ] && [ ! -d $SRC/$SRCSUBD ]; then
-                        echo "removing $F from deleted ${D#$DEST/}"
-                        rm -f $D/$F
-                    fi
-                done
-            done
-        fi
-    done
+DESTDIR="$DEST"
+if [ "${SRC%/}" = "$SRC" ]; then
+    # there's no trailing slash, so rsync will append $SRC basename to $DEST
+    DESTDIR="$DEST/${SRC##*/}"
 fi
+# Look for catalogs under $DESTDIR, and if any of the corresponding source 
+# directories have gone away, remove any .cvmfscatalog or .cvmfsautocatalog
+# in the destination.  Note: $DESTSUBDIR may be empty, and $SRC may or
+# may not have a trailing slash.
+DESTSUBDIR="${DESTDIR#/cvmfs/$REPO}"
+cvmfs_server list-catalogs -x $REPO|grep -E "^$DESTSUBDIR(/|$)"|while read DIR; do
+    # SRCSUBD will always either start with a slash or be empty
+    SRCSUBD="${DIR#$DESTSUBDIR}"
+    if [ ! -d "$SRC$SRCSUBD" ]; then
+        for F in .cvmfscatalog .cvmfsautocatalog; do
+            CATFILE="/cvmfs/$REPO$DIR/$F"
+            if [ -f "$CATFILE" ] ; then
+                echo "removing $F from deleted dir $DIR"
+                rm -f "$CATFILE"
+            fi
+        done
+    fi
+done
 
 exec rsync $RSYNC_OPTIONS $SRC $DEST
