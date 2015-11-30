@@ -53,12 +53,12 @@ cvmfs_run_test() {
   popdir
 
   echo "syncing it to the new repository"
-  cvmfs_rsync -av $src_dir $repo_dir || return 1
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av $src_dir $repo_dir || return 1
 
   # testing .cvmfsautocatalog files without auto-generation because only
   #  need to show that they aren't removed until their source dir is removed
   AUTOCATFILE=/cvmfs/$CVMFS_TEST_REPO/People/Americans/.cvmfsautocatalog
-  touch $AUTOCATFILE
+  sudo -u $CVMFS_TEST_USER touch $AUTOCATFILE
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -81,7 +81,7 @@ cvmfs_run_test() {
   popdir
 
   echo "syncing it to the new repository"
-  cvmfs_rsync -av --delete $src_dir $repo_dir || return 2
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir $repo_dir || return 2
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -104,8 +104,8 @@ cvmfs_run_test() {
   popdir
 
   echo "syncing it to the new repository in two steps"
-  cvmfs_rsync -av --delete $src_dir/People/ $repo_dir/People || return 3
-  cvmfs_rsync -av --delete $src_dir/Continents/ $repo_dir/Continents || return 4
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/ $repo_dir/People || return 3
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/Continents/ $repo_dir/Continents || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -125,8 +125,8 @@ cvmfs_run_test() {
   popdir
 
   echo "syncing subdir to the new repository in two steps"
-  cvmfs_rsync -av --delete $src_dir/People/Germans/AlbertEinstein/ $repo_dir/People/Germans/AlbertEinstein || return 5
-  cvmfs_rsync -av --delete $src_dir/People/Russians/ $repo_dir/People/Russians || return 6
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Germans/AlbertEinstein/ $repo_dir/People/Germans/AlbertEinstein || return 5
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Russians/ $repo_dir/People/Russians || return 6
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
