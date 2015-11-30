@@ -7,7 +7,8 @@ cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
   local scratch_dir=$(pwd)
-  local src_dir=$scratch_dir/srcdir/
+  local src_dir=$scratch_dir/srcdir
+  local pubtime_file=$scratch_dir/pubtime
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
@@ -53,7 +54,7 @@ cvmfs_run_test() {
   popdir
 
   echo "syncing it to the new repository"
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av $src_dir $repo_dir || return 1
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av $src_dir/ $repo_dir || return 1
 
   # testing .cvmfsautocatalog files without auto-generation because only
   #  need to show that they aren't removed until their source dir is removed
@@ -69,6 +70,9 @@ cvmfs_run_test() {
   echo "check if the right number of catalogs are present in the repository (1)"
   [ $(get_catalog_count $repo_name) -eq 8 ] || return 101
 
+  # no catalogs should be created after this point
+  touch $pubtime_file
+
   # ============================================================================
 
   echo "starting transaction to edit repository"
@@ -81,13 +85,16 @@ cvmfs_run_test() {
   popdir
 
   echo "syncing it to the new repository"
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir $repo_dir || return 2
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/ $repo_dir || return 2
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "check if the right number of catalogs are present in the repository (2)"
   [ $(get_catalog_count $repo_name) -eq 6 ] || return 102
+
+  echo "making sure no catalog files were recreated"
+  [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 112
 
   echo "making sure test .cvmfsautocatalog file still exists"
   [ -f $AUTOCATFILE ] || return 122
@@ -104,7 +111,7 @@ cvmfs_run_test() {
   popdir
 
   echo "syncing it to the new repository in two steps"
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/ $repo_dir/People || return 3
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People $repo_dir/ || return 3
   sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/Continents/ $repo_dir/Continents || return 4
 
   echo "creating CVMFS snapshot"
@@ -112,6 +119,9 @@ cvmfs_run_test() {
 
   echo "check if the right number of catalogs are present in the repository (3)"
   [ $(get_catalog_count $repo_name) -eq 4 ] || return 103
+
+  echo "making sure no catalog files were recreated"
+  [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 113
 
   # ============================================================================
 
@@ -126,13 +136,16 @@ cvmfs_run_test() {
 
   echo "syncing subdir to the new repository in two steps"
   sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Germans/AlbertEinstein/ $repo_dir/People/Germans/AlbertEinstein || return 5
-  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Russians/ $repo_dir/People/Russians || return 6
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Russians $repo_dir/People || return 6
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "check if the right number of catalogs are present in the repository (4)"
   [ $(get_catalog_count $repo_name) -eq 4 ] || return 105
+
+  echo "making sure no catalog files were recreated"
+  [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 115
 
   # ============================================================================
 
