@@ -95,18 +95,22 @@ cvmfs_run_test() {
   cvmfs_server tag $legacy_repo_name || return 16
 
   echo "try to roll back to an outdated catalog schema (should fail)"
-  rollback_repo $legacy_repo_name $legacy_tag && return 17
+  local rollback_log="rollback.log"
+  rollback_repo $legacy_repo_name $legacy_tag > $rollback_log 2>&1 && return 17
+
+  echo "check log file for error message"
+  cat $rollback_log | grep -e 'outdated and incompatible catalog schema' || return 18
 
   echo -n "getting HEAD revision again..."
   local head_revision_after=$(get_head_revision $legacy_repo_name)
   echo "done ($head_revision_after)"
 
   echo "revision should not have changed"
-  [ $head_revision -eq $head_revision_after ] || return 18
+  [ $head_revision -eq $head_revision_after ] || return 19
 
   echo "create a new repository transaction"
-  start_transaction $legacy_repo_name || return  19
-  publish_repo      $legacy_repo_name || return  20
+  start_transaction $legacy_repo_name || return  20
+  publish_repo      $legacy_repo_name || return  21
 
   return 0
 }
