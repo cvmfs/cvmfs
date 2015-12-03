@@ -191,6 +191,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_migrate.h swissknife_migrate.cc
   swissknife_scrub.h swissknife_scrub.cc
   swissknife_gc.h swissknife_gc.cc
+  swissknife_graft.h swissknife_graft.cc
   swissknife.h swissknife.cc)
 
 
@@ -644,27 +645,27 @@ if (BUILD_SERVER)
 
   install(
     FILES      webapi/cvmfs-api.wsgi
-    DESTINATION    "/var/www/wsgi-scripts"
+    DESTINATION    "${CMAKE_INSTALL_PREFIX}/var/www/wsgi-scripts"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
   if (GEOIP_BUILTIN)
     install(
       FILES      ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so
-      DESTINATION    "/usr/share/cvmfs-server/webapi"
+      DESTINATION    "${CMAKE_INSTALL_PREFIX}/usr/share/cvmfs-server/webapi"
       PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
     )
   endif (GEOIP_BUILTIN)
 
   install(
     FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
-    DESTINATION    "/usr/share/cvmfs-server/webapi"
+    DESTINATION    "${CMAKE_INSTALL_PREFIX}/usr/share/cvmfs-server/webapi"
     PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
   )
 
   install(
     FILES          doc/README-spooler
-    DESTINATION    "/var/spool/cvmfs"
+    DESTINATION    "${CMAKE_INSTALL_PREFIX}/var/spool/cvmfs"
     PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     RENAME         README
   )
