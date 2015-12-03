@@ -18,28 +18,6 @@ static bool ProcessCatalogProperties(const std::string &scratch_path,
   char buf[128];
   external_data = false;
   ssize_t retval;
-  if (-1 != (retval = platform_lgetxattr(scratch_path.c_str(),
-                                         "user.external_data", buf, 127)))
-  {
-    if (retval == 0) {
-      LogCvmfs(kLogFsTraversal, kLogWarning, "Extended attribute "
-               "'external_data' set on %s, but no value provided.",
-               scratch_path.c_str());
-      return false;
-    }
-    if ((retval != 1) || (buf[0] != '0' && buf[0] != '1')) {
-      LogCvmfs(kLogFsTraversal, kLogWarning, "Extended attribute "
-               "'external_data' set on %s, but value is not one of '0' or "
-               "'1'.", scratch_path.c_str());
-      return false;
-    }
-    external_data = buf[0] == '1';
-    return true;
-  } else if (errno == ERANGE) {
-    LogCvmfs(kLogFsTraversal, kLogWarning, "Value of extended attribute on "
-             "path %s is too long; must be '1' or '0'", scratch_path.c_str());
-    return false;
-  }
   LogCvmfs(kLogFsTraversal, kLogDebug, "Processing catalog marker %s.",
            scratch_path.c_str());
   FILE *fp = fopen(scratch_path.c_str(), "r");
