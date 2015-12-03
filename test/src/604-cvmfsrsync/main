@@ -37,16 +37,16 @@ cvmfs_run_test() {
   mkdir -p Continents/Europe/Germany Continents/Europe/.Switzerland
 
   # create some directories for famous people
-  mkdir People/Germans/AlbertEinstein People/Germans/JohannWolfgangGoethe 
+  mkdir People/Germans/AlbertEinstein People/Germans/JohannWolfgangGoethe
   mkdir People/Americans/GeorgeWashington People/Americans/BarackObama
-  mkdir People/Russians/MikhailKalashnikov People/Russians/YuriGagarin 
+  mkdir People/Russians/MikhailKalashnikov People/Russians/YuriGagarin
 
   # add some files to some of the directories
   cp_bin People/Germans/AlbertEinstein
   cp /etc/passwd People/Americans/BarackObama
   cp_usrbin People/Russians/MikhailKalashnikov
-  echo Batavia >Continents/NorthAmerica/UnitedStates/Illinois 
-  echo Geneva >Continents/Europe/.Switzerland/Geneva 
+  echo Batavia >Continents/NorthAmerica/UnitedStates/Illinois
+  echo Geneva >Continents/Europe/.Switzerland/Geneva
 
   # add a top-level file as well
   echo "refugee" > People/AManWithoutACountry
@@ -68,7 +68,7 @@ cvmfs_run_test() {
   check_repository $CVMFS_TEST_REPO -i || return $?
 
   echo "check if the right number of catalogs are present in the repository (1)"
-  [ $(get_catalog_count $repo_name) -eq 8 ] || return 101
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 8 ] || return 101
 
   # no catalogs should be created after this point
   touch $pubtime_file
@@ -91,7 +91,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "check if the right number of catalogs are present in the repository (2)"
-  [ $(get_catalog_count $repo_name) -eq 6 ] || return 102
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 6 ] || return 102
 
   echo "making sure no catalog files were recreated"
   [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 112
@@ -118,7 +118,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "check if the right number of catalogs are present in the repository (3)"
-  [ $(get_catalog_count $repo_name) -eq 4 ] || return 103
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 4 ] || return 103
 
   echo "making sure no catalog files were recreated"
   [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 113
@@ -142,7 +142,7 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   echo "check if the right number of catalogs are present in the repository (4)"
-  [ $(get_catalog_count $repo_name) -eq 4 ] || return 105
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 4 ] || return 105
 
   echo "making sure no catalog files were recreated"
   [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 115
