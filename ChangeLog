@@ -1,4 +1,5 @@
 2.2.0:
+  * Add cvmfs_rsync utility (CVM-814)
   * Fixes for OS X El Capitan, move install directory on OS X to /usr/local 
     (CVM-917)
   * Fix rare bug in the garbage collection that can lead to removal of live
