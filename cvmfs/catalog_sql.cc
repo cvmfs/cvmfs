@@ -22,6 +22,9 @@ namespace catalog {
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  * Always remember to update the legacy catalog migration classes to produce a
  * compatible catalog structure when updating the schema revisions here!
+ *
+ * Repository rollbacks to an outdated catalog schema is not supported. Have a
+ * look into CVM-252 if that becomes necessary at some point.
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  */
 
