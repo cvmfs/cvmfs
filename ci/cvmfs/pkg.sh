@@ -50,14 +50,6 @@ mkdir -p $pkg_resource_dir
 cvmfs_version="$(get_cvmfs_version_from_cmake $CVMFS_SOURCE_LOCATION)"
 echo "detected upstream version: $cvmfs_version"
 
-# check if there is an OpenSSL installed via brew
-OPENSSL_INCLUDE=""
-brew_openssl_keg=/usr/local/opt/openssl
-if [ -d $brew_openssl_keg ]; then
-  echo "using homebrew'ed OpenSSL at $brew_openssl_keg"
-  OPENSSL_INCLUDE="-DOPENSSL_ROOT_DIR=$brew_openssl_keg"
-fi
-
 echo "building CernVM-FS $cvmfs_version in '$CVMFS_RESULT_LOCATION' from '$CVMFS_SOURCE_LOCATION'"
 cd $CVMFS_RESULT_LOCATION
 cmake -DCMAKE_INSTALL_PREFIX:PATH=$CVMFS_INSTALL_PREFIX \
@@ -105,13 +97,16 @@ productbuild --distribution $cvmfs_dist_file  \
              --package-path $pkg_build_dir    \
              $product_package
 
+echo "removing intermediate CernVM-FS package..."
+rm -f $cvmfs_package
+
 # generating package map section for specific platform
 if [ ! -z $CVMFS_CI_PLATFORM_LABEL ]; then
   echo "generating package map section for ${CVMFS_CI_PLATFORM_LABEL}..."
-  generate_package_map "$CVMFS_CI_PLATFORM_LABEL"                            \
-                       "$(basename $(find . -regex '.*cvmfs-[0-9].*\.pkg'))" \
-                       ""                                                    \
-                       ""                                                    \
-                       ""                                                    \
+  generate_package_map "$CVMFS_CI_PLATFORM_LABEL" \
+                       "${cvmfs_build_tag}.pkg"   \
+                       ""                         \
+                       ""                         \
+                       ""                         \
                        ""
 fi

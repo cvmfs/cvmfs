@@ -17,15 +17,15 @@ There are only two steps necessary to access any repository:\
 \f0  variable that points to your site's HTTP proxy. Ask your network administrator for details.\uc0\u8232 \u8232 For testing purposes 
 \f1 CVMFS_HTTP_PROXY=DIRECT
 \f0  works as well:\uc0\u8232 \u8232 
-\f1 cat "CVMFS_HTTP_PROXY=DIRECT" | sudo tee /etc/cvmfs/default.local\uc0\u8232 
+\f1 echo "CVMFS_HTTP_PROXY=DIRECT" | sudo tee -a /etc/cvmfs/default.local\uc0\u8232 
 \f0 \
 {\listtext	2.	}Mount a CernVM-FS repository using the following steps:\
 \pard\tx940\tx1440\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\li1440\fi-1440\pardirnatural\partightenfactor0
 \ls1\ilvl1\cf0 {\listtext	\'95	}
-\f1 mkdir /cvmfs/atlas.cern.ch
+\f1 sudo mkdir /cvmfs/atlas.cern.ch
 \f0 \
 {\listtext	\'95	}
-\f1 mount -t cvmfs atlas.cern.ch /cvmfs/atlas.cern.ch
+\f1 sudo mount -t cvmfs atlas.cern.ch /cvmfs/atlas.cern.ch
 \f0 \
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
 \cf0 \

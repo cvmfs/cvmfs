@@ -196,6 +196,9 @@ cvmfs_setup() {
 
   # put workarounds for OS X in place (CernVM-FS poor-man's relocatability)
   if [ x"$sys_arch" = x"Darwin" ]; then
+    # sweep legacy CernVM-FS installation that was not installed into /usr/local
+    _usrlocal_migrate
+
     # symlink configuration files into /etc
     if [ ! -e /etc/cvmfs           ] && \
        [   -e /usr/local/etc/cvmfs ]; then
@@ -991,7 +994,7 @@ cvmfs_reload() {
   # can be remounted
   for m in $mount_list
   do
-    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64 -w0)
+    touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap)
   done
 
   # Avoid deadlock if cwd is on cvmfs
@@ -1011,7 +1014,7 @@ cvmfs_reload() {
       continue
     fi
     echo "Pausing ${fqrn} on ${m}"
-    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64 -w0) && cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
+    cd "$m" && rm -f ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "$m" | base64_nowrap) && cvmfs2 __RELOAD__ ${CVMFS_RELOAD_SOCKETS}/cvmfs.$fqrn stop_and_go | \
       awk -v PREFIX="$fqrn: " '{print PREFIX $0}' &
     cd /
     echo $pid > ${CVMFS_RELOAD_SOCKETS}/pid.cvmfs.${fqrn}.paused
@@ -1053,7 +1056,7 @@ cvmfs_reload() {
 
   if stat ${CVMFS_RELOAD_SOCKETS}/pid.* >/dev/null 2>&1; then
     if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
-      touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64 -w0)
+      touch ${CVMFS_RELOAD_SOCKETS}/cvmfs.pause/$(echo -n "${CVMFS_MOUNT_DIR}/${CVMFS_CONFIG_REPOSITORY}" | base64_nowrap)
     fi
     for pidfile in ${CVMFS_RELOAD_SOCKETS}/pid.*; do
       kill -s USR1 $(cat $pidfile)
@@ -1623,6 +1626,133 @@ runas() {
   esac
 }
 
+
+base64_nowrap() {
+  case $(uname) in
+    Linux )
+      base64 -w0
+      ;;
+    Darwin )
+      base64 -b0
+      ;;
+  esac
+}
+
+
+__usrlocal_migrate_clean_legacy_binaries() {
+  echo "cleaning up legacy binaries..."
+  for binary in /usr/bin/cvmfs2               \
+                /usr/bin/cvmfs_config         \
+                /usr/bin/cvmfs_talk           \
+                /usr/bin/cvmfs_fsck           \
+                /sbin/mount_cvmfs             \
+                /usr/lib/libcvmfs_fuse*.dylib \
+                /etc/auto_cvmfs; do
+    if [ -f $binary   ] && \
+       [ ! -L $binary ]; then
+      rm -f "$binary"
+      echo "found and removed legacy binary '$binary'"
+    fi
+  done
+}
+
+__usrlocal_migrate_clean_legacy_directories() {
+  echo "cleaning up legacy directories..."
+  for directory in /etc/bash_completion.d/cvmfs \
+                   /usr/share/doc/cvmfs-*; do
+    if [ -d $directory ]; then
+      rm -fR "$directory"
+      echo "found and removed legacy directory '$directory'"
+    fi
+  done
+}
+
+__usrlocal_migrate_clean_and_rescue_legacy_configuration() {
+  local old_conf_dir="/etc/cvmfs"
+  local new_conf_dir="/usr/local/etc/cvmfs"
+
+  echo "cleaning up legacy configuration..."
+  if [ -L $old_conf_dir ] &&
+     [ x"$(readlink $old_conf_dir)" = x"$new_conf_dir" ]; then
+    echo "configuration already points to $new_conf_dir. do nothing."
+    return 0
+  fi
+
+  if [ ! -e $old_conf_dir ]; then
+    echo "no legacy configuration found. do nothing."
+    return 0
+  fi
+
+  # detect and remove all configuration files of previous CernVM-FS installs
+  # Note: This deletes only the configuration files that have been shipped with
+  #       CernVM-FS. Everything user-added stays intact.
+  for conf_file in config.d/atlas-nightlies.cern.ch.conf            \
+                   config.d/cms.cern.ch.conf                        \
+                   config.d/grid.cern.ch.conf                       \
+                   config.sh                                        \
+                   default.conf                                     \
+                   default.d/50-cern.conf                           \
+                   default.d/60-egi.conf                            \
+                   default.d/README                                 \
+                   domain.d/cern.ch.conf                            \
+                   domain.d/egi.eu.conf                             \
+                   domain.d/opensciencegrid.org.conf                \
+                   keys/cern.ch/cern-it1.cern.ch.pub                \
+                   keys/cern.ch/cern-it2.cern.ch.pub                \
+                   keys/cern.ch/cern-it3.cern.ch.pub                \
+                   keys/cern.ch/cern.ch.pub                         \
+                   keys/egi.eu/egi.eu.pub                           \
+                   keys/opensciencegrid.org/opensciencegrid.org.pub \
+                   serverorder.sh; do
+    local old_conf_file="${old_conf_dir}/${conf_file}"
+    if [ -f $old_conf_file ]; then
+      local quarantined_conf_file="${new_conf_dir}/quarantine/${conf_file}"
+      mkdir -p "$(dirname $quarantined_conf_file)"
+      mv -f "$old_conf_file" "$quarantined_conf_file"
+      echo "found and quarantined legacy configuration file '$conf_file'"
+    fi
+  done
+
+  # rescue all configuration files that have been added by the user
+  local cwd="$(pwd)"
+  cd "$old_conf_dir" # remove $old_conf_dir prefix from `find` output
+  for conf_file in $(find . -type f); do
+    echo "found and rescued user added configuration file '$conf_file'"
+    local rescued_conf_file="${new_conf_dir}/${conf_file}"
+    mkdir -p "$(dirname $rescued_conf_file)"
+    mv -f "$conf_file" "$rescued_conf_file"
+  done
+  cd "$cwd"
+
+  # remove legacy configuration directory
+  rm -fR /etc/cvmfs
+  echo "removed legacy configuration directory"
+}
+
+__usrlocal_migrate_clean_legacy_sudoers() {
+  echo "cleaning up legacy sudoers configuration..."
+  if cat /etc/sudoers | grep -q '# added by CernVM-FS'; then
+    local doomed_sudoers="$(cat /etc/sudoers | grep '# added by CernVM-FS')"
+    sed -i .cvmfs_backup -e "/# added by CernVM-FS/d" /etc/sudoers
+    echo "found and removed the following legacy sudoers configurations:"
+    echo "-----"
+    echo "$doomed_sudoers"
+    echo "-----"
+  fi
+}
+
+_usrlocal_migrate() {
+  # this cleans out left-overs from CernVM-FS versions prior to 2.2.0 as they
+  # used to be installed into /usr/... in contrast to newer versions that are
+  # compliant with Apple's "System Integrity Protection" that has been intro-
+  # duced with OS X El Capitan.
+  [ x"$sys_arch" = x"Darwin" ] || return 1
+
+  __usrlocal_migrate_clean_legacy_binaries
+  __usrlocal_migrate_clean_legacy_directories
+  __usrlocal_migrate_clean_and_rescue_legacy_configuration
+  __usrlocal_migrate_clean_legacy_sudoers
+}
 
 case "$1" in
   setup)
