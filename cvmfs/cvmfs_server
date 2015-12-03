@@ -4051,6 +4051,15 @@ publish() {
     echo "Tagging $name"
     $user_shell "$tag_command" || { publish_failed $name; die "Tagging failed\n\nExecuted Command:\n$tag_command";  }
 
+    # finalizing transaction
+    echo "Flushing file system buffers"
+    sync
+
+    # committing newly created revision
+    echo "Signing new manifest"
+    sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
+    set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
+
     # run the automatic garbage collection (if configured)
     if has_auto_garbage_collection_enabled $name; then
       echo "Running automatic garbage collection"
@@ -4060,17 +4069,9 @@ publish() {
                $dry_run    \
                $manifest   \
                $trunk_hash \
-               -z $gc_timespan || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
+               -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
+      sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     fi
-
-    # finalizing transaction
-    echo "Flushing file system buffers"
-    sync
-
-    # committing newly created revision
-    echo "Signing new manifest"
-    sign_manifest $name $manifest      || { publish_failed $name; die "Signing failed"; }
-    set_ro_root_hash $name $trunk_hash || { publish_failed $name; die "Root hash update failed"; }
 
     # check again for open file descriptors (potential race condition)
     if has_file_descriptors_on_mount_point $name && \

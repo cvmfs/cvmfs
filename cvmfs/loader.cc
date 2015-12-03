@@ -454,6 +454,11 @@ static CvmfsExports *LoadLibrary(const bool debug_mode,
     library_paths.push_back(library_name);
     library_paths.push_back("/usr/lib/"   + library_name);
     library_paths.push_back("/usr/lib64/" + library_name);
+#ifdef __APPLE__
+    // Since OS X El Capitan (10.11) came with SIP, we needed to relocate our
+    // binaries from /usr/... to /usr/local/...
+    library_paths.push_back("/usr/local/lib/" + library_name);
+#endif
   }
 
   vector<string>::const_iterator i    = library_paths.begin();
