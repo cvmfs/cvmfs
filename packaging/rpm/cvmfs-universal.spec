@@ -154,6 +154,7 @@ Requires: openssl
 Requires: httpd
 Requires: libcap
 Requires: lsof
+Requires: rsync
 
 Conflicts: cvmfs-server < 2.1
 
@@ -365,6 +366,7 @@ fi
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
+%{_bindir}/cvmfs_rsync
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %{_libdir}/libtbb_cvmfs.so
 %{_libdir}/libtbb_cvmfs.so.2
