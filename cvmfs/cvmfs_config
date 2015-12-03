@@ -1718,7 +1718,9 @@ __usrlocal_migrate_clean_and_rescue_legacy_configuration() {
   cd "$old_conf_dir" # remove $old_conf_dir prefix from `find` output
   for conf_file in $(find . -type f); do
     echo "found and rescued user added configuration file '$conf_file'"
-    mv -f $conf_file ${new_conf_dir}/${conf_file}
+    local rescued_conf_file="${new_conf_dir}/${conf_file}"
+    mkdir -p "$(dirname $rescued_conf_file)"
+    mv -f "$conf_file" "$rescued_conf_file"
   done
   cd "$cwd"
 
