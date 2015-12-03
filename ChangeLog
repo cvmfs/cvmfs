@@ -1,4 +1,5 @@
 2.2.0:
+  * Avoid rolling back to incompatible catalog schemas (CVM-252)
   * Add cvmfs_rsync utility (CVM-814)
   * Fixes for OS X El Capitan, move install directory on OS X to /usr/local 
     (CVM-917)
