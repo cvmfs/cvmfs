@@ -67,6 +67,9 @@ std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 NameString GetFileName(const PathString &path);
+void SplitPath(const std::string &path,
+                      std::string &out_dirname,  // NOLINT
+                      std::string &out_fname);  // NOLINT
 bool IsAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 

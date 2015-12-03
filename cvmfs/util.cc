@@ -113,6 +113,26 @@ string MakeCanonicalPath(const string &path) {
 
 
 /**
+ * Return both the file and directory name for a given path
+ *
+ * NOTE: If only a filename is given, the directory is returned as "."
+ */
+void SplitPath(const std::string &path,
+                      std::string &out_dirname,  // NOLINT
+                      std::string &out_fname) {  // NOLINT
+  size_t dir_sep = path.rfind('/');
+  if (dir_sep != std::string::npos) {
+    out_dirname = path.substr(0, dir_sep+1);
+    out_fname = path.substr(dir_sep+1);
+  } else {
+    out_dirname = ".";
+    out_fname = path;
+  }
+}
+
+
+
+/**
  * Gets the directory part of a path.
  */
 string GetParentPath(const string &path) {

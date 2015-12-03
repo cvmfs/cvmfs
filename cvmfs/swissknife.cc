@@ -18,6 +18,7 @@
 #include "signature.h"
 #include "swissknife_check.h"
 #include "swissknife_gc.h"
+#include "swissknife_graft.h"
 #include "swissknife_hash.h"
 #include "swissknife_history.h"
 #include "swissknife_info.h"
@@ -29,7 +30,6 @@
 #include "swissknife_sign.h"
 #include "swissknife_sync.h"
 #include "swissknife_zpipe.h"
-#include "swissknife_graft.h"
 
 using namespace std;  // NOLINT
 
