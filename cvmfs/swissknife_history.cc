@@ -1101,6 +1101,16 @@ int CommandRollbackTag::Main(const ArgumentList &args) {
     return 1;
   }
 
+  // check if the catalog has a supported revision
+  if (catalog->schema() < catalog::CatalogDatabase::kLatestSupportedSchema -
+                          catalog::CatalogDatabase::kSchemaEpsilon) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "not rolling back to outdated and "
+                                    "incompatible catalog schema (%.1f < %.1f)",
+             catalog->schema(),
+             catalog::CatalogDatabase::kLatestSupportedSchema);
+    return 1;
+  }
+
   // update the catalog to be republished
   catalog->Transaction();
   catalog->UpdateLastModified();
