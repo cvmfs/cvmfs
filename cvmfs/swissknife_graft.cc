@@ -74,7 +74,8 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
                             (0 == platform_stat(output_file.c_str(), &sbuf)) &&
                             S_ISDIR(sbuf.st_mode);
   if (output_file_is_dir && (input_file == "-")) {
-    fprintf(stderr, "Output file (%s): Is a directory\n", output_file.c_str());
+    LogCvmfs(kLogCvmfs, kLogStderr, "Output file (%s): Is a directory\n",
+             output_file.c_str());
     return 1;
   }
 
@@ -83,12 +84,14 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
                             S_ISDIR(sbuf.st_mode);
     if (input_file_is_dir) {
       if (!output_file_is_dir && output_file.size()) {
-        fprintf(stderr, "Input (%s) is a directory but output (%s) is not\n",
+        LogCvmfs(kLogCvmfs, kLogStderr, "Input (%s) is a directory but output"
+                " (%s) is not\n",
                 input_file.c_str(), output_file.c_str());
         return 1;
       }
       if (m_verbose_) {
-        fprintf(stderr, "Recursing into directory %s\n", input_file.c_str());
+        LogCvmfs(kLogCvmfs, kLogStderr,"Recursing into directory %s\n",
+                 input_file.c_str());
       }
       return Recurse(input_file, output_file);
     } else {
@@ -104,9 +107,10 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
                                       bool output_file_is_dir,
                                       bool input_file_is_stdin) {
   if (output_file.size() && m_verbose_) {
-    printf("Grafting %s to %s\n", input_file.c_str(), output_file.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "Grafting %s to %s", input_file.c_str(),
+             output_file.c_str());
   } else if (!output_file.size()) {
-    printf("Grafting %s\n", input_file.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout,"Grafting %s", input_file.c_str());
   }
   int fd;
   if (input_file_is_stdin) {
