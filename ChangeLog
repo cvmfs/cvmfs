@@ -1,4 +1,6 @@
 2.2.0:
+  * Fixes for OS X El Capitan, move install directory on OS X to /usr/local 
+    (CVM-917)
   * Fix rare bug in the garbage collection that can lead to removal of live
     files (CVM-942)
   * Add support for grafting of files (CVM-908)
