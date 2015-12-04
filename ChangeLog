@@ -1,4 +1,5 @@
 2.2.0:
+  * Avoid use of sudo in cvmfs_server (CVM-245)
   * Various build system fixes (CVM-854, CVM-857)
   * Avoid rolling back to incompatible catalog schemas (CVM-252)
   * Add cvmfs_rsync utility (CVM-814)
