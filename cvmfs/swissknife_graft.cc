@@ -136,10 +136,10 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     std::string dirname, fname;
     std::string graft_fname;
     if (output_file_is_dir) {
-      SplitPath(input_file, dirname, fname);
+      SplitPath(input_file, &dirname, &fname);
       graft_fname =  output_file + "/.cvmfsgraft-" + fname;
     } else {
-      SplitPath(output_file, dirname, fname);
+      SplitPath(output_file, &dirname, &fname);
       graft_fname = dirname + "/.cvmfsgraft-" + fname;
     }
     fd = open(graft_fname.c_str(), O_CREAT|O_TRUNC|O_WRONLY, 0644);
@@ -175,9 +175,7 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   // Create and truncate the output file.
   std::string output_fname;
   if (output_file_is_dir) {
-    std::string dirname, fname;
-    SplitPath(input_file, dirname, fname);
-    output_fname = output_file + "/" + fname;
+    output_fname = output_file + "/" + GetFileName(input_file);
   } else {
     output_fname = output_file;
   }

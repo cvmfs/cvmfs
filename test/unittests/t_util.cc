@@ -368,6 +368,29 @@ TEST_F(T_Util, GetFileName) {
   EXPECT_EQ(NameString(fake_path), GetFileName(PathString(fake_path)));
 }
 
+
+TEST_F(T_Util, SplitPath) {
+  string dirname;
+  string filename;
+  SplitPath("/a/b/c", &dirname, &filename);
+  EXPECT_EQ("/a/b", dirname);  EXPECT_EQ("c", filename);
+  SplitPath("a/b/c", &dirname, &filename);
+  EXPECT_EQ("a/b", dirname);  EXPECT_EQ("c", filename);
+  SplitPath("a/b", &dirname, &filename);
+  EXPECT_EQ("a", dirname);  EXPECT_EQ("b", filename);
+  SplitPath("b", &dirname, &filename);
+  EXPECT_EQ(".", dirname);  EXPECT_EQ("b", filename);
+  SplitPath("a//b", &dirname, &filename);
+  EXPECT_EQ("a/", dirname);  EXPECT_EQ("b", filename);
+  SplitPath("/a", &dirname, &filename);
+  EXPECT_EQ("", dirname);  EXPECT_EQ("a", filename);
+  SplitPath("/", &dirname, &filename);
+  EXPECT_EQ("", dirname);  EXPECT_EQ("", filename);
+  SplitPath("", &dirname, &filename);
+  EXPECT_EQ(".", dirname);  EXPECT_EQ("", filename);
+}
+
+
 TEST_F(T_Util, CreateFile) {
   ASSERT_DEATH(CreateFile("myfakepath/otherfakepath.txt", 0777), ".*");
   string filename = sandbox + "/createfile.txt";
