@@ -1707,7 +1707,7 @@ mangle_s3_cvmfs_url() {
 
 # lowers restrictions of hardlink creation if needed
 # allows AUFS to properly whiteout files without root privileges
-# Note: this function requires sudo
+# Note: this function requires a privileged user
 lower_hardlink_restrictions() {
   if [ -f /proc/sys/kernel/yama/protected_nonaccess_hardlinks ] && \
      [ $(cat /proc/sys/kernel/yama/protected_nonaccess_hardlinks) -ne 0 ]; then
@@ -1756,7 +1756,7 @@ ensure_swissknife_suid() {
 
 # cvmfs requires a couple of apache modules to be enabled when running on
 # an ubuntu machine. This enables these modules on an ubuntu installation
-# Note: this function requires sudo
+# Note: this function requires a privileged user
 ensure_enabled_apache_modules() {
   which a2enmod > /dev/null 2>&1    || return 0
   which apache2ctl > /dev/null 2>&1 || return 0
