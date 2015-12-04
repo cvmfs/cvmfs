@@ -489,6 +489,41 @@ TEST_F(T_Util, ClosePipe) {
   free(buffer_output);
 }
 
+
+static void *MainReadPipe(void *data) {
+  int fd = *(reinterpret_cast<int *>(data));
+  char buf = '\0';
+  do {
+    ReadPipe(fd, &buf, 1);
+  } while (buf != 's');
+  return NULL;
+}
+
+TEST_F(T_Util, SafeWrite) {
+  int fd[2];
+  void *buffer_output = scalloc(20, sizeof(char));
+  MakePipe(fd);
+  SafeWrite(fd[1], to_write.c_str(), to_write.length());
+  read(fd[0], buffer_output, to_write.length());
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  free(buffer_output);
+
+  // Large write
+  int size = 1024*1024;  // 1M
+  buffer_output = scalloc(size, 1);
+  pthread_t thread;
+  int retval = pthread_create(&thread, NULL, MainReadPipe, &fd[0]);
+  EXPECT_EQ(0, retval);
+  EXPECT_TRUE(SafeWrite(fd[1], buffer_output, size));
+  char stop = 's';
+  WritePipe(fd[1], &stop, 1);
+  pthread_join(thread, NULL);
+  free(buffer_output);
+  ClosePipe(fd);
+
+  EXPECT_FALSE(SafeWrite(-1, &stop, 1));
+}
+
 TEST_F(T_Util, Nonblock2Block) {
   int fd[2];
   MakePipe(fd);

@@ -156,15 +156,10 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
                                "checksum=" + hash.ToString(with_suffix) + "\n";
   size_t nbytes = graft_contents.size();
   const char *buf = graft_contents.c_str();
-  while (nbytes) {
-    int retval = write(fd, buf, nbytes);
-    if (retval < 0) {
-      if (errno == EINTR) {continue;}
-      perror("Failed writing to graft file");
-      return 1;
-    }
-    buf += retval;
-    nbytes -= retval;
+  retval = SafeWrite(fd, buf, nbytes);
+  if (!retval) {
+    perror("Failed writing to graft file");
+    return 1;
   }
   if (output_file.size()) {
     close(fd);
