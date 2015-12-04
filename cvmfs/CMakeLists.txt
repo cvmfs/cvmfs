@@ -645,27 +645,27 @@ if (BUILD_SERVER)
 
   install(
     FILES      webapi/cvmfs-api.wsgi
-    DESTINATION    "${CMAKE_INSTALL_PREFIX}/var/www/wsgi-scripts"
+    DESTINATION    "/var/www/wsgi-scripts"
     PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
   if (GEOIP_BUILTIN)
     install(
       FILES      ${PYTHON_GEOIP_BUILTIN_LOCATION}/dist/GeoIP.so
-      DESTINATION    "${CMAKE_INSTALL_PREFIX}/usr/share/cvmfs-server/webapi"
+      DESTINATION    "/usr/share/cvmfs-server/webapi"
       PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
     )
   endif (GEOIP_BUILTIN)
 
   install(
     FILES      webapi/cvmfs_api.py webapi/cvmfs_geo.py
-    DESTINATION    "${CMAKE_INSTALL_PREFIX}/usr/share/cvmfs-server/webapi"
+    DESTINATION    "/usr/share/cvmfs-server/webapi"
     PERMISSIONS    OWNER_READ GROUP_READ WORLD_READ
   )
 
   install(
     FILES          doc/README-spooler
-    DESTINATION    "${CMAKE_INSTALL_PREFIX}/var/spool/cvmfs"
+    DESTINATION    "/var/spool/cvmfs"
     PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     RENAME         README
   )
