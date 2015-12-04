@@ -835,11 +835,21 @@ is_owner_or_root() {
 # @return       a shell invocation to impersonate $CVMFS_USER
 get_user_shell() {
   local name=$1
+  local shell_cmd=""
 
   load_repo_config $name
-  local user_shell="sh -c"
-  [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
-  echo "$user_shell"
+  if [ x"$(whoami)" = x"$CVMFS_USER" ]; then
+    shell_cmd="sh -c"
+  elif is_root; then
+    if [ $HAS_RUNUSER -ne 0 ]; then
+      shell_cmd="runuser -l $CVMFS_USER -c"
+    else
+      shell_cmd="su $CVMFS_USER -c"
+    fi
+  fi
+
+  echo "$shell_cmd"
+  [ ! -z "$shell_cmd" ] # return false if no suitable shell could be constructed
 }
 
 
