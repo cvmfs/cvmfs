@@ -1,4 +1,5 @@
 2.2.0:
+  * Allow for repository removal without removing the content (CVM-738)
   * Add cvmfs_config fsck command (CVM-371)
   * Avoid use of sudo in cvmfs_server (CVM-245)
   * Various build system fixes (CVM-783, CVM-854, CVM-857)
