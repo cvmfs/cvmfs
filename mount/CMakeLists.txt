@@ -27,7 +27,7 @@ if (MACOSX)
 
   install (
     TARGETS       ${MOUNT_TARGET_NAME}
-    DESTINATION   ${CMAKE_MOUNT_INSTALL_BINDIR}
+    DESTINATION   ${CMAKE_INSTALL_PREFIX}${CMAKE_MOUNT_INSTALL_BINDIR}
     PERMISSIONS   OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
@@ -146,15 +146,15 @@ else (MACOSX)
   SET( autofsmap_target  ${autofsmap_dest}/auto.cvmfs)
   install (
     TARGETS       auto.cvmfs
-    DESTINATION   ${autofsmap_dest}
+    DESTINATION   ${CMAKE_INSTALL_PREFIX}${autofsmap_dest}
     PERMISSIONS   OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
   # Symlink /etc/auto.cvmfs --> /sbin/auto.cvmfs
   install(CODE "
     if (\"\$ENV{DESTDIR}\" STREQUAL \"\")
       execute_process(COMMAND ln -sf
-        ${autofsmap_target}
-        ${autofsmap_link})
+        ${CMAKE_INSTALL_PREFIX}${autofsmap_target}
+        ${CMAKE_INSTALL_PREFIX}${autofsmap_link})
     else ()
       execute_process(COMMAND ln -sf
         ${autofsmap_target}
@@ -164,7 +164,7 @@ else (MACOSX)
 
   install (
     TARGETS       ${MOUNT_TARGET_NAME}
-    DESTINATION   ${CMAKE_MOUNT_INSTALL_BINDIR}
+    DESTINATION   ${CMAKE_INSTALL_PREFIX}${CMAKE_MOUNT_INSTALL_BINDIR}
     PERMISSIONS   OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
