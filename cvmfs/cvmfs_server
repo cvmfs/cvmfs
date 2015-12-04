@@ -3203,9 +3203,9 @@ rmfs() {
        [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
       echo -n "Removing Keys and Certificate... "
       rm -f /etc/cvmfs/keys/$name.masterkey \
-          /etc/cvmfs/keys/$name.pub \
-          /etc/cvmfs/keys/$name.key \
-          /etc/cvmfs/keys/$name.crt || die "fail"
+            /etc/cvmfs/keys/$name.pub       \
+            /etc/cvmfs/keys/$name.key       \
+            /etc/cvmfs/keys/$name.crt || die "fail"
       echo "done"
     fi
 
