@@ -1326,6 +1326,14 @@ peek_backend() {
 }
 
 
+# reads the upstream config part of a CernVM-FS server configuration file
+# This is the third comma-separated field in the upstream string
+read_upstream_config() {
+  local upstream_string="$1"
+  echo "$upstream_string" | cut -f3 -d','
+}
+
+
 # switches on/off the garbage collection for a given repository
 #
 # @param name  the name of the repository to be changed
