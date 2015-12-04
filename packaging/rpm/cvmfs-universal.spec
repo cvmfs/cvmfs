@@ -145,7 +145,6 @@ Requires: bash
 Requires: coreutils
 Requires: grep
 Requires: sed
-Requires: sudo
 Requires: psmisc
 Requires: curl
 Requires: gzip
