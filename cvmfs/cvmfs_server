@@ -90,6 +90,13 @@ if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
   fi
 fi
 
+# Check if `runuser` is available on this system
+# Note: at least Ubuntu in older versions doesn't provide this command
+HAS_RUNUSER=0
+if which runuser > /dev/null 2>&1; then
+  HAS_RUNUSER=1
+fi
+
 is_systemd() {
   [ x"$SERVICE_BIN" = x"false" ]
 }
@@ -825,14 +832,25 @@ is_owner_or_root() {
 # a specific CVMFS repository.
 #
 # @param name   the name of the repository whose owner should be impersonated
-# @return       a shell invocation to impersonate $CVMFS_USER
+# @return       a shell invocation to impersonate $CVMFS_USER via stdout or
+#               exit code 1 if user couldn't be impersonated
 get_user_shell() {
   local name=$1
+  local shell_cmd=""
 
   load_repo_config $name
-  local user_shell="sh -c"
-  [ $(whoami) != $CVMFS_USER ] && user_shell="sudo -E -H -u $CVMFS_USER sh -c"
-  echo "$user_shell"
+  if [ x"$(whoami)" = x"$CVMFS_USER" ]; then
+    shell_cmd="sh -c"
+  elif is_root; then
+    if [ $HAS_RUNUSER -ne 0 ]; then
+      shell_cmd="runuser -m $CVMFS_USER -c"
+    else
+      shell_cmd="su $CVMFS_USER -c"
+    fi
+  fi
+
+  echo "$shell_cmd"
+  [ ! -z "$shell_cmd" ] # return false if no suitable shell could be constructed
 }
 
 
@@ -1689,7 +1707,7 @@ mangle_s3_cvmfs_url() {
 
 # lowers restrictions of hardlink creation if needed
 # allows AUFS to properly whiteout files without root privileges
-# Note: this function requires sudo
+# Note: this function requires a privileged user
 lower_hardlink_restrictions() {
   if [ -f /proc/sys/kernel/yama/protected_nonaccess_hardlinks ] && \
      [ $(cat /proc/sys/kernel/yama/protected_nonaccess_hardlinks) -ne 0 ]; then
@@ -1738,7 +1756,7 @@ ensure_swissknife_suid() {
 
 # cvmfs requires a couple of apache modules to be enabled when running on
 # an ubuntu machine. This enables these modules on an ubuntu installation
-# Note: this function requires sudo
+# Note: this function requires a privileged user
 ensure_enabled_apache_modules() {
   which a2enmod > /dev/null 2>&1    || return 0
   which apache2ctl > /dev/null 2>&1 || return 0
@@ -2009,7 +2027,6 @@ remove_config_files() {
     remove_apache_config_file "cvmfs.${name}.conf"
     reload_apache > /dev/null
   fi
-  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
   rm -rf /etc/cvmfs/repositories.d/$name
 }
 
