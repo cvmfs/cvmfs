@@ -338,7 +338,7 @@ cvmfs_umount() {
       timeout=$(($timeout-1))
       sleep 1
     done
-    
+
     times=5
     result=-1
   done
