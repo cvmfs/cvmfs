@@ -1,4 +1,6 @@
 2.2.0:
+  * Add support for explicitly listed repositories in 'cvmfs_config probe'
+    (CVM-793)
   * Allow for repository removal without removing the content (CVM-738)
   * Add cvmfs_config fsck command (CVM-371)
   * Avoid use of sudo in cvmfs_server (CVM-245)
