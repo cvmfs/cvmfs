@@ -843,7 +843,7 @@ get_user_shell() {
     shell_cmd="sh -c"
   elif is_root; then
     if [ $HAS_RUNUSER -ne 0 ]; then
-      shell_cmd="runuser -l $CVMFS_USER -c"
+      shell_cmd="runuser -m $CVMFS_USER -c"
     else
       shell_cmd="su $CVMFS_USER -c"
     fi
