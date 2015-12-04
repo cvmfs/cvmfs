@@ -90,6 +90,13 @@ if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
   fi
 fi
 
+# Check if `runuser` is available on this system
+# Note: at least Ubuntu in older versions doesn't provide this command
+HAS_RUNUSER=0
+if which runuser > /dev/null 2>&1; then
+  HAS_RUNUSER=1
+fi
+
 is_systemd() {
   [ x"$SERVICE_BIN" = x"false" ]
 }
