@@ -69,7 +69,7 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
 
   if (input_file != "-") {
     bool input_file_is_dir = (0 == platform_stat(input_file.c_str(), &sbuf)) &&
-                            S_ISDIR(sbuf.st_mode);
+                             S_ISDIR(sbuf.st_mode);
     if (input_file_is_dir) {
       if (!output_file_is_dir && output_file.size()) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Input (%s) is a directory but output"
@@ -120,6 +120,7 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   }
   mode_t input_file_mode = sbuf.st_mode;
 
+  // TODO(jblomer): let the user chose the hash algorithm
   shash::Any hash(shash::kSha1);
   uint64_t processed_size;
   bool retval = zlib::CompressFd2Null(fd, &hash, &processed_size);
@@ -150,8 +151,9 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   } else {
     fd = 1;
   }
+  const bool with_suffix = true;
   std::string graft_contents = "size=" + StringifyInt(processed_size) + "\n" +
-                               "checksum=" + hash.ToString(true) + "\n";
+                               "checksum=" + hash.ToString(with_suffix) + "\n";
   size_t nbytes = graft_contents.size();
   const char *buf = graft_contents.c_str();
   while (nbytes) {
