@@ -1,7 +1,7 @@
 2.2.0:
   * Add cvmfs_config fsck command (CVM-371)
   * Avoid use of sudo in cvmfs_server (CVM-245)
-  * Various build system fixes (CVM-854, CVM-857)
+  * Various build system fixes (CVM-783, CVM-854, CVM-857)
   * Avoid rolling back to incompatible catalog schemas (CVM-252)
   * Add cvmfs_rsync utility (CVM-814)
   * Fixes for OS X El Capitan, move install directory on OS X to /usr/local 
