@@ -2027,7 +2027,6 @@ remove_config_files() {
     remove_apache_config_file "cvmfs.${name}.conf"
     reload_apache > /dev/null
   fi
-  sed -i -e "/added by CernVM-FS for ${name}/d" /etc/sudoers
   rm -rf /etc/cvmfs/repositories.d/$name
 }
 
