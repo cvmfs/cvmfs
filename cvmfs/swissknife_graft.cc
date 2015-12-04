@@ -133,17 +133,12 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   mode_t input_file_mode = sbuf.st_mode;
 
   shash::Any hash(shash::kSha1);
-  off_t processed_size = -1;
+  uint64_t processed_size;
   bool retval = zlib::CompressFd2Null(fd, &hash, &processed_size);
   if (!input_file_is_stdin) {close(fd);}
   if (!retval) {
     std::string errmsg = "Unable to checksum input file (" + input_file + ")";
     perror(errmsg.c_str());
-    return 1;
-  }
-  if (-1 == processed_size) {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Internal error: CompressFd2Null did not "
-                                    "update processed_size.");
     return 1;
   }
 

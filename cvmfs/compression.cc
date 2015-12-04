@@ -402,7 +402,7 @@ bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash) {
 
 
 bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
-                     off_t *processed_bytes) {
+                     uint64_t *processed_bytes) {
   int z_ret, flush;
   bool result = false;
   unsigned have;
