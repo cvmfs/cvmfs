@@ -129,7 +129,7 @@ cvmfs_config_usage() {
  echo "  showconfig [<repository>]"
  echo "  stat [-v | <repository>]"
  echo "  status"
- echo "  probe"
+ echo "  probe [<repository list>]"
  echo "  fsck [<cvmfs_fsck options>]"
  echo "  reload [-c | <repository>]"
  echo "  umount"
@@ -1038,7 +1038,12 @@ cvmfs_probe() {
   RETVAL=0
 
   cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
-  local list="$(list_repos)"
+  local list
+  if [ $# -gt 0 ]; then
+    list="$@"
+  else
+    list="$(list_repos)"
+  fi
 
   local org
   for org in $list
@@ -1821,7 +1826,7 @@ case "$1" in
 
   probe)
     shift 1
-    cvmfs_probe
+    cvmfs_probe $@
     RETVAL=$?
     ;;
 
