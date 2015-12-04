@@ -456,7 +456,10 @@ min() {
 
 destroy_repo() {
   local repo=$1
-  sudo cvmfs_server rmfs -f $repo || return 100
+  shift 1
+  local additional_flags="$@"
+
+  sudo cvmfs_server rmfs -f $additional_flags $repo || return 100
 }
 
 
