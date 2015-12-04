@@ -281,7 +281,7 @@ Supported Commands:
                 [-a tag name] [-c tag channel] [-m tag description]
                 <fully qualified name>
                 Make a new repository snapshot
-  rmfs          [-f don't ask again]
+  rmfs          [-p(reserve) repo data and keys] [-f don't ask again]
                 <fully qualified name>
                 Remove the repository
   abort         [-f don't ask again]
