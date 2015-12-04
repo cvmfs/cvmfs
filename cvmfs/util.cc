@@ -1516,15 +1516,6 @@ void SafeSleepMs(const unsigned ms) {
 
 
 /**
- * Deal with EINTR and partial reads.
- */
-bool SafeRead(int fd, void *buf, size_t nbyte) {
-  // TODO(jblomer)
-  return false;
-}
-
-
-/**
  * Deal with EINTR and partial writes.
  */
 bool SafeWrite(int fd, const void *buf, size_t nbyte) {

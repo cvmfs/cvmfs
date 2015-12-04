@@ -213,7 +213,7 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  pid_t *child_pid = NULL);
 
 void SafeSleepMs(const unsigned ms);
-bool SafeRead(int fd, void *buf, size_t nbyte);
+bool SafeRead(int fd, void *buf, size_t nbyte);  // TODO(jblomer)
 bool SafeWrite(int fd, const void *buf, size_t nbyte);
 
 /**
