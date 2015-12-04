@@ -90,7 +90,7 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
         return 1;
       }
       if (m_verbose_) {
-        LogCvmfs(kLogCvmfs, kLogStderr,"Recursing into directory %s\n",
+        LogCvmfs(kLogCvmfs, kLogStderr, "Recursing into directory %s\n",
                  input_file.c_str());
       }
       return Recurse(input_file, output_file);
@@ -110,7 +110,7 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     LogCvmfs(kLogCvmfs, kLogStdout, "Grafting %s to %s", input_file.c_str(),
              output_file.c_str());
   } else if (!output_file.size()) {
-    LogCvmfs(kLogCvmfs, kLogStdout,"Grafting %s", input_file.c_str());
+    LogCvmfs(kLogCvmfs, kLogStdout, "Grafting %s", input_file.c_str());
   }
   int fd;
   if (input_file_is_stdin) {
