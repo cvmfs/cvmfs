@@ -19,5 +19,5 @@ TEST(T_Compression, CompressFd2Null) {
   EXPECT_EQ("e8ec3d88b62ebf526e4e5a4ff6162a3aa48a6b78", hash.ToString());
   close(fd_null);
 
-  EXPECT_FALSE(zlib::CompressFd2Null(-1, &hash, NULL));
+  EXPECT_FALSE(zlib::CompressFd2Null(-1, &hash));
 }

@@ -1,8 +1,7 @@
 /**
  * This file is part of the CernVM File System.
  *
- * It assists in creating graft files for publishing
- * in CVMFS.
+ * It assists in creating graft files for publishing in CVMFS.
  */
 
 #ifndef CVMFS_SWISSKNIFE_GRAFT_H_
@@ -47,9 +46,9 @@ class CommandGraft : public Command {
   bool DirCallback(const std::string &relative_path,
                    const std::string &dir_name);
 
-  std::string m_output_file_;
-  std::string m_input_file_;
-  bool m_verbose_;
+  std::string output_file_;
+  std::string input_file_;
+  bool verbose_;
 };
 
 }  // namespace swissknife

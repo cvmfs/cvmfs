@@ -4,6 +4,7 @@
  * Process a set of input files and create appropriate graft files.
  */
 
+#include "cvmfs_config.h"
 #include "swissknife_graft.h"
 
 #include <fcntl.h>
@@ -20,11 +21,11 @@
 
 bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
                                            const std::string &dir_name) {
-  if (!m_output_file_.size()) {return true;}
-  std::string full_output_path = m_output_file_ + "/" +
+  if (!output_file_.size()) {return true;}
+  std::string full_output_path = output_file_ + "/" +
                           (relative_path.size() ? relative_path : ".") +
                           "/" + dir_name;
-  std::string full_input_path = m_input_file_ + "/" +
+  std::string full_input_path = input_file_ + "/" +
                                 (relative_path.size() ? relative_path : ".") +
                                 "/" + dir_name;
   platform_stat64 sbuf;
@@ -37,12 +38,12 @@ bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
 
 void swissknife::CommandGraft::FileCallback(const std::string &relative_path,
                                             const std::string &file_name) {
-  std::string full_input_path = m_input_file_ + "/" +
+  std::string full_input_path = input_file_ + "/" +
                                 (relative_path.size() ? relative_path : ".") +
                                 "/" + file_name;
   std::string full_output_path;
-  if (m_output_file_.size()) {
-    full_output_path = m_output_file_ + "/" +
+  if (output_file_.size()) {
+    full_output_path = output_file_ + "/" +
                        (relative_path.size() ? relative_path : ".") +
                        "/" + file_name;
   }
@@ -50,24 +51,11 @@ void swissknife::CommandGraft::FileCallback(const std::string &relative_path,
 }
 
 
-int swissknife::CommandGraft::Recurse(const std::string &input_file,
-                                      const std::string &output_file) {
-  m_output_file_ = output_file;
-  m_input_file_ = input_file;
-
-  FileSystemTraversal<CommandGraft> traverser(this, input_file, true);
-  traverser.fn_new_file       = &CommandGraft::FileCallback;
-  traverser.fn_new_dir_prefix = &CommandGraft::DirCallback;
-  traverser.Recurse(input_file);
-  return 0;
-}
-
-
 int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   const std::string &input_file = *args.find('i')->second;
   const std::string output_file =
       (args.find('o') == args.end()) ? "" : *(args.find('o')->second);
-  m_verbose_ = args.find('v') != args.end();
+  verbose_ = args.find('v') != args.end();
 
   platform_stat64 sbuf;
   bool output_file_is_dir = output_file.size() &&
@@ -89,7 +77,7 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
                 input_file.c_str(), output_file.c_str());
         return 1;
       }
-      if (m_verbose_) {
+      if (verbose_) {
         LogCvmfs(kLogCvmfs, kLogStderr, "Recursing into directory %s\n",
                  input_file.c_str());
       }
@@ -106,7 +94,7 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
                                       const std::string &output_file,
                                       bool output_file_is_dir,
                                       bool input_file_is_stdin) {
-  if (output_file.size() && m_verbose_) {
+  if (output_file.size() && verbose_) {
     LogCvmfs(kLogCvmfs, kLogStdout, "Grafting %s to %s", input_file.c_str(),
              output_file.c_str());
   } else if (!output_file.size()) {
@@ -199,5 +187,18 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   }
   close(fd);
 
+  return 0;
+}
+
+
+int swissknife::CommandGraft::Recurse(const std::string &input_file,
+                                      const std::string &output_file) {
+  output_file_ = output_file;
+  input_file_ = input_file;
+
+  FileSystemTraversal<CommandGraft> traverser(this, input_file, true);
+  traverser.fn_new_file       = &CommandGraft::FileCallback;
+  traverser.fn_new_dir_prefix = &CommandGraft::DirCallback;
+  traverser.Recurse(input_file);
   return 0;
 }
