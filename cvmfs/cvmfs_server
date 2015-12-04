@@ -281,7 +281,7 @@ Supported Commands:
                 [-a tag name] [-c tag channel] [-m tag description]
                 <fully qualified name>
                 Make a new repository snapshot
-  rmfs          [-f don't ask again]
+  rmfs          [-p(reserve) repo data and keys] [-f don't ask again]
                 <fully qualified name>
                 Remove the repository
   abort         [-f don't ask again]
@@ -3127,15 +3127,19 @@ import() {
 rmfs() {
   local names
   local force=0
+  local preserve_data=0
   local retcode=0
 
   # optional parameter handling
   OPTIND=1
-  while getopts "f" option
+  while getopts "fp" option
   do
     case $option in
       f)
         force=1
+      ;;
+      p)
+        preserve_data=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3188,18 +3192,20 @@ rmfs() {
     remove_spool_area $name
     echo done
 
-    if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+    if [ $preserve_data -eq 0 ] && \
+       is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
       echo -n "Removing Repository Storage... "
       remove_repository_storage $name || die "fail"
       echo "done"
     fi
 
-    if [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
+    if [ $preserve_data -eq 0 ] && \
+       [ "$CVMFS_REPOSITORY_TYPE" = stratum0 ]; then
       echo -n "Removing Keys and Certificate... "
       rm -f /etc/cvmfs/keys/$name.masterkey \
-          /etc/cvmfs/keys/$name.pub \
-          /etc/cvmfs/keys/$name.key \
-          /etc/cvmfs/keys/$name.crt || die "fail"
+            /etc/cvmfs/keys/$name.pub       \
+            /etc/cvmfs/keys/$name.key       \
+            /etc/cvmfs/keys/$name.crt || die "fail"
       echo "done"
     fi
 
