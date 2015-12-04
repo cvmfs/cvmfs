@@ -1,5 +1,6 @@
 
 cvmfs_test_name="Graft creation"
+cvmfs_test_autofs_on_startup=false
 
 verify_hello_world() {
   local output=$1
@@ -114,7 +115,5 @@ cvmfs_run_test() {
     return $verify_result
   fi
 
-
   return 0
 }
-
