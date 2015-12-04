@@ -832,7 +832,8 @@ is_owner_or_root() {
 # a specific CVMFS repository.
 #
 # @param name   the name of the repository whose owner should be impersonated
-# @return       a shell invocation to impersonate $CVMFS_USER
+# @return       a shell invocation to impersonate $CVMFS_USER via stdout or
+#               exit code 1 if user couldn't be impersonated
 get_user_shell() {
   local name=$1
   local shell_cmd=""
