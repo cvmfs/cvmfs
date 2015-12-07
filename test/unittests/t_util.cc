@@ -107,15 +107,6 @@ class T_Util : public ::testing::Test {
     return string(buf);
   }
 
-  static string GetRfcTimeString() {
-    time_t now = time(NULL);
-    char buf[32];
-    struct tm ts;
-    gmtime_r(&now, &ts);
-    strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", &ts);
-    return string(buf);
-  }
-
   static timeval CreateTimeval(int64_t tv_sec, int64_t tv_usec) {
     timeval t;
     t.tv_sec = tv_sec;
@@ -795,16 +786,13 @@ TEST_F(T_Util, StringifyTime) {
 
 TEST_F(T_Util, RfcTimestamp) {
   char *curr_locale = setlocale(LC_TIME, NULL);
-  const char *format = "%a, %e %h %Y %H:%M:%S %z";
+  const char *format = "%a, %e %h %Y %H:%M:%S %Z";
   setlocale(LC_TIME, "C");
-  struct tm tm1;
-  struct tm tm2;
-  string str1 = GetRfcTimeString();
-  string str2 = RfcTimestamp();
-  strptime(str1.c_str(), format, &tm1);
-  strptime(str2.c_str(), format, &tm2);
-  time_t time1 = mktime(&tm1);
-  time_t time2 = mktime(&tm2);
+  struct tm tm;
+  time_t time1 = time(NULL);
+  string str = RfcTimestamp();
+  strptime(str.c_str(), format, &tm);
+  time_t time2 = mktime(&tm);
   EXPECT_GT(2, time2 - time1);
   setlocale(LC_TIME, curr_locale);
 }
