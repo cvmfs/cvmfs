@@ -1,4 +1,5 @@
 2.2.0:
+  * Minor fixes to libcvmfs (CVM-831)
   * Add CLI for grafting files (CVM-933)
   * Add support for explicitly listed repositories in 'cvmfs_config probe'
     (CVM-793)
