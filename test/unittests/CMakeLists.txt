@@ -73,6 +73,7 @@ set(CVMFS_UNITTEST_FILES
   t_tracer.cc
   t_file_chunk.cc
   t_platforms.cc
+  t_compressor.cc
 )
 
 #
@@ -320,4 +321,3 @@ if (INSTALL_UNITTESTS_DEBUG)
     DESTINATION    bin
   )
 endif (INSTALL_UNITTESTS_DEBUG)
-
