@@ -2454,10 +2454,11 @@ mkfs() {
   local garbage_collectable=false
   local s3_config=""
   local keys_import_location
+  local configure_apache=1
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:vga:zs:k:" option; do
+  while getopts "w:u:o:mf:vga:zs:k:p" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2491,6 +2492,9 @@ mkfs() {
       ;;
       k)
         keys_import_location=$OPTARG
+      ;;
+      p)
+        configure_apache=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2671,12 +2675,13 @@ add_replica() {
   local upstream
   local owner
   local silence_httpd_warning=0
+  local configure_apache=1
   local enable_auto_gc=0
   local s3_config
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:w:azs:" option
+  while getopts "o:u:n:w:azs:p" option
   do
     case $option in
       u)
@@ -2699,6 +2704,9 @@ add_replica() {
       ;;
       s)
         s3_config=$OPTARG
+      ;;
+      p)
+        configure_apache=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2904,10 +2912,11 @@ import() {
   local chown_backend=0
   local unionfs=
   local recreate_whitelist=0
+  local configure_apache=1
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:r" option; do
+  while getopts "w:o:c:u:k:lsmgf:rp" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2941,6 +2950,9 @@ import() {
       ;;
       r)
         recreate_whitelist=1
+      ;;
+      p)
+        configure_apache=0
       ;;
       ?)
         shift $(($OPTIND-2))
