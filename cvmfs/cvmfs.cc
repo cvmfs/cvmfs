@@ -1822,7 +1822,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string nfs_shared_dir = string(cvmfs::kDefaultCachedir);
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
-  string hostname = "localhost";
+  string hostname = "";
   string proxies = "";
   string fallback_proxies = "";
   string dns_server = "";
