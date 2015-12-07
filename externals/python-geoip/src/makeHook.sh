@@ -14,9 +14,9 @@ if [ -f .tmp/*.egg ]; then
 elif [ -d .tmp/*.egg ]; then
   # for some reason SLC6 produces an uncompressed *.egg directory containing GeoIP.so
   cp .tmp/*.egg/GeoIP.so .tmp
-elif [ -f .tmp/GeoIP*.so ]; then
+elif [ -f .tmp/GeoIP.*.so ]; then
   # on ArchLinux no *.egg is created but a GeoIP.<system tag>.so file
-  cp .tmp/GeoIP*.so .tmp/GeoIP.so
+  cp .tmp/GeoIP.*.so .tmp/GeoIP.so
 else
   echo "couldn't extract GeoIP build result in makeHook.sh"
   exit 1
