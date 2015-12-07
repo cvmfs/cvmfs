@@ -1933,6 +1933,7 @@ create_config_files_for_new_repository() {
   local hash_algo=$6
   local autotagging=$7
   local garbage_collectable=$8
+  local configure_apache=$9
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -1975,17 +1976,18 @@ CVMFS_AUTO_GC=true
 EOF
   fi
 
-  # make sure that the config file does not exist, yet
-  remove_apache_config_file "cvmfs.${name}.conf" || true
+  if [ $configure_apache -eq 1 ]; then
+    # make sure that the config file does not exist, yet
+    remove_apache_config_file "cvmfs.${name}.conf" || true
 
-  create_apache_config_file "cvmfs.${name}.conf" << EOF
+    create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
 EOF
 
-  # ONLY FOR LOCAL UPSTREAM
-  if is_local_upstream $upstream; then
-    local repository_dir=$(get_upstream_config $upstream)
-    create_apache_config_file "cvmfs.${name}.conf" << EOF
+    # ONLY FOR LOCAL UPSTREAM
+    if is_local_upstream $upstream; then
+      local repository_dir=$(get_upstream_config $upstream)
+      create_apache_config_file "cvmfs.${name}.conf" << EOF
 KeepAlive On
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
@@ -2008,6 +2010,7 @@ Alias /cvmfs/$name ${repository_dir}
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
 </Directory>
 EOF
+    fi
   fi
 
   cat > $client_conf << EOF
