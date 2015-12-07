@@ -2579,15 +2579,16 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
-  create_config_files_for_new_repository "$name"        \
-                                         "$upstream"    \
-                                         "$stratum0"    \
-                                         "$cvmfs_user"  \
-                                         "$unionfs"     \
-                                         "$hash_algo"   \
-                                         "$autotagging" \
-                                         "$garbage_collectable" || die "fail"
-  if is_local_upstream $upstream; then
+  create_config_files_for_new_repository "$name"                \
+                                         "$upstream"            \
+                                         "$stratum0"            \
+                                         "$cvmfs_user"          \
+                                         "$unionfs"             \
+                                         "$hash_algo"           \
+                                         "$autotagging"         \
+                                         "$garbage_collectable" \
+                                         "$configure_apache" || die "fail"
+  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
   fi
   echo "done"
@@ -2817,7 +2818,7 @@ CVMFS_AUTO_GC=true
 EOF
   fi
 
-  if is_local_upstream $upstream; then
+  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
 $(cat_wsgi_config ${alias_name})
@@ -3040,7 +3041,8 @@ import() {
                                          "$unionfs"    \
                                          "sha1"        \
                                          "true"        \
-                                         "false" || die "fail!"
+                                         "false"       \
+                                         "$configure_apache" || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -3054,8 +3056,8 @@ import() {
 
   # create storage
   echo -n "Creating CernVM-FS Repository Infrastructure... "
-  create_spool_area_for_new_repository $name || die "fail!"
-  reload_apache > /dev/null                  || die "fail!"
+  create_spool_area_for_new_repository $name               || die "fail!"
+  [ $configure_apache -eq 0 ] || reload_apache > /dev/null || die "fail!"
   echo "done"
 
   # load repository configuration file
