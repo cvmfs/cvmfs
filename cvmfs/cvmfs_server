@@ -2033,8 +2033,11 @@ EOF
 remove_config_files() {
   local name=$1
   load_repo_config $name
-  if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-    remove_apache_config_file "cvmfs.${name}.conf"
+
+  local apache_conf_file_name="cvmfs.${name}.conf"
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE &&
+     has_apache_config_file "$apache_conf_file_name"; then
+    remove_apache_config_file "$apache_conf_file_name"
     reload_apache > /dev/null
   fi
   rm -rf /etc/cvmfs/repositories.d/$name
