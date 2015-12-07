@@ -228,9 +228,11 @@ static std::string GetCvmfsBinary() {
 #ifdef __APPLE__
   int major, minor, patch;
   platform_get_os_version(&major, &minor, &patch);
-  if (major == 10 && minor >= 9) {     // OS X El Capitan came with SIP, forcing
-    paths.push_back("/usr/local/bin"); // us to become relocatable. CVMFS 2.2.0+
-  }                                    // installs into /usr/local always
+  // OS X El Capitan came with SIP, forcing us to become relocatable. CVMFS
+  // 2.2.0+ installs into /usr/local always
+  if (major == 10 && minor >= 9) {
+    paths.push_back("/usr/local/bin");
+  }
 #endif
 
   // TODO(reneme): C++11 range based for loop

@@ -67,6 +67,9 @@ std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 NameString GetFileName(const PathString &path);
+void SplitPath(const std::string &path,
+               std::string *dirname,
+               std::string *filename);
 bool IsAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 
@@ -210,7 +213,8 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  pid_t *child_pid = NULL);
 
 void SafeSleepMs(const unsigned ms);
-
+bool SafeRead(int fd, void *buf, size_t nbyte);  // TODO(jblomer)
+bool SafeWrite(int fd, const void *buf, size_t nbyte);
 
 /**
  * Knuth's random shuffle algorithm.
