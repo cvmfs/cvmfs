@@ -263,18 +263,19 @@ Supported Commands:
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
-                [-k path to existing keychain]
+                [-k path to existing keychain] [-p no apache config]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                 [-a silence apache warning] [-z enable garbage collection]
-                [-n alias name] [-s S3 config file]
+                [-n alias name] [-s S3 config file] [-p no apache config]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
                 [-f union filesystem type] [-c file ownership (UID:GID)]
                 [-k path to keys] [-g chown backend] [-r recreate whitelist]
+                [-p no apache config]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
