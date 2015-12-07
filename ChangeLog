@@ -1,4 +1,5 @@
 2.2.0:
+  * Add -p switch to cvmfs_server commands to skip Apache config (CVM-900)
   * Minor fixes to libcvmfs (CVM-831, CVM-893)
   * Add CLI for grafting files (CVM-933)
   * Add support for explicitly listed repositories in 'cvmfs_config probe'
