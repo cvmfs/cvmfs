@@ -744,6 +744,16 @@ remove_apache_config_file() {
 }
 
 
+# check if an apache configuration file exists. This looks in the appropriate
+# place, depending on the installed apache version.
+has_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)/${file_name}"
+  [ -f $conf_path ]
+}
+
+
 get_fd_modes() {
   local path=$1
   lsof -Fan 2>/dev/null | grep -B1 -e "^n$path" | grep -e '^a.*'
