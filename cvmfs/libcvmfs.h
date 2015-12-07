@@ -19,7 +19,8 @@
 // 16: remove unnecessary free
 // 17: apply new classes around the cache manager
 // 18: add cvmfs_pread and support for chunked files
-#define LIBCVMFS_REVISION 18
+// 19: CernVM-FS 2.2.0
+#define LIBCVMFS_REVISION 19
 
 #include <sys/stat.h>
 #include <unistd.h>
