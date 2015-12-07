@@ -263,18 +263,19 @@ Supported Commands:
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
-                [-k path to existing keychain]
+                [-k path to existing keychain] [-p no apache config]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
                 [-a silence apache warning] [-z enable garbage collection]
-                [-n alias name] [-s S3 config file]
+                [-n alias name] [-s S3 config file] [-p no apache config]
                 <stratum 0 url> <public key>
                 Creates a Stratum 1 replica of a Stratum 0 repository
   import        [-w stratum0 url] [-o owner] [-u upstream storage]
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
                 [-f union filesystem type] [-c file ownership (UID:GID)]
                 [-k path to keys] [-g chown backend] [-r recreate whitelist]
+                [-p no apache config]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
@@ -741,6 +742,16 @@ remove_apache_config_file() {
 
   # remove configuration file
   rm -f $conf_path
+}
+
+
+# check if an apache configuration file exists. This looks in the appropriate
+# place, depending on the installed apache version.
+has_apache_config_file() {
+  local file_name=$1
+  local conf_path
+  conf_path="$(get_apache_conf_path)/${file_name}"
+  [ -f $conf_path ]
 }
 
 
@@ -1923,6 +1934,7 @@ create_config_files_for_new_repository() {
   local hash_algo=$6
   local autotagging=$7
   local garbage_collectable=$8
+  local configure_apache=$9
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -1965,17 +1977,18 @@ CVMFS_AUTO_GC=true
 EOF
   fi
 
-  # make sure that the config file does not exist, yet
-  remove_apache_config_file "cvmfs.${name}.conf" || true
+  if [ $configure_apache -eq 1 ]; then
+    # make sure that the config file does not exist, yet
+    remove_apache_config_file "cvmfs.${name}.conf" || true
 
-  create_apache_config_file "cvmfs.${name}.conf" << EOF
+    create_apache_config_file "cvmfs.${name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
 EOF
 
-  # ONLY FOR LOCAL UPSTREAM
-  if is_local_upstream $upstream; then
-    local repository_dir=$(get_upstream_config $upstream)
-    create_apache_config_file "cvmfs.${name}.conf" << EOF
+    # ONLY FOR LOCAL UPSTREAM
+    if is_local_upstream $upstream; then
+      local repository_dir=$(get_upstream_config $upstream)
+      create_apache_config_file "cvmfs.${name}.conf" << EOF
 KeepAlive On
 # Translation URL to real pathname
 Alias /cvmfs/$name ${repository_dir}
@@ -1998,6 +2011,7 @@ Alias /cvmfs/$name ${repository_dir}
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
 </Directory>
 EOF
+    fi
   fi
 
   cat > $client_conf << EOF
@@ -2023,8 +2037,11 @@ EOF
 remove_config_files() {
   local name=$1
   load_repo_config $name
-  if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
-    remove_apache_config_file "cvmfs.${name}.conf"
+
+  local apache_conf_file_name="cvmfs.${name}.conf"
+  if is_local_upstream $CVMFS_UPSTREAM_STORAGE &&
+     has_apache_config_file "$apache_conf_file_name"; then
+    remove_apache_config_file "$apache_conf_file_name"
     reload_apache > /dev/null
   fi
   rm -rf /etc/cvmfs/repositories.d/$name
@@ -2438,10 +2455,11 @@ mkfs() {
   local garbage_collectable=false
   local s3_config=""
   local keys_import_location
+  local configure_apache=1
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:vga:zs:k:" option; do
+  while getopts "w:u:o:mf:vga:zs:k:p" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2475,6 +2493,9 @@ mkfs() {
       ;;
       k)
         keys_import_location=$OPTARG
+      ;;
+      p)
+        configure_apache=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2559,15 +2580,16 @@ mkfs() {
 
   # create system-wide configuration
   echo -n "Creating Configuration Files... "
-  create_config_files_for_new_repository "$name"        \
-                                         "$upstream"    \
-                                         "$stratum0"    \
-                                         "$cvmfs_user"  \
-                                         "$unionfs"     \
-                                         "$hash_algo"   \
-                                         "$autotagging" \
-                                         "$garbage_collectable" || die "fail"
-  if is_local_upstream $upstream; then
+  create_config_files_for_new_repository "$name"                \
+                                         "$upstream"            \
+                                         "$stratum0"            \
+                                         "$cvmfs_user"          \
+                                         "$unionfs"             \
+                                         "$hash_algo"           \
+                                         "$autotagging"         \
+                                         "$garbage_collectable" \
+                                         "$configure_apache" || die "fail"
+  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
   fi
   echo "done"
@@ -2655,12 +2677,13 @@ add_replica() {
   local upstream
   local owner
   local silence_httpd_warning=0
+  local configure_apache=1
   local enable_auto_gc=0
   local s3_config
 
   # optional parameter handling
   OPTIND=1
-  while getopts "o:u:n:w:azs:" option
+  while getopts "o:u:n:w:azs:p" option
   do
     case $option in
       u)
@@ -2683,6 +2706,9 @@ add_replica() {
       ;;
       s)
         s3_config=$OPTARG
+      ;;
+      p)
+        configure_apache=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2793,7 +2819,7 @@ CVMFS_AUTO_GC=true
 EOF
   fi
 
-  if is_local_upstream $upstream; then
+  if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     create_apache_config_file "cvmfs.${alias_name}.conf" << EOF
 # Created by cvmfs_server.  Don't touch.
 $(cat_wsgi_config ${alias_name})
@@ -2888,10 +2914,11 @@ import() {
   local chown_backend=0
   local unionfs=
   local recreate_whitelist=0
+  local configure_apache=1
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:r" option; do
+  while getopts "w:o:c:u:k:lsmgf:rp" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2925,6 +2952,9 @@ import() {
       ;;
       r)
         recreate_whitelist=1
+      ;;
+      p)
+        configure_apache=0
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3012,7 +3042,8 @@ import() {
                                          "$unionfs"    \
                                          "sha1"        \
                                          "true"        \
-                                         "false" || die "fail!"
+                                         "false"       \
+                                         "$configure_apache" || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -3026,8 +3057,8 @@ import() {
 
   # create storage
   echo -n "Creating CernVM-FS Repository Infrastructure... "
-  create_spool_area_for_new_repository $name || die "fail!"
-  reload_apache > /dev/null                  || die "fail!"
+  create_spool_area_for_new_repository $name               || die "fail!"
+  [ $configure_apache -eq 0 ] || reload_apache > /dev/null || die "fail!"
   echo "done"
 
   # load repository configuration file
