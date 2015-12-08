@@ -441,6 +441,7 @@ least CernVM-FS $creator to manipulate this repository."
   #   2.1.20+ -> 2.2.0-1 (2.2.0-0 was a server pre-release and needs migration)
   #     -> new (mandatory) parameters in client.conf (Stratum 0)
   #     -> adjustments in /etc/fstab
+  #     -> CVMFS_AUTO_REPAIR_MOUNTPOINT=true becomes the enforced default
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -4853,7 +4854,7 @@ migrate_2_1_20() {
   echo "--> updating server.conf"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
   if ! grep -q "CVMFS_AUTO_REPAIR_MOUNTPOINT" $server_conf; then
-    echo "CVMFS_AUTO_REPAIR_MOUNTPOINT=true" >> $server_conf
+    echo "CVMFS_AUTO_REPAIR_MOUNTPOINT=true" >> $server_confg
   else
     sed -i -e "s/^\(CVMFS_AUTO_REPAIR_MOUNTPOINT\)=.*/\1=true/" $server_conf
   fi
