@@ -793,6 +793,9 @@ TEST_F(T_Util, RfcTimestamp) {
   string str = RfcTimestamp();
   strptime(str.c_str(), format, &tm);
   time_t time2 = mktime(&tm) - timezone;
+  if (tm.tm_isdst > 0) {
+    time2 -= 3600;
+  }
   EXPECT_GT(2, time2 - time1);
   setlocale(LC_TIME, curr_locale);
 }
