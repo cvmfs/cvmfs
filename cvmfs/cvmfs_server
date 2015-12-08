@@ -2927,10 +2927,11 @@ import() {
   local unionfs=
   local recreate_whitelist=0
   local configure_apache=1
+  local recreate_repo_key=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:rp" option; do
+  while getopts "w:o:c:u:k:lsmgf:rpt" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2967,6 +2968,9 @@ import() {
       ;;
       p)
         configure_apache=0
+      ;;
+      t)
+        recreate_repo_key=1
       ;;
       ?)
         shift $(($OPTIND-2))
