@@ -4852,6 +4852,12 @@ migrate_2_1_20() {
 
   echo "--> updating server.conf"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
+  if ! grep -q "CVMFS_AUTO_REPAIR_MOUNTPOINT" $server_conf; then
+    echo "CVMFS_AUTO_REPAIR_MOUNTPOINT=true" >> $server_conf
+  else
+    sed -i -e "s/^\(CVMFS_AUTO_REPAIR_MOUNTPOINT\)=.*/\1=true/" $server_conf
+  fi
+
   sed -i -e "s/^\(CVMFS_CREATOR_VERSION\)=.*/\1=$destination_version/" $server_conf
 
   # update repository information
