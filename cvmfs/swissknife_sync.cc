@@ -493,6 +493,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
   if (args.find('g') != args.end()) params.garbage_collectable = true;
   if (args.find('k') != args.end()) params.include_xattrs = true;
+  if (args.find('X') != args.end()) params.external_data = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -593,6 +594,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                     "engine failed");
     return 4;
   }
+  sync->SetExternalData(params.external_data);
 
   sync->Traverse();
 

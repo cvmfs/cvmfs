@@ -265,12 +265,11 @@ class Catalog : public SingleCopy {
     kExternalPublishDisable,  // External data property is explicitly disabled.
     kExternalPublishEnable,   // External data is explicitly enabled.
   };
-  ExternalDataStatus GetExternalDataLocked() const;
-  ExternalDataStatus GetExternalDataUnlocked() const;  // For holders of lock_
 
  private:
   bool LookupEntry(const shash::Md5 &md5path, const bool expand_symlink,
                    DirectoryEntry *dirent) const;
+  ExternalDataStatus GetExternalDataImpl() const;
   CatalogDatabase *database_;
   pthread_mutex_t *lock_;
 

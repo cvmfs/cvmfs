@@ -271,7 +271,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                [-a tag name] [-c tag channel] [-m tag description]
+                [-a tag name] [-c tag channel] [-m tag description] [-X (external data)]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-f don't ask again]
@@ -3886,6 +3886,9 @@ publish() {
       n)
         manual_revision="$OPTARG"
       ;;
+      X)
+        external_option="-X"
+      ;;
       ?)
         shift $(($OPTIND-2))
         usage "Command publish: Unrecognized option: $1"
@@ -3975,7 +3978,7 @@ publish() {
       -o $manifest                                   \
       -e $hash_algorithm                             \
       $(get_follow_http_redirects_flag)              \
-      $log_level $tweaks_option $verbosity"
+      $log_level $tweaks_option $external_option $verbosity"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi

@@ -415,19 +415,7 @@ void Catalog::DropDatabaseFileOwnership() {
 }
 
 
-Catalog::ExternalDataStatus Catalog::GetExternalDataUnlocked() const {
-  if (!IsRoot()) {return kExternalPublishDisable;}
-  ExternalDataStatus status =
-    static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
-  if (status == kExternalPublishUnknown) {
-    int attr_value = database().GetPropertyDefault<int>("external_data", 0);
-    status = attr_value ? kExternalPublishEnable : kExternalPublishDisable;
-    atomic_write32(&external_data_status_, status);
-  }
-  return status;
-}
-
-Catalog::ExternalDataStatus Catalog::GetExternalDataLocked() const {
+Catalog::ExternalDataStatus Catalog::GetExternalDataImpl() const {
   if (!IsRoot()) {return kExternalPublishDisable;}
   ExternalDataStatus status = \
     static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
@@ -441,8 +429,13 @@ Catalog::ExternalDataStatus Catalog::GetExternalDataLocked() const {
 }
 
 bool Catalog::GetExternalData() const {
-  ExternalDataStatus status = GetExternalDataLocked();
-  return (status == kExternalPublishEnable);
+  if (IsRoot()) {
+    ExternalDataStatus status = GetExternalDataImpl();
+    return (status == kExternalPublishEnable);
+  } else if (HasParent()) {
+    return parent_->GetExternalData();
+  }
+  return false;
 }
 
 

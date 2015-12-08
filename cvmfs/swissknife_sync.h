@@ -30,6 +30,7 @@ struct SyncParameters {
     stop_for_catalog_tweaks(false),
     garbage_collectable(false),
     include_xattrs(false),
+    external_data(false),
     catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
     min_file_chunk_size(kDefaultMinFileChunkSize),
     avg_file_chunk_size(kDefaultAvgFileChunkSize),
@@ -58,6 +59,7 @@ struct SyncParameters {
   bool             stop_for_catalog_tweaks;
   bool             garbage_collectable;
   bool             include_xattrs;
+  bool             external_data;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
   size_t           avg_file_chunk_size;
