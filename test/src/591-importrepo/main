@@ -318,6 +318,16 @@ cvmfs_run_test() {
   echo "importing repository recreating repo signing keys and create a fresh whitelist"
   import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r -t || return 45
 
+  echo "open transaction to change something"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository (same as a bit up)"
+  change_some_files_in $repo_dir || return $?
+
+  local publish3_log="publish3.log"
+  echo "creating CVMFS snapshot (log: $publish3_log)"
+  publish_repo $CVMFS_TEST_REPO > $publish3_log 2>&1 || return $?
+
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
 
