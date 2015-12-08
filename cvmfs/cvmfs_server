@@ -440,6 +440,7 @@ least CernVM-FS $creator to manipulate this repository."
   #
   #   2.1.20+ -> 2.2.0-1 (2.2.0-0 was a server pre-release and needs migration)
   #     -> new (mandatory) parameters in client.conf (Stratum 0)
+  #     -> adjustments in /etc/fstab
   #
   # Note: I tried to make this code as verbose as possible
   #
@@ -2143,8 +2144,8 @@ setup_and_mount_new_repository() {
       ofs_workdir=""
     fi
     cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
-${overlayfs_name}_$name /cvmfs/$name $overlayfs_name upperdir=${scratch_dir},lowerdir=${rdonly_dir}$ofs_workdir,ro$selinux_context 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
+${overlayfs_name}_$name /cvmfs/$name $overlayfs_name upperdir=${scratch_dir},lowerdir=${rdonly_dir}$ofs_workdir,noauto,ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   else
     echo -n "(aufs) "
@@ -2152,8 +2153,8 @@ EOF
       selinux_context=",context=\"system_u:object_r:default_t:s0\""
     fi
     cat >> /etc/fstab << EOF
-cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid 0 0 # added by CernVM-FS for $name
-aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,ro$selinux_context 0 0 # added by CernVM-FS for $name
+cvmfs2#$name $rdonly_dir fuse allow_other,config=/etc/cvmfs/repositories.d/${name}/client.conf:${CVMFS_SPOOL_DIR}/client.local,cvmfs_suid,noauto 0 0 # added by CernVM-FS for $name
+aufs_$name /cvmfs/$name aufs br=${scratch_dir}=rw:${rdonly_dir}=rr,udba=none,noauto,ro$selinux_context 0 0 # added by CernVM-FS for $name
 EOF
   fi
   local user_shell="$(get_user_shell $name)"
@@ -4834,6 +4835,20 @@ migrate_2_1_20() {
   [ -z "$CVMFS_HIDE_MAGIC_XATTRS" ] && echo "CVMFS_HIDE_MAGIC_XATTRS=yes" >> $client_conf
   [ -z "$CVMFS_FOLLOW_REDIRECTS"  ] && echo "CVMFS_FOLLOW_REDIRECTS=yes"  >> $client_conf
   [ -z "$CVMFS_SERVER_CACHE_MODE" ] && echo "CVMFS_SERVER_CACHE_MODE=yes" >> $client_conf
+
+  echo "--> updating /etc/fstab"
+  local tmp_fstab=$(mktemp)
+  awk  "/added by CernVM-FS for $name/"' {
+          for (i = 1; i <= NF; i++) {
+            if (i == 4) $i = $i",noauto";
+            printf("%s ", $i);
+          }
+          print "";
+          next;
+        };
+        { print $0 }' /etc/fstab > $tmp_fstab
+  cat $tmp_fstab > /etc/fstab
+  rm -f $tmp_fstab
 
   echo "--> updating server.conf"
   local server_conf="/etc/cvmfs/repositories.d/${name}/server.conf"
