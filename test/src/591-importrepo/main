@@ -278,7 +278,7 @@ cvmfs_run_test() {
 
   local publish2_log="publish2.log"
   echo "creating CVMFS snapshot (log: $publish2_log)"
-  publish_repo $CVMFS_TEST_REPO > $publish_log 2>&1 || return $?
+  publish_repo $CVMFS_TEST_REPO > $publish2_log 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?
