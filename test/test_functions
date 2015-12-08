@@ -1889,3 +1889,10 @@ remove_local_mount() {
   sudo umount $mountpoint
   rm -fR $cache $mountpoint
 }
+
+get_internal_value() {
+  local repo=$1
+  local key=$2
+  
+  echo $(sudo cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
+}
