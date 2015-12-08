@@ -3103,6 +3103,19 @@ import() {
     echo "done"
   fi
 
+  # creating a new repository signing key if requested
+  if [ $recreate_repo_key -ne 0 ]; then
+    echo -n "Creating new repository signing key... "
+    local manifest_url="${CVMFS_STRATUM0}/.cvmfspublished"
+    local unsigned_manifest="${CVMFS_SPOOL_DIR}/tmp/unsigned_manifest"
+    create_cert $name $CVMFS_USER                     || die "fail (certificate creation)!"
+    get_item $name $manifest_url | \
+      strip_manifest_signature - > $unsigned_manifest || die "fail (manifest download)!"
+    chown $CVMFS_USER $unsigned_manifest              || die "fail (manifest chown)!"
+    sign_manifest $name $unsigned_manifest            || die "fail (manifest resign)!"
+    echo "done"
+  fi
+
   # recreate whitelist if requested
   if [ $recreate_whitelist -ne 0 ]; then
     echo -n "Recreating whitelist... "
