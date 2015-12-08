@@ -1,4 +1,6 @@
 2.2.0:
+  * Do not mount /cvmfs on boot on the release manager machine; on the first
+    transaction, CVMFS_AUTO_REPAIR_MOUNTPOINT mounts automatically
   * Perform host fail-over on HTTP 400 error code (CVM-819)
   * Fail immediately if CVMFS_SERVER_URL is unset (CVM-892)
   * Add -p switch to cvmfs_server commands to skip Apache config (CVM-900)
