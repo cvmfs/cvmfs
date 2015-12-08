@@ -51,6 +51,14 @@ else (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 #
+# Set install prefix to /usr by default.
+#
+if (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set (CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "CVMFS install path default is /usr" FORCE)
+  message("Setting default install prefix to ${CMAKE_INSTALL_PREFIX} on Linux")
+endif (LINUX AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+
+#
 # check if we use Clang
 #
 if (CMAKE_CXX_COMPILER MATCHES ".*clang")
