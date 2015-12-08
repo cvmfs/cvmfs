@@ -440,6 +440,7 @@ least CernVM-FS $creator to manipulate this repository."
   #
   #   2.1.20+ -> 2.2.0-1 (2.2.0-0 was a server pre-release and needs migration)
   #     -> new (mandatory) parameters in client.conf (Stratum 0)
+  #     -> adjustments in /etc/fstab
   #
   # Note: I tried to make this code as verbose as possible
   #
