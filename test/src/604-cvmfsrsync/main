@@ -1,0 +1,154 @@
+
+cvmfs_test_name="Sync files into a repository using cvmfs_rsync"
+cvmfs_test_autofs_on_startup=false
+
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+  local src_dir=$scratch_dir/srcdir
+  local pubtime_file=$scratch_dir/pubtime
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  echo "load repository configuration"
+  load_repo_config $CVMFS_TEST_REPO
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new source dir"
+  # create source dir
+  mkdir $src_dir
+  pushdir $src_dir
+
+  # create a .cvmfsdirtab for its subdirectories
+  (echo "/People/*"
+  echo "/Continents/*/*") > .cvmfsdirtab
+
+  # create some directories that will have catalogs including one with a dot
+  mkdir People
+  mkdir People/Germans People/Americans People/Russians People/.French
+  mkdir -p Continents/NorthAmerica/UnitedStates
+  mkdir -p Continents/Europe/Germany Continents/Europe/.Switzerland
+
+  # create some directories for famous people
+  mkdir People/Germans/AlbertEinstein People/Germans/JohannWolfgangGoethe
+  mkdir People/Americans/GeorgeWashington People/Americans/BarackObama
+  mkdir People/Russians/MikhailKalashnikov People/Russians/YuriGagarin
+
+  # add some files to some of the directories
+  cp_bin People/Germans/AlbertEinstein
+  cp /etc/passwd People/Americans/BarackObama
+  cp_usrbin People/Russians/MikhailKalashnikov
+  echo Batavia >Continents/NorthAmerica/UnitedStates/Illinois
+  echo Geneva >Continents/Europe/.Switzerland/Geneva
+
+  # add a top-level file as well
+  echo "refugee" > People/AManWithoutACountry
+
+  popdir
+
+  echo "syncing it to the new repository"
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av $src_dir/ $repo_dir || return 1
+
+  # testing .cvmfsautocatalog files without auto-generation because only
+  #  need to show that they aren't removed until their source dir is removed
+  AUTOCATFILE=/cvmfs/$CVMFS_TEST_REPO/People/Americans/.cvmfsautocatalog
+  sudo -u $CVMFS_TEST_USER touch $AUTOCATFILE
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  echo "check if the right number of catalogs are present in the repository (1)"
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 8 ] || return 101
+
+  # no catalogs should be created after this point
+  touch $pubtime_file
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "removing stuff in the source dir"
+  pushdir $src_dir
+  rm -rf People/.French
+  rm -rf Continents/NorthAmerica
+  popdir
+
+  echo "syncing it to the new repository"
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/ $repo_dir || return 2
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check if the right number of catalogs are present in the repository (2)"
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 6 ] || return 102
+
+  echo "making sure no catalog files were recreated"
+  [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 112
+
+  echo "making sure test .cvmfsautocatalog file still exists"
+  [ -f $AUTOCATFILE ] || return 122
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "removing stuff in the source dir"
+  pushdir $src_dir
+  rm -rf People/Americans
+  rm -rf Continents/Europe/Germany
+  popdir
+
+  echo "syncing it to the new repository in two steps"
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People $repo_dir/ || return 3
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/Continents/ $repo_dir/Continents || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check if the right number of catalogs are present in the repository (3)"
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 4 ] || return 103
+
+  echo "making sure no catalog files were recreated"
+  [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 113
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "removing stuff in the source dir"
+  pushdir $src_dir
+  rm -f People/Germans/AlbertEinstein/rm
+  rm -rf People/Russians/MikhailKalashnikov
+  popdir
+
+  echo "syncing subdir to the new repository in two steps"
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Germans/AlbertEinstein/ $repo_dir/People/Germans/AlbertEinstein || return 5
+  sudo -u $CVMFS_TEST_USER cvmfs_rsync -av --delete $src_dir/People/Russians $repo_dir/People || return 6
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check if the right number of catalogs are present in the repository (4)"
+  [ $(get_catalog_count $CVMFS_TEST_REPO) -eq 4 ] || return 105
+
+  echo "making sure no catalog files were recreated"
+  [ -z "`find $repo_dir -name .cvmfscatalog -newer $pubtime_file`" ] || return 115
+
+  # ============================================================================
+
+  return 0
+}
+

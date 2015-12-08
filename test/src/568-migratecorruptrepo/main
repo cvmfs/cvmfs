@@ -40,21 +40,31 @@ cvmfs_run_test() {
           $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
           $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
           $legacy_repo_storage || return 3
-  sudo cvmfs_server import \
-    -o $CVMFS_TEST_USER    \
-    -l                     \
-    -s                     \
-    -g                     \
-    $legacy_repo_name > $migration_log 2>&1 || return 4
+  import_repo $legacy_repo_name $CVMFS_TEST_USER \
+    -l                                           \
+    -s                                           \
+    -g > $migration_log 2>&1 || return 4
 
   echo "look for the expected notes and warnings in the output"
   cat "$migration_log" | grep '^NOTE: fixed.*transition point.*nested_mountpoint_out_of_sync' || return 5
   cat "$migration_log" | grep '^NOTE: fixed.*dangling.*mountpoint.*dangling_mountpoint'       || return 6
   cat "$migration_log" | grep '^WARNING.*non-empty.*mountpoint.*non_empty_nested_mountpoint'  || return 7
 
+  local expected_warnings=1
+  local expected_notes=2
+  if uses_overlayfs $legacy_repo_name; then
+    echo "we are running on OverlayFS."
+    echo " OverlayFS: Need to check for one more warning"
+    cat "$migration_log" | grep '^WARNING:.*using.*OverlayFS.*hard.*links' || return 101
+    expected_warnings=$(( $expected_warnings + 1 ))
+
+    echo " OverlayFS: We should eliminate all hardlinks in the legacy repo"
+    sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name || return 102
+  fi
+
   echo "check that there are no unexpected warnings"
-  [ $(cat "$migration_log" | grep '^NOTE'    | wc -l) -eq 2 ] || return 8
-  [ $(cat "$migration_log" | grep '^WARNING' | wc -l) -eq 1 ] || return 9
+  [ $(cat "$migration_log" | grep '^NOTE'    | wc -l) -eq $expected_notes ]    || return 8
+  [ $(cat "$migration_log" | grep '^WARNING' | wc -l) -eq $expected_warnings ] || return 9
 
   echo "remove the (legacy) quarantaine directory"
   sudo rm -fR ${legacy_repo_storage}/data/quarantaine || return 10

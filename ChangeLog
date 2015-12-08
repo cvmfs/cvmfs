@@ -1,4 +1,28 @@
 2.2.0:
+  * Do not mount /cvmfs on boot on the release manager machine; on the first
+    transaction, CVMFS_AUTO_REPAIR_MOUNTPOINT mounts automatically
+  * Perform host fail-over on HTTP 400 error code (CVM-819)
+  * Fail immediately if CVMFS_SERVER_URL is unset (CVM-892)
+  * Add -p switch to cvmfs_server commands to skip Apache config (CVM-900)
+  * Minor fixes to libcvmfs (CVM-831, CVM-893)
+  * Add CLI for grafting files (CVM-933)
+  * Add support for explicitly listed repositories in 'cvmfs_config probe'
+    (CVM-793)
+  * Allow for repository removal without removing the content (CVM-738)
+  * Add cvmfs_config fsck command (CVM-371)
+  * Avoid use of sudo in cvmfs_server (CVM-245)
+  * Various build system fixes (CVM-783, CVM-854, CVM-857)
+  * Avoid rolling back to incompatible catalog schemas (CVM-252)
+  * Add cvmfs_rsync utility (CVM-814)
+  * Fixes for OS X El Capitan, move install directory on OS X to /usr/local 
+    (CVM-917)
+  * Fix rare bug in the garbage collection that can lead to removal of live
+    files (CVM-942)
+  * Add support for grafting of files (CVM-908)
+  * Make CVMFS_AUTO_REPAIR_MOUNTPOINT the default (CVM-889)
+  * Fix mount point auto repair when only the read-only branch is broken (CVM-918)
+  * Fix URL option parsing for S3 backend in cvmfs_server
+  * Add quasi-static cvmfs_preload binary (CVM-912, CVM-914)
   * Add auto-balancer for catalogs (experimental) with server parameters
     CVMFS_AUTOCATALOGS, CVMFS_AUTOCATALOGS_MAX_WEIGHT, 
     CVMFS_AUTOCATALOGS_MIN_WEIGHT
@@ -23,11 +47,10 @@
   * Add support for chunked files in libcvmfs (CVM-687)
   * Fix rare race that can result in a hanging reload
   * Fix memory and file descriptor leak in the download manager during reload
-  * Add support for SHA-256
+  * Add support for SHA-256, SHA3-256, SHAKE128 with 160 output bits
   * Add listing of /var/run/cvmfs to bugreport tarball (CVM-868)
   * Prevent ctrl+c during cvmfs_config reload (CVM-869)
   * Avoid use of attr utility in the server (CVM-853)
-  * Build GeoIP libraries for the server only (CVM-854)
   * Add catalog-chown command to cvmfs_server (CVM-836)
   * Handle import of repositories with an expired whitelist (CVM-780)
   * Fix leak of temporary files during garbage collection (CVM-846)

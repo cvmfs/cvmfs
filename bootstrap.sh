@@ -64,7 +64,7 @@ do_copy() {
   print_hint "Copying $library_name"
 
   mkdir -p $dest_dir
-  cp $library_dir/src/* $dest_dir
+  cp -r $library_dir/src/* $dest_dir
 }
 
 patch_external() {
@@ -100,6 +100,7 @@ do_extract  "tbb"         "tbb-${TBB_VERSION}.tar.gz"
 do_copy     "sqlite3"
 do_copy     "vjson"
 do_copy     "sha2"
+do_copy     "sha3"
 
 patch_external "leveldb"     "dont_search_snappy.patch"           \
                              "dont_search_tcmalloc.patch"

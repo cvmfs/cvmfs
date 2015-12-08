@@ -9,6 +9,7 @@ script_location=$(dirname $(readlink --canonicalize $0))
 #
 #  SERVER_PACKAGE        location of the CernVM-FS server package to install
 #  CLIENT_PACKAGE        location of the CernVM-FS client package to install
+#  DEVEL_PACKAGE         location of the CernVM-FS devel package to install
 #  CONFIG_PACKAGES       location of the CernVM-FS config packages
 #  SOURCE_DIRECTORY      location of the CernVM-FS sources forming above packages
 #  UNITTEST_PACKAGE      location of the CernVM-FS unit test package
@@ -17,19 +18,23 @@ script_location=$(dirname $(readlink --canonicalize $0))
 
 SERVER_PACKAGE=""
 CLIENT_PACKAGE=""
+DEVEL_PACKAGE=""
 UNITTEST_PACKAGE=""
 CONFIG_PACKAGES=""
 SOURCE_DIRECTORY=""
 LOG_DIRECTORY=""
 
 # parse script parameters (same for all platforms)
-while getopts "s:c:k:t:g:l:" option; do
+while getopts "s:c:d:k:t:g:l:" option; do
   case $option in
     s)
       SERVER_PACKAGE=$OPTARG
       ;;
     c)
       CLIENT_PACKAGE=$OPTARG
+      ;;
+    d)
+      DEVEL_PACKAGE=$OPTARG
       ;;
     k)
       CONFIG_PACKAGES="$OPTARG"
@@ -53,6 +58,7 @@ done
 # check that all mandatory parameters are set
 if [ "x$SERVER_PACKAGE"        = "x" ] ||
    [ "x$CLIENT_PACKAGE"        = "x" ] ||
+   [ "x$DEVEL_PACKAGE"         = "x" ] ||
    [ "x$CONFIG_PACKAGES"       = "x" ] ||
    [ "x$SOURCE_DIRECTORY"      = "x" ] ||
    [ "x$UNITTEST_PACKAGE"      = "x" ] ||

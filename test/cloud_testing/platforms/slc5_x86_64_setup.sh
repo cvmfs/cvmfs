@@ -38,6 +38,7 @@ echo "installing RPM packages... "
 install_rpm "$CONFIG_PACKAGES"
 install_rpm $CLIENT_PACKAGE
 install_rpm $SERVER_PACKAGE
+install_rpm $DEVEL_PACKAGE
 install_rpm $UNITTEST_PACKAGE
 
 # installing WSGI apache module

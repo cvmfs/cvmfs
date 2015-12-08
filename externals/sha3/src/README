@@ -1,0 +1,5 @@
+Taken from KeccakCodePackage
+git 543b3c53ba402efd8c7e5382cbf58eeb269e6a3c
+https://github.com/gvanas/KeccakCodePackage
+
+Added C++ header guards

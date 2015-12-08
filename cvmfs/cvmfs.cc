@@ -1822,7 +1822,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string nfs_shared_dir = string(cvmfs::kDefaultCachedir);
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
-  string hostname = "localhost";
+  string hostname = "";
   string proxies = "";
   string fallback_proxies = "";
   string dns_server = "";
@@ -1831,6 +1831,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string repository_tag = "";
   string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
+  bool server_cache_mode = false;  // currently means: no rename in the cache
   string trusted_certs = "";
   string proxy_template = "";
   catalog::OwnerMap uid_map;
@@ -1965,6 +1966,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
       && cvmfs::options_manager_->IsOn(parameter))
   {
     cvmfs::hide_magic_xattrs_ = true;
+  }
+  if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_CACHE_MODE", &parameter)
+      && cvmfs::options_manager_->IsOn(parameter))
+  {
+    server_cache_mode = true;
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
@@ -2200,8 +2206,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
       return loader::kFailCacheDir;
     }
   }
-  cvmfs::cache_manager_ =
-    cache::PosixCacheManager::Create(alien_cache, alien_cache != ".");
+  cvmfs::cache_manager_ = cache::PosixCacheManager::Create(
+    alien_cache, alien_cache != ".", server_cache_mode);
   if (cvmfs::cache_manager_ == NULL) {
     *g_boot_error = "Failed to setup cache in " + alien_cache +
                     ": " + strerror(errno);
@@ -2509,7 +2515,7 @@ static void Spawn() {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = cvmfs::AlarmReload;
-    sa.sa_flags = SA_SIGINFO;
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
     sigfillset(&sa.sa_mask);
     retval = sigaction(SIGALRM, &sa, NULL);
     assert(retval == 0);

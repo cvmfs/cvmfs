@@ -107,15 +107,6 @@ class T_Util : public ::testing::Test {
     return string(buf);
   }
 
-  static string GetRfcTimeString() {
-    time_t now = time(NULL);
-    char buf[32];
-    struct tm ts;
-    gmtime_r(&now, &ts);
-    strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", &ts);
-    return string(buf);
-  }
-
   static timeval CreateTimeval(int64_t tv_sec, int64_t tv_usec) {
     timeval t;
     t.tv_sec = tv_sec;
@@ -368,6 +359,29 @@ TEST_F(T_Util, GetFileName) {
   EXPECT_EQ(NameString(fake_path), GetFileName(PathString(fake_path)));
 }
 
+
+TEST_F(T_Util, SplitPath) {
+  string dirname;
+  string filename;
+  SplitPath("/a/b/c", &dirname, &filename);
+  EXPECT_EQ("/a/b", dirname);  EXPECT_EQ("c", filename);
+  SplitPath("a/b/c", &dirname, &filename);
+  EXPECT_EQ("a/b", dirname);  EXPECT_EQ("c", filename);
+  SplitPath("a/b", &dirname, &filename);
+  EXPECT_EQ("a", dirname);  EXPECT_EQ("b", filename);
+  SplitPath("b", &dirname, &filename);
+  EXPECT_EQ(".", dirname);  EXPECT_EQ("b", filename);
+  SplitPath("a//b", &dirname, &filename);
+  EXPECT_EQ("a/", dirname);  EXPECT_EQ("b", filename);
+  SplitPath("/a", &dirname, &filename);
+  EXPECT_EQ("", dirname);  EXPECT_EQ("a", filename);
+  SplitPath("/", &dirname, &filename);
+  EXPECT_EQ("", dirname);  EXPECT_EQ("", filename);
+  SplitPath("", &dirname, &filename);
+  EXPECT_EQ(".", dirname);  EXPECT_EQ("", filename);
+}
+
+
 TEST_F(T_Util, CreateFile) {
   ASSERT_DEATH(CreateFile("myfakepath/otherfakepath.txt", 0777), ".*");
   string filename = sandbox + "/createfile.txt";
@@ -464,6 +478,41 @@ TEST_F(T_Util, ClosePipe) {
   ASSERT_DEATH(WritePipe(fd[1], to_write.c_str(), to_write.length()), ".*");
   ASSERT_DEATH(ReadPipe(fd[0], buffer_output, to_write.length()), ".*");
   free(buffer_output);
+}
+
+
+static void *MainReadPipe(void *data) {
+  int fd = *(reinterpret_cast<int *>(data));
+  char buf = '\0';
+  do {
+    ReadPipe(fd, &buf, 1);
+  } while (buf != 's');
+  return NULL;
+}
+
+TEST_F(T_Util, SafeWrite) {
+  int fd[2];
+  void *buffer_output = scalloc(20, sizeof(char));
+  MakePipe(fd);
+  SafeWrite(fd[1], to_write.c_str(), to_write.length());
+  read(fd[0], buffer_output, to_write.length());
+  EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
+  free(buffer_output);
+
+  // Large write
+  int size = 1024*1024;  // 1M
+  buffer_output = scalloc(size, 1);
+  pthread_t thread;
+  int retval = pthread_create(&thread, NULL, MainReadPipe, &fd[0]);
+  EXPECT_EQ(0, retval);
+  EXPECT_TRUE(SafeWrite(fd[1], buffer_output, size));
+  char stop = 's';
+  WritePipe(fd[1], &stop, 1);
+  pthread_join(thread, NULL);
+  free(buffer_output);
+  ClosePipe(fd);
+
+  EXPECT_FALSE(SafeWrite(-1, &stop, 1));
 }
 
 TEST_F(T_Util, Nonblock2Block) {
@@ -737,8 +786,17 @@ TEST_F(T_Util, StringifyTime) {
 
 TEST_F(T_Util, RfcTimestamp) {
   char *curr_locale = setlocale(LC_TIME, NULL);
+  const char *format = "%a, %e %h %Y %H:%M:%S %Z";
   setlocale(LC_TIME, "C");
-  EXPECT_EQ(GetRfcTimeString(), RfcTimestamp());
+  struct tm tm;
+  time_t time1 = time(NULL);
+  string str = RfcTimestamp();
+  strptime(str.c_str(), format, &tm);
+  time_t time2 = mktime(&tm) - timezone;
+  if (tm.tm_isdst > 0) {
+    time2 -= 3600;
+  }
+  EXPECT_GT(2, time2 - time1);
   setlocale(LC_TIME, curr_locale);
 }
 
@@ -769,6 +827,21 @@ TEST_F(T_Util, String2Int64) {
   EXPECT_EQ(static_cast<int64_t>(-234), String2Int64("-234.034"));
   EXPECT_EQ(static_cast<int64_t>(234), String2Int64("234.999"));
   EXPECT_EQ(static_cast<int64_t>(234), String2Int64("0234"));
+}
+
+TEST_F(T_Util, String2Uint64Parse) {
+  uint64_t result;
+  EXPECT_TRUE(String2Uint64Parse("0", NULL));
+  EXPECT_TRUE(String2Uint64Parse("0", &result));
+  EXPECT_EQ(0U, result);
+  EXPECT_TRUE(String2Uint64Parse("-0", &result));
+  EXPECT_EQ(0U, result);
+  EXPECT_TRUE(String2Uint64Parse("1234567890", &result));
+  EXPECT_EQ(1234567890U, result);
+  EXPECT_FALSE(String2Uint64Parse("", &result));
+  EXPECT_FALSE(String2Uint64Parse("1a", &result));
+  EXPECT_FALSE(String2Uint64Parse("a1", &result));
+  EXPECT_FALSE(String2Uint64Parse("-1", &result));
 }
 
 TEST_F(T_Util, String2Uint64Pair) {
@@ -1177,11 +1250,11 @@ TEST_F(T_Util, ManagedExecExecuteBinaryDoubleFork) {
   close(fd_stderr);
 
   // wait for the child process to terminate
-  const unsigned int timeout = 1000;
+  const unsigned int timeout = 120000;  // 2 minutes
   unsigned int counter = 0;
   while (counter < timeout && kill(child_pid, 0) == 0) {
-    usleep(5000);
-    ++counter;
+    SafeSleepMs(50);
+    counter += 50;
   }
   EXPECT_LT(counter, timeout) << "detached process did not terminate in time";
 }

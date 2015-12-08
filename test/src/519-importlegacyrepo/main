@@ -42,15 +42,10 @@ cvmfs_run_test() {
           $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
           $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
           $legacy_repo_storage || return 3
-  sudo cvmfs_server import \
-    -o $CVMFS_TEST_USER    \
-    -l                     \
-    -s                     \
-    -g                     \
-    $legacy_repo_name || return 4
-
-  echo "make sure that we are not suffering from the exdev bug"
-  apply_server_cache_config $legacy_repo_name
+  import_repo "$legacy_repo_name" "$CVMFS_TEST_USER" \
+    -l                                               \
+    -s                                               \
+    -g || return 4
 
   echo "list newly generated repository under /cvmfs/${legacy_repo_name}"
   ls -lisa /cvmfs/${legacy_repo_name} || return 5
@@ -68,6 +63,11 @@ cvmfs_run_test() {
   echo "create an empty repository revision (exdev workaround)"
   start_transaction $legacy_repo_name || return $?
   publish_repo      $legacy_repo_name || return $?
+
+  if uses_overlayfs $legacy_repo_name; then
+    echo "we are running on OverlayFS. We need to erase all hardlinks now..."
+    sudo cvmfs_server eliminate-hardlinks -f $legacy_repo_name || return 101
+  fi
 
   # cheate a new repository revision of the migrated catalogs
   echo "create a new repository revision"

@@ -32,6 +32,7 @@ RUN        yum -y update && yum -y install                      \
                                         gawk                    \
                                         gcc4                    \
                                         gcc4-c++                \
+                                        gdb                     \
                                         git                     \
                                         glibc-common            \
                                         grep                    \

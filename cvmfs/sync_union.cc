@@ -11,6 +11,8 @@
 #include <sys/capability.h>
 #include <unistd.h>
 
+#include <vector>
+
 #include "fs_traversal.h"
 #include "logging.h"
 #include "platform.h"
@@ -29,13 +31,11 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
   scratch_path_(scratch_path),
   union_path_(union_path),
   mediator_(mediator),
-  initialized_(false)
-{
-  mediator_->RegisterUnionEngine(this);
-}
+  initialized_(false) {}
 
 
 bool SyncUnion::Initialize() {
+  mediator_->RegisterUnionEngine(this);
   initialized_ = true;
   return true;
 }
@@ -222,7 +222,9 @@ bool SyncUnionOverlayfs::Initialize() {
 
 
 bool ObtainSysAdminCapabilityInternal(cap_t caps) {
-  const cap_value_t cap = CAP_SYS_ADMIN;
+  /*const*/ cap_value_t cap = CAP_SYS_ADMIN;  // is non-const as cap_set_flag()
+                                              // expects a non-const pointer
+                                              // on RHEL 5 and older
 
   // do sanity-check if supported in <sys/capability.h> otherwise just pray...
   // Note: CAP_SYS_ADMIN is a rather common capability and is very likely to be
@@ -314,7 +316,10 @@ void SyncUnionOverlayfs::CheckForBrokenHardlink(const SyncItem &entry) const {
                                       "with existing hardlinks in lowerdir "
                                       "(linkcount %d). OverlayFS cannot handle "
                                       "hardlinks and would produce "
-                                      "inconsistencies. Aborting..." ,
+                                      "inconsistencies. \n\n"
+                                      "Consider running this command: \n"
+                                      "  cvmfs_server eliminate-hardlinks\n\n"
+                                      "Aborting..." ,
              entry.GetUnionPath().c_str(), entry.GetRdOnlyLinkcount());
     abort();
   }
@@ -400,7 +405,7 @@ bool SyncUnionOverlayfs::HasXattr(string const &path, string const &attr_name) {
   // TODO(reneme): it is quite heavy-weight to allocate an object that contains
   //               an std::map<> just to check if an xattr is there...
   UniquePtr<XattrList> xattrs(XattrList::CreateFromFile(path));
-  assert (xattrs);
+  assert(xattrs);
 
   std::vector<std::string> attrs = xattrs->ListKeys();
   std::vector<std::string>::const_iterator i    = attrs.begin();

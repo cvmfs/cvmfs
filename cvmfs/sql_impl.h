@@ -168,7 +168,8 @@ bool Database<DerivedT>::Configure() {
   // unexpected open read-write file descriptors in the cache directory like
   // etilqs_<number>.
   if (!read_write_) {
-    return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute();
+    return Sql(sqlite_db() , "PRAGMA temp_store=2;").Execute() &&
+           Sql(sqlite_db() , "PRAGMA locking_mode=EXCLUSIVE;").Execute();
   }
   return true;
 }
@@ -320,6 +321,14 @@ void Database<DerivedT>::DropFileOwnership() {
   database_.DropFileOwnership();
   LogCvmfs(kLogSql, kLogDebug, "Database object dropped ownership of '%s'",
            database_.filename().c_str());
+}
+
+
+template <class DerivedT>
+unsigned Database<DerivedT>::GetModifiedRowCount() const {
+  const int modified_rows = sqlite3_total_changes(sqlite_db());
+  assert(modified_rows >= 0);
+  return static_cast<unsigned>(modified_rows);
 }
 
 /**

@@ -236,14 +236,14 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   }
 
   // parse dirtab file
-  catalog::Dirtab dirtab(dirtab_file);
-  if (!dirtab.IsValid()) {
+  catalog::Dirtab *dirtab = catalog::Dirtab::Create(dirtab_file);
+  if (!dirtab->IsValid()) {
     LogCvmfs(kLogCatalog, kLogStderr, "Invalid or not readable dirtab '%s'",
              dirtab_file.c_str());
     return 1;
   }
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "Found %d rules in dirtab '%s'",
-           dirtab.RuleCount(), dirtab_file.c_str());
+           dirtab->RuleCount(), dirtab_file.c_str());
 
   // initialize catalog infrastructure
   g_download_manager->Init(1, true, g_statistics);
@@ -261,9 +261,10 @@ int swissknife::CommandApplyDirtab::Main(const ArgumentList &args) {
   catalog_manager.Init();
 
   vector<string> new_nested_catalogs;
-  DetermineNestedCatalogCandidates(dirtab, &catalog_manager,
+  DetermineNestedCatalogCandidates(*dirtab, &catalog_manager,
                                    &new_nested_catalogs);
   const bool success = CreateCatalogMarkers(new_nested_catalogs);
+  delete dirtab;
 
   return (success) ? 0 : 1;
 }

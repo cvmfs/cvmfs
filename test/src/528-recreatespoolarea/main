@@ -138,10 +138,7 @@ cvmfs_run_test() {
           keys || return 9
 
   echo "recreating repository spool area"
-  sudo cvmfs_server import \
-    -o $CVMFS_TEST_USER \
-    -k keys \
-    $CVMFS_TEST_REPO || return 10
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -k keys || return 10
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?

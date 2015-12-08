@@ -91,7 +91,7 @@ Requires: shadow-utils
 Requires: SysVinit
 Requires: e2fsprogs
   %else
-    %if 0%{?fc21}
+    %if 0%{?fc21} || 0%{?fc22}
 Requires: procps-ng
     %else
 Requires: sysvinit-tools
@@ -145,7 +145,6 @@ Requires: bash
 Requires: coreutils
 Requires: grep
 Requires: sed
-Requires: sudo
 Requires: psmisc
 Requires: curl
 Requires: gzip
@@ -153,6 +152,8 @@ Requires: attr
 Requires: openssl
 Requires: httpd
 Requires: libcap
+Requires: lsof
+Requires: rsync
 
 Conflicts: cvmfs-server < 2.1
 
@@ -364,6 +365,7 @@ fi
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
+%{_bindir}/cvmfs_rsync
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %{_libdir}/libtbb_cvmfs.so
 %{_libdir}/libtbb_cvmfs.so.2
@@ -386,6 +388,9 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Fri Oct 23 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Fix dependency for Fedora 22
+- Add lsof dependency for cvmfs-server
 * Tue Oct 13 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
 - Add libcap dependency for cvmfs-server
 * Wed Sep 30 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0

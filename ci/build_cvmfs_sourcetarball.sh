@@ -33,6 +33,10 @@ else
   echo "Creating release tarball $tarball"
 fi
 
+echo "cleaning left-over tarballs..."
+[ ! -f ${CVMFS_RESULT_LOCATION}/${tarball}    ] || rm -f ${CVMFS_RESULT_LOCATION}/${tarball}
+[ ! -f ${CVMFS_RESULT_LOCATION}/source.tar.gz ] || rm -f ${CVMFS_RESULT_LOCATION}/source.tar.gz
+
 echo "creating source tar ball '$tarball'..."
 create_cvmfs_source_tarball ${CVMFS_SOURCE_LOCATION} \
                             ${CVMFS_RESULT_LOCATION}/${tarball}

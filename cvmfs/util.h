@@ -32,8 +32,8 @@
 namespace CVMFS_NAMESPACE_GUARD {
 #endif
 
+const unsigned kPageSize = 4096;
 const size_t kMaxPathLength = 256;
-
 const int kDefaultFileMode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
 const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
@@ -67,6 +67,9 @@ std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 NameString GetFileName(const PathString &path);
+void SplitPath(const std::string &path,
+               std::string *dirname,
+               std::string *filename);
 bool IsAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 
@@ -163,6 +166,8 @@ std::string RfcTimestamp();
 time_t IsoTimestamp2UtcTime(const std::string &iso8601);
 int64_t String2Int64(const std::string &value);
 uint64_t String2Uint64(const std::string &value);
+bool String2Uint64Parse(const std::string &value, uint64_t *result);
+
 void String2Uint64Pair(const std::string &value, uint64_t *a, uint64_t *b);
 bool HasPrefix(const std::string &str, const std::string &prefix,
                const bool ignore_case);
@@ -208,7 +213,8 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  pid_t *child_pid = NULL);
 
 void SafeSleepMs(const unsigned ms);
-
+bool SafeRead(int fd, void *buf, size_t nbyte);  // TODO(jblomer)
+bool SafeWrite(int fd, const void *buf, size_t nbyte);
 
 /**
  * Knuth's random shuffle algorithm.

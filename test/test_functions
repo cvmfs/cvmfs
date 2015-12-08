@@ -269,6 +269,18 @@ uses_overlayfs() {
 }
 
 
+break_hardlink() {
+  local path="$1"
+  local tmp_file="$(mktemp)"
+  local linkcount="$(stat --format=%h $path)"
+
+  echo "Note: breaking up hardlink to '$path' linkcount: $linkcount"
+  cp -f $path $tmp_file
+  rm -f $path
+  mv    $tmp_file $path
+}
+
+
 cvmfs_clean() {
   runs_under_parrot && return 0
 
@@ -349,6 +361,9 @@ cvmfs_umount() {
       timeout=$(($timeout-1))
       sleep 1
     done
+
+    times=5
+    result=-1
   done
 
   return 0
@@ -466,7 +481,10 @@ min() {
 
 destroy_repo() {
   local repo=$1
-  sudo cvmfs_server rmfs -f $repo || return 100
+  shift 1
+  local additional_flags="$@"
+
+  sudo cvmfs_server rmfs -f $additional_flags $repo || return 100
 }
 
 
@@ -603,6 +621,25 @@ make_huge_repo() {
 }
 
 
+import_repo() {
+  local repo=$1
+  local uid=$2
+  shift 2
+  local extra_options="$*"
+
+  echo "Importing repository $repo..."
+  local unionfs=""
+  if [ x"$CVMFS_TEST_UNIONFS" != x"" ]; then
+    echo "  UnionFS: $CVMFS_TEST_UNIONFS"
+    unionfs=" -f $CVMFS_TEST_UNIONFS"
+  fi
+  sudo cvmfs_server import -o $uid $unionfs $extra_options $repo || return 102
+
+  local client_conf="/etc/cvmfs/repositories.d/${repo}/client.conf"
+  apply_server_cache_config $repo || return 103
+}
+
+
 get_stratum1_name() {
   local repo_name="$1"
   echo "$repo_name.$(date +%s%N | md5sum | head -c6).replica"
@@ -650,16 +687,13 @@ create_big_file() {
 # - file size
 # - parent directory
 # - symlink destination (when applicable)
-# - uid and gid can be specified
 #
 # @param directory          the directory to be listed
-# @param uid                specify a UID for the file owner (optional)
-# @param gid                specify a GID for the file owner (optional)
+# @param show_linkcount     yes be default, otherwise linkcount is left out
 # @return                   a custom directory listing
 create_listing() {
   local directory=$1
-  local uid=$2
-  local gid=$3
+  local show_linkcount=$2
   local lst
 
   lst=$(ls --almost-all --recursive -l --file-type --time-style=+ $directory | \
@@ -696,15 +730,18 @@ create_listing() {
 
     # print out file information
     printf $1                     " ";
-    printf $2                     " ";
-    printf (uid == "" ? $3 : uid) " ";
-    printf (gid == "" ? $4 : gid) " ";
+    if (show_linkcount == "yes")
+    {
+      printf $2                   " ";
+    }
+    printf $3                     " ";
+    printf $4                     " ";
     printf $6;
 
     if(first == "l") printf " " $7 " " $8;
     if(first != "d") printf " " $5;
     printf "\n"
-  }' uid=$uid gid=$gid base_dir=$directory)
+  }' base_dir=$directory show_linkcount=$show_linkcount)
 
   echo -e "$lst"
 }
@@ -715,13 +752,21 @@ create_listing() {
 #
 # @param dir1    the directory to probe
 # @param dir2    the ground truth directory
+# @param repo    the underlying repository name (optional - to detect overlayfs)
 # @return        != 0 to indicate inequality, 0 means success
 compare_directories() {
   local dir1=$1
   local dir2=$2
+  local repo_name=$3
+  local show_linkcount="yes"
 
-  listing1=$(create_listing $dir1)
-  listing2=$(create_listing $dir2)
+  if [ ! -z $repo_name ] && uses_overlayfs $repo_name; then
+    echo "NOTE: $repo_name is based on OverlayFS - ignoring link counts"
+    show_linkcount="no"
+  fi
+
+  listing1=$(create_listing $dir1 $show_linkcount)
+  listing2=$(create_listing $dir2 $show_linkcount)
 
   echo "check if directory structure and file meta data fits"
   local listingFile1="listing_$(basename $dir1)"
@@ -824,6 +869,18 @@ get_catalog_count() {
   echo $(cvmfs_server list-catalogs -x $repo_name | wc -l)
 }
 
+# read the manifest piped in through stdin and figure out the root catalog hash
+# @param (stdin)  a manifest file content
+# return          the catalog root hash referenced in the manifest
+get_root_hash_from_manifest() {
+  grep --text '^C[a-f0-9]*\(-[a-z0-9]*\)\?$' | sed -e 's/^C\(.*\)$/\1/'
+              # ^^~~~~~~~^ ^~~~~~~~~~~~^
+              # ||       | |           |
+              # ||       | +-----------+-- (optional) Hash Suffix
+              # |+-------+---------------- Hash String
+              # +------------------------- Manifest Field Identifier
+}
+
 # retrieves the hash of the current root catalog of the given
 # repository by investigating the manifest
 # @param repo_name  the name of the repository
@@ -831,14 +888,7 @@ get_catalog_count() {
 get_current_root_catalog() {
   local repo_name=$1
   local manifest_url="$(get_repo_url $repo_name)/.cvmfspublished"
-  local catalog_record=$(curl "$manifest_url" 2>/dev/null | grep --text '^C[a-f0-9]*\(-[a-z0-9]*\)\?$')
-                                                                        # ^^~~~~~~~^ ^~~~~~~~~~~~^
-                                                                        # ||       | |           |
-                                                                        # ||       | +-----------+-- (optional) Hash Suffix
-                                                                        # |+-------+---------------- Hash String
-                                                                        # +------------------------- Manifest Field Identifier
-  local characters=$(echo -n $catalog_record | wc -c)
-  echo -n $catalog_record | tail -c $(( $characters - 1 ))
+  curl "$manifest_url" 2>/dev/null | get_root_hash_from_manifest
 }
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure
@@ -1192,7 +1242,8 @@ cleanup_legacy_repo_leftovers() {
 _resign_legacy_repository() {
   local repo_name="$1"
   local repo_storage="$(get_local_repo_storage $repo_name)"
-  local legacy_repo_storage="${repo_storage}/pub/catalogs"
+  local legacy_repo_storage="${repo_storage}"
+  [ -d ${repo_storage}/pub ] && legacy_repo_storage="${legacy_repo_storage}/pub/catalogs" # for 2.0.x style repositories
   local tmp_dir="$(pwd)/tmp"
   local upstream="local,${legacy_repo_storage}/data/txn,${legacy_repo_storage}"
 
@@ -1203,15 +1254,16 @@ _resign_legacy_repository() {
   echo `date -u "+%Y%m%d%H%M%S"` > ${whitelist}.unsigned
   echo "E`date -u --date='next month' "+%Y%m%d%H%M%S"`" >> ${whitelist}.unsigned
   echo "N$repo_name" >> ${whitelist}.unsigned
-  openssl x509 -fingerprint -sha1 -in /etc/cvmfs/keys/${repo_name}.crt | grep "SHA1 Fingerprint" | sed 's/SHA1 Fingerprint=//' >> ${whitelist}.unsigned
+  openssl x509 -in /etc/cvmfs/keys/${repo_name}.crt -outform der | \
+    cvmfs_swissknife hash -a sha1 -f >> ${whitelist}.unsigned || return 2
   local hash;
-  hash=`openssl sha1 < ${whitelist}.unsigned | tr -d '\n' | tail -c40`
+  hash=`cat ${whitelist}.unsigned | cvmfs_swissknife hash -a sha1`
   echo "--" >> ${whitelist}.unsigned
   echo $hash >> ${whitelist}.unsigned
   echo -n $hash > ${whitelist}.hash
-  openssl rsautl -inkey /etc/cvmfs/keys/${repo_name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature
-  cat ${whitelist}.unsigned ${whitelist}.signature | sudo tee ${legacy_repo_storage}/.cvmfswhitelist > /dev/null
-  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash
+  openssl rsautl -inkey /etc/cvmfs/keys/${repo_name}.masterkey -sign -in ${whitelist}.hash -out ${whitelist}.signature || return 3
+  cat ${whitelist}.unsigned ${whitelist}.signature | sudo tee ${legacy_repo_storage}/.cvmfswhitelist > /dev/null       || return 4
+  rm -f ${whitelist}.unsigned ${whitelist}.signature ${whitelist}.hash                                                 || return 5
 }
 
 
@@ -1240,20 +1292,36 @@ plant_tarball() {
 #       it expects a repo keychain to be planted in /etc/keys/${legacy_repo_name}
 # @param tarball           path to the tarball containing the legacy repo
 # @param legacy_repo_name  FQRN of the repository to be planted
-# @param verbose           print verbose output
+# @param repo_owner        user ID that is supposed to own the repository
 plant_legacy_repository_revision() {
   local tarball="$1"
   local legacy_repo_name="$2"
-  local verbose="$3"
+  local repo_owner="$3"
+  local verbose="$4"
   local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
 
-  plant_tarball "$tarball" "$verbose"                                  || return 104
-  [ -d ${legacy_repo_storage}/pub ]                                    || return 105
-  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
-  [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
-  sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
-  _resign_legacy_repository "$legacy_repo_name"                        || return 109
+  plant_tarball "$tarball" "$verbose" || return 104
+
+  # figure out if we just planted a CVMFS 2.0.x repository or something newer
+  local is_cvmfs_20=0
+  [ -d ${legacy_repo_storage}/pub ] && is_cvmfs_20=1
+
+  # do a couple of sanity checks and adjustments
+  if [ $is_cvmfs_20 -eq 1 ]; then
+    [ -d ${legacy_repo_storage}/pub ]                                    || return 105
+    [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfscatalog ]             || return 106
+    [ -f ${legacy_repo_storage}/pub/catalogs/.cvmfswhitelist ]           || return 107
+    sudo touch ${legacy_repo_storage}/pub/catalogs/.cvmfs_master_replica || return 108
+  else
+    [ -d ${legacy_repo_storage}/data ]                      || return 105
+    [ -f ${legacy_repo_storage}/.cvmfspublished ]           || return 106
+    [ -f ${legacy_repo_storage}/.cvmfswhitelist ]           || return 107
+    sudo touch ${legacy_repo_storage}/.cvmfs_master_replica || return 108
+  fi
+
+  _resign_legacy_repository "$legacy_repo_name" || return 109
 }
+
 
 
 # creates a path into the CAS of CVMFS server
@@ -1280,6 +1348,14 @@ peek_backend() {
 
   load_repo_config $repo_name
   cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
+}
+
+
+# reads the upstream config part of a CernVM-FS server configuration file
+# This is the third comma-separated field in the upstream string
+read_upstream_config() {
+  local upstream_string="$1"
+  echo "$upstream_string" | cut -f3 -d','
 }
 
 
@@ -1809,12 +1885,14 @@ do_local_mount() {
   local mountpoint="$1"
   local repo_name="$2"
   local repo_url="$3"
+  local config_file="$4"
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
   local output="$(mktemp ${mountpoint}.log.XXXXX)"
 
   mkdir $mountpoint $cache
-  cat > $config << EOF
+  if [ -z $config_file ]; then
+    cat > $config << EOF
 CVMFS_CACHE_BASE=$cache
 CVMFS_RELOAD_SOCKETS=$cache
 CVMFS_SERVER_URL=$repo_url
@@ -1822,6 +1900,10 @@ CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${repo_name}.pub
 CVMFS_KCACHE_TIMEOUT=15
 EOF
+  else
+    cat $config_file > $config
+  fi
+
   cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
 }
 
@@ -1846,4 +1928,11 @@ print_internal_affairs() {
   fi
 
   as_root cvmfs_talk -i $repo_name internal affairs
+}
+
+get_internal_value() {
+  local repo=$1
+  local key=$2
+
+  echo $(as_root cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
 }

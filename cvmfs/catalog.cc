@@ -430,6 +430,11 @@ uint64_t Catalog::GetLastModified() const {
 }
 
 
+uint64_t Catalog::GetNumChunks() const {
+  return counters_.Get("self_regular") + counters_.Get("self_chunks");
+}
+
+
 uint64_t Catalog::GetNumEntries() const {
   const string sql = "SELECT count(*) FROM catalog;";
 

@@ -7,7 +7,7 @@
 # you're doing.
 Vagrant.configure(2) do |config|
   # allow virtual box to take advantage of the host's speed
-  # Snippet found here (thanks to Stefan Wrobel): 
+  # Snippet found here (thanks to Stefan Wrobel):
   # https://stefanwrobel.com/how-to-make-vagrant-performance-not-suck
   config.vm.provider "virtualbox" do |v|
     host = RbConfig::CONFIG['host_os']
@@ -61,7 +61,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "ubuntu" do |ub|
-    ub.vm.box = "ubuntu-trusty"
+    ub.vm.box = "ubuntu/trusty64"
     ub.vm.network "private_network", ip: "192.168.33.12"
     ub.vm.synced_folder '.', '/vagrant', nfs: true
     ub.vm.provision "shell", path: "vagrant/provision_ubuntu.sh"
