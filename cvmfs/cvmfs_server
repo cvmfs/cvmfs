@@ -1643,6 +1643,16 @@ sign_manifest() {
 }
 
 
+# this strips both the attached signature block and the certificate hash from
+# an already signed manifest file and prints the result to stdout
+strip_manifest_signature() {
+  local signed_manifest="$1"
+  # print lines starting with a capital letter (except X for the certificate)
+  # and stop as soon as we find the signature delimiter '--'
+  awk '/^[A-WY-Z]/ {print $0}; /--/ {exit}' $signed_manifest
+}
+
+
 check_upstream_validity() {
   local upstream=$1
   local silent=0
