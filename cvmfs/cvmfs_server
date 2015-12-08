@@ -3037,6 +3037,19 @@ import() {
     [ $chown_backend -ne 0 ] || [ x"$cvmfs_user" = x"$(stat -c%U $item)" ] || die "$item not owned by $cvmfs_user"
   done
 
+  # check availability of repository signing key and certificate
+  local keys="$public_key"
+  if [ $recreate_repo_key -eq 0 ]; then
+    if [ ! -f ${keys_location}/${private_key} ] || \
+       [ ! -f ${keys_location}/${certificate} ]; then
+      die "repository signing key or certificate not found (use -t maybe?)"
+    fi
+    keys="$keys $private_key $certificate"
+  else
+    [ $recreate_whitelist -ne 0 ] || die "using -t implies whitelist recreation (use -r maybe?)"
+  fi
+
+  # check whitelist expiry date
   if [ $recreate_whitelist -eq 0 ]; then
     [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
     local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
@@ -3064,7 +3077,6 @@ import() {
 
   # import the old repository security keys
   echo -n "Importing the given key files... "
-  keys="$private_key $certificate $public_key"
   if [ -f ${keys_location}/${master_key} ]; then
     keys="$keys $master_key"
   fi
