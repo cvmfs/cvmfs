@@ -568,8 +568,7 @@ void SyncMediator::CreateNestedCatalog(const SyncItem &requestFile) {
   const std::string notice = "Nested catalog at ";
   PrintChangesetNotice(kAddCatalog, notice + requestFile.GetUnionPath());
   if (!params_->dry_run) {
-    catalog_manager_->CreateNestedCatalog(requestFile.relative_parent_path(),
-                                          requestFile.IsExternalData());
+    catalog_manager_->CreateNestedCatalog(requestFile.relative_parent_path());
   }
 }
 

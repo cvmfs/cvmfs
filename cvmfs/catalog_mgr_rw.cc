@@ -528,8 +528,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
  * @param external_data whether data for this catalog is external to the repository
  * @return true on success, false otherwise
  */
-void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint,
-                                                 CatalogProperty external_data)
+void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
 {
   const string nested_root_path = MakeRelativePath(mountpoint);
 
@@ -558,9 +557,10 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint,
   const bool volatile_content = false;
   CatalogDatabase *new_catalog_db = CatalogDatabase::Create(database_file_path);
   assert(NULL != new_catalog_db);
+  // Note we do not set the external_data bit for nested catalogs
   retval = new_catalog_db->InsertInitialValues(nested_root_path,
                                                volatile_content,
-                                               external_data,
+                                               kUnset,
                                                new_root_entry);
   assert(retval);
   // TODO(rmeusel): we need a way to attach a catalog directy from an open

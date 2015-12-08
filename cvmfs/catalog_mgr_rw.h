@@ -110,8 +110,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void ShrinkHardlinkGroup(const std::string &remove_path);
 
   // Nested catalog handling
-  void CreateNestedCatalog(const std::string &mountpoint,
-                           CatalogProperty external_data);
+  void CreateNestedCatalog(const std::string &mountpoint);
   void RemoveNestedCatalog(const std::string &mountpoint);
   bool IsTransitionPoint(const std::string &path);
 

@@ -65,7 +65,7 @@ Catalog::Catalog(const PathString &path,
   assert(retval == 0);
 
   atomic_init32(&external_data_status_);
-  ExternalDataStatus status = kExternalUnknown;
+  ExternalDataStatus status = kExternalPublishUnknown;
   atomic_write32(&external_data_status_, status);
   database_ = NULL;
   uid_map_ = NULL;
@@ -416,44 +416,33 @@ void Catalog::DropDatabaseFileOwnership() {
 
 
 Catalog::ExternalDataStatus Catalog::GetExternalDataUnlocked() const {
-  ExternalDataStatus status = \
+  if (!IsRoot()) {return kExternalPublishDisable;}
+  ExternalDataStatus status =
     static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
-  if (status == kExternalUnknown) {
-    bool attr = false;
-    if (database().HasProperty("external_data")) {
-      attr = database().GetProperty<int>("external_data");
-      status = attr ? kExternalPresent : kExternalNone;
-    } else {
-      status = parent_ ? parent_->GetExternalDataLocked() : \
-                         kExternalUnspecified;
-    }
+  if (status == kExternalPublishUnknown) {
+    int attr_value = database().GetPropertyDefault<int>("external_data", 0);
+    status = attr_value ? kExternalPublishEnable : kExternalPublishDisable;
     atomic_write32(&external_data_status_, status);
   }
   return status;
 }
 
 Catalog::ExternalDataStatus Catalog::GetExternalDataLocked() const {
+  if (!IsRoot()) {return kExternalPublishDisable;}
   ExternalDataStatus status = \
     static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
-  if (status == kExternalUnknown) {
+  if (status == kExternalPublishUnknown) {
     MutexLockGuard guard(*lock_);
-    bool attr = false;
-    if (database().HasProperty("external_data")) {
-      bool attr = database().GetProperty<int>("external_data");
-      status = attr ? kExternalPresent : kExternalNone;
-    } else {
-      status = parent_ ? parent_->GetExternalDataLocked() :
-                         kExternalUnspecified;
-    }
-    atomic_write32(&external_data_status_, attr ? kExternalPresent :
-                                                  kExternalNone);
+    int attr_value = database().GetPropertyDefault<int>("external_data", 0);
+    status = attr_value ? kExternalPublishEnable : kExternalPublishDisable;
+    atomic_write32(&external_data_status_, status);
   }
   return status;
 }
 
 bool Catalog::GetExternalData() const {
   ExternalDataStatus status = GetExternalDataLocked();
-  return (status == kExternalPresent);
+  return (status == kExternalPublishEnable);
 }
 
 

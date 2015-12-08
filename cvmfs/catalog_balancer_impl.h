@@ -141,8 +141,7 @@ template <class CatalogMgrT>
 void CatalogBalancer<CatalogMgrT>::AddCatalog(virtual_node_t *child_node) {
   assert(child_node != NULL);
   string new_catalog_path = child_node->path.substr(1);
-  // TODO(jblomer): figure out a proper value for external property
-  catalog_mgr_->CreateNestedCatalog(new_catalog_path, kUnset);
+  catalog_mgr_->CreateNestedCatalog(new_catalog_path);
   child_node->weight = 1;
   child_node->is_new_nested_catalog = true;
   LogCvmfs(kLogPublish, kLogStdout, "Automatic creation of nested"

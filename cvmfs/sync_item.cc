@@ -15,9 +15,7 @@ using namespace std;  // NOLINT
 
 static bool ProcessCatalogProperties(const std::string &scratch_path,
                                      bool &external_data) {  // NOLINT
-  char buf[128];
   external_data = false;
-  ssize_t retval;
   LogCvmfs(kLogFsTraversal, kLogDebug, "Processing catalog marker %s.",
            scratch_path.c_str());
   FILE *fp = fopen(scratch_path.c_str(), "r");
@@ -69,12 +67,12 @@ namespace publish {
 
 SyncItem::SyncItem() :
   union_engine_(NULL),
-  external_data_(kUnset),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
   valid_graft_(false),
   graft_marker_present_(false),
+  external_data_(kUnset),
   graft_size_(-1),
   scratch_type_(static_cast<SyncItemType>(0)),
   rdonly_type_(static_cast<SyncItemType>(0)) {}
@@ -84,12 +82,12 @@ SyncItem::SyncItem(const string       &relative_parent_path,
                    const SyncUnion    *union_engine,
                    const SyncItemType  entry_type) :
   union_engine_(union_engine),
-  external_data_(kUnset),
   whiteout_(false),
   opaque_(false),
   masked_hardlink_(false),
   valid_graft_(false),
   graft_marker_present_(false),
+  external_data_(kUnset),
   relative_parent_path_(relative_parent_path),
   filename_(filename),
   graft_size_(-1),

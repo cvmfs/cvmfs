@@ -325,7 +325,6 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
     opts.fallback_proxies,
     download::DownloadManager::kSetProxyBoth);
   external_download_ready_ = true;
-  
 
   signature_manager_ = new signature::SignatureManager();
   signature_manager_->Init();

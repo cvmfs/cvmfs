@@ -404,12 +404,6 @@ class DownloadManager {
   bool opt_ipv4_only_;
   bool follow_redirects_;
 
-  /**
-   * If data files are kept outside CVMFS (and stored by path instead of hash),
-   * then this is set to true
-   */
-  bool external_data_;
-
   // Host list
   std::vector<std::string> *opt_host_chain_;
   /**

@@ -215,6 +215,10 @@ bool CatalogDatabase::InsertInitialValues(
   }
 
   if (external_data != kUnset) {
+    if (!root_path.empty()) {
+      PrintSqlError("External data bit may not be set for nested catalog.");
+      return false;
+    }
     if (!this->SetProperty("external_data", external_data == kYes ? 1 : 0)) {
       PrintSqlError("failed to set external data flag into the newly created "
                     "catalog tables.");

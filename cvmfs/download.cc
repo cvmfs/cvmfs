@@ -1305,8 +1305,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
 }
 
 
-DownloadManager::DownloadManager() :
-    external_data_(false) {
+DownloadManager::DownloadManager() {
   pool_handles_idle_ = NULL;
   pool_handles_inuse_ = NULL;
   pool_max_handles_ = 0;
@@ -1404,8 +1403,6 @@ void DownloadManager::Init(const unsigned max_pool_handles,
                            const string &name,
                            bool external_data)
 {
-  external_data_ = external_data;
-
   atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);
   assert(retval == CURLE_OK);
