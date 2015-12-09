@@ -3815,6 +3815,9 @@ transaction() {
   names=$(get_or_guess_multiple_repository_names $@)
   check_multiple_repository_existence "$names"
 
+  # sanity checks
+  check_autofs_on_cvmfs && die "Autofs on /cvmfs has to be disabled"
+
   # go through the repositories
   for name in $names; do
 
