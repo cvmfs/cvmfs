@@ -1,4 +1,5 @@
 2.2.0:
+  * Enable `cvmfs_server import` to generate new repository keys (CVM-865)
   * Do not mount /cvmfs on boot on the release manager machine; on the first
     transaction, CVMFS_AUTO_REPAIR_MOUNTPOINT mounts automatically
   * Perform host fail-over on HTTP 400 error code (CVM-819)
