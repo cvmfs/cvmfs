@@ -2334,6 +2334,8 @@ _update_geodb_install() {
   local download_target=${CVMFS_UPDATEGEO_DB}.gz
   local unzip_target=${CVMFS_UPDATEGEO_DB}.new
 
+  to_syslog "updating GeoIP database from $CVMFS_UPDATEGEO_URL"
+
   # downloading the GeoIP database file
   if ! curl -sS                  \
             --fail               \
@@ -2341,6 +2343,7 @@ _update_geodb_install() {
             --max-time 60        \
             "$CVMFS_UPDATEGEO_URL" > $download_target 2>/dev/null; then
     echo "failed to download $CVMFS_UPDATEGEO_URL" >&2
+    to_syslog "failed to download $CVMFS_UPDATEGEO_URL"
     rm -f $download_target
     return 1
   fi
@@ -2348,6 +2351,7 @@ _update_geodb_install() {
   # unzipping the GeoIP database file
   if ! zcat $download_target > $unzip_target 2>/dev/null; then
     echo "failed to unzip $download_target to $unzip_target" >&2
+    to_syslog "failed to unzip $download_target tp $unzip_target"
     rm -f $download_target $unzip_target
     return 2
   fi
@@ -2358,9 +2362,12 @@ _update_geodb_install() {
   # atomically installing the GeoIP database
   if ! mv -f $unzip_target $dbfile; then
     echo "failed to install $dbfile" >&2
+    to_syslog "failed to install $dbfile"
     rm -f $unzip_target
     return 3
   fi
+
+  to_syslog "successfully updated GeoIP database from $CVMFS_UPDATEGEO_URL"
 
   return 0
 }
@@ -4564,11 +4571,20 @@ __snapshot_cleanup() {
 
   load_repo_config $alias_name
   local user_shell="$(get_user_shell $alias_name)"
-
   $user_shell "$(__swissknife_cmd) remove     \
                  -r ${CVMFS_UPSTREAM_STORAGE} \
                  -o .cvmfs_is_snapshotting"       || echo "Warning: failed to remove .cvmfs_is_snapshotting"
   release_lock ${CVMFS_SPOOL_DIR}/is_snapshotting || echo "Warning: failed to release snapshotting lock"
+}
+
+__snapshot_succeeded() {
+  local alias_name=$1
+  __snapshot_cleanup $alias_name
+}
+
+__snapshot_failed() {
+  local alias_name=$1
+  __snapshot_cleanup $alias_name
 }
 
 snapshot() {
@@ -4673,7 +4689,7 @@ snapshot() {
     fi
 
     # here the lock is already acquired and needs to be cleared in case of abort
-    trap "__snapshot_cleanup $alias_name" EXIT HUP INT TERM
+    trap "__snapshot_failed $alias_name" EXIT HUP INT TERM
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
@@ -4722,7 +4738,7 @@ snapshot() {
 
     # all done, clear the trap and run the cleanup manually
     trap - EXIT HUP INT TERM
-    __snapshot_cleanup $alias_name
+    __snapshot_succeeeded $alias_name
 
   done
 
