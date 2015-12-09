@@ -4464,6 +4464,8 @@ gc() {
       fi
     fi
 
+    to_syslog "manually garbage collecting $name"
+
     # run the garbage collection
     echo "Running Garbage Collection"
     __run_gc "$name"           \
@@ -4476,12 +4478,17 @@ gc() {
     # sign the result
     if is_stratum0 $name && [ $dry_run -eq 0 ]; then
       echo "Signing Repository Manifest"
-      sign_manifest $name $manifest || die "Fail!"
+      if ! sign_manifest $name $manifest; then
+        to_syslog "failed to sign manifest after manually garbage collecting $name"
+        die "Fail!"
+      fi
 
       # close the transaction
       trap - EXIT HUP INT TERM
       close_transaction $name 0
     fi
+
+    to_syslog "successfully manual garbage collected $name"
 
   done
 }
@@ -4510,6 +4517,8 @@ __run_gc() {
   fi
 
   # do it!
+  [ $dry_run -ne 0 ] || to_syslog "garbage collecting $name"
+
   local user_shell="$(get_user_shell $name)"
   local gc_command="$(__swissknife_cmd dbg) gc                         \
                                             -r $repository_url         \
@@ -4518,7 +4527,11 @@ __run_gc() {
                                             -k $CVMFS_PUBLIC_KEY       \
                                             -t ${CVMFS_SPOOL_DIR}/tmp/ \
                                             $additional_switches"
-  $user_shell "$gc_command" || return 6
+
+  if ! $user_shell "$gc_command"; then
+    to_syslog "failed to garbage collect $name"
+    return 6
+  fi
 
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
   if is_stratum0 $name && [ $dry_run -eq 0 ]; then
@@ -4531,8 +4544,13 @@ __run_gc() {
       -f $name                                         \
       -b $base_hash                                    \
       -e $hash_algorithm"
-    $user_shell "$tag_command" || return 7
+    if ! $user_shell "$tag_command"; then
+      to_syslog "failed to update history after garbage collecting $name"
+      return 7
+    fi
   fi
+
+  to_syslog "successfully garbage collected $name"
 
   return 0
 }
