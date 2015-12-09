@@ -2351,7 +2351,7 @@ _update_geodb_install() {
   # unzipping the GeoIP database file
   if ! zcat $download_target > $unzip_target 2>/dev/null; then
     echo "failed to unzip $download_target to $unzip_target" >&2
-    to_syslog "failed to unzip $download_target tp $unzip_target"
+    to_syslog "failed to unzip $download_target to $unzip_target"
     rm -f $download_target $unzip_target
     return 2
   fi
