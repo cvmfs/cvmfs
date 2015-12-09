@@ -3947,6 +3947,8 @@ abort() {
     handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
     sync
 
+    to_syslog "aborting transaction for $name"
+
     abort_before_hook $name
     close_transaction $name $use_fd_fallback
     abort_after_hook $name
