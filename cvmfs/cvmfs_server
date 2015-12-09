@@ -1417,6 +1417,17 @@ __health_check_print_repair_info() {
   fi
 }
 
+__health_check_syslog_repair_info() {
+  local name="$1"
+  local reason="$2"
+  local success="$3"
+  if $success; then
+    to_syslog "repaired mounts for $name ($reason)"
+  else
+    to_syslog "failed to repair mounts for $name ($reason)"
+  fi
+}
+
 # checks and warns in inconsistent repository states or unfavorable configs.
 #
 # @param name           the FQRN of the repository to be checked
@@ -1428,6 +1439,7 @@ health_check() {
   local repair_in_txn=${3-0}
   local rdonly_broken=0
   local rw_broken=0
+  local success=false
 
   load_repo_config $name
 
@@ -1471,12 +1483,16 @@ health_check() {
     fi
 
     echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
-    cvmfs_suid_helper rdonly_mount $name > /dev/null && echo "success" || { echo "fail"; exit 1; }
+    cvmfs_suid_helper rdonly_mount $name > /dev/null && success=true || success=false
+    __health_check_syslog_repair_info $name ".../rdonly" $success
+    $success && echo "success" || { echo "fail"; exit 1; }
   fi
 
   if [ $rw_broken -eq 1 ]; then
     echo -n "Note: Trying to mount /cvmfs/${name}... "
-    cvmfs_suid_helper rw_mount $name && echo "success" || { echo "fail"; exit 1; }
+    cvmfs_suid_helper rw_mount $name && success=true || success=false
+    __health_check_syslog_repair_info $name "/cvmfs/${name}" $success
+    $success && echo "success" || { echo "fail"; exit 1; }
   fi
 
   # check mounted CVMFS revision against published one
@@ -1487,16 +1503,13 @@ health_check() {
     __health_check_print_repair_info $name $repair_in_txn
     local published_hash="$(get_published_root_hash $name)"
     echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
-    if cvmfs_suid_helper rw_umount     $name                   && \
-       cvmfs_suid_helper rdonly_umount $name                   && \
-       set_ro_root_hash                $name "$published_hash" && \
-       cvmfs_suid_helper rdonly_mount  $name > /dev/null       && \
-       cvmfs_suid_helper rw_mount      $name; then
-      echo "success"
-    else
-      echo "fail"
-      exit 1
-    fi
+    cvmfs_suid_helper rw_umount     $name                   && \
+    cvmfs_suid_helper rdonly_umount $name                   && \
+    set_ro_root_hash                $name "$published_hash" && \
+    cvmfs_suid_helper rdonly_mount  $name > /dev/null       && \
+    cvmfs_suid_helper rw_mount      $name && success=true || success=false
+    __health_check_syslog_repair_info $name "outdated revision" $success
+    $success && echo "success" || { echo "fail"; exit 1; }
   fi
 
   # check transaction status
@@ -1505,14 +1518,18 @@ health_check() {
       echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
       __health_check_print_repair_info $name $repair_in_txn
       echo -n "Note: Trying to remount /cvmfs/${name} read/write... "
-      cvmfs_suid_helper open $name && echo "success" || { echo "fail"; exit 1; }
+      cvmfs_suid_helper open $name && success=true || success=false
+      __health_check_syslog_repair_info $name "non-writable transaction" $success
+      $success && echo "success" || { echo "fail"; exit 1; }
     fi
   else
     if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
       echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
       __health_check_print_repair_info $name $repair_in_txn
       echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
-      cvmfs_suid_helper lock $name && echo "success" || { echo "fail"; exit 1; }
+      cvmfs_suid_helper lock $name && success=true || success=false
+      __health_check_syslog_repair_info $name "writable mount point" $success
+      $success && echo "success" || { echo "fail"; exit 1; }
     fi
   fi
 }
