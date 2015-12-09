@@ -912,6 +912,18 @@ is_stratum1() {
   ! is_stratum0 $name
 }
 
+get_repo_info_from_url() {
+  local url="$1"
+  shift 1
+  __swissknife info $(get_follow_http_redirects_flag) -r "$url" $@ 2>/dev/null
+}
+
+# expects load_repo_config to be called with the right repository before
+# possible parameters, see `cvmfs_swissknife info`
+get_repo_info() {
+  get_repo_info_from_url "$CVMFS_STRATUM0" $@
+}
+
 # checks if a given repository is replicable
 #
 # @param name   the repository name or URL to be checked
@@ -921,11 +933,11 @@ is_master_replica() {
   local is_master_replica
 
   if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
-    is_master_replica=$(__swissknife info -L -r $name -m  2>/dev/null)
+    is_master_replica=$(get_repo_info_from_url $name -m -L)
   else
     load_repo_config $name
     is_stratum0 $name || return 1
-    is_master_replica=$(__swissknife info -r $CVMFS_STRATUM0 -m $(get_follow_http_redirects_flag) 2>/dev/null)
+    is_master_replica=$(get_repo_info -m)
   fi
 
   [ "x$is_master_replica" = "xtrue" ]
@@ -942,7 +954,7 @@ is_garbage_collectable() {
   if is_stratum0 $name; then
     [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]
   else
-    [ x"$(__swissknife info -r $CVMFS_STRATUM1 -g $(get_follow_http_redirects_flag))" = x"yes" ]
+    [ x"$(get_repo_info_from_url $CVMFS_STRATUM1 -g)" = x"yes" ]
   fi
 }
 
@@ -1891,9 +1903,7 @@ get_mounted_root_hash() {
   local repository_name=$1
 
   load_repo_config $repository_name
-  __swissknife info -r $CVMFS_STRATUM0           \
-                    -u ${CVMFS_SPOOL_DIR}/rdonly \
-                    -C $(get_follow_http_redirects_flag)
+  get_repo_info -u ${CVMFS_SPOOL_DIR}/rdonly -C
 }
 
 
@@ -1905,7 +1915,7 @@ get_published_root_hash() {
   local repository_name=$1
 
   load_repo_config $repository_name
-  __swissknife info -r $CVMFS_STRATUM0 -c $(get_follow_http_redirects_flag)
+  get_repo_info -c
 }
 
 
@@ -2765,8 +2775,8 @@ add_replica() {
   public_key=$2
 
   # get the name of the repository pointed to by $stratum0
-  name=$(__swissknife info -L -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
-  name=$(__swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
+  name=$(get_repo_info_from_url $stratum0 -L -n) || die "Failed to access Stratum0 repository at $stratum0"
+  name=$(get_repo_info_from_url $stratum0    -n) || die "Failed to access Stratum0 repository at $stratum0"
   if [ x$alias_name = x"" ]; then
     alias_name=$name
   else
@@ -4042,7 +4052,7 @@ publish() {
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
-    local revision_number=$(__swissknife info -r $stratum0 -v $(get_follow_http_redirects_flag))
+    local revision_number=$(get_repo_info -v)
     if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
       echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
       retcode=1
@@ -4419,7 +4429,7 @@ gc() {
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
     is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
 
-    local head_timestamp="$(__swissknife info -r $CVMFS_STRATUM0 -t $(get_follow_http_redirects_flag))"
+    local head_timestamp="$(get_repo_info -t)"
     [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
 
     # figure out the URL of the repository
