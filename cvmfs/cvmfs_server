@@ -912,6 +912,16 @@ is_stratum1() {
   ! is_stratum0 $name
 }
 
+
+# Parse redirects configuration into redirect flag.
+# Assumes that config is loaded already, i.e. load_repo_config().
+get_follow_http_redirects_flag() {
+  if [ x"$CVMFS_FOLLOW_REDIRECTS" = x"yes" ]; then
+    echo "-L"
+  fi
+}
+
+
 get_repo_info_from_url() {
   local url="$1"
   shift 1
@@ -2491,13 +2501,6 @@ alterfs() {
   fi
 }
 
-# Parse redirects configuration into redirect flag.
-# Assumes that config is loaded already, i.e. load_repo_config().
-get_follow_http_redirects_flag() {
-  if [ x"$CVMFS_FOLLOW_REDIRECTS" = x"yes" ]; then
-    echo "-L"
-  fi
-}
 
 ################################################################################
 
