@@ -1133,6 +1133,7 @@ publish_starting() {
   acquire_lock "$pub_lock" ignore_stale || die "Failed to acquire publishing lock"
   trap "publish_failed $name" EXIT HUP INT TERM
   cvmfs_suid_helper lock $name
+  to_syslog "publishing $name"
 }
 
 publish_failed() {
@@ -1142,6 +1143,7 @@ publish_failed() {
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
   cvmfs_suid_helper open $name
+  to_syslog "failed to publish $name"
 }
 
 publish_succeeded() {
@@ -1150,6 +1152,7 @@ publish_succeeded() {
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
+  to_syslog "successfully published $name revision $(get_repo_info -v)"
 }
 
 
