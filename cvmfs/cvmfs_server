@@ -275,7 +275,7 @@ Supported Commands:
                 [-l import legacy repo (2.0.x)] [-s show migration statistics]
                 [-f union filesystem type] [-c file ownership (UID:GID)]
                 [-k path to keys] [-g chown backend] [-r recreate whitelist]
-                [-p no apache config]
+                [-p no apache config] [-t recreate repo key and certificate]
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
@@ -1643,6 +1643,16 @@ sign_manifest() {
 }
 
 
+# this strips both the attached signature block and the certificate hash from
+# an already signed manifest file and prints the result to stdout
+strip_manifest_signature() {
+  local signed_manifest="$1"
+  # print lines starting with a capital letter (except X for the certificate)
+  # and stop as soon as we find the signature delimiter '--'
+  awk '/^[A-WY-Z]/ {print $0}; /--/ {exit}' $signed_manifest
+}
+
+
 check_upstream_validity() {
   local upstream=$1
   local silent=0
@@ -2917,10 +2927,11 @@ import() {
   local unionfs=
   local recreate_whitelist=0
   local configure_apache=1
+  local recreate_repo_key=0
 
   # parameter handling
   OPTIND=1
-  while getopts "w:o:c:u:k:lsmgf:rp" option; do
+  while getopts "w:o:c:u:k:lsmgf:rpt" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2957,6 +2968,9 @@ import() {
       ;;
       p)
         configure_apache=0
+      ;;
+      t)
+        recreate_repo_key=1
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3023,6 +3037,19 @@ import() {
     [ $chown_backend -ne 0 ] || [ x"$cvmfs_user" = x"$(stat -c%U $item)" ] || die "$item not owned by $cvmfs_user"
   done
 
+  # check availability of repository signing key and certificate
+  local keys="$public_key"
+  if [ $recreate_repo_key -eq 0 ]; then
+    if [ ! -f ${keys_location}/${private_key} ] || \
+       [ ! -f ${keys_location}/${certificate} ]; then
+      die "repository signing key or certificate not found (use -t maybe?)"
+    fi
+    keys="$keys $private_key $certificate"
+  else
+    [ $recreate_whitelist -ne 0 ] || die "using -t implies whitelist recreation (use -r maybe?)"
+  fi
+
+  # check whitelist expiry date
   if [ $recreate_whitelist -eq 0 ]; then
     [ -f "${storage_location}/.cvmfswhitelist" ] || die "didn't find ${storage_location}/.cvmfswhitelist"
     local expiry=$(get_expiry_from_string "$(cat "${storage_location}/.cvmfswhitelist")")
@@ -3050,7 +3077,6 @@ import() {
 
   # import the old repository security keys
   echo -n "Importing the given key files... "
-  keys="$private_key $certificate $public_key"
   if [ -f ${keys_location}/${master_key} ]; then
     keys="$keys $master_key"
   fi
@@ -3074,6 +3100,19 @@ import() {
     if has_selinux; then
       chcon -Rv --type=httpd_sys_content_t $storage_location > /dev/null || die "fail!"
     fi
+    echo "done"
+  fi
+
+  # creating a new repository signing key if requested
+  if [ $recreate_repo_key -ne 0 ]; then
+    echo -n "Creating new repository signing key... "
+    local manifest_url="${CVMFS_STRATUM0}/.cvmfspublished"
+    local unsigned_manifest="${CVMFS_SPOOL_DIR}/tmp/unsigned_manifest"
+    create_cert $name $CVMFS_USER                     || die "fail (certificate creation)!"
+    get_item $name $manifest_url | \
+      strip_manifest_signature - > $unsigned_manifest || die "fail (manifest download)!"
+    chown $CVMFS_USER $unsigned_manifest              || die "fail (manifest chown)!"
+    sign_manifest $name $unsigned_manifest            || die "fail (manifest resign)!"
     echo "done"
   fi
 
