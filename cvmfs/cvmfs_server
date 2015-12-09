@@ -4580,11 +4580,13 @@ __snapshot_cleanup() {
 __snapshot_succeeded() {
   local alias_name=$1
   __snapshot_cleanup $alias_name
+  to_syslog "successfully snapshotted $alias_name from $CVMFS_STRATUM0"
 }
 
 __snapshot_failed() {
   local alias_name=$1
   __snapshot_cleanup $alias_name
+  to_syslog "failed to snapshot $alias_name from $CVMFS_STRATUM0"
 }
 
 snapshot() {
@@ -4670,12 +4672,14 @@ snapshot() {
     if ! acquire_lock $snapshot_lock; then
       if [ $abort_on_conflict -eq 1 ]; then
         echo "another snapshot is in progress... aborting"
+        to_syslog "did not snapshot $alias_name due to another snapshot"
         retcode=1
         continue
       fi
 
       if [ $initial_snapshot -eq 1 ]; then
         echo "an initial snapshot is in progress... aborting"
+        to_syslog "did not snapshot $alias_name due to another initial snapshot"
         retcode=1
         continue
       fi
@@ -4683,6 +4687,7 @@ snapshot() {
       echo "waiting for another snapshot to finish..."
       if ! wait_and_acquire_lock $snapshot_lock; then
         echo "failed to acquire snapshot lock"
+        to_syslog "did not snapshot $alias_name due to locking issues"
         retcode=1
         continue
       fi
@@ -4690,6 +4695,7 @@ snapshot() {
 
     # here the lock is already acquired and needs to be cleared in case of abort
     trap "__snapshot_failed $alias_name" EXIT HUP INT TERM
+    to_syslog "snapshotting $alias_name from $stratum0"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
@@ -4738,7 +4744,7 @@ snapshot() {
 
     # all done, clear the trap and run the cleanup manually
     trap - EXIT HUP INT TERM
-    __snapshot_succeeeded $alias_name
+    __snapshot_succeeded $alias_name
 
   done
 
