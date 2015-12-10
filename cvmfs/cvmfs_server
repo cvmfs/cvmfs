@@ -154,6 +154,17 @@ __swissknife() {
 }
 
 
+to_syslog() {
+  logger -t cvmfs_server $1 > /dev/null 2>&1 || return 0
+}
+
+to_syslog_for_repo() {
+  local repo_name="$1"
+  local message="$2"
+  to_syslog "(${repo_name}) $message"
+}
+
+
 cvmfs_mkfqrn() {
    local repo=$1
 
@@ -907,6 +918,28 @@ is_stratum1() {
   ! is_stratum0 $name
 }
 
+
+# Parse redirects configuration into redirect flag.
+# Assumes that config is loaded already, i.e. load_repo_config().
+get_follow_http_redirects_flag() {
+  if [ x"$CVMFS_FOLLOW_REDIRECTS" = x"yes" ]; then
+    echo "-L"
+  fi
+}
+
+
+get_repo_info_from_url() {
+  local url="$1"
+  shift 1
+  __swissknife info $(get_follow_http_redirects_flag) -r "$url" $@ 2>/dev/null
+}
+
+# expects load_repo_config to be called with the right repository before
+# possible parameters, see `cvmfs_swissknife info`
+get_repo_info() {
+  get_repo_info_from_url "$CVMFS_STRATUM0" $@
+}
+
 # checks if a given repository is replicable
 #
 # @param name   the repository name or URL to be checked
@@ -916,11 +949,11 @@ is_master_replica() {
   local is_master_replica
 
   if [ $(echo $name | cut --bytes=1-7) = "http://" ]; then
-    is_master_replica=$(__swissknife info -L -r $name -m  2>/dev/null)
+    is_master_replica=$(get_repo_info_from_url $name -m -L)
   else
     load_repo_config $name
     is_stratum0 $name || return 1
-    is_master_replica=$(__swissknife info -r $CVMFS_STRATUM0 -m $(get_follow_http_redirects_flag) 2>/dev/null)
+    is_master_replica=$(get_repo_info -m)
   fi
 
   [ "x$is_master_replica" = "xtrue" ]
@@ -937,7 +970,7 @@ is_garbage_collectable() {
   if is_stratum0 $name; then
     [ x"$CVMFS_GARBAGE_COLLECTION" = x"true" ]
   else
-    [ x"$(__swissknife info -r $CVMFS_STRATUM1 -g $(get_follow_http_redirects_flag))" = x"yes" ]
+    [ x"$(get_repo_info_from_url $CVMFS_STRATUM1 -g)" = x"yes" ]
   fi
 }
 
@@ -1058,6 +1091,8 @@ open_transaction() {
   is_stratum0 $name                    || die "Cannot open transaction on Stratum1"
   acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
   cvmfs_suid_helper open  $name        || die "Failed to make /cvmfs/$name writable"
+
+  to_syslog_for_repo $name "opened transaction"
 }
 
 # closes a previously opened transaction
@@ -1091,6 +1126,10 @@ close_transaction() {
   cvmfs_suid_helper rdonly_mount $name > /dev/null
   cvmfs_suid_helper rw_mount $name
   release_lock "$tx_lock"
+
+  local fallback_msg=""
+  [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
+  to_syslog_for_repo $name "closed transaction $fallback_msg"
 }
 
 # checks if a repository is currently runing a publish procedure
@@ -1110,6 +1149,7 @@ publish_starting() {
   acquire_lock "$pub_lock" ignore_stale || die "Failed to acquire publishing lock"
   trap "publish_failed $name" EXIT HUP INT TERM
   cvmfs_suid_helper lock $name
+  to_syslog_for_repo $name "started publishing"
 }
 
 publish_failed() {
@@ -1119,6 +1159,7 @@ publish_failed() {
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
   cvmfs_suid_helper open $name
+  to_syslog_for_repo $name "failed to publish"
 }
 
 publish_succeeded() {
@@ -1127,6 +1168,7 @@ publish_succeeded() {
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
+  to_syslog_for_repo $name "successfully published revision $(get_repo_info -v)"
 }
 
 
@@ -1406,6 +1448,17 @@ __health_check_print_repair_info() {
   fi
 }
 
+__health_check_syslog_repair_info() {
+  local name="$1"
+  local reason="$2"
+  local success="$3"
+  if $success; then
+    to_syslog_for_repo $name "repaired mounts ($reason)"
+  else
+    to_syslog_for_repo $name "failed to repair mounts ($reason)"
+  fi
+}
+
 # checks and warns in inconsistent repository states or unfavorable configs.
 #
 # @param name           the FQRN of the repository to be checked
@@ -1417,6 +1470,7 @@ health_check() {
   local repair_in_txn=${3-0}
   local rdonly_broken=0
   local rw_broken=0
+  local success=false
 
   load_repo_config $name
 
@@ -1460,12 +1514,16 @@ health_check() {
     fi
 
     echo -n "Note: Trying to mount ${CVMFS_SPOOL_DIR}/rdonly... "
-    cvmfs_suid_helper rdonly_mount $name > /dev/null && echo "success" || { echo "fail"; exit 1; }
+    cvmfs_suid_helper rdonly_mount $name > /dev/null && success=true || success=false
+    __health_check_syslog_repair_info $name ".../rdonly" $success
+    $success && echo "success" || { echo "fail"; exit 1; }
   fi
 
   if [ $rw_broken -eq 1 ]; then
     echo -n "Note: Trying to mount /cvmfs/${name}... "
-    cvmfs_suid_helper rw_mount $name && echo "success" || { echo "fail"; exit 1; }
+    cvmfs_suid_helper rw_mount $name && success=true || success=false
+    __health_check_syslog_repair_info $name "/cvmfs/${name}" $success
+    $success && echo "success" || { echo "fail"; exit 1; }
   fi
 
   # check mounted CVMFS revision against published one
@@ -1476,16 +1534,13 @@ health_check() {
     __health_check_print_repair_info $name $repair_in_txn
     local published_hash="$(get_published_root_hash $name)"
     echo -n "Note: Trying to remount repository mountpoints to $published_hash... "
-    if cvmfs_suid_helper rw_umount     $name                   && \
-       cvmfs_suid_helper rdonly_umount $name                   && \
-       set_ro_root_hash                $name "$published_hash" && \
-       cvmfs_suid_helper rdonly_mount  $name > /dev/null       && \
-       cvmfs_suid_helper rw_mount      $name; then
-      echo "success"
-    else
-      echo "fail"
-      exit 1
-    fi
+    cvmfs_suid_helper rw_umount     $name                   && \
+    cvmfs_suid_helper rdonly_umount $name                   && \
+    set_ro_root_hash                $name "$published_hash" && \
+    cvmfs_suid_helper rdonly_mount  $name > /dev/null       && \
+    cvmfs_suid_helper rw_mount      $name && success=true || success=false
+    __health_check_syslog_repair_info $name "outdated revision" $success
+    $success && echo "success" || { echo "fail"; exit 1; }
   fi
 
   # check transaction status
@@ -1494,14 +1549,18 @@ health_check() {
       echo "$name is in a transaction but /cvmfs/$name is not mounted read/write" >&2
       __health_check_print_repair_info $name $repair_in_txn
       echo -n "Note: Trying to remount /cvmfs/${name} read/write... "
-      cvmfs_suid_helper open $name && echo "success" || { echo "fail"; exit 1; }
+      cvmfs_suid_helper open $name && success=true || success=false
+      __health_check_syslog_repair_info $name "non-writable transaction" $success
+      $success && echo "success" || { echo "fail"; exit 1; }
     fi
   else
     if ! is_mounted "/cvmfs/$name" "^.* ro[, ].*$"; then
       echo "$name is not in a transaction but /cvmfs/$name is mounted read/write" >&2
       __health_check_print_repair_info $name $repair_in_txn
       echo -n "Note: Trying to remount /cvmfs/${name} read-only... "
-      cvmfs_suid_helper lock $name && echo "success" || { echo "fail"; exit 1; }
+      cvmfs_suid_helper lock $name && success=true || success=false
+      __health_check_syslog_repair_info $name "writable mount point" $success
+      $success && echo "success" || { echo "fail"; exit 1; }
     fi
   fi
 }
@@ -1863,9 +1922,7 @@ get_mounted_root_hash() {
   local repository_name=$1
 
   load_repo_config $repository_name
-  __swissknife info -r $CVMFS_STRATUM0           \
-                    -u ${CVMFS_SPOOL_DIR}/rdonly \
-                    -C $(get_follow_http_redirects_flag)
+  get_repo_info -u ${CVMFS_SPOOL_DIR}/rdonly -C
 }
 
 
@@ -1877,7 +1934,7 @@ get_published_root_hash() {
   local repository_name=$1
 
   load_repo_config $repository_name
-  __swissknife info -r $CVMFS_STRATUM0 -c $(get_follow_http_redirects_flag)
+  get_repo_info -c
 }
 
 
@@ -2287,11 +2344,17 @@ _update_geodb_lazy_install_slot() {
   [ "`date +%k`" -ge "$CVMFS_UPDATEGEO_HOUR" ]
 }
 
+_to_syslog_for_geoip() {
+  to_syslog "(GeoIP) $1"
+}
+
 _update_geodb_install() {
   local retcode=0
   local dbfile="$CVMFS_UPDATEGEO_DB"
   local download_target=${CVMFS_UPDATEGEO_DB}.gz
   local unzip_target=${CVMFS_UPDATEGEO_DB}.new
+
+  _to_syslog_for_geoip "started update from $CVMFS_UPDATEGEO_URL"
 
   # downloading the GeoIP database file
   if ! curl -sS                  \
@@ -2300,6 +2363,7 @@ _update_geodb_install() {
             --max-time 60        \
             "$CVMFS_UPDATEGEO_URL" > $download_target 2>/dev/null; then
     echo "failed to download $CVMFS_UPDATEGEO_URL" >&2
+    _to_syslog_for_geoip "failed to download from $CVMFS_UPDATEGEO_URL"
     rm -f $download_target
     return 1
   fi
@@ -2307,6 +2371,7 @@ _update_geodb_install() {
   # unzipping the GeoIP database file
   if ! zcat $download_target > $unzip_target 2>/dev/null; then
     echo "failed to unzip $download_target to $unzip_target" >&2
+    _to_syslog_for_geoip "failed to unzip $download_target to $unzip_target"
     rm -f $download_target $unzip_target
     return 2
   fi
@@ -2317,9 +2382,12 @@ _update_geodb_install() {
   # atomically installing the GeoIP database
   if ! mv -f $unzip_target $dbfile; then
     echo "failed to install $dbfile" >&2
+    _to_syslog_for_geoip "failed to install $dbfile"
     rm -f $unzip_target
     return 3
   fi
+
+  _to_syslog_for_geoip "successfully updated from $CVMFS_UPDATEGEO_URL"
 
   return 0
 }
@@ -2443,13 +2511,6 @@ alterfs() {
   fi
 }
 
-# Parse redirects configuration into redirect flag.
-# Assumes that config is loaded already, i.e. load_repo_config().
-get_follow_http_redirects_flag() {
-  if [ x"$CVMFS_FOLLOW_REDIRECTS" = x"yes" ]; then
-    echo "-L"
-  fi
-}
 
 ################################################################################
 
@@ -2737,8 +2798,8 @@ add_replica() {
   public_key=$2
 
   # get the name of the repository pointed to by $stratum0
-  name=$(__swissknife info -L -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
-  name=$(__swissknife info -r $stratum0 -n 2>/dev/null) || die "Failed to access Stratum0 repository at $stratum0"
+  name=$(get_repo_info_from_url $stratum0 -L -n) || die "Failed to access Stratum0 repository at $stratum0"
+  name=$(get_repo_info_from_url $stratum0    -n) || die "Failed to access Stratum0 repository at $stratum0"
   if [ x$alias_name = x"" ]; then
     alias_name=$name
   else
@@ -3919,6 +3980,8 @@ abort() {
     handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
     sync
 
+    to_syslog_for_repo $name "aborting transaction"
+
     abort_before_hook $name
     close_transaction $name $use_fd_fallback
     abort_after_hook $name
@@ -4012,7 +4075,7 @@ publish() {
     [ $(count_wr_fds /cvmfs/$name) -eq 0 ] || { echo "Open writable file descriptors on $name"; retcode=1; continue; }
     is_cwd_on_path "/cvmfs/$name" && { echo "Current working directory is in /cvmfs/$name.  Please release, e.g. by 'cd \$HOME'."; retcode=1; continue; } || true
     gc_timespan="$(get_auto_garbage_collection_timespan $name)" || { retcode=1; continue; }
-    local revision_number=$(__swissknife info -r $stratum0 -v $(get_follow_http_redirects_flag))
+    local revision_number=$(get_repo_info -v)
     if [ x"$manual_revision" != x"" ] && [ $manual_revision -le $revision_number ]; then
       echo "Current revision '$revision_number' is ahead of manual revision number '$manual_revision'."
       retcode=1
@@ -4389,7 +4452,7 @@ gc() {
     is_owner_or_root       $name || die "Permission denied: Repository $name is owned by $user"
     is_in_transaction      $name && die "Cannot run garbage collection while in a transaction"
 
-    local head_timestamp="$(__swissknife info -r $CVMFS_STRATUM0 -t $(get_follow_http_redirects_flag))"
+    local head_timestamp="$(get_repo_info -t)"
     [ $head_timestamp -gt $preserve_timestamp ] || die "Latest repository revision is older than given timestamp"
 
     # figure out the URL of the repository
@@ -4421,6 +4484,8 @@ gc() {
       fi
     fi
 
+    to_syslog_for_repo $name "started manual garbage collection"
+
     # run the garbage collection
     echo "Running Garbage Collection"
     __run_gc "$name"           \
@@ -4433,12 +4498,17 @@ gc() {
     # sign the result
     if is_stratum0 $name && [ $dry_run -eq 0 ]; then
       echo "Signing Repository Manifest"
-      sign_manifest $name $manifest || die "Fail!"
+      if ! sign_manifest $name $manifest; then
+        to_syslog_for_repo $name "failed to sign manifest after manual garbage collection"
+        die "Fail!"
+      fi
 
       # close the transaction
       trap - EXIT HUP INT TERM
       close_transaction $name 0
     fi
+
+    to_syslog_for_repo $name "successfully finished manual garbage collection"
 
   done
 }
@@ -4467,6 +4537,8 @@ __run_gc() {
   fi
 
   # do it!
+  [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
+
   local user_shell="$(get_user_shell $name)"
   local gc_command="$(__swissknife_cmd dbg) gc                         \
                                             -r $repository_url         \
@@ -4475,7 +4547,11 @@ __run_gc() {
                                             -k $CVMFS_PUBLIC_KEY       \
                                             -t ${CVMFS_SPOOL_DIR}/tmp/ \
                                             $additional_switches"
-  $user_shell "$gc_command" || return 6
+
+  if ! $user_shell "$gc_command"; then
+    to_syslog_for_repo $name "failed to garbage collect"
+    return 6
+  fi
 
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
   if is_stratum0 $name && [ $dry_run -eq 0 ]; then
@@ -4488,8 +4564,13 @@ __run_gc() {
       -f $name                                         \
       -b $base_hash                                    \
       -e $hash_algorithm"
-    $user_shell "$tag_command" || return 7
+    if ! $user_shell "$tag_command"; then
+      to_syslog_for_repo $name "failed to update history after garbage collection"
+      return 7
+    fi
   fi
+
+  to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0
 }
@@ -4503,11 +4584,22 @@ __snapshot_cleanup() {
 
   load_repo_config $alias_name
   local user_shell="$(get_user_shell $alias_name)"
-
   $user_shell "$(__swissknife_cmd) remove     \
                  -r ${CVMFS_UPSTREAM_STORAGE} \
                  -o .cvmfs_is_snapshotting"       || echo "Warning: failed to remove .cvmfs_is_snapshotting"
   release_lock ${CVMFS_SPOOL_DIR}/is_snapshotting || echo "Warning: failed to release snapshotting lock"
+}
+
+__snapshot_succeeded() {
+  local alias_name=$1
+  __snapshot_cleanup $alias_name
+  to_syslog_for_repo $alias_name "successfully snapshotted from $CVMFS_STRATUM0"
+}
+
+__snapshot_failed() {
+  local alias_name=$1
+  __snapshot_cleanup $alias_name
+  to_syslog_for_repo $alias_name "failed to snapshot from $CVMFS_STRATUM0"
 }
 
 snapshot() {
@@ -4593,12 +4685,14 @@ snapshot() {
     if ! acquire_lock $snapshot_lock; then
       if [ $abort_on_conflict -eq 1 ]; then
         echo "another snapshot is in progress... aborting"
+        to_syslog_for_repo $alias_name "did not snapshot (another snapshot in progress)"
         retcode=1
         continue
       fi
 
       if [ $initial_snapshot -eq 1 ]; then
         echo "an initial snapshot is in progress... aborting"
+        to_syslog_for_repo $alias_name "did not snapshot (another initial snapshot in progress)"
         retcode=1
         continue
       fi
@@ -4606,13 +4700,15 @@ snapshot() {
       echo "waiting for another snapshot to finish..."
       if ! wait_and_acquire_lock $snapshot_lock; then
         echo "failed to acquire snapshot lock"
+        to_syslog_for_repo $alias_name "did not snapshot (locking issues)"
         retcode=1
         continue
       fi
     fi
 
     # here the lock is already acquired and needs to be cleared in case of abort
-    trap "__snapshot_cleanup $alias_name" EXIT HUP INT TERM
+    trap "__snapshot_failed $alias_name" EXIT HUP INT TERM
+    to_syslog_for_repo $alias_name "started snapshotting from $stratum0"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
@@ -4661,7 +4757,7 @@ snapshot() {
 
     # all done, clear the trap and run the cleanup manually
     trap - EXIT HUP INT TERM
-    __snapshot_cleanup $alias_name
+    __snapshot_succeeded $alias_name
 
   done
 
