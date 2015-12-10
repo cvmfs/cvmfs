@@ -3466,6 +3466,11 @@ rmfs() {
     remove_config_files $name || die "fail"
     echo "done"
 
+    echo -n "Updating globel JSON information... "
+    update_global_replica_info
+    update_global_repository_info
+    echo "done"
+
     echo "CernVM-FS repository $name wiped out!"
 
   done
