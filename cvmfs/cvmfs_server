@@ -1092,7 +1092,7 @@ open_transaction() {
   acquire_lock "$tx_lock" ignore_stale || die "Failed to create transaction lock"
   cvmfs_suid_helper open  $name        || die "Failed to make /cvmfs/$name writable"
 
-  to_syslog "opened transaction for $name"
+  to_syslog_for_repo $name "opened transaction"
 }
 
 # closes a previously opened transaction
@@ -1128,8 +1128,8 @@ close_transaction() {
   release_lock "$tx_lock"
 
   local fallback_msg=""
-  [ $use_fd_fallback -eq 0 ] || fallback_msg=" (using force)"
-  to_syslog "closed transaction for ${name}$fallback_msg"
+  [ $use_fd_fallback -eq 0 ] || fallback_msg="(using force)"
+  to_syslog_for_repo $name "closed transaction $fallback_msg"
 }
 
 # checks if a repository is currently runing a publish procedure
@@ -1149,7 +1149,7 @@ publish_starting() {
   acquire_lock "$pub_lock" ignore_stale || die "Failed to acquire publishing lock"
   trap "publish_failed $name" EXIT HUP INT TERM
   cvmfs_suid_helper lock $name
-  to_syslog "publishing $name"
+  to_syslog_for_repo $name "started publishing"
 }
 
 publish_failed() {
@@ -1159,7 +1159,7 @@ publish_failed() {
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
   cvmfs_suid_helper open $name
-  to_syslog "failed to publish $name"
+  to_syslog_for_repo $name "failed to publish"
 }
 
 publish_succeeded() {
@@ -1168,7 +1168,7 @@ publish_succeeded() {
   local pub_lock="${CVMFS_SPOOL_DIR}/is_publishing"
   trap - EXIT HUP INT TERM
   release_lock $pub_lock
-  to_syslog "successfully published $name revision $(get_repo_info -v)"
+  to_syslog_for_repo $name "successfully published revision $(get_repo_info -v)"
 }
 
 
@@ -1453,9 +1453,9 @@ __health_check_syslog_repair_info() {
   local reason="$2"
   local success="$3"
   if $success; then
-    to_syslog "repaired mounts for $name ($reason)"
+    to_syslog_for_repo $name "repaired mounts ($reason)"
   else
-    to_syslog "failed to repair mounts for $name ($reason)"
+    to_syslog_for_repo $name "failed to repair mounts ($reason)"
   fi
 }
 
@@ -2354,7 +2354,7 @@ _update_geodb_install() {
   local download_target=${CVMFS_UPDATEGEO_DB}.gz
   local unzip_target=${CVMFS_UPDATEGEO_DB}.new
 
-  to_syslog "updating GeoIP database from $CVMFS_UPDATEGEO_URL"
+  _to_syslog_for_geoip "started update from $CVMFS_UPDATEGEO_URL"
 
   # downloading the GeoIP database file
   if ! curl -sS                  \
@@ -2363,7 +2363,7 @@ _update_geodb_install() {
             --max-time 60        \
             "$CVMFS_UPDATEGEO_URL" > $download_target 2>/dev/null; then
     echo "failed to download $CVMFS_UPDATEGEO_URL" >&2
-    to_syslog "failed to download $CVMFS_UPDATEGEO_URL"
+    _to_syslog_for_geoip "failed to download from $CVMFS_UPDATEGEO_URL"
     rm -f $download_target
     return 1
   fi
@@ -2371,7 +2371,7 @@ _update_geodb_install() {
   # unzipping the GeoIP database file
   if ! zcat $download_target > $unzip_target 2>/dev/null; then
     echo "failed to unzip $download_target to $unzip_target" >&2
-    to_syslog "failed to unzip $download_target to $unzip_target"
+    _to_syslog_for_geoip "failed to unzip $download_target to $unzip_target"
     rm -f $download_target $unzip_target
     return 2
   fi
@@ -2382,12 +2382,12 @@ _update_geodb_install() {
   # atomically installing the GeoIP database
   if ! mv -f $unzip_target $dbfile; then
     echo "failed to install $dbfile" >&2
-    to_syslog "failed to install $dbfile"
+    _to_syslog_for_geoip "failed to install $dbfile"
     rm -f $unzip_target
     return 3
   fi
 
-  to_syslog "successfully updated GeoIP database from $CVMFS_UPDATEGEO_URL"
+  _to_syslog_for_geoip "successfully updated from $CVMFS_UPDATEGEO_URL"
 
   return 0
 }
@@ -3980,7 +3980,7 @@ abort() {
     handle_read_only_file_descriptors_on_mount_point $name || use_fd_fallback=1
     sync
 
-    to_syslog "aborting transaction for $name"
+    to_syslog_for_repo $name "aborting transaction"
 
     abort_before_hook $name
     close_transaction $name $use_fd_fallback
@@ -4484,7 +4484,7 @@ gc() {
       fi
     fi
 
-    to_syslog "manually garbage collecting $name"
+    to_syslog_for_repo $name "started manual garbage collection"
 
     # run the garbage collection
     echo "Running Garbage Collection"
@@ -4499,7 +4499,7 @@ gc() {
     if is_stratum0 $name && [ $dry_run -eq 0 ]; then
       echo "Signing Repository Manifest"
       if ! sign_manifest $name $manifest; then
-        to_syslog "failed to sign manifest after manually garbage collecting $name"
+        to_syslog_for_repo $name "failed to sign manifest after manual garbage collection"
         die "Fail!"
       fi
 
@@ -4508,7 +4508,7 @@ gc() {
       close_transaction $name 0
     fi
 
-    to_syslog "successfully manual garbage collected $name"
+    to_syslog_for_repo $name "successfully finished manual garbage collection"
 
   done
 }
@@ -4537,7 +4537,7 @@ __run_gc() {
   fi
 
   # do it!
-  [ $dry_run -ne 0 ] || to_syslog "garbage collecting $name"
+  [ $dry_run -ne 0 ] || to_syslog_for_repo $name "started garbage collection"
 
   local user_shell="$(get_user_shell $name)"
   local gc_command="$(__swissknife_cmd dbg) gc                         \
@@ -4549,7 +4549,7 @@ __run_gc() {
                                             $additional_switches"
 
   if ! $user_shell "$gc_command"; then
-    to_syslog "failed to garbage collect $name"
+    to_syslog_for_repo $name "failed to garbage collect"
     return 6
   fi
 
@@ -4565,12 +4565,12 @@ __run_gc() {
       -b $base_hash                                    \
       -e $hash_algorithm"
     if ! $user_shell "$tag_command"; then
-      to_syslog "failed to update history after garbage collecting $name"
+      to_syslog_for_repo $name "failed to update history after garbage collection"
       return 7
     fi
   fi
 
-  to_syslog "successfully garbage collected $name"
+  to_syslog_for_repo $name "successfully finished garbage collection"
 
   return 0
 }
@@ -4593,13 +4593,13 @@ __snapshot_cleanup() {
 __snapshot_succeeded() {
   local alias_name=$1
   __snapshot_cleanup $alias_name
-  to_syslog "successfully snapshotted $alias_name from $CVMFS_STRATUM0"
+  to_syslog_for_repo $alias_name "successfully snapshotted from $CVMFS_STRATUM0"
 }
 
 __snapshot_failed() {
   local alias_name=$1
   __snapshot_cleanup $alias_name
-  to_syslog "failed to snapshot $alias_name from $CVMFS_STRATUM0"
+  to_syslog_for_repo $alias_name "failed to snapshot from $CVMFS_STRATUM0"
 }
 
 snapshot() {
@@ -4685,14 +4685,14 @@ snapshot() {
     if ! acquire_lock $snapshot_lock; then
       if [ $abort_on_conflict -eq 1 ]; then
         echo "another snapshot is in progress... aborting"
-        to_syslog "did not snapshot $alias_name due to another snapshot"
+        to_syslog_for_repo $alias_name "did not snapshot (another snapshot in progress)"
         retcode=1
         continue
       fi
 
       if [ $initial_snapshot -eq 1 ]; then
         echo "an initial snapshot is in progress... aborting"
-        to_syslog "did not snapshot $alias_name due to another initial snapshot"
+        to_syslog_for_repo $alias_name "did not snapshot (another initial snapshot in progress)"
         retcode=1
         continue
       fi
@@ -4700,7 +4700,7 @@ snapshot() {
       echo "waiting for another snapshot to finish..."
       if ! wait_and_acquire_lock $snapshot_lock; then
         echo "failed to acquire snapshot lock"
-        to_syslog "did not snapshot $alias_name due to locking issues"
+        to_syslog_for_repo $alias_name "did not snapshot (locking issues)"
         retcode=1
         continue
       fi
@@ -4708,7 +4708,7 @@ snapshot() {
 
     # here the lock is already acquired and needs to be cleared in case of abort
     trap "__snapshot_failed $alias_name" EXIT HUP INT TERM
-    to_syslog "snapshotting $alias_name from $stratum0"
+    to_syslog_for_repo $alias_name "started snapshotting from $stratum0"
 
     local log_level=
     [ "x$CVMFS_LOG_LEVEL" != x ] && log_level="-l $CVMFS_LOG_LEVEL"
