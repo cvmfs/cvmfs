@@ -158,6 +158,12 @@ to_syslog() {
   logger -t cvmfs_server $1 > /dev/null 2>&1 || return 0
 }
 
+to_syslog_for_repo() {
+  local repo_name="$1"
+  local message="$2"
+  to_syslog "(${repo_name}) $message"
+}
+
 
 cvmfs_mkfqrn() {
    local repo=$1
@@ -2336,6 +2342,10 @@ _update_geodb_days_since_update() {
 _update_geodb_lazy_install_slot() {
   [ "`date +%w`" -eq "$CVMFS_UPDATEGEO_DAY"  ] && \
   [ "`date +%k`" -ge "$CVMFS_UPDATEGEO_HOUR" ]
+}
+
+_to_syslog_for_geoip() {
+  to_syslog "(GeoIP) $1"
 }
 
 _update_geodb_install() {
