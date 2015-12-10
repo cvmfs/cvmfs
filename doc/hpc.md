@@ -10,7 +10,7 @@ These problems can be overcome by preloading a CernVM-FS cache on the shared clu
   * Millions of synchronized meta-data operations per node (path lookups, in particular) will not drown the shared cluster file system but resolve locally in the parrot-cvmfs clients.
   * The file system is always consistent; applications never see half-synchronized directories.
   * After initial preloading, only change sets need to be transfered to the shared file system.  This is much faster than `rsync`, which always has to browse the entire name space.
-  * Identical files are internally de-duplicated.  While space of the order of terabytes is usually not an issue for HPC shared file systems, file system caches benefit from deduplication.  We will also show how to preload only specific parts of a repository namespace.
+  * Identical files are internally de-duplicated.  While space of the order of terabytes is usually not an issue for HPC shared file systems, file system caches benefit from deduplication. It is also possible to preload only specific parts of a repository namespace.
   * Support for extra functionality implemented by CernVM-FS such as versioning and variant symlinks (symlinks resolved according to environment variables).
 
 In the following, we assume a Supercomputer with a shared file system (e.g. Lustre or GPFS) that is accessible from all the normal nodes as well as from one or multiple _login nodes_. Only the login nodes need to have access to the Internet. They will be used to preload the CernVM-FS cache on the shared cluster file system.
@@ -19,25 +19,25 @@ In the following, we assume a Supercomputer with a shared file system (e.g. Lust
 
 The [`cvmfs_preload` utility](http://cernvm.cern.ch/portal/filesystem/downloads) is used to preload a CernVM-FS cache.  Internally it uses the same code that used to replicate between CernVM-FS stratum 0 and stratum 1.  The `cvmfs_preload` command is a self-extracting binary with no further dependencies and should work on a majority of x86_64 Linux hosts.
 
-The `cvmfs_preload` command replicates from a stratum 0 (not from a stratum 1). Because this induces significant load on the source server, stratum 0 administrators should be informed before using their server as a source.  In order to preload the ALICE repository into /shared/cache, one could run from a login node
+The `cvmfs_preload` command replicates from a stratum 0 (not from a stratum 1). Because this induces significant load on the source server, stratum 0 administrators should be informed before using their server as a source.  As an example, in order to preload the ALICE repository into /shared/cache, one could run from a login node
 
-    cvmfs_preload -u http://hcc-cvmfs.unl.edu:8000/cvmfs/alice.cern.ch -r /shared/cache
+    cvmfs_preload -u http://hcc-cvmfs-example.unl.edu:8000/cvmfs/alice.cern.ch -r /shared/cache
 
-This will preload the entire repository.  In order to preload only specific parts of the namespace, you can create a _dirtab_ file with path prefixes.  The path prefixes must not involve symbolic links.  A dirtab file for ALICE could look like
+This will preload the entire repository.  In order to preload only specific parts of the namespace, you can create a _dirtab_ file with path prefixes.  The path prefixes must not involve symbolic links.  An example dirtab file for ALICE could look like
 
-    /etc
-    /x86_64-2.6-gnu-4.8.3/Modules
-    /x86_64-2.6-gnu-4.8.3/Packages/GEANT3
-    /x86_64-2.6-gnu-4.8.3/Packages/ROOT
-    /x86_64-2.6-gnu-4.8.3/Packages/gcc
-    /x86_64-2.6-gnu-4.8.3/Packages/AliRoot/v5*
+    /example/etc
+    /example/x86_64-2.6-gnu-4.8.3/Modules
+    /example/x86_64-2.6-gnu-4.8.3/Packages/GEANT3
+    /example/x86_64-2.6-gnu-4.8.3/Packages/ROOT
+    /example/x86_64-2.6-gnu-4.8.3/Packages/gcc
+    /example/x86_64-2.6-gnu-4.8.3/Packages/AliRoot/v5*
 
 The corresponding invokation of `cvmfs_preload` is
 
     cvmfs_preload -u http://hcc-cvmfs.unl.edu:8000/cvmfs/alice.cern.ch -r /shared/cache \
       -d </path/to/dirtab>
 
-The initial preloading can take several hours to a few days.  Subsequent invokations of the same command only transfer a change set and typically finish within seconds or minutes.
+The initial preloading can take several hours to a few days.  Subsequent invokations of the same command only transfer a change set and typically finish within seconds or minutes. These subsequent invokations need to be either done manually when necessary or scheduled for instance with a cron job.
 
 The `cvmfs_preload` command can preload files from multiple repositories
 into the same cache directory.
