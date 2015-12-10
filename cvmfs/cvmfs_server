@@ -40,6 +40,7 @@ CVMFS_UPDATEGEO_DB=${CVMFS_UPDATEGEO_DIR}/GeoLiteCity.dat
 
 DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 
+LATEST_JSON_INFO_SCHEMA=1
 
 # setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
@@ -1880,6 +1881,18 @@ create_repository_skeleton() {
 }
 
 
+create_global_info_skeleton() {
+  # TODO(rmeusel): make this a bit more flexible
+  local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
+  local info_dir="${storage_dir}/v${LATEST_JSON_INFO_SCHEMA}/"
+  [ ! -d $info_dir ] || return 0
+  mkdir -p $info_dir
+  echo "{}" > ${info_dir}/repositories
+  echo "{}" > ${info_dir}/replicas
+  echo "{}" > ${info_dir}/maintainer
+}
+
+
 get_cvmfs_owner() {
   local name=$1
   local owner=$2
@@ -2026,6 +2039,38 @@ Alias /cvmfs/${name} ${storage_dir}
 EOF
 }
 
+create_apache_config_for_global_info() {
+  local conf_file="cvmfs.info.conf"
+
+  ! has_apache_config_file $conf_file || return 0
+
+  # TODO(rmeusel): make this a bit more flexible
+  local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
+
+  # TODO(rmeusel): fine-tune this configuration file
+  create_apache_config_file $conf_file << EOF
+# Created by cvmfs_server.  Don't touch.
+
+KeepAlive On
+Alias /cvmfs/info ${storage_dir}
+<Directory "${storage_dir}">
+    Options -MultiViews
+    AllowOverride Limit
+    $(get_compatible_apache_allow_from_all_config)
+
+    EnableMMAP Off
+    EnableSendFile Off
+
+    FileETag None
+
+    ExpiresActive On
+    ExpiresDefault "access plus 3 days"
+    ExpiresByType text/html "access plus 5 minutes"
+    ExpiresByType application/x-cvmfs "access plus 2 minutes"
+</Directory>
+EOF
+}
+
 # puts all configuration files in place that are need for a stratum0 repository
 #
 # @param name        the name of the repository
@@ -2089,6 +2134,7 @@ EOF
     # make sure that the config file does not exist, yet
     remove_apache_config_file "cvmfs.${name}.conf" || true
     create_apache_config_for_repository $name $repository_dir
+    create_apache_config_for_global_info
   fi
 
   cat > $client_conf << EOF
@@ -2695,6 +2741,7 @@ mkfs() {
   # create storage area
   if is_local_upstream $upstream; then
     echo -n "Creating Backend Storage... "
+    create_global_info_skeleton
     create_repository_storage $name || die "fail"
     echo "done"
   fi
@@ -2902,12 +2949,14 @@ EOF
 
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     create_apache_config_for_repository $alias_name $storage_dir "with wsgi"
+    create_apache_config_for_global_info
     reload_apache > /dev/null
   fi
   echo "done"
 
   if is_local_upstream $upstream; then
     _update_geodb -l
+    create_global_info_skeleton
 
     echo -n "Create CernVM-FS Storage... "
     mkdir -p $storage_dir
