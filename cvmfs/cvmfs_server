@@ -2389,7 +2389,6 @@ _write_info_file() {
   cat - > $tmp_file
   chmod 0644 $tmp_file
   mv -f $tmp_file $info_file
-  rm -f $tmp_file
 }
 
 
