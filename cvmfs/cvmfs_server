@@ -1973,8 +1973,12 @@ migrate_legacy_dirtab() {
 # sends wsgi configuration to stdout
 #
 # @param name        the name of the repository
+# @param with_wsgi   if not set, this function is a NOOP
 cat_wsgi_config() {
   local name=$1
+  local with_wsgi="$2"
+
+  [ x"$with_wsgi" != x"" ] || return 0
   echo "# Enable api functions
 WSGIPythonPath /usr/share/cvmfs-server/webapi
 Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
