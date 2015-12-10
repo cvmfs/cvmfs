@@ -122,6 +122,13 @@ static bool Peek(const shash::Any &remote_hash) {
   return Peek(MakePath(remote_hash));
 }
 
+static void ReportDownloadError(const shash::Any &failed_hash,
+                                const download::Failures error_code) {
+  LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s)",
+           failed_hash.ToString().c_str(),
+           error_code, download::Code2Ascii(error_code));
+}
+
 
 static void Store(const string &local_path, const string &remote_path) {
   if (preload_cache) {
