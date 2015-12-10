@@ -134,7 +134,7 @@ cvmfs_config_usage() {
  echo "  reload [-c | <repository>]"
  echo "  umount"
  echo "  wipecache"
- echo "  killall"
+ echo "  killall [-l(azy unmount)] [-k(ill cvmfs user sessions)]"
  echo "  bugreport"
 }
 
@@ -1093,6 +1093,7 @@ cvmfs_config_fsck() {
 
 
 cvmfs_umount() {
+  local silent=$1
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
 
@@ -1101,14 +1102,16 @@ cvmfs_umount() {
   local m
   for m in $mount_list
   do
-    echo -n "Unmounting ${m}: "
+    [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
     umount $m 2>/dev/null
     if [ $? -ne 0 ]; then
       RETVAL=1
-      echo "Failed!"
-      $fuser -m -a -v $m
+      if [ "x$silent" != "x" ]; then
+        echo "Failed!"
+        $fuser -m -a -v $m
+      fi
     else
-      echo "OK"
+      [ "x$silent" != "x" ] || echo "OK"
     fi
   done
 
@@ -1147,15 +1150,11 @@ cvmfs_killall() {
   echo "OK"
 
   echo -n "Unmounting stale mount points... "
-  mount_list=`list_mounts | awk '{print $3}'`
-  for m in $mount_list; do
-    umount $m 2>/dev/null
-    if [ $? -ne 0 ]; then
-      echo "Failed!"
-      $fuser -m -a -v $m
-      return 1
-    fi
-  done
+  cvmfs_umount silent
+  if [ $? -ne 0 ]; then
+    echo "Failed!"
+    return 1
+  fi
   echo "OK"
 
   echo -n "Cleaning up run-time variable data... "
@@ -1959,7 +1958,7 @@ case "$1" in
       echo "root privileges required"
       exit 1
     fi
-    cvmfs_killall
+    cvmfs_killall $@
     RETVAL=$?
     ;;
 
