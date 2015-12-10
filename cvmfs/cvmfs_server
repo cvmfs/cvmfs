@@ -1881,18 +1881,6 @@ create_repository_skeleton() {
 }
 
 
-create_global_info_skeleton() {
-  # TODO(rmeusel): make this a bit more flexible
-  local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
-  local info_dir="${storage_dir}/v${LATEST_JSON_INFO_SCHEMA}/"
-  [ ! -d $info_dir ] || return 0
-  mkdir -p $info_dir
-  echo "{}" > ${info_dir}/repositories
-  echo "{}" > ${info_dir}/replicas
-  echo "{}" > ${info_dir}/maintainer
-}
-
-
 get_cvmfs_owner() {
   local name=$1
   local owner=$2
@@ -2385,6 +2373,18 @@ has_file_descriptors_on_mount_point() {
 #                        JSON "API" related functions                          #
 #                                                                              #
 ################################################################################
+
+
+create_global_info_skeleton() {
+  # TODO(rmeusel): make this a bit more flexible
+  local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
+  local info_dir="${storage_dir}/v${LATEST_JSON_INFO_SCHEMA}/"
+  [ ! -d $info_dir ] || return 0
+  mkdir -p $info_dir
+  echo "{}" > ${info_dir}/repositories
+  echo "{}" > ${info_dir}/replicas
+  echo "{}" > ${info_dir}/maintainer
+}
 
 
 ################################################################################
