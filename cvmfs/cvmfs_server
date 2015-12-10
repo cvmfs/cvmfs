@@ -2420,12 +2420,44 @@ _render_repo() {
 
 
 update_global_replica_info() {
-  echo "soon!" > /dev/null
+  local info_file="$(_global_info_path)/replicas"
+  local file="$(mktemp)"
+
+  (
+    echo '{'
+    echo '"schema"   : '$LATEST_JSON_INFO_SCHEMA','
+    echo '"replicas" : ['
+
+    for repo in $(_available_repos "stratum1"); do
+      _render_repo $repo
+    done
+
+    echo ']'
+    echo '}'
+  ) > $file
+
+  mv -f $file $info_file
 }
 
 
 update_global_repository_info() {
-  echo "soon!" > /dev/null
+  local info_file="$(_global_info_path)/repositories"
+  local file="$(mktemp)"
+
+  (
+    echo '{'
+    echo '"schema"   : '$LATEST_JSON_INFO_SCHEMA','
+    echo '"repositories" : ['
+
+    for repo in $(_available_repos "stratum0"); do
+      _render_repo $repo
+    done
+
+    echo ']'
+    echo '}'
+  ) > $file
+
+  mv -f $file $info_file
 }
 
 
