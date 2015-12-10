@@ -3034,7 +3034,7 @@ import() {
 
   # default values
   [ x"$stratum0" = x ] && stratum0="$(mangle_local_cvmfs_url $name)"
-  [ x"$upstream" = x ] && upstream=$(make_upstream "local" "/srv/cvmfs/$name/data/txn" "/srv/cvmfs/$name")
+  [ x"$upstream" = x ] && upstream=$(make_local_upstream $name)
   [ x"$unionfs"  = x ] && unionfs="$(get_available_union_fs)"
 
   local private_key="${name}.key"
