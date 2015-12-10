@@ -2417,7 +2417,7 @@ _render_repos() {
     echo '    {'
     echo '      "name"  : "'$CVMFS_REPOSITORY_NAME'",'
     if [ x"$CVMFS_REPOSITORY_NAME" != x"$repo" ]; then
-      echo '      "alias" : "'$repo '",'
+      echo '      "alias" : "'$repo'",'
     fi
     echo '      "url"   : "/cvmfs/'$repo'"'
     echo -n '    }'
