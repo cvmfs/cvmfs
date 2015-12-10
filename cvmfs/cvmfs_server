@@ -2387,6 +2387,16 @@ create_global_info_skeleton() {
 }
 
 
+update_global_replica_info() {
+  echo "soon!" > /dev/null
+}
+
+
+update_global_repository_info() {
+  echo "soon!" > /dev/null
+}
+
+
 ################################################################################
 #                                                                              #
 #                                Sub Commands                                  #
@@ -2796,6 +2806,10 @@ mkfs() {
   publish $name > /dev/null      || die "fail (publish)"
   cat $rdonly_dir/new_repository || die "fail (finish)"
 
+  echo -n "Updating globel JSON information... "
+  update_global_repository_info
+  echo "done"
+
   print_new_repository_notice $name $cvmfs_user
 }
 
@@ -2979,6 +2993,10 @@ EOF
     mkdir -p $temp_dir                      || die "fail (mkdir temp)"
   fi
   chown -R $cvmfs_user $spool_dir           || die "fail (chown)"
+  echo "done"
+
+  echo -n "Updating globel JSON information... "
+  update_global_replica_info
   echo "done"
 
   echo "\
