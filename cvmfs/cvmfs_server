@@ -2870,7 +2870,7 @@ mkfs() {
   publish $name > /dev/null      || die "fail (publish)"
   cat $rdonly_dir/new_repository || die "fail (finish)"
 
-  echo -n "Updating globel JSON information... "
+  echo -n "Updating global JSON information... "
   update_global_repository_info
   echo "done"
 
@@ -3059,8 +3059,8 @@ EOF
   chown -R $cvmfs_user $spool_dir           || die "fail (chown)"
   echo "done"
 
-  echo -n "Updating globel JSON information... "
-  update_global_replica_info
+  echo -n "Updating global JSON information... "
+  update_global_repository_info
   echo "done"
 
   echo "\
@@ -3356,6 +3356,10 @@ import() {
     alterfs -m on $name
   fi
 
+  echo -n "Updating global JSON information... "
+  update_global_repository_info
+  echo "done"
+
   # reset trap and finish
   trap - EXIT HUP INT QUIT TERM
   print_new_repository_notice $name $cvmfs_user
@@ -3466,8 +3470,7 @@ rmfs() {
     remove_config_files $name || die "fail"
     echo "done"
 
-    echo -n "Updating globel JSON information... "
-    update_global_replica_info
+    echo -n "Updating global JSON information... "
     update_global_repository_info
     echo "done"
 
