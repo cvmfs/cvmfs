@@ -214,9 +214,7 @@ static void *MainWorker(void *data) {
       do {
         retval = g_download_manager->Fetch(&download_chunk);
         if (retval != download::kFailOk) {
-          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s), "
-                   "abort", url_chunk.c_str(),
-                   retval, download::Code2Ascii(retval));
+          ReportDownloadError(chunk_hash, retval);
           abort();
         }
         attempts++;
@@ -342,9 +340,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
                catalog_hash.ToString().c_str());
       goto pull_skip;
     } else {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d - %s)",
-               catalog_hash.ToString().c_str(), dl_retval,
-               download::Code2Ascii(dl_retval));
+      ReportDownloadError(catalog_hash, dl_retval);
       goto pull_cleanup;
     }
   }
@@ -557,8 +553,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                        &history_hash);
     dl_retval = g_download_manager->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
-               dl_retval, download::Code2Ascii(dl_retval));
+      ReportDownloadError(history_hash, dl_retval);
       goto fini;
     }
     const std::string history_db_path = history_path + ".uncompressed";
