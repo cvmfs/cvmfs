@@ -127,6 +127,34 @@ static void ReportDownloadError(const shash::Any &failed_hash,
   LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s)",
            failed_hash.ToString().c_str(),
            error_code, download::Code2Ascii(error_code));
+
+  switch (error_code) {
+    case download::kFailProxyResolve:
+    case download::kFailHostResolve:
+      LogCvmfs(kLogCvmfs, kLogStderr, "DNS lookup for Stratum 0 failed "
+                                      "perhaps check the network path?");
+      break;
+
+    case download::kFailProxyConnection:
+    case download::kFailHostConnection:
+      LogCvmfs(kLogCvmfs, kLogStderr, "couldn't reach Stratum 0 - "
+                                      "perhaps check the network path?");
+      break;
+
+    case download::kFailHostHttp:
+      LogCvmfs(kLogCvmfs, kLogStderr, "unexpected HTTP error code - "
+                                      "perhaps check Stratum 0 health?");
+      break;
+
+    case download::kFailBadData:
+      LogCvmfs(kLogCvmfs, kLogStderr, "downloaded corrupted data - "
+                                      "perhaps check Stratum 0 health?");
+      break;
+
+    default:
+      LogCvmfs(kLogCvmfs, kLogStderr, "unexpected error - feel free to file "
+                                      "a bug report");
+  }
 }
 
 
