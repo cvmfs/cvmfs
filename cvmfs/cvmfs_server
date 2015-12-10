@@ -2378,16 +2378,18 @@ has_file_descriptors_on_mount_point() {
 _global_info_path() {
   # TODO(rmeusel): make this a bit more flexible
   local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
-  local info_dir="${storage_dir}/v${LATEST_JSON_INFO_SCHEMA}"
-  echo "${info_dir}"
+  echo "${storage_dir}/v${LATEST_JSON_INFO_SCHEMA}/repositories"
 }
 
 
-create_global_info_skeleton() {
-  local info_dir="$(_global_info_path)"
-  [ ! -d $info_dir ] || return 0
-  mkdir -p $info_dir
-  echo "{}" > ${info_dir}/repositories
+_write_info_file() {
+  local info_file=$(_global_info_path)
+  local tmp_file=$(mktemp)
+
+  cat - > $tmp_file
+  chmod 0644 $tmp_file
+  mv -f $tmp_file $info_file
+  rm -f $tmp_file
 }
 
 
@@ -2426,27 +2428,33 @@ _render_repos() {
 }
 
 
+_render_info_file() {
+  echo '{'
+  echo '  "schema"       : '$LATEST_JSON_INFO_SCHEMA','
+  echo '  "repositories" : ['
+
+  _render_repos $(_available_repos "stratum0")
+
+  echo '  ],'
+  echo '  "replicas" : ['
+
+  _render_repos $(_available_repos "stratum1")
+
+  echo '  ]'
+  echo '}'
+}
+
+
+create_global_info_skeleton() {
+  local info_file="$(_global_info_path)"
+  [ ! -d $info_file ] || return 0
+  mkdir -p $(dirname $info_file)
+  echo "{}" | _write_info_file
+}
+
+
 update_global_repository_info() {
-  local info_file="$(_global_info_path)/repositories"
-  local file="$(mktemp)"
-
-  (
-    echo '{'
-    echo '  "schema"       : '$LATEST_JSON_INFO_SCHEMA','
-    echo '  "repositories" : ['
-
-    _render_repos $(_available_repos "stratum0")
-
-    echo '  ],'
-    echo '  "replicas" : ['
-
-    _render_repos $(_available_repos "stratum1")
-
-    echo '  ]'
-    echo '}'
-  ) > $file
-
-  mv -f $file $info_file
+  _render_info_file | _write_info_file
 }
 
 
