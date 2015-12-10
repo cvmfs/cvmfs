@@ -2375,10 +2375,16 @@ has_file_descriptors_on_mount_point() {
 ################################################################################
 
 
-create_global_info_skeleton() {
+_global_info_path() {
   # TODO(rmeusel): make this a bit more flexible
   local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
-  local info_dir="${storage_dir}/v${LATEST_JSON_INFO_SCHEMA}/"
+  local info_dir="${storage_dir}/v${LATEST_JSON_INFO_SCHEMA}"
+  echo "${info_dir}"
+}
+
+
+create_global_info_skeleton() {
+  local info_dir="$(_global_info_path)"
   [ ! -d $info_dir ] || return 0
   mkdir -p $info_dir
   echo "{}" > ${info_dir}/repositories
