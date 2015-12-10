@@ -38,6 +38,8 @@ CVMFS_UPDATEGEO_URL="http://geolite.maxmind.com/download/geoip/database/GeoLiteC
 CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
 CVMFS_UPDATEGEO_DB=${CVMFS_UPDATEGEO_DIR}/GeoLiteCity.dat
 
+DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
+
 
 # setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
@@ -1393,14 +1395,6 @@ get_or_guess_multiple_repository_names() {
 foreclose_legacy_cvmfs() {
   local found_something=0
 
-  # This can potentially prevent 2.0 to 2.1 migration
-  #if [ $(ls /srv/cvmfs/ 2>/dev/null | wc -l) -eq 1 ]; then
-  #  if [ -d /srv/cvmfs/*/pub ] || [ -d /srv/cvmfs/*/shadow ]; then
-  #    echo "found legacy repo structure in /srv/cvmfs" 1>&2
-  #    found_something=1
-  #  fi
-  #fi
-
   if [ -f /etc/cvmfs/server.conf ] || [ -f /etc/cvmfs/replica.conf ]; then
     echo "found legacy configuration files in /etc/cvmfs" 1>&2
     found_something=1
@@ -1766,7 +1760,8 @@ make_upstream() {
 
 make_local_upstream() {
   local repo_name=$1
-  make_upstream "local" "/srv/cvmfs/${repo_name}/data/txn" "/srv/cvmfs/${repo_name}"
+  local repo_storage="${DEFAULT_LOCAL_STORAGE}/${repo_name}"
+  make_upstream "local" "${repo_storage}/data/txn" "$repo_storage"
 }
 
 make_s3_upstream() {
