@@ -2393,6 +2393,32 @@ create_global_info_skeleton() {
 }
 
 
+_available_repos() {
+  local filter="$1"
+  local repo=""
+
+  for repository in /etc/cvmfs/repositories.d/*; do
+    repo=$(basename $repository)
+
+    if ( [ x"$filter" = x"" ]                              ) || \
+       ( [ x"$filter" = x"stratum0" ] && is_stratum0 $repo ) || \
+       ( [ x"$filter" = x"stratum1" ] && is_stratum1 $repo ); then
+      echo $repo
+    fi
+  done
+}
+
+
+_render_repo() {
+  local repo_name="$1"
+  load_repo_config $repo
+  echo '{'
+  echo '  "name" : "'$repo'",'
+  echo '  "uri"  : "/cvmfs/'$repo'/info/endpoint"'
+  echo '},'
+}
+
+
 update_global_replica_info() {
   echo "soon!" > /dev/null
 }
