@@ -1791,6 +1791,18 @@ __attribute__((visibility("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
 
 
+static std::string CalculateHostString(
+    const loader::LoaderExports &loader_exports,
+    const std::string &parameter) {
+  std::string host_str = parameter;
+  vector<string> tokens = SplitString(loader_exports.repository_name, '.');
+  const string org = tokens[0];
+  host_str = ReplaceAll(host_str, "@org@", org);
+  host_str = ReplaceAll(host_str, "@fqrn@", loader_exports.repository_name);
+  return host_str;
+}
+
+
 static void LogSqliteError(void *user_data __attribute__((unused)),
                            int sqlite_extended_error, const char *message)
 {
@@ -1976,12 +1988,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (cvmfs::options_manager_->GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_URL", &parameter)) {
-    external_host = parameter;
-    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
-    const string org = tokens[0];
-    external_host = ReplaceAll(external_host, "@org@", org);
-    external_host = ReplaceAll(external_host, "@fqrn@",
-                               loader_exports->repository_name);
+    external_host = CalculateHostString(*loader_exports, parameter);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;
@@ -2025,11 +2032,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     server_cache_mode = true;
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
-    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
-    const string org = tokens[0];
-    hostname = parameter;
-    hostname = ReplaceAll(hostname, "@org@", org);
-    hostname = ReplaceAll(hostname, "@fqrn@", loader_exports->repository_name);
+    hostname = CalculateHostString(*loader_exports, parameter);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
