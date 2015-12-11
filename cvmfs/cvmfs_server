@@ -2455,6 +2455,22 @@ create_global_info_skeleton() {
   mkdir -p $info_path
 
   _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
+  _check_info_file "meta" || _write_info_file "meta" << EOF
+{
+  "administrator" : "Your Name",
+  "email"         : "you@organisation.org",
+  "organisation"  : "Your Organisation",
+
+  "location" : {
+    "lat" : 46.2316354,
+    "lon" : 6.05360090
+  },
+
+  "custom" : {
+    "_comment" : "Put arbitrary structured data here"
+  }
+}
+EOF
 }
 
 
