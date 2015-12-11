@@ -2377,18 +2377,18 @@ has_file_descriptors_on_mount_point() {
 
 _global_info_path() {
   # TODO(rmeusel): make this a bit more flexible
-  local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
-  echo "${storage_dir}/v${LATEST_JSON_INFO_SCHEMA}/repositories"
+  echo "${DEFAULT_LOCAL_STORAGE}/info/v${LATEST_JSON_INFO_SCHEMA}"
 }
 
 
 _write_info_file() {
-  local info_file=$(_global_info_path)
+  local info_file="$1"
+  local info_file_path="$(_global_info_path)/${info_file}"
   local tmp_file=$(mktemp)
 
   cat - > $tmp_file
   chmod 0644 $tmp_file
-  mv -f $tmp_file $info_file
+  mv -f $tmp_file $info_file_path
 }
 
 
@@ -2445,15 +2445,15 @@ _render_info_file() {
 
 
 create_global_info_skeleton() {
-  local info_file="$(_global_info_path)"
-  [ ! -d $info_file ] || return 0
-  mkdir -p $(dirname $info_file)
-  echo "{}" | _write_info_file
+  local info_path="$(_global_info_path)"
+  [ ! -d $info_path ] || return 0
+  mkdir -p $info_path
+  echo "{}" | _write_info_file "repositories"
 }
 
 
 update_global_repository_info() {
-  _render_info_file | _write_info_file
+  _render_info_file | _write_info_file "repositories"
 }
 
 
