@@ -5440,34 +5440,66 @@ update_info() {
     echo "done"
   fi
 
-  # open the meta information file for editing
-  local tmp_file=$(mktemp)
-  trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
-
-  local editor=${EDITOR:=vi}
-  cp -f "$(get_global_info_path)/meta" $tmp_file
-
-  $editor $tmp_file < $(tty) > $(tty) 2>&1
-
-  # check JSON validitiy
-  if which jq > /dev/null 2>&1; then
-    echo -n "Checking JSON validity... "
-    if ! jq_output=$(jq '.' $tmp_file 2>&1); then
-      die "fail (invalid JSON)\njq said: $jq_output"
-    else
-      echo "done"
+  # manually edit the meta information file
+  local tmp_file=""
+  if [ $edit_meta_info -eq 1 ]; then
+    # figure out which editor to use
+    local editor=${EDITOR:=vi}
+    if ! which $editor  > /dev/null 2>&1; then
+      echo "Didn't find editor '$editor'."
+      echo "Consider to use the \$EDITOR environment variable"
+      exit 1
     fi
-  else
-    echo
-    echo "Warning: Didn't find 'jq' on your system. It is your responsibility "
-    echo "         to produce a valid JSON file."
-    echo
+
+    # check if we have `jq` for JSON validity checks
+    local has_jq=1
+    if ! which jq > /dev/null 2>&1; then
+      has_jq=0
+      echo
+      echo "Warning: Didn't find 'jq' on your system. It is your responsibility"
+      echo "         to produce a valid JSON file."
+      echo
+      read -p "  Press any key to continue..." nirvana
+    fi
+
+    # copy the meta information file for editing
+    tmp_file=$(mktemp)
+    trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
+    cp -f "$(get_global_info_path)/meta" $tmp_file
+
+    # edit until the JSON is valid
+    local json_valid=true
+    while true; do
+      $editor $tmp_file < $(tty) > $(tty) 2>&1
+      [ $has_jq -eq 1 ] || break
+
+      local jq_output=""
+      local retry=""
+      if ! jq_output=$(jq '.' $tmp_file 2>&1); then
+        echo
+        echo "Your JSON file is invalid, please check again:"
+        echo "$jq_output"
+        read -p "Edit again? [y]: " retry
+        if [ x"$retry" != x"y" ] && \
+           [ x"$retry" != x"Y" ] && \
+           [ x"$retry" != x""  ]; then
+          json_valid=false
+          break
+        fi
+      else
+        break
+      fi
+    done
+
+    $json_valid || die "Aborting..."
   fi
 
   # update the JSON files
   echo -n "Updating global JSON information... "
-  update_global_repository_info       || die "fail (update repo info)"
-  update_global_meta_info "$tmp_file" || die "fail (update meta info)"
+  update_global_repository_info || die "fail (update repo info)"
+  if [ $edit_meta_info -eq 1 ]; then
+    update_global_meta_info "$tmp_file" || die "fail (update meta info)"
+  fi
   echo "done"
 }
 
