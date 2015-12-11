@@ -189,7 +189,8 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
-    skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks"
+    skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
+    update-info"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -337,6 +338,8 @@ Supported Commands:
   list          List available repositories
   update-geodb  [-l update lazily based on CVMFS_UPDATEGEO* variables]
                 Updates the geo-IP database
+  update-info   [-p no apache config]
+                Open meta info JSON file for editing
 "
 
 
@@ -2490,6 +2493,15 @@ update_global_repository_info() {
   is_root              || return 2
 
   _render_info_file | _write_info_file "repositories"
+}
+
+
+update_global_meta_info() {
+  local meta_info_file="$1"
+  has_global_info_path || return 1
+  is_root              || return 2
+
+  cat "$meta_info_file" | _write_info_file "meta"
 }
 
 
@@ -5379,6 +5391,80 @@ eliminate_hardlinks() {
                               -s"
 
   _run_catalog_migration "$name" "$migrate_command"
+}
+
+
+################################################################################
+
+_update_info_cleanup() {
+  local tmp_file="$1"
+  rm -f $tmp_file > /dev/null 2>&1
+}
+
+update_info() {
+  local configure_apache=1
+
+  # parameter handling
+  OPTIND=1
+  while getopts "p" option; do
+    case $option in
+      p)
+        configure_apache=0
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command update-info: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  # sanity checks
+  is_root || die "only root can update meta information"
+
+  # create info HTTP resource if not existent yet
+  if ! has_global_info_path; then
+    echo -n "Creating Info Resource... "
+    create_global_info_skeleton || die "fail"
+    echo "done"
+  fi
+
+  if [ $configure_apache -eq 1 ] && ! has_apache_config_for_global_info; then
+    echo -n "Creating Apache Configuration for Info Resource... "
+    create_apache_config_for_global_info || die "fail (create apache config)"
+    reload_apache > /dev/null            || die "fail (reload apache)"
+    echo "done"
+  fi
+
+  # open the meta information file for editing
+  local tmp_file=$(mktemp)
+  trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
+
+  local editor=${EDITOR:=vi}
+  cp -f "$(get_global_info_path)/meta" $tmp_file
+
+  $editor $tmp_file < $(tty) > $(tty) 2>&1
+
+  # check JSON validitiy
+  if which jq > /dev/null 2>&1; then
+    echo -n "Checking JSON validity... "
+    if ! jq_output=$(jq '.' $tmp_file 2>&1); then
+      die "fail (invalid JSON)\njq said: $jq_output"
+    else
+      echo "done"
+    fi
+  else
+    echo
+    echo "Warning: Didn't find 'jq' on your system. It is your responsibility "
+    echo "         to produce a valid JSON file."
+    echo
+  fi
+
+  # update the JSON files
+  echo -n "Updating global JSON information... "
+  update_global_repository_info       || die "fail (update repo info)"
+  update_global_meta_info "$tmp_file" || die "fail (update meta info)"
+  echo "done"
 }
 
 
