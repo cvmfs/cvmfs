@@ -2459,6 +2459,10 @@ create_global_info_skeleton() {
 
 
 update_global_repository_info() {
+  # sanity checks
+  [ -d $(_global_info_path) ] || return 0
+  is_root                     || return 0
+
   _render_info_file | _write_info_file "repositories"
 }
 
