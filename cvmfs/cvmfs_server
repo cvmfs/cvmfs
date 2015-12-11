@@ -2027,10 +2027,15 @@ Alias /cvmfs/${name} ${storage_dir}
 EOF
 }
 
+has_apache_config_for_global_info() {
+  local conf_file="cvmfs.info.conf"
+  has_apache_config_file $conf_file
+}
+
 create_apache_config_for_global_info() {
   local conf_file="cvmfs.info.conf"
 
-  ! has_apache_config_file $conf_file || return 0
+  ! has_apache_config_for_global_info || return 0
 
   # TODO(rmeusel): make this a bit more flexible
   local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
@@ -2375,7 +2380,7 @@ has_file_descriptors_on_mount_point() {
 ################################################################################
 
 
-_global_info_path() {
+get_global_info_path() {
   # TODO(rmeusel): make this a bit more flexible
   echo "${DEFAULT_LOCAL_STORAGE}/info/v${LATEST_JSON_INFO_SCHEMA}"
 }
@@ -2383,7 +2388,7 @@ _global_info_path() {
 
 _write_info_file() {
   local info_file="$1"
-  local info_file_path="$(_global_info_path)/${info_file}"
+  local info_file_path="$(get_global_info_path)/${info_file}"
   local tmp_file=$(mktemp)
 
   cat - > $tmp_file
@@ -2394,7 +2399,7 @@ _write_info_file() {
 
 _check_info_file() {
   local info_file="$1"
-  [ -f "$(_global_info_path)/${info_file}" ]
+  [ -f "$(get_global_info_path)/${info_file}" ]
 }
 
 
@@ -2450,8 +2455,13 @@ _render_info_file() {
 }
 
 
+has_global_info_path() {
+  [ -d $(get_global_info_path) ]
+}
+
+
 create_global_info_skeleton() {
-  local info_path="$(_global_info_path)"
+  local info_path="$(get_global_info_path)"
   mkdir -p $info_path
 
   _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
