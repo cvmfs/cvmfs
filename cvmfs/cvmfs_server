@@ -2392,6 +2392,12 @@ _write_info_file() {
 }
 
 
+_check_info_file() {
+  local info_file="$1"
+  [ -f "$(_global_info_path)/${info_file}" ]
+}
+
+
 _available_repos() {
   local filter="$1"
   local repo=""
@@ -2446,9 +2452,9 @@ _render_info_file() {
 
 create_global_info_skeleton() {
   local info_path="$(_global_info_path)"
-  [ ! -d $info_path ] || return 0
   mkdir -p $info_path
-  echo "{}" | _write_info_file "repositories"
+
+  _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
 }
 
 
