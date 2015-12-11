@@ -2474,11 +2474,6 @@ create_global_info_skeleton() {
   "email"         : "you@organisation.org",
   "organisation"  : "Your Organisation",
 
-  "location" : {
-    "lat" : 46.2316354,
-    "lon" : 6.05360090
-  },
-
   "custom" : {
     "_comment" : "Put arbitrary structured data here"
   }
