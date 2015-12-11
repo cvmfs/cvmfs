@@ -2486,8 +2486,8 @@ EOF
 
 update_global_repository_info() {
   # sanity checks
-  [ -d $(_global_info_path) ] || return 0
-  is_root                     || return 0
+  has_global_info_path || return 1
+  is_root              || return 2
 
   _render_info_file | _write_info_file "repositories"
 }
@@ -2903,8 +2903,7 @@ mkfs() {
   cat $rdonly_dir/new_repository || die "fail (finish)"
 
   echo -n "Updating global JSON information... "
-  update_global_repository_info
-  echo "done"
+  update_global_repository_info && echo "done" || echo "fail"
 
   print_new_repository_notice $name $cvmfs_user
 }
@@ -3092,8 +3091,7 @@ EOF
   echo "done"
 
   echo -n "Updating global JSON information... "
-  update_global_repository_info
-  echo "done"
+  update_global_repository_info && echo "done" || echo "fail"
 
   echo "\
 
@@ -3389,8 +3387,7 @@ import() {
   fi
 
   echo -n "Updating global JSON information... "
-  update_global_repository_info
-  echo "done"
+  update_global_repository_info && echo "done" || echo "fail"
 
   # reset trap and finish
   trap - EXIT HUP INT QUIT TERM
@@ -3503,8 +3500,7 @@ rmfs() {
     echo "done"
 
     echo -n "Updating global JSON information... "
-    update_global_repository_info
-    echo "done"
+    update_global_repository_info && echo "done" || echo "fail"
 
     echo "CernVM-FS repository $name wiped out!"
 
