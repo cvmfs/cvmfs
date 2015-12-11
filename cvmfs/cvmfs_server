@@ -338,7 +338,7 @@ Supported Commands:
   list          List available repositories
   update-geodb  [-l update lazily based on CVMFS_UPDATEGEO* variables]
                 Updates the geo-IP database
-  update-info   [-p no apache config]
+  update-info   [-p no apache config] [-e don't edit /info/meta]
                 Open meta info JSON file for editing
 "
 
@@ -5403,13 +5403,17 @@ _update_info_cleanup() {
 
 update_info() {
   local configure_apache=1
+  local edit_meta_info=1
 
   # parameter handling
   OPTIND=1
-  while getopts "p" option; do
+  while getopts "pe" option; do
     case $option in
       p)
         configure_apache=0
+      ;;
+      e)
+        edit_meta_info=0
       ;;
       ?)
         shift $(($OPTIND-2))
