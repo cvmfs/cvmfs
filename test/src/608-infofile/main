@@ -46,9 +46,12 @@ cvmfs_run_test() {
   ! has_repo $CVMFS_TEST_REPO || destroy_repo $CVMFS_TEST_REPO || return 2
 
   echo "check that neither $CVMFS_TEST_REPO nor $replica_name are registered"
-  d $info_url > /dev/null                                || return 3
-  ! repo_is_registered $CVMFS_TEST_REPO                  || return 4
-  ! replica_is_registered $CVMFS_TEST_REPO $replica_name || return 5
+  if d $info_url > /dev/null; then
+    ! repo_is_registered $CVMFS_TEST_REPO                  || return 4
+    ! replica_is_registered $CVMFS_TEST_REPO $replica_name || return 5
+  else
+    echo "--> info file doesn't exist yet"
+  fi
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
