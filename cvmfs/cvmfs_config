@@ -134,6 +134,7 @@ cvmfs_config_usage() {
  echo "  reload [-c | <repository>]"
  echo "  umount"
  echo "  wipecache"
+ echo "  killall [-l(azy unmount)] [-k(ill cvmfs user sessions)]"
  echo "  bugreport"
 }
 
@@ -1092,6 +1093,7 @@ cvmfs_config_fsck() {
 
 
 cvmfs_umount() {
+  local silent=$1
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
 
@@ -1100,18 +1102,73 @@ cvmfs_umount() {
   local m
   for m in $mount_list
   do
-    echo -n "Unmounting ${m}: "
+    [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
     umount $m 2>/dev/null
     if [ $? -ne 0 ]; then
       RETVAL=1
-      echo "Failed!"
-      $fuser -m -a -v $m
+      if [ "x$silent" != "x" ]; then
+        echo "Failed!"
+        $fuser -m -a -v $m
+      fi
     else
-      echo "OK"
+      [ "x$silent" != "x" ] || echo "OK"
     fi
   done
 
   return $RETVAL
+}
+
+
+cvmfs_killall() {
+  local pid=$$
+
+  echo -n "Terminating cvmfs_config processes... "
+  local config_pids=$(pgrep -x cvmfs_config)
+  other_config_pids=
+  for p in $config_pids; do
+    if [ $p -ne $pid ]; then
+      other_config_pids="$p $other_config_pids"
+    fi
+  done
+  if [ "x$other_config_pids" != "x" ]; then
+    kill -s KILL $other_config_pids
+    waitfor cvmfs_config 10
+    if [ $? -ne 0 ]; then
+      echo "Failed!"
+      return 1
+    fi
+  fi
+  echo "OK"
+
+  echo -n "Terminating cvmfs2 processes... "
+  killall -q -KILL ${INSTALL_BASE}/bin/cvmfs2
+  waitfor cvmfs2 10
+  if [ $? -ne 0 ]; then
+    echo "Failed!"
+    return 1
+  fi
+  echo "OK"
+
+  echo -n "Unmounting stale mount points... "
+  cvmfs_umount silent
+  if [ $? -ne 0 ]; then
+    echo "Failed!"
+    return 1
+  fi
+  echo "OK"
+
+  echo -n "Cleaning up run-time variable data... "
+  rm -rf /var/run/cvmfs/*
+  echo "OK"
+
+  $pidof automount > /dev/null
+  if [ $? -eq 0 ]; then
+    echo -n "Reloading autofs... "
+    reload_service autofs
+    echo "OK"
+  fi
+
+  return 0
 }
 
 
@@ -1206,6 +1263,46 @@ cvmfs_bugreport() {
 die() {
   echo -e $1 >&2
   exit 1
+}
+
+
+waitfor() {
+  local process=$1
+  local timeout=$2
+  local pid=$$
+
+  local seconds=0
+  while [ $seconds -lt $timeout ]; do
+    local procs=$(pgrep -x $process)
+    local num_other_procs=0
+    for p in $procs; do
+      # Not myself
+      if [ $p -eq $pid ]; then
+        continue;
+      fi
+      # No zombies
+      local pstate=$(ps -p "$p" -o state=)
+      if echo "$pstate" | grep "Z"; then
+        continue
+      fi
+      # Not the CernVM instance of cvmfs
+      case $sys_arch in
+        Linux )
+          if [ "x$(cat /proc/$p/cmdline 2>/dev/null | head -c1)" = "x@" ]; then
+            continue
+          fi
+        ;;
+      esac
+      num_other_procs=$(($num_other_procs + 1))
+    done
+    if [ $num_other_procs -eq 0 ]; then
+      return 0
+    fi
+    sleep 1
+    seconds=$(($seconds + 1))
+  done
+
+  return 1
 }
 
 
@@ -1853,6 +1950,15 @@ case "$1" in
     fi
     shift 1
     cvmfs_reload -c
+    RETVAL=$?
+    ;;
+
+  killall)
+    if [ `id -u` -ne 0 ]; then
+      echo "root privileges required"
+      exit 1
+    fi
+    cvmfs_killall $@
     RETVAL=$?
     ;;
 
