@@ -16,7 +16,8 @@ File::File(const std::string    &path,
            IoDispatcher         *io_dispatcher,
            ChunkDetector        *chunk_detector,
            shash::Algorithms     hash_algorithm,
-           const shash::Suffix   hash_suffix) :
+           const shash::Suffix   hash_suffix,
+           const std::string    &alt_path) :
   AbstractFile(path, GetFileSize(path)),
   might_become_chunked_(chunk_detector != NULL &&
                         chunk_detector->MightFindChunks(size())),
@@ -24,7 +25,8 @@ File::File(const std::string    &path,
   hash_suffix_(hash_suffix),
   bulk_chunk_(NULL),
   io_dispatcher_(io_dispatcher),
-  chunk_detector_(chunk_detector)
+  chunk_detector_(chunk_detector),
+  alt_path_(alt_path)
 {
   chunks_to_commit_ = 0;  // tbb::atomic has no init constructor
   CreateInitialChunk();

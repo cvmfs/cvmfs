@@ -340,11 +340,23 @@ int S3Uploader::SelectBucket(const std::string &rem_filename) const {
 }
 
 
+void S3Uploader::CallbackAltPath(const UploaderResults &results) {
+  // TODO(jblomer): die properly
+  assert(results.return_code == 0);
+}
+
+
 void S3Uploader::FileUpload(
   const std::string &local_path,
   const std::string &remote_path,
+  const std::string &alt_path,
   const CallbackTN  *callback
 ) {
+  if (alt_path.size()) {
+    this->AbstractUploader::Upload(local_path, alt_path, "",
+      AbstractUploader::MakeCallback(&S3Uploader::CallbackAltPath, this));
+  }
+
   // Choose S3 account and bucket based on the target
   std::string access_key, secret_key, bucket_name;
   const std::string mangled_filename = repository_alias_ + "/" + remote_path;
@@ -357,7 +369,7 @@ void S3Uploader::FileUpload(
                             bucket_name,
                             mangled_filename,
                             const_cast<void*>(
-                                static_cast<void const*>(callback)),
+                              static_cast<void const*>(callback)),
                             local_path);
 
   if (remote_path.compare(0, 6, ".cvmfs") == 0) {
@@ -372,8 +384,7 @@ void S3Uploader::FileUpload(
   const bool retval = UploadJobInfo(info);
   assert(retval);
 
-  LogCvmfs(kLogUploadS3, kLogDebug,
-           "Uploading from file finished: %s",
+  LogCvmfs(kLogUploadS3, kLogDebug, "Uploading from file finished: %s",
            local_path.c_str());
 }
 
@@ -432,7 +443,12 @@ int S3Uploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
 }
 
 
-UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
+UploadStreamHandle *S3Uploader::InitStreamedUpload(
+  const CallbackTN *callback,
+  const std::string &alt_path)
+{
+  // TODO(jblomer): do something with alt_path
+  
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
 

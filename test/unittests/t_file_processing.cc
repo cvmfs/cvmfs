@@ -110,7 +110,9 @@ class FP_MockUploader : public AbstractMockUploader<FP_MockUploader> {
   }
 
   upload::UploadStreamHandle* InitStreamedUpload(
-                                            const CallbackTN *callback = NULL) {
+    const CallbackTN *callback = NULL,
+    const std::string &alt_path = NULL)
+  {
     return new MockStreamHandle(callback);
   }
 

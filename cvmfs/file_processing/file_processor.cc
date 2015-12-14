@@ -44,7 +44,9 @@ FileProcessor::~FileProcessor() {
 
 void FileProcessor::Process(const std::string   &local_path,
                             const bool           allow_chunking,
-                            const shash::Suffix  hash_suffix) {
+                            const shash::Suffix  hash_suffix,
+                            const std::string   &alt_path) 
+{
   ChunkDetector *chunk_detector = (chunking_enabled_ && allow_chunking)
                                         ? new Xor32Detector(minimal_chunk_size_,
                                                             average_chunk_size_,
@@ -54,7 +56,8 @@ void FileProcessor::Process(const std::string   &local_path,
                         io_dispatcher_,
                         chunk_detector,
                         hash_algorithm_,
-                        hash_suffix);
+                        hash_suffix,
+                        alt_path);
 
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "Scheduling '%s' for processing ("
                                         "chunking: %s, hash_suffix: %c)",
