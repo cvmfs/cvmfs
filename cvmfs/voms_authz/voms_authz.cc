@@ -414,7 +414,7 @@ bool
 CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
 {
     if (g_VOMS_Init == NULL) {
-        LogCvmfs(kLogVoms, kLogDebug, "VOMS library not present; failing VOMS "
+        LogCvmfs(kLogVoms, kLogSyslog, "VOMS library not present; failing VOMS "
                  "authz.");
         return false;
     }

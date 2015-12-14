@@ -208,6 +208,8 @@ struct ProxyHelper {
   }
 
 
+  // TODO(jblomer): more error handling here: if the user proxy certificate
+  // does not exist, it is hard to figure out.
   FILE *GetProxyFile(pid_t pid, uid_t uid, gid_t gid) {
     if (!CheckHelperLaunched()) {return NULL;}
 

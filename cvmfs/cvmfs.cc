@@ -1086,6 +1086,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   catalog::ClientCtx ctx(fctx->uid, fctx->gid, fctx->pid);
 
   // Get VOMS information, if any,
+  // TODO(jblomer): without VOMS, cvmfs will allow access.  This is probably
+  // not the right default.
 #ifdef VOMS_AUTHZ
   if ((ctx.uid != 0) && voms_requirements.size())
   {
