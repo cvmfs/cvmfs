@@ -41,6 +41,7 @@ ClientCatalogManager::ClientCatalogManager(
   , offline_mode_(false)
   , all_inodes_(0)
   , loaded_inodes_(0)
+  , fixed_alt_root_catalog_(false)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "constructing client catalog manager");
   n_certificate_hits_ = statistics->Register("cache.n_certificate_hits",
@@ -83,10 +84,14 @@ shash::Any ClientCatalogManager::GetRootHash() {
 /**
  * Specialized initialization that uses a fixed root hash.
  */
-bool ClientCatalogManager::InitFixed(const shash::Any &root_hash) {
+bool ClientCatalogManager::InitFixed(
+  const shash::Any &root_hash,
+  bool alternative_path)
+{
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog with root hash %s",
            root_hash.ToString().c_str());
   WriteLock();
+  fixed_alt_root_catalog_ = alternative_path;
   bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
   Unlock();
 
@@ -118,7 +123,11 @@ LoadError ClientCatalogManager::LoadCatalog(
   // Load a particular catalog
   if (!hash.IsNull()) {
     cvmfs_path += " (" + hash.ToString() + ")";
-    LoadError load_error = LoadCatalogCas(hash, cvmfs_path, "", catalog_path);
+    string alt_catalog_path = "";
+    if (mountpoint.IsEmpty() && fixed_alt_root_catalog_)
+      alt_catalog_path = hash.MakeAlternativePath();
+    LoadError load_error = 
+      LoadCatalogCas(hash, cvmfs_path, alt_catalog_path, catalog_path);
     if (load_error == catalog::kLoadNew)
       loaded_catalogs_[mountpoint] = hash;
     *catalog_hash = hash;
