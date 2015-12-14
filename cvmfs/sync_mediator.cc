@@ -186,7 +186,7 @@ void SyncMediator::LeaveDirectory(const SyncItem &entry)
  * Do any pending processing and commit all changes to the catalogs.
  * To be called after change set traversal is finished.
  */
-manifest::Manifest *SyncMediator::Commit() {
+manifest::Manifest *SyncMediator::Commit(const bool use_alt_path) {
   if (!params_->print_changeset) {
     // line break the 'progress bar', see SyncMediator::PrintChangesetNotice()
     LogCvmfs(kLogPublish, kLogStdout, "");
@@ -252,7 +252,8 @@ manifest::Manifest *SyncMediator::Commit() {
   }
   catalog_manager_->PrecalculateListings();
   return catalog_manager_->Commit(params_->stop_for_catalog_tweaks,
-                                  params_->manual_revision);
+                                  params_->manual_revision,
+                                  use_alt_path);
 }
 
 

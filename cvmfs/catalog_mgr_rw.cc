@@ -95,6 +95,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string     &dir_temp,
   const bool        volatile_content,
   const bool        garbage_collectable,
+  const string     &voms_authz,
   upload::Spooler  *spooler)
 {
   // Create a new root catalog at file_path
@@ -153,9 +154,13 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
   manifest->set_garbage_collectability(garbage_collectable);
+  if (voms_authz.size()) {
+    manifest->set_has_alt_catalog_path(true);
+  }
 
   // Upload catalog
-  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath());
+  spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath(),
+    manifest->has_alt_catalog_path() ? manifest->MakeCatalogPath() : "");
   spooler->WaitForUpload();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
@@ -677,7 +682,8 @@ void WritableCatalogManager::PrecalculateListings() {
 
 manifest::Manifest *WritableCatalogManager::Commit(
   const bool     stop_for_tweaks,
-  const uint64_t manual_revision)
+  const uint64_t manual_revision,
+  const bool     use_alt_path)
 {
   reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetDirty();
   WritableCatalogList catalogs_to_snapshot;
@@ -711,7 +717,8 @@ manifest::Manifest *WritableCatalogManager::Commit(
         (*i)->SetRevision(manual_revision - 1);
       }
     }
-    shash::Any hash = SnapshotCatalog(*i);
+    // If requested, make root catalog publicly available
+    shash::Any hash = SnapshotCatalog((*i)->IsRoot() && use_alt_path, *i);
 
     if ((*i)->GetCounters().GetSelfEntries() > catalog_entry_warn_threshold_) {
       LogCvmfs(kLogCatalog, kLogStdout,
@@ -739,6 +746,7 @@ manifest::Manifest *WritableCatalogManager::Commit(
       result = new manifest::Manifest(hash, catalog_size, "");
       result->set_ttl((*i)->GetTTL());
       result->set_revision((*i)->GetRevision());
+      result->set_has_alt_catalog_path(use_alt_path);
     }
   }
 
@@ -784,8 +792,9 @@ int WritableCatalogManager::GetModifiedCatalogsRecursively(
  * Makes a new catalog revision.  Compresses and uploads catalog.  Returns
  * content hash.
  */
-shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
-  const
+shash::Any WritableCatalogManager::SnapshotCatalog(
+  const bool use_alt_path,
+  WritableCatalog *catalog) const
 {
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "creating snapshot of catalog '%s'",
            catalog->path().c_str());
@@ -832,7 +841,8 @@ shash::Any WritableCatalogManager::SnapshotCatalog(WritableCatalog *catalog)
 
   // Upload catalog
   spooler_->Upload(catalog->database_path() + ".compressed",
-                   "data/" + hash_catalog.MakePath());
+                   "data/" + hash_catalog.MakePath(),
+                   use_alt_path ? hash_catalog.MakeAlternativePath() : "");
 
   // Update registered catalog hash in nested catalog
   if (catalog->HasParent()) {
