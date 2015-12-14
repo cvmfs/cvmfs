@@ -44,6 +44,7 @@ set(CVMFS_UNITTEST_FILES
   t_base64.cc
   t_pathspec.cc
   t_dirtab.cc
+  t_relaxed_path_filter.cc
   t_callbacks.cc
   t_lru.cc
   t_sqlite_database.cc
@@ -147,6 +148,8 @@ set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
   ${CVMFS_SOURCE_DIR}/path_filters/dirtab.h
+  ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.h
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/manifest.h

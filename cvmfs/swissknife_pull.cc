@@ -29,7 +29,7 @@
 #include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
-#include "path_filters/dirtab.h"
+#include "path_filters/relaxed_path_filter.h"
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"

@@ -139,6 +139,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
 
   path_filters/dirtab.h path_filters/dirtab.cc
+  path_filters/relaxed_path_filter.h path_filters/relaxed_path_filter.cc
 
   upload.h upload.cc
   upload_spooler_definition.h upload_spooler_definition.cc
