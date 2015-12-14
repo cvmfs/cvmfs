@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "../../cvmfs/dirtab.h"
+#include "../../cvmfs/path_filters/dirtab.h"
 
 class T_Dirtab : public ::testing::Test {
  protected:

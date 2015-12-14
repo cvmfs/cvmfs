@@ -8,7 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "util.h"
+#include "../util.h"
 
 namespace catalog {
 

@@ -2,13 +2,13 @@
  * This file is part of the CernVM File System.
  */
 
-#ifndef CVMFS_DIRTAB_H_
-#define CVMFS_DIRTAB_H_
+#ifndef CVMFS_PATH_FILTERS_DIRTAB_H_
+#define CVMFS_PATH_FILTERS_DIRTAB_H_
 
 #include <string>
 #include <vector>
 
-#include "pathspec/pathspec.h"
+#include "../pathspec/pathspec.h"
 
 namespace catalog {
 
@@ -193,5 +193,5 @@ class RelaxedPathFilter : public Dirtab {
 
 }  // namespace catalog
 
-#endif  // CVMFS_DIRTAB_H_
+#endif  // CVMFS_PATH_FILTERS_DIRTAB_H_
 

@@ -145,8 +145,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.h
 
-  ${CVMFS_SOURCE_DIR}/dirtab.cc
-  ${CVMFS_SOURCE_DIR}/dirtab.h
+  ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/dirtab.h
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/manifest.h
