@@ -1994,10 +1994,10 @@ Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
 
 # creates a standard Apache configuration file for a repository
 #
-# @param name         the name of the repository to be served
-# @param storage_dir  the storage location of the repository
-# @param with_wsgi    wether or not to enable WSGI api functions
-create_apache_config_for_repository() {
+# @param name         the name of the endpoint to be served
+# @param storage_dir  the storage location of the data
+# @param with_wsgi    whether or not to enable WSGI api functions
+create_apache_config_for_endpoint() {
   local name=$1
   local storage_dir=$2
   local with_wsgi="$3"
@@ -2036,35 +2036,9 @@ has_apache_config_for_global_info() {
 }
 
 create_apache_config_for_global_info() {
-  local conf_file="cvmfs.info.conf"
-
   ! has_apache_config_for_global_info || return 0
-
-  # TODO(rmeusel): make this a bit more flexible
   local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
-
-  # TODO(rmeusel): fine-tune this configuration file
-  create_apache_config_file $conf_file << EOF
-# Created by cvmfs_server.  Don't touch.
-
-KeepAlive On
-Alias /cvmfs/info ${storage_dir}
-<Directory "${storage_dir}">
-    Options -MultiViews
-    AllowOverride Limit
-    $(get_compatible_apache_allow_from_all_config)
-
-    EnableMMAP Off
-    EnableSendFile Off
-
-    FileETag None
-
-    ExpiresActive On
-    ExpiresDefault "access plus 3 days"
-    ExpiresByType text/html "access plus 5 minutes"
-    ExpiresByType application/x-cvmfs "access plus 2 minutes"
-</Directory>
-EOF
+  create_apache_config_for_endpoint "info" "$storage_dir"
 }
 
 # puts all configuration files in place that are need for a stratum0 repository
@@ -2129,7 +2103,7 @@ EOF
     local repository_dir=$(get_upstream_config $upstream)
     # make sure that the config file does not exist, yet
     remove_apache_config_file "cvmfs.${name}.conf" || true
-    create_apache_config_for_repository $name $repository_dir
+    create_apache_config_for_endpoint $name $repository_dir
     create_apache_config_for_global_info
   fi
 
@@ -3071,7 +3045,7 @@ EOF
   fi
 
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
-    create_apache_config_for_repository $alias_name $storage_dir "with wsgi"
+    create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
     create_apache_config_for_global_info
     reload_apache > /dev/null
   fi
