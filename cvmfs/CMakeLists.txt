@@ -51,7 +51,8 @@ set (CVMFS_CLIENT_SOURCES
   catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_client.h catalog_mgr_client.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
-  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
+  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc 
+  voms_authz/cred_fetcher.cc voms_authz/voms_cred.h
   directory_entry.h directory_entry.cc
   shortstring.h
   file_chunk.h file_chunk.cc
@@ -285,8 +286,6 @@ include_directories (${INCLUDE_DIRECTORIES})
 #
 
 if (BUILD_CVMFS)
-
-  add_executable (cvmfs_cred_fetcher voms_authz/cred_fetcher.cc voms_authz/voms_cred.h)
   add_executable (cvmfs2 ${CVMFS_LOADER_SOURCES})
   add_library (cvmfs_fuse_debug SHARED  ${CVMFS2_DEBUG_SOURCES})
   add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES})
@@ -571,7 +570,7 @@ endif (BUILD_PRELOADER)
 
 if (BUILD_CVMFS)
   install (
-    TARGETS      cvmfs2 cvmfs_fsck cvmfs_cred_fetcher
+    TARGETS      cvmfs2 cvmfs_fsck
     RUNTIME
     DESTINATION    bin
   )

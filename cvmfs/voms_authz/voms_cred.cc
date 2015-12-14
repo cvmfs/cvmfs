@@ -94,7 +94,8 @@ struct ProxyHelper {
   ~ProxyHelper() {
     MutexLockGuard guard(m_helper_mutex);
     if (m_subprocess > 0) {
-      InformChild(kChildExit, 0);  // Tell child process to exit with status 0.
+      // Tell child process to exit with status 0.
+      InformChild(CredentialsFetcher::kCmdChildExit, 0);
       // TODO(bbockelm): It may be beneficial to have a timeout here.
       ReportChildDeath(m_subprocess, 0);
     }
@@ -144,9 +145,11 @@ struct ProxyHelper {
     for (rlim_t idx=4; idx < m_max_files; idx++) {
       close(idx);
     }
-    char *args[2];
-    char executable_name[] = "cvmfs_cred_fetcher";
+    char *args[3];
+    char executable_name[] = "cvmfs2";
+    char process_flavor[] = "__cred_fetcher__";
     args[0] = executable_name;
+    args[1] = process_flavor;
     args[1] = NULL;
     // NOTE: We have forked from a threaded process.  We do
     // not know the status of any other mutex in the program - particularly,
@@ -215,7 +218,7 @@ struct ProxyHelper {
     struct msghdr msg_send;
     memset(&msg_send, '\0', sizeof(msg_send));
     struct iovec iov[4];
-    int command = kCredReq;
+    int command = CredentialsFetcher::kCmdCredReq;
     iov[0].iov_base = &command;
     iov[0].iov_len = sizeof(command);
     iov[1].iov_base = &pid;
@@ -316,9 +319,7 @@ struct ProxyHelper {
 
 static ProxyHelper g_instance;
 
-
 FILE *
 GetProxyFile(pid_t pid, uid_t uid, gid_t gid) {
   return g_instance.GetProxyFile(pid, uid, gid);
 }
-
