@@ -40,6 +40,7 @@ CVMFS_UPDATEGEO_DB=${CVMFS_UPDATEGEO_DIR}/GeoLiteCity.dat
 
 DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 
+LATEST_JSON_INFO_SCHEMA=1
 
 # setup server hooks: no-ops (overrideable by /etc/cvmfs/cvmfs_server_hooks.sh)
 transaction_before_hook() { :; }
@@ -188,7 +189,8 @@ is_subcommand() {
   local subcommand="$1"
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
-    skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks"
+    skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
+    update-info"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -336,6 +338,8 @@ Supported Commands:
   list          List available repositories
   update-geodb  [-l update lazily based on CVMFS_UPDATEGEO* variables]
                 Updates the geo-IP database
+  update-info   [-p no apache config] [-e don't edit /info/meta]
+                Open meta info JSON file for editing
 "
 
 
@@ -1990,10 +1994,10 @@ Alias /cvmfs/$name/api /var/www/wsgi-scripts/cvmfs-api.wsgi/$name
 
 # creates a standard Apache configuration file for a repository
 #
-# @param name         the name of the repository to be served
-# @param storage_dir  the storage location of the repository
-# @param with_wsgi    wether or not to enable WSGI api functions
-create_apache_config_for_repository() {
+# @param name         the name of the endpoint to be served
+# @param storage_dir  the storage location of the data
+# @param with_wsgi    whether or not to enable WSGI api functions
+create_apache_config_for_endpoint() {
   local name=$1
   local storage_dir=$2
   local with_wsgi="$3"
@@ -2024,6 +2028,17 @@ Alias /cvmfs/${name} ${storage_dir}
     ExpiresByType application/x-cvmfs "access plus 2 minutes"
 </Directory>
 EOF
+}
+
+has_apache_config_for_global_info() {
+  local conf_file="cvmfs.info.conf"
+  has_apache_config_file $conf_file
+}
+
+create_apache_config_for_global_info() {
+  ! has_apache_config_for_global_info || return 0
+  local storage_dir="${DEFAULT_LOCAL_STORAGE}/info"
+  create_apache_config_for_endpoint "info" "$storage_dir"
 }
 
 # puts all configuration files in place that are need for a stratum0 repository
@@ -2088,7 +2103,8 @@ EOF
     local repository_dir=$(get_upstream_config $upstream)
     # make sure that the config file does not exist, yet
     remove_apache_config_file "cvmfs.${name}.conf" || true
-    create_apache_config_for_repository $name $repository_dir
+    create_apache_config_for_endpoint $name $repository_dir
+    create_apache_config_for_global_info
   fi
 
   cat > $client_conf << EOF
@@ -2331,6 +2347,130 @@ has_file_descriptors_on_mount_point() {
 
   [ $(count_rd_only_fds $mountpoint) -gt 0 ] || \
   [ $(count_wr_fds      $mountpoint) -gt 0 ]
+}
+
+
+################################################################################
+#                                                                              #
+#                        JSON "API" related functions                          #
+#                                                                              #
+################################################################################
+
+
+get_global_info_path() {
+  # TODO(rmeusel): make this a bit more flexible
+  echo "${DEFAULT_LOCAL_STORAGE}/info/v${LATEST_JSON_INFO_SCHEMA}"
+}
+
+
+_write_info_file() {
+  local info_file="$1"
+  local info_file_path="$(get_global_info_path)/${info_file}"
+  local tmp_file=$(mktemp)
+
+  cat - > $tmp_file
+  chmod 0644 $tmp_file
+  mv -f $tmp_file $info_file_path
+}
+
+
+_check_info_file() {
+  local info_file="$1"
+  [ -f "$(get_global_info_path)/${info_file}" ]
+}
+
+
+_available_repos() {
+  local filter="$1"
+  local repo=""
+
+  for repository in /etc/cvmfs/repositories.d/*; do
+    repo=$(basename $repository)
+    if ( [ x"$filter" = x"" ]                              ) || \
+       ( [ x"$filter" = x"stratum0" ] && is_stratum0 $repo ) || \
+       ( [ x"$filter" = x"stratum1" ] && is_stratum1 $repo ); then
+      echo $repo
+    fi
+  done
+}
+
+
+_render_repos() {
+  local i=$#
+
+  for repo in $@; do
+    load_repo_config $repo
+
+    echo '    {'
+    echo '      "name"  : "'$CVMFS_REPOSITORY_NAME'",'
+    if [ x"$CVMFS_REPOSITORY_NAME" != x"$repo" ]; then
+      echo '      "alias" : "'$repo'",'
+    fi
+    echo '      "url"   : "/cvmfs/'$repo'"'
+    echo -n '    }'
+
+    i=$(( $i - 1 ))
+    [ $i -gt 0 ] && echo "," || echo ""
+  done
+}
+
+
+_render_info_file() {
+  echo '{'
+  echo '  "schema"       : '$LATEST_JSON_INFO_SCHEMA','
+  echo '  "repositories" : ['
+
+  _render_repos $(_available_repos "stratum0")
+
+  echo '  ],'
+  echo '  "replicas" : ['
+
+  _render_repos $(_available_repos "stratum1")
+
+  echo '  ]'
+  echo '}'
+}
+
+
+has_global_info_path() {
+  [ -d $(get_global_info_path) ]
+}
+
+
+create_global_info_skeleton() {
+  local info_path="$(get_global_info_path)"
+  mkdir -p $info_path
+
+  _check_info_file "repositories" || echo "{}" | _write_info_file "repositories"
+  _check_info_file "meta" || _write_info_file "meta" << EOF
+{
+  "administrator" : "Your Name",
+  "email"         : "you@organisation.org",
+  "organisation"  : "Your Organisation",
+
+  "custom" : {
+    "_comment" : "Put arbitrary structured data here"
+  }
+}
+EOF
+}
+
+
+update_global_repository_info() {
+  # sanity checks
+  has_global_info_path || return 1
+  is_root              || return 2
+
+  _render_info_file | _write_info_file "repositories"
+}
+
+
+update_global_meta_info() {
+  local meta_info_file="$1"
+  has_global_info_path || return 1
+  is_root              || return 2
+
+  cat "$meta_info_file" | _write_info_file "meta"
 }
 
 
@@ -2695,6 +2835,7 @@ mkfs() {
   # create storage area
   if is_local_upstream $upstream; then
     echo -n "Creating Backend Storage... "
+    create_global_info_skeleton
     create_repository_storage $name || die "fail"
     echo "done"
   fi
@@ -2741,6 +2882,9 @@ mkfs() {
   chown $cvmfs_user /cvmfs/${name}/new_repository
   publish $name > /dev/null      || die "fail (publish)"
   cat $rdonly_dir/new_repository || die "fail (finish)"
+
+  echo -n "Updating global JSON information... "
+  update_global_repository_info && echo "done" || echo "fail"
 
   print_new_repository_notice $name $cvmfs_user
 }
@@ -2901,13 +3045,15 @@ EOF
   fi
 
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
-    create_apache_config_for_repository $alias_name $storage_dir "with wsgi"
+    create_apache_config_for_endpoint $alias_name $storage_dir "with wsgi"
+    create_apache_config_for_global_info
     reload_apache > /dev/null
   fi
   echo "done"
 
   if is_local_upstream $upstream; then
     _update_geodb -l
+    create_global_info_skeleton
 
     echo -n "Create CernVM-FS Storage... "
     mkdir -p $storage_dir
@@ -2924,6 +3070,9 @@ EOF
   fi
   chown -R $cvmfs_user $spool_dir           || die "fail (chown)"
   echo "done"
+
+  echo -n "Updating global JSON information... "
+  update_global_repository_info && echo "done" || echo "fail"
 
   echo "\
 
@@ -3218,6 +3367,9 @@ import() {
     alterfs -m on $name
   fi
 
+  echo -n "Updating global JSON information... "
+  update_global_repository_info && echo "done" || echo "fail"
+
   # reset trap and finish
   trap - EXIT HUP INT QUIT TERM
   print_new_repository_notice $name $cvmfs_user
@@ -3327,6 +3479,9 @@ rmfs() {
     echo -n "Removing Configuration... "
     remove_config_files $name || die "fail"
     echo "done"
+
+    echo -n "Updating global JSON information... "
+    update_global_repository_info && echo "done" || echo "fail"
 
     echo "CernVM-FS repository $name wiped out!"
 
@@ -5205,6 +5360,116 @@ eliminate_hardlinks() {
                               -s"
 
   _run_catalog_migration "$name" "$migrate_command"
+}
+
+
+################################################################################
+
+_update_info_cleanup() {
+  local tmp_file="$1"
+  rm -f $tmp_file > /dev/null 2>&1
+}
+
+update_info() {
+  local configure_apache=1
+  local edit_meta_info=1
+
+  # parameter handling
+  OPTIND=1
+  while getopts "pe" option; do
+    case $option in
+      p)
+        configure_apache=0
+      ;;
+      e)
+        edit_meta_info=0
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command update-info: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  # sanity checks
+  is_root || die "only root can update meta information"
+
+  # create info HTTP resource if not existent yet
+  if ! has_global_info_path; then
+    echo -n "Creating Info Resource... "
+    create_global_info_skeleton || die "fail"
+    echo "done"
+  fi
+
+  if [ $configure_apache -eq 1 ] && ! has_apache_config_for_global_info; then
+    echo -n "Creating Apache Configuration for Info Resource... "
+    create_apache_config_for_global_info || die "fail (create apache config)"
+    reload_apache > /dev/null            || die "fail (reload apache)"
+    echo "done"
+  fi
+
+  # manually edit the meta information file
+  local tmp_file=""
+  if [ $edit_meta_info -eq 1 ]; then
+    # figure out which editor to use
+    local editor=${EDITOR:=vi}
+    if ! which $editor  > /dev/null 2>&1; then
+      echo "Didn't find editor '$editor'."
+      echo "Consider to use the \$EDITOR environment variable"
+      exit 1
+    fi
+
+    # check if we have `jq` for JSON validity checks
+    local has_jq=1
+    if ! which jq > /dev/null 2>&1; then
+      has_jq=0
+      echo
+      echo "Warning: Didn't find 'jq' on your system. It is your responsibility"
+      echo "         to produce a valid JSON file."
+      echo
+      read -p "  Press any key to continue..." nirvana
+    fi
+
+    # copy the meta information file for editing
+    tmp_file=$(mktemp)
+    trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
+    cp -f "$(get_global_info_path)/meta" $tmp_file
+
+    # edit until the JSON is valid
+    local json_valid=true
+    while true; do
+      $editor $tmp_file < $(tty) > $(tty) 2>&1
+      [ $has_jq -eq 1 ] || break
+
+      local jq_output=""
+      local retry=""
+      if ! jq_output=$(jq '.' $tmp_file 2>&1); then
+        echo
+        echo "Your JSON file is invalid, please check again:"
+        echo "$jq_output"
+        read -p "Edit again? [y]: " retry
+        if [ x"$retry" != x"y" ] && \
+           [ x"$retry" != x"Y" ] && \
+           [ x"$retry" != x""  ]; then
+          json_valid=false
+          break
+        fi
+      else
+        break
+      fi
+    done
+
+    $json_valid || die "Aborting..."
+  fi
+
+  # update the JSON files
+  echo -n "Updating global JSON information... "
+  update_global_repository_info || die "fail (update repo info)"
+  if [ $edit_meta_info -eq 1 ]; then
+    update_global_meta_info "$tmp_file" || die "fail (update meta info)"
+  fi
+  echo "done"
 }
 
 

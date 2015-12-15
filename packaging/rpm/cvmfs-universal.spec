@@ -154,6 +154,10 @@ Requires: httpd
 Requires: libcap
 Requires: lsof
 Requires: rsync
+%if 0%{?el6} || 0%{?el7} || 0%{?fedora} || 0%{?suse_version} >= 1300
+Requires: jq # this is 'nice-to-have' at the moment
+             # TODO(rmeusel): consider using 'Recommends:' in the far future
+%endif
 
 Conflicts: cvmfs-server < 2.1
 
@@ -388,6 +392,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Fri Dec 11 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
+- Add jq (weak) dependency
 * Fri Oct 23 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
 - Fix dependency for Fedora 22
 - Add lsof dependency for cvmfs-server
