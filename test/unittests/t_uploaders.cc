@@ -272,7 +272,7 @@ class T_Uploaders : public FileSandbox {
 
   bool CheckFile(const std::string &remote_path) const {
     const std::string absolute_path = AbsoluteDestinationPath(remote_path);
-    return FileExists(absolute_path);
+    return FileExists(absolute_path) || SymlinkExists(absolute_path);
   }
 
 
@@ -611,6 +611,7 @@ TYPED_TEST(T_Uploaders, SimpleFileUpload) {
 
   this->uploader_->Upload(big_file_path,
                           dest_name,
+                          "",
                           AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
@@ -628,11 +629,39 @@ TYPED_TEST(T_Uploaders, SimpleFileUpload) {
 //------------------------------------------------------------------------------
 
 
+TYPED_TEST(T_Uploaders, AlternativePath) {
+  const std::string big_file_path = TestFixture::GetBigFile();
+  const std::string dest_name     = "big_file";
+
+  this->uploader_->Upload(big_file_path,
+                          dest_name,
+                          "alt_file",
+                          AbstractUploader::MakeClosure(
+                              &UploadCallbacks::SimpleUploadClosure,
+                              &this->delegate_,
+                              UploaderResults(0, big_file_path)));
+
+  this->uploader_->WaitForUpload();
+  EXPECT_TRUE(TestFixture::CheckFile(dest_name));
+  EXPECT_TRUE(TestFixture::CheckFile("alt_file"));
+  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  TestFixture::CompareFileContents(big_file_path,
+                                   TestFixture::AbsoluteDestinationPath(
+                                       dest_name));
+  TestFixture::CompareFileContents(big_file_path,
+                                   TestFixture::AbsoluteDestinationPath(
+                                       "alt_file"));
+}
+
+
+//------------------------------------------------------------------------------
+
+
 TYPED_TEST(T_Uploaders, PeekIntoStorage) {
   const std::string small_file_path = TestFixture::GetSmallFile();
   const std::string dest_name       = "small_file";
 
-  this->uploader_->Upload(small_file_path, dest_name,
+  this->uploader_->Upload(small_file_path, dest_name, "",
                           AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
@@ -660,7 +689,7 @@ TYPED_TEST(T_Uploaders, RemoveFromStorage) {
   const std::string small_file_path = TestFixture::GetSmallFile();
   const std::string dest_name       = "also_small_file";
 
-  this->uploader_->Upload(small_file_path, dest_name,
+  this->uploader_->Upload(small_file_path, dest_name, "",
                           AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
@@ -694,7 +723,7 @@ TYPED_TEST(T_Uploaders, UploadEmptyFile) {
   const std::string empty_file_path = TestFixture::GetEmptyFile();
   const std::string dest_name       = "empty_file";
 
-  this->uploader_->Upload(empty_file_path, dest_name,
+  this->uploader_->Upload(empty_file_path, dest_name, "",
                           AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
@@ -717,7 +746,7 @@ TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
   const std::string huge_file_path = TestFixture::GetHugeFile();
   const std::string dest_name     = "huge_file";
 
-  this->uploader_->Upload(huge_file_path, dest_name,
+  this->uploader_->Upload(huge_file_path, dest_name, "",
                           AbstractUploader::MakeClosure(
                               &UploadCallbacks::SimpleUploadClosure,
                               &this->delegate_,
@@ -729,6 +758,32 @@ TYPED_TEST(T_Uploaders, UploadHugeFileSlow) {
   TestFixture::CompareFileContents(huge_file_path,
                                    TestFixture::AbsoluteDestinationPath(
                                        dest_name));
+}
+
+
+//------------------------------------------------------------------------------
+
+
+TYPED_TEST(T_Uploaders, AltPathHugeFileSlow) {
+  const std::string huge_file_path = TestFixture::GetHugeFile();
+  const std::string dest_name     = "huge_file";
+
+  this->uploader_->Upload(huge_file_path, dest_name, "alt_path",
+                          AbstractUploader::MakeClosure(
+                              &UploadCallbacks::SimpleUploadClosure,
+                              &this->delegate_,
+                              UploaderResults(0, huge_file_path)));
+  this->uploader_->WaitForUpload();
+
+  EXPECT_TRUE(TestFixture::CheckFile(dest_name));
+  EXPECT_TRUE(TestFixture::CheckFile("alt_path"));
+  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  TestFixture::CompareFileContents(huge_file_path,
+                                   TestFixture::AbsoluteDestinationPath(
+                                       dest_name));
+  TestFixture::CompareFileContents(huge_file_path,
+                                   TestFixture::AbsoluteDestinationPath(
+                                       "alt_path"));                                   
 }
 
 
@@ -765,7 +820,7 @@ TYPED_TEST(T_Uploaders, UploadManyFilesSlow) {
   Files::const_iterator i    = files.begin();
   Files::const_iterator iend = files.end();
   for (; i != iend; ++i) {
-    this->uploader_->Upload(i->first, i->second,
+    this->uploader_->Upload(i->first, i->second, "",
                             AbstractUploader::MakeClosure(
                                 &UploadCallbacks::SimpleUploadClosure,
                                 &this->delegate_,

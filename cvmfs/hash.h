@@ -302,6 +302,15 @@ struct Digest {
   }
 
   /**
+   * The alternative path is used to symlink the root catalog from the webserver
+   * root to the data directory.  This way, the data directory can be protected
+   * while the root catalog remains accessible.
+   */
+  std::string MakeAlternativePath() const {
+    return ".cvmfsalt-" + ToString(true);
+  }
+
+  /**
    * Produces a relative path representation of the digest without appending the
    * hash suffix. See Digest<>::MakePath() for more details.
    *

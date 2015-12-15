@@ -80,7 +80,8 @@ class FileProcessor : public Observable<SpoolerResult> {
 
   void Process(const std::string   &local_path,
                const bool           allow_chunking,
-               const shash::Suffix  hash_suffix = shash::kSuffixNone);
+               const shash::Suffix  hash_suffix = shash::kSuffixNone,
+               const std::string   &alt_path = "");
 
   void WaitForProcessing();
 

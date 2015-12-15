@@ -607,6 +607,16 @@ TEST_F(T_Util, SymlinkExists) {
   EXPECT_FALSE(SymlinkExists("/fakepath/myfakepath"));
 }
 
+TEST_F(T_Util, SymlinkForced) {
+  string symlinkname = sandbox + "/myfile";
+  string filename = CreateFileWithContent("mysymlinkfile.txt", to_write);
+  EXPECT_TRUE(SymlinkForced(filename, symlinkname));
+  EXPECT_TRUE(SymlinkExists(symlinkname));
+  EXPECT_TRUE(SymlinkForced(filename, symlinkname));
+  EXPECT_TRUE(SymlinkExists(symlinkname));
+  EXPECT_FALSE(SymlinkForced(filename, "/no/such/directory"));
+}
+
 TEST_F(T_Util, MkdirDeep) {
   string mydirectory = sandbox + "/mydirectory";
   string myfile = CreateFileWithContent("myfile.txt", to_write);

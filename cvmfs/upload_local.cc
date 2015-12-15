@@ -73,6 +73,7 @@ void LocalUploader::WorkerThread() {
 void LocalUploader::FileUpload(
   const std::string &local_path,
   const std::string &remote_path,
+  const std::string &alt_path,
   const CallbackTN   *callback
 ) {
   LogCvmfs(kLogSpooler, kLogVerboseMsg, "FileUpload call started.");
@@ -108,7 +109,25 @@ void LocalUploader::FileUpload(
                                           "'%s'",
              tmp_path.c_str(), remote_path.c_str());
     atomic_inc32(&copy_errors_);
+    Respond(callback, UploaderResults(retcode, local_path));
+    return;
   }
+
+  if (alt_path.size()) {
+    const std::string dest_path = upstream_path_ + "/" + alt_path;
+    if (remote_path != dest_path) {
+      retval = SymlinkForced(remote_path, dest_path);
+      if (!retval) {
+        LogCvmfs(kLogSpooler, kLogVerboseMsg,
+                 "failed to symlink file '%s' to its alternate path %s: %s "
+                 "(errno=%d)", remote_path.c_str(), dest_path.c_str(),
+                 strerror(errno), errno);
+        atomic_inc32(&copy_errors_);
+        retcode = 100;
+      }
+    }
+  }
+
   Respond(callback, UploaderResults(retcode, local_path));
 }
 
@@ -140,14 +159,16 @@ int LocalUploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
 
 
 UploadStreamHandle* LocalUploader::InitStreamedUpload(
-                                                   const CallbackTN *callback) {
+  const CallbackTN *callback,
+  const std::string &alt_path)
+{
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
   if (tmp_fd < 0) {
     return NULL;
   }
 
-  return new LocalStreamHandle(callback, tmp_fd, tmp_path);
+  return new LocalStreamHandle(callback, tmp_fd, tmp_path, alt_path);
 }
 
 
@@ -215,7 +236,24 @@ void LocalUploader::FinalizeStreamedUpload(UploadStreamHandle  *handle,
     }
   }
 
+  const std::string &alt_path = local_handle->alt_path_;
+  if (alt_path.size()) {
+    const std::string dest_path = upstream_path_ + "/" + alt_path;
+    retval = SymlinkForced(final_path, dest_path);
+    if (!retval) {
+      const int cpy_errno = errno;
+      LogCvmfs(kLogSpooler, kLogVerboseMsg,
+               "failed to symlink file '%s' to its alternate path %s: %s "
+               "(errno=%d)", final_path.c_str(), dest_path.c_str(),
+               strerror(errno), errno);
+      atomic_inc32(&copy_errors_);
+      Respond(handle->commit_callback, UploaderResults(cpy_errno));
+      return;
+    }
+  }
+
   const CallbackTN *callback = handle->commit_callback;
+  // TODO(jblomer): do we leak memory if the function is left earlier?
   delete local_handle;
 
   Respond(callback, UploaderResults(0));

@@ -170,6 +170,7 @@ class AbstractMockUploader : public upload::AbstractUploader {
 
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
+                          const std::string  &alt_path = "",
                           const CallbackTN   *callback = NULL) {
     assert(AbstractMockUploader::not_implemented);
   }

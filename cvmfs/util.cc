@@ -463,6 +463,18 @@ bool SymlinkExists(const string &path) {
 
 
 /**
+ * Equivalent of `ln -sf $src $dest`
+ */
+bool SymlinkForced(const std::string &src, const std::string &dest) {
+  int retval = unlink(dest.c_str());
+  if ((retval != 0) && (errno != ENOENT))
+    return false;
+  retval = symlink(src.c_str(), dest.c_str());
+  return retval == 0;
+}
+
+
+/**
  * The mkdir -p command.  Additionally checks if the directory is writable
  * if it exists.
  */

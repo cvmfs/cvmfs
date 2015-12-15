@@ -81,6 +81,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
                                               const bool garbage_collectable,
+                                              const std::string &voms_authz,
                                               upload::Spooler   *spooler);
 
   // DirectoryEntry handling
@@ -120,7 +121,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void PrecalculateListings();
 
   manifest::Manifest *Commit(const bool     stop_for_tweaks,
-                             const uint64_t manual_revision);
+                             const uint64_t manual_revision,
+                             const bool     use_alt_path);
   void Balance() {
       if (IsBalanceable()) {
           DoBalance();
@@ -160,7 +162,8 @@ class WritableCatalogManager : public SimpleCatalogManager {
   int GetModifiedCatalogsRecursively(const Catalog *catalog,
                                      WritableCatalogList *result) const;
 
-  shash::Any SnapshotCatalog(WritableCatalog *catalog) const;
+  shash::Any SnapshotCatalog(const bool use_alt_path,
+                             WritableCatalog *catalog) const;
   void CatalogUploadCallback(const upload::SpoolerResult &result);
 
  private:

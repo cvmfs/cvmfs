@@ -105,7 +105,7 @@ class SyncMediator {
   void EnterDirectory(const SyncItem &entry);
   void LeaveDirectory(const SyncItem &entry);
 
-  manifest::Manifest *Commit();
+  manifest::Manifest *Commit(const bool use_alt_path);
 
  private:
   typedef std::stack<HardlinkGroupMap> HardlinkGroupMapStack;
