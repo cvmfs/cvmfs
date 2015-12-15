@@ -135,7 +135,7 @@ bool CommandCheck::CompareCounters(const catalog::Counters &a,
 bool CommandCheck::Exists(const string &file)
 {
   if (remote_repository == NULL) {
-    return FileExists(file);
+    return FileExists(file) || SymlinkExists(file);
   } else {
     const string url = *remote_repository + "/" + file;
     download::JobInfo head(&url, false);
@@ -634,6 +634,23 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
              certificate_path.c_str());
     delete manifest;
     return 1;
+  }
+
+  if (manifest->has_alt_catalog_path()) {
+    if (!Exists(manifest->certificate().MakeAlternativePath())) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to find alternative certificate link %s",
+               manifest->certificate().MakeAlternativePath().c_str());
+      delete manifest;
+      return 1;
+    }
+    if (!Exists(manifest->catalog_hash().MakeAlternativePath())) {
+      LogCvmfs(kLogCvmfs, kLogStderr,
+               "failed to find alternative catalog link %s",
+               manifest->catalog_hash().MakeAlternativePath().c_str());
+      delete manifest;
+      return 1;
+    }
   }
 
   shash::Any root_hash = manifest->catalog_hash();
