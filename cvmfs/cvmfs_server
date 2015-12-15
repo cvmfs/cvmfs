@@ -1687,9 +1687,12 @@ check_expiry() {
 sign_manifest() {
   local name=$1
   local unsigned_manifest=$2
+  local bootstrap_symlinks=""
 
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
+
+  [ -z "$CVMFS_VOMS_AUTHZ" ] || bootstrap_symlinks="-b"
 
   $user_shell "$(__swissknife_cmd) sign \
     -c /etc/cvmfs/keys/${name}.crt      \
@@ -1697,7 +1700,8 @@ sign_manifest() {
     -n $name                            \
     -m $unsigned_manifest               \
     -t ${CVMFS_SPOOL_DIR}/tmp           \
-    -r $CVMFS_UPSTREAM_STORAGE" > /dev/null
+    -r $CVMFS_UPSTREAM_STORAGE          \
+    $bootstrap_symlinks" > /dev/null
 }
 
 
