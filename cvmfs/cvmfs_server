@@ -2383,8 +2383,10 @@ _check_info_file() {
 _available_repos() {
   local filter="$1"
   local repo=""
+  local repo_cfg_path="/etc/cvmfs/repositories.d"
 
-  for repository in /etc/cvmfs/repositories.d/*; do
+  [ $(ls $repo_cfg_path | wc -l) -gt 0 ] || return 0
+  for repository in ${repo_cfg_path}/*; do
     repo=$(basename $repository)
     if ( [ x"$filter" = x"" ]                              ) || \
        ( [ x"$filter" = x"stratum0" ] && is_stratum0 $repo ) || \
