@@ -7,6 +7,7 @@ import cvmfs_api
 import GeoIP
 
 gi = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCity.dat", GeoIP.GEOIP_STANDARD)
+gi6 = GeoIP.open("/var/lib/cvmfs-server/geo/GeoLiteCityv6.dat", GeoIP.GEOIP_STANDARD)
 
 positive_expire_secs = 60*60  # 1 hour
 
@@ -85,7 +86,10 @@ def api(path_info, repo_name, version, start_response, environ):
             rem_addr = environ['REMOTE_ADDR']
 
     if (len(rem_addr) < 256) and addr_pattern.search(rem_addr):
-        gir_rem = gi.record_by_addr(rem_addr)
+        if rem_addr.find(':') != -1:
+            gir_rem = gi6.record_by_addr_v6(rem_addr)
+        else:
+            gir_rem = gi.record_by_addr(rem_addr)
     else:
         gir_rem = None
 
@@ -99,7 +103,11 @@ def api(path_info, repo_name, version, start_response, environ):
     onegood = False
     for server in servers:
         if (len(server) < 256) and addr_pattern.search(server):
+            # try IPv4 first since that DB is better and most servers
+            #    today are dual stack if they have IPv6
             gir_server = gi.record_by_name(server)
+            if gir_server is None:
+                gir_server = gi6.record_by_name_v6(server)
         else:
             gir_server = None
 
