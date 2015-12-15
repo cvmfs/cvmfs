@@ -235,6 +235,13 @@ bool LocalUploader::Peek(const std::string& path) const {
 }
 
 
+bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
+  const std::string src  = "data/" + object.MakePath();
+  const std::string dest = upstream_path_ + "/" + object.MakeAlternativePath();
+  return SymlinkForced(src, dest);
+}
+
+
 int LocalUploader::Move(const std::string &local_path,
                         const std::string &remote_path) const {
   const std::string destination_path = upstream_path_ + "/" + remote_path;
