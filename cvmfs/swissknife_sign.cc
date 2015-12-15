@@ -46,7 +46,6 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   string pwd = "";
   if (args.find('s') != args.end()) pwd = *args.find('s')->second;
   upload::Spooler *spooler = NULL;
-  const bool bootstrapping_symlinks = (args.find('b') != args.end());
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
@@ -164,7 +163,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
     signed_manifest += "--\n" + published_hash.ToString() + "\n";
 
     // Create alternative bootstrapping symlinks for VOMS secured repos
-    if (bootstrapping_symlinks) {
+    if (manifest->has_alt_catalog_path()) {
       const bool success =
         spooler->PlaceBootstrappingShortcut(manifest->certificate())  &&
         spooler->PlaceBootstrappingShortcut(manifest->catalog_hash()) &&
