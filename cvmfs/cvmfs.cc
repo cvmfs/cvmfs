@@ -1828,6 +1828,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string dns_server = "";
   string public_keys = "";
   string root_hash = "";
+  bool alt_root_path = false;
   string repository_tag = "";
   string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
@@ -1943,6 +1944,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_ROOT_HASH", &parameter))
     root_hash = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_ALT_ROOT_PATH", &parameter) &&
+      cvmfs::options_manager_->IsOn(parameter))
+  {
+    alt_root_path = true;
+  }
   if (cvmfs::options_manager_->GetValue("CVMFS_REPOSITORY_TAG", &parameter))
     repository_tag = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_REPOSITORY_DATE", &parameter))
@@ -2473,7 +2479,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::fixed_catalog_ = true;
     shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)),
                                    shash::kSuffixCatalog);
-    retval = cvmfs::catalog_manager_->InitFixed(hash);
+    retval = cvmfs::catalog_manager_->InitFixed(hash, alt_root_path);
   } else {
     retval = cvmfs::catalog_manager_->Init();
   }

@@ -1,0 +1,64 @@
+
+cvmfs_test_name="Alternative catalog path"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  echo foo > foo
+  echo bar > bar
+  mkdir -p nested/foo/bar
+  touch nested/.cvmfscatalog
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "NO" "-V xyz" || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  produce_files_in $repo_dir || return 3
+  publish_repo $CVMFS_TEST_REPO || return $?
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  local backend_dir="/srv/cvmfs/$CVMFS_TEST_REPO"
+
+  local f
+  cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO || return 10
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 11
+  sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
+  for l in $(find $backend_dir -maxdepth 1 -type l); do
+    f="$backend_dir/$(readlink $l)"
+    sudo rm -f $l
+    sudo mv $f $l
+  done
+  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=yes >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
+
+  # Mount with fixed root hash
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return 12
+
+  # Force failed mount
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 30
+  sudo sh -c "echo CVMFS_ALT_ROOT_PATH=no >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
+  sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO && return 31
+
+  # Mount latest
+  sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
+  sudo rm -f "/var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return 14
+
+  # Detect missing alternative paths
+  destroy_repo $CVMFS_TEST_REPO || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "NO" "-V xyz" || return $?
+  sudo find $backend_dir -maxdepth 1 -type l -exec rm -f {} \;
+  check_repository $CVMFS_TEST_REPO -i && return 20
+
+  return 0
+}

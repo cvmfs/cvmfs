@@ -109,6 +109,10 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
+  std::string voms_authz;
+  if (args.find('V') != args.end()) {
+    voms_authz = *args.find('V')->second;
+  }
 
   const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
@@ -116,8 +120,9 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   // TODO(rmeusel): use UniquePtr
   manifest::Manifest *manifest =
-    catalog::WritableCatalogManager::CreateRepository(
-      dir_temp, volatile_content, garbage_collectable, spooler);
+    catalog::WritableCatalogManager::CreateRepository(dir_temp,
+                                                      volatile_content,
+                                                      spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;
@@ -125,6 +130,11 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   spooler->WaitForUpload();
   delete spooler;
+
+  // set optional manifest fields
+  const bool needs_bootstrap_shortcuts = !voms_authz.empty();
+  manifest->set_garbage_collectability(garbage_collectable);
+  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
 
   if (!manifest->Export(manifest_path)) {
     PrintError("Failed to create new repository");
@@ -490,6 +500,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('i') != args.end()) params.ignore_xdir_hardlinks = true;
   if (args.find('d') != args.end()) params.stop_for_catalog_tweaks = true;
   if (args.find('g') != args.end()) params.garbage_collectable = true;
+  if (args.find('V') != args.end()) params.voms_authz = *args.find('V')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
@@ -602,7 +613,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
+  const bool needs_bootstrap_shortcuts = !params.voms_authz.empty();
   manifest->set_garbage_collectability(params.garbage_collectable);
+  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
   g_download_manager->Fini();
 
   // finalize the spooler

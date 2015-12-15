@@ -279,6 +279,7 @@ Supported Commands:
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
                 [-k path to existing keychain] [-p no apache config]
+                [-V VOMS authorization]
                 <fully qualified repository name>
                 Creates a new repository with a given name
   add-replica   [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
@@ -2679,10 +2680,11 @@ mkfs() {
   local s3_config=""
   local keys_import_location
   local configure_apache=1
+  local voms_authz=""
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:vga:zs:k:p" option; do
+  while getopts "w:u:o:mf:vga:zs:k:pV:" option; do
     case $option in
       w)
         stratum0=$OPTARG
@@ -2719,6 +2721,9 @@ mkfs() {
       ;;
       p)
         configure_apache=0
+      ;;
+      V)
+        voms_authz=$OPTARG
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -2856,13 +2861,18 @@ mkfs() {
     echo -n "(repository flagged volatile)... "
   fi
   local user_shell="$(get_user_shell $name)"
-  local create_cmd="$(__swissknife_cmd) create \
-    -t $temp_dir                               \
-    -r $upstream                               \
-    -a $hash_algo $volatile_opt                \
+  local create_cmd="$(__swissknife_cmd) create  \
+    -t $temp_dir                                \
+    -r $upstream                                \
+    -a $hash_algo $volatile_opt $voms_authz_opt \
     -o ${temp_dir}/new_manifest"
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
+  fi
+  if [ "x$voms_authz" != "x" ]; then
+    echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
+    create_cmd="$create_cmd -V $voms_authz"
+    echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> /etc/cvmfs/repositories.d/$name/server.conf
   fi
   $user_shell "$create_cmd" > /dev/null        || die "fail! (cannot init repo)"
   sign_manifest $name ${temp_dir}/new_manifest || die "fail! (cannot sign repo)"
@@ -3257,6 +3267,7 @@ import() {
   trap _import_desaster_cleanup EXIT HUP INT QUIT TERM
 
   # create the configuration for the new repository
+  # TODO(jblomer): make a better guess for hash
   echo -n "Creating configuration files... "
   create_config_files_for_new_repository "$name"       \
                                          "$upstream"   \
@@ -4140,6 +4151,7 @@ publish() {
   local spool_dir
   local stratum0
   local upstream
+  local hash_algorithm
   local tweaks_option=
   local tag_name=
   local tag_channel=00
@@ -4297,6 +4309,9 @@ publish() {
     fi
     if [ "x$CVMFS_MAXIMAL_CONCURRENT_WRITES" != "x" ]; then
       sync_command="$sync_command -q $CVMFS_MAXIMAL_CONCURRENT_WRITES"
+    fi
+    if [ "x${CVMFS_VOMS_AUTHZ}" != x ]; then
+      sync_command="$sync_command -V $CVMFS_VOMS_AUTHZ"
     fi
     local tag_command="$(__swissknife_cmd dbg) tag_create \
       -r $upstream                                        \

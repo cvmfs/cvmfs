@@ -50,6 +50,7 @@ struct SyncParameters {
   std::string      manifest_path;
   std::string      spooler_definition;
   std::string      union_fs_type;
+  std::string      voms_authz;
   bool             print_changeset;
   bool             dry_run;
   bool             mucatalogs;
@@ -90,6 +91,8 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
+    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+                                         "(default: none)"));
     r.push_back(Parameter::Switch('v', "repository containing volatile files"));
     r.push_back(Parameter::Switch(
       'z', "mark new repository as garbage collectable"));
@@ -234,6 +237,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
+    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+                                         "(default: none)"));
     return r;
   }
   int Main(const ArgumentList &args);

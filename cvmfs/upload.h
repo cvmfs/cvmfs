@@ -204,6 +204,16 @@ class Spooler : public Observable<SpoolerResult> {
   bool Peek(const std::string &path) const;
 
   /**
+   * Creates a top-level shortcut to the given data object. This is particularly
+   * useful for bootstrapping repositories whose data-directory is secured by
+   * a VOMS certificate.
+   *
+   * @param object  content hash of the object to be exposed on the top-level
+   * @return        true on success
+   */
+  bool PlaceBootstrappingShortcut(const shash::Any &object) const;
+
+  /**
    * Blocks until all jobs currently under processing are finished. After it
    * returned, more jobs can be scheduled if needed.
    * Note: We assume that no one schedules new jobs while this method is in
