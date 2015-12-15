@@ -138,6 +138,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   pathspec/pathspec.h pathspec/pathspec.cc
   pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
 
+  path_filters/dirtab.h path_filters/dirtab.cc
+  path_filters/relaxed_path_filter.h path_filters/relaxed_path_filter.cc
+
   upload.h upload.cc
   upload_spooler_definition.h upload_spooler_definition.cc
   upload_facility.h upload_facility.cc
@@ -171,7 +174,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_balancer.h catalog_balancer_impl.h
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
-  dirtab.h dirtab.cc
   history.h
   history_sql.h history_sql.cc
   history_sqlite.h history_sqlite.cc

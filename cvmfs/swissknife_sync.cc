@@ -31,10 +31,10 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
-#include "dirtab.h"
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
+#include "path_filters/dirtab.h"
 #include "platform.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
