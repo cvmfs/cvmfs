@@ -307,7 +307,7 @@ struct Digest {
    * while the root catalog remains accessible.
    */
   std::string MakeAlternativePath() const {
-    return ".cvmfsalt-" + ToString(true);
+    return ".cvmfsalt-" + ToStringWithSuffix();
   }
 
   /**
