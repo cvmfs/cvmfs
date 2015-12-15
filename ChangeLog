@@ -1,5 +1,5 @@
 2.2.0:
-  * Add static status files on stratum 1 server (CVM-860)
+  * Add static status files on stratum 0/1 server (CVM-860)
   * Fix cache directory selection in `cvmfs_config wipecache` (CVM-709)
   * Add `cvmfs_config killall` command (CVM-899)
   * Log events to syslog in cvmfs_server (CVM-812, CVM-861)
