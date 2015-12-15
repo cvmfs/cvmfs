@@ -108,6 +108,8 @@ void LocalUploader::FileUpload(
                                           "'%s'",
              tmp_path.c_str(), remote_path.c_str());
     atomic_inc32(&copy_errors_);
+    Respond(callback, UploaderResults(retcode, local_path));
+    return;
   }
   Respond(callback, UploaderResults(retcode, local_path));
 }
