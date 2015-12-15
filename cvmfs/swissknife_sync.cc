@@ -120,8 +120,9 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   // TODO(rmeusel): use UniquePtr
   manifest::Manifest *manifest =
-    catalog::WritableCatalogManager::CreateRepository(
-      dir_temp, volatile_content, garbage_collectable, voms_authz, spooler);
+    catalog::WritableCatalogManager::CreateRepository(dir_temp,
+                                                      volatile_content,
+                                                      spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;
@@ -129,6 +130,11 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   spooler->WaitForUpload();
   delete spooler;
+
+  // set optional manifest fields
+  const bool needs_bootstrap_shortcuts = !voms_authz.empty();
+  manifest->set_garbage_collectability(garbage_collectable);
+  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
 
   if (!manifest->Export(manifest_path)) {
     PrintError("Failed to create new repository");

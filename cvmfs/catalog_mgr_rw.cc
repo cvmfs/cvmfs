@@ -94,8 +94,6 @@ void WritableCatalogManager::ActivateCatalog(Catalog *catalog) {
 manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string     &dir_temp,
   const bool        volatile_content,
-  const bool        garbage_collectable,
-  const string     &voms_authz,
   upload::Spooler  *spooler)
 {
   // Create a new root catalog at file_path
@@ -153,10 +151,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string manifest_path = dir_temp + "/manifest";
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
-  manifest->set_garbage_collectability(garbage_collectable);
-  if (! voms_authz.empty()) {
-    manifest->set_has_alt_catalog_path(true);
-  }
 
   // Upload catalog
   spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath());
