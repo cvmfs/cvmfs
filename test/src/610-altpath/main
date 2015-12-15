@@ -47,10 +47,7 @@ cvmfs_run_test() {
   cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO || return 30
   sudo sh -c "echo CVMFS_ALT_ROOT_PATH=no >> /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local"
   sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
-  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO
-  if [ $? -eq 0 ]; then
-    return 31
-  fi
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO && return 31
 
   # Mount latest
   sudo rm -rf "/var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO}"
@@ -61,10 +58,7 @@ cvmfs_run_test() {
   destroy_repo $CVMFS_TEST_REPO || return $?
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER "NO" "-V xyz" || return $?
   sudo find $backend_dir -maxdepth 1 -type l -exec rm -f {} \;
-  check_repository $CVMFS_TEST_REPO -i
-  if [ $? -eq 0 ]; then
-    return 20
-  fi
+  check_repository $CVMFS_TEST_REPO -i && return 20
 
   return 0
 }
