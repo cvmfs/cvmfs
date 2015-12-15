@@ -49,7 +49,7 @@ class Manifest {
     history_(history),
     publish_timestamp_(publish_timestamp),
     garbage_collectable_(garbage_collectable),
-    has_alt_catalog_path_(false) { }
+    has_alt_catalog_path_(has_alt_catalog_path) { }
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
@@ -100,13 +100,13 @@ class Manifest {
   bool has_alt_catalog_path() const { return has_alt_catalog_path_; }
 
   std::string MakeCatalogPath() const {
-    return has_alt_catalog_path_ ?
-      (".cvmfsalt-" + catalog_hash_.ToString(true)) : catalog_hash_.MakePath();
+    return has_alt_catalog_path_ ? catalog_hash_.MakeAlternativePath() :
+      ("data/" + catalog_hash_.MakePath());
   }
 
   std::string MakeCertificatePath() const {
     return has_alt_catalog_path_ ?
-      (".cvmfsalt-" + certificate_.ToString(true)) : certificate_.MakePath();
+      certificate_.MakeAlternativePath() : ("data/" + certificate_.MakePath());
   }
 
  private:
