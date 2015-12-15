@@ -914,4 +914,37 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
   TestFixture::FreeBufferStreams(&streams);
 }
 
+
+//------------------------------------------------------------------------------
+
+
+TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
+  const std::string big_file_path = TestFixture::GetBigFile();
+
+  shash::Any digest(shash::kSha1);
+  ASSERT_TRUE(shash::HashFile(big_file_path, &digest));
+
+  const std::string dest_name = "data/" + digest.MakePath();
+
+  this->uploader_->Upload(big_file_path,
+                          dest_name,
+                          AbstractUploader::MakeClosure(
+                              &UploadCallbacks::SimpleUploadClosure,
+                              &this->delegate_,
+                              UploaderResults(0, big_file_path)));
+
+  this->uploader_->WaitForUpload();
+  EXPECT_TRUE(TestFixture::CheckFile(dest_name));
+
+  EXPECT_EQ(1u, this->delegate_.simple_upload_invocations);
+  TestFixture::CompareFileContents(big_file_path,
+                                   TestFixture::AbsoluteDestinationPath(
+                                       dest_name));
+
+  ASSERT_TRUE(this->uploader_->PlaceBootstrappingShortcut(digest));
+  TestFixture::CompareFileContents(big_file_path,
+                                   TestFixture::AbsoluteDestinationPath(
+                                       digest.MakeAlternativePath()));
+}
+
 }  // namespace upload
