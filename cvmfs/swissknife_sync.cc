@@ -613,7 +613,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
+  const bool needs_bootstrap_shortcuts = !params.voms_authz.empty();
   manifest->set_garbage_collectability(params.garbage_collectable);
+  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
   g_download_manager->Fini();
 
   // finalize the spooler
