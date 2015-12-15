@@ -303,13 +303,15 @@ fi
 :
 
 %preun
-%if 0%{?selinux_cvmfs}
 if [ $1 = 0 ] ; then
-    for variant in %{selinux_variants} ; do
-        /usr/sbin/semodule -s ${variant} -r cvmfs &> /dev/null || :
-    done
-fi
+%if 0%{?selinux_cvmfs}
+  for variant in %{selinux_variants} ; do
+    /usr/sbin/semodule -s ${variant} -r cvmfs &> /dev/null || :
+  done
 %endif
+
+  /usr/bin/cvmfs_config umount
+fi
 
 %postun
 if [ $1 -eq 0 ]; then
@@ -392,6 +394,8 @@ fi
 %doc COPYING AUTHORS README ChangeLog
 
 %changelog
+* Tue Dec 15 2015 Jakob Blomer <jblomer@cern.ch> - 2.2.0
+- Unmount repositories when cvmfs is erased
 * Fri Dec 11 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
 - Add jq (weak) dependency
 * Fri Oct 23 2015 Rene Meusel <rene.meusel@cern.ch> - 2.2.0
