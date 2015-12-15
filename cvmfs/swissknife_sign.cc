@@ -46,6 +46,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   string pwd = "";
   if (args.find('s') != args.end()) pwd = *args.find('s')->second;
   upload::Spooler *spooler = NULL;
+  const bool bootstrapping_symlinks = (args.find('b') != args.end());
 
   if (!DirectoryExists(temp_dir)) {
     LogCvmfs(kLogCvmfs, kLogStderr, "%s does not exist", temp_dir.c_str());
@@ -161,6 +162,22 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       reinterpret_cast<const unsigned char *>(signed_manifest.data()),
       signed_manifest.length(), &published_hash);
     signed_manifest += "--\n" + published_hash.ToString() + "\n";
+
+    // Create alternative bootstrapping symlinks for VOMS secured repos
+    if (bootstrapping_symlinks) {
+      const bool success =
+        spooler->PlaceBootstrappingShortcut(manifest->certificate())  &&
+        spooler->PlaceBootstrappingShortcut(manifest->catalog_hash()) &&
+        (manifest->history().IsNull() ||
+         spooler->PlaceBootstrappingShortcut(manifest->history()));
+
+      if (! success) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
+                                        "symlinks");
+        delete manifest;
+        goto sign_fail;
+      }
+    }
 
     // Sign manifest
     unsigned char *sig;
