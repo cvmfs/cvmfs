@@ -77,6 +77,8 @@ if ! pidof systemd > /dev/null 2>&1 || [ $(minpidof systemd) -ne 1 ]; then
     SERVICE_BIN="/usr/sbin/service" # Ubuntu
   elif [ -x /sbin/rc-service ]; then
     SERVICE_BIN="/sbin/rc-service" # OpenRC
+  elif [ running_on_osx ]; then
+    SERVICE_BIN="false" # we don't need to run any service on mac
   else
     die "Neither systemd nor service binary detected"
   fi
