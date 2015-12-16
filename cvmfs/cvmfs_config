@@ -337,6 +337,10 @@ cvmfs_chksetup() {
     fi
   fi
 
+  # saving global mount directory configuration
+  local global_mount_dir
+  global_mount_dir=$CVMFS_MOUNT_DIR
+
   # No autofs integration on OS X
   if [ "$sys_arch" = "Linux" ]; then
     for path in /etc/auto.master /etc/autofs/auto.master; do
@@ -352,8 +356,6 @@ cvmfs_chksetup() {
     fi
     # Check that /etc/auto.cvmfs is referenced in auto.master
     # Check that /etc/auto.cvmfs is executable on Linux
-    local global_mount_dir
-    global_mount_dir=$CVMFS_MOUNT_DIR
     if ! grep -q "^$CVMFS_MOUNT_DIR[[:space:]]\+\(program:\|\)/etc/auto.cvmfs" $AUTOMASTER 2> /dev/null; then
       if ! check_is_on CVMFS_NFS_SOURCE; then
         echo "Warning: CernVM-FS map is not referenced from autofs master map"

@@ -58,7 +58,7 @@ if [ -z "$testsuite" ]; then
 fi
 
 # start running the tests
-TEST_ROOT=$(readlink -f $(dirname $0))
+TEST_ROOT=$(cd "$(dirname "$0")"; pwd)
 export TEST_ROOT
 
 num_tests=0
@@ -125,7 +125,7 @@ setup_environment() {
   fi
 
   # if we are not inside a docker
-  if [ x"$CVMFS_TEST_DOCKER" = xno ]; then
+  if [ x"$CVMFS_TEST_DOCKER" = xno ] && ! [ running_on_osx ]; then
     # configure autofs to the test's needs
     service_switch autofs restart || true
     local timeout=10 # wait until autofs restarts (possible race >.<)

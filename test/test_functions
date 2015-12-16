@@ -303,6 +303,14 @@ cvmfs_mount() {
   if [ "x$CVMFS_TEST_DEBUGLOG" != "x" ]; then
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
+
+  if running_on_osx; then
+    for i in $(echo "$repositories" | tr "," " "); do
+      mkdir -p "/cvmfs/$i"
+      mount -t cvmfs "$i" "/cvmfs/$i" || return 102
+    done
+  fi
+
   cvmfs_config probe > /dev/null 2>&1 || return 101
 
   return 0
@@ -955,7 +963,11 @@ load_repo_config() {
 
 
 get_millisecond_epoch() {
-  echo $(( $(date +%s%N) / 1000000 ))
+  if running_on_osx; then
+    echo $(( $(date +%s) * 1000 ))
+  else
+    echo $(( $(date +%s%N) / 1000000 ))
+  fi
 }
 
 
@@ -1895,4 +1907,8 @@ get_internal_value() {
   local key=$2
   
   echo $(sudo cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
+}
+
+running_on_osx() {
+  [ "x$(uname)" == "xDarwin" ]
 }
