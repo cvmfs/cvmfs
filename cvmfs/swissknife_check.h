@@ -39,11 +39,12 @@ class CommandCheck : public Command {
   int Main(const ArgumentList &args);
 
  protected:
-  bool InspectTree(const std::string &path,
-                   const shash::Any &catalog_hash,
-                   const uint64_t catalog_size,
-                   const catalog::DirectoryEntry *transition_point,
-                   catalog::DeltaCounters *computed_counters);
+  bool InspectTree(const std::string               &path,
+                   const shash::Any                &catalog_hash,
+                   const uint64_t                   catalog_size,
+                   const bool                       is_nested_catalog,
+                   const catalog::DirectoryEntry  *transition_point,
+                   catalog::DeltaCounters         *computed_counters);
   catalog::Catalog* FetchCatalog(const std::string  &path,
                                  const shash::Any   &catalog_hash,
                                  const uint64_t      catalog_size = 0);

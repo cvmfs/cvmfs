@@ -503,11 +503,12 @@ bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
-bool CommandCheck::InspectTree(const string &path,
-                               const shash::Any &catalog_hash,
-                               const uint64_t catalog_size,
+bool CommandCheck::InspectTree(const string                  &path,
+                               const shash::Any              &catalog_hash,
+                               const uint64_t                 catalog_size,
+                               const bool                     is_nested_catalog,
                                const catalog::DirectoryEntry *transition_point,
-                               catalog::DeltaCounters *computed_counters)
+                               catalog::DeltaCounters        *computed_counters)
 {
   LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
@@ -542,8 +543,9 @@ bool CommandCheck::InspectTree(const string &path,
              path.c_str());
     retval = false;
   }
-  if (transition_point != NULL) {
-    if (!CompareEntries(*transition_point, root_entry, true, true)) {
+  if (is_nested_catalog) {
+    if (transition_point != NULL &&
+        !CompareEntries(*transition_point, root_entry, true, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "transition point and root entry differ (%s)", path.c_str());
       retval = false;
@@ -598,7 +600,8 @@ bool CommandCheck::InspectTree(const string &path,
       retval = false;
     } else {
       catalog::DeltaCounters nested_counters;
-      if (!InspectTree(i->path.ToString(), i->hash, i->size,
+      const bool is_nested = true;
+      if (!InspectTree(i->path.ToString(), i->hash, i->size, is_nested,
                        &nested_transition_point, &nested_counters))
         retval = false;
       nested_counters.PopulateToParent(computed_counters);
@@ -754,10 +757,10 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
              tag_name.c_str());
   }
 
-
-  if (subtree_path != "" && !FindSubtreeRootCatalog( subtree_path,
-                                                    &root_hash,
-                                                    &root_size)) {
+  const bool is_nested_catalog = (!subtree_path.empty());
+  if (is_nested_catalog && !FindSubtreeRootCatalog( subtree_path,
+                                                   &root_hash,
+                                                   &root_size)) {
     LogCvmfs(kLogCvmfs, kLogStdout, "cannot find nested catalog at %s",
              subtree_path.c_str());
     delete manifest;
@@ -768,6 +771,7 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   bool retval = InspectTree(subtree_path,
                             root_hash,
                             root_size,
+                            is_nested_catalog,
                             NULL,
                             &computed_counters);
 
