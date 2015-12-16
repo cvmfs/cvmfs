@@ -311,6 +311,11 @@ void WritableCatalog::SetRevision(const uint64_t new_revision) {
 }
 
 
+void WritableCatalog::SetTTL(const uint64_t new_ttl) {
+  database().SetProperty("TTL", new_ttl);
+}
+
+
 /**
  * Sets the content hash of the previous catalog revision.
  */
