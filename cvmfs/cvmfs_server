@@ -327,6 +327,7 @@ Supported Commands:
   check         [-c disable data chunk existence check]
                 [-i check data integrity] (may take some time)]
                 [-t tag (check given tag instead of trunk)]
+                [-s path to nested catalog subtree to check]
                 <fully qualified name>
                 Checks if the repository is sane
   transaction   <fully qualified name>
@@ -3859,11 +3860,12 @@ check() {
   local stratum0
   local check_chunks=1
   local check_integrity=0
+  local subtree_path=""
   local tag=
 
   # optional parameter handling
   OPTIND=1
-  while getopts "cit:" option
+  while getopts "cit:s:" option
   do
     case $option in
       c)
@@ -3874,6 +3876,9 @@ check() {
       ;;
       t)
         tag="-n $OPTARG"
+      ;;
+      s)
+        subtree_path="$OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -3918,12 +3923,20 @@ check() {
   [ "x$CVMFS_LOG_LEVEL" != x ] && log_level_param="-l $CVMFS_LOG_LEVEL"
   [ $check_chunks -ne 0 ]      && check_chunks_param="-c"
 
-  echo "Verifying Catalog Integrity of $name ..."
+  local subtree_msg=""
+  local subtree_param=""
+  if [ "x$subtree_path" != "x" ]; then
+    subtree_param="-s '$subtree_path'"
+    subtree_msg=" (starting at nested catalog '$subtree_path')"
+  fi
+
+  echo "Verifying Catalog Integrity of ${name}${subtree_msg}..."
   local user_shell="$(get_user_shell $name)"
   local check_cmd
   check_cmd="$(__swissknife_cmd dbg) check $tag  \
                      $check_chunks_param         \
                      $log_level_param            \
+                     $subtree_param              \
                      -r $stratum0                \
                      -t ${CVMFS_SPOOL_DIR}/tmp"
   $user_shell "$check_cmd"

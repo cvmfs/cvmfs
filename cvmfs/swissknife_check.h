@@ -32,6 +32,7 @@ class CommandCheck : public Command {
     r.push_back(Parameter::Optional('n', "check specific repository tag"));
     r.push_back(Parameter::Optional('t', "temp directory (default: /tmp)"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
+    r.push_back(Parameter::Optional('s', "check subtree (nested catalog)"));
     r.push_back(Parameter::Switch('c', "check availability of data chunks"));
     return r;
   }
@@ -43,9 +44,9 @@ class CommandCheck : public Command {
                    const uint64_t catalog_size,
                    const catalog::DirectoryEntry *transition_point,
                    catalog::DeltaCounters *computed_counters);
-  const catalog::Catalog* FetchCatalog(const std::string  &path,
-                                       const shash::Any   &catalog_hash,
-                                       const uint64_t      catalog_size = 0);
+  catalog::Catalog* FetchCatalog(const std::string  &path,
+                                 const shash::Any   &catalog_hash,
+                                 const uint64_t      catalog_size = 0);
 
   std::string DecompressPiece(const shash::Any catalog_hash);
   std::string DownloadPiece(const shash::Any catalog_hash);

@@ -425,10 +425,9 @@ string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
 }
 
 
-const catalog::Catalog* CommandCheck::FetchCatalog(
-                                          const string      &path,
-                                          const shash::Any  &catalog_hash,
-                                          const uint64_t     catalog_size) {
+catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
+                                             const shash::Any  &catalog_hash,
+                                             const uint64_t     catalog_size) {
   string tmp_file;
   if (remote_repository == NULL)
     tmp_file = DecompressPiece(catalog_hash);
@@ -441,8 +440,8 @@ const catalog::Catalog* CommandCheck::FetchCatalog(
     return NULL;
   }
 
-  const catalog::Catalog *catalog =
-    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
+  catalog::Catalog *catalog =
+                   catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
   int64_t catalog_file_size = GetFileSize(tmp_file);
   assert(catalog_file_size > 0);
   unlink(tmp_file.c_str());
@@ -584,6 +583,7 @@ bool CommandCheck::InspectTree(const string &path,
 int CommandCheck::Main(const swissknife::ArgumentList &args) {
   string tag_name;
   check_chunks = false;
+  string subtree_path = "";
 
   temp_directory_ = (args.find('t') != args.end()) ? *args.find('t')->second
                                                    : "/tmp";
@@ -601,6 +601,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
   const string repository = MakeCanonicalPath(*args.find('r')->second);
+  if (args.find('s') != args.end())
+    subtree_path = MakeCanonicalPath(*args.find('s')->second);
 
   // Repository can be HTTP address or on local file system
   if (repository.substr(0, 7) == "http://") {
@@ -708,6 +710,10 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     root_size = tag.size;
     LogCvmfs(kLogCvmfs, kLogStdout, "Inspecting repository tag %s",
              tag_name.c_str());
+  }
+
+  if (subtree_path != "") {
+
   }
 
   catalog::DeltaCounters computed_counters;
