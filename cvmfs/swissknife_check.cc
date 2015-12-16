@@ -425,6 +425,40 @@ string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
 }
 
 
+const catalog::Catalog* CommandCheck::FetchCatalog(
+                                          const string      &path,
+                                          const shash::Any  &catalog_hash,
+                                          const uint64_t     catalog_size) {
+  string tmp_file;
+  if (remote_repository == NULL)
+    tmp_file = DecompressPiece(catalog_hash);
+  else
+    tmp_file = DownloadPiece(catalog_hash);
+
+  if (tmp_file == "") {
+    LogCvmfs(kLogCvmfs, kLogStdout, "failed to load catalog %s",
+             catalog_hash.ToString().c_str());
+    return NULL;
+  }
+
+  const catalog::Catalog *catalog =
+    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
+  int64_t catalog_file_size = GetFileSize(tmp_file);
+  assert(catalog_file_size > 0);
+  unlink(tmp_file.c_str());
+
+  if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "catalog file size mismatch, "
+             "expected %"PRIu64", got %"PRIu64,
+             catalog_size, catalog_file_size);
+    delete catalog;
+    return NULL;
+  }
+
+  return catalog;
+}
+
+
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
@@ -437,22 +471,9 @@ bool CommandCheck::InspectTree(const string &path,
   LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
            catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
 
-  string tmp_file;
-  if (remote_repository == NULL)
-    tmp_file = DecompressPiece(catalog_hash);
-  else
-    tmp_file = DownloadPiece(catalog_hash);
-  if (tmp_file == "") {
-    LogCvmfs(kLogCvmfs, kLogStdout, "failed to load catalog %s",
-             catalog_hash.ToString().c_str());
-    return false;
-  }
-
-  int64_t catalog_file_size = GetFileSize(tmp_file);
-  assert(catalog_file_size > 0);
-  const catalog::Catalog *catalog =
-    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
-  unlink(tmp_file.c_str());
+  const catalog::Catalog *catalog = FetchCatalog(path,
+                                                 catalog_hash,
+                                                 catalog_size);
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
@@ -460,13 +481,6 @@ bool CommandCheck::InspectTree(const string &path,
   }
 
   int retval = true;
-
-  if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "catalog file size mismatch, "
-             "expected %"PRIu64", got %"PRIu64,
-             catalog_size, catalog_file_size);
-    retval = false;
-  }
 
   if (catalog->root_prefix() != PathString(path.data(), path.length())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "root prefix mismatch; "
