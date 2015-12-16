@@ -1,0 +1,52 @@
+
+cvmfs_test_name="Health Check a Catalog Subtree"
+cvmfs_test_autofs_on_startup=false
+
+produce_files_in() {
+  local working_dir=$1
+
+  pushdir $working_dir
+
+  mkdir -p foo
+  mkdir -p bar
+  mkdir -p baz
+
+  echo "/*" > .cvmfsdirtab
+
+  popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # ============================================================================
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i || return $?
+
+  # ============================================================================
+
+  local check_log_1="check_1.log"
+  echo "check only subtree (foo) - logging to $check_log_1"
+  check_repository $CVMFS_TEST_REPO -s /foo > $check_log_1 2>&1 || return 4
+
+  echo "checking log file"
+  cat $check_log_1
+
+  return 0
+}
+
