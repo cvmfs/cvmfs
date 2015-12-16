@@ -1,6 +1,12 @@
 cvmfs_test_name="GeoIP Service"
 cvmfs_test_autofs_on_startup=false
 
+CVMFS_TEST_611_REPLICA_NAME=
+
+cleanup() {
+  [ -z "$CVMFS_TEST_611_REPLICA_NAME" ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_611_REPLICA_NAME
+}
+
 cvmfs_getaddr() {
   # exit after the first line in case there are multiple addresses
   ip $1 -o addr show scope global|awk '{split($4,a,"/");print a[1];exit}'
@@ -45,12 +51,16 @@ cvmfs_run_test() {
 
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
-  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
-
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  CVMFS_TEST_611_REPLICA_NAME=$replica_name
+  echo "install a cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
 
   echo "create Stratum1 repository on the same machine"
   load_repo_config $CVMFS_TEST_REPO
@@ -75,23 +85,23 @@ cvmfs_run_test() {
 
   echo "checking x-forwarded-for IPv4"
   result="`curl -s -H "x-forwarded-for: $ipv4addr" http://localhost/$api/$fnal,$cern,$asgc|head -5`"
-  cvmfs_check_georesult $result $me fnal,cern,asgc || return 5
+  cvmfs_check_georesult "$result" $me fnal,cern,asgc || return 5
 
   echo "checking x-forwarded-for IPv6"
   result="`curl -s -H "x-forwarded-for: $ipv6addr" http://localhost/$api/$asgc,$fnal,$cern|head -5`"
-  cvmfs_check_georesult $result $me asgc,fnal,cern || return 6
+  cvmfs_check_georesult "$result" $me asgc,fnal,cern || return 6
 
   echo "checking direct IPv4"
   result="`curl -s http://$ipv4addr/$api/$cern,$asgc,$fnal|head -5`"
-  cvmfs_check_georesult $result $me cern,asgc,fnal || return 7
+  cvmfs_check_georesult "$result" $me cern,asgc,fnal || return 7
 
   echo "checking direct IPv6"
   result="`curl -s http://$ipv6addr/$api/$fnal,$asgc,$cern|head -5`"
-  cvmfs_check_georesult $result $me fnal,asgc,cern || return 8
+  cvmfs_check_georesult "$result" $me fnal,asgc,cern || return 8
 
   echo "checking IPv6-only server"
   result="`curl -s http://$ipv4addr/$api/ipv6.cybernode.com,$cern,$fnal|head -5`"
-  cvmfs_check_georesult $result ipv6only ipv6.cybernode.com,cern,fnal || return 9
+  cvmfs_check_georesult "$result" ipv6only ipv6.cybernode.com,cern,fnal || return 9
 
   return 0
 }
