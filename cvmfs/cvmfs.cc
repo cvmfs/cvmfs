@@ -1805,6 +1805,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
   unsigned low_speed_limit = cvmfs::kDefaultLowSpeedLimit;
+  unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
+  unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
   unsigned proxy_reset_after = 0;
   unsigned host_reset_after = 0;
   unsigned max_retries = 1;
@@ -1895,9 +1897,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (cvmfs::options_manager_->GetValue("CVMFS_MAX_RETRIES", &parameter))
     max_retries = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_BACKOFF_INIT", &parameter))
-    backoff_init = String2Uint64(parameter)*1000;
+    backoff_init = String2Uint64(parameter) * 1000;
   if (cvmfs::options_manager_->GetValue("CVMFS_BACKOFF_MAX", &parameter))
-    backoff_max = String2Uint64(parameter)*1000;
+    backoff_max = String2Uint64(parameter) * 1000;
+  if (cvmfs::options_manager_->GetValue("CVMFS_DNS_TIMEOUT", &parameter))
+    dns_timeout_ms = String2Uint64(parameter) * 1000;
+  if (cvmfs::options_manager_->GetValue("CVMFS_DNS_RETRIES", &parameter))
+    dns_retries = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_SEND_INFO_HEADER", &parameter) &&
       cvmfs::options_manager_->IsOn(parameter))
   {
@@ -2329,6 +2335,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_);
   cvmfs::download_manager_->SetHostChain(hostname);
+  if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
+      (dns_retries != download::DownloadManager::kDnsDefaultRetries))
+  {
+    cvmfs::download_manager_->SetDnsParameters(dns_retries, dns_timeout_ms);
+  }
   if (!dns_server.empty()) {
     cvmfs::download_manager_->SetDnsServer(dns_server);
   }
