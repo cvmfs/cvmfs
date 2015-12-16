@@ -583,7 +583,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   result.mtime_    = RetrieveInt64(4);
   result.name_.Assign(name, strlen(name));
   result.symlink_.Assign(symlink, strlen(symlink));
-  if (expand_symlink)
+  if (expand_symlink && !g_raw_symlinks)
     ExpandSymlink(&result.symlink_);
 
   return result;
