@@ -458,6 +458,48 @@ catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
 }
 
 
+bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
+                                          shash::Any   *root_hash,
+                                          uint64_t     *root_size) {
+  catalog::Catalog *current_catalog = FetchCatalog("", *root_hash);
+  if (current_catalog == NULL) {
+    return false;
+  }
+
+  typedef vector<string> Tokens;
+  const Tokens path_tokens = SplitString(subtree_path, '/');
+
+  string      current_path = "";
+  bool        found        = false;
+
+  Tokens::const_iterator i    = path_tokens.begin();
+  Tokens::const_iterator iend = path_tokens.end();
+  for (; i != iend; ++i) {
+    if (i->empty()) {
+      continue;
+    }
+
+    current_path += "/" + *i;
+    if (current_catalog->FindNested(PathString(current_path),
+                                    root_hash,
+                                    root_size)) {
+      delete current_catalog;
+
+      if (current_path.length() < subtree_path.length()) {
+        current_catalog = FetchCatalog(current_path, *root_hash);
+        if (current_catalog == NULL) {
+          break;
+        }
+      } else {
+        found = true;
+      }
+    }
+  }
+
+  return found;
+}
+
+
 /**
  * Recursion on nested catalog level.  No ownership of computed_counters.
  */
@@ -712,12 +754,22 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
              tag_name.c_str());
   }
 
-  if (subtree_path != "") {
 
+  if (subtree_path != "" && !FindSubtreeRootCatalog( subtree_path,
+                                                    &root_hash,
+                                                    &root_size)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "cannot find nested catalog at %s",
+             subtree_path.c_str());
+    delete manifest;
+    return 1;
   }
 
   catalog::DeltaCounters computed_counters;
-  bool retval = InspectTree("", root_hash, root_size, NULL, &computed_counters);
+  bool retval = InspectTree(subtree_path,
+                            root_hash,
+                            root_size,
+                            NULL,
+                            &computed_counters);
 
   delete manifest;
   return retval ? 0 : 1;

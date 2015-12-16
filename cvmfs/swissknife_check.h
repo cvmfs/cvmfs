@@ -47,6 +47,9 @@ class CommandCheck : public Command {
   catalog::Catalog* FetchCatalog(const std::string  &path,
                                  const shash::Any   &catalog_hash,
                                  const uint64_t      catalog_size = 0);
+  bool FindSubtreeRootCatalog(const std::string &subtree_path,
+                              shash::Any        *root_hash,
+                              uint64_t          *root_size);
 
   std::string DecompressPiece(const shash::Any catalog_hash);
   std::string DownloadPiece(const shash::Any catalog_hash);
