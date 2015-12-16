@@ -34,9 +34,11 @@ CVMFS_UPDATEGEO_HOUR=10 # First hour of day for update, 0-23, default 10am
 CVMFS_UPDATEGEO_MINDAYS=25 # Minimum days between update attempts
 CVMFS_UPDATEGEO_MAXDAYS=100 # Maximum days old before considering it an error
 
-CVMFS_UPDATEGEO_URL="http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz"
+CVMFS_UPDATEGEO_URLBASE="http://geolite.maxmind.com/download/geoip/database"
+CVMFS_UPDATEGEO_URLBASE6="${CVMFS_UPDATEGEO_URLBASE}/GeoLiteCityv6-beta"
 CVMFS_UPDATEGEO_DIR="/var/lib/cvmfs-server/geo"
-CVMFS_UPDATEGEO_DB=${CVMFS_UPDATEGEO_DIR}/GeoLiteCity.dat
+CVMFS_UPDATEGEO_DAT="GeoLiteCity.dat"
+CVMFS_UPDATEGEO_DAT6="GeoLiteCityv6.dat"
 
 DEFAULT_LOCAL_STORAGE="/srv/cvmfs"
 
@@ -2486,7 +2488,13 @@ update_global_meta_info() {
 
 _update_geodb_days_since_update() {
   local timestamp=$(date +%s)
-  local db_mtime=$(stat --format='%Y' $CVMFS_UPDATEGEO_DB)
+  local dbdir=$CVMFS_UPDATEGEO_DIR
+  local db_mtime=$(stat --format='%Y' ${dbdir}/${CVMFS_UPDATEGEO_DAT})
+  local db_mtime6=$(stat --format='%Y' ${dbdir}/${CVMFS_UPDATEGEO_DAT6})
+  if [ "$db_mtime6" -lt "$db_mtime" ]; then
+    # take the older of the two
+    db_mtime=$db_mtime6
+  fi
   local days_since_update=$(( ( $timestamp - $db_mtime ) / 86400 ))
   echo "$days_since_update"
 }
@@ -2500,22 +2508,25 @@ _to_syslog_for_geoip() {
   to_syslog "(GeoIP) $1"
 }
 
-_update_geodb_install() {
+_update_geodb_install_1() {
   local retcode=0
-  local dbfile="$CVMFS_UPDATEGEO_DB"
-  local download_target=${CVMFS_UPDATEGEO_DB}.gz
-  local unzip_target=${CVMFS_UPDATEGEO_DB}.new
+  local urlbase="$1"
+  local datname="$2"
+  local dburl="${urlbase}/${datname}.gz"
+  local dbfile="${CVMFS_UPDATEGEO_DIR}/${datname}"
+  local download_target=${dbfile}.gz
+  local unzip_target=${dbfile}.new
 
-  _to_syslog_for_geoip "started update from $CVMFS_UPDATEGEO_URL"
+  _to_syslog_for_geoip "started update from $dburl"
 
   # downloading the GeoIP database file
   if ! curl -sS                  \
             --fail               \
             --connect-timeout 10 \
             --max-time 60        \
-            "$CVMFS_UPDATEGEO_URL" > $download_target 2>/dev/null; then
-    echo "failed to download $CVMFS_UPDATEGEO_URL" >&2
-    _to_syslog_for_geoip "failed to download from $CVMFS_UPDATEGEO_URL"
+            "$dburl" > $download_target 2>/dev/null; then
+    echo "failed to download $dburl" >&2
+    _to_syslog_for_geoip "failed to download from $dburl"
     rm -f $download_target
     return 1
   fi
@@ -2539,14 +2550,20 @@ _update_geodb_install() {
     return 3
   fi
 
-  _to_syslog_for_geoip "successfully updated from $CVMFS_UPDATEGEO_URL"
+  _to_syslog_for_geoip "successfully updated from $dburl"
 
   return 0
 }
 
+_update_geodb_install() {
+  _update_geodb_install_1 $CVMFS_UPDATEGEO_URLBASE $CVMFS_UPDATEGEO_DAT && \
+    _update_geodb_install_1 $CVMFS_UPDATEGEO_URLBASE6 $CVMFS_UPDATEGEO_DAT6
+}
+
 _update_geodb() {
-  local dbfile=$CVMFS_UPDATEGEO_DB
   local dbdir=$CVMFS_UPDATEGEO_DIR
+  local dbfile=$dbdir/$CVMFS_UPDATEGEO_DAT
+  local dbfile6=$dbdir/$CVMFS_UPDATEGEO_DAT6
   local lazy=false
   local retcode=0
 
@@ -2567,25 +2584,28 @@ _update_geodb() {
   # sanity checks
   [ -w "$dbdir"  ]   || { echo "Directory '$dbdir' doesn't exist or is not writable by $(whoami)" >&2; return 1; }
   [ ! -f "$dbfile" ] || [ -w "$dbfile" ] || { echo "GeoIP database '$dbfile' is not writable by $(whoami)" >&2; return 2; }
+  [ ! -f "$dbfile6" ] || [ -w "$dbfile6" ] || { echo "GeoIP database '$dbfile6' is not writable by $(whoami)" >&2; return 2; }
 
   # check if an update/installation needs to be done
-  if [ ! -f "$dbfile" ]; then
+  if [ ! -f "$dbfile" ] || [ ! -f "$dbfile6" ]; then
     echo -n "Installing GeoIP Database... "
   elif ! $lazy; then
     echo -n "Updating GeoIP Database... "
-  elif [ $(_update_geodb_days_since_update) -gt $CVMFS_UPDATEGEO_MAXDAYS ]; then
-    echo -n "GeoIP Database is very old. Updating... "
-  elif [ $(_update_geodb_days_since_update) -gt $CVMFS_UPDATEGEO_MINDAYS ]; then
-    if _update_geodb_lazy_install_slot; then
-      echo -n "GeoIP Database is expired. Updating... "
-    else
-      echo "GeoIP Database is expired but doing nothing right now."
-      return 0
-    fi
   else
     local days_old=$(_update_geodb_days_since_update)
-    echo "GeoIP Database is up to date ($days_old days old). Nothing to do."
-    return 0
+    if [ $days_old -gt $CVMFS_UPDATEGEO_MAXDAYS ]; then
+      echo -n "GeoIP Database is very old. Updating... "
+    elif [ $days_old -gt $CVMFS_UPDATEGEO_MINDAYS ]; then
+      if _update_geodb_lazy_install_slot; then
+        echo -n "GeoIP Database is expired. Updating... "
+      else
+        echo "GeoIP Database is expired, but waiting for install time slot."
+        return 0
+      fi
+    else
+      echo "GeoIP Database is up to date ($days_old days old). Nothing to do."
+      return 0
+    fi
   fi
 
   # at this point the database needs to be installed or updated
@@ -3019,9 +3039,9 @@ add_replica() {
       if [ x"$cvmfs_user" != x"root" ]; then
         echo "NOTE: If snapshot is not run regularly as root, the GeoIP database will not be updated."
         echo "      You have three options:"
-        echo "      1. chown $CVMFS_UPDATEGEO_DIR and $CVMFS_UPDATEGEO_DB accordingly OR"
+        echo "      1. chown -R $CVMFS_UPDATEGEO_DIR accordingly OR"
         echo "      2. run update-geodb monthly as root OR"
-        echo "      3. chown $CVMFS_UPDATEGEO_DIR and $CVMFS_UPDATEGEO_DB to a dedicated"
+        echo "      3. chown -R $CVMFS_UPDATEGEO_DIR to a dedicated"
         echo "         user ID and run update-geodb monthly as that user"
       fi
     else

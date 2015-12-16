@@ -1,0 +1,115 @@
+cvmfs_test_name="GeoIP Service"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_611_REPLICA_NAME=
+
+cleanup() {
+  [ -z "$CVMFS_TEST_611_REPLICA_NAME" ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_611_REPLICA_NAME
+}
+
+cvmfs_getaddr() {
+  # exit after the first line in case there are multiple addresses
+  ip $1 -o addr show scope global|awk '{split($4,a,"/");print a[1];exit}'
+}
+
+cvmfs_check_georesult() {
+  local result=$1
+  local me=$2
+  local reqorder=$3
+  local expectorder
+  echo "  result for $reqorder is $result"
+  [ -n "$1" ] || return 1
+  if [[ "$me" == *.cern.ch ]] || [[ "$me" == *.fnal.gov ]]; then
+    local cern
+    local fnal
+    local asgc
+    local n=1
+    for site in ${reqorder//,/ }; do
+      eval $site=$n
+      let n+=1
+    done
+    if [[ "$me" == *.cern.ch ]]; then
+      expectorder=$cern,$fnal,$asgc
+    elif [[ "$me" == *.fnal.gov ]]; then
+      expectorder=$fnal,$cern,$asgc
+    fi
+  else
+    # not testing at CERN or FNAL, so any order will do
+    expectorder="[123],[123],[123]"
+  fi
+  [[ $result == $expectorder ]] || return 2
+}
+
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "checking if both IPv4 and IPv6 addresses are available"
+  local ipv4addr="`cvmfs_getaddr -4`"
+  local ipv6addr="`cvmfs_getaddr -6`"
+  [ -n "$ipv4addr" ] || return 1
+  if [ -z "$ipv6addr" ]; then
+    echo "WARNING: No IPv6 address available, skipping IPv6 tests"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  fi
+
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  CVMFS_TEST_611_REPLICA_NAME=$replica_name
+  echo "install a cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create Stratum1 repository on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+  create_stratum1 $replica_name                          \
+                  root                                   \
+                  $CVMFS_STRATUM0                        \
+                  /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                  || return 3
+
+  echo "do a snapshot to make sure geo ip database is downloaded"
+  sudo cvmfs_server snapshot $replica_name || return 4
+
+  local me="`uname -n`"
+  local api="cvmfs/$replica_name/api/v1.0/geo/$me"
+  local fnal=cvmfs.fnal.gov
+  local cern=cvmfs-stratum-one.cern.ch
+  local asgc=cvmfs02.grid.sinica.edu.tw
+  local result
+
+  # limit the output from curl to 5 lines so in case there's some kind
+  #   of error some useful output will show but not too much
+
+  echo "checking x-forwarded-for IPv4"
+  result="`curl -s -H "x-forwarded-for: $ipv4addr" http://localhost/$api/$fnal,$cern,$asgc|head -5`"
+  cvmfs_check_georesult "$result" $me fnal,cern,asgc || return 5
+
+  if [ -n "$ipv6addr" ]; then
+    echo "checking x-forwarded-for IPv6"
+    result="`curl -s -H "x-forwarded-for: $ipv6addr" http://localhost/$api/$asgc,$fnal,$cern|head -5`"
+    cvmfs_check_georesult "$result" $me asgc,fnal,cern || return 6
+  fi
+
+  echo "checking direct IPv4"
+  result="`curl -s http://$ipv4addr/$api/$cern,$asgc,$fnal|head -5`"
+  cvmfs_check_georesult "$result" $me cern,asgc,fnal || return 7
+
+  if [ -n "$ipv6addr" ]; then
+    echo "checking direct IPv6"
+    result="`curl -s http://$ipv6addr/$api/$fnal,$asgc,$cern|head -5`"
+    cvmfs_check_georesult "$result" $me fnal,asgc,cern || return 8
+
+    echo "checking IPv6-only server"
+    result="`curl -s http://$ipv4addr/$api/ipv6.cybernode.com,$cern,$fnal|head -5`"
+    cvmfs_check_georesult "$result" ipv6only ipv6.cybernode.com,cern,fnal || return 9
+  fi
+
+  return 0
+}
