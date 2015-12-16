@@ -1,4 +1,5 @@
 2.2.0:
+  * Allow for alternative URLs for root catalog outside /data subdirectory
   * Add static status files on stratum 0/1 server (CVM-860)
   * Fix cache directory selection in `cvmfs_config wipecache` (CVM-709)
   * Add `cvmfs_config killall` command (CVM-899)
