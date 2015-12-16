@@ -8,10 +8,20 @@ produce_files_in() {
   pushdir $working_dir
 
   mkdir -p foo
+  mkdir -p foo/1
+  mkdir -p foo/2
+  mkdir -p foo/3
+  mkdir -p foo/4
   mkdir -p bar
   mkdir -p baz
 
-  echo "/*" > .cvmfsdirtab
+  echo "foobar" > foo/3/foobar
+
+  echo "/*"     >  .cvmfsdirtab
+  echo "/foo/*" >> .cvmfsdirtab
+
+  create_big_file foo/4/moo 100
+  create_big_file foo/2/muh 100
 
   popdir
 }
@@ -35,17 +45,35 @@ cvmfs_run_test() {
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
 
+  local check_log_1="check_1.log"
   echo "check catalog and data integrity"
-  check_repository $CVMFS_TEST_REPO -i || return $?
+  check_repository $CVMFS_TEST_REPO -i > $check_log_1 2>&1 || return $?
+
+  echo "checking the log file"
+  cat $check_log_1 | grep -e 'at /$'      || return  4
+  cat $check_log_1 | grep -e 'at /baz$'   || return  5
+  cat $check_log_1 | grep -e 'at /bar$'   || return  6
+  cat $check_log_1 | grep -e 'at /foo$'   || return  7
+  cat $check_log_1 | grep -e 'at /foo/4$' || return  8
+  cat $check_log_1 | grep -e 'at /foo/2$' || return  9
+  cat $check_log_1 | grep -e 'at /foo/3$' || return 10
+  cat $check_log_1 | grep -e 'at /foo/1$' || return 11
 
   # ============================================================================
 
-  local check_log_1="check_1.log"
-  echo "check only subtree (foo) - logging to $check_log_1"
-  check_repository $CVMFS_TEST_REPO -s /foo > $check_log_1 2>&1 || return 4
+  local check_log_2="check_2.log"
+  echo "check only subtree (foo) - logging to $check_log_2"
+  check_repository $CVMFS_TEST_REPO -s /foo > $check_log_2 2>&1 || return 12
 
   echo "checking log file"
-  cat $check_log_1
+  cat $check_log_2 | grep -e 'at /$'      && return 13
+  cat $check_log_2 | grep -e 'at /baz$'   && return 14
+  cat $check_log_2 | grep -e 'at /bar$'   && return 15
+  cat $check_log_2 | grep -e 'at /foo$'   || return 16
+  cat $check_log_2 | grep -e 'at /foo/4$' || return 17
+  cat $check_log_2 | grep -e 'at /foo/2$' || return 18
+  cat $check_log_2 | grep -e 'at /foo/3$' || return 19
+  cat $check_log_2 | grep -e 'at /foo/1$' || return 20
 
   return 0
 }
