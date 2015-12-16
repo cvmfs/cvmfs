@@ -1977,6 +1977,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       && cvmfs::options_manager_->IsOn(parameter))
   {
     server_cache_mode = true;
+    g_raw_symlinks = true;
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
