@@ -1,10 +1,10 @@
 cvmfs_test_name="GeoIP Service"
 cvmfs_test_autofs_on_startup=false
 
-CVMFS_TEST_611_REPLICA_NAME=
+CVMFS_TEST_614_REPLICA_NAME=
 
 cleanup() {
-  [ -z "$CVMFS_TEST_611_REPLICA_NAME" ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_611_REPLICA_NAME
+  [ -z "$CVMFS_TEST_614_REPLICA_NAME" ] || sudo cvmfs_server rmfs -f $CVMFS_TEST_614_REPLICA_NAME
 }
 
 cvmfs_getaddr() {
@@ -62,7 +62,7 @@ cvmfs_run_test() {
 
   local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
 
-  CVMFS_TEST_611_REPLICA_NAME=$replica_name
+  CVMFS_TEST_614_REPLICA_NAME=$replica_name
   echo "install a cleanup function"
   trap cleanup EXIT HUP INT TERM || return $?
 
