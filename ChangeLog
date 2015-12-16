@@ -1,4 +1,5 @@
 2.2.0:
+  * Allow for configuration of DNS timeout and retry (CVM-875)
   * Add IPv6 support for GeoAPI (CVM-807)
   * Add `cvmfs_server check -s` to verify subtrees
   * Don't resolve magic symlinks in server mode (CVM-879)
