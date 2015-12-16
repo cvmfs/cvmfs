@@ -306,7 +306,8 @@ cvmfs_mount() {
     sudo sh -c "echo \"CVMFS_DEBUGLOG=$CVMFS_TEST_DEBUGLOG\" >> /etc/cvmfs/default.local" || return 100
   fi
 
-  if running_on_osx; then
+  eval $(cvmfs_config showconfig | grep -e ^CVMFS_CONFIG_REPOSITORY=)
+  if running_on_osx && [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
     for i in $(echo "$repositories" | tr "," " "); do
       mkdir -p "/cvmfs/$i"
       mount -t cvmfs "$i" "/cvmfs/$i" || return 102
