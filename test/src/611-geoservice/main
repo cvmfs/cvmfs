@@ -48,7 +48,10 @@ cvmfs_run_test() {
   local ipv4addr="`cvmfs_getaddr -4`"
   local ipv6addr="`cvmfs_getaddr -6`"
   [ -n "$ipv4addr" ] || return 1
-  [ -n "$ipv6addr" ] || echo "WARNING: No IPv6 address available, skipping IPv6 tests"
+  if [ -z "$ipv6addr" ]; then
+    echo "WARNING: No IPv6 address available, skipping IPv6 tests"
+    CVMFS_GENERAL_WARNING_FLAG=1
+  fi
 
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
