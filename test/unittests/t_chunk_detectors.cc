@@ -14,20 +14,19 @@ namespace upload {
 
 class T_ChunkDetectors : public ::testing::Test {
  protected:
+  static const size_t data_size_ = 104857600; // 100 MiB
+
   void CreateBuffers(const size_t buffer_size) {
     ClearBuffers();
-
-    const size_t MB          = 1048576;
-    const size_t full_size   = 100 * MB;
 
     // make sure we always produce the same test data
     rng_.InitSeed(42);
 
     // produce some test data
     size_t i = 0;
-    while (i < full_size) {
+    while (i < data_size()) {
       CharBuffer * buffer = new CharBuffer(buffer_size);
-      buffer->SetUsedBytes(std::min(full_size - i, buffer_size));
+      buffer->SetUsedBytes(std::min(data_size() - i, buffer_size));
       buffer->SetBaseOffset(i);
 
       for (size_t j = 0; j < buffer->size(); ++j) {
@@ -42,6 +41,8 @@ class T_ChunkDetectors : public ::testing::Test {
   virtual void TearDown() {
     ClearBuffers();
   }
+
+  size_t data_size() const { return data_size_; }
 
  private:
   void ClearBuffers() {
