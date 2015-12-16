@@ -1,4 +1,5 @@
 2.2.0:
+  * Add `cvmfs_server check -s` to verify subtrees
   * Don't resolve magic symlinks in server mode (CVM-879)
   * Unmount repositories when rpm is erased (CVM-757)
   * Allow for alternative URLs for root catalog outside /data subdirectory
