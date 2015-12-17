@@ -407,6 +407,30 @@ TEST_F(T_Dns, HostValid) {
 }
 
 
+TEST_F(T_Dns, HostBestAddresses) {
+  Host host;
+  host.name_ = "name";
+  host.status_ = kFailOk;
+  host.deadline_ = time(NULL) + 10;
+  host.ipv4_addresses_.insert("10.0.0.1");
+  EXPECT_TRUE(host.IsValid());
+
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferSystem).begin());
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferV4).begin());
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferV6).begin());
+
+  host.ipv6_addresses_.insert("[::1]");
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferSystem).begin());
+  EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferV4).begin());
+  EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferV6).begin());
+  
+  host.ipv4_addresses_.clear();
+  EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferSystem).begin());
+  EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferV4).begin());
+  EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferV6).begin());
+}
+
+
 TEST_F(T_Dns, HostExtendDeadline) {
   Host host;
   host.name_ = "name";

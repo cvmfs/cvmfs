@@ -172,6 +172,18 @@ string StripIp(const string &decorated_ip) {
 
 atomic_int64 Host::global_id_ = 0;
 
+const set<string> &Host::ViewBestAddresses(IpPreference preference) const {
+  if (((preference == kIpPreferSystem) || (preference == kIpPreferV4)) &&
+      HasIpv4())
+  {
+    return ipv4_addresses_;
+  }
+  if ((preference == kIpPreferV6) && !HasIpv6())
+    return ipv4_addresses_;
+  return ipv6_addresses_;
+}
+
+
 void Host::CopyFrom(const Host &other) {
   deadline_ = other.deadline_;
   id_ = other.id_;
