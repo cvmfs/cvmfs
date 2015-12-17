@@ -423,7 +423,7 @@ TEST_F(T_Dns, HostBestAddresses) {
   EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferSystem).begin());
   EXPECT_EQ("10.0.0.1", *host.ViewBestAddresses(kIpPreferV4).begin());
   EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferV6).begin());
-  
+
   host.ipv4_addresses_.clear();
   EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferSystem).begin());
   EXPECT_EQ("[::1]", *host.ViewBestAddresses(kIpPreferV4).begin());

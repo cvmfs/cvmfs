@@ -317,6 +317,7 @@ class DownloadManager {
 
   void SetDnsServer(const std::string &address);
   void SetDnsParameters(const unsigned retries, const unsigned timeout_sec);
+  void SetIpPreference(const dns::IpPreference preference);
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
@@ -444,7 +445,12 @@ class DownloadManager {
   /**
    * Used to resolve proxy addresses (host addresses are resolved by the proxy).
    */
-  dns::NormalResolver *resolver;
+  dns::NormalResolver *resolver_;
+
+  /**
+   * If a proxy has IPv4 and IPv6 addresses, which one to prefer
+   */
+  dns::IpPreference opt_ip_preference_;
 
   /**
    * Used to replace @proxy@ in the Geo-API calls to order Stratum 1 servers,

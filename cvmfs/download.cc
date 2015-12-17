@@ -917,7 +917,7 @@ void DownloadManager::ValidateProxyIpsUnlocked(
            host.name().c_str());
 
   unsigned group_idx = opt_proxy_groups_current_;
-  dns::Host new_host = resolver->Resolve(host.name());
+  dns::Host new_host = resolver_->Resolve(host.name());
 
   bool update_only = true;  // No changes to the list of IP addresses.
   if (new_host.status() != dns::kFailOk) {
@@ -954,21 +954,11 @@ void DownloadManager::ValidateProxyIpsUnlocked(
     }
   }
   vector<ProxyInfo> new_infos;
-  // IPv4 addresses have precedence
-  set<string>::const_iterator iter_ips;
-  if (new_host.HasIpv4()) {
-    iter_ips = new_host.ipv4_addresses().begin();
-    for (; iter_ips != new_host.ipv4_addresses().end(); ++iter_ips) {
-      string url_ip = dns::RewriteUrl(url, *iter_ips);
-      new_infos.push_back(ProxyInfo(new_host, url_ip));
-    }
-  } else {
-    // IPv6
-    iter_ips = new_host.ipv6_addresses().begin();
-    for (; iter_ips != new_host.ipv6_addresses().end(); ++iter_ips) {
-      string url_ip = dns::RewriteUrl(url, *iter_ips);
-      new_infos.push_back(ProxyInfo(new_host, url_ip));
-    }
+  set<string> best_addresses = new_host.ViewBestAddresses(opt_ip_preference_);
+  set<string>::const_iterator iter_ips = best_addresses.begin();
+  for (; iter_ips != best_addresses.end(); ++iter_ips) {
+    string url_ip = dns::RewriteUrl(url, *iter_ips);
+    new_infos.push_back(ProxyInfo(new_host, url_ip));
   }
   group->insert(group->end(), new_infos.begin(), new_infos.end());
   opt_num_proxies_ += new_infos.size();
@@ -1324,6 +1314,7 @@ DownloadManager::DownloadManager() {
   assert(retval == 0);
 
   opt_dns_server_ = NULL;
+  opt_ip_preference_ = dns::kIpPreferSystem;
   opt_timeout_proxy_ = 0;
   opt_timeout_direct_ = 0;
   opt_low_speed_limit_ = 0;
@@ -1341,7 +1332,7 @@ DownloadManager::DownloadManager() {
   opt_ipv4_only_ = false;
   follow_redirects_ = false;
 
-  resolver = NULL;
+  resolver_ = NULL;
 
   opt_timestamp_backup_proxies_ = 0;
   opt_timestamp_failover_proxies_ = 0;
@@ -1410,6 +1401,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   opt_proxy_groups_current_burned_ = 0;
   opt_num_proxies_ = 0;
   opt_host_chain_current_ = 0;
+  opt_ip_preference_ = dns::kIpPreferSystem;
 
   counters_ = new Counters(statistics, name);
 
@@ -1434,9 +1426,9 @@ void DownloadManager::Init(const unsigned max_pool_handles,
   {
     opt_ipv4_only_ = true;
   }
-  resolver = dns::NormalResolver::Create(opt_ipv4_only_,
-                                         1 /* retries */, 3000 /* timeout */);
-  assert(resolver);
+  resolver_ = dns::NormalResolver::Create(opt_ipv4_only_,
+                                          1 /* retries */, 3000 /* timeout */);
+  assert(resolver_);
 
   // Parsing environment variables
   if (use_system_proxy) {
@@ -1491,8 +1483,8 @@ void DownloadManager::Fini() {
 
   curl_global_cleanup();
 
-  delete resolver;
-  resolver = NULL;
+  delete resolver_;
+  resolver_ = NULL;
 }
 
 
@@ -1606,7 +1598,7 @@ void DownloadManager::SetDnsServer(const string &address) {
 
     vector<string> servers;
     servers.push_back(address);
-    bool retval = resolver->SetResolvers(servers);
+    bool retval = resolver_->SetResolvers(servers);
     assert(retval);
   }
   pthread_mutex_unlock(lock_options_);
@@ -1622,11 +1614,18 @@ void DownloadManager::SetDnsParameters(
   const unsigned timeout_sec)
 {
   pthread_mutex_lock(lock_options_);
-  delete resolver;
-  resolver = NULL;
-  resolver =
+  delete resolver_;
+  resolver_ = NULL;
+  resolver_ =
     dns::NormalResolver::Create(opt_ipv4_only_, retries, timeout_sec*1000);
-  assert(resolver);
+  assert(resolver_);
+  pthread_mutex_unlock(lock_options_);
+}
+
+
+void DownloadManager::SetIpPreference(dns::IpPreference preference) {
+  pthread_mutex_lock(lock_options_);
+  opt_ip_preference_ = preference;
   pthread_mutex_unlock(lock_options_);
 }
 
@@ -2228,7 +2227,7 @@ void DownloadManager::SetProxyChain(
   vector<dns::Host> hosts;
   LogCvmfs(kLogDownload, kLogDebug, "resolving %u proxy addresses",
            hostnames.size());
-  resolver->ResolveMany(hostnames, &hosts);
+  resolver_->ResolveMany(hostnames, &hosts);
 
   // Construct opt_proxy_groups_: traverse proxy list in same order and expand
   // names to resolved IP addresses.
@@ -2259,25 +2258,12 @@ void DownloadManager::SetProxyChain(
       }
 
       // IPv4 addresses have precedence
-      set<string>::const_iterator iter_ips;
-      if (hosts[num_proxy].HasIpv4()) {
-        // IPv4
-        iter_ips = hosts[num_proxy].ipv4_addresses().begin();
-        for (; iter_ips != hosts[num_proxy].ipv4_addresses().end();
-             ++iter_ips)
-        {
-          string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
-          infos.push_back(ProxyInfo(hosts[num_proxy], url_ip));
-        }
-      } else {
-        // IPv6
-        iter_ips = hosts[num_proxy].ipv6_addresses().begin();
-        for (; iter_ips != hosts[num_proxy].ipv6_addresses().end();
-             ++iter_ips)
-        {
-          string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
-          infos.push_back(ProxyInfo(hosts[num_proxy], url_ip));
-        }
+      set<string> best_addresses =
+        hosts[num_proxy].ViewBestAddresses(opt_ip_preference_);
+      set<string>::const_iterator iter_ips = best_addresses.begin();
+      for (; iter_ips != best_addresses.end(); ++iter_ips) {
+        string url_ip = dns::RewriteUrl(this_group[j], *iter_ips);
+        infos.push_back(ProxyInfo(hosts[num_proxy], url_ip));
       }
     }
     opt_proxy_groups_->push_back(infos);
@@ -2433,7 +2419,7 @@ void DownloadManager::SetRetryParameters(const unsigned max_retries,
 
 void DownloadManager::SetMaxIpaddrPerProxy(unsigned limit) {
   pthread_mutex_lock(lock_options_);
-  resolver->set_throttle(limit);
+  resolver_->set_throttle(limit);
   pthread_mutex_unlock(lock_options_);
 }
 
