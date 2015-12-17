@@ -1874,6 +1874,7 @@ CVMFS_SERVER_URL=$repo_url
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${repo_name}.pub
 CVMFS_KCACHE_TIMEOUT=15
+CVMFS_DEBUGLOG=$output
 EOF
   else
     cat $config_file > $config
@@ -1893,6 +1894,6 @@ remove_local_mount() {
 get_internal_value() {
   local repo=$1
   local key=$2
-  
+
   echo $(sudo cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
 }

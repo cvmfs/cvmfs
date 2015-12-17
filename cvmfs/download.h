@@ -306,6 +306,9 @@ class DownloadManager {
    */
   static const unsigned kMaxMemSize;
 
+  static const unsigned kDnsDefaultRetries = 1;
+  static const unsigned kDnsDefaultTimeoutMs = 3000;
+
   DownloadManager();
   ~DownloadManager();
 
@@ -316,7 +319,7 @@ class DownloadManager {
   Failures Fetch(JobInfo *info);
 
   void SetDnsServer(const std::string &address);
-  void SetDnsParameters(const unsigned retries, const unsigned timeout_sec);
+  void SetDnsParameters(const unsigned retries, const unsigned timeout_ms);
   void SetIpPreference(const dns::IpPreference preference);
   void SetTimeout(const unsigned seconds_proxy, const unsigned seconds_direct);
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);

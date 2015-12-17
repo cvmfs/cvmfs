@@ -425,34 +425,97 @@ string CommandCheck::DecompressPiece(const shash::Any catalog_hash) {
 }
 
 
-/**
- * Recursion on nested catalog level.  No ownership of computed_counters.
- */
-bool CommandCheck::InspectTree(const string &path,
-                               const shash::Any &catalog_hash,
-                               const uint64_t catalog_size,
-                               const catalog::DirectoryEntry *transition_point,
-                               catalog::DeltaCounters *computed_counters)
-{
-  LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
-           catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
-
+catalog::Catalog* CommandCheck::FetchCatalog(const string      &path,
+                                             const shash::Any  &catalog_hash,
+                                             const uint64_t     catalog_size) {
   string tmp_file;
   if (remote_repository == NULL)
     tmp_file = DecompressPiece(catalog_hash);
   else
     tmp_file = DownloadPiece(catalog_hash);
+
   if (tmp_file == "") {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to load catalog %s",
              catalog_hash.ToString().c_str());
+    return NULL;
+  }
+
+  catalog::Catalog *catalog =
+                   catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
+  int64_t catalog_file_size = GetFileSize(tmp_file);
+  assert(catalog_file_size > 0);
+  unlink(tmp_file.c_str());
+
+  if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "catalog file size mismatch, "
+             "expected %"PRIu64", got %"PRIu64,
+             catalog_size, catalog_file_size);
+    delete catalog;
+    return NULL;
+  }
+
+  return catalog;
+}
+
+
+bool CommandCheck::FindSubtreeRootCatalog(const string &subtree_path,
+                                          shash::Any   *root_hash,
+                                          uint64_t     *root_size) {
+  catalog::Catalog *current_catalog = FetchCatalog("", *root_hash);
+  if (current_catalog == NULL) {
     return false;
   }
 
-  int64_t catalog_file_size = GetFileSize(tmp_file);
-  assert(catalog_file_size > 0);
-  const catalog::Catalog *catalog =
-    catalog::Catalog::AttachFreely(path, tmp_file, catalog_hash);
-  unlink(tmp_file.c_str());
+  typedef vector<string> Tokens;
+  const Tokens path_tokens = SplitString(subtree_path, '/');
+
+  string      current_path = "";
+  bool        found        = false;
+
+  Tokens::const_iterator i    = path_tokens.begin();
+  Tokens::const_iterator iend = path_tokens.end();
+  for (; i != iend; ++i) {
+    if (i->empty()) {
+      continue;
+    }
+
+    current_path += "/" + *i;
+    if (current_catalog->FindNested(PathString(current_path),
+                                    root_hash,
+                                    root_size)) {
+      delete current_catalog;
+
+      if (current_path.length() < subtree_path.length()) {
+        current_catalog = FetchCatalog(current_path, *root_hash);
+        if (current_catalog == NULL) {
+          break;
+        }
+      } else {
+        found = true;
+      }
+    }
+  }
+
+  return found;
+}
+
+
+/**
+ * Recursion on nested catalog level.  No ownership of computed_counters.
+ */
+bool CommandCheck::InspectTree(const string                  &path,
+                               const shash::Any              &catalog_hash,
+                               const uint64_t                 catalog_size,
+                               const bool                     is_nested_catalog,
+                               const catalog::DirectoryEntry *transition_point,
+                               catalog::DeltaCounters        *computed_counters)
+{
+  LogCvmfs(kLogCvmfs, kLogStdout, "[inspecting catalog] %s at %s",
+           catalog_hash.ToString().c_str(), path == "" ? "/" : path.c_str());
+
+  const catalog::Catalog *catalog = FetchCatalog(path,
+                                                 catalog_hash,
+                                                 catalog_size);
   if (catalog == NULL) {
     LogCvmfs(kLogCvmfs, kLogStdout, "failed to open catalog %s",
              catalog_hash.ToString().c_str());
@@ -460,13 +523,6 @@ bool CommandCheck::InspectTree(const string &path,
   }
 
   int retval = true;
-
-  if ((catalog_size > 0) && (uint64_t(catalog_file_size) != catalog_size)) {
-    LogCvmfs(kLogCvmfs, kLogStdout, "catalog file size mismatch, "
-             "expected %"PRIu64", got %"PRIu64,
-             catalog_size, catalog_file_size);
-    retval = false;
-  }
 
   if (catalog->root_prefix() != PathString(path.data(), path.length())) {
     LogCvmfs(kLogCvmfs, kLogStderr, "root prefix mismatch; "
@@ -487,8 +543,9 @@ bool CommandCheck::InspectTree(const string &path,
              path.c_str());
     retval = false;
   }
-  if (transition_point != NULL) {
-    if (!CompareEntries(*transition_point, root_entry, true, true)) {
+  if (is_nested_catalog) {
+    if (transition_point != NULL &&
+        !CompareEntries(*transition_point, root_entry, true, true)) {
       LogCvmfs(kLogCvmfs, kLogStderr,
                "transition point and root entry differ (%s)", path.c_str());
       retval = false;
@@ -543,7 +600,8 @@ bool CommandCheck::InspectTree(const string &path,
       retval = false;
     } else {
       catalog::DeltaCounters nested_counters;
-      if (!InspectTree(i->path.ToString(), i->hash, i->size,
+      const bool is_nested = true;
+      if (!InspectTree(i->path.ToString(), i->hash, i->size, is_nested,
                        &nested_transition_point, &nested_counters))
         retval = false;
       nested_counters.PopulateToParent(computed_counters);
@@ -570,6 +628,7 @@ bool CommandCheck::InspectTree(const string &path,
 int CommandCheck::Main(const swissknife::ArgumentList &args) {
   string tag_name;
   check_chunks = false;
+  string subtree_path = "";
 
   temp_directory_ = (args.find('t') != args.end()) ? *args.find('t')->second
                                                    : "/tmp";
@@ -587,6 +646,8 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
     SetLogVerbosity(static_cast<LogLevels>(log_level));
   }
   const string repository = MakeCanonicalPath(*args.find('r')->second);
+  if (args.find('s') != args.end())
+    subtree_path = MakeCanonicalPath(*args.find('s')->second);
 
   // Repository can be HTTP address or on local file system
   if (repository.substr(0, 7) == "http://") {
@@ -696,8 +757,23 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
              tag_name.c_str());
   }
 
+  const bool is_nested_catalog = (!subtree_path.empty());
+  if (is_nested_catalog && !FindSubtreeRootCatalog( subtree_path,
+                                                   &root_hash,
+                                                   &root_size)) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "cannot find nested catalog at %s",
+             subtree_path.c_str());
+    delete manifest;
+    return 1;
+  }
+
   catalog::DeltaCounters computed_counters;
-  bool retval = InspectTree("", root_hash, root_size, NULL, &computed_counters);
+  bool retval = InspectTree(subtree_path,
+                            root_hash,
+                            root_size,
+                            is_nested_catalog,
+                            NULL,
+                            &computed_counters);
 
   delete manifest;
   return retval ? 0 : 1;

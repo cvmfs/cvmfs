@@ -849,9 +849,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     if (proxy_ptr->host.status() == dns::kFailOk) {
       curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
     } else {
-      // We know it can't work, don't even try to download: TODO(jblomer)
-      curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, info->proxy.c_str());
-      // curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "http://$.");
+      // We know it can't work, don't even try to download
+      curl_easy_setopt(info->curl_handle, CURLOPT_PROXY, "0.0.0.0");
     }
   }
   curl_easy_setopt(curl_handle, CURLOPT_LOW_SPEED_LIMIT, opt_low_speed_limit_);
@@ -1427,7 +1426,7 @@ void DownloadManager::Init(const unsigned max_pool_handles,
     opt_ipv4_only_ = true;
   }
   resolver_ = dns::NormalResolver::Create(opt_ipv4_only_,
-                                          1 /* retries */, 3000 /* timeout */);
+    kDnsDefaultRetries, kDnsDefaultTimeoutMs);
   assert(resolver_);
 
   // Parsing environment variables
@@ -1611,13 +1610,13 @@ void DownloadManager::SetDnsServer(const string &address) {
  */
 void DownloadManager::SetDnsParameters(
   const unsigned retries,
-  const unsigned timeout_sec)
+  const unsigned timeout_ms)
 {
   pthread_mutex_lock(lock_options_);
   delete resolver_;
   resolver_ = NULL;
   resolver_ =
-    dns::NormalResolver::Create(opt_ipv4_only_, retries, timeout_sec*1000);
+    dns::NormalResolver::Create(opt_ipv4_only_, retries, timeout_ms);
   assert(resolver_);
   pthread_mutex_unlock(lock_options_);
 }

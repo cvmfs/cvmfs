@@ -673,6 +673,13 @@ void WritableCatalogManager::PrecalculateListings() {
 }
 
 
+void WritableCatalogManager::SetTTL(const uint64_t new_ttl) {
+  SyncLock();
+  reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetTTL(new_ttl);
+  SyncUnlock();
+}
+
+
 manifest::Manifest *WritableCatalogManager::Commit(
   const bool     stop_for_tweaks,
   const uint64_t manual_revision)
