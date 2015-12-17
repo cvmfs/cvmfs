@@ -23,7 +23,9 @@ shift
 test_exclusions=0
 xml_output=""
 debug=""
-while getopts "xo:d" option; do
+parrot=""
+parrot_config=""
+while getopts "xo:dp" option; do
   case $option in
     x)
       test_exclusions=1
@@ -33,6 +35,10 @@ while getopts "xo:d" option; do
     ;;
     d)
       debug="-x"
+    ;;
+    p)
+      parrot="parrot_run"
+      parrot_config="export HTTP_PROXY=\"ca-proxy.cern.ch:3128\""
     ;;
     ?)
       usage
@@ -125,7 +131,7 @@ setup_environment() {
   fi
 
   # if we are not inside a docker
-  if [ x"$CVMFS_TEST_DOCKER" = xno ]; then
+  if [ x"$CVMFS_TEST_DOCKER" = xno ] && ! runs_under_parrot; then
     # configure autofs to the test's needs
     service_switch autofs restart || true
     local timeout=10 # wait until autofs restarts (possible race >.<)
@@ -223,9 +229,10 @@ do
 
   # run the test
   test_start=$(get_millisecond_epoch)
-  bash $debug -c ". ./test_functions                     && \
+  $parrot bash $debug -c ". ./test_functions             && \
                   . $t/main                              && \
                   cd $workdir                            && \
+                  $parrot_config                         && \
                   cvmfs_run_test $logfile $(pwd)/${t}    && \
                   retval=\$?                             && \
                   retval=\$(mangle_test_retval \$retval) && \

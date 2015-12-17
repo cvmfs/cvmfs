@@ -64,6 +64,25 @@ die() {
   exit 1
 }
 
+runs_under_parrot() {
+  [ "x$PARROT_ENABLED" = "xTRUE" ]
+}
+
+is_root() {
+  [ $(id -u) -eq 0 ]
+}
+
+as_root() {
+  if is_root; then
+    $@
+  elif ! runs_under_parrot; then
+    sudo $@
+  else
+    echo "##################################################"
+    echo "# Warning: cannot run sudo in parrot environment #"
+    echo "##################################################"
+  fi
+}
 
 # Find the service binary (or detect systemd)
 minpidof() {
@@ -263,6 +282,8 @@ break_hardlink() {
 
 
 cvmfs_clean() {
+  runs_under_parrot && return 0
+
   sudo cvmfs_config umount > /dev/null || return 100
   sudo sh -c "rm -rf /var/lib/cvmfs/*"
   sudo rm -f /etc/cvmfs/default.local
@@ -285,6 +306,8 @@ cvmfs_clean() {
 cvmfs_mount() {
   repositories=$1
   shift 1
+
+  runs_under_parrot && return 0
 
   sudo sh -c "echo \"CVMFS_REPOSITORIES=$repositories\" > /etc/cvmfs/default.local" || return 100
   sudo sh -c "echo \"CVMFS_HTTP_PROXY=\\\"${CVMFS_TEST_PROXY}\\\"\" >> /etc/cvmfs/default.local" || return 100
@@ -425,6 +448,8 @@ check_time() {
 check_memory() {
   local instance=$1
   local limit=$2
+
+  runs_under_parrot && return 0
 
   local pid=$(attr -qg pid /cvmfs/$instance)             || return 100
   local rss="$(sudo cat /proc/$pid/status | grep VmRSS)" || return 101
@@ -1890,9 +1915,24 @@ remove_local_mount() {
   rm -fR $cache $mountpoint
 }
 
+drop_file_system_caches() {
+  as_root sh -c "echo 3 > /proc/sys/vm/drop_caches"
+}
+
+print_internal_affairs() {
+  local repo_name="$1"
+
+  if runs_under_parrot; then
+    echo "cvmfs_talk is not available with parrot environment"
+    return 0
+  fi
+
+  as_root cvmfs_talk -i $repo_name internal affairs
+}
+
 get_internal_value() {
   local repo=$1
   local key=$2
-  
-  echo $(sudo cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
+
+  echo $(as_root cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
 }

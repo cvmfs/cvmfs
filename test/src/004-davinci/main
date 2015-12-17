@@ -1,22 +1,14 @@
 
 cvmfs_test_name="Setup Davinci"
 
-cvmfs_run_test() {
-  logfile=$1
+check_catalogs() {
+  local repo_name="$1"
+  local all_catalogs=
+  local uniq_catalogs=
 
-  cvmfs_mount lhcb || 1
-  
-  . /cvmfs/lhcb.cern.ch/etc/login.sh || return 1
-  ( time SetupProject.sh Davinci ) || return 2
-  sync
-  sudo sh -c "echo 3 > /proc/sys/vm/drop_caches" || return 3
-  
-  start_time=$(date -u +%s)
-  ( time SetupProject.sh Davinci ) || return 4
-  end_time=`date -u +%s`
-  check_time $start_time $end_time 180
+  runs_under_parrot && return 0
 
-  all_catalogs=$(sudo cvmfs_talk -i lhcb.cern.ch open catalogs | awk '{print $2}' | sort) || return 6
+  all_catalogs=$(sudo cvmfs_talk -i $repo_name open catalogs | awk '{print $2}' | sort) || return 6
   uniq_catalogs=$(echo "$all_catalogs" | uniq) || return 7
 
   if [ "$all_catalogs" != "$uniq_catalogs" ]; then
@@ -26,10 +18,27 @@ cvmfs_run_test() {
     return 8
   fi
   echo "All catalogs: $all_catalogs"
-  sudo cvmfs_talk -i lhcb.cern.ch internal affairs || return 9
+}
 
+cvmfs_run_test() {
+  logfile=$1
+
+  cvmfs_mount lhcb || 1
+
+  . /cvmfs/lhcb.cern.ch/etc/login.sh || return 1
+  ( time SetupProject.sh Davinci ) || return 2
+  sync
+  drop_file_system_caches || return 3
+
+  start_time=$(date -u +%s)
+  ( time SetupProject.sh Davinci ) || return 4
+  end_time=`date -u +%s`
+  check_time $start_time $end_time 180
+
+  check_catalogs lhcb.cern.ch || return $?
+  print_internal_affairs lhcb.cern.ch || return 9
   check_memory lhcb.cern.ch 65000
- 
+
   return 0
 }
 
