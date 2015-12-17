@@ -94,7 +94,8 @@ cvmfs_run_test() {
   local cern=cvmfs-stratum-one.cern.ch
   local asgc=cvmfs02.grid.sinica.edu.tw
   local ipv6=ipv6.cybernode.com  # has only ipv6 address
-  local other=google.com # has one ipv4 and at least one ipv6 address
+  local other=google.com # has both ipv4 and ipv6.  if multiple addresses,
+                         #  should resolve to same or close-by geolocation.
   local result
 
   # limit the output from curl to 5 lines so in case there's some kind
