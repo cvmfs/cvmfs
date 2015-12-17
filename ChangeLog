@@ -1,4 +1,5 @@
 2.2.0:
+  * Harden GeoAPI against cache poisoning (CVM-722)
   * Fix handling of empty CVMFS_CONFIG_REPOSITORY
   * Allow for configuration of DNS timeout and retry (CVM-875)
   * Add IPv6 support for GeoAPI (CVM-807)
