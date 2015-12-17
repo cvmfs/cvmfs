@@ -309,11 +309,11 @@ cvmfs_mount() {
   fi
 
   if running_on_osx; then
+      eval $(cvmfs_config showconfig | grep -e ^CVMFS_CONFIG_REPOSITORY=)
+      if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
+        _cvmfs_mount_manually "$CVMFS_CONFIG_REPOSITORY"
+      fi
       for i in $(echo "$repositories" | tr "," " "); do
-        eval $(cvmfs_config showconfig $i | grep -e ^CVMFS_CONFIG_REPOSITORY=)
-        if [ "x$CVMFS_CONFIG_REPOSITORY" != "x" ]; then
-          _cvmfs_mount_manually "$CVMFS_CONFIG_REPOSITORY"
-        fi
         _cvmfs_mount_manually "$i" || return 102
       done
   fi
@@ -1934,5 +1934,14 @@ purge_disk_cache() {
     sudo purge
   else
     sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"
+  fi
+}
+
+try_automount() {
+  local repo=$1
+  if running_on_osx; then
+    mount -t cvmfs "$repo" "/cvmfs/$repo"
+  else
+    ls /cvmfs/${repo}
   fi
 }

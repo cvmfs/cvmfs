@@ -10,13 +10,13 @@ cvmfs_run_test() {
   cvmfs_umount lhcb.cern.ch || return 10
   sudo rm -f "$(get_cvmfs_cachedir lhcb.cern.ch)/cvmfschecksum.lhcb.cern.ch" || return 11
 
-  ls /cvmfs/lhcb.cern.ch || return 20
+  try_automount lhcb.cern.ch || return 20
   if ! sudo cvmfs_talk -i lhcb.cern.ch internal affairs | grep -A1 "cache.n_certificate_hits" | grep "1"
   then
     sudo cvmfs_talk -i lhcb.cern.ch internal affairs
     return 21
   fi
 
-  return 0 
+  return 0
 }
 
