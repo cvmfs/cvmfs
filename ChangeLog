@@ -1,4 +1,7 @@
 2.2.0:
+  * Immediately pick up new catalogs after idle period (CVM-636)
+  * Add CVMFS_REPOSITORY_TTL server parameter for repository TTL in seconds
+  * Move python library to a separate repository
   * Harden GeoAPI against cache poisoning (CVM-722)
   * Fix handling of empty CVMFS_CONFIG_REPOSITORY
   * Allow for configuration of DNS timeout and retry (CVM-875)
