@@ -1,4 +1,6 @@
 2.2.0:
+  * Fix crash when publishing specific files which a size of a multiple of the
+    chunk size (CVM-957)
   * Immediately pick up new catalogs after idle period (CVM-636)
   * Add CVMFS_REPOSITORY_TTL server parameter for repository TTL in seconds
   * Move python library to a separate repository
