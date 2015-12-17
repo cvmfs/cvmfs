@@ -4337,6 +4337,9 @@ publish() {
     if [ "x$manual_revision" != "x" ]; then
       sync_command="$sync_command -v $manual_revision"
     fi
+    if [ "x$CVMFS_REPOSITORY_TTL" != "x" ]; then
+      sync_command="$sync_command -T $CVMFS_REPOSITORY_TTL"
+    fi
     if [ "x$CVMFS_GARBAGE_COLLECTION" = "xtrue" ]; then
       sync_command="$sync_command -g"
     fi
