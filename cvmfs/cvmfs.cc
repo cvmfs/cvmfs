@@ -1867,6 +1867,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string proxies = "";
   string fallback_proxies = "";
   string dns_server = "";
+  unsigned ip_prefer = 0;
   string public_keys = "";
   string root_hash = "";
   bool alt_root_path = false;
@@ -1977,6 +1978,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     fallback_proxies = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_IP_PREFER", &parameter))
+    ip_prefer = String2Int64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
@@ -2396,6 +2399,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
   delete uuid;
   uuid = NULL;
+  if (ip_prefer != 0) {
+    switch (ip_prefer) {
+      case 4:
+        cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV4);
+        break;
+      case 6:
+        cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV6);
+        break;
+    }    
+  }
   if (send_info_header)
     cvmfs::download_manager_->EnableInfoHeader();
   proxies = download::ResolveProxyDescription(proxies,
