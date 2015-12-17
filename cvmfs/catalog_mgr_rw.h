@@ -118,6 +118,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
    */
   void PrecalculateListings();
 
+  void SetTTL(const uint64_t new_ttl);
   manifest::Manifest *Commit(const bool     stop_for_tweaks,
                              const uint64_t manual_revision);
   void Balance() {

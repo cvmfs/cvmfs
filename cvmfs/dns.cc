@@ -392,8 +392,9 @@ void Resolver::ResolveMany(const vector<string> &names, vector<Host> *hosts) {
     host.deadline_ = time(NULL) + effective_ttl;
 
     if (host.status_ != kFailOk) {
-      LogCvmfs(kLogDns, kLogDebug, "failed to resolve %s - %d (%s)",
-               names[i].c_str(), host.status_, Code2Ascii(host.status_));
+      LogCvmfs(kLogDns, kLogDebug, "failed to resolve %s - %d (%s), ttl %u",
+               names[i].c_str(), host.status_, Code2Ascii(host.status_),
+               effective_ttl);
       (*hosts)[i] = host;
       continue;
     }
