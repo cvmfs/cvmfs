@@ -151,6 +151,8 @@ service_switch() {
   local service_name=$1
   local state=$2
 
+  running_on_osx && return 0
+
   case $state in
     on)
       echo "starting $service_name..."
@@ -326,7 +328,7 @@ _cvmfs_mount_manually() {
   local repository=$1
   cvmfs_config status | grep -q "/cvmfs/$repository" && return 0
   mkdir -p "/cvmfs/$repository"
-  mount -t cvmfs "$repository" "/cvmfs/$repository"
+  mount -t cvmfs "$repository" "/cvmfs/$repository" >/dev/null 2>&1
 }
 
 
@@ -352,7 +354,7 @@ cvmfs_umount() {
     fi
 
     local timeout=5
-    while cat /proc/mounts | grep -q " /cvmfs/$r "; do
+    while mount | grep -q " /cvmfs/$r "; do
       if [ $timeout -eq 0 ]; then
         return 101
       fi
@@ -1925,4 +1927,12 @@ get_internal_value() {
 
 running_on_osx() {
   [ "x$(uname)" == "xDarwin" ]
+}
+
+purge_disk_cache() {
+  if running_on_osx; then
+    sudo purge
+  else
+    sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"
+  fi
 }
