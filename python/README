@@ -1,4 +1,0 @@
-The CernVM-FS python package allows for the inspection of CernVM-FS repositories
-using python. Currently the functionality is restricted to retrieving both the
-repository Manifest and Whitelist. Furthermore the package can verify the auth-
-enticity of a repository using a provided public key file.
