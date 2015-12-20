@@ -42,6 +42,8 @@ class T_Fetcher : public ::testing::Test {
     MkdirDeep(GetParentPath(src_path_ + "/" + hash_regular_.MakePath()), 0700);
     EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
                              src_path_ + "/" + hash_regular_.MakePath()));
+    EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
+                             tmp_path_ + "/reg"));
     free(buf);
     EXPECT_TRUE(zlib::CompressMem2Mem(&y, 1, &buf, &buf_size));
     shash::HashMem(static_cast<unsigned char *>(buf), buf_size, &hash_catalog_);
@@ -66,10 +68,14 @@ class T_Fetcher : public ::testing::Test {
 
     fetcher_ = new Fetcher(
       cache_mgr_, download_mgr_, &backoff_throttle_, &statistics_);
+    external_fetcher_ = new Fetcher(
+      cache_mgr_, download_mgr_, &backoff_throttle_, &statistics_,
+      "fetch-external", true);
   }
 
   virtual void TearDown() {
     delete fetcher_;
+    delete external_fetcher_;
     download_mgr_->Fini();
     delete download_mgr_;
     delete cache_mgr_;
@@ -79,6 +85,7 @@ class T_Fetcher : public ::testing::Test {
   }
 
   Fetcher *fetcher_;
+  Fetcher *external_fetcher_;
   cache::PosixCacheManager *cache_mgr_;
   perf::Statistics statistics_;
   download::DownloadManager *download_mgr_;
@@ -190,6 +197,34 @@ TEST_F(T_Fetcher, GetTls) {
   pthread_join(thread, &other_thread_tls);
   EXPECT_TRUE(other_thread_tls != NULL);
   EXPECT_NE(other_thread_tls, this_tls);
+}
+
+
+TEST_F(T_Fetcher, ExternalFetch) {
+  // Make sure our file is not in the cache
+  EXPECT_EQ(0, unlink((src_path_ + "/" + hash_regular_.MakePath()).c_str()));
+
+  // Download fails
+  EXPECT_EQ(-EIO,
+    external_fetcher_->Fetch(hash_regular_, cache::CacheManager::kSizeUnknown,
+                             "/reg-fail", cache::CacheManager::kTypeRegular));
+
+  // Download and store in cache
+  int fd = external_fetcher_->Fetch(hash_regular_,
+                                    cache::CacheManager::kSizeUnknown, "/reg",
+                                    cache::CacheManager::kTypeRegular);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+  fd = cache_mgr_->Open(hash_regular_);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+
+  // Download fails
+  shash::Any rnd_hash(shash::kSha1);
+  rnd_hash.Randomize();
+  EXPECT_EQ(-EIO,
+    fetcher_->Fetch(rnd_hash, cache::CacheManager::kSizeUnknown, "/reg",
+                    cache::CacheManager::kTypeRegular));
 }
 
 
