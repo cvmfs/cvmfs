@@ -220,7 +220,10 @@ FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
   CutMarks result;
   off_t next_cut;
   while ((next_cut = file->FindNextCutMark(buffer)) != 0) {
-    result.push_back(next_cut);
+    assert (next_cut > 0);
+    if (static_cast<size_t>(next_cut) < file->size()) {
+      result.push_back(next_cut);
+    }
   }
 
   return result;

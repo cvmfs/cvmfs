@@ -1,9 +1,0 @@
-0.1.0:
-  * Initial version
-  * Features:
-    * Inspect local and remote CernVM-FS repositories
-    * Find local Stratum0 repositories
-    * Check installed CernVM-FS (server) versions
-    * Read and interpret repository manifest files (.cvmfspublished)
-    * Read and interpret a repository whitelist (.cvmfswhitelist)
-    * Verify the repository authenticity via public key

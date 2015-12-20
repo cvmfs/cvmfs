@@ -39,10 +39,14 @@ zypper --non-interactive      \
        refresh
 
 echo "downloading necessary RPMs..."
+# Workaround: Some versions of zypper report an error even if the download-only
+#             job finished successfully. We ignore this and hope for follow-up
+#             errors in case something _actually_ went wrong.
+#   Bugzilla: https://bugzilla.opensuse.org/show_bug.cgi?id=956480
 zypper --non-interactive       \
        --root ${DESTINATION}   \
        install --download-only \
-       sles-release zypper
+       sles-release zypper || true
 
 echo "copying zypper cache for later re-build..."
 zypper_cache="${DESTINATION}/var/cache/zypp/packages"

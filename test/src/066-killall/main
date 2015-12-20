@@ -1,0 +1,20 @@
+
+cvmfs_test_name="Killing all cvmfs2 instances"
+
+cvmfs_run_test() {
+  logfile=$1
+
+  sudo cvmfs_config killall || return 1
+
+  cvmfs_mount grid.cern.ch || return 10
+  cvmfs_mount atlas.cern.ch || return 11
+  sudo cvmfs_config reload &
+
+  # Let cvmfs_config reload start
+  sleep 2
+
+  sudo cvmfs_config killall || return 20
+
+  return 0
+}
+

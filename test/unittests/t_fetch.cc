@@ -42,6 +42,8 @@ class T_Fetcher : public ::testing::Test {
     MkdirDeep(GetParentPath(src_path_ + "/" + hash_regular_.MakePath()), 0700);
     EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
                              src_path_ + "/" + hash_regular_.MakePath()));
+    EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
+                             tmp_path_ + "/altpath"));
     free(buf);
     EXPECT_TRUE(zlib::CompressMem2Mem(&y, 1, &buf, &buf_size));
     shash::HashMem(static_cast<unsigned char *>(buf), buf_size, &hash_catalog_);
@@ -228,6 +230,20 @@ TEST_F(T_Fetcher, Fetch) {
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   fd = cache_mgr_->Open(hash_catalog_);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+}
+
+
+TEST_F(T_Fetcher, FetchAltPath) {
+  unlink((src_path_ + "/" + hash_regular_.MakePath()).c_str());
+  int fd;
+  fd = fetcher_->Fetch(hash_regular_, cache::CacheManager::kSizeUnknown, "reg",
+                       cache::CacheManager::kTypeRegular);
+  EXPECT_LT(fd, 0);
+
+  fd = fetcher_->Fetch(hash_regular_, cache::CacheManager::kSizeUnknown, "reg",
+                       cache::CacheManager::kTypeRegular, "altpath");
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }

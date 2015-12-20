@@ -44,6 +44,7 @@ set(CVMFS_UNITTEST_FILES
   t_base64.cc
   t_pathspec.cc
   t_dirtab.cc
+  t_relaxed_path_filter.cc
   t_callbacks.cc
   t_lru.cc
   t_sqlite_database.cc
@@ -72,6 +73,8 @@ set(CVMFS_UNITTEST_FILES
   t_manifest.cc
   t_tracer.cc
   t_file_chunk.cc
+  t_platforms.cc
+  t_compression.cc
 )
 
 #
@@ -143,8 +146,10 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.cc
   ${CVMFS_SOURCE_DIR}/pathspec/pathspec_pattern.h
 
-  ${CVMFS_SOURCE_DIR}/dirtab.cc
-  ${CVMFS_SOURCE_DIR}/dirtab.h
+  ${CVMFS_SOURCE_DIR}/path_filters/dirtab.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/dirtab.h
+  ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.cc
+  ${CVMFS_SOURCE_DIR}/path_filters/relaxed_path_filter.h
 
   ${CVMFS_SOURCE_DIR}/manifest.cc
   ${CVMFS_SOURCE_DIR}/manifest.h
@@ -232,25 +237,27 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # add optional dependencies
 #
-if (LIBCURL_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
-endif (LIBCURL_BUILTIN)
+if (BUILD_UNITTESTS)
+  if (LIBCURL_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libcares libcurl)
+  endif (LIBCURL_BUILTIN)
 
-if (SQLITE3_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} sqlite3)
-endif (SQLITE3_BUILTIN)
+  if (SQLITE3_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} sqlite3)
+  endif (SQLITE3_BUILTIN)
 
-if (ZLIB_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} zlib)
-endif (ZLIB_BUILTIN)
+  if (ZLIB_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} zlib)
+  endif (ZLIB_BUILTIN)
 
-if (PACPARSER_BUILTIN)
-  add_dependencies (${PROJECT_TEST_NAME} libpacparser)
-endif (PACPARSER_BUILTIN)
+  if (PACPARSER_BUILTIN)
+    add_dependencies (${PROJECT_TEST_NAME} libpacparser)
+  endif (PACPARSER_BUILTIN)
 
-if (TBB_PRIVATE_LIB)
-  add_dependencies (${PROJECT_TEST_NAME} libtbb)
-endif (TBB_PRIVATE_LIB)
+  if (TBB_PRIVATE_LIB)
+    add_dependencies (${PROJECT_TEST_NAME} libtbb)
+  endif (TBB_PRIVATE_LIB)
+endif (BUILD_UNITTESTS)
 
 if (BUILD_UNITTESTS_DEBUG)
   if (LIBCURL_BUILTIN)

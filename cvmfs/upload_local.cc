@@ -109,6 +109,8 @@ void LocalUploader::FileUpload(
                                           "'%s'",
              tmp_path.c_str(), remote_path.c_str());
     atomic_inc32(&copy_errors_);
+    Respond(callback, UploaderResults(retcode, local_path));
+    return;
   }
   const std::string destination_path = upstream_path_ + "/" + alt_path;
   if (alt_path.size() &&
@@ -260,6 +262,13 @@ bool LocalUploader::Remove(const std::string& file_to_delete) {
 
 bool LocalUploader::Peek(const std::string& path) const {
   return FileExists(upstream_path_ + "/" + path);
+}
+
+
+bool LocalUploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
+  const std::string src  = "data/" + object.MakePath();
+  const std::string dest = upstream_path_ + "/" + object.MakeAlternativePath();
+  return SymlinkForced(src, dest);
 }
 
 

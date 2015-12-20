@@ -12,7 +12,7 @@ SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
 
 if [ $# -lt 4 ]; then
   echo "Usage: $0 <workspace>" "<docker image name>"
-  echo "<build script invocation with OPTIONAL parameters>"
+  echo "<build script invocation>"
   echo
   echo "This script runs a build script inside a docker container. The docker "
   echo "image is generated on demand - i.e. look into ci/docker for available"
@@ -104,17 +104,13 @@ elif [ $(image_creation $image_name) -lt $(image_recipe $container_dir) ]; then
   bootstrap_image "$image_name" "$container_dir"
 fi
 
-# parse the command line arguments (keep quotation marks)
-# Note: By convention the build scripts are called like this:
-#       ./script.sh <source location> <build location> <optional parameters>
-#       Source and build location are dpendent on the docker environment and
-#       are appended here accordingly
 build_script="$1"
 shift 1
 
 [ -f $build_script ] || die "build script $build_script not found"
 [ -x $build_script ] || die "build script $build_script not executable"
 
+# parse the command line arguments (keep quotation marks)
 while [ $# -gt 0 ]; do
   if echo "$1" | grep -q "[[:space:]]"; then
     args="$args \"$1\""
@@ -127,8 +123,10 @@ done
 # run provided script inside the docker container
 uid=$(id -u)
 gid=$(id -g)
-echo "++ $docker_build_script $args"
+echo "++ $build_script $args"
 sudo docker run --volume=${CVMFS_WORKSPACE}:${CVMFS_WORKSPACE}        \
+                --volume=/etc/passwd:/etc/passwd                      \
+                --volume=/etc/group:/etc/group                        \
                 --user=${uid}:${gid}                                  \
                 --rm=true                                             \
                 --privileged=true                                     \

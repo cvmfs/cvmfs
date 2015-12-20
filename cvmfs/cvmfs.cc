@@ -288,6 +288,17 @@ class RemountFence : public SingleCopy {
 };
 RemountFence *remount_fence_;
 
+/**
+ * The thread that triggers the reload of the root catalog is informed through
+ * this pipe by the alarm signal handler when the TTL expires.
+ */
+int pipe_remount_trigger_[2];
+
+/**
+ * Triggers `RemountCheck()` when the repository TTL expires.
+ */
+pthread_t *thread_remount_trigger_ = NULL;
+
 
 unsigned GetMaxTTL() {
   pthread_mutex_lock(&lock_max_ttl_);
@@ -357,6 +368,10 @@ static void AlarmReload(int signal __attribute__((unused)),
                         void *context __attribute__((unused)))
 {
   atomic_cas32(&catalogs_expired_, 0, 1);
+  if (pipe_remount_trigger_[1] >= 0) {
+    char c = 'T';
+    WritePipe(pipe_remount_trigger_[1], &c, 1);
+  }
 }
 
 
@@ -483,6 +498,30 @@ static bool CheckVOMS(const fuse_ctx &fctx) {
 #endif
   return true;
 }
+
+// TODO(jblomer): the remount functions need to move into a separate entity
+/**
+ * Gets triggered by the alarm timer to start `RemountCheck()`.  This can't
+ * be called from the alarm timer because of missing signal safety.
+ */
+static void *MainRemountTrigger(void *data) {
+  char c;
+  LogCvmfs(kLogCvmfs, kLogDebug, "starting remount trigger");
+  while (true) {
+    ReadPipe(pipe_remount_trigger_[0], &c, 1);
+    if (c == 'Q')
+      break;
+
+    // We don't need to call this if we are already draining the caches
+    if (!atomic_read32(&drainout_mode_)) {
+      LogCvmfs(kLogCvmfs, kLogDebug, "trigger remount of idle mount point");
+      RemountCheck();
+    }
+  }
+  LogCvmfs(kLogCvmfs, kLogDebug, "stopping remount trigger");
+  return NULL;
+}
+
 
 static bool GetDirentForInode(const fuse_ino_t ino,
                               catalog::DirectoryEntry *dirent,
@@ -1908,6 +1947,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
   unsigned low_speed_limit = cvmfs::kDefaultLowSpeedLimit;
+  unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
+  unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
   unsigned proxy_reset_after = 0;
   unsigned host_reset_after = 0;
   unsigned max_retries = 1;
@@ -1925,12 +1966,14 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string nfs_shared_dir = string(cvmfs::kDefaultCachedir);
   bool shared_cache = false;
   int64_t quota_limit = cvmfs::kDefaultCacheSizeMb;
-  string hostname = "localhost";
+  string hostname = "";
   string proxies = "";
   string fallback_proxies = "";
   string dns_server = "";
+  unsigned ip_prefer = 0;
   string public_keys = "";
   string root_hash = "";
+  bool alt_root_path = false;
   string repository_tag = "";
   string repository_date = "";
   string alien_cache = ".";  // default: exclusive cache
@@ -1997,9 +2040,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (cvmfs::options_manager_->GetValue("CVMFS_MAX_RETRIES", &parameter))
     max_retries = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_BACKOFF_INIT", &parameter))
-    backoff_init = String2Uint64(parameter)*1000;
+    backoff_init = String2Uint64(parameter) * 1000;
   if (cvmfs::options_manager_->GetValue("CVMFS_BACKOFF_MAX", &parameter))
-    backoff_max = String2Uint64(parameter)*1000;
+    backoff_max = String2Uint64(parameter) * 1000;
+  if (cvmfs::options_manager_->GetValue("CVMFS_DNS_TIMEOUT", &parameter))
+    dns_timeout_ms = String2Uint64(parameter) * 1000;
+  if (cvmfs::options_manager_->GetValue("CVMFS_DNS_RETRIES", &parameter))
+    dns_retries = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_SEND_INFO_HEADER", &parameter) &&
       cvmfs::options_manager_->IsOn(parameter))
   {
@@ -2034,6 +2081,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     fallback_proxies = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_IP_PREFER", &parameter))
+    ip_prefer = String2Int64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
@@ -2046,6 +2095,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_ROOT_HASH", &parameter))
     root_hash = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_ALT_ROOT_PATH", &parameter) &&
+      cvmfs::options_manager_->IsOn(parameter))
+  {
+    alt_root_path = true;
+  }
   if (cvmfs::options_manager_->GetValue("CVMFS_REPOSITORY_TAG", &parameter))
     repository_tag = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_REPOSITORY_DATE", &parameter))
@@ -2074,6 +2128,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       && cvmfs::options_manager_->IsOn(parameter))
   {
     server_cache_mode = true;
+    g_raw_symlinks = true;
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
     vector<string> tokens = SplitString(loader_exports->repository_name, '.');
@@ -2425,6 +2480,11 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_);
   cvmfs::download_manager_->SetHostChain(hostname);
+  if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
+      (dns_retries != download::DownloadManager::kDnsDefaultRetries))
+  {
+    cvmfs::download_manager_->SetDnsParameters(dns_retries, dns_timeout_ms);
+  }
   if (!dns_server.empty()) {
     cvmfs::download_manager_->SetDnsServer(dns_server);
   }
@@ -2442,6 +2502,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
   delete uuid;
   uuid = NULL;
+  if (ip_prefer != 0) {
+    switch (ip_prefer) {
+      case 4:
+        cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV4);
+        break;
+      case 6:
+        cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV6);
+        break;
+    }    
+  }
   if (send_info_header)
     cvmfs::download_manager_->EnableInfoHeader();
   proxies = download::ResolveProxyDescription(proxies,
@@ -2576,7 +2646,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::fixed_catalog_ = true;
     shash::Any hash = MkFromHexPtr(shash::HexPtr(string(root_hash)),
                                    shash::kSuffixCatalog);
-    retval = cvmfs::catalog_manager_->InitFixed(hash);
+    retval = cvmfs::catalog_manager_->InitFixed(hash, alt_root_path);
   } else {
     retval = cvmfs::catalog_manager_->Init();
   }
@@ -2596,6 +2666,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::volatile_repository_ = true;
   }
 
+  cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
   auto_umount::SetMountpoint(*cvmfs::mountpoint_);
 
@@ -2610,6 +2681,7 @@ static void Spawn() {
   int retval;
 
   // Setup catalog reload alarm (_after_ fork())
+  MakePipe(cvmfs::pipe_remount_trigger_);
   atomic_init32(&cvmfs::maintenance_mode_);
   atomic_init32(&cvmfs::drainout_mode_);
   atomic_init32(&cvmfs::reload_critical_section_);
@@ -2618,7 +2690,7 @@ static void Spawn() {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = cvmfs::AlarmReload;
-    sa.sa_flags = SA_SIGINFO;
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
     sigfillset(&sa.sa_mask);
     retval = sigaction(SIGALRM, &sa, NULL);
     assert(retval == 0);
@@ -2629,6 +2701,12 @@ static void Spawn() {
   } else {
     cvmfs::catalogs_valid_until_ = cvmfs::kIndefiniteDeadline;
   }
+
+  cvmfs::thread_remount_trigger_ = reinterpret_cast<pthread_t *>(
+    smalloc(sizeof(pthread_t)));
+  retval = pthread_create(cvmfs::thread_remount_trigger_, NULL,
+                          cvmfs::MainRemountTrigger, NULL);
+  assert(retval == 0);
 
   cvmfs::pid_ = getpid();
   if (cvmfs::UseWatchdog() && g_monitor_ready) {
@@ -2666,6 +2744,16 @@ static string GetErrorMsg() {
 
 static void Fini() {
   signal(SIGALRM, SIG_IGN);
+  if (cvmfs::thread_remount_trigger_) {
+    char quit = 'Q';
+    WritePipe(cvmfs::pipe_remount_trigger_[1], &quit, 1);
+    pthread_join(*cvmfs::thread_remount_trigger_, NULL);
+    free(cvmfs::thread_remount_trigger_);
+    cvmfs::thread_remount_trigger_ = NULL;
+    ClosePipe(cvmfs::pipe_remount_trigger_);
+    cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
+  }
+
   if (g_talk_ready) talk::Fini();
 
   // Must be before quota is stopped

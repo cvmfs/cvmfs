@@ -23,13 +23,13 @@
 
 #include "atomic.h"
 #include "catalog.h"
-#include "dirtab.h"
 #include "download.h"
 #include "hash.h"
 #include "history_sqlite.h"
 #include "logging.h"
 #include "manifest.h"
 #include "manifest_fetch.h"
+#include "path_filters/relaxed_path_filter.h"
 #include "signature.h"
 #include "smalloc.h"
 #include "upload.h"
@@ -122,6 +122,41 @@ static bool Peek(const shash::Any &remote_hash) {
   return Peek(MakePath(remote_hash));
 }
 
+static void ReportDownloadError(const shash::Any &failed_hash,
+                                const download::Failures error_code) {
+  LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s)",
+           failed_hash.ToString().c_str(),
+           error_code, download::Code2Ascii(error_code));
+
+  switch (error_code) {
+    case download::kFailProxyResolve:
+    case download::kFailHostResolve:
+      LogCvmfs(kLogCvmfs, kLogStderr, "DNS lookup for Stratum 0 failed "
+                                      "perhaps check the network path?");
+      break;
+
+    case download::kFailProxyConnection:
+    case download::kFailHostConnection:
+      LogCvmfs(kLogCvmfs, kLogStderr, "couldn't reach Stratum 0 - "
+                                      "perhaps check the network path?");
+      break;
+
+    case download::kFailHostHttp:
+      LogCvmfs(kLogCvmfs, kLogStderr, "unexpected HTTP error code - "
+                                      "perhaps check Stratum 0 health?");
+      break;
+
+    case download::kFailBadData:
+      LogCvmfs(kLogCvmfs, kLogStderr, "downloaded corrupted data - "
+                                      "perhaps check Stratum 0 health?");
+      break;
+
+    default:
+      LogCvmfs(kLogCvmfs, kLogStderr, "unexpected error - feel free to file "
+                                      "a bug report");
+  }
+}
+
 
 static void Store(const string &local_path, const string &remote_path) {
   if (preload_cache) {
@@ -207,9 +242,7 @@ static void *MainWorker(void *data) {
       do {
         retval = g_download_manager->Fetch(&download_chunk);
         if (retval != download::kFailOk) {
-          LogCvmfs(kLogCvmfs, kLogStderr, "failed to download %s (%d - %s), "
-                   "abort", url_chunk.c_str(),
-                   retval, download::Code2Ascii(retval));
+          ReportDownloadError(chunk_hash, retval);
           abort();
         }
         attempts++;
@@ -335,9 +368,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
                catalog_hash.ToString().c_str());
       goto pull_skip;
     } else {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download catalog %s (%d - %s)",
-               catalog_hash.ToString().c_str(), dl_retval,
-               download::Code2Ascii(dl_retval));
+      ReportDownloadError(catalog_hash, dl_retval);
       goto pull_cleanup;
     }
   }
@@ -550,8 +581,7 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
                                        &history_hash);
     dl_retval = g_download_manager->Fetch(&download_history);
     if (dl_retval != download::kFailOk) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "failed to download history (%d - %s)",
-               dl_retval, download::Code2Ascii(dl_retval));
+      ReportDownloadError(history_hash, dl_retval);
       goto fini;
     }
     const std::string history_db_path = history_path + ".uncompressed";

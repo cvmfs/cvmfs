@@ -347,7 +347,7 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   if (!opts.root_hash.empty()) {
     const shash::Any hash = shash::MkFromHexPtr(shash::HexPtr(opts.root_hash),
                                                 shash::kSuffixCatalog);
-    clg_mgr_init = catalog_manager_->InitFixed(hash);
+    clg_mgr_init = catalog_manager_->InitFixed(hash, false);
   } else {
     clg_mgr_init = catalog_manager_->Init();
   }

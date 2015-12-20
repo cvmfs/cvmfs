@@ -12,8 +12,9 @@ get_second_proxyname() {
 cvmfs_run_test() {
   logfile=$1
 
-  # Only three stratum 1s, make sure FNAL is among them.
-  # Also make sure that they have large geographical distance
+  # Make sure that the stratum 1s have large geographical distance
+  #   between them.  Use cvmfs.fnal.gov as one of them because it is
+  #   a high-availability system.
   sudo sh -c 'echo "CVMFS_SERVER_URL=\"http://cvmfs02.grid.sinica.edu.tw:8000/cvmfs/@fqrn@;http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;http://cvmfs.fnal.gov:8000/cvmfs/@fqrn@\"" > /etc/cvmfs/config.d/grid.cern.ch.local' || return 100
   sudo sh -c 'echo "CVMFS_HTTP_PROXY=DIRECT" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 101
   sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 102
@@ -44,7 +45,9 @@ cvmfs_run_test() {
   fi
 
   cvmfs_umount grid.cern.ch
-  sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=\"http://cmsopsquid.cern.ch:3128;http://cmsbproxy.fnal.gov:3128\"" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 301
+  # change cmsbproxy.fnal.gov:3128 to cvmfsbproxy.fnal.gov:3126 when
+  #  it is in production (scheduled for December 2015), here and below
+  sudo sh -c 'echo "CVMFS_FALLBACK_PROXY=\"http://cvmfsbproxy.cern.ch:3126;http://cmsbproxy.fnal.gov:3128\"" >> /etc/cvmfs/config.d/grid.cern.ch.local' || return 301
   cvmfs_mount grid.cern.ch || return 3
 
   sudo cvmfs_talk -i grid.cern.ch proxy info
@@ -60,7 +63,7 @@ cvmfs_run_test() {
     return 33
   fi
 
-  sudo cvmfs_talk -i grid.cern.ch proxy fallback "http://cmsbproxy.fnal.gov:3128;http://cmsopsquid.cern.ch:3128" || return 34
+  sudo cvmfs_talk -i grid.cern.ch proxy fallback "http://cmsbproxy.fnal.gov:3128;http://cvmfsbproxy.cern.ch:3126" || return 34
   sudo cvmfs_talk -i grid.cern.ch proxy info
   sudo cvmfs_talk -i grid.cern.ch host probe geo || return 35
   sudo cvmfs_talk -i grid.cern.ch proxy info
@@ -73,7 +76,10 @@ cvmfs_run_test() {
     return 36
   fi
 
-  sudo cvmfs_talk -i grid.cern.ch proxy set "http://ca-proxy.cern.ch:3128" || return 37
+  # Use cvmfsbproxy also as a regular proxy here because it's one of the
+  #  few that are accessible from the anywhere in the world.  This is not
+  #  the use it is intended for, but one client doesn't hurt.
+  sudo cvmfs_talk -i grid.cern.ch proxy set "http://cvmfsbproxy.cern.ch:3126" || return 37
   sudo cvmfs_talk -i grid.cern.ch proxy info
   sudo cvmfs_talk -i grid.cern.ch host probe geo || return 38
   sudo cvmfs_talk -i grid.cern.ch proxy info
