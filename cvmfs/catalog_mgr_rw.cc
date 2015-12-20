@@ -94,7 +94,6 @@ void WritableCatalogManager::ActivateCatalog(Catalog *catalog) {
 manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string     &dir_temp,
   const bool        volatile_content,
-  const bool        garbage_collectable,
   CatalogProperty   external_data,
   upload::Spooler  *spooler)
 {
@@ -154,7 +153,6 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string manifest_path = dir_temp + "/manifest";
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
-  manifest->set_garbage_collectability(garbage_collectable);
 
   // Upload catalog
   spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath());
@@ -678,6 +676,13 @@ bool WritableCatalogManager::IsTransitionPoint(const string &path) {
 
 void WritableCatalogManager::PrecalculateListings() {
   // TODO(jblomer): meant for micro catalogs
+}
+
+
+void WritableCatalogManager::SetTTL(const uint64_t new_ttl) {
+  SyncLock();
+  reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetTTL(new_ttl);
+  SyncUnlock();
 }
 
 

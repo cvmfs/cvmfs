@@ -35,6 +35,7 @@
 #include <set>
 #include <string>
 
+#include "path_filters/dirtab.h"
 #include "sync_item.h"
 
 namespace publish {

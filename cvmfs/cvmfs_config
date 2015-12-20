@@ -75,7 +75,7 @@ parm_list="CVMFS_USER CVMFS_NFILES CVMFS_CACHE_BASE CVMFS_CACHE_DIR CVMFS_MOUNT_
           CVMFS_PROXY_RESET_AFTER CVMFS_MAX_RETRIES CVMFS_BACKOFF_INIT CVMFS_BACKOFF_MAX \
           CVMFS_ALIEN_CACHE CVMFS_TRUSTED_CERTS CVMFS_INITIAL_GENERATION \
           CVMFS_CONFIG_REPOSITORY CVMFS_LOW_SPEED_LIMIT CVMFS_FALLBACK_PROXY CVMFS_PROXY_TEMPLATE \
-          CVMFS_FOLLOW_REDIRECTS CVMFS_MAX_IPADDR_PER_PROXY"
+          CVMFS_FOLLOW_REDIRECTS CVMFS_MAX_IPADDR_PER_PROXY CVMFS_ALT_ROOT_PATH CVMFS_IP_PREFER"
 switch_list="CVMFS_IGNORE_SIGNATURE CVMFS_STRICT_MOUNT CVMFS_SHARED_CACHE \
           CVMFS_NFS_SOURCE CVMFS_NFS_SHARED CVMFS_CHECK_PERMISSIONS CVMFS_AUTO_UPDATE \
           CVMFS_MOUNT_RW CVMFS_SEND_INFO_HEADER CVMFS_USE_GEOAPI CVMFS_CLAIM_OWNERSHIP \
@@ -129,10 +129,12 @@ cvmfs_config_usage() {
  echo "  showconfig [<repository>]"
  echo "  stat [-v | <repository>]"
  echo "  status"
- echo "  probe"
+ echo "  probe [<repository list>]"
+ echo "  fsck [<cvmfs_fsck options>]"
  echo "  reload [-c | <repository>]"
  echo "  umount"
  echo "  wipecache"
+ echo "  killall [-l(azy unmount)] [-k(ill cvmfs user sessions)]"
  echo "  bugreport"
 }
 
@@ -145,10 +147,7 @@ cvmfs_setup() {
   nocfgmod=0
   nostart=0
 
-  if ! cvmfs_readconfig; then
-    echo "Failed to read CernVM-FS configuration"
-    return 1
-  fi
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
 
   while [ $# -ne 0 ]
   do
@@ -260,10 +259,7 @@ cvmfs_chksetup() {
   num_warnings=0
   num_errors=0
 
-  if ! cvmfs_readconfig; then
-    echo "Failed to read CernVM-FS configuration"
-    return 1
-  fi
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
 
   # Check binaries
   local binary
@@ -434,8 +430,7 @@ cvmfs_chksetup() {
   fi
 
   # Check repository specfic settings
-  local repo_list
-  repo_list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+  local repo_list="$(list_repos)"
   local repo
   for repo in $repo_list
   do
@@ -741,9 +736,9 @@ cvmfs_showconfig() {
   local retval
   org=$1
 
-  cvmfs_readconfig
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   if [ -z "$org" ]; then
-    list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+    list="$(list_repos)"
     for entry in $list
     do
       echo
@@ -755,7 +750,7 @@ cvmfs_showconfig() {
 
   fqrn=`cvmfs_mkfqrn $org`
   org=`cvmfs_getorg $fqrn`
-  cvmfs_readconfig $fqrn
+  cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
   retval=$?
   if [ $retval -ne 0 ]; then
     return $retval
@@ -763,7 +758,7 @@ cvmfs_showconfig() {
 
   echo "CVMFS_REPOSITORY_NAME=$fqrn"
   local var
-  for var in $var_list
+  for var in $(echo $var_list | tr ' ' '\n'  | sort)
   do
     if [ "x$var" = "xCVMFS_CACHE_DIR" ]; then
       echo "CVMFS_CACHE_DIR=$CVMFS_CACHE_DIR"
@@ -816,7 +811,7 @@ cvmfs_stat() {
     return 0
   fi
 
-  cvmfs_readconfig
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   fqrn=`cvmfs_mkfqrn $org`
   org=`cvmfs_getorg $fqrn`
   local active=0
@@ -922,41 +917,13 @@ cvmfs_status() {
 
 
 cvmfs_reload() {
-  if ! cvmfs_readconfig; then
-    echo "Failed to read CernVM-FS configuration"
-    return 1
-  fi
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
   local clean_cache; clean_cache=0
   local cache_directories=
   if [ "x$1" = "x-c" ]; then
     clean_cache=1
     shift
-    local list
-    list=""
-    if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
-       list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
-    fi
-    local org shared
-    for org in $list shared
-    do
-      case $org in
-        none)
-        ;;
-        *)
-          . /etc/cvmfs/config.sh # start with fresh repository_... functions
-          cvmfs_readconfig
-          if [ "$org" != "shared" ]; then
-            fqrn=`cvmfs_mkfqrn $org`
-            cvmfs_readconfig $fqrn
-          else
-            fqrn=shared
-          fi
-          cache_directories="${CVMFS_CACHE_BASE}/${fqrn} $cache_directories"
-        ;;
-      esac
-    done
-    . /etc/cvmfs/config.sh # start with fresh repository_... functions
-    cvmfs_readconfig
+    cache_directories=$(list_cache_directories)
   elif [ "x$1" != "x" ]; then
     org=$1
     fqrn=$(cvmfs_mkfqrn $org)
@@ -1070,15 +1037,13 @@ cvmfs_reload() {
 
 cvmfs_probe() {
   RETVAL=0
-  local list
-  list=""
 
-  if ! cvmfs_readconfig; then
-    echo "Failed to read CernVM-FS configuration"
-    return 1
-  fi
-  if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
-    list=`echo $CVMFS_REPOSITORIES | sed 's/,/ /g'`
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+  local list
+  if [ $# -gt 0 ]; then
+    list="$@"
+  else
+    list="$(list_repos)"
   fi
 
   local org
@@ -1089,9 +1054,9 @@ cvmfs_probe() {
       ;;
       *)
         . /etc/cvmfs/config.sh # start with fresh repository_... functions
-        cvmfs_readconfig
+        cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
         fqrn=`cvmfs_mkfqrn $org`
-        cvmfs_readconfig $fqrn
+        cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
         echo -n "Probing $CVMFS_MOUNT_DIR/$fqrn... "
         df -P "$CVMFS_MOUNT_DIR/$fqrn" 2>&1 | grep -q ^cvmfs2
         if [ $? -ne 0 ]; then
@@ -1107,8 +1072,28 @@ cvmfs_probe() {
   return $RETVAL
 }
 
+cvmfs_config_fsck() {
+  local retval=0
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+  local cache_directories=$(list_cache_directories)
+
+  local dir
+  for dir in $cache_directories; do
+    if [ ! -d $dir ]; then
+      continue
+    fi
+
+    echo "CernVM-FS fsck on $dir"
+    cvmfs_fsck $@ $dir
+    retval=$(($? + $retval))
+  done
+
+  return $retval
+}
+
 
 cvmfs_umount() {
+  local silent=$1
   local mount_list
   mount_list=`list_mounts | awk '{print $3}'`
 
@@ -1117,18 +1102,73 @@ cvmfs_umount() {
   local m
   for m in $mount_list
   do
-    echo -n "Unmounting ${m}: "
+    [ "x$silent" != "x" ] || echo -n "Unmounting ${m}: "
     umount $m 2>/dev/null
     if [ $? -ne 0 ]; then
       RETVAL=1
-      echo "Failed!"
-      $fuser -m -a -v $m
+      if [ "x$silent" != "x" ]; then
+        echo "Failed!"
+        $fuser -m -a -v $m
+      fi
     else
-      echo "OK"
+      [ "x$silent" != "x" ] || echo "OK"
     fi
   done
 
   return $RETVAL
+}
+
+
+cvmfs_killall() {
+  local pid=$$
+
+  echo -n "Terminating cvmfs_config processes... "
+  local config_pids=$(pgrep -x cvmfs_config)
+  other_config_pids=
+  for p in $config_pids; do
+    if [ $p -ne $pid ]; then
+      other_config_pids="$p $other_config_pids"
+    fi
+  done
+  if [ "x$other_config_pids" != "x" ]; then
+    kill -s KILL $other_config_pids
+    waitfor cvmfs_config 10
+    if [ $? -ne 0 ]; then
+      echo "Failed!"
+      return 1
+    fi
+  fi
+  echo "OK"
+
+  echo -n "Terminating cvmfs2 processes... "
+  killall -q -KILL ${INSTALL_BASE}/bin/cvmfs2
+  waitfor cvmfs2 10
+  if [ $? -ne 0 ]; then
+    echo "Failed!"
+    return 1
+  fi
+  echo "OK"
+
+  echo -n "Unmounting stale mount points... "
+  cvmfs_umount silent
+  if [ $? -ne 0 ]; then
+    echo "Failed!"
+    return 1
+  fi
+  echo "OK"
+
+  echo -n "Cleaning up run-time variable data... "
+  rm -rf /var/run/cvmfs/*
+  echo "OK"
+
+  $pidof automount > /dev/null
+  if [ $? -eq 0 ]; then
+    echo -n "Reloading autofs... "
+    reload_service autofs
+    echo "OK"
+  fi
+
+  return 0
 }
 
 
@@ -1220,8 +1260,86 @@ cvmfs_bugreport() {
 }
 
 
+die() {
+  echo -e $1 >&2
+  exit 1
+}
+
+
+waitfor() {
+  local process=$1
+  local timeout=$2
+  local pid=$$
+
+  local seconds=0
+  while [ $seconds -lt $timeout ]; do
+    local procs=$(pgrep -x $process)
+    local num_other_procs=0
+    for p in $procs; do
+      # Not myself
+      if [ $p -eq $pid ]; then
+        continue;
+      fi
+      # No zombies
+      local pstate=$(ps -p "$p" -o state=)
+      if echo "$pstate" | grep "Z"; then
+        continue
+      fi
+      # Not the CernVM instance of cvmfs
+      case $sys_arch in
+        Linux )
+          if [ "x$(cat /proc/$p/cmdline 2>/dev/null | head -c1)" = "x@" ]; then
+            continue
+          fi
+        ;;
+      esac
+      num_other_procs=$(($num_other_procs + 1))
+    done
+    if [ $num_other_procs -eq 0 ]; then
+      return 0
+    fi
+    sleep 1
+    seconds=$(($seconds + 1))
+  done
+
+  return 1
+}
+
+
 list_mounts() {
   mount -t $fuse_fs_type | grep "^cvmfs2[[:space:]]"
+}
+
+
+# cvmfs_readconfig must have been called before
+list_repos() {
+  if [ "x$CVMFS_REPOSITORIES" != "x" ]; then
+    echo "$(echo $CVMFS_REPOSITORIES | sed 's/,/ /g')"
+  fi
+}
+
+
+# Some of the cache directories might not exist yet.  It's necessary to list
+# them nevertheless to avoid a race in cvmfs_config reload.
+list_cache_directories() {
+  local repos="$(list_repos)"
+  local org
+  for org in $repos shared
+  do
+    . /etc/cvmfs/config.sh # start with fresh repository_... functions
+    cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
+    if [ "$org" != "shared" ]; then
+      fqrn=`cvmfs_mkfqrn $org`
+      cvmfs_readconfig $fqrn || die "Failed to read CernVM-FS configuration"
+    else
+      fqrn=shared
+    fi
+    cache_directories="${CVMFS_CACHE_BASE}/${fqrn} $cache_directories"
+  done
+  echo "$cache_directories" | tr ' ' '\n' | sort -u | tr '\n' ' '
+
+  . /etc/cvmfs/config.sh # start with fresh repository_... functions
+  cvmfs_readconfig || die "Failed to read CernVM-FS configuration"
 }
 
 
@@ -1805,7 +1923,13 @@ case "$1" in
 
   probe)
     shift 1
-    cvmfs_probe
+    cvmfs_probe $@
+    RETVAL=$?
+    ;;
+
+  fsck)
+    shift 1
+    cvmfs_config_fsck $@
     RETVAL=$?
     ;;
 
@@ -1826,6 +1950,15 @@ case "$1" in
     fi
     shift 1
     cvmfs_reload -c
+    RETVAL=$?
+    ;;
+
+  killall)
+    if [ `id -u` -ne 0 ]; then
+      echo "root privileges required"
+      exit 1
+    fi
+    cvmfs_killall $@
     RETVAL=$?
     ;;
 

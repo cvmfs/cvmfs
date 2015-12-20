@@ -80,7 +80,6 @@ class WritableCatalogManager : public SimpleCatalogManager {
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
-                                              const bool garbage_collectable,
                                               CatalogProperty external_data,
                                               upload::Spooler   *spooler);
 
@@ -121,6 +120,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
    */
   void PrecalculateListings();
 
+  void SetTTL(const uint64_t new_ttl);
   manifest::Manifest *Commit(const bool     stop_for_tweaks,
                              const uint64_t manual_revision);
   void Balance() {

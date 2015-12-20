@@ -61,6 +61,7 @@ class S3Uploader : public AbstractUploader {
 
   bool Remove(const std::string &file_to_delete);
   bool Peek(const std::string& path) const;
+  bool PlaceBootstrappingShortcut(const shash::Any &object) const;
 
   /**
    * Determines the number of failed jobs in the S3CompressionWorker as

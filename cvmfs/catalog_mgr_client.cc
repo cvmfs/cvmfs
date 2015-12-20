@@ -41,6 +41,7 @@ ClientCatalogManager::ClientCatalogManager(
   , offline_mode_(false)
   , all_inodes_(0)
   , loaded_inodes_(0)
+  , fixed_alt_root_catalog_(false)
 {
   LogCvmfs(kLogCatalog, kLogDebug, "constructing client catalog manager");
   n_certificate_hits_ = statistics->Register("cache.n_certificate_hits",
@@ -83,10 +84,14 @@ shash::Any ClientCatalogManager::GetRootHash() {
 /**
  * Specialized initialization that uses a fixed root hash.
  */
-bool ClientCatalogManager::InitFixed(const shash::Any &root_hash) {
+bool ClientCatalogManager::InitFixed(
+  const shash::Any &root_hash,
+  bool alternative_path)
+{
   LogCvmfs(kLogCatalog, kLogDebug, "Initialize catalog with root hash %s",
            root_hash.ToString().c_str());
   WriteLock();
+  fixed_alt_root_catalog_ = alternative_path;
   bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
   Unlock();
 
@@ -118,7 +123,11 @@ LoadError ClientCatalogManager::LoadCatalog(
   // Load a particular catalog
   if (!hash.IsNull()) {
     cvmfs_path += " (" + hash.ToString() + ")";
-    LoadError load_error = LoadCatalogCas(hash, cvmfs_path, catalog_path);
+    string alt_catalog_path = "";
+    if (mountpoint.IsEmpty() && fixed_alt_root_catalog_)
+      alt_catalog_path = hash.MakeAlternativePath();
+    LoadError load_error = 
+      LoadCatalogCas(hash, cvmfs_path, alt_catalog_path, catalog_path);
     if (load_error == catalog::kLoadNew)
       loaded_catalogs_[mountpoint] = hash;
     *catalog_hash = hash;
@@ -160,7 +169,8 @@ LoadError ClientCatalogManager::LoadCatalog(
              manifest_failure, manifest::Code2Ascii(manifest_failure));
 
     if (catalog_path) {
-      LoadError error = LoadCatalogCas(cache_hash, cvmfs_path, catalog_path);
+      LoadError error =
+        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
       if (error != catalog::kLoadNew)
         return error;
     }
@@ -178,7 +188,8 @@ LoadError ClientCatalogManager::LoadCatalog(
   // Short way out, use cached copy
   if (ensemble.manifest->catalog_hash() == cache_hash) {
     if (catalog_path) {
-      LoadError error = LoadCatalogCas(cache_hash, cvmfs_path, catalog_path);
+      LoadError error =
+        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
       if (error == catalog::kLoadNew) {
         loaded_catalogs_[mountpoint] = cache_hash;
         *catalog_hash = cache_hash;
@@ -197,7 +208,11 @@ LoadError ClientCatalogManager::LoadCatalog(
 
   // Load new catalog
   catalog::LoadError load_retval =
-    LoadCatalogCas(ensemble.manifest->catalog_hash(), cvmfs_path, catalog_path);
+    LoadCatalogCas(ensemble.manifest->catalog_hash(),
+                   cvmfs_path,
+                   ensemble.manifest->has_alt_catalog_path() ?
+                     ensemble.manifest->MakeCatalogPath() : "",
+                   catalog_path);
   if (load_retval != catalog::kLoadNew)
     return load_retval;
   loaded_catalogs_[mountpoint] = ensemble.manifest->catalog_hash();
@@ -215,11 +230,12 @@ LoadError ClientCatalogManager::LoadCatalog(
 LoadError ClientCatalogManager::LoadCatalogCas(
   const shash::Any &hash,
   const string &name,
+  const std::string &alt_catalog_path,
   string *catalog_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-                           cache::CacheManager::kTypeCatalog);
+                           cache::CacheManager::kTypeCatalog, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;

@@ -61,7 +61,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
     perf::Statistics *statistics);
   virtual ~ClientCatalogManager();
 
-  bool InitFixed(const shash::Any &root_hash);
+  bool InitFixed(const shash::Any &root_hash, bool alternative_path);
 
   shash::Any GetRootHash();
 
@@ -83,6 +83,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
  private:
   LoadError LoadCatalogCas(const shash::Any &hash,
                            const std::string &name,
+                           const std::string &alt_catalog_path,
                            std::string *catalog_path);
 
   /**
@@ -97,6 +98,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   bool offline_mode_;  /**< cached copy used because there is no network */
   uint64_t all_inodes_;
   uint64_t loaded_inodes_;
+  bool fixed_alt_root_catalog_;  /**< fixed root hash but alternative url */
   BackoffThrottle backoff_throttle_;
   perf::Counter *n_certificate_hits_;
   perf::Counter *n_certificate_misses_;

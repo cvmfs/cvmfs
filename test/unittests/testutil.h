@@ -201,6 +201,10 @@ class AbstractMockUploader : public upload::AbstractUploader {
     assert(AbstractMockUploader::not_implemented);
   }
 
+  virtual bool PlaceBootstrappingShortcut(const shash::Any &object) const {
+    assert(AbstractMockUploader::not_implemented);
+  }
+
   virtual unsigned int GetNumberOfErrors() const {
     assert(AbstractMockUploader::not_implemented);
   }

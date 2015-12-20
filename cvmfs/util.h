@@ -73,6 +73,9 @@ std::string GetParentPath(const std::string &path);
 PathString GetParentPath(const PathString &path);
 std::string GetFileName(const std::string &path);
 NameString GetFileName(const PathString &path);
+void SplitPath(const std::string &path,
+               std::string *dirname,
+               std::string *filename);
 bool IsAbsolutePath(const std::string &path);
 bool IsHttpUrl(const std::string &path);
 
@@ -141,6 +144,7 @@ bool FileExists(const std::string &path);
 int64_t GetFileSize(const std::string &path);
 bool DirectoryExists(const std::string &path);
 bool SymlinkExists(const std::string &path);
+bool SymlinkForced(const std::string &src, const std::string &dest);
 bool MkdirDeep(const std::string &path, const mode_t mode);
 bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
@@ -216,7 +220,8 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  pid_t *child_pid = NULL);
 
 void SafeSleepMs(const unsigned ms);
-
+bool SafeRead(int fd, void *buf, size_t nbyte);  // TODO(jblomer)
+bool SafeWrite(int fd, const void *buf, size_t nbyte);
 
 /**
  * Knuth's random shuffle algorithm.

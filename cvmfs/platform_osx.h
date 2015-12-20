@@ -21,8 +21,8 @@
 #include <sys/xattr.h>
 
 #include <cassert>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include <string>

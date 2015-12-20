@@ -404,13 +404,15 @@ bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash) {
 }
 
 
-bool CompressFd2Null(int fd_src, shash::Any *compressed_hash) {
+bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
+                     uint64_t *processed_bytes) {
   int z_ret, flush;
-  bool result = -1;
+  bool result = false;
   unsigned have;
   z_stream strm;
   unsigned char in[kZChunk];
   unsigned char out[kZChunk];
+  off_t cksum_bytes = 0;
   shash::ContextPtr hash_context(compressed_hash->algorithm);
 
   CompressInit(&strm);
@@ -420,7 +422,11 @@ bool CompressFd2Null(int fd_src, shash::Any *compressed_hash) {
   // Compress until end of file
   do {
     ssize_t bytes_read = read(fd_src, in, kZChunk);
-    if (bytes_read < 0) goto compress_fd2null_final;
+    if (bytes_read < 0) {
+      if (errno == EINTR) {continue;}
+      goto compress_fd2null_final;
+    }
+    cksum_bytes += bytes_read;
     strm.avail_in = bytes_read;
 
     flush = (static_cast<size_t>(bytes_read) < kZChunk) ? Z_FINISH : Z_NO_FLUSH;
@@ -445,6 +451,9 @@ bool CompressFd2Null(int fd_src, shash::Any *compressed_hash) {
   if (z_ret != Z_STREAM_END) goto compress_fd2null_final;
 
   shash::Final(hash_context, compressed_hash);
+  if (processed_bytes) {
+    *processed_bytes = cksum_bytes;
+  }
   result = true;
 
   // Clean up and return
