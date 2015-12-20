@@ -2452,8 +2452,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                                backoff_max);
   cvmfs::download_manager_->SetMaxIpaddrPerProxy(max_ipaddr_per_proxy);
   cvmfs::download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
-  delete uuid;
-  uuid = NULL;
   if (ip_prefer != 0) {
     switch (ip_prefer) {
       case 4:
