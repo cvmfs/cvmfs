@@ -1,0 +1,34 @@
+
+cvmfs_test_name="Probing host failover on HTTP 400"
+
+cvmfs_run_test() {
+  logfile=$1
+  src_location=$2
+
+  ${src_location}/../../common/mock_services/http_400.sh 9090 &
+  local http_server_pid=$!
+  trap "kill $http_server_pid" EXIT HUP INT TERM
+
+  sudo cat << EOF > /etc/cvmfs/config.d/grid.cern.ch.conf
+CVMFS_SERVER_URL="http://localhost:9090/cvmfs/grid.cern.ch;http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch"
+CVMFS_USE_GEOAPI=no
+EOF
+  cvmfs_mount grid.cern.ch \
+    "CVMFS_HTTP_PROXY='DIRECT;DIRECT'" || return 1
+
+  no_host_failover="$(get_internal_value grid.cern.ch download.n_host_failover)"
+  no_proxy_failover="$(get_internal_value grid.cern.ch download.n_proxy_failover)"
+
+  if [ "x$no_host_failover" != "x1" ]; then
+    echo "number of host failovers: $no_host_failover, expected: 1"
+    return 10
+  fi
+
+  if [ "x$no_proxy_failover" != "x0" ]; then
+    echo "number of proxy failovers: $no_proxy_failover, expected: 0"
+    return 20
+  fi
+
+  return 0
+}
+

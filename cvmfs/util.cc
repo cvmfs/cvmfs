@@ -113,6 +113,27 @@ string MakeCanonicalPath(const string &path) {
 
 
 /**
+ * Return both the file and directory name for a given path.
+ *
+ * NOTE: If only a filename is given, the directory is returned as "."
+ */
+void SplitPath(
+  const std::string &path,
+  std::string *dirname,
+  std::string *filename)
+{
+  size_t dir_sep = path.rfind('/');
+  if (dir_sep != std::string::npos) {
+    *dirname = path.substr(0, dir_sep);
+    *filename = path.substr(dir_sep+1);
+  } else {
+    *dirname = ".";
+    *filename = path;
+  }
+}
+
+
+/**
  * Gets the directory part of a path.
  */
 string GetParentPath(const string &path) {
@@ -283,7 +304,10 @@ void MakePipe(int pipe_fd[2]) {
  * Writes to a pipe should always succeed.
  */
 void WritePipe(int fd, const void *buf, size_t nbyte) {
-  int num_bytes = write(fd, buf, nbyte);
+  int num_bytes;
+  do {
+    num_bytes = write(fd, buf, nbyte);
+  } while ((num_bytes < 0) && (errno == EINTR));
   assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
 }
 
@@ -292,7 +316,10 @@ void WritePipe(int fd, const void *buf, size_t nbyte) {
  * Reads from a pipe should always succeed.
  */
 void ReadPipe(int fd, void *buf, size_t nbyte) {
-  int num_bytes = read(fd, buf, nbyte);
+  int num_bytes;
+  do {
+    num_bytes = read(fd, buf, nbyte);
+  } while ((num_bytes < 0) && (errno == EINTR));
   assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
 }
 
@@ -304,6 +331,8 @@ void ReadHalfPipe(int fd, void *buf, size_t nbyte) {
   int num_bytes;
   do {
     num_bytes = read(fd, buf, nbyte);
+    if ((num_bytes < 0) && (errno == EINTR))
+      continue;
   } while (num_bytes == 0);
   assert((num_bytes >= 0) && (static_cast<size_t>(num_bytes) == nbyte));
 }
@@ -430,6 +459,18 @@ bool SymlinkExists(const string &path) {
   platform_stat64 info;
   return ((platform_lstat(path.c_str(), &info) == 0) &&
           S_ISLNK(info.st_mode));
+}
+
+
+/**
+ * Equivalent of `ln -sf $src $dest`
+ */
+bool SymlinkForced(const std::string &src, const std::string &dest) {
+  int retval = unlink(dest.c_str());
+  if ((retval != 0) && (errno != ENOENT))
+    return false;
+  retval = symlink(src.c_str(), dest.c_str());
+  return retval == 0;
 }
 
 
@@ -1483,6 +1524,25 @@ void SafeSleepMs(const unsigned ms) {
   wait_for.tv_sec = ms / 1000;
   wait_for.tv_usec = (ms % 1000) * 1000;
   select(0, NULL, NULL, NULL, &wait_for);
+}
+
+
+/**
+ * Deal with EINTR and partial writes.
+ */
+bool SafeWrite(int fd, const void *buf, size_t nbyte) {
+  while (nbyte) {
+    ssize_t retval = write(fd, buf, nbyte);
+    if (retval < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    assert(static_cast<size_t>(retval) <= nbyte);
+    buf = reinterpret_cast<const char *>(buf) + retval;
+    nbyte -= retval;
+  }
+  return true;
 }
 
 

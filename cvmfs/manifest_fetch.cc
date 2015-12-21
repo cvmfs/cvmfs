@@ -49,7 +49,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   const string manifest_url = base_url + string("/.cvmfspublished");
   download::JobInfo download_manifest(&manifest_url, false, probe_hosts, NULL);
   shash::Any certificate_hash;
-  string certificate_url = base_url + "/data";  // rest is in manifest
+  string certificate_url = base_url + "/";  // rest is in manifest
   download::JobInfo download_certificate(&certificate_url, true, probe_hosts,
                                          &certificate_hash);
 
@@ -97,7 +97,7 @@ Failures Fetch(const std::string &base_url, const std::string &repository_name,
   certificate_hash = ensemble->manifest->certificate();
   ensemble->FetchCertificate(certificate_hash);
   if (!ensemble->cert_buf) {
-    certificate_url += "/" + certificate_hash.MakePath();
+    certificate_url += ensemble->manifest->MakeCertificatePath();
     retval_dl = download_manager->Fetch(&download_certificate);
     if (retval_dl != download::kFailOk) {
       result = kFailLoad;

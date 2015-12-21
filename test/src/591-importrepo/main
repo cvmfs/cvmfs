@@ -278,7 +278,55 @@ cvmfs_run_test() {
 
   local publish2_log="publish2.log"
   echo "creating CVMFS snapshot (log: $publish2_log)"
-  publish_repo $CVMFS_TEST_REPO > $publish_log 2>&1 || return $?
+  publish_repo $CVMFS_TEST_REPO > $publish2_log 2>&1 || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  # ============================================================================
+
+  echo "removing repository again"
+  destroy_repo $CVMFS_TEST_REPO || return 37
+
+  echo "repair the tampered whitelist"
+  cp .cvmfswhitelist.bak ${repo_backend}/$CVMFS_TEST_REPO/.cvmfswhitelist || return 38
+
+  echo "planting the repository again"
+  respawn_repository $CVMFS_TEST_REPO $CVMFS_TEST_USER $repo_backend $repo_keychain || return $?
+
+  echo "removing the repository signing key and certificate"
+  sudo rm -f /etc/cvmfs/keys/${CVMFS_TEST_REPO}.key || return 39
+  sudo rm -f /etc/cvmfs/keys/${CVMFS_TEST_REPO}.crt || return 40
+
+  echo "importing repository (should fail due to missing repo signing key)"
+  local import_log_5="import_5.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER > $import_log_5 2>&1 && return 41
+
+  echo "check error messages"
+  cat $import_log_5 | grep 'repository signing key or certificate not found' || return 42
+
+  echo "importing repository recreating the repo signing key (should fail due to non-explicit whitelist rewrite)"
+  local import_log_6="import_6.log"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -t > $import_log_6 2>&1 && return 43
+
+  echo "check error messages"
+  cat $import_log_6 | grep 'implies whitelist recreation' || return 44
+
+  echo "importing repository recreating repo signing keys and create a fresh whitelist"
+  import_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER -r -t || return 45
+
+  echo "open transaction to change something"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository (same as a bit up)"
+  change_some_files_in $repo_dir || return $?
+
+  local publish3_log="publish3.log"
+  echo "creating CVMFS snapshot (log: $publish3_log)"
+  publish_repo $CVMFS_TEST_REPO > $publish3_log 2>&1 || return $?
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir || return $?

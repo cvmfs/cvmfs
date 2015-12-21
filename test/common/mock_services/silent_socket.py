@@ -27,6 +27,8 @@ def print_msg(msg):
 class SilentHandler(SocketServer.BaseRequestHandler):
 	def handle(self):
 		print_msg("(" + str(datetime.datetime.now()) + ") incoming connection: " + str(self.client_address))
+		data = self.request[0].strip()
+		print "   * " + data;
 		time.sleep(100000000)
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):

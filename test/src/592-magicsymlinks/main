@@ -170,6 +170,12 @@ cvmfs_run_test() {
   echo "check magic symlinks"
   check_symlinks "$TEST_592_MOUNTPOINT" || return 5
 
+  echo "ensure raw symlinks in server mode"
+  check_symlinks "/var/spool/cvmfs/${CVMFS_TEST_REPO}/rdonly"
+  if [ $? -eq 0 ]; then
+    return 30
+  fi
+
   echo "umount private mount"
   remove_local_mount $TEST_592_MOUNTPOINT || return 6
 
