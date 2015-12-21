@@ -633,7 +633,7 @@ void SyncMediator::AddFile(const SyncItem &entry) {
         entry.CreateBasicCatalogDirent(),
         default_xattrs,  // TODO(bbockelm): For now, use default xattrs
                          // on grafted files.
-        entry.IsExternalData(), // TODO: Allow this to be specified in graft.
+        entry.IsExternalData(),  // TODO(bbockelm): Take this from in graft.
         entry.relative_parent_path());
     } else {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,

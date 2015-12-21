@@ -72,8 +72,8 @@ class Fetcher : SingleCopy {
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
           perf::Statistics *statistics,
-          const std::string &name="fetch",
-          bool external_data=false);
+          const std::string &name = "fetch",
+          bool external_data = false);
   ~Fetcher();
   int Fetch(const shash::Any &id,
             const uint64_t size,

@@ -126,7 +126,7 @@ LoadError ClientCatalogManager::LoadCatalog(
     string alt_catalog_path = "";
     if (mountpoint.IsEmpty() && fixed_alt_root_catalog_)
       alt_catalog_path = hash.MakeAlternativePath();
-    LoadError load_error = 
+    LoadError load_error =
       LoadCatalogCas(hash, cvmfs_path, alt_catalog_path, catalog_path);
     if (load_error == catalog::kLoadNew)
       loaded_catalogs_[mountpoint] = hash;

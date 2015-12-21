@@ -1972,7 +1972,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     external_timeout = String2Uint64(parameter);
   else
     external_timeout = timeout;
-  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_TIMEOUT_DIRECT", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_TIMEOUT_DIRECT",
+      &parameter))
     external_timeout_direct = String2Uint64(parameter);
   else
     external_timeout_direct = timeout_direct;
@@ -2024,11 +2025,13 @@ static int Init(const loader::LoaderExports *loader_exports) {
     proxies = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_FALLBACK_PROXY", &parameter))
     fallback_proxies = parameter;
-  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY",
+      &parameter))
     external_proxies = parameter;
   else
     external_proxies = "DIRECT";
-  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY", &parameter))
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY",
+      &parameter))
     fallback_external_proxies = parameter;
   else
     fallback_external_proxies = fallback_proxies;
@@ -2460,7 +2463,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       case 6:
         cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV6);
         break;
-    }    
+    }
   }
   if (send_info_header)
     cvmfs::download_manager_->EnableInfoHeader();
@@ -2498,19 +2501,21 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                                backoff_init,
                                                backoff_max);
   cvmfs::external_download_manager_->SetMaxIpaddrPerProxy(max_ipaddr_per_proxy);
-  cvmfs::external_download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
+  cvmfs::external_download_manager_->SetProxyTemplates(uuid->uuid(),
+                                                       proxy_template);
   delete uuid;
   uuid = NULL;
   if (send_info_header)
     cvmfs::external_download_manager_->EnableInfoHeader();
   external_proxies = download::ResolveProxyDescription(external_proxies,
-                                              cvmfs::external_download_manager_);
+                                            cvmfs::external_download_manager_);
   if (external_proxies == "") {
     *g_boot_error = "failed to discover HTTP proxy servers";
     return loader::kFailWpad;
   }
   cvmfs::external_download_manager_->SetProxyChain(
-    external_proxies, fallback_external_proxies, download::DownloadManager::kSetProxyBoth);
+    external_proxies, fallback_external_proxies,
+    download::DownloadManager::kSetProxyBoth);
   g_external_download_ready = true;
   if (use_geo_api) {
     cvmfs::external_download_manager_->ProbeGeo();

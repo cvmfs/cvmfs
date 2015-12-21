@@ -80,7 +80,7 @@ static void AnswerStringList(const int con_fd, const vector<string> &list) {
 }
 
 
-static std::string GenerateHostInfo(download::DownloadManager &manager) {
+static std::string GenerateHostInfo(download::DownloadManager &manager) {  // NOLINT
   vector<string> host_chain;
   vector<int> rtt;
   unsigned active_host;
