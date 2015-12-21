@@ -92,7 +92,7 @@ bool ClientCatalogManager::InitFixed(
            root_hash.ToString().c_str());
   WriteLock();
   fixed_alt_root_catalog_ = alternative_path;
-  bool attached = MountCatalog(PathString("", 0), root_hash, NULL);
+  bool attached = MountCatalog(PathString("", 0), root_hash, NULL, NULL);
   Unlock();
 
   if (!attached) {
@@ -107,7 +107,8 @@ LoadError ClientCatalogManager::LoadCatalog(
   const PathString  &mountpoint,
   const shash::Any  &hash,
   std::string *catalog_path,
-  shash::Any *catalog_hash)
+  shash::Any *catalog_hash,
+  const ClientCtx *ctx)
 {
   string cvmfs_path = "file catalog at " + repo_name_ + ":" +
     (mountpoint.IsEmpty() ?
@@ -127,7 +128,7 @@ LoadError ClientCatalogManager::LoadCatalog(
     if (mountpoint.IsEmpty() && fixed_alt_root_catalog_)
       alt_catalog_path = hash.MakeAlternativePath();
     LoadError load_error = 
-      LoadCatalogCas(hash, cvmfs_path, alt_catalog_path, catalog_path);
+      LoadCatalogCas(hash, cvmfs_path, alt_catalog_path, catalog_path, ctx);
     if (load_error == catalog::kLoadNew)
       loaded_catalogs_[mountpoint] = hash;
     *catalog_hash = hash;
@@ -170,7 +171,7 @@ LoadError ClientCatalogManager::LoadCatalog(
 
     if (catalog_path) {
       LoadError error =
-        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
+        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path, ctx);
       if (error != catalog::kLoadNew)
         return error;
     }
@@ -189,7 +190,7 @@ LoadError ClientCatalogManager::LoadCatalog(
   if (ensemble.manifest->catalog_hash() == cache_hash) {
     if (catalog_path) {
       LoadError error =
-        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path);
+        LoadCatalogCas(cache_hash, cvmfs_path, "", catalog_path, ctx);
       if (error == catalog::kLoadNew) {
         loaded_catalogs_[mountpoint] = cache_hash;
         *catalog_hash = cache_hash;
@@ -212,7 +213,8 @@ LoadError ClientCatalogManager::LoadCatalog(
                    cvmfs_path,
                    ensemble.manifest->has_alt_catalog_path() ?
                      ensemble.manifest->MakeCatalogPath() : "",
-                   catalog_path);
+                   catalog_path,
+                   ctx);
   if (load_retval != catalog::kLoadNew)
     return load_retval;
   loaded_catalogs_[mountpoint] = ensemble.manifest->catalog_hash();
@@ -231,11 +233,14 @@ LoadError ClientCatalogManager::LoadCatalogCas(
   const shash::Any &hash,
   const string &name,
   const std::string &alt_catalog_path,
-  string *catalog_path)
+  string *catalog_path,
+  const ClientCtx *ctx)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-                           cache::CacheManager::kTypeCatalog, alt_catalog_path);
+                           cache::CacheManager::kTypeCatalog,
+                           ctx ? ctx->pid : -1, ctx ? ctx->uid : -1,
+                           ctx ? ctx->gid : -1, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;

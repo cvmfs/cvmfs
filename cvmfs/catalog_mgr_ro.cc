@@ -24,7 +24,8 @@ namespace catalog {
 LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
                                             const shash::Any  &hash,
                                             std::string       *catalog_path,
-                                            shash::Any        *catalog_hash)
+                                            shash::Any        *catalog_hash,
+                                            const ClientCtx   *ctx)
 {
   shash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
   assert(shash::kSuffixCatalog == effective_hash.suffix);

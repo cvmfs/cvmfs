@@ -503,7 +503,8 @@ static void *MainRemountTrigger(void *data) {
 
 
 static bool GetDirentForInode(const fuse_ino_t ino,
-                              catalog::DirectoryEntry *dirent)
+                              catalog::DirectoryEntry *dirent,
+                              const fuse_ctx *fctx)
 {
   // Lookup inode in cache
   if (inode_cache_->Lookup(ino, dirent))
@@ -516,6 +517,13 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // the kDirentNegative, it was an I/O error
   *dirent = catalog::DirectoryEntry();
 
+  catalog::ClientCtx ctx;
+  if (fctx) {
+    ctx.uid = fctx->uid;
+    ctx.gid = fctx->gid;
+    ctx.pid = fctx->pid;
+  }
+
   if (nfs_maps_) {
     // NFS mode
     PathString path;
@@ -524,7 +532,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       *dirent = dirent_negative;
       return false;
     }
-    if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
+    if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent,
+                                     fctx ? &ctx : NULL))
+    {
       // Fix inodes
       dirent->set_inode(ino);
       inode_cache_->Insert(ino, *dirent);
@@ -536,7 +546,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // Non-NFS mode
   PathString path;
   if (ino == catalog_manager_->GetRootInode()) {
-    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent);
+    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent,
+                                 &ctx);
     dirent->set_inode(ino);
     inode_cache_->Insert(ino, *dirent);
     return true;
@@ -549,7 +560,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     *dirent = dirent_negative;
     return false;
   }
-  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
+  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent, &ctx)) {
     // Fix inodes
     dirent->set_inode(ino);
     inode_cache_->Insert(ino, *dirent);
@@ -563,7 +574,8 @@ static bool GetDirentForInode(const fuse_ino_t ino,
 
 
 static bool GetDirentForPath(const PathString &path,
-                             catalog::DirectoryEntry *dirent)
+                             catalog::DirectoryEntry *dirent,
+                             const fuse_ctx *fctx)
 {
   uint64_t live_inode = 0;
   if (!nfs_maps_)
@@ -578,9 +590,17 @@ static bool GetDirentForPath(const PathString &path,
     return true;
   }
 
+  catalog::ClientCtx ctx;
+  if (fctx) {
+    ctx.uid = fctx->uid;
+    ctx.gid = fctx->gid;
+    ctx.pid = fctx->pid;
+  }
+
   // Lookup inode in catalog TODO: not twice md5 calculation
   bool retval;
-  retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
+  retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent,
+                                        fctx ? &ctx : NULL);
   if (retval) {
     if (nfs_maps_) {
       // Fix inode
@@ -655,7 +675,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
   // Special NFS lookups: . and ..
   if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
-    if (GetDirentForInode(parent, &dirent)) {
+    if (GetDirentForInode(parent, &dirent, fuse_req_ctx(req))) {
       if (strcmp(name, ".") == 0) {
         goto lookup_reply_positive;
       } else {
@@ -666,8 +686,11 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
         }
         if (!GetPathForInode(parent, &parent_path))
           goto lookup_reply_negative;
-        if (GetDirentForPath(GetParentPath(parent_path), &dirent))
+        if (GetDirentForPath(GetParentPath(parent_path), &dirent,
+                             fuse_req_ctx(req)))
+        {
           goto lookup_reply_positive;
+        }
       }
     }
     // No entry for "." or no entry for ".."
@@ -687,7 +710,7 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   path.Append("/", 1);
   path.Append(name, strlen(name));
   tracer::Trace(tracer::kFuseLookup, path, "lookup()");
-  if (!GetDirentForPath(path, &dirent)) {
+  if (!GetDirentForPath(path, &dirent, fuse_req_ctx(req))) {
     if (dirent.GetSpecial() == catalog::kDirentNegative)
       goto lookup_reply_negative;
     else
@@ -772,7 +795,7 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
            uint64_t(ino));
 
   catalog::DirectoryEntry dirent;
-  const bool found = GetDirentForInode(ino, &dirent);
+  const bool found = GetDirentForInode(ino, &dirent, fuse_req_ctx(req));
   remount_fence_->Leave();
 
   if (!found) {
@@ -798,7 +821,7 @@ static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
            uint64_t(ino));
 
   catalog::DirectoryEntry dirent;
-  const bool found = GetDirentForInode(ino, &dirent);
+  const bool found = GetDirentForInode(ino, &dirent, fuse_req_ctx(req));
   remount_fence_->Leave();
 
   if (!found) {
@@ -860,7 +883,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOENT);
     return;
   }
-  found = GetDirentForInode(ino, &d);
+  found = GetDirentForInode(ino, &d, fuse_req_ctx(req));
 
   if (!found) {
     remount_fence_->Leave();
@@ -872,6 +895,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOTDIR);
     return;
   }
+
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64", path %s",
            uint64_t(ino), path.c_str());
 
@@ -886,7 +910,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // Add parent directory link
   catalog::DirectoryEntry p;
   if (d.inode() != catalog_manager_->GetRootInode() &&
-      GetDirentForPath(GetParentPath(path), &p))
+      GetDirentForPath(GetParentPath(path), &p, fuse_req_ctx(req)))
   {
     info = p.GetStatStructure();
     AddToDirListing(req, "..", &info, &fuse_listing);
@@ -894,7 +918,10 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
-  bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog);
+  const fuse_ctx *fctx = fuse_req_ctx(req);
+  catalog::ClientCtx ctx(fctx->uid, fctx->gid, fctx->pid);
+  bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog,
+                                              &ctx);
 
   if (!retval) {
     remount_fence_->Leave();
@@ -911,7 +938,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                       listing_from_catalog.AtPtr(i)->name.GetLength());
 
     catalog::DirectoryEntry entry_dirent;
-    if (!GetDirentForPath(entry_path, &entry_dirent)) {
+    if (!GetDirentForPath(entry_path, &entry_dirent, fuse_req_ctx(req))) {
       LogCvmfs(kLogCvmfs, kLogDebug, "listing entry %s vanished, skipping",
                entry_path.c_str());
       continue;
@@ -1047,12 +1074,15 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOENT);
     return;
   }
-  found = GetDirentForInode(ino, &dirent);
+  found = GetDirentForInode(ino, &dirent, fuse_req_ctx(req));
   if (!found) {
     remount_fence_->Leave();
     ReplyNegative(dirent, req);
     return;
   }
+
+  const struct fuse_ctx *fctx = fuse_req_ctx(req);
+  catalog::ClientCtx ctx(fctx->uid, fctx->gid, fctx->pid);
 
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
@@ -1099,7 +1129,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Retrieve File chunks from the catalog
       FileChunkList *chunks = new FileChunkList();
       if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
-                                           chunks) ||
+                                           chunks, &ctx) ||
           chunks->IsEmpty())
       {
         remount_fence_->Leave();
@@ -1147,7 +1177,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
     volatile_repository_ ? cache::CacheManager::kTypeVolatile :
-                           cache::CacheManager::kTypeRegular);
+                           cache::CacheManager::kTypeRegular,
+    ctx.pid, ctx.uid, ctx.gid);
 
   if (fd >= 0) {
     if (perf::Xadd(no_open_files_, 1) <
@@ -1428,17 +1459,19 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_getxattr on inode: %"PRIu64" for xattr: %s",
            uint64_t(ino), name);
+  const fuse_ctx &fctx = *fuse_req_ctx(req);
 
   const string attr = name;
   catalog::DirectoryEntry d;
-  const bool found = GetDirentForInode(ino, &d);
+  const bool found = GetDirentForInode(ino, &d, &fctx);
   bool retval;
   XattrList xattrs;
   if (d.HasXattrs()) {
     PathString path;
     retval = GetPathForInode(ino, &path);
     assert(retval);
-    retval = catalog_manager_->LookupXattrs(path, &xattrs);
+    catalog::ClientCtx ctx(fctx.uid, fctx.gid, fctx.pid);
+    retval = catalog_manager_->LookupXattrs(path, &xattrs, &ctx);
     assert(retval);
   }
   if (d.IsLink()) {
@@ -1446,7 +1479,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
       catalog::kLookupSole | catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
-    retval = catalog_manager_->LookupPath(path, lookup_options, &raw_symlink);
+    catalog::ClientCtx ctx(fctx.uid, fctx.gid, fctx.pid);
+    retval = catalog_manager_->LookupPath(path, lookup_options, &raw_symlink,
+                                          &ctx);
     assert(retval);
     d.set_symlink(raw_symlink.symlink());
   }
@@ -1616,13 +1651,15 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
            uint64_t(ino), size, hide_magic_xattrs_);
 
   catalog::DirectoryEntry d;
-  const bool found = GetDirentForInode(ino, &d);
+  const fuse_ctx &fctx = *fuse_req_ctx(req);
+  const bool found = GetDirentForInode(ino, &d, &fctx);
   XattrList xattrs;
   if (d.HasXattrs()) {
     PathString path;
     bool retval = GetPathForInode(ino, &path);
     assert(retval);
-    retval = catalog_manager_->LookupXattrs(path, &xattrs);
+    catalog::ClientCtx ctx(fctx.uid, fctx.gid, fctx.pid);
+    retval = catalog_manager_->LookupXattrs(path, &xattrs, &ctx);
     assert(retval);
   }
   remount_fence_->Leave();
@@ -1670,7 +1707,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
 bool Evict(const string &path) {
   catalog::DirectoryEntry dirent;
   remount_fence_->Enter();
-  const bool found = GetDirentForPath(PathString(path), &dirent);
+  const bool found = GetDirentForPath(PathString(path), &dirent, NULL);
   remount_fence_->Leave();
 
   if (!found || !dirent.IsRegular())
@@ -1683,7 +1720,7 @@ bool Evict(const string &path) {
 bool Pin(const string &path) {
   catalog::DirectoryEntry dirent;
   remount_fence_->Enter();
-  const bool found = GetDirentForPath(PathString(path), &dirent);
+  const bool found = GetDirentForPath(PathString(path), &dirent, NULL);
   if (!found || !dirent.IsRegular()) {
     remount_fence_->Leave();
     return false;
@@ -1694,7 +1731,7 @@ bool Pin(const string &path) {
   } else {
     FileChunkList chunks;
     catalog_manager_->ListFileChunks(PathString(path), dirent.hash_algorithm(),
-                                     &chunks);
+                                     &chunks, NULL);
     remount_fence_->Leave();
     for (unsigned i = 0; i < chunks.size(); ++i) {
       bool retval =

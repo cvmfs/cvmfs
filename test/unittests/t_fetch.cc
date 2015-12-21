@@ -243,7 +243,7 @@ TEST_F(T_Fetcher, FetchAltPath) {
   EXPECT_LT(fd, 0);
 
   fd = fetcher_->Fetch(hash_regular_, cache::CacheManager::kSizeUnknown, "reg",
-                       cache::CacheManager::kTypeRegular, "altpath");
+                       cache::CacheManager::kTypeRegular, -1, -1, -1, "altpath");
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }

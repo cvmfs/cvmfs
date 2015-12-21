@@ -77,6 +77,9 @@ class Fetcher : SingleCopy {
             const uint64_t size,
             const std::string &name,
             const cache::CacheManager::ObjectType object_type,
+            pid_t pid = -1,
+            uid_t uid = -1,
+            gid_t gid = -1,
             const std::string &alt_url = "");
 
   cache::CacheManager *cache_mgr() { return cache_mgr_; }
