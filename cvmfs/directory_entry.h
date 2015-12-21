@@ -97,6 +97,7 @@ class DirectoryEntryBase {
     , mtime_(0)
     , linkcount_(1)  // generally a normal file has linkcount 1 -> default
     , has_xattrs_(false)
+    , compression_algorithm_(zlib::kZlibDefault)
     { }
 
   inline bool IsRegular() const                 { return S_ISREG(mode_); }
