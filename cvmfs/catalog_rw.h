@@ -59,7 +59,8 @@ class WritableCatalog : public Catalog {
   void AddEntry(const DirectoryEntry &entry,
                 const XattrList &xattr,
                 const std::string &entry_path,
-                const std::string &parent_path);
+                const std::string &parent_path,
+                const bool external_data=false);
   void TouchEntry(const DirectoryEntryBase &entry, const shash::Md5 &path_hash);
   inline void TouchEntry(
     const DirectoryEntryBase &entry,
@@ -111,7 +112,8 @@ class WritableCatalog : public Catalog {
   inline void AddEntry(
     const DirectoryEntry &entry,
     const XattrList &xattrs,
-    const std::string &path)
+    const std::string &path,
+    const bool external_data=false)
   {
     AddEntry(entry, xattrs, path, GetParentPath(path));
   }

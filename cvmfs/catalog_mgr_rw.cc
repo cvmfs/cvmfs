@@ -345,7 +345,7 @@ void WritableCatalogManager::AddFile(
   }
 
   assert(!entry.IsRegular() || !entry.checksum().IsNull());
-  catalog->AddEntry(entry, xattrs, file_path, parent_path);
+  catalog->AddEntry(entry, xattrs, file_path, parent_path, external_data);
   SyncUnlock();
 }
 

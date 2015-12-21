@@ -240,6 +240,7 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('j', "catalog entry warning threshold"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
+    r.push_back(Parameter::Switch('Y', "enable external data"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('V', "VOMS authz requirement "

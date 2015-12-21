@@ -174,6 +174,10 @@ void SyncUnionAufs::Traverse() {
   traversal.fn_ignore_file    = &SyncUnionAufs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
   traversal.fn_new_symlink    = &SyncUnionAufs::ProcessSymlink;
+  LogCvmfs(kLogUnionFs, kLogVerboseMsg, "Aufs starting traversal "
+           "recursion for scratch_path=[%s] with external data set to %d",
+           scratch_path().c_str(),
+           GetExternalData());
 
   traversal.Recurse(scratch_path());
 }

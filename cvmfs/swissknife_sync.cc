@@ -505,7 +505,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('g') != args.end()) params.garbage_collectable = true;
   if (args.find('V') != args.end()) params.voms_authz = *args.find('V')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
-  if (args.find('X') != args.end()) params.external_data = true;
+  if (args.find('Y') != args.end()) params.external_data = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));

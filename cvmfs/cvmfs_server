@@ -4211,7 +4211,7 @@ publish() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "pa:c:m:vn:" option
+  while getopts "Xpa:c:m:vn:" option
   do
     case $option in
       p)
@@ -4233,7 +4233,7 @@ publish() {
         manual_revision="$OPTARG"
       ;;
       X)
-        external_option="-X"
+        external_option="-Y"
       ;;
       ?)
         shift $(($OPTIND-2))

@@ -511,7 +511,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
     assert(xattrs != NULL);
   }
 
-  if (result.IsChunked()) {
+  if (!item.IsExternalData() && result.IsChunked()) {
     catalog_manager_->AddChunkedFile(
       item.CreateBasicCatalogDirent(),
       *xattrs,
