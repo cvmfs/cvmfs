@@ -79,6 +79,12 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   virtual bool Deflate(unsigned char *outbuf, size_t& outbufsize,
           unsigned char*& inbuf, size_t& inbufsize,
           const bool flush) = 0;
+          
+  /**
+    * Return an upper bound on the number of bytes required in order 
+    * to compress an input number of bytes.
+    * Returns: Upper bound on the number of bytes required to compress.
+    */
   virtual size_t DeflateBound(const size_t bytes) { return bytes; }
   virtual Compressor* Clone() = 0;
   static void RegisterPlugins();
