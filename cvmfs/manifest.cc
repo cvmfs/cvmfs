@@ -66,6 +66,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   shash::Any history;
   uint64_t publish_timestamp = 0;
   bool garbage_collectable = false;
+  bool has_alt_catalog_path = false;
 
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
@@ -86,26 +87,28 @@ Manifest *Manifest::Load(const map<char, string> &content) {
     publish_timestamp = String2Uint64(iter->second);
   if ((iter = content.find('G')) != content.end())
     garbage_collectable = (iter->second == "yes");
+  if ((iter = content.find('A')) != content.end())
+    has_alt_catalog_path = (iter->second == "yes");
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
                       history, publish_timestamp, garbage_collectable,
-                      alt_catalog_path);
+                      has_alt_catalog_path);
 }
 
 
 Manifest::Manifest(const shash::Any &catalog_hash,
                    const uint64_t catalog_size,
                    const string &root_path)
-{
-  catalog_hash_ = catalog_hash;
-  catalog_size_ = catalog_size;
-  root_path_ = shash::Md5(shash::AsciiPtr(root_path));
-  ttl_ = catalog::Catalog::kDefaultTTL;
-  revision_ = 0;
-  publish_timestamp_ = 0;
-  garbage_collectable_ = false;
-}
+ : catalog_hash_(catalog_hash)
+ , catalog_size_(catalog_size)
+ , root_path_(shash::Md5(shash::AsciiPtr(root_path)))
+ , ttl_(catalog::Catalog::kDefaultTTL)
+ , revision_(0)
+ , publish_timestamp_(0)
+ , garbage_collectable_(false)
+ , has_alt_catalog_path_(false)
+{ }
 
 
 /**
@@ -118,14 +121,13 @@ string Manifest::ExportString() const {
     "R" + root_path_.ToString() + "\n" +
     "D" + StringifyInt(ttl_) + "\n" +
     "S" + StringifyInt(revision_) + "\n" +
-    "G" + StringifyBool(garbage_collectable_) + "\n";
+    "G" + StringifyBool(garbage_collectable_) + "\n" +
+    "A" + StringifyBool(has_alt_catalog_path_) + "\n";
 
   if (!micro_catalog_hash_.IsNull())
     manifest += "L" + micro_catalog_hash_.ToString() + "\n";
   if (repository_name_ != "")
     manifest += "N" + repository_name_ + "\n";
-  if (alt_catalog_path_ != "")
-    manifest += "A" + alt_catalog_path_ + "\n";
   if (!certificate_.IsNull())
     manifest += "X" + certificate_.ToString() + "\n";
   if (!history_.IsNull())

@@ -22,6 +22,9 @@ namespace catalog {
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  * Always remember to update the legacy catalog migration classes to produce a
  * compatible catalog structure when updating the schema revisions here!
+ *
+ * Repository rollbacks to an outdated catalog schema is not supported. Have a
+ * look into CVM-252 if that becomes necessary at some point.
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  */
 
@@ -589,7 +592,7 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
   result.mtime_    = RetrieveInt64(4);
   result.name_.Assign(name, strlen(name));
   result.symlink_.Assign(symlink, strlen(symlink));
-  if (expand_symlink)
+  if (expand_symlink && !g_raw_symlinks)
     ExpandSymlink(&result.symlink_);
 
   return result;

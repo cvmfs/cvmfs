@@ -95,6 +95,12 @@ bool Spooler::Peek(const std::string &path) const {
 }
 
 
+bool Spooler::PlaceBootstrappingShortcut(const shash::Any &object) const {
+  assert(! object.IsNull());
+  return uploader_->PlaceBootstrappingShortcut(object);
+}
+
+
 void Spooler::ProcessingCallback(const SpoolerResult &data) {
   NotifyListeners(data);
 }

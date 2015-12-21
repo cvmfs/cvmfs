@@ -59,6 +59,9 @@ generate_certs() {
   local script_location=$1
   mkdir -p $TEST600_CERTS_DIR $TEST600_GRID_CACHE $TEST600_GRID_MOUNTPOINT
   local voms_path=${TEST600_GRID_MOUNTPOINT}/emi-ui-2.10.4-1_sl5v1
+  if [ ! -e "$voms_path" ]; then
+    voms_path="/"
+  fi
 
   cp $script_location/ca-generate-certs $TEST600_CERTS_DIR/
   cp $script_location/openssl-usercert-extensions.conf $TEST600_CERTS_DIR/
@@ -138,10 +141,13 @@ cvmfs_run_test() {
   echo "set a trap for system directory cleanup"
   trap cleanup EXIT HUP INT TERM
 
-  mount_cvmfs_grid $TEST600_GRID_MOUNTPOINT $TEST600_GRID_CACHE || return 10
+  # Allow mount of grid.cern.ch to fail; this is just used for grid tools
+  mount_cvmfs_grid $TEST600_GRID_MOUNTPOINT $TEST600_GRID_CACHE
   ls $TEST600_GRID_MOUNTPOINT
+  echo "Generating certificates"
   generate_certs $script_location
   # requires mod_gridsite from the gridsite package
+  echo "Setting up apache configuration"
   cp $script_location/test600.cvmfs.secure.conf $TEST600_HTTPS_CONFIG
   sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST600_HTTPS_CONFIG
   sed -i "s,@GRIDSECURITYDIR@,$TEST600_GRID_SECURITY_DIR," $TEST600_HTTPS_CONFIG

@@ -8,6 +8,9 @@ SOURCES_64OPT = 64opt/KeccakF-1600-opt64.c \
   64opt/KeccakF-1600-opt64-settings.h \
   64opt/SnP-interface.h
 
+SOURCES_64COMPACT = 64compact/KeccakF-1600-compact64.c \
+  64compact/SnP-interface.h
+
 SOURCES_32BI = 32BI/KeccakF-1600-inplace32BI.c \
   32BI/SnP-interface.h
 
@@ -34,6 +37,9 @@ libsha3.a: $(OBJECT_FILES)
 
 KeccakF-1600-64opt.o: $(SOURCES_GENERIC) $(SOURCES_64OPT)
 	$(CC) $(CFLAGS) -o KeccakF-1600-64opt.o -c 64opt/KeccakF-1600-opt64.c
+
+KeccakF-1600-64compact.o: $(SOURCES_GENERIC) $(SOURCES_64COMPACT)
+	$(CC) $(CFLAGS) -o KeccakF-1600-64compact.o -c 64compact/KeccakF-1600-compact64.c
 
 KeccakF-1600-32BI.o: $(SOURCES_GENERIC) $(SOURCES_32BI)
 	$(CC) $(CFLAGS) -o KeccakF-1600-32BI.o -c 32BI/KeccakF-1600-inplace32BI.c

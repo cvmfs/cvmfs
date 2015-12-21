@@ -1,0 +1,116 @@
+
+cvmfs_test_name="Avoid Resurrection of Legacy Catalog via Rollback"
+cvmfs_test_autofs_on_startup=false
+
+
+get_head_revision() {
+  local repo_name="$1"
+  cvmfs_server tag -i trunk -x $repo_name | cut -f4 -d' '
+}
+
+
+TEST604_WORKSPACE=""
+TEST604_LEGACY_STORAGE=""
+TEST604_NEW_REPO_NAME=""
+cleanup() {
+  [ -z "$TEST604_WORKSPACE" ]      || cd $TEST604_WORKSPACE
+  [ -z "$TEST604_NEW_REPO_NAME" ]  || sudo cvmfs_server rmfs -f $TEST604_NEW_REPO_NAME
+  [ -z "$TEST604_LEGACY_STORAGE" ] || sudo rm -fR $TEST604_LEGACY_STORAGE
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  local guinea_pig_location="${script_location}/../../common/guinea_pig_repo_20"
+  local legacy_repo_name="testmigration.cern.ch"
+  local repo_dir="/cvmfs/${legacy_repo_name}"
+  local legacy_repo_storage="$(get_local_repo_storage $legacy_repo_name)"
+  TEST604_WORKSPACE="$scratch_dir"
+
+  echo "make sure there are no legacy repo leftovers from previous tests"
+  cleanup_legacy_repo_leftovers "$legacy_repo_name"
+
+  echo "set a trap for desaster cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  echo -n "resurrect legacy repository... "
+  TEST604_LEGACY_STORAGE="$legacy_repo_storage"
+  plant_tarball "${guinea_pig_location}/keys.tar.gz"                                              || return $?
+  plant_legacy_repository_revision "${guinea_pig_location}/revision-6.tar.gz" "$legacy_repo_name" || return $?
+  echo "done"
+
+  echo -n "get root hash of top-most legacy revision... "
+  local legacy_root_catalog="$(cat ${legacy_repo_storage}/pub/catalogs/.cvmfspublished | get_root_hash_from_manifest)"
+  echo "done ($legacy_root_catalog)"
+
+  echo "run the repository migration"
+  TEST604_NEW_REPO_NAME="$legacy_repo_name"
+  sudo mv $legacy_repo_storage/pub/data $legacy_repo_storage         || return 1
+  sudo ln -s $legacy_repo_storage/data $legacy_repo_storage/pub/data || return 2
+  sudo cp $legacy_repo_storage/pub/catalogs/.cvmfspublished         \
+          $legacy_repo_storage/pub/catalogs/.cvmfswhitelist         \
+          $legacy_repo_storage/pub/catalogs/.cvmfs_master_replica   \
+          $legacy_repo_storage || return 3
+  import_repo "$legacy_repo_name" "$CVMFS_TEST_USER" \
+    -l                                               \
+    -s                                               \
+    -g || return 4
+
+  echo -n "get root hash of first new catalog... "
+  local uptodate_root_catalog="$(get_current_root_catalog $legacy_repo_name)"
+  echo "done ($uptodate_root_catalog)"
+
+  echo "create some new revisions"
+  start_transaction $legacy_repo_name || return  5
+  publish_repo      $legacy_repo_name || return  6
+  start_transaction $legacy_repo_name || return  7
+  publish_repo      $legacy_repo_name || return  8
+  start_transaction $legacy_repo_name || return  9
+  publish_repo      $legacy_repo_name || return 10
+
+  echo "list current tags"
+  cvmfs_server tag $legacy_repo_name || return 11
+
+  echo "create tag pointing to the legacy repository"
+  local legacy_tag="legacy"
+  cvmfs_server tag -a $legacy_tag -h "$legacy_root_catalog" $legacy_repo_name || return 12
+
+  echo "create tag pointing to the up-to-date repository"
+  local uptodate_tag="uptodate"
+  cvmfs_server tag -a $uptodate_tag -h "$uptodate_root_catalog" $legacy_repo_name || return 13
+
+  echo "list current tags"
+  cvmfs_server tag $legacy_repo_name || return 14
+
+  echo "roll back to the first up-to-date catalog"
+  rollback_repo $legacy_repo_name $uptodate_tag || return 15
+
+  echo -n "get HEAD revision... "
+  local head_revision=$(get_head_revision $legacy_repo_name)
+  echo "done ($head_revision)"
+
+  echo "list current tags"
+  cvmfs_server tag $legacy_repo_name || return 16
+
+  echo "try to roll back to an outdated catalog schema (should fail)"
+  local rollback_log="rollback.log"
+  rollback_repo $legacy_repo_name $legacy_tag > $rollback_log 2>&1 && return 17
+
+  echo "check log file for error message"
+  cat $rollback_log | grep -e 'outdated and incompatible catalog schema' || return 18
+
+  echo -n "getting HEAD revision again..."
+  local head_revision_after=$(get_head_revision $legacy_repo_name)
+  echo "done ($head_revision_after)"
+
+  echo "revision should not have changed"
+  [ $head_revision -eq $head_revision_after ] || return 19
+
+  echo "create a new repository transaction"
+  start_transaction $legacy_repo_name || return  20
+  publish_repo      $legacy_repo_name || return  21
+
+  return 0
+}

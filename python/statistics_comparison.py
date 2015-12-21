@@ -78,10 +78,13 @@ class DockerExecutor:
               "check the output type \"docker " +
               " attach " + container_id + "\" in a different terminal")
         result = client.wait(container_id)
-        client.remove_container(container_id, force=True)
         if result != 0:
-            print("Test execution failed! Exiting...")
+            print("Test execution failed!\n" +
+                  "Docker container with id " + str(container_id) +
+                  " might be used for post-mortem analysis\n" +
+                  "Exiting...")
             exit(100)
+        client.remove_container(container_id, force=True)
 
 
 def parse_args():

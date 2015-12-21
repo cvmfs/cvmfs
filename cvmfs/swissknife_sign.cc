@@ -142,10 +142,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
 
     // Safe certificate (and wait for the upload through a Future)
     spooler->ProcessCertificate(certificate, "");
-    std::string alt_path = manifest->alt_catalog_path();
-    if (alt_path.size()) {
-      alt_path += "cert";
-      spooler->ProcessCertificate(certificate, alt_path);
+    if (manifest->has_alt_catalog_path()) {
+      spooler->ProcessCertificate(certificate, manifest->MakeCertificatePath());
     }
     const shash::Any certificate_hash = certificate_hash_.Get();
     spooler->UnregisterListener(callback);
@@ -166,6 +164,22 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       reinterpret_cast<const unsigned char *>(signed_manifest.data()),
       signed_manifest.length(), &published_hash);
     signed_manifest += "--\n" + published_hash.ToString() + "\n";
+
+    // Create alternative bootstrapping symlinks for VOMS secured repos
+    if (manifest->has_alt_catalog_path()) {
+      const bool success =
+        spooler->PlaceBootstrappingShortcut(manifest->certificate())  &&
+        spooler->PlaceBootstrappingShortcut(manifest->catalog_hash()) &&
+        (manifest->history().IsNull() ||
+         spooler->PlaceBootstrappingShortcut(manifest->history()));
+
+      if (! success) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
+                                        "symlinks");
+        delete manifest;
+        goto sign_fail;
+      }
+    }
 
     // Sign manifest
     unsigned char *sig;

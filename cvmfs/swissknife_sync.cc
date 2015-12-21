@@ -31,10 +31,10 @@
 
 #include "catalog_mgr_ro.h"
 #include "catalog_mgr_rw.h"
-#include "dirtab.h"
 #include "download.h"
 #include "logging.h"
 #include "manifest.h"
+#include "path_filters/dirtab.h"
 #include "platform.h"
 #include "sync_mediator.h"
 #include "sync_union.h"
@@ -108,7 +108,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     }
   }
   const bool volatile_content    = (args.count('v') > 0);
-  const bool garbage_collectable = (args.count('g') > 0);
+  const bool garbage_collectable = (args.count('z') > 0);
   std::string voms_authz;
   if (args.find('V') != args.end()) {
     voms_authz = *args.find('V')->second;
@@ -120,8 +120,10 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   // TODO(rmeusel): use UniquePtr
   manifest::Manifest *manifest =
-    catalog::WritableCatalogManager::CreateRepository(
-      dir_temp, volatile_content, garbage_collectable, voms_authz, spooler);
+    catalog::WritableCatalogManager::CreateRepository(dir_temp,
+                                                      volatile_content,
+                                                      voms_authz,
+                                                      spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
     return 1;
@@ -129,6 +131,11 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
 
   spooler->WaitForUpload();
   delete spooler;
+
+  // set optional manifest fields
+  const bool needs_bootstrap_shortcuts = !voms_authz.empty();
+  manifest->set_garbage_collectability(garbage_collectable);
+  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
 
   if (!manifest->Export(manifest_path)) {
     PrintError("Failed to create new repository");
@@ -541,6 +548,10 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     params.max_concurrent_write_jobs = String2Uint64(*args.find('q')->second);
   }
 
+  if (args.find('T') != args.end()) {
+    params.ttl_seconds = String2Uint64(*args.find('T')->second);
+  }
+
   if (!CheckParams(params)) return 2;
 
   // Start spooler
@@ -600,6 +611,12 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
 
   sync->Traverse();
 
+  if (params.ttl_seconds > 0) {
+    LogCvmfs(kLogCvmfs, kLogStdout, "Setting repository TTL to %"PRIu64" s",
+             params.ttl_seconds);
+    catalog_manager.SetTTL(params.ttl_seconds);
+  }
+
   LogCvmfs(kLogCvmfs, kLogStdout, "Exporting repository manifest");
   UniquePtr<manifest::Manifest> manifest(mediator.Commit());
 
@@ -608,13 +625,9 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 5;
   }
 
+  const bool needs_bootstrap_shortcuts = !params.voms_authz.empty();
   manifest->set_garbage_collectability(params.garbage_collectable);
-
-  std::string voms_authz;
-  if (catalog_manager.GetVOMSAuthz(voms_authz) && voms_authz.size()) {
-    manifest->set_alt_catalog_path(".cvmfsroot");
-  }
-
+  manifest->set_has_alt_catalog_path(needs_bootstrap_shortcuts);
   g_download_manager->Fini();
 
   // finalize the spooler

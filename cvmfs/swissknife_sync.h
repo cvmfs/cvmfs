@@ -35,6 +35,7 @@ struct SyncParameters {
     avg_file_chunk_size(kDefaultAvgFileChunkSize),
     max_file_chunk_size(kDefaultMaxFileChunkSize),
     manual_revision(0),
+    ttl_seconds(0),
     max_concurrent_write_jobs(0),
     is_balanced(false),
     max_weight(kDefaultMaxWeight),
@@ -50,6 +51,7 @@ struct SyncParameters {
   std::string      manifest_path;
   std::string      spooler_definition;
   std::string      union_fs_type;
+  std::string      voms_authz;
   bool             print_changeset;
   bool             dry_run;
   bool             mucatalogs;
@@ -63,8 +65,8 @@ struct SyncParameters {
   size_t           avg_file_chunk_size;
   size_t           max_file_chunk_size;
   uint64_t         manual_revision;
+  uint64_t         ttl_seconds;
   uint64_t         max_concurrent_write_jobs;
-  std::string      voms_authz;
   bool             is_balanced;
   unsigned         max_weight;
   unsigned         min_weight;
@@ -91,6 +93,8 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
     r.push_back(Parameter::Optional('a', "hash algorithm (default: SHA-1)"));
+    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+                                         "(default: none)"));
     r.push_back(Parameter::Switch('v', "repository containing volatile files"));
     r.push_back(Parameter::Switch(
       'z', "mark new repository as garbage collectable"));
@@ -239,6 +243,9 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
+    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+                                         "(default: none)"));
+    r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
     return r;
   }
   int Main(const ArgumentList &args);

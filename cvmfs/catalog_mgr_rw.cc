@@ -94,7 +94,6 @@ void WritableCatalogManager::ActivateCatalog(Catalog *catalog) {
 manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string     &dir_temp,
   const bool        volatile_content,
-  const bool        garbage_collectable,
   const std::string &voms_authz,
   upload::Spooler  *spooler)
 {
@@ -155,13 +154,12 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
   if (voms_authz.size()) {
-    manifest->set_alt_catalog_path(".cvmfsroot");
+    manifest->set_has_alt_catalog_path(true);
   }
-  manifest->set_garbage_collectability(garbage_collectable);
 
   // Upload catalog
   spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath(),
-                  manifest->alt_catalog_path());
+                  manifest->MakeCatalogPath());
   spooler->WaitForUpload();
   unlink(file_path_compressed.c_str());
   if (spooler->GetNumberOfErrors() > 0) {
@@ -680,6 +678,13 @@ bool WritableCatalogManager::IsTransitionPoint(const string &path) {
 
 void WritableCatalogManager::PrecalculateListings() {
   // TODO(jblomer): meant for micro catalogs
+}
+
+
+void WritableCatalogManager::SetTTL(const uint64_t new_ttl) {
+  SyncLock();
+  reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetTTL(new_ttl);
+  SyncUnlock();
 }
 
 

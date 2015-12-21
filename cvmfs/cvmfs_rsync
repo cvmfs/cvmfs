@@ -1,0 +1,67 @@
+#!/bin/bash
+# Rsync directories into cvmfs.
+
+ME=cvmfs_rsync
+
+usage()
+{
+    echo "$ME [rsync_options] srcdir /cvmfs/reponame[/destsubdir]" >&2
+    echo "  Rsync to cvmfs repositories.  Avoids .cvmfscatalog and .cvmfsautocatalog" >&2
+    echo "  files while allowing directories containing them to be deleted when their" >&2
+    echo "  source goes away." >&2
+    exit 1
+}
+
+if [ $# -lt 2 ]; then
+    usage
+fi
+
+# readlink -m canonicalizes paths, removing extra slashes, etc.
+DEST="`readlink -m ${@:$#}`"
+let IDX="$# - 1"
+SRC="${@:$IDX:1}"
+let IDX-=1
+RSYNC_OPTIONS="${@:1:$IDX} --exclude .cvmfscatalog --exclude .cvmfsautocatalog"
+
+DESTWITHOUTCVMFS="${DEST#/cvmfs/}"
+if [ "DESTWITHOUTCVMFS" = "$DEST" ]; then
+    echo "$ME: destination does not begin with /cvmfs/" >&2
+    usage
+fi
+
+REPO="${DESTWITHOUTCVMFS%%/*}"
+if [ -z "$REPO" ]; then
+    echo "$ME: no reponame given" >&2
+    usage
+fi
+
+if [[ "$SRC" =~ ^[^/]*: ]]; then
+    echo "$ME: srcdir must be locally mounted, not a remote host, sorry" >&2
+    usage
+fi
+
+DESTDIR="$DEST"
+if [ "${SRC%/}" = "$SRC" ]; then
+    # there's no trailing slash, so rsync will append $SRC basename to $DEST
+    DESTDIR="$DEST/${SRC##*/}"
+fi
+# Look for catalogs under $DESTDIR, and if any of the corresponding source 
+# directories have gone away, remove any .cvmfscatalog or .cvmfsautocatalog
+# in the destination.  Note: $DESTSUBDIR may be empty, and $SRC may or
+# may not have a trailing slash.
+DESTSUBDIR="${DESTDIR#/cvmfs/$REPO}"
+cvmfs_server list-catalogs -x $REPO|grep -E "^$DESTSUBDIR(/|$)"|while read DIR; do
+    # SRCSUBD will always either start with a slash or be empty
+    SRCSUBD="${DIR#$DESTSUBDIR}"
+    if [ ! -d "$SRC$SRCSUBD" ]; then
+        for F in .cvmfscatalog .cvmfsautocatalog; do
+            CATFILE="/cvmfs/$REPO$DIR/$F"
+            if [ -f "$CATFILE" ] ; then
+                echo "removing $F from deleted dir $DIR"
+                rm -f "$CATFILE"
+            fi
+        done
+    fi
+done
+
+exec rsync $RSYNC_OPTIONS $SRC $DEST

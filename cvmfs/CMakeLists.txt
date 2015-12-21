@@ -145,6 +145,9 @@ set (CVMFS_SWISSKNIFE_SOURCES
   pathspec/pathspec.h pathspec/pathspec.cc
   pathspec/pathspec_pattern.h pathspec/pathspec_pattern.cc
 
+  path_filters/dirtab.h path_filters/dirtab.cc
+  path_filters/relaxed_path_filter.h path_filters/relaxed_path_filter.cc
+
   upload.h upload.cc
   upload_spooler_definition.h upload_spooler_definition.cc
   upload_facility.h upload_facility.cc
@@ -178,7 +181,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   catalog_mgr_rw.h catalog_mgr_rw.cc
   catalog_balancer.h catalog_balancer_impl.h
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
-  dirtab.h dirtab.cc
   history.h
   history_sql.h history_sql.cc
   history_sqlite.h history_sqlite.cc
@@ -198,6 +200,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_migrate.h swissknife_migrate.cc
   swissknife_scrub.h swissknife_scrub.cc
   swissknife_gc.h swissknife_gc.cc
+  swissknife_graft.h swissknife_graft.cc
   swissknife.h swissknife.cc)
 
 
@@ -591,7 +594,7 @@ if (BUILD_CVMFS)
     install (
         FILES         bash_completion/cvmfs.bash_completion
         RENAME        cvmfs
-        DESTINATION   /etc/bash_completion.d
+        DESTINATION   ${SYSCONF_INSTALL_DIR}/bash_completion.d
         PERMISSIONS   OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
     )
   endif (INSTALL_BASH_COMPLETION)
@@ -639,8 +642,14 @@ if (BUILD_SERVER)
 
   install(
     FILES      cvmfs_server_hooks.sh.demo
-    DESTINATION    "/etc/cvmfs"
+    DESTINATION    "${SYSCONF_INSTALL_DIR}/cvmfs"
     PERMISSIONS    OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+  install (
+    FILES      cvmfs_rsync
+    DESTINATION    bin
+    PERMISSIONS    OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 
   install(

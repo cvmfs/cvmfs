@@ -150,7 +150,7 @@ struct ProxyHelper {
     char process_flavor[] = "__cred_fetcher__";
     args[0] = executable_name;
     args[1] = process_flavor;
-    args[1] = NULL;
+    args[2] = NULL;
     // NOTE: We have forked from a threaded process.  We do
     // not know the status of any other mutex in the program - particularly,
     // those related to formatting strings or logging.  Hence, we CANNOT
