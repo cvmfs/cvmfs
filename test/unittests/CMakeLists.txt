@@ -31,7 +31,7 @@ set(CVMFS_UNITTEST_FILES
   t_buffer.cc
   t_chunk_detectors.cc
   t_upload_facility.cc
-  # t_uploaders.cc
+  t_uploaders.cc
   t_file_processing.cc
   t_async_reader.cc
   t_test_utils.cc
