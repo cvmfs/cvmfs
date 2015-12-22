@@ -332,7 +332,7 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
     PrintError("failed to load public key(s)");
     return -1;
   } else {
-      LogCvmfs(kLogCvmfs, kLogStdout, "CernVM-FS: using public key(s) %s",
+      LogCvmfs(kLogCvmfs, kLogDebug, "CernVM-FS: using public key(s) %s",
                JoinStrings(
                  SplitString(opts.pubkey, ':'), ", ").c_str());
   }
