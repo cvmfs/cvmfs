@@ -13,7 +13,7 @@ usage()
   echo "    /etc/cvmfs/repositories.d/<repository>/replica.conf" >&2
   echo "  If another snapshot is in progress on a repository, it will be skipped." >&2
   echo "  -s: use separate logs for each repository in /var/log/cvmfs" >&2
-  echo "      (default is to use /var/log/cvmfs/updates.log)" >&2
+  echo "      (default is to use /var/log/cvmfs/updates.log for all)" >&2
   echo "  -n: do not warn if /etc/logrotate.d/cvmfs does not exist" >&2
   echo "  -i: skip repositories that have not run initial snapshot" >&2
   exit 2
