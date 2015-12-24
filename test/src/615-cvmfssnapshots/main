@@ -1,0 +1,53 @@
+cvmfs_test_name="cvmfs_snapshots stratum one replication script"
+cvmfs_test_autofs_on_startup=false
+
+CVMFS_TEST_615_REPLICA_NAMES=
+
+cleanup() {
+  if [ -n "$CVMFS_TEST_615_REPLICA_NAMES" ]; then
+    for repo in $CVMFS_TEST_615_REPLICA_NAMES; do
+      sudo cvmfs_server rmfs -f $repo
+    done
+  fi
+}
+
+cvmfs_run_test() {
+  logfile=$1
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  local replica_name="$(get_stratum1_name $CVMFS_TEST_REPO)"
+
+  CVMFS_TEST_615_REPLICA_NAMES="${replica_name}-1 ${replica_name}-2 ${replica_name}-3"
+  echo "install a cleanup function"
+  trap cleanup EXIT HUP INT TERM || return $?
+
+  echo "create 3 Stratum1 repositories on the same machine"
+  load_repo_config $CVMFS_TEST_REPO
+
+  for num in 1 2 3; do
+    create_stratum1 ${replica_name}-$num                   \
+                    root                                   \
+                    $CVMFS_STRATUM0                        \
+                    /etc/cvmfs/keys/${CVMFS_TEST_REPO}.pub \
+                    || return $num
+  done
+
+  echo "disabling snapshots to second replica"
+  sudo $SHELL -c "echo "CVMFS_REPLICA_ACTIVE=no" >> /etc/cvmfs/repositories.d/${replica_name}-2/replica.conf"
+
+  echo "running cvmfs_snapshots"
+  sudo cvmfs_snapshots -n || return 5
+
+  echo "checking if snapshot worked on replicas 1 and 3"
+  cmp /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfspublished /srv/cvmfs/${replica_name}-1/.cvmfspublished || return 6
+  cmp /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfspublished /srv/cvmfs/${replica_name}-3/.cvmfspublished || return 7
+
+  echo "checking if replica 2 was skipped"
+  [ -f /srv/cvmfs/${replica_name}-2/.cvmfspublished ] && return 8
+
+  return 0
+}
