@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -303,6 +304,13 @@ inline void platform_get_os_version(int32_t *major,
   assert(res == 0);
   const int matches = sscanf(uts_info.release, "%u.%u.%u", major, minor, patch);
   assert(matches == 3 && "failed to read version string");
+}
+
+inline uint64_t platform_monotonic_time() {
+  struct timespec tp;
+  int retval = clock_gettime(CLOCK_MONOTONIC, &tp);
+  assert(retval == 0);
+  return tp.tv_sec + (tp.tv_nsec >= 500000000);
 }
 
 #ifdef CVMFS_NAMESPACE_GUARD

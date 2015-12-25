@@ -358,7 +358,7 @@ if (BUILD_CVMFS)
   target_link_libraries (cvmfs_fuse       ${CVMFS2_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES}
                                           ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${SHA2_ARCHIVE}
-                                          ${SHA3_ARCHIVE} pthread)
+                                          ${SHA3_ARCHIVE} ${RT_LIBRARY} pthread)
 
 endif (BUILD_CVMFS)
 

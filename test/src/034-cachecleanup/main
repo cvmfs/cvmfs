@@ -10,6 +10,11 @@ cvmfs_run_test() {
   find /cvmfs/atlas-condb.cern.ch -type f -size +100M -size -200M | head -n 64 | \
     xargs file > /dev/null || return 1
 
+  turnover=$(sudo cvmfs_talk -i atlas_condb.cern.ch cleanup rate 120)
+  if [ turnover -le 0 ]; then
+    return 2
+  fi
+
   return 0
 }
 
