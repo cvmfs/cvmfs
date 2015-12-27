@@ -89,7 +89,7 @@ class T_Catalog : public ::testing::Test {
         new_clg_db(catalog::CatalogDatabase::Create(db_file));
       EXPECT_TRUE(new_clg_db.IsValid());
       bool retval =
-          new_clg_db->InsertInitialValues(root_path, volatile_content);
+          new_clg_db->InsertInitialValues(root_path, volatile_content, kUnset);
       EXPECT_TRUE(retval);
     }
     return db_file;
