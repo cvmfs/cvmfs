@@ -78,6 +78,9 @@ int Fetcher::Fetch(
   const uint64_t size,
   const std::string &name,
   const cache::CacheManager::ObjectType object_type,
+  pid_t pid,
+  uid_t uid,
+  gid_t gid,
   const std::string &alt_url)
 {
   int fd_return;  // Read-only file descriptor that is returned
