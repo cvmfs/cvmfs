@@ -2513,6 +2513,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                                        proxy_template);
   delete uuid;
   uuid = NULL;
+  if (ip_prefer != 0) {
+    switch (ip_prefer) {
+      case 4:
+        cvmfs::external_download_manager_->SetIpPreference(dns::kIpPreferV4);
+        break;
+      case 6:
+        cvmfs::external_download_manager_->SetIpPreference(dns::kIpPreferV6);
+        break;
+    }
+  }
   if (send_info_header)
     cvmfs::external_download_manager_->EnableInfoHeader();
   external_proxies = download::ResolveProxyDescription(external_proxies,
