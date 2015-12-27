@@ -324,12 +324,6 @@ bool CommandCheck::Find(const catalog::Catalog *catalog,
                  "only regular files can be external: %s", full_path.c_str());
         retval = false;
       }
-      if (!catalog->GetExternalData()) {
-        LogCvmfs(kLogCvmfs, kLogStderr,
-                 "File (%s) is marked as external but catalog does not "
-                 "support this.", full_path.c_str());
-        retval = false;
-      }
     }
 
     // checking file chunk integrity

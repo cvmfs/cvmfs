@@ -80,12 +80,12 @@ static void AnswerStringList(const int con_fd, const vector<string> &list) {
 }
 
 
-static std::string GenerateHostInfo(download::DownloadManager &manager) {  // NOLINT
+static std::string GenerateHostInfo(download::DownloadManager *manager) {
   vector<string> host_chain;
   vector<int> rtt;
   unsigned active_host;
 
-  manager.GetHostInfo(&host_chain, &rtt, &active_host);
+  manager->GetHostInfo(&host_chain, &rtt, &active_host);
   string host_str;
   for (unsigned i = 0; i < host_chain.size(); ++i) {
     host_str += "  [" + StringifyInt(i) + "] " + host_chain[i] + " (";
@@ -261,9 +261,9 @@ static void *MainTalk(void *data __attribute__((unused))) {
           Answer(con_fd, "OK\n");
         }
       } else if (line == "external host info") {
-        Answer(con_fd, GenerateHostInfo(*cvmfs::external_download_manager_));
+        Answer(con_fd, GenerateHostInfo(cvmfs::external_download_manager_));
       } else if (line == "host info") {
-        Answer(con_fd, GenerateHostInfo(*cvmfs::download_manager_));
+        Answer(con_fd, GenerateHostInfo(cvmfs::download_manager_));
       } else if (line == "host probe") {
         cvmfs::download_manager_->ProbeHosts();
         Answer(con_fd, "OK\n");

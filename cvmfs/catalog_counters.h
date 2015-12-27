@@ -88,7 +88,7 @@ class TreeCountersBase {
       (*map)[prefix + "file_size"]          = &file_size;
       (*map)[prefix + "chunked_size"]       = &chunked_file_size;
       (*map)[prefix + "xattr"]              = &xattrs;
-      (*map)[prefix + "externals"]          = &externals;
+      (*map)[prefix + "external"]           = &externals;
       (*map)[prefix + "external_file_size"] = &external_file_size;
     }
 

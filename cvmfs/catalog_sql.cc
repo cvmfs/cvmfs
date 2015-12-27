@@ -58,10 +58,10 @@ const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 //           * add schema_revision property
 //   1 --> 2: (Jan 22 2014 - Git: 85e6680e52cfe56dc1213a5ad74a5cc62fd50ead):
 //            * add xattr column to catalog table
-//            * add self_xattrs and subtree_xattrs statistics counters
+//            * add self_xattr and subtree_xattr statistics counters
 //   2 --> 3: (Sep 28 2015 - Git: f4171234b13ea448589820c1524ee52eae141bb4):
 //            * add kFlagFileExternal to entries in catalog table
-//            * add self_externals and subtree_externals statistics counters
+//            * add self_external and subtree_external statistics counters
 const unsigned CatalogDatabase::kLatestSchemaRevision = 3;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
@@ -117,11 +117,11 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (2 --> 3)");
 
     Sql sql_upgrade4(*this,
-      "INSERT INTO statistics (counter, value) VALUES ('self_externals', 0);");
+      "INSERT INTO statistics (counter, value) VALUES ('self_external', 0);");
     Sql sql_upgrade5(*this, "INSERT INTO statistics (counter, value) VALUES "
                             "('self_external_file_size', 0);");
     Sql sql_upgrade6(*this, "INSERT INTO statistics (counter, value) VALUES "
-                            "('subtree_externals', 0);");
+                            "('subtree_external', 0);");
     Sql sql_upgrade7(*this, "INSERT INTO statistics (counter, value) VALUES "
                             "('subtree_external_file_size', 0);");
     if (!sql_upgrade4.Execute() || !sql_upgrade5.Execute() ||

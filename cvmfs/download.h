@@ -313,8 +313,7 @@ class DownloadManager {
   ~DownloadManager();
 
   void Init(const unsigned max_pool_handles, const bool use_system_proxy,
-      perf::Statistics * statistics, const std::string &name = "download",
-      bool external = false);
+      perf::Statistics * statistics, const std::string &name = "download");
   void Fini();
   void Spawn();
   Failures Fetch(JobInfo *info);

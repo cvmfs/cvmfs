@@ -18,11 +18,11 @@ class T_CatalogSql : public ::testing::Test {
 
 static void RevertToRevision2(catalog::CatalogDatabase *db) {
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM statistics WHERE counter='self_externals';").Execute());
+    "DELETE FROM statistics WHERE counter='self_external';").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DELETE FROM statistics WHERE "
     "counter='self_external_file_size';").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
-    "DELETE FROM statistics WHERE counter='subtree_externals';").Execute());
+    "DELETE FROM statistics WHERE counter='subtree_external';").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DELETE FROM statistics WHERE "
     "counter='subtree_external_file_size';").Execute());
   ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
@@ -161,7 +161,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     ASSERT_TRUE(sql5.FetchRow());
     EXPECT_EQ(0, sql5.RetrieveInt(0));
     sqlite::Sql sql6(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='self_externals'");
+      "SELECT value FROM statistics WHERE counter='self_external'");
     ASSERT_TRUE(sql6.FetchRow());
     EXPECT_EQ(0, sql6.RetrieveInt(0));
     sqlite::Sql sql7(db->sqlite_db(),
@@ -169,7 +169,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     ASSERT_TRUE(sql7.FetchRow());
     EXPECT_EQ(0, sql7.RetrieveInt(0));
     sqlite::Sql sql8(db->sqlite_db(),
-      "SELECT value FROM statistics WHERE counter='subtree_externals'");
+      "SELECT value FROM statistics WHERE counter='subtree_external'");
     ASSERT_TRUE(sql8.FetchRow());
     EXPECT_EQ(0, sql8.RetrieveInt(0));
     sqlite::Sql sql9(db->sqlite_db(), "SELECT value FROM statistics WHERE "

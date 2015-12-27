@@ -375,8 +375,8 @@ TEST_F(T_CatalogCounters, FieldsMap) {
   EXPECT_EQ(DeltaCounters_t(0), *map["subtree_symlink"]);
   EXPECT_EQ(DeltaCounters_t(2), *map["self_chunked"]);
   EXPECT_EQ(DeltaCounters_t(0), *map["subtree_chunked"]);
-  EXPECT_EQ(DeltaCounters_t(1), *map["self_externals"]);
-  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_externals"]);
+  EXPECT_EQ(DeltaCounters_t(1), *map["self_external"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["subtree_external"]);
 
   d_counters.PopulateToParent(&d_parent);
 
@@ -389,8 +389,8 @@ TEST_F(T_CatalogCounters, FieldsMap) {
   EXPECT_EQ(DeltaCounters_t(3), *map["subtree_symlink"]);
   EXPECT_EQ(DeltaCounters_t(0), *map["self_chunked"]);
   EXPECT_EQ(DeltaCounters_t(2), *map["subtree_chunked"]);
-  EXPECT_EQ(DeltaCounters_t(0), *map["self_externals"]);
-  EXPECT_EQ(DeltaCounters_t(1), *map["subtree_externals"]);
+  EXPECT_EQ(DeltaCounters_t(0), *map["self_external"]);
+  EXPECT_EQ(DeltaCounters_t(1), *map["subtree_external"]);
 }
 
 }  // namespace catalog

@@ -1392,8 +1392,7 @@ void DownloadManager::FiniHeaders() {
 void DownloadManager::Init(const unsigned max_pool_handles,
                            const bool use_system_proxy,
                            perf::Statistics *statistics,
-                           const string &name,
-                           bool external_data)
+                           const string &name)
 {
   atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);

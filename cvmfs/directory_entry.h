@@ -309,6 +309,7 @@ class DirectoryEntry : public DirectoryEntryBase {
    */
   uint32_t hardlink_group_;
 
+  // TODO(jblomer): transform into bitfield to save memory
   bool is_nested_catalog_root_;
   bool is_nested_catalog_mountpoint_;
   bool is_chunked_file_;
