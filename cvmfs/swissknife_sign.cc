@@ -170,7 +170,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
         (manifest->history().IsNull() ||
          spooler->PlaceBootstrappingShortcut(manifest->history()));
 
-      if (! success) {
+      if (!success) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
                                         "symlinks");
         delete manifest;

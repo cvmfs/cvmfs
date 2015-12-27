@@ -54,6 +54,9 @@ DirectoryEntryBase::Differences DirectoryEntry::CompareTo(
   if (IsChunkedFile() != other.IsChunkedFile()) {
     result |= Difference::kChunkedFileFlag;
   }
+  if (IsExternalFile() != other.IsExternalFile()) {
+    result |= Difference::kExternalFileFlag;
+  }
 
   return result;
 }

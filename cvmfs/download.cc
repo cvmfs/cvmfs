@@ -147,8 +147,12 @@ static Failures PrepareDownloadDestination(JobInfo *info) {
   if (info->destination == kDestinationPath) {
     assert(info->destination_path != NULL);
     info->destination_file = fopen(info->destination_path->c_str(), "w");
-    if (info->destination_file == NULL)
+    if (info->destination_file == NULL) {
+      LogCvmfs(kLogDownload, kLogDebug, "Failed to open path %s: %s"
+               " (errno=%d).",
+               info->destination_path->c_str(), strerror(errno), errno);
       return kFailLocalIO;
+    }
   }
 
   if (info->destination == kDestinationSink)
@@ -283,6 +287,8 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     } else {
       int64_t written = info->destination_sink->Write(ptr, num_bytes);
       if ((written < 0) || (static_cast<uint64_t>(written) != num_bytes)) {
+        LogCvmfs(kLogDownload, kLogDebug, "Failed to perform write on path"
+                 " %s.", info->destination_path->c_str());
         info->error_code = kFailLocalIO;
         return 0;
       }
@@ -328,6 +334,9 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       }
     } else {
       if (fwrite(ptr, 1, num_bytes, info->destination_file) != num_bytes) {
+       LogCvmfs(kLogDownload, kLogDebug,
+                 "downloading %s, IO failure: %s (errno=%d)",
+                 info->url->c_str(), strerror(errno), errno);
         info->error_code = kFailLocalIO;
         return 0;
       }
@@ -1383,7 +1392,8 @@ void DownloadManager::FiniHeaders() {
 void DownloadManager::Init(const unsigned max_pool_handles,
                            const bool use_system_proxy,
                            perf::Statistics *statistics,
-                           const string &name)
+                           const string &name,
+                           bool external_data)
 {
   atomic_init32(&multi_threaded_);
   int retval = curl_global_init(CURL_GLOBAL_ALL);
