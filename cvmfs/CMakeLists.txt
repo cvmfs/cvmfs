@@ -60,6 +60,7 @@ set (CVMFS_CLIENT_SOURCES
   sqlitevfs.cc sqlitevfs.h
   fetch.cc fetch.h
   sink.h
+  clientctx.cc clientctx.h
 )
 
 
