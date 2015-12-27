@@ -15,6 +15,7 @@ TEST(T_ClientCtx, GetInstance) {
   EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
   ClientCtx::CleanupInstance();
   EXPECT_FALSE(ClientCtx::GetInstance()->IsSet());
+  ClientCtx::CleanupInstance();
 }
 
 TEST(T_ClientCtx, GetSet) {
@@ -54,4 +55,6 @@ TEST(T_ClientCtx, GetSet) {
   EXPECT_EQ(10U, uid);
   EXPECT_EQ(11U, gid);
   EXPECT_EQ(12, pid);
+
+  ClientCtx::CleanupInstance();
 }
