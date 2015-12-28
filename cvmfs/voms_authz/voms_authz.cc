@@ -410,6 +410,10 @@ IsRoleMatching(const char *role1, const char *role2)
 }
 
 
+static bool CheckSingleAuthz(const struct vomsdata *voms_ptr,
+                             const std::string & authz);
+
+
 bool
 CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
 {
@@ -418,32 +422,10 @@ CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
                  "authz.");
         return false;
     }
-
-    // Break the authz into VOMS and roles.
-    // We will compare the required auth against the cached session VOMS info.
-    // Roles must match exactly; Sub-groups are authorized in their parent
-    // group.
-
-    // NOTE: Trim out everything past the first ',' or '\n'; this will allow
-    // us to extend the authz in the future.
-    size_t delim = std::min(authz.find(","), authz.find("\n"));
-    std::string first_authz = (delim != std::string::npos) ?
-                              authz.substr(0, delim) : authz;
-    delim = first_authz.find("/Role=");
-    std::string role, group;
-    if (delim != std::string::npos) {
-        role = first_authz.substr(delim+6);
-        group = first_authz.substr(0, delim);
-    } else {
-        group = first_authz;
-    }
-    if (group[0] != '/') {return false;}
-    std::vector<std::string> group_hierarchy;
-    SplitGroupToPaths(group, group_hierarchy);
-
     LogCvmfs(kLogVoms, kLogDebug, "Checking whether user with UID %d has VOMS"
              " auth %s.", ctx->uid, authz.c_str());
 
+    // Get VOMS information from cache; if not present, store it.
     struct vomsdata *voms_ptr;
     if (!g_cache.get(ctx->pid, voms_ptr))
     {
@@ -466,14 +448,55 @@ CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
         return false;
     }
 
+    // Check all authorizations against our information
+    size_t last_delim = 0;
+    size_t delim = authz.find('\n');
+    while (delim != std::string::npos) {
+        std::string next_authz = authz.substr(last_delim, delim-last_delim);
+        last_delim = delim + 1;
+        delim = authz.find('\n', last_delim);
+
+        if (CheckSingleAuthz(voms_ptr, next_authz)) {return true;}
+    }
+    std::string next_authz = authz.substr(last_delim);
+    return CheckSingleAuthz(voms_ptr, next_authz);
+}
+
+
+static bool
+CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
+{
+    // Break the authz into VOMS and roles.
+    // We will compare the required auth against the cached session VOMS info.
+    // Roles must match exactly; Sub-groups are authorized in their parent
+    // group.
+
+    size_t delim = authz.find("/Role=");
+    std::string role, group;
+    if (delim != std::string::npos) {
+        role = authz.substr(delim+6);
+        group = authz.substr(0, delim);
+    } else {
+        group = authz;
+    }
+    if (group[0] != '/') {return false;}
+    std::vector<std::string> group_hierarchy;
+    SplitGroupToPaths(group, group_hierarchy);
+
     // Now we have valid VOMS data, check authz.
     for (int idx=0; voms_ptr->data[idx] != NULL; idx++)
     {  // Iterator through the VOs
         struct voms *it = voms_ptr->data[idx];
+        // Check first against the full DN.
+        if (it->user && !strcmp(it->user, authz.c_str())) {
+            return true;
+        }
+
         // Iterate through the FQANs.
         for (int idx2=0; it->std[idx2] != NULL; idx2++)
         {
             struct data *it2 = it->std[idx2];
+            if (!it2->group) {continue;}
             LogCvmfs(kLogVoms, kLogDebug, "Checking (%s Role=%s) against group"
                      " %s, role %s.", group.c_str(), role.c_str(), it2->group,
                      it2->role);
@@ -489,3 +512,4 @@ CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
 
     return false;
 }
+
