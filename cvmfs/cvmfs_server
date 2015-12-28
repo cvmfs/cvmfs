@@ -2891,17 +2891,12 @@ mkfs() {
     volatile_opt="-v"
     echo -n "(repository flagged volatile)... "
   fi
-  local voms_authz_opt=
-  if [ "x$voms_authz" != "x" ]; then
-    voms_authz_opt="-V $voms_authz"
-    echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
-  fi
   local user_shell="$(get_user_shell $name)"
   local create_cmd="$(__swissknife_cmd) create  \
-    $external_data_opt                         \
+    $external_data_opt                          \
     -t $temp_dir                                \
     -r $upstream                                \
-    -a $hash_algo $volatile_opt $voms_authz_opt \
+    -a $hash_algo $volatile_opt                 \
     -o ${temp_dir}/new_manifest"
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
