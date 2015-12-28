@@ -328,7 +328,8 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   signature_ready_ = true;
 
   if (!opts.blacklist.empty()) {
-    if (!signature_manager_->LoadBlacklist(opts.blacklist)) {
+    const bool append = false;
+    if (!signature_manager_->LoadBlacklist(opts.blacklist, append)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "failed to load blacklist");
       return -2;
     }

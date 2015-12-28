@@ -101,6 +101,8 @@ class OptionsManager {
    */
   std::string Dump();
 
+  bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
+
  protected:
   /**
     * The ConfigValue structure contains a concrete value of a variable, as well
@@ -110,8 +112,6 @@ class OptionsManager {
     std::string value;
     std::string source;
   };
-
-  bool HasConfigRepository(const std::string &fqrn, std::string *config_path);
 
   std::map<std::string, ConfigValue> config_;
 };  // class OptionManager
