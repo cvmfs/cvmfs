@@ -190,8 +190,10 @@ quota::ListenerHandle *watchdog_listener_ = NULL;
 quota::ListenerHandle *unpin_listener_ = NULL;
 signature::SignatureManager *signature_manager_ = NULL;
 download::DownloadManager *download_manager_ = NULL;
+download::DownloadManager *external_download_manager_ = NULL;
 cache::CacheManager *cache_manager_ = NULL;
 Fetcher *fetcher_ = NULL;
+Fetcher *external_fetcher_ = NULL;
 lru::InodeCache *inode_cache_ = NULL;
 lru::PathCache *path_cache_ = NULL;
 lru::Md5PathCache *md5path_cache_ = NULL;
@@ -1227,7 +1229,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     return;
   }
 
-  fd = fetcher_->Fetch(
+  fd = (dirent.IsExternalFile() ? external_fetcher_ : fetcher_)->Fetch(
     dirent.checksum(),
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
@@ -1628,6 +1630,20 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     } else {
       attribute_value = "DIRECT";
     }
+  } else if (attr == "user.external_file") {
+    attribute_value = d.IsExternalFile() ? "1" : "0";
+  } else if (attr == "user.external_data") {
+    attribute_value = catalog_manager_->GetExternalDataRepository() ? "1" : "0";
+  } else if (attr == "user.external_host") {
+    vector<string> host_chain;
+    vector<int> rtt;
+    unsigned current_host;
+    external_download_manager_->GetHostInfo(&host_chain, &rtt, &current_host);
+    if (host_chain.size()) {
+      attribute_value = string(host_chain[current_host]);
+    } else {
+      attribute_value = "internal error: no hosts defined";
+    }
   } else if (attr == "user.host") {
     vector<string> host_chain;
     vector<int> rtt;
@@ -1670,6 +1686,10 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds);
   } else if (attr == "user.timeout_direct") {
+    unsigned seconds, seconds_direct;
+    download_manager_->GetTimeout(&seconds, &seconds_direct);
+    attribute_value = StringifyInt(seconds_direct);
+  } else if (attr == "user.external_timeout") {
     unsigned seconds, seconds_direct;
     download_manager_->GetTimeout(&seconds, &seconds_direct);
     attribute_value = StringifyInt(seconds_direct);
@@ -1739,7 +1759,9 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.root_hash\0user.expires\0user.maxfd\0user.usedfd\0user.nioerr\0"
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
-    "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0";
+    "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
+    "user.external_host\0user.external_data\0user.external_file\0"
+    "user.external_timeout\0";
   string attribute_list;
   if (hide_magic_xattrs_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
@@ -1826,7 +1848,7 @@ bool Pin(const string &path) {
     dirent.checksum(), dirent.size(), path, false);
   if (!retval)
     return false;
-  int fd = fetcher_->Fetch(
+  int fd = (dirent.IsExternalFile() ? external_fetcher_ : fetcher_)->Fetch(
     dirent.checksum(), dirent.size(), path, cache::CacheManager::kTypePinned);
   if (fd < 0) {
     return false;
@@ -1894,6 +1916,7 @@ void UnregisterQuotaListener() {
 
 bool g_options_ready = false;
 bool g_download_ready = false;
+bool g_external_download_ready = false;
 bool g_nfs_maps_ready = false;
 bool g_monitor_ready = false;
 bool g_signature_ready = false;
@@ -1908,6 +1931,18 @@ string *g_boot_error = NULL;
 
 __attribute__((visibility("default")))
 loader::CvmfsExports *g_cvmfs_exports = NULL;
+
+
+static std::string CalculateHostString(
+    const std::string &fqrn,
+    const std::string &parameter) {
+  std::string host_str = parameter;
+  vector<string> tokens = SplitString(fqrn, '.');
+  const string org = tokens[0];
+  host_str = ReplaceAll(host_str, "@org@", org);
+  host_str = ReplaceAll(host_str, "@fqrn@", fqrn);
+  return host_str;
+}
 
 
 static void LogSqliteError(void *user_data __attribute__((unused)),
@@ -1946,6 +1981,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   uint64_t mem_cache_size = cvmfs::kDefaultMemcache;
   unsigned timeout = cvmfs::kDefaultTimeout;
   unsigned timeout_direct = cvmfs::kDefaultTimeout;
+  unsigned external_timeout = cvmfs::kDefaultTimeout;
+  unsigned external_timeout_direct = cvmfs::kDefaultTimeout;
   unsigned low_speed_limit = cvmfs::kDefaultLowSpeedLimit;
   unsigned dns_timeout_ms = download::DownloadManager::kDnsDefaultTimeoutMs;
   unsigned dns_retries = download::DownloadManager::kDnsDefaultRetries;
@@ -1969,7 +2006,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string hostname = "";
   string proxies = "";
   string fallback_proxies = "";
+  string external_proxies = "";
+  string fallback_external_proxies = "";
   string dns_server = "";
+  std::string external_host;
   unsigned ip_prefer = 0;
   string public_keys = "";
   string root_hash = "";
@@ -2031,6 +2071,15 @@ static int Init(const loader::LoaderExports *loader_exports) {
     timeout = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TIMEOUT_DIRECT", &parameter))
     timeout_direct = String2Uint64(parameter);
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_TIMEOUT", &parameter))
+    external_timeout = String2Uint64(parameter);
+  else
+    external_timeout = timeout;
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_TIMEOUT_DIRECT",
+      &parameter))
+    external_timeout_direct = String2Uint64(parameter);
+  else
+    external_timeout_direct = timeout_direct;
   if (cvmfs::options_manager_->GetValue("CVMFS_LOW_SPEED_LIMIT", &parameter))
     low_speed_limit = String2Uint64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_PROXY_RESET_AFTER", &parameter))
@@ -2079,8 +2128,22 @@ static int Init(const loader::LoaderExports *loader_exports) {
     proxies = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_FALLBACK_PROXY", &parameter))
     fallback_proxies = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_HTTP_PROXY",
+      &parameter))
+    external_proxies = parameter;
+  else
+    external_proxies = "DIRECT";
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_FALLBACK_PROXY",
+      &parameter))
+    fallback_external_proxies = parameter;
+  else
+    fallback_external_proxies = fallback_proxies;
   if (cvmfs::options_manager_->GetValue("CVMFS_DNS_SERVER", &parameter))
     dns_server = parameter;
+  if (cvmfs::options_manager_->GetValue("CVMFS_EXTERNAL_URL", &parameter)) {
+    external_host =
+      CalculateHostString(loader_exports->repository_name, parameter);
+  }
   if (cvmfs::options_manager_->GetValue("CVMFS_IP_PREFER", &parameter))
     ip_prefer = String2Int64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
@@ -2131,11 +2194,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
     g_raw_symlinks = true;
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_SERVER_URL", &parameter)) {
-    vector<string> tokens = SplitString(loader_exports->repository_name, '.');
-    const string org = tokens[0];
-    hostname = parameter;
-    hostname = ReplaceAll(hostname, "@org@", org);
-    hostname = ReplaceAll(hostname, "@fqrn@", loader_exports->repository_name);
+    hostname = CalculateHostString(loader_exports->repository_name, parameter);
   }
   if (cvmfs::options_manager_->GetValue("CVMFS_CACHE_BASE", &parameter)) {
     cachedir = MakeCanonicalPath(parameter);
@@ -2500,8 +2559,6 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                                backoff_max);
   cvmfs::download_manager_->SetMaxIpaddrPerProxy(max_ipaddr_per_proxy);
   cvmfs::download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
-  delete uuid;
-  uuid = NULL;
   if (ip_prefer != 0) {
     switch (ip_prefer) {
       case 4:
@@ -2510,7 +2567,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       case 6:
         cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV6);
         break;
-    }    
+    }
   }
   if (send_info_header)
     cvmfs::download_manager_->EnableInfoHeader();
@@ -2526,6 +2583,65 @@ static int Init(const loader::LoaderExports *loader_exports) {
   if (use_geo_api) {
     cvmfs::download_manager_->ProbeGeo();
   }
+
+  // Initialize the _external_ download manager.  Mostly the same as the
+  // primary except it has a different hostname and timeout.
+  cvmfs::external_download_manager_ = new download::DownloadManager();
+  cvmfs::external_download_manager_->Init(cvmfs::kDefaultNumConnections, false,
+      cvmfs::statistics_, "download-external");
+  cvmfs::external_download_manager_->SetHostChain(external_host.size() ?
+                                                  external_host : hostname);
+  if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
+      (dns_retries != download::DownloadManager::kDnsDefaultRetries))
+  {
+    cvmfs::external_download_manager_->SetDnsParameters(dns_retries,
+                                                        dns_timeout_ms);
+  }
+  if (!dns_server.empty()) {
+    cvmfs::external_download_manager_->SetDnsServer(dns_server);
+  }
+  if (follow_redirects) {
+    cvmfs::external_download_manager_->EnableRedirects();
+  }
+  cvmfs::external_download_manager_->SetTimeout(external_timeout,
+                                                external_timeout_direct);
+  cvmfs::external_download_manager_->SetLowSpeedLimit(low_speed_limit);
+  cvmfs::external_download_manager_->SetProxyGroupResetDelay(proxy_reset_after);
+  cvmfs::external_download_manager_->SetHostResetDelay(host_reset_after);
+  cvmfs::external_download_manager_->SetRetryParameters(max_retries,
+                                               backoff_init,
+                                               backoff_max);
+  cvmfs::external_download_manager_->SetMaxIpaddrPerProxy(max_ipaddr_per_proxy);
+  cvmfs::external_download_manager_->SetProxyTemplates(uuid->uuid(),
+                                                       proxy_template);
+  delete uuid;
+  uuid = NULL;
+  if (ip_prefer != 0) {
+    switch (ip_prefer) {
+      case 4:
+        cvmfs::external_download_manager_->SetIpPreference(dns::kIpPreferV4);
+        break;
+      case 6:
+        cvmfs::external_download_manager_->SetIpPreference(dns::kIpPreferV6);
+        break;
+    }
+  }
+  if (send_info_header)
+    cvmfs::external_download_manager_->EnableInfoHeader();
+  external_proxies = download::ResolveProxyDescription(external_proxies,
+                                            cvmfs::external_download_manager_);
+  if (external_proxies == "") {
+    *g_boot_error = "failed to discover HTTP proxy servers";
+    return loader::kFailWpad;
+  }
+  cvmfs::external_download_manager_->SetProxyChain(
+    external_proxies, fallback_external_proxies,
+    download::DownloadManager::kSetProxyBoth);
+  g_external_download_ready = true;
+  if (use_geo_api) {
+    cvmfs::external_download_manager_->ProbeGeo();
+  }
+
 
   cvmfs::signature_manager_ = new signature::SignatureManager();
   cvmfs::signature_manager_->Init();
@@ -2555,6 +2671,15 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::download_manager_,
     cvmfs::backoff_throttle_,
     cvmfs::statistics_);
+
+  const bool is_external_data = true;
+  cvmfs::external_fetcher_ = new cvmfs::Fetcher(
+    cvmfs::cache_manager_,
+    cvmfs::external_download_manager_,
+    cvmfs::backoff_throttle_,
+    cvmfs::statistics_,
+    "fetch-external",
+    is_external_data);
 
   // Load initial file catalog
   LogCvmfs(kLogCvmfs, kLogDebug, "fuse inode size is %d bits",
@@ -2714,6 +2839,7 @@ static void Spawn() {
     monitor::Spawn();
   }
   cvmfs::download_manager_->Spawn();
+  cvmfs::external_download_manager_->Spawn();
   cvmfs::cache_manager_->quota_mgr()->Spawn();
   if (cvmfs::cache_manager_->quota_mgr()->IsEnforcing()) {
     cvmfs::watchdog_listener_ = quota::RegisterWatchdogListener(
@@ -2768,6 +2894,7 @@ static void Fini() {
   tracer::Fini();
   if (g_signature_ready) cvmfs::signature_manager_->Fini();
   if (g_download_ready) cvmfs::download_manager_->Fini();
+  if (g_external_download_ready) cvmfs::external_download_manager_->Fini();
   if (g_nfs_maps_ready) nfs_maps::Fini();
   if (g_quota_ready) {
     if (cvmfs::unpin_listener_) {
@@ -2794,6 +2921,7 @@ static void Fini() {
   delete cvmfs::remount_fence_;
   delete cvmfs::signature_manager_;
   delete cvmfs::download_manager_;
+  delete cvmfs::external_download_manager_;
   delete cvmfs::inode_annotation_;
   delete cvmfs::directory_handles_;
   delete cvmfs::chunk_tables_;
@@ -2810,6 +2938,7 @@ static void Fini() {
   cvmfs::remount_fence_ = NULL;
   cvmfs::signature_manager_ = NULL;
   cvmfs::download_manager_ = NULL;
+  cvmfs::external_download_manager_ = NULL;
   cvmfs::inode_annotation_ = NULL;
   cvmfs::directory_handles_ = NULL;
   cvmfs::chunk_tables_ = NULL;

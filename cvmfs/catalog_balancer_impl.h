@@ -55,8 +55,8 @@ void CatalogBalancer<CatalogMgrT>::AddCatalogMarker(string path) {
       MakeEmptyDirectoryEntryBase(".cvmfsautocatalog", parent.uid(),
                                            parent.gid());
   string relative_path = path.substr(1);
-  catalog_mgr_->AddFile(cvmfscatalog, xattr, relative_path);
-  catalog_mgr_->AddFile(cvmfsautocatalog, xattr, relative_path);
+  catalog_mgr_->AddFile(cvmfscatalog, xattr, false, relative_path);
+  catalog_mgr_->AddFile(cvmfsautocatalog, xattr, false, relative_path);
 }
 
 template <class CatalogMgrT>

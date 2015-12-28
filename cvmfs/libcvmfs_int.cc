@@ -315,6 +315,17 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   // ctx.download_manager_->EnableInfoHeader();
   download_ready_ = true;
 
+  external_download_manager_ = new download::DownloadManager();
+  external_download_manager_->Init(16, false, statistics);
+  external_download_manager_->SetHostChain(opts.external_url);
+  external_download_manager_->SetTimeout(opts.timeout,
+                                opts.timeout_direct);
+  external_download_manager_->SetProxyChain(
+    download::ResolveProxyDescription(opts.proxies, external_download_manager_),
+    opts.fallback_proxies,
+    download::DownloadManager::kSetProxyBoth);
+  external_download_ready_ = true;
+
   signature_manager_ = new signature::SignatureManager();
   signature_manager_->Init();
   if (!signature_manager_->LoadPublicRsaKeys(opts.pubkey)) {
@@ -339,6 +350,14 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
     download_manager_,
     &backoff_throttle_,
     statistics_);
+
+  external_fetcher_ = new cvmfs::Fetcher(
+    cvmfs_globals::Instance()->cache_mgr(),
+    external_download_manager_,
+    &backoff_throttle_,
+    statistics_,
+    "fetch-external",
+    true);
 
   // Load initial file catalog
   catalog_manager_ = new catalog::ClientCatalogManager(
@@ -378,10 +397,13 @@ cvmfs_context::cvmfs_context(const options &opts)
   , catalog_manager_(NULL)
   , signature_manager_(NULL)
   , download_manager_(NULL)
+  , external_download_manager_(NULL)
   , fetcher_(NULL)
+  , external_fetcher_(NULL)
   , md5path_cache_(NULL)
   , fd_lockfile(-1)
   , download_ready_(false)
+  , external_download_ready_(false)
   , signature_ready_(false)
   , catalog_ready_(false)
   , pathcache_ready_(false)
@@ -392,6 +414,8 @@ cvmfs_context::cvmfs_context(const options &opts)
 cvmfs_context::~cvmfs_context() {
   delete fetcher_;
   fetcher_ = NULL;
+  delete external_fetcher_;
+  external_fetcher_ = NULL;
 
   if (catalog_ready_) {
     delete catalog_manager_;
@@ -402,6 +426,12 @@ cvmfs_context::~cvmfs_context() {
     download_manager_->Fini();
     delete download_manager_;
     download_manager_ = NULL;
+  }
+
+  if (external_download_ready_) {
+    external_download_manager_->Fini();
+    delete external_download_manager_;
+    external_download_manager_ = NULL;
   }
 
   if (signature_ready_) {
@@ -600,7 +630,7 @@ int cvmfs_context::Open(const char *c_path) {
     return fd | kFdChunked;
   }
 
-  fd = fetcher_->Fetch(
+  fd = (dirent.IsExternalFile() ? external_fetcher_ : fetcher_)->Fetch(
     dirent.checksum(),
     dirent.size(),
     string(path.GetChars(), path.GetLength()),

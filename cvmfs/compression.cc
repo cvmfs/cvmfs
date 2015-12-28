@@ -256,8 +256,11 @@ StreamStates DecompressZStream2File(
           return kStreamIOError;
       }
       size_t have = kZChunk - strm->avail_out;
-      if (fwrite(out, 1, have, f) != have || ferror(f))
+      if (fwrite(out, 1, have, f) != have || ferror(f)) {
+        LogCvmfs(kLogCompress, kLogDebug, "Inflate to file failed with %s "
+             "(errno=%d)", strerror(errno), errno);
         return kStreamIOError;
+      }
     } while (strm->avail_out == 0);
 
     pos += kZChunk;

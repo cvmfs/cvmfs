@@ -511,7 +511,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
     assert(xattrs != NULL);
   }
 
-  if (result.IsChunked()) {
+  if (!item.IsExternalData() && result.IsChunked()) {
     catalog_manager_->AddChunkedFile(
       item.CreateBasicCatalogDirent(),
       *xattrs,
@@ -521,6 +521,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
     catalog_manager_->AddFile(
       item.CreateBasicCatalogDirent(),
       *xattrs,
+      item.IsExternalData(),
       item.relative_parent_path());
   }
 
@@ -623,6 +624,7 @@ void SyncMediator::AddFile(const SyncItem &entry) {
     catalog_manager_->AddFile(
       entry.CreateBasicCatalogDirent(),
       default_xattrs,
+      entry.IsExternalData(),
       entry.relative_parent_path());
   } else if (entry.HasGraftMarker()) {
     if (entry.IsValidGraft()) {
@@ -631,6 +633,7 @@ void SyncMediator::AddFile(const SyncItem &entry) {
         entry.CreateBasicCatalogDirent(),
         default_xattrs,  // TODO(bbockelm): For now, use default xattrs
                          // on grafted files.
+        entry.IsExternalData(),  // TODO(bbockelm): Take this from in graft.
         entry.relative_parent_path());
     } else {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,

@@ -16,7 +16,22 @@ class T_CatalogSql : public ::testing::Test {
   }
 };
 
+static void RevertToRevision2(catalog::CatalogDatabase *db) {
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "DELETE FROM statistics WHERE counter='self_external';").Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DELETE FROM statistics WHERE "
+    "counter='self_external_file_size';").Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "DELETE FROM statistics WHERE counter='subtree_external';").Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(), "DELETE FROM statistics WHERE "
+    "counter='subtree_external_file_size';").Execute());
+  ASSERT_TRUE(sqlite::Sql(db->sqlite_db(),
+    "UPDATE properties SET value=2 WHERE key='schema_revision';").Execute());
+}
+
 static void RevertToRevision1(catalog::CatalogDatabase *db) {
+  RevertToRevision2(db);
+
   string table_sql;
   string indexes_sql;
   sqlite::Sql sql_schema(db->sqlite_db(),
@@ -87,7 +102,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
   fclose(ftmp);
   UnlinkGuard unlink_guard(path);
 
-  // Revision 1 --> 2
+  // Revision 1 --> 3
   {
     UniquePtr<catalog::CatalogDatabase>
       db(catalog::CatalogDatabase::Create(path));
@@ -105,7 +120,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     sqlite::Sql sql2(db->sqlite_db(),
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql2.FetchRow());
-    EXPECT_EQ(2, sql2.RetrieveInt(0));
+    EXPECT_EQ(3, sql2.RetrieveInt(0));
     sqlite::Sql sql3(db->sqlite_db(),
       "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql3.FetchRow());
@@ -116,7 +131,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     EXPECT_EQ(0, sql4.RetrieveInt(0));
   }
 
-  // Revision 0 --> 2
+  // Revision 0 --> 3
   {
     UniquePtr<catalog::CatalogDatabase> db(catalog::CatalogDatabase::Open(
       path, catalog::CatalogDatabase::kOpenReadWrite));
@@ -136,7 +151,7 @@ TEST_F(T_CatalogSql, SchemaMigration) {
     sqlite::Sql sql3(db->sqlite_db(),
       "SELECT value FROM properties WHERE key='schema_revision'");
     ASSERT_TRUE(sql3.FetchRow());
-    EXPECT_EQ(2, sql3.RetrieveInt(0));
+    EXPECT_EQ(3, sql3.RetrieveInt(0));
     sqlite::Sql sql4(db->sqlite_db(),
       "SELECT value FROM statistics WHERE counter='self_xattr'");
     ASSERT_TRUE(sql4.FetchRow());
@@ -145,5 +160,21 @@ TEST_F(T_CatalogSql, SchemaMigration) {
       "SELECT value FROM statistics WHERE counter='subtree_xattr'");
     ASSERT_TRUE(sql5.FetchRow());
     EXPECT_EQ(0, sql5.RetrieveInt(0));
+    sqlite::Sql sql6(db->sqlite_db(),
+      "SELECT value FROM statistics WHERE counter='self_external'");
+    ASSERT_TRUE(sql6.FetchRow());
+    EXPECT_EQ(0, sql6.RetrieveInt(0));
+    sqlite::Sql sql7(db->sqlite_db(),
+      "SELECT value FROM statistics WHERE counter='self_external_file_size'");
+    ASSERT_TRUE(sql7.FetchRow());
+    EXPECT_EQ(0, sql7.RetrieveInt(0));
+    sqlite::Sql sql8(db->sqlite_db(),
+      "SELECT value FROM statistics WHERE counter='subtree_external'");
+    ASSERT_TRUE(sql8.FetchRow());
+    EXPECT_EQ(0, sql8.RetrieveInt(0));
+    sqlite::Sql sql9(db->sqlite_db(), "SELECT value FROM statistics WHERE "
+      "counter='subtree_external_file_size'");
+    ASSERT_TRUE(sql9.FetchRow());
+    EXPECT_EQ(0, sql9.RetrieveInt(0));
   }
 }
