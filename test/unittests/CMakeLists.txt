@@ -75,6 +75,7 @@ set(CVMFS_UNITTEST_FILES
   t_file_chunk.cc
   t_platforms.cc
   t_compression.cc
+  t_clientctx.cc
 )
 
 #
@@ -198,6 +199,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
   ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
   ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc
+  ${CVMFS_SOURCE_DIR}/clientctx.h
+  ${CVMFS_SOURCE_DIR}/clientctx.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})

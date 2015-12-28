@@ -100,14 +100,14 @@ Manifest *Manifest::Load(const map<char, string> &content) {
 Manifest::Manifest(const shash::Any &catalog_hash,
                    const uint64_t catalog_size,
                    const string &root_path)
- : catalog_hash_(catalog_hash)
- , catalog_size_(catalog_size)
- , root_path_(shash::Md5(shash::AsciiPtr(root_path)))
- , ttl_(catalog::Catalog::kDefaultTTL)
- , revision_(0)
- , publish_timestamp_(0)
- , garbage_collectable_(false)
- , has_alt_catalog_path_(false)
+  : catalog_hash_(catalog_hash)
+  , catalog_size_(catalog_size)
+  , root_path_(shash::Md5(shash::AsciiPtr(root_path)))
+  , ttl_(catalog::Catalog::kDefaultTTL)
+  , revision_(0)
+  , publish_timestamp_(0)
+  , garbage_collectable_(false)
+  , has_alt_catalog_path_(false)
 { }
 
 
