@@ -46,9 +46,7 @@ class UF_MockUploader : public AbstractMockUploader<UF_MockUploader> {
     initialize_called(false) {}
 
   upload::UploadStreamHandle* InitStreamedUpload(
-    const CallbackTN *callback = NULL,
-    const std::string  &alt_path = "") 
-  {
+                                            const CallbackTN *callback = NULL) {
     return new UF_MockStreamHandle(callback);
   }
 

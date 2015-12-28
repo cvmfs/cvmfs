@@ -141,10 +141,7 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       spooler->RegisterListener(&CommandSign::CertificateUploadCallback, this);
 
     // Safe certificate (and wait for the upload through a Future)
-    spooler->ProcessCertificate(certificate, "");
-    if (manifest->has_alt_catalog_path()) {
-      spooler->ProcessCertificate(certificate, manifest->MakeCertificatePath());
-    }
+    spooler->ProcessCertificate(certificate);
     const shash::Any certificate_hash = certificate_hash_.Get();
     spooler->UnregisterListener(callback);
 

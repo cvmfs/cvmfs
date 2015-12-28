@@ -28,9 +28,7 @@ class GC_MockUploader : public AbstractMockUploader<GC_MockUploader> {
     AbstractMockUploader<GC_MockUploader>(spooler_definition) {}
 
   upload::UploadStreamHandle* InitStreamedUpload(
-    const CallbackTN *callback = NULL,
-    const std::string  &alt_path = "") 
-  {
+                                            const CallbackTN *callback = NULL) {
     return NULL;
   }
 

@@ -131,15 +131,13 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *
    * @param local_path   path to the file to be uploaded
    * @param remote_path  desired path for the file in the backend storage
-   * @param alt_path     alternate destination to also save the path
    * @param callback     (optional) gets notified when the upload was finished
    */
   void Upload(const std::string  &local_path,
               const std::string  &remote_path,
-              const std::string  &alt_path,
               const CallbackTN   *callback = NULL) {
     ++jobs_in_flight_;
-    FileUpload(local_path, remote_path, alt_path, callback);
+    FileUpload(local_path, remote_path, callback);
   }
 
 
@@ -152,13 +150,10 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
    *
    * @param callback   (optional) this callback will be invoked once this parti-
    *                   cular streamed upload is committed.
-   * @param alt_path   (optional) a path where the uploader should also make this
-   *                   file available.
    * @return           a pointer to the initialized UploadStreamHandle
    */
   virtual UploadStreamHandle* InitStreamedUpload(
-                                       const CallbackTN   *callback = NULL,
-                                       const std::string  &alt_path = "") = 0;
+                                       const CallbackTN   *callback = NULL) = 0;
 
 
   /**
@@ -269,7 +264,6 @@ class AbstractUploader : public PolymorphicConstruction<AbstractUploader,
 
   virtual void FileUpload(const std::string  &local_path,
                           const std::string  &remote_path,
-                          const std::string  &alt_path,
                           const CallbackTN   *callback = NULL) = 0;
 
   /**
