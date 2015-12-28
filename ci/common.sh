@@ -171,3 +171,41 @@ compare_versions() {
 
   [ $lhs1$lhs2$lhs3 $comparison_operator $rhs1$rhs2$rhs3 ]
 }
+
+_template_placeholders() {
+  local template_path="$1"
+  cat $template_path | grep -ohe '@[^@]\+@' | sort | uniq
+}
+
+_unwrap_placeholder() {
+  local placeholder="$1"
+  echo "$placeholder" | sed -e 's/^@\([^@]*\)@/\1/'
+}
+
+_unwrap_variable() {
+  local var="$1"
+  echo $(eval "echo \$$var")
+}
+
+_escape_slashes() {
+  echo "$1" | sed -e 's/\//\\\//g'
+}
+
+# Expands placeholder strings in a template file using all shell variables in
+# the caller's scope. Placeholders look like this: @VARIABLE_NAME@
+#
+# @param template_path  path to the template file to be expanded
+# @return               content of $template_path with expanded placeholders
+expand_template() {
+  local template_path="$1"
+
+  local tmp="$(cat $template_path)"
+  for placeholder in $(_template_placeholders $template_path); do
+    local var=$(_unwrap_placeholder $placeholder)
+    local cont="$(_unwrap_variable $var)"
+    [ ! -z $cont ] || die "\$$var for '$template_path' is empty!"
+    tmp="$(echo "$tmp" | sed -e "s/$placeholder/$(_escape_slashes $cont)/g")"
+  done
+
+  echo "$tmp"
+}

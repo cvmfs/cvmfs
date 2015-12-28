@@ -80,6 +80,12 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
   virtual bool Deflate(unsigned char *outbuf, size_t& outbufsize,
           unsigned char*& inbuf, size_t& inbufsize,
           const bool flush) = 0;
+          
+  /**
+    * Return an upper bound on the number of bytes required in order 
+    * to compress an input number of bytes.
+    * Returns: Upper bound on the number of bytes required to compress.
+    */
   virtual size_t DeflateBound(const size_t bytes) { return bytes; }
   virtual Compressor* Clone() = 0;
   static void RegisterPlugins();
@@ -135,7 +141,8 @@ bool CompressPath2Path(const std::string &src, const std::string &dest,
 bool DecompressPath2Path(const std::string &src, const std::string &dest);
 
 bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash);
-bool CompressFd2Null(int fd_src, shash::Any *compressed_hash);
+bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
+                     uint64_t* size = NULL);
 bool CompressFile2File(FILE *fsrc, FILE *fdest);
 bool CompressFile2File(FILE *fsrc, FILE *fdest, shash::Any *compressed_hash);
 bool CompressPath2File(const std::string &src, FILE *fdest,

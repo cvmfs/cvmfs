@@ -78,7 +78,8 @@ int Fetcher::Fetch(
   const uint64_t size,
   const std::string &name,
   const zlib::Algorithms compression_algorithm,
-  const cache::CacheManager::ObjectType object_type)
+  const cache::CacheManager::ObjectType object_type,
+  const std::string &alt_url)
 {
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
@@ -122,7 +123,7 @@ int Fetcher::Fetch(
 
   // Involve the download manager
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", name.c_str());
-  const string url = "/data/" + id.MakePath();
+  const string url = "/" + (alt_url.size() ? alt_url : "data/" + id.MakePath());
   void *txn = alloca(cache_mgr_->SizeOfTxn());
   retval = cache_mgr_->StartTxn(id, size, txn);
   if (retval < 0) {

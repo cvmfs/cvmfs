@@ -338,6 +338,9 @@ cvmfs_umount() {
       timeout=$(($timeout-1))
       sleep 1
     done
+
+    times=5
+    result=-1
   done
 
   return 0
@@ -453,7 +456,10 @@ min() {
 
 destroy_repo() {
   local repo=$1
-  sudo cvmfs_server rmfs -f $repo || return 100
+  shift 1
+  local additional_flags="$@"
+
+  sudo cvmfs_server rmfs -f $additional_flags $repo || return 100
 }
 
 
@@ -838,6 +844,18 @@ get_catalog_count() {
   echo $(cvmfs_server list-catalogs -x $repo_name | wc -l)
 }
 
+# read the manifest piped in through stdin and figure out the root catalog hash
+# @param (stdin)  a manifest file content
+# return          the catalog root hash referenced in the manifest
+get_root_hash_from_manifest() {
+  grep --text '^C[a-f0-9]*\(-[a-z0-9]*\)\?$' | sed -e 's/^C\(.*\)$/\1/'
+              # ^^~~~~~~~^ ^~~~~~~~~~~~^
+              # ||       | |           |
+              # ||       | +-----------+-- (optional) Hash Suffix
+              # |+-------+---------------- Hash String
+              # +------------------------- Manifest Field Identifier
+}
+
 # retrieves the hash of the current root catalog of the given
 # repository by investigating the manifest
 # @param repo_name  the name of the repository
@@ -845,14 +863,7 @@ get_catalog_count() {
 get_current_root_catalog() {
   local repo_name=$1
   local manifest_url="$(get_repo_url $repo_name)/.cvmfspublished"
-  local catalog_record=$(curl "$manifest_url" 2>/dev/null | grep --text '^C[a-f0-9]*\(-[a-z0-9]*\)\?$')
-                                                                        # ^^~~~~~~~^ ^~~~~~~~~~~~^
-                                                                        # ||       | |           |
-                                                                        # ||       | +-----------+-- (optional) Hash Suffix
-                                                                        # |+-------+---------------- Hash String
-                                                                        # +------------------------- Manifest Field Identifier
-  local characters=$(echo -n $catalog_record | wc -c)
-  echo -n $catalog_record | tail -c $(( $characters - 1 ))
+  curl "$manifest_url" 2>/dev/null | get_root_hash_from_manifest
 }
 
 # uses `cvmfs_server check` to check the integrity of the catalog structure
@@ -1312,6 +1323,14 @@ peek_backend() {
 
   load_repo_config $repo_name
   cvmfs_swissknife peek -d $remote_path -r $CVMFS_UPSTREAM_STORAGE
+}
+
+
+# reads the upstream config part of a CernVM-FS server configuration file
+# This is the third comma-separated field in the upstream string
+read_upstream_config() {
+  local upstream_string="$1"
+  echo "$upstream_string" | cut -f3 -d','
 }
 
 
@@ -1855,6 +1874,7 @@ CVMFS_SERVER_URL=$repo_url
 CVMFS_HTTP_PROXY=DIRECT
 CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/${repo_name}.pub
 CVMFS_KCACHE_TIMEOUT=15
+CVMFS_DEBUGLOG=$output
 EOF
   else
     cat $config_file > $config
@@ -1869,4 +1889,11 @@ remove_local_mount() {
 
   sudo umount $mountpoint
   rm -fR $cache $mountpoint
+}
+
+get_internal_value() {
+  local repo=$1
+  local key=$2
+
+  echo $(sudo cvmfs_talk -i $repo internal affairs | grep "^$key" | cut -d\| -f2)
 }

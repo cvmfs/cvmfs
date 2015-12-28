@@ -1,4 +1,42 @@
 2.2.0:
+  * Add CVMFS_IP_PREFER=[4|6] to select preferred IP protocol for proxies
+  * Fix crash when publishing specific files which a size of a multiple of the
+    chunk size (CVM-957)
+  * Immediately pick up new catalogs after idle period (CVM-636)
+  * Add CVMFS_REPOSITORY_TTL server parameter for repository TTL in seconds
+  * Move python library to a separate repository
+  * Harden GeoAPI against cache poisoning (CVM-722)
+  * Fix handling of empty CVMFS_CONFIG_REPOSITORY
+  * Allow for configuration of DNS timeout and retry (CVM-875)
+  * Add IPv6 support for GeoAPI (CVM-807)
+  * Add `cvmfs_server check -s` to verify subtrees
+  * Don't resolve magic symlinks in server mode (CVM-879)
+  * Unmount repositories when rpm is erased (CVM-757)
+  * Allow for alternative URLs for root catalog outside /data subdirectory
+  * Add static status files on stratum 0/1 server (CVM-860)
+  * Fix cache directory selection in `cvmfs_config wipecache` (CVM-709)
+  * Add `cvmfs_config killall` command (CVM-899)
+  * Log events to syslog in cvmfs_server (CVM-812, CVM-861)
+  * Enable `cvmfs_server import` to generate new repository keys (CVM-865)
+  * Do not mount /cvmfs on boot on the release manager machine; on the first
+    transaction, CVMFS_AUTO_REPAIR_MOUNTPOINT mounts automatically
+  * Perform host fail-over on HTTP 400 error code (CVM-819)
+  * Fail immediately if CVMFS_SERVER_URL is unset (CVM-892)
+  * Add -p switch to cvmfs_server commands to skip Apache config (CVM-900)
+  * Minor fixes to libcvmfs (CVM-831, CVM-893)
+  * Add CLI for grafting files (CVM-933)
+  * Add support for explicitly listed repositories in 'cvmfs_config probe'
+    (CVM-793)
+  * Allow for repository removal without removing the content (CVM-738)
+  * Add cvmfs_config fsck command (CVM-371)
+  * Avoid use of sudo in cvmfs_server (CVM-245)
+  * Various build system fixes (CVM-783, CVM-854, CVM-857)
+  * Avoid rolling back to incompatible catalog schemas (CVM-252)
+  * Add cvmfs_rsync utility (CVM-814)
+  * Fixes for OS X El Capitan, move install directory on OS X to /usr/local 
+    (CVM-917)
+  * Fix rare bug in the garbage collection that can lead to removal of live
+    files (CVM-942)
   * Add support for grafting of files (CVM-908)
   * Make CVMFS_AUTO_REPAIR_MOUNTPOINT the default (CVM-889)
   * Fix mount point auto repair when only the read-only branch is broken (CVM-918)
@@ -32,7 +70,6 @@
   * Add listing of /var/run/cvmfs to bugreport tarball (CVM-868)
   * Prevent ctrl+c during cvmfs_config reload (CVM-869)
   * Avoid use of attr utility in the server (CVM-853)
-  * Build GeoIP libraries for the server only (CVM-854)
   * Add catalog-chown command to cvmfs_server (CVM-836)
   * Handle import of repositories with an expired whitelist (CVM-780)
   * Fix leak of temporary files during garbage collection (CVM-846)

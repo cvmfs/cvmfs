@@ -582,4 +582,9 @@ bool S3Uploader::Peek(const std::string& path) const {
   return retme;
 }
 
+
+bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
+  return false; // TODO(rmeusel): implement
+}
+
 }  // namespace upload

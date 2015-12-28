@@ -215,7 +215,7 @@ bool OptionsManager::HasConfigRepository(const string &fqrn,
 
   string config_repository;
   if (GetValue("CVMFS_CONFIG_REPOSITORY", &config_repository)) {
-    if (config_repository == fqrn)
+    if (config_repository.empty() || (config_repository == fqrn))
       return false;
     sanitizer::RepositorySanitizer repository_sanitizer;
     if (!repository_sanitizer.IsValid(config_repository)) {

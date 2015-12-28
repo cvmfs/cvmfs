@@ -794,6 +794,66 @@ TEST(T_Shash, MakePathWithoutSuffix) {
 }
 
 
+TEST(T_Shash, MakeAlternativePath) {
+  Prng prng;
+  prng.InitSeed(27111987);
+
+  shash::Any hash_md5(shash::kMd5);
+  hash_md5.Randomize(&prng);
+  ASSERT_FALSE(hash_md5.IsNull());
+  EXPECT_EQ(".cvmfsalt-959a032bcfdd999742a321eb0daeddd5",
+            hash_md5.MakeAlternativePath());
+  hash_md5.suffix = 'Q';
+  EXPECT_EQ(".cvmfsalt-959a032bcfdd999742a321eb0daeddd5Q",
+            hash_md5.MakeAlternativePath());
+
+  shash::Any hash_sha1(shash::kSha1);
+  hash_sha1.Randomize(&prng);
+  ASSERT_FALSE(hash_sha1.IsNull());
+  EXPECT_EQ(".cvmfsalt-cf3e56cf3da37ad17cf1f2c2ff5d86497fc29068",
+            hash_sha1.MakeAlternativePath());
+  hash_sha1.suffix = 'V';
+  EXPECT_EQ(".cvmfsalt-cf3e56cf3da37ad17cf1f2c2ff5d86497fc29068V",
+            hash_sha1.MakeAlternativePath());
+
+  shash::Any hash_rmd160(shash::kRmd160);
+  hash_rmd160.Randomize(&prng);
+  ASSERT_FALSE(hash_rmd160.IsNull());
+  EXPECT_EQ(".cvmfsalt-aa1deda59d5329553580d78fcd0b393157a5d28e-rmd160",
+            hash_rmd160.MakeAlternativePath());
+  hash_rmd160.suffix = 'C';
+  EXPECT_EQ(".cvmfsalt-aa1deda59d5329553580d78fcd0b393157a5d28e-rmd160C",
+            hash_rmd160.MakeAlternativePath());
+
+  shash::Any hash_sha256(shash::kSha256);
+  hash_sha256.Randomize(&prng);
+  ASSERT_FALSE(hash_sha256.IsNull());
+  EXPECT_EQ(".cvmfsalt-0152bb2ee41313d8d63b9274230f90379adf92017d479810ac4f796a"
+            "28925527-sha256", hash_sha256.MakeAlternativePath());
+  hash_sha256.suffix = 'D';
+  EXPECT_EQ(".cvmfsalt-0152bb2ee41313d8d63b9274230f90379adf92017d479810ac4f796a"
+            "28925527-sha256D", hash_sha256.MakeAlternativePath());
+
+  shash::Any hash_sha3(shash::kSha3);
+  hash_sha3.Randomize(&prng);
+  ASSERT_FALSE(hash_sha3.IsNull());
+  EXPECT_EQ(".cvmfsalt-49cadab9d5427330e8e14aea6f430872fd1c9cfdbbd147f49d8cf2ac"
+            "6a576199-sha3", hash_sha3.MakeAlternativePath());
+  hash_sha3.suffix = 'H';
+  EXPECT_EQ(".cvmfsalt-49cadab9d5427330e8e14aea6f430872fd1c9cfdbbd147f49d8cf2ac"
+            "6a576199-sha3H", hash_sha3.MakeAlternativePath());
+
+  shash::Any hash_shake128(shash::kShake128);
+  hash_shake128.Randomize(&prng);
+  ASSERT_FALSE(hash_shake128.IsNull());
+  EXPECT_EQ(".cvmfsalt-6aa50e250bd3b7f77c965f310f99645330d403f0-shake128",
+            hash_shake128.MakeAlternativePath());
+  hash_shake128.suffix = 'L';
+  EXPECT_EQ(".cvmfsalt-6aa50e250bd3b7f77c965f310f99645330d403f0-shake128L",
+            hash_shake128.MakeAlternativePath());
+}
+
+
 TEST(T_Shash, HashSuffix) {
   Prng prng;
   prng.InitSeed(9);
