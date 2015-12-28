@@ -414,6 +414,10 @@ static bool CheckSingleAuthz(const struct vomsdata *voms_ptr,
                              const std::string & authz);
 
 
+static bool CheckMultipleAuthz(const struct vomsdata *voms_ptr,
+                               const std::string  &authz_list);
+
+
 bool
 CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
 {
@@ -447,18 +451,25 @@ CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
                  "pointer.");
         return false;
     }
+    return CheckMultipleAuthz(voms_ptr, authz);
+}
 
+
+static bool
+CheckMultipleAuthz(const struct vomsdata *voms_ptr,
+                   const std::string &authz_list)
+{
     // Check all authorizations against our information
     size_t last_delim = 0;
-    size_t delim = authz.find('\n');
+    size_t delim = authz_list.find('\n');
     while (delim != std::string::npos) {
-        std::string next_authz = authz.substr(last_delim, delim-last_delim);
+        std::string next_authz = authz_list.substr(last_delim, delim-last_delim);
         last_delim = delim + 1;
-        delim = authz.find('\n', last_delim);
+        delim = authz_list.find('\n', last_delim);
 
         if (CheckSingleAuthz(voms_ptr, next_authz)) {return true;}
     }
-    std::string next_authz = authz.substr(last_delim);
+    std::string next_authz = authz_list.substr(last_delim);
     return CheckSingleAuthz(voms_ptr, next_authz);
 }
 
@@ -466,6 +477,9 @@ CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz)
 static bool
 CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
 {
+    // An empty entry should authorize nobody.
+    if (!authz.size()) {return false;}
+
     // Break the authz into VOMS and roles.
     // We will compare the required auth against the cached session VOMS info.
     // Roles must match exactly; Sub-groups are authorized in their parent

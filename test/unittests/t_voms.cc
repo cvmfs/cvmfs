@@ -64,5 +64,22 @@ TEST(T_VOMS, VomsAuthz) {
     EXPECT_EQ(CheckSingleAuthz(&voms_info, "/cms/Role=pilot"), true);
     voms_entry.user = NULL;
     EXPECT_EQ(CheckSingleAuthz(&voms_info, TEST_DN), false);
+
+    // Switch to multiple authz functions.
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, ""), false);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, "\n"), false);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, "/cms"), true);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, "/cms\n"), true);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, "/atlas"), false);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, "/cms\natlas"), true);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, "/atlas\n/cms"), true);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, "/atlas\n\n/cms"), true);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, "/atlas\n\n/dteam\n"), false);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN), false);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\n"), false);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\n/cms/Role=prod"), false);
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\n/cms/Role=pilot"), true);
+    voms_entry.user = &user_dn[0];
+    EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\n/cms/Role=prod"), true);
 }
 
