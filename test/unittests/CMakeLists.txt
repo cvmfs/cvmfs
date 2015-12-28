@@ -75,6 +75,7 @@ set(CVMFS_UNITTEST_FILES
   t_file_chunk.cc
   t_platforms.cc
   t_compression.cc
+  t_voms.cc
 )
 
 #
