@@ -93,13 +93,13 @@ class VOMSSessionCache {
     // If result is NULL, then the operation failed and errno is set.
     struct vomsdata *try_put(pid_t pid, struct vomsdata *voms_ptr)
     {
-        if (m_zombie) {return false;}
+        if (m_zombie) {return NULL;}
         KeyType mykey;
         if (!lookup(pid, mykey))
         {
             LogCvmfs(kLogVoms, kLogDebug, "Failed to determine session key "
                      "for PID %d.", pid);
-            return false;
+            return NULL;
         }
         time_t now = get_mono_time();
 

@@ -33,8 +33,7 @@ void IoDispatcher::ScheduleWrite(Chunk       *chunk,
       // it successfully committed the complete chunk
       AbstractUploader::MakeClosure(&IoDispatcher::ChunkUploadCompleteCallback,
                                     this,
-                                    chunk),
-      chunk->file()->alt_path());
+                                    chunk));
     if (handle == NULL) {
       LogCvmfs(kLogSpooler, kLogStderr, "initiating streamed upload failed");
       abort();

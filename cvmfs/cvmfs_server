@@ -276,7 +276,7 @@ CernVM-FS Server Tool $(cvmfs_version_string)
 Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
-  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner]
+  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner] [-X (enable external data)]
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
@@ -298,7 +298,7 @@ Supported Commands:
                 <fully qualified repository name>
                 Imports an old CernVM-FS repository into a fresh 2.1.x repo
   publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                [-a tag name] [-c tag channel] [-m tag description]
+                [-a tag name] [-c tag channel] [-m tag description] [-X (external data)]
                 <fully qualified name>
                 Make a new repository snapshot
   rmfs          [-p(reserve) repo data and keys] [-f don't ask again]
@@ -2701,13 +2701,18 @@ mkfs() {
   local garbage_collectable=false
   local s3_config=""
   local keys_import_location
+  local external_data=0
+
   local configure_apache=1
   local voms_authz=""
 
   # parameter handling
   OPTIND=1
-  while getopts "w:u:o:mf:vga:zs:k:pV:" option; do
+  while getopts "Xw:u:o:mf:vga:zs:k:pV:" option; do
     case $option in
+      X)
+        external_data=1
+      ;;
       w)
         stratum0=$OPTARG
       ;;
@@ -2874,6 +2879,10 @@ mkfs() {
   local temp_dir="${CVMFS_SPOOL_DIR}/tmp"
   local rdonly_dir="${CVMFS_SPOOL_DIR}/rdonly"
   local scratch_dir="${CVMFS_SPOOL_DIR}/scratch"
+  local external_data_opt=""
+  if [ $external_data -eq 1 ]; then
+    external_data_opt="-X"
+  fi
 
   echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
@@ -2882,16 +2891,12 @@ mkfs() {
     volatile_opt="-v"
     echo -n "(repository flagged volatile)... "
   fi
-  local voms_authz_opt=
-  if [ "x$voms_authz" != "x" ]; then
-    voms_authz_opt="-V $voms_authz"
-    echo -n "(repository will be accessible with VOMS credentials $voms_authz)... "
-  fi
   local user_shell="$(get_user_shell $name)"
   local create_cmd="$(__swissknife_cmd) create  \
+    $external_data_opt                          \
     -t $temp_dir                                \
     -r $upstream                                \
-    -a $hash_algo $volatile_opt $voms_authz_opt \
+    -a $hash_algo $volatile_opt                 \
     -o ${temp_dir}/new_manifest"
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
@@ -2920,7 +2925,12 @@ mkfs() {
   echo "New CernVM-FS repository for $name" > /cvmfs/${name}/new_repository
   chown $cvmfs_user /cvmfs/${name}/new_repository
   publish $name > /dev/null      || die "fail (publish)"
-  cat $rdonly_dir/new_repository || die "fail (finish)"
+  # When publishing an external repository, it is the user's responsibility to
+  # stage the actual data files to the web server - not the publication function.
+  # Hence, the following is guaranteed to not work.
+  if [ $external_data -eq 0 ]; then
+    cat $rdonly_dir/new_repository || die "fail (finish)"
+  fi
 
   echo -n "Updating global JSON information... "
   update_global_repository_info && echo "done" || echo "fail"
@@ -4202,7 +4212,7 @@ publish() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "pa:c:m:vn:" option
+  while getopts "Xpa:c:m:vn:" option
   do
     case $option in
       p)
@@ -4222,6 +4232,9 @@ publish() {
       ;;
       n)
         manual_revision="$OPTARG"
+      ;;
+      X)
+        external_option="-Y"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -4312,7 +4325,7 @@ publish() {
       -o $manifest                                   \
       -e $hash_algorithm                             \
       $(get_follow_http_redirects_flag)              \
-      $log_level $tweaks_option $verbosity"
+      $log_level $tweaks_option $external_option $verbosity"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
     fi

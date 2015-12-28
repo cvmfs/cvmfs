@@ -158,7 +158,7 @@ int CredentialsFetcher::MainCredentialsFetcher(int argc, char *argv[]) {
 
     errno = 0;
     // TODO(bbockelm): Implement timeouts.
-    while (-1 == recvmsg(kTransportFd, &msg_recv, NULL) && errno == EINTR) {}
+    while (-1 == recvmsg(kTransportFd, &msg_recv, 0) && errno == EINTR) {}
     if (errno) {
       LogCvmfs(kLogVoms, kLogSyslogErr | kLogDebug,
                "failed to receive messaage from child: %s (errno=%d)",
@@ -208,7 +208,7 @@ int CredentialsFetcher::MainCredentialsFetcher(int argc, char *argv[]) {
     }
 
     errno = 0;
-    while (-1 == sendmsg(3, &msg_send, NULL) && errno == EINTR) {}
+    while (-1 == sendmsg(3, &msg_send, 0) && errno == EINTR) {}
     if (errno) {
       LogCvmfs(kLogVoms, kLogSyslogErr | kLogDebug,
                "failed to send messaage to parent: %s (errno=%d)",

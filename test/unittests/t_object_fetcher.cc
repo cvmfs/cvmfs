@@ -489,6 +489,7 @@ class T_ObjectFetcher : public ::testing::Test {
     const bool success = catalog_db->InsertInitialValues(root_path,
                                                          volatile_content,
                                                          "",
+                                                         kUnset,
                                                          root_entry) &&
                          catalog_db->SetProperty("revision", catalog_revision);
     ASSERT_TRUE(success) << "failed to initialise catalog in: " << tmp_path;

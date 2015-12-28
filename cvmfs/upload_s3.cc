@@ -343,7 +343,6 @@ int S3Uploader::SelectBucket(const std::string &rem_filename) const {
 void S3Uploader::FileUpload(
   const std::string &local_path,
   const std::string &remote_path,
-  const std::string & /*alt_path*/,
   const CallbackTN  *callback
 ) {
   // Choose S3 account and bucket based on the target
@@ -433,9 +432,7 @@ int S3Uploader::CreateAndOpenTemporaryChunkFile(std::string *path) const {
 }
 
 
-UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback,
-    const std::string & /*alt_path*/)
-{
+UploadStreamHandle *S3Uploader::InitStreamedUpload(const CallbackTN *callback) {
   std::string tmp_path;
   const int tmp_fd = CreateAndOpenTemporaryChunkFile(&tmp_path);
 
@@ -587,7 +584,7 @@ bool S3Uploader::Peek(const std::string& path) const {
 
 
 bool S3Uploader::PlaceBootstrappingShortcut(const shash::Any &object) const {
-  return false; // TODO(rmeusel): implement
+  return false;  // TODO(rmeusel): implement
 }
 
 }  // namespace upload

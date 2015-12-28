@@ -109,6 +109,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   }
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
+  const bool external_data       = (args.count('X') > 0);
   std::string voms_authz;
   if (args.find('V') != args.end()) {
     voms_authz = *args.find('V')->second;
@@ -123,6 +124,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     catalog::WritableCatalogManager::CreateRepository(dir_temp,
                                                       volatile_content,
                                                       voms_authz,
+                                                      external_data ? kYes :
+                                                                      kUnset,
                                                       spooler);
   if (!manifest) {
     PrintError("Failed to create new repository");
@@ -504,6 +507,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('g') != args.end()) params.garbage_collectable = true;
   if (args.find('V') != args.end()) params.voms_authz = *args.find('V')->second;
   if (args.find('k') != args.end()) params.include_xattrs = true;
+  if (args.find('Y') != args.end()) params.external_data = true;
   if (args.find('z') != args.end()) {
     unsigned log_level =
     1 << (kLogLevel0 + String2Uint64(*args.find('z')->second));
@@ -608,6 +612,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
                                     "engine failed");
     return 4;
   }
+  sync->SetExternalData(params.external_data);
 
   sync->Traverse();
 

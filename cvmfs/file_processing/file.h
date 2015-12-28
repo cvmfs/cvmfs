@@ -34,8 +34,7 @@ class File : public AbstractFile {
        IoDispatcher         *io_dispatcher,
        ChunkDetector        *chunk_detector,
        shash::Algorithms     hash_algorithm,
-       const shash::Suffix   hash_suffix = shash::kSuffixNone,
-       const std::string    &alt_path = "");
+       const shash::Suffix   hash_suffix = shash::kSuffixNone);
   ~File();
 
   bool MightBecomeChunked() const { return might_become_chunked_; }
@@ -74,8 +73,6 @@ class File : public AbstractFile {
   const Chunk*        bulk_chunk()  const { return bulk_chunk_;  }
   const ChunkVector&  chunks()      const { return chunks_;      }
         shash::Suffix hash_suffix() const { return hash_suffix_; }
-
-  const std::string&  alt_path()    const { return alt_path_; }
 
   Chunk* current_chunk() {
     return (chunks_.size() > 0) ? chunks_.back() : NULL;
@@ -116,11 +113,6 @@ class File : public AbstractFile {
    * The ChunkDetector to be used for this file.
    */
   ChunkDetector *chunk_detector_;
-
-  /**
-   * An alternate path where this file should be committed.
-   */
-  const std::string alt_path_;
 };
 
 }  // namespace upload

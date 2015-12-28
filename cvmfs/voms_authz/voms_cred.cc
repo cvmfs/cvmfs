@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -113,7 +114,7 @@ struct ProxyHelper {
 
     // Pre-sockets to communicate with helper process
     int socks[2];
-    if (-1 == socketpair(AF_UNIX, SOCK_STREAM, NULL, socks)) {
+    if (-1 == socketpair(AF_UNIX, SOCK_STREAM, 0, socks)) {
       LogCvmfs(kLogVoms, kLogWarning, "Failed to create socket pair for "
                "fetcher process communication: %s (errno=%d)",
                strerror(errno), errno);
@@ -264,7 +265,7 @@ struct ProxyHelper {
 
     errno = 0;
     // TODO(bbockelm): Implement timeouts.
-    while (-1 == recvmsg(m_sock, &msg_recv, NULL) && errno == EINTR) {}
+    while (-1 == recvmsg(m_sock, &msg_recv, 0) && errno == EINTR) {}
     if (errno) {
       int result = errno;
       // Socket is disconnected; child has died.

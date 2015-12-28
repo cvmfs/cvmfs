@@ -31,7 +31,7 @@ set(CVMFS_UNITTEST_FILES
   t_buffer.cc
   t_chunk_detectors.cc
   t_upload_facility.cc
-  # t_uploaders.cc
+  t_uploaders.cc
   t_file_processing.cc
   t_async_reader.cc
   t_test_utils.cc
@@ -76,6 +76,7 @@ set(CVMFS_UNITTEST_FILES
   t_platforms.cc
   t_compression.cc
   t_voms.cc
+  t_clientctx.cc
 )
 
 #
@@ -199,6 +200,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
   ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
   ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc
+  ${CVMFS_SOURCE_DIR}/clientctx.h
+  ${CVMFS_SOURCE_DIR}/clientctx.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})

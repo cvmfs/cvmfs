@@ -135,11 +135,9 @@ class Spooler : public Observable<SpoolerResult> {
    *                      backend storage
    * @param remote_path   the destination of the file to be copied in the
    *                      backend storage
-   * @param alt_path      a secondary destination where the file should be saved.
    */
   void Upload(const std::string &local_path,
-              const std::string &remote_path,
-              const std::string &alt_path = "");
+              const std::string &remote_path);
 
   /**
    * Schedules a process job that compresses and hashes the provided file in
@@ -184,10 +182,8 @@ class Spooler : public Observable<SpoolerResult> {
    * processing parameters (like chunking and hash suffixes) accordingly.
    *
    * @param local_path  the location of the certificate file
-   * @param alt_path    the alternate location of the certificate file (if any)
    */
-  void ProcessCertificate(const std::string &local_path,
-                          const std::string &alt_catalog_path = "");
+  void ProcessCertificate(const std::string &local_path);
 
 
   /**
