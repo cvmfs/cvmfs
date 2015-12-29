@@ -182,6 +182,7 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 bool CatalogDatabase::InsertInitialValues(
   const std::string    &root_path,
   const bool            volatile_content,
+  const std::string    &voms_authz,
   CatalogProperty       external_data,
   const DirectoryEntry &root_entry)
 {
@@ -217,6 +218,13 @@ bool CatalogDatabase::InsertInitialValues(
     }
   }
 
+  if (voms_authz.size()) {
+    if (!this->SetProperty("voms_authz", voms_authz)) {
+      PrintSqlError("failed to insert VOMS authz flag into the newly created "
+                    "catalog tables.");
+      return false;
+    }
+  }
   if (external_data != kUnset) {
     if (!root_path.empty()) {
       PrintSqlError("External data bit may not be set for nested catalog.");

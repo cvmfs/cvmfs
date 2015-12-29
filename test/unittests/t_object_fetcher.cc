@@ -488,6 +488,7 @@ class T_ObjectFetcher : public ::testing::Test {
     catalog::DirectoryEntry root_entry;  // mocked root entry...
     const bool success = catalog_db->InsertInitialValues(root_path,
                                                          volatile_content,
+                                                         "",
                                                          kUnset,
                                                          root_entry) &&
                          catalog_db->SetProperty("revision", catalog_revision);

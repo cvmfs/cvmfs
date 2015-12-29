@@ -123,6 +123,7 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   manifest::Manifest *manifest =
     catalog::WritableCatalogManager::CreateRepository(dir_temp,
                                                       volatile_content,
+                                                      voms_authz,
                                                       external_data ? kYes :
                                                                       kUnset,
                                                       spooler);

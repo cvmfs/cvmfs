@@ -184,6 +184,7 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t GetRevision() const;
   bool GetVolatileFlag() const;
   uint64_t GetTTL() const;
+  bool GetVOMSAuthz(std::string&) const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;
 
