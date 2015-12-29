@@ -280,7 +280,6 @@ Supported Commands:
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
-                [-k path to existing keychain]
                 [-k path to existing keychain] [-p no apache config]
                 [-V VOMS authorization]
                 <fully qualified repository name>

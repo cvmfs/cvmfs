@@ -49,6 +49,7 @@
 #include "atomic.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "download.h"
@@ -459,8 +460,8 @@ bool cvmfs_context::GetDirentForPath(const PathString         &path,
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
   // Lookup inode in catalog TODO: not twice md5 calculation
-  catalog::ClientCtx ctx(geteuid(), getegid(), getpid());
-  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent, &ctx)) {
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
     md5path_cache_->Insert(md5path, *dirent);
     return true;
   }
@@ -583,8 +584,8 @@ int cvmfs_context::ListDirectory(
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
-  catalog::ClientCtx ctx(geteuid(), getegid(), getpid());
-  if (!catalog_manager_->ListingStat(path, &listing_from_catalog, &ctx)) {
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
+  if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
     return -EIO;
   }
   for (unsigned i = 0; i < listing_from_catalog.size(); ++i) {
@@ -615,9 +616,9 @@ int cvmfs_context::Open(const char *c_path) {
              path.c_str());
 
     FileChunkList *chunks = new FileChunkList();
-    catalog::ClientCtx ctx(geteuid(), getegid(), getpid());
+    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
     if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
-                                          chunks, &ctx) ||
+                                          chunks) ||
         chunks->IsEmpty())
     {
       LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "

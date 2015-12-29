@@ -366,8 +366,7 @@ void swissknife::CommandApplyDirtab::FilterCandidatesFromGlobResult(
     // a new directory and thus not in any catalog yet.
     catalog::DirectoryEntry dirent;
     const bool lookup_success =
-      catalog_manager->LookupPath(candidate_rel, catalog::kLookupSole, &dirent,
-                                  NULL);
+      catalog_manager->LookupPath(candidate_rel, catalog::kLookupSole, &dirent);
     if (!lookup_success) {
       LogCvmfs(kLogCatalog, kLogDebug, "Didn't find '%s' in catalogs, could "
                                        "be a new directory and nested catalog.",

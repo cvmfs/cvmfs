@@ -548,8 +548,7 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
   virtual LoadError LoadCatalog(const PathString &mountpoint,
                                 const shash::Any &hash,
                                 std::string  *catalog_path,
-                                shash::Any   *catalog_hash,
-                                const catalog::ClientCtx *c);
+                                shash::Any   *catalog_hash);
 
   virtual MockCatalog* CreateCatalog(const PathString  &mountpoint,
                                  const shash::Any  &catalog_hash,

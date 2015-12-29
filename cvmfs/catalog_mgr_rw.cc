@@ -192,12 +192,12 @@ bool WritableCatalogManager::FindCatalog(const string &path,
   assert(best_fit != NULL);
   Catalog *catalog = NULL;
   bool retval = MountSubtree(PathString(path.data(), path.length()),
-                             best_fit, &catalog, NULL);
+                             best_fit, &catalog);
   if (!retval)
     return false;
 
   catalog::DirectoryEntry dummy;
-  bool found = LookupPath(path, kLookupSole, &dummy, NULL);
+  bool found = LookupPath(path, kLookupSole, &dummy);
   if (!found || !catalog->IsWritable())
     return false;
 
@@ -513,7 +513,7 @@ void WritableCatalogManager::TouchDirectory(const DirectoryEntryBase &entry,
     retval = catalog->FindNested(transition_path, &nested_hash, &nested_size);
     assert(retval);
     Catalog *nested_catalog;
-    nested_catalog = MountCatalog(transition_path, nested_hash, catalog, NULL);
+    nested_catalog = MountCatalog(transition_path, nested_hash, catalog);
     assert(nested_catalog != NULL);
 
     // update nested catalog root in the child catalog
