@@ -154,8 +154,6 @@ static std::string map_to_string(const std::map<std::string, std::string> &opts_
         if (!first_string) {opts_string += ",";}
         first_string = false;
 
-        opts_string += it->first + "=";
-
         std::string value = it->second;
         size_t escape_val = value.find('\\', 0);
         while (escape_val != std::string::npos) {
@@ -167,7 +165,11 @@ static std::string map_to_string(const std::map<std::string, std::string> &opts_
             value.replace(escape_val, 1, "\\,", 2);
             escape_val = value.find(',', escape_val + 2);
         }
-        opts_string += value;
+
+        if (!value.empty()) {
+            opts_string += it->first + "=";
+            opts_string += value;
+        }
     }
     return opts_string;
 }
@@ -266,7 +268,19 @@ static std::string write_pubkey(const char *text) {
 }
 
 
-static std::string fill_global_opts(std::string input_opts) {
+static std::string get_cache_dir(const std::string &opts) {
+    std::map<std::string, std::string> opts_map = parse_opts(opts.c_str());
+    if (opts_map.find("cachedir") != opts_map.end()) {
+        return opts_map["cachedir"];
+    }
+    if (opts_map.find("cache_directory") != opts_map.end()) {
+        return opts_map["cache_directory"];
+    }
+    return "";
+}
+
+
+static std::string fill_global_opts(const std::string &input_opts) {
     std::map<std::string, std::string> opts_map = parse_opts(input_opts.c_str());
     if ((opts_map.find("cachedir") == opts_map.end()) &&
         (opts_map.find("cache_directory") == opts_map.end())) {
@@ -277,7 +291,9 @@ static std::string fill_global_opts(std::string input_opts) {
 }
 
 
-static std::string fill_repo_opts(std::string repo_name, std::string input_opts, bool enable_builtin) {
+static std::string fill_repo_opts(const std::string &repo_name,
+                                  const std::string &input_opts,
+                                  const bool enable_builtin) {
     std::map<std::string, std::string> opts_map = parse_opts(input_opts.c_str());
     if (opts_map.find("proxies") == opts_map.end()) {
         const char *http_proxy = getenv("http_proxy");
@@ -501,12 +517,31 @@ static int libcvmfs_copy_tree(cvmfs_context *ctx,
 static
 int libcvmfs_copy_repository_tree(const std::string &repository_name,
                                   const std::string &repository_opts,
+                                  const std::string &global_opts,
                                   const std::vector<std::string> &sources,
                                   const std::string &dest,
                                   const bool verbose,
                                   const bool recursive) {
     std::string full_opts = "repo_name=" + repository_name + "," + repository_opts;
+    std::string cache_dir = get_cache_dir(global_opts);
+    char orig_dir[PATH_MAX];
+    if (!getcwd(orig_dir, PATH_MAX)) {
+        fprintf(stderr, "Warning: unable to get current working directory: %s\n",
+                strerror(errno));
+        orig_dir[0] = '\0';
+    }
+    if (-1 == chdir(cache_dir.c_str())) {
+        fprintf(stderr, "Warning: unable to change directory to cache directory (%s): %s\n",
+                cache_dir.c_str(), strerror(errno));
+        orig_dir[0] = '\0';
+    }
     cvmfs_context *ctx = cvmfs_attach_repo(full_opts.c_str());
+    if (strlen(orig_dir) > 0) {
+        if (-1 == chdir(orig_dir)) {
+            fprintf(stderr, "Warning: unable to change directory back to original directory (%s): %s\n",
+                    orig_dir, strerror(errno));
+        }
+    }
     if (ctx == NULL) {
         fprintf(stderr, "Failed to initialize repository %s.\n", repository_name.c_str());
         return 3;
@@ -712,7 +747,7 @@ int main(int argc, char *argv[]) {
     repo_opts = fill_repo_opts(repository_name, repo_opts, enable_builtin);
     if (verbose) {printf("Using repo options: %s\n", repo_opts.c_str());}
 
-    int retval = libcvmfs_copy_repository_tree(repository_name, repo_opts,
+    int retval = libcvmfs_copy_repository_tree(repository_name, repo_opts, global_opts,
                                                sources, dest, verbose, recursive);
 
     cvmfs_fini();
