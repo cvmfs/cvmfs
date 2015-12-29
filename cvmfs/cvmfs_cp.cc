@@ -5,10 +5,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -17,6 +20,67 @@
 static void log_verbose(const char *msg) {
     printf("%s\n", msg);
 }
+
+
+static std::vector<char> g_temp_directory;
+static bool g_cleanup_temp_directory = false;
+static bool g_exit_now = false;
+
+
+static const char *cern_key_text =
+"-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAukBusmYyFW8KJxVMmeCj\n\
+N7vcU1mERMpDhPTa5PgFROSViiwbUsbtpP9CvfxB/KU1gggdbtWOTZVTQqA3b+p8\n\
+g5Vve3/rdnN5ZEquxeEfIG6iEZta9Zei5mZMeuK+DPdyjtvN1wP0982ppbZzKRBu\n\
+BbzR4YdrwwWXXNZH65zZuUISDJB4my4XRoVclrN5aGVz4PjmIZFlOJ+ytKsMlegW\n\
+SNDwZO9z/YtBFil/Ca8FJhRPFMKdvxK+ezgq+OQWAerVNX7fArMC+4Ya5pF3ASr6\n\
+3mlvIsBpejCUBygV4N2pxIcPJu/ZDaikmVvdPTNOTZlIFMf4zIP/YHegQSJmOyVp\n\
+HQIDAQAB\n\
+-----END PUBLIC KEY-----\n\
+";
+static const char *cern_url =
+"http://cvmfs-stratum-one.cern.ch/cvmfs/@fqrn@;"
+"http://cernvmfs.gridpp.rl.ac.uk/cvmfs/@fqrn@;"
+"http://cvmfs.racf.bnl.gov/cvmfs/@fqrn@;"
+"http://cvmfs.fnal.gov/cvmfs/@fqrn@;"
+"http://cvmfs02.grid.sinica.edu.tw/cvmfs/@fqrn@";
+
+
+static const char *oasis_key_text =
+"-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqQGYXTp9cRcMbGeDoijB\n\
+gKNTCEpIWB7XcqIHVXJjfxEkycQXMyZkB7O0CvV3UmmY2K7CQqTnd9ddcApn7BqQ\n\
+/7QGP0H1jfXLfqVdwnhyjIHxmV2x8GIHRHFA0wE+DadQwoi1G0k0SNxOVS5qbdeV\n\
+yiyKsoU4JSqy5l2tK3K/RJE4htSruPCrRCK3xcN5nBeZK5gZd+/ufPIG+hd78kjQ\n\
+Dy3YQXwmEPm7kAZwIsEbMa0PNkp85IDkdR1GpvRvDMCRmUaRHrQUPBwPIjs0akL+\n\
+qoTxJs9k6quV0g3Wd8z65s/k5mEZ+AnHHI0+0CL3y80wnuLSBYmw05YBtKyoa1Fb\n\
+FQIDAQAB\n\
+-----END PUBLIC KEY-----\n\
+";
+static const char *oasis_url =
+"http://cvmfs-egi.gridpp.rl.ac.uk:8000/cvmfs/@fqrn@;"
+"http://klei.nikhef.nl:8000/cvmfs/@fqrn@;"
+"http://cvmfs-s1bnl.opensciencegrid.org:8000/cvmfs/@fqrn@;"
+"http://cvmfs-s1fnal.opensciencegrid.org:8000/cvmfs/@fqrn@;"
+"http://cvmfsrep.grid.sinica.edu.tw:8000/cvmfs/@fqrn@";
+
+
+static const char *egi_key_text =
+"-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxKhc7s1HmmPWH4Cq1U3K\n\
+4FNFKcMQgZxUrgQEfvgkF97OZ8I8wzC9MWqmegX6tqlPmAzYWTM+Xi4nEBWYRhd+\n\
+hVN/prHyYGzb/kTyCSHa9EQtIk9SUyoPfQxkGRnx68pD5con8KJySNa8neplsXx+\n\
+2gypwjasBRQLzB3BrrGhrzZ5fL84+dsxNBBW6QfNO1BS5ATeWl3g1J27f0GoGtRO\n\
+YbPhaAd9D+B+qVo9pt3jKXvjTZQG0pE16xaX1elciFT9OhtZGaErDJyURskD7g3/\n\
+NotcpBL5K5v95zA/kh5u+TRrmeTxHyDOpyrGrkqRaT5p+/C1z0HDyKFQbptegCbn\n\
+GwIDAQAB\n\
+-----END PUBLIC KEY-----\n\
+";
+static const char *egi_url =
+"http://cvmfs-egi.gridpp.rl.ac.uk:8000/cvmfs/@fqrn@;"
+"http://klei.nikhef.nl:8000/cvmfs/@fqrn@;"
+"http://cvmfsrepo.lcg.triumf.ca:8000/cvmfs/@fqrn@;"
+"http://cvmfsrep.grid.sinica.edu.tw:8000/cvmfs/@fqrn@";
 
 
 static void usage(const char *argv0) {
@@ -34,15 +98,230 @@ static void usage(const char *argv0) {
             "  -g global_opts  Global CVMFS options passed to CVMFS.\n"
             "  -m repo_opts    Per-repo options.\n"
             "  -r              Enable recursive mode\n"
+            "  -b              Allow use of built-in keys (which may have been revoked).\n"
             "  -v              Enable verbose mode\n\n",
             PACKAGE_VERSION, argv0, argv0
     );
 }
 
 
+std::map<std::string, std::string> parse_opts(char const *options) {
+    std::map<std::string, std::string> opts_map;
+    while (*options) {
+      char const *next = options;
+      std::string name;
+      std::string value;
+
+      // get the option name
+      for (next=options; *next && *next != ',' && *next != '='; next++) {
+        if (*next == '\\') {
+          next++;
+          if (*next == '\0') break;
+        }
+        name += *next;
+      }
+
+      if (*next == '=') {
+        next++;
+      }
+
+      // get the option value
+      for (; *next && *next != ','; next++) {
+        if (*next == '\\') {
+          next++;
+          if (*next == '\0') break;
+        }
+        value += *next;
+      }
+
+      if (!name.empty() || !value.empty()) {
+        opts_map[name] = value;
+      }
+
+      if (*next == ',') next++;
+      options = next;
+    }
+    return opts_map;
+}
+
+
+static std::string map_to_string(const std::map<std::string, std::string> &opts_map) {
+    std::string opts_string;
+    bool first_string = true;
+    for (std::map<std::string, std::string>::const_iterator it = opts_map.begin();
+                                                            it != opts_map.end();
+                                                            it++) {
+        if (!first_string) {opts_string += ",";}
+        first_string = false;
+
+        opts_string += it->first + "=";
+
+        std::string value = it->second;
+        size_t escape_val = value.find('\\', 0);
+        while (escape_val != std::string::npos) {
+            value.replace(escape_val, 1, "\\\\", 2);
+            escape_val = value.find('\\', escape_val + 2);
+        }
+        escape_val = value.find(',', 0);
+        while (escape_val != std::string::npos) {
+            value.replace(escape_val, 1, "\\,", 2);
+            escape_val = value.find(',', escape_val + 2);
+        }
+        opts_string += value;
+    }
+    return opts_string;
+}
+
+
+static void start_cleanup(int sig) {
+    g_exit_now = true;
+    signal(sig, SIG_DFL);
+}
+
+
+static bool make_temp_directory() {
+    if (g_cleanup_temp_directory) {return true;}
+
+    g_temp_directory.reserve(50);
+    strncpy(&g_temp_directory[0], "/tmp/cvmfs_cp_XXXXXX", 50);
+    if (!mkdtemp(&g_temp_directory[0])) {
+        fprintf(stderr, "Failed to make temporary directory (%s): %s\n",
+                &g_temp_directory[0], strerror(errno));
+        return false;
+    }
+    signal(SIGINT, start_cleanup);
+    signal(SIGTERM, start_cleanup);
+    signal(SIGQUIT, start_cleanup);
+    signal(SIGHUP, start_cleanup);
+    g_cleanup_temp_directory = true;
+
+    return true;
+}
+
+
+static void cleanup_temp_directory() {
+    static const char *rm = "rm";
+    static const char *rf = "-rf";
+    std::vector<const char *> exec_info;
+    exec_info.reserve(4);
+    exec_info[0] = rm;
+    exec_info[1] = rf;
+    exec_info[2] = &g_temp_directory[0];
+    exec_info[3] = NULL;
+
+    pid_t child_pid = fork();
+    if (-1 == child_pid) {
+        fprintf(stderr, "Failed to fork process to clean temporary directory (%s): %s\n",
+                &g_temp_directory[0], strerror(errno));
+        return;
+    } else if (!child_pid) {
+        execvp("/bin/rm", const_cast<char * const*>(&exec_info[0]));
+        fprintf(stderr, "Failed to exec process to clean temporary directory (%s): %s\n",
+                &g_temp_directory[0], strerror(errno));
+        _exit(1);
+    }
+    int status;
+    if (-1 == waitpid(child_pid, &status, 0)) {
+        if (WIFEXITED(status)) {
+            fprintf(stderr, "Failure to cleanup temporary directory (%s); rm exited with %d.\n",
+                    &g_temp_directory[0], WEXITSTATUS(status));
+        } else if (WIFSIGNALED(status)) {
+            fprintf(stderr, "Failure to cleanup temporary directory (%s); rm exited with signal %d.\n",
+                    &g_temp_directory[0], WTERMSIG(status));
+        } else {
+            fprintf(stderr, "Failure to cleanup temporary directory (%s); rm status code %d.\n",
+                    &g_temp_directory[0], status);
+        }
+    }
+}
+
+
+static std::string write_pubkey(const char *text) {
+    if (!make_temp_directory()) {return "";}
+
+    std::string pubkey_location = &g_temp_directory[0];
+    pubkey_location += "/pubkey";
+    int fd = open(pubkey_location.c_str(), O_CREAT|O_EXCL|O_WRONLY, 0600);
+    if (-1 == fd) {
+        fprintf(stderr, "Failed to open pubkey file (%s): %s\n",
+                pubkey_location.c_str(), strerror(errno));
+        return "";
+    }
+    const char *buf = text;
+    size_t bytes_to_write = strlen(text);
+    while (bytes_to_write) {
+        ssize_t bytes_written = write(fd, buf, bytes_to_write);
+        if (-1 == bytes_written) {
+            if (errno == EINTR) {continue;}
+            fprintf(stderr, "Failed to write to pubkey file (%s): %s\n",
+                    pubkey_location.c_str(), strerror(errno));
+            close(fd);
+            return "";
+        }
+        bytes_to_write -= bytes_written;
+        buf += bytes_written;
+    }
+    close(fd);
+    return pubkey_location;
+}
+
+
+static std::string fill_global_opts(std::string input_opts) {
+    std::map<std::string, std::string> opts_map = parse_opts(input_opts.c_str());
+    if ((opts_map.find("cachedir") == opts_map.end()) &&
+        (opts_map.find("cache_directory") == opts_map.end())) {
+       if (!make_temp_directory()) {return "";}
+       opts_map["cachedir"] = &g_temp_directory[0];
+    }
+    return map_to_string(opts_map);
+}
+
+
+static std::string fill_repo_opts(std::string repo_name, std::string input_opts, bool enable_builtin) {
+    std::map<std::string, std::string> opts_map = parse_opts(input_opts.c_str());
+    if (opts_map.find("proxies") == opts_map.end()) {
+        const char *http_proxy = getenv("http_proxy");
+        if (http_proxy) {
+            std::string http_proxy_str = http_proxy;
+            http_proxy_str += ";DIRECT";
+            opts_map["proxies"] = http_proxy_str;
+        } else {
+            opts_map["proxies"] = "DIRECT";
+        }
+    }
+    if ((opts_map.find("pubkey") == opts_map.end()) && enable_builtin) {
+        if (repo_name.rfind(".opensciencegrid.org") != std::string::npos) {
+            opts_map["pubkey"] = write_pubkey(oasis_key_text);
+        } else if (repo_name.rfind(".egi.eu") != std::string::npos) {
+            opts_map["pubkey"] = write_pubkey(egi_key_text);
+        } else if (repo_name.rfind(".cern.ch") != std::string::npos) {
+            opts_map["pubkey"] = write_pubkey(cern_key_text);
+        }
+    }
+    if (opts_map.find("url") == opts_map.end()) {
+        if (repo_name.rfind(".opensciencegrid.org") != std::string::npos) {
+            opts_map["url"] = oasis_url;
+        } else if (repo_name.rfind(".egi.eu") != std::string::npos) {
+            opts_map["url"] = egi_url;
+        } else if (repo_name.rfind(".cern.ch") != std::string::npos) {
+            opts_map["url"] = cern_url;
+        }
+    }
+    std::string url = opts_map["url"];
+    size_t escape_val = url.find("@fqrn@");
+    while (escape_val != std::string::npos) {
+        url.replace(escape_val, 6, repo_name);
+        escape_val = url.find("@fqrn@", escape_val + 6);
+    }
+    opts_map["url"] = url;
+    
+    return map_to_string(opts_map);
+}
+
+
 // Copied from util.cc to avoid external dependencies.
 // TODO(bbockelm) Revisit - do we really need to avoid all deps?
-std::string GetFileName(const std::string &path) {
+static std::string GetFileName(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
   if (idx != std::string::npos)
     return path.substr(idx+1);
@@ -51,7 +330,7 @@ std::string GetFileName(const std::string &path) {
 }
 
 
-std::string GetParentPath(const std::string &path) {
+static std::string GetParentPath(const std::string &path) {
   const std::string::size_type idx = path.find_last_of('/');
   if (idx != std::string::npos)
     return path.substr(0, idx);
@@ -64,6 +343,7 @@ static int libcvmfs_copy_file(cvmfs_context *ctx,
                               const std::string &source,
                               const std::string &dest,
                               const bool verbose) {
+    if (g_exit_now) {errno = EIO; return -1;}
     int source_fd = cvmfs_open(ctx, source.c_str());
     if (-1 == source_fd) {
         fprintf(stderr, "Failed to open repository file %s (%s).\n",
@@ -100,7 +380,8 @@ static int libcvmfs_copy_file(cvmfs_context *ctx,
     while (true) {
         int retval = cvmfs_pread(ctx, source_fd, &buffer[0], buffer_size,
                                  offset);
-        if (retval == -1) {
+        if (g_exit_now || (retval == -1)) {
+            if (g_exit_now) {errno = EIO;}
             if (errno == EINTR) {continue;}
             fprintf(stderr, "Failed to read source file %s (%s)\n",
                             source.c_str(), strerror(errno));
@@ -142,6 +423,7 @@ static int libcvmfs_copy_tree(cvmfs_context *ctx,
     std::string base_dir = GetParentPath(source);
     size_t base_len = base_dir.length();
     while (!worklist.empty()) {
+        if (g_exit_now) {errno=EIO; return -1;}
         std::string back = worklist.back();
         worklist.pop_back();
         struct stat st;
@@ -259,7 +541,9 @@ int libcvmfs_copy_repository_tree(const std::string &repository_name,
         } else {
             for (std::vector<std::string>::const_iterator it = sources.begin();
                  it != sources.end(); it++) {
-                if (-1 == cvmfs_stat(ctx, it->c_str(), &st)) {
+                if (g_exit_now) {
+                    retval = 4;
+                } else if (-1 == cvmfs_stat(ctx, it->c_str(), &st)) {
                     fprintf(stderr, "Source (%s) stat error: %s\n", dest.c_str(), 
                             strerror(errno));
                     retval = 3;
@@ -278,7 +562,7 @@ int libcvmfs_copy_repository_tree(const std::string &repository_name,
     }
 
     cvmfs_detach_repo(ctx);
-    return 0;
+    return retval;
 }
 
 
@@ -316,13 +600,14 @@ int main(int argc, char *argv[]) {
     bool recursive = false;
     bool verbose = false;
     bool ignore_mount = false;
+    bool enable_builtin = false;
     std::string global_opts;
     std::string repo_opts;
     int c;
     std::string cvmfs_prefix = "/cvmfs/", repository_name, my_repository_name;
     std::vector<std::string> sources;
     size_t slash_idx, next_slash_idx;
-    while (-1 != (c = getopt(argc, argv, "g:m:rvi"))) {
+    while (-1 != (c = getopt(argc, argv, "bg:m:rvi"))) {
         switch (c) {
             case 'g':
                 global_opts = optarg;
@@ -338,6 +623,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'i':
                 ignore_mount = true;
+                break;
+            case 'b':
+                enable_builtin = true;
                 break;
             case '?':
                 if ((optopt == 'g') || (optopt == 'm')) {
@@ -405,6 +693,9 @@ int main(int argc, char *argv[]) {
         printf("Initializing libcvmfs with global options.\n");
         cvmfs_set_log_fn(log_verbose);
     }
+    global_opts = fill_global_opts(global_opts);
+    if (verbose) {printf("Using global options: %s\n", global_opts.c_str());}
+
     if (cvmfs_init(global_opts.c_str())) {
         fprintf(stderr, "Failed to initialize libcvmfs with global options.\n");
         return 2;
@@ -412,12 +703,22 @@ int main(int argc, char *argv[]) {
 
     struct stat st;
     if (!ignore_mount && (0 == stat(("/cvmfs/" + repository_name).c_str(), &st))) {
+        if (g_cleanup_temp_directory) {
+            cleanup_temp_directory();
+        }
         return real_cp(repository_name, sources, dest, recursive, verbose);
     }
+
+    repo_opts = fill_repo_opts(repository_name, repo_opts, enable_builtin);
+    if (verbose) {printf("Using repo options: %s\n", repo_opts.c_str());}
 
     int retval = libcvmfs_copy_repository_tree(repository_name, repo_opts,
                                                sources, dest, verbose, recursive);
 
     cvmfs_fini();
+
+    if (g_cleanup_temp_directory) {
+        cleanup_temp_directory();
+    }
     return retval;
 }
