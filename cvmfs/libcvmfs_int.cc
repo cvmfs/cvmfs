@@ -316,7 +316,7 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   download_ready_ = true;
 
   external_download_manager_ = new download::DownloadManager();
-  external_download_manager_->Init(16, false, statistics);
+  external_download_manager_->Init(16, false, statistics, "download-external");
   external_download_manager_->SetHostChain(opts.external_url);
   external_download_manager_->SetTimeout(opts.timeout,
                                 opts.timeout_direct);
