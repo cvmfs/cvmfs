@@ -406,8 +406,7 @@ catalog::LoadError catalog::MockCatalogManager::LoadCatalog(
                                                   const PathString &mountpoint,
                                                   const shash::Any &hash,
                                                   string  *catalog_path,
-                                                  shash::Any *catalog_hash,
-                                                  const catalog::ClientCtx *c)
+                                                  shash::Any *catalog_hash)
 {
   map<PathString, MockCatalog*>::iterator it = catalog_map_.find(mountpoint);
   if (it != catalog_map_.end() && catalog_hash != NULL) {

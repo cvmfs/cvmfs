@@ -73,8 +73,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   LoadError LoadCatalog(const PathString  &mountpoint,
                         const shash::Any  &hash,
                         std::string       *catalog_path,
-                        shash::Any        *catalog_hash,
-                        const ClientCtx   *ctx);
+                        shash::Any        *catalog_hash);
   void UnloadCatalog(const catalog::Catalog *catalog);
   catalog::Catalog* CreateCatalog(const PathString &mountpoint,
                                   const shash::Any  &catalog_hash,
@@ -85,8 +84,7 @@ class ClientCatalogManager : public AbstractCatalogManager<Catalog> {
   LoadError LoadCatalogCas(const shash::Any &hash,
                            const std::string &name,
                            const std::string &alt_catalog_path,
-                           std::string *catalog_path,
-                           const ClientCtx *ctx);
+                           std::string *catalog_path);
 
   /**
    * Required for unpinning

@@ -5,6 +5,7 @@
 #include "cvmfs_config.h"
 #include "catalog_mgr_ro.h"
 
+#include "clientctx.h"
 #include "compression.h"
 #include "download.h"
 #include "util.h"
@@ -24,8 +25,7 @@ namespace catalog {
 LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
                                             const shash::Any  &hash,
                                             std::string       *catalog_path,
-                                            shash::Any        *catalog_hash,
-                                            const ClientCtx   *ctx)
+                                            shash::Any        *catalog_hash)
 {
   shash::Any effective_hash = hash.IsNull() ? base_hash_ : hash;
   assert(shash::kSuffixCatalog == effective_hash.suffix);
@@ -40,10 +40,11 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   download::JobInfo download_catalog(&url, true, false, fcatalog,
                                      &effective_hash);
-  if (ctx) {
-    download_catalog.uid = ctx->uid;
-    download_catalog.gid = ctx->gid;
-    download_catalog.pid = ctx->pid;
+  ClientCtx *ctx = ClientCtx::GetInstance();
+  if (ctx->IsSet()) {
+    ctx->Get(&download_catalog.uid,
+             &download_catalog.gid,
+             &download_catalog.pid);
   }
 
   download::Failures retval = download_manager_->Fetch(&download_catalog);

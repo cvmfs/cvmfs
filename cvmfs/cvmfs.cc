@@ -70,6 +70,7 @@
 #include "backoff.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "compat.h"
 #include "compression.h"
 #include "directory_entry.h"
@@ -540,12 +541,9 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // the kDirentNegative, it was an I/O error
   *dirent = catalog::DirectoryEntry();
 
-  catalog::ClientCtx ctx;
-  if (fctx) {
-    ctx.uid = fctx->uid;
-    ctx.gid = fctx->gid;
-    ctx.pid = fctx->pid;
-  }
+  ClientCtxGuard ctxg(fctx ? fctx->uid : -1,
+                      fctx ? fctx->gid : -1,
+                      fctx ? fctx->pid : -1);
 
   if (nfs_maps_) {
     // NFS mode
@@ -555,9 +553,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
       *dirent = dirent_negative;
       return false;
     }
-    if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent,
-                                     fctx ? &ctx : NULL))
-    {
+    if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
       // Fix inodes
       dirent->set_inode(ino);
       inode_cache_->Insert(ino, *dirent);
@@ -569,8 +565,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
   // Non-NFS mode
   PathString path;
   if (ino == catalog_manager_->GetRootInode()) {
-    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent,
-                                 &ctx);
+    catalog_manager_->LookupPath(PathString(), catalog::kLookupSole, dirent);
     dirent->set_inode(ino);
     inode_cache_->Insert(ino, *dirent);
     return true;
@@ -583,7 +578,7 @@ static bool GetDirentForInode(const fuse_ino_t ino,
     *dirent = dirent_negative;
     return false;
   }
-  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent, &ctx)) {
+  if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
     // Fix inodes
     dirent->set_inode(ino);
     inode_cache_->Insert(ino, *dirent);
@@ -613,17 +608,13 @@ static bool GetDirentForPath(const PathString &path,
     return true;
   }
 
-  catalog::ClientCtx ctx;
-  if (fctx) {
-    ctx.uid = fctx->uid;
-    ctx.gid = fctx->gid;
-    ctx.pid = fctx->pid;
-  }
+  ClientCtxGuard ctxg(fctx ? fctx->uid : -1,
+                      fctx ? fctx->gid : -1,
+                      fctx ? fctx->pid : -1);
 
   // Lookup inode in catalog TODO: not twice md5 calculation
   bool retval;
-  retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent,
-                                        fctx ? &ctx : NULL);
+  retval = catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent);
   if (retval) {
     if (nfs_maps_) {
       // Fix inode
@@ -954,9 +945,10 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
   // Add all names
   catalog::StatEntryList listing_from_catalog;
   const fuse_ctx *fctx = fuse_req_ctx(req);
-  catalog::ClientCtx ctx(fctx->uid, fctx->gid, fctx->pid);
-  bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog,
-                                              &ctx);
+  ClientCtxGuard ctxg(fctx ? fctx->uid : -1,
+                      fctx ? fctx->gid : -1,
+                      fctx ? fctx->pid : -1);
+  bool retval = catalog_manager_->ListingStat(path, &listing_from_catalog);
 
   if (!retval) {
     remount_fence_->Leave();
@@ -1124,13 +1116,15 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
   }
 
   const struct fuse_ctx *fctx = fuse_req_ctx(req);
-  catalog::ClientCtx ctx(fctx->uid, fctx->gid, fctx->pid);
+  ClientCtxGuard ctxg(fctx ? fctx->uid : -1,
+                      fctx ? fctx->gid : -1,
+                      fctx ? fctx->pid : -1);
 
   // Get VOMS information, if any,
   // TODO(jblomer): without VOMS, cvmfs will allow access.  This is probably
   // not the right default.
 #ifdef VOMS_AUTHZ
-  if ((ctx.uid != 0) && voms_requirements.size())
+  if ((fctx->uid != 0) && voms_requirements.size())
   {
     if (!CheckVOMSAuthz(fctx, voms_requirements))
     {
@@ -1186,7 +1180,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Retrieve File chunks from the catalog
       FileChunkList *chunks = new FileChunkList();
       if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
-                                           chunks, &ctx) ||
+                                           chunks) ||
           chunks->IsEmpty())
       {
         remount_fence_->Leave();
@@ -1235,7 +1229,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     string(path.GetChars(), path.GetLength()),
     volatile_repository_ ? cache::CacheManager::kTypeVolatile :
                            cache::CacheManager::kTypeRegular,
-    ctx.pid, ctx.uid, ctx.gid);
+    fctx->pid, fctx->uid, fctx->gid);
 
   if (fd >= 0) {
     if (perf::Xadd(no_open_files_, 1) <
@@ -1326,6 +1320,10 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       if ((chunk_fd.fd == -1) || (chunk_fd.chunk_idx != chunk_idx)) {
         if (chunk_fd.fd != -1) cache_manager_->Close(chunk_fd.fd);
         string verbose_path = "Part of " + chunks.path.ToString();
+        const struct fuse_ctx *fctx = fuse_req_ctx(req);
+        ClientCtxGuard ctxg(fctx ? fctx->uid : -1,
+                            fctx ? fctx->gid : -1,
+                            fctx ? fctx->pid : -1);
         chunk_fd.fd = fetcher_->Fetch(
           chunks.list->AtPtr(chunk_idx)->content_hash(),
           chunks.list->AtPtr(chunk_idx)->size(),
@@ -1529,12 +1527,13 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   const bool found = GetDirentForInode(ino, &d, &fctx);
   bool retval;
   XattrList xattrs;
+  ClientCtxGuard ctxg(fctx.uid, fctx.gid, fctx.pid);
+
   if (d.HasXattrs()) {
     PathString path;
     retval = GetPathForInode(ino, &path);
     assert(retval);
-    catalog::ClientCtx ctx(fctx.uid, fctx.gid, fctx.pid);
-    retval = catalog_manager_->LookupXattrs(path, &xattrs, &ctx);
+    retval = catalog_manager_->LookupXattrs(path, &xattrs);
     assert(retval);
   }
   if (d.IsLink()) {
@@ -1542,9 +1541,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     catalog::LookupOptions lookup_options = static_cast<catalog::LookupOptions>(
       catalog::kLookupSole | catalog::kLookupRawSymlink);
     catalog::DirectoryEntry raw_symlink;
-    catalog::ClientCtx ctx(fctx.uid, fctx.gid, fctx.pid);
-    retval = catalog_manager_->LookupPath(path, lookup_options, &raw_symlink,
-                                          &ctx);
+    retval = catalog_manager_->LookupPath(path, lookup_options, &raw_symlink);
     assert(retval);
     d.set_symlink(raw_symlink.symlink());
   }
@@ -1740,12 +1737,12 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
   const fuse_ctx &fctx = *fuse_req_ctx(req);
   const bool found = GetDirentForInode(ino, &d, &fctx);
   XattrList xattrs;
+  ClientCtxGuard ctxg(fctx.uid, fctx.gid, fctx.pid);
   if (d.HasXattrs()) {
     PathString path;
     bool retval = GetPathForInode(ino, &path);
     assert(retval);
-    catalog::ClientCtx ctx(fctx.uid, fctx.gid, fctx.pid);
-    retval = catalog_manager_->LookupXattrs(path, &xattrs, &ctx);
+    retval = catalog_manager_->LookupXattrs(path, &xattrs);
     assert(retval);
   }
   remount_fence_->Leave();
@@ -1819,7 +1816,7 @@ bool Pin(const string &path) {
   } else {
     FileChunkList chunks;
     catalog_manager_->ListFileChunks(PathString(path), dirent.hash_algorithm(),
-                                     &chunks, NULL);
+                                     &chunks);
     remount_fence_->Leave();
     for (unsigned i = 0; i < chunks.size(); ++i) {
       bool retval =
@@ -2791,6 +2788,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::volatile_repository_ = true;
   }
 
+  // Make sure client context TLS has been initialized
+  // (first initialization is not thread safe).
+  ClientCtx::GetInstance();
+
   cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
   auto_umount::SetMountpoint(*cvmfs::mountpoint_);
@@ -2977,6 +2978,10 @@ static void Fini() {
   cvmfs::backoff_throttle_ = NULL;
   delete cvmfs::statistics_;
   cvmfs::statistics_ = NULL;
+
+  // Make sure client context TLS is cleaned up
+  // (destruction is not thread safe)
+  ClientCtx::CleanupInstance();
 }
 
 

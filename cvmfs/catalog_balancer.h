@@ -112,7 +112,7 @@ class CatalogBalancer {
     VirtualNode(const std::string &path, CatalogMgrT *catalog_mgr)
       : children(), weight(1), dirent(), path(path),
         is_new_nested_catalog(false) {
-      catalog_mgr->LookupPath(path, kLookupSole, &dirent, NULL);
+      catalog_mgr->LookupPath(path, kLookupSole, &dirent);
     }
     VirtualNode(const std::string &path, const DirectoryEntry &dirent,
                 CatalogMgrT *catalog_mgr)
