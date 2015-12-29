@@ -340,6 +340,7 @@ fi
 %{_bindir}/cvmfs_talk
 %{_bindir}/cvmfs_fsck
 %{_bindir}/cvmfs_config
+%{_bindir}/cvmfs_cp
 /usr/libexec/cvmfs/auto.cvmfs
 %{_sysconfdir}/auto.cvmfs
 %{_sysconfdir}/cvmfs/config.sh

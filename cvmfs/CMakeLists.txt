@@ -575,7 +575,7 @@ endif (BUILD_PRELOADER)
 
 if (BUILD_CVMFS)
   install (
-    TARGETS      cvmfs2 cvmfs_fsck
+    TARGETS      cvmfs2 cvmfs_fsck cvmfs_cp
     RUNTIME
     DESTINATION    bin
   )
