@@ -253,6 +253,8 @@ int cvmfs_globals::Setup(const options &opts) {
 
   cvmfs::pid_ = getpid();
 
+  ClientCtx::GetInstance();
+
   return LIBCVMFS_FAIL_OK;
 }
 
@@ -296,6 +298,7 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
 
 void cvmfs_context::Destroy(cvmfs_context *ctx) {
   perf::Statistics *statistics = ctx->statistics();
+  ClientCtx::CleanupInstance();
   delete ctx;
   delete statistics;
 }

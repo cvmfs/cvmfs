@@ -2788,6 +2788,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::volatile_repository_ = true;
   }
 
+  // Make sure client context TLS has been initialized
+  // (first initialization is not thread safe).
+  ClientCtx::GetInstance();
+
   cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
   auto_umount::SetMountpoint(*cvmfs::mountpoint_);
@@ -2974,6 +2978,10 @@ static void Fini() {
   cvmfs::backoff_throttle_ = NULL;
   delete cvmfs::statistics_;
   cvmfs::statistics_ = NULL;
+
+  // Make sure client context TLS is cleaned up
+  // (destruction is not thread safe)
+  ClientCtx::CleanupInstance();
 }
 
 
