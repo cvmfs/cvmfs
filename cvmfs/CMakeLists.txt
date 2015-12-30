@@ -60,6 +60,7 @@ set (CVMFS_CLIENT_SOURCES
   sqlitevfs.cc sqlitevfs.h
   fetch.cc fetch.h
   sink.h
+  clientctx.cc clientctx.h
 )
 
 
@@ -459,8 +460,8 @@ if (BUILD_SERVER)
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
                          ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${OPENSSL_LIBRARIES}
-                         ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE}
+                         ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${LIBCURL_ARCHIVE} 
+                         ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE}
                          ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
                          ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}
                          pthread dl)

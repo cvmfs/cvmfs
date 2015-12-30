@@ -206,6 +206,17 @@ class AbstractCatalogManager : public SingleCopy {
     return (inode <= kInodeOffset) ? GetRootInode() : inode;
   }
 
+  /**
+   * Returns true if the entire repository (starting at the root catalog)
+   * is marked as enabling external data.
+   *
+   * Returns false if there is no root catalog.
+   */
+  inline bool GetExternalDataRepository() const {
+    CatalogT *root_catalog = GetRootCatalog();
+    return root_catalog ? root_catalog->GetExternalData() : false;
+  }
+
  protected:
   /**
    * Load the catalog and return a file name and the catalog hash. Derived

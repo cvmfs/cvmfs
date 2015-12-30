@@ -81,6 +81,7 @@ class DirectoryEntryBase {
     static const unsigned int kNestedCatalogTransitionFlags = 0x100;
     static const unsigned int kChunkedFileFlag              = 0x200;
     static const unsigned int kHasXattrsFlag                = 0x400;
+    static const unsigned int kExternalFileFlag             = 0x800;
   };
   typedef unsigned int Differences;
 
@@ -245,6 +246,7 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
     , is_chunked_file_(false)
+    , is_external_file_(false)
     , is_negative_(false) { }
 
   inline DirectoryEntry()
@@ -253,6 +255,7 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
     , is_chunked_file_(false)
+    , is_external_file_(false)
     , is_negative_(false) { }
 
   inline explicit DirectoryEntry(SpecialDirents special_type)
@@ -261,6 +264,7 @@ class DirectoryEntry : public DirectoryEntryBase {
     , is_nested_catalog_root_(false)
     , is_nested_catalog_mountpoint_(false)
     , is_chunked_file_(false)
+    , is_external_file_(false)
     , is_negative_(true) { assert(special_type == kDirentNegative); }
 
   inline SpecialDirents GetSpecial() const {
@@ -281,6 +285,7 @@ class DirectoryEntry : public DirectoryEntryBase {
     return is_nested_catalog_mountpoint_;
   }
   inline bool IsChunkedFile() const { return is_chunked_file_; }
+  inline bool IsExternalFile() const { return is_external_file_; }
   inline uint32_t hardlink_group() const { return hardlink_group_; }
   inline time_t cached_mtime() const     { return cached_mtime_; }
 
@@ -297,6 +302,9 @@ class DirectoryEntry : public DirectoryEntryBase {
   inline void set_is_chunked_file(const bool val) {
     is_chunked_file_ = val;
   }
+  inline void set_is_external_file(const bool val) {
+    is_external_file_ = val;
+  }
 
  private:
    /**
@@ -310,9 +318,11 @@ class DirectoryEntry : public DirectoryEntryBase {
    */
   uint32_t hardlink_group_;
 
+  // TODO(jblomer): transform into bitfield to save memory
   bool is_nested_catalog_root_;
   bool is_nested_catalog_mountpoint_;
   bool is_chunked_file_;
+  bool is_external_file_;
   bool is_negative_;
 };
 

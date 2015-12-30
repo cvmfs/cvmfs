@@ -16,6 +16,10 @@ void DeltaCounters::ApplyDelta(const DirectoryEntry &dirent, const int delta) {
       self.chunked_files     += delta;
       self.chunked_file_size += delta * dirent.size();
     }
+    if (dirent.IsExternalFile()) {
+      self.externals += delta;
+      self.external_file_size += delta * dirent.size();
+    }
   } else if (dirent.IsLink()) {
     self.symlinks += delta;
   } else if (dirent.IsDirectory()) {

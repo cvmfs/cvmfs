@@ -59,6 +59,8 @@ ParameterList CommandInfo::GetParams() {
                                         "collectable"));
   r.push_back(Parameter::Switch('h', "print results in human readable form"));
   r.push_back(Parameter::Switch('L', "follow HTTP redirects"));
+  r.push_back(Parameter::Switch('X', "show whether external data is supported "
+                                        "in the root catalog."));
   return r;
 }
 
@@ -157,6 +159,27 @@ int swissknife::CommandInfo::Main(const swissknife::ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
              (human_readable) ? "Mounted Root Hash:               " : "",
              root_hash.c_str());
+  }
+
+  // Get information about external data
+  if (args.count('X') > 0) {
+    assert(!mount_point.empty());
+    const std::string external_data_xattr = "user.external_data";
+    std::string external_data;
+    const bool success = platform_getxattr(mount_point,
+                                           external_data_xattr,
+                                           &external_data);
+    if (!success) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to retrieve extended attribute "
+                                      " '%s' from '%s' (errno: %d)",
+                                      external_data_xattr.c_str(),
+                                      mount_point.c_str(),
+                                      errno);
+      return 1;
+    }
+    LogCvmfs(kLogCvmfs, kLogStdout, "%s%s",
+             (human_readable) ? "External data enabled:               " : "",
+             external_data.c_str());
   }
 
   // Get information from the Manifest

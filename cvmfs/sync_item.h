@@ -57,6 +57,7 @@ class SyncItem {
   inline bool IsNew()             const { return WasType(kItemNew);            }
   inline bool IsCharacterDevice() const { return IsType(kItemCharacterDevice); }
   inline bool IsGraftMarker()     const { return IsType(kItemMarker);          }
+  inline bool IsExternalData()    const { return external_data_;              }
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
@@ -68,6 +69,7 @@ class SyncItem {
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
+  void SetExternalData(bool val) {external_data_ = val;}
 
   inline zlib::Algorithms GetCompressionAlgorithm() const {
     return compression_algorithm_;
@@ -217,6 +219,7 @@ class SyncItem {
   bool valid_graft_;                  /**< checksum and size in graft marker */
   bool graft_marker_present_;         /**< .cvmfsgraft-$filename exists */
 
+  bool external_data_;
   std::string relative_parent_path_;
   std::string filename_;
   ssize_t graft_size_;

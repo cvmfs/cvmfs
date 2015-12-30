@@ -47,6 +47,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   bool CreateEmptyDatabase();
   bool InsertInitialValues(const std::string     &root_path,
                            const bool             volatile_content,
+                           CatalogProperty        external_data,
                            const DirectoryEntry  &root_entry
                                              = DirectoryEntry(kDirentNegative));
 
@@ -181,6 +182,11 @@ class SqlDirent : public Sql {
   static const int kFlagLink                = 8;
   static const int kFlagFileStat            = 16;  // currently unused
   static const int kFlagFileChunk           = 64;
+  /**
+   * The file is not natively stored in cvmfs but on a different storage system,
+   * for instance on HTTPS data federation services.
+   */
+  static const int kFlagFileExternal        = 128;
   // as of 2^8: 3 bit for hashes
   //   - 0: SHA-1
   //   - 1: RIPEMD-160
@@ -190,6 +196,7 @@ class SqlDirent : public Sql {
   // Compression methods, 3 bits starting at 2^11
   // Corresponds to zlib::Algorithms
   static const int kFlagPosCompression      = 11;
+
 
  protected:
   /**
