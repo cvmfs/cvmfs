@@ -76,6 +76,7 @@ set(CVMFS_UNITTEST_FILES
   t_platforms.cc
   t_compressor.cc
   t_compression.cc
+  t_clientctx.cc
 )
 
 #
@@ -196,6 +197,8 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.h
+  ${CVMFS_SOURCE_DIR}/clientctx.h
+  ${CVMFS_SOURCE_DIR}/clientctx.cc
 )
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})

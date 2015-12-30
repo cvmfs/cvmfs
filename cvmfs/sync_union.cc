@@ -91,6 +91,7 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
   SyncItem entry = CreateSyncItem(parent_dir, filename, kItemFile);
+  entry.SetExternalData(GetExternalData());
   ProcessFile(entry);
 }
 
@@ -173,6 +174,10 @@ void SyncUnionAufs::Traverse() {
   traversal.fn_ignore_file    = &SyncUnionAufs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
   traversal.fn_new_symlink    = &SyncUnionAufs::ProcessSymlink;
+  LogCvmfs(kLogUnionFs, kLogVerboseMsg, "Aufs starting traversal "
+           "recursion for scratch_path=[%s] with external data set to %d",
+           scratch_path().c_str(),
+           GetExternalData());
 
   traversal.Recurse(scratch_path());
 }
