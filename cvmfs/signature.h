@@ -67,9 +67,15 @@ class SignatureManager {
                         unsigned *letter_length,
                         unsigned *pos_after_mark);
 
+  // Returns the PEM-encoded text of the last key used to successfully
+  // verify data.
+  const char *GetLastSuccessfulVerificationKey() {return last_letter_pubkey_;}
+
  private:
   void InitX509Store();
+  char *GenerateKeyText(RSA *pubkey);
 
+  char *last_letter_pubkey_;
   EVP_PKEY *private_key_;
   X509 *certificate_;
   std::vector<RSA *> public_keys_;  /**< Contains cvmfs public master keys */
