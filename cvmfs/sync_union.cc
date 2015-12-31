@@ -46,6 +46,9 @@ SyncItem SyncUnion::CreateSyncItem(const std::string  &relative_parent_path,
                                    const SyncItemType  entry_type) const {
   SyncItem entry(relative_parent_path, filename, this, entry_type);
   PreprocessSyncItem(&entry);
+  if (entry_type == kItemFile) {
+    entry.SetExternalData(GetExternalData());
+  }
   return entry;
 }
 
@@ -91,7 +94,6 @@ void SyncUnion::ProcessRegularFile(const string &parent_dir,
   LogCvmfs(kLogUnionFs, kLogDebug, "SyncUnion::ProcessRegularFile(%s, %s)",
            parent_dir.c_str(), filename.c_str());
   SyncItem entry = CreateSyncItem(parent_dir, filename, kItemFile);
-  entry.SetExternalData(GetExternalData());
   ProcessFile(entry);
 }
 
