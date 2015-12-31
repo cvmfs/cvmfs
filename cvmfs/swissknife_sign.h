@@ -35,15 +35,18 @@ class CommandSign : public Command {
     r.push_back(Parameter::Optional('n', "repository name"));
     r.push_back(Parameter::Switch('b', "generate symlinks for VOMS-secured "
                                        "repo backends"));
+    r.push_back(Parameter::Optional('M', "repository meta info file"));
     return r;
   }
   int Main(const ArgumentList &args);
 
  protected:
   void CertificateUploadCallback(const upload::SpoolerResult &result);
+  void MetainfoUploadCallback(const upload::SpoolerResult &result);
 
  private:
   Future<shash::Any> certificate_hash_;
+  Future<shash::Any> metainfo_hash_;
 };
 
 }  // namespace swissknife

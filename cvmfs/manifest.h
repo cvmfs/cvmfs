@@ -50,7 +50,8 @@ class Manifest {
     history_(history),
     publish_timestamp_(publish_timestamp),
     garbage_collectable_(garbage_collectable),
-    has_alt_catalog_path_(has_alt_catalog_path) { }
+    has_alt_catalog_path_(has_alt_catalog_path),
+    meta_info_(meta_info) { }
 
   std::string ExportString() const;
   bool Export(const std::string &path) const;
@@ -87,6 +88,9 @@ class Manifest {
   }
   void set_has_alt_catalog_path(const bool &has_alt_path) {
     has_alt_catalog_path_ = has_alt_path;
+  }
+  void set_meta_info(const shash::Any &meta_info) {
+    meta_info_ = meta_info;
   }
 
   uint64_t revision() const { return revision_; }
