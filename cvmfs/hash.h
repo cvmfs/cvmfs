@@ -51,6 +51,7 @@ const char kSuffixMicroCatalog = 'L';  // currently unused
 const char kSuffixPartial      = 'P';
 const char kSuffixTemporary    = 'T';
 const char kSuffixCertificate  = 'X';
+const char kSuffixMetainfo     = 'M';
 
 
 /**
