@@ -1,5 +1,5 @@
 2.2.0:
-  * Add support for external data (CVM-906)
+  * Add support for external data (CVM-907)
   * Add CVMFS_IP_PREFER=[4|6] to select preferred IP protocol for proxies
   * Fix crash when publishing specific files which a size of a multiple of the
     chunk size (CVM-957)
