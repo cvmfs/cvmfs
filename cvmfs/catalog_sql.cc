@@ -218,7 +218,7 @@ bool CatalogDatabase::InsertInitialValues(
     }
   }
 
-  if (voms_authz.size()) {
+  if (!voms_authz.empty()) {
     if (!this->SetProperty("voms_authz", voms_authz)) {
       PrintSqlError("failed to insert VOMS authz flag into the newly created "
                     "catalog tables.");
