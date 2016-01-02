@@ -92,10 +92,11 @@ void WritableCatalogManager::ActivateCatalog(Catalog *catalog) {
  * @return true on success, false otherwise
  */
 manifest::Manifest *WritableCatalogManager::CreateRepository(
-  const string     &dir_temp,
-  const bool        volatile_content,
-  CatalogProperty   external_data,
-  upload::Spooler  *spooler)
+  const string      &dir_temp,
+  const bool         volatile_content,
+  const std::string &voms_authz,
+  CatalogProperty    external_data,
+  upload::Spooler   *spooler)
 {
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
@@ -122,6 +123,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
     if (!new_clg_db.IsValid() ||
         !new_clg_db->InsertInitialValues(root_path,
                                           volatile_content,
+                                          voms_authz,
                                           external_data,
                                           root_entry))
     {
@@ -153,6 +155,9 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string manifest_path = dir_temp + "/manifest";
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
+  if (!voms_authz.empty()) {
+    manifest->set_has_alt_catalog_path(true);
+  }
 
   // Upload catalog
   spooler->Upload(file_path_compressed, "data/" + hash_catalog.MakePath());
@@ -559,6 +564,8 @@ void WritableCatalogManager::CreateNestedCatalog(const std::string &mountpoint)
   // Note we do not set the external_data bit for nested catalogs
   retval = new_catalog_db->InsertInitialValues(nested_root_path,
                                                volatile_content,
+                                               "",  // At this point, only root
+                                                    // catalog gets VOMS authz
                                                kUnset,
                                                new_root_entry);
   assert(retval);
