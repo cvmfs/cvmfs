@@ -789,7 +789,7 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
     UniquePtr<catalog::CatalogDatabase>
       new_clg_db(catalog::CatalogDatabase::Create(clg_db_path));
     if (!new_clg_db.IsValid() ||
-        !new_clg_db->InsertInitialValues(root_path, volatile_content, kUnset)) {
+        !new_clg_db->InsertInitialValues(root_path, volatile_content, "", kUnset)) {
       Error("Failed to create database for new catalog");
       unlink(clg_db_path.c_str());
       return false;
