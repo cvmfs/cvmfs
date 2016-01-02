@@ -77,10 +77,10 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    *   - inbufsize - the remaining bytes of input to read in.
    *   - flush - unchanged from input
    */
-  virtual bool Deflate(unsigned char *outbuf, size_t& outbufsize,
-          unsigned char*& inbuf, size_t& inbufsize,
+  virtual bool Deflate(unsigned char *outbuf, size_t& outbufsize,  // NOLINT
+          unsigned char*& inbuf, size_t& inbufsize,  // NOLINT
           const bool flush) = 0;
-          
+
   /**
     * Return an upper bound on the number of bytes required in order 
     * to compress an input number of bytes.
@@ -98,8 +98,8 @@ class ZlibCompressor: public Compressor {
   ~ZlibCompressor();
 
 
-  bool Deflate(unsigned char *outbuf, size_t& outbufsize,
-          unsigned char*& inbuf, size_t& inbufsize,
+  bool Deflate(unsigned char *outbuf, size_t& outbufsize,  // NOLINT
+          unsigned char*& inbuf, size_t& inbufsize,  // NOLINT
           const bool flush);
   size_t DeflateBound(const size_t bytes);
   Compressor* Clone();
@@ -112,8 +112,8 @@ class ZlibCompressor: public Compressor {
 class EchoCompressor: public Compressor {
  public:
   explicit EchoCompressor(const Algorithms &alg);
-  bool Deflate(unsigned char *outbuf, size_t& outbufsize,
-          unsigned char*& inbuf, size_t& inbufsize,
+  bool Deflate(unsigned char *outbuf, size_t& outbufsize,  // NOLINT
+          unsigned char*& inbuf, size_t& inbufsize,  // NOLINT
           const bool flush);
   size_t DeflateBound(const size_t bytes) { return bytes; }
   Compressor* Clone();

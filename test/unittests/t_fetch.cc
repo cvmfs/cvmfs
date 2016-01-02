@@ -209,11 +209,13 @@ TEST_F(T_Fetcher, ExternalFetch) {
   // Download fails
   EXPECT_EQ(-EIO,
     external_fetcher_->Fetch(hash_regular_, cache::CacheManager::kSizeUnknown,
-                             "/reg-fail", cache::CacheManager::kTypeRegular));
+                             "/reg-fail", zlib::kZlibDefault,
+                             cache::CacheManager::kTypeRegular));
 
   // Download and store in cache
   int fd = external_fetcher_->Fetch(hash_regular_,
                                     cache::CacheManager::kSizeUnknown, "/reg",
+                                    zlib::kZlibDefault,
                                     cache::CacheManager::kTypeRegular);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
@@ -226,7 +228,7 @@ TEST_F(T_Fetcher, ExternalFetch) {
   rnd_hash.Randomize();
   EXPECT_EQ(-EIO,
     fetcher_->Fetch(rnd_hash, cache::CacheManager::kSizeUnknown, "/reg",
-                    cache::CacheManager::kTypeRegular));
+                    zlib::kZlibDefault, cache::CacheManager::kTypeRegular));
 }
 
 
@@ -276,11 +278,12 @@ TEST_F(T_Fetcher, FetchAltPath) {
   unlink((src_path_ + "/" + hash_regular_.MakePath()).c_str());
   int fd;
   fd = fetcher_->Fetch(hash_regular_, cache::CacheManager::kSizeUnknown, "reg",
-                       cache::CacheManager::kTypeRegular);
+                       zlib::kZlibDefault, cache::CacheManager::kTypeRegular);
   EXPECT_LT(fd, 0);
 
   fd = fetcher_->Fetch(hash_regular_, cache::CacheManager::kSizeUnknown, "reg",
-                       cache::CacheManager::kTypeRegular, "altpath");
+                       zlib::kZlibDefault, cache::CacheManager::kTypeRegular,
+                       "altpath");
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
