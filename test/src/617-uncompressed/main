@@ -1,11 +1,11 @@
 cvmfs_test_name="Populate repository of uncompressed files"
 cvmfs_test_autofs_on_startup=false
 
-# TODO: large file
-
 produce_files_in() {
 	local working_dir=$1
+  local large_file=$2
 
+  cp $large_file $working_dir/large
 	pushdir $working_dir
 
 	echo "meaningless file content" > file
@@ -34,6 +34,9 @@ cvmfs_run_test() {
   mkdir reference_dir
   local reference_dir=$scratch_dir/reference_dir
 
+  local large_file="large_file"
+  dd if=/dev/urandom of=$large_file bs=1024 count=$((100*1024))
+
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -Z none || return $?
 
@@ -44,10 +47,10 @@ cvmfs_run_test() {
   start_transaction $CVMFS_TEST_REPO || return $?
 
   echo "putting some stuff in the new repository"
-  produce_files_in $repo_dir || return 3
+  produce_files_in $repo_dir $large_file || return 3
 
   echo "putting exactly the same stuff in the scratch space for comparison"
-  produce_files_in $reference_dir || return 4
+  produce_files_in $reference_dir $large_file || return 4
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
@@ -60,6 +63,8 @@ cvmfs_run_test() {
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  rm -f $large_file
 
   return 0
 }
