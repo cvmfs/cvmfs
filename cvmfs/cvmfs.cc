@@ -2561,9 +2561,25 @@ static int Init(const loader::LoaderExports *loader_exports) {
     }
   }
   g_signature_ready = true;
+  string config_repository_path = "";
   if (FileExists("/etc/cvmfs/blacklist")) {
-    if (!cvmfs::signature_manager_->LoadBlacklist("/etc/cvmfs/blacklist")) {
+    const bool append = false;
+    if (!cvmfs::signature_manager_->LoadBlacklist("/etc/cvmfs/blacklist",
+                                                  append))
+    {
       *g_boot_error = "failed to load blacklist";
+      return loader::kFailSignature;
+    }
+  }
+  if (cvmfs::options_manager_->HasConfigRepository(*cvmfs::repository_name_,
+                                                   &config_repository_path)
+      && FileExists(config_repository_path + "blacklist"))
+  {
+    const bool append = true;
+    if (!cvmfs::signature_manager_->LoadBlacklist(
+          config_repository_path + "blacklist", append))
+    {
+      *g_boot_error = "failed to load blacklist from config repository";
       return loader::kFailSignature;
     }
   }
