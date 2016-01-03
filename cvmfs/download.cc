@@ -55,6 +55,7 @@
 #include "sanitizer.h"
 #include "smalloc.h"
 #include "util.h"
+#include "voms_authz/voms_authz.h"
 
 using namespace std;  // NOLINT
 
@@ -787,6 +788,11 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
   CURL *curl_handle = info->curl_handle;
   string url_prefix;
 
+  curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
+  const char *cadir = getenv("X509_CERT_DIR");
+  if (!cadir) {cadir = "/etc/grid-security/certificates";}
+  curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
+
   pthread_mutex_lock(lock_options_);
   // Check if proxy group needs to be reset from backup to primary
   if (opt_timestamp_backup_proxies_ > 0) {
@@ -877,6 +883,12 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
 
   string url = url_prefix + *(info->url);
+  if ((info->pid != -1) && (url.substr(0, 5) == "https"))
+  {
+    ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
+                        info->cred_fname);
+  }
+
   if (url.find("@proxy@") != string::npos) {
     string replacement;
     if (proxy_template_forced_ != "") {
@@ -1046,6 +1058,17 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            info->url->c_str(), curl_error);
   UpdateStatistics(info->curl_handle);
 
+  if (info->cred_fname)
+  {
+    unlink(info->cred_fname);
+    free(info->cred_fname);
+    info->cred_fname = NULL;
+    curl_easy_setopt(info->curl_handle, CURLOPT_SSLCERT, NULL);
+    curl_easy_setopt(info->curl_handle, CURLOPT_SSLKEY, NULL);
+    curl_easy_setopt(info->curl_handle, CURLOPT_FRESH_CONNECT, 0);
+    curl_easy_setopt(info->curl_handle, CURLOPT_FORBID_REUSE, 0);
+  }
+
   // Verification and error classification
   switch (curl_error) {
     case CURLE_OK:
@@ -1093,6 +1116,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->error_code = kFailOk;
       break;
     case CURLE_UNSUPPORTED_PROTOCOL:
+      info->error_code = kFailUnsupportedProtocol;
+      break;
     case CURLE_URL_MALFORMAT:
       info->error_code = kFailBadUrl;
       break;
@@ -1116,6 +1141,12 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     case CURLE_TOO_MANY_REDIRECTS:
       info->error_code = kFailHostConnection;
       break;
+    case CURLE_SSL_CACERT:
+      LogCvmfs(kLogDownload, kLogDebug | kLogSyslogErr, "SSL certificate cannot"
+               "be authenticated with known CA certificates. "
+               "X509_CERT_DIR might point to the wrong directory.");
+      info->error_code = kFailHostConnection;
+      break;
     case CURLE_ABORTED_BY_CALLBACK:
     case CURLE_WRITE_ERROR:
       // Error set by callback
@@ -1126,6 +1157,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       info->error_code = kFailOther;
       break;
   }
+
+  std::vector<std::string> *host_chain = opt_host_chain_;
 
   // Determination if download should be repeated
   bool try_again = false;
@@ -1139,7 +1172,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
            (info->error_code == kFailHostConnection) ||
            (info->error_code == kFailHostHttp)) &&
          info->probe_hosts &&
-         opt_host_chain_ && (info->num_used_hosts < opt_host_chain_->size()))
+         host_chain && (info->num_used_hosts < host_chain->size()))
        )
     {
       try_again = true;
@@ -1155,8 +1188,8 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       if (!same_url_retry && (info->num_used_proxies >= opt_num_proxies_)) {
         // Check if this can be made a host fail-over
         if (info->probe_hosts &&
-            opt_host_chain_ &&
-            (info->num_used_hosts < opt_host_chain_->size()))
+            host_chain &&
+            (info->num_used_hosts < host_chain->size()))
         {
           // reset proxy group if not already performed by other handle
           if (opt_proxy_groups_) {

@@ -49,6 +49,7 @@
 #include "atomic.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "download.h"
@@ -252,6 +253,8 @@ int cvmfs_globals::Setup(const options &opts) {
 
   cvmfs::pid_ = getpid();
 
+  ClientCtx::GetInstance();
+
   return LIBCVMFS_FAIL_OK;
 }
 
@@ -295,6 +298,7 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
 
 void cvmfs_context::Destroy(cvmfs_context *ctx) {
   perf::Statistics *statistics = ctx->statistics();
+  ClientCtx::CleanupInstance();
   delete ctx;
   delete statistics;
 }
@@ -460,6 +464,7 @@ bool cvmfs_context::GetDirentForPath(const PathString         &path,
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
   // Lookup inode in catalog TODO: not twice md5 calculation
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
   if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
     md5path_cache_->Insert(md5path, *dirent);
     return true;
@@ -583,6 +588,7 @@ int cvmfs_context::ListDirectory(
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
   if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
     return -EIO;
   }
@@ -614,6 +620,7 @@ int cvmfs_context::Open(const char *c_path) {
              path.c_str());
 
     FileChunkList *chunks = new FileChunkList();
+    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
     if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
                                           chunks) ||
         chunks->IsEmpty())

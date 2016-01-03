@@ -5,6 +5,7 @@
 #include "cvmfs_config.h"
 #include "catalog_mgr_ro.h"
 
+#include "clientctx.h"
 #include "compression.h"
 #include "download.h"
 #include "util.h"
@@ -39,6 +40,12 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   download::JobInfo download_catalog(&url, true, false, fcatalog,
                                      &effective_hash);
+  ClientCtx *ctx = ClientCtx::GetInstance();
+  if (ctx->IsSet()) {
+    ctx->Get(&download_catalog.uid,
+             &download_catalog.gid,
+             &download_catalog.pid);
+  }
 
   download::Failures retval = download_manager_->Fetch(&download_catalog);
   fclose(fcatalog);

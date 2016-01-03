@@ -479,32 +479,51 @@ static bool
 CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
 {
   // An empty entry should authorize nobody.
-  if (!authz.size()) {return false;}
+  if (authz.empty()) {return false;}
 
-  // Break the authz into VOMS and roles.
+  // Break the authz into VOMS VO, groups, and roles.
   // We will compare the required auth against the cached session VOMS info.
   // Roles must match exactly; Sub-groups are authorized in their parent
   // group.
-  size_t delim = authz.find("/Role=");
-  std::string role, group;
-  if (delim != std::string::npos) {
-    role = authz.substr(delim+6);
-    group = authz.substr(0, delim);
+
+  std::string vo, role, group;
+  bool is_dn = false;
+  if (authz[0] != '/') {
+        size_t delim = authz.find(':');
+        if (delim != std::string::npos) {
+            vo = authz.substr(0, delim);
+            size_t delim2 = authz.find("/Role=", delim+1);
+            if (delim2 != std::string::npos) {
+                role = authz.substr(delim2 + 6);
+                group = authz.substr(delim + 1, delim2 - delim - 1);
+            } else {
+                group = authz.substr(delim + 1);;
+            }
+        }
   } else {
-    group = authz;
+        // No VOMS info in the authz; it is a DN.
+        is_dn = true;
   }
-  if (group[0] != '/') {return false;}
+  // Quick sanity check of group name.
+  if (!group.empty() && group[0] != '/') {return false;}
+
   std::vector<std::string> group_hierarchy;
   SplitGroupToPaths(group, group_hierarchy);
 
   // Now we have valid VOMS data, check authz.
   // Iterator through the VOs
-  for (int idx=0; voms_ptr->data[idx] != NULL; idx++) {
+  for (int idx=0; voms_ptr->data[idx] != NULL; idx++) {  
     struct voms *it = voms_ptr->data[idx];
     // Check first against the full DN.
-    if (it->user && !strcmp(it->user, authz.c_str())) {
-      return true;
+    if (is_dn) {
+      if (it->user && !strcmp(it->user, authz.c_str())) {
+        return true;
+      } else {
+        break;
+      }
     }
+    if (!it->voname) {continue;}
+    if (strcmp(vo.c_str(), it->voname)) {continue;}
 
     // Iterate through the FQANs.
     for (int idx2=0; it->std[idx2] != NULL; idx2++) {
@@ -516,7 +535,7 @@ CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
       std::vector<std::string> avail_hierarchy;
       SplitGroupToPaths(it2->group, avail_hierarchy);
       if (IsSubgroupOf(avail_hierarchy, group_hierarchy) &&
-          IsRoleMatching(it2->role, role.c_str()))
+              IsRoleMatching(it2->role, role.c_str()))
       {
         return true;
       }

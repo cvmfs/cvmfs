@@ -48,6 +48,7 @@ enum Failures {
   kFailBadData,
   kFailTooBig,
   kFailOther,
+  kFailUnsupportedProtocol,
 
   kFailNumEntries
 };  // Failures
@@ -68,7 +69,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[10] = "corrupted data received";
   texts[11] = "resource too big to download";
   texts[12] = "unknown network error";
-  texts[13] = "no text";
+  texts[13] = "Unsupported URL in protocol";
+  texts[14] = "no text";
   return texts[error];
 }
 
@@ -118,6 +120,11 @@ struct JobInfo {
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
+  bool secure;
+  pid_t pid;
+  uid_t uid;
+  gid_t gid;
+  char *cred_fname;
   Destination destination;
   struct {
     size_t size;
@@ -137,6 +144,11 @@ struct JobInfo {
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
+    pid = -1;
+    uid = -1;
+    gid = -1;
+    secure = false;
+    cred_fname = 0;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;
@@ -210,6 +222,7 @@ struct JobInfo {
   }
 
   ~JobInfo() {
+    delete cred_fname;
     if (wait_at[0] >= 0) {
       close(wait_at[0]);
       close(wait_at[1]);
