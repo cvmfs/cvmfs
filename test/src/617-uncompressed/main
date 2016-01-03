@@ -2,6 +2,8 @@ cvmfs_test_name="Populate repository of uncompressed files"
 cvmfs_test_autofs_on_startup=false
 
 # TODO: large file
+# TODO: cvmfs_fsck
+# TODO: cvmfs_swissknife upload
 
 produce_files_in() {
 	local working_dir=$1
