@@ -1,0 +1,62 @@
+cvmfs_test_name="Populate repository of uncompressed files"
+cvmfs_test_autofs_on_startup=false
+
+# TODO: large file
+
+produce_files_in() {
+	local working_dir=$1
+
+	pushdir $working_dir
+
+	echo "meaningless file content" > file
+	echo "more clever file content" > clever
+
+	mkdir foo
+	mkdir bar
+  mkdir nested
+  touch nested/empty
+  touch nested/.cvmfscatalog
+
+	mkdir foo/bar
+	mkdir bar/foo
+
+	ln file hardlinkToFile
+	ln -s clever symlinkToClever
+
+	popdir
+}
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  local scratch_dir=$(pwd)
+  mkdir reference_dir
+  local reference_dir=$scratch_dir/reference_dir
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -Z none || return $?
+
+  grep "^CVMFS_COMPRESSION_ALGORITHM=none$" \
+    /etc/cvmfs/repositories.d/${CVMFS_TEST_REPO}/server.conf || return 20
+
+  echo "starting transaction to edit repository"
+  start_transaction $CVMFS_TEST_REPO || return $?
+
+  echo "putting some stuff in the new repository"
+  produce_files_in $repo_dir || return 3
+
+  echo "putting exactly the same stuff in the scratch space for comparison"
+  produce_files_in $reference_dir || return 4
+
+  echo "creating CVMFS snapshot"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "compare the results of cvmfs to our reference copy"
+  compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
+
+  echo "check catalog and data integrity"
+  check_repository $CVMFS_TEST_REPO -i  || return $?
+
+  return 0
+}

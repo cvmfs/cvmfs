@@ -111,10 +111,6 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
   if (args.find('Z') != args.end()) {
     compression_algorithm =
       zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
-    if (compression_algorithm == zlib::kUnknown) {
-      PrintError("unknown compression algorithm");
-      return 1;
-    }
   }
 
   const bool volatile_content    = (args.count('v') > 0);
@@ -125,7 +121,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     voms_authz = *args.find('V')->second;
   }
 
-  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
+  const upload::SpoolerDefinition sd(spooler_definition,
+                                     hash_algorithm, compression_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
 
@@ -173,8 +170,14 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
+  if (args.find('Z') != args.end()) {
+    compression_algorithm =
+      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
 
-  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
+  const upload::SpoolerDefinition sd(spooler_definition,
+                                     hash_algorithm, compression_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   spooler->Upload(source, dest);
@@ -551,10 +554,6 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   if (args.find('Z') != args.end()) {
     compression_algorithm =
       zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
-    if (compression_algorithm == zlib::kUnknown) {
-      PrintError("unknown compression algorithm");
-      return 1;
-    }
   }
 
   if (args.find('j') != args.end()) {

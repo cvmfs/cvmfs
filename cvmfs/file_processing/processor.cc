@@ -94,7 +94,7 @@ void ChunkProcessingTask::Crunch(const unsigned char  *data,
 
     // Do a single deflate
     done = chunk_->compressor()->Deflate(
-      output_start, outbufsize, running_data, running_inputsize, finalize);
+      finalize, &running_data, &running_inputsize, &output_start, &outbufsize);
 
     // Now:
     //  outbufsize is the number of bytes used
@@ -202,7 +202,7 @@ FileScrubbingTask::CutMarks FileScrubbingTask::FindNextChunkCutMarks() {
   CutMarks result;
   off_t next_cut;
   while ((next_cut = file->FindNextCutMark(buffer)) != 0) {
-    assert (next_cut > 0);
+    assert(next_cut > 0);
     if (static_cast<size_t>(next_cut) < file->size()) {
       result.push_back(next_cut);
     }

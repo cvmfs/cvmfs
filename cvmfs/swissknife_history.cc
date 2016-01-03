@@ -40,7 +40,6 @@ void CommandTag::InsertCommonParameters(ParameterList *r) {
   r->push_back(Parameter::Optional(
     'e', "hash algorithm to use (default SHA1)"));
   r->push_back(Parameter::Switch('L', "follow HTTP redirects"));
-  r->push_back(Parameter::Optional('Z', "Compression Algorithm"));
 }
 
 
@@ -79,11 +78,6 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
     (args.find('f') == args.end())
     ? ""
     : *args.find('f')->second;
-
-  const zlib::Algorithms compression_alg =
-    (args.find('Z') == args.end())
-    ? zlib::kZlibDefault
-    : zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
 
   // Sanity checks
   if (hash_algo == shash::kAny) {
@@ -177,7 +171,7 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
     const bool use_file_chunking = false;
     const upload::SpoolerDefinition sd(spl_definition,
                                        hash_algo,
-                                       compression_alg,
+                                       zlib::kZlibDefault,
                                        use_file_chunking);
     env->spooler = upload::Spooler::Construct(sd);
     if (!env->spooler) {

@@ -424,12 +424,12 @@ static bool CheckMultipleAuthz(const struct vomsdata *voms_ptr,
 
 bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
   if (g_VOMS_Init == NULL) {
-    LogCvmfs(kLogVoms, kLogSyslog, 
+    LogCvmfs(kLogVoms, kLogSyslog,
              "VOMS library not present; failing VOMS authz.");
     return false;
   }
-  LogCvmfs(kLogVoms, kLogDebug, 
-           "Checking whether user with UID %d has VOMS auth %s.", 
+  LogCvmfs(kLogVoms, kLogDebug,
+           "Checking whether user with UID %d has VOMS auth %s.",
            ctx->uid, authz.c_str());
 
   // Get VOMS information from cache; if not present, store it.
@@ -438,7 +438,7 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
     voms_ptr = GenerateVOMSData(ctx);
     if (voms_ptr) {
       voms_ptr = g_cache.try_put(ctx->pid, voms_ptr);
-      LogCvmfs(kLogVoms, kLogDebug, 
+      LogCvmfs(kLogVoms, kLogDebug,
                "Caching user's VOMS credentials at address %p.", voms_ptr);
     } else {
       LogCvmfs(kLogVoms, kLogDebug, "User has no VOMS credentials.");
@@ -448,7 +448,7 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string & authz) {
     LogCvmfs(kLogVoms, kLogDebug, "Using cached VOMS credentials.");
   }
   if (!voms_ptr) {
-    LogCvmfs(kLogVoms, kLogDebug, 
+    LogCvmfs(kLogVoms, kLogDebug,
              "ERROR: VOMS credentials are null pointer.");
     return false;
   }
@@ -480,7 +480,7 @@ CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
 {
   // An empty entry should authorize nobody.
   if (!authz.size()) {return false;}
-  
+
   // Break the authz into VOMS and roles.
   // We will compare the required auth against the cached session VOMS info.
   // Roles must match exactly; Sub-groups are authorized in their parent
@@ -496,16 +496,16 @@ CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
   if (group[0] != '/') {return false;}
   std::vector<std::string> group_hierarchy;
   SplitGroupToPaths(group, group_hierarchy);
-  
+
   // Now we have valid VOMS data, check authz.
   // Iterator through the VOs
-  for (int idx=0; voms_ptr->data[idx] != NULL; idx++) {  
+  for (int idx=0; voms_ptr->data[idx] != NULL; idx++) {
     struct voms *it = voms_ptr->data[idx];
     // Check first against the full DN.
     if (it->user && !strcmp(it->user, authz.c_str())) {
       return true;
     }
-  
+
     // Iterate through the FQANs.
     for (int idx2=0; it->std[idx2] != NULL; idx2++) {
       struct data *it2 = it->std[idx2];
@@ -522,6 +522,6 @@ CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
       }
     }
   }
-  
+
   return false;
 }

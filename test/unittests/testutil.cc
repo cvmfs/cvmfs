@@ -191,7 +191,7 @@ DirectoryEntry DirectoryEntryTestFactory::Directory(
     const string &name,
     unsigned size,
     shash::Any hash,
-    bool is_nested_catalog_mountpoint) 
+    bool is_nested_catalog_mountpoint)
 {
   DirectoryEntry dirent;
   dirent.mode_ = 16893;

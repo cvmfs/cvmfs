@@ -269,7 +269,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     shash::Update((unsigned char *)ptr, num_bytes, info->hash_context);
 
   if (info->destination == kDestinationSink) {
-    if (info->compression_alg == zlib::kZlibDefault) {
+    if (info->compressed) {
       zlib::StreamStates retval =
         zlib::DecompressZStream2Sink(ptr, num_bytes,
                                      &info->zstream, info->destination_sink);
@@ -315,7 +315,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
     info->destination_mem.pos += num_bytes;
   } else {
     // Write to file
-    if (info->compression_alg == zlib::kZlibDefault) {
+    if (info->compressed) {
       // LogCvmfs(kLogDownload, kLogDebug, "REMOVE-ME: writing %d bytes for %s",
       //          num_bytes, info->url->c_str());
       zlib::StreamStates retval =
@@ -745,7 +745,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   if (info->info_header) {
     header_lists_->AppendHeader(info->headers, info->info_header);
   }
-  if (info->compression_alg == zlib::kZlibDefault) {
+  if (info->compressed) {
     zlib::DecompressInit(&(info->zstream));
   }
   if (info->expected_hash) {
@@ -1071,9 +1071,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
       }
 
       // Decompress memory in a single run
-      if ((info->destination == kDestinationMem) &&
-          (info->compression_alg == zlib::kZlibDefault))
-      {
+      if ((info->destination == kDestinationMem) && info->compressed) {
         void *buf;
         uint64_t size;
         bool retval = zlib::DecompressMem2Mem(info->destination_mem.data,
@@ -1222,7 +1220,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     }
     if (info->expected_hash)
       shash::Init(info->hash_context);
-    if (info->compression_alg == zlib::kZlibDefault)
+    if (info->compressed)
       zlib::DecompressInit(&info->zstream);
 
     // Failure handling
@@ -1286,7 +1284,7 @@ bool DownloadManager::VerifyAndFinalize(const int curl_error, JobInfo *info) {
     info->destination_file = NULL;
   }
 
-  if (info->compression_alg == zlib::kZlibDefault)
+  if (info->compressed)
     zlib::DecompressFini(&info->zstream);
 
   if (info->headers) {

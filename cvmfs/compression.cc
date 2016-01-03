@@ -126,12 +126,17 @@ namespace zlib {
 const unsigned kZChunk = 16384;
 const unsigned kBufferSize = 32768;
 
+/**
+ * Aborts if string doesn't match any of the algorithms.
+ */
 Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option) {
   if (algorithm_option == "default")
     return kZlibDefault;
   if (algorithm_option == "none")
     return kNoCompression;
-  return kUnknown;
+  LogCvmfs(kLogCompress, kLogStderr, "unknown compression algorithms: %s",
+           algorithm_option.c_str());
+  assert(false);
 }
 
 void CompressInit(z_stream *strm) {
@@ -799,19 +804,23 @@ bool DecompressMem2Mem(const void *buf, const int64_t size,
   return true;
 }
 
-// Abstract functions for Compressor
+
+//------------------------------------------------------------------------------
+
+
 void Compressor::RegisterPlugins() {
   RegisterPlugin<ZlibCompressor>();
   RegisterPlugin<EchoCompressor>();
 }
 
 
-/**
- * ZlibCompressor functions
- */
+//------------------------------------------------------------------------------
+
+
 bool ZlibCompressor::WillHandle(const zlib::Algorithms &alg) {
   return alg == kZlibDefault;
 }
+
 
 ZlibCompressor::ZlibCompressor(const Algorithms &alg)
   : Compressor(alg)
@@ -837,35 +846,38 @@ Compressor* ZlibCompressor::Clone() {
   return other;
 }
 
-bool ZlibCompressor::Deflate(unsigned char *outbuf, size_t& outbufsize,
-        unsigned char*& inbuf, size_t& inbufsize,
-        const bool flush)
+bool ZlibCompressor::Deflate(
+  const bool flush,
+  unsigned char **inbuf, size_t *inbufsize,
+  unsigned char **outbuf, size_t *outbufsize)
 {
   // Adding compression
-  stream_.avail_in = inbufsize;
-  stream_.next_in = inbuf;
+  stream_.avail_in = *inbufsize;
+  stream_.next_in = *inbuf;
   const int flush_int = (flush) ? Z_FINISH : Z_NO_FLUSH;
   int retcode = 0;
 
-  stream_.avail_out = outbufsize;
-  stream_.next_out = outbuf;
+  stream_.avail_out = *outbufsize;
+  stream_.next_out = *outbuf;
 
   // Deflate in zlib!
   retcode = deflate(&stream_, flush_int);
   assert(retcode == Z_OK || retcode == Z_STREAM_END);
 
-  outbufsize -= stream_.avail_out;
-  inbuf = stream_.next_in;
-  inbufsize = stream_.avail_in;
+  *outbufsize -= stream_.avail_out;
+  *inbuf = stream_.next_in;
+  *inbufsize = stream_.avail_in;
 
   return (flush_int == Z_NO_FLUSH && retcode == Z_OK && stream_.avail_in == 0)
          || (flush_int == Z_FINISH  && retcode == Z_STREAM_END);
 }
 
+
 ZlibCompressor::~ZlibCompressor() {
   int retcode = deflateEnd(&stream_);
   assert(retcode == Z_OK);
 }
+
 
 size_t ZlibCompressor::DeflateBound(const size_t bytes) {
   // Call zlib's deflate bound
@@ -873,37 +885,38 @@ size_t ZlibCompressor::DeflateBound(const size_t bytes) {
 }
 
 
+//------------------------------------------------------------------------------
+
+
 EchoCompressor::EchoCompressor(const zlib::Algorithms &alg):
   Compressor(alg)
 {
 }
 
+
 bool EchoCompressor::WillHandle(const zlib::Algorithms &alg) {
   return alg == kNoCompression;
 }
+
 
 Compressor* EchoCompressor::Clone() {
   return new EchoCompressor(zlib::kNoCompression);
 }
 
-bool EchoCompressor::Deflate(unsigned char *outbuf, size_t& outbufsize,
-        unsigned char*& inbuf, size_t& inbufsize,
-        const bool flush)
-{
-  size_t bytes_to_copy = min(outbufsize, inbufsize);
-  memcpy(outbuf, inbuf, bytes_to_copy);
 
-  // Check if we are done, ie, we memcpy'd all of the input bytes
-  bool done = false;
-  if (bytes_to_copy == inbufsize)
-    done = true;
-  else
-    done = false;
+bool EchoCompressor::Deflate(
+  const bool flush,
+  unsigned char **inbuf, size_t *inbufsize,
+  unsigned char **outbuf, size_t *outbufsize)
+{
+  size_t bytes_to_copy = min(*outbufsize, *inbufsize);
+  memcpy(*outbuf, *inbuf, bytes_to_copy);
+  const bool done = (bytes_to_copy == *inbufsize);
 
   // Update the return variables
-  inbuf += bytes_to_copy;
-  outbufsize = bytes_to_copy;
-  inbufsize = inbufsize - bytes_to_copy;
+  *inbuf += bytes_to_copy;
+  *outbufsize = bytes_to_copy;
+  *inbufsize -= bytes_to_copy;
 
   return done;
 }

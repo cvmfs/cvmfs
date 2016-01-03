@@ -12,8 +12,8 @@
 #include <string>
 
 #include "duplex_zlib.h"
-#include "file_processing/char_buffer.h"
 #include "sink.h"
+#include "util.h"
 
 namespace shash {
 struct Any;
@@ -41,28 +41,27 @@ enum StreamStates {
 enum Algorithms {
   kZlibDefault = 0,
   kNoCompression,
-  kUnknown,
 };
 
 /**
-  * Abstract Compression class which is inhereited by implementations of
-  * compression engines such as zlib...
-  *
-  * In order to add a new compression method, you simply need to add a new class
-  * which is a sub-class of the Compressor.  The subclass needs to implement the
-  * Defalte, DefalteBound, Clone, and WillHandle functions.  For information on
-  * the WillHandle function, read up on the PolymorphicConstruction class.
-  * The new sub-class must be listed in the implemention of the
-  * Compressor::RegisterPlugins function.
-  *
-  */
+ * Abstract Compression class which is inherited by implementations of
+ * compression engines such as zlib.
+ *
+ * In order to add a new compression method, you simply need to add a new class
+ * which is a sub-class of the Compressor.  The subclass needs to implement the
+ * Deflate, DeflateBound, Clone, and WillHandle functions.  For information on
+ * the WillHandle function, read up on the PolymorphicConstruction class.
+ * The new sub-class must be listed in the implemention of the
+ * Compressor::RegisterPlugins function.
+ *
+ */
 class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
  public:
-  explicit Compressor(const Algorithms &alg) {}
-  virtual ~Compressor() {}
+  explicit Compressor(const Algorithms &alg) { }
+  virtual ~Compressor() { }
   /**
-   * Deflate funciton.  The arguments and returns closely match the input
-   * and output of the zlib deflate function.
+   * Deflate function.  The arguments and returns closely match the input and
+   * output of the zlib deflate function.
    * Input:
    *   - outbuf - Ouput buffer to write the compressed data.
    *   - outbufsize - Size of the output buffer
@@ -77,19 +76,21 @@ class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
    *   - inbufsize - the remaining bytes of input to read in.
    *   - flush - unchanged from input
    */
-  virtual bool Deflate(unsigned char *outbuf, size_t& outbufsize,  // NOLINT
-          unsigned char*& inbuf, size_t& inbufsize,  // NOLINT
-          const bool flush) = 0;
+  virtual bool Deflate(const bool flush,
+                       unsigned char **inbuf, size_t *inbufsize,
+                       unsigned char **outbuf, size_t *outbufsize) = 0;
 
   /**
-    * Return an upper bound on the number of bytes required in order 
-    * to compress an input number of bytes.
-    * Returns: Upper bound on the number of bytes required to compress.
-    */
-  virtual size_t DeflateBound(const size_t bytes) { return bytes; }
+   * Return an upper bound on the number of bytes required in order to compress
+   * an input number of bytes.
+   * Returns: Upper bound on the number of bytes required to compress.
+   */
+  virtual size_t DeflateBound(const size_t bytes) = 0;
   virtual Compressor* Clone() = 0;
+
   static void RegisterPlugins();
 };
+
 
 class ZlibCompressor: public Compressor {
  public:
@@ -97,28 +98,29 @@ class ZlibCompressor: public Compressor {
   explicit ZlibCompressor(const ZlibCompressor &other);
   ~ZlibCompressor();
 
-
-  bool Deflate(unsigned char *outbuf, size_t& outbufsize,  // NOLINT
-          unsigned char*& inbuf, size_t& inbufsize,  // NOLINT
-          const bool flush);
+  bool Deflate(const bool flush,
+               unsigned char **inbuf, size_t *inbufsize,
+               unsigned char **outbuf, size_t *outbufsize);
   size_t DeflateBound(const size_t bytes);
   Compressor* Clone();
   static bool WillHandle(const zlib::Algorithms &alg);
 
- protected:
+ private:
   z_stream stream_;
 };
+
 
 class EchoCompressor: public Compressor {
  public:
   explicit EchoCompressor(const Algorithms &alg);
-  bool Deflate(unsigned char *outbuf, size_t& outbufsize,  // NOLINT
-          unsigned char*& inbuf, size_t& inbufsize,  // NOLINT
-          const bool flush);
+  bool Deflate(const bool flush,
+               unsigned char **inbuf, size_t *inbufsize,
+               unsigned char **outbuf, size_t *outbufsize);
   size_t DeflateBound(const size_t bytes) { return bytes; }
   Compressor* Clone();
   static bool WillHandle(const zlib::Algorithms &alg);
 };
+
 
 Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option);
 

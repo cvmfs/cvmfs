@@ -24,6 +24,7 @@
 
 #include <string>
 
+#include "compression.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"

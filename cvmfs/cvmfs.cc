@@ -1207,15 +1207,6 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
            uint64_t(catalog_manager_->MangleInode(ino)), size, off, fi->fh);
   perf::Inc(n_fs_read_);
 
-  // Get the dirent for the compression algorithm
-  bool found;
-  catalog::DirectoryEntry dirent;
-  found = GetDirentForInode(ino, &dirent);
-  if (!found) {
-    // TODO(jblomer): Better error handling
-    return;
-  }
-
   // Get data chunk (<=128k guaranteed by Fuse)
   char *data = static_cast<char *>(alloca(size));
   unsigned int overall_bytes_fetched = 0;
@@ -1255,7 +1246,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
           chunks.list->AtPtr(chunk_idx)->content_hash(),
           chunks.list->AtPtr(chunk_idx)->size(),
           verbose_path,
-          dirent.compression_algorithm(),
+          chunks.compression_alg,
           volatile_repository_ ? cache::CacheManager::kTypeVolatile
                                : cache::CacheManager::kTypeRegular);
         if (chunk_fd.fd < 0) {

@@ -5,7 +5,8 @@
 #include <gtest/gtest.h>
 
 // Single Authz test is static
-#include "../../cvmfs/voms_authz/voms_authz.cc"
+// TODO(jblomer): find a better solution than pulling in the .cc file
+#include "../../cvmfs/voms_authz/voms_authz.cc"  // NOLINT
 
 #define TEST_DN "/DC=ch/DC=cern/OU=Organic Units/OU=Users" \
                 "/CN=bbockelm/CN=659869/CN=Brian Paul Bockelman"
@@ -28,7 +29,7 @@ TEST(T_Voms, VomsAuthz) {
   voms_datap[2] = voms_data + 2;
   voms_datap[3] = NULL;
   voms_entry.std = voms_datap;
-  
+
   // Fill in attributes actually used in the authz matching.
   std::vector<char> user_dn; user_dn.reserve(100);
   strncpy(&user_dn[0], TEST_DN, 99);
@@ -41,12 +42,12 @@ TEST(T_Voms, VomsAuthz) {
   strncpy(&group3[0], "/cms/escms", 49);
   std::vector<char> role1; role1.reserve(50);
   strncpy(&role1[0], "pilot", 49);
-  
+
   voms_data[0].group = &group1[0];
   voms_data[1].group = &group2[0];
   voms_data[2].group = &group3[0];
   voms_data[2].role = &role1[0];
-  
+
   // Ok, now let's verify the authz checks.
   EXPECT_EQ(CheckSingleAuthz(&voms_info, "/cms"), true);
   EXPECT_EQ(CheckSingleAuthz(&voms_info, "/cms/uscms"), true);
@@ -58,13 +59,13 @@ TEST(T_Voms, VomsAuthz) {
   EXPECT_EQ(CheckSingleAuthz(&voms_info, "/cms/Role=prod"), false);
   EXPECT_EQ(CheckSingleAuthz(&voms_info, "/cms/uscms/Role=pilot"), false);
   EXPECT_EQ(CheckSingleAuthz(&voms_info, "/cms/dcms/Role=pilot"), false);
-  
+
   voms_data[0].group = NULL;
   EXPECT_EQ(CheckSingleAuthz(&voms_info, "/cms"), true);
   EXPECT_EQ(CheckSingleAuthz(&voms_info, "/cms/Role=pilot"), true);
   voms_entry.user = NULL;
   EXPECT_EQ(CheckSingleAuthz(&voms_info, TEST_DN), false);
-  
+
   // Switch to multiple authz functions.
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, ""), false);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, "\n"), false);

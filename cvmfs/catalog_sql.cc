@@ -53,15 +53,16 @@ const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 
 // ChangeLog
-//   0 --> 1 (Jan  6 2014 - Git: 3667fe7a669d0d65e07275b753a7c6f23fc267df)
-//           * add size column to nested catalog table,
-//           * add schema_revision property
+//   0 --> 1: (Jan  6 2014 - Git: 3667fe7a669d0d65e07275b753a7c6f23fc267df)
+//            * add size column to nested catalog table,
+//            * add schema_revision property
 //   1 --> 2: (Jan 22 2014 - Git: 85e6680e52cfe56dc1213a5ad74a5cc62fd50ead):
 //            * add xattr column to catalog table
 //            * add self_xattr and subtree_xattr statistics counters
 //   2 --> 3: (Sep 28 2015 - Git: f4171234b13ea448589820c1524ee52eae141bb4):
 //            * add kFlagFileExternal to entries in catalog table
 //            * add self_external and subtree_external statistics counters
+//            * store compression algorithm in flags
 const unsigned CatalogDatabase::kLatestSchemaRevision = 3;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
@@ -341,12 +342,14 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   else if (entry.IsNestedCatalogMountpoint())
     database_flags |= kFlagDirNestedMountpoint;
 
-  if (entry.IsDirectory())
+  if (entry.IsDirectory()) {
     database_flags |= kFlagDir;
-  else if (entry.IsLink())
+  } else if (entry.IsLink()) {
     database_flags |= kFlagFile | kFlagLink;
-  else
+  } else {
     database_flags |= kFlagFile;
+    database_flags |= entry.compression_algorithm() << kFlagPosCompression;
+  }
 
   if (entry.IsChunkedFile())
     database_flags |= kFlagFileChunk;
@@ -356,8 +359,6 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
 
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
-
-  database_flags |= entry.compression_algorithm() << kFlagPosCompression;
 
   return database_flags;
 }

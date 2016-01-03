@@ -1701,7 +1701,7 @@ sign_manifest() {
     -n $name                            \
     -m $unsigned_manifest               \
     -t ${CVMFS_SPOOL_DIR}/tmp           \
-    -r $CVMFS_UPSTREAM_STORAGE" >/dev/null
+    -r $CVMFS_UPSTREAM_STORAGE" > /dev/null
 }
 
 
@@ -3313,7 +3313,7 @@ import() {
   trap _import_desaster_cleanup EXIT HUP INT QUIT TERM
 
   # create the configuration for the new repository
-  # TODO(jblomer): make a better guess for hash
+  # TODO(jblomer): make a better guess for hash and compression algorithm
   echo -n "Creating configuration files... "
   create_config_files_for_new_repository "$name"       \
                                          "$upstream"   \
@@ -3323,7 +3323,8 @@ import() {
                                          "sha1"        \
                                          "true"        \
                                          "false"       \
-                                         "$configure_apache" || die "fail!"
+                                         "$configure_apache" \
+                                         "default" || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -4542,7 +4543,6 @@ rollback() {
   local user_shell="$(get_user_shell $name)"
   local base_hash=$(get_mounted_root_hash $name)
   local hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
-  local compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
 
   local rollback_command="$(__swissknife_cmd dbg) tag_rollback \
     -w $stratum0                                               \

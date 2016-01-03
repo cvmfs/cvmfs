@@ -55,7 +55,7 @@ struct FileChunkReflist {
   FileChunkReflist(
     FileChunkList *l,
     const PathString &p,
-    zlib::Algorithms alg = zlib::kZlibDefault)
+    zlib::Algorithms alg)
     : list(l)
     , path(p)
     , compression_alg(alg) { }

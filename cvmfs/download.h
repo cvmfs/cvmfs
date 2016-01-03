@@ -114,6 +114,7 @@ struct Counters {
  */
 struct JobInfo {
   const std::string *url;
+  bool compressed;
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
@@ -127,12 +128,12 @@ struct JobInfo {
   const std::string *destination_path;
   cvmfs::Sink *destination_sink;
   const shash::Any *expected_hash;
-  zlib::Algorithms compression_alg;
   const std::string *extra_info;
 
   // Default initialization of fields
   void Init() {
     url = NULL;
+    compressed = false;
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
@@ -143,7 +144,6 @@ struct JobInfo {
     destination_path = NULL;
     destination_sink = NULL;
     expected_hash = NULL;
-    compression_alg = zlib::kZlibDefault;
     extra_info = NULL;
 
     curl_handle = NULL;
@@ -164,7 +164,7 @@ struct JobInfo {
   {
     Init();
     url = u;
-    compression_alg = c ? zlib::kZlibDefault : zlib::kNoCompression;
+    compressed = c;
     probe_hosts = ph;
     destination = kDestinationPath;
     destination_path = p;
@@ -175,7 +175,7 @@ struct JobInfo {
   {
     Init();
     url = u;
-    compression_alg = c ? zlib::kZlibDefault : zlib::kNoCompression;
+    compressed = c;
     probe_hosts = ph;
     destination = kDestinationFile;
     destination_file = f;
@@ -186,7 +186,7 @@ struct JobInfo {
   {
     Init();
     url = u;
-    compression_alg = c ? zlib::kZlibDefault : zlib::kNoCompression;
+    compressed = c;
     probe_hosts = ph;
     destination = kDestinationMem;
     expected_hash = h;
@@ -196,7 +196,7 @@ struct JobInfo {
   {
     Init();
     url = u;
-    compression_alg = c ? zlib::kZlibDefault : zlib::kNoCompression;
+    compressed = c;
     probe_hosts = ph;
     destination = kDestinationSink;
     destination_sink = s;
