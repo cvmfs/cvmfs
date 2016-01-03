@@ -127,7 +127,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   prng.h
   hash.h hash.cc
   compression.h compression.cc
-  clientctx.cc clientctx.h
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   object_fetcher.h

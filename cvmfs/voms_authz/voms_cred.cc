@@ -1,8 +1,8 @@
 /**
  * This file is part of the CernVM File System.
  *
- * This file implements the parent-side portion of the
- * communication with the cvmfs_cred_fetcher.
+ * This file implements the parent-side portion of the communication with the
+ * cvmfs_cred_fetcher.
  */
 
 #include <errno.h>
@@ -51,11 +51,20 @@ ReportChildDeath(pid_t pid, int flags) {
   }
 }
 
-// Manage helper forked process
+
+/**
+ * Manage helper forked process
+ *
+ * TODO(jblomer): member naming: no m_ prefix, trailing underscore
+ * TODO(jblomer): put into anonymous namespace
+ */
 struct ProxyHelper {
+  // TODO(jblomer): remove magic number
   ProxyHelper() : m_subprocess(-1), m_max_files(1024) {
     pthread_mutex_init(&m_helper_mutex, NULL);
 
+    // TODO(jblomer): make a utility function, this code is also used in the
+    // monitor
     rlimit rlim;
     if (-1 != getrlimit(RLIMIT_NOFILE, &rlim)) {
       if ((rlim.rlim_cur != RLIM_INFINITY) && (m_max_files < rlim.rlim_cur)) {
@@ -77,6 +86,7 @@ struct ProxyHelper {
     } else if (path == NULL) {
       return;
     }
+    // TODO(jblomer): use SplitString from util
     const char *next_delim;
     while ((next_delim = strstr(path, ":"))) {
       size_t copy_size = (next_delim-path) < PATH_MAX ? next_delim-path
@@ -142,6 +152,7 @@ struct ProxyHelper {
 
 
   void ExecFetcher(int unix_sock) {
+    // TODO(jblomer): remove magic number
     dup2(unix_sock, 3);  // Always lives on FD 3.
     for (rlim_t idx=4; idx < m_max_files; idx++) {
       close(idx);
@@ -320,6 +331,7 @@ struct ProxyHelper {
   std::vector<std::string> m_paths;
 };
 
+// TODO(jblomer): make it a singleton (well-defined initialization time)
 static ProxyHelper g_instance;
 
 FILE *

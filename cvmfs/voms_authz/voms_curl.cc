@@ -1,14 +1,13 @@
 /**
  * This file is part of the CernVM File System.
  *
- * This configures a given CURL handle to authenticate
- * using a user's X509 credential.
+ * This configures a given CURL handle to authenticate using a user's X509
+ * credential.
  */
 
 
 #include "voms_authz.h"
 
-#include <curl/curl.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
@@ -18,9 +17,14 @@
 
 #include <cstring>
 
+#include "../duplex_curl.h"
 #include "../logging_internal.h"
 #include "../util_concurrency.h"
 
+// TODO(jblomer): more documentation
+
+// TODO(jblomer): add unit tests for functions, perhaps all these functions can
+// be encapuslated in a class so that the global vanish, too.
 pthread_mutex_t g_ssl_mutex = PTHREAD_MUTEX_INITIALIZER;
 bool loaded_ssl_strings = false;
 
@@ -30,6 +34,7 @@ struct sslctx_info {
   STACK_OF(X509) *chain;
   EVP_PKEY *pkey;
 };
+
 
 static void
 LogOpenSSLErrors(const char *top_message) {
@@ -235,4 +240,3 @@ ConfigureCurlHandle(CURL *curl_handle, pid_t pid, uid_t uid, gid_t gid,
     close(fd);
     return true;
 }
-
