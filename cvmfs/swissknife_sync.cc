@@ -625,6 +625,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
     return 4;
   }
   sync->SetExternalData(params.external_data);
+  sync->SetCompressionAlgorithm(compression_algorithm);
 
   sync->Traverse();
 

@@ -138,7 +138,8 @@ void WritableCatalog::AddEntry(
   const XattrList &xattrs,
   const string &entry_path,
   const string &parent_path,
-  const bool external_data)
+  const bool external_data,
+  const zlib::Algorithms compression_algorithm)
 {
   SetDirty();
 
@@ -150,6 +151,7 @@ void WritableCatalog::AddEntry(
   shash::Md5 parent_hash((shash::AsciiPtr(parent_path)));
   DirectoryEntry effective_entry(entry);
   effective_entry.set_has_xattrs(!xattrs.IsEmpty());
+  effective_entry.set_compression_algorithm(compression_algorithm);
 
   if (effective_entry.IsRegular() && (GetExternalData() || external_data)) {
     LogCvmfs(kLogCatalog, kLogDebug, "Entry is set as external data.");

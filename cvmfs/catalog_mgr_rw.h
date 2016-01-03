@@ -88,9 +88,11 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void AddFile(const DirectoryEntryBase &entry,
                const XattrList &xattrs,
                      bool       external_data,
+                     zlib::Algorithms compression_algorithm,
                const std::string &parent_directory)
   {
-    AddFile(DirectoryEntry(entry), xattrs, external_data, parent_directory);
+    AddFile(DirectoryEntry(entry), xattrs, external_data, compression_algorithm,
+            parent_directory);
   }
   void AddChunkedFile(const DirectoryEntryBase &entry,
                       const XattrList &xattrs,
@@ -144,6 +146,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   void AddFile(const DirectoryEntry  &entry,
                const XattrList       &xattrs,
                      bool             external_data,
+                     zlib::Algorithms compression_algorithm,
                const std::string     &parent_directory);
 
  private:

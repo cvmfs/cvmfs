@@ -147,6 +147,10 @@ class DirectoryEntryBase {
   inline zlib::Algorithms compression_algorithm() const {
     return compression_algorithm_;
   }
+  inline void set_compression_algorithm(
+      zlib::Algorithms compression_algorithm) {
+    compression_algorithm_ = compression_algorithm;
+  }
 
   /**
    * Converts to a stat struct as required by many Fuse callbacks.
