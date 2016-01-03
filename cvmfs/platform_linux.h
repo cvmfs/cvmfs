@@ -308,7 +308,11 @@ inline void platform_get_os_version(int32_t *major,
 
 inline uint64_t platform_monotonic_time() {
   struct timespec tp;
+#ifdef CLOCK_MONOTONIC_COARSE
+  int retval = clock_gettime(CLOCK_MONOTONIC_COARSE, &tp);
+#else
   int retval = clock_gettime(CLOCK_MONOTONIC, &tp);
+#endif
   assert(retval == 0);
   return tp.tv_sec + (tp.tv_nsec >= 500000000);
 }
