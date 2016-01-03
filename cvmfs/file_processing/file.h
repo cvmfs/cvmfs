@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "../compression.h"
 #include "../hash.h"
 #include "../platform.h"
 #include "char_buffer.h"
@@ -34,6 +35,7 @@ class File : public AbstractFile {
        IoDispatcher         *io_dispatcher,
        ChunkDetector        *chunk_detector,
        shash::Algorithms     hash_algorithm,
+       zlib::Algorithms      compression_alg,
        const shash::Suffix   hash_suffix = shash::kSuffixNone);
   ~File();
 
@@ -100,6 +102,10 @@ class File : public AbstractFile {
    * Suffix to be appended to the bulk chunk content hash
    */
   const shash::Suffix hash_suffix_;
+  /**
+   * Compression algorithm for the chunks
+   */
+  const zlib::Algorithms compression_alg_;
 
   ChunkVector chunks_;  ///< List of generated Chunks
   Chunk *bulk_chunk_;  ///< Associated bulk Chunk

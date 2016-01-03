@@ -14,7 +14,7 @@ namespace upload {
 
 class T_ChunkDetectors : public ::testing::Test {
  protected:
-  static const size_t data_size_ = 104857600; // 100 MiB
+  static const size_t data_size_ = 104857600;  // 100 MiB
 
   void CreateBuffers(const size_t buffer_size) {
     ClearBuffers();
@@ -300,12 +300,12 @@ TEST_F(T_ChunkDetectors, Xor32ChunkDetectorZerosBufferPowerOfTwo) {
   for (; !fail && j != jend; ++j) {
     while ((next_cut = xor32_detector.FindNextCutMark(*j)) != 0) {
       EXPECT_EQ(0, next_cut % max_chk_size);
-      EXPECT_GE(data_size(), next_cut); // ChunkDetector might decide to cut
-                                        // right in the end of a file. This is
-                                        // because it works on CharBuffer-level
-                                        // and doesn't have a notion about the
-                                        // actual file's size.
-                                        // Hence: EXPECT_GreaterEqual()
+      EXPECT_GE(data_size(), next_cut);  // ChunkDetector might decide to cut
+                                         // right in the end of a file. This is
+                                         // because it works on CharBuffer-level
+                                         // and doesn't have a notion about the
+                                         // actual file's size.
+                                         // Hence: EXPECT_GreaterEqual()
     }
   }
 }

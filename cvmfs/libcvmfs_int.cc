@@ -623,7 +623,8 @@ int cvmfs_context::Open(const char *c_path) {
       return -EIO;
     }
 
-    fd = chunk_tables_.Add(FileChunkReflist(chunks, path));
+    fd = chunk_tables_.Add(
+      FileChunkReflist(chunks, path, dirent.compression_algorithm()));
     return fd | kFdChunked;
   }
 
@@ -631,6 +632,7 @@ int cvmfs_context::Open(const char *c_path) {
     dirent.checksum(),
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
+    dirent.compression_algorithm(),
     cache::CacheManager::kTypeRegular);
   atomic_inc64(&num_fs_open_);
 
@@ -661,6 +663,8 @@ int64_t cvmfs_context::Pread(
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
+    zlib::Algorithms compression_alg =
+      open_chunks.chunk_reflist.compression_alg;
     if (chunk_list == NULL)
       return -EBADF;
 
@@ -677,6 +681,7 @@ int64_t cvmfs_context::Pread(
           chunk_list->AtPtr(chunk_idx)->content_hash(),
           chunk_list->AtPtr(chunk_idx)->size(),
           "no path info",
+          compression_alg,
           cache::CacheManager::kTypeRegular);
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;

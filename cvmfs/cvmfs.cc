@@ -1115,7 +1115,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       chunk_tables_->Lock();
       // Check again to avoid race
       if (!chunk_tables_->inode2chunks.Contains(ino)) {
-        chunk_tables_->inode2chunks.Insert(ino, FileChunkReflist(chunks, path));
+        chunk_tables_->inode2chunks.Insert(
+          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm()));
         chunk_tables_->inode2references.Insert(ino, 1);
       } else {
         uint32_t refctr;
@@ -1148,6 +1149,7 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     dirent.checksum(),
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
+    dirent.compression_algorithm(),
     volatile_repository_ ? cache::CacheManager::kTypeVolatile :
                            cache::CacheManager::kTypeRegular);
 
@@ -1244,6 +1246,7 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
           chunks.list->AtPtr(chunk_idx)->content_hash(),
           chunks.list->AtPtr(chunk_idx)->size(),
           verbose_path,
+          chunks.compression_alg,
           volatile_repository_ ? cache::CacheManager::kTypeVolatile
                                : cache::CacheManager::kTypeRegular);
         if (chunk_fd.fd < 0) {
@@ -1731,6 +1734,7 @@ bool Pin(const string &path) {
         chunks.AtPtr(i)->content_hash(),
         chunks.AtPtr(i)->size(),
         "Part of " + path,
+        dirent.compression_algorithm(),
         cache::CacheManager::kTypePinned);
       if (fd < 0) {
         return false;
@@ -1746,7 +1750,8 @@ bool Pin(const string &path) {
   if (!retval)
     return false;
   int fd = (dirent.IsExternalFile() ? external_fetcher_ : fetcher_)->Fetch(
-    dirent.checksum(), dirent.size(), path, cache::CacheManager::kTypePinned);
+    dirent.checksum(), dirent.size(), path, dirent.compression_algorithm(),
+    cache::CacheManager::kTypePinned);
   if (fd < 0) {
     return false;
   }

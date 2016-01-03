@@ -280,6 +280,7 @@ Supported Commands:
                 [-m replicable] [-f union filesystem type] [-v volatile content]
                 [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
                 [-z enable garbage collection] [-s S3 config file]
+                [-Z compression algorithm (default: zlib)]
                 [-k path to existing keychain] [-p no apache config]
                 [-V VOMS authorization]
                 <fully qualified repository name>
@@ -2061,6 +2062,7 @@ create_config_files_for_new_repository() {
   local autotagging=$7
   local garbage_collectable=$8
   local configure_apache=$9
+  local compression_alg=${10}
 
   # other configurations
   local spool_dir="/var/spool/cvmfs/${name}"
@@ -2090,6 +2092,7 @@ CVMFS_MAX_CHUNK_SIZE=$CVMFS_DEFAULT_MAX_CHUNK_SIZE
 CVMFS_CATALOG_ENTRY_WARN_THRESHOLD=$CVMFS_DEFAULT_CATALOG_ENTRY_WARN_THRESHOLD
 CVMFS_UNION_FS_TYPE=$unionfs
 CVMFS_HASH_ALGORITHM=$hash_algo
+CVMFS_COMPRESSION_ALGORITHM=$compression_alg
 CVMFS_AUTO_TAG=$autotagging
 CVMFS_GARBAGE_COLLECTION=$garbage_collectable
 CVMFS_AUTO_REPAIR_MOUNTPOINT=true
@@ -2697,6 +2700,7 @@ mkfs() {
   local autotagging=true
   local unionfs
   local hash_algo
+  local compression_alg
   local garbage_collectable=false
   local s3_config=""
   local keys_import_location
@@ -2707,7 +2711,7 @@ mkfs() {
 
   # parameter handling
   OPTIND=1
-  while getopts "Xw:u:o:mf:vga:zs:k:pV:" option; do
+  while getopts "Xw:u:o:mf:vga:zs:k:pV:Z:" option; do
     case $option in
       X)
         external_data=1
@@ -2745,6 +2749,9 @@ mkfs() {
       k)
         keys_import_location=$OPTARG
       ;;
+      Z)
+        compression_alg=$OPTARG
+      ;;
       p)
         configure_apache=0
       ;;
@@ -2766,6 +2773,7 @@ mkfs() {
   # default values
   [ x"$unionfs"   = x"" ] && unionfs="$(get_available_union_fs)"
   [ x"$hash_algo" = x"" ] && hash_algo=sha1
+  [ x"$compression_alg" = x"" ] && compression_alg=default
 
   # upstream generation (defaults to local upstream)
   if [ x"$upstream" = x"" ]; then
@@ -2842,7 +2850,9 @@ mkfs() {
                                          "$hash_algo"           \
                                          "$autotagging"         \
                                          "$garbage_collectable" \
-                                         "$configure_apache" || die "fail"
+                                         "$configure_apache"    \
+                                         "$compression_alg"     \
+                                         || die "fail"
   if is_local_upstream $upstream && [ $configure_apache -eq 1 ]; then
     reload_apache > /dev/null
   fi
@@ -3303,7 +3313,7 @@ import() {
   trap _import_desaster_cleanup EXIT HUP INT QUIT TERM
 
   # create the configuration for the new repository
-  # TODO(jblomer): make a better guess for hash
+  # TODO(jblomer): make a better guess for hash and compression algorithm
   echo -n "Creating configuration files... "
   create_config_files_for_new_repository "$name"       \
                                          "$upstream"   \
@@ -3313,7 +3323,8 @@ import() {
                                          "sha1"        \
                                          "true"        \
                                          "false"       \
-                                         "$configure_apache" || die "fail!"
+                                         "$configure_apache" \
+                                         "default" || die "fail!"
   echo "done"
 
   # import the old repository security keys
@@ -4268,6 +4279,7 @@ publish() {
     stratum0=$CVMFS_STRATUM0
     upstream=$CVMFS_UPSTREAM_STORAGE
     hash_algorithm="${CVMFS_HASH_ALGORITHM-sha1}"
+    compression_alg="${CVMFS_COMPRESSION_ALGORITHM-default}"
 
     # more sanity checks
     is_owner_or_root $name || { echo "Permission denied: Repository $name is owned by $user"; retcode=1; continue; }
@@ -4323,6 +4335,7 @@ publish() {
       -w $stratum0                                   \
       -o $manifest                                   \
       -e $hash_algorithm                             \
+      -Z $compression_alg                            \
       $(get_follow_http_redirects_flag)              \
       $log_level $tweaks_option $external_option $verbosity"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then

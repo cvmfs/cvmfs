@@ -234,8 +234,9 @@ LoadError ClientCatalogManager::LoadCatalogCas(
   string *catalog_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
+  // Catalogs are always zlib compressed
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-                           cache::CacheManager::kTypeCatalog, alt_catalog_path);
+    zlib::kZlibDefault, cache::CacheManager::kTypeCatalog, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;
