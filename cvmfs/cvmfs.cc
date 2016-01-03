@@ -1912,7 +1912,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   string fallback_external_proxies = "";
   string dns_server = "";
   std::string external_host;
-  unsigned ip_prefer = 0;
+  unsigned ipfamily_prefer = 0;
   string public_keys = "";
   string root_hash = "";
   bool alt_root_path = false;
@@ -2046,8 +2046,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
     external_host =
       CalculateHostString(loader_exports->repository_name, parameter);
   }
-  if (cvmfs::options_manager_->GetValue("CVMFS_IP_PREFER", &parameter))
-    ip_prefer = String2Int64(parameter);
+  if (cvmfs::options_manager_->GetValue("CVMFS_IPFAMILY_PREFER", &parameter))
+    ipfamily_prefer = String2Int64(parameter);
   if (cvmfs::options_manager_->GetValue("CVMFS_TRUSTED_CERTS", &parameter))
     trusted_certs = parameter;
   if (cvmfs::options_manager_->GetValue("CVMFS_PUBLIC_KEY", &parameter)) {
@@ -2461,8 +2461,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                                backoff_max);
   cvmfs::download_manager_->SetMaxIpaddrPerProxy(max_ipaddr_per_proxy);
   cvmfs::download_manager_->SetProxyTemplates(uuid->uuid(), proxy_template);
-  if (ip_prefer != 0) {
-    switch (ip_prefer) {
+  if (ipfamily_prefer != 0) {
+    switch (ipfamily_prefer) {
       case 4:
         cvmfs::download_manager_->SetIpPreference(dns::kIpPreferV4);
         break;
@@ -2518,8 +2518,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
                                                        proxy_template);
   delete uuid;
   uuid = NULL;
-  if (ip_prefer != 0) {
-    switch (ip_prefer) {
+  if (ipfamily_prefer != 0) {
+    switch (ipfamily_prefer) {
       case 4:
         cvmfs::external_download_manager_->SetIpPreference(dns::kIpPreferV4);
         break;

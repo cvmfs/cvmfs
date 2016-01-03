@@ -2,7 +2,7 @@
   * Read blacklist from config repository if available (CVM-901)
   * Add support for uncompressed files (CVM-906)
   * Add support for external data (CVM-907)
-  * Add CVMFS_IP_PREFER=[4|6] to select preferred IP protocol for proxies
+  * Add CVMFS_IPFAMILY_PREFER=[4|6] to select preferred IP protocol for proxies
   * Fix crash when publishing specific files which a size of a multiple of the
     chunk size (CVM-957)
   * Immediately pick up new catalogs after idle period (CVM-636)
