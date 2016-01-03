@@ -9,11 +9,22 @@ cvmfs_run_test() {
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
   create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
 
-  #EDITOR="cat" cvmfs_server repo-metainfo $CVMFS_TEST_REPO > reference
-  #grep -a "^M" /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfspublished || return 20
+  local tty_bin=$(which tty)
+  sudo mv $tty_bin ${tty_bin}.disabled || return 10
+  sudo sh -c "echo '#!/bin/sh' > $tty_bin" || return 11
+  sudo sh -c "echo 'echo reference' >> $tty_bin" || return 12
+  sudo chmod +x $tty_bin || return 13
+  touch reference
+  EDITOR="cat" cvmfs_server repo-metainfo $CVMFS_TEST_REPO
+  local retval=$?
+  sudo mv ${tty_bin}.disabled $tty_bin || return 14
+  if [ $retval -ne 0 ]; then
+    return 21
+  fi
+  grep -a "^M" /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfspublished || return 20
 
-  #cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded || return 30
-  #diff reference downloaded || return 40
+  cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded || return 30
+  diff reference downloaded || return 40
 
   return 0
 }
