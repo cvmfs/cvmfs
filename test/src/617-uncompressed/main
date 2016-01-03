@@ -2,8 +2,6 @@ cvmfs_test_name="Populate repository of uncompressed files"
 cvmfs_test_autofs_on_startup=false
 
 # TODO: large file
-# TODO: cvmfs_fsck
-# TODO: cvmfs_swissknife upload
 
 produce_files_in() {
 	local working_dir=$1
@@ -56,6 +54,9 @@ cvmfs_run_test() {
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
+
+  echo "validating the cvmfs cache"
+  sudo cvmfs_fsck /var/spool/cvmfs/${CVMFS_TEST_REPO}/cache/${CVMFS_TEST_REPO} || return 30
 
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i  || return $?

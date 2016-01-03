@@ -170,14 +170,8 @@ int swissknife::CommandUpload::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
-  zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
-  if (args.find('Z') != args.end()) {
-    compression_algorithm =
-      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
-  }
 
-  const upload::SpoolerDefinition sd(spooler_definition,
-                                     hash_algorithm, compression_algorithm);
+  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
   spooler->Upload(source, dest);
