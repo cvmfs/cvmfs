@@ -27,9 +27,10 @@ class T_Fetcher : public ::testing::Test {
     used_fds_ = GetNoUsedFds();
 
     tmp_path_ = CreateTempDir(GetCurrentWorkingDirectory() + "/cvmfs_ut_fetch");
-    // Three source files that can be downloaded
+    // 4 source files that can be downloaded
     src_path_ = tmp_path_ + "/data";
     hash_regular_ = shash::Any(shash::kSha1);
+    hash_uncompressed_ = shash::Any(shash::kSha1);
     hash_catalog_ = shash::Any(shash::kSha1, shash::kSuffixCatalog);
     hash_cert_ = shash::Any(shash::kSha1, shash::kSuffixCertificate);
     unsigned char x = 'x';
@@ -39,9 +40,14 @@ class T_Fetcher : public ::testing::Test {
     uint64_t buf_size;
     EXPECT_TRUE(zlib::CompressMem2Mem(&x, 1, &buf, &buf_size));
     shash::HashMem(static_cast<unsigned char *>(buf), buf_size, &hash_regular_);
+    shash::HashMem(&x, 1, &hash_uncompressed_);
     MkdirDeep(GetParentPath(src_path_ + "/" + hash_regular_.MakePath()), 0700);
+    MkdirDeep(GetParentPath(src_path_ + "/" + hash_uncompressed_.MakePath()),
+              0700);
     EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
                              src_path_ + "/" + hash_regular_.MakePath()));
+    EXPECT_TRUE(CopyMem2Path(&x, 1,
+                             src_path_ + "/" + hash_uncompressed_.MakePath()));
     EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
                              tmp_path_ + "/reg"));
     EXPECT_TRUE(CopyMem2Path(static_cast<unsigned char *>(buf), buf_size,
@@ -93,6 +99,7 @@ class T_Fetcher : public ::testing::Test {
   download::DownloadManager *download_mgr_;
   unsigned used_fds_;
   shash::Any hash_regular_;
+  shash::Any hash_uncompressed_;
   shash::Any hash_catalog_;
   shash::Any hash_cert_;
   string tmp_path_;
@@ -269,6 +276,27 @@ TEST_F(T_Fetcher, Fetch) {
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
   fd = cache_mgr_->Open(hash_catalog_);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+}
+
+
+TEST_F(T_Fetcher, FetchUncompressed) {
+  EXPECT_EQ(-ENOENT, cache_mgr_->Open(hash_uncompressed_));
+
+  // Download and store in cache
+  // TODO(jblomer): use cache::CacheManager::kSizeUnknown
+  int fd =
+    fetcher_->Fetch(hash_uncompressed_, 1, "x",
+                    zlib::kZlibDefault, cache::CacheManager::kTypeRegular);
+  EXPECT_EQ(-EIO, fd);
+
+  fd =
+    fetcher_->Fetch(hash_uncompressed_, 1, "x",
+                    zlib::kNoCompression, cache::CacheManager::kTypeRegular);
+  EXPECT_GE(fd, 0);
+  EXPECT_EQ(0, cache_mgr_->Close(fd));
+  fd = cache_mgr_->Open(hash_uncompressed_);
   EXPECT_GE(fd, 0);
   EXPECT_EQ(0, cache_mgr_->Close(fd));
 }
