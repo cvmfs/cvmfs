@@ -1,0 +1,19 @@
+cvmfs_test_name="Repository meta info JSON file"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local scratch_dir=$(pwd)
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER || return $?
+
+  #EDITOR="cat" cvmfs_server repo-metainfo $CVMFS_TEST_REPO > reference
+  #grep -a "^M" /srv/cvmfs/${CVMFS_TEST_REPO}/.cvmfspublished || return 20
+
+  #cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded || return 30
+  #diff reference downloaded || return 40
+
+  return 0
+}
