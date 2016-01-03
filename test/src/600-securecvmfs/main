@@ -130,7 +130,7 @@ cvmfs_run_test() {
   apache_switch on
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -V /cvmfs || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -V cvmfs:/cvmfs || return $?
 
   start_transaction $CVMFS_TEST_REPO || return $?
   echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world
