@@ -107,6 +107,12 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
+  if (args.find('Z') != args.end()) {
+    compression_algorithm =
+      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
+
   const bool volatile_content    = (args.count('v') > 0);
   const bool garbage_collectable = (args.count('z') > 0);
   const bool external_data       = (args.count('X') > 0);
@@ -115,7 +121,8 @@ int swissknife::CommandCreate::Main(const swissknife::ArgumentList &args) {
     voms_authz = *args.find('V')->second;
   }
 
-  const upload::SpoolerDefinition sd(spooler_definition, hash_algorithm);
+  const upload::SpoolerDefinition sd(spooler_definition,
+                                     hash_algorithm, compression_algorithm);
   upload::Spooler *spooler = upload::Spooler::Construct(sd);
   assert(spooler);
 
@@ -537,6 +544,11 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
       return 1;
     }
   }
+  zlib::Algorithms compression_algorithm = zlib::kZlibDefault;
+  if (args.find('Z') != args.end()) {
+    compression_algorithm =
+      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+  }
 
   if (args.find('j') != args.end()) {
     params.catalog_entry_warn_threshold =
@@ -561,6 +573,7 @@ int swissknife::CommandSync::Main(const swissknife::ArgumentList &args) {
   upload::SpoolerDefinition spooler_definition(
     params.spooler_definition,
     hash_algorithm,
+    compression_algorithm,
     params.use_file_chunking,
     params.min_file_chunk_size,
     params.avg_file_chunk_size,

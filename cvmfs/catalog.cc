@@ -56,7 +56,7 @@ Catalog::Catalog(const PathString &path,
   managed_database_(false),
   parent_(parent),
   nested_catalog_cache_dirty_(true),
-  voms_authz_status_(Unknown),
+  voms_authz_status_(kVomsUnknown),
   initialized_(false)
 {
   max_row_id_ = 0;
@@ -449,23 +449,23 @@ uint64_t Catalog::GetTTL() const {
 }
 
 
-bool Catalog::GetVOMSAuthz(std::string &voms_authz) const {
+bool Catalog::GetVOMSAuthz(string *authz) const {
   bool result;
   pthread_mutex_lock(lock_);
-  if (voms_authz_status_ == Present) {
-    voms_authz = voms_authz_;
+  if (voms_authz_status_ == kVomsPresent) {
+    *authz = voms_authz_;
     result = true;
-  } else if (voms_authz_status_ == None) {
+  } else if (voms_authz_status_ == kVomsNone) {
     result = false;
   } else {
     if (database().HasProperty("voms_authz")) {
-      voms_authz_ = database().GetProperty<std::string>("voms_authz");
-      voms_authz = voms_authz_;
-      voms_authz_status_ = Present;
+      voms_authz_ = database().GetProperty<string>("voms_authz");
+      *authz = voms_authz_;
+      voms_authz_status_ = kVomsPresent;
     } else {
-      voms_authz_status_ = None;
+      voms_authz_status_ = kVomsNone;
     }
-    result = voms_authz_status_ == Present;
+    result = (voms_authz_status_ == kVomsPresent);
   }
   pthread_mutex_unlock(lock_);
   return result;

@@ -75,9 +75,11 @@ class Fetcher : SingleCopy {
           const std::string &name = "fetch",
           bool external_data = false);
   ~Fetcher();
+  // TODO(jblomer): reduce number of arguments
   int Fetch(const shash::Any &id,
             const uint64_t size,
             const std::string &name,
+            const zlib::Algorithms compression_algorithm,
             const cache::CacheManager::ObjectType object_type,
             pid_t pid = -1,
             uid_t uid = -1,

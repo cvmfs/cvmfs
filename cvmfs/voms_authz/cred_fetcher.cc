@@ -123,10 +123,10 @@ int CredentialsFetcher::MainCredentialsFetcher(int argc, char *argv[]) {
   LogCvmfs(kLogVoms, kLogDebug, "starting credentials fetcher");
 
   // TODO(jblomer): apply logging parameters
-  //int foreground = String2Int64(argv[2]);
-  //int syslog_level = String2Int64(argv[3]);
-  //int syslog_facility = String2Int64(argv[4]);
-  //vector<string> logfiles = SplitString(argv[5], ':');
+  // int foreground = String2Int64(argv[2]);
+  // int syslog_level = String2Int64(argv[3]);
+  // int syslog_facility = String2Int64(argv[4]);
+  // vector<string> logfiles = SplitString(argv[5], ':');
   /*SetLogSyslogLevel(syslog_level);
   SetLogSyslogFacility(syslog_facility);
   if ((logfiles.size() > 0) && (logfiles[0] != ""))

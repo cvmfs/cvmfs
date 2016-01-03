@@ -243,6 +243,7 @@ LoadError ClientCatalogManager::LoadCatalogCas(
     ctx->Get(&uid, &gid, &pid);
   }
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
+                           zlib::kZlibDefault,
                            cache::CacheManager::kTypeCatalog,
                            pid, uid, gid, alt_catalog_path);
   if (fd >= 0) {

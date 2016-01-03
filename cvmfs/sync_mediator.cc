@@ -504,6 +504,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
 
   SyncItem &item = itr->second;
   item.SetContentHash(result.content_hash);
+  item.SetCompressionAlgorithm(result.compression_alg);
 
   XattrList *xattrs = &default_xattrs;
   if (params_->include_xattrs) {
@@ -555,6 +556,7 @@ void SyncMediator::PublishHardlinksCallback(
            j != jend; ++j)
       {
         j->second.SetContentHash(result.content_hash);
+        j->second.SetCompressionAlgorithm(result.compression_alg);
       }
 
       break;
