@@ -2905,7 +2905,7 @@ mkfs() {
     $external_data_opt                          \
     -t $temp_dir                                \
     -r $upstream                                \
-    -a $hash_algo $volatile_opt $voms_authz_opt \
+    -a $hash_algo $volatile_opt                 \
     -o ${temp_dir}/new_manifest"
   if $garbage_collectable; then
     create_cmd="$create_cmd -z"
