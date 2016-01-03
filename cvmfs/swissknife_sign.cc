@@ -187,7 +187,9 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
         spooler->PlaceBootstrappingShortcut(manifest->certificate())  &&
         spooler->PlaceBootstrappingShortcut(manifest->catalog_hash()) &&
         (manifest->history().IsNull() ||
-         spooler->PlaceBootstrappingShortcut(manifest->history()));
+         spooler->PlaceBootstrappingShortcut(manifest->history())) &&
+        (metainfo_hash.IsNull() ||
+         spooler->PlaceBootstrappingShortcut(metainfo_hash));
 
       if (!success) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
