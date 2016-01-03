@@ -556,6 +556,7 @@ void SyncMediator::PublishHardlinksCallback(
            j != jend; ++j)
       {
         j->second.SetContentHash(result.content_hash);
+        j->second.SetCompressionAlgorithm(result.compression_alg);
       }
 
       break;

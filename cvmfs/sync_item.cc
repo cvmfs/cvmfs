@@ -25,7 +25,8 @@ SyncItem::SyncItem() :
   external_data_(kUnset),
   graft_size_(-1),
   scratch_type_(static_cast<SyncItemType>(0)),
-  rdonly_type_(static_cast<SyncItemType>(0)) {}
+  rdonly_type_(static_cast<SyncItemType>(0)),
+  compression_algorithm_(zlib::kZlibDefault) {}
 
 SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
@@ -42,7 +43,8 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   filename_(filename),
   graft_size_(-1),
   scratch_type_(entry_type),
-  rdonly_type_(kItemUnknown)
+  rdonly_type_(kItemUnknown),
+  compression_algorithm_(zlib::kZlibDefault)
 {
   content_hash_.algorithm = shash::kAny;
   // Note: graft marker for non-regular files are silently ignored
