@@ -116,7 +116,7 @@ class EchoCompressor: public Compressor {
   bool Deflate(const bool flush,
                unsigned char **inbuf, size_t *inbufsize,
                unsigned char **outbuf, size_t *outbufsize);
-  size_t DeflateBound(const size_t bytes) { return bytes; }
+  size_t DeflateBound(const size_t bytes);
   Compressor* Clone();
   static bool WillHandle(const zlib::Algorithms &alg);
 };

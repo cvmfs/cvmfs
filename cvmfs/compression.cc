@@ -921,4 +921,11 @@ bool EchoCompressor::Deflate(
   return done;
 }
 
+
+size_t EchoCompressor::DeflateBound(const size_t bytes) {
+  // zero bytes as an upper bound is no good because some callers want to
+  // allocate buffers according to this value
+  return (bytes == 0) ? 1 : bytes;
+}
+
 }  // namespace zlib
