@@ -480,10 +480,10 @@ if (BUILD_SERVER)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
-                         ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${LIBCURL_ARCHIVE}
-                         ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE}
-                         ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
+                         ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
+                         ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_LIBRARIES}
+                         ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
+                         ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
                          ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}
                          pthread dl)
 
@@ -517,11 +517,10 @@ if (BUILD_SERVER)
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
     target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS}
-                           ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-                           ${CURL_LIBRARIES} ${ZLIB_LIBRARIES}
-                           ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE}
-                           ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}
-                           ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE}
+                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
+                           ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_DEBUG_LIBRARIES}
+                           ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
+                           ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
                            ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}
                            pthread dl)
   endif (BUILD_SERVER_DEBUG)
