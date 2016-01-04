@@ -62,7 +62,7 @@ TEST_F(T_Compressor, Compression) {
 
   // Decompress it, check if it's still the same
   char *decompress_buf;
-  size_t decompress_size;
+  uint64_t decompress_size;
   DecompressMem2Mem(buf, buf_size,
     reinterpret_cast<void **>(&decompress_buf), &decompress_size);
 
@@ -98,11 +98,11 @@ TEST_F(T_Compressor, CompressionLong) {
 
   // Decompress it, check if it's still the same
   char *decompress_buf;
-  size_t decompress_size;
+  uint64_t decompress_size;
   bool retval = DecompressMem2Mem(compress_buf, compress_pos,
     reinterpret_cast<void **>(&decompress_buf), &decompress_size);
   EXPECT_EQ(true, retval);
-  EXPECT_EQ(decompress_size, long_size);
+  EXPECT_EQ(decompress_size, static_cast<uint64_t>(long_size));
   EXPECT_EQ(0, memcmp(decompress_buf, long_string, long_size));
 
   delete compress_buf;
