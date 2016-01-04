@@ -1,0 +1,112 @@
+#!/bin/bash
+# Do cvmfs_server snapshot on all active cvmfs replicas.  Intended to
+#   be run from cron on CVMFS Stratum Ones, typically every 15 minutes.
+
+usage()
+{
+  if [ -n "$1" ]; then
+    echo "$*" >&2
+  fi
+  echo "cvmfs_snapshots [-s] [-n] [-i]" >&2
+  echo "  Do cvmfs_server snapshot on all active replica repositories." >&2
+  echo "  To deactivate a repository, set CVMFS_REPLICA_ACTIVE=no in" >&2
+  echo "    /etc/cvmfs/repositories.d/<repository>/replica.conf" >&2
+  echo "  If another snapshot is in progress on a repository, it will be skipped." >&2
+  echo "  -s: use separate logs for each repository in /var/log/cvmfs" >&2
+  echo "      (default is to use /var/log/cvmfs/updates.log for all)" >&2
+  echo "  -n: do not warn if /etc/logrotate.d/cvmfs does not exist" >&2
+  echo "  -i: skip repositories that have not run initial snapshot" >&2
+  exit 2
+}
+
+separate_logs=false
+logrotate_warn=true
+skip_noninitial=false
+OPTIND=1
+while getopts "sni" option; do
+  case $option in
+    s)
+      separate_logs=true
+    ;;
+    n)
+      logrotate_warn=false
+    ;;
+    i)
+      skip_noninitial=true
+    ;;
+    ?)
+      shift $(($OPTIND-2))
+      usage "Unrecognized option: $1"
+    ;;
+  esac
+done
+shift $(($OPTIND-1))
+
+if [ -n "$1" ]; then
+  usage "unexpected non-option parameter"
+fi
+
+if [ ! -d /var/log/cvmfs ]; then
+  if ! mkdir /var/log/cvmfs 2>/dev/null; then
+    echo "Error: /var/log/cvmfs does not exist and could not create it" >&2
+    exit 1
+  fi
+fi
+if [ ! -w /var/log/cvmfs ]; then
+  echo "Error: cannot write to /var/log/cvmfs" >&2
+  exit 1
+fi
+
+if $logrotate_warn && [ ! -f /etc/logrotate.d/cvmfs ]; then
+  cat <<!EOF!
+Error: /etc/logrotate.d/cvmfs does not exist.
+To prevent this error message, create the file or use -n option.
+Suggested content:
+/var/log/cvmfs/*.log {
+    weekly
+    missingok
+    notifempty
+}
+!EOF!
+  exit 1
+fi
+
+if ! $separate_logs; then
+  # write into a temporary file in case more than one is active at the
+  #  same time
+  fulllog=/var/log/cvmfs/updates.log
+  log=/tmp/cvmfs_snapshots.$$.log
+  trap "rm -f $log" 0
+  (echo; echo "Logging in $log at `date`") >>$fulllog
+fi
+
+for replica in /etc/cvmfs/repositories.d/*/replica.conf; do
+  if grep -q "^CVMFS_REPLICA_ACTIVE=no" $replica; then
+    continue
+  fi
+  repodir="${replica%/*}"
+  repo="${repodir##*/}"
+
+  if $separate_logs; then
+    log=/var/log/cvmfs/$repo.log
+  fi
+
+  (
+  echo
+  if $skip_noninitial && [ ! -f /srv/cvmfs/$repo/.cvmfs_last_snapshot ]; then
+    echo "Skipping $repo at `date`, no initial snapshot"
+    exit
+  fi
+  echo "Starting $repo at `date`"
+  if ! cvmfs_server snapshot -t $repo; then
+    echo "ERROR from cvmfs_server!" >&2
+  fi
+  echo "Finished $repo at `date`"
+  ) >> $log 2>&1
+
+  if ! $separate_logs; then
+    cat $log >>$fulllog
+    > $log
+  fi
+done
+

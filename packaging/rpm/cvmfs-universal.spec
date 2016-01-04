@@ -372,6 +372,7 @@ fi
 %{_bindir}/cvmfs_swissknife_debug
 %{_bindir}/cvmfs_suid_helper
 %{_bindir}/cvmfs_server
+%{_bindir}/cvmfs_snapshots
 %{_bindir}/cvmfs_rsync
 %{_sysconfdir}/cvmfs/cvmfs_server_hooks.sh.demo
 %{_libdir}/libtbb_cvmfs.so
