@@ -486,16 +486,14 @@ static void RemountCheck() {
 
 static bool CheckVoms(const fuse_ctx &fctx) {
   std::string voms_requirements;
-  if (catalog_manager_->GetVOMSAuthz(&voms_requirements))
-  {
+  if (catalog_manager_->GetVOMSAuthz(&voms_requirements)) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
              "properties", voms_requirements.c_str());
   }
 
   // Get VOMS information, if any,
 #ifdef VOMS_AUTHZ
-  if ((fctx.uid != 0) && voms_requirements.size())
-  {
+  if ((fctx.uid != 0) && voms_requirements.size()) {
     return CheckVOMSAuthz(&fctx, voms_requirements);
   }
 #endif
@@ -692,9 +690,8 @@ static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
         }
         if (!GetPathForInode(parent, &parent_path))
           goto lookup_reply_negative;
-        if (GetDirentForPath(GetParentPath(parent_path), &dirent)) {
+        if (GetDirentForPath(GetParentPath(parent_path), &dirent))
           goto lookup_reply_positive;
-        }
       }
     }
     // No entry for "." or no entry for ".."
@@ -1313,10 +1310,6 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       if ((chunk_fd.fd == -1) || (chunk_fd.chunk_idx != chunk_idx)) {
         if (chunk_fd.fd != -1) cache_manager_->Close(chunk_fd.fd);
         string verbose_path = "Part of " + chunks.path.ToString();
-        const struct fuse_ctx *fctx = fuse_req_ctx(req);
-        ClientCtxGuard ctxg(fctx ? fctx->uid : -1,
-                            fctx ? fctx->gid : -1,
-                            fctx ? fctx->pid : -1);
         chunk_fd.fd = fetcher_->Fetch(
           chunks.list->AtPtr(chunk_idx)->content_hash(),
           chunks.list->AtPtr(chunk_idx)->size(),
