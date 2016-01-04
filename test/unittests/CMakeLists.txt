@@ -76,9 +76,12 @@ set(CVMFS_UNITTEST_FILES
   t_platforms.cc
   t_compressor.cc
   t_compression.cc
-  t_voms.cc
   t_clientctx.cc
 )
+
+if (VOMS_FOUND)
+  set (CVMFS_UNITTTEST_SOURCES ${CVMFS_UNITTEST_SOURCES} t_voms.cc)
+endif (VOMS_FOUND)
 
 #
 # unit test source files

@@ -51,8 +51,6 @@ set (CVMFS_CLIENT_SOURCES
   catalog_mgr.h catalog_mgr_impl.h
   catalog_mgr_client.h catalog_mgr_client.cc
   catalog_counters.h catalog_counters_impl.h catalog_counters.cc
-  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc 
-  voms_authz/cred_fetcher.cc voms_authz/voms_cred.h
   directory_entry.h directory_entry.cc
   shortstring.h
   file_chunk.h file_chunk.cc
@@ -84,7 +82,9 @@ set (CVMFS2_DEBUG_SOURCES
   cvmfs.h cvmfs.cc
 )
 if (VOMS_FOUND)
-  set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES} voms_authz/voms_authz.cc)
+  set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES}
+  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
+  voms_authz/cred_fetcher.cc voms_authz/voms_cred.h)
 endif (VOMS_FOUND)
 
 set (CVMFS2_SOURCES
@@ -131,8 +131,6 @@ set (CVMFS_SWISSKNIFE_SOURCES
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   object_fetcher.h
   statistics.cc statistics.h
-
-  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
 
   file_processing/async_reader.h file_processing/async_reader_impl.h file_processing/async_reader.cc
   file_processing/char_buffer.h
@@ -204,6 +202,13 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_graft.h swissknife_graft.cc
   swissknife.h swissknife.cc)
 
+if (VOMS_FOUND)
+  set (CVMFS_SWISSKNIFE_SOURCES ${CVMFS_SWISSKNIFE_SOURCES}
+       voms_authz/voms_cred.cc
+       voms_authz/voms_authz.h
+       voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
+
 
 set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
   ${CVMFS_SWISSKNIFE_SOURCES}
@@ -257,9 +262,13 @@ set (CVMFS_PRELOADER_SOURCES
   dns.cc dns.h
   dirtab.cc dirtab.h
   catalog.cc catalog.h
-  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
   preload.cc
 )
+
+if (VOMS_FOUND)
+  set (CVMFS_PRELOADER_SOURCES ${CVMFS_PRELOADER_SOURCES}
+       voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
 
 #
 # configure some compiler flags for proper build
