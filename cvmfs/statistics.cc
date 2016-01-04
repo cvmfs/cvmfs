@@ -110,7 +110,7 @@ Recorder::Recorder(uint32_t resolution_s, uint32_t capacity_s)
   , resolution_s_(resolution_s)
 {
   assert((resolution_s > 0) && (capacity_s > resolution_s));
-  int has_remainder = (capacity_s_ % resolution_s_) != 0;  // 0 or 1
+  bool has_remainder = (capacity_s_ % resolution_s_) != 0;
   if (has_remainder) {
     capacity_s_ += resolution_s_ - (capacity_s_ % resolution_s_);
   }
