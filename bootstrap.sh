@@ -4,7 +4,7 @@ set -e
 
 CARES_VERSION=1.10.0
 CURL_VERSION=7.39.0
-PACPARSER_VERSION=1.3.1
+PACPARSER_VERSION=1.3.5
 ZLIB_VERSION=1.2.8
 SPARSEHASH_VERSION=1.12
 LEVELDB_VERSION=1.18
@@ -104,6 +104,7 @@ do_copy     "sha3"
 
 patch_external "leveldb"     "dont_search_snappy.patch"           \
                              "dont_search_tcmalloc.patch"
+patch_external "pacparser"   "fix_find_proxy_ex.patch"
 patch_external "tbb"         "custom_library_suffix.patch"        \
                              "symlink_to_build_directories.patch" \
                              "32bit_mock.patch"
