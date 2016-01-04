@@ -1,4 +1,5 @@
 2.2.0:
+  * Add support for VOMS authentication in fuse module (CVM-904)
   * Add `cvmfs_server repo-metainfo` command (CVM-804)
   * Add `cvmfs_talk cleanup rate` command (CVM-270)
   * Read blacklist from config repository if available (CVM-901)
