@@ -5,10 +5,10 @@
 #ifndef CVMFS_CLIENTCTX_H_
 #define CVMFS_CLIENTCTX_H_
 
-#include <assert.h>
-
 #include <pthread.h>
 #include <unistd.h>
+
+#include <cassert>
 
 /**
  * A client context associates a file system call with the uid, gid, and pid
@@ -49,9 +49,8 @@ class ClientCtx {
 };
 
 /**
- * RAII form of the ClientCtx.  On construction, automatically sets
- * the context via the constructor; on destruction, restores to the
- * previous values.
+ * RAII form of the ClientCtx.  On construction, automatically sets the context 
+ * via the constructor; on destruction, restores to the previous values.
  *
  * Meant to be allocated on the stack.
  */
