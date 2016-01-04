@@ -358,6 +358,7 @@ void WritableCatalogManager::AddFile(
 void WritableCatalogManager::AddChunkedFile(
   const DirectoryEntryBase  &entry,
   const XattrList           &xattrs,
+  const bool                 external_data,
   const std::string         &parent_directory,
   const FileChunkList       &file_chunks)
 {
@@ -365,6 +366,7 @@ void WritableCatalogManager::AddChunkedFile(
 
   DirectoryEntry full_entry(entry);
   full_entry.set_is_chunked_file(true);
+  full_entry.set_is_external_file(external_data);
 
   AddFile(full_entry, xattrs, false, parent_directory);
 

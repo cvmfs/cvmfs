@@ -516,6 +516,7 @@ void SyncMediator::PublishFilesCallback(const upload::SpoolerResult &result) {
     catalog_manager_->AddChunkedFile(
       item.CreateBasicCatalogDirent(),
       *xattrs,
+      item.IsExternalData(),
       item.relative_parent_path(),
       result.file_chunks);
   } else {

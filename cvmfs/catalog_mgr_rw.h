@@ -94,6 +94,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   }
   void AddChunkedFile(const DirectoryEntryBase &entry,
                       const XattrList &xattrs,
+                      const bool external_data,
                       const std::string &parent_directory,
                       const FileChunkList &file_chunks);
   void RemoveFile(const std::string &file_path);
