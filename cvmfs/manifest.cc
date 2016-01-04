@@ -61,7 +61,6 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   uint64_t catalog_size = 0;
   shash::Any micro_catalog_hash;
   string repository_name;
-  std::string alt_catalog_path;
   shash::Any certificate;
   shash::Any history;
   uint64_t publish_timestamp = 0;
@@ -75,8 +74,6 @@ Manifest *Manifest::Load(const map<char, string> &content) {
                                       shash::kSuffixMicroCatalog);
   if ((iter = content.find('N')) != content.end())
     repository_name = iter->second;
-  if ((iter = content.find('A')) != content.end())
-    alt_catalog_path = iter->second;
   if ((iter = content.find('X')) != content.end())
     certificate = MkFromHexPtr(shash::HexPtr(iter->second),
                                shash::kSuffixCertificate);
