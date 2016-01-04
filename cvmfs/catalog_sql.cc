@@ -220,7 +220,7 @@ bool CatalogDatabase::InsertInitialValues(
   }
 
   if (!voms_authz.empty()) {
-    if (!this->SetProperty("voms_authz", voms_authz)) {
+    if (!SetVOMSAuthz(voms_authz)) {
       PrintSqlError("failed to insert VOMS authz flag into the newly created "
                     "catalog tables.");
       return false;
@@ -280,6 +280,12 @@ bool CatalogDatabase::InsertInitialValues(
   }
 
   return true;
+}
+
+
+bool
+CatalogDatabase::SetVOMSAuthz(const std::string &voms_authz) {
+  return this->SetProperty("voms_authz", voms_authz);
 }
 
 

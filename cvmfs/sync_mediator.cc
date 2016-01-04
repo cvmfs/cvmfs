@@ -628,7 +628,34 @@ void SyncMediator::AddFile(const SyncItem &entry) {
       default_xattrs,
       entry.IsExternalData(),
       entry.relative_parent_path());
-  } else if (entry.HasGraftMarker()) {
+  } else if (entry.IsAuthzMarker()) {
+    if (entry.GetRelativePath() == ".cvmfsauthz") {
+      LogCvmfs(kLogPublish, kLogDebug, "Adding contents of authz marker to"
+                                       " root catalog.");
+      int fd = open(entry.GetScratchPath().c_str(), O_RDONLY);
+      if (fd == -1) {
+        LogCvmfs(kLogPublish, kLogStderr, "Unable to open authz file (%s)"
+                 "from the publication process: %s",
+                 entry.GetScratchPath().c_str(),
+                 strerror(errno));
+        abort();
+      }
+      std::string new_authz;
+      if (!SafeReadToString(fd, &new_authz)) {
+        LogCvmfs(kLogPublish, kLogStderr, "Failed to read authz file (%s): %s",
+                 entry.GetScratchPath().c_str(),
+                 strerror(errno));
+        abort();
+      }
+      close(fd);
+      catalog_manager_->SetVOMSAuthz(new_authz);
+    } else {
+      LogCvmfs(kLogPublish, kLogStderr, "Encountered a authz file (%s) outside"
+               " the root directory; authz can only be set at top-level.",
+               entry.GetRelativePath().c_str());
+      abort();
+    }
+  }else if (entry.HasGraftMarker()) {
     if (entry.IsValidGraft()) {
       // Graft files are added to catalog immediately.
       catalog_manager_->AddFile(

@@ -61,6 +61,7 @@ class SyncItem {
 
   inline bool IsWhiteout()        const { return whiteout_;                    }
   inline bool IsCatalogMarker()   const { return filename_ == ".cvmfscatalog"; }
+  inline bool IsAuthzMarker()     const { return filename_ == ".cvmfsauthz";   }
   inline bool IsOpaqueDirectory() const { return IsDirectory() && opaque_;     }
 
   bool HasGraftMarker()           const { return graft_marker_present_;        }

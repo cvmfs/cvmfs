@@ -58,6 +58,7 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   bool CompactDatabase() const;
 
   double GetRowIdWasteRatio() const;
+  bool SetVOMSAuthz(const std::string&);
 
  protected:
   // TODO(rmeusel): C++11 - constructor inheritance
