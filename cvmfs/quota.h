@@ -332,12 +332,6 @@ class PosixQuotaManager : public QuotaManager {
    */
   static const uint64_t kVolatileFlag = 1ULL << 63;
 
-  /**
-   * Remember cleanup events for 1 day.
-   */
-  static const uint64_t kCleanupRetention = 86400;
-
-
   bool InitDatabase(const bool rebuild_database);
   bool RebuildDatabase();
   void CloseDatabase();
