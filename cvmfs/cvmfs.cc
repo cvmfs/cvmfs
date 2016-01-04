@@ -3001,9 +3001,11 @@ static int AltProcessFlavor(int argc, char **argv) {
   if (strcmp(argv[1], "__wpad__") == 0) {
     return download::MainResolveProxyDescription(argc, argv);
   }
+#ifdef VOMS_AUTHZ
   if (strcmp(argv[1], "__cred_fetcher__") == 0) {
     return CredentialsFetcher::MainCredentialsFetcher(argc, argv);
   }
+#endif
   return 1;
 }
 
