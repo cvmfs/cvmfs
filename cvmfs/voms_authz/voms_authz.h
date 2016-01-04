@@ -20,7 +20,7 @@ bool CheckVOMSAuthz(const struct fuse_ctx *ctx, const std::string &);
 bool ConfigureCurlHandle(void *curl_handle, pid_t pid, uid_t uid, gid_t gid,
                          char *&fname);  // NOLINT
 
-FILE * GetProxyFile(pid_t pid, uid_t uid, gid_t gid);
+FILE *GetProxyFile(pid_t pid, uid_t uid, gid_t gid);
 
 #endif  // CVMFS_VOMS_AUTHZ_VOMS_AUTHZ_H_
 

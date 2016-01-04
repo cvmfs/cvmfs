@@ -62,6 +62,11 @@ set (CVMFS_CLIENT_SOURCES
   sink.h
   clientctx.cc clientctx.h
 )
+if (VOMS_FOUND)
+  set (CVMFS_CLIENT_SOURCES ${CVMFS_CLIENT_SOURCES}
+  voms_authz/voms_cred.h voms_authz/voms_cred.cc
+  voms_authz/voms_authz.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
 
 
 set (CVMFS2_DEBUG_SOURCES
@@ -83,8 +88,7 @@ set (CVMFS2_DEBUG_SOURCES
 )
 if (VOMS_FOUND)
   set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES}
-  voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc
-  voms_authz/cred_fetcher.cc voms_authz/voms_cred.h)
+  voms_authz/cred_fetcher.cc)
 endif (VOMS_FOUND)
 
 set (CVMFS2_SOURCES
@@ -477,7 +481,7 @@ if (BUILD_SERVER)
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
                          ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${LIBCURL_ARCHIVE} 
+                         ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${LIBCURL_ARCHIVE}
                          ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE}
                          ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
                          ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}

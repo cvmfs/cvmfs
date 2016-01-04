@@ -878,6 +878,8 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     url_prefix = (*opt_host_chain_)[opt_host_chain_current_];
 
   string url = url_prefix + *(info->url);
+
+#ifdef VOMS_AUTHZ
   if ((info->pid != -1) && (url.substr(0, 5) == "https")) {
     curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
     // TODO(jblomer): get the environment variable only once
@@ -887,6 +889,7 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
     ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
                         info->cred_fname);
   }
+#endif
 
   if (url.find("@proxy@") != string::npos) {
     string replacement;
