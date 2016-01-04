@@ -144,7 +144,7 @@ cvmfs_globals::~cvmfs_globals() {
 
   sqlite3_shutdown();
   delete statistics_;
-  
+
   ClientCtx::CleanupInstance();
 }
 
@@ -464,7 +464,6 @@ bool cvmfs_context::GetDirentForPath(const PathString         &path,
     return dirent->GetSpecial() != catalog::kDirentNegative;
 
   // Lookup inode in catalog TODO: not twice md5 calculation
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
   if (catalog_manager_->LookupPath(path, catalog::kLookupSole, dirent)) {
     md5path_cache_->Insert(md5path, *dirent);
     return true;
@@ -503,6 +502,7 @@ void cvmfs_context::AppendStringToList(char const   *str,
 
 int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
   atomic_inc64(&num_fs_stat_);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -523,6 +523,7 @@ int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
 int cvmfs_context::Readlink(const char *c_path, char *buf, size_t size) {
   atomic_inc64(&num_fs_readlink_);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -552,6 +553,7 @@ int cvmfs_context::ListDirectory(
   size_t *buflen
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -588,7 +590,6 @@ int cvmfs_context::ListDirectory(
 
   // Add all names
   catalog::StatEntryList listing_from_catalog;
-  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
   if (!catalog_manager_->ListingStat(path, &listing_from_catalog)) {
     return -EIO;
   }
@@ -602,6 +603,7 @@ int cvmfs_context::ListDirectory(
 
 int cvmfs_context::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -620,7 +622,6 @@ int cvmfs_context::Open(const char *c_path) {
              path.c_str());
 
     FileChunkList *chunks = new FileChunkList();
-    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
     if (!catalog_manager_->ListFileChunks(path, dirent.hash_algorithm(),
                                           chunks) ||
         chunks->IsEmpty())
@@ -668,6 +669,7 @@ int64_t cvmfs_context::Pread(
   uint64_t off)
 {
   if (fd & kFdChunked) {
+    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
