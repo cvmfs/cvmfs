@@ -361,6 +361,10 @@ NOTE: $errormsg
   fi
 }
 
+is_redhat() {
+  [ -f /etc/redhat-release ]
+}
+
 load_repo_config() {
   local name=$1
   . /etc/cvmfs/repositories.d/${name}/server.conf
@@ -663,7 +667,7 @@ check_wsgi_module() {
 
   echo "The apache wsgi module must be installed and enabled.
 The required package is called ${APACHE_WSGI_MODPKG}."
-  if [ -f /etc/redhat-release ]; then
+  if is_redhat; then
     case "`cat /etc/redhat-release`" in
       *"release 5."*)
         if [ -f /etc/httpd/conf.d/wsgi.conf ]; then
