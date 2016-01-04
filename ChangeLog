@@ -1,4 +1,5 @@
 2.2.0:
+  * Add `cvmfs_talk cleanup rate` command (CVM-270)
   * Read blacklist from config repository if available (CVM-901)
   * Add support for uncompressed files (CVM-906)
   * Add support for external data (CVM-907)
