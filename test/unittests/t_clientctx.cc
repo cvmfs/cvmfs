@@ -58,3 +58,34 @@ TEST(T_ClientCtx, GetSet) {
 
   ClientCtx::CleanupInstance();
 }
+
+TEST(T_ClientCtx, Guard) {
+  uid_t uid;
+  gid_t gid;
+  pid_t pid;
+
+  {
+    ClientCtxGuard guard(1, 2, 3);
+    EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
+    ClientCtx::GetInstance()->Get(&uid, &gid, &pid);
+    EXPECT_EQ(1U, uid);
+    EXPECT_EQ(2U, gid);
+    EXPECT_EQ(3, pid);
+  }
+  EXPECT_FALSE(ClientCtx::GetInstance()->IsSet());
+
+  ClientCtx::GetInstance()->Set(4, 5, 6);
+  {
+    ClientCtxGuard guard(7, 8, 9);
+    EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
+    ClientCtx::GetInstance()->Get(&uid, &gid, &pid);
+    EXPECT_EQ(7U, uid);
+    EXPECT_EQ(8U, gid);
+    EXPECT_EQ(9, pid);
+  }
+  EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
+  ClientCtx::GetInstance()->Get(&uid, &gid, &pid);
+  EXPECT_EQ(4U, uid);
+  EXPECT_EQ(5U, gid);
+  EXPECT_EQ(6, pid);
+}

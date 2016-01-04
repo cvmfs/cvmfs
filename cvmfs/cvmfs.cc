@@ -70,6 +70,7 @@
 #include "backoff.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "compat.h"
 #include "compression.h"
 #include "directory_entry.h"
@@ -101,8 +102,11 @@
 #include "util.h"
 #include "util_concurrency.h"
 #include "uuid.h"
+#include "voms_authz/voms_cred.h"
 #include "wpad.h"
 #include "xattr.h"
+
+#include "voms_authz/voms_authz.h"
 
 #ifdef FUSE_CAP_EXPORT_SUPPORT
 #define CVMFS_NFS_SUPPORT
@@ -480,6 +484,22 @@ static void RemountCheck() {
 }
 
 
+static bool CheckVoms(const fuse_ctx &fctx) {
+  std::string voms_requirements;
+  if (catalog_manager_->GetVOMSAuthz(&voms_requirements)) {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
+             "properties", voms_requirements.c_str());
+  }
+
+  // Get VOMS information, if any,
+#ifdef VOMS_AUTHZ
+  if ((fctx.uid != 0) && voms_requirements.size()) {
+    return CheckVOMSAuthz(&fctx, voms_requirements);
+  }
+#endif
+  return true;
+}
+
 // TODO(jblomer): the remount functions need to move into a separate entity
 /**
  * Gets triggered by the alarm timer to start `RemountCheck()`.  This can't
@@ -637,6 +657,8 @@ static bool GetPathForInode(const fuse_ino_t ino, PathString *path) {
  */
 static void cvmfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
   perf::Inc(n_fs_lookup_);
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
   remount_fence_->Enter();
@@ -766,12 +788,20 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
   perf::Inc(n_fs_stat_);
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for inode: %"PRIu64,
            uint64_t(ino));
+
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
+    return;
+  }
 
   catalog::DirectoryEntry dirent;
   const bool found = GetDirentForInode(ino, &dirent);
@@ -793,6 +823,8 @@ static void cvmfs_getattr(fuse_req_t req, fuse_ino_t ino,
  */
 static void cvmfs_readlink(fuse_req_t req, fuse_ino_t ino) {
   perf::Inc(n_fs_readlink_);
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
 
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
@@ -847,12 +879,20 @@ static void AddToDirListing(const fuse_req_t req,
 static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   RemountCheck();
 
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64,
            uint64_t(ino));
+
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
+    return;
+  }
 
   PathString path;
   catalog::DirectoryEntry d;
@@ -874,6 +914,7 @@ static void cvmfs_opendir(fuse_req_t req, fuse_ino_t ino,
     fuse_reply_err(req, ENOTDIR);
     return;
   }
+
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_opendir on inode: %"PRIu64", path %s",
            uint64_t(ino), path.c_str());
 
@@ -1035,6 +1076,8 @@ static void cvmfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
                        struct fuse_file_info *fi)
 {
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on inode: %"PRIu64, uint64_t(ino));
@@ -1055,6 +1098,28 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
     ReplyNegative(dirent, req);
     return;
   }
+
+  std::string voms_requirements;
+  if (catalog_manager_->GetVOMSAuthz(&voms_requirements))
+  {
+    LogCvmfs(kLogCvmfs, kLogDebug, "Got VOMS authz %s from filesystem "
+             "properties", voms_requirements.c_str());
+  }
+
+  // Get VOMS information, if any,
+  // TODO(jblomer): without VOMS, cvmfs will allow access.  This is probably
+  // not the right default.
+#ifdef VOMS_AUTHZ
+  if ((fuse_ctx->uid != 0) && !voms_requirements.empty())
+  {
+    if (!CheckVOMSAuthz(fuse_ctx, voms_requirements))
+    {
+      remount_fence_->Leave();
+      fuse_reply_err(req, EACCES);
+      return;
+    }
+  }
+#endif
 
   // Don't check.  Either done by the OS or one wants to purposefully work
   // around wrong open flags
@@ -1213,6 +1278,9 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
 
   // Do we have a a chunked file?
   if (static_cast<int64_t>(fi->fh) < 0) {
+    const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+    ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+
     const uint64_t chunk_handle =
       static_cast<uint64_t>(-static_cast<int64_t>(fi->fh));
     ChunkFd chunk_fd;
@@ -1428,17 +1496,27 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                            size_t size)
 #endif
 {
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
            "cvmfs_getxattr on inode: %"PRIu64" for xattr: %s",
            uint64_t(ino), name);
 
+  if (!CheckVoms(*fuse_ctx)) {
+    remount_fence_->Leave();
+    fuse_reply_err(req, EACCES);
+    return;
+  }
+
   const string attr = name;
   catalog::DirectoryEntry d;
   const bool found = GetDirentForInode(ino, &d);
   bool retval;
   XattrList xattrs;
+
   if (d.HasXattrs()) {
     PathString path;
     retval = GetPathForInode(ino, &path);
@@ -1463,6 +1541,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
   }
 
   string attribute_value;
+  std::string lookup_value;
 
   if (attr == "user.pid") {
     attribute_value = StringifyInt(pid_);
@@ -1506,6 +1585,10 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     attribute_value = StringifyInt(revision);
   } else if (attr == "user.root_hash") {
     attribute_value = catalog_manager_->GetRootHash().ToString();
+  } else if ((attr == "user.voms_authz") &&
+             catalog_manager_->GetVOMSAuthz(&lookup_value))
+  {
+    attribute_value = lookup_value;
   } else if (attr == "user.tag") {
     attribute_value = *repository_tag_;
   } else if (attr == "user.expires") {
@@ -1632,6 +1715,9 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 
 static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
+  const struct fuse_ctx *fuse_ctx = fuse_req_ctx(req);
+  ClientCtxGuard ctx_guard(fuse_ctx->uid, fuse_ctx->gid, fuse_ctx->pid);
+
   remount_fence_->Enter();
   ino = catalog_manager_->MangleInode(ino);
   LogCvmfs(kLogCvmfs, kLogDebug,
@@ -2709,6 +2795,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     cvmfs::volatile_repository_ = true;
   }
 
+  // Make sure client context TLS has been initialized
+  // (first initialization is not thread safe).
+  ClientCtx::GetInstance();
+
   cvmfs::pipe_remount_trigger_[0] = cvmfs::pipe_remount_trigger_[1] = -1;
   cvmfs::remount_fence_ = new cvmfs::RemountFence();
   auto_umount::SetMountpoint(*cvmfs::mountpoint_);
@@ -2895,6 +2985,10 @@ static void Fini() {
   cvmfs::backoff_throttle_ = NULL;
   delete cvmfs::statistics_;
   cvmfs::statistics_ = NULL;
+
+  // Make sure client context TLS is cleaned up
+  // (destruction is not thread safe)
+  ClientCtx::CleanupInstance();
 }
 
 
@@ -2904,6 +2998,9 @@ static int AltProcessFlavor(int argc, char **argv) {
   }
   if (strcmp(argv[1], "__wpad__") == 0) {
     return download::MainResolveProxyDescription(argc, argv);
+  }
+  if (strcmp(argv[1], "__cred_fetcher__") == 0) {
+    return CredentialsFetcher::MainCredentialsFetcher(argc, argv);
   }
   return 1;
 }

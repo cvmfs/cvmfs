@@ -39,7 +39,6 @@ LoadError SimpleCatalogManager::LoadCatalog(const PathString  &mountpoint,
 
   download::JobInfo download_catalog(&url, true, false, fcatalog,
                                      &effective_hash);
-
   download::Failures retval = download_manager_->Fetch(&download_catalog);
   fclose(fcatalog);
 
