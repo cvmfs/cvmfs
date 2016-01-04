@@ -6,7 +6,6 @@
 #include "catalog_mgr_client.h"
 
 #include "cache.h"
-#include "clientctx.h"
 #include "download.h"
 #include "fetch.h"
 #include "manifest.h"
@@ -235,17 +234,8 @@ LoadError ClientCatalogManager::LoadCatalogCas(
   string *catalog_path)
 {
   assert(hash.suffix == shash::kSuffixCatalog);
-  ClientCtx *ctx = ClientCtx::GetInstance();
-  uid_t uid = -1;
-  gid_t gid = -1;
-  pid_t pid = -1;
-  if (ctx->IsSet()) {
-    ctx->Get(&uid, &gid, &pid);
-  }
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-                           zlib::kZlibDefault,
-                           cache::CacheManager::kTypeCatalog,
-                           pid, uid, gid, alt_catalog_path);
+    zlib::kZlibDefault, cache::CacheManager::kTypeCatalog, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;
