@@ -22,8 +22,8 @@
  */
 class CredentialsFetcher {
  public:
-  static const int kTransportFd = 3; 
-   
+  static const int kTransportFd = 3;
+
   /**
    * Protocol steering between client and server.
    */

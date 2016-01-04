@@ -92,11 +92,11 @@ void WritableCatalogManager::ActivateCatalog(Catalog *catalog) {
  * @return true on success, false otherwise
  */
 manifest::Manifest *WritableCatalogManager::CreateRepository(
-  const string     &dir_temp,
-  const bool        volatile_content,
+  const string      &dir_temp,
+  const bool         volatile_content,
   const std::string &voms_authz,
-  CatalogProperty   external_data,
-  upload::Spooler  *spooler)
+  CatalogProperty    external_data,
+  upload::Spooler   *spooler)
 {
   // Create a new root catalog at file_path
   string file_path = dir_temp + "/new_root_catalog";
@@ -155,7 +155,7 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
   const string manifest_path = dir_temp + "/manifest";
   manifest::Manifest *manifest =
     new manifest::Manifest(hash_catalog, catalog_size, "");
-  if (voms_authz.size()) {
+  if (!voms_authz.empty()) {
     manifest->set_has_alt_catalog_path(true);
   }
 

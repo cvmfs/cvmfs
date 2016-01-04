@@ -77,6 +77,7 @@ int Fetcher::Fetch(
   const shash::Any &id,
   const uint64_t size,
   const std::string &name,
+  const zlib::Algorithms compression_algorithm,
   const cache::CacheManager::ObjectType object_type,
   pid_t pid,
   uid_t uid,
@@ -150,6 +151,7 @@ int Fetcher::Fetch(
   tls->download_job.pid = pid;
   tls->download_job.uid = uid;
   tls->download_job.gid = gid;
+  tls->download_job.compressed = (compression_algorithm == zlib::kZlibDefault);
   download_mgr_->Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {
