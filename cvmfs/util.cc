@@ -1546,6 +1546,49 @@ bool SafeWrite(int fd, const void *buf, size_t nbyte) {
 }
 
 
+/**
+ * Deal with EINTR and partial reads.
+ */
+ssize_t SafeRead(int fd, void *buf, size_t nbyte) {
+  ssize_t total_bytes = 0;
+  while (nbyte) {
+    ssize_t retval = read(fd, buf, nbyte);
+    if (retval < 0) {
+      if (errno == EINTR)
+        continue;
+      return -1;
+    } else if (retval == 0) {
+      return total_bytes;
+    }
+    assert(static_cast<size_t>(retval) <= nbyte);
+    buf = reinterpret_cast<char *>(buf) + retval;
+    nbyte -= retval;
+    total_bytes += retval;
+  }
+  return total_bytes;
+}
+
+
+/**
+ * Pull file contents into a string
+ */
+bool SafeReadToString(int fd, std::string *final_result) {
+  if (!final_result) {return false;}
+
+  std::string tmp_result;
+  static const int buf_size = 4096;
+  std::vector<char> buf; buf.reserve(buf_size);
+  ssize_t total_bytes = -1;
+  do {
+    total_bytes = SafeRead(fd, &buf[0], buf_size);
+    if (total_bytes < 0) {return false;}
+    tmp_result.append(&buf[0], total_bytes);
+  } while (total_bytes == buf_size);
+  final_result->swap(tmp_result);
+  return true;
+}
+
+
 static inline void Base64Block(const unsigned char input[3], const char *table,
                                char output[4])
 {

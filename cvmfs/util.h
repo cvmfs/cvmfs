@@ -224,8 +224,13 @@ bool ManagedExec(const std::vector<std::string> &command_line,
                  pid_t *child_pid = NULL);
 
 void SafeSleepMs(const unsigned ms);
-bool SafeRead(int fd, void *buf, size_t nbyte);  // TODO(jblomer)
+// Note that SafeWrite cannot return partial results but
+// SafeRead can (as we may have hit the EOF).
+ssize_t SafeRead(int fd, void *buf, size_t nbyte);
 bool SafeWrite(int fd, const void *buf, size_t nbyte);
+
+// Read the contents of a file descriptor to a string.
+bool SafeReadToString(int fd, std::string *final_result);
 
 /**
  * Knuth's random shuffle algorithm.
