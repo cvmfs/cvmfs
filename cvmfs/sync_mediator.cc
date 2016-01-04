@@ -631,12 +631,20 @@ void SyncMediator::AddFile(const SyncItem &entry) {
   } else if (entry.HasGraftMarker()) {
     if (entry.IsValidGraft()) {
       // Graft files are added to catalog immediately.
-      catalog_manager_->AddFile(
-        entry.CreateBasicCatalogDirent(),
-        default_xattrs,  // TODO(bbockelm): For now, use default xattrs
-                         // on grafted files.
-        entry.IsExternalData(),  // TODO(bbockelm): Take this from in graft.
-        entry.relative_parent_path());
+      if (entry.IsChunkedGraft()) {
+        catalog_manager_->AddChunkedFile(
+          entry.CreateBasicCatalogDirent(),
+          default_xattrs,
+          entry.relative_parent_path(),
+          *(entry.GetGraftChunks()));
+      } else {
+        catalog_manager_->AddFile(
+          entry.CreateBasicCatalogDirent(),
+          default_xattrs,  // TODO(bbockelm): For now, use default xattrs
+                           // on grafted files.
+          entry.IsExternalData(),  // TODO(bbockelm): Take this from in graft.
+          entry.relative_parent_path());
+      }
     } else {
       // Unlike with regular files, grafted files can be "unpublishable" - i.e.,
       // the graft file is missing information.  It's not clear that continuing
