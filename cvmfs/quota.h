@@ -16,7 +16,12 @@
 
 #include "duplex_sqlite3.h"
 #include "hash.h"
+#include "statistics.h"
 #include "util.h"
+
+namespace perf {
+class Recorder;
+}
 
 /**
  * The QuotaManager keeps track of the cache contents.  It is informed by the
@@ -38,9 +43,11 @@
 class QuotaManager : SingleCopy {
  public:
   /**
-   * Backchannel protocol revision.
+   * Quota manager protocol revision.
    * Revision 1:
-   *  command 'R': release pinned files if possible
+   *  - backchannel command 'R': release pinned files if possible
+   * Revision 2:
+   *  - add kCleanupRate command
    */
   static const uint32_t kProtocolRevision;
 
@@ -67,6 +74,7 @@ class QuotaManager : SingleCopy {
   virtual uint64_t GetCapacity() = 0;
   virtual uint64_t GetSize() = 0;
   virtual uint64_t GetSizePinned() = 0;
+  virtual uint64_t GetCleanupRate(uint64_t period_s) = 0;
 
   virtual void Spawn() = 0;
   virtual pid_t GetPid() = 0;
@@ -142,6 +150,7 @@ class NoopQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity() { return uint64_t(-1); }
   virtual uint64_t GetSize() { return 0; }
   virtual uint64_t GetSizePinned() { return 0; }
+  virtual uint64_t GetCleanupRate(uint64_t period_s) { return 0; }
 
   virtual void Spawn() { }
   virtual pid_t GetPid() { return getpid(); }
@@ -198,6 +207,7 @@ class PosixQuotaManager : public QuotaManager {
   virtual uint64_t GetCapacity();
   virtual uint64_t GetSize();
   virtual uint64_t GetSizePinned();
+  virtual uint64_t GetCleanupRate(uint64_t period_s);
 
   virtual void Spawn();
   virtual pid_t GetPid();
@@ -235,6 +245,8 @@ class PosixQuotaManager : public QuotaManager {
     kGetProtocolRevision,
     kInsertVolatile,
     kListVolatile,
+    // as of protocol revision 2
+    kCleanupRate,
   };
 
   /**
@@ -319,7 +331,6 @@ class PosixQuotaManager : public QuotaManager {
    * Volatile entries are used for instance for ALICE conditions data.
    */
   static const uint64_t kVolatileFlag = 1ULL << 63;
-
 
   bool InitDatabase(const bool rebuild_database);
   bool RebuildDatabase();
@@ -417,6 +428,12 @@ class PosixQuotaManager : public QuotaManager {
    * will be performed in a detached, asynchronous process.
    */
   bool async_delete_;
+
+  /**
+   * Keeps track of the number of cleanups over time.  Use by
+   * `cvmfs_talk cleanup rate`
+   */
+  perf::MultiRecorder cleanup_recorder_;
 
   sqlite3 *database_;
   sqlite3_stmt *stmt_touch_;

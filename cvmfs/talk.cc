@@ -175,6 +175,19 @@ static void *MainTalk(void *data __attribute__((unused))) {
           vector<string> ls_catalogs = quota_mgr->ListCatalogs();
           AnswerStringList(con_fd, ls_catalogs);
         }
+      } else if (line.substr(0, 12) == "cleanup rate") {
+        QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
+        if (!quota_mgr->IsEnforcing()) {
+          Answer(con_fd, "Cache is unmanaged\n");
+        } else {
+          if (line.length() < 9) {
+            Answer(con_fd, "Usage: cleanup rate <period in mn>\n");
+          } else {
+            const uint64_t period_s = String2Uint64(line.substr(13)) * 60;
+            const uint64_t rate = quota_mgr->GetCleanupRate(period_s);
+            Answer(con_fd, StringifyInt(rate) + "\n");
+          }
+        }
       } else if (line.substr(0, 7) == "cleanup") {
         QuotaManager *quota_mgr = cvmfs::cache_manager_->quota_mgr();
         if (!quota_mgr->IsEnforcing()) {
