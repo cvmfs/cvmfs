@@ -66,6 +66,7 @@ Manifest *Manifest::Load(const map<char, string> &content) {
   uint64_t publish_timestamp = 0;
   bool garbage_collectable = false;
   bool has_alt_catalog_path = false;
+  shash::Any meta_info;
 
   if ((iter = content.find('B')) != content.end())
     catalog_size = String2Uint64(iter->second);
@@ -86,25 +87,28 @@ Manifest *Manifest::Load(const map<char, string> &content) {
     garbage_collectable = (iter->second == "yes");
   if ((iter = content.find('A')) != content.end())
     has_alt_catalog_path = (iter->second == "yes");
+  if ((iter = content.find('M')) != content.end())
+    meta_info = MkFromHexPtr(shash::HexPtr(iter->second),
+                             shash::kSuffixMetainfo);
 
   return new Manifest(catalog_hash, catalog_size, root_path, ttl, revision,
                       micro_catalog_hash, repository_name, certificate,
                       history, publish_timestamp, garbage_collectable,
-                      has_alt_catalog_path);
+                      has_alt_catalog_path, meta_info);
 }
 
 
 Manifest::Manifest(const shash::Any &catalog_hash,
                    const uint64_t catalog_size,
                    const string &root_path)
- : catalog_hash_(catalog_hash)
- , catalog_size_(catalog_size)
- , root_path_(shash::Md5(shash::AsciiPtr(root_path)))
- , ttl_(catalog::Catalog::kDefaultTTL)
- , revision_(0)
- , publish_timestamp_(0)
- , garbage_collectable_(false)
- , has_alt_catalog_path_(false)
+  : catalog_hash_(catalog_hash)
+  , catalog_size_(catalog_size)
+  , root_path_(shash::Md5(shash::AsciiPtr(root_path)))
+  , ttl_(catalog::Catalog::kDefaultTTL)
+  , revision_(0)
+  , publish_timestamp_(0)
+  , garbage_collectable_(false)
+  , has_alt_catalog_path_(false)
 { }
 
 
@@ -131,6 +135,8 @@ string Manifest::ExportString() const {
     manifest += "H" + history_.ToString() + "\n";
   if (publish_timestamp_ > 0)
     manifest += "T" + StringifyInt(publish_timestamp_) + "\n";
+  if (!meta_info_.IsNull())
+    manifest += "M" + meta_info_.ToString() + "\n";
   // Reserved: Z -> for identification of channel tips
 
   return manifest;

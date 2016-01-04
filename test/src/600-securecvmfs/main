@@ -1,0 +1,186 @@
+
+cvmfs_test_name="Test CVMFS over HTTPS with VOMS authentication"
+cvmfs_test_autofs_on_startup=false
+
+TEST600_HTTPS_CONFIG=/etc/httpd/conf.d/test600.cvmfs.secure.conf
+# Set later to the scratch dir
+TEST600_HOSTCERT=
+TEST600_HOSTKEY=
+TEST600_VOMSDIR=
+TEST600_TESTCA=
+TEST600_TESTCRL=
+# These two variables will be updated later with the generated hash
+TEST600_TESTCA_HASH=
+TEST600_TESTCRL_HASH=
+# replacing /etc/grid-security
+TEST600_GRID_SECURITY_DIR=
+# Mountpoint and cache directory for grid.cern.ch private mount
+TEST600_GRID_MOUNTPOINT=
+TEST600_GRID_CACHE=
+# For generate_certs
+TEST600_CERTS_DIR=
+# Bind mount to /etc/grid-security active
+TEST600_GRID_SECURITY_TAINTED=
+
+cleanup() {
+  sudo umount ${TEST600_GRID_MOUNTPOINT}
+  [ "x$TEST600_GRID_SECURITY_TAINTED" = "xyes" ] && sudo umount /etc/grid-security
+  [ -z "$TEST600_HTTPS_CONFIG" ] || sudo rm -f $TEST600_HTTPS_CONFIG
+  [ -z "$TEST600_HOSTCERT" ] || sudo rm -f $TEST600_HOSTCERT
+  [ -z "$TEST600_HOSTKEY" ] || sudo rm -f $TEST600_HOSTKEY
+  [ -z "$TEST600_VOMSDIR" ] || sudo rm -fR $TEST600_VOMSDIR
+  [ -z "$TEST600_TESTCA" ] || sudo rm -f $TEST600_TESTCA
+  [ -z "$TEST600_TESTCRL" ] || sudo rm -f $TEST600_TESTCRL
+  [ -z "$TEST600_TESTCA_HASH" ] || sudo rm -f $TEST600_TESTCA_HASH
+  [ -z "$TEST600_TESTCRL_HASH" ] || sudo rm -f $TEST600_TESTCRL_HASH
+}
+
+mount_cvmfs_grid() {
+  local mountpoint=$1
+  local cache_dir=$2
+
+  mkdir -p $mountpoint $cache_dir
+
+  echo "writing config in ${cache_dir}/client.conf"
+  cat << EOF > ${cache_dir}/client.conf
+CVMFS_CACHE_BASE=$cache_dir
+CVMFS_RELOAD_SOCKETS=$cache_dir
+CVMFS_CLAIM_OWNERSHIP=yes
+CVMFS_SERVER_URL=http://cvmfs-stratum-one.cern.ch/cvmfs/grid.cern.ch
+CVMFS_HTTP_PROXY="${CVMFS_TEST_PROXY}"
+EOF
+  cat ${cache_dir}/client.conf
+
+  cvmfs2 -o config=${cache_dir}/client.conf grid.cern.ch $mountpoint
+  return $?
+}
+
+generate_certs() {
+  local script_location=$1
+  mkdir -p $TEST600_CERTS_DIR $TEST600_GRID_CACHE $TEST600_GRID_MOUNTPOINT
+  local voms_path=${TEST600_GRID_MOUNTPOINT}/emi-ui-2.10.4-1_sl5v1
+  if [ ! -e "$voms_path" ]; then
+    voms_path="/"
+  fi
+
+  cp $script_location/ca-generate-certs $TEST600_CERTS_DIR/
+  cp $script_location/openssl-usercert-extensions.conf $TEST600_CERTS_DIR/
+  cp $script_location/openssl-cert-extensions-template.conf $TEST600_CERTS_DIR/
+  cp $script_location/openssl.config $TEST600_CERTS_DIR/
+
+  pushd $TEST600_CERTS_DIR
+  ./ca-generate-certs $HOSTNAME
+  result=$?
+  LD_LIBRARY_PATH=${voms_path}/usr/lib64 \
+     ${voms_path}/usr/bin/voms-proxy-fake -certdir ${TEST600_GRID_SECURITY_DIR}/certificates \
+      -cert usercert.pem -key userkey.pem -out vomsproxy.pem -rfc \
+      -hostcert hostcert.pem -hostkey hostkey.pem -fqan /cvmfs/Role=NULL \
+      -voms cvmfs -uri $HOSTNAME:15000
+  popd
+
+  mkdir -p ${TEST600_GRID_SECURITY_DIR}/vomsdir/cvmfs
+
+  set -x
+  echo "/DC=org/DC=Open Science Grid/O=OSG Test/OU=Services/CN=$HOSTNAME" > ${TEST600_GRID_SECURITY_DIR}/vomsdir/cvmfs/$HOSTNAME.lsc
+  echo "/DC=org/DC=Open Science Grid/O=OSG Test/CN=OSG Test CA" >> ${TEST600_GRID_SECURITY_DIR}/vomsdir/cvmfs/$HOSTNAME.lsc
+
+  LD_LIBRARY_PATH=${voms_path}/usr/lib64 X509_CERT_DIR=${TEST600_GRID_SECURITY_DIR}/certificates \
+    ${voms_path}/usr/bin/voms-proxy-info -file $TEST600_CERTS_DIR/vomsproxy.pem \
+    -all
+
+  sudo cp $TEST600_CERTS_DIR/hostcert.pem $TEST600_HOSTCERT || return 1
+  sudo cp $TEST600_CERTS_DIR/hostkey.pem $TEST600_HOSTKEY || return 1
+  sudo cp $TEST600_CERTS_DIR/OSG-Test-CA.pem $TEST600_TESTCA || return 1
+  sudo cp $TEST600_CERTS_DIR/OSG-Test-CA.r0 $TEST600_TESTCRL || return 1
+  local hash=`openssl x509 -in $TEST600_TESTCA -noout -hash`
+  TEST600_TESTCA_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/${hash}.0
+  TEST600_TESTCRL_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/${hash}.r0
+  sudo ln -sf $TEST600_TESTCA $TEST600_TESTCA_HASH || return 1
+  sudo ln -sf $TEST600_TESTCRL $TEST600_TESTCRL_HASH || return 1
+  set +x
+
+  return $result;
+}
+
+cvmfs_run_test() {
+  local logfile=$1
+  local script_location=$2
+  local scratch_dir=$(pwd)
+
+  local TEST600_GRID_SECURITY_DIR=${scratch_dir}/grid-security
+  mkdir -p ${TEST600_GRID_SECURITY_DIR}/certificates ${scratch_dir}/vomsdir
+  TEST600_HOSTCERT=${TEST600_GRID_SECURITY_DIR}/hostcert-cvmfs.pem
+  TEST600_HOSTKEY=${TEST600_GRID_SECURITY_DIR}/hostkey-cvmfs.pem
+  TEST600_VOMSDIR=${TEST600_GRID_SECURITY_DIR}/vomsdir/cvmfs
+  TEST600_TESTCA=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.pem
+  TEST600_TESTCRL=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.r0
+  # These two variables will be updated later with the generated hash
+  TEST600_TESTCA_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.pem
+  TEST600_TESTCRL_HASH=${TEST600_GRID_SECURITY_DIR}/certificates/OSG-Test-CA.r0
+
+  TEST600_CERTS_DIR=$(pwd)/certs
+  TEST600_GRID_MOUNTPOINT=$(pwd)/cvmfs-grid/mountpoint
+  TEST600_GRID_CACHE=$(pwd)/cvmfs-grid/cache
+
+  # Generate repo first - check will fail after apache change below until we
+  # change the default URL.
+  [ -z "$TEST600_HTTPS_CONFIG" ] || sudo rm -f $TEST600_HTTPS_CONFIG
+  echo "restarting apache"
+  apache_switch off
+  apache_switch on
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -V cvmfs:/cvmfs || return $?
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/hello_world
+  publish_repo $CVMFS_TEST_REPO -v || return $?
+
+  # ( . ${script_location}/../../common/migration_tests/common.sh; install_packages gridsite voms-clients-cpp )
+
+  echo "set a trap for system directory cleanup"
+  trap cleanup EXIT HUP INT TERM
+
+  # Allow mount of grid.cern.ch to fail; this is just used for grid tools
+  mount_cvmfs_grid $TEST600_GRID_MOUNTPOINT $TEST600_GRID_CACHE
+  ls $TEST600_GRID_MOUNTPOINT
+  echo "Generating certificates"
+  generate_certs $script_location
+  # requires mod_gridsite from the gridsite package
+  echo "Setting up apache configuration"
+  cp $script_location/test600.cvmfs.secure.conf $TEST600_HTTPS_CONFIG
+  sed -i "s/@REPONAME@/$CVMFS_TEST_REPO/" $TEST600_HTTPS_CONFIG
+  sed -i "s,@GRIDSECURITYDIR@,$TEST600_GRID_SECURITY_DIR," $TEST600_HTTPS_CONFIG
+  cp $script_location/gacl /srv/cvmfs/$CVMFS_TEST_REPO/data/.gacl
+  echo "restarting apache"
+  apache_switch off
+  apache_switch on
+
+  sed -i "s|CVMFS_SERVER_URL=http://localhost/cvmfs/$CVMFS_TEST_REPO|CVMFS_SERVER_URL=https://$HOSTNAME:8443/cvmfs/$CVMFS_TEST_REPO|" /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
+  echo "X509_CERT_DIR=${TEST600_GRID_SECURITY_DIR}/certificates" >> /etc/cvmfs/repositories.d/$CVMFS_TEST_REPO/client.conf
+  # TODO(jblomer): Fixed catalogs with alternative path should be properly solved
+  sed -i -e '/^CVMFS_ROOT_HASH=/d' /var/spool/cvmfs/${CVMFS_TEST_REPO}/client.local
+  cvmfs_suid_helper rw_umount $CVMFS_TEST_REPO
+  cvmfs_suid_helper rdonly_umount $CVMFS_TEST_REPO
+  # Remove any cached files to make sure we reload over https.
+  rm -rf /var/spool/cvmfs/$CVMFS_TEST_REPO/cache/$CVMFS_TEST_REPO
+  cvmfs_suid_helper rdonly_mount $CVMFS_TEST_REPO || return $?
+  cvmfs_suid_helper rw_mount $CVMFS_TEST_REPO || return $?
+  export X509_USER_PROXY=$(pwd)/certs/vomsproxy.pem
+  cp $(pwd)/certs/vomsproxy.pem $(pwd)/certs/vomsproxy.pem.nobody
+  chown nobody: $(pwd)/certs/vomsproxy.pem.nobody
+  cat $X509_USER_PROXY
+  sudo mkdir -p /etc/grid-security || return 20
+  sudo mount --bind $TEST600_GRID_SECURITY_DIR /etc/grid-security || return 21
+  TEST600_GRID_SECURITY_TAINTED="yes"
+  sudo -u nobody /bin/sh -c "X509_USER_PROXY=$PWD/certs/vomsproxy.pem.nobody cat /cvmfs/$CVMFS_TEST_REPO/hello_world" > /dev/null || return 30
+  # This should work because the above and below are in the same session id.
+  sudo -u nobody /bin/sh -c "cat /cvmfs/$CVMFS_TEST_REPO/hello_world" || return 31
+  sudo -u nobody setsid /bin/sh -c "env && cat /cvmfs/$CVMFS_TEST_REPO/hello_world"
+  # Last line should have resulted in an IO error.
+  if [ $? -eq 0 ]; then
+    return 40
+  fi
+
+  return 0
+}

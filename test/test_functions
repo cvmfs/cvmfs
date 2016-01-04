@@ -496,7 +496,12 @@ create_repo() {
     destroy_repo $repo || return 101
   fi
 
-  echo "Creating new repository $repo..."
+  echo -n "Creating new repository $repo "
+  if [ x"$extra_options" != x"" ]; then
+    echo "(with extra options $extra_options) ..."
+  else
+    echo "..."
+  fi
   local s3_config=""
   local stratum0=""
   local unionfs=""
@@ -1866,6 +1871,7 @@ do_local_mount() {
   local repo_name="$2"
   local repo_url="$3"
   local config_file="$4"
+  local extra_option="$5"
   local cache="$(get_cache_directory $mountpoint)"
   local config="$(mktemp ${mountpoint}.conf.XXXXX)"
   local output="$(mktemp ${mountpoint}.log.XXXXX)"
@@ -1873,6 +1879,7 @@ do_local_mount() {
   mkdir $mountpoint $cache
   if [ -z $config_file ]; then
     cat > $config << EOF
+CVMFS_MOUNT_DIR=/cvmfs
 CVMFS_CACHE_BASE=$cache
 CVMFS_RELOAD_SOCKETS=$cache
 CVMFS_SERVER_URL=$repo_url
@@ -1884,6 +1891,9 @@ EOF
   else
     cat $config_file > $config
   fi
+  echo "$extra_option" >> $config
+  echo "  *** local mount config:"
+  cat "$config"
 
   cvmfs2 -d -o config=$config $repo_name $mountpoint >> $output 2>&1
 }

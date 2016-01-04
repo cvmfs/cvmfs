@@ -14,6 +14,7 @@
 #include "platform.h"
 #include "smalloc.h"
 #include "util.h"
+#include "util_concurrency.h"
 
 using namespace std;  // NOLINT
 
@@ -55,6 +56,7 @@ Catalog::Catalog(const PathString &path,
   managed_database_(false),
   parent_(parent),
   nested_catalog_cache_dirty_(true),
+  voms_authz_status_(kVomsUnknown),
   initialized_(false)
 {
   max_row_id_ = 0;
@@ -63,6 +65,9 @@ Catalog::Catalog(const PathString &path,
   int retval = pthread_mutex_init(lock_, NULL);
   assert(retval == 0);
 
+  atomic_init32(&external_data_status_);
+  ExternalDataStatus status = kExternalPublishUnknown;
+  atomic_write32(&external_data_status_, status);
   database_ = NULL;
   uid_map_ = NULL;
   gid_map_ = NULL;
@@ -139,6 +144,9 @@ bool Catalog::ReadCatalogCounters() {
   } else if (database().schema_revision() < 2) {
     statistics_loaded =
       counters_.ReadFromDatabase(database(), LegacyMode::kNoXattrs);
+  } else if (database().schema_revision() < 3) {
+    statistics_loaded =
+      counters_.ReadFromDatabase(database(), LegacyMode::kNoExternals);
   } else {
     statistics_loaded = counters_.ReadFromDatabase(database());
   }
@@ -408,6 +416,30 @@ void Catalog::DropDatabaseFileOwnership() {
 }
 
 
+Catalog::ExternalDataStatus Catalog::GetExternalDataImpl() const {
+  if (!IsRoot()) {return kExternalPublishDisable;}
+  ExternalDataStatus status = \
+    static_cast<ExternalDataStatus>(atomic_read32(&external_data_status_));
+  if (status == kExternalPublishUnknown) {
+    MutexLockGuard guard(*lock_);
+    int attr_value = database().GetPropertyDefault<int>("external_data", 0);
+    status = attr_value ? kExternalPublishEnable : kExternalPublishDisable;
+    atomic_write32(&external_data_status_, status);
+  }
+  return status;
+}
+
+bool Catalog::GetExternalData() const {
+  if (IsRoot()) {
+    ExternalDataStatus status = GetExternalDataImpl();
+    return (status == kExternalPublishEnable);
+  } else if (HasParent()) {
+    return parent_->GetExternalData();
+  }
+  return false;
+}
+
+
 uint64_t Catalog::GetTTL() const {
   pthread_mutex_lock(lock_);
   const uint64_t result =
@@ -416,6 +448,28 @@ uint64_t Catalog::GetTTL() const {
   return result;
 }
 
+
+bool Catalog::GetVOMSAuthz(string *authz) const {
+  bool result;
+  pthread_mutex_lock(lock_);
+  if (voms_authz_status_ == kVomsPresent) {
+    *authz = voms_authz_;
+    result = true;
+  } else if (voms_authz_status_ == kVomsNone) {
+    result = false;
+  } else {
+    if (database().HasProperty("voms_authz")) {
+      voms_authz_ = database().GetProperty<string>("voms_authz");
+      *authz = voms_authz_;
+      voms_authz_status_ = kVomsPresent;
+    } else {
+      voms_authz_status_ = kVomsNone;
+    }
+    result = (voms_authz_status_ == kVomsPresent);
+  }
+  pthread_mutex_unlock(lock_);
+  return result;
+}
 
 uint64_t Catalog::GetRevision() const {
   pthread_mutex_lock(lock_);

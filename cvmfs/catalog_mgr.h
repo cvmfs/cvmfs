@@ -184,6 +184,7 @@ class AbstractCatalogManager : public SingleCopy {
   uint64_t GetRevision() const;
   bool GetVolatileFlag() const;
   uint64_t GetTTL() const;
+  bool GetVOMSAuthz(std::string *authz) const;
   int GetNumCatalogs() const;
   std::string PrintHierarchy() const;
 
@@ -204,6 +205,17 @@ class AbstractCatalogManager : public SingleCopy {
    */
   inline inode_t MangleInode(const inode_t inode) const {
     return (inode <= kInodeOffset) ? GetRootInode() : inode;
+  }
+
+  /**
+   * Returns true if the entire repository (starting at the root catalog)
+   * is marked as enabling external data.
+   *
+   * Returns false if there is no root catalog.
+   */
+  inline bool GetExternalDataRepository() const {
+    CatalogT *root_catalog = GetRootCatalog();
+    return root_catalog ? root_catalog->GetExternalData() : false;
   }
 
  protected:

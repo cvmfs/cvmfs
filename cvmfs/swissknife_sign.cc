@@ -45,6 +45,8 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
   if (args.find('n') != args.end()) repo_name = *args.find('n')->second;
   string pwd = "";
   if (args.find('s') != args.end()) pwd = *args.find('s')->second;
+  string meta_info = "";
+  if (args.find('M') != args.end()) meta_info = *args.find('M')->second;
   upload::Spooler *spooler = NULL;
 
   if (!DirectoryExists(temp_dir)) {
@@ -150,10 +152,27 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
       goto sign_fail;
     }
 
+    // Safe repository meta info file
+    shash::Any metainfo_hash;
+    if (!meta_info.empty()) {
+      upload::Spooler::CallbackPtr callback =
+        spooler->RegisterListener(&CommandSign::MetainfoUploadCallback, this);
+      spooler->ProcessMetainfo(meta_info);
+      metainfo_hash = metainfo_hash_.Get();
+      spooler->UnregisterListener(callback);
+
+      if (metainfo_hash.IsNull()) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info");
+        goto sign_fail;
+      }
+    }
+
     // Update manifest
     manifest->set_certificate(certificate_hash);
     manifest->set_repository_name(repo_name);
     manifest->set_publish_timestamp(time(NULL));
+    if (!metainfo_hash.IsNull())
+      manifest->set_meta_info(metainfo_hash);
 
     string signed_manifest = manifest->ExportString();
     shash::Any published_hash(manifest->GetHashAlgorithm());
@@ -168,9 +187,11 @@ int swissknife::CommandSign::Main(const swissknife::ArgumentList &args) {
         spooler->PlaceBootstrappingShortcut(manifest->certificate())  &&
         spooler->PlaceBootstrappingShortcut(manifest->catalog_hash()) &&
         (manifest->history().IsNull() ||
-         spooler->PlaceBootstrappingShortcut(manifest->history()));
+         spooler->PlaceBootstrappingShortcut(manifest->history())) &&
+        (metainfo_hash.IsNull() ||
+         spooler->PlaceBootstrappingShortcut(metainfo_hash));
 
-      if (! success) {
+      if (!success) {
         LogCvmfs(kLogCvmfs, kLogStderr, "failed to place VOMS bootstrapping "
                                         "symlinks");
         delete manifest;
@@ -249,4 +270,17 @@ void swissknife::CommandSign::CertificateUploadCallback(
              result.return_code);
   }
   certificate_hash_.Set(certificate_hash);
+}
+
+
+void swissknife::CommandSign::MetainfoUploadCallback(
+                                          const upload::SpoolerResult &result) {
+  shash::Any metainfo_hash;
+  if (result.return_code == 0) {
+    metainfo_hash = result.content_hash;
+  } else {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info (retcod: %d)",
+             result.return_code);
+  }
+  metainfo_hash_.Set(metainfo_hash);
 }

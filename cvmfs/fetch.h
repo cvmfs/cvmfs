@@ -71,11 +71,15 @@ class Fetcher : SingleCopy {
   Fetcher(cache::CacheManager *cache_mgr,
           download::DownloadManager *download_mgr,
           BackoffThrottle *backoff_throttle,
-          perf::Statistics *statistics);
+          perf::Statistics *statistics,
+          const std::string &name = "fetch",
+          bool external_data = false);
   ~Fetcher();
+  // TODO(jblomer): reduce number of arguments
   int Fetch(const shash::Any &id,
             const uint64_t size,
             const std::string &name,
+            const zlib::Algorithms compression_algorithm,
             const cache::CacheManager::ObjectType object_type,
             const std::string &alt_url = "");
 
@@ -130,6 +134,13 @@ class Fetcher : SingleCopy {
   int OpenSelect(const shash::Any &id,
                  const std::string &name,
                  const cache::CacheManager::ObjectType object_type);
+
+  /**
+   * If set to true, this fetcher is in 'external data' mode:
+   * instead of constructing the to-be-downloaded URL from the entry hash,
+   * it will use the filename.
+   */
+  bool external_;
 
   /**
    * Key to the thread's ThreadLocalStorage memory

@@ -126,7 +126,7 @@ LoadError ClientCatalogManager::LoadCatalog(
     string alt_catalog_path = "";
     if (mountpoint.IsEmpty() && fixed_alt_root_catalog_)
       alt_catalog_path = hash.MakeAlternativePath();
-    LoadError load_error = 
+    LoadError load_error =
       LoadCatalogCas(hash, cvmfs_path, alt_catalog_path, catalog_path);
     if (load_error == catalog::kLoadNew)
       loaded_catalogs_[mountpoint] = hash;
@@ -235,7 +235,7 @@ LoadError ClientCatalogManager::LoadCatalogCas(
 {
   assert(hash.suffix == shash::kSuffixCatalog);
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-                           cache::CacheManager::kTypeCatalog, alt_catalog_path);
+    zlib::kZlibDefault, cache::CacheManager::kTypeCatalog, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;

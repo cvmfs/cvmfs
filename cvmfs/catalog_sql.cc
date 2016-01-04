@@ -53,14 +53,17 @@ const float CatalogDatabase::kLatestSchema = 2.5;
 const float CatalogDatabase::kLatestSupportedSchema = 2.5;  // + 1.X (r/o)
 
 // ChangeLog
-//   0 --> 1 (Jan  6 2014 - Git: 3667fe7a669d0d65e07275b753a7c6f23fc267df):
-//           * add size column to nested catalog table
-//           * add schema_revision property
-//   1 --> 2 (Jan 22 2014 - Git: 85e6680e52cfe56dc1213a5ad74a5cc62fd50ead):
-//           * add xattr column to catalog table
-//           * add self_xattrs and subtree_xattrs statistics counters
-const unsigned CatalogDatabase::kLatestSchemaRevision = 2;
-
+//   0 --> 1: (Jan  6 2014 - Git: 3667fe7a669d0d65e07275b753a7c6f23fc267df)
+//            * add size column to nested catalog table,
+//            * add schema_revision property
+//   1 --> 2: (Jan 22 2014 - Git: 85e6680e52cfe56dc1213a5ad74a5cc62fd50ead):
+//            * add xattr column to catalog table
+//            * add self_xattr and subtree_xattr statistics counters
+//   2 --> 3: (Sep 28 2015 - Git: f4171234b13ea448589820c1524ee52eae141bb4):
+//            * add kFlagFileExternal to entries in catalog table
+//            * add self_external and subtree_external statistics counters
+//            * store compression algorithm in flags
+const unsigned CatalogDatabase::kLatestSchemaRevision = 3;
 
 bool CatalogDatabase::CheckSchemaCompatibility() {
   return !( (schema_version() >= 2.0-kSchemaEpsilon)                   &&
@@ -111,6 +114,31 @@ bool CatalogDatabase::LiveSchemaUpgradeIfNecessary() {
     }
   }
 
+  if (IsEqualSchema(schema_version(), 2.5) && (schema_revision() == 2)) {
+    LogCvmfs(kLogCatalog, kLogDebug, "upgrading schema revision (2 --> 3)");
+
+    Sql sql_upgrade4(*this,
+      "INSERT INTO statistics (counter, value) VALUES ('self_external', 0);");
+    Sql sql_upgrade5(*this, "INSERT INTO statistics (counter, value) VALUES "
+                            "('self_external_file_size', 0);");
+    Sql sql_upgrade6(*this, "INSERT INTO statistics (counter, value) VALUES "
+                            "('subtree_external', 0);");
+    Sql sql_upgrade7(*this, "INSERT INTO statistics (counter, value) VALUES "
+                            "('subtree_external_file_size', 0);");
+    if (!sql_upgrade4.Execute() || !sql_upgrade5.Execute() ||
+        !sql_upgrade6.Execute() || !sql_upgrade7.Execute())
+    {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade catalogs (2 --> 3)");
+      return false;
+    }
+
+    set_schema_revision(3);
+    if (!StoreSchemaRevision()) {
+      LogCvmfs(kLogCatalog, kLogDebug, "failed to upgrade schema revision");
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -155,6 +183,8 @@ bool CatalogDatabase::CreateEmptyDatabase() {
 bool CatalogDatabase::InsertInitialValues(
   const std::string    &root_path,
   const bool            volatile_content,
+  const std::string    &voms_authz,
+  CatalogProperty       external_data,
   const DirectoryEntry &root_entry)
 {
   assert(read_write());
@@ -184,6 +214,25 @@ bool CatalogDatabase::InsertInitialValues(
   if (volatile_content) {
     if (!this->SetProperty("volatile", 1)) {
       PrintSqlError("failed to insert volatile flag into the newly created "
+                    "catalog tables.");
+      return false;
+    }
+  }
+
+  if (!voms_authz.empty()) {
+    if (!this->SetProperty("voms_authz", voms_authz)) {
+      PrintSqlError("failed to insert VOMS authz flag into the newly created "
+                    "catalog tables.");
+      return false;
+    }
+  }
+  if (external_data != kUnset) {
+    if (!root_path.empty()) {
+      PrintSqlError("External data bit may not be set for nested catalog.");
+      return false;
+    }
+    if (!this->SetProperty("external_data", external_data == kYes ? 1 : 0)) {
+      PrintSqlError("failed to set external data flag into the newly created "
                     "catalog tables.");
       return false;
     }
@@ -293,15 +342,20 @@ unsigned SqlDirent::CreateDatabaseFlags(const DirectoryEntry &entry) const {
   else if (entry.IsNestedCatalogMountpoint())
     database_flags |= kFlagDirNestedMountpoint;
 
-  if (entry.IsDirectory())
+  if (entry.IsDirectory()) {
     database_flags |= kFlagDir;
-  else if (entry.IsLink())
+  } else if (entry.IsLink()) {
     database_flags |= kFlagFile | kFlagLink;
-  else
+  } else {
     database_flags |= kFlagFile;
+    database_flags |= entry.compression_algorithm() << kFlagPosCompression;
+  }
 
   if (entry.IsChunkedFile())
     database_flags |= kFlagFileChunk;
+
+  if (entry.IsExternalFile())
+    database_flags |= kFlagFileExternal;
 
   if (!entry.checksum_ptr()->IsNull())
     StoreHashAlgorithm(entry.checksum_ptr()->algorithm, &database_flags);
@@ -324,6 +378,16 @@ shash::Algorithms SqlDirent::RetrieveHashAlgorithm(const unsigned flags) const {
   in_flags++;
   assert(in_flags < shash::kAny);
   return static_cast<shash::Algorithms>(in_flags);
+}
+
+
+zlib::Algorithms SqlDirent::RetrieveCompressionAlgorithm(const unsigned flags)
+  const
+{
+  // 3 bits, so use 7 (111) to only pull out the flags we want
+  unsigned in_flags =
+    ((7 << kFlagPosCompression) & flags) >> kFlagPosCompression;
+  return static_cast<zlib::Algorithms>(in_flags);
 }
 
 
@@ -561,9 +625,12 @@ DirectoryEntry SqlLookup::GetDirent(const Catalog *catalog,
     result.inode_            = catalog->GetMangledInode(RetrieveInt64(12),
                                                         result.hardlink_group_);
     result.is_chunked_file_  = (database_flags & kFlagFileChunk);
+    result.is_external_file_ = (database_flags & kFlagFileExternal);
     result.has_xattrs_       = RetrieveInt(15) != 0;
     result.checksum_         =
       RetrieveHashBlob(0, RetrieveHashAlgorithm(database_flags));
+    result.compression_algorithm_ =
+      RetrieveCompressionAlgorithm(database_flags);
 
     if (g_claim_ownership) {
       result.uid_             = g_uid;

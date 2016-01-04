@@ -180,11 +180,19 @@ DirectoryEntry DirectoryEntryTestFactory::RegularFile(const string &name,
 }
 
 
+DirectoryEntry DirectoryEntryTestFactory::ExternalFile() {
+  DirectoryEntry dirent;
+  dirent.mode_ = 33188;
+  dirent.is_external_file_ = true;
+  return dirent;
+}
+
 DirectoryEntry DirectoryEntryTestFactory::Directory(
     const string &name,
     unsigned size,
     shash::Any hash,
-    bool is_nested_catalog_mountpoint) {
+    bool is_nested_catalog_mountpoint)
+{
   DirectoryEntry dirent;
   dirent.mode_ = 16893;
   dirent.name_ = NameString(name);

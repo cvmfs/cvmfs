@@ -24,6 +24,7 @@
 
 #include <string>
 
+#include "compression.h"
 #include "directory_entry.h"
 #include "file_chunk.h"
 #include "hash.h"
@@ -47,6 +48,8 @@ class CatalogDatabase : public sqlite::Database<CatalogDatabase> {
   bool CreateEmptyDatabase();
   bool InsertInitialValues(const std::string     &root_path,
                            const bool             volatile_content,
+                           const std::string     &voms_authz,
+                           CatalogProperty        external_data,
                            const DirectoryEntry  &root_entry
                                              = DirectoryEntry(kDirentNegative));
 
@@ -181,12 +184,21 @@ class SqlDirent : public Sql {
   static const int kFlagLink                = 8;
   static const int kFlagFileStat            = 16;  // currently unused
   static const int kFlagFileChunk           = 64;
+  /**
+   * The file is not natively stored in cvmfs but on a different storage system,
+   * for instance on HTTPS data federation services.
+   */
+  static const int kFlagFileExternal        = 128;
   // as of 2^8: 3 bit for hashes
   //   - 0: SHA-1
   //   - 1: RIPEMD-160
   // Corresponds to shash::algorithms with offset in order to support future
   // hashes
   static const int kFlagPosHash             = 8;
+  // Compression methods, 3 bits starting at 2^11
+  // Corresponds to zlib::Algorithms
+  static const int kFlagPosCompression      = 11;
+
 
  protected:
   /**
@@ -198,6 +210,7 @@ class SqlDirent : public Sql {
   unsigned CreateDatabaseFlags(const DirectoryEntry &entry) const;
   void StoreHashAlgorithm(const shash::Algorithms algo, unsigned *flags) const;
   shash::Algorithms RetrieveHashAlgorithm(const unsigned flags) const;
+  zlib::Algorithms RetrieveCompressionAlgorithm(const unsigned flags) const;
 
   /**
    * The hardlink information (hardlink group ID and linkcount) is saved in one

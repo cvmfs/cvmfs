@@ -155,8 +155,9 @@ Requires: libcap
 Requires: lsof
 Requires: rsync
 %if 0%{?el6} || 0%{?el7} || 0%{?fedora} || 0%{?suse_version} >= 1300
-Requires: jq # this is 'nice-to-have' at the moment
-             # TODO(rmeusel): consider using 'Recommends:' in the far future
+# this is 'nice-to-have' at the moment
+# TODO(rmeusel): consider using 'Recommends:' in the far future
+Requires: jq
 %endif
 
 Conflicts: cvmfs-server < 2.1

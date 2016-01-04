@@ -11,11 +11,11 @@ set (PROJECT_TEST_DEBUG_NAME ${PROJECT_TEST_NAME}_debug)
 set(CVMFS_UNITTEST_FILES
   # test steering
   main.cc
-  
+
   # test utility functions
   testutil.cc testutil.h
   env.cc env.h
-  
+
   t_atomic.cc
   t_smallhash.cc
   t_bigvector.cc
@@ -74,14 +74,20 @@ set(CVMFS_UNITTEST_FILES
   t_tracer.cc
   t_file_chunk.cc
   t_platforms.cc
+  t_compressor.cc
   t_compression.cc
+  t_clientctx.cc
 )
+
+if (VOMS_FOUND)
+  set (CVMFS_UNITTEST_FILES ${CVMFS_UNITTEST_FILES} t_voms.cc)
+endif (VOMS_FOUND)
 
 #
 # unit test source files
 #
 set (CVMFS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/cvmfs")
-set (CVMFS_UNITTEST_SOURCES 
+set (CVMFS_UNITTEST_SOURCES
 
   ${CVMFS_UNITTEST_FILES}
 
@@ -195,7 +201,16 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.h
+  ${CVMFS_SOURCE_DIR}/clientctx.h
+  ${CVMFS_SOURCE_DIR}/clientctx.cc
 )
+
+if (VOMS_FOUND)
+  set (CVMFS_UNITTEST_SOURCES ${CVMFS_UNITTEST_SOURCES}
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
@@ -276,7 +291,7 @@ if (BUILD_UNITTESTS_DEBUG)
   if (TBB_PRIVATE_LIB)
     add_dependencies (${PROJECT_TEST_DEBUG_NAME} libtbb)
   endif (TBB_PRIVATE_LIB)
-  
+
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha2)
   add_dependencies (${PROJECT_TEST_DEBUG_NAME} libsha3)
 endif (BUILD_UNITTESTS_DEBUG)
@@ -293,11 +308,11 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES}
-                             ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
+set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
+                             ${LIBCURL_ARCHIVE} ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
-                             ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE} 
+                             ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}
                              pthread dl)
 
 target_link_libraries (${PROJECT_TEST_NAME} ${UNITTEST_LINK_LIBRARIES})
@@ -324,4 +339,3 @@ if (INSTALL_UNITTESTS_DEBUG)
     DESTINATION    bin
   )
 endif (INSTALL_UNITTESTS_DEBUG)
-

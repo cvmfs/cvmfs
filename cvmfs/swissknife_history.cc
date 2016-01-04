@@ -171,6 +171,7 @@ CommandTag::Environment* CommandTag::InitializeEnvironment(
     const bool use_file_chunking = false;
     const upload::SpoolerDefinition sd(spl_definition,
                                        hash_algo,
+                                       zlib::kZlibDefault,
                                        use_file_chunking);
     env->spooler = upload::Spooler::Construct(sd);
     if (!env->spooler) {

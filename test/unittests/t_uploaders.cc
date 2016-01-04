@@ -179,6 +179,7 @@ class T_Uploaders : public FileSandbox {
 
     return SpoolerDefinition(definition,
                              shash::kSha1,
+                             zlib::kZlibDefault,
                              use_file_chunking,
                              min_chunk_size,
                              avg_chunk_size,
@@ -932,8 +933,8 @@ TYPED_TEST(T_Uploaders, MultipleStreamedUploadSlow) {
 
 TYPED_TEST(T_Uploaders, PlaceBootstrappingShortcut) {
   if (TestFixture::IsS3()) {
-    SUCCEED(); // TODO(rmeusel): enable this as soon as the feature is
-    return;    //                implemented for the S3Uploader
+    SUCCEED();  // TODO(rmeusel): enable this as soon as the feature is
+    return;     //                implemented for the S3Uploader
   }
 
   const std::string big_file_path = TestFixture::GetBigFile();

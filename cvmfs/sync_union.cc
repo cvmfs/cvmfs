@@ -46,6 +46,9 @@ SyncItem SyncUnion::CreateSyncItem(const std::string  &relative_parent_path,
                                    const SyncItemType  entry_type) const {
   SyncItem entry(relative_parent_path, filename, this, entry_type);
   PreprocessSyncItem(&entry);
+  if (entry_type == kItemFile) {
+    entry.SetExternalData(GetExternalData());
+  }
   return entry;
 }
 
@@ -173,6 +176,10 @@ void SyncUnionAufs::Traverse() {
   traversal.fn_ignore_file    = &SyncUnionAufs::IgnoreFilePredicate;
   traversal.fn_new_dir_prefix = &SyncUnionAufs::ProcessDirectory;
   traversal.fn_new_symlink    = &SyncUnionAufs::ProcessSymlink;
+  LogCvmfs(kLogUnionFs, kLogVerboseMsg, "Aufs starting traversal "
+           "recursion for scratch_path=[%s] with external data set to %d",
+           scratch_path().c_str(),
+           GetExternalData());
 
   traversal.Recurse(scratch_path());
 }

@@ -13,6 +13,7 @@
 
 #include "duplex_zlib.h"
 #include "sink.h"
+#include "util.h"
 
 namespace shash {
 struct Any;
@@ -35,6 +36,94 @@ enum StreamStates {
   kStreamContinue,
   kStreamEnd,
 };
+
+// Do not change order of algorithms.  Used as flags in the catalog
+enum Algorithms {
+  kZlibDefault = 0,
+  kNoCompression,
+};
+
+/**
+ * Abstract Compression class which is inherited by implementations of
+ * compression engines such as zlib.
+ *
+ * In order to add a new compression method, you simply need to add a new class
+ * which is a sub-class of the Compressor.  The subclass needs to implement the
+ * Deflate, DeflateBound, Clone, and WillHandle functions.  For information on
+ * the WillHandle function, read up on the PolymorphicConstruction class.
+ * The new sub-class must be listed in the implemention of the
+ * Compressor::RegisterPlugins function.
+ *
+ */
+class Compressor: public PolymorphicConstruction<Compressor, Algorithms> {
+ public:
+  explicit Compressor(const Algorithms &alg) { }
+  virtual ~Compressor() { }
+  /**
+   * Deflate function.  The arguments and returns closely match the input and
+   * output of the zlib deflate function.
+   * Input:
+   *   - outbuf - Ouput buffer to write the compressed data.
+   *   - outbufsize - Size of the output buffer
+   *   - inbuf - Input data to be compressed
+   *   - inbufsize - Size of the input buffer
+   *   - flush - Whether the compression stream should be flushed / finished
+   * Upon return:
+   *   returns: true - if done compressing, false otherwise
+   *   - outbuf - output buffer pointer (unchanged from input)
+   *   - outbufsize - The number of bytes used in the outbuf
+   *   - inbuf - Pointer to the next byte of input to read in
+   *   - inbufsize - the remaining bytes of input to read in.
+   *   - flush - unchanged from input
+   */
+  virtual bool Deflate(const bool flush,
+                       unsigned char **inbuf, size_t *inbufsize,
+                       unsigned char **outbuf, size_t *outbufsize) = 0;
+
+  /**
+   * Return an upper bound on the number of bytes required in order to compress
+   * an input number of bytes.
+   * Returns: Upper bound on the number of bytes required to compress.
+   */
+  virtual size_t DeflateBound(const size_t bytes) = 0;
+  virtual Compressor* Clone() = 0;
+
+  static void RegisterPlugins();
+};
+
+
+class ZlibCompressor: public Compressor {
+ public:
+  explicit ZlibCompressor(const Algorithms &alg);
+  explicit ZlibCompressor(const ZlibCompressor &other);
+  ~ZlibCompressor();
+
+  bool Deflate(const bool flush,
+               unsigned char **inbuf, size_t *inbufsize,
+               unsigned char **outbuf, size_t *outbufsize);
+  size_t DeflateBound(const size_t bytes);
+  Compressor* Clone();
+  static bool WillHandle(const zlib::Algorithms &alg);
+
+ private:
+  z_stream stream_;
+};
+
+
+class EchoCompressor: public Compressor {
+ public:
+  explicit EchoCompressor(const Algorithms &alg);
+  bool Deflate(const bool flush,
+               unsigned char **inbuf, size_t *inbufsize,
+               unsigned char **outbuf, size_t *outbufsize);
+  size_t DeflateBound(const size_t bytes);
+  Compressor* Clone();
+  static bool WillHandle(const zlib::Algorithms &alg);
+};
+
+
+Algorithms ParseCompressionAlgorithm(const std::string &algorithm_option);
+std::string AlgorithmName(const zlib::Algorithms alg);
 
 
 void CompressInit(z_stream *strm);

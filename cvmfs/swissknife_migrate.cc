@@ -726,7 +726,7 @@ bool CommandMigrate::AbstractMigrationWorker<DerivedT>::CleanupNestedCatalogs(
  * both the catalog management and migration classes get updated.
  */
 const float    CommandMigrate::MigrationWorker_20x::kSchema         = 2.5;
-const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 2;
+const unsigned CommandMigrate::MigrationWorker_20x::kSchemaRevision = 3;
 
 
 template<class DerivedT>
@@ -789,7 +789,7 @@ bool CommandMigrate::MigrationWorker_20x::CreateNewEmptyCatalog(
     UniquePtr<catalog::CatalogDatabase>
       new_clg_db(catalog::CatalogDatabase::Create(clg_db_path));
     if (!new_clg_db.IsValid() ||
-        !new_clg_db->InsertInitialValues(root_path, volatile_content)) {
+        !new_clg_db->InsertInitialValues(root_path, volatile_content, "", kUnset)) {
       Error("Failed to create database for new catalog");
       unlink(clg_db_path.c_str());
       return false;

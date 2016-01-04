@@ -22,9 +22,11 @@ SyncItem::SyncItem() :
   masked_hardlink_(false),
   valid_graft_(false),
   graft_marker_present_(false),
+  external_data_(kUnset),
   graft_size_(-1),
   scratch_type_(static_cast<SyncItemType>(0)),
-  rdonly_type_(static_cast<SyncItemType>(0)) {}
+  rdonly_type_(static_cast<SyncItemType>(0)),
+  compression_algorithm_(zlib::kZlibDefault) {}
 
 SyncItem::SyncItem(const string       &relative_parent_path,
                    const string       &filename,
@@ -36,11 +38,13 @@ SyncItem::SyncItem(const string       &relative_parent_path,
   masked_hardlink_(false),
   valid_graft_(false),
   graft_marker_present_(false),
+  external_data_(kUnset),
   relative_parent_path_(relative_parent_path),
   filename_(filename),
   graft_size_(-1),
   scratch_type_(entry_type),
-  rdonly_type_(kItemUnknown)
+  rdonly_type_(kItemUnknown),
+  compression_algorithm_(zlib::kZlibDefault)
 {
   content_hash_.algorithm = shash::kAny;
   // Note: graft marker for non-regular files are silently ignored
@@ -172,6 +176,7 @@ catalog::DirectoryEntryBase SyncItem::CreateBasicCatalogDirent() const {
                            this->GetUnionStat().st_size;
   dirent.mtime_          = this->GetUnionStat().st_mtime;
   dirent.checksum_       = this->GetContentHash();
+  dirent.compression_algorithm_ = this->GetCompressionAlgorithm();
 
   dirent.name_.Assign(filename_.data(), filename_.length());
 

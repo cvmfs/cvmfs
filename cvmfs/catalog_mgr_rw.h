@@ -80,14 +80,17 @@ class WritableCatalogManager : public SimpleCatalogManager {
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
+                                              const std::string &voms_authz,
+                                              CatalogProperty external_data,
                                               upload::Spooler   *spooler);
 
   // DirectoryEntry handling
   void AddFile(const DirectoryEntryBase &entry,
                const XattrList &xattrs,
+                     bool       external_data,
                const std::string &parent_directory)
   {
-    AddFile(DirectoryEntry(entry), xattrs, parent_directory);
+    AddFile(DirectoryEntry(entry), xattrs, external_data, parent_directory);
   }
   void AddChunkedFile(const DirectoryEntryBase &entry,
                       const XattrList &xattrs,
@@ -140,6 +143,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   void AddFile(const DirectoryEntry  &entry,
                const XattrList       &xattrs,
+                     bool             external_data,
                const std::string     &parent_directory);
 
  private:

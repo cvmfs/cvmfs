@@ -1,0 +1,83 @@
+#!/bin/sh -x
+
+if [ $# -ge 2 ]; then
+    echo "usage: `basename $0` [hostname] [username]" 1>&2
+    exit 1
+fi
+hostname=${1:-'osg-test.localdomain'}
+username=${2:-'John Q Public'}
+echo "Generating CA certificate host, and user certificate for '$hostname and $username'"
+
+INDEX_FILE=index.txt
+SERIAL_FILE=serial
+PRIVATE_KEY_FILE=OSG-Test-CA-private.pem
+CA_FILE=OSG-Test-CA.pem
+OPENSSL_CONFIG=openssl.config
+CA_SUBJECT='/DC=org/DC=Open Science Grid/O=OSG Test/CN=OSG Test CA'
+HOST_REQUEST=host-cert-request.pem
+USER_REQUEST=user-cert-request.pem
+HOST_REQ_PRIV=hostkey.pem
+USER_REQ_PRIV=userkey.pem
+HOST_CERT_SUBJECT="/DC=org/DC=Open Science Grid/O=OSG Test/OU=Services/CN=$hostname"
+USER_CERT_SUBJECT="/DC=org/DC=Open Science Grid/O=OSG Test/OU=Users/CN=$username"
+SERIAL_NUMBER=A1B2C3D4E5F6
+USER_SERIAL_NUMBER=A1B2C3D4E5F7
+DAYS=10
+CRL_NUMBER_FILE=crlnumber
+CRL_FILE=OSG-Test-CA.r0
+
+# Clean up from previous run
+rm -f *.pem *.r0
+rm -f $INDEX_FILE
+rm -f $PRIVATE_KEY_FILE
+rm -f $CA_FILE
+rm -f $CRL_NUMBER_FILE
+rm -fr certs
+
+# Prepare OpenSSL files and directories
+touch $INDEX_FILE
+echo $SERIAL_NUMBER > $SERIAL_FILE
+echo 01 > $CRL_NUMBER_FILE
+
+# Create CA certificate
+openssl genrsa -out $PRIVATE_KEY_FILE 2048
+openssl req -new -x509 -out $CA_FILE -key $PRIVATE_KEY_FILE -config $OPENSSL_CONFIG -subj "$CA_SUBJECT" -days $DAYS
+
+# Create host certificate
+openssl req -new -nodes -out $HOST_REQUEST -keyout initial-$HOST_REQ_PRIV -subj "$HOST_CERT_SUBJECT"
+openssl rsa -in initial-$HOST_REQ_PRIV -outform PEM -out $HOST_REQ_PRIV
+rm -f initial-$HOST_REQ_PRIV
+chmod 0400 $HOST_REQ_PRIV
+
+sed --expression="s/##HOSTNAME##/$hostname/" openssl-cert-extensions-template.conf > openssl-cert-extensions.conf
+openssl ca -config $OPENSSL_CONFIG -cert $CA_FILE -keyfile $PRIVATE_KEY_FILE \
+    -days $DAYS -policy policy_anything -preserveDN -extfile openssl-cert-extensions.conf \
+    -in $HOST_REQUEST -notext -out hostcert.pem -outdir . -batch
+if [ $? -eq 0 ]; then
+    rm -f $HOST_REQUEST
+    rm -f $SERIAL_NUMBER.pem
+    rm -f serial*
+fi
+
+# Create user certificate
+openssl req -new -nodes -out $USER_REQUEST -keyout initial-$USER_REQ_PRIV -subj "$USER_CERT_SUBJECT" || exit 1
+openssl rsa -in initial-$USER_REQ_PRIV -outform PEM -out $USER_REQ_PRIV || exit 1
+rm -f initial-$USER_REQ_PRIV
+chmod 0400 $USER_REQ_PRIV
+
+echo $USER_SERIAL_NUMBER > $SERIAL_FILE
+openssl ca -config $OPENSSL_CONFIG -cert $CA_FILE -keyfile $PRIVATE_KEY_FILE \
+    -days $DAYS -policy policy_anything -preserveDN -extfile openssl-usercert-extensions.conf \
+    -in $USER_REQUEST -notext -out usercert.pem -outdir . -batch
+if [ $? -eq 0 ]; then
+    rm -f $HOST_REQUEST
+    rm -f $SERIAL_NUMBER.pem
+    rm -f serial*
+fi
+
+# Create CRL
+openssl ca -gencrl -config $OPENSSL_CONFIG -cert $CA_FILE -keyfile $PRIVATE_KEY_FILE \
+    -crldays $DAYS -out $CRL_FILE
+if [ $? -eq 0 ]; then
+    rm -f index.*
+fi

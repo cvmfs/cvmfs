@@ -30,6 +30,7 @@ struct SyncParameters {
     stop_for_catalog_tweaks(false),
     garbage_collectable(false),
     include_xattrs(false),
+    external_data(false),
     catalog_entry_warn_threshold(kDefaultEntryWarnThreshold),
     min_file_chunk_size(kDefaultMinFileChunkSize),
     avg_file_chunk_size(kDefaultAvgFileChunkSize),
@@ -60,6 +61,7 @@ struct SyncParameters {
   bool             stop_for_catalog_tweaks;
   bool             garbage_collectable;
   bool             include_xattrs;
+  bool             external_data;
   uint64_t         catalog_entry_warn_threshold;
   size_t           min_file_chunk_size;
   size_t           avg_file_chunk_size;
@@ -89,6 +91,7 @@ class CommandCreate : public Command {
   ParameterList GetParams() {
     ParameterList r;
     r.push_back(Parameter::Mandatory('o', "manifest output file"));
+    r.push_back(Parameter::Switch('X', "enable external data"));
     r.push_back(Parameter::Mandatory('t', "directory for temporary storage"));
     r.push_back(Parameter::Mandatory('r', "spooler definition"));
     r.push_back(Parameter::Optional('l', "log level (0-4, default: 2)"));
@@ -98,6 +101,10 @@ class CommandCreate : public Command {
     r.push_back(Parameter::Switch('v', "repository containing volatile files"));
     r.push_back(Parameter::Switch(
       'z', "mark new repository as garbage collectable"));
+    r.push_back(Parameter::Optional(
+      'Z', "compression algorithm (default: zlib)"));
+    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+                                         "(default: none)"));
     return r;
   }
   int Main(const ArgumentList &args);
@@ -225,6 +232,8 @@ class CommandSync : public Command {
     r.push_back(Parameter::Switch('d', "pause publishing to allow for "
                                           "catalog tweaks"));
     r.push_back(Parameter::Switch('g', "repo is garbage collectable"));
+    r.push_back(Parameter::Optional('V', "VOMS authz requirement "
+                                         "(default: none)"));
     r.push_back(Parameter::Switch('p', "enable file chunking"));
     r.push_back(Parameter::Switch('k', "include extended attributes"));
     r.push_back(Parameter::Optional('z', "log level (0-4, default: 2)"));
@@ -237,8 +246,11 @@ class CommandSync : public Command {
     r.push_back(Parameter::Optional('j', "catalog entry warning threshold"));
     r.push_back(Parameter::Optional('v', "manual revision number"));
     r.push_back(Parameter::Optional('q', "number of concurrent write jobs"));
+    r.push_back(Parameter::Switch('Y', "enable external data"));
     r.push_back(Parameter::Optional('X', "maximum weight of the autocatalogs"));
     r.push_back(Parameter::Optional('M', "minimum weight of the autocatalogs"));
+    r.push_back(Parameter::Optional(
+      'Z', "compression algorithm (default: zlib)"));
     r.push_back(Parameter::Optional('V', "VOMS authz requirement "
                                          "(default: none)"));
     r.push_back(Parameter::Optional('T', "Root catalog TTL in seconds"));
