@@ -1,5 +1,5 @@
 
-cvmfs_test_name="Test CVMFS over HTTPS"
+cvmfs_test_name="Test CVMFS over HTTPS with VOMS authentication"
 cvmfs_test_autofs_on_startup=false
 
 TEST600_HTTPS_CONFIG=/etc/httpd/conf.d/test600.cvmfs.secure.conf
