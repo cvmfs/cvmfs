@@ -485,7 +485,7 @@ CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
   // We will compare the required auth against the cached session VOMS info.
   // Roles must match exactly; Sub-groups are authorized in their parent
   // group.
-
+  // TODO(jblomer): move to a unit testable function
   std::string vo, role, group;
   bool is_dn = false;
   if (authz[0] != '/') {
