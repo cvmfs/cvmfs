@@ -23,16 +23,9 @@
 #include "voms/voms_apic.h"
 
 #include "../logging.h"
+#include "../platform.h"
 
 // TODO(jblomer): add unit tests for static functions
-
-// TODO(jblomer): use monotonic time from platform.h
-static time_t get_mono_time()
-{
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
-  return ts.tv_sec;
-}
 
 // VOMS API declarations
 extern "C" {
@@ -55,7 +48,7 @@ class VOMSSessionCache {
  public:
   VOMSSessionCache()
     : m_zombie(true),
-      m_last_clean(get_mono_time())
+      m_last_clean(platform_monotonic_time())
   {
     pthread_mutex_init(&m_mutex, NULL);
     load_voms_library();
@@ -75,7 +68,7 @@ class VOMSSessionCache {
   // TODO(jblomer): change type of vomsdata
   bool get(pid_t pid, struct vomsdata *&vomsinfo) {  // NOLINT
     if (m_zombie) {return false;}
-    time_t now = get_mono_time();
+    time_t now = platform_monotonic_time();
     KeyType mykey;
     if (!lookup(pid, mykey)) {return false;}
     LogCvmfs(kLogVoms, kLogDebug, "PID %d maps to session %d, UID %d, "
@@ -114,7 +107,7 @@ class VOMSSessionCache {
                "for PID %d.", pid);
       return NULL;
     }
-    time_t now = get_mono_time();
+    time_t now = platform_monotonic_time();
 
     pthread_mutex_lock(&m_mutex);
     std::pair<KeyToVOMS::iterator, bool> result =
@@ -246,7 +239,7 @@ class VOMSSessionCache {
   void clean_tables() {
     LogCvmfs(kLogVoms, kLogDebug, "Expiring VOMS credential tables.");
     m_pid_map.clear();
-    m_last_clean = get_mono_time();
+    m_last_clean = platform_monotonic_time();
     // TODO(jblomer): remove magic number
     time_t expiry = m_last_clean + 100;
     KeyToVOMS::iterator it = m_map.begin();
@@ -332,7 +325,8 @@ class VOMSSessionCache {
 // TODO(jblomer): use a singleton instead (well-defined initialization time)
 static VOMSSessionCache g_cache;
 
-static FILE *GetProxyFile(const struct fuse_ctx *ctx) {
+static FILE *
+GetProxyFile(const struct fuse_ctx *ctx) {
   return GetProxyFile(ctx->pid, ctx->uid, ctx->gid);
 }
 
