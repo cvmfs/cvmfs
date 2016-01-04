@@ -438,6 +438,8 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
   int fd_lockfile = -1;
   string spooler_definition_str;
   manifest::ManifestEnsemble ensemble;
+  shash::Any meta_info_hash;
+  string meta_info;
 
   // Option parsing
   if (args.find('c') != args.end())
@@ -554,6 +556,22 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
     goto fini;
   }
 
+  // Get meta info
+  meta_info_hash = ensemble.manifest->meta_info();
+  if (!meta_info_hash.IsNull()) {
+    meta_info_hash = ensemble.manifest->meta_info();
+    const string url = *stratum0_url + "/data/" + meta_info_hash.MakePath();
+    download::JobInfo download_metainfo(&url, true, false, &meta_info_hash);
+    dl_retval = g_download_manager->Fetch(&download_metainfo);
+    if (dl_retval != download::kFailOk) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to fetch meta info (%d - %s)",
+               dl_retval, download::Code2Ascii(dl_retval));
+      goto fini;
+    }
+    meta_info = string(download_metainfo.destination_mem.data,
+                       download_metainfo.destination_mem.size);
+  }
+
   is_garbage_collectable = ensemble.manifest->garbage_collectable();
 
   // Manifest available, now the spooler's hash algorithm can be determined
@@ -655,6 +673,11 @@ int swissknife::CommandPull::Main(const swissknife::ArgumentList &args) {
       StoreBuffer(ensemble.cert_buf,
                   ensemble.cert_size,
                   ensemble.manifest->certificate(), true);
+    }
+    if (!meta_info_hash.IsNull()) {
+      const unsigned char *info = reinterpret_cast<const unsigned char *>(
+        meta_info.data());
+      StoreBuffer(info, meta_info.size(), meta_info_hash, true);
     }
     if (preload_cache) {
       bool retval = ensemble.manifest->ExportChecksum(*preload_cachedir, 0660);
