@@ -35,6 +35,27 @@ cvmfs_run_test() {
   fi
 
   #################################################################
+  echo "Test compression algorithm"
+  output=$(echo 'Hello World!' | cvmfs_swissknife graft -i - -Z zlib)
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  echo "$output"
+
+  verify_hello_world "$output"
+  verify_result=$?
+  if [ $verify_result -ne 0 ]; then
+    return $verify_result
+  fi
+
+  local uncompressed_cksum=$(echo "hello world" | cvmfs_swissknife graft -i - -Z none | grep checksum | tr '=' ' ' | awk '{print $2;}')
+  local uncompressed_cksum_real=$(echo "hello world" | sha1sum | awk '{print $1;}')
+  if [ x"$uncompressed_cksum_real" != x"$uncompressed_cksum" ]; then
+    echo "Uncompressed check failed; produced $uncompressed_cksum, expected $uncompressed_cksum_real"
+    return 24
+  fi
+
+  #################################################################
   echo "Single file output"
   mkdir -p simple1
   echo "Hello World!" > hello_world
@@ -114,6 +135,8 @@ cvmfs_run_test() {
   if [ $verify_result -eq 0 ]; then
     return $verify_result
   fi
+
+
 
   return 0
 }
