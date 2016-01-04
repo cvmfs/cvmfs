@@ -49,7 +49,7 @@ class ClientCtx {
 };
 
 /**
- * RAII form of the ClientCtx.  On construction, automatically sets the context 
+ * RAII form of the ClientCtx.  On construction, automatically sets the context
  * via the constructor; on destruction, restores to the previous values.
  *
  * Meant to be allocated on the stack.
@@ -72,8 +72,7 @@ class ClientCtxGuard {
     ClientCtx *ctx = ClientCtx::GetInstance();
     if (set_on_construction_) {
       ctx->Set(old_uid_, old_gid_, old_pid_);
-    }
-    else {
+    } else {
       ctx->Unset();
     }
   }

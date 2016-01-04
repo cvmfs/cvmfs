@@ -63,7 +63,7 @@ TEST(T_ClientCtx, Guard) {
   uid_t uid;
   gid_t gid;
   pid_t pid;
-  
+
   {
     ClientCtxGuard guard(1, 2, 3);
     EXPECT_TRUE(ClientCtx::GetInstance()->IsSet());
@@ -73,7 +73,7 @@ TEST(T_ClientCtx, Guard) {
     EXPECT_EQ(3, pid);
   }
   EXPECT_FALSE(ClientCtx::GetInstance()->IsSet());
-  
+
   ClientCtx::GetInstance()->Set(4, 5, 6);
   {
     ClientCtxGuard guard(7, 8, 9);

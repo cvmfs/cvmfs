@@ -57,7 +57,7 @@ TEST_F(T_Compressor, Compression) {
     compressor->Deflate(true, &input, &size_input, &buf, &buf_size);
 
   ASSERT_TRUE(deflate_finished);
-  ASSERT_TRUE(buf_size > 0);
+  ASSERT_GT(buf_size, 0);
   ASSERT_EQ(0U, size_input);
 
   // Decompress it, check if it's still the same

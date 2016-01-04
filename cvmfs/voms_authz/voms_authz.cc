@@ -512,7 +512,7 @@ CheckSingleAuthz(const struct vomsdata *voms_ptr, const std::string & authz)
 
   // Now we have valid VOMS data, check authz.
   // Iterator through the VOs
-  for (int idx=0; voms_ptr->data[idx] != NULL; idx++) {  
+  for (int idx=0; voms_ptr->data[idx] != NULL; idx++) {
     struct voms *it = voms_ptr->data[idx];
     // Check first against the full DN.
     if (is_dn) {

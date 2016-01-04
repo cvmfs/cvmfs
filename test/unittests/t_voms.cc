@@ -77,11 +77,15 @@ TEST(T_VOMS, VomsAuthz) {
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, "cms:/cms\natlas"), true);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas\ncms:/cms"), true);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas\n\ncms:/cms"), true);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, "atlas:/atlas\n\ndteam:/dteam\n"), false);
+  EXPECT_EQ(CheckMultipleAuthz(
+    &voms_info, "atlas:/atlas\n\ndteam:/dteam\n"), false);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN), false);
   EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\n"), false);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\ncms:/cms/Role=prod"), false);
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\ncms:/cms/Role=pilot"), true);
+  EXPECT_EQ(CheckMultipleAuthz(
+    &voms_info, TEST_DN "\ncms:/cms/Role=prod"), false);
+  EXPECT_EQ(CheckMultipleAuthz(
+    &voms_info, TEST_DN "\ncms:/cms/Role=pilot"), true);
   voms_entry.user = &user_dn[0];
-  EXPECT_EQ(CheckMultipleAuthz(&voms_info, TEST_DN "\ncms:/cms/Role=prod"), true);
+  EXPECT_EQ(CheckMultipleAuthz(
+    &voms_info, TEST_DN "\ncms:/cms/Role=prod"), true);
 }

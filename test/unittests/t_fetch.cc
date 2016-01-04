@@ -310,7 +310,7 @@ TEST_F(T_Fetcher, FetchAltPath) {
   EXPECT_LT(fd, 0);
 
   fd = fetcher_->Fetch(hash_regular_, cache::CacheManager::kSizeUnknown, "reg",
-                       zlib::kZlibDefault, 
+                       zlib::kZlibDefault,
                        cache::CacheManager::kTypeRegular,
                        "altpath");
   EXPECT_GE(fd, 0);
