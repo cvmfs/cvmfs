@@ -120,11 +120,10 @@ struct JobInfo {
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
-  bool secure;
   pid_t pid;
   uid_t uid;
   gid_t gid;
-  char *cred_fname;
+  char *cred_fname;  ///< TODO(jblomer): transfer credentials in memory
   Destination destination;
   struct {
     size_t size;
@@ -147,8 +146,7 @@ struct JobInfo {
     pid = -1;
     uid = -1;
     gid = -1;
-    secure = false;
-    cred_fname = 0;
+    cred_fname = NULL;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;
