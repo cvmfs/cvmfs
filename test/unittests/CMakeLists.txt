@@ -80,7 +80,7 @@ set(CVMFS_UNITTEST_FILES
 )
 
 if (VOMS_FOUND)
-  set (CVMFS_UNITTTEST_SOURCES ${CVMFS_UNITTEST_SOURCES} t_voms.cc)
+  set (CVMFS_UNITTEST_FILES ${CVMFS_UNITTEST_FILES} t_voms.cc)
 endif (VOMS_FOUND)
 
 #
@@ -201,12 +201,16 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.h
-  ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
-  ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
-  ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc
   ${CVMFS_SOURCE_DIR}/clientctx.h
   ${CVMFS_SOURCE_DIR}/clientctx.cc
 )
+
+if (VOMS_FOUND)
+  set (CVMFS_UNITTEST_SOURCES ${CVMFS_UNITTEST_SOURCES}
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
