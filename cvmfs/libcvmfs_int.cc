@@ -144,6 +144,8 @@ cvmfs_globals::~cvmfs_globals() {
 
   sqlite3_shutdown();
   delete statistics_;
+  
+  ClientCtx::CleanupInstance();
 }
 
 int cvmfs_globals::Setup(const options &opts) {
@@ -298,7 +300,6 @@ cvmfs_context* cvmfs_context::Create(const options &opts) {
 
 void cvmfs_context::Destroy(cvmfs_context *ctx) {
   perf::Statistics *statistics = ctx->statistics();
-  ClientCtx::CleanupInstance();
   delete ctx;
   delete statistics;
 }
