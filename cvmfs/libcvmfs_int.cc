@@ -634,7 +634,8 @@ int cvmfs_context::Open(const char *c_path) {
     }
 
     fd = chunk_tables_.Add(
-      FileChunkReflist(chunks, path, dirent.compression_algorithm()));
+      FileChunkReflist(chunks, path, dirent.compression_algorithm(),
+                       dirent.IsExternalFile()));
     return fd | kFdChunked;
   }
 
@@ -688,12 +689,23 @@ int64_t cvmfs_context::Pread(
       ChunkFd *chunk_fd = open_chunks.chunk_fd;
       if ((chunk_fd->fd == -1) || (chunk_fd->chunk_idx != chunk_idx)) {
         if (chunk_fd->fd != -1) fetcher_->cache_mgr()->Close(chunk_fd->fd);
-        chunk_fd->fd = fetcher_->Fetch(
-          chunk_list->AtPtr(chunk_idx)->content_hash(),
-          chunk_list->AtPtr(chunk_idx)->size(),
-          "no path info",
-          compression_alg,
-          cache::CacheManager::kTypeRegular);
+        if (!open_chunks.chunk_reflist.external_data) {
+          chunk_fd->fd = external_fetcher_->Fetch(
+            chunk_list->AtPtr(chunk_idx)->content_hash(),
+            chunk_list->AtPtr(chunk_idx)->size(),
+            "no path info",
+            compression_alg,
+            cache::CacheManager::kTypeRegular);
+        } else {
+          chunk_fd->fd = fetcher_->Fetch(
+            chunk_list->AtPtr(chunk_idx)->content_hash(),
+            chunk_list->AtPtr(chunk_idx)->size(),
+            "no path info",
+            compression_alg,
+            cache::CacheManager::kTypeRegular,
+            open_chunks.chunk_reflist.path.ToString(),
+            chunk_list->AtPtr(chunk_idx)->offset());
+        }
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;
           return -EIO;

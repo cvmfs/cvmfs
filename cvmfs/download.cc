@@ -761,6 +761,18 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
     info->destination_mem.data = static_cast<char *>(smalloc(64*1024));
   }
 
+  if ((info->range_offset != -1) && (info->range_size)) {
+    char byte_range_array[100];
+    if (snprintf(byte_range_array, 100, "%ld-%ld",
+             info->range_offset,
+             info->range_offset + info->range_size - 1) == 100) {
+      abort();  // Should be impossible given limits on offset size.
+    }
+    curl_easy_setopt(handle, CURLOPT_RANGE, byte_range_array);
+  } else {
+    curl_easy_setopt(handle, CURLOPT_RANGE, NULL);
+  }
+
   // Set curl parameters
   curl_easy_setopt(handle, CURLOPT_PRIVATE, static_cast<void *>(info));
   curl_easy_setopt(handle, CURLOPT_WRITEHEADER,

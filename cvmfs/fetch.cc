@@ -80,7 +80,8 @@ int Fetcher::Fetch(
   const std::string &name,
   const zlib::Algorithms compression_algorithm,
   const cache::CacheManager::ObjectType object_type,
-  const std::string &alt_url)
+  const std::string &alt_url,
+  off_t range_offset)
 {
   int fd_return;  // Read-only file descriptor that is returned
   int retval;
@@ -126,7 +127,7 @@ int Fetcher::Fetch(
   LogCvmfs(kLogCache, kLogDebug, "downloading %s", name.c_str());
   std::string url;
   if (external_) {
-    url = name;
+    url = !alt_url.empty() ? alt_url : name;
   } else {
     url = "/" + (alt_url.size() ? alt_url : "data/" + id.MakePath());
   }
@@ -153,6 +154,8 @@ int Fetcher::Fetch(
              &tls->download_job.pid);
   }
   tls->download_job.compressed = (compression_algorithm == zlib::kZlibDefault);
+  tls->download_job.range_offset = range_offset;
+  tls->download_job.range_size = size;
   download_mgr_->Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {

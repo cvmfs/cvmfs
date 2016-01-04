@@ -1181,7 +1181,8 @@ static void cvmfs_open(fuse_req_t req, fuse_ino_t ino,
       // Check again to avoid race
       if (!chunk_tables_->inode2chunks.Contains(ino)) {
         chunk_tables_->inode2chunks.Insert(
-          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm()));
+          ino, FileChunkReflist(chunks, path, dirent.compression_algorithm(),
+                                dirent.IsExternalFile()));
         chunk_tables_->inode2references.Insert(ino, 1);
       } else {
         uint32_t refctr;
@@ -1310,13 +1311,25 @@ static void cvmfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
       if ((chunk_fd.fd == -1) || (chunk_fd.chunk_idx != chunk_idx)) {
         if (chunk_fd.fd != -1) cache_manager_->Close(chunk_fd.fd);
         string verbose_path = "Part of " + chunks.path.ToString();
-        chunk_fd.fd = fetcher_->Fetch(
-          chunks.list->AtPtr(chunk_idx)->content_hash(),
-          chunks.list->AtPtr(chunk_idx)->size(),
-          verbose_path,
-          chunks.compression_alg,
-          volatile_repository_ ? cache::CacheManager::kTypeVolatile
-                               : cache::CacheManager::kTypeRegular);
+        if (chunks.external_data) {
+          chunk_fd.fd = external_fetcher_->Fetch(
+            chunks.list->AtPtr(chunk_idx)->content_hash(),
+            chunks.list->AtPtr(chunk_idx)->size(),
+            verbose_path,
+            chunks.compression_alg,
+            volatile_repository_ ? cache::CacheManager::kTypeVolatile
+                                 : cache::CacheManager::kTypeRegular,
+            chunks.path.ToString(),
+            chunks.list->AtPtr(chunk_idx)->offset());
+        } else {
+          chunk_fd.fd = fetcher_->Fetch(
+            chunks.list->AtPtr(chunk_idx)->content_hash(),
+            chunks.list->AtPtr(chunk_idx)->size(),
+            verbose_path,
+            chunks.compression_alg,
+            volatile_repository_ ? cache::CacheManager::kTypeVolatile
+                                 : cache::CacheManager::kTypeRegular);
+        }
         if (chunk_fd.fd < 0) {
           chunk_fd.fd = -1;
           chunk_tables_->Lock();
@@ -1818,12 +1831,24 @@ bool Pin(const string &path) {
           false);
       if (!retval)
         return false;
-      int fd = fetcher_->Fetch(
-        chunks.AtPtr(i)->content_hash(),
-        chunks.AtPtr(i)->size(),
-        "Part of " + path,
-        dirent.compression_algorithm(),
-        cache::CacheManager::kTypePinned);
+      int fd = -1;
+      if (dirent.IsExternalFile()) {
+        fd = external_fetcher_->Fetch(
+          chunks.AtPtr(i)->content_hash(),
+          chunks.AtPtr(i)->size(),
+          "Part of " + path,
+          dirent.compression_algorithm(),
+          cache::CacheManager::kTypePinned,
+          path,
+          chunks.AtPtr(i)->offset());
+      } else {
+        fd = fetcher_->Fetch(
+          chunks.AtPtr(i)->content_hash(),
+          chunks.AtPtr(i)->size(),
+          "Part of " + path,
+          dirent.compression_algorithm(),
+          cache::CacheManager::kTypePinned);
+      }
       if (fd < 0) {
         return false;
       }
