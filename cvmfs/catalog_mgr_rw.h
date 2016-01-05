@@ -87,14 +87,12 @@ class WritableCatalogManager : public SimpleCatalogManager {
   // DirectoryEntry handling
   void AddFile(const DirectoryEntryBase &entry,
                const XattrList &xattrs,
-                     bool       external_data,
                const std::string &parent_directory)
   {
-    AddFile(DirectoryEntry(entry), xattrs, external_data, parent_directory);
+    AddFile(DirectoryEntry(entry), xattrs, parent_directory);
   }
   void AddChunkedFile(const DirectoryEntryBase &entry,
                       const XattrList &xattrs,
-                      const bool external_data,
                       const std::string &parent_directory,
                       const FileChunkList &file_chunks);
   void RemoveFile(const std::string &file_path);
@@ -144,7 +142,6 @@ class WritableCatalogManager : public SimpleCatalogManager {
 
   void AddFile(const DirectoryEntry  &entry,
                const XattrList       &xattrs,
-                     bool             external_data,
                const std::string     &parent_directory);
 
  private:

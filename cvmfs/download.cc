@@ -891,17 +891,18 @@ void DownloadManager::SetUrlOptions(JobInfo *info) {
 
   string url = url_prefix + *(info->url);
 
-#ifdef VOMS_AUTHZ
-  if ((info->pid != -1) && (url.substr(0, 5) == "https")) {
-    curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
-    // TODO(jblomer): get the environment variable only once
+  curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
+  if (url.substr(0, 5) == "https") {
     const char *cadir = getenv("X509_CERT_DIR");
     if (!cadir) {cadir = "/etc/grid-security/certificates";}
     curl_easy_setopt(curl_handle, CURLOPT_CAPATH, cadir);
-    ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
-                        info->cred_fname);
-  }
+#ifdef VOMS_AUTHZ
+    if (info->pid != -1) {
+      ConfigureCurlHandle(curl_handle, info->pid, info->uid, info->gid,
+                          info->cred_fname);
+    }
 #endif
+  }
 
   if (url.find("@proxy@") != string::npos) {
     string replacement;
