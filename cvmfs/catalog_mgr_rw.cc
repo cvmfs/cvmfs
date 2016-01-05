@@ -122,10 +122,10 @@ manifest::Manifest *WritableCatalogManager::CreateRepository(
     UniquePtr<CatalogDatabase> new_clg_db(CatalogDatabase::Create(file_path));
     if (!new_clg_db.IsValid() ||
         !new_clg_db->InsertInitialValues(root_path,
-                                          volatile_content,
-                                          voms_authz,
-                                          external_data,
-                                          root_entry))
+                                         volatile_content,
+                                         voms_authz,
+                                         external_data,
+                                         root_entry))
     {
       LogCvmfs(kLogCatalog, kLogStderr, "creation of catalog '%s' failed",
                file_path.c_str());

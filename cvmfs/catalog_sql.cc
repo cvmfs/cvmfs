@@ -272,6 +272,12 @@ bool CatalogDatabase::InsertInitialValues(
     }
   }
 
+  // Set creation timestamp
+  if (!this->SetProperty("last_modified", static_cast<uint64_t>(time(NULL)))) {
+    PrintSqlError("failed to store creation timestamp in the new catalog.");
+    return false;
+  }
+
   // Commit initial filling transaction
   retval = Sql(*this, "COMMIT;").Execute();
   if (!retval) {
