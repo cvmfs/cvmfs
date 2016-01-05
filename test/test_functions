@@ -626,9 +626,14 @@ get_stratum1_name() {
 }
 
 
+# creates a repository replica, as is done on stratum 1s
+# @param replica_name  the name of the new replica
+# @param replica_owner the owner of the new replica
+# @param stratum0_url  the url for the source repository
+# @param stratum0_pub  the public key the repository
 create_stratum1() {
   local replica_name=$1
-  local uid=$2
+  local replica_owner=$2
   local stratum0_url=$3
   local stratum0_pub=$4
   shift 4
@@ -641,7 +646,7 @@ create_stratum1() {
     echo "  Stratum1:  $stratum1_url"
     s3_config=" -s $CVMFS_TEST_S3_CONFIG -w $stratum1_url -a"
   fi
-  sudo cvmfs_server add-replica -o $CVMFS_TEST_USER    \
+  sudo cvmfs_server add-replica -o $replica_owner      \
                                 -n $replica_name       \
                                 $s3_config             \
                                 $additional_parameters \
