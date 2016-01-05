@@ -23,6 +23,7 @@
 
 #include "atomic.h"
 #include "catalog.h"
+#include "compression.h"
 #include "download.h"
 #include "hash.h"
 #include "history_sqlite.h"
@@ -49,11 +50,13 @@ class ChunkJob {
  public:
   ChunkJob()
     : suffix(shash::kSuffixNone)
-    , hash_algorithm(shash::kAny) {}
+    , hash_algorithm(shash::kAny)
+    , compression_alg(zlib::kZlibDefault) {}
 
-  explicit ChunkJob(const shash::Any &hash)
+  ChunkJob(const shash::Any &hash, zlib::Algorithms compression_alg)
     : suffix(hash.suffix)
     , hash_algorithm(hash.algorithm)
+    , compression_alg(compression_alg)
   {
     memcpy(digest, hash.digest, hash.GetDigestSize());
   }
@@ -71,6 +74,7 @@ class ChunkJob {
 
   const shash::Suffix      suffix;
   const shash::Algorithms  hash_algorithm;
+  const zlib::Algorithms   compression_alg;
   unsigned char            digest[shash::kMaxDigestSize];
 };
 
@@ -158,32 +162,50 @@ static void ReportDownloadError(const shash::Any &failed_hash,
 }
 
 
-static void Store(const string &local_path, const string &remote_path) {
+static void Store(
+  const string &local_path,
+  const string &remote_path,
+  const bool compressed_src)
+{
   if (preload_cache) {
-    string tmp_dest;
-    FILE *fdest = CreateTempFile(remote_path, 0660, "w", &tmp_dest);
-    if (fdest == NULL) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create temporary file '%s'",
-               remote_path.c_str());
-      abort();
+    if (!compressed_src) {
+      int retval = rename(local_path.c_str(), remote_path.c_str());
+      if (retval != 0) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to move '%s' to '%s'",
+                 local_path.c_str(), remote_path.c_str());
+        abort();
+      }
+    } else {
+      // compressed input
+      string tmp_dest;
+      FILE *fdest = CreateTempFile(remote_path, 0660, "w", &tmp_dest);
+      if (fdest == NULL) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create temporary file '%s'",
+                 remote_path.c_str());
+        abort();
+      }
+      int retval = zlib::DecompressPath2File(local_path, fdest);
+      if (!retval) {
+        LogCvmfs(kLogCvmfs, kLogStderr, "Failed to preload %s to %s",
+                 local_path.c_str(), remote_path.c_str());
+        abort();
+      }
+      fclose(fdest);
+      retval = rename(tmp_dest.c_str(), remote_path.c_str());
+      assert(retval == 0);
+      unlink(local_path.c_str());
     }
-    int retval = zlib::DecompressPath2File(local_path, fdest);
-    if (!retval) {
-      LogCvmfs(kLogCvmfs, kLogStderr, "Failed to preload %s to %s",
-               local_path.c_str(), remote_path.c_str());
-      abort();
-    }
-    fclose(fdest);
-    retval = rename(tmp_dest.c_str(), remote_path.c_str());
-    assert(retval == 0);
-    unlink(local_path.c_str());
   } else {
     spooler->Upload(local_path, remote_path);
   }
 }
 
-static void Store(const string &local_path, const shash::Any &remote_hash) {
-  Store(local_path, MakePath(remote_hash));
+static void Store(
+  const string &local_path,
+  const shash::Any &remote_hash,
+  const bool compressed_src = true)
+{
+  Store(local_path, MakePath(remote_hash), compressed_src);
 }
 
 
@@ -201,7 +223,7 @@ static void StoreBuffer(const unsigned char *buffer, const unsigned size,
   }
   assert(retval);
   fclose(ftmp);
-  Store(tmp_file, dest_path);
+  Store(tmp_file, dest_path, true);
 }
 
 static void StoreBuffer(const unsigned char *buffer, const unsigned size,
@@ -225,6 +247,7 @@ static void *MainWorker(void *data) {
       break;
 
     shash::Any chunk_hash = next_chunk.hash();
+    zlib::Algorithms compression_alg = next_chunk.compression_alg;
     LogCvmfs(kLogCvmfs, kLogVerboseMsg, "processing chunk %s",
              chunk_hash.ToString().c_str());
 
@@ -248,7 +271,8 @@ static void *MainWorker(void *data) {
         attempts++;
       } while ((retval != download::kFailOk) && (attempts < retries));
       fclose(fchunk);
-      Store(tmp_file, chunk_hash);
+      Store(tmp_file, chunk_hash,
+            (compression_alg == zlib::kZlibDefault) ? true : false);
       atomic_inc64(&overall_new);
     }
     if (atomic_xadd64(&overall_chunks, 1) % 1000 == 0)
@@ -339,6 +363,7 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
 
   // Download and uncompress catalog
   shash::Any chunk_hash;
+  zlib::Algorithms compression_alg;
   catalog::Catalog *catalog = NULL;
   string file_catalog;
   string file_catalog_vanilla;
@@ -395,8 +420,8 @@ static bool Pull(const shash::Any &catalog_hash, const std::string &path) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to gather chunks");
     goto pull_cleanup;
   }
-  while (catalog->AllChunksNext(&chunk_hash)) {
-    ChunkJob next_chunk(chunk_hash);
+  while (catalog->AllChunksNext(&chunk_hash, &compression_alg)) {
+    ChunkJob next_chunk(chunk_hash, compression_alg);
     WritePipe(pipe_chunks[1], &next_chunk, sizeof(next_chunk));
     atomic_inc64(&chunk_queue);
   }

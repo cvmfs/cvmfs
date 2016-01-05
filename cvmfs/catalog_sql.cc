@@ -1110,6 +1110,12 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
     " ((flags&" + StringifyInt(hash_mask) + ") >> " +
     StringifyInt(SqlDirent::kFlagPosHash) + ")+1 AS hash_algorithm ";
 
+  int compression_mask = 7 << SqlDirent::kFlagPosCompression;
+  string flags2compression =
+    " ((flags&" + StringifyInt(compression_mask) + ") >> " +
+    StringifyInt(SqlDirent::kFlagPosCompression) + ") " +
+    "AS compression_algorithm ";
+
   // TODO(reneme): this depends on shash::kSuffix* being a char!
   //               it should be more generic or replaced entirely
   // TODO(reneme): this is practically the same as SqlListContentHashes and
@@ -1119,13 +1125,15 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
     StringifyInt(shash::kSuffixNone) + " " +
   "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
     StringifyInt(shash::kSuffixMicroCatalog) + " END " +
-  "AS chunk_type, " + flags2hash +
-  "FROM catalog WHERE hash IS NOT NULL";
+  "AS chunk_type, " + flags2hash + "," + flags2compression +
+  "FROM catalog WHERE (hash IS NOT NULL) AND "
+    "(flags & " + StringifyInt(SqlDirent::kFlagFileExternal) + " = 0)";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql +=
       " UNION "
       "SELECT DISTINCT chunks.hash, " + StringifyInt(shash::kSuffixPartial) +
-      ", " + flags2hash + "FROM chunks, catalog WHERE "
+      ", " + flags2hash + "," + flags2compression +
+      "FROM chunks, catalog WHERE "
       "chunks.md5path_1=catalog.md5path_1 AND "
       "chunks.md5path_2=catalog.md5path_2";
   }
@@ -1139,13 +1147,14 @@ bool SqlAllChunks::Open() {
 }
 
 
-bool SqlAllChunks::Next(shash::Any *hash) {
+bool SqlAllChunks::Next(shash::Any *hash, zlib::Algorithms *compression_alg) {
   if (!FetchRow()) {
     return false;
   }
 
   *hash = RetrieveHashBlob(0, static_cast<shash::Algorithms>(RetrieveInt(2)),
                               static_cast<shash::Suffix>(RetrieveInt(1)));
+  *compression_alg = static_cast<zlib::Algorithms>(RetrieveInt(3));
   return true;
 }
 
