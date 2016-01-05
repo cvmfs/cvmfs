@@ -80,6 +80,7 @@ class WritableCatalogManager : public SimpleCatalogManager {
   ~WritableCatalogManager();
   static manifest::Manifest *CreateRepository(const std::string &dir_temp,
                                               const bool volatile_content,
+                                              const std::string &voms_authz,
                                               CatalogProperty external_data,
                                               upload::Spooler   *spooler);
 

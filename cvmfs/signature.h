@@ -45,7 +45,7 @@ class SignatureManager {
   static shash::Any MkFromFingerprint(const std::string &fingerprint);
 
   bool LoadPublicRsaKeys(const std::string &path_list);
-  bool LoadBlacklist(const std::string &path_blacklist);
+  bool LoadBlacklist(const std::string &path_blacklist, bool append);
   std::vector<std::string> GetBlacklistedCertificates();
 
   bool LoadTrustedCaCrl(const std::string &path_list);

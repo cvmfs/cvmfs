@@ -10,6 +10,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "atomic.h"
 
@@ -79,6 +80,70 @@ class Statistics {
   };
   std::map<std::string, CounterInfo *> counters_;
   pthread_mutex_t *lock_;
+};
+
+
+/**
+ * Keeps track of events over time.  Can be used to query the number of events
+ * between now and a point in time in the past.  The time range should be
+ * smaller than capacity_s seconds.  Uses a monotonic clock.  Not thread-safe.
+ */
+class Recorder {
+ public:
+  Recorder(uint32_t resolution_s, uint32_t capacity_s);
+
+  void Tick();
+  void TickAt(uint64_t timestamp);
+  uint64_t GetNoTicks(uint32_t retrospect_s) const;
+
+  uint32_t capacity_s() const { return capacity_s_; }
+  uint32_t resolution_s() const { return resolution_s_; }
+
+ private:
+  /**
+   * Records number of ticks (events) per unit of resolution.  A ring buffer.
+   * Entries older than capacity_s get overwritten by new events.
+   */
+  std::vector<uint32_t> bins_;
+
+  /**
+   * When the most recent tick occured.
+   */
+  uint64_t last_timestamp_;
+
+  /**
+   * Time window in seconds that the recorder is supposed to remember.
+   */
+  uint32_t capacity_s_;
+
+  /**
+   * Size of the bins for the tick counters.
+   */
+  uint32_t resolution_s_;
+
+  /**
+   * Shorthand for bins_.size(), constant during lifetime of the recorder.
+   */
+  unsigned no_bins_;
+};
+
+
+/**
+ * Writes to multiple recorders.  Recorders with coarsed-grained resolution and
+ * a large capacity are combined with precise recorders with shorter capacity.
+ * Preferred recorders should be added first because GetNoTicks will use the
+ * first recorder with a capacity >= retrospect_s (or the last recorder).
+ */
+class MultiRecorder {
+ public:
+  void Tick();
+  void TickAt(uint64_t timestamp);
+  uint64_t GetNoTicks(uint32_t retrospect_s) const;
+
+  void AddRecorder(uint32_t resolution_s, uint32_t capacity_s);
+
+ private:
+  std::vector<Recorder> recorders_;
 };
 
 }  // namespace perf

@@ -176,7 +176,8 @@ TEST_F(T_CatalogManager, Lookup) {
   EXPECT_TRUE(catalog_mgr_.LookupPath("/file1", kLookupFull, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // the father directory belongs to the catalog, so there is no problem
-  EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/file2", kLookupFull, &dirent));
+  EXPECT_TRUE(
+    catalog_mgr_.LookupPath("/dir/dir/file2", kLookupFull, &dirent));
   EXPECT_TRUE(dirent.IsRegular());
   // /dir/dir/dir/file4 belongs to a catalog that is not mounted yet
   EXPECT_TRUE(catalog_mgr_.LookupPath("/dir/dir/dir/file4", kLookupSole,

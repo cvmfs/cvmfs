@@ -28,6 +28,10 @@ cvmfs_run_test() {
   publish_repo $CVMFS_TEST_REPO || return $?
 
   local hash=$(attr -qg hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/file1)
+  local attrval=$(attr -qg compression /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/file1)
+  if [ x"$attrval" != "xzlib" ]; then
+    return 22
+  fi
 
   start_transaction $CVMFS_TEST_REPO || return $?
   echo "Some other file" > /cvmfs/$CVMFS_TEST_REPO/file2

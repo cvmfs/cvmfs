@@ -9,6 +9,7 @@
 
 #include "backoff.h"
 #include "cache.h"
+#include "clientctx.h"
 #include "download.h"
 #include "logging.h"
 #include "quota.h"
@@ -77,6 +78,7 @@ int Fetcher::Fetch(
   const shash::Any &id,
   const uint64_t size,
   const std::string &name,
+  const zlib::Algorithms compression_algorithm,
   const cache::CacheManager::ObjectType object_type,
   const std::string &alt_url)
 {
@@ -144,6 +146,13 @@ int Fetcher::Fetch(
   tls->download_job.destination_sink = &sink;
   tls->download_job.expected_hash = &id;
   tls->download_job.extra_info = &name;
+  ClientCtx *ctx = ClientCtx::GetInstance();
+  if (ctx->IsSet()) {
+    ctx->Get(&tls->download_job.uid,
+             &tls->download_job.gid,
+             &tls->download_job.pid);
+  }
+  tls->download_job.compressed = (compression_algorithm == zlib::kZlibDefault);
   download_mgr_->Fetch(&tls->download_job);
 
   if (tls->download_job.error_code == download::kFailOk) {

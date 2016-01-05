@@ -235,7 +235,7 @@ LoadError ClientCatalogManager::LoadCatalogCas(
 {
   assert(hash.suffix == shash::kSuffixCatalog);
   int fd = fetcher_->Fetch(hash, cache::CacheManager::kSizeUnknown, name,
-                           cache::CacheManager::kTypeCatalog, alt_catalog_path);
+    zlib::kZlibDefault, cache::CacheManager::kTypeCatalog, alt_catalog_path);
   if (fd >= 0) {
     *catalog_path = "@" + StringifyInt(fd);
     return kLoadNew;

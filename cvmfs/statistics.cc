@@ -4,8 +4,10 @@
 
 #include "statistics.h"
 
+#include <algorithm>
 #include <cassert>
 
+#include "platform.h"
 #include "smalloc.h"
 #include "util.h"
 #include "util_concurrency.h"
@@ -32,6 +34,7 @@ std::string Counter::PrintRatio(Counter divider) {
 
 
 //-----------------------------------------------------------------------------
+
 
 Counter *Statistics::Lookup(const std::string &name) {
   MutexLockGuard lock_guard(lock_);
@@ -92,6 +95,114 @@ Statistics::~Statistics() {
   }
   pthread_mutex_destroy(lock_);
   free(lock_);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+/**
+ * If necessary, capacity_s is extended to be a multiple of resolution_s
+ */
+Recorder::Recorder(uint32_t resolution_s, uint32_t capacity_s)
+  : last_timestamp_(0)
+  , capacity_s_(capacity_s)
+  , resolution_s_(resolution_s)
+{
+  assert((resolution_s > 0) && (capacity_s > resolution_s));
+  bool has_remainder = (capacity_s_ % resolution_s_) != 0;
+  if (has_remainder) {
+    capacity_s_ += resolution_s_ - (capacity_s_ % resolution_s_);
+  }
+  no_bins_ = capacity_s_ / resolution_s_;
+  bins_.reserve(no_bins_);
+  for (unsigned i = 0; i < no_bins_; ++i)
+    bins_.push_back(0);
+}
+
+
+void Recorder::Tick() {
+  TickAt(platform_monotonic_time());
+}
+
+
+void Recorder::TickAt(uint64_t timestamp) {
+  uint64_t bin_abs = timestamp / resolution_s_;
+  uint64_t last_bin_abs = last_timestamp_ / resolution_s_;
+
+  // timestamp in the past: don't update last_timestamp_
+  if (bin_abs < last_bin_abs) {
+    // Do we still remember this event?
+    if ((last_bin_abs - bin_abs) < no_bins_)
+      bins_[bin_abs % no_bins_]++;
+    return;
+  }
+
+  if (last_bin_abs == bin_abs) {
+    bins_[bin_abs % no_bins_]++;
+  } else {
+    // When clearing bins between last_timestamp_ and now, avoid cycling the
+    // ring buffer multiple times.
+    unsigned max_bins_clear = std::min(bin_abs, last_bin_abs + no_bins_ + 1);
+    for (uint64_t i = last_bin_abs + 1; i < max_bins_clear; ++i)
+      bins_[i % no_bins_] = 0;
+    bins_[bin_abs % no_bins_] = 1;
+  }
+
+  last_timestamp_ = timestamp;
+}
+
+
+uint64_t Recorder::GetNoTicks(uint32_t retrospect_s) const {
+  uint64_t now = platform_monotonic_time();
+  if (retrospect_s > now)
+    retrospect_s = now;
+
+  uint64_t last_bin_abs = last_timestamp_ / resolution_s_;
+  uint64_t past_bin_abs = (now - retrospect_s) / resolution_s_;
+  int64_t min_bin_abs =
+    std::max(past_bin_abs,
+             (last_bin_abs < no_bins_) ? 0 : (last_bin_abs - (no_bins_ - 1)));
+  uint64_t result = 0;
+  for (int64_t i = last_bin_abs; i >= min_bin_abs; --i) {
+    result += bins_[i % no_bins_];
+  }
+
+  return result;
+}
+
+
+//------------------------------------------------------------------------------
+
+
+void MultiRecorder::AddRecorder(uint32_t resolution_s, uint32_t capacity_s) {
+  recorders_.push_back(Recorder(resolution_s, capacity_s));
+}
+
+
+uint64_t MultiRecorder::GetNoTicks(uint32_t retrospect_s) const {
+  unsigned N = recorders_.size();
+  for (unsigned i = 0; i < N; ++i) {
+    if ( (recorders_[i].capacity_s() >= retrospect_s) ||
+         (i == (N - 1)) )
+    {
+      return recorders_[i].GetNoTicks(retrospect_s);
+    }
+  }
+  return 0;
+}
+
+
+void MultiRecorder::Tick() {
+  uint64_t now = platform_monotonic_time();
+  for (unsigned i = 0; i < recorders_.size(); ++i)
+    recorders_[i].TickAt(now);
+}
+
+
+void MultiRecorder::TickAt(uint64_t timestamp) {
+  for (unsigned i = 0; i < recorders_.size(); ++i)
+    recorders_[i].TickAt(timestamp);
 }
 
 }  // namespace perf

@@ -62,6 +62,11 @@ set (CVMFS_CLIENT_SOURCES
   sink.h
   clientctx.cc clientctx.h
 )
+if (VOMS_FOUND)
+  set (CVMFS_CLIENT_SOURCES ${CVMFS_CLIENT_SOURCES}
+  voms_authz/voms_cred.h voms_authz/voms_cred.cc
+  voms_authz/voms_authz.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
 
 
 set (CVMFS2_DEBUG_SOURCES
@@ -81,6 +86,10 @@ set (CVMFS2_DEBUG_SOURCES
   auto_umount.h auto_umount.cc
   cvmfs.h cvmfs.cc
 )
+if (VOMS_FOUND)
+  set (CVMFS2_DEBUG_SOURCES ${CVMFS2_DEBUG_SOURCES}
+  voms_authz/cred_fetcher.cc)
+endif (VOMS_FOUND)
 
 set (CVMFS2_SOURCES
   ${CVMFS2_DEBUG_SOURCES}
@@ -122,6 +131,7 @@ set (CVMFS_SWISSKNIFE_SOURCES
   prng.h
   hash.h hash.cc
   compression.h compression.cc
+  clientctx.cc clientctx.h
   util.h util.cc
   util_concurrency.h util_concurrency_impl.h util_concurrency.cc
   object_fetcher.h
@@ -197,6 +207,13 @@ set (CVMFS_SWISSKNIFE_SOURCES
   swissknife_graft.h swissknife_graft.cc
   swissknife.h swissknife.cc)
 
+if (VOMS_FOUND)
+  set (CVMFS_SWISSKNIFE_SOURCES ${CVMFS_SWISSKNIFE_SOURCES}
+       voms_authz/voms_cred.cc
+       voms_authz/voms_authz.h
+       voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
+
 
 set (CVMFS_SWISSKNIFE_DEBUG_SOURCES
   ${CVMFS_SWISSKNIFE_SOURCES}
@@ -248,10 +265,16 @@ set (CVMFS_PRELOADER_SOURCES
   whitelist.cc whitelist.h
   sanitizer.cc sanitizer.h
   dns.cc dns.h
-  dirtab.cc dirtab.h
+  path_filters/dirtab.h path_filters/dirtab.cc
+  path_filters/relaxed_path_filter.h path_filters/relaxed_path_filter.cc
   catalog.cc catalog.h
   preload.cc
 )
+
+if (VOMS_FOUND)
+  set (CVMFS_PRELOADER_SOURCES ${CVMFS_PRELOADER_SOURCES}
+       voms_authz/voms_cred.cc voms_authz/voms_authz.h voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
 
 #
 # configure some compiler flags for proper build
@@ -282,7 +305,6 @@ include_directories (${INCLUDE_DIRECTORIES})
 #
 
 if (BUILD_CVMFS)
-
   add_executable (cvmfs2 ${CVMFS_LOADER_SOURCES})
   add_library (cvmfs_fuse_debug SHARED  ${CVMFS2_DEBUG_SOURCES})
   add_library (cvmfs_fuse SHARED ${CVMFS2_SOURCES})
@@ -359,7 +381,7 @@ if (BUILD_CVMFS)
   target_link_libraries (cvmfs_fuse       ${CVMFS2_LIBS} ${CVMFS_FUSE_LINK_LIBRARIES})
   target_link_libraries (cvmfs_fsck       ${CVMFS_FSCK_LIBS} ${ZLIB_LIBRARIES}
                                           ${OPENSSL_LIBRARIES} ${ZLIB_ARCHIVE} ${SHA2_ARCHIVE}
-                                          ${SHA3_ARCHIVE} pthread)
+                                          ${SHA3_ARCHIVE} ${RT_LIBRARY} pthread)
 
 endif (BUILD_CVMFS)
 
@@ -459,10 +481,10 @@ if (BUILD_SERVER)
 
   # link the stuff (*_LIBRARIES are dynamic link libraries)
   target_link_libraries (cvmfs_swissknife  ${CVMFS_SWISSKNIFE_LIBS}
-                         ${SQLITE3_LIBRARY} ${CARES_LIBRARIES} ${CURL_LIBRARIES}
-                         ${ZLIB_LIBRARIES} ${TBB_LIBRARIES} ${LIBCURL_ARCHIVE} 
-                         ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES} ${SQLITE3_ARCHIVE}
-                         ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
+                         ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
+                         ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_LIBRARIES}
+                         ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
+                         ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
                          ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}
                          pthread dl)
 
@@ -496,11 +518,10 @@ if (BUILD_SERVER)
       set (TBB_DEBUG_LIBRARIES ${TBB_LIBRARIES})
     endif (NOT TBB_DEBUG_LIBRARIES)
     target_link_libraries (cvmfs_swissknife_debug  ${CVMFS_SWISSKNIFE_LIBS}
-                           ${SQLITE3_LIBRARY} ${CARES_LIBRARIES}
-                           ${CURL_LIBRARIES} ${ZLIB_LIBRARIES}
-                           ${OPENSSL_LIBRARIES} ${LIBCURL_ARCHIVE}
-                           ${CARES_ARCHIVE} ${SQLITE3_ARCHIVE} ${ZLIB_ARCHIVE}
-                           ${TBB_DEBUG_LIBRARIES} ${RT_LIBRARY} ${VJSON_ARCHIVE}
+                           ${SQLITE3_LIBRARY}  ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE}
+                           ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${TBB_DEBUG_LIBRARIES}
+                           ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${OPENSSL_LIBRARIES}
+                           ${SQLITE3_ARCHIVE} ${RT_LIBRARY} ${VJSON_ARCHIVE}
                            ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${CAP_LIBRARIES}
                            pthread dl)
   endif (BUILD_SERVER_DEBUG)

@@ -56,6 +56,7 @@ Catalog::Catalog(const PathString &path,
   managed_database_(false),
   parent_(parent),
   nested_catalog_cache_dirty_(true),
+  voms_authz_status_(kVomsUnknown),
   initialized_(false)
 {
   max_row_id_ = 0;
@@ -351,8 +352,9 @@ bool Catalog::AllChunksBegin() {
 }
 
 
-bool Catalog::AllChunksNext(shash::Any *hash) {
-  return sql_all_chunks_->Next(hash);
+bool Catalog::AllChunksNext(shash::Any *hash, zlib::Algorithms *compression_alg)
+{
+  return sql_all_chunks_->Next(hash, compression_alg);
 }
 
 
@@ -448,6 +450,28 @@ uint64_t Catalog::GetTTL() const {
 }
 
 
+bool Catalog::GetVOMSAuthz(string *authz) const {
+  bool result;
+  pthread_mutex_lock(lock_);
+  if (voms_authz_status_ == kVomsPresent) {
+    *authz = voms_authz_;
+    result = true;
+  } else if (voms_authz_status_ == kVomsNone) {
+    result = false;
+  } else {
+    if (database().HasProperty("voms_authz")) {
+      voms_authz_ = database().GetProperty<string>("voms_authz");
+      *authz = voms_authz_;
+      voms_authz_status_ = kVomsPresent;
+    } else {
+      voms_authz_status_ = kVomsNone;
+    }
+    result = (voms_authz_status_ == kVomsPresent);
+  }
+  pthread_mutex_unlock(lock_);
+  return result;
+}
+
 uint64_t Catalog::GetRevision() const {
   pthread_mutex_lock(lock_);
   const uint64_t result =
@@ -457,7 +481,10 @@ uint64_t Catalog::GetRevision() const {
 }
 
 uint64_t Catalog::GetLastModified() const {
-  return database().GetProperty<int>("last_modified");
+  const std::string prop_name = "last_modified";
+  return (database().HasProperty(prop_name))
+    ? database().GetProperty<int>(prop_name)
+    : 0u;
 }
 
 

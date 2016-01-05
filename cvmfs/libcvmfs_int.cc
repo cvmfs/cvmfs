@@ -49,6 +49,7 @@
 #include "atomic.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "download.h"
@@ -143,6 +144,8 @@ cvmfs_globals::~cvmfs_globals() {
 
   sqlite3_shutdown();
   delete statistics_;
+
+  ClientCtx::CleanupInstance();
 }
 
 int cvmfs_globals::Setup(const options &opts) {
@@ -252,6 +255,8 @@ int cvmfs_globals::Setup(const options &opts) {
 
   cvmfs::pid_ = getpid();
 
+  ClientCtx::GetInstance();
+
   return LIBCVMFS_FAIL_OK;
 }
 
@@ -316,7 +321,7 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   download_ready_ = true;
 
   external_download_manager_ = new download::DownloadManager();
-  external_download_manager_->Init(16, false, statistics);
+  external_download_manager_->Init(16, false, statistics, "download-external");
   external_download_manager_->SetHostChain(opts.external_url);
   external_download_manager_->SetTimeout(opts.timeout,
                                 opts.timeout_direct);
@@ -339,7 +344,8 @@ int cvmfs_context::Setup(const options &opts, perf::Statistics *statistics) {
   signature_ready_ = true;
 
   if (!opts.blacklist.empty()) {
-    if (!signature_manager_->LoadBlacklist(opts.blacklist)) {
+    const bool append = false;
+    if (!signature_manager_->LoadBlacklist(opts.blacklist, append)) {
       LogCvmfs(kLogCvmfs, kLogDebug, "failed to load blacklist");
       return -2;
     }
@@ -497,6 +503,7 @@ void cvmfs_context::AppendStringToList(char const   *str,
 
 int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
   atomic_inc64(&num_fs_stat_);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -517,6 +524,7 @@ int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
 int cvmfs_context::Readlink(const char *c_path, char *buf, size_t size) {
   atomic_inc64(&num_fs_readlink_);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -546,6 +554,7 @@ int cvmfs_context::ListDirectory(
   size_t *buflen
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -595,6 +604,7 @@ int cvmfs_context::ListDirectory(
 
 int cvmfs_context::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -623,7 +633,8 @@ int cvmfs_context::Open(const char *c_path) {
       return -EIO;
     }
 
-    fd = chunk_tables_.Add(FileChunkReflist(chunks, path));
+    fd = chunk_tables_.Add(
+      FileChunkReflist(chunks, path, dirent.compression_algorithm()));
     return fd | kFdChunked;
   }
 
@@ -631,6 +642,7 @@ int cvmfs_context::Open(const char *c_path) {
     dirent.checksum(),
     dirent.size(),
     string(path.GetChars(), path.GetLength()),
+    dirent.compression_algorithm(),
     cache::CacheManager::kTypeRegular);
   atomic_inc64(&num_fs_open_);
 
@@ -658,9 +670,12 @@ int64_t cvmfs_context::Pread(
   uint64_t off)
 {
   if (fd & kFdChunked) {
+    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
+    zlib::Algorithms compression_alg =
+      open_chunks.chunk_reflist.compression_alg;
     if (chunk_list == NULL)
       return -EBADF;
 
@@ -677,6 +692,7 @@ int64_t cvmfs_context::Pread(
           chunk_list->AtPtr(chunk_idx)->content_hash(),
           chunk_list->AtPtr(chunk_idx)->size(),
           "no path info",
+          compression_alg,
           cache::CacheManager::kTypeRegular);
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;
