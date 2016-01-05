@@ -2643,7 +2643,10 @@ static int Init(const loader::LoaderExports *loader_exports) {
     download::DownloadManager::kSetProxyBoth);
   g_external_download_ready = true;
   if (use_geo_api) {
-    cvmfs::external_download_manager_->ProbeGeo();
+    std::vector<std::string> host_chain;
+    cvmfs::external_download_manager_->GetHostInfo(&host_chain, NULL, NULL);
+    cvmfs::download_manager_->GeoSortServers(&host_chain);
+    cvmfs::external_download_manager_->SetHostChain(host_chain);
   }
 
 
