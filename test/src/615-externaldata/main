@@ -87,6 +87,15 @@ cvmfs_run_test() {
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
 
+  echo "overwrite default"
+  start_transaction $CVMFS_TEST_REPO || return $?
+  echo "not external" > /cvmfs/$CVMFS_TEST_REPO/native
+  publish_repo $CVMFS_TEST_REPO -v -N || return $?
+  local is_external=$(attr -qg external_file /cvmfs/$CVMFS_TEST_REPO/native)
+  if [ "x$is_external" != "x0" ]; then
+    return 30
+  fi
+
   # Remove cached and external copy of the file; only copy is in the spool area,
   # which should not be used.
   mv /srv/cvmfs/$CVMFS_TEST_REPO/external/file "$cache_file"

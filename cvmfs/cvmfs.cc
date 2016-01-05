@@ -1661,8 +1661,6 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       fuse_reply_err(req, ENOATTR);
       return;
     }
-  } else if (attr == "user.external_data") {
-    attribute_value = catalog_manager_->GetExternalDataRepository() ? "1" : "0";
   } else if (attr == "user.external_host") {
     vector<string> host_chain;
     vector<int> rtt;
