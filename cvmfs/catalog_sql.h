@@ -525,7 +525,7 @@ class SqlAllChunks : public Sql {
  public:
   explicit SqlAllChunks(const CatalogDatabase &database);
   bool Open();
-  bool Next(shash::Any *hash);
+  bool Next(shash::Any *hash, zlib::Algorithms *compression_alg);
   bool Close();
 };
 

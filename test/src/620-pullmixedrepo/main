@@ -134,7 +134,7 @@ cvmfs_run_test() {
   compare_directories $repo_dir $reference_dir || return $?
   echo "check catalog and data integrity"
   check_repository $CVMFS_TEST_REPO -i || return $?
-  
+
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -172,6 +172,34 @@ cvmfs_run_test() {
 
   echo "clean up"
   sudo cvmfs_server rmfs -f $replica_name
+
+  echo "preloading a cache"
+  local preload_dir=/srv/cvmfs/${CVMFS_TEST_REPO}/preloaded
+  cvmfs_preload -u "http://localhost/cvmfs/$CVMFS_TEST_REPO" \
+    -r $preload_dir \
+    -k "/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub" \
+    -m "$CVMFS_TEST_REPO" || return $?
+
+  local local_conf=$(pwd)/local.conf
+  echo "Create a local configuration file in $local_conf"
+  mkdir cache || return 40
+  cat > $local_conf << EOF
+CVMFS_CACHE_BASE=$(pwd)/cache
+CVMFS_QUOTA_LIMIT=-1
+CVMFS_RELOAD_SOCKETS=$(pwd)/cache
+CVMFS_ALIEN_CACHE=$preload_dir
+CVMFS_SERVER_URL=NOAVAIL
+CVMFS_HTTP_PROXY=NOAVAIL
+CVMFS_PUBLIC_KEY=/etc/cvmfs/keys/$CVMFS_TEST_REPO.pub
+EOF
+
+  echo "Mount the repository in $REPO_MOUNTPOINT to verify it"
+  REPO_MOUNTPOINT="$(pwd)/mnt"
+  trap desaster_cleanup EXIT HUP INT TERM
+  do_local_mount $mnt_point $CVMFS_TEST_REPO XXX $local_conf || return 41
+
+  ls $mnt_point || return 42
+  diff $mnt_point/large $reference_dir/large || return 43
 
   return 0
 }

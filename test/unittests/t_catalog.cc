@@ -291,10 +291,12 @@ TEST_F(T_Catalog, Chunks) {
                                            NULL,
                                            false);
   shash::Any hash;
+  zlib::Algorithms compression_alg;
   EXPECT_TRUE(catalog->AllChunksBegin());
   unsigned counter = 0;
-  while (catalog->AllChunksNext(&hash)) {
+  while (catalog->AllChunksNext(&hash, &compression_alg)) {
     ++counter;
+    EXPECT_EQ(zlib::kZlibDefault, compression_alg);
   }
   EXPECT_TRUE(catalog->AllChunksEnd());
   EXPECT_EQ(4u, counter);  // number of files with content + empty hash
