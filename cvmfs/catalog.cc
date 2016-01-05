@@ -480,7 +480,10 @@ uint64_t Catalog::GetRevision() const {
 }
 
 uint64_t Catalog::GetLastModified() const {
-  return database().GetProperty<int>("last_modified");
+  const std::string prop_name = "last_modified";
+  return (database().HasProperty(prop_name))
+    ? database().GetProperty<int>(prop_name)
+    : 0u;
 }
 
 
