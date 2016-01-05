@@ -265,7 +265,8 @@ set (CVMFS_PRELOADER_SOURCES
   whitelist.cc whitelist.h
   sanitizer.cc sanitizer.h
   dns.cc dns.h
-  dirtab.cc dirtab.h
+  path_filters/dirtab.h path_filters/dirtab.cc
+  path_filters/relaxed_path_filter.h path_filters/relaxed_path_filter.cc
   catalog.cc catalog.h
   preload.cc
 )

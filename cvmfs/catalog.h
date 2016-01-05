@@ -147,7 +147,7 @@ class Catalog : public SingleCopy {
                               listing);
   }
   bool AllChunksBegin();
-  bool AllChunksNext(shash::Any *hash);
+  bool AllChunksNext(shash::Any *hash, zlib::Algorithms *compression_alg);
   bool AllChunksEnd();
 
   inline bool ListPathChunks(const PathString &path,

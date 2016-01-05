@@ -66,8 +66,10 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PreserveDataObjects(
 
   if (configuration_.verbose) {
     if (data.catalog->IsRoot()) {
-      LogCvmfs(kLogGc, kLogStdout, "Preserving Revision %d",
-                                   data.catalog->revision());
+      const int    rev   = data.catalog->revision();
+      const time_t mtime = static_cast<time_t>(data.catalog->GetLastModified());
+      LogCvmfs(kLogGc, kLogStdout, "Preserving Revision %d (%s)",
+                                   rev, StringifyTime(mtime, true).c_str());
     }
     PrintCatalogTreeEntry(data.tree_level, data.catalog);
   }
@@ -94,8 +96,10 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::SweepDataObjects(
 
   if (configuration_.verbose) {
     if (data.catalog->IsRoot()) {
-      LogCvmfs(kLogGc, kLogStdout, "Sweeping Revision %d",
-                                   data.catalog->revision());
+      const int    rev   = data.catalog->revision();
+      const time_t mtime = static_cast<time_t>(data.catalog->GetLastModified());
+      LogCvmfs(kLogGc, kLogStdout, "Sweeping Revision %d (%s)",
+                                   rev, StringifyTime(mtime, true).c_str());
     }
     PrintCatalogTreeEntry(data.tree_level, data.catalog);
   }

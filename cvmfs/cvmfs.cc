@@ -1651,10 +1651,15 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         attribute_value = "1";
       }
     } else {
-      attribute_value = "0";
+      fuse_reply_err(req, ENOATTR);
     }
   } else if (attr == "user.external_file") {
-    attribute_value = d.IsExternalFile() ? "1" : "0";
+    if (d.IsRegular()) {
+      attribute_value = d.IsExternalFile() ? "1" : "0";
+    } else {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
   } else if (attr == "user.external_data") {
     attribute_value = catalog_manager_->GetExternalDataRepository() ? "1" : "0";
   } else if (attr == "user.external_host") {
@@ -1668,7 +1673,12 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       attribute_value = "internal error: no hosts defined";
     }
   } else if (attr == "user.compression") {
-    attribute_value = zlib::AlgorithmName(d.compression_algorithm());
+    if (d.IsRegular()) {
+      attribute_value = zlib::AlgorithmName(d.compression_algorithm());
+    } else {
+      fuse_reply_err(req, ENOATTR);
+      return;
+    }
   } else if (attr == "user.host") {
     vector<string> host_chain;
     vector<int> rtt;
@@ -1786,8 +1796,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
     "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
-    "user.external_host\0user.external_data\0user.external_file\0"
-    "user.external_timeout\0user.compression\0user.chunks\0";
+    "user.external_host\0user.external_data\0user.external_timeout\0";
   string attribute_list;
   if (hide_magic_xattrs_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");
@@ -1798,10 +1807,16 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
       const char regular_file_list[] = "user.hash\0user.lhash\0";
       attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
     }
+
     if (d.IsLink()) {
       const char symlink_list[] = "xfsroot.rawlink\0user.rawlink\0";
       attribute_list += string(symlink_list, sizeof(symlink_list)-1);
+    } else if (d.IsRegular()) {
+      const char regular_file_list[] = "user.external_file\0user.compression\0"
+                                       "user.chunks\0";
+      attribute_list += string(regular_file_list, sizeof(regular_file_list)-1);
     }
+
     attribute_list = xattrs.ListKeysPosix(attribute_list);
   }
 
