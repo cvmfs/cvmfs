@@ -1120,7 +1120,8 @@ SqlAllChunks::SqlAllChunks(const CatalogDatabase &database) {
   "WHEN flags & " + StringifyInt(SqlDirent::kFlagDir) + " THEN " +
     StringifyInt(shash::kSuffixMicroCatalog) + " END " +
   "AS chunk_type, " + flags2hash +
-  "FROM catalog WHERE hash IS NOT NULL";
+  "FROM catalog WHERE (hash IS NOT NULL) AND "
+    "(flags & " + StringifyInt(SqlDirent::kFlagFileExternal) + " = 0)";
   if (database.schema_version() >= 2.4 - CatalogDatabase::kSchemaEpsilon) {
     sql +=
       " UNION "

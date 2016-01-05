@@ -192,6 +192,7 @@ class SqlDirent : public Sql {
   // as of 2^8: 3 bit for hashes
   //   - 0: SHA-1
   //   - 1: RIPEMD-160
+  //   - ...
   // Corresponds to shash::algorithms with offset in order to support future
   // hashes
   static const int kFlagPosHash             = 8;
