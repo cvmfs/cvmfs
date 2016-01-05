@@ -60,7 +60,9 @@ class WritableCatalog : public Catalog {
                 const XattrList &xattr,
                 const std::string &entry_path,
                 const std::string &parent_path,
-                const bool external_data = false);
+                const bool external_data=false,
+                const zlib::Algorithms compression_algorithm =
+                                            zlib::kZlibDefault);
   void TouchEntry(const DirectoryEntryBase &entry, const shash::Md5 &path_hash);
   inline void TouchEntry(
     const DirectoryEntryBase &entry,

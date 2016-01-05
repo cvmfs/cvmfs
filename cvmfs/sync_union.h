@@ -134,6 +134,13 @@ class SyncUnion {
   void SetExternalData(bool external_data) {external_data_ = external_data;}
   bool GetExternalData() const {return external_data_;}
 
+  void SetCompressionAlgorithm(zlib::Algorithms compression_algorithm) {
+    compression_algorithm_ = compression_algorithm;
+  }
+  zlib::Algorithms GetCompressionAlgorithm() const {
+    return compression_algorithm_;
+  }
+
  protected:
   std::string rdonly_path_;
   std::string scratch_path_;
@@ -203,6 +210,7 @@ class SyncUnion {
  private:
   bool initialized_;
   bool external_data_;
+  zlib::Algorithms compression_algorithm_;
 };  // class SyncUnion
 
 

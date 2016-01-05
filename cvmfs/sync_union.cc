@@ -31,7 +31,8 @@ SyncUnion::SyncUnion(SyncMediator *mediator,
   scratch_path_(scratch_path),
   union_path_(union_path),
   mediator_(mediator),
-  initialized_(false) {}
+  initialized_(false),
+  compression_algorithm_(zlib::kZlibDefault) {}
 
 
 bool SyncUnion::Initialize() {
@@ -306,7 +307,7 @@ bool SyncUnionOverlayfs::ObtainSysAdminCapability() const {
 
 void SyncUnionOverlayfs::PreprocessSyncItem(SyncItem *entry) const {
   SyncUnion::PreprocessSyncItem(entry);
-  if (entry->IsWhiteout() || entry->IsDirectory()) {
+  if (entry->IsGraftMarker() || entry->IsWhiteout() || entry->IsDirectory()) {
     return;
   }
 

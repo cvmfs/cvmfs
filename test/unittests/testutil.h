@@ -558,6 +558,7 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
   void AddFile(const DirectoryEntryBase &entry,
                const XattrList &xattrs,
                      bool       external_data,
+                     zlib::Algorithms compression_algorithm,
                const std::string &parent_directory)
   {
     ++num_added_files_;
