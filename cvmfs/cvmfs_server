@@ -338,6 +338,10 @@ Supported Commands:
   snapshot      [-t fail if other snapshot is in progress]
                 <fully qualified name>
                 Synchronize a Stratum 1 replica with the Stratum 0 source
+  snapshot -a   [-s use separate logs in /var/log/cvmfs for each repository]
+                [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
+                [-i skip repositories that have not run initial snapshot]
+                Do snapshot on all active replica repositories
   migrate       <fully qualified name>
                 Migrates a repository to the current version of CernVM-FS
   list          List available repositories
@@ -4915,8 +4919,10 @@ __snapshot_failed() {
   to_syslog_for_repo $alias_name "failed to snapshot from $CVMFS_STRATUM0"
 }
 
-snapshot() {
-  local alias_names
+__do_snapshot() {
+  local alias_names="$1"
+  local abort_on_conflict=$2
+  local alias_name
   local name
   local user
   local spool_dir
@@ -4927,27 +4933,7 @@ snapshot() {
   local timeout
   local retries
   local retcode=0
-  local abort_on_conflict=0
   local gc_timespan=0
-
-  OPTIND=1
-  while getopts "t" option; do
-    case $option in
-      t)
-        abort_on_conflict=1
-      ;;
-      ?)
-        shift $(($OPTIND-2))
-        usage "Command snapshot: Unrecognized option: $1"
-      ;;
-    esac
-  done
-  shift $(($OPTIND-1))
-
-  # get repository names
-  check_parameter_count_for_multiple_repositories $#
-  alias_names=$(get_or_guess_multiple_repository_names $@)
-  check_multiple_repository_existence "$alias_names"
 
   for alias_name in $alias_names; do
 
@@ -4973,7 +4959,7 @@ snapshot() {
     check_repository_compatibility $alias_name
     [ ! -z $stratum1 ] || die "Missing CVMFS_STRATUM1 URL in server.conf"
     gc_timespan="$(get_auto_garbage_collection_timespan $alias_name)" || { retcode=1; continue; }
-    if is_local_upstream $CVMFS_UPSTREAM_STORAGE && is_root && check_apache; then
+    if is_local_upstream $upstream && is_root && check_apache; then
       # this might have been missed if add-replica -a was used or
       #  if a migrate was done while apache wasn't running, but then
       #  apache was enabled later
@@ -4984,7 +4970,7 @@ snapshot() {
     # do it!
     local user_shell="$(get_user_shell $alias_name)"
 
-    if is_local_upstream $CVMFS_UPSTREAM_STORAGE; then
+    if is_local_upstream $upstream; then
         # try to update the geodb, but continue if it doesn't work
         _update_geodb -l || true
     fi
@@ -5077,6 +5063,176 @@ snapshot() {
   return $retcode
 }
 
+__do_all_snapshots() {
+  local separate_logs=0
+  local logrotate_nowarn=0
+  local skip_noninitial=0
+  local log
+  local fullog
+  local repo
+  local repos
+
+  OPTIND=1
+  while getopts "sni" option; do
+    case $option in
+      s)
+        separate_logs=1
+      ;;
+      n)
+        logrotate_nowarn=1
+      ;;
+      i)
+        skip_noninitial=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command snapshot -a: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  if [ ! -d /var/log/cvmfs ]; then
+    if ! mkdir /var/log/cvmfs 2>/dev/null; then
+      die "/var/log/cvmfs does not exist and could not create it"
+    fi
+  fi
+  [ -w /var/log/cvmfs ] || die "cannot write to /var/log/cvmfs"
+
+  if [ $logrotate_nowarn == 0 ] && [ ! -f /etc/logrotate.d/cvmfs ]; then
+    cat << EOF
+/etc/logrotate.d/cvmfs does not exist!
+To prevent this error message, create the file or use -n option.
+Suggested content:
+/var/log/cvmfs/*.log {
+    weekly
+    missingok
+    notifempty
+}
+EOF
+    exit 1
+  fi
+
+  if [ $separate_logs == 0 ]; then
+    # write into a temporary file in case more than one is active at the
+    #  same time
+    fulllog=/var/log/cvmfs/snapshots.log
+    log=/tmp/cvmfs_snapshots.$$.log
+    trap "rm -f $log" 0
+    (echo; echo "Logging in $log at `date`") >>$fulllog
+  fi
+
+  # Sort the active repositories by last snapshot time when on local storage.
+  # For non-local, swissknife only supports checking whether a file exists,
+  #  so only check whether non-initial snapshots are being skipped.
+  repos="$(for replica in /etc/cvmfs/repositories.d/*/replica.conf; do
+
+    # get repository information
+    local repodir="${replica%/*}"
+    repo="${repodir##*/}"
+    unset CVMFS_REPLICA_ACTIVE # remove previous setting, default is yes
+    load_repo_config $repo
+
+    if [ "$CVMFS_REPLICA_ACTIVE" = "no" ]; then
+      continue
+    fi
+
+    local upstream=$CVMFS_UPSTREAM_STORAGE
+    local snapshot_time=0
+    if is_local_upstream $upstream; then
+      local storage_dir=$(get_upstream_config $upstream)
+      local snapshot_file=$storage_dir/.cvmfs_last_snapshot
+      if [ -f $snapshot_file ]; then
+        snapshot_time="$(stat --format='%Y' $snapshot_file)"
+      elif [ $skip_noninitial == 1 ]; then
+        continue
+      fi
+    elif [ $skip_noninitial == 1 ]; then
+      if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
+        continue
+      fi
+    fi
+
+    echo "${snapshot_time}:${repo}"
+
+  done|sort -n|cut -d: -f2)"
+
+  for repo in $repos; do 
+    if [ $separate_logs == 1 ]; then
+      log=/var/log/cvmfs/$repo.log
+    fi
+
+    (
+    echo
+    echo "Starting $repo at `date`"
+    if ! __do_snapshot $repo 1; then
+      echo "ERROR from cvmfs_server snapshot!" >&2
+    fi
+    echo "Finished $repo at `date`"
+    ) >> $log 2>&1
+
+    if [ $separate_logs == 0 ]; then
+      cat $log >>$fulllog
+      > $log
+    fi
+
+  done
+}
+
+snapshot() {
+  local alias_names
+  local retcode=0
+  local abort_on_conflict=0
+  local do_all=0
+  local allopts=""
+
+  OPTIND=1
+  while getopts "atsni" option; do
+    case $option in
+      a)
+        do_all=1
+      ;;
+      s|n|i)
+        allopts="$allopts -$option"
+      ;;
+      t)
+        abort_on_conflict=1
+      ;;
+      ?)
+        shift $(($OPTIND-2))
+        usage "Command snapshot: Unrecognized option: $1"
+      ;;
+    esac
+  done
+  shift $(($OPTIND-1))
+
+  if [ $do_all == 1 ]; then
+    [ $# == 0 ] || die "no non-option parameters expected with -a"
+
+    # ignore if there's a -t option, it's always implied with -a
+
+    __do_all_snapshots $allopts
+
+    # always return success because this is used from cron and we
+    #  don't want cron sending an email every time something fails
+    # errors will be in the log
+
+  else
+    if [ -n "$allopts" ]; then
+      usage "Command snapshot:$allopts unrecognized without -a"
+    fi
+
+    # get repository names
+    check_parameter_count_for_multiple_repositories $#
+    alias_names=$(get_or_guess_multiple_repository_names $@)
+    check_multiple_repository_existence "$alias_names"
+
+    __do_snapshot "$alias_names" $abort_on_conflict
+    retcode=$?
+  fi
+
+  return $retcode
+}
 
 ################################################################################
 
