@@ -64,7 +64,6 @@ static int CallbackCertVerify(int ok, X509_STORE_CTX *ctx) {
 SignatureManager::SignatureManager() {
   private_key_ = NULL;
   certificate_ = NULL;
-  last_letter_pubkey_ = NULL;
   x509_store_ = NULL;
   x509_lookup_ = NULL;
 }
@@ -115,8 +114,6 @@ void SignatureManager::Fini() {
       RSA_free(public_keys_[i]);
     public_keys_.clear();
   }
-  free(last_letter_pubkey_);
-  last_letter_pubkey_ = NULL;
   // Lookup is freed automatically
   if (x509_store_) X509_STORE_free(x509_store_);
 
@@ -184,8 +181,6 @@ bool SignatureManager::LoadCertificatePath(const string &file_pem) {
     X509_free(certificate_);
     certificate_ = NULL;
   }
-  free(last_letter_pubkey_);
-  last_letter_pubkey_ = NULL;
 
   bool result;
   char *nopwd = strdupa("");
@@ -215,8 +210,6 @@ bool SignatureManager::LoadCertificateMem(const unsigned char *buffer,
     X509_free(certificate_);
     certificate_ = NULL;
   }
-  free(last_letter_pubkey_);
-  last_letter_pubkey_ = NULL;
 
   bool result;
   char *nopwd = strdupa("");
@@ -249,8 +242,6 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
       RSA_free(public_keys_[i]);
     public_keys_.clear();
   }
-  free(last_letter_pubkey_);
-  last_letter_pubkey_ = NULL;
 
   if (path_list == "")
     return true;
@@ -299,38 +290,46 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
 }
 
 
-char * SignatureManager::GenerateKeyText(RSA *pubkey) {
-    if (!pubkey) {return NULL;}
+std::string SignatureManager::GenerateKeyText(RSA *pubkey) {
+  if (!pubkey) {return "";}
 
-    BIO *bp = BIO_new(BIO_s_mem());
-    if (bp == NULL) {
-        LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to allocate"
-                 " memory for pubkey");
-        return NULL;
-    }
-    if (!PEM_write_bio_RSA_PUBKEY(bp, pubkey)) {
-        LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to write"
-                 " pubkey to memory");
-        return NULL;
-    }
-    char *bio_pubkey_text;
-    long bytes = BIO_get_mem_data(bp, &bio_pubkey_text);
+  BIO *bp = BIO_new(BIO_s_mem());
+  if (bp == NULL) {
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to allocate"
+             " memory for pubkey");
+    return "";
+  }
+  if (!PEM_write_bio_RSA_PUBKEY(bp, pubkey)) {
+    LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to write"
+             " pubkey to memory");
+    return "";
+  }
+  char *bio_pubkey_text;
+  long bytes = BIO_get_mem_data(bp, &bio_pubkey_text);
+  std::string bio_pubkey_str(bio_pubkey_text, bytes);
+  BIO_free(bp);
 
-    // Make a copy of the pubkey text via malloc; while we
-    // could keep the copy in the BIO object, we would have to use openssl's
-    // heap management routines.
-    char *bio_pubkey_copy = static_cast<char *>(malloc(bytes+1));
-    if (!bio_pubkey_copy) {
-        LogCvmfs(kLogSignature, kLogDebug | kLogSyslogErr, "Failed to allocate"
-                 " memory for pubkey copy");
-    }
-    memcpy(bio_pubkey_copy, bio_pubkey_text, bytes);
-    bio_pubkey_copy[bytes] = '\0';
-    BIO_free(bp);
-
-    return bio_pubkey_copy;
+  return bio_pubkey_str;
 }
 
+
+std::string SignatureManager::GetActivePubkeys() {
+  std::string pubkeys;
+  for (std::vector<RSA *>::const_iterator it = public_keys_.begin();
+       it != public_keys_.end();
+       it++) {
+    pubkeys += GenerateKeyText(*it);
+  }
+  if (certificate_) {
+    // Increases the refcount of the rsa object.
+    RSA *rsa = EVP_PKEY_get1_RSA(X509_get_pubkey(certificate_));
+    if (rsa) {
+      pubkeys += GenerateKeyText(rsa);
+      RSA_free(rsa);
+    }
+  }
+  return pubkeys;
+}
 
 /**
  * Loads a list of blacklisted certificates (fingerprints) from a file.
@@ -614,8 +613,6 @@ bool SignatureManager::Verify(const unsigned char *buffer,
     result = true;
     RSA *rsa = EVP_PKEY_get1_RSA(X509_get_pubkey(certificate_));
     if (rsa) {
-      free(last_letter_pubkey_);
-      last_letter_pubkey_ = GenerateKeyText(rsa);
       RSA_free(rsa);
     }
   }
@@ -650,9 +647,6 @@ bool SignatureManager::VerifyRsa(const unsigned char *buffer,
         (memcmp(buffer, to, size) == 0))
     {
       free(to);
-      free(last_letter_pubkey_);
-      last_letter_pubkey_ = GenerateKeyText(public_keys_[i]);
-      printf("Pubkey used:\n%s\n", last_letter_pubkey_);
       return true;
     }
 
