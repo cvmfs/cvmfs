@@ -20,13 +20,18 @@ cvmfs_run_test() {
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
 
   echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
-  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -X || return $?
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -X -Z none || return $?
 
   start_transaction $CVMFS_TEST_REPO || return $?
   mkdir -p /cvmfs/$CVMFS_TEST_REPO/external
   mkdir -p /cvmfs/$CVMFS_TEST_REPO/internal
   echo "Hello World" > /cvmfs/$CVMFS_TEST_REPO/external/file
   cp /cvmfs/$CVMFS_TEST_REPO/external/file /cvmfs/$CVMFS_TEST_REPO/internal/file
+
+  # Create a large file to be chunked.
+  echo "creating large file to be chunked"
+  dd if=/dev/urandom of=chunked_file bs=1M count=32
+  cp chunked_file /cvmfs/$CVMFS_TEST_REPO/chunked_file
 
   echo "creating CVMFS snapshot"
   export CVMFS_LOG_LEVEL=4
@@ -40,6 +45,30 @@ cvmfs_run_test() {
   fi
   echo "File in cache is $cache_file"
   mkdir -p /srv/cvmfs/$CVMFS_TEST_REPO/external
+
+  # Verify chunked files are really chunked, readable, and have the correct
+  cp chunked_file /srv/cvmfs/$CVMFS_TEST_REPO/chunked_file
+  local chunked_true_hash=$(cat chunked_file | sha1sum | awk '{print $1;}')
+  local chunked_cvmfs_hash=$(attr -qg hash /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/chunked_file)
+  local chunked_cvmfs_read=$(cat /cvmfs/$CVMFS_TEST_REPO/chunked_file | sha1sum | awk '{print $1;}')
+  local chunk_count=$(attr -qg chunks /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/chunked_file)
+  local chunk_external=$(attr -qg external_file /var/spool/cvmfs/test.cern.ch/rdonly/chunked_file)
+  if [ "x$chunk_external" != "x1" ]; then
+    echo "Chunked file is not marked as external."
+    return 24
+  fi
+  if [ x"$chunked_true_hash" != x"$chunked_cvmfs_hash" ]; then
+    echo "Correct hash is $chunked_true_hash but CVMFS thinks file hash is $chunked_cvmfs_hash"
+    return 25
+  fi
+  if [ x"$chunked_cvmfs_read" != x"$chunked_cvmfs_hash" ]; then
+    echo "Correct hash is $chunked_cvmfs_hash but CVMFS output was $chunked_cvmfs_read"
+    return 26
+  fi
+  if [[ "$chunk_count" -lt 2 ]]; then
+    echo "Chunk count is $chunk_count"
+    return 27
+  fi
 
   # Make sure file is NOT in the spool area but instead in the external area
   mv "$cache_file" /srv/cvmfs/$CVMFS_TEST_REPO/external/file

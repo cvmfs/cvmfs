@@ -136,6 +136,10 @@ struct JobInfo {
   const shash::Any *expected_hash;
   const std::string *extra_info;
 
+  // Allow byte ranges to be specified.
+  off_t range_offset;
+  off_t range_size;
+
   // Default initialization of fields
   void Init() {
     url = NULL;
@@ -165,6 +169,9 @@ struct JobInfo {
     error_code = kFailOther;
     num_used_proxies = num_used_hosts = num_retries = 0;
     backoff_ms = 0;
+
+    range_offset = -1;
+    range_size = -1;
   }
 
   // One constructor per destination + head request

@@ -195,11 +195,12 @@ EOF
 
   echo "Mount the repository in $REPO_MOUNTPOINT to verify it"
   REPO_MOUNTPOINT="$(pwd)/mnt"
-  trap desaster_cleanup EXIT HUP INT TERM
-  do_local_mount $mnt_point $CVMFS_TEST_REPO XXX $local_conf || return 41
+  local retval=0
+  do_local_mount $mnt_point $CVMFS_TEST_REPO XXX $local_conf || retval=41
 
-  ls $mnt_point || return 42
-  diff $mnt_point/large $reference_dir/large || return 43
+  ls $mnt_point || retval=42
+  diff $mnt_point/large $reference_dir/large || retval=43
+  desaster_cleanup $mnt_point $replica_name
 
   return 0
 }

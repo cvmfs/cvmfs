@@ -131,9 +131,6 @@ class SyncUnion {
   bool IsInitialized() const { return initialized_; }
   virtual bool SupportsHardlinks() const { return false; }
 
-  void SetExternalData(bool external_data) {external_data_ = external_data;}
-  bool GetExternalData() const {return external_data_;}
-
  protected:
   std::string rdonly_path_;
   std::string scratch_path_;
@@ -202,7 +199,6 @@ class SyncUnion {
 
  private:
   bool initialized_;
-  bool external_data_;
 };  // class SyncUnion
 
 

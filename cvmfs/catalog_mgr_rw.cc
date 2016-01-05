@@ -335,7 +335,6 @@ void WritableCatalogManager::AddDirectory(const DirectoryEntryBase &entry,
 void WritableCatalogManager::AddFile(
   const DirectoryEntry  &entry,
   const XattrList       &xattrs,
-        bool             external_data,
   const std::string     &parent_directory)
 {
   const string parent_path = MakeRelativePath(parent_directory);
@@ -350,7 +349,8 @@ void WritableCatalogManager::AddFile(
   }
 
   assert(!entry.IsRegular() || !entry.checksum().IsNull());
-  catalog->AddEntry(entry, xattrs, file_path, parent_path, external_data);
+  assert(entry.IsRegular() || !entry.IsExternalFile());
+  catalog->AddEntry(entry, xattrs, file_path, parent_path);
   SyncUnlock();
 }
 
@@ -366,7 +366,7 @@ void WritableCatalogManager::AddChunkedFile(
   DirectoryEntry full_entry(entry);
   full_entry.set_is_chunked_file(true);
 
-  AddFile(full_entry, xattrs, false, parent_directory);
+  AddFile(full_entry, xattrs, parent_directory);
 
   const string parent_path = MakeRelativePath(parent_directory);
   const string file_path   = entry.GetFullPath(parent_path);
@@ -402,7 +402,7 @@ void WritableCatalogManager::AddHardlinkGroup(
   if (entries.size() == 1) {
     DirectoryEntry fix_linkcount(entries[0]);
     fix_linkcount.set_linkcount(1);
-    return AddFile(fix_linkcount, xattrs, false, parent_directory);
+    return AddFile(fix_linkcount, xattrs, parent_directory);
   }
 
   LogCvmfs(kLogCatalog, kLogVerboseMsg, "adding hardlink group %s/%s",
