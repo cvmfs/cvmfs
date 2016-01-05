@@ -1637,7 +1637,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
         FileChunkList chunks;
         if (!catalog_manager_->ListFileChunks(path, d.hash_algorithm(),
-                                             &chunks) ||
+                                              &chunks) ||
             chunks.IsEmpty())
         {
           LogCvmfs(kLogCvmfs, kLogDebug| kLogSyslogErr, "file %s is marked as "
@@ -1652,6 +1652,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       }
     } else {
       fuse_reply_err(req, ENOATTR);
+      return;
     }
   } else if (attr == "user.external_file") {
     if (d.IsRegular()) {
