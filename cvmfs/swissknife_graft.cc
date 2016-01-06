@@ -13,10 +13,105 @@
 #include <cstdio>
 #include <vector>
 
-#include "compression.h"
 #include "fs_traversal.h"
 #include "hash.h"
 #include "platform.h"
+
+
+bool
+swissknife::CommandGraft::ChecksumFdWithChunks(
+                                 int fd,
+                                 zlib::Compressor *compressor,
+                                 uint64_t *file_size,
+                                 shash::Any *file_hash,
+                                 std::vector<uint64_t> *chunk_offsets,
+                                 std::vector<shash::Any> *chunk_checksums) {
+  if (!compressor || !file_size || !file_hash) {
+    return false;
+  }
+  *file_size = 0;
+  shash::Any chunk_hash(hash_alg_);
+  ssize_t bytes_read;
+  unsigned char in_buf[zlib::kZChunk];
+  unsigned char *cur_in_buf = in_buf;
+  size_t in_buf_size = zlib::kZChunk;
+  unsigned char out_buf[zlib::kZChunk];
+  size_t avail_in = 0;
+
+  // Initialize the file and per-chunk checksums
+  shash::ContextPtr file_hash_context(hash_alg_);
+  file_hash_context.buffer = alloca(file_hash_context.size);
+  shash::Init(file_hash_context);
+
+  shash::ContextPtr chunk_hash_context(hash_alg_);
+  chunk_hash_context.buffer = alloca(chunk_hash_context.size);
+  shash::Init(chunk_hash_context);
+
+  bool do_chunk = chunk_size_ > 0;
+  if (do_chunk) {
+    if (!chunk_offsets || !chunk_checksums) {
+      return false;
+    }
+    chunk_offsets->push_back(0);
+  }
+
+  bool flush;
+  do {
+    bytes_read = read(fd, cur_in_buf + avail_in, in_buf_size);
+    if (-1 == bytes_read) {
+      if (errno == EINTR) {continue;}
+      LogCvmfs(kLogCvmfs, kLogStderr, "Failure when reading file: %s",
+                                      strerror(errno));
+      return false;
+    }
+    *file_size += bytes_read;
+    avail_in += bytes_read;
+
+    flush = (static_cast<size_t>(bytes_read) < in_buf_size);
+
+    // If possible, make progress on deflate.
+    unsigned char *cur_out_buf = out_buf;
+    size_t avail_out;
+    compressor->Deflate(flush, &cur_in_buf, &avail_in, &cur_out_buf, &avail_out);
+    shash::Update(out_buf, avail_out, file_hash_context);
+    if (do_chunk) shash::Update(out_buf, avail_out, chunk_hash_context);
+
+    if (!avail_in) {
+      // All bytes are consumed; set the buffer back to the beginning.
+      cur_in_buf = in_buf;
+      in_buf_size = zlib::kZChunk;
+    } else {
+      in_buf_size = zlib::kZChunk - (cur_in_buf - in_buf) - avail_in;
+    }
+
+    // Start a new hash if current one is above threshold
+    if (do_chunk && (*file_size - chunk_offsets->back() > chunk_size_)) {
+      shash::Final(chunk_hash_context, &chunk_hash);
+      chunk_offsets->push_back(*file_size);
+      chunk_checksums->push_back(chunk_hash);
+      shash::Init(chunk_hash_context);
+    }
+  } while (!flush);
+
+  shash::Final(file_hash_context, file_hash);
+  if (do_chunk) {
+    shash::Final(chunk_hash_context, &chunk_hash);
+    chunk_checksums->push_back(chunk_hash);
+  }
+
+  // Zero-size chunks are not allowed;
+  if (do_chunk && (chunk_offsets->back() == *file_size)) {
+    chunk_offsets->pop_back();
+    chunk_checksums->pop_back();
+  }
+
+  // Do not chunk a file if it is under threshold.
+  if (do_chunk && (chunk_offsets->size() == 1)) {
+    chunk_offsets->clear();
+    chunk_checksums->clear();
+  }
+  return true;
+}
 
 
 bool swissknife::CommandGraft::DirCallback(const std::string &relative_path,
@@ -61,6 +156,15 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   compression_alg_ = (args.find('Z') == args.end()) ?
                      zlib::kNoCompression :
                      zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
+
+  std::string chunk_size = (args.find('c') == args.end()) ?
+                           "32" : *args.find('c')->second;
+  if (!String2Uint64Parse(chunk_size, &chunk_size_)) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "Unable to parse chunk size: %s",
+                                    chunk_size.c_str());
+    return 1;
+  }
+  chunk_size_ *= 1024*1024; // Convert to MB.
 
   platform_stat64 sbuf;
   bool output_file_is_dir = output_file.size() &&
@@ -125,18 +229,19 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   }
   mode_t input_file_mode = input_file_is_stdin ? 0644 : sbuf.st_mode;
 
-  shash::Any hash(hash_alg_);
+  shash::Any file_hash(hash_alg_);
   uint64_t processed_size;
-  bool retval;
-  if (compression_alg_ == zlib::kZlibDefault) {
-    retval = zlib::CompressFd2Null(fd, &hash, &processed_size);
-  } else if (compression_alg_ == zlib::kNoCompression) {
-    processed_size = sbuf.st_size;
-    retval = HashFd(fd, &hash);
-  } else {
-    // Touch this if we add compression algorithms in the future.
-    abort();
-  }
+  std::vector<uint64_t> chunk_offsets;
+  std::vector<shash::Any> chunk_checksums;
+  zlib::Compressor * compressor = zlib::Compressor::Construct(compression_alg_);
+
+  bool retval = ChecksumFdWithChunks(fd,
+                                     compressor,
+                                     &processed_size,
+                                     &file_hash,
+                                     &chunk_offsets,
+                                     &chunk_checksums);
+
   if (!input_file_is_stdin) {close(fd);}
   if (!retval) {
     std::string errmsg = "Unable to checksum input file (" + input_file + ")";
@@ -166,7 +271,24 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
   }
   const bool with_suffix = true;
   std::string graft_contents = "size=" + StringifyInt(processed_size) + "\n" +
-                               "checksum=" + hash.ToString(with_suffix) + "\n";
+                               "checksum=" + file_hash.ToString(with_suffix) +
+                               "\n";
+  if (!chunk_offsets.empty()) {
+    std::vector<std::string> chunk_off_str;
+    chunk_off_str.reserve(chunk_offsets.size());
+    std::vector<std::string> chunk_ck_str;
+    chunk_ck_str.reserve(chunk_offsets.size());
+    for (unsigned idx = 0; idx < chunk_offsets.size(); idx++) {
+      chunk_off_str.push_back(StringifyInt(chunk_offsets[idx]));
+      chunk_ck_str.push_back(chunk_checksums[idx].ToStringWithSuffix());
+    }
+    graft_contents += "chunk_offsets=" +
+                      JoinStrings(chunk_off_str, ",") +
+                      "\n";
+    graft_contents += "chunk_checksums=" +
+                      JoinStrings(chunk_ck_str, ",") +
+                      "\n";
+  }
   size_t nbytes = graft_contents.size();
   const char *buf = graft_contents.c_str();
   retval = SafeWrite(fd, buf, nbytes);

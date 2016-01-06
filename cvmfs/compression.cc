@@ -123,7 +123,6 @@ bool CopyPath2Mem(const string &path,
 
 namespace zlib {
 
-const unsigned kZChunk = 16384;
 const unsigned kBufferSize = 32768;
 
 /**
