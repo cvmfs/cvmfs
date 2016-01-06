@@ -4704,7 +4704,7 @@ gc() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "ldr:t:f" option
+  while getopts "ldr:t:fL:" option
   do
     case $option in
       l)
@@ -4721,6 +4721,9 @@ gc() {
       ;;
       f)
         force=1
+      ;;
+      L)
+        deletion_log="$OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
