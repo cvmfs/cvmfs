@@ -4551,6 +4551,7 @@ publish() {
                $dry_run    \
                $manifest   \
                $trunk_hash \
+               ""          \
                -z $gc_timespan      || { local err=$?; publish_failed $name; die "Garbage collection failed ($err)"; }
       sign_manifest $name $manifest || { publish_failed $name; die "Signing failed"; }
     fi
@@ -4699,6 +4700,7 @@ gc() {
   local preserve_timestamp=0
   local timestamp_threshold=""
   local force=0
+  local deletion_log=""
 
   # optional parameter handling
   OPTIND=1
@@ -4828,6 +4830,7 @@ gc() {
              "$dry_run"        \
              "$manifest"       \
              "$base_hash"      \
+             "$deletion_log"   \
              $additional_switches || die "Fail ($?)!"
 
     # sign the result
@@ -4854,7 +4857,8 @@ __run_gc() {
   local dry_run="$3"
   local manifest="$4"
   local base_hash="$5"
-  shift 5
+  local deletion_log="$6"
+  shift 6
   local additional_switches="$*"
 
   load_repo_config $name
@@ -4869,6 +4873,13 @@ __run_gc() {
   if is_stratum0 $name; then
     [ x"$manifest"  != x"" ] || return 4
     [ x"$base_hash" != x"" ] || return 5
+  fi
+
+  # handle a configured deletion log (manually passed log has precedence)
+  if [ x"$deletion_log" != x"" ]; then
+    additional_switches="$additional_switches -L $deletion_log"
+  elif [ ! -z $CVMFS_GC_DELETION_LOG ]; then
+    additional_switches="$additional_switches -L $CVMFS_GC_DELETION_LOG"
   fi
 
   # do it!
@@ -5085,6 +5096,7 @@ snapshot() {
       __run_gc "$alias_name" \
                "$stratum1"   \
                "$dry_run"    \
+               ""            \
                ""            \
                ""            \
                -z $gc_timespan || die "Garbage collection failed ($?)"
