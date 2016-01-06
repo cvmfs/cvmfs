@@ -10,6 +10,7 @@
 #include <string>
 
 #include "directory_entry.h"
+#include "file_chunk.h"
 #include "hash.h"
 #include "platform.h"
 #include "util.h"
@@ -47,6 +48,7 @@ class SyncItem {
 
  public:
   SyncItem();
+  ~SyncItem();
 
   inline bool IsDirectory()       const { return IsType(kItemDir);             }
   inline bool WasDirectory()      const { return WasType(kItemDir);            }
@@ -65,7 +67,9 @@ class SyncItem {
 
   bool HasGraftMarker()           const { return graft_marker_present_;        }
   bool IsValidGraft()             const { return valid_graft_;                 }
+  bool IsChunkedGraft()           const { return graft_chunklist_;             }
 
+  inline const FileChunkList* GetGraftChunks() const {return graft_chunklist_;}
   inline shash::Any GetContentHash() const { return content_hash_; }
   inline void SetContentHash(const shash::Any &hash) { content_hash_ = hash; }
   inline bool HasContentHash() const { return !content_hash_.IsNull(); }
@@ -222,6 +226,9 @@ class SyncItem {
   bool external_data_;
   std::string relative_parent_path_;
   std::string filename_;
+  FileChunkList *graft_chunklist_;    /**< Chunklist from graft.  Not
+                                           initialized by default to save
+                                           memory*/
   ssize_t graft_size_;
 
   mutable SyncItemType scratch_type_;
