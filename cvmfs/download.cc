@@ -1717,25 +1717,7 @@ void DownloadManager::GetTimeout(unsigned *seconds_proxy,
  * removes the host list.
  */
 void DownloadManager::SetHostChain(const string &host_list) {
-  pthread_mutex_lock(lock_options_);
-  opt_timestamp_backup_host_ = 0;
-  delete opt_host_chain_;
-  delete opt_host_chain_rtt_;
-  opt_host_chain_current_ = 0;
-
-  if (host_list == "") {
-    opt_host_chain_ = NULL;
-    opt_host_chain_rtt_ = NULL;
-    pthread_mutex_unlock(lock_options_);
-    return;
-  }
-
-  opt_host_chain_ = new vector<string>(SplitString(host_list, ';'));
-  opt_host_chain_rtt_ =
-    new vector<int>(opt_host_chain_->size(), kProbeUnprobed);
-  // LogCvmfs(kLogDownload, kLogSyslog, "using host %s",
-  //          (*opt_host_chain_)[0].c_str());
-  pthread_mutex_unlock(lock_options_);
+  SetHostChain(SplitString(host_list, ';'));
 }
 
 
