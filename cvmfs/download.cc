@@ -2061,12 +2061,6 @@ bool DownloadManager::ProbeGeo() {
   if ((host_chain.size() < 2) && ((proxy_chain.size() - fallback_group) < 2))
     return true;
 
-  // Protect against concurrent access to prng_
-  pthread_mutex_lock(lock_options_);
-  // Determine random hosts for the Geo-API query
-  vector<string> host_chain_shuffled = Shuffle(host_chain, &prng_);
-  pthread_mutex_unlock(lock_options_);
-
   vector<string> host_names;
   for (unsigned i = 0; i < host_chain.size(); ++i)
     host_names.push_back(dns::ExtractHost(host_chain[i]));
@@ -2086,8 +2080,7 @@ bool DownloadManager::ProbeGeo() {
   std::vector<uint64_t> geo_order;
   bool success = GeoSortServers(&host_names, &geo_order);
   if (!success) {
-    LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
-             "failed to retrieve geographic order from stratum 1 servers");
+    // GeoSortServers already logged a failure message.
     return false;
   }
 

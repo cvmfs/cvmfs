@@ -2593,7 +2593,8 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::external_download_manager_ = new download::DownloadManager();
   cvmfs::external_download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_, "download-external");
-  cvmfs::external_download_manager_->SetHostChain(external_host.size() ?
+  
+  cvmfs::external_download_manager_->SetHostChain(!external_host.empty() ?
                                                   external_host : hostname);
   if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||
       (dns_retries != download::DownloadManager::kDnsDefaultRetries))
@@ -2644,9 +2645,16 @@ static int Init(const loader::LoaderExports *loader_exports) {
   g_external_download_ready = true;
   if (use_geo_api) {
     std::vector<std::string> host_chain;
-    cvmfs::external_download_manager_->GetHostInfo(&host_chain, NULL, NULL);
-    cvmfs::download_manager_->GeoSortServers(&host_chain);
-    cvmfs::external_download_manager_->SetHostChain(host_chain);
+    // If no external host was specified, reuse the geo API ordering
+    // of the regular download manager.
+    if (external_host.empty()) {
+      cvmfs::download_manager_->GetHostInfo(&host_chain, NULL, NULL);
+      cvmfs::external_download_manager_->SetHostChain(host_chain);
+    } else {
+      cvmfs::external_download_manager_->GetHostInfo(&host_chain, NULL, NULL);
+      cvmfs::download_manager_->GeoSortServers(&host_chain);
+      cvmfs::external_download_manager_->SetHostChain(host_chain);
+    }
   }
 
 
