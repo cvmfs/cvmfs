@@ -26,5 +26,13 @@ cvmfs_run_test() {
   cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded || return 30
   diff reference downloaded || return 40
 
+  echo "create a revision in the repository" # Regression test: used to lose the
+                                             # hash to the repoinfo on publish
+  start_transaction $CVMFS_TEST_REPO || return 41
+  publish_repo      $CVMFS_TEST_REPO || return 42
+
+  cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded || return 50
+  diff reference downloaded || return 51
+
   return 0
 }
