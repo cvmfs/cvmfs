@@ -206,7 +206,7 @@ int cvmfs_globals::Setup(const options &opts) {
   }
 
   // Create cache directory, if necessary
-  if (!MkdirDeep(cache_directory_, 0700)) {
+  if (!MkdirDeep(cache_directory_, 0700, false)) {
     PrintError("cannot create cache directory " + cache_directory_);
     return LIBCVMFS_FAIL_MKCACHE;
   }
@@ -232,7 +232,7 @@ int cvmfs_globals::Setup(const options &opts) {
   // Also, it brings speed later on.
   if (opts.change_to_cache_directory) {
     if (opts.alien_cachedir != "")
-      MkdirDeep(opts.alien_cachedir, 0770);
+      MkdirDeep(opts.alien_cachedir, 0770, false);
     if (chdir(cache_directory_.c_str()) != 0) {
       PrintError("cache directory " + cache_directory_ + " is unavailable");
       return LIBCVMFS_FAIL_OPENCACHE;

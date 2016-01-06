@@ -337,7 +337,7 @@ int main(int argc, char **argv) {
   has_fuse_group = GetGidOf("fuse", &gid_fuse);
 
   // Prepare cache directory
-  retval = MkdirDeep(cachedir, 0755);
+  retval = MkdirDeep(cachedir, 0755, false);
   if (!retval) {
     LogCvmfs(kLogCvmfs, kLogStderr, "Failed to create cache directory %s",
              cachedir.c_str());

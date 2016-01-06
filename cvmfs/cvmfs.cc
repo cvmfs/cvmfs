@@ -2388,7 +2388,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
       "Number of I/O errors");
 
   // Create cache directory, if necessary
-  if (!MkdirDeep(*cvmfs::cachedir_, 0700)) {
+  if (!MkdirDeep(*cvmfs::cachedir_, 0700, false)) {
     *g_boot_error = "cannot create cache directory " + *cvmfs::cachedir_;
     return loader::kFailCacheDir;
   }
@@ -2632,7 +2632,7 @@ static int Init(const loader::LoaderExports *loader_exports) {
   cvmfs::external_download_manager_ = new download::DownloadManager();
   cvmfs::external_download_manager_->Init(cvmfs::kDefaultNumConnections, false,
       cvmfs::statistics_, "download-external");
-  
+
   cvmfs::external_download_manager_->SetHostChain(!external_host.empty() ?
                                                   external_host : hostname);
   if ((dns_timeout_ms != download::DownloadManager::kDnsDefaultTimeoutMs) ||

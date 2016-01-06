@@ -478,23 +478,32 @@ bool SymlinkForced(const std::string &src, const std::string &dest) {
  * The mkdir -p command.  Additionally checks if the directory is writable
  * if it exists.
  */
-bool MkdirDeep(const std::string &path, const mode_t mode) {
+bool MkdirDeep(
+  const std::string &path,
+  const mode_t mode,
+  bool verify_writable)
+{
   if (path == "") return false;
 
   int retval = mkdir(path.c_str(), mode);
   if (retval == 0) return true;
 
-  if ((errno == ENOENT) && (MkdirDeep(GetParentPath(path), mode))) {
-    return MkdirDeep(path, mode);
+  if ((errno == ENOENT) &&
+      (MkdirDeep(GetParentPath(path), mode, verify_writable)))
+  {
+    return MkdirDeep(path, mode, verify_writable);
   }
 
   if (errno == EEXIST) {
     platform_stat64 info;
     if ((platform_stat(path.c_str(), &info) == 0) && S_ISDIR(info.st_mode)) {
-      // Check writability
-      retval = utimes(path.c_str(), NULL);
-      if (retval == 0)
+      if (verify_writable) {
+        retval = utimes(path.c_str(), NULL);
+        if (retval == 0)
+          return true;
+      } else {
         return true;
+      }
     }
   }
 
