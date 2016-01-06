@@ -285,6 +285,14 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::LogDeletion(
     LogCvmfs(kLogGc, kLogStdout, "Sweep: %s",
                                  hash.ToStringWithSuffix().c_str());
   }
+
+  if (configuration_.has_deletion_log()) {
+    const int written = fprintf(configuration_.deleted_objects_logfile,
+                                "%s\n", hash.ToStringWithSuffix().c_str());
+    if (written < 0) {
+      LogCvmfs(kLogGc, kLogStderr, "failed to write to deleted objects log");
+    }
+  }
 }
 
 #endif  // CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
