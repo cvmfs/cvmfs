@@ -1,0 +1,29 @@
+
+cvmfs_test_name="Pubkeys xattr"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO || return $?
+
+  local known_pubkey=$(find /etc/cvmfs/keys/ -name "${CVMFS_TEST_REPO}.pub")
+  attr -qg pubkeys /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly > pubkey_attr
+
+  if `diff -q pubkey_attr $known_pubkey`; then
+    echo "Pubkeys match:"
+    cat pubkey_attr
+  else
+    echo "Correct pubkey:"
+    cat "$known_pubkey"
+    echo "pubkey from xattr:"
+    cat pubkey_attr
+    diff -u pubkey_attr $known_pubkey
+    return 1
+  fi
+
+  return 0
+}
+
