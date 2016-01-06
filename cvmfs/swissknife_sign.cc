@@ -266,8 +266,9 @@ void swissknife::CommandSign::CertificateUploadCallback(
   if (result.return_code == 0) {
     certificate_hash = result.content_hash;
   } else {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate (retcod: %d)",
-             result.return_code);
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload certificate "
+                                    "(retcode: %d)",
+                                    result.return_code);
   }
   certificate_hash_.Set(certificate_hash);
 }
@@ -279,7 +280,7 @@ void swissknife::CommandSign::MetainfoUploadCallback(
   if (result.return_code == 0) {
     metainfo_hash = result.content_hash;
   } else {
-    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info (retcod: %d)",
+    LogCvmfs(kLogCvmfs, kLogStderr, "Failed to upload meta info (retcode: %d)",
              result.return_code);
   }
   metainfo_hash_.Set(metainfo_hash);

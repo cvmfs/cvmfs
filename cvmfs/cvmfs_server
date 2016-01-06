@@ -192,7 +192,7 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
     skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
-    update-info repo-metainfo"
+    update-info update-repoinfo"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -276,82 +276,83 @@ CernVM-FS Server Tool $(cvmfs_version_string)
 Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
-  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner] [-X (external data)]
-                [-m replicable] [-f union filesystem type] [-v volatile content]
-                [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
-                [-z enable garbage collection] [-s S3 config file]
-                [-Z compression algorithm (default: zlib)]
-                [-k path to existing keychain] [-p no apache config]
-                [-V VOMS authorization]
-                <fully qualified repository name>
-                Creates a new repository with a given name
-  add-replica   [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
-                [-a silence apache warning] [-z enable garbage collection]
-                [-n alias name] [-s S3 config file] [-p no apache config]
-                <stratum 0 url> <public key>
-                Creates a Stratum 1 replica of a Stratum 0 repository
-  import        [-w stratum0 url] [-o owner] [-u upstream storage]
-                [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                [-f union filesystem type] [-c file ownership (UID:GID)]
-                [-k path to keys] [-g chown backend] [-r recreate whitelist]
-                [-p no apache config] [-t recreate repo key and certificate]
-                <fully qualified repository name>
-                Imports an old CernVM-FS repository into a fresh 2.1.x repo
-  publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                [-a tag name] [-c tag channel] [-m tag description]
-                [-X (force external data) | -N (force native data)]
-                [-Z compression algorithm]
-                <fully qualified name>
-                Make a new repository snapshot
-  rmfs          [-p(reserve) repo data and keys] [-f don't ask again]
-                <fully qualified name>
-                Remove the repository
-  abort         [-f don't ask again]
-                <fully qualified name>
-                Abort transaction and return to the state before
-  rollback      [-t tag] [-f don't ask again]
-                <fully qualified name>
-                Re-publishes the given tag as the new latest revision.
-                All snapshots between trunk and the target tag become
-                inaccessible.  Without a tag name, trunk-previous is used.
-  resign        <fully qualified name>
-                Re-sign the 30 day whitelist
-  list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
-                [-x machine readable]
-                <fully qualified name>
-                Print a full list of all nested catalogs of a repository
-  info          <fully qualified name>
-                Print summary about the repository
-  tag           Create and manage named snapshots
-                [-a create tag <name>] [-c channel] [-m message] [-h root hash]
-                [-r remove tag <name>] [-f don't ask again]
-                [-i inspect tag <name>] [-x machine readable]
-                [-l list tags] [-x machine readable]
-                <fully qualified name>
-                Print named tags (snapshots) of the repository
-  check         [-c disable data chunk existence check]
-                [-i check data integrity] (may take some time)]
-                [-t tag (check given tag instead of trunk)]
-                [-s path to nested catalog subtree to check]
-                <fully qualified name>
-                Checks if the repository is sane
-  transaction   <fully qualified name>
-                Start to edit a repository
-  snapshot      [-t fail if other snapshot is in progress]
-                <fully qualified name>
-                Synchronize a Stratum 1 replica with the Stratum 0 source
-  snapshot -a   [-s use separate logs in /var/log/cvmfs for each repository]
-                [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
-                [-i skip repositories that have not run initial snapshot]
-                Do snapshot on all active replica repositories
-  migrate       <fully qualified name>
-                Migrates a repository to the current version of CernVM-FS
-  list          List available repositories
-  update-geodb  [-l update lazily based on CVMFS_UPDATEGEO* variables]
-                Updates the geo-IP database
-  update-info   [-p no apache config] [-e don't edit /info/meta]
-                Open meta info JSON file for editing
-  repo-metainfo Open repository meta info JSON file for editing
+  mkfs            [-w stratum0 url] [-u upstream storage] [-o owner]
+                  [-m replicable] [-f union filesystem type] [-s S3 config file]
+                  [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
+                  [-z enable garbage collection] [-v volatile content]
+                  [-Z compression algorithm (default: zlib)]
+                  [-k path to existing keychain] [-p no apache config]
+                  [-V VOMS authorization] [-X (external data)]
+                  <fully qualified repository name>
+                  Creates a new repository with a given name
+  add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
+                  [-a silence apache warning] [-z enable garbage collection]
+                  [-n alias name] [-s S3 config file] [-p no apache config]
+                  <stratum 0 url> <public key>
+                  Creates a Stratum 1 replica of a Stratum 0 repository
+  import          [-w stratum0 url] [-o owner] [-u upstream storage]
+                  [-l import legacy repo (2.0.x)] [-s show migration statistics]
+                  [-f union filesystem type] [-c file ownership (UID:GID)]
+                  [-k path to keys] [-g chown backend] [-r recreate whitelist]
+                  [-p no apache config] [-t recreate repo key and certificate]
+                  <fully qualified repository name>
+                  Imports an old CernVM-FS repository into a fresh 2.1.x repo
+  publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
+                  [-a tag name] [-c tag channel] [-m tag description]
+                  [-X (force external data) | -N (force native data)]
+                  [-Z compression algorithm]
+                  <fully qualified name>
+                  Make a new repository snapshot
+  rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
+                  <fully qualified name>
+                  Remove the repository
+  abort           [-f don't ask again]
+                  <fully qualified name>
+                  Abort transaction and return to the state before
+  rollback        [-t tag] [-f don't ask again]
+                  <fully qualified name>
+                  Re-publishes the given tag as the new latest revision.
+                  All snapshots between trunk and the target tag become
+                  inaccessible.  Without a tag name, trunk-previous is used.
+  resign          <fully qualified name>
+                  Re-sign the 30 day whitelist
+  list-catalogs   [-s catalog sizes] [-e catalog entry counts]
+                  [-h catalog hashes] [-x machine readable]
+                  <fully qualified name>
+                  Print a full list of all nested catalogs of a repository
+  info            <fully qualified name>
+                  Print summary about the repository
+  tag             Create and manage named snapshots
+                  [-a create tag <name>] [-c channel] [-m message] [-h hash]
+                  [-r remove tag <name>] [-f don't ask again]
+                  [-i inspect tag <name>] [-x machine readable]
+                  [-l list tags] [-x machine readable]
+                  <fully qualified name>
+                  Print named tags (snapshots) of the repository
+  check           [-c disable data chunk existence check]
+                  [-i check data integrity] (may take some time)]
+                  [-t tag (check given tag instead of trunk)]
+                  [-s path to nested catalog subtree to check]
+                  <fully qualified name>
+                  Checks if the repository is sane
+  transaction     <fully qualified name>
+                  Start to edit a repository
+  snapshot        [-t fail if other snapshot is in progress]
+                  <fully qualified name>
+                  Synchronize a Stratum 1 replica with the Stratum 0 source
+  snapshot -a     [-s use separate logs in /var/log/cvmfs for each repository]
+                  [-n do not warn if /etc/logrotate.d/cvmfs does not exist]
+                  [-i skip repositories that have not run initial snapshot]
+                  Do snapshot on all active replica repositories
+  migrate         <fully qualified name>
+                  Migrates a repository to the current version of CernVM-FS
+  list            List available repositories
+  update-geodb    [-l update lazily based on CVMFS_UPDATEGEO* variables]
+                  Updates the geo-IP database
+  update-info     [-p no apache config] [-e don't edit /info/meta]
+                  Open meta info JSON file for editing
+  update-repoinfo <fully qualified name>
+                  Open repository meta info JSON file for editing
 "
 
 
@@ -2534,7 +2535,7 @@ check_jq() {
 }
 
 
-edit_json_unil_valid() {
+edit_json_until_valid() {
   local json_file="$1"
   local editor=$(get_editor)
   local has_jq=$(check_jq)
@@ -2572,7 +2573,7 @@ create_repometa_skeleton() {
   "administrator" : "Your Name",
   "email"         : "you@organisation.org",
   "organisation"  : "Your Organisation",
-  "description"   : "Repository content"
+  "description"   : "Repository content",
   "recommended-stratum1s" : [ "stratum1 url", "stratum1 url" ],
 
   "custom" : {
@@ -2991,6 +2992,9 @@ mkfs() {
 
   echo -n "Creating Initial Repository... "
   create_whitelist $name $cvmfs_user $upstream $temp_dir > /dev/null
+  local repoinfo_file=${temp_dir}/new_repoinfo
+  touch $repoinfo_file
+  create_repometa_skeleton $repoinfo_file
   local volatile_opt=
   if [ $volatile_content -eq 1 ]; then
     volatile_opt="-v"
@@ -3010,8 +3014,8 @@ mkfs() {
     create_cmd="$create_cmd -V $voms_authz"
     echo "CVMFS_VOMS_AUTHZ=$voms_authz" >> /etc/cvmfs/repositories.d/$name/server.conf
   fi
-  $user_shell "$create_cmd" > /dev/null        || die "fail! (cannot init repo)"
-  sign_manifest $name ${temp_dir}/new_manifest || die "fail! (cannot sign repo)"
+  $user_shell "$create_cmd" > /dev/null                       || die "fail! (cannot init repo)"
+  sign_manifest $name ${temp_dir}/new_manifest $repoinfo_file || die "fail! (cannot sign repo)"
   echo "done"
 
   echo -n "Mounting CernVM-FS Storage... "
@@ -5194,7 +5198,7 @@ EOF
 
   done|sort -n|cut -d: -f2)"
 
-  for repo in $repos; do 
+  for repo in $repos; do
     if [ $separate_logs -eq 1 ]; then
       log=/var/log/cvmfs/$repo.log
     fi
@@ -5734,12 +5738,14 @@ eliminate_hardlinks() {
 
 ################################################################################
 
-_repo_metainfo_cleanup() {
-  local tmp_file="$1"
-  rm -f $tmp_file > /dev/null 2>&1
+_update_repoinfo_cleanup() {
+  while [ $# -gt 0 ]; do
+    rm -f $1 > /dev/null 2>&1
+    shift 1
+  done
 }
 
-repo_metainfo() {
+update_repoinfo() {
   local name
   local tmp_file
 
@@ -5761,7 +5767,7 @@ repo_metainfo() {
   chown $CVMFS_USER $tmp_file_info $tmp_file_manifest || \
     die "Cannot change ownership of temporary files"
   is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
-  trap "_repo_metainfo_cleanup $tmp_file_info $tmp_file_manifest; \
+  trap "_update_repoinfo_cleanup $tmp_file_info $tmp_file_manifest; \
     close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for meta info editing"
 
@@ -5769,12 +5775,12 @@ repo_metainfo() {
     die "Failed getting repository meta info for $name"
   get_repo_info -R > $tmp_file_manifest || \
     die "Failed getting repository manifest for $name"
-  # TODO: if empty file
-  if [ true ]; then
+
+  if [ -f $tmp_file_info ] && [ ! -s $tmp_file_info ]; then
     create_repometa_skeleton $tmp_file_info
   fi
 
-  edit_json_unil_valid $tmp_file_info
+  edit_json_until_valid $tmp_file_info
   sign_manifest $name $tmp_file_manifest $tmp_file_info
 }
 
@@ -5833,7 +5839,7 @@ update_info() {
     trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
     cp -f "$(get_global_info_path)/meta" $tmp_file
 
-    edit_json_unil_valid $tmp_file || die "Aborting..."
+    edit_json_until_valid $tmp_file || die "Aborting..."
   fi
 
   # update the JSON files
