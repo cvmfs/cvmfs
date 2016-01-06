@@ -1661,8 +1661,6 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
       fuse_reply_err(req, ENOATTR);
       return;
     }
-  } else if (attr == "user.external_data") {
-    attribute_value = catalog_manager_->GetExternalDataRepository() ? "1" : "0";
   } else if (attr == "user.external_host") {
     vector<string> host_chain;
     vector<int> rtt;
@@ -1797,7 +1795,7 @@ static void cvmfs_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size) {
     "user.host\0user.proxy\0user.uptime\0user.nclg\0user.nopen\0"
     "user.ndownload\0user.timeout\0user.timeout_direct\0user.rx\0user.speed\0"
     "user.fqrn\0user.ndiropen\0user.inode_max\0user.tag\0user.host_list\0"
-    "user.external_host\0user.external_data\0user.external_timeout\0";
+    "user.external_host\0user.external_timeout\0";
   string attribute_list;
   if (hide_magic_xattrs_) {
     LogCvmfs(kLogCvmfs, kLogDebug, "Hiding extended attributes");

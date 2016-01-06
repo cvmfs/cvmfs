@@ -39,16 +39,6 @@ const int kDefaultDirMode = S_IXUSR | S_IWUSR | S_IRUSR |
                             S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 
 /**
- * A tristate value in the properties table.
- * TODO(jblomer): rename to something more generic
- */
-enum CatalogProperty {
-  kUnset,
-  kNo,
-  kYes
-};
-
-/**
  * Type Trait:
  * "Static" assertion that a template parameter is a pointer
  */
