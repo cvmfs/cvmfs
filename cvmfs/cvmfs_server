@@ -192,7 +192,7 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
     skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
-    update-info repo-metainfo"
+    update-info update-repoinfo"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -347,7 +347,7 @@ Supported Commands:
                 Updates the geo-IP database
   update-info   [-p no apache config] [-e don't edit /info/meta]
                 Open meta info JSON file for editing
-  repo-metainfo Open repository meta info JSON file for editing
+  update-repoinfo Open repository meta info JSON file for editing
 "
 
 
@@ -5578,12 +5578,12 @@ eliminate_hardlinks() {
 
 ################################################################################
 
-_repo_metainfo_cleanup() {
+_update_repoinfo_cleanup() {
   local tmp_file="$1"
   rm -f $tmp_file > /dev/null 2>&1
 }
 
-repo_metainfo() {
+update_repoinfo() {
   local name
   local tmp_file
 
@@ -5605,7 +5605,7 @@ repo_metainfo() {
   chown $CVMFS_USER $tmp_file_info $tmp_file_manifest || \
     die "Cannot change ownership of temporary files"
   is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
-  trap "_repo_metainfo_cleanup $tmp_file_info $tmp_file_manifest; \
+  trap "_update_repoinfo_cleanup $tmp_file_info $tmp_file_manifest; \
     close_transaction $name 0" EXIT HUP INT TERM
   open_transaction $name || die "Failed to open transaction for meta info editing"
 

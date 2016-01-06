@@ -3,7 +3,7 @@
   * Print error message at the end of a failing `cvmfs_server check` (CVM-958)
   * Use patched pacparser 1.3.5 for IPv6 support (CVM-903)
   * Add support for VOMS authentication in fuse module (CVM-904)
-  * Add `cvmfs_server repo-metainfo` command (CVM-804)
+  * Add `cvmfs_server update-repoinfo` command (CVM-804)
   * Add `cvmfs_talk cleanup rate` command (CVM-270)
   * Read blacklist from config repository if available (CVM-901)
   * Add support for uncompressed files (CVM-906)
