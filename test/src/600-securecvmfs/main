@@ -182,5 +182,22 @@ cvmfs_run_test() {
     return 40
   fi
 
+  # Check authz attr
+  if [ x"`attr -qg authz /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly`" != "xcvmfs:/cvmfs" ]; then
+    return 41
+  fi
+
+  # Change authz attr and make sure it is reflected.
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cat << EOF > new_authz
+cvmfs:/cvmfs
+foo
+EOF
+  set -x
+  # TODO(bbockelm) Need to change test apache configuration to re-publish.
+  # publish_repo $CVMFS_TEST_REPO -F new_authz
+  # $(attr -qg authz /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly | grep -q foo) || return 42
+  
+
   return 0
 }

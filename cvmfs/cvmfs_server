@@ -4319,6 +4319,7 @@ publish() {
   local verbosity=""
   local manual_revision=""
   local gc_timespan=0
+  local authz_file=""
   local force_external=0
   local force_native=0
   local force_compression_algorithm=""
@@ -4326,7 +4327,7 @@ publish() {
 
   # optional parameter handling
   OPTIND=1
-  while getopts "NXZ:pa:c:m:vn:" option
+  while getopts "F:NXZ:pa:c:m:vn:" option
   do
     case $option in
       p)
@@ -4355,6 +4356,9 @@ publish() {
       ;;
       Z)
         force_compression_algorithm="$OPTARG"
+      ;;
+      F)
+        authz_file="-F $OPTARG"
       ;;
       ?)
         shift $(($OPTIND-2))
@@ -4459,6 +4463,7 @@ publish() {
       -e $hash_algorithm                             \
       -Z $compression_alg                            \
       $(get_follow_http_redirects_flag)              \
+      $authz_file                                    \
       $log_level $tweaks_option $external_option $verbosity"
     if [ "x$CVMFS_UNION_FS_TYPE" != "x" ]; then
       sync_command="$sync_command -f $CVMFS_UNION_FS_TYPE"
@@ -4500,7 +4505,7 @@ publish() {
       sync_command="$sync_command -q $CVMFS_MAXIMAL_CONCURRENT_WRITES"
     fi
     if [ "x${CVMFS_VOMS_AUTHZ}" != x ]; then
-      sync_command="$sync_command -V $CVMFS_VOMS_AUTHZ"
+      sync_command="$sync_command -V"
     fi
     local tag_command="$(__swissknife_cmd dbg) tag_create \
       -r $upstream                                        \

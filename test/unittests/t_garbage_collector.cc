@@ -1223,8 +1223,8 @@ TEST_F(T_GarbageCollector, LogDeletionToFile) {
   UnlinkGuard unlink_guard(dest_path);
 
   GcConfiguration config = GetStandardGarbageCollectorConfiguration();
-  config.keep_history_depth      = 0;            // no history preservation
-  config.deleted_objects_logfile = deletion_log; // log deletion to tmp file
+  config.keep_history_depth      = 0;             // no history preservation
+  config.deleted_objects_logfile = deletion_log;  // log deletion to tmp file
 
   MyGarbageCollector gc(config);
   const bool gc1 = gc.Collect();
@@ -1245,11 +1245,16 @@ TEST_F(T_GarbageCollector, LogDeletionToFile) {
   preserved_hashes.push_back(h("2dc2b87b8ac840e4fb1cad25c806395c931f7b31"));
   preserved_hashes.push_back(h("a727b47d99fba5fe196400a3c7bc1738172dff71"));
   preserved_hashes.push_back(h("80b59550342b6f5141b42e5b2d58ce453f12d710"));
-  preserved_hashes.push_back(h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb",'P'));
-  preserved_hashes.push_back(h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7",'P'));
-  preserved_hashes.push_back(h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4",'P'));
-  preserved_hashes.push_back(h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e",'P'));
-  preserved_hashes.push_back(h("1a17be523120c7d3a7be745ada1658cc74e8507b",'P'));
+  preserved_hashes.push_back(
+    h("defae1853b929bbbdbc7c6d4e75531273f1ae4cb", 'P'));
+  preserved_hashes.push_back(
+    h("24bf4276fcdbe57e648b82af4e8fece5bd3581c7", 'P'));
+  preserved_hashes.push_back(
+    h("acc4c10cf875861ec8d6744a9ab81cb2abe433b4", 'P'));
+  preserved_hashes.push_back(
+    h("654be8b6938b3fb30be3e9476f3ed26db74e0a9e", 'P'));
+  preserved_hashes.push_back(
+    h("1a17be523120c7d3a7be745ada1658cc74e8507b", 'P'));
   preserved_hashes.push_back(h("18588c597700a7e2d3b4ce91bdf5a947a4ad13fc"));
   preserved_hashes.push_back(h("fea3b5156ebbeddb89c85bc14c8e9caa185c10c7"));
   preserved_hashes.push_back(h("0aceb47a362df1522a69217736617493bef07d5a"));

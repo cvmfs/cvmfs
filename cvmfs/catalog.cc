@@ -427,14 +427,14 @@ bool Catalog::GetVOMSAuthz(string *authz) const {
   bool result;
   pthread_mutex_lock(lock_);
   if (voms_authz_status_ == kVomsPresent) {
-    *authz = voms_authz_;
+    if (authz) {*authz = voms_authz_;}
     result = true;
   } else if (voms_authz_status_ == kVomsNone) {
     result = false;
   } else {
     if (database().HasProperty("voms_authz")) {
       voms_authz_ = database().GetProperty<string>("voms_authz");
-      *authz = voms_authz_;
+      if (authz) {*authz = voms_authz_;}
       voms_authz_status_ = kVomsPresent;
     } else {
       voms_authz_status_ = kVomsNone;

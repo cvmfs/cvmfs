@@ -2,6 +2,8 @@
  * This file is part of the CernVM File System.
  */
 
+#include <string>
+
 #include "relaxed_path_filter.h"
 
 using namespace catalog;
