@@ -226,9 +226,11 @@ class SyncItem {
   bool external_data_;
   std::string relative_parent_path_;
   std::string filename_;
-  FileChunkList *graft_chunklist_;    /**< Chunklist from graft.  Not
-                                           initialized by default to save
-                                           memory*/
+
+  /**
+   * Chunklist from graft. Not initialized by default to save memory.
+   */
+  FileChunkList *graft_chunklist_;
   ssize_t graft_size_;
 
   mutable SyncItemType scratch_type_;

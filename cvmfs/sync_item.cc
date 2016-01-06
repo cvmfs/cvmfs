@@ -55,7 +55,7 @@ SyncItem::SyncItem(const string       &relative_parent_path,
 
 
 SyncItem::~SyncItem() {
-  if (graft_chunklist_) {delete graft_chunklist_;}
+  delete graft_chunklist_;
 }
 
 
@@ -288,8 +288,8 @@ void SyncItem::CheckGraft() {
     } else if (info[0] == "chunk_offsets") {
       std::vector<std::string> offsets = SplitString(info[1], ',');
       for (std::vector<std::string>::const_iterator it = offsets.begin();
-           it != offsets.end();
-           it++) {
+           it != offsets.end(); it++)
+      {
         uint64_t val;
         if (!String2Uint64Parse(*it, &val)) {
           valid_graft_ = false;
@@ -302,8 +302,8 @@ void SyncItem::CheckGraft() {
     } else if (info[0] == "chunk_checksums") {
       std::vector<std::string> csums = SplitString(info[1], ',');
       for (std::vector<std::string>::const_iterator it = csums.begin();
-           it != csums.end();
-           it++) {
+           it != csums.end(); it++)
+      {
         shash::HexPtr hashP(*it);
         if (hashP.IsValid()) {
           chunk_checksums.push_back(shash::MkFromHexPtr(hashP));
@@ -325,43 +325,41 @@ void SyncItem::CheckGraft() {
   valid_graft_ = valid_graft_ && (graft_size_ > -1) && found_checksum
                  && (chunk_checksums.size() == chunk_offsets.size());
 
-  // If present, parse chunks.
-  if (valid_graft_ && !chunk_offsets.empty()) {
-    graft_chunklist_ = new FileChunkList(chunk_offsets.size());
-    off_t last_offset = chunk_offsets[0];
-    if (last_offset != 0) {
-      LogCvmfs(kLogFsTraversal, kLogWarning, "First chunk offset must be 0"
-               " (in graft marker %s).", graftfile.c_str());
-      valid_graft_ = false;
-    }
-    for (unsigned idx = 1; idx < chunk_offsets.size(); idx++) {
-      off_t cur_offset = chunk_offsets[idx];
-      if (last_offset >= cur_offset) {
-        LogCvmfs(kLogFsTraversal, kLogWarning, "Chunk offsets must be sorted "
-                 "in strictly increasing order (in graft marker %s).",
-                 graftfile.c_str());
-        valid_graft_ = false;
-        break;
-      }
-      size_t cur_size = cur_offset - last_offset;
-      graft_chunklist_->PushBack(FileChunk(chunk_checksums[idx - 1],
-                                            last_offset,
-                                            cur_size));
-      last_offset = cur_offset;
-    }
-    if (graft_size_ <= last_offset) {
-      LogCvmfs(kLogFsTraversal, kLogWarning, "Last offset must be strictly "
-               "less than total file size (in graft marker %s).",
+  if (!valid_graft_ || chunk_offsets.empty())
+    return;
+
+  // Parse chunks
+  graft_chunklist_ = new FileChunkList(chunk_offsets.size());
+  off_t last_offset = chunk_offsets[0];
+  if (last_offset != 0) {
+    LogCvmfs(kLogFsTraversal, kLogWarning, "First chunk offset must be 0"
+             " (in graft marker %s).", graftfile.c_str());
+    valid_graft_ = false;
+  }
+  for (unsigned idx = 1; idx < chunk_offsets.size(); idx++) {
+    off_t cur_offset = chunk_offsets[idx];
+    if (last_offset >= cur_offset) {
+      LogCvmfs(kLogFsTraversal, kLogWarning, "Chunk offsets must be sorted "
+               "in strictly increasing order (in graft marker %s).",
                graftfile.c_str());
       valid_graft_ = false;
+      break;
     }
-    graft_chunklist_->PushBack(FileChunk(chunk_checksums.back(),
-                                          last_offset,
-                                          graft_size_ - last_offset));
+    size_t cur_size = cur_offset - last_offset;
+    graft_chunklist_->PushBack(FileChunk(chunk_checksums[idx - 1],
+                                         last_offset,
+                                         cur_size));
+    last_offset = cur_offset;
   }
-
-  return;
+  if (graft_size_ <= last_offset) {
+    LogCvmfs(kLogFsTraversal, kLogWarning, "Last offset must be strictly "
+             "less than total file size (in graft marker %s).",
+             graftfile.c_str());
+    valid_graft_ = false;
+  }
+  graft_chunklist_->PushBack(FileChunk(chunk_checksums.back(),
+                                        last_offset,
+                                        graft_size_ - last_offset));
 }
-
 
 }  // namespace publish
