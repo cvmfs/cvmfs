@@ -100,6 +100,7 @@ class GarbageCollector {
 
   void PrintCatalogTreeEntry(const unsigned int  tree_level,
                              const CatalogTN    *catalog) const;
+  void LogDeletion(const shash::Any &hash) const;
 
  private:
   const Configuration   configuration_;

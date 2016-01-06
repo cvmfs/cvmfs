@@ -132,10 +132,7 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::Sweep(
                                                        const shash::Any &hash) {
   ++condemned_objects_;
 
-  if (configuration_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Sweep: %s", hash.ToString().c_str());
-  }
-
+  LogDeletion(hash);
   if (configuration_.dry_run) {
     return;
   }
@@ -278,6 +275,15 @@ void GarbageCollector<CatalogTraversalT, HashFilterT>::PrintCatalogTreeEntry(
     tree_indent.c_str(),
     hash_string.c_str(),
     path.c_str());
+}
+
+
+template <class CatalogTraversalT, class HashFilterT>
+void GarbageCollector<CatalogTraversalT, HashFilterT>::LogDeletion(
+                                                 const shash::Any &hash) const {
+  if (configuration_.verbose) {
+    LogCvmfs(kLogGc, kLogStdout, "Sweep: %s", hash.ToString().c_str());
+  }
 }
 
 #endif  // CVMFS_GARBAGE_COLLECTION_GARBAGE_COLLECTOR_IMPL_H_
