@@ -536,7 +536,6 @@ static void *MainWritePipe(void *void_data) {
 
 
 TEST_F(T_Util, SafeRead) {
-
   // Small read
   int fd[2];
   void *buffer_output = scalloc(40, sizeof(char));
@@ -544,7 +543,7 @@ TEST_F(T_Util, SafeRead) {
   SafeWrite(fd[1], to_write.c_str(), to_write.length());
   close(fd[1]);
   EXPECT_EQ(SafeRead(fd[0], buffer_output, 2*to_write.length()),
-                     static_cast<long>(to_write.length()));
+                     static_cast<size_t>(to_write.length()));
   EXPECT_STREQ(to_write.c_str(), static_cast<const char*>(buffer_output));
   free(buffer_output);
   close(fd[0]);
@@ -562,7 +561,7 @@ TEST_F(T_Util, SafeRead) {
   int retval = pthread_create(&thread, NULL, MainWritePipe, &pdata);
   EXPECT_EQ(0, retval);
   EXPECT_EQ(SafeRead(fd[0], buffer_output, size),
-            static_cast<long>(to_write_large.size()));
+            static_cast<size_t>(to_write_large.size()));
   pthread_join(thread, NULL);
   free(buffer_output);
   close(fd[0]);

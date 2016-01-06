@@ -785,9 +785,9 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
 
   if ((info->range_offset != -1) && (info->range_size)) {
     char byte_range_array[100];
-    if (snprintf(byte_range_array, 100, "%ld-%ld",
-             info->range_offset,
-             info->range_offset + info->range_size - 1) == 100) {
+    if (snprintf(byte_range_array, sizeof(byte_range_array), "%ld-%ld",
+                 info->range_offset,
+                 info->range_offset + info->range_size - 1) == 100) {
       abort();  // Should be impossible given limits on offset size.
     }
     curl_easy_setopt(handle, CURLOPT_RANGE, byte_range_array);

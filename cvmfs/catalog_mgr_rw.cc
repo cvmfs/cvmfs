@@ -692,7 +692,8 @@ void WritableCatalogManager::SetTTL(const uint64_t new_ttl) {
 bool WritableCatalogManager::SetVOMSAuthz(const std::string &voms_authz) {
   bool result;
   SyncLock();
-  result = reinterpret_cast<WritableCatalog *>(GetRootCatalog())->SetVOMSAuthz(voms_authz);
+  result = reinterpret_cast<WritableCatalog *>(
+    GetRootCatalog())->SetVOMSAuthz(voms_authz);
   SyncUnlock();
   return result;
 }

@@ -185,12 +185,12 @@ class Spooler : public Observable<SpoolerResult> {
    */
   void ProcessCertificate(const std::string &local_path);
 
- /**
-  * Convenience wrapper to process a meta info file.
-  *
-  * @param local_path  the location of the meta info file
-  */
- void ProcessMetainfo(const std::string &local_path);
+  /**
+   * Convenience wrapper to process a meta info file.
+   *
+   * @param local_path  the location of the meta info file
+   */
+  void ProcessMetainfo(const std::string &local_path);
 
 
   /**

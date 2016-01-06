@@ -305,7 +305,7 @@ std::string SignatureManager::GenerateKeyText(RSA *pubkey) {
     return "";
   }
   char *bio_pubkey_text;
-  long bytes = BIO_get_mem_data(bp, &bio_pubkey_text);
+  long bytes = BIO_get_mem_data(bp, &bio_pubkey_text);  // NOLINT
   std::string bio_pubkey_str(bio_pubkey_text, bytes);
   BIO_free(bp);
 
