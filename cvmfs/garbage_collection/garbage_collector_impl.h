@@ -282,7 +282,8 @@ template <class CatalogTraversalT, class HashFilterT>
 void GarbageCollector<CatalogTraversalT, HashFilterT>::LogDeletion(
                                                  const shash::Any &hash) const {
   if (configuration_.verbose) {
-    LogCvmfs(kLogGc, kLogStdout, "Sweep: %s", hash.ToString().c_str());
+    LogCvmfs(kLogGc, kLogStdout, "Sweep: %s",
+                                 hash.ToStringWithSuffix().c_str());
   }
 }
 
