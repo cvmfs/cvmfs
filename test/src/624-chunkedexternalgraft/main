@@ -1,0 +1,45 @@
+
+cvmfs_test_name="Pubkeys xattr"
+cvmfs_test_autofs_on_startup=false
+
+cvmfs_run_test() {
+  logfile=$1
+  local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+
+  echo "create a fresh repository named $CVMFS_TEST_REPO with user $CVMFS_TEST_USER"
+  create_empty_repo $CVMFS_TEST_REPO $CVMFS_TEST_USER NO -X -Z none || return $?
+
+  echo "creating test file"
+  dd if=/dev/urandom of=chunks count=16 bs=1M
+  local correct_sha1=$(sha1sum chunks | awk '{print $1;}')
+
+  start_transaction $CVMFS_TEST_REPO || return $?
+  cvmfs_swissknife graft -i chunks -o /cvmfs/$CVMFS_TEST_REPO/chunks -c 1
+  echo "----- START GRAFT -----"
+  cat /cvmfs/$CVMFS_TEST_REPO/.cvmfsgraft-chunks
+  echo "----- END GRAFT -----"
+  publish_repo $CVMFS_TEST_REPO || return $?
+
+  # Verify we have an external file.
+  if `sha1sum /cvmfs/$CVMFS_TEST_REPO/chunks > /dev/null`; then
+    return 1
+  fi
+
+  # Now the file should be available.
+  cp chunks /srv/cvmfs/$CVMFS_TEST_REPO/chunks
+
+  local chunks=$(attr -qg chunks /var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly/chunks)
+  if [ "$chunks" -ne 16 ]; then
+    echo "Chunk count incorrect; found $chunks, expected 16."
+    return 2
+  fi
+
+  local cvmfs_sha1=$(sha1sum /cvmfs/$CVMFS_TEST_REPO/chunks | awk '{print $1;}')
+  if [ "$cvmfs_sha1" != "$correct_sha1" ]; then
+    echo "CVMFS had the incorrect SHA1; expected $correct_sha1, found $cvmfs_sha1"
+    return 3
+  fi
+
+  return 0
+}
+
