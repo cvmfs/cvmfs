@@ -32,9 +32,9 @@ ParameterList CommandGc::GetParams() {
   r.push_back(Parameter::Optional('z', "conserve revisions younger than <z>"));
   r.push_back(Parameter::Optional('k', "repository master key(s)"));
   r.push_back(Parameter::Optional('t', "temporary directory"));
+  r.push_back(Parameter::Optional('L', "path to deletion log file"));
   r.push_back(Parameter::Switch('d', "dry run"));
   r.push_back(Parameter::Switch('l', "list objects to be removed"));
-  // to be extended...
   return r;
 }
 
@@ -54,6 +54,8 @@ int CommandGc::Main(const ArgumentList &args) {
   const bool list_condemned_objects = (args.count('l') > 0);
   const std::string temp_directory = (args.count('t') > 0) ?
     *args.find('t')->second : "/tmp";
+  const std::string deletion_log_path = (args.count('L') > 0) ?
+    *args.find('L')->second : "";
 
   if (revisions < 0) {
     LogCvmfs(kLogCvmfs, kLogStderr,
@@ -66,6 +68,16 @@ int CommandGc::Main(const ArgumentList &args) {
     LogCvmfs(kLogCvmfs, kLogStderr,
              "neither a timestamp nor history threshold given");
     return 1;
+  }
+
+  FILE *deletion_log_file = NULL;
+  if (!deletion_log_path.empty()) {
+    deletion_log_file = fopen(deletion_log_path.c_str(), "a+");
+    if (NULL == deletion_log_file) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to open deletion log file "
+                                      "(errno: %d)", errno);
+      return 1;
+    }
   }
 
   download::DownloadManager   download_manager;
@@ -103,6 +115,7 @@ int CommandGc::Main(const ArgumentList &args) {
   config.dry_run = dry_run;
   config.verbose = list_condemned_objects;
   config.object_fetcher = &object_fetcher;
+  config.deleted_objects_logfile = deletion_log_file;
 
   if (config.uploader == NULL) {
     LogCvmfs(kLogCvmfs, kLogStderr, "failed to initialize spooler for '%s'",
@@ -110,11 +123,31 @@ int CommandGc::Main(const ArgumentList &args) {
     return 1;
   }
 
+  if (deletion_log_file != NULL) {
+    const int bytes_written = fprintf(deletion_log_file,
+                                      "# Garbage Collection started at %s\n",
+                                      StringifyTime(time(NULL), true).c_str());
+    if (bytes_written < 0) {
+      LogCvmfs(kLogCvmfs, kLogStderr, "failed to write to deletion log '%s' "
+                                      "(errno: %d)",
+                                      deletion_log_path.c_str(), errno);
+      return 1;
+    }
+  }
+
   GC collector(config);
   const bool success = collector.Collect();
 
   download_manager.Fini();
   signature_manager.Fini();
+
+  if (deletion_log_file != NULL) {
+    const int bytes_written = fprintf(deletion_log_file,
+                                      "# Garbage Collection finished at %s\n\n",
+                                      StringifyTime(time(NULL), true).c_str());
+    assert(bytes_written >= 0);
+    fclose(deletion_log_file);
+  }
 
   return success ? 0 : 1;
 }
