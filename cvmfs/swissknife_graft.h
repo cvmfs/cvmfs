@@ -9,6 +9,8 @@
 
 #include <string>
 
+#include "compression.h"
+
 #include "swissknife.h"
 
 // Forward dec'ls.
@@ -31,6 +33,7 @@ class CommandGraft : public Command {
                                        "('-' for reading from stdin)"));
     r.push_back(Parameter::Optional('o', "Output location for graft file"));
     r.push_back(Parameter::Switch('v', "Verbose output"));
+    r.push_back(Parameter::Optional('Z', "Compression algorithm"));
     return r;
   }
 
@@ -49,6 +52,7 @@ class CommandGraft : public Command {
   std::string output_file_;
   std::string input_file_;
   bool verbose_;
+  zlib::Algorithms alg_;
 };
 
 }  // namespace swissknife

@@ -435,17 +435,16 @@ bool CompressFile2Null(FILE *fsrc, shash::Any *compressed_hash) {
 
 
 bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
-                     uint64_t *processed_bytes) {
-  int z_ret, flush;
+                     uint64_t *processed_bytes, Algorithms alg) {
+  int flush;
   bool result = false;
-  unsigned have;
-  z_stream strm;
   unsigned char in[kZChunk];
   unsigned char out[kZChunk];
   off_t cksum_bytes = 0;
   shash::ContextPtr hash_context(compressed_hash->algorithm);
 
-  CompressInit(&strm);
+  Compressor *compressor = zlib::Compressor::Construct(alg);
+
   hash_context.buffer = alloca(hash_context.size);
   shash::Init(hash_context);
 
@@ -457,28 +456,22 @@ bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
       goto compress_fd2null_final;
     }
     cksum_bytes += bytes_read;
-    strm.avail_in = bytes_read;
 
-    flush = (static_cast<size_t>(bytes_read) < kZChunk) ? Z_FINISH : Z_NO_FLUSH;
-    strm.next_in = in;
+    flush = (static_cast<size_t>(bytes_read) < kZChunk);
 
     // Run deflate() on input until output buffer not full, finish
     // compression if all of source has been read in
+    size_t avail_out = kZChunk;
+    size_t avail_in = bytes_read;
+    unsigned char *next_out = out;
+    unsigned char *next_in = in;
     do {
-      strm.avail_out = kZChunk;
-      strm.next_out = out;
-      z_ret = deflate(&strm, flush);  // no bad return value
-      if (z_ret == Z_STREAM_ERROR)
-        goto compress_fd2null_final;  // state not clobbered
-      have = kZChunk - strm.avail_out;
-      shash::Update(out, have, hash_context);
-    } while (strm.avail_out == 0);
+      compressor->Deflate(flush, &next_in, &avail_in, &next_out, &avail_out);
+      shash::Update(out, avail_out, hash_context);
+    } while (avail_out == 0);
 
     // Done when last data in file processed
-  } while (flush != Z_FINISH);
-
-  // stream will be complete
-  if (z_ret != Z_STREAM_END) goto compress_fd2null_final;
+  } while (!flush);
 
   shash::Final(hash_context, compressed_hash);
   if (processed_bytes) {
@@ -488,7 +481,6 @@ bool CompressFd2Null(int fd_src, shash::Any *compressed_hash,
 
   // Clean up and return
  compress_fd2null_final:
-  CompressFini(&strm);
   LogCvmfs(kLogCompress, kLogDebug, "file compression finished with result %d",
            result);
   return result;
