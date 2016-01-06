@@ -55,16 +55,19 @@ struct FileChunkReflist {
   FileChunkReflist(
     FileChunkList *l,
     const PathString &p,
-    zlib::Algorithms alg)
+    zlib::Algorithms alg,
+    bool external)
     : list(l)
     , path(p)
-    , compression_alg(alg) { }
+    , compression_alg(alg)
+    , external_data(external) { }
 
   unsigned FindChunkIdx(const uint64_t offset);
 
   FileChunkList *list;
   PathString path;
   zlib::Algorithms compression_alg;
+  bool external_data;
 };
 
 

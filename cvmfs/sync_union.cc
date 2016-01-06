@@ -47,7 +47,8 @@ SyncItem SyncUnion::CreateSyncItem(const std::string  &relative_parent_path,
   SyncItem entry(relative_parent_path, filename, this, entry_type);
   PreprocessSyncItem(&entry);
   if (entry_type == kItemFile) {
-    entry.SetExternalData(GetExternalData());
+    entry.SetExternalData(mediator_->IsExternalData());
+    entry.SetCompressionAlgorithm(mediator_->GetCompressionAlgorithm());
   }
   return entry;
 }
@@ -179,7 +180,7 @@ void SyncUnionAufs::Traverse() {
   LogCvmfs(kLogUnionFs, kLogVerboseMsg, "Aufs starting traversal "
            "recursion for scratch_path=[%s] with external data set to %d",
            scratch_path().c_str(),
-           GetExternalData());
+           mediator_->IsExternalData());
 
   traversal.Recurse(scratch_path());
 }
