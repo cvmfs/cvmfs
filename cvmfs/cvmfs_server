@@ -5580,8 +5580,10 @@ eliminate_hardlinks() {
 ################################################################################
 
 _update_repoinfo_cleanup() {
-  local tmp_file="$1"
-  rm -f $tmp_file > /dev/null 2>&1
+  while [ $# -gt 0 ]; do
+    rm -f $1 > /dev/null 2>&1
+    shift 1
+  done
 }
 
 update_repoinfo() {
