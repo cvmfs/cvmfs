@@ -481,6 +481,7 @@ void Update(const unsigned char *buffer, const unsigned buffer_size,
             ContextPtr context);
 void Final(ContextPtr context, Any *any_digest);
 bool HashFile(const std::string &filename, Any *any_digest);
+bool HashFd(int fd, Any *any_digest);
 void HashMem(const unsigned char *buffer, const unsigned buffer_size,
              Any *any_digest);
 void HashString(const std::string &content, Any *any_digest);

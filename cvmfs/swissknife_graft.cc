@@ -56,6 +56,11 @@ int swissknife::CommandGraft::Main(const swissknife::ArgumentList &args) {
   const std::string output_file =
       (args.find('o') == args.end()) ? "" : *(args.find('o')->second);
   verbose_ = args.find('v') != args.end();
+  hash_alg_ = (args.find('a') == args.end()) ?
+              shash::kSha1 : shash::ParseHashAlgorithm(*args.find('a')->second);
+  compression_alg_ = (args.find('Z') == args.end()) ?
+                     zlib::kNoCompression :
+                     zlib::ParseCompressionAlgorithm(*args.find('Z')->second);
 
   platform_stat64 sbuf;
   bool output_file_is_dir = output_file.size() &&
@@ -118,12 +123,20 @@ int swissknife::CommandGraft::Publish(const std::string &input_file,
     std::string errmsg = "Unable to stat input file (" + input_file + ")";
     perror(errmsg.c_str());
   }
-  mode_t input_file_mode = sbuf.st_mode;
+  mode_t input_file_mode = input_file_is_stdin ? 0644 : sbuf.st_mode;
 
-  // TODO(jblomer): let the user chose the hash algorithm
-  shash::Any hash(shash::kSha1);
+  shash::Any hash(hash_alg_);
   uint64_t processed_size;
-  bool retval = zlib::CompressFd2Null(fd, &hash, &processed_size);
+  bool retval;
+  if (compression_alg_ == zlib::kZlibDefault) {
+    retval = zlib::CompressFd2Null(fd, &hash, &processed_size);
+  } else if (compression_alg_ == zlib::kNoCompression) {
+    processed_size = sbuf.st_size;
+    retval = HashFd(fd, &hash);
+  } else {
+    // Touch this if we add compression algorithms in the future.
+    abort();
+  }
   if (!input_file_is_stdin) {close(fd);}
   if (!retval) {
     std::string errmsg = "Unable to checksum input file (" + input_file + ")";
