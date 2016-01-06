@@ -192,7 +192,7 @@ is_subcommand() {
   local supported_commands="mkfs add-replica import publish rollback rmfs alterfs \
     resign list info tag list-tags lstags check transaction abort snapshot \
     skeleton migrate list-catalogs update-geodb gc catalog-chown eliminate-hardlinks \
-    update-info"
+    update-info repo-metainfo"
 
   for possible_command in $supported_commands; do
     if [ x"$possible_command" = x"$subcommand" ]; then
@@ -345,6 +345,7 @@ Supported Commands:
                 Updates the geo-IP database
   update-info   [-p no apache config] [-e don't edit /info/meta]
                 Open meta info JSON file for editing
+  repo-metainfo Open repository meta info JSON file for editing
 "
 
 
@@ -358,6 +359,10 @@ NOTE: $errormsg
   else
     exit 2
   fi
+}
+
+is_redhat() {
+  [ -f /etc/redhat-release ]
 }
 
 load_repo_config() {
@@ -608,8 +613,15 @@ get_overlayfs_type() {
   ofs_name="$(get_overlayfs_name)"
   vermagic="$(modinfo --field vermagic $ofs_name)"
   krnl_version="$(echo "$vermagic" | grep -oe '^[0-9]\+\.[0-9]\+.[0-9]\+')"
+
+  post_v22_krnl_version="3.18.0"
+  if is_redhat; then post_v22_krnl_version="3.10.0"; fi
+
   ofs_type=$OFS_POST_V22
-  if compare_versions "$krnl_version" -lt 3.18.0; then ofs_type=$OFS_PRE_V22; fi
+  if compare_versions "$krnl_version" -lt "$post_v22_krnl_version"; then
+    ofs_type=$OFS_PRE_V22
+  fi
+
   echo "$ofs_type"
 }
 
@@ -662,7 +674,7 @@ check_wsgi_module() {
 
   echo "The apache wsgi module must be installed and enabled.
 The required package is called ${APACHE_WSGI_MODPKG}."
-  if [ -f /etc/redhat-release ]; then
+  if is_redhat; then
     case "`cat /etc/redhat-release`" in
       *"release 5."*)
         if [ -f /etc/httpd/conf.d/wsgi.conf ]; then
@@ -1691,9 +1703,15 @@ check_expiry() {
 sign_manifest() {
   local name=$1
   local unsigned_manifest=$2
+  local metainfo_file=$3
 
   load_repo_config $name
   local user_shell="$(get_user_shell $name)"
+
+  local metainfo=
+  if [ "x$metainfo_file" != "x" ]; then
+    metainfo="-M $metainfo_file"
+  fi
 
   $user_shell "$(__swissknife_cmd) sign \
     -c /etc/cvmfs/keys/${name}.crt      \
@@ -1701,7 +1719,7 @@ sign_manifest() {
     -n $name                            \
     -m $unsigned_manifest               \
     -t ${CVMFS_SPOOL_DIR}/tmp           \
-    -r $CVMFS_UPSTREAM_STORAGE" > /dev/null
+    -r $CVMFS_UPSTREAM_STORAGE $metainfo" > /dev/null
 }
 
 
@@ -2480,6 +2498,80 @@ update_global_meta_info() {
   is_root              || return 2
 
   cat "$meta_info_file" | _write_info_file "meta"
+}
+
+
+get_editor() {
+  local editor=${EDITOR:=vi}
+  if ! which $editor  > /dev/null 2>&1; then
+    echo  "Didn't find editor '$editor'." 1>&2
+    echo "Consider to use the \$EDITOR environment variable" 1>&2
+    exit 1
+  fi
+  echo $editor
+}
+
+
+check_jq() {
+  local has_jq=1
+  if ! which jq > /dev/null 2>&1; then
+    has_jq=0
+    echo 1>&2
+    echo "Warning: Didn't find 'jq' on your system. It is your responsibility" 1>&2
+    echo "         to produce a valid JSON file." 1>&2
+    echo 1>&2
+    read -p "  Press any key to continue..." nirvana
+  fi
+  echo $has_jq
+}
+
+
+edit_json_unil_valid() {
+  local json_file="$1"
+  local editor=$(get_editor)
+  local has_jq=$(check_jq)
+
+  local retval=0
+  while true; do
+    $editor $json_file < $(tty) > $(tty) 2>&1
+    [ $has_jq -eq 1 ] || break
+
+    local jq_output=""
+    local retry=""
+    if ! jq_output=$(jq '.' $json_file 2>&1); then
+      echo
+      echo "Your JSON file is invalid, please check again:"
+      echo "$jq_output"
+      read -p "Edit again? [y]: " retry
+      if [ x"$retry" != x"y" ] && \
+         [ x"$retry" != x"Y" ] && \
+         [ x"$retry" != x""  ]; then
+        retval=1
+        break
+      fi
+    else
+      break
+    fi
+  done
+
+  return $retval
+}
+
+create_repometa_skeleton() {
+  local json_file="$1"
+  cat > "$json_file" << EOF
+{
+  "administrator" : "Your Name",
+  "email"         : "you@organisation.org",
+  "organisation"  : "Your Organisation",
+  "description"   : "Repository content"
+  "recommended-stratum1s" : [ "stratum1 url", "stratum1 url" ],
+
+  "custom" : {
+    "_comment" : "Put arbitrary structured data here"
+  }
+}
+EOF
 }
 
 
@@ -5449,6 +5541,53 @@ eliminate_hardlinks() {
 
 ################################################################################
 
+_repo_metainfo_cleanup() {
+  local tmp_file="$1"
+  rm -f $tmp_file > /dev/null 2>&1
+}
+
+repo_metainfo() {
+  local name
+  local tmp_file
+
+  # get repository name
+  shift $(($OPTIND-1))
+  check_parameter_count_with_guessing $#
+  name=$(get_or_guess_repository_name $1)
+
+  # sanity checks
+  check_repository_existence $name || die "The repository $name does not exist"
+  load_repo_config $name
+  is_owner_or_root $name           || die "Permission denied: Repository $name is owned by $CVMFS_USER"
+  is_stratum0 $name                || die "This is not a stratum 0 repository"
+  ! is_publishing $name            || die "Repository is currently publishing"
+  health_check $name $silence_warnings
+
+  tmp_file_info=$(mktemp)
+  tmp_file_manifest=$(mktemp)
+  chown $CVMFS_USER $tmp_file_info $tmp_file_manifest || \
+    die "Cannot change ownership of temporary files"
+  is_in_transaction $name && die "Cannot edit repository meta info while in a transaction"
+  trap "_repo_metainfo_cleanup $tmp_file_info $tmp_file_manifest; \
+    close_transaction $name 0" EXIT HUP INT TERM
+  open_transaction $name || die "Failed to open transaction for meta info editing"
+
+  get_repo_info -M > $tmp_file_info || \
+    die "Failed getting repository meta info for $name"
+  get_repo_info -R > $tmp_file_manifest || \
+    die "Failed getting repository manifest for $name"
+  # TODO: if empty file
+  if [ true ]; then
+    create_repometa_skeleton $tmp_file_info
+  fi
+
+  edit_json_unil_valid $tmp_file_info
+  sign_manifest $name $tmp_file_manifest $tmp_file_info
+}
+
+
+################################################################################
+
 _update_info_cleanup() {
   local tmp_file="$1"
   rm -f $tmp_file > /dev/null 2>&1
@@ -5496,55 +5635,12 @@ update_info() {
   # manually edit the meta information file
   local tmp_file=""
   if [ $edit_meta_info -eq 1 ]; then
-    # figure out which editor to use
-    local editor=${EDITOR:=vi}
-    if ! which $editor  > /dev/null 2>&1; then
-      echo "Didn't find editor '$editor'."
-      echo "Consider to use the \$EDITOR environment variable"
-      exit 1
-    fi
-
-    # check if we have `jq` for JSON validity checks
-    local has_jq=1
-    if ! which jq > /dev/null 2>&1; then
-      has_jq=0
-      echo
-      echo "Warning: Didn't find 'jq' on your system. It is your responsibility"
-      echo "         to produce a valid JSON file."
-      echo
-      read -p "  Press any key to continue..." nirvana
-    fi
-
     # copy the meta information file for editing
     tmp_file=$(mktemp)
     trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
     cp -f "$(get_global_info_path)/meta" $tmp_file
 
-    # edit until the JSON is valid
-    local json_valid=true
-    while true; do
-      $editor $tmp_file < $(tty) > $(tty) 2>&1
-      [ $has_jq -eq 1 ] || break
-
-      local jq_output=""
-      local retry=""
-      if ! jq_output=$(jq '.' $tmp_file 2>&1); then
-        echo
-        echo "Your JSON file is invalid, please check again:"
-        echo "$jq_output"
-        read -p "Edit again? [y]: " retry
-        if [ x"$retry" != x"y" ] && \
-           [ x"$retry" != x"Y" ] && \
-           [ x"$retry" != x""  ]; then
-          json_valid=false
-          break
-        fi
-      else
-        break
-      fi
-    done
-
-    $json_valid || die "Aborting..."
+    edit_json_unil_valid $tmp_file || die "Aborting..."
   fi
 
   # update the JSON files

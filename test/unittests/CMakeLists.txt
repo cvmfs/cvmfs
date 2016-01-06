@@ -76,9 +76,12 @@ set(CVMFS_UNITTEST_FILES
   t_platforms.cc
   t_compressor.cc
   t_compression.cc
-  t_voms.cc
   t_clientctx.cc
 )
+
+if (VOMS_FOUND)
+  set (CVMFS_UNITTEST_FILES ${CVMFS_UNITTEST_FILES} t_voms.cc)
+endif (VOMS_FOUND)
 
 #
 # unit test source files
@@ -198,12 +201,16 @@ set (CVMFS_UNITTEST_SOURCES
   ${CVMFS_SOURCE_DIR}/fetch.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.cc
   ${CVMFS_SOURCE_DIR}/sqlitevfs.h
-  ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
-  ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
-  ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc
   ${CVMFS_SOURCE_DIR}/clientctx.h
   ${CVMFS_SOURCE_DIR}/clientctx.cc
 )
+
+if (VOMS_FOUND)
+  set (CVMFS_UNITTEST_SOURCES ${CVMFS_UNITTEST_SOURCES}
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_cred.cc
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_authz.h
+       ${CVMFS_SOURCE_DIR}/voms_authz/voms_curl.cc)
+endif (VOMS_FOUND)
 
 set (CVMFS_UNITTEST_DEBUG_SOURCES ${CVMFS_UNITTEST_SOURCES})
 
@@ -301,8 +308,8 @@ endif (BUILD_UNITTESTS_DEBUG)
 #
 # link the stuff (*_LIBRARIES are dynamic link libraries)
 #
-set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES}
-                             ${CARES_LIBRARIES} ${CURL_LIBRARIES} ${LIBCURL_ARCHIVE} ${CARES_ARCHIVE}
+set (UNITTEST_LINK_LIBRARIES ${GTEST_LIBRARIES} ${GOOGLETEST_ARCHIVE} ${OPENSSL_LIBRARIES} ${CURL_LIBRARIES}
+                             ${LIBCURL_ARCHIVE} ${CARES_LIBRARIES} ${CARES_ARCHIVE} ${OPENSSL_LIBRARIES}
                              ${SQLITE3_LIBRARY} ${SQLITE3_ARCHIVE} ${TBB_LIBRARIES}
                              ${ZLIB_LIBRARIES} ${ZLIB_ARCHIVE} ${RT_LIBRARY} ${UUID_LIBRARIES}
                              ${SHA2_ARCHIVE} ${SHA3_ARCHIVE} ${PACPARSER_LIBRARIES} ${PACPARSER_ARCHIVE}

@@ -352,8 +352,9 @@ bool Catalog::AllChunksBegin() {
 }
 
 
-bool Catalog::AllChunksNext(shash::Any *hash) {
-  return sql_all_chunks_->Next(hash);
+bool Catalog::AllChunksNext(shash::Any *hash, zlib::Algorithms *compression_alg)
+{
+  return sql_all_chunks_->Next(hash, compression_alg);
 }
 
 
@@ -480,7 +481,10 @@ uint64_t Catalog::GetRevision() const {
 }
 
 uint64_t Catalog::GetLastModified() const {
-  return database().GetProperty<int>("last_modified");
+  const std::string prop_name = "last_modified";
+  return (database().HasProperty(prop_name))
+    ? database().GetProperty<int>(prop_name)
+    : 0u;
 }
 
 

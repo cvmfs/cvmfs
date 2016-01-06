@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <libkern/OSAtomic.h>
 #include <mach/mach.h>
+#include <mach/mach_time.h>
 #include <mach-o/dyld.h>
 #include <signal.h>
 #include <sys/mount.h>
@@ -248,6 +249,17 @@ inline void platform_get_os_version(int32_t *major,
   const int matches = sscanf(version.c_str(), "%u.%u.%u", major, minor, patch);
   assert(matches == 3 && "failed to read OS X version string");
 }
+
+
+inline uint64_t platform_monotonic_time() {
+  uint64_t val_abs = mach_absolute_time();
+  // Doing the conversion every time is slow but thread-safe
+  mach_timebase_info_data_t info;
+  mach_timebase_info(&info);
+  uint64_t val_ns = val_abs * (info.numer / info.denom);
+  return val_ns * 1e-9;
+}
+
 
 /**
  * strdupa does not exist on OSX

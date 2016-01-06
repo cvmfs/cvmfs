@@ -294,8 +294,8 @@ bool SignatureManager::LoadPublicRsaKeys(const string &path_list) {
  * Loads a list of blacklisted certificates (fingerprints) from a file.
  */
 bool SignatureManager::LoadBlacklist(
-  const std::string &path_blacklist, 
-  bool append) 
+  const std::string &path_blacklist,
+  bool append)
 {
   if (!append)
     blacklisted_certificates_.clear();

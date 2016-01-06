@@ -557,7 +557,6 @@ class MockCatalogManager : public AbstractCatalogManager<MockCatalog> {
   MockCatalog* RetrieveRootCatalog() { return GetRootCatalog(); }
   void AddFile(const DirectoryEntryBase &entry,
                const XattrList &xattrs,
-                     bool       external_data,
                const std::string &parent_directory)
   {
     ++num_added_files_;

@@ -49,6 +49,7 @@
 #include "atomic.h"
 #include "cache.h"
 #include "catalog_mgr_client.h"
+#include "clientctx.h"
 #include "compression.h"
 #include "directory_entry.h"
 #include "download.h"
@@ -143,6 +144,8 @@ cvmfs_globals::~cvmfs_globals() {
 
   sqlite3_shutdown();
   delete statistics_;
+
+  ClientCtx::CleanupInstance();
 }
 
 int cvmfs_globals::Setup(const options &opts) {
@@ -251,6 +254,8 @@ int cvmfs_globals::Setup(const options &opts) {
   vfs_registered_ = true;
 
   cvmfs::pid_ = getpid();
+
+  ClientCtx::GetInstance();
 
   return LIBCVMFS_FAIL_OK;
 }
@@ -498,6 +503,7 @@ void cvmfs_context::AppendStringToList(char const   *str,
 
 int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
   atomic_inc64(&num_fs_stat_);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_getattr (stat) for path: %s", c_path);
 
@@ -518,6 +524,7 @@ int cvmfs_context::GetAttr(const char *c_path, struct stat *info) {
 int cvmfs_context::Readlink(const char *c_path, char *buf, size_t size) {
   atomic_inc64(&num_fs_readlink_);
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_readlink on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   PathString p;
   p.Assign(c_path, strlen(c_path));
@@ -547,6 +554,7 @@ int cvmfs_context::ListDirectory(
   size_t *buflen
 ) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_listdir on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   if (c_path[0] == '/' && c_path[1] == '\0') {
     // root path is expected to be "", not "/"
@@ -596,6 +604,7 @@ int cvmfs_context::ListDirectory(
 
 int cvmfs_context::Open(const char *c_path) {
   LogCvmfs(kLogCvmfs, kLogDebug, "cvmfs_open on path: %s", c_path);
+  ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
 
   int fd = -1;
   catalog::DirectoryEntry dirent;
@@ -625,7 +634,8 @@ int cvmfs_context::Open(const char *c_path) {
     }
 
     fd = chunk_tables_.Add(
-      FileChunkReflist(chunks, path, dirent.compression_algorithm()));
+      FileChunkReflist(chunks, path, dirent.compression_algorithm(),
+                       dirent.IsExternalFile()));
     return fd | kFdChunked;
   }
 
@@ -661,6 +671,7 @@ int64_t cvmfs_context::Pread(
   uint64_t off)
 {
   if (fd & kFdChunked) {
+    ClientCtxGuard ctxg(geteuid(), getegid(), getpid());
     const int chunk_handle = fd & ~kFdChunked;
     SimpleChunkTables::OpenChunks open_chunks = chunk_tables_.Get(chunk_handle);
     FileChunkList *chunk_list = open_chunks.chunk_reflist.list;
@@ -678,12 +689,23 @@ int64_t cvmfs_context::Pread(
       ChunkFd *chunk_fd = open_chunks.chunk_fd;
       if ((chunk_fd->fd == -1) || (chunk_fd->chunk_idx != chunk_idx)) {
         if (chunk_fd->fd != -1) fetcher_->cache_mgr()->Close(chunk_fd->fd);
-        chunk_fd->fd = fetcher_->Fetch(
-          chunk_list->AtPtr(chunk_idx)->content_hash(),
-          chunk_list->AtPtr(chunk_idx)->size(),
-          "no path info",
-          compression_alg,
-          cache::CacheManager::kTypeRegular);
+        if (!open_chunks.chunk_reflist.external_data) {
+          chunk_fd->fd = external_fetcher_->Fetch(
+            chunk_list->AtPtr(chunk_idx)->content_hash(),
+            chunk_list->AtPtr(chunk_idx)->size(),
+            "no path info",
+            compression_alg,
+            cache::CacheManager::kTypeRegular);
+        } else {
+          chunk_fd->fd = fetcher_->Fetch(
+            chunk_list->AtPtr(chunk_idx)->content_hash(),
+            chunk_list->AtPtr(chunk_idx)->size(),
+            "no path info",
+            compression_alg,
+            cache::CacheManager::kTypeRegular,
+            open_chunks.chunk_reflist.path.ToString(),
+            chunk_list->AtPtr(chunk_idx)->offset());
+        }
         if (chunk_fd->fd < 0) {
           chunk_fd->fd = -1;
           return -EIO;

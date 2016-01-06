@@ -48,6 +48,7 @@ enum Failures {
   kFailBadData,
   kFailTooBig,
   kFailOther,
+  kFailUnsupportedProtocol,
 
   kFailNumEntries
 };  // Failures
@@ -68,7 +69,8 @@ inline const char *Code2Ascii(const Failures error) {
   texts[10] = "corrupted data received";
   texts[11] = "resource too big to download";
   texts[12] = "unknown network error";
-  texts[13] = "no text";
+  texts[13] = "Unsupported URL in protocol";
+  texts[14] = "no text";
   return texts[error];
 }
 
@@ -118,6 +120,10 @@ struct JobInfo {
   bool probe_hosts;
   bool head_request;
   bool follow_redirects;
+  pid_t pid;
+  uid_t uid;
+  gid_t gid;
+  char *cred_fname;  ///< TODO(jblomer): transfer credentials in memory
   Destination destination;
   struct {
     size_t size;
@@ -130,6 +136,10 @@ struct JobInfo {
   const shash::Any *expected_hash;
   const std::string *extra_info;
 
+  // Allow byte ranges to be specified.
+  off_t range_offset;
+  off_t range_size;
+
   // Default initialization of fields
   void Init() {
     url = NULL;
@@ -137,6 +147,10 @@ struct JobInfo {
     probe_hosts = false;
     head_request = false;
     follow_redirects = false;
+    pid = -1;
+    uid = -1;
+    gid = -1;
+    cred_fname = NULL;
     destination = kDestinationNone;
     destination_mem.size = destination_mem.pos = 0;
     destination_mem.data = NULL;
@@ -155,6 +169,9 @@ struct JobInfo {
     error_code = kFailOther;
     num_used_proxies = num_used_hosts = num_retries = 0;
     backoff_ms = 0;
+
+    range_offset = -1;
+    range_size = -1;
   }
 
   // One constructor per destination + head request
@@ -210,6 +227,7 @@ struct JobInfo {
   }
 
   ~JobInfo() {
+    delete cred_fname;
     if (wait_at[0] >= 0) {
       close(wait_at[0]);
       close(wait_at[1]);

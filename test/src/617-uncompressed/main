@@ -29,6 +29,7 @@ produce_files_in() {
 cvmfs_run_test() {
   logfile=$1
   local repo_dir=/cvmfs/$CVMFS_TEST_REPO
+  local rdonly_repo_dir=/var/spool/cvmfs/$CVMFS_TEST_REPO/rdonly
 
   local scratch_dir=$(pwd)
   mkdir reference_dir
@@ -54,6 +55,12 @@ cvmfs_run_test() {
 
   echo "creating CVMFS snapshot"
   publish_repo $CVMFS_TEST_REPO || return $?
+
+  echo "Make sure the compression xattr is set correctly"
+  local attrval=`attr -qg compression $rdonly_repo_dir/file`
+  if [ x"$attrval" != xnone ]; then
+    return 5
+  fi
 
   echo "compare the results of cvmfs to our reference copy"
   compare_directories $repo_dir $reference_dir $CVMFS_TEST_REPO || return $?
