@@ -5613,8 +5613,8 @@ repo_metainfo() {
     die "Failed getting repository meta info for $name"
   get_repo_info -R > $tmp_file_manifest || \
     die "Failed getting repository manifest for $name"
-  # TODO: if empty file
-  if [ true ]; then
+
+  if [ -f $tmp_file_info ] && [ ! -s $tmp_file_info ]; then
     create_repometa_skeleton $tmp_file_info
   fi
 
