@@ -1,0 +1,30 @@
+
+cvmfs_test_name="Read-only alien cache"
+
+cleanup() {
+  if [ x"$CVMFS_TEST068_TMPDIR" != x ]; then
+    rm -rf "$CVMFS_TEST068_TMPDIR"
+  fi
+}
+
+CVMFS_TEST068_TMPDIR=
+cvmfs_run_test() {
+  logfile=$1
+
+  CVMFS_TEST068_TMPDIR=$(mktemp -d)
+  trap cleanup EXIT HUP INT TERM
+  sudo cvmfs2 __MK_ALIEN_CACHE__ "$CVMFS_TEST068_TMPDIR" $(id -u cvmfs) $(id -g cvmfs) || return 10
+
+  cvmfs_mount grid.cern.ch "CVMFS_ALIEN_CACHE=$CVMFS_TEST068_TMPDIR" \
+    "CVMFS_QUOTA_LIMIT=-1" \
+    "CVMFS_SHARED_CACHE=no" || return 1
+  cvmfs_umount grid.cern.ch
+
+  sudo chown -R root $CVMFS_TEST068_TMPDIR
+  sudo chmod 0555 $CVMFS_TEST068_TMPDIR
+  cvmfs_mount grid.cern.ch "CVMFS_ALIEN_CACHE=$CVMFS_TEST068_TMPDIR" \
+    "CVMFS_QUOTA_LIMIT=-1" \
+    "CVMFS_SHARED_CACHE=no" || return 2
+
+  return 0
+}

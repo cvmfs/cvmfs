@@ -139,7 +139,8 @@ int64_t GetFileSize(const std::string &path);
 bool DirectoryExists(const std::string &path);
 bool SymlinkExists(const std::string &path);
 bool SymlinkForced(const std::string &src, const std::string &dest);
-bool MkdirDeep(const std::string &path, const mode_t mode);
+bool MkdirDeep(const std::string &path, const mode_t mode,
+               bool verify_writable = true);
 bool MakeCacheDirectories(const std::string &path, const mode_t mode);
 FILE *CreateTempFile(const std::string &path_prefix, const int mode,
                      const char *open_flags, std::string *final_path);
