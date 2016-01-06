@@ -1,4 +1,5 @@
 2.2.0:
+  * Print error message at the end of a failing `cvmfs_server check` (CVM-958)
   * Use patched pacparser 1.3.5 for IPv6 support (CVM-903)
   * Add support for VOMS authentication in fuse module (CVM-904)
   * Add `cvmfs_server repo-metainfo` command (CVM-804)
