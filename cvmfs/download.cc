@@ -184,6 +184,11 @@ static size_t CallbackCurlHeader(void *ptr, size_t size, size_t nmemb,
     unsigned i;
     for (i = 8; (i < header_line.length()) && (header_line[i] == ' '); ++i) {}
 
+    // TODO(jblomer): consolidate the code
+    if (header_line.length() > i+2) {
+      info->http_code = DownloadManager::ParseHttpCode(&header_line[i]);
+    }
+
     if (header_line[i] == '2') {
       return num_bytes;
     } else if ((header_line.length() > i+2) && (header_line[i] == '3') &&
@@ -355,6 +360,22 @@ const int DownloadManager::kProbeUnprobed = -1;
 const int DownloadManager::kProbeDown     = -2;
 const int DownloadManager::kProbeGeo      = -3;
 const unsigned DownloadManager::kMaxMemSize = 1024*1024;
+
+
+/**
+ * -1 of digits is not a valid Http return code
+ */
+int DownloadManager::ParseHttpCode(const char digits[3]) {
+  int result = 0;
+  int factor = 100;
+  for (int i = 0; i < 3; ++i) {
+    if ((digits[i] < '0') || (digits[i] > '9'))
+      return -1;
+    result += (digits[i] - '0') * factor;
+    factor /= 10;
+  }
+  return result;
+}
 
 
 /**
@@ -736,6 +757,7 @@ void DownloadManager::InitializeRequest(JobInfo *info, CURL *handle) {
   // Initialize internal download state
   info->curl_handle = handle;
   info->error_code = kFailOk;
+  info->http_code = -1;
   info->nocache = false;
   info->follow_redirects = follow_redirects_;
   info->num_used_proxies = 1;
