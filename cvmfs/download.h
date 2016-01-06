@@ -347,10 +347,17 @@ class DownloadManager {
   void GetTimeout(unsigned *seconds_proxy, unsigned *seconds_direct);
   void SetLowSpeedLimit(const unsigned low_speed_limit);
   void SetHostChain(const std::string &host_list);
+  void SetHostChain(const std::vector<std::string> &host_list);
   void GetHostInfo(std::vector<std::string> *host_chain,
                    std::vector<int> *rtt, unsigned *current_host);
   void ProbeHosts();
   bool ProbeGeo();
+    // Sort list of servers using the Geo API.  If the output_order
+    // vector is NULL, then the servers vector input is itself sorted.
+    // If it is non-NULL, then servers is left unchanged and the zero-based
+    // ordering is stored into output_order.
+  bool GeoSortServers(std::vector<std::string> *servers,
+                      std::vector<uint64_t>    *output_order = NULL);
   void SwitchHost();
   void SetProxyChain(const std::string &proxy_list,
                      const std::string &fallback_proxy_list,

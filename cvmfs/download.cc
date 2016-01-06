@@ -1752,26 +1752,32 @@ void DownloadManager::GetTimeout(unsigned *seconds_proxy,
  * removes the host list.
  */
 void DownloadManager::SetHostChain(const string &host_list) {
+  SetHostChain(SplitString(host_list, ';'));
+}
+
+
+void DownloadManager::SetHostChain(const std::vector<std::string> &host_list) {
   pthread_mutex_lock(lock_options_);
   opt_timestamp_backup_host_ = 0;
   delete opt_host_chain_;
   delete opt_host_chain_rtt_;
   opt_host_chain_current_ = 0;
 
-  if (host_list == "") {
+  if (host_list.empty()) {
     opt_host_chain_ = NULL;
     opt_host_chain_rtt_ = NULL;
     pthread_mutex_unlock(lock_options_);
     return;
   }
 
-  opt_host_chain_ = new vector<string>(SplitString(host_list, ';'));
+  opt_host_chain_ = new vector<string>(host_list);
   opt_host_chain_rtt_ =
     new vector<int>(opt_host_chain_->size(), kProbeUnprobed);
   // LogCvmfs(kLogDownload, kLogSyslog, "using host %s",
   //          (*opt_host_chain_)[0].c_str());
   pthread_mutex_unlock(lock_options_);
 }
+
 
 
 /**
@@ -1783,9 +1789,9 @@ void DownloadManager::GetHostInfo(vector<string> *host_chain, vector<int> *rtt,
 {
   pthread_mutex_lock(lock_options_);
   if (opt_host_chain_) {
-    *current_host = opt_host_chain_current_;
-    *host_chain = *opt_host_chain_;
-    *rtt = *opt_host_chain_rtt_;
+    if (current_host) {*current_host = opt_host_chain_current_;}
+    if (host_chain) {*host_chain = *opt_host_chain_;}
+    if (rtt) {*rtt = *opt_host_chain_rtt_;}
   }
   pthread_mutex_unlock(lock_options_);
 }
@@ -1990,24 +1996,27 @@ void DownloadManager::ProbeHosts() {
 }
 
 
-/**
- * Uses the Geo-API of Stratum 1s to let any of them order the list of servers
- *   and fallback proxies (if any).
- * Tries at most three random Stratum 1s before giving up.
- * If you change the host list in between by SetHostChain() or the fallback
- *   proxy list by SetProxyChain(), they will be overwritten by this function.
- */
-bool DownloadManager::ProbeGeo() {
-  vector<string> host_chain;
-  vector<int> host_rtt;
-  unsigned current_host;
-  vector< vector<ProxyInfo> > proxy_chain;
-  unsigned fallback_group;
-
-  GetHostInfo(&host_chain, &host_rtt, &current_host);
-  GetProxyInfo(&proxy_chain, NULL, &fallback_group);
-  if ((host_chain.size() < 2) && ((proxy_chain.size() - fallback_group) < 2))
+bool DownloadManager::GeoSortServers(std::vector<std::string> *servers,
+                    std::vector<uint64_t> *output_order) {
+  if (!servers) {return false;}
+  if (servers->size() == 1) {
+    if (output_order) {
+      output_order->clear();
+      output_order->push_back(0);
+    }
     return true;
+  }
+
+  std::vector<std::string> host_chain;
+  GetHostInfo(&host_chain, NULL, NULL);
+
+  std::vector<std::string> server_dns_names;
+  server_dns_names.reserve(servers->size());
+  for (unsigned i = 0; i < servers->size(); ++i) {
+    std::string host = dns::ExtractHost((*servers)[i]);
+    server_dns_names.push_back(host.empty() ? (*servers)[i] : host);
+  }
+  std::string host_list = JoinStrings(server_dns_names, ",");
 
   // Protect against concurrent access to prng_
   pthread_mutex_lock(lock_options_);
@@ -2015,28 +2024,10 @@ bool DownloadManager::ProbeGeo() {
   vector<string> host_chain_shuffled = Shuffle(host_chain, &prng_);
   pthread_mutex_unlock(lock_options_);
 
-  vector<string> host_names;
-  for (unsigned i = 0; i < host_chain.size(); ++i)
-    host_names.push_back(dns::ExtractHost(host_chain[i]));
-  SortTeam(&host_names, &host_chain);
-
-  // Add fallback proxy names to the end of the host list
-  unsigned first_geo_fallback = host_names.size();
-  for (unsigned i = fallback_group; i < proxy_chain.size(); ++i) {
-    // We only take the first fallback proxy name from every group under the
-    // assumption that load-balanced servers are at the same location
-    host_names.push_back(proxy_chain[i][0].host.name());
-  }
-  // TODO(dwd): fallback proxies should be sorted to for maximum cache reuse.
-  // For WLCG there's no reason to sort fallbacks, they're set by a widely
-  // shared config but that can change in a different context.
-
-  string host_list = JoinStrings(host_names, ",");
-
   // Request ordered list via Geo-API
   bool success = false;
-  unsigned max_attempts = std::min(host_chain_shuffled.size(), size_t(3));
-  vector<uint64_t> geo_order(host_names.size());
+  unsigned max_attempts = std::min(servers->size(), size_t(3));
+  vector<uint64_t> geo_order(servers->size());
   for (unsigned i = 0; i < max_attempts; ++i) {
     string url = host_chain_shuffled[i] + "/api/v1.0/geo/@proxy@/" + host_list;
     LogCvmfs(kLogDownload, kLogDebug,
@@ -2046,7 +2037,7 @@ bool DownloadManager::ProbeGeo() {
     if (result == kFailOk) {
       string order(info.destination_mem.data, info.destination_mem.size);
       free(info.destination_mem.data);
-      bool retval = ValidateGeoReply(order, host_names.size(), &geo_order);
+      bool retval = ValidateGeoReply(order, servers->size(), &geo_order);
       if (!retval) {
         LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
                  "retrieved invalid GeoAPI reply from %s [%s]",
@@ -2068,6 +2059,63 @@ bool DownloadManager::ProbeGeo() {
   if (!success) {
     LogCvmfs(kLogDownload, kLogDebug | kLogSyslogWarn,
              "failed to retrieve geographic order from stratum 1 servers");
+    return false;
+  }
+
+  if (output_order) {
+    output_order->swap(geo_order);
+  } else {
+    std::vector<std::string> sorted_servers;
+    sorted_servers.reserve(geo_order.size());
+    for (unsigned i = 0; i < geo_order.size(); ++i) {
+      uint64_t orderval = geo_order[i];
+      sorted_servers.push_back((*servers)[orderval]);
+    }
+    servers->swap(sorted_servers);
+  }
+  return true;
+}
+
+
+/**
+ * Uses the Geo-API of Stratum 1s to let any of them order the list of servers
+ *   and fallback proxies (if any).
+ * Tries at most three random Stratum 1s before giving up.
+ * If you change the host list in between by SetHostChain() or the fallback
+ *   proxy list by SetProxyChain(), they will be overwritten by this function.
+ */
+bool DownloadManager::ProbeGeo() {
+  vector<string> host_chain;
+  vector<int> host_rtt;
+  unsigned current_host;
+  vector< vector<ProxyInfo> > proxy_chain;
+  unsigned fallback_group;
+
+  GetHostInfo(&host_chain, &host_rtt, &current_host);
+  GetProxyInfo(&proxy_chain, NULL, &fallback_group);
+  if ((host_chain.size() < 2) && ((proxy_chain.size() - fallback_group) < 2))
+    return true;
+
+  vector<string> host_names;
+  for (unsigned i = 0; i < host_chain.size(); ++i)
+    host_names.push_back(dns::ExtractHost(host_chain[i]));
+  SortTeam(&host_names, &host_chain);
+
+  // Add fallback proxy names to the end of the host list
+  unsigned first_geo_fallback = host_names.size();
+  for (unsigned i = fallback_group; i < proxy_chain.size(); ++i) {
+    // We only take the first fallback proxy name from every group under the
+    // assumption that load-balanced servers are at the same location
+    host_names.push_back(proxy_chain[i][0].host.name());
+  }
+  // TODO(dwd): fallback proxies should be sorted to for maximum cache reuse.
+  // For WLCG there's no reason to sort fallbacks, they're set by a widely
+  // shared config but that can change in a different context.
+
+  std::vector<uint64_t> geo_order;
+  bool success = GeoSortServers(&host_names, &geo_order);
+  if (!success) {
+    // GeoSortServers already logged a failure message.
     return false;
   }
 
