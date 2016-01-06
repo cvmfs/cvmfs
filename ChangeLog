@@ -1,4 +1,5 @@
 2.2.0:
+  * Fix mounting with a read-only cache directory
   * Add user.pubkeys extended attribute
   * Add `cvmfs_server snapshot -a` (CVM-813)
   * Add support for a garbage collection deletion log (CVM-710)
