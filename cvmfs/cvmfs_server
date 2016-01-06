@@ -2530,7 +2530,7 @@ check_jq() {
 }
 
 
-edit_json_unil_valid() {
+edit_json_until_valid() {
   local json_file="$1"
   local editor=$(get_editor)
   local has_jq=$(check_jq)
@@ -5618,7 +5618,7 @@ repo_metainfo() {
     create_repometa_skeleton $tmp_file_info
   fi
 
-  edit_json_unil_valid $tmp_file_info
+  edit_json_until_valid $tmp_file_info
   sign_manifest $name $tmp_file_manifest $tmp_file_info
 }
 
@@ -5677,7 +5677,7 @@ update_info() {
     trap "_update_info_cleanup $tmp_file" EXIT HUP INT TERM
     cp -f "$(get_global_info_path)/meta" $tmp_file
 
-    edit_json_unil_valid $tmp_file || die "Aborting..."
+    edit_json_until_valid $tmp_file || die "Aborting..."
   fi
 
   # update the JSON files
