@@ -1621,6 +1621,7 @@ static void cvmfs_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
     bool has_authz = catalog_manager_->GetVOMSAuthz(&attribute_value);
     if (!has_authz) {
       fuse_reply_err(req, ENOATTR);
+      return;
     }
   } else if (attr == "user.chunks") {
     if (d.IsRegular()) {

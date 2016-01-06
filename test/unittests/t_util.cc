@@ -49,7 +49,6 @@ class T_Util : public ::testing::Test {
     path_without_slash = "/my/path";
     fake_path = "mypath";
     to_write = "Hello, world!\n";
-    std::string to_write_large;
     while (to_write_large.size() < 1024*1024) {
       to_write_large += to_write;
     }
@@ -530,7 +529,7 @@ struct write_pipe_data {
 static void *MainWritePipe(void *void_data) {
   struct write_pipe_data *data =
     reinterpret_cast<struct write_pipe_data *>(void_data);
-  SafeWrite(data->fd, data->data, data->dlen);
+  EXPECT_TRUE(SafeWrite(data->fd, data->data, data->dlen));
   close(data->fd);
   return NULL;
 }
@@ -552,6 +551,7 @@ TEST_F(T_Util, SafeRead) {
 
   // Large read
   int size = to_write_large.size() + 1024;
+  EXPECT_GE(size, 1024*1024);
   MakePipe(fd);
   buffer_output = scalloc(size, 1);
   pthread_t thread;
@@ -559,7 +559,7 @@ TEST_F(T_Util, SafeRead) {
   pdata.fd = fd[1];
   pdata.data = to_write_large.c_str();
   pdata.dlen = to_write_large.size();
-  int retval = pthread_create(&thread, NULL, MainWritePipe, &fd[1]);
+  int retval = pthread_create(&thread, NULL, MainWritePipe, &pdata);
   EXPECT_EQ(0, retval);
   EXPECT_EQ(SafeRead(fd[0], buffer_output, size),
             static_cast<long>(to_write_large.size()));

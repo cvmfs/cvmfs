@@ -1577,12 +1577,12 @@ bool SafeReadToString(int fd, std::string *final_result) {
 
   std::string tmp_result;
   static const int buf_size = 4096;
-  std::vector<char> buf; buf.reserve(buf_size);
+  char buf[4096];
   ssize_t total_bytes = -1;
   do {
-    total_bytes = SafeRead(fd, &buf[0], buf_size);
+    total_bytes = SafeRead(fd, buf, buf_size);
     if (total_bytes < 0) {return false;}
-    tmp_result.append(&buf[0], total_bytes);
+    tmp_result.append(buf, total_bytes);
   } while (total_bytes == buf_size);
   final_result->swap(tmp_result);
   return true;
