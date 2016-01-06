@@ -276,78 +276,79 @@ CernVM-FS Server Tool $(cvmfs_version_string)
 Usage: cvmfs_server COMMAND [options] <parameters>
 
 Supported Commands:
-  mkfs          [-w stratum0 url] [-u upstream storage] [-o owner] [-X (external data)]
-                [-m replicable] [-f union filesystem type] [-v volatile content]
-                [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
-                [-z enable garbage collection] [-s S3 config file]
-                [-Z compression algorithm (default: zlib)]
-                [-k path to existing keychain] [-p no apache config]
-                [-V VOMS authorization]
-                <fully qualified repository name>
-                Creates a new repository with a given name
-  add-replica   [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
-                [-a silence apache warning] [-z enable garbage collection]
-                [-n alias name] [-s S3 config file] [-p no apache config]
-                <stratum 0 url> <public key>
-                Creates a Stratum 1 replica of a Stratum 0 repository
-  import        [-w stratum0 url] [-o owner] [-u upstream storage]
-                [-l import legacy repo (2.0.x)] [-s show migration statistics]
-                [-f union filesystem type] [-c file ownership (UID:GID)]
-                [-k path to keys] [-g chown backend] [-r recreate whitelist]
-                [-p no apache config] [-t recreate repo key and certificate]
-                <fully qualified repository name>
-                Imports an old CernVM-FS repository into a fresh 2.1.x repo
-  publish       [-p pause for tweaks] [-n manual revision number] [-v verbose]
-                [-a tag name] [-c tag channel] [-m tag description]
-                [-X (force external data) | -N (force native data)]
-                [-Z compression algorithm]
-                <fully qualified name>
-                Make a new repository snapshot
-  rmfs          [-p(reserve) repo data and keys] [-f don't ask again]
-                <fully qualified name>
-                Remove the repository
-  abort         [-f don't ask again]
-                <fully qualified name>
-                Abort transaction and return to the state before
-  rollback      [-t tag] [-f don't ask again]
-                <fully qualified name>
-                Re-publishes the given tag as the new latest revision.
-                All snapshots between trunk and the target tag become
-                inaccessible.  Without a tag name, trunk-previous is used.
-  resign        <fully qualified name>
-                Re-sign the 30 day whitelist
-  list-catalogs [-s catalog sizes] [-e catalog entry counts] [-h catalog hashes]
-                [-x machine readable]
-                <fully qualified name>
-                Print a full list of all nested catalogs of a repository
-  info          <fully qualified name>
-                Print summary about the repository
-  tag           Create and manage named snapshots
-                [-a create tag <name>] [-c channel] [-m message] [-h root hash]
-                [-r remove tag <name>] [-f don't ask again]
-                [-i inspect tag <name>] [-x machine readable]
-                [-l list tags] [-x machine readable]
-                <fully qualified name>
-                Print named tags (snapshots) of the repository
-  check         [-c disable data chunk existence check]
-                [-i check data integrity] (may take some time)]
-                [-t tag (check given tag instead of trunk)]
-                [-s path to nested catalog subtree to check]
-                <fully qualified name>
-                Checks if the repository is sane
-  transaction   <fully qualified name>
-                Start to edit a repository
-  snapshot      [-t fail if other snapshot is in progress]
-                <fully qualified name>
-                Synchronize a Stratum 1 replica with the Stratum 0 source
-  migrate       <fully qualified name>
-                Migrates a repository to the current version of CernVM-FS
-  list          List available repositories
-  update-geodb  [-l update lazily based on CVMFS_UPDATEGEO* variables]
-                Updates the geo-IP database
-  update-info   [-p no apache config] [-e don't edit /info/meta]
-                Open meta info JSON file for editing
-  update-repoinfo Open repository meta info JSON file for editing
+  mkfs            [-w stratum0 url] [-u upstream storage] [-o owner]
+                  [-m replicable] [-f union filesystem type] [-s S3 config file]
+                  [-g disable auto tags] [-a hash algorithm (default: SHA-1)]
+                  [-z enable garbage collection] [-v volatile content]
+                  [-Z compression algorithm (default: zlib)]
+                  [-k path to existing keychain] [-p no apache config]
+                  [-V VOMS authorization] [-X (external data)]
+                  <fully qualified repository name>
+                  Creates a new repository with a given name
+  add-replica     [-u stratum1 upstream storage] [-o owner] [-w stratum1 url]
+                  [-a silence apache warning] [-z enable garbage collection]
+                  [-n alias name] [-s S3 config file] [-p no apache config]
+                  <stratum 0 url> <public key>
+                  Creates a Stratum 1 replica of a Stratum 0 repository
+  import          [-w stratum0 url] [-o owner] [-u upstream storage]
+                  [-l import legacy repo (2.0.x)] [-s show migration statistics]
+                  [-f union filesystem type] [-c file ownership (UID:GID)]
+                  [-k path to keys] [-g chown backend] [-r recreate whitelist]
+                  [-p no apache config] [-t recreate repo key and certificate]
+                  <fully qualified repository name>
+                  Imports an old CernVM-FS repository into a fresh 2.1.x repo
+  publish         [-p pause for tweaks] [-n manual revision number] [-v verbose]
+                  [-a tag name] [-c tag channel] [-m tag description]
+                  [-X (force external data) | -N (force native data)]
+                  [-Z compression algorithm]
+                  <fully qualified name>
+                  Make a new repository snapshot
+  rmfs            [-p(reserve) repo data and keys] [-f don't ask again]
+                  <fully qualified name>
+                  Remove the repository
+  abort           [-f don't ask again]
+                  <fully qualified name>
+                  Abort transaction and return to the state before
+  rollback        [-t tag] [-f don't ask again]
+                  <fully qualified name>
+                  Re-publishes the given tag as the new latest revision.
+                  All snapshots between trunk and the target tag become
+                  inaccessible.  Without a tag name, trunk-previous is used.
+  resign          <fully qualified name>
+                  Re-sign the 30 day whitelist
+  list-catalogs   [-s catalog sizes] [-e catalog entry counts]
+                  [-h catalog hashes] [-x machine readable]
+                  <fully qualified name>
+                  Print a full list of all nested catalogs of a repository
+  info            <fully qualified name>
+                  Print summary about the repository
+  tag             Create and manage named snapshots
+                  [-a create tag <name>] [-c channel] [-m message] [-h hash]
+                  [-r remove tag <name>] [-f don't ask again]
+                  [-i inspect tag <name>] [-x machine readable]
+                  [-l list tags] [-x machine readable]
+                  <fully qualified name>
+                  Print named tags (snapshots) of the repository
+  check           [-c disable data chunk existence check]
+                  [-i check data integrity] (may take some time)]
+                  [-t tag (check given tag instead of trunk)]
+                  [-s path to nested catalog subtree to check]
+                  <fully qualified name>
+                  Checks if the repository is sane
+  transaction     <fully qualified name>
+                  Start to edit a repository
+  snapshot        [-t fail if other snapshot is in progress]
+                  <fully qualified name>
+                  Synchronize a Stratum 1 replica with the Stratum 0 source
+  migrate         <fully qualified name>
+                  Migrates a repository to the current version of CernVM-FS
+  list            List available repositories
+  update-geodb    [-l update lazily based on CVMFS_UPDATEGEO* variables]
+                  Updates the geo-IP database
+  update-info     [-p no apache config] [-e don't edit /info/meta]
+                  Open meta info JSON file for editing
+  update-repoinfo <fully qualified name>
+                  Open repository meta info JSON file for editing
 "
 
 
