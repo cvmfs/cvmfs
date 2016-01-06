@@ -786,15 +786,21 @@ int CommandCheck::Main(const swissknife::ArgumentList &args) {
   }
 
   catalog::DeltaCounters computed_counters;
-  bool retval = InspectTree(subtree_path,
-                            root_hash,
-                            root_size,
-                            is_nested_catalog,
-                            NULL,
-                            &computed_counters);
+  const bool successful = InspectTree(subtree_path,
+                                      root_hash,
+                                      root_size,
+                                      is_nested_catalog,
+                                      NULL,
+                                      &computed_counters);
 
   delete manifest;
-  return retval ? 0 : 1;
+
+  if (!successful) {
+    LogCvmfs(kLogCvmfs, kLogStderr, "CATALOG PROBLEMS OR OTHER ERRORS FOUND");
+    return 1;
+  }
+
+  return 0;
 }
 
 }  // namespace swissknife
