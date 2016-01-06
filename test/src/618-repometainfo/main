@@ -15,7 +15,7 @@ cvmfs_run_test() {
   sudo sh -c "echo 'echo reference' >> $tty_bin" || return 12
   sudo chmod +x $tty_bin || return 13
   touch reference
-  EDITOR="cat" cvmfs_server repo-metainfo $CVMFS_TEST_REPO
+  EDITOR="cat" cvmfs_server update-repoinfo $CVMFS_TEST_REPO
   local retval=$?
   sudo mv ${tty_bin}.disabled $tty_bin || return 14
   if [ $retval -ne 0 ]; then
@@ -25,6 +25,14 @@ cvmfs_run_test() {
 
   cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded || return 30
   diff reference downloaded || return 40
+
+  echo "create a revision in the repository" # Regression test: used to lose the
+                                             # hash to the repoinfo on publish
+  start_transaction $CVMFS_TEST_REPO || return 41
+  publish_repo      $CVMFS_TEST_REPO || return 42
+
+  cvmfs_swissknife info -r http://localhost/cvmfs/${CVMFS_TEST_REPO} -M > downloaded || return 50
+  diff reference downloaded || return 51
 
   return 0
 }
