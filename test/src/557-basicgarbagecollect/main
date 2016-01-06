@@ -252,8 +252,14 @@ cvmfs_run_test() {
     peek_backend $CVMFS_TEST_REPO ${clg_hash}C || return 10
   done
 
-  echo "perform basic garbage collection"
-  cvmfs_server gc -f $CVMFS_TEST_REPO || return 11
+  local gc_log="${scratch_dir}/gc.log"
+  echo "perform basic garbage collection (logging deletions to $gc_log)"
+  cvmfs_server gc -fL "$gc_log" $CVMFS_TEST_REPO || return 11
+
+  echo "deletion log:"
+  echo "------------------------"
+  cat $gc_log
+  echo "------------------------"
 
   echo "check that the temporary scratch directory is empty"
   [ $(ls ${CVMFS_SPOOL_DIR}/tmp | wc -l) -eq 0 ] || return 50
@@ -264,11 +270,23 @@ cvmfs_run_test() {
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_2 && return 12
   peek_backend $CVMFS_TEST_REPO $chopped_shakespeare_3 && return 12
 
+  echo "check that deletion log contains shakespeare"
+  cat $gc_log | grep -q $shakespeare_object    || return 12
+  cat $gc_log | grep -q $chopped_shakespeare_1 || return 12
+  cat $gc_log | grep -q $chopped_shakespeare_2 || return 12
+  cat $gc_log | grep -q $chopped_shakespeare_3 || return 12
+
   echo "check if kafka is still there"
   peek_backend $CVMFS_TEST_REPO $kafka_object    || return 13
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_1 || return 13
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_2 || return 13
   peek_backend $CVMFS_TEST_REPO $chopped_kafka_3 || return 13
+
+  echo "check that deletion log doesn't contain kafka"
+  cat $gc_log | grep -q $kafka_object    && return 13
+  cat $gc_log | grep -q $chopped_kafka_1 && return 13
+  cat $gc_log | grep -q $chopped_kafka_2 && return 13
+  cat $gc_log | grep -q $chopped_kafka_3 && return 13
 
   echo "check if the catalog revisions 1-4 are gone"
   for clg_hash in $condemned_clgs; do
