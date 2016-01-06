@@ -320,14 +320,8 @@ std::string SignatureManager::GetActivePubkeys() {
        it++) {
     pubkeys += GenerateKeyText(*it);
   }
-  if (certificate_) {
-    // Increases the refcount of the rsa object.
-    RSA *rsa = EVP_PKEY_get1_RSA(X509_get_pubkey(certificate_));
-    if (rsa) {
-      pubkeys += GenerateKeyText(rsa);
-      RSA_free(rsa);
-    }
-  }
+  // NOTE: we do not add the pubkey of the certificate here, as it is
+  // not used for the whitelist verification.
   return pubkeys;
 }
 
