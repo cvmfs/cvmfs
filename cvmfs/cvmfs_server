@@ -5099,7 +5099,7 @@ __do_all_snapshots() {
   fi
   [ -w /var/log/cvmfs ] || die "cannot write to /var/log/cvmfs"
 
-  if [ $logrotate_nowarn == 0 ] && [ ! -f /etc/logrotate.d/cvmfs ]; then
+  if [ $logrotate_nowarn -eq 0 ] && [ ! -f /etc/logrotate.d/cvmfs ]; then
     cat << EOF
 /etc/logrotate.d/cvmfs does not exist!
 To prevent this error message, create the file or use -n option.
@@ -5113,7 +5113,7 @@ EOF
     exit 1
   fi
 
-  if [ $separate_logs == 0 ]; then
+  if [ $separate_logs -eq 0 ]; then
     # write into a temporary file in case more than one is active at the
     #  same time
     fulllog=/var/log/cvmfs/snapshots.log
@@ -5144,10 +5144,10 @@ EOF
       local snapshot_file=$storage_dir/.cvmfs_last_snapshot
       if [ -f $snapshot_file ]; then
         snapshot_time="$(stat --format='%Y' $snapshot_file)"
-      elif [ $skip_noninitial == 1 ]; then
+      elif [ $skip_noninitial -eq 1 ]; then
         continue
       fi
-    elif [ $skip_noninitial == 1 ]; then
+    elif [ $skip_noninitial -eq 1 ]; then
       if $user_shell "$(__swissknife_cmd) peek -d .cvmfs_last_snapshot -r ${upstream}" | grep -v -q "available"; then
         continue
       fi
@@ -5158,7 +5158,7 @@ EOF
   done|sort -n|cut -d: -f2)"
 
   for repo in $repos; do 
-    if [ $separate_logs == 1 ]; then
+    if [ $separate_logs -eq 1 ]; then
       log=/var/log/cvmfs/$repo.log
     fi
 
@@ -5171,7 +5171,7 @@ EOF
     echo "Finished $repo at `date`"
     ) >> $log 2>&1
 
-    if [ $separate_logs == 0 ]; then
+    if [ $separate_logs -eq 0 ]; then
       cat $log >>$fulllog
       > $log
     fi
@@ -5206,8 +5206,8 @@ snapshot() {
   done
   shift $(($OPTIND-1))
 
-  if [ $do_all == 1 ]; then
-    [ $# == 0 ] || die "no non-option parameters expected with -a"
+  if [ $do_all -eq 1 ]; then
+    [ $# -eq 0 ] || die "no non-option parameters expected with -a"
 
     # ignore if there's a -t option, it's always implied with -a
 
